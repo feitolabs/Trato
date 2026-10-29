@@ -192,3 +192,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Não integradas por orientação: `banco-de-dados-seguro` (refazendo F3.5/F3.6/F3.8) e `auth-login` (ainda trabalhando).
 - Pendências: busca de textos proibidos no `verificar` (V2.1); custos reais de provedor para fechar V2.3 (P7/P16); ajustar a tela Carteira ao extrato (F6.6).
 
+## 29/10/2026 — Banco refeito para o caminho A integrado e aplicado
+
+- Em develop (sem push): `claude/fase-3-banco-completo-23eeae` (commit 34e6219: F3.5 refeita para o caminho A/D15, sem saque, chave Pix nem saldo; F3.6, F3.8b, rollbacks, testes e docs ajustados). Verificação: 442 testes no backend, 406 no app, TUDO OK.
+- Informado pelo João/sessão principal: aplicadas no Supabase em 29/10/2026 F3.3, F3.4, F3.5 (caminho A), F3.6, F3.7, F3.8a, F3.8b e F3.8c. Advisor de segurança sem alertas; 46 tabelas com RLS, 92 policies, 0 privilégios do anon, 4 buckets privados. Não apliquei nada: só os arquivos entraram em develop.
+- Faltam só os seeds (cidade, categorias, taxa, contas do ledger), que dependem de P2, P6, P7 e do OK do João.
+- Não integradas por orientação (sessões em andamento): ligar-backend-banco, ligar-app-api, telas-profissional, telas-comuns, pagamento-e2e e auth-login.
+

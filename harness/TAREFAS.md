@@ -37,11 +37,11 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração. Aplicada no Supabase Trato em 29/10/2026 (versão 20261029025430) com o OK do João. 15 tabelas, RLS em todas, 0 linhas de dados.
 - [x] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite).  *(APLICADA no Supabase em 29/10/2026, versão 20261029170308.)*
 - [x] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out.  *(APLICADA no Supabase em 29/10/2026, versão 20261029170728.)*
-- [~] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*  *(D15, caminho A: a versão atual NÃO será aplicada; está sendo refeita para o ledger espelho, sem saldo próprio nem saque.)*
-- [~] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)* *(espera a F3.5 refeita; não aplicada.)*
+- [x] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(APLICADA em 29/10/2026 com OK do João, refeita para o caminho A/D15: ledger espelho, sem saldo próprio, saque nem chave Pix. Seeds das contas do ledger dependem de P7 e do OK do João.)*
+- [x] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações. *(APLICADA no Supabase em 29/10/2026 com OK do João.)*
 - [x] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável.  *(APLICADA no Supabase em 29/10/2026, versão 20261029170820.)*
-- [~] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)* *(pendente: refazer as policies conforme a F3.5 refeita; não aplicada.)*
-- [~] **F3.9** Rodar advisors do Supabase e corrigir. *Pronto quando:* sem alerta de segurança. *(rodado após a F3.2: só restam os 15 avisos "RLS sem policy", esperados até a F3.8)*
+- [x] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro. *(APLICADA em 29/10/2026 com OK do João: F3.8a, F3.8b e F3.8c. 46 tabelas com RLS, 92 policies, 0 privilégios do anon, 4 buckets privados.)*
+- [x] **F3.9** Rodar advisors do Supabase e corrigir. *Pronto quando:* sem alerta de segurança. *(advisor de segurança sem alertas após a F3.8, 29/10/2026.)*
 
 ## Fase 4 — Backend Python
 
