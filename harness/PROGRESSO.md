@@ -136,3 +136,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `app/lib/telas/auth/`: login, criar conta (passo 1), confirmar celular (passo 2) e recuperar senha, com validação no app e goldens em 3 tamanhos. Onboarding e escolha de perfil agora levam a elas.
 - Develop: 305 testes no backend, 108 no app, verificação OK. Sem push.
 - Provisório (abre EmBreveTela): Google, Apple, biometria, envio de SMS e de código. Falta ligar ao Supabase Auth e escolher o provedor de SMS (P11).
+
+## 29/10/2026 — F3.2 aplicada no Supabase
+
+- Com o OK do João, `apply_migration` no projeto "Trato" (`ornaoshsvuszquntkqsk`): versão `20261029025430`, 15 tabelas, RLS ligado em todas, 10 gatilhos, extensão `btree_gist` e o EXCLUDE de faixas criados. 0 linhas em qualquer tabela (sem taxa, cidade nem definições).
+- Arquivo local renomeado para a versão do Supabase. Rollback em `supabase/rollback/F3.2_rollback.sql` (não executado).
+- Advisors de segurança: 15 INFO "RLS ligado sem policy" (esperado até a F3.8) e 2 WARN da função `public.rls_auto_enable()` (SECURITY DEFINER executável por anon/authenticated), que **já existia no projeto** (usada pelo gatilho de evento `ensure_rls` da plataforma). Não mexi: revogar o EXECUTE é mudança de permissão e precisa de OK do João.
+- Não testado no banco real: o comportamento do EXCLUDE (precisaria inserir linhas de teste). A existência da constraint foi confirmada.
+- Em paralelo, telas (só app/): F5.4 (início/buscar/perfil), F5.8-F5.9 (pedidos/chat), F5.10-F5.11 (conclusão/avaliação/disputa/garantia) e F6.3-F6.4 (calculadora/check-in).
