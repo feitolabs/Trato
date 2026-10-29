@@ -101,6 +101,8 @@ Derivada de `docs/v2-impacto.md`. Não depende de aplicar migrations.
 
 ## Fase 7 — Painel administrativo (web) — depende de P9
 
+*Backend da API administrativa (verificação, disputas, pagamentos em leitura, usuários, configuração, auditoria) integrado em `develop`: ver `docs/api-admin.md`. O painel web (telas) ainda está em andamento na sessão `painel-admin`; as tarefas abaixo ficam abertas até o painel entrar.*
+
 - [ ] **F7.1** Fila de verificação. - [ ] **F7.2** Fila de disputas e decisão.
 - [ ] **F7.3** Pagamentos, conciliação, repasses e saques. - [ ] **F7.4** Usuários, pedidos, suporte, categorias.
 - [ ] **F7.5** Configurações com validação, aprovação dupla, histórico e reversão.

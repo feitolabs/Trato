@@ -264,3 +264,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Android/iOS: `INTERNET` no release, permissões de câmera e localização (ainda sem plugin), assinatura de release via `key.properties` (ignorado), textos de uso no Info.plist. `app/lib/` intocado.
 - Docs: `docs/BUILD.md` e `docs/ENTREGA.md` novos; `COMO-RODAR.md` atualizado. F9.5 `[x]`.
 - Verificação: etapas segredos, backend (490 testes) e app (586 testes) TUDO OK. Falta, com OK do João: push, primeiro run do CI, keystore, contas Play/Apple, ícone final.
+
+## 29/10/2026 — Integração: docs jurídicos, câmera/GPS, API admin, seeds e entrega
+
+- Em develop (sem push), cada uma verificada: `docs-juridico-provedores` (provedores, pedido de proposta, rascunhos jurídicos, checklist), `app-camera-gps`, `api-admin` (backend administrativo, `docs/api-admin.md`), `seeds-banco` (**só arquivos** em `supabase/seeds/`, nada aplicado) e `entrega-ci-build` (CI em jobs, build, `BUILD.md`, `ENTREGA.md`).
+- Conflitos resolvidos mantendo os dois lados: `harness/PROGRESSO.md` (seeds e entrega) e `AndroidManifest.xml` (permissões e uses-feature de localização).
+- Testes em develop: 727 no backend (1 pulado), 629 no app, verificação OK.
+- Não integrada: `painel-admin` (sessão ainda rodando). Seeds dependem de valores "A DEFINIR PELO JOÃO" (cidade, garantias, taxa, mínimo, P1, P7, administrador) e do OK para aplicar.
+- Segue pendente: rota `POST /v1/arquivos/url-envio` (upload de foto), validar câmera e GPS em aparelho, keystore e contas das lojas, primeiro run do CI (depende de push).
+
