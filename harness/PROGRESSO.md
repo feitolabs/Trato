@@ -18,3 +18,15 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - 🔒 Conectar Supabase (leitura) e GitHub (push).
 
 **Próxima tarefa:** F1.5 (instalar Flutter e gerar plataformas) ou F2.1 (tokens de design).
+
+## 28/10/2026 — F1.5 plataformas Flutter
+
+**Feito**
+- João aprovou o `TAREFAS.md` e instalou o Flutter (3.47.8, `C:\flutter`).
+- `flutter create` gerou `android/` e `ios/` (org `br.com.feitolabs`). Nome no Android ajustado para "Trato".
+- `verificar.py` acha o Flutter fora do PATH. Verificação completa: TUDO OK (backend 3 testes, `flutter analyze` sem problemas, `flutter test` 1 teste).
+
+**Pendente**
+- Android SDK (emulador) e Mac para iOS — ver PENDENCIAS.
+
+**Próxima tarefa:** F2.1 (tokens de design do protótipo).

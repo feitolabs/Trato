@@ -30,7 +30,9 @@ Não inventar regra: enquanto estiver aqui, não implementar.
 
 ## Ambiente
 
-- **Flutter SDK não está instalado** nesta máquina. Sem ele não dá para gerar as pastas
-  `android/` e `ios/` nem rodar o app. Instalar: https://docs.flutter.dev/get-started/install/windows
+- Flutter 3.47.8 instalado em `C:\flutter`, mas **fora do PATH** (o `verificar` acha sozinho).
+  Para usar no terminal: adicionar `C:\flutter\bin` ao PATH do usuário.
+- **Android SDK não instalado:** sem ele não roda no emulador nem gera APK. Instalar o Android Studio.
+- **iOS:** build e simulador só em macOS com Xcode. Definir um Mac (ou CI na nuvem, ex.: Codemagic) antes da Fase 9.
 - Supabase CLI e GitHub CLI (`gh`) não estão instalados (opcionais).
 - Repositório GitHub "Trato" ainda não está ligado como `origin`.
