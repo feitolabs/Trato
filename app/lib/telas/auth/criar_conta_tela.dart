@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
@@ -12,9 +13,12 @@ import 'validacao.dart';
 /// Tela 5 do protótipo: "Criar conta", passo 1 de 2.
 /// Termos e política abrem [EmBreveTela] até os textos legais existirem.
 class CriarContaTela extends StatefulWidget {
-  const CriarContaTela({super.key, this.perfil = PerfilUso.cliente});
+  const CriarContaTela({super.key, this.perfil = PerfilUso.cliente, this.servico});
 
   final PerfilUso perfil;
+
+  /// Se nulo, usa [ServicoAuthPadrao.atual].
+  final ServicoAuth? servico;
 
   @override
   State<CriarContaTela> createState() => _CriarContaTelaState();
@@ -33,6 +37,10 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   var _aceitouTermos = false;
   var _avisosWhatsapp = false;
   var _tentou = false;
+  var _carregando = false;
+  String? _erroServico;
+
+  ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
 
   @override
   void dispose() {
@@ -59,12 +67,39 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       ValidacaoAuth.senhaNova(_senha.text) == null &&
       _aceitouTermos;
 
-  void _criar() {
+  Future<void> _criar() async {
+    if (_carregando) return;
     setState(() => _tentou = true);
     if (!_valido) return;
+    setState(() {
+      _carregando = true;
+      _erroServico = null;
+    });
+    String? erro;
+    try {
+      await _servico.criarConta(DadosCadastro(
+        nome: _nome.text.trim(),
+        email: _email.text.trim(),
+        senha: _senha.text,
+        celular: _celular.text,
+      ));
+    } on ErroAuth catch (e) {
+      erro = e.mensagem;
+    }
+    if (!mounted) return;
+    setState(() {
+      _carregando = false;
+      _erroServico = erro;
+    });
+    if (erro != null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-          builder: (_) => ConfirmarCelularTela(celular: _celular.text, perfil: widget.perfil)),
+        builder: (_) => ConfirmarCelularTela(
+          celular: _celular.text,
+          perfil: widget.perfil,
+          servico: widget.servico,
+        ),
+      ),
     );
   }
 
@@ -78,7 +113,14 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     );
     return EstruturaAuth(
       tituloBarra: 'Passo 1 de 2',
-      rodape: BotaoPrimario(texto: 'Criar conta', aoTocar: _criar),
+      rodape: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MensagemErroAuth(_erroServico),
+          BotaoPrimario(texto: 'Criar conta', aoTocar: _criar, carregando: _carregando),
+        ],
+      ),
       children: [
         const SizedBox(height: EspacosTrato.x2),
         Text('Criar conta', style: TipografiaTrato.tituloGrande),

@@ -48,3 +48,22 @@ class EstruturaAuth extends StatelessWidget {
     );
   }
 }
+
+/// Erro vindo do serviço de login (senha errada, sem internet...). Some quando [mensagem] é nula.
+class MensagemErroAuth extends StatelessWidget {
+  const MensagemErroAuth(this.mensagem, {super.key});
+
+  final String? mensagem;
+
+  @override
+  Widget build(BuildContext context) {
+    if (mensagem == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
+      child: Text(
+        mensagem!,
+        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.vermelhoTexto),
+      ),
+    );
+  }
+}

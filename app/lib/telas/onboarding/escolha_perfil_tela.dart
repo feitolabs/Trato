@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../auth/criar_conta_tela.dart';
@@ -34,7 +35,10 @@ enum PerfilUso {
 
 /// Tela 3 do protótipo: "Como você quer usar o Trato?".
 class EscolhaPerfilTela extends StatefulWidget {
-  const EscolhaPerfilTela({super.key});
+  const EscolhaPerfilTela({super.key, this.servico});
+
+  /// Repassado ao cadastro. Se nulo, usa o serviço padrão.
+  final ServicoAuth? servico;
 
   @override
   State<EscolhaPerfilTela> createState() => _EscolhaPerfilTelaState();
@@ -80,7 +84,7 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
                 texto: _escolhido.botao,
                 aoTocar: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => CriarContaTela(perfil: _escolhido),
+                    builder: (_) => CriarContaTela(perfil: _escolhido, servico: widget.servico),
                   ),
                 ),
               ),
