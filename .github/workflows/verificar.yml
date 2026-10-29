@@ -1,0 +1,36 @@
+name: Verificar
+
+# Roda a mesma verificação local (python harness/verificar.py) em todo push e pull request.
+# Sem segredos: os testes de hoje não precisam de .env, Supabase nem Stripe.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4.2.2
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: "3.11"
+
+      - name: Instalar o backend (com ferramentas de desenvolvimento)
+        run: python -m pip install -e "backend[dev]"
+
+      - name: Flutter estável
+        uses: subosito/flutter-action@v2.18.0
+        with:
+          channel: stable
+          flutter-version: "3.47.8"
+
+      - name: Verificar (segredos, lint, testes do backend e do app)
+        run: python harness/verificar.py
