@@ -1,4 +1,5 @@
 import '../componentes/componentes.dart';
+import '../dispositivo/servico_camera.dart';
 import '../telas/carteira/modelos.dart';
 import '../telas/conclusao/dados_exemplo.dart';
 import '../telas/pagamento/modelos.dart';
@@ -6,12 +7,15 @@ import '../telas/pedido_novo/modelos.dart';
 import '../telas/pedidos/modelos.dart';
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/servico_check_in.dart';
+import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
+import 'fila_offline.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
+import 'servico_upload.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`). Só pedem e mostram; o backend decide.
 // Onde a rota ainda não existe no backend, a classe lança [ErroTrato.indisponivel] e o
@@ -315,10 +319,17 @@ class RepositorioPerfilApi implements RepositorioPerfil {
 }
 
 class RepositorioProfissionalApi implements RepositorioProfissional {
-  RepositorioProfissionalApi(this._api, {this.captura = const CapturaIndisponivel()});
+  RepositorioProfissionalApi(
+    this._api, {
+    this.captura = const CapturaIndisponivel(),
+    this.upload,
+    this.fila,
+  });
 
   final ClienteApi _api;
   final CapturaCheckIn captura;
+  final ServicoUpload? upload;
+  final FilaOffline? fila;
 
   // Sem rota no backend: GET /v1/profissionais/me/inicio (pedidos abertos, próximo atendimento).
   @override
@@ -356,7 +367,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId) =>
-      ServicoCheckInApi(_api, pedidoId: pedidoId, captura: captura);
+      ServicoCheckInApi(_api, pedidoId: pedidoId, captura: captura, upload: upload, fila: fila);
 }
 
 // Sem rota no backend: POST /v1/orcamentos/resumo {total_centavos} → taxa e líquido.
@@ -367,19 +378,28 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
   Future<ResumoOrcamento> resumir(int totalCentavos) async => throw ErroTrato.indisponivel;
 }
 
-/// Foto do check-in já enviada ao armazenamento.
+/// Foto do check-in. Com [arquivoId] ela já está no armazenamento; sem ele (sem internet na
+/// hora) o arquivo fica em [local] e é enviado depois.
 class FotoCapturada {
-  const FotoCapturada({required this.arquivoId, required this.tiradaEm});
+  const FotoCapturada({this.arquivoId, required this.tiradaEm, this.local});
 
-  final String arquivoId;
+  final String? arquivoId;
+
+  /// Relógio do aparelho; a hora válida é a do servidor.
   final DateTime tiradaEm;
+  final ArquivoCapturado? local;
+
+  bool get pendente => arquivoId == null;
 }
 
 class PosicaoCapturada {
-  const PosicaoCapturada(this.latitude, this.longitude);
+  const PosicaoCapturada(this.latitude, this.longitude, {this.distanciaMetros});
 
   final double latitude;
   final double longitude;
+
+  /// Distância até o endereço, só para mostrar. Quem confere é o backend.
+  final int? distanciaMetros;
 }
 
 /// Câmera e GPS do aparelho. O app captura e envia; o backend valida a prova.
@@ -388,7 +408,7 @@ abstract interface class CapturaCheckIn {
   Future<PosicaoCapturada?> posicao();
 }
 
-/// Câmera, GPS e envio de arquivo ainda não estão ligados no app.
+/// Sem câmera e GPS (demonstração): nada é capturado.
 class CapturaIndisponivel implements CapturaCheckIn {
   const CapturaIndisponivel();
 
@@ -400,11 +420,23 @@ class CapturaIndisponivel implements CapturaCheckIn {
 }
 
 class ServicoCheckInApi implements ServicoCheckIn {
-  ServicoCheckInApi(this._api, {required this.pedidoId, required this.captura});
+  ServicoCheckInApi(
+    this._api, {
+    required this.pedidoId,
+    required this.captura,
+    this.upload,
+    this.fila,
+  });
 
   final ClienteApi _api;
   final String pedidoId;
   final CapturaCheckIn captura;
+
+  /// Necessário para enviar foto capturada sem internet.
+  final ServicoUpload? upload;
+
+  /// Se houver, check-in e check-out feitos sem internet ficam guardados e saem depois.
+  final FilaOffline? fila;
   FotoCapturada? _foto;
   PosicaoCapturada? _posicao;
 
@@ -414,11 +446,11 @@ class ServicoCheckInApi implements ServicoCheckIn {
     return foto == null ? null : FotoChegada(hora: _hora(foto.tiradaEm.toLocal()));
   }
 
-  /// A distância até o endereço é calculada pelo backend; aqui só se guarda a posição.
+  /// A conferência é do backend; a distância aqui, quando existe, é só informativa.
   @override
   Future<int?> localizar() async {
-    _posicao = await captura.posicao();
-    return null;
+    final posicao = _posicao = await captura.posicao();
+    return posicao?.distanciaMetros;
   }
 
   // Sem rota no backend: mensagens rápidas e aviso de cliente ausente.
@@ -431,6 +463,44 @@ class ServicoCheckInApi implements ServicoCheckIn {
   Map<String, Object?> _fotoJson(FotoCapturada f) =>
       {'arquivo_id': f.arquivoId, 'tirada_em': f.tiradaEm.toUtc().toIso8601String()};
 
+  Future<FotoCapturada> _enviada(FotoCapturada f, FinalidadeArquivo finalidade) async {
+    if (!f.pendente) return f;
+    final envio = upload;
+    final arquivo = f.local;
+    if (envio == null || arquivo == null) throw ErroTrato.semInternet;
+    final r = await envio.enviar(arquivo, finalidade, pedidoId: pedidoId);
+    return FotoCapturada(arquivoId: r.arquivoId, tiradaEm: f.tiradaEm);
+  }
+
+  Future<void> _postar(AcaoOffline a, {required bool tardio}) async {
+    final fin =
+        a.tipo == TipoAcaoOffline.checkIn ? FinalidadeArquivo.checkIn : FinalidadeArquivo.checkOut;
+    final foto = await _enviada(a.foto, fin);
+    final posicao = a.posicao;
+    final Map<String, Object?> prova = a.tipo == TipoAcaoOffline.checkIn
+        ? {
+            'foto': _fotoJson(foto),
+            'localizacao': {'latitude': posicao!.latitude, 'longitude': posicao.longitude},
+            'codigo_inicio': a.codigo,
+          }
+        : {'foto_final': _fotoJson(foto), 'codigo_conclusao': a.codigo};
+    // Quando a prova foi feita sem internet, o servidor recebe a hora do aparelho como dica
+    // (`offline_capturada_em`). A hora que vale é sempre a do servidor.
+    if (tardio || a.foto.pendente) {
+      prova['offline_capturada_em'] = a.foto.tiradaEm.toUtc().toIso8601String();
+    }
+    final acao = a.tipo == TipoAcaoOffline.checkIn ? 'fazer_check_in' : 'fazer_check_out';
+    await _api.post('/v1/pedidos/$pedidoId/acoes/$acao', corpo: {'prova': prova});
+  }
+
+  /// Guarda para enviar depois, se houver fila. Devolve se guardou.
+  bool _guardar(AcaoOffline a) {
+    final f = fila;
+    if (f == null) return false;
+    f.guardar(a);
+    return true;
+  }
+
   @override
   Future<ResultadoInicio> iniciarServico(String codigo) async {
     final foto = _foto;
@@ -441,19 +511,20 @@ class ServicoCheckInApi implements ServicoCheckIn {
         'Tire a foto de chegada e permita a localização antes de iniciar.',
       );
     }
+    final acao = AcaoOffline(
+      pedidoId: pedidoId,
+      tipo: TipoAcaoOffline.checkIn,
+      codigo: codigo,
+      foto: foto,
+      posicao: posicao,
+    );
     try {
-      await _api.post(
-        '/v1/pedidos/$pedidoId/acoes/fazer_check_in',
-        corpo: {
-          'prova': {
-            'foto': _fotoJson(foto),
-            'localizacao': {'latitude': posicao.latitude, 'longitude': posicao.longitude},
-            'codigo_inicio': codigo,
-          },
-        },
-      );
+      await _postar(acao, tardio: false);
       return ResultadoInicio.iniciado;
     } on ErroTrato catch (erro) {
+      if (erro.tipo == TipoErro.semInternet && _guardar(acao)) {
+        return ResultadoInicio.guardadoOffline;
+      }
       // O backend recusou a prova (código errado, longe do local...): o app não decide.
       if (erro.tipo == TipoErro.recusado) {
         return ResultadoInicio.codigoIncorreto;
@@ -462,13 +533,71 @@ class ServicoCheckInApi implements ServicoCheckIn {
     }
   }
 
-  /// Check-out: foto final e código de conclusão que o cliente informa.
-  Future<void> fazerCheckOut({required FotoCapturada fotoFinal, required String codigo}) async {
-    await _api.post(
-      '/v1/pedidos/$pedidoId/acoes/fazer_check_out',
-      corpo: {
-        'prova': {'foto_final': _fotoJson(fotoFinal), 'codigo_conclusao': codigo},
-      },
+  /// Check-out: foto final e código de conclusão que o cliente informa. Devolve `false` se
+  /// ficou guardado para enviar quando a internet voltar.
+  Future<bool> fazerCheckOut({required FotoCapturada fotoFinal, required String codigo}) async {
+    final acao = AcaoOffline(
+      pedidoId: pedidoId,
+      tipo: TipoAcaoOffline.checkOut,
+      codigo: codigo,
+      foto: fotoFinal,
     );
+    try {
+      await _postar(acao, tardio: false);
+      return true;
+    } on ErroTrato catch (erro) {
+      if (erro.tipo == TipoErro.semInternet && _guardar(acao)) return false;
+      rethrow;
+    }
+  }
+
+  /// Tenta enviar o que ficou guardado deste pedido. Devolve quantas ações saíram. Chamar ao
+  /// abrir a tela e quando a conexão voltar. Ação recusada pelo backend sai da fila.
+  Future<int> reenviarPendentes() async {
+    final f = fila;
+    if (f == null) return 0;
+    var enviadas = 0;
+    for (final a in f.pendentes.where((a) => a.pedidoId == pedidoId).toList()) {
+      try {
+        await _postar(a, tardio: true);
+        f.remover(a);
+        enviadas++;
+      } on ErroTrato catch (erro) {
+        if (erro.tipo == TipoErro.semInternet) break;
+        if (erro.tipo == TipoErro.recusado) f.remover(a);
+        if (erro.tipo != TipoErro.recusado) rethrow;
+      }
+    }
+    return enviadas;
+  }
+}
+
+/// Check-out: foto final + código de conclusão. O app envia; o backend confere.
+class ServicoCheckOutApi implements ServicoCheckOut {
+  ServicoCheckOutApi(this._checkIn, this._captura);
+
+  final ServicoCheckInApi _checkIn;
+  final CapturaCheckIn _captura;
+  FotoCapturada? _foto;
+
+  @override
+  Future<FotoChegada?> tirarFotoFinal() async {
+    final foto = _foto = await _captura.foto();
+    return foto == null ? null : FotoChegada(hora: _hora(foto.tiradaEm.toLocal()));
+  }
+
+  @override
+  Future<ResultadoFim> finalizar(String codigo) async {
+    final foto = _foto;
+    if (foto == null) {
+      throw const ErroTrato(TipoErro.recusado, 'Tire a foto final antes de concluir.');
+    }
+    try {
+      final enviado = await _checkIn.fazerCheckOut(fotoFinal: foto, codigo: codigo);
+      return enviado ? ResultadoFim.concluido : ResultadoFim.guardadoOffline;
+    } on ErroTrato catch (erro) {
+      if (erro.tipo == TipoErro.recusado) return ResultadoFim.codigoIncorreto;
+      rethrow;
+    }
   }
 }

@@ -59,6 +59,7 @@ class RascunhoPedido {
     required this.descricao,
     required this.prazo,
     required this.faixa,
+    this.fotos = const [],
   });
 
   final List<String> servicos;
@@ -67,4 +68,7 @@ class RascunhoPedido {
   final String descricao;
   final String prazo;
   final FaixaPreco faixa;
+
+  /// Referências (`arquivoId`) das fotos já enviadas.
+  final List<String> fotos;
 }

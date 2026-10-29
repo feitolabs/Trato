@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
+import '../../dispositivo/explicacao_permissao.dart';
+import '../../dispositivo/permissao.dart';
 import '../../tema/tema.dart';
 import '../auth/estrutura_auth.dart';
+import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'servico_check_in.dart';
 
 /// Tela 26: "Check-in". Três passos: foto de chegada, localização e código de início.
@@ -17,6 +21,8 @@ class CheckInTela extends StatefulWidget {
     this.distanciaInicialMetros,
     this.mensagensRapidas = const ['Cheguei', 'Estou na portaria', 'Preciso de 15 minutos'],
     this.aoIniciar,
+    this.permissao,
+    this.avisoDistanciaMetros = 300,
   });
 
   final ServicoCheckIn servico;
@@ -30,6 +36,14 @@ class CheckInTela extends StatefulWidget {
   /// Chamado quando o backend aceitou o código e o serviço começou.
   final VoidCallback? aoIniciar;
 
+  /// Se vier, a tela explica e pede câmera e localização só na hora de usar. Sem ele (testes
+  /// antigos e demonstração), assume que o serviço cuida disso.
+  final ServicoPermissao? permissao;
+
+  /// Acima disso a tela só mostra um aviso de "você parece longe". Não bloqueia: quem confere
+  /// a presença no local é o backend.
+  final int avisoDistanciaMetros;
+
   @override
   State<CheckInTela> createState() => _CheckInTelaState();
 }
@@ -41,6 +55,7 @@ class _CheckInTelaState extends State<CheckInTela> {
   bool _iniciando = false;
   String? _erroCodigo;
   String? _aviso;
+  String? _erroPasso;
 
   @override
   void dispose() {
@@ -50,14 +65,31 @@ class _CheckInTelaState extends State<CheckInTela> {
 
   bool get _podeIniciar => _foto != null && _distancia != null && _codigo.text.length == 4;
 
+  Future<bool> _permitido(TipoPermissao tipo, TextoPermissao texto) async {
+    final p = widget.permissao;
+    return p == null || await garantirPermissao(context, p, tipo, texto);
+  }
+
   Future<void> _tirarFoto() async {
-    final foto = await widget.servico.tirarFoto();
-    if (mounted && foto != null) setState(() => _foto = foto);
+    setState(() => _erroPasso = null);
+    if (!await _permitido(TipoPermissao.camera, TextoPermissao.cameraCheckIn)) return;
+    try {
+      final foto = await widget.servico.tirarFoto();
+      if (mounted && foto != null) setState(() => _foto = foto);
+    } on ErroTrato catch (erro) {
+      if (mounted) setState(() => _erroPasso = erro.mensagem);
+    }
   }
 
   Future<void> _localizar() async {
-    final metros = await widget.servico.localizar();
-    if (mounted && metros != null) setState(() => _distancia = metros);
+    setState(() => _erroPasso = null);
+    if (!await _permitido(TipoPermissao.localizacao, TextoPermissao.localizacao)) return;
+    try {
+      final metros = await widget.servico.localizar();
+      if (mounted && metros != null) setState(() => _distancia = metros);
+    } on ErroTrato catch (erro) {
+      if (mounted) setState(() => _erroPasso = erro.mensagem);
+    }
   }
 
   Future<void> _enviarMensagem(String mensagem) async {
@@ -75,12 +107,27 @@ class _CheckInTelaState extends State<CheckInTela> {
       _iniciando = true;
       _erroCodigo = null;
     });
-    final resultado = await widget.servico.iniciarServico(_codigo.text);
+    final ResultadoInicio resultado;
+    try {
+      resultado = await widget.servico.iniciarServico(_codigo.text);
+    } on ErroTrato catch (erro) {
+      if (mounted) {
+        setState(() {
+          _iniciando = false;
+          _erroPasso = erro.mensagem;
+        });
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _iniciando = false;
       if (resultado == ResultadoInicio.codigoIncorreto) {
         _erroCodigo = 'Código incorreto. Peça de novo ao cliente.';
+      }
+      if (resultado == ResultadoInicio.guardadoOffline) {
+        _aviso = 'Sem internet. Guardamos sua chegada e enviamos assim que o sinal voltar. '
+            'O serviço só começa quando o Trato confirmar.';
       }
     });
     if (resultado == ResultadoInicio.iniciado) widget.aoIniciar?.call();
@@ -122,6 +169,19 @@ class _CheckInTelaState extends State<CheckInTela> {
           textoAcao: 'Localizar',
           aoTocarAcao: _localizar,
         ),
+        if (distancia != null && distancia > widget.avisoDistanciaMetros) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          const AvisoFaixa(
+            texto: 'Você parece estar longe do endereço. Confira se está no lugar certo; '
+                'o Trato confere de novo ao iniciar.',
+            tipo: TipoStatus.alerta,
+            icone: Icons.location_off_outlined,
+          ),
+        ],
+        if (_erroPasso != null) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          AvisoFaixa(texto: _erroPasso!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
+        ],
         const SizedBox(height: EspacosTrato.x3),
         _CartaoCodigo(
           controlador: _codigo,

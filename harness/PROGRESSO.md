@@ -236,3 +236,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `harness/verificar.py` ganhou "App — textos proibidos (D13)": falha se `app/lib/**/*.dart` tiver "escrow", "garantia total", "profissional seguro", "reembolso automático", "menor taxa do mercado" ou "24/7" fora de comentário. Linha com `verificar: ignorar` é liberada. V2.1 passa a `[x]`.
 - Em paralelo (sessões `app-pendencias` e `backend-pendencias`): token do login na API, pontos de entrada de telas, câmera/GPS, rotas de backend que faltam e testes com Postgres local.
 
+
+## 29/10/2026 — Câmera e GPS reais atrás de interfaces (app)
+
+- `app/lib/dispositivo/`: `ServicoCamera` (foto, galeria, compressão, sem EXIF, SHA-256), `ServicoLocalizacao`, `ServicoPermissao` e a explicação antes do pedido (finalidade e retenção; "negada para sempre" leva às configurações). Real (`image_picker`, `geolocator`, `permission_handler`, versões fixas) e fake para cada um. `Dispositivo.real/fake` monta tudo.
+- `ServicoUpload` (`dados/`): pede a URL assinada ao backend e faz o PUT. **Rota `POST /v1/arquivos/url-envio` não existe**; contrato proposto em `docs/app-camera-gps.md`.
+- Check-in com permissões, aviso de "longe do endereço" e modo offline (`FilaOffline`, `offline_capturada_em`); `CheckOutTela` nova; `NovoPedidoTela.aoCapturarFoto`. Verificação, nota de materiais e cadastro já recebiam `CapturarFoto`: falta só ligar em `rotas.dart` (fora desta tarefa).
+- Manifest do Android e Info.plist com câmera e localização "em uso"; `INTERNET` entrou no manifesto principal.
+- Testes: 35 novos (permissões, sem GPS, longe, offline, upload, EXIF, hash). `flutter analyze` limpo. No `verificar.py` as seções do app passam; as do backend só rodam com o `.venv` (que não está no worktree) e passaram com o `.venv` do projeto (497 testes).
