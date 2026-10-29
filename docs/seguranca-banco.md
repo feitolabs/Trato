@@ -15,7 +15,7 @@ Quem **escreve** é sempre o backend. O ledger (livro do dinheiro), as mensagens
 |---|---|---|---|
 | F3.3 | `20261029030000_f33_pedidos_orcamentos_contratos.sql` | `pedidos`, `pedidos_endereco`, `pedido_respostas`, `pedido_historico`, `midias`, `orcamentos`, `orcamento_itens`, `contratos` | `rollback/F3.3_rollback.sql` |
 | F3.4 | `20261029030100_f34_execucao.sql` | `etapas`, `aditivos`, `notas_material`, `nota_material_itens`, `agendamentos`, `presencas` | `rollback/F3.4_rollback.sql` |
-| F3.5 | `20261029030200_f35_dinheiro_ledger.sql` | `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas`, view `saldos_contas`, `repasses`, `chaves_pix`, `saques` | `rollback/F3.5_rollback.sql` |
+| F3.5 | `20261029030200_f35_dinheiro_ledger.sql` | `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas`, `repasses` (**refeita no caminho A, D15**: sem `chaves_pix`, `saques` nem view de saldo) | `rollback/F3.5_rollback.sql` |
 | F3.6 | `20261029030300_f36_disputas_garantias_avaliacoes.sql` | `disputas`, `disputa_evidencias`, `garantias`, `retrabalhos`, `avaliacoes`, `avaliacao_criterios` | `rollback/F3.6_rollback.sql` |
 | F3.7 | `20261029030400_f37_chat_notificacoes_auditoria.sql` | `conversas`, `mensagens`, `notificacoes`, `notificacao_preferencias`, `auditoria`, `registrar_auditoria()`, `verificar_cadeia_auditoria()` | `rollback/F3.7_rollback.sql` |
 | F3.8a | `20261029030500_f38a_funcoes_auxiliares.sql` | schema `privado` com as funções das policies; privilégios padrão fechados | `rollback/F3.8a_rollback.sql` |
@@ -35,7 +35,7 @@ Nenhuma migration insere dado de negócio (sem taxa, sem cidade, sem contas do l
 4. **Funções:** todas `SECURITY DEFINER` com `set search_path = ''`, nomes qualificados e `EXECUTE` revogado de `public` e `anon` (lição do `rls_auto_enable`). As funções das policies ficam no schema `privado`, que a API não expõe e ao qual `anon` nem tem `USAGE`. As funções de gatilho também têm o `EXECUTE` revogado. Só `registrar_auditoria` e `verificar_cadeia_auditoria` são executáveis (apenas pelo `service_role`).
 5. **Privilégios padrão fechados (F3.8a).** Observado no projeto (leitura): tabelas novas nascem com `TRUNCATE`, `REFERENCES`, `TRIGGER` (e `MAINTAIN`) para `anon`, `authenticated` e `service_role`. A RLS **não** protege contra `TRUNCATE`. A F3.8a fecha o padrão e a F3.8b fecha as 15 tabelas da F3.2. Cada migration também declara os privilégios do `service_role` de forma explícita (só o que a tabela precisa; nunca `TRUNCATE`), então funciona com qualquer padrão da plataforma.
 6. **Imutabilidade em duas camadas** (trigger que levanta exceção **e** `REVOKE`): `lancamentos`, `partidas`, `auditoria`, `mensagens` (só `lida_em` preenche uma vez), `pedido_historico`, `midias`, `presencas`, `nota_material_itens`, `disputa_evidencias`, `avaliacao_criterios`. Congelados por coluna: `contratos` (só o `status` muda), `config_*` aprovada, orçamento enviado, etapa ligada ao contrato, garantia, aditivo decidido, disputa decidida.
-7. **Ledger de partidas dobradas.** `constraint trigger` adiado: no `COMMIT`, débitos = créditos e pelo menos 2 partidas. Partida só entra na transação em que o lançamento nasceu. Só o estorno corrige, e precisa **inverter exatamente** as partidas do original (um lançamento só é estornado uma vez, mesmo contrato). Idempotência única em lançamento, repasse, saque e pagamento. Saldo nunca é coluna: view `saldos_contas` (`security_invoker`, então a RLS vale para quem consulta).
+7. **Ledger de partidas dobradas.** `constraint trigger` adiado: no `COMMIT`, débitos = créditos e pelo menos 2 partidas. Partida só entra na transação em que o lançamento nasceu. Só o estorno corrige, e precisa **inverter exatamente** as partidas do original (um lançamento só é estornado uma vez, mesmo contrato). Idempotência única em lançamento, repasse e pagamento. **Caminho A (D15):** o ledger só espelha o que o parceiro liquida (`lancamentos.evento_webhook_id` aponta o evento); não há saldo no banco (nem coluna, nem view) e não há saque: o app mostra extrato.
 8. **Auditoria com cadeia de hash (N16).** `registrar_auditoria()` serializa, numera e encadeia (`hash_anterior`, `hash`), com horário do servidor. `verificar_cadeia_auditoria()` acusa a primeira linha adulterada ou removida. Ação financeira, bloqueio e revelação de dado pessoal exigem motivo.
 9. **Alçada (escopo 18.5).** Só mediador ativo decide disputa. Reembolso acima da alçada dele exige uma segunda pessoa (líder de suporte ou administrador), diferente de quem decidiu. Alçada nula vale como zero.
 10. **Regras que o banco também checa (defesa em profundidade, além do backend):** cliente não orça o próprio pedido; só profissional aprovado e verificado envia orçamento; contrato só nasce de orçamento aceito, com o mesmo valor; só o cliente do contrato paga; chave Pix só com CPF/CNPJ do próprio dono; saque só para chave própria, ativa e verificada; check-out exige check-in; presença e mensagem usam a hora do servidor; só as partes escrevem no chat; webhook com assinatura inválida nunca é "processado".
@@ -77,10 +77,7 @@ Equipe: N1/N2 = atendente_n1/n2; Lid = lider_suporte; Med = mediador; Fin = fina
 | `eventos_webhook` | ninguém | Fin | insert/update (só retorno do processamento) |
 | `contas_ledger` | só as contas do próprio usuário | Fin | insert/update |
 | `lancamentos`, `partidas` | só os que tocam a conta do próprio usuário | Fin | **só insert**; nunca update/delete |
-| `saldos_contas` (view) | só as contas do próprio usuário | Fin | — |
-| `repasses` | profissional dono | Fin, Med | insert/update |
-| `chaves_pix` | **só o dono** (chave completa) | ninguém direto | insert/update |
-| `saques` | profissional dono | Fin | insert/update |
+| `repasses` (ordem de liberação ao parceiro) | profissional dono | Fin, Med | insert/update |
 | `disputas` | parte (sem avaliação interna) | N2, Lid, Med, Fin | insert/update |
 | `disputa_evidencias` | parte (só as visíveis) | N2, Lid, Med (todas, com nota interna); Fin (só visíveis) | só insert |
 | `garantias`, `retrabalhos` | parte | Med | insert/update |
@@ -90,7 +87,7 @@ Equipe: N1/N2 = atendente_n1/n2; Lid = lider_suporte; Med = mediador; Fin = fina
 | `notificacoes`, `notificacao_preferencias` | dono | ninguém | insert/update |
 | `auditoria` | ninguém | Adm, DPO, Seg, Jur | só por `registrar_auditoria()` |
 
-Quem **não** pode (conferido nos testes): N1 não vê documentos, ledger, saques, chat nem endereço; Med não vê ledger nem saques; Fin não vê chat nem endereço; Cad não vê pedidos, pagamentos nem contratos; Mod não vê nada financeiro.
+Quem **não** pode (conferido nos testes): N1 não vê documentos, ledger, webhooks, chat nem endereço; Med não vê ledger nem webhooks; Fin não vê chat nem endereço; Cad não vê pedidos, pagamentos nem contratos; Mod não vê nada financeiro.
 
 ---
 
@@ -114,10 +111,10 @@ Resultado (cada rodada aplica as 10 migrations em ordem, roda a suíte, desfaz t
 
 Resumo por assunto (saída curta):
 
-- **(a) A não lê o que é de B:** pedido, endereço, orçamento, chat, anexo, pagamento, contrato, saldo, extrato, CPF/telefone, notificação. OK.
+- **(a) A não lê o que é de B:** pedido, endereço, orçamento, chat, anexo, pagamento, contrato, extrato, CPF/telefone, notificação. OK.
 - **(b) Profissional e endereço:** vê o pedido aberto da categoria e cidade certas **sem** endereço; outra categoria, outra cidade e profissional em análise não veem nada; contratado mas com `liberado_em` nulo não vê; depois de liberado vê; quem orçou e perdeu nunca vê; contrato cancelado tira o acesso. OK.
 - **(c) Documentos:** `cadastro` lê (tabela e Storage); N1, N2, Med, Fin, Seg, Adm, DPO, o próprio profissional, cliente e `anon` não. OK.
-- **(d) Ledger:** `UPDATE`/`DELETE`/`TRUNCATE` falham para o dono e para o `service_role`; partida desequilibrada, lançamento com uma partida só ou sem partidas, partida zero, partida em lançamento fechado e chave de idempotência repetida são recusados; estorno correto passa e devolve o saldo; estorno que não inverte, em outro contrato ou repetido é recusado. OK.
+- **(d) Ledger:** `UPDATE`/`DELETE`/`TRUNCATE` falham para o dono e para o `service_role`; partida desequilibrada, lançamento com uma partida só ou sem partidas, partida zero, partida em lançamento fechado e chave de idempotência repetida são recusados; estorno correto passa e devolve o valor; estorno que não inverte, em outro contrato ou repetido é recusado. OK.
 - **(e) Mensagens e auditoria:** não editam nem apagam (dono e `service_role`); `lida_em` preenche uma vez; auditoria só entra por `registrar_auditoria`, a cadeia de hash fecha e **detecta** adulteração e remoção de linha. OK.
 - **(f) Configuração e contrato:** versão aprovada não muda nem se apaga; contrato só muda `status`. OK.
 - **(g) Superfície:** `anon` não lê nenhuma das 49 tabelas/views, não tem privilégio algum, não executa nenhuma função; nenhuma policy usa `using (true)`; nenhuma função `SECURITY DEFINER` sem `search_path` vazio nem executável pelo app; o app não tem `INSERT/UPDATE/DELETE/TRUNCATE` em tabela nenhuma; `service_role` lê tudo, grava onde deve e nunca faz `TRUNCATE`. OK.
@@ -178,7 +175,7 @@ Estado do Supabase conferido só por leitura (29/10/2026): 2 migrations aplicada
 | N12 | `pedidos_endereco.liberado_em` gravado pelo backend |
 | N16 | Cadeia de hash na auditoria (implementada) |
 | 18.5 | Alçada: mediador decide; reembolso acima do teto dele exige líder de suporte ou administrador; teto nulo = zero |
-| (novo) | Convenção do prefixo da ação da auditoria (`financeiro.`, `pagamento.`, `repasse.`, `saque.`, `estorno.`, `reembolso.`, `bloqueio.`, `dado_pessoal.`) para exigir motivo: **confirmar** |
+| (novo) | Convenção do prefixo da ação da auditoria (`financeiro.`, `pagamento.`, `repasse.`, `estorno.`, `reembolso.`, `bloqueio.`, `dado_pessoal.`) para exigir motivo: **confirmar** |
 | (novo) | Buckets: 10 MB (5 MB no avatar) e tipos de arquivo: **confirmar** |
 
 ---
@@ -212,8 +209,8 @@ PRECISO DO SEU OK
 ---
 
 PRECISO DO SEU OK
-**O que:** aplicar a **F3.5** (`20261029030200_f35_dinheiro_ledger.sql`): `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas` (ledger imutável com equilíbrio conferido no `COMMIT`), view `saldos_contas`, `repasses`, `chaves_pix`, `saques`. **Não cria contas do ledger** (depende de P7/P4/P8).
-**Por que:** guardar o dinheiro com partidas dobradas e só estorno como correção.
+**O que:** aplicar a **F3.5** (`20261029030200_f35_dinheiro_ledger.sql`), **versão do caminho A (D15)**: `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas` (ledger imutável, espelho do que o parceiro liquida, equilíbrio conferido no `COMMIT`) e `repasses` (só a ordem de liberação ao parceiro: taxa, gatilho, congelamento por disputa; não é saldo). **Não cria** `chaves_pix`, `saques` nem view de saldo. **Não cria contas do ledger** (depende de P7/P4/P8).
+**Por que:** registrar, com partidas dobradas, o que o parceiro de pagamento cobra e liquida (o Trato não guarda saldo nem faz saque), com estorno como única correção.
 **Risco:** **médio, pelo peso da tabela, não pela operação**: depois que houver lançamento real, a F3.5 não pode mais ser desfeita sem perder o livro. Convém revisar o desenho do ledger antes (seção 2, item 7).
 **Como desfazer:** `supabase/rollback/F3.5_rollback.sql` (só antes de haver dinheiro real; depois, nunca).
 **Posso continuar?**
@@ -274,3 +271,19 @@ PRECISO DO SEU OK
    *(A ordem de aplicação continua F3.3 → F3.4 → F3.5 → F3.6 → F3.7: a F3.6 depende da F3.5. Aprove na ordem que quiser, mas aplique nessa sequência.)*
 5. Aprovar **F3.8a, F3.8b e F3.8c** nessa ordem. Rodar `get_advisors` e o teste com dois usuários reais ao final.
 6. Só então os seeds (taxa, cidades, contas do ledger), que dependem de P2, P3, P4, P6, P7 e P8.
+
+## Mudança D15 (29/10/2026): custódia no caminho A
+
+O João decidiu (D15, `harness/DECISOES.md`) que o parceiro de pagamento custodia e liquida, e o ledger do Trato só **espelha**. Por isso a F3.5 foi refeita **antes** de ser aplicada. F3.3 e F3.4 já estão aplicadas e não mudaram; a F3.7 não depende da F3.5 e não foi alterada.
+
+**O que saiu:** tabelas `chaves_pix` e `saques`, a view `saldos_contas` e o lançamento do tipo `saque` (`lancamentos.saque_id` também). `lancamentos.contrato_id` voltou a ser obrigatório (como no modelo aprovado).
+**O que ficou:** `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas` (imutáveis, equilíbrio no `COMMIT`, só estorno corrige) e `repasses`, agora só como **ordem de liberação ao parceiro** (taxa, gatilho, prazo, congelamento por disputa, id da transferência no parceiro).
+**O que entrou:** `lancamentos.evento_webhook_id` (qual evento do parceiro originou o espelho) e `repasses.provedor_transferencia_id` (único).
+
+**Efeitos de segurança:**
+- Menos dado sensível: o banco não guarda chave Pix nem documento do titular. O recebimento (chave, KYC) fica no parceiro.
+- O app não tem saldo para ler: a Carteira é extrato (`lancamentos` e `partidas` da própria conta, via RLS). Quem precisar de total para conciliar com o parceiro soma as partidas no backend.
+- A F3.6 continua fechando as FKs `repasses.congelado_por_disputa_id` e `lancamentos.disputa_id`; a F3.8b só perdeu o que se referia a saques, chaves Pix e à view.
+
+**Riscos que continuam:** `repasses` ainda pode ser lida como "dinheiro do profissional" por quem monta a tela; o texto deve dizer "liberação agendada", não "saldo". Se o advogado/contador concluir que mesmo a ordem de liberação não deve existir no Trato, `repasses` pode virar só um campo do contrato. `eventos_webhook.provedor` ainda aceita só `'stripe'` (P7): trocar de parceiro pede uma migration pequena.
+**Testes:** 572 verificações OK no modo real e 278 no permissivo; rollbacks idênticos ao estado anterior.

@@ -2,6 +2,7 @@
 
 > **Status: modelo aprovado pelo João (28/10/2026).** A F3.2 está aplicada no Supabase. As migrations
 > F3.3 a F3.8c estão **preparadas e testadas em banco local, mas NÃO aplicadas** (cada uma pede o OK do João).
+> **Custódia no caminho A (D15):** a F3.5 foi refeita (sem `chaves_pix`, `saques` nem saldo); F3.3 e F3.4 já estão aplicadas.
 > As diferenças entre este desenho e o que foi escrito nas migrations estão na **seção 13**.
 > Plano de aplicação, testes e riscos: `docs/seguranca-banco.md`.
 > Prioridade das fontes: `regras.txt` > observações extras (D1–D12) > protótipo > escopo (PDF).
@@ -81,9 +82,6 @@ erDiagram
     lancamentos ||--o| lancamentos : "estorna"
     contratos ||--o{ repasses : "libera"
     repasses }o--o| lancamentos : "registra"
-    usuarios ||--o{ chaves_pix : "cadastra"
-    chaves_pix ||--o{ saques : "destino"
-    perfis_profissional ||--o{ saques : "solicita"
     eventos_webhook }o--o| pagamentos : "confirma"
 
     contratos ||--o{ disputas : "pode ter"
@@ -108,7 +106,7 @@ Grupos de tabelas e a migration que cria cada um (seção 9):
 | Configuração versionada | `config_definicoes`, `config_versoes`, `config_parametros`, `config_faixas_taxa` | F3.2 |
 | Pedido e contrato | `pedidos`, `pedidos_endereco`, `pedido_respostas`, `pedido_historico`, `midias`, `orcamentos`, `orcamento_itens`, `contratos` | F3.3 |
 | Execução | `etapas`, `aditivos`, `notas_material`, `nota_material_itens`, `agendamentos`, `presencas` | F3.4 |
-| Dinheiro | `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas`, `repasses`, `chaves_pix`, `saques` | F3.5 |
+| Dinheiro | `pagamentos`, `eventos_webhook`, `contas_ledger`, `lancamentos`, `partidas`, `repasses` | F3.5 (caminho A, D15: sem `chaves_pix` nem `saques`) |
 | Pós-serviço | `disputas`, `disputa_evidencias`, `garantias`, `retrabalhos`, `avaliacoes`, `avaliacao_criterios` | F3.6 |
 | Comunicação e trilha | `conversas`, `mensagens`, `notificacoes`, `notificacao_preferencias`, `auditoria` | F3.7 |
 
@@ -171,7 +169,7 @@ Um usuário da equipe pode ter mais de um papel? Ver N1. Se sim, a PK vira `(usu
 | `status` | text | `em_analise`, `aprovado`, `recusado`, `suspenso` |
 | `nivel_verificacao` | text | `basico`, `verificado`, `verificado_plus` (escopo 3.1). Só `verificado`+ envia orçamento |
 | `bio` | text | |
-| `cnpj` | text | Opcional (saque Pix aceita CPF ou CNPJ) |
+| `cnpj` | text | Opcional (o recebimento é cadastrado no parceiro de pagamento, D15) |
 | `servicos_concluidos` | integer | Cache atualizado por rotina |
 | `nota_publica` | numeric(3,2) | Cache. Cálculo em si **fora desta versão** (N15) |
 | `reverificar_em` | timestamptz | Selfie a cada 6 meses (escopo 3.1) |
@@ -532,7 +530,9 @@ Se a nota é pré-requisito para liberar o sinal de material: P4. Se o valor da 
 
 ---
 
-## 7. Dinheiro: pagamento, ledger, repasse e saque (F3.5)
+## 7. Dinheiro: pagamento, ledger espelho e ordem de liberação (F3.5, caminho A)
+
+> **D15 (29/10/2026):** o parceiro de pagamento custodia e liquida; o Trato não guarda saldo próprio nem faz saque. O ledger só espelha. A seção 7.5 (`chaves_pix`, `saques`) e a view de saldo do desenho original **foram retiradas**.
 
 > Nenhuma tabela desta seção é escrita pelo app. Só o backend, com chave de idempotência.
 
@@ -575,7 +575,7 @@ Sem número de cartão, sem CVV, sem token além do id do Stripe.
 
 ### 7.3 Ledger imutável de partidas dobradas
 
-Três tabelas. Saldo **nunca** é coluna editável: é calculado das partidas (view `saldos_contas`).
+Três tabelas. **Não há saldo no banco** (nem coluna, nem view): a Carteira do app é extrato; totais para conciliação saem das partidas, no backend.
 
 #### `contas_ledger`
 | Coluna | Tipo | Notas |
@@ -594,9 +594,9 @@ Contas de sistema propostas: `caixa_parceiro` (dinheiro no Stripe), `retido_serv
 | Coluna | Tipo | Notas |
 |---|---|---|
 | `id` | uuid PK | |
-| `contrato_id` | uuid FK | Partidas dobradas **por serviço** |
-| `pagamento_id`, `repasse_id`, `saque_id`, `disputa_id` | uuid null | Origem |
-| `tipo` | text | `cobranca`, `retencao`, `taxa`, `custo_stripe`, `repasse`, `saque`, `reembolso`, `estorno` |
+| `contrato_id` | uuid FK | Partidas dobradas **por serviço** (obrigatório) |
+| `pagamento_id`, `repasse_id`, `disputa_id`, `evento_webhook_id` | uuid null | Origem. `evento_webhook_id` = evento do parceiro que este lançamento espelha |
+| `tipo` | text | `cobranca`, `retencao`, `taxa`, `custo_stripe`, `repasse`, `reembolso`, `estorno` |
 | `estorna_id` | uuid FK `lancamentos` null | Só estorno corrige; aponta o lançamento original |
 | `chave_idempotencia` | text **unique** not null | |
 | `descricao` | text | |
@@ -626,13 +626,13 @@ Exemplo do desenho (valores ilustrativos; o cálculo real depende de P1–P4):
 | Custo Stripe (R$ 2) | `despesa_stripe` 2 | `caixa_parceiro` 2 |
 | Liberação: taxa | `retido_servico` T | `receita_trato` T |
 | Liberação: líquido | `retido_servico` L | `a_pagar_profissional` L |
-| Saque Pix | `a_pagar_profissional` S | `caixa_parceiro` S |
+| Repasse liquidado pelo parceiro ao profissional (espelho do evento; **o Trato não faz saque**, D15) | `a_pagar_profissional` L | `caixa_parceiro` L |
 | Estorno de qualquer um | partidas invertidas do original | |
 
 Carteira do profissional (retido / a liberar / liberado): derivada de `retido_servico` por contrato,
 `repasses` agendados e `a_pagar_profissional`. Nada guardado em coluna.
 
-### 7.4 `repasses`
+### 7.4 `repasses` — ordem de liberação ao parceiro (não é saldo nem saque)
 | Coluna | Tipo | Notas |
 |---|---|---|
 | `id` | uuid PK | |
@@ -643,18 +643,13 @@ Carteira do profissional (retido / a liberar / liberado): derivada de `retido_se
 | `gatilho` | text | `confirmacao_cliente`, `prazo`, `etapa_aprovada`, `decisao_disputa`, `sinal_material` |
 | `status` | text | `agendado`, `congelado`, `liberado`, `estornado` |
 | `liberar_em` | timestamptz | Prazo (7 dias, D6; **P1**) |
+| `provedor_transferencia_id` | text unique null | Id da transferência no parceiro (espelho) |
 | `congelado_por_disputa_id` | uuid null | D7: disputa congela o valor |
 | `lancamento_id` | uuid FK null | Lançamento que efetivou |
 | `chave_idempotencia` | text unique | |
 | `criado_em`, `liberado_em` | timestamptz | |
 
 Índice parcial: `(liberar_em) where status='agendado'` (rotina de liberação F4.9).
-
-### 7.5 `chaves_pix` e `saques`
-| Tabela | Colunas | Chave / índice |
-|---|---|---|
-| `chaves_pix` | `id`, `usuario_id`, `tipo` (`cpf`, `cnpj`, `email`, `telefone`, `aleatoria`), `chave`, `documento_titular`, `verificada_em`, `ativa`, `criada_em`. **`documento_titular` deve ser igual ao CPF/CNPJ do usuário** (checado no backend; escopo 8.1) | `unique(usuario_id, chave)`. Troca de chave dispara alerta antifraude e reverificação |
-| `saques` | `id`, `profissional_id`, `chave_pix_id`, `valor_centavos`, `taxa_saque_centavos` null, `status` (`solicitado`, `em_analise`, `enviado`, `pago`, `falhou`, `estornado`), `stripe_payout_id`, `chave_idempotencia` unique, `solicitado_em`, `pago_em`, `lancamento_id` | `(profissional_id, solicitado_em desc)` |
 
 ---
 
@@ -764,7 +759,7 @@ imutabilidade **e já liga `ENABLE ROW LEVEL SECURITY`** (sem policy = fechado).
 | **F3.2** | Função/trigger `atualizado_em`; `usuarios`, `usuarios_privados`, `equipe`, `cidades`, `categorias`, `categoria_perguntas`, `perfis_profissional`, `profissional_categorias`, `profissional_regioes`, `verificacoes`, `verificacao_documentos`; `config_definicoes`, `config_versoes`, `config_parametros`, `config_faixas_taxa` + seed das definições (sem valores de taxa até **P2**) | — |
 | **F3.3** | `pedidos`, `pedidos_endereco`, `pedido_respostas`, `pedido_historico`, `midias`, `orcamentos`, `orcamento_itens`, `contratos` (com `config_versao_id`) | F3.2 |
 | **F3.4** | `etapas`, `aditivos`, `notas_material`, `nota_material_itens`, `agendamentos`, `presencas` | F3.3 |
-| **F3.5** | `pagamentos`, `eventos_webhook`, `contas_ledger` (+ contas de sistema), `lancamentos`, `partidas` (constraint trigger de equilíbrio + imutabilidade), view `saldos_contas`, `repasses`, `chaves_pix`, `saques` | F3.3, F3.4 |
+| **F3.5** | `pagamentos`, `eventos_webhook`, `contas_ledger` (+ contas de sistema), `lancamentos`, `partidas` (constraint trigger de equilíbrio + imutabilidade), `repasses` (caminho A, D15) | F3.3, F3.4 |
 | **F3.6** | `disputas`, `disputa_evidencias`, `garantias`, `retrabalhos`, `avaliacoes`, `avaliacao_criterios`; FK `repasses.congelado_por_disputa_id` | F3.5 |
 | **F3.7** | `conversas`, `mensagens`, `notificacoes`, `notificacao_preferencias`, `auditoria` + `registrar_auditoria()` | F3.3 |
 | **F3.8** | Funções auxiliares (`eh_equipe`, `pode_ver_pedido`, `eh_parte_do_contrato`) e **todas as policies** da seção 10; testes de acesso com dois usuários | F3.2–F3.7 |
@@ -811,7 +806,7 @@ Princípios: negar por padrão; `auth.uid()` identifica o usuário; funções au
 | `aditivos`, `notas_material`, `nota_material_itens` | Parte | Parte (rascunho só do autor) | Mediador, financeiro | |
 | `pagamentos` | Os próprios (como pagador) | Os do contrato, **sem** dados do meio de pagamento do cliente | Financeiro, mediador | |
 | `eventos_webhook`, `partidas`, `lancamentos`, `contas_ledger` | — | Só via backend (extrato calculado) | Financeiro (leitura); nunca escrita direta | Extrato do profissional é uma view `meu_extrato` filtrada pela conta dele |
-| `repasses`, `saques`, `chaves_pix` | — | Próprios (chave Pix: só os últimos dígitos) | Financeiro | `chaves_pix.chave` completa só dono |
+| `repasses` | — | Próprios | Financeiro | — |
 | `disputas`, `disputa_evidencias` | Parte; não vê `nota_interna` | Parte; não vê `nota_interna` | Mediador (decide), financeiro (valores), N2 | Financeiro **não** decide mérito; mediador **não** altera valores |
 | `garantias`, `retrabalhos` | Parte | Parte | Mediador | |
 | `avaliacoes`, `avaliacao_criterios` | Públicas as do profissional (publicadas); as próprias; a nota do cliente: só ele e o profissional que vai atendê-lo | Idem | Moderador | Nota do cliente não é pública (25.3) |
@@ -843,7 +838,7 @@ URLs assinadas e curtas, geradas pelo backend.
 | **P3** | Quem paga taxa e custo Stripe | `contratos.liquido_profissional_centavos`, `pagamentos.acrescimo_cliente_centavos` |
 | **P4** | Os 30% vão direto ao profissional ou ficam retidos? | Lançamentos do adiantamento, gatilho `sinal_material`, `orcamentos.sinal_material_centavos` |
 | **P6** | Cidade do piloto | Seed de `cidades` |
-| **P7** | Stripe Connect com Pix e retenção no Brasil | `stripe_account_id`, `saques.stripe_payout_id`, modelo de contas do ledger |
+| **P7** | Stripe Connect com Pix e retenção no Brasil | `stripe_account_id`, `repasses.provedor_transferencia_id`, modelo de contas do ledger |
 | **P8** | Origem do fundo de garantia | Sem conta de fundo, sem tabela de cobertura de danos |
 | **P10** | Fornecedor de verificação | `verificacoes.fornecedor_ref`, campos de retorno |
 | **P11** | Provedor de SMS/WhatsApp | `notificacoes.canal`, `telefone_confirmado_em` |
@@ -896,7 +891,7 @@ Nada foi mudado em silêncio. Cada linha diz o que mudou e por quê. **O João c
 | D-2 | `perfis_publicos` (10.2, 11) | View que esconde dados internos | **Sem view.** Policy (perfil aprovado) + `SELECT` por coluna (sem CNPJ e sem reverificação) | View `SECURITY DEFINER` é erro de advisor; coluna resolve igual |
 | D-3 | `contas_ledger.codigo` (7.3) | `unique` | `unique (codigo, usuario)` | `a_pagar_profissional` existe uma vez por profissional |
 | D-4 | Contas de sistema (9, F3.5) | "+ contas de sistema" | **Sem seed.** Nenhuma conta é criada | O desenho das contas depende de P4, P7 e P8; seed é `INSERT` e pede OK |
-| D-5 | `lancamentos.contrato_id` (7.3) | FK sem `null` | `null` só quando `tipo = 'saque'` | Saque não pertence a um contrato |
+| D-5 | `lancamentos.contrato_id` (7.3) | FK sem `null` | **Igual ao modelo** (obrigatório). A versão antiga da F3.5 permitia `null` para saque; saiu com o caminho A | D15: não há saque |
 | D-6 | `midias` (5.5) | sem coluna de bucket | `bucket` (`pedido-midias` ou `chat-anexos`), `unique (bucket, storage_path)`, `finalidade='chat'` ⇔ `chat-anexos` | A policy do Storage precisa saber o bucket |
 | D-7 | Buckets (10.2) | `pedido-midias`, `verificacao`, `avatar` | + **`chat-anexos`** | Pedido do escopo desta etapa (anexos de chat) |
 | D-8 | `notificacao_preferencias` (8.6) | `atualizada_em` | `atualizado_em` | Mesmo nome do resto do banco |
@@ -912,8 +907,7 @@ Nada foi mudado em silêncio. Cada linha diz o que mudou e por quê. **O João c
 ### 13.2 Regras que o banco passou a conferir (não estavam descritas como constraint)
 Total do orçamento = soma dos itens; orçamento enviado congelado e itens só em rascunho; só um orçamento aceito por pedido; contrato só nasce de orçamento aceito com o mesmo valor e cliente; contrato sem `DELETE`; um contrato por pedido (como 5.8);
 etapa congelada ao entrar no contrato; aditivo só aprovado pelo cliente do contrato e imutável depois; pagamento só pelo cliente do contrato, parcelas só no cartão de crédito, aditivo só pago se aprovado;
-repasse: `bruto = taxa + líquido`, só para o profissional do contrato; chave Pix só com o CPF/CNPJ do dono; saque só com chave própria, ativa e verificada;
-check-out exige check-in; hora do servidor em presença, nota de material e mensagem; item de nota só na mesma transação da nota;
+repasse: `bruto = taxa + líquido`, só para o profissional do contrato, id de transferência do parceiro único; check-out exige check-in; hora do servidor em presença, nota de material e mensagem; item de nota só na mesma transação da nota;
 disputa: uma ativa por contrato, só as partes abrem, só mediador decide, reembolso acima da alçada exige segunda pessoa (líder ou administrador), decidida não muda mais;
 retrabalho só do cliente e dentro da garantia; avaliação só entre as partes do contrato, critério coerente com a direção;
 lançamento: mínimo de 2 partidas, equilíbrio no `COMMIT`, partida só na transação do lançamento, estorno = inversão exata do original (mesmo contrato);

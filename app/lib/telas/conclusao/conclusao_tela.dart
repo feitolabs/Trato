@@ -57,7 +57,7 @@ class ConclusaoTela extends StatelessWidget {
               const Divider(),
               const SizedBox(height: EspacosTrato.x3),
               LinhaValor(
-                rotulo: 'Total retido',
+                rotulo: 'Total do serviço',
                 valor: formatarReais(resumo.totalRetidoCentavos),
                 destaque: true,
               ),

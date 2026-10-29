@@ -30,11 +30,10 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   late MetodoPagamento _metodo = widget.dados.opcoes.first.metodo;
 
   static const _passos = [
-    'Você paga agora e o profissional vê que o pagamento está garantido.',
-    'O pagamento fica retido, nas condições do arranjo com nosso parceiro de '
-        'pagamento, até a conclusão.',
-    'Você confirma o serviço e o valor é liberado. Se algo der errado, abra uma '
-        'disputa e o valor fica congelado até a decisão.',
+    'Você paga e o app mostra "Aguardando confirmação do pagamento" até o parceiro confirmar.',
+    'O pagamento é processado por parceiro e acompanhado no app.',
+    'Você confirma o serviço ao final. Se algo der errado, abra uma disputa: '
+        'o caso passa por suporte e análise de problemas.',
   ];
 
   @override
@@ -92,7 +91,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Seu dinheiro fica protegido', style: TipografiaTrato.tituloOpcao),
+                          Text('Como funciona o pagamento', style: TipografiaTrato.tituloOpcao),
                           const SizedBox(height: EspacosTrato.x4),
                           for (var i = 0; i < _passos.length; i++) ...[
                             if (i > 0) const SizedBox(height: EspacosTrato.x3),

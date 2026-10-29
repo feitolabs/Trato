@@ -24,13 +24,13 @@ const _paginas = [
   ),
   _PaginaOnboarding(
     icone: Icons.lock_outline,
-    titulo: 'Seu dinheiro fica\nprotegido',
-    texto: 'O pagamento fica retido até a conclusão. Você confirma o serviço e o valor é liberado.',
+    titulo: 'Pagamento por parceiro,\nacompanhado no app',
+    texto: 'O pagamento é processado por parceiro e acompanhado no app. Você confirma o serviço ao final.',
   ),
   _PaginaOnboarding(
     icone: Icons.verified_user_outlined,
-    titulo: 'Se algo der errado,\nvocê tem garantia',
-    texto: 'Abra uma disputa e o valor fica congelado até a decisão. Serviços com garantia ativa.',
+    titulo: 'Se algo der errado,\nhá suporte',
+    texto: 'Abra uma disputa e o caso passa por suporte e análise de problemas. O prazo de garantia do serviço vem no orçamento.',
   ),
 ];
 

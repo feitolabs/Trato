@@ -48,7 +48,7 @@ class _GaleriaComponentesState extends State<GaleriaComponentes> {
                     ),
                     const SizedBox(height: EspacosTrato.x2),
                     const ChipStatus(
-                        texto: 'Em execução · pagamento retido', tipo: TipoStatus.info),
+                        texto: 'Em execução · pagamento acompanhado', tipo: TipoStatus.info),
                   ],
                 ),
               ),
@@ -57,7 +57,7 @@ class _GaleriaComponentesState extends State<GaleriaComponentes> {
                 spacing: EspacosTrato.x2,
                 runSpacing: EspacosTrato.x2,
                 children: [
-                  ChipStatus(texto: 'Disputa aberta · valor congelado', tipo: TipoStatus.alerta),
+                  ChipStatus(texto: 'Disputa aberta · em análise', tipo: TipoStatus.alerta),
                   ChipStatus(texto: 'Finalizado', tipo: TipoStatus.sucesso, icone: Icons.check),
                   ChipStatus(texto: '3 orçamentos novos', tipo: TipoStatus.destaque),
                   ChipStatus(texto: 'SOS', tipo: TipoStatus.perigo, icone: Icons.warning_amber),

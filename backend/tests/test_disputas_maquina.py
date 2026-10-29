@@ -48,9 +48,14 @@ def test_so_cliente_abre(ator):
         abrir(ator, 1000, Motivo.DANO, T0, T0, CFG)
 
 
-def test_abrir_fora_da_janela_de_72h():
-    with pytest.raises(PrazoExpirado):
-        abrir(Ator.CLIENTE, 1000, Motivo.DANO, T0, T0 + timedelta(hours=73), CFG)
+def test_abrir_fora_da_janela_de_72h_nao_recusa_a_reclamacao():
+    """D13: a janela só decide o congelamento do repasse, não renuncia ao direito de reclamar."""
+    tarde = abrir(Ator.CLIENTE, 1000, Motivo.DANO, T0, T0 + timedelta(hours=73), CFG)
+    no_prazo = abrir(Ator.CLIENTE, 1000, Motivo.DANO, T0, T0 + timedelta(hours=72), CFG)
+
+    assert tarde.estado is Estado.ABERTA
+    assert tarde.abertura_dentro_da_janela_de_congelamento is False
+    assert no_prazo.abertura_dentro_da_janela_de_congelamento is True
 
 
 @pytest.mark.parametrize("valor", [0, -5, 10.5, True])

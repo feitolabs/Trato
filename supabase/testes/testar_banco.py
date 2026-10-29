@@ -458,19 +458,23 @@ def suite(b, rodada):
     verifica("estorno com as mesmas partidas (não invertidas) é recusado", tem_erro(e, "inverter"), str(e))
     _, e = lancar(C2, "estorno", [(caixa, "credito", 150000), (retido, "debito", 150000)], chave="est-outro", extra=L1)
     verifica("estorno em contrato diferente do original é recusado", tem_erro(e, "mesmo contrato"), str(e))
-    saldo_antes = b.um("select saldo_centavos from saldos_contas where conta_id=%s", (retido,))
+    def saldo_passivo(conta):  # o ledger não tem saldo pronto (D15): a conta soma as partidas
+        return b.um("select coalesce(sum(case sentido when 'credito' then valor_centavos else -valor_centavos end),0) from partidas where conta_id=%s", (conta,))
+    saldo_antes = saldo_passivo(retido)
     LE, e = lancar(C1, "estorno", [(caixa, "credito", 150000), (retido, "debito", 150000)], chave="est-ok", extra=L1)
     verifica("estorno correto (partidas invertidas) confirma", e is None, str(e))
-    saldo_depois = b.um("select saldo_centavos from saldos_contas where conta_id=%s", (retido,))
-    verifica("o estorno devolve o saldo (retido_servico cai 150000)", saldo_antes - saldo_depois == 150000, f"{saldo_antes}->{saldo_depois}")
+    saldo_depois = saldo_passivo(retido)
+    verifica("o estorno devolve o valor (retido_servico cai 150000)", saldo_antes - saldo_depois == 150000, f"{saldo_antes}->{saldo_depois}")
     _, e = lancar(C1, "estorno", [(caixa, "credito", 150000), (retido, "debito", 150000)], chave="est-2x", extra=L1)
     verifica("um lançamento só é estornado uma vez", tem_erro(e, "duplicate", "unique"), str(e))
     verifica("tipo estorno exige estorna_id", tem_erro(b.falha("insert into lancamentos(contrato_id,tipo,chave_idempotencia) values (%s,'estorno','e-sem')", (C1,)), "check"))
 
-    print("\n== (a) Saldo e extrato de cada usuário ==")
-    verifica("P1 vê só a própria conta no saldo", {r[0] for r in b.ve(S["P1"], "select conta_id from saldos_contas")} == {ap_p1})
-    verifica("saldo de P1 = 92500", b.ve(S["P1"], "select saldo_centavos from saldos_contas")[0][0] == 92500)
-    verifica("P4 vê só a dele", {r[0] for r in b.ve(S["P4"], "select conta_id from saldos_contas")} == {ap_p4})
+    print("\n== (a) Extrato de cada usuário (sem saldo pronto, D15) ==")
+    verifica("P1 vê só a própria conta", {r[0] for r in b.ve(S["P1"], "select id from contas_ledger")} == {ap_p1})
+    verifica("as partidas de P1 somam 92500 (extrato)", b.ve(S["P1"], "select sum(valor_centavos) from partidas")[0][0] == 92500)
+    verifica("P4 vê só a dele", {r[0] for r in b.ve(S["P4"], "select id from contas_ledger")} == {ap_p4})
+    verifica("não existe view de saldo, tabela de saques nem de chaves Pix (D15)",
+             b.um("select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname='public' and c.relname in ('saldos_contas','saques','chaves_pix')") == 0)
     verifica("P1 não lê as contas nem as partidas de P4",
              len(b.ve(S["P1"], "select 1 from contas_ledger where id=%s", (ap_p4,))) == 0
              and len(b.ve(S["P1"], "select 1 from partidas where conta_id=%s", (ap_p4,))) == 0)
@@ -478,16 +482,16 @@ def suite(b, rodada):
     verifica("P1 não vê as contas de sistema (retido, caixa, receita)",
              len(b.ve(S["P1"], "select 1 from contas_ledger where usuario_id is null")) == 0)
     verifica("cliente A não lê nada do ledger",
-             len(b.ve(S["A"], "select 1 from saldos_contas")) + len(b.ve(S["A"], "select 1 from partidas")) + len(b.ve(S["A"], "select 1 from lancamentos")) == 0)
-    verifica("financeiro lê o ledger inteiro", len(b.ve(S["fin"], "select 1 from partidas")) >= 10 and len(b.ve(S["fin"], "select 1 from saldos_contas")) == 5)
+             len(b.ve(S["A"], "select 1 from contas_ledger")) + len(b.ve(S["A"], "select 1 from partidas")) + len(b.ve(S["A"], "select 1 from lancamentos")) == 0)
+    verifica("financeiro lê o ledger inteiro", len(b.ve(S["fin"], "select 1 from partidas")) >= 10 and len(b.ve(S["fin"], "select 1 from contas_ledger")) == 5)
     verifica("mediador, N1 e cadastro não leem o ledger",
              sum(len(b.ve(S[c], "select 1 from partidas")) for c in ("med", "n1", "cad", "seg")) == 0)
 
-    # repasses, chaves Pix, saques
+    # repasses (ordem de liberação ao parceiro)
     rep = str(uuid.uuid4())
     b.exec("""insert into repasses(id, contrato_id, profissional_id, valor_bruto_centavos, taxa_centavos, valor_liquido_centavos,
                 gatilho, chave_idempotencia) values (%s,%s,%s,100000,7500,92500,'confirmacao_cliente',%s)""", (rep, C1, S["P1"], "rep-" + rep))
-    print("\n== Repasses, Pix e saques ==")
+    print("\n== Repasses (ordem de liberação ao parceiro) ==")
     verifica("repasse: bruto = taxa + líquido", tem_erro(b.falha("""insert into repasses(contrato_id, profissional_id, valor_bruto_centavos, taxa_centavos,
         valor_liquido_centavos, gatilho, chave_idempotencia) values (%s,%s,100,1,1,'prazo','r-ruim')""", (C1, S["P1"])), "check"))
     verifica("repasse só vai para o profissional do contrato", tem_erro(b.falha("""insert into repasses(contrato_id, profissional_id, valor_bruto_centavos, taxa_centavos,
@@ -495,27 +499,25 @@ def suite(b, rodada):
     verifica("P1 lê o próprio repasse; P4, P5 e A não", len(b.ve(S["P1"], "select 1 from repasses")) == 1
              and len(b.ve(S["P4"], "select 1 from repasses")) + len(b.ve(S["A"], "select 1 from repasses")) + len(b.ve(S["P5"], "select 1 from repasses")) == 0)
     verifica("financeiro lê repasses; mediador também (leitura)", len(b.ve(S["fin"], "select 1 from repasses")) == 1)
-    verifica("chave Pix com titular de outra pessoa é recusada",
-             tem_erro(b.falha("insert into chaves_pix(usuario_id, tipo, chave, documento_titular) values (%s,'cpf','123',%s)", (S["P1"], cpf_de("A"))), "titular"))
-    cpf_p1 = cpf_de("P1")
-    cpf_fmt = f"{cpf_p1[:3]}.{cpf_p1[3:6]}.{cpf_p1[6:9]}-{cpf_p1[9:]}"
-    chave = str(uuid.uuid4())
-    verifica("chave Pix com o CPF do dono (com pontuação) entra",
-             b.falha("insert into chaves_pix(id, usuario_id, tipo, chave, documento_titular) values (%s,%s,'cpf',%s,%s)", (chave, S["P1"], cpf_p1, cpf_fmt)) is None)
-    verifica("saque com chave não verificada é recusado",
-             tem_erro(b.falha("insert into saques(profissional_id, chave_pix_id, valor_centavos, chave_idempotencia) values (%s,%s,100,'s1')", (S["P1"], chave)), "verificada"))
-    b.exec("update chaves_pix set verificada_em=now() where id=%s", (chave,))
-    verifica("saque com chave verificada entra",
-             b.falha("insert into saques(profissional_id, chave_pix_id, valor_centavos, chave_idempotencia) values (%s,%s,100,'s2')", (S["P1"], chave)) is None)
-    verifica("saque não usa chave de outra pessoa",
-             tem_erro(b.falha("insert into saques(profissional_id, chave_pix_id, valor_centavos, chave_idempotencia) values (%s,%s,100,'s3')", (S["P5"], chave)), "não é do profissional"))
-    verifica("chave Pix: só o dono lê", len(b.ve(S["P1"], "select 1 from chaves_pix")) == 1
-             and sum(len(b.ve(S[c], "select 1 from chaves_pix")) for c in ("P5", "A", "fin", "adm", "n1")) == 0)
-    verifica("saques: dono e financeiro leem; outros não", len(b.ve(S["P1"], "select 1 from saques")) == 1 and len(b.ve(S["fin"], "select 1 from saques")) == 1
-             and sum(len(b.ve(S[c], "select 1 from saques")) for c in ("P5", "med", "n1", "A")) == 0)
+    verifica("repasse: id da transferência no parceiro é único",
+             b.falha("update repasses set provedor_transferencia_id='tr_1' where id=%s", (rep,)) is None
+             and tem_erro(b.falha("""insert into repasses(contrato_id, profissional_id, valor_bruto_centavos, taxa_centavos,
+                valor_liquido_centavos, gatilho, chave_idempotencia, provedor_transferencia_id) values (%s,%s,100,0,100,'prazo','r-dup','tr_1')""", (C1, S["P1"])), "duplicate", "unique"))
+    verifica("lançamento sem contrato é recusado (não há mais saque)",
+             tem_erro(b.falha("insert into lancamentos(tipo, chave_idempotencia) values ('taxa','sem-ctr')"), "null", "contrato_id"))
+    verifica("lançamento do tipo 'saque' é recusado",
+             tem_erro(b.falha("insert into lancamentos(contrato_id, tipo, chave_idempotencia) values (%s,'saque','l-saque')", (C1,)), "check"))
     verifica("webhook: só o financeiro lê", len(b.ve(S["P1"], "select 1 from eventos_webhook")) == 0
              and b.exec("select 1")[0][0] == 1)
     b.exec("insert into eventos_webhook(provedor, evento_id, tipo, assinatura_valida, payload) values ('stripe','evt_1','payment_intent.succeeded',true,'{}')")
+    ev = b.um("select id from eventos_webhook where evento_id='evt_1'")
+    lid = str(uuid.uuid4())
+    e = b.transacao([("insert into lancamentos(id, contrato_id, tipo, chave_idempotencia, evento_webhook_id) values (%s,%s,'cobranca','l-ev',%s)", (lid, C1, ev)),
+                     ("insert into partidas(lancamento_id, conta_id, sentido, valor_centavos) values (%s,%s,'debito',10)", (lid, caixa)),
+                     ("insert into partidas(lancamento_id, conta_id, sentido, valor_centavos) values (%s,%s,'credito',10)", (lid, retido))], papel="service_role")
+    verifica("lançamento espelha um evento do parceiro (evento_webhook_id)", e is None, str(e))
+    verifica("lançamento com evento inexistente é recusado",
+             tem_erro(b.falha("insert into lancamentos(contrato_id, tipo, chave_idempotencia, evento_webhook_id) values (%s,'taxa','l-ev2',%s)", (C1, str(uuid.uuid4()))), "foreign key", "violates"))
     verifica("webhook repetido (mesmo evento) é recusado", tem_erro(b.falha("insert into eventos_webhook(provedor, evento_id, tipo, assinatura_valida, payload) values ('stripe','evt_1','x',true,'{}')"), "duplicate", "unique"))
     verifica("webhook com assinatura inválida não pode ser marcado como processado",
              tem_erro(b.falha("insert into eventos_webhook(provedor, evento_id, tipo, assinatura_valida, payload, processado_em) values ('stripe','evt_2','x',false,'{}',now())"), "check"))
@@ -684,12 +686,12 @@ def suite(b, rodada):
     # --- N1/N2 atendimento ------------------------------------------------------------------------
     print("\n== Equipe de atendimento: o que pode ==")
     verifica("N1 consulta pedido, contrato e pagamento", all(len(b.ve(S["n1"], f"select 1 from {t}")) > 0 for t in ("pedidos", "contratos", "pagamentos")))
-    verifica("N1 não vê documentos, ledger, saques, chat nem endereço",
-             sum(len(b.ve(S["n1"], f"select 1 from {t}")) for t in ("verificacao_documentos", "partidas", "saques", "mensagens", "pedidos_endereco")) == 0)
+    verifica("N1 não vê documentos, ledger, webhooks, chat nem endereço",
+             sum(len(b.ve(S["n1"], f"select 1 from {t}")) for t in ("verificacao_documentos", "partidas", "eventos_webhook", "mensagens", "pedidos_endereco")) == 0)
     verifica("moderador não vê dados financeiros",
-             sum(len(b.ve(S["mod"], f"select 1 from {t}")) for t in ("pagamentos", "partidas", "saques", "repasses", "contratos")) == 0)
-    verifica("cadastro não vê pedido, pagamento nem saque",
-             sum(len(b.ve(S["cad"], f"select 1 from {t}")) for t in ("pedidos", "pagamentos", "saques", "contratos")) == 0)
+             sum(len(b.ve(S["mod"], f"select 1 from {t}")) for t in ("pagamentos", "partidas", "eventos_webhook", "repasses", "contratos")) == 0)
+    verifica("cadastro não vê pedido, pagamento nem repasse",
+             sum(len(b.ve(S["cad"], f"select 1 from {t}")) for t in ("pedidos", "pagamentos", "repasses", "contratos")) == 0)
     verifica("seguranca vê contrato (localização), mas não ledger", len(b.ve(S["seg"], "select 1 from contratos")) == 2 and len(b.ve(S["seg"], "select 1 from partidas")) == 0)
 
     # --- storage -------------------------------------------------------------------------------

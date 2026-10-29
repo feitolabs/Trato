@@ -190,7 +190,7 @@ class _CartaoCarteira extends StatelessWidget {
       aoTocar: aoTocar ?? () {},
       child: Row(
         children: [
-          Expanded(child: _Valor(rotulo: 'Retido', centavos: carteira.retidoCentavos)),
+          Expanded(child: _Valor(rotulo: 'Em andamento', centavos: carteira.retidoCentavos)),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(child: _Valor(rotulo: 'Para sacar', centavos: carteira.paraSacarCentavos)),
         ],
