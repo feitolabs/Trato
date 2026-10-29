@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
+import '../auth/login_tela.dart';
 import 'escolha_perfil_tela.dart';
 
 class _PaginaOnboarding {
@@ -70,7 +70,7 @@ class _OnboardingTelaState extends State<OnboardingTela> {
       );
 
   void _irParaLogin() => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const EmBreveTela(titulo: 'Entrar na sua conta')),
+        MaterialPageRoute<void>(builder: (_) => const LoginTela()),
       );
 
   @override
