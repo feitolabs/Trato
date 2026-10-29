@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'auth/config_auth.dart';
+import 'auth/servico_auth.dart';
+import 'auth/servico_auth_supabase.dart';
 import 'dados/config.dart';
 import 'dados/repositorios_trato.dart';
 import 'dados/sessao.dart';
@@ -14,7 +17,14 @@ const _mostrarGaleria = bool.fromEnvironment('GALERIA');
 /// Sessão do usuário. O serviço de login entrega o token aqui; o cliente HTTP o envia.
 final sessaoTrato = SessaoTrato();
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Sem chaves do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY por --dart-define), o login fica no
+  // serviço de teste. Ver docs/login-configuracao.md. O token do login ainda não é passado à API.
+  final configAuth = ConfigAuth.doAmbiente();
+  if (configAuth.supabaseConfigurado) {
+    ServicoAuthPadrao.atual = await ServicoAuthSupabase.inicializar(configAuth);
+  }
   // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
   RotasTrato.repos = RepositoriosTrato.deConfig(ConfigTrato.doAmbiente(), sessaoTrato);
   runApp(const TratoApp());
