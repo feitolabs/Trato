@@ -51,9 +51,9 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [!] **F4.4** Fluxo de pagamento: 30% adiantado, restante no fim, por etapas, aditivo. *Bloqueado:* P1, P4, P7.
 - [x] **F4.5** Idempotência e webhooks Stripe assinados. *Pronto quando:* reenvio do mesmo evento não duplica lançamento.
 - [x] **F4.6** Ledger de partidas dobradas e saldos derivados. *Pronto quando:* soma de débitos = créditos em todos os testes.
-- [ ] **F4.7** Disputa (congela, 48 h, decisão em 5 dias úteis, resultados). *Pronto quando:* testes dos 4 resultados.
-- [ ] **F4.8** Garantia e retrabalho (prazo por categoria, 7 dias para atender). *Pronto quando:* testes.
-- [ ] **F4.9** Rotinas: liberação por prazo, expiração de pedido, lembretes. *Pronto quando:* testes com relógio simulado.
+- [x] **F4.7** Disputa (congela, 48 h, decisão em 5 dias úteis, resultados). *Pronto quando:* testes dos 4 resultados.
+- [x] **F4.8** Garantia e retrabalho (prazo por categoria, 7 dias para atender). *Pronto quando:* testes.
+- [x] **F4.9** Rotinas: liberação por prazo, expiração de pedido, lembretes. *Pronto quando:* testes com relógio simulado.
 - [ ] **F4.10** Simulação ponta a ponta pela API (Stripe modo teste). *Pronto quando:* um serviço vai de Aberto a Concluído.
 
 ## Fase 5 — App do Cliente (MVP primeiro)

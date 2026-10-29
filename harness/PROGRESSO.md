@@ -124,3 +124,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Nada foi enviado ao Supabase. Falta o OK do João para aplicar.
 - Seed de `config_definicoes` fora desta migration: precisa dos limites mínimo e máximo de cada parâmetro, que o João define.
 - Em paralelo: F5.2/F5.3 (telas de login e cadastro) na sessão f2-4-responsivo, F4.9 (rotinas) na f4-1, F4.7 e F4.8 em andamento.
+
+## 28/10/2026 — F4.7, F4.8 e F4.9 integradas
+
+- `backend/src/trato/disputas/` (F4.7), `garantias/` (F4.8) e `rotinas/` (F4.9), todas em Python puro, prazos por configuração, sem banco.
+- Develop: 305 testes no backend, 51 no app, verificação OK. Sem push.
+- Falta para fechar a Fase 4: F4.2 (taxa progressiva, P2), F4.4 (fluxo de pagamento, P1/P4/P7) e F4.10 (simulação ponta a ponta).
