@@ -130,3 +130,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `backend/src/trato/disputas/` (F4.7), `garantias/` (F4.8) e `rotinas/` (F4.9), todas em Python puro, prazos por configuração, sem banco.
 - Develop: 305 testes no backend, 51 no app, verificação OK. Sem push.
 - Falta para fechar a Fase 4: F4.2 (taxa progressiva, P2), F4.4 (fluxo de pagamento, P1/P4/P7) e F4.10 (simulação ponta a ponta).
+
+## 28/10/2026 — F5.2 e F5.3 (telas) integradas
+
+- `app/lib/telas/auth/`: login, criar conta (passo 1), confirmar celular (passo 2) e recuperar senha, com validação no app e goldens em 3 tamanhos. Onboarding e escolha de perfil agora levam a elas.
+- Develop: 305 testes no backend, 108 no app, verificação OK. Sem push.
+- Provisório (abre EmBreveTela): Google, Apple, biometria, envio de SMS e de código. Falta ligar ao Supabase Auth e escolher o provedor de SMS (P11).

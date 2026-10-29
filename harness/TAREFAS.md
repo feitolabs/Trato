@@ -59,8 +59,8 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 ## Fase 5 — App do Cliente (MVP primeiro)
 
 - [ ] **F5.1** Splash, onboarding (3), escolha de perfil.
-- [ ] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha.
-- [ ] **F5.3** Cadastro em 2 passos + confirmação por SMS.
+- [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
+- [~] **F5.3** Cadastro em 2 passos + confirmação por SMS. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
 - [ ] **F5.4** Início, categorias, buscar, perfil do profissional.
 - [ ] **F5.5** Novo pedido com perguntas guiadas, fotos, prazo, faixa de preço.
 - [ ] **F5.6** Orçamentos recebidos, detalhe, aceite com contrato digital.
