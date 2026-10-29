@@ -24,3 +24,36 @@ def test_app_principal_sem_adaptadores_responde_503():
     r = TestClient(app).post("/v1/pedidos", headers={"Authorization": "Bearer x"})
 
     assert r.status_code == 503
+
+
+TEXTOS_PROIBIDOS = (
+    "garantia total",
+    "escrow",
+    "profissional seguro",
+    "reembolso automático",
+    "reembolso automatico",
+    "menor taxa do mercado",
+    "24/7",
+)
+
+
+def test_api_nao_promete_o_que_a_d13_proibe():
+    import json
+
+    texto = json.dumps(app.openapi(), ensure_ascii=False).lower()
+
+    for proibido in TEXTOS_PROIBIDOS:
+        assert proibido not in texto
+    assert "suporte e análise de problemas" in texto
+
+
+def test_modulos_nao_trazem_textos_proibidos():
+    from pathlib import Path
+
+    import trato
+
+    raiz = Path(trato.__file__).parent
+    for arquivo in raiz.rglob("*.py"):
+        conteudo = arquivo.read_text(encoding="utf-8").lower()
+        for proibido in TEXTOS_PROIBIDOS:
+            assert proibido not in conteudo, f"{proibido!r} em {arquivo.name}"
