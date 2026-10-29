@@ -19,6 +19,11 @@ class CampoTrato extends StatelessWidget {
     this.formatadores,
     this.senha = false,
     this.aoMudar,
+    this.estilo,
+    this.estiloDica,
+    this.centralizado = false,
+    this.textoAcao,
+    this.aoTocarAcao,
   });
 
   final String rotulo;
@@ -37,6 +42,15 @@ class CampoTrato extends StatelessWidget {
   final List<TextInputFormatter>? formatadores;
   final bool senha;
   final ValueChanged<String>? aoMudar;
+
+  /// Estilo do texto digitado e da dica (ex.: código de confirmação em destaque).
+  final TextStyle? estilo;
+  final TextStyle? estiloDica;
+  final bool centralizado;
+
+  /// Ação tocável dentro do campo, à direita. Ex.: "Mostrar" na senha.
+  final String? textoAcao;
+  final VoidCallback? aoTocarAcao;
 
   @override
   Widget build(BuildContext context) {
@@ -57,16 +71,20 @@ class CampoTrato extends StatelessWidget {
           keyboardType: teclado,
           inputFormatters: formatadores,
           onChanged: aoMudar,
-          style: TipografiaTrato.corpo,
+          style: estilo ?? TipografiaTrato.corpo,
+          textAlign: centralizado ? TextAlign.center : TextAlign.start,
           decoration: InputDecoration(
             hintText: dica,
+            hintStyle: estiloDica,
             errorText: erro,
             // prefixText/suffixText somem sem foco; no protótipo "R$" e "h" ficam sempre visíveis.
             prefixIcon: prefixo != null
                 ? _TextoFixo(prefixo!, inicio: true)
                 : (iconeInicio == null ? null : Icon(iconeInicio)),
             prefixIconConstraints: const BoxConstraints(),
-            suffixIcon: sufixo == null ? null : _TextoFixo(sufixo!, inicio: false),
+            suffixIcon: textoAcao != null
+                ? _Acao(textoAcao!, aoTocarAcao)
+                : (sufixo == null ? null : _TextoFixo(sufixo!, inicio: false)),
             suffixIconConstraints: const BoxConstraints(),
           ),
         ),
@@ -93,6 +111,25 @@ class _TextoFixo extends StatelessWidget {
         right: inicio ? EspacosTrato.x1 : EspacosTrato.x4,
       ),
       child: Text(texto, style: TipografiaTrato.corpo),
+    );
+  }
+}
+
+class _Acao extends StatelessWidget {
+  const _Acao(this.texto, this.aoTocar);
+
+  final String texto;
+  final VoidCallback? aoTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: aoTocar,
+      borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4, vertical: EspacosTrato.x3),
+        child: Text(texto, style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.azulTexto)),
+      ),
     );
   }
 }

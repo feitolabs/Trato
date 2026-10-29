@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
+import '../auth/criar_conta_tela.dart';
 
 enum PerfilUso {
   cliente(
@@ -80,7 +80,7 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
                 texto: _escolhido.botao,
                 aoTocar: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => EmBreveTela(titulo: _escolhido.botao),
+                    builder: (_) => CriarContaTela(perfil: _escolhido),
                   ),
                 ),
               ),

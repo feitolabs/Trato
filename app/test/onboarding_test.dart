@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/main.dart';
-import 'package:trato/telas/em_breve_tela.dart';
+import 'package:trato/telas/auth/criar_conta_tela.dart';
+import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/telas/onboarding/onboarding_tela.dart';
 
@@ -58,13 +59,13 @@ void main() {
       expect(find.byType(EscolhaPerfilTela), findsOneWidget);
     });
 
-    testWidgets('Já tenho conta abre o login (provisório)', (tester) async {
+    testWidgets('Já tenho conta abre o login', (tester) async {
       await abrir(tester);
 
       await tester.tap(find.text('Já tenho conta'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(LoginTela), findsOneWidget);
     });
   });
 
@@ -81,7 +82,7 @@ void main() {
       expect(find.text('Criar conta de cliente'), findsNothing);
     });
 
-    testWidgets('botão abre o cadastro do perfil escolhido (provisório)', (tester) async {
+    testWidgets('botão abre o cadastro do perfil escolhido', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: EscolhaPerfilTela()));
 
       await tester.tap(find.text('Quero trabalhar'));
@@ -89,7 +90,7 @@ void main() {
       await tester.tap(find.text('Criar conta de profissional'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(CriarContaTela), findsOneWidget);
     });
   });
 }
