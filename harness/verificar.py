@@ -113,6 +113,7 @@ def checar_app() -> bool:
 
 
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8")
     resultados = [checar_segredos(), checar_env_ignorado(), checar_backend(), checar_app()]
     titulo("Resultado")
     if all(resultados):
