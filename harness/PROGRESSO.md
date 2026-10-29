@@ -189,6 +189,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Novo `backend/src/trato/pagamentos/provedor/` (interface `ProvedorPagamento`, `ProvedorFake`, `ProvedorStripeTeste` com transporte injetado, sem rede), `taxa.py` (bps + mínimo, progressiva desligada), `orquestrador.py` e `api/rotas_pagamento.py` (cobrança, aditivo, decisão da disputa). Único ajuste em código alheio: gancho `Contexto.apos_transicao`.
 - Testes: fluxo Aberto→Concluído pela API com webhook assinado, duplicado, fora de ordem, falha, cancelamento, disputa, retrabalho, aditivo. Relatório em `docs/f4-10-simulacao.md` (o que falta para o Stripe real; P2/P7).
 - Sem banco real, sem rede, sem push. Avaliação ainda não existe no backend.
+
+## 29/10/2026 — Telas do profissional faltantes (F6.1, F6.5, F6.7, F5.9 cliente)
+
+- Branch `feature/telas-profissional-faltantes`. 10 telas novas em `telas/{profissional_cadastro,verificacao,nota_material,aditivo,disputa_profissional,perfil_publico}/` + peças comuns em `telas/profissional_apoio/`. Serviços por interface com fakes; callbacks a ligar em `rotas.dart` listados em `docs/telas-profissional.md`.
+- Protótipo não conferido página a página: todas marcadas "sem protótipo".
+- Testes: `test/telas_profissional_test.dart` (27) e goldens 14×3. Não mexi em main.dart, rotas.dart, componentes.dart nem tema.
 ## 29/10/2026 — Rodada V2 integrada
 
 - Em develop (sem push nesta sessão), uma por vez, cada uma verificada: `v2-margem` (simulador e `docs/simulacao-margem.md`), `v2-impacto-docs` (`docs/v2-impacto.md`, PENDENCIAS, TAREFAS, advogado-e-contador), `feature/v2-backend-d13` (pedido só pago após webhook assinado; garantia financiada desligada; janela de congelamento separada dos prazos legais) e `v2-textos-telas` (textos sem promessas proibidas; SOS atrás de `kSosHabilitado`). `claude/v2-backend-pago-43520a` não tinha commits próprios: os do backend estavam em `feature/v2-backend-d13`.
