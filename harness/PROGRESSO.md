@@ -108,3 +108,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - F4.2 e F4.4 continuam bloqueadas por P1–P4 e P7.
 
 **Próxima tarefa:** F3.9/F3.2 dependem do OK do João; do lado do app, F5.2 (login) e F5.3 (cadastro).
+
+## 28/10/2026 — Modelo aprovado e leitura do Supabase
+
+- João aprovou `docs/modelo-de-dados.md` (F3.1). Valem as propostas provisórias do documento (N1 sem coluna de papel, N8 região por cidade/bairro, N10 `excluir_em` sem prazo, N11 escrita só pelo backend) até ele decidir diferente.
+- Leitura (sem escrita) no Supabase: projeto "Trato" `ornaoshsvuszquntkqsk`, região sa-east-1, Postgres 17.11, status ativo, **0 tabelas e 0 migrations**.
+- Plano da F3.2 apresentado ao João; **nada foi criado nem aplicado**.
+- Aviso: a sessão da F3.1 abriu por conta própria F4.7 (disputa), F4.8 (garantia) e uma F2.4 duplicada (responsividade, já integrada em develop). Nenhuma foi integrada.

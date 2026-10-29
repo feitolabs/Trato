@@ -20,7 +20,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F1.4** Backend "olá mundo" (FastAPI `/saude`) lendo `.env`, com teste. *Pronto quando:* `pytest` passa.
 - [~] **F1.5** App Flutter "olá mundo". Android ok (APK debug roda no emulador API 37). *Falta:* iOS (precisa de Mac). *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
 - [ ] **F1.6** João coloca as chaves reais no `.env` (Supabase, Stripe teste). *Pronto quando:* backend sobe e lê as variáveis.
-- [ ] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada.
+- [~] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada. Leitura feita em 28/10/2026: projeto "Trato" (sa-east-1, Postgres 17) ativo, 0 tabelas, 0 migrations.
 - [ ] **F1.8** 🔒 Ligar `origin` ao GitHub "Trato" e dar push de `main` e `develop`. *Pronto quando:* branches no GitHub.
 
 ## Fase 2 — Design
@@ -33,7 +33,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 ## Fase 3 — Banco de dados (cada migration 🔒)
 
-- [~] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova. *(documento escrito; falta o João aprovar)*
+- [x] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova. (aprovado pelo João em 28/10/2026; as propostas provisórias N1, N8, N10, N11 valem até ele decidir diferente)
 - [ ] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração (taxa progressiva, prazos, limites).
 - [ ] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite).
 - [ ] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out.
