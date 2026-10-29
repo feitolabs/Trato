@@ -231,3 +231,8 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em develop: 479 no backend, 586 no app, verificação OK.
 - Ainda sem ponto de entrada: nota de materiais e aditivo (cliente e profissional), responder disputa, atender retrabalho, busca com serviço. O token do login não chega ao cliente HTTP. Detalhe tela a tela em `docs/STATUS-MVP.md`.
 
+## 29/10/2026 — Busca de textos proibidos no verificar (V2.1)
+
+- `harness/verificar.py` ganhou "App — textos proibidos (D13)": falha se `app/lib/**/*.dart` tiver "escrow", "garantia total", "profissional seguro", "reembolso automático", "menor taxa do mercado" ou "24/7" fora de comentário. Linha com `verificar: ignorar` é liberada. V2.1 passa a `[x]`.
+- Em paralelo (sessões `app-pendencias` e `backend-pendencias`): token do login na API, pontos de entrada de telas, câmera/GPS, rotas de backend que faltam e testes com Postgres local.
+
