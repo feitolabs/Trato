@@ -161,14 +161,15 @@ OK    estorno que NÃO inverte exatamente o original é recusado
 OK    estorno com as mesmas partidas (não invertidas) é recusado
 OK    estorno em contrato diferente do original é recusado
 OK    estorno correto (partidas invertidas) confirma
-OK    o estorno devolve o saldo (retido_servico cai 150000)
+OK    o estorno devolve o valor (retido_servico cai 150000)
 OK    um lançamento só é estornado uma vez
 OK    tipo estorno exige estorna_id
 
-== (a) Saldo e extrato de cada usuário ==
-OK    P1 vê só a própria conta no saldo
-OK    saldo de P1 = 92500
+== (a) Extrato de cada usuário (sem saldo pronto, D15) ==
+OK    P1 vê só a própria conta
+OK    as partidas de P1 somam 92500 (extrato)
 OK    P4 vê só a dele
+OK    não existe view de saldo, tabela de saques nem de chaves Pix (D15)
 OK    P1 não lê as contas nem as partidas de P4
 OK    P1 vê no extrato só lançamentos que tocam a conta dele
 OK    P1 não vê as contas de sistema (retido, caixa, receita)
@@ -176,19 +177,17 @@ OK    cliente A não lê nada do ledger
 OK    financeiro lê o ledger inteiro
 OK    mediador, N1 e cadastro não leem o ledger
 
-== Repasses, Pix e saques ==
+== Repasses (ordem de liberação ao parceiro) ==
 OK    repasse: bruto = taxa + líquido
 OK    repasse só vai para o profissional do contrato
 OK    P1 lê o próprio repasse; P4, P5 e A não
 OK    financeiro lê repasses; mediador também (leitura)
-OK    chave Pix com titular de outra pessoa é recusada
-OK    chave Pix com o CPF do dono (com pontuação) entra
-OK    saque com chave não verificada é recusado
-OK    saque com chave verificada entra
-OK    saque não usa chave de outra pessoa
-OK    chave Pix: só o dono lê
-OK    saques: dono e financeiro leem; outros não
+OK    repasse: id da transferência no parceiro é único
+OK    lançamento sem contrato é recusado (não há mais saque)
+OK    lançamento do tipo 'saque' é recusado
 OK    webhook: só o financeiro lê
+OK    lançamento espelha um evento do parceiro (evento_webhook_id)
+OK    lançamento com evento inexistente é recusado
 OK    webhook repetido (mesmo evento) é recusado
 OK    webhook com assinatura inválida não pode ser marcado como processado
 OK    financeiro lê webhooks; mediador não
@@ -291,9 +290,9 @@ OK    regiões/categorias do profissional: A vê as de P1 aprovado; não as do P
 
 == Equipe de atendimento: o que pode ==
 OK    N1 consulta pedido, contrato e pagamento
-OK    N1 não vê documentos, ledger, saques, chat nem endereço
+OK    N1 não vê documentos, ledger, webhooks, chat nem endereço
 OK    moderador não vê dados financeiros
-OK    cadastro não vê pedido, pagamento nem saque
+OK    cadastro não vê pedido, pagamento nem repasse
 OK    seguranca vê contrato (localização), mas não ledger
 
 == Storage (buckets privados) ==
@@ -310,8 +309,8 @@ OK    app não apaga nem altera arquivos do Storage
 OK    avatar: A vê a foto de P1 (profissional aprovado)
 
 == (g) anon não lê nada; o app não escreve; funções seguras ==
-OK    RLS ligado em TODAS as 48 tabelas do schema public
-OK    anon não consegue ler nenhuma das 49 tabelas/views
+OK    RLS ligado em TODAS as 46 tabelas do schema public
+OK    anon não consegue ler nenhuma das 46 tabelas/views
 OK    authenticated (o app) não tem INSERT/UPDATE/DELETE/TRUNCATE em nenhuma tabela
 OK    anon não tem nenhum privilégio em nenhuma tabela
 OK    nenhuma policy usa using (true)
@@ -323,7 +322,7 @@ OK    TODA função SECURITY DEFINER tem search_path vazio
 OK    NENHUMA função (public/privado) é executável por anon ou PUBLIC
 OK    nenhuma função SECURITY DEFINER do schema public é chamável pelo app (RPC)
 OK    rls_auto_enable não é executável por anon (lição do advisor)
-OK    service_role lê todas as 48 tabelas (o backend funciona)
+OK    service_role lê todas as 46 tabelas (o backend funciona)
 OK    service_role não tem TRUNCATE em nenhuma tabela
 OK    anon e authenticated não têm TRUNCATE em nenhuma tabela
 OK    service_role consegue gravar pedido e ler de volta (grants do backend)
@@ -505,14 +504,15 @@ OK    estorno que NÃO inverte exatamente o original é recusado
 OK    estorno com as mesmas partidas (não invertidas) é recusado
 OK    estorno em contrato diferente do original é recusado
 OK    estorno correto (partidas invertidas) confirma
-OK    o estorno devolve o saldo (retido_servico cai 150000)
+OK    o estorno devolve o valor (retido_servico cai 150000)
 OK    um lançamento só é estornado uma vez
 OK    tipo estorno exige estorna_id
 
-== (a) Saldo e extrato de cada usuário ==
-OK    P1 vê só a própria conta no saldo
-OK    saldo de P1 = 92500
+== (a) Extrato de cada usuário (sem saldo pronto, D15) ==
+OK    P1 vê só a própria conta
+OK    as partidas de P1 somam 92500 (extrato)
 OK    P4 vê só a dele
+OK    não existe view de saldo, tabela de saques nem de chaves Pix (D15)
 OK    P1 não lê as contas nem as partidas de P4
 OK    P1 vê no extrato só lançamentos que tocam a conta dele
 OK    P1 não vê as contas de sistema (retido, caixa, receita)
@@ -520,19 +520,17 @@ OK    cliente A não lê nada do ledger
 OK    financeiro lê o ledger inteiro
 OK    mediador, N1 e cadastro não leem o ledger
 
-== Repasses, Pix e saques ==
+== Repasses (ordem de liberação ao parceiro) ==
 OK    repasse: bruto = taxa + líquido
 OK    repasse só vai para o profissional do contrato
 OK    P1 lê o próprio repasse; P4, P5 e A não
 OK    financeiro lê repasses; mediador também (leitura)
-OK    chave Pix com titular de outra pessoa é recusada
-OK    chave Pix com o CPF do dono (com pontuação) entra
-OK    saque com chave não verificada é recusado
-OK    saque com chave verificada entra
-OK    saque não usa chave de outra pessoa
-OK    chave Pix: só o dono lê
-OK    saques: dono e financeiro leem; outros não
+OK    repasse: id da transferência no parceiro é único
+OK    lançamento sem contrato é recusado (não há mais saque)
+OK    lançamento do tipo 'saque' é recusado
 OK    webhook: só o financeiro lê
+OK    lançamento espelha um evento do parceiro (evento_webhook_id)
+OK    lançamento com evento inexistente é recusado
 OK    webhook repetido (mesmo evento) é recusado
 OK    webhook com assinatura inválida não pode ser marcado como processado
 OK    financeiro lê webhooks; mediador não
@@ -635,9 +633,9 @@ OK    regiões/categorias do profissional: A vê as de P1 aprovado; não as do P
 
 == Equipe de atendimento: o que pode ==
 OK    N1 consulta pedido, contrato e pagamento
-OK    N1 não vê documentos, ledger, saques, chat nem endereço
+OK    N1 não vê documentos, ledger, webhooks, chat nem endereço
 OK    moderador não vê dados financeiros
-OK    cadastro não vê pedido, pagamento nem saque
+OK    cadastro não vê pedido, pagamento nem repasse
 OK    seguranca vê contrato (localização), mas não ledger
 
 == Storage (buckets privados) ==
@@ -654,8 +652,8 @@ OK    app não apaga nem altera arquivos do Storage
 OK    avatar: A vê a foto de P1 (profissional aprovado)
 
 == (g) anon não lê nada; o app não escreve; funções seguras ==
-OK    RLS ligado em TODAS as 48 tabelas do schema public
-OK    anon não consegue ler nenhuma das 49 tabelas/views
+OK    RLS ligado em TODAS as 46 tabelas do schema public
+OK    anon não consegue ler nenhuma das 46 tabelas/views
 OK    authenticated (o app) não tem INSERT/UPDATE/DELETE/TRUNCATE em nenhuma tabela
 OK    anon não tem nenhum privilégio em nenhuma tabela
 OK    nenhuma policy usa using (true)
@@ -667,7 +665,7 @@ OK    TODA função SECURITY DEFINER tem search_path vazio
 OK    NENHUMA função (public/privado) é executável por anon ou PUBLIC
 OK    nenhuma função SECURITY DEFINER do schema public é chamável pelo app (RPC)
 OK    rls_auto_enable não é executável por anon (lição do advisor)
-OK    service_role lê todas as 48 tabelas (o backend funciona)
+OK    service_role lê todas as 46 tabelas (o backend funciona)
 OK    service_role não tem TRUNCATE em nenhuma tabela
 OK    anon e authenticated não têm TRUNCATE em nenhuma tabela
 OK    service_role consegue gravar pedido e ler de volta (grants do backend)
@@ -679,4 +677,4 @@ OK    tabelas novas nascem fechadas (privilégio padrão sem anon/authenticated)
 OK    anon não consegue chamar função do schema privado
 OK    authenticated chama as funções privadas só sobre si mesmo (um usuário comum recebe falso)
 
-RESUMO: 574 verificações OK, 0 com erro
+RESUMO: 572 verificações OK, 0 com erro
