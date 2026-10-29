@@ -18,6 +18,7 @@ from trato.garantias import EstadoRetrabalho as E
 T0 = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
 SEG = timedelta(seconds=1)
 CFG = ConfigGarantia(garantia_dias_por_categoria={"pintura": 90})
+CFG_FINANCIADA = ConfigGarantia(garantia_financiada_habilitada=True)
 
 
 def test_padrao_30_dias_e_categoria_sobrescreve():
@@ -130,10 +131,26 @@ def test_reatribuir_exige_outro_profissional_e_bloqueia_novo_ate_ser_reatribuido
     r = abrir_retrabalho(g, "a", T0, CFG)
     na = marcar_nao_atendido_se_vencido(r, r.atender_ate + SEG)
     with pytest.raises(ErroRetrabalho, match="profissional"):
-        transicionar(na, E.REATRIBUIDO, T0)
+        transicionar(na, E.REATRIBUIDO, T0, config=CFG_FINANCIADA)
     with pytest.raises(ErroRetrabalho, match="em curso"):
         abrir_retrabalho(g, "b", T0 + timedelta(days=8), CFG, existentes=[na])
-    reatrib = transicionar(na, E.REATRIBUIDO, T0, outro_profissional_id="p2")
+    reatrib = transicionar(na, E.REATRIBUIDO, T0, outro_profissional_id="p2", config=CFG_FINANCIADA)
     assert reatrib.estado is E.REATRIBUIDO and reatrib.outro_profissional_id == "p2"
     with pytest.raises(ErroRetrabalho):
         transicionar(reatrib, E.RESOLVIDO, T0)
+
+
+def test_garantia_financiada_vem_desligada_por_padrao():
+    assert ConfigGarantia().garantia_financiada_habilitada is False
+    with pytest.raises(ValueError):
+        ConfigGarantia(garantia_financiada_habilitada="sim")  # type: ignore[arg-type]
+
+
+def test_reatribuir_com_custo_para_o_trato_exige_a_configuracao_ligada():
+    g = abrir_garantia(T0, None, CFG)
+    r = abrir_retrabalho(g, "a", T0, CFG)
+    na = marcar_nao_atendido_se_vencido(r, r.atender_ate + SEG)
+
+    for config in (None, CFG):
+        with pytest.raises(ErroRetrabalho, match="suporte e análise de problemas"):
+            transicionar(na, E.REATRIBUIDO, T0, outro_profissional_id="p2", config=config)

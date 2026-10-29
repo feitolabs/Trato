@@ -18,8 +18,12 @@ rotina daquele item fica desligada. Nunca há prazo fixo no código.
 Dúvidas que mudam o comportamento (ficam como parâmetro até o João decidir):
 - P1: `prazo_liberacao` é 48 h ou 7 dias? E `prazo_confirmacao_cliente` (48 h; 72 h acima do
   limite de valor). Basta trocar os valores da configuração.
-- N17/D3: a janela de reclamação (`janela_reclamacao`) bloqueia a liberação? Com
-  `liberacao_espera_janela=True` o saldo só é liberado depois dela; com `False`, só vale
+- D13: `janela_congelamento_repasse` é a janela COMERCIAL (configurável) que segura o repasse.
+  Ela NÃO é o prazo legal para reclamar: esses prazos são só informativos
+  (`disputas.prazos_legais`) e nenhuma rotina daqui recusa ou encerra reclamação nem renuncia
+  direito do cliente. Passar da janela só deixa o saldo liberar.
+- N17/D3: a janela de congelamento (`janela_congelamento_repasse`) bloqueia a liberação? Com
+  `liberacao_espera_congelamento=True` o saldo só é liberado depois dela; com `False`, só vale
   `prazo_liberacao`.
 - N14: não existe prazo de aprovação de aditivo; só o intervalo do lembrete.
 """
@@ -57,8 +61,8 @@ class ConfigRotinas:
     prazo_confirmacao_cliente_acima_do_limite: timedelta | None = None
     limite_valor_prazo_maior_centavos: int | None = None
     prazo_liberacao: timedelta | None = None
-    janela_reclamacao: timedelta | None = None
-    liberacao_espera_janela: bool = False
+    janela_congelamento_repasse: timedelta | None = None
+    liberacao_espera_congelamento: bool = False
     # Disputa
     prazo_resposta_disputa: timedelta | None = None
     prazo_decisao_disputa_dias_uteis: int | None = None
@@ -191,8 +195,8 @@ def liberacoes_por_prazo(
 ) -> list[AcaoRotina]:
     """Libera o saldo do profissional depois do prazo, se o pedido está concluído e sem disputa.
 
-    Instante da liberação = `concluido_em + prazo_liberacao`; com `liberacao_espera_janela`,
-    o maior entre isso e `concluido_em + janela_reclamacao`. No limite exato já libera.
+    Instante da liberação = `concluido_em + prazo_liberacao`; com `liberacao_espera_congelamento`,
+    o maior entre isso e `concluido_em + janela_congelamento_repasse`. No limite exato já libera.
     """
     if config.prazo_liberacao is None:
         return []
@@ -204,8 +208,8 @@ def liberacoes_por_prazo(
         if item.disputa_aberta or item.saldo_a_liberar_centavos <= 0:
             continue
         espera = config.prazo_liberacao
-        if config.liberacao_espera_janela and config.janela_reclamacao is not None:
-            espera = max(espera, config.janela_reclamacao)
+        if config.liberacao_espera_congelamento and config.janela_congelamento_repasse is not None:
+            espera = max(espera, config.janela_congelamento_repasse)
         if agora < pedido.concluido_em + espera:
             continue
         saida.append(
