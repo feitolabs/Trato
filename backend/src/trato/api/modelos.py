@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from trato.api.repositorios import DadosPedido, EnderecoPedido, RespostaPedido
 from trato.pedidos.estados import (
     Foto,
     Janela,
@@ -43,6 +44,57 @@ class LocalizacaoIn(_Entrada):
 class JanelaIn(_Entrada):
     inicio: AwareDatetime
     fim: AwareDatetime
+
+
+class RespostaIn(_Entrada):
+    pergunta_id: str
+    resposta: Any
+
+
+class EnderecoIn(_Entrada):
+    logradouro: str = Field(min_length=1)
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cep: str | None = None
+    referencia: str | None = None
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+
+
+class AbrirPedidoIn(_Entrada):
+    """O que o cliente descreve. Com repositório em memória o corpo é opcional."""
+
+    categoria_id: str
+    cidade_id: str
+    titulo: str = Field(min_length=1)
+    descricao: str = Field(min_length=1)
+    bairro: str | None = None
+    local_aprox_lat: float | None = Field(default=None, ge=-90, le=90)
+    local_aprox_lng: float | None = Field(default=None, ge=-180, le=180)
+    prazo_desejado: date | None = None
+    faixa_preco_min_centavos: int | None = Field(default=None, ge=0)
+    faixa_preco_max_centavos: int | None = Field(default=None, ge=0)
+    urgente: bool = False
+    respostas: list[RespostaIn] = Field(default_factory=list)
+    endereco: EnderecoIn | None = None
+
+    def para_dados(self) -> DadosPedido:
+        return DadosPedido(
+            categoria_id=self.categoria_id,
+            cidade_id=self.cidade_id,
+            titulo=self.titulo,
+            descricao=self.descricao,
+            bairro=self.bairro,
+            local_aprox_lat=self.local_aprox_lat,
+            local_aprox_lng=self.local_aprox_lng,
+            prazo_desejado=self.prazo_desejado,
+            faixa_preco_min_centavos=self.faixa_preco_min_centavos,
+            faixa_preco_max_centavos=self.faixa_preco_max_centavos,
+            urgente=self.urgente,
+            respostas=tuple(RespostaPedido(r.pergunta_id, r.resposta) for r in self.respostas),
+            endereco=EnderecoPedido(**self.endereco.model_dump()) if self.endereco else None,
+        )
 
 
 class AceitarOrcamentoIn(_Entrada):

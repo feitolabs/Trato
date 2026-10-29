@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from trato import disputas, garantias
 from trato.financeiro import ledger
 from trato.pedidos import estados
+from trato.persistencia import erros as erros_pg
 
 # Do mais específico para o mais geral: vale o primeiro que casar.
 _STATUS: tuple[tuple[type[Exception], int], ...] = (
@@ -25,6 +26,13 @@ _STATUS: tuple[tuple[type[Exception], int], ...] = (
     (garantias.ErroGarantia, 409),
     (ledger.LancamentoInvalido, 422),
     (ledger.LedgerErro, 409),
+    (erros_pg.NaoEncontrado, 404),
+    (erros_pg.Duplicado, 409),
+    (erros_pg.RegraDoBanco, 409),
+    (erros_pg.DadosInvalidos, 422),
+    (erros_pg.ConfigNaoPublicada, 503),
+    (erros_pg.BancoIndisponivel, 503),
+    (erros_pg.ErroPersistencia, 500),
 )
 
 
@@ -42,5 +50,6 @@ def instalar_tratadores(app: FastAPI) -> None:
         garantias.ErroRetrabalho,
         garantias.ErroGarantia,
         ledger.LedgerErro,
+        erros_pg.ErroPersistencia,
     ):
         app.add_exception_handler(tipo, _resposta)

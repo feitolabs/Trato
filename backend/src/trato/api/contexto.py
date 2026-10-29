@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -53,6 +54,8 @@ class Contexto:
     agora: Callable[[], datetime] = agora_utc
     segredo_webhook: Callable[[], str] = segredo_webhook_do_env
     manipuladores_webhook: dict[str, ManipuladorWebhook] = field(default_factory=dict)
+    # Só existem com persistência Postgres (a memória não os implementa).
+    extras: dict[str, Any] = field(default_factory=dict)
 
 
 def obter_contexto(request: Request) -> Contexto:

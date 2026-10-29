@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from trato.api.repositorios import (
     ConfigApi,
     Contrato,
+    DadosPedido,
     EventoWebhook,
     Orcamento,
 )
@@ -26,11 +27,14 @@ class PedidosEmMemoria:
     def obter(self, pedido_id: str) -> Pedido | None:
         return self._pedidos.get(pedido_id)
 
-    def salvar(self, pedido: Pedido, evento: Evento | None = None) -> None:
+    def salvar(
+        self, pedido: Pedido, evento: Evento | None = None, dados: DadosPedido | None = None
+    ) -> Pedido:
         self._pedidos[pedido.id] = pedido
         lista = self._eventos.setdefault(pedido.id, [])
         if evento is not None:
             lista.append(evento)
+        return pedido
 
     def eventos(self, pedido_id: str) -> Sequence[Evento]:
         return tuple(self._eventos.get(pedido_id, ()))

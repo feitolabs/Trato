@@ -17,11 +17,23 @@ class Config(BaseSettings):
     )
 
     trato_ambiente: str = "desenvolvimento"
+    # memoria (padrão, para testes rápidos) | postgres (Supabase)
+    trato_persistencia: str = "memoria"
 
     supabase_url: str = ""
     supabase_anon_key: SecretStr = SecretStr("")
     supabase_service_role_key: SecretStr = SecretStr("")
     supabase_db_url: SecretStr = SecretStr("")
+
+    # Persistência real. A URL de conexão ao Postgres do Supabase fica só no .env do João.
+    database_url: SecretStr = SecretStr("")
+    # Papel usado em cada transação (`set local role`); vazio = o usuário da própria URL.
+    trato_banco_papel: str = "service_role"
+    # Validação do JWT do Supabase Auth: o segredo HS256 OU a URL das chaves públicas (JWKS).
+    supabase_jwt_secret: SecretStr = SecretStr("")
+    supabase_jwks_url: str = ""
+    # Segredo do servidor para os códigos de check-in/check-out (nunca vai ao banco em claro).
+    trato_codigo_segredo: SecretStr = SecretStr("")
 
     stripe_secret_key: SecretStr = SecretStr("")
     stripe_publishable_key: str = ""
