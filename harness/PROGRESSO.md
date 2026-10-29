@@ -222,3 +222,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Faltam só os seeds (cidade, categorias, taxa, contas do ledger), que dependem de P2, P6, P7 e do OK do João.
 - Não integradas por orientação (sessões em andamento): ligar-backend-banco, ligar-app-api, telas-profissional, telas-comuns, pagamento-e2e e auth-login.
 
+## 29/10/2026 — Rodada final integrada (auth, banco ligado, pagamento e2e, telas, app ligado à API)
+
+- Em develop (sem push), cada uma verificada: `auth-login` (ServicoAuth, telas de auth, `docs/login-configuracao.md`), `pagamento-e2e` (F4.10 em teste), `telas-comuns`, `ligar-backend-banco` (persistência Postgres), `feature/telas-profissional-faltantes` e `ligar-app-api` (camada `app/lib/dados/`, modo demo|api). `claude/telas-profissional-e5fdf8` não tinha commits à frente.
+- Conflitos resolvidos mantendo os dois lados: `.env.example`, `api/contexto.py` (`apos_transicao` e `extras`), `api/rotas_pedidos.py` (`salvar` + ganchos), `pubspec.yaml` (e `pubspec.lock` regerado) e `PROGRESSO.md`. Em `notificacoes_tela.dart` ficou a versão com serviço (telas-comuns) e um adaptador `ServicoNotificacoesRepositorio` liga a camada `dados/`.
+- Ambiente: instalei no `.venv` do backend `psycopg[binary]`, `psycopg-pool` e `pyjwt[crypto]` (já declarados no `pyproject.toml`) para a verificação rodar.
+- Ligação em `rotas.dart`: cadastro → verificação → casca do profissional (fotos de demonstração, sem câmera); aba Mensagens → lista → chat; Perfil → privacidade/LGPD e ajuda; aba Perfil do profissional → perfil público e avaliações. `main.dart` usa `ServicoAuthSupabase` quando há chaves.
+- Testes em develop: 479 no backend, 586 no app, verificação OK.
+- Ainda sem ponto de entrada: nota de materiais e aditivo (cliente e profissional), responder disputa, atender retrabalho, busca com serviço. O token do login não chega ao cliente HTTP. Detalhe tela a tela em `docs/STATUS-MVP.md`.
+

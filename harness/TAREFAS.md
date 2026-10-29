@@ -54,35 +54,35 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F4.7** Disputa (congela, 48 h, decisão em 5 dias úteis, resultados). *Pronto quando:* testes dos 4 resultados.
 - [x] **F4.8** Garantia e retrabalho (prazo por categoria, 7 dias para atender). *Pronto quando:* testes.
 - [x] **F4.9** Rotinas: liberação por prazo, expiração de pedido, lembretes. *Pronto quando:* testes com relógio simulado.
-- [~] **F4.10** Simulação ponta a ponta pela API (Stripe modo teste). *Pronto quando:* um serviço vai de Aberto a Concluído. *(fluxo ponta a ponta com ProvedorFake e Stripe teste simulado: ver docs/f4-10-simulacao.md; camada HTTP FastAPI com rotas de pedidos, disputa, retrabalho, ledger e webhook, repositórios em memória; falta banco real e Stripe modo teste)*
+- [~] **F4.10** Simulação ponta a ponta pela API (Stripe modo teste). *Pronto quando:* um serviço vai de Aberto a Concluído. *(fluxo ponta a ponta com ProvedorFake e Stripe teste simulado: ver docs/f4-10-simulacao.md; camada HTTP FastAPI com rotas de pedidos, disputa, retrabalho, ledger e webhook, repositórios em memória; falta banco real e Stripe modo teste)* *(pagamento e2e com provedor fake e Stripe `sk_test_`, tudo em teste; persistência Postgres opcional; nenhuma chamada real. Ver `docs/f4-10-simulacao.md`.)*
 
 ## Fase 5 — App do Cliente (MVP primeiro)
 
-- [ ] **F5.1** Splash, onboarding (3), escolha de perfil.
-- [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
-- [~] **F5.3** Cadastro em 2 passos + confirmação por SMS. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
+- [~] **F5.1** Splash, onboarding (3), escolha de perfil. *(telas prontas e ligadas; falta conferir com o João, ver F2.5)*
+- [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(`ServicoAuth` com fake e Supabase; `main.dart` troca para o Supabase quando há chaves. Falta passar o token à API, Google/Apple/biometria e SMS. Ver `docs/login-configuracao.md`.)*
+- [~] **F5.3** Cadastro em 2 passos + confirmação por SMS. *(cadastro e confirmação por `ServicoAuth`; falta Supabase real com chaves, Google/Apple e provedor de SMS, P11.)*
 - [~] **F5.4** Início, categorias, buscar, perfil do profissional.
 - [~] **F5.5** Novo pedido com perguntas guiadas, fotos, prazo, faixa de preço. *(tela pronta com dados de exemplo; falta o ponto de entrada no app e a API)*
 - [~] **F5.6** Orçamentos recebidos, detalhe, aceite com contrato digital. *(orçamentos recebidos e detalhe ligados ao pagamento no fluxo; contrato digital e API pendentes)*
 - [~] **F5.7** Pagamento (Pix/cartão, 30% adiantado) e recibo. *(tela de pagamento ligada ao aceite; falta recibo, Stripe e API)*
 - [~] **F5.8** Seus pedidos, pedido em execução (linha do tempo, código de início).
-- [~] **F5.9** Aditivo (aprovar/recusar) e nota de materiais.
+- [~] **F5.9** Aditivo (aprovar/recusar) e nota de materiais. *(telas de nota e aditivo prontas nos dois lados, com fakes; falta ligar os botões nos pedidos em execução.)*
 - [~] **F5.10** Conclusão (código), avaliação, garantia, retrabalho.
 - [~] **F5.11** Relatar problema (disputa).
-- [ ] **F5.12** Chat, notificações.
-- [~] **F5.13** Perfil, ajuda, LGPD (exportar e excluir conta), SOS e compartilhar atendimento. *(só a tela de Perfil, ligada à aba; falta ajuda, LGPD, SOS e compartilhar)*
+- [~] **F5.12** Chat, notificações. *(notificações e lista de mensagens ligadas, com fakes e sem protótipo; falta API.)*
+- [~] **F5.13** Perfil, ajuda, LGPD (exportar e excluir conta), SOS e compartilhar atendimento. *(Perfil, privacidade/LGPD, excluir conta e ajuda ligados, com fakes e sem protótipo; falta compartilhar atendimento e exclusão real. SOS desligado, D13.)*
 
 *Pronto quando (cada uma):* tela confere com o protótipo, teste de widget passa, funciona em Android e iOS.
 
 ## Fase 6 — App do Profissional
 
-- [ ] **F6.1** Cadastro e verificação (documento + selfie), status da análise.
+- [~] **F6.1** Cadastro e verificação (documento + selfie), status da análise. *(cadastro e verificação ligados ao cadastro de profissional, com fakes e sem câmera; falta API e status da análise.)*
 - [~] **F6.2** Início, pedidos abertos com filtros, detalhe, recusar com motivo. *(início, detalhe e recusa com dados de exemplo; falta filtros e API)*
 - [~] **F6.3** Calculadora de orçamento (taxa e líquido vindos do backend), etapas, sinal, validade, garantia.
 - [~] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out.
-- [ ] **F6.5** Enviar nota dos materiais e criar aditivo.
-- [~] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ). *(tela da carteira com dados de exemplo; falta ligar à aba da casca do profissional e à API)* *(D15: a carteira vira extrato, sem saque próprio; ajustar a tela.)*
-- [ ] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações.
+- [~] **F6.5** Enviar nota dos materiais e criar aditivo. *(telas prontas com fakes; falta o ponto de entrada no pedido em execução do profissional.)*
+- [~] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ). *(extrato ligado à aba Carteira da casca (D15), sem saque; no modo `api` usa `GET /v1/extrato`.)*
+- [~] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações. *(telas de responder disputa, atender retrabalho, perfil público e avaliações prontas; perfil e avaliações ligados à aba Perfil, as duas primeiras sem ponto de entrada.)*
 
 *Pronto quando:* profissional de teste é aprovado, orça, executa, recebe e saca.
 
