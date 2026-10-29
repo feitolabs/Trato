@@ -34,7 +34,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 ## Fase 3 — Banco de dados (cada migration 🔒)
 
 - [x] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova. (aprovado pelo João em 28/10/2026; as propostas provisórias N1, N8, N10, N11 valem até ele decidir diferente)
-- [ ] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração (taxa progressiva, prazos, limites).
+- [~] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração (taxa progressiva, prazos, limites). SQL escrito em supabase/migrations (NÃO aplicado), testado num Postgres local descartável; falta o OK do João para aplicar.
 - [ ] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite).
 - [ ] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out.
 - [ ] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques.
