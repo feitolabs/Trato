@@ -236,10 +236,15 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `harness/verificar.py` ganhou "App — textos proibidos (D13)": falha se `app/lib/**/*.dart` tiver "escrow", "garantia total", "profissional seguro", "reembolso automático", "menor taxa do mercado" ou "24/7" fora de comentário. Linha com `verificar: ignorar` é liberada. V2.1 passa a `[x]`.
 - Em paralelo (sessões `app-pendencias` e `backend-pendencias`): token do login na API, pontos de entrada de telas, câmera/GPS, rotas de backend que faltam e testes com Postgres local.
 
+## 29/10/2026 — Pendências do MVP integradas (backend e app)
+
+- Em develop (sem push nesta passada), cada uma verificada: `feature/fase-4-pendencias-backend` (rotas do app: orçamentos, pagamento, mensagens, notificações, perfil, pedidos abertos, resumo de orçamento, verificação e avaliação; testes de integração com Postgres local; `docs/app-ligacao.md`) e `feature/fase-5-pendencias-app` (token do login no `SessaoTrato`, pontos de entrada de nota, aditivo, disputa, retrabalho e busca, câmera e GPS em `app/lib/dispositivo/`, permissões Android/iOS).
+- Testes em develop: 497 no backend (1 pulado), 594 no app, verificação OK.
+- Falta: ligar no app as rotas novas (hoje as telas ainda usam os fakes nessas áreas), rota de URL assinada para upload de foto, validar câmera e GPS num aparelho real, e a chamada de `POST .../cobranca` só funciona com o serviço de pagamento instalado. Detalhe em `docs/STATUS-MVP.md` e `docs/app-ligacao.md`.
 
 ## 29/10/2026 — Câmera e GPS reais atrás de interfaces (app)
 
-- `app/lib/dispositivo/`: `ServicoCamera` (foto, galeria, compressão, sem EXIF, SHA-256), `ServicoLocalizacao`, `ServicoPermissao` e a explicação antes do pedido (finalidade e retenção; "negada para sempre" leva às configurações). Real (`image_picker`, `geolocator`, `permission_handler`, versões fixas) e fake para cada um. `Dispositivo.real/fake` monta tudo.
+- `app/lib/dispositivo/`: `ServicoCamera` (foto, galeria, compressão, sem EXIF, SHA-256), `ServicoLocalizacao`, `ServicoPermissao` e a explicação antes do pedido (finalidade e retenção; "negada para sempre" leva às configurações). Real (`image_picker`, `geolocator`, `permission_handler`, versões fixas) e fake para cada um. `ServicosDispositivo.real/fake` monta tudo.
 - `ServicoUpload` (`dados/`): pede a URL assinada ao backend e faz o PUT. **Rota `POST /v1/arquivos/url-envio` não existe**; contrato proposto em `docs/app-camera-gps.md`.
 - Check-in com permissões, aviso de "longe do endereço" e modo offline (`FilaOffline`, `offline_capturada_em`); `CheckOutTela` nova; `NovoPedidoTela.aoCapturarFoto`. Verificação, nota de materiais e cadastro já recebiam `CapturarFoto`: falta só ligar em `rotas.dart` (fora desta tarefa).
 - Manifest do Android e Info.plist com câmera e localização "em uso"; `INTERNET` entrou no manifesto principal.

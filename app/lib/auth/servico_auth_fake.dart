@@ -59,6 +59,10 @@ class ServicoAuthFake implements ServicoAuth {
   @override
   Stream<SessaoAuth?> get sessaoMudou => _controle.stream;
 
+  /// Token de teste, só existe enquanto há sessão.
+  @override
+  String? get tokenAtual => _sessao == null ? null : 'token-de-teste-${_sessao!.id}';
+
   @override
   Future<SessaoAuth> entrarComEmail({required String email, required String senha}) async {
     _checarFalha();

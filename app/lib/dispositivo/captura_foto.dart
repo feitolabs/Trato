@@ -13,8 +13,8 @@ import 'servico_camera.dart';
 ///
 /// Uso (no ponto onde a tela é montada, com o `context` dela):
 /// `aoCapturarFoto: () => captura.capturar(context, FinalidadeArquivo.notaMaterial)`
-class CapturaFoto {
-  CapturaFoto({required this.camera, required this.permissao, required this.upload});
+class CapturaFotoGuiada {
+  CapturaFotoGuiada({required this.camera, required this.permissao, required this.upload});
 
   final ServicoCamera camera;
   final ServicoPermissao permissao;

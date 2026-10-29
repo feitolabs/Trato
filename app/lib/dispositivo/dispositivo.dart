@@ -1,41 +1,84 @@
-import '../dados/cliente_api.dart';
-import '../dados/servico_upload.dart';
-import 'captura_foto.dart';
-import 'permissao.dart';
-import 'servico_camera.dart';
-import 'servico_camera_real.dart';
-import 'servico_localizacao.dart';
-import 'servico_localizacao_real.dart';
+import 'dart:async';
 
-/// Todos os serviços de aparelho num só lugar, para o ponto de entrada montar uma vez.
-class Dispositivo {
-  Dispositivo({
+/// Ponto GPS capturado no aparelho. Só coordenadas: quem confere proximidade é o backend.
+class PosicaoGps {
+  const PosicaoGps({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+}
+
+/// Câmera. Devolve a referência do arquivo local, ou null se a pessoa cancelou ou negou a
+/// permissão. As telas nunca conhecem o plugin.
+abstract interface class CapturaFoto {
+  Future<String?> fotografar();
+}
+
+/// Localização. Null se negada, desligada ou sem sinal.
+abstract interface class Localizador {
+  Future<PosicaoGps?> posicaoAtual();
+}
+
+/// Envio do arquivo capturado. O upload será por URL assinada do backend (rota ainda não
+/// existe, ver docs/STATUS-MVP.md): quando existir, basta uma implementação nova desta interface.
+abstract interface class EnvioMidia {
+  /// Recebe a referência local e devolve a referência que vai para o backend.
+  Future<String> enviar(String referenciaLocal);
+}
+
+/// Enquanto não há rota de upload: a referência local segue como está. Não sobe nada.
+class EnvioMidiaSemRota implements EnvioMidia {
+  const EnvioMidiaSemRota();
+
+  @override
+  Future<String> enviar(String referenciaLocal) async => referenciaLocal;
+}
+
+/// Os três juntos, como o `rotas.dart` os usa.
+class DispositivoTrato {
+  const DispositivoTrato({
     required this.camera,
-    required this.localizacao,
-    required this.permissao,
-    required this.upload,
+    required this.localizador,
+    this.envio = const EnvioMidiaSemRota(),
   });
 
-  /// Aparelho de verdade (câmera, GPS, permissões do sistema) e envio pela API.
-  factory Dispositivo.real(ClienteApi api) => Dispositivo(
-        camera: ServicoCameraReal(),
-        localizacao: const ServicoLocalizacaoReal(),
-        permissao: const ServicoPermissaoReal(),
-        upload: ServicoUploadApi(api),
-      );
+  /// Sem aparelho de verdade: referências e posição de teste. Padrão até o `main` trocar.
+  factory DispositivoTrato.fake() =>
+      DispositivoTrato(camera: CapturaFotoFake(), localizador: LocalizadorFake());
 
-  /// Demonstração e testes: nada toca no aparelho nem na rede.
-  factory Dispositivo.fake() => Dispositivo(
-        camera: ServicoCameraFake(),
-        localizacao: ServicoLocalizacaoFake(),
-        permissao: ServicoPermissaoFake(),
-        upload: ServicoUploadFake(),
-      );
+  final CapturaFoto camera;
+  final Localizador localizador;
+  final EnvioMidia envio;
 
-  final ServicoCamera camera;
-  final ServicoLocalizacao localizacao;
-  final ServicoPermissao permissao;
-  final ServicoUpload upload;
+  /// Tira a foto e a prepara para o backend. Null se cancelada.
+  Future<String?> fotografarEEnviar() async {
+    final local = await camera.fotografar();
+    if (local == null) return null;
+    return envio.enviar(local);
+  }
+}
 
-  late final CapturaFoto fotos = CapturaFoto(camera: camera, permissao: permissao, upload: upload);
+/// PROVISÓRIO — só teste e demonstração.
+class CapturaFotoFake implements CapturaFoto {
+  CapturaFotoFake({this.cancelar = false});
+
+  final bool cancelar;
+  int tiradas = 0;
+
+  @override
+  Future<String?> fotografar() async {
+    if (cancelar) return null;
+    tiradas++;
+    return 'fake://foto/$tiradas';
+  }
+}
+
+/// PROVISÓRIO — só teste e demonstração.
+class LocalizadorFake implements Localizador {
+  LocalizadorFake({this.posicao = const PosicaoGps(latitude: -19.92, longitude: -43.94)});
+
+  final PosicaoGps? posicao;
+
+  @override
+  Future<PosicaoGps?> posicaoAtual() async => posicao;
 }

@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato/telas/aditivo/criar_aditivo_tela.dart';
+import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
+import 'package:trato/telas/busca/busca_profissionais_tela.dart';
+import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
+import 'package:trato/telas/disputa_profissional/atender_retrabalho_tela.dart';
+import 'package:trato/telas/disputa_profissional/responder_disputa_tela.dart';
+import 'package:trato/telas/fluxo/rotas.dart';
+import 'package:trato/telas/nota_material/enviar_nota_tela.dart';
+import 'package:trato/telas/nota_material/ver_nota_tela.dart';
 import 'package:trato/telas/auth/confirmar_celular_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
@@ -175,5 +184,61 @@ void main() {
     await _tocar(tester, 'Perfil');
     await _tocar(tester, 'Central de ajuda');
     expect(find.byType(AjudaTela), findsOneWidget);
+  });
+
+  testWidgets('pedido em execução: abre a nota de materiais e o aditivo', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Pedidos');
+    await _tocar(tester, 'Troca de tomadas e chuveiro');
+
+    await _tocar(tester, 'Ver nota de materiais');
+    expect(find.byType(VerNotaTela), findsOneWidget);
+    expect(find.text('Materiais do serviço'), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Ver aditivo do serviço');
+    expect(find.byType(ResponderAditivoTela), findsOneWidget);
+  });
+
+  testWidgets('notificação de disputa e de retrabalho abrem as telas do profissional',
+      (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Perfil');
+    await _tocar(tester, 'Notificações');
+
+    await _tocar(tester, 'Disputa aberta no seu serviço');
+    expect(find.byType(ResponderDisputaTela), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Retrabalho pedido');
+    expect(find.byType(AtenderRetrabalhoTela), findsOneWidget);
+  });
+
+  testWidgets('aba Buscar: busca por serviço e abre o perfil do profissional', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Buscar');
+    expect(find.byType(BuscaProfissionaisTela), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Carlos');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await _tocar(tester, 'Carlos Mendes');
+
+    expect(find.byType(PerfilProfissionalTela), findsOneWidget);
+  });
+
+  testWidgets('profissional: pedido de hoje oferece nota de materiais e aditivo', (tester) async {
+    await _abrir(tester, RotasTrato.cascaProfissionalParaTeste());
+    await _tocar(tester, 'Fazer check-in');
+    expect(find.text('Enviar nota de materiais'), findsOneWidget);
+    expect(find.text('Criar aditivo'), findsOneWidget);
+
+    await _tocar(tester, 'Enviar nota de materiais');
+    expect(find.byType(EnviarNotaTela), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Fazer check-in');
+    await _tocar(tester, 'Criar aditivo');
+    expect(find.byType(CriarAditivoTela), findsOneWidget);
   });
 }

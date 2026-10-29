@@ -131,6 +131,22 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
           quando: 'ontem',
           lida: true,
         ),
+        Notificacao(
+          id: 'n3',
+          titulo: 'Disputa aberta no seu serviço',
+          texto: 'O cliente abriu uma disputa. Responda dentro do prazo.',
+          quando: 'ontem',
+          tipo: 'disputa',
+          destinoId: 'disp-1',
+        ),
+        Notificacao(
+          id: 'n4',
+          titulo: 'Retrabalho pedido',
+          texto: 'Escolha um horário para refazer o serviço.',
+          quando: 'há 3 dias',
+          tipo: 'retrabalho',
+          destinoId: 'disp-1',
+        ),
       ];
 }
 

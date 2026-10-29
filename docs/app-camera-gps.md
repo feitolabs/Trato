@@ -12,11 +12,11 @@ e demonstração. **O app só captura e envia. A hora, a distância e a validaç
 | GPS (posição, precisão, distância) | `dispositivo/servico_localizacao.dart` | `servico_localizacao_real.dart` (`geolocator`) | `ServicoLocalizacaoFake` |
 | Permissões | `dispositivo/permissao.dart` | `ServicoPermissaoReal` (`permission_handler`) | `ServicoPermissaoFake` |
 | Tela de explicação | `dispositivo/explicacao_permissao.dart` | `garantirPermissao(...)` | — |
-| Foto + permissão + envio para as telas | `dispositivo/captura_foto.dart` | `CapturaFoto.capturar(...)` | — |
+| Foto + permissão + envio para as telas | `dispositivo/captura_foto.dart` | `CapturaFotoGuiada.capturar(...)` | — |
 | Check-in/out no aparelho | `dispositivo/captura_check_in_dispositivo.dart` | `CapturaCheckInDispositivo` | — |
 | Envio por URL assinada | `dados/servico_upload.dart` | `ServicoUploadApi` | `ServicoUploadFake` |
 | Fila offline | `dados/fila_offline.dart` | `FilaOfflineMemoria` | — |
-| Montagem | `dispositivo/dispositivo.dart` | `Dispositivo.real(api)` | `Dispositivo.fake()` |
+| Montagem | `dispositivo/servicos_dispositivo.dart` | `ServicosDispositivo.real(api)` | `ServicosDispositivo.fake()` |
 
 Versões fixas (sem `^`): `image_picker 1.1.2`, `geolocator 13.0.2`, `permission_handler 11.3.1`, `image 4.3.0`.
 
@@ -46,12 +46,21 @@ servidor. Roda em outra thread (`compute`).
 | Verificação, cadastro, nota de materiais, evidência de disputa | Já recebiam `CapturarFoto`. Basta passar `() => dispositivo.fotos.capturar(context, FinalidadeArquivo.documento)` (ver exemplos abaixo). |
 | Novo pedido (`NovoPedidoTela`) | Novo parâmetro `aoCapturarFoto`. As fotos aparecem como anexos e vão em `RascunhoPedido.fotos` (máx. 4 no total). |
 
+### Convivência com `DispositivoTrato` (develop)
+A sessão `app-pendencias` deixou uma primeira versão em `dispositivo.dart`, `dispositivo_real.dart` e
+`check_in_dispositivo.dart` (`DispositivoTrato`, `ServicoCheckInDispositivo`), que `main.dart` e `rotas.dart`
+usam hoje. Ela não tem explicação de permissão, compressão, remoção de EXIF, upload nem offline, e pede a
+permissão direto ao plugin. Esta tarefa **não mexeu nela** (os dois arquivos de entrada estavam fora do escopo).
+O que está nesta página é o substituto: `ServicosDispositivo` + `CapturaFotoGuiada` + `CapturaCheckInDispositivo`.
+Quando o integrador trocar o `RotasTrato.dispositivo`, `dispositivo_real.dart` e `check_in_dispositivo.dart`
+podem ser apagados.
+
 ### Ligação que falta no ponto de entrada
 `main.dart`, `rotas.dart` e `componentes.dart` ficaram de fora desta tarefa (a sessão `app-pendencias` mexe neles).
 Quem ligar faz:
 
 ```dart
-final dispositivo = Dispositivo.real(clienteApi); // modo api; em demo, Dispositivo.fake()
+final dispositivo = ServicosDispositivo.real(clienteApi); // modo api; em demo, ServicosDispositivo.fake()
 
 // Verificação
 VerificacaoTela(

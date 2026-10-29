@@ -308,10 +308,10 @@ void main() {
     });
   });
 
-  group('CapturaFoto', () {
+  group('CapturaFotoGuiada', () {
     testWidgets('permissão concedida: tira, envia e devolve a referência', (tester) async {
       final upload = ServicoUploadFake();
-      final captura = CapturaFoto(
+      final captura = CapturaFotoGuiada(
         camera: ServicoCameraFake(),
         permissao: ServicoPermissaoFake(),
         upload: upload,
@@ -334,7 +334,7 @@ void main() {
 
     testWidgets('permissão negada para sempre: não abre a câmera', (tester) async {
       final camera = ServicoCameraFake();
-      final captura = CapturaFoto(
+      final captura = CapturaFotoGuiada(
         camera: camera,
         permissao: ServicoPermissaoFake(atual: EstadoPermissao.negadaParaSempre),
         upload: ServicoUploadFake(),
@@ -358,7 +358,7 @@ void main() {
     });
 
     testWidgets('falha no envio: avisa em português simples e devolve nulo', (tester) async {
-      final captura = CapturaFoto(
+      final captura = CapturaFotoGuiada(
         camera: ServicoCameraFake(),
         permissao: ServicoPermissaoFake(),
         upload: ServicoUploadFake(falha: ErroTrato.semInternet),
@@ -380,7 +380,7 @@ void main() {
 
     testWidgets('galeria: não pede a permissão da câmera', (tester) async {
       final camera = ServicoCameraFake();
-      final captura = CapturaFoto(
+      final captura = CapturaFotoGuiada(
         camera: camera,
         permissao: ServicoPermissaoFake(atual: EstadoPermissao.negadaParaSempre),
         upload: ServicoUploadFake(),
