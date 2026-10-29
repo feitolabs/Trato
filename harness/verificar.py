@@ -6,6 +6,7 @@ Sai com código 1 se qualquer etapa falhar.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -100,8 +101,19 @@ def checar_backend() -> bool:
     return ok
 
 
+def achar_flutter() -> str | None:
+    """Flutter no PATH, em $FLUTTER_ROOT ou na instalação padrão C:\\flutter."""
+    if achado := shutil.which("flutter"):
+        return achado
+    nome = "flutter.bat" if sys.platform == "win32" else "flutter"
+    for raiz in (os.environ.get("FLUTTER_ROOT"), "C:/flutter"):
+        if raiz and (Path(raiz) / "bin" / nome).exists():
+            return str(Path(raiz) / "bin" / nome)
+    return None
+
+
 def checar_app() -> bool:
-    flutter = shutil.which("flutter")
+    flutter = achar_flutter()
     if not flutter:
         titulo("App Flutter")
         print("AVISO: Flutter SDK não instalado — análise e testes do app foram pulados.")

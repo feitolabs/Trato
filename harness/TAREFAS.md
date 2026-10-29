@@ -10,7 +10,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F0.3** `CLAUDE.md` curto. *Pronto quando:* regras + ações perigosas + gitflow.
 - [x] **F0.4** Este arquivo. *Pronto quando:* fases 1–9 quebradas em tarefas.
 - [x] **F0.5** `harness/verificar.ps1` e `verificar.sh`. *Pronto quando:* rodam testes, lint e busca de segredos.
-- [ ] **F0.6** 🔒 João aprova esta lista.
+- [x] **F0.6** 🔒 João aprova esta lista. (aprovado em 28/10/2026: "pode prosseguir")
 
 ## Fase 1 — Ambiente e segurança de base
 
@@ -18,7 +18,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F1.2** `.env.example` (só nomes) e `.gitignore` ignorando `.env`. *Pronto quando:* `git check-ignore .env` confirma.
 - [x] **F1.3** Checagem de segredos no `verificar`. *Pronto quando:* falha se achar chave no código.
 - [x] **F1.4** Backend "olá mundo" (FastAPI `/saude`) lendo `.env`, com teste. *Pronto quando:* `pytest` passa.
-- [!] **F1.5** App Flutter "olá mundo". *Bloqueado:* instalar Flutter SDK. *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
+- [~] **F1.5** App Flutter "olá mundo". Plataformas geradas, analyze e test ok. *Falta:* Android SDK (emulador) e Mac (iOS). *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
 - [ ] **F1.6** João coloca as chaves reais no `.env` (Supabase, Stripe teste). *Pronto quando:* backend sobe e lê as variáveis.
 - [ ] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada.
 - [ ] **F1.8** 🔒 Ligar `origin` ao GitHub "Trato" e dar push de `main` e `develop`. *Pronto quando:* branches no GitHub.
