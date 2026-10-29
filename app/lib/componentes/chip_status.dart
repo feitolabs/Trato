@@ -4,10 +4,10 @@ import '../tema/tema.dart';
 
 /// Família de cor do chip, seguindo o protótipo.
 enum TipoStatus {
-  /// "Em execução · pagamento retido", "2 orçamentos recebidos".
+  /// "Em execução · pagamento acompanhado", "2 orçamentos recebidos".
   info(CoresTrato.azulSuave, CoresTrato.azulTexto),
 
-  /// "Disputa aberta · valor congelado", aditivo aguardando.
+  /// "Disputa aberta · em análise", aditivo aguardando.
   alerta(CoresTrato.ambarSuave, CoresTrato.ambarTexto),
 
   /// "Finalizado", "Garantia ativa".

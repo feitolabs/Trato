@@ -64,6 +64,9 @@ class Disputa:
     aprovado_por: str | None = None
     aprovado_em: datetime | None = None
     divisao: Divisao | None = None  # preenchida quando DECIDIDA
+    # False = aberta depois da janela de congelamento: o repasse pode já ter sido liberado.
+    # A reclamação continua valendo (suporte e análise); só o congelamento automático some.
+    abertura_dentro_da_janela_de_congelamento: bool = True
 
     def _exigir(self, estado: Estado, ator: Ator, esperado: Ator) -> None:
         if ator is not esperado:
@@ -145,18 +148,22 @@ def abrir(
     agora: datetime,
     config: ConfigDisputa,
 ) -> Disputa:
-    """Cliente abre disputa dentro da janela de retenção do repasse; o valor fica congelado."""
+    """Cliente abre a disputa; o valor retido fica congelado.
+
+    A janela de congelamento (`prazo_congelar_repasse_horas`) só diz se o repasse ainda está
+    retido por padrão. Passar dela NÃO recusa a reclamação: isso seria renunciar a um direito
+    do cliente por regra automática. Os prazos legais são só informativos (`prazos_legais`).
+    """
     if ator is not Ator.CLIENTE:
         raise TransicaoInvalida(f"{ator} não pode abrir disputa (só cliente)")
     if isinstance(valor_congelado, bool) or not isinstance(valor_congelado, int):
         raise ResultadoInvalido("valor congelado deve ser inteiro (centavos)")
     if valor_congelado <= 0:
         raise ResultadoInvalido("valor congelado deve ser > 0")
-    if not dentro_da_janela(concluido_em, agora, config):
-        raise PrazoExpirado("janela para abrir disputa encerrada")
     return Disputa(
         valor_congelado=valor_congelado,
         motivo=motivo,
         aberta_em=agora,
         prazos=calcular_prazos(agora, config),
+        abertura_dentro_da_janela_de_congelamento=dentro_da_janela(concluido_em, agora, config),
     )

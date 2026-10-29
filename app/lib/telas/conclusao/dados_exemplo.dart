@@ -141,7 +141,7 @@ const resumoConclusaoExemplo = ResumoConclusao(
   orcamentoCentavos: 38000,
   aditivoCentavos: 4500,
   codigo: '7305',
-  avisoLiberacao: 'Liberação automática em 48 horas, salvo disputa aberta. '
+  avisoLiberacao: 'Confirmação automática em 48 horas, salvo disputa aberta. '
       'Ao confirmar, a garantia de 90 dias começa a contar.',
 );
 

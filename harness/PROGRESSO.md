@@ -182,3 +182,20 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em `backend/tests/margem/` (55): Pix, cartão à vista, 3x e 6x, os dois tipos de regra, arredondamento e soma exata.
 - `docs/simulacao-margem.md`: tickets R$ 80 a R$ 3.000 × Pix/cartão/3x/6x para 5% fixa, 7,5% fixa e progressiva 7,5/5/3,5. **Custos do provedor são ESTIMATIVAS até haver proposta (P7); faixas e mínimo de R$ 5,00 são hipóteses (P2).** Resultado: Pix nunca negativo; cartão 6x negativo em tudo; 5% fixa perde no cartão até R$ 500; a progressiva fica negativa no 3x a partir de R$ 1.000.
 - Sem banco, sem `app/`, sem push.
+
+## 29/10/2026 — Rodada V2 integrada
+
+- Em develop (sem push nesta sessão), uma por vez, cada uma verificada: `v2-margem` (simulador e `docs/simulacao-margem.md`), `v2-impacto-docs` (`docs/v2-impacto.md`, PENDENCIAS, TAREFAS, advogado-e-contador), `feature/v2-backend-d13` (pedido só pago após webhook assinado; garantia financiada desligada; janela de congelamento separada dos prazos legais) e `v2-textos-telas` (textos sem promessas proibidas; SOS atrás de `kSosHabilitado`). `claude/v2-backend-pago-43520a` não tinha commits próprios: os do backend estavam em `feature/v2-backend-d13`.
+- Testes em develop: 442 no backend, 406 no app, verificação OK.
+- Decisões D13, D14 e D15 registradas em `DECISOES.md`. D15: custódia caminho A (ledger espelho, sem saldo próprio nem saque).
+- Estado do banco (informado pelo João): F3.3, F3.4 e F3.7 **aplicadas** no Supabase em 29/10/2026 (versões 20261029170308, 20261029170728, 20261029170820). F3.5 está sendo refeita para o caminho A (a atual não será aplicada); F3.6 e F3.8 aguardam. F1.8: `origin` ligado e push de `main` e `develop` feito em https://github.com/feitolabs/Trato.
+- Não integradas por orientação: `banco-de-dados-seguro` (refazendo F3.5/F3.6/F3.8) e `auth-login` (ainda trabalhando).
+- Pendências: busca de textos proibidos no `verificar` (V2.1); custos reais de provedor para fechar V2.3 (P7/P16); ajustar a tela Carteira ao extrato (F6.6).
+
+## 29/10/2026 — Banco refeito para o caminho A integrado e aplicado
+
+- Em develop (sem push): `claude/fase-3-banco-completo-23eeae` (commit 34e6219: F3.5 refeita para o caminho A/D15, sem saque, chave Pix nem saldo; F3.6, F3.8b, rollbacks, testes e docs ajustados). Verificação: 442 testes no backend, 406 no app, TUDO OK.
+- Informado pelo João/sessão principal: aplicadas no Supabase em 29/10/2026 F3.3, F3.4, F3.5 (caminho A), F3.6, F3.7, F3.8a, F3.8b e F3.8c. Advisor de segurança sem alertas; 46 tabelas com RLS, 92 policies, 0 privilégios do anon, 4 buckets privados. Não apliquei nada: só os arquivos entraram em develop.
+- Faltam só os seeds (cidade, categorias, taxa, contas do ledger), que dependem de P2, P6, P7 e do OK do João.
+- Não integradas por orientação (sessões em andamento): ligar-backend-banco, ligar-app-api, telas-profissional, telas-comuns, pagamento-e2e e auth-login.
+
