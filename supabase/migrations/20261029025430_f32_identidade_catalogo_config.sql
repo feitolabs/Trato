@@ -1,7 +1,8 @@
 -- F3.2 — Identidade, profissional, verificação, catálogo e configuração versionada.
 -- Fonte: docs/modelo-de-dados.md, seções 1, 3 e 4 (aprovado pelo João em 28/10/2026).
 --
--- ATENÇÃO: este arquivo NÃO foi aplicado. Aplicar só com o OK explícito do João.
+-- APLICADA no Supabase "Trato" em 29/10/2026 (versão 20261029025430), com o OK explícito do João.
+-- O nome do arquivo segue a versão registrada no Supabase. Não editar a estrutura: criar nova migration.
 -- Só cria estrutura (DDL). Não insere nenhum dado: sem taxa, sem cidade, sem definições
 -- de configuração (dependem de P2, P6 e dos limites mínimo/máximo que o João vai definir).
 -- Todas as tabelas nascem com RLS ligado e SEM policy: ninguém lê pelo app até a F3.8.

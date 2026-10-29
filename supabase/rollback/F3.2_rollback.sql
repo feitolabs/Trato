@@ -1,4 +1,4 @@
--- Desfaz a migration F3.2 (supabase/migrations/20261028000100_f32_identidade_catalogo_config.sql).
+-- Desfaz a migration F3.2 (supabase/migrations/20261029025430_f32_identidade_catalogo_config.sql).
 -- ATENÇÃO: apaga as tabelas e todos os dados delas. Só rodar com OK do João.
 -- Ordem inversa das dependências.
 

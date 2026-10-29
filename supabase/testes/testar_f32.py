@@ -13,7 +13,7 @@ cur.execute("""create schema if not exists auth; create schema if not exists ext
   create table auth.users (id uuid primary key default gen_random_uuid());
   alter database postgres set search_path = "$user", public, extensions;""")
 con.close(); con = psycopg2.connect(srv.get_uri()); con.autocommit = True; cur = con.cursor()
-sql = (raiz / "supabase/migrations/20261028000100_f32_identidade_catalogo_config.sql").read_text(encoding="utf-8")
+sql = (raiz / "supabase/migrations/20261029025430_f32_identidade_catalogo_config.sql").read_text(encoding="utf-8")
 # O Postgres embutido não traz btree_gist: no teste local tiramos só a extensão e o EXCLUDE de faixas.
 sql = sql.replace("create extension if not exists btree_gist with schema extensions;", "")
 i = sql.index("  -- Faixas da mesma versão e escopo")
