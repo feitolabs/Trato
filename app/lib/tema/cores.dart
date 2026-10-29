@@ -26,6 +26,9 @@ abstract final class CoresTrato {
   static const textoSecundario = Color(0xFF485D5A);
   static const textoDica = Color(0xFF6B6A68);
 
+  /// Ponto inativo do indicador de páginas sobre fundo petróleo (splash).
+  static const pontoSobrePetroleo = Color(0xFF2A5A64);
+
   static const logoAzul = Color(0xFF60B3C3);
   static const logoAzulClaro = Color(0xFFA8D3DA);
 }

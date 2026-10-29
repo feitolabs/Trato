@@ -20,6 +20,7 @@ Não inventar regra: enquanto estiver aqui, não implementar.
 | P11 | **SMS/WhatsApp:** qual provedor (Twilio, Zenvia…)? | Tela Confirmar celular | Fase 5 |
 | P12 | **Fontes do protótipo:** identifiquei como Archivo (títulos) e Figtree (corpo) pelo desenho das letras. Confirmar ou mandar os nomes certos. | Todas as telas | Tipografia |
 | P13 | **Ícones:** o protótipo usa ícones de traço fino (estilo Lucide). Hoje uso os Material Outlined, que são parecidos. Trocar pelo pacote Lucide na F2.5? | Todas as telas | Fidelidade ao design |
+| P14 | **Textos do onboarding (páginas 2 e 3):** o PDF só mostra a página 1 de 3. Escrevi as outras duas com frases das telas de pagamento e disputa ("Seu dinheiro fica protegido", "Se algo der errado, você tem garantia"). Confirmar ou mandar o texto final. | Onboarding | Textos de tela |
 
 ## Para advogado e contador (o agente não decide)
 
