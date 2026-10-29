@@ -249,3 +249,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Check-in com permissões, aviso de "longe do endereço" e modo offline (`FilaOffline`, `offline_capturada_em`); `CheckOutTela` nova; `NovoPedidoTela.aoCapturarFoto`. Verificação, nota de materiais e cadastro já recebiam `CapturarFoto`: falta só ligar em `rotas.dart` (fora desta tarefa).
 - Manifest do Android e Info.plist com câmera e localização "em uso"; `INTERNET` entrou no manifesto principal.
 - Testes: 35 novos (permissões, sem GPS, longe, offline, upload, EXIF, hash). `flutter analyze` limpo. No `verificar.py` as seções do app passam; as do backend só rodam com o `.venv` (que não está no worktree) e passaram com o `.venv` do projeto (497 testes).
+
+
+## 29/10/2026 — Seeds do banco preparados (sem aplicar)
+
+- Branch `claude/seeds-banco-c8bade`. Só arquivos: `supabase/seeds/` (`parametros.sql` único, `seed_cidades_categorias`, `seed_config_taxa`, `seed_contas_ledger`, `seed_equipe_admin` só como modelo comentado), rollbacks em `supabase/rollback/seed_*_rollback.sql`, teste `supabase/testes/testar_seeds.py` (62 verificações em Postgres local) e `docs/seeds.md` com o formato `PRECISO DO SEU OK` e a lista de valores do João.
+- Nada foi aplicado em banco real. Os seeds abortam sem gravar enquanto houver `A DEFINIR PELO JOÃO` (cidade, garantias, taxa, mínimo, P1, P7, administrador). Tabela progressiva fica desligada (D2 em espera); ledger só roda com P7 confirmado.

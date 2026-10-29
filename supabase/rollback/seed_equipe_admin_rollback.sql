@@ -1,0 +1,8 @@
+-- Rollback do seed_equipe_admin — SÓ MODELO COMENTADO. Não executa nada.
+-- Se o João criou o administrador à mão e quer desfazer (só com OK dele):
+--   * a pessoa não é apagada: public.equipe usa on delete restrict em versões de configuração e
+--     em outras tabelas; o jeito seguro é revogar (ativo = false, revogado_em = now()).
+--
+-- -- update public.equipe set ativo = false, revogado_em = now() where usuario_id = '<UUID_DO_ADMIN>';
+--
+-- Apagar o usuário em Authentication > Users é decisão do João, no painel.
