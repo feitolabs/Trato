@@ -201,6 +201,10 @@ def checar_flutter(nome: str, pasta: Path) -> bool:
     return ok
 
 
+def checar_app() -> bool:
+    return checar_flutter("App", APP)
+
+
 def checar_admin() -> bool:
     return checar_flutter("Painel admin", ADMIN)
 
