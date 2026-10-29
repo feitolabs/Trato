@@ -140,6 +140,19 @@ class PedidosPostgres:
         self, pedido: Pedido, evento: Evento | None = None, dados: DadosPedido | None = None
     ) -> Pedido:
         pid = exigir_uuid(pedido.id, "pedido")
+        try:
+            return self._salvar(pid, pedido, evento, dados)
+        except RegraDoBanco as erro:
+            if pedido.estado is Estado.AGUARDANDO_CONFIRMACAO:
+                raise RegraDoBanco(
+                    "O estado 'aguardando confirmação' ainda não existe no banco "
+                    "(falta migration que o inclua em pedidos.status)."
+                ) from erro
+            raise
+
+    def _salvar(
+        self, pid: str, pedido: Pedido, evento: Evento | None, dados: DadosPedido | None
+    ) -> Pedido:
         with self._banco.transacao() as con:
             existe = con.execute("select 1 from public.pedidos where id = %s", (pid,)).fetchone()
             if existe is None:

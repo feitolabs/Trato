@@ -27,10 +27,13 @@ limita o backend aos privilégios que as migrations deram a ele.
 
 ### Antes de ligar no banco real (depende do João)
 
-1. **Aplicar as migrations** pendentes (F3.5 a F3.8 estão só preparadas). Com `service_role` o backend
-   precisa dos privilégios das tabelas da F3.2, que **só chegam na F3.8b**. A F3.8b depende da F3.5
-   e da F3.6. Enquanto elas não estiverem aplicadas, o caminho é conectar com o usuário dono do
-   projeto e deixar `TRATO_BANCO_PAPEL=` vazio (menos seguro: o dono pode desligar gatilhos).
+1. **Migrations aplicadas.** Com `service_role` o backend precisa dos privilégios das tabelas da
+   F3.2, que **só chegam na F3.8b**. O harness registra F3.5, F3.6, F3.8 e F3.9 como aplicadas no
+   projeto; confirme que a F3.8b está lá. Se não estiver, o caminho é conectar com o usuário dono
+   e deixar `TRATO_BANCO_PAPEL=` vazio (menos seguro: o dono pode desligar gatilhos).
+   **Falta uma migration**: o estado `aguardando_confirmacao` (V2, cliente avisou que pagou) não
+   está na restrição `pedidos.status` da F3.3. Até incluí-lo, `informar_pagamento` responde 409 com
+   mensagem clara em modo `postgres`.
 2. **Publicar a configuração versionada** (`config_versoes` vigente) com ao menos:
    `adiantamento_bps`, `prazo_resposta_disputa_horas`, `prazo_decisao_disputa_dias_uteis`,
    `prazo_congelar_disputa_horas`, mais as **faixas de taxa** (`config_faixas_taxa`, decisão P2).
@@ -105,11 +108,12 @@ ausente (503).
 
 ## Limites conhecidos (pendências)
 
-- **Em modo `postgres`, ledger, disputas, garantias e eventos de webhook seguem em memória**: as
-  tabelas (F3.5/F3.6) não estão no banco e a F3.5 está sendo refeita (caminho A, D15). Reiniciar
-  perde esses dados; não usar assim em produção.
-- **Pagamento/webhook**: não mudou (modo teste, `manipuladores_webhook` vazio). Falta o manipulador
-  que traduz o evento assinado em `confirmar_pagamento`.
+- **Em modo `postgres`, ledger, disputas, garantias e eventos de webhook seguem em memória**: os
+  repositórios Postgres deles ficam para depois da F3.5 refeita (caminho A, D15). Reiniciar perde
+  esses dados; não usar assim em produção.
+- **Pagamento/webhook**: não mudou (modo teste). O manipulador `webhook_pagamento.py` funciona com
+  `PedidosPostgres` (ator sistema vira `ator_id` nulo no histórico), mas o lançamento no ledger vai
+  para a memória.
 - **Conta com dois papéis** (profissional que também contrata): hoje vale o papel mais alto
   (profissional). Falta o app dizer com qual papel está agindo.
 - **Retrabalho/remarcação**: a remarcação cria novo agendamento (o antigo vira `remarcado`), mas o
