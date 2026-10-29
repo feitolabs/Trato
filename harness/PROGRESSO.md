@@ -195,6 +195,17 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Branch `feature/telas-profissional-faltantes`. 10 telas novas em `telas/{profissional_cadastro,verificacao,nota_material,aditivo,disputa_profissional,perfil_publico}/` + peças comuns em `telas/profissional_apoio/`. Serviços por interface com fakes; callbacks a ligar em `rotas.dart` listados em `docs/telas-profissional.md`.
 - Protótipo não conferido página a página: todas marcadas "sem protótipo".
 - Testes: `test/telas_profissional_test.dart` (27) e goldens 14×3. Não mexi em main.dart, rotas.dart, componentes.dart nem tema.
+
+## 29/10/2026 — App ligado à API (modo demo | api)
+
+- Nova camada `app/lib/dados/`: `ClienteApi` (http, `TRATO_API_URL`, Authorization, 15 s, erros em português), modelos à mão, repositórios (interface + API + fake) de pedidos, orçamentos, pagamento, chat, notificações, perfil e profissional; `Carregador` dá carregando/erro/vazio às telas.
+- `--dart-define=TRATO_MODO=demo|api` (padrão demo). `main.dart` escolhe; `rotas.dart` entrega os repositórios às telas (as telas não conhecem a rede).
+- No modo api, ligadas: Novo pedido, Seus pedidos, Pedido em execução (linha do tempo + código de início), Conclusão, Confirmar, Relatar problema (disputa), Retrabalho, Carteira como extrato (D15). Fake por falta de rota no backend: orçamentos (lista), pagamento/cobrança, chat, notificações, perfil, início/pedidos abertos e calculadora do profissional, câmera/GPS do check-in. Tabela completa em `docs/app-ligacao.md`.
+- Telas novas: Notificações e Aguardando confirmação do pagamento (consulta a cada 3 s; só avança quando o backend diz pago, D14/D15). Edições aditivas: `CarteiraTela(soExtrato)`, `CascaProfissionalTela(abaCarteira, carregarDetalhe, recusarPedido)`, código de início na execução, `PedidoResumo.id/estadoApi`.
+- Novo pedido ganhou ponto de entrada: botão "Novo pedido" na aba Pedidos.
+- Testes: 35 novos em `app/test/dados/` (cliente HTTP e repositórios API com `MockClient`; telas ligadas com repositórios fake). Goldens não mudaram.
+- Sem push, sem banco. Backend não foi tocado.
+
 ## 29/10/2026 — Rodada V2 integrada
 
 - Em develop (sem push nesta sessão), uma por vez, cada uma verificada: `v2-margem` (simulador e `docs/simulacao-margem.md`), `v2-impacto-docs` (`docs/v2-impacto.md`, PENDENCIAS, TAREFAS, advogado-e-contador), `feature/v2-backend-d13` (pedido só pago após webhook assinado; garantia financiada desligada; janela de congelamento separada dos prazos legais) e `v2-textos-telas` (textos sem promessas proibidas; SOS atrás de `kSosHabilitado`). `claude/v2-backend-pago-43520a` não tinha commits próprios: os do backend estavam em `feature/v2-backend-d13`.

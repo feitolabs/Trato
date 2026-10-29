@@ -16,7 +16,12 @@ class CarteiraTela extends StatelessWidget {
     this.aoVerTudo,
     this.aoTentarNovamente,
     this.barraInferior,
+    this.soExtrato = false,
   });
+
+  /// D15: a Carteira é só extrato (o Trato não guarda saldo nem faz saque). Esconde os
+  /// cartões de saldo e o botão de saque e mostra apenas os lançamentos.
+  final bool soExtrato;
 
   final DadosCarteira dados;
   final VoidCallback? aoSacarPix;
@@ -34,24 +39,22 @@ class CarteiraTela extends StatelessWidget {
       body: SafeArea(
         child: ConteudoResponsivo(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(
-                top: EspacosTrato.x5, bottom: EspacosTrato.x5),
+            padding: const EdgeInsets.only(top: EspacosTrato.x5, bottom: EspacosTrato.x5),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Carteira', style: TipografiaTrato.tituloGrande),
                 const SizedBox(height: EspacosTrato.x5),
                 if (dados.erro != null)
-                  _CartaoErro(
-                      mensagem: dados.erro!,
-                      aoTentarNovamente: aoTentarNovamente)
-                else if (resumo != null) ...[
-                  _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),
-                  const SizedBox(height: EspacosTrato.x3),
-                  _LinhaSaldos(resumo: resumo),
-                  const SizedBox(height: EspacosTrato.x6),
-                  _CabecalhoExtrato(
-                      aoVerTudo: dados.extrato.isEmpty ? null : aoVerTudo),
+                  _CartaoErro(mensagem: dados.erro!, aoTentarNovamente: aoTentarNovamente)
+                else if (resumo != null || soExtrato) ...[
+                  if (!soExtrato && resumo != null) ...[
+                    _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),
+                    const SizedBox(height: EspacosTrato.x3),
+                    _LinhaSaldos(resumo: resumo),
+                    const SizedBox(height: EspacosTrato.x6),
+                  ],
+                  _CabecalhoExtrato(aoVerTudo: dados.extrato.isEmpty ? null : aoVerTudo),
                   const SizedBox(height: EspacosTrato.x3),
                   if (dados.extrato.isEmpty)
                     const _ExtratoVazio()
@@ -89,8 +92,7 @@ class _CartaoDisponivel extends StatelessWidget {
             child: Text(
               Dinheiro.formatar(resumo.disponivelCentavos),
               maxLines: 1,
-              style: TipografiaTrato.marcaPequena
-                  .copyWith(color: CoresTrato.creme, fontSize: 44),
+              style: TipografiaTrato.marcaPequena.copyWith(color: CoresTrato.creme, fontSize: 44),
             ),
           ),
           const SizedBox(height: EspacosTrato.x3),
@@ -181,14 +183,12 @@ class _CartaoSaldo extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(Dinheiro.formatar(centavos),
-                style: TipografiaTrato.titulo, maxLines: 1),
+            child: Text(Dinheiro.formatar(centavos), style: TipografiaTrato.titulo, maxLines: 1),
           ),
           const SizedBox(height: EspacosTrato.x1),
           Text(
             texto,
-            style: TipografiaTrato.corpoPequeno
-                .copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
           ),
         ],
       ),
@@ -209,8 +209,7 @@ class _CabecalhoExtrato extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text('Extrato por serviço',
-                style: TipografiaTrato.titulo, maxLines: 1),
+            child: Text('Extrato por serviço', style: TipografiaTrato.titulo, maxLines: 1),
           ),
         ),
         if (aoVerTudo != null) BotaoLink(texto: 'Ver tudo', aoTocar: aoVerTudo),
@@ -251,19 +250,16 @@ class _LinhaExtrato extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final liberado = item.status == StatusExtrato.liberado;
-    final secundario = TipografiaTrato.corpoPequeno
-        .copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-                child: Text(item.titulo, style: TipografiaTrato.tituloCartao)),
+            Expanded(child: Text(item.titulo, style: TipografiaTrato.tituloCartao)),
             const SizedBox(width: EspacosTrato.x3),
-            Text(Dinheiro.formatar(item.liquidoCentavos),
-                style: TipografiaTrato.tituloCartao),
+            Text(Dinheiro.formatar(item.liquidoCentavos), style: TipografiaTrato.tituloCartao),
           ],
         ),
         Text(item.detalheData, style: secundario),
@@ -302,8 +298,7 @@ class _ExtratoVazio extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             'Quando você concluir um serviço, ele aparece aqui com o valor, a taxa e o líquido.',
-            style: TipografiaTrato.corpoPequeno
-                .copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
           ),
         ],
       ),
@@ -323,10 +318,7 @@ class _CartaoErro extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const ChipStatus(
-              texto: 'Erro',
-              tipo: TipoStatus.perigo,
-              icone: Icons.error_outline),
+          const ChipStatus(texto: 'Erro', tipo: TipoStatus.perigo, icone: Icons.error_outline),
           const SizedBox(height: EspacosTrato.x3),
           Text(mensagem, style: TipografiaTrato.corpo),
           const SizedBox(height: EspacosTrato.x4),

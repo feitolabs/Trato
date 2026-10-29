@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../em_breve_tela.dart';
 import 'detalhe_pedido_tela.dart';
 import 'dados_exemplo.dart';
@@ -23,7 +24,19 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoFazerOrcamento,
     this.aoPerguntar,
     this.aoRecusar,
+    this.abaCarteira,
+    this.carregarDetalhe,
+    this.recusarPedido,
   });
+
+  /// Carrega o detalhe do pedido tocado (API). Sem isso, mostra [detalhe].
+  final Future<DetalhePedido> Function(PedidoAberto pedido)? carregarDetalhe;
+
+  /// Recusa o pedido tocado. Sem isso, usa [aoRecusar].
+  final Future<void> Function(PedidoAberto pedido, MotivoRecusa motivo)? recusarPedido;
+
+  /// Conteúdo da aba Carteira (extrato). Sem isso, a aba mostra "Em breve".
+  final Widget? abaCarteira;
 
   final int abaInicial;
   final InicioProfissional inicio;
@@ -45,17 +58,25 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   void _ir(int indice) => setState(() => _aba = indice);
 
   void _abrirDetalhe(PedidoAberto pedido) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => DetalhePedidoTela(
-          dados: widget.detalhe,
+    Widget tela(DetalhePedido dados) => DetalhePedidoTela(
+          dados: dados,
           aoFazerOrcamento: widget.aoFazerOrcamento,
           aoPerguntar: widget.aoPerguntar,
           aoRecusar: (motivo) {
             widget.aoRecusar?.call(motivo);
+            widget.recusarPedido?.call(pedido, motivo);
             Navigator.of(context).pop();
           },
-        ),
+        );
+    final carregar = widget.carregarDetalhe;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => carregar == null
+            ? tela(widget.detalhe)
+            : Carregador<DetalhePedido>(
+                carregar: () => carregar(pedido),
+                construir: (_, dados) => tela(dados),
+              ),
       ),
     );
   }
@@ -74,7 +95,10 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         aoAbrirFiltros: _filtros,
         aoAbrirPedido: _abrirDetalhe,
       ),
-      for (final aba in abasProfissional.skip(1)) EmBreveTela(titulo: aba.rotulo),
+      for (final (i, aba) in abasProfissional.indexed.skip(1))
+        i == 3 && widget.abaCarteira != null
+            ? widget.abaCarteira!
+            : EmBreveTela(titulo: aba.rotulo),
     ];
     return Scaffold(
       body: IndexedStack(index: _aba, children: paginas),

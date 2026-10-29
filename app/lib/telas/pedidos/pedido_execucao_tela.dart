@@ -63,6 +63,32 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         icone: Icons.lock_outline,
                       ),
                     ),
+                    if (pedido.codigoInicio != null) ...[
+                      const SizedBox(height: EspacosTrato.x4),
+                      CartaoTrato(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Código de início', style: TipografiaTrato.tituloCartao),
+                            const SizedBox(height: EspacosTrato.x2),
+                            Semantics(
+                              label: 'Código de início ${pedido.codigoInicio!.split('').join(' ')}',
+                              child: ExcludeSemantics(
+                                child:
+                                    Text(pedido.codigoInicio!, style: TipografiaTrato.tituloGrande),
+                              ),
+                            ),
+                            const SizedBox(height: EspacosTrato.x1),
+                            Text(
+                              'Passe este código ao profissional quando ele chegar.',
+                              style: TipografiaTrato.corpoPequeno.copyWith(
+                                color: CoresTrato.textoSecundario,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (_aditivo != null) ...[
                       const SizedBox(height: EspacosTrato.x4),
                       CartaoAditivo(
