@@ -35,12 +35,12 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 - [x] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova. (aprovado pelo João em 28/10/2026; as propostas provisórias N1, N8, N10, N11 valem até ele decidir diferente)
 - [x] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração. Aplicada no Supabase Trato em 29/10/2026 (versão 20261029025430) com o OK do João. 15 tabelas, RLS em todas, 0 linhas de dados.
-- [ ] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite).
-- [ ] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out.
-- [ ] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques.
-- [ ] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações.
-- [ ] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável.
-- [ ] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro.
+- [~] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite). *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [~] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [~] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [~] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [~] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [~] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
 - [~] **F3.9** Rodar advisors do Supabase e corrigir. *Pronto quando:* sem alerta de segurança. *(rodado após a F3.2: só restam os 15 avisos "RLS sem policy", esperados até a F3.8)*
 
 ## Fase 4 — Backend Python
@@ -54,7 +54,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F4.7** Disputa (congela, 48 h, decisão em 5 dias úteis, resultados). *Pronto quando:* testes dos 4 resultados.
 - [x] **F4.8** Garantia e retrabalho (prazo por categoria, 7 dias para atender). *Pronto quando:* testes.
 - [x] **F4.9** Rotinas: liberação por prazo, expiração de pedido, lembretes. *Pronto quando:* testes com relógio simulado.
-- [ ] **F4.10** Simulação ponta a ponta pela API (Stripe modo teste). *Pronto quando:* um serviço vai de Aberto a Concluído.
+- [~] **F4.10** Simulação ponta a ponta pela API (Stripe modo teste). *Pronto quando:* um serviço vai de Aberto a Concluído. *(camada HTTP FastAPI com rotas de pedidos, disputa, retrabalho, ledger e webhook, repositórios em memória; falta banco real e Stripe modo teste)*
 
 ## Fase 5 — App do Cliente (MVP primeiro)
 
@@ -62,26 +62,26 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
 - [~] **F5.3** Cadastro em 2 passos + confirmação por SMS. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
 - [~] **F5.4** Início, categorias, buscar, perfil do profissional.
-- [ ] **F5.5** Novo pedido com perguntas guiadas, fotos, prazo, faixa de preço.
-- [ ] **F5.6** Orçamentos recebidos, detalhe, aceite com contrato digital.
-- [ ] **F5.7** Pagamento (Pix/cartão, 30% adiantado) e recibo.
+- [~] **F5.5** Novo pedido com perguntas guiadas, fotos, prazo, faixa de preço. *(tela pronta com dados de exemplo; falta o ponto de entrada no app e a API)*
+- [~] **F5.6** Orçamentos recebidos, detalhe, aceite com contrato digital. *(orçamentos recebidos e detalhe ligados ao pagamento no fluxo; contrato digital e API pendentes)*
+- [~] **F5.7** Pagamento (Pix/cartão, 30% adiantado) e recibo. *(tela de pagamento ligada ao aceite; falta recibo, Stripe e API)*
 - [~] **F5.8** Seus pedidos, pedido em execução (linha do tempo, código de início).
 - [~] **F5.9** Aditivo (aprovar/recusar) e nota de materiais.
 - [~] **F5.10** Conclusão (código), avaliação, garantia, retrabalho.
 - [~] **F5.11** Relatar problema (disputa).
 - [ ] **F5.12** Chat, notificações.
-- [ ] **F5.13** Perfil, ajuda, LGPD (exportar e excluir conta), SOS e compartilhar atendimento.
+- [~] **F5.13** Perfil, ajuda, LGPD (exportar e excluir conta), SOS e compartilhar atendimento. *(só a tela de Perfil, ligada à aba; falta ajuda, LGPD, SOS e compartilhar)*
 
 *Pronto quando (cada uma):* tela confere com o protótipo, teste de widget passa, funciona em Android e iOS.
 
 ## Fase 6 — App do Profissional
 
 - [ ] **F6.1** Cadastro e verificação (documento + selfie), status da análise.
-- [ ] **F6.2** Início, pedidos abertos com filtros, detalhe, recusar com motivo.
+- [~] **F6.2** Início, pedidos abertos com filtros, detalhe, recusar com motivo. *(início, detalhe e recusa com dados de exemplo; falta filtros e API)*
 - [~] **F6.3** Calculadora de orçamento (taxa e líquido vindos do backend), etapas, sinal, validade, garantia.
 - [~] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out.
 - [ ] **F6.5** Enviar nota dos materiais e criar aditivo.
-- [ ] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ).
+- [~] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ). *(tela da carteira com dados de exemplo; falta ligar à aba da casca do profissional e à API)*
 - [ ] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações.
 
 *Pronto quando:* profissional de teste é aprovado, orça, executa, recebe e saca.
@@ -99,7 +99,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 - [ ] **F8.1** Mascarar telefone, endereço só após contratar. - [ ] **F8.2** Antifraude básico.
 - [ ] **F8.3** LGPD: consentimentos, exportar, excluir, retenção. - [ ] **F8.4** Regras das lojas.
-- [ ] **F8.5** Advisors + varredura de segredos no repo. - [ ] **F8.6** Lista para advogado e contador.
+- [ ] **F8.5** Advisors + varredura de segredos no repo. - [x] **F8.6** Lista para advogado e contador.
 
 ## Fase 9 — Entrega
 

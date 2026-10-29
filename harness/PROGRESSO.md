@@ -163,3 +163,15 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `app/lib/telas/fluxo/rotas.dart` liga: login/cadastro → casca do cliente; aba Pedidos → pedido em execução → chat → conclusão → avaliação ou relato; finalizado → garantia. Cadastro de profissional → `AreaProfissionalProvisoria` (calculadora e check-in, com serviços de teste).
 - Testes: 267 no app (7 percursos novos em `test/fluxo_test.dart`). No emulador: splash → onboarding → login → cadastro (formulário preenchido e validado). Não conferido no emulador: confirmar celular → casca, e as telas de pedido (só nos testes).
 - Ainda sem tela: orçamentos recebidos, novo pedido, disputa em andamento, perfil do cliente, lista de mensagens, home do profissional. Dados continuam de exemplo.
+
+## 29/10/2026 — Integração em lote (sessões do banco, API, telas e docs)
+
+- Em develop (sem push), uma por vez, cada uma verificada antes de entrar: F2.4 duplicada com telas F5.5/F5.6 (`telas/orcamentos/`, `telas/pedido_novo/`), F5.7 e F5.13 (`telas/pagamento/`, `telas/perfil_cliente/`), F6.2 (`telas/profissional_inicio/`), camada HTTP do backend (`trato/api/`), F6.6 (`telas/carteira/`), banco F3.3 a F3.8 (**só arquivos SQL**) e docs (`docs/advogado-e-contador.md`, `docs/COMO-RODAR.md`, workflow `.github/workflows/verificar.yml`, não executado).
+- Ligação no fluxo (`rotas.dart`): pedido com orçamentos → lista → detalhe → aceite → pagamento; aba Perfil do cliente; cadastro de profissional agora cai na casca do profissional (check-in e orçamento com serviços de teste).
+- Testes em develop: 362 no backend, 404 no app, verificação OK.
+- **Migrations F3.3 a F3.8c NÃO foram aplicadas no Supabase.** Plano e riscos em `docs/seguranca-banco.md`; aplicar é decisão do João. Testadas num Postgres local (574 verificações).
+- Para o app/backend: nas tabelas com colunas escondidas não usar `select *`; app só lê, escrita pelo backend com `service_role`; buckets `verificacao`, `pedido-midias`, `chat-anexos`, `avatar` com upload por URL assinada.
+- Descoberta: tabelas novas do `public` nascem com TRUNCATE/REFERENCES/TRIGGER para anon/authenticated e sem SELECT/INSERT para service_role; as migrations dão os grants explicitamente.
+- Não ligado ainda (sem ponto de entrada óbvio): Novo pedido (tela 11), Carteira na aba do profissional (a casca tem a aba como "em breve"), `AreaProfissionalProvisoria` ficou sem uso. Sair do perfil sem ação definida.
+- `docs/COMO-RODAR.md` cobre F9.5 só em parte (falta `ENTREGA.md`).
+
