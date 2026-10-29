@@ -30,3 +30,17 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Android SDK (emulador) e Mac para iOS — ver PENDENCIAS.
 
 **Próxima tarefa:** F2.1 (tokens de design do protótipo).
+
+## 28/10/2026 — F2.1 e F2.2 tema do protótipo
+
+**Feito**
+- Cores medidas nos pixels do PDF de telas (o PDF é imagem + OCR) → `docs/design-tokens.md`.
+- Tema Flutter em `app/lib/tema/` (cores, tipografia, espaços, ThemeData). Fontes Archivo e Figtree (OFL) embutidas em `app/assets/fontes/`.
+- Splash provisória com o tema; golden tests em 3 tamanhos (320, 390, 768 de largura).
+- `verificar` agora falha se houver cor solta fora de `lib/tema/`. Verificação: TUDO OK (8 testes no app, 3 no backend).
+
+**Riscos**
+- Goldens gerados no Windows: podem dar diferença de pixel em macOS/Linux. Gerar no CI quando existir.
+- Fontes a confirmar (P12).
+
+**Próxima tarefa:** F2.3 (componentes: botão, campo, cartão, chip, linha do tempo, barra de abas).

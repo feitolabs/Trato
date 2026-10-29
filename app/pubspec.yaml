@@ -17,3 +17,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: Archivo
+      fonts:
+        - asset: assets/fontes/Archivo.ttf
+    - family: Figtree
+      fonts:
+        - asset: assets/fontes/Figtree.ttf

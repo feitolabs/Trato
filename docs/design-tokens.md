@@ -1,0 +1,71 @@
+# Tokens de design — Trato
+
+Extraídos de `Trato — Telas do app.pdf` (27 telas). O PDF é imagem com OCR; as cores foram
+medidas nos pixels (cor dominante de cada área, e pixel mais escuro para texto fino).
+Código: `app/lib/tema/`. **Nenhuma cor, fonte ou espaçamento fora do tema.**
+
+Escala: a tela do protótipo tem 292,5 pt de largura e corresponde a 390 dp (iPhone padrão).
+1 pt do PDF ≈ 1,333 dp.
+
+## Cores
+
+| Token | Hex | Onde aparece |
+|---|---|---|
+| `petroleo` (primária) | `#0E3A43` | Splash, botões primários, títulos, texto principal, cartão "Descreva o problema", resumo da calculadora |
+| `creme` (fundo) | `#F4EEE2` | Fundo de todas as telas; texto sobre petróleo |
+| `superficie` | `#FBF8F1` | Cartões, campos, botões secundários, barra inferior |
+| `borda` | `#D8CFBE` | Contorno de cartões, campos e botões secundários |
+| `azulClaro` | `#8FC1C8` | Ilustrações e espaços de foto |
+| `azulSuave` | `#DCEBEE` | Fundo de chip informativo ("Em execução · pagamento retido"), aba ativa da barra, opção selecionada |
+| `azulTexto` | `#0B6067` | Texto de chip informativo, links ("Pular", "Já tenho conta", "Adicionar item"), garantia ativa |
+| `laranja` (destaque) | `#FF8A4C` | Ponto do logo, chip "3 orçamentos novos" |
+| `ambarSuave` / `ambarTexto` | `#F8EBCB` / `#7C5100` | Aditivo aguardando, "Disputa aberta · valor congelado" |
+| `verdeSuave` / `verdeTexto` | `#E3EFE5` / `#22683C` | Chip "Finalizado", sucesso |
+| `vermelhoSuave` / `vermelhoTexto` | `#F8E0DC` / `#9C221B` | Botão SOS, erros |
+| `textoSecundario` | `#485D5A` | Subtítulos, rótulos ("Olá, Mariana", "1 DE 3", "Buscar"), descrições |
+| `textoDica` | `#6B6A68` | Placeholder dos campos |
+| `logoAzul` / `logoAzulClaro` | `#60B3C3` / `#A8D3DA` | Só no logo Feito Labs |
+
+## Tipografia
+
+| Estilo | Fonte | Tamanho / peso | Exemplo |
+|---|---|---|---|
+| `marca` | Archivo | 72 / 900 | "Trato" na splash |
+| `lema` | Figtree | 18 / 400 | "Serviço feito, dinheiro liberado." |
+| `tituloGrande` | Archivo | 28 / 800, altura 1,15 | "Descreva o problema, receba orçamentos", "Seus pedidos" |
+| `titulo` | Archivo | 22 / 800 | "Categorias", "Linha do tempo", "Material" |
+| `tituloCartao` | Figtree | 17 / 700 | "Troca de tomadas e chuveiro" |
+| `corpo` | Figtree | 16 / 400, altura 1,5 | Textos e campos |
+| `corpoForte` | Figtree | 16 / 700 | Botões, rótulos de campo |
+| `corpoPequeno` | Figtree | 14 / 400 | Descrições de cartão, chips |
+| `legenda` | Figtree | 13 / 400 | Dicas abaixo dos campos |
+| `sobretitulo` | Figtree | 13 / 700, espaçamento 1,5, maiúsculas | "1 DE 3", "FEITO LABS APRESENTA" |
+
+> **A confirmar com o João (P12):** as fontes foram identificadas pelo desenho das letras
+> (o PDF não traz o nome). Se o protótipo usou outras fontes, é só trocar os arquivos em
+> `app/assets/fontes/` e os nomes em `tipografia.dart`.
+
+## Espaços, raios e tamanhos (dp)
+
+| Token | Valor | Uso |
+|---|---|---|
+| `margemTela` | 20 | Margem lateral (16 em telas densas, 24 no onboarding) |
+| `espaco` | 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48 | Escala de espaçamento |
+| `raioPequeno` | 8 | Chips |
+| `raio` | 12 | Botões, campos, cartões de categoria |
+| `raioGrande` | 16 | Cartões, ilustração do onboarding |
+| `raioPilula` | 999 | Botão SOS, indicador da aba ativa |
+| `alturaBotao` | 52 | Botões primário e secundário |
+| `alturaCampo` | 52 | Campos de texto |
+| `bordaFina` | 1 | Contornos |
+
+## Componentes observados (para a F2.3)
+
+- **Botão primário:** fundo petróleo, texto creme, Figtree 16/700, raio 12, altura 52, largura total.
+- **Botão secundário:** fundo superfície, borda `borda`, texto petróleo.
+- **Link:** `azulTexto`, sublinhado, Figtree 16/700.
+- **Campo:** fundo superfície, borda `borda`, raio 12, rótulo acima (Figtree 16/700).
+- **Cartão:** fundo superfície, borda `borda`, raio 16, padding 20.
+- **Chip de status:** fundo suave + texto forte da mesma família (azul, âmbar, verde, vermelho, laranja), raio 8, Figtree 14/700.
+- **Linha do tempo:** círculo petróleo com ✓ (feito), círculo azul suave com borda (atual), círculo vazio (futuro), linha cinza ligando.
+- **Barra inferior:** 5 abas, ícone e rótulo; ativa com pílula `azulSuave` atrás do ícone e rótulo em negrito.

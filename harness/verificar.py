@@ -79,6 +79,23 @@ def checar_env_ignorado() -> bool:
     return False
 
 
+def checar_cores_soltas() -> bool:
+    """Regra 7: cor só no tema. Color(0x...) e Colors.* fora de app/lib/tema/ falham."""
+    titulo("App — cores fora do tema")
+    padrao = re.compile(r"\bColor\(\s*0x|\bColor\.fromARGB\(|\bColor\.fromRGBO\(|\bColors\.(?!transparent\b)")
+    ok = True
+    for arquivo in (APP / "lib").rglob("*.dart"):
+        if (APP / "lib" / "tema") in arquivo.parents:
+            continue
+        for numero, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), start=1):
+            if padrao.search(linha):
+                print(f"FALHA: cor solta em {arquivo.relative_to(RAIZ)}:{numero} — use CoresTrato")
+                ok = False
+    if ok:
+        print("ok")
+    return ok
+
+
 def python_do_backend() -> str:
     venv = BACKEND / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     return str(venv) if venv.exists() else sys.executable
@@ -126,7 +143,13 @@ def checar_app() -> bool:
 
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
-    resultados = [checar_segredos(), checar_env_ignorado(), checar_backend(), checar_app()]
+    resultados = [
+        checar_segredos(),
+        checar_env_ignorado(),
+        checar_cores_soltas(),
+        checar_backend(),
+        checar_app(),
+    ]
     titulo("Resultado")
     if all(resultados):
         print("TUDO OK")
