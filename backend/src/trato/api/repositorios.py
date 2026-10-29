@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Protocol
 
 from trato.disputas import ConfigDisputa, Disputa
@@ -31,13 +31,56 @@ class Orcamento:
 
 @dataclass(frozen=True)
 class Contrato:
-    """Congelado ao aceitar o orçamento. Etapas e aditivos entram na F4.4."""
+    """Congelado ao aceitar o orçamento. Etapas e aditivos entram na F4.4.
+
+    `aceito_em` e os dados do aparelho são registrados no aceite (só o Postgres os guarda).
+    """
 
     pedido_id: str
     orcamento_id: str
     profissional_id: str
     valor_centavos: int
     categoria_id: str | None = None
+    aceito_em: datetime | None = None
+    aceite_ip: str | None = None
+    aceite_dispositivo: str | None = None
+
+
+@dataclass(frozen=True)
+class RespostaPedido:
+    pergunta_id: str
+    resposta: Any
+
+
+@dataclass(frozen=True)
+class EnderecoPedido:
+    logradouro: str
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cep: str | None = None
+    referencia: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+
+
+@dataclass(frozen=True)
+class DadosPedido:
+    """O que o cliente descreve ao abrir o pedido. A memória ignora; o Postgres exige."""
+
+    categoria_id: str
+    cidade_id: str
+    titulo: str
+    descricao: str
+    bairro: str | None = None
+    local_aprox_lat: float | None = None
+    local_aprox_lng: float | None = None
+    prazo_desejado: date | None = None
+    faixa_preco_min_centavos: int | None = None
+    faixa_preco_max_centavos: int | None = None
+    urgente: bool = False
+    respostas: tuple[RespostaPedido, ...] = ()
+    endereco: EnderecoPedido | None = None
 
 
 @dataclass(frozen=True)
@@ -65,8 +108,14 @@ class ProvedorConfig(Protocol):
 class RepositorioPedidos(Protocol):
     def obter(self, pedido_id: str) -> Pedido | None: ...
 
-    def salvar(self, pedido: Pedido, evento: Evento | None = None) -> None:
-        """Grava o pedido e, se vier, o evento de auditoria (mesma transação)."""
+    def salvar(
+        self, pedido: Pedido, evento: Evento | None = None, dados: DadosPedido | None = None
+    ) -> Pedido:
+        """Grava o pedido e, se vier, o evento de auditoria (mesma transação).
+
+        Devolve o pedido como ficou gravado (o Postgres refaz os códigos de início e conclusão
+        a partir do segredo do servidor). `dados` só vale ao criar o pedido.
+        """
 
     def eventos(self, pedido_id: str) -> Sequence[Evento]: ...
 

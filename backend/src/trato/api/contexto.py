@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -65,6 +66,8 @@ class Contexto:
         default_factory=lambda: _manipuladores_padrao()
     )
     apos_transicao: list[GanchoTransicao] = field(default_factory=list)
+    # Só existem com persistência Postgres (a memória não os implementa).
+    extras: dict[str, Any] = field(default_factory=dict)
 
 
 def obter_contexto(request: Request) -> Contexto:

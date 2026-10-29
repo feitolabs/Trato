@@ -20,6 +20,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import (
     AbrirDisputaIn,
+    AbrirPedidoIn,
     AcaoPedidoIn,
     AceitarOrcamentoIn,
     CancelarIn,
@@ -102,12 +103,13 @@ def _concluir_efeitos(contexto: Contexto, pedido: Pedido) -> None:
 
 @router.post("", response_model=PedidoOut, status_code=201, summary="Abrir pedido")
 def abrir_pedido(
+    corpo: AbrirPedidoIn | None = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
     pedido = estados.abrir_pedido(uuid.uuid4().hex, ator_de(usuario), contexto.agora())
-    contexto.pedidos.salvar(pedido)
-    return pedido_out(pedido, usuario)
+    gravado = contexto.pedidos.salvar(pedido, None, corpo.para_dados() if corpo else None)
+    return pedido_out(gravado, usuario)
 
 
 @router.get("", response_model=list[PedidoOut], summary="Meus pedidos")
@@ -179,9 +181,9 @@ def mudar_estado(
     transicao = estados.transicionar(
         pedido, acao, ator_de(usuario), contexto.agora(), prova, cfg.prazos_pedido
     )
-    contexto.pedidos.salvar(transicao.pedido, transicao.evento)
-
     if acao is Acao.ACEITAR_ORCAMENTO:
+        # Contrato antes do pedido: se o contrato falhar (ex.: taxa não publicada), o pedido
+        # continua aberto. Gravar o contrato de novo com os mesmos dados não duplica.
         orcamento = contexto.orcamentos.obter(transicao.pedido.orcamento_id or "")
         if orcamento is not None:
             contexto.contratos.salvar(
@@ -191,12 +193,14 @@ def mudar_estado(
                     orcamento.profissional_id,
                     orcamento.valor_centavos,
                     orcamento.categoria_id,
+                    aceito_em=transicao.evento.em,
                 )
             )
-    _concluir_efeitos(contexto, transicao.pedido)
+    gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    _concluir_efeitos(contexto, gravado)
     for gancho in contexto.apos_transicao:
-        gancho(pedido, transicao.pedido, acao, contexto)
-    return pedido_out(transicao.pedido, usuario)
+        gancho(pedido, gravado, acao, contexto)
+    return pedido_out(gravado, usuario)
 
 
 # --- Disputa ----------------------------------------------------------------------------
