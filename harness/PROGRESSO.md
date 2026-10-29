@@ -236,3 +236,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `harness/verificar.py` ganhou "App — textos proibidos (D13)": falha se `app/lib/**/*.dart` tiver "escrow", "garantia total", "profissional seguro", "reembolso automático", "menor taxa do mercado" ou "24/7" fora de comentário. Linha com `verificar: ignorar` é liberada. V2.1 passa a `[x]`.
 - Em paralelo (sessões `app-pendencias` e `backend-pendencias`): token do login na API, pontos de entrada de telas, câmera/GPS, rotas de backend que faltam e testes com Postgres local.
 
+## 29/10/2026 — Painel admin web (F7.1 a F7.6, telas com dados de exemplo)
+
+- Branch `feature/f7-painel-admin`, sem push. Projeto novo `admin/` (Flutter Web, D13): login por papel, verificação, disputas, pagamentos somente leitura (D15), busca/suporte/categorias, configurações com aprovação dupla e reversão, auditoria com verificação da cadeia de hash.
+- Tema copiado de `app/lib/tema/` com aviso de origem (`admin/lib/tema/LEIA-ME.md`). `app/` e `backend/` não foram tocados.
+- Dados vêm de `ApiAdmin` (interface) com `ApiFake`; a API admin do backend ainda não existe. Contrato de endpoints, papéis e regras em `docs/painel-admin.md`.
+- `harness/verificar.py` agora também confere `admin/lib` (cores soltas, textos D13) e roda `flutter analyze`/`flutter test` do painel.
+- Falta: backend `/v1/admin/*`, cliente HTTP do painel, MFA da equipe, botão de aprovação da segunda pessoa na disputa, deploy (precisa de OK).
+
