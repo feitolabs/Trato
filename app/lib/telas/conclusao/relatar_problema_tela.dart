@@ -102,7 +102,7 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
         const SizedBox(height: EspacosTrato.x4),
         Text(
           '${dados.nomeProfissional} tem ${dados.prazoRespostaHoras} horas para responder. '
-          'Sem acordo, nossa equipe de mediação decide com base no chat, nas fotos e no orçamento.',
+          'Sem acordo, nosso suporte analisa o caso e decide com base no chat, nas fotos e no orçamento.',
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),
       ],
@@ -134,12 +134,12 @@ class _AvisoCongelado extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'Valor congelado até a decisão. ',
+                    text: 'Caso em análise. ',
                     style: base.copyWith(fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
                     text:
-                        '${formatarReais(valorCentavos)} ficam retidos enquanto o problema é resolvido.',
+                        'O suporte analisa o problema do serviço de ${formatarReais(valorCentavos)} e avisa a decisão.',
                   ),
                 ],
                 style: base,

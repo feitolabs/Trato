@@ -479,7 +479,7 @@ class _ResumoEscuro extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
-            'A taxa só é cobrada quando o pagamento for liberado. '
+            'A taxa é cobrada após a confirmação do pagamento pelo parceiro. '
             'Pedido cancelado antes do início não paga taxa.',
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
           ),

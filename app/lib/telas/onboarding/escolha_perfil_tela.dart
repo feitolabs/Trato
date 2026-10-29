@@ -8,7 +8,7 @@ enum PerfilUso {
   cliente(
     icone: Icons.home_outlined,
     titulo: 'Quero contratar',
-    descricao: 'Peça orçamentos e pague com o valor retido até a conclusão.',
+    descricao: 'Peça orçamentos e acompanhe o pagamento pelo app.',
     botao: 'Criar conta de cliente',
   ),
   profissional(

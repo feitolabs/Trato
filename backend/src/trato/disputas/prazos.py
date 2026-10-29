@@ -58,8 +58,9 @@ def calcular_prazos(aberta_em: datetime, config: ConfigDisputa) -> Prazos:
 
 
 def dentro_da_janela(concluido_em: datetime, agora: datetime, config: ConfigDisputa) -> bool:
-    """O cliente ainda pode abrir disputa? Vale até o fim da janela de retenção do repasse
-    (conclusão + prazo_congelar_repasse_horas, limite inclusivo)."""
+    """O repasse ainda está na janela que o congela? (conclusão + prazo_congelar_repasse_horas,
+    limite inclusivo). Só decide o congelamento do repasse; NÃO decide se o cliente pode
+    reclamar (ver `prazos_legais.py`)."""
     _exigir_aware(concluido_em)
     _exigir_aware(agora)
     limite = concluido_em + timedelta(hours=config.prazo_congelar_repasse_horas)

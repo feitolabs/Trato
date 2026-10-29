@@ -17,11 +17,17 @@ class ConfigGarantia:
 
     garantia_dias_padrao: int = 30
     prazo_atendimento_dias: int = 7
+    # D13: garantia financiada pelo Trato está fora do MVP. Liga só por configuração
+    # (tabela), depois da definição de P8 (fundo) e do parecer jurídico. O retrabalho com o
+    # mesmo profissional segue como "suporte e análise de problemas".
+    garantia_financiada_habilitada: bool = False
     garantia_dias_por_categoria: Mapping[str, int] = field(
         default_factory=lambda: MappingProxyType({})
     )
 
     def __post_init__(self) -> None:
+        if not isinstance(self.garantia_financiada_habilitada, bool):
+            raise ValueError("garantia_financiada_habilitada deve ser verdadeiro ou falso")
         if self.garantia_dias_padrao <= 0 or self.prazo_atendimento_dias <= 0:
             raise ValueError("prazos devem ser maiores que zero")
         if any(d <= 0 for d in self.garantia_dias_por_categoria.values()):

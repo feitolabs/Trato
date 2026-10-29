@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from trato.api.contexto import Contexto, obter_contexto
 from trato.api.modelos import WebhookOut
 from trato.api.repositorios import EventoWebhook
+from trato.api.webhook_pagamento import EventoForaDeOrdem
 from trato.pagamentos.idempotencia import processar_uma_vez
 from trato.pagamentos.webhook import AssinaturaInvalida, verificar_assinatura
 
@@ -61,9 +62,15 @@ async def receber_stripe(
     manipulador = contexto.manipuladores_webhook.get(tipo)
 
     def processar() -> None:
-        contexto.eventos_webhook.registrar(evento)
         if manipulador is not None:
             manipulador(evento, contexto)
+        contexto.eventos_webhook.registrar(evento)  # só guarda o que foi tratado sem erro
 
-    executou, _ = processar_uma_vez(contexto.eventos_webhook, f"{PROVEDOR}:{evento_id}", processar)
+    try:
+        executou, _ = processar_uma_vez(
+            contexto.eventos_webhook, f"{PROVEDOR}:{evento_id}", processar
+        )
+    except EventoForaDeOrdem as erro:
+        # A chave volta a ficar livre: o provedor reenvia quando o pedido estiver pronto.
+        raise HTTPException(409, "Evento antes do tempo; tente de novo.") from erro
     return WebhookOut(recebido=True, duplicado=not executou, tratado=manipulador is not None)

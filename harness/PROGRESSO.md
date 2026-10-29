@@ -189,3 +189,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Novo `backend/src/trato/pagamentos/provedor/` (interface `ProvedorPagamento`, `ProvedorFake`, `ProvedorStripeTeste` com transporte injetado, sem rede), `taxa.py` (bps + mínimo, progressiva desligada), `orquestrador.py` e `api/rotas_pagamento.py` (cobrança, aditivo, decisão da disputa). Único ajuste em código alheio: gancho `Contexto.apos_transicao`.
 - Testes: fluxo Aberto→Concluído pela API com webhook assinado, duplicado, fora de ordem, falha, cancelamento, disputa, retrabalho, aditivo. Relatório em `docs/f4-10-simulacao.md` (o que falta para o Stripe real; P2/P7).
 - Sem banco real, sem rede, sem push. Avaliação ainda não existe no backend.
+## 29/10/2026 — Rodada V2 integrada
+
+- Em develop (sem push nesta sessão), uma por vez, cada uma verificada: `v2-margem` (simulador e `docs/simulacao-margem.md`), `v2-impacto-docs` (`docs/v2-impacto.md`, PENDENCIAS, TAREFAS, advogado-e-contador), `feature/v2-backend-d13` (pedido só pago após webhook assinado; garantia financiada desligada; janela de congelamento separada dos prazos legais) e `v2-textos-telas` (textos sem promessas proibidas; SOS atrás de `kSosHabilitado`). `claude/v2-backend-pago-43520a` não tinha commits próprios: os do backend estavam em `feature/v2-backend-d13`.
+- Testes em develop: 442 no backend, 406 no app, verificação OK.
+- Decisões D13, D14 e D15 registradas em `DECISOES.md`. D15: custódia caminho A (ledger espelho, sem saldo próprio nem saque).
+- Estado do banco (informado pelo João): F3.3, F3.4 e F3.7 **aplicadas** no Supabase em 29/10/2026 (versões 20261029170308, 20261029170728, 20261029170820). F3.5 está sendo refeita para o caminho A (a atual não será aplicada); F3.6 e F3.8 aguardam. F1.8: `origin` ligado e push de `main` e `develop` feito em https://github.com/feitolabs/Trato.
+- Não integradas por orientação: `banco-de-dados-seguro` (refazendo F3.5/F3.6/F3.8) e `auth-login` (ainda trabalhando).
+- Pendências: busca de textos proibidos no `verificar` (V2.1); custos reais de provedor para fechar V2.3 (P7/P16); ajustar a tela Carteira ao extrato (F6.6).
+

@@ -120,7 +120,7 @@ class _LinhaSaldos extends StatelessWidget {
           Expanded(
             child: _CartaoSaldo(
               icone: Icons.lock_outline,
-              rotulo: 'Retido',
+              rotulo: 'Em andamento',
               cor: CoresTrato.azulTexto,
               centavos: resumo.retidoCentavos,
               texto: resumo.textoRetido,
@@ -130,7 +130,7 @@ class _LinhaSaldos extends StatelessWidget {
           Expanded(
             child: _CartaoSaldo(
               icone: Icons.schedule,
-              rotulo: 'A liberar',
+              rotulo: 'A confirmar',
               cor: CoresTrato.ambarTexto,
               centavos: resumo.aLiberarCentavos,
               texto: resumo.textoALiberar,
@@ -279,7 +279,7 @@ class _LinhaExtrato extends StatelessWidget {
             ),
             const SizedBox(width: EspacosTrato.x2),
             ChipStatus(
-              texto: liberado ? 'Liberado' : 'A liberar',
+              texto: liberado ? 'Confirmado' : 'A confirmar',
               tipo: liberado ? TipoStatus.sucesso : TipoStatus.alerta,
             ),
           ],

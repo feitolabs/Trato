@@ -3,7 +3,7 @@
 --
 -- STATUS: PREPARADA, NÃO APLICADA. Aplicar só com o OK explícito do João (CLAUDE.md).
 -- Só DDL. RLS ligado e sem policy (F3.8). anon/authenticated sem acesso até a F3.8.
--- Depende da F3.5. Fecha as FKs repasses.congelado_por_disputa_id e lancamentos.disputa_id.
+-- Depende da F3.5 (refeita para o caminho A, D15). Fecha as FKs repasses.congelado_por_disputa_id e lancamentos.disputa_id.
 -- Reversão: supabase/rollback/F3.6_rollback.sql
 
 -- ---------------------------------------------------------------------------
