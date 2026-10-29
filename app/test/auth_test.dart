@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato/auth/servico_auth.dart';
+import 'package:trato/auth/servico_auth_fake.dart';
 import 'package:trato/telas/auth/confirmar_celular_tela.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
@@ -120,13 +123,118 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    for (final texto in ['Entrar com Google', 'Entrar com Apple', 'Entrar com biometria']) {
-      testWidgets('$texto abre "em breve"', (tester) async {
-        await _abrir(tester, const LoginTela());
-        await _tocar(tester, texto);
-        expect(find.byType(EmBreveTela), findsOneWidget);
-      });
-    }
+    testWidgets('Entrar com biometria abre "em breve"', (tester) async {
+      await _abrir(tester, const LoginTela());
+      await _tocar(tester, 'Entrar com biometria');
+      expect(find.byType(EmBreveTela), findsOneWidget);
+    });
+
+    testWidgets('senha errada mostra o erro em português e não sai da tela', (tester) async {
+      final servico = ServicoAuthFake(
+        contas: {'mariana@email.com': 'segredo123'},
+        aceitaQualquerLogin: false,
+      );
+      await _abrir(tester, LoginTela(servico: servico));
+      await _digitar(tester, 'E-mail, CPF ou telefone', 'mariana@email.com');
+      await _digitar(tester, 'Senha', 'errada999');
+
+      await _tocar(tester, 'Entrar');
+
+      expect(find.text('E-mail ou senha incorretos.'), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsNothing);
+      expect(servico.sessaoAtual, isNull);
+    });
+
+    testWidgets('senha certa entra com a conta cadastrada', (tester) async {
+      final servico = ServicoAuthFake(
+        contas: {'mariana@email.com': 'segredo123'},
+        aceitaQualquerLogin: false,
+      );
+      await _abrir(tester, LoginTela(servico: servico));
+      await _digitar(tester, 'E-mail, CPF ou telefone', 'Mariana@Email.com');
+      await _digitar(tester, 'Senha', 'segredo123');
+
+      await _tocar(tester, 'Entrar');
+
+      expect(find.byType(CascaClienteTela), findsOneWidget);
+      expect(servico.sessaoAtual?.email, 'mariana@email.com');
+    });
+
+    testWidgets('sem internet mostra o erro', (tester) async {
+      final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
+      await _abrir(tester, LoginTela(servico: servico));
+      await _digitar(tester, 'E-mail, CPF ou telefone', 'mariana@email.com');
+      await _digitar(tester, 'Senha', 'segredo123');
+
+      await _tocar(tester, 'Entrar');
+
+      expect(find.text('Sem internet. Confira sua conexão e tente de novo.'), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsNothing);
+    });
+
+    testWidgets('identificador que não é e-mail pede o e-mail', (tester) async {
+      await _abrir(tester, const LoginTela());
+      await _digitar(tester, 'E-mail, CPF ou telefone', '12345678901');
+      await _digitar(tester, 'Senha', 'segredo123');
+
+      await _tocar(tester, 'Entrar');
+
+      expect(find.text('Entre com o e-mail da sua conta.'), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsNothing);
+    });
+
+    testWidgets('Google habilitado entra', (tester) async {
+      final servico = ServicoAuthFake();
+      await _abrir(tester, LoginTela(servico: servico));
+      await _tocar(tester, 'Entrar com Google');
+      expect(find.byType(CascaClienteTela), findsOneWidget);
+      expect(servico.sessaoAtual?.id, 'fake-google');
+    });
+
+    testWidgets('Google desabilitado não aparece', (tester) async {
+      await _abrir(tester, LoginTela(servico: ServicoAuthFake(provedores: {})));
+      expect(find.text('Entrar com Google'), findsNothing);
+      expect(find.text('Entrar com Apple'), findsNothing);
+    });
+
+    testWidgets('Google cancelado some em silêncio; outro erro aparece', (tester) async {
+      final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.cancelado);
+      await _abrir(tester, LoginTela(servico: servico));
+      await _tocar(tester, 'Entrar com Google');
+      expect(find.byType(CascaClienteTela), findsNothing);
+      expect(find.text('Entrada cancelada.'), findsNothing);
+
+      servico.falharNaProxima = const ErroAuth(TipoErroAuth.desconhecido);
+      await _tocar(tester, 'Entrar com Google');
+      expect(find.text('Algo deu errado. Tente de novo.'), findsOneWidget);
+    });
+
+    testWidgets('Apple só aparece no iOS', (tester) async {
+      await _abrir(tester, LoginTela(servico: ServicoAuthFake()));
+      expect(find.text('Entrar com Apple'), findsNothing);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await _abrir(tester, LoginTela(servico: ServicoAuthFake(), key: UniqueKey()));
+        await tester.pumpAndSettle();
+        await _tocar(tester, 'Entrar com Apple');
+        expect(find.byType(CascaClienteTela), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('no iOS, Apple desabilitada no serviço não aparece', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        await _abrir(
+            tester, LoginTela(servico: ServicoAuthFake(provedores: {ProvedorAuth.google})));
+        expect(find.text('Entrar com Apple'), findsNothing);
+        expect(find.text('Entrar com Google'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
 
     testWidgets('Esqueci minha senha e Criar conta levam às telas certas', (tester) async {
       await _abrir(tester, const LoginTela());
@@ -184,6 +292,44 @@ void main() {
       expect(find.text('Passo 2 de 2'), findsOneWidget);
       expect(find.textContaining('(31) 9••••-4417', findRichText: true), findsOneWidget);
     });
+
+    Future<void> aceitarETocar(WidgetTester tester) async {
+      await preencher(tester);
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+      await _tocar(tester, 'Criar conta');
+    }
+
+    testWidgets('e-mail já usado mostra o erro e fica no passo 1', (tester) async {
+      final servico = ServicoAuthFake(contas: {'mariana@email.com': 'outra12345'});
+      await _abrir(tester, CriarContaTela(servico: servico));
+
+      await aceitarETocar(tester);
+
+      expect(find.text('Este e-mail já tem uma conta. Tente entrar.'), findsOneWidget);
+      expect(find.byType(ConfirmarCelularTela), findsNothing);
+    });
+
+    testWidgets('sem internet mostra o erro e fica no passo 1', (tester) async {
+      final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
+      await _abrir(tester, CriarContaTela(servico: servico));
+
+      await aceitarETocar(tester);
+
+      expect(find.text('Sem internet. Confira sua conexão e tente de novo.'), findsOneWidget);
+      expect(find.byType(ConfirmarCelularTela), findsNothing);
+    });
+
+    testWidgets('conta criada fica na sessão do serviço', (tester) async {
+      final servico = ServicoAuthFake();
+      await _abrir(tester, CriarContaTela(servico: servico));
+
+      await aceitarETocar(tester);
+
+      expect(servico.sessaoAtual?.email, 'mariana@email.com');
+      expect(servico.sessaoAtual?.nome, 'Mariana Alves');
+      expect(find.byType(ConfirmarCelularTela), findsOneWidget);
+    });
   });
 
   group('confirmar celular', () {
@@ -198,15 +344,71 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    testWidgets('contagem de reenvio chega a zero e vira link', (tester) async {
-      await _abrir(tester, const ConfirmarCelularTela(celular: _celularDigitado));
-      expect(find.text('Reenviar em 0:45'), findsOneWidget);
+    testWidgets('código errado mostra o erro; o certo (do teste) entra', (tester) async {
+      final servico = ServicoAuthFake(codigoCelular: '654321');
+      await _abrir(tester, ConfirmarCelularTela(celular: _celularDigitado, servico: servico));
+
+      await _digitar(tester, 'Código', '123456');
+      await _tocar(tester, 'Confirmar código');
+      expect(find.text('Código incorreto. Confira e tente de novo.'), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsNothing);
+
+      await _digitar(tester, 'Código', '654321');
+      await _tocar(tester, 'Confirmar código');
+      expect(find.byType(CascaClienteTela), findsOneWidget);
+    });
+
+    testWidgets('depois de 5 erros pede um código novo', (tester) async {
+      final servico = ServicoAuthFake();
+      await _abrir(tester, ConfirmarCelularTela(celular: _celularDigitado, servico: servico));
+
+      for (var i = 0; i < LimitesCodigoCelular.maxTentativas; i++) {
+        await _digitar(tester, 'Código', '000000');
+        await _tocar(tester, 'Confirmar código');
+      }
+      expect(find.text('Muitas tentativas. Peça um código novo.'), findsOneWidget);
+
+      // Mesmo o código certo não vale mais.
+      await _digitar(tester, 'Código', '123456');
+      await _tocar(tester, 'Confirmar código');
+      expect(find.byType(CascaClienteTela), findsNothing);
+    });
+
+    testWidgets('sem internet ao confirmar mostra o erro', (tester) async {
+      final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
+      await _abrir(tester, ConfirmarCelularTela(celular: _celularDigitado, servico: servico));
+      await _digitar(tester, 'Código', '123456');
+
+      await _tocar(tester, 'Confirmar código');
+
+      expect(find.text('Sem internet. Confira sua conexão e tente de novo.'), findsOneWidget);
+    });
+
+    testWidgets('reenvio só libera depois de 60 s e para depois de 3 reenvios', (tester) async {
+      var agora = DateTime(2026, 10, 29, 12);
+      final servico = ServicoAuthFake(agora: () => agora);
+      await _abrir(tester, ConfirmarCelularTela(celular: _celularDigitado, servico: servico));
+      expect(find.text('Reenviar em 1:00'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Reenviar em 0:44'), findsOneWidget);
+      expect(find.text('Reenviar em 0:59'), findsOneWidget);
+      expect(find.text('Reenviar código'), findsNothing);
 
-      await tester.pump(const Duration(seconds: 44));
-      expect(find.text('Reenviar código'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 59));
+      for (var i = 1; i <= LimitesCodigoCelular.maxReenvios; i++) {
+        agora = agora.add(const Duration(seconds: 60));
+        expect(find.text('Reenviar código'), findsOneWidget);
+        await _tocar(tester, 'Reenviar código');
+        expect(find.text('Enviamos um código novo.'), findsOneWidget);
+        expect(find.text('Reenviar em 1:00'), findsOneWidget);
+        expect(servico.codigosEnviados, i + 1);
+        await tester.pump(const Duration(seconds: 60));
+      }
+
+      agora = agora.add(const Duration(seconds: 60));
+      await _tocar(tester, 'Reenviar código');
+      expect(find.text('Você já pediu códigos demais. Tente mais tarde.'), findsOneWidget);
+      expect(servico.codigosEnviados, 1 + LimitesCodigoCelular.maxReenvios);
     });
 
     testWidgets('Mudar número volta ao passo 1', (tester) async {
@@ -225,7 +427,7 @@ void main() {
   });
 
   group('recuperar senha', () {
-    testWidgets('e-mail inválido mostra erro; válido abre "em breve"', (tester) async {
+    testWidgets('e-mail inválido mostra erro; válido confirma o envio', (tester) async {
       await _abrir(tester, const RecuperarSenhaTela());
 
       await _digitar(tester, 'E-mail', 'mariana');
@@ -234,7 +436,19 @@ void main() {
 
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _tocar(tester, 'Enviar código');
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.textContaining('você vai receber as instruções'), findsOneWidget);
+      expect(find.text('E-mail inválido.'), findsNothing);
+    });
+
+    testWidgets('sem internet ao recuperar mostra o erro', (tester) async {
+      final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
+      await _abrir(tester, RecuperarSenhaTela(servico: servico));
+      await _digitar(tester, 'E-mail', 'mariana@email.com');
+
+      await _tocar(tester, 'Enviar código');
+
+      expect(find.text('Sem internet. Confira sua conexão e tente de novo.'), findsOneWidget);
+      expect(find.textContaining('você vai receber as instruções'), findsNothing);
     });
 
     testWidgets('Fale com o suporte abre "em breve"', (tester) async {
