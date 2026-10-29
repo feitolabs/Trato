@@ -41,7 +41,9 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "E501"]
+# A fixture `adm` vem de tests/api/admin_ambiente.py e é importada dentro dos testes.
+"tests/api/test_admin_*.py" = ["F811"]
 
 [tool.ruff.lint.flake8-bugbear]
 # Padrão do FastAPI: Depends/Query/Header nos argumentos das rotas.
@@ -50,4 +52,5 @@ extend-immutable-calls = [
     "fastapi.Query",
     "fastapi.Header",
     "trato.api.contexto.exigir_papel",
+    "trato.api.admin.contexto.exigir",
 ]
