@@ -27,7 +27,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 - [x] **F2.1** Extrair do PDF de telas: cores, fontes, raios, espaçamentos, ícones. *Pronto quando:* `docs/design-tokens.md` com valores e print de origem.
 - [x] **F2.2** Tema Flutter em `app/lib/tema/` (cores, tipografia, espaçamentos). *Pronto quando:* nenhuma cor literal fora do tema (checado no `verificar`).
-- [ ] **F2.3** Componentes: botão (primário/secundário/texto), campo, cartão, chip de status, linha do tempo, barra de abas. *Pronto quando:* galeria de componentes com teste de widget.
+- [x] **F2.3** Componentes: botão (primário/secundário/texto), campo, cartão, chip de status, linha do tempo, barra de abas. *Pronto quando:* galeria de componentes com teste de widget.
 - [~] **F2.4** Responsividade: breakpoints celular pequeno, grande e tablet. *Pronto quando:* golden tests em 3 tamanhos.
 - [ ] **F2.5** Tela de exemplo (Splash + Onboarding 1/3) igual ao protótipo. *Pronto quando:* comparação lado a lado aprovada pelo João.
 
