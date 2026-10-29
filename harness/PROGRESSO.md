@@ -182,3 +182,14 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em `backend/tests/margem/` (55): Pix, cartão à vista, 3x e 6x, os dois tipos de regra, arredondamento e soma exata.
 - `docs/simulacao-margem.md`: tickets R$ 80 a R$ 3.000 × Pix/cartão/3x/6x para 5% fixa, 7,5% fixa e progressiva 7,5/5/3,5. **Custos do provedor são ESTIMATIVAS até haver proposta (P7); faixas e mínimo de R$ 5,00 são hipóteses (P2).** Resultado: Pix nunca negativo; cartão 6x negativo em tudo; 5% fixa perde no cartão até R$ 500; a progressiva fica negativa no 3x a partir de R$ 1.000.
 - Sem banco, sem `app/`, sem push.
+
+
+## 29/10/2026 — App ligado à API (modo demo | api)
+
+- Nova camada `app/lib/dados/`: `ClienteApi` (http, `TRATO_API_URL`, Authorization, 15 s, erros em português), modelos à mão, repositórios (interface + API + fake) de pedidos, orçamentos, pagamento, chat, notificações, perfil e profissional; `Carregador` dá carregando/erro/vazio às telas.
+- `--dart-define=TRATO_MODO=demo|api` (padrão demo). `main.dart` escolhe; `rotas.dart` entrega os repositórios às telas (as telas não conhecem a rede).
+- No modo api, ligadas: Novo pedido, Seus pedidos, Pedido em execução (linha do tempo + código de início), Conclusão, Confirmar, Relatar problema (disputa), Retrabalho, Carteira como extrato (D15). Fake por falta de rota no backend: orçamentos (lista), pagamento/cobrança, chat, notificações, perfil, início/pedidos abertos e calculadora do profissional, câmera/GPS do check-in. Tabela completa em `docs/app-ligacao.md`.
+- Telas novas: Notificações e Aguardando confirmação do pagamento (consulta a cada 3 s; só avança quando o backend diz pago, D14/D15). Edições aditivas: `CarteiraTela(soExtrato)`, `CascaProfissionalTela(abaCarteira, carregarDetalhe, recusarPedido)`, código de início na execução, `PedidoResumo.id/estadoApi`.
+- Novo pedido ganhou ponto de entrada: botão "Novo pedido" na aba Pedidos.
+- Testes: 35 novos em `app/test/dados/` (cliente HTTP e repositórios API com `MockClient`; telas ligadas com repositórios fake). Goldens não mudaram.
+- Sem push, sem banco. Backend não foi tocado.

@@ -20,7 +20,16 @@ class PedidoResumo {
     required this.subtitulo,
     required this.statusTexto,
     required this.statusTipo,
+    this.id,
+    this.estadoApi,
   });
+
+  /// Id do pedido na API (nulo nos dados de exemplo).
+  final String? id;
+
+  /// Estado do pedido como o backend informa ("em_andamento"...). Quem liga as telas usa isto
+  /// para decidir a rota; o texto abaixo é só para exibir.
+  final String? estadoApi;
 
   final String titulo;
   final String subtitulo;
@@ -54,7 +63,11 @@ class PedidoEmExecucao {
     required this.etapas,
     required this.fotos,
     this.aditivo,
+    this.codigoInicio,
   });
+
+  /// Código que o cliente passa ao profissional para começar. Só o backend o gera e confere.
+  final String? codigoInicio;
 
   final String numero;
   final String titulo;

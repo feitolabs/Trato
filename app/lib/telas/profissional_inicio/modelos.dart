@@ -9,7 +9,11 @@ class ProximoAtendimento {
     required this.quando,
     required this.titulo,
     required this.endereco,
+    this.pedidoId,
   });
+
+  /// Id do pedido na API (nulo nos dados de exemplo).
+  final String? pedidoId;
 
   /// Ex.: "Hoje · 14h".
   final String quando;
