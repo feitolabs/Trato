@@ -5,6 +5,8 @@ enum TipoNotificacao {
   orcamento(Icons.request_quote_outlined, 'Orçamento'),
   pagamento(Icons.account_balance_wallet_outlined, 'Pagamento'),
   mensagem(Icons.chat_bubble_outline, 'Mensagem'),
+  disputa(Icons.gavel_outlined, 'Disputa'),
+  retrabalho(Icons.handyman_outlined, 'Retrabalho'),
   sistema(Icons.info_outline, 'Aviso');
 
   const TipoNotificacao(this.icone, this.rotulo);

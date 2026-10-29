@@ -18,6 +18,8 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoTocarSos,
     this.aoConversar,
     this.aoVerConclusao,
+    this.aoVerNota,
+    this.aoVerAditivo,
   });
 
   final PedidoEmExecucao pedido;
@@ -26,6 +28,10 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoTocarSos;
   final VoidCallback? aoConversar;
   final VoidCallback? aoVerConclusao;
+
+  /// Abrem a nota de materiais e o aditivo do pedido (quem liga as telas é o `rotas.dart`).
+  final VoidCallback? aoVerNota;
+  final VoidCallback? aoVerAditivo;
 
   @override
   State<PedidoExecucaoTela> createState() => _PedidoExecucaoTelaState();
@@ -96,6 +102,13 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         aoRecusar: () => _decidir(EstadoAditivo.recusado, widget.aoRecusarAditivo),
                         aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
                       ),
+                    ],
+                    if (widget.aoVerNota != null || widget.aoVerAditivo != null) ...[
+                      const SizedBox(height: EspacosTrato.x3),
+                      if (widget.aoVerNota != null)
+                        BotaoLink(texto: 'Ver nota de materiais', aoTocar: widget.aoVerNota!),
+                      if (widget.aoVerAditivo != null)
+                        BotaoLink(texto: 'Ver aditivo do serviço', aoTocar: widget.aoVerAditivo!),
                     ],
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Linha do tempo', style: TipografiaTrato.titulo),

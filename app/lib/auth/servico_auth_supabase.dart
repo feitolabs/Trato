@@ -56,6 +56,9 @@ class ServicoAuthSupabase implements ServicoAuth {
   Stream<SessaoAuth?> get sessaoMudou =>
       _auth.onAuthStateChange.map((e) => _paraSessao(e.session?.user));
 
+  @override
+  String? get tokenAtual => _auth.currentSession?.accessToken;
+
   /// "(31) 98765-4417" vira "+5531987654417".
   static String celularE164(String celular) => '+55${celular.replaceAll(RegExp(r'\D'), '')}';
 

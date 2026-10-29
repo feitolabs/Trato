@@ -13,7 +13,12 @@ class ServicoNotificacoesRepositorio implements ServicoNotificacoes {
         for (final n in await _repositorio.listar())
           Notificacao(
             id: n.id,
-            tipo: TipoNotificacao.sistema,
+            tipo: switch (n.tipo) {
+              'disputa' => TipoNotificacao.disputa,
+              'retrabalho' => TipoNotificacao.retrabalho,
+              _ => TipoNotificacao.sistema,
+            },
+            destinoId: n.destinoId,
             titulo: n.titulo,
             texto: n.texto,
             quando: n.quando,
