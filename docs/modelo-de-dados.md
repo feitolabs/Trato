@@ -1,7 +1,9 @@
 # Modelo de dados do Trato (F3.1)
 
-> **Status: proposta para aprovação do João.** Este documento é só desenho.
-> Nenhuma migration foi criada e nada foi executado no Supabase.
+> **Status: modelo aprovado pelo João (28/10/2026).** A F3.2 está aplicada no Supabase. As migrations
+> F3.3 a F3.8c estão **preparadas e testadas em banco local, mas NÃO aplicadas** (cada uma pede o OK do João).
+> As diferenças entre este desenho e o que foi escrito nas migrations estão na **seção 13**.
+> Plano de aplicação, testes e riscos: `docs/seguranca-banco.md`.
 > Prioridade das fontes: `regras.txt` > observações extras (D1–D12) > protótipo > escopo (PDF).
 > Referências: escopo seções 3, 4, 8, 11 e 22.2; `harness/DECISOES.md`; `harness/PENDENCIAS.md`.
 
@@ -878,5 +880,44 @@ view `perfis_publicos` para esconder dados internos; funções `SECURITY DEFINER
 ---
 
 ## 12. O que este documento não faz
-Não cria migration, não conecta no Supabase, não executa SQL, não define fórmula de taxa (P2), não define fluxo de repasse (P1/P4),
+Não define fórmula de taxa (P2), não define fluxo de repasse (P1/P4),
 não promete cobertura de danos (P8) e não decide nada de custódia, nota fiscal ou LGPD (advogado e contador).
+
+---
+
+## 13. Diferenças entre o modelo aprovado e as migrations F3.3 a F3.8 (preparadas, não aplicadas)
+
+Nada foi mudado em silêncio. Cada linha diz o que mudou e por quê. **O João confirma** ao aprovar cada migration.
+
+### 13.1 Mudanças de desenho (por segurança ou consistência)
+| # | Onde | Modelo aprovado | Migration | Motivo |
+|---|---|---|---|---|
+| D-1 | `usuarios_privados` (10.2) | `cadastro`, `seguranca` e `dpo` leem, "com auditoria" | **Só o dono lê.** A equipe lê pelo backend, que chama `registrar_auditoria` com motivo | RLS não registra leitura; o escopo 22.4 exige "quem, quando e por quê" |
+| D-2 | `perfis_publicos` (10.2, 11) | View que esconde dados internos | **Sem view.** Policy (perfil aprovado) + `SELECT` por coluna (sem CNPJ e sem reverificação) | View `SECURITY DEFINER` é erro de advisor; coluna resolve igual |
+| D-3 | `contas_ledger.codigo` (7.3) | `unique` | `unique (codigo, usuario)` | `a_pagar_profissional` existe uma vez por profissional |
+| D-4 | Contas de sistema (9, F3.5) | "+ contas de sistema" | **Sem seed.** Nenhuma conta é criada | O desenho das contas depende de P4, P7 e P8; seed é `INSERT` e pede OK |
+| D-5 | `lancamentos.contrato_id` (7.3) | FK sem `null` | `null` só quando `tipo = 'saque'` | Saque não pertence a um contrato |
+| D-6 | `midias` (5.5) | sem coluna de bucket | `bucket` (`pedido-midias` ou `chat-anexos`), `unique (bucket, storage_path)`, `finalidade='chat'` ⇔ `chat-anexos` | A policy do Storage precisa saber o bucket |
+| D-7 | Buckets (10.2) | `pedido-midias`, `verificacao`, `avatar` | + **`chat-anexos`** | Pedido do escopo desta etapa (anexos de chat) |
+| D-8 | `notificacao_preferencias` (8.6) | `atualizada_em` | `atualizado_em` | Mesmo nome do resto do banco |
+| D-9 | Atendimento N1 (10.2) | Só N2 lê pedido/contrato/pagamento | **N1 também** lê pedido, contrato, pagamento, agendamento e aditivo | Escopo 18.5: N1 "consulta pedido e pagamento" |
+| D-10 | `config_*` (10.2) | Leitura: financeiro, jurídico, **produto**, administrador | financeiro, jurídico, administrador | Não existe o papel `produto` em `equipe.papel` |
+| D-11 | Funções auxiliares (9, F3.8) | `eh_equipe`, `pode_ver_pedido`... em `public` | No schema **`privado`**, fora da API | Ninguém as chama por RPC |
+| D-12 | F3.8 (9) | Uma migration | Três: **F3.8a** (funções e privilégios), **F3.8b** (policies), **F3.8c** (Storage) | Um OK por mudança de risco diferente |
+| D-13 | `mensagens` (8.5) | `lida_em` pode mudar | Muda **uma vez** (nulo → data); nada mais | N9 provisório |
+| D-14 | Visibilidade do pedido (10.1) | Aberto + categoria + região | + `expira_em` no futuro, cliente com `status = 'ativo'`, perfil `aprovado`; vale também para quem orçou ou conversou | Pedido vencido ou de cliente bloqueado não aparece |
+| D-15 | Privilégios | Não descritos | Colunas sensíveis fora do `SELECT` do app; `service_role` com privilégios explícitos e sem `TRUNCATE`; privilégios padrão do `public` fechados | Ver `docs/seguranca-banco.md`, itens 3 e 5 |
+| D-16 | `auditoria.ator_id` | FK implícita | **Sem FK** | A trilha sobrevive a qualquer mudança de conta |
+
+### 13.2 Regras que o banco passou a conferir (não estavam descritas como constraint)
+Total do orçamento = soma dos itens; orçamento enviado congelado e itens só em rascunho; só um orçamento aceito por pedido; contrato só nasce de orçamento aceito com o mesmo valor e cliente; contrato sem `DELETE`; um contrato por pedido (como 5.8);
+etapa congelada ao entrar no contrato; aditivo só aprovado pelo cliente do contrato e imutável depois; pagamento só pelo cliente do contrato, parcelas só no cartão de crédito, aditivo só pago se aprovado;
+repasse: `bruto = taxa + líquido`, só para o profissional do contrato; chave Pix só com o CPF/CNPJ do dono; saque só com chave própria, ativa e verificada;
+check-out exige check-in; hora do servidor em presença, nota de material e mensagem; item de nota só na mesma transação da nota;
+disputa: uma ativa por contrato, só as partes abrem, só mediador decide, reembolso acima da alçada exige segunda pessoa (líder ou administrador), decidida não muda mais;
+retrabalho só do cliente e dentro da garantia; avaliação só entre as partes do contrato, critério coerente com a direção;
+lançamento: mínimo de 2 partidas, equilíbrio no `COMMIT`, partida só na transação do lançamento, estorno = inversão exata do original (mesmo contrato);
+webhook de assinatura inválida nunca "processado"; auditoria com motivo obrigatório em ação financeira, bloqueio e dado pessoal.
+
+### 13.3 O que continua em aberto (nada foi decidido)
+P1 a P4, P6 a P8, P10, P11, N2 a N4, N6, N7, N10, N12 a N15, N17 e N18 seguem como estão na seção 11. As propostas provisórias N1, N8, N9, N10, N11 e N16 foram **usadas** como o documento sugeria.
