@@ -33,15 +33,13 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
       body: SafeArea(
         child: ConteudoResponsivo(
           child: ListView(
-            padding: const EdgeInsets.only(
-                top: EspacosTrato.x6, bottom: EspacosTrato.x4),
+            padding: const EdgeInsets.only(top: EspacosTrato.x6, bottom: EspacosTrato.x4),
             children: [
               Text('Seus pedidos', style: TipografiaTrato.tituloGrande),
               const SizedBox(height: EspacosTrato.x4),
               _Abas(
                 finalizados: _verFinalizados,
-                aoTrocar: (finalizados) =>
-                    setState(() => _verFinalizados = finalizados),
+                aoTrocar: (finalizados) => setState(() => _verFinalizados = finalizados),
               ),
               const SizedBox(height: EspacosTrato.x4),
               for (final pedido in pedidos) ...[
@@ -81,10 +79,7 @@ class _Abas extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: _Aba(
-                texto: 'Finalizados',
-                ativa: finalizados,
-                aoTocar: () => aoTrocar(true)),
+            child: _Aba(texto: 'Finalizados', ativa: finalizados, aoTocar: () => aoTrocar(true)),
           ),
         ],
       ),
@@ -150,8 +145,7 @@ class _CartaoPedido extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           Text(
             pedido.subtitulo,
-            style: TipografiaTrato.corpoPequeno
-                .copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x3),
           ChipStatus(texto: pedido.statusTexto, tipo: pedido.statusTipo),

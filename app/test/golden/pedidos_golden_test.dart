@@ -39,8 +39,7 @@ void main() {
           ),
         );
 
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('pedidos_${tela}_$nome.png'));
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('pedidos_${tela}_$nome.png'));
       });
     }
   }

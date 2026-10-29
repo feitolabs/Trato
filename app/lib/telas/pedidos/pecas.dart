@@ -6,8 +6,7 @@ import 'modelos.dart';
 
 /// Espaço de foto do protótipo: bloco azul-claro com o rótulo embaixo à esquerda.
 class EspacoFoto extends StatelessWidget {
-  const EspacoFoto(
-      {super.key, required this.rotulo, this.largura, this.altura = 96});
+  const EspacoFoto({super.key, required this.rotulo, this.largura, this.altura = 96});
 
   final String rotulo;
   final double? largura;
@@ -28,8 +27,7 @@ class EspacoFoto extends StatelessWidget {
         rotulo,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style:
-            TipografiaTrato.corpoPequeno.copyWith(fontWeight: FontWeight.w600),
+        style: TipografiaTrato.corpoPequeno.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -45,8 +43,7 @@ class BotaoSos extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: CoresTrato.vermelhoSuave,
-      shape: const StadiumBorder(
-          side: BorderSide(color: CoresTrato.vermelhoTexto, width: 1.5)),
+      shape: const StadiumBorder(side: BorderSide(color: CoresTrato.vermelhoTexto, width: 1.5)),
       child: InkWell(
         customBorder: const StadiumBorder(),
         onTap: aoTocar,
@@ -58,13 +55,11 @@ class BotaoSos extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.warning_amber_rounded,
-                  size: 20, color: CoresTrato.vermelhoTexto),
+              const Icon(Icons.warning_amber_rounded, size: 20, color: CoresTrato.vermelhoTexto),
               const SizedBox(width: EspacosTrato.x2),
               Text(
                 'SOS',
-                style: TipografiaTrato.corpoForte
-                    .copyWith(color: CoresTrato.vermelhoTexto),
+                style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.vermelhoTexto),
               ),
             ],
           ),
@@ -102,8 +97,7 @@ class CartaoAditivo extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.schedule,
-                  size: 18, color: CoresTrato.ambarTexto),
+              const Icon(Icons.schedule, size: 18, color: CoresTrato.ambarTexto),
               const SizedBox(width: EspacosTrato.x2),
               Expanded(
                 child: Text(
@@ -151,13 +145,9 @@ class CartaoAditivo extends StatelessWidget {
             const SizedBox(height: EspacosTrato.x4),
             Row(
               children: [
-                Expanded(
-                    child:
-                        BotaoSecundario(texto: 'Recusar', aoTocar: aoRecusar)),
+                Expanded(child: BotaoSecundario(texto: 'Recusar', aoTocar: aoRecusar)),
                 const SizedBox(width: EspacosTrato.x3),
-                Expanded(
-                    child: BotaoPrimario(
-                        texto: 'Aprovar aditivo', aoTocar: aoAprovar)),
+                Expanded(child: BotaoPrimario(texto: 'Aprovar aditivo', aoTocar: aoAprovar)),
               ],
             ),
           ] else

@@ -17,8 +17,7 @@ class ServicoCheckInFake implements ServicoCheckIn {
   Future<int?> localizar() async => 20;
 
   @override
-  Future<void> enviarMensagemRapida(String mensagem) async =>
-      mensagens.add(mensagem);
+  Future<void> enviarMensagemRapida(String mensagem) async => mensagens.add(mensagem);
 
   @override
   Future<void> avisarClienteAusente() async => clienteAusenteAvisado = true;
@@ -26,8 +25,6 @@ class ServicoCheckInFake implements ServicoCheckIn {
   @override
   Future<ResultadoInicio> iniciarServico(String codigo) async {
     codigosEnviados.add(codigo);
-    return codigo == codigoCerto
-        ? ResultadoInicio.iniciado
-        : ResultadoInicio.codigoIncorreto;
+    return codigo == codigoCerto ? ResultadoInicio.iniciado : ResultadoInicio.codigoIncorreto;
   }
 }

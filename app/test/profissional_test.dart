@@ -50,9 +50,7 @@ CalculadoraOrcamentoTela _calculadora(
     );
 
 Finder _campo(String rotulo) => find.descendant(
-      of: find
-          .ancestor(of: find.text(rotulo), matching: find.byType(Column))
-          .first,
+      of: find.ancestor(of: find.text(rotulo), matching: find.byType(Column)).first,
       matching: find.byType(TextField),
     );
 
@@ -91,8 +89,7 @@ void main() {
   });
 
   group('Calculadora de orçamento', () {
-    testWidgets('soma exibida e interface chamada com o total certo',
-        (tester) async {
+    testWidgets('soma exibida e interface chamada com o total certo', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
@@ -104,13 +101,10 @@ void main() {
       expect(find.text('Taxa Trato (7,5%)'), findsOneWidget);
       expect(find.text('– R\$ 28,50'), findsOneWidget);
       expect(find.text('R\$ 351,50'), findsOneWidget);
-      expect(
-          find.text('Serviços parecidos na região: R\$ 300,00 a R\$ 450,00.'),
-          findsOneWidget);
+      expect(find.text('Serviços parecidos na região: R\$ 300,00 a R\$ 450,00.'), findsOneWidget);
     });
 
-    testWidgets('rótulo da taxa acompanha o percentual devolvido',
-        (tester) async {
+    testWidgets('rótulo da taxa acompanha o percentual devolvido', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 500);
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
@@ -119,8 +113,7 @@ void main() {
       expect(find.text('R\$ 361,00'), findsOneWidget);
     });
 
-    testWidgets('mudar um campo refaz o pedido com o novo total',
-        (tester) async {
+    testWidgets('mudar um campo refaz o pedido com o novo total', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
@@ -148,23 +141,18 @@ void main() {
 
     testWidgets('sem horas e valor não há total nem chamada', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
-      await _abrir(
-          tester,
-          _calculadora(servico,
-              itens: [], desloc: '', horas: '', valorHora: ''));
+      await _abrir(tester, _calculadora(servico, itens: [], desloc: '', horas: '', valorHora: ''));
       await tester.pump();
       expect(servico.pedidos, isEmpty);
       expect(find.text('—'), findsWidgets);
     });
 
-    testWidgets('validação: campos obrigatórios bloqueiam o envio',
-        (tester) async {
+    testWidgets('validação: campos obrigatórios bloqueiam o envio', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
       OrcamentoPronto? enviado;
       await _abrir(
         tester,
-        _calculadora(servico,
-            aoEnviar: (o) => enviado = o, horas: '', valorHora: ''),
+        _calculadora(servico, aoEnviar: (o) => enviado = o, horas: '', valorHora: ''),
       );
 
       await tester.tap(find.text('Enviar orçamento'));
@@ -178,16 +166,14 @@ void main() {
     testWidgets('validação: deslocamento inválido', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
       OrcamentoPronto? enviado;
-      await _abrir(tester,
-          _calculadora(servico, aoEnviar: (o) => enviado = o, desloc: '1,2,3'));
+      await _abrir(tester, _calculadora(servico, aoEnviar: (o) => enviado = o, desloc: '1,2,3'));
       await tester.tap(find.text('Enviar orçamento'));
       await tester.pump();
       expect(enviado, isNull);
       expect(find.text('Use só números, como 30 ou 30,50.'), findsOneWidget);
     });
 
-    testWidgets('enviar entrega o orçamento em centavos inteiros',
-        (tester) async {
+    testWidgets('enviar entrega o orçamento em centavos inteiros', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
       OrcamentoPronto? enviado;
       await _abrir(tester, _calculadora(servico, aoEnviar: (o) => enviado = o));
@@ -227,8 +213,7 @@ void main() {
       expect(servico.pedidos.last, 40000);
     });
 
-    testWidgets('adicionar item sem valor mostra erro e não fecha',
-        (tester) async {
+    testWidgets('adicionar item sem valor mostra erro e não fecha', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 750);
       await _abrir(tester, _calculadora(servico));
       await tester.tap(find.text('Adicionar item'));
@@ -269,8 +254,7 @@ void main() {
 
     testWidgets('só inicia com foto, localização e 4 números', (tester) async {
       final servico = await abrirCheckIn(tester, completo: false);
-      FilledButton botao() =>
-          tester.widget<FilledButton>(find.byType(FilledButton));
+      FilledButton botao() => tester.widget<FilledButton>(find.byType(FilledButton));
       expect(botao().onPressed, isNull);
 
       await tester.tap(find.text('Tirar foto'));
@@ -293,23 +277,19 @@ void main() {
       await abrirCheckIn(tester);
       await tester.enterText(find.byType(TextField), '48a2199');
       await tester.pump();
-      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
-          '4821');
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, '4821');
     });
 
-    testWidgets('código certo inicia; errado mostra erro vindo do backend',
-        (tester) async {
+    testWidgets('código certo inicia; errado mostra erro vindo do backend', (tester) async {
       var iniciou = false;
-      final servico =
-          await abrirCheckIn(tester, aoIniciar: () => iniciou = true);
+      final servico = await abrirCheckIn(tester, aoIniciar: () => iniciou = true);
 
       await tester.enterText(find.byType(TextField), '0000');
       await tester.pump();
       await tester.tap(find.text('Iniciar serviço'));
       await tester.pump();
       await tester.pump();
-      expect(find.text('Código incorreto. Peça de novo ao cliente.'),
-          findsOneWidget);
+      expect(find.text('Código incorreto. Peça de novo ao cliente.'), findsOneWidget);
       expect(iniciou, isFalse);
 
       await tester.enterText(find.byType(TextField), '4821');
@@ -321,8 +301,7 @@ void main() {
       expect(iniciou, isTrue);
     });
 
-    testWidgets('mensagens rápidas e cliente ausente chamam o serviço',
-        (tester) async {
+    testWidgets('mensagens rápidas e cliente ausente chamam o serviço', (tester) async {
       final servico = await abrirCheckIn(tester);
       await tester.tap(find.text('Estou na portaria'));
       await tester.pump();
@@ -344,30 +323,23 @@ void main() {
   };
   for (final MapEntry(key: nome, value: tamanho) in tamanhos.entries) {
     for (final escala in [1.0, Responsivo.escalaFonteMaxima]) {
-      testWidgets(
-          'sem estouro — calculadora e check-in — $nome, fonte x$escala',
-          (tester) async {
+      testWidgets('sem estouro — calculadora e check-in — $nome, fonte x$escala', (tester) async {
         tester.platformDispatcher.textScaleFactorTestValue = escala;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
-        await _abrir(tester, _calculadora(ServicoOrcamentoFake(taxaBps: 750)),
-            tamanho: tamanho);
+        await _abrir(tester, _calculadora(ServicoOrcamentoFake(taxaBps: 750)), tamanho: tamanho);
         await tester.pump();
         expect(tester.takeException(), isNull);
-        await tester.drag(
-            find.byType(SingleChildScrollView).first, const Offset(0, -3000));
+        await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -3000));
         await tester.pump();
         expect(tester.takeException(), isNull);
 
         await _abrir(
           tester,
-          CheckInTela(
-              servico: ServicoCheckInFake(),
-              tituloBarra: 'Mariana · hoje, 14h'),
+          CheckInTela(servico: ServicoCheckInFake(), tituloBarra: 'Mariana · hoje, 14h'),
           tamanho: tamanho,
         );
-        await tester.drag(
-            find.byType(SingleChildScrollView).first, const Offset(0, -3000));
+        await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -3000));
         await tester.pump();
         expect(tester.takeException(), isNull);
       });

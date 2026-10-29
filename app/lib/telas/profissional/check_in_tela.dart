@@ -15,11 +15,7 @@ class CheckInTela extends StatefulWidget {
     required this.tituloBarra,
     this.fotoInicial,
     this.distanciaInicialMetros,
-    this.mensagensRapidas = const [
-      'Cheguei',
-      'Estou na portaria',
-      'Preciso de 15 minutos'
-    ],
+    this.mensagensRapidas = const ['Cheguei', 'Estou na portaria', 'Preciso de 15 minutos'],
     this.aoIniciar,
   });
 
@@ -52,8 +48,7 @@ class _CheckInTelaState extends State<CheckInTela> {
     super.dispose();
   }
 
-  bool get _podeIniciar =>
-      _foto != null && _distancia != null && _codigo.text.length == 4;
+  bool get _podeIniciar => _foto != null && _distancia != null && _codigo.text.length == 4;
 
   Future<void> _tirarFoto() async {
     final foto = await widget.servico.tirarFoto();
@@ -105,8 +100,7 @@ class _CheckInTelaState extends State<CheckInTela> {
       children: [
         Text('Check-in', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
-        Text('Três passos para começar o serviço.',
-            style: TipografiaTrato.corpo),
+        Text('Três passos para começar o serviço.', style: TipografiaTrato.corpo),
         const SizedBox(height: EspacosTrato.x5),
         _CartaoPasso(
           miniatura: const ColoredBox(color: CoresTrato.azulClaro),
@@ -120,13 +114,10 @@ class _CheckInTelaState extends State<CheckInTela> {
         _CartaoPasso(
           miniatura: const ColoredBox(
             color: CoresTrato.azulSuave,
-            child:
-                Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
+            child: Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
           ),
           titulo: 'Localização',
-          detalhe: distancia == null
-              ? 'Confirme que você chegou'
-              : 'A $distancia m do endereço',
+          detalhe: distancia == null ? 'Confirme que você chegou' : 'A $distancia m do endereço',
           feito: distancia != null,
           textoAcao: 'Localizar',
           aoTocarAcao: _localizar,
@@ -145,8 +136,7 @@ class _CheckInTelaState extends State<CheckInTela> {
           runSpacing: EspacosTrato.x2,
           children: [
             for (final mensagem in widget.mensagensRapidas)
-              _ChipMensagem(
-                  texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
+              _ChipMensagem(texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
           ],
         ),
         if (_aviso != null) ...[
@@ -154,9 +144,7 @@ class _CheckInTelaState extends State<CheckInTela> {
           Text(_aviso!, style: TipografiaTrato.legenda),
         ],
         const SizedBox(height: EspacosTrato.x5),
-        Center(
-            child: BotaoLink(
-                texto: 'Cliente não está no local', aoTocar: _clienteAusente)),
+        Center(child: BotaoLink(texto: 'Cliente não está no local', aoTocar: _clienteAusente)),
       ],
     );
   }
@@ -186,9 +174,7 @@ class _CartaoPasso extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
-            child: SizedBox.square(
-                dimension: EspacosTrato.x12 + EspacosTrato.x2,
-                child: miniatura),
+            child: SizedBox.square(dimension: EspacosTrato.x12 + EspacosTrato.x2, child: miniatura),
           ),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
@@ -207,10 +193,7 @@ class _CartaoPasso extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: feito
-                  ? const ChipStatus(
-                      texto: 'Feito',
-                      tipo: TipoStatus.sucesso,
-                      icone: Icons.check)
+                  ? const ChipStatus(texto: 'Feito', tipo: TipoStatus.sucesso, icone: Icons.check)
                   : BotaoLink(texto: textoAcao, aoTocar: aoTocarAcao),
             ),
           ),
@@ -222,8 +205,7 @@ class _CartaoPasso extends StatelessWidget {
 
 /// Cartão com contorno petróleo: é o passo em destaque do protótipo.
 class _CartaoCodigo extends StatelessWidget {
-  const _CartaoCodigo(
-      {required this.controlador, required this.aoMudar, this.erro});
+  const _CartaoCodigo({required this.controlador, required this.aoMudar, this.erro});
 
   final TextEditingController controlador;
   final VoidCallback aoMudar;
@@ -244,8 +226,7 @@ class _CartaoCodigo extends StatelessWidget {
           children: [
             Text('Código de início', style: TipografiaTrato.tituloCartao),
             const SizedBox(height: EspacosTrato.x1),
-            Text('Peça os 4 números para a cliente.',
-                style: TipografiaTrato.legenda),
+            Text('Peça os 4 números para a cliente.', style: TipografiaTrato.legenda),
             const SizedBox(height: EspacosTrato.x4),
             TextField(
               controller: controlador,
@@ -255,8 +236,7 @@ class _CartaoCodigo extends StatelessWidget {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (_) => aoMudar(),
               style: TipografiaTrato.tituloGrande.copyWith(letterSpacing: 12),
-              decoration: InputDecoration(
-                  counterText: '', errorText: erro, hintText: '— — — —'),
+              decoration: InputDecoration(counterText: '', errorText: erro, hintText: '— — — —'),
             ),
           ],
         ),

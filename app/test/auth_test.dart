@@ -5,13 +5,15 @@ import 'package:trato/telas/auth/criar_conta_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/auth/recuperar_senha_tela.dart';
 import 'package:trato/telas/auth/validacao.dart';
+import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/em_breve_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 const _celularDigitado = '(31) 98765-4417';
 
-Future<void> _abrir(WidgetTester tester, Widget tela, {Size tamanho = const Size(390, 1600)}) async {
+Future<void> _abrir(WidgetTester tester, Widget tela,
+    {Size tamanho = const Size(390, 1600)}) async {
   tester.view.physicalSize = tamanho;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -108,14 +110,14 @@ void main() {
       expect(find.text('Ocultar'), findsOneWidget);
     });
 
-    testWidgets('com dados preenchidos, Entrar abre "em breve"', (tester) async {
+    testWidgets('com dados preenchidos, Entrar leva à casca do cliente', (tester) async {
       await _abrir(tester, const LoginTela());
       await _digitar(tester, 'E-mail, CPF ou telefone', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
 
       await _tocar(tester, 'Entrar');
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
     for (final texto in ['Entrar com Google', 'Entrar com Apple', 'Entrar com biometria']) {
@@ -185,7 +187,7 @@ void main() {
   });
 
   group('confirmar celular', () {
-    testWidgets('código incompleto mostra erro; completo abre "em breve"', (tester) async {
+    testWidgets('código incompleto mostra erro; completo leva ao app', (tester) async {
       await _abrir(tester, const ConfirmarCelularTela(celular: _celularDigitado));
 
       await _tocar(tester, 'Confirmar código');
@@ -193,7 +195,7 @@ void main() {
 
       await _digitar(tester, 'Código', '123456');
       await _tocar(tester, 'Confirmar código');
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
     testWidgets('contagem de reenvio chega a zero e vira link', (tester) async {

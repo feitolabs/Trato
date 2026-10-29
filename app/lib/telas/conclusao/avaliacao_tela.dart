@@ -90,7 +90,8 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
           ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        Text('Como foi o serviço do ${dados.nomeProfissional}?', style: TipografiaTrato.tituloGrande),
+        Text('Como foi o serviço do ${dados.nomeProfissional}?',
+            style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
         Text(
           'Sua nota ajuda outros clientes. O ${dados.nomeProfissional} também avalia você.',

@@ -157,3 +157,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Em develop (sem push): F5.4 (`telas/cliente/`), F5.8-F5.9 (`telas/pedidos/`), F5.10-F5.11 (`telas/conclusao/`), F6.3-F6.4 (`telas/profissional/`). Verificação: 305 testes no backend, 260 no app.
 - Marcadas como em andamento (`[~]`): as telas existem com dados de exemplo, mas **não estão ligadas ao fluxo** nem ao backend. Falta ligar a casca do cliente ao login, as telas entre si e tudo à API.
 - Pendências vindas das sessões: P1 (48 h x 7 dias na conclusão), P2/P5 (taxa mostrada na calculadora vem de interface, hoje com implementação fake), P13 (ícones).
+
+## 29/10/2026 — Telas ligadas ao fluxo
+
+- `app/lib/telas/fluxo/rotas.dart` liga: login/cadastro → casca do cliente; aba Pedidos → pedido em execução → chat → conclusão → avaliação ou relato; finalizado → garantia. Cadastro de profissional → `AreaProfissionalProvisoria` (calculadora e check-in, com serviços de teste).
+- Testes: 267 no app (7 percursos novos em `test/fluxo_test.dart`). No emulador: splash → onboarding → login → cadastro (formulário preenchido e validado). Não conferido no emulador: confirmar celular → casca, e as telas de pedido (só nos testes).
+- Ainda sem tela: orçamentos recebidos, novo pedido, disputa em andamento, perfil do cliente, lista de mensagens, home do profissional. Dados continuam de exemplo.

@@ -59,7 +59,8 @@ class DadosAvaliacao {
 
 /// Resultado da avaliação entregue a quem chama a tela.
 class EnvioAvaliacao {
-  const EnvioAvaliacao({required this.notas, required this.comentario, required this.gorjetaCentavos});
+  const EnvioAvaliacao(
+      {required this.notas, required this.comentario, required this.gorjetaCentavos});
 
   /// Nota (0 a 5) por critério, na ordem de [DadosAvaliacao.criterios].
   final List<int> notas;
@@ -124,7 +125,8 @@ class DadosGarantia {
   bool get ativa => diasRestantes > 0;
 
   /// Parte já consumida da garantia, de 0 a 1 (preenchimento da barra).
-  double get progresso => diasTotal <= 0 ? 1 : ((diasTotal - diasRestantes) / diasTotal).clamp(0, 1);
+  double get progresso =>
+      diasTotal <= 0 ? 1 : ((diasTotal - diasRestantes) / diasTotal).clamp(0, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,8 +141,7 @@ const resumoConclusaoExemplo = ResumoConclusao(
   orcamentoCentavos: 38000,
   aditivoCentavos: 4500,
   codigo: '7305',
-  avisoLiberacao:
-      'Liberação automática em 48 horas, salvo disputa aberta. '
+  avisoLiberacao: 'Liberação automática em 48 horas, salvo disputa aberta. '
       'Ao confirmar, a garantia de 90 dias começa a contar.',
 );
 

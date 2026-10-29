@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
+import '../fluxo/rotas.dart';
 import 'estrutura_auth.dart';
 import 'recuperar_senha_tela.dart';
 import 'validacao.dart';
@@ -44,7 +45,7 @@ class _LoginTelaState extends State<LoginTela> {
 
   void _entrar() {
     setState(() => _tentou = true);
-    if (_erroIdentificador == null && _erroSenha == null) _emBreve('Início');
+    if (_erroIdentificador == null && _erroSenha == null) RotasTrato.irParaCliente(context);
   }
 
   @override

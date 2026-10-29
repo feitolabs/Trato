@@ -43,11 +43,8 @@ class Aditivo {
   final String descricao;
   final EstadoAditivo estado;
 
-  Aditivo comEstado(EstadoAditivo novo) => Aditivo(
-      titulo: titulo,
-      valorCentavos: valorCentavos,
-      descricao: descricao,
-      estado: novo);
+  Aditivo comEstado(EstadoAditivo novo) =>
+      Aditivo(titulo: titulo, valorCentavos: valorCentavos, descricao: descricao, estado: novo);
 }
 
 class PedidoEmExecucao {
