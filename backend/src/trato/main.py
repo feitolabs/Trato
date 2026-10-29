@@ -3,9 +3,11 @@
 from fastapi import FastAPI
 
 from trato import __version__
+from trato.api import instalar
 from trato.config import obter_config
 
 app = FastAPI(title="Trato API", version=__version__)
+instalar(app)
 
 
 @app.get("/saude")

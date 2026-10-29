@@ -36,3 +36,12 @@ select = ["E", "F", "I", "B", "UP", "S"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Padrão do FastAPI: Depends/Query/Header nos argumentos das rotas.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Header",
+    "trato.api.contexto.exigir_papel",
+]
