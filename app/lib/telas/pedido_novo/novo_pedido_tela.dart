@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../em_breve_tela.dart';
+import '../profissional_apoio/apoio.dart' show CapturarFoto;
 import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_pedido.dart';
@@ -12,6 +13,8 @@ import 'pecas_pedido.dart';
 ///
 /// Só coleta e mostra: quem decide o que acontece depois é o backend. Os callbacks são
 /// opcionais; sem eles, o botão correspondente abre [EmBreveTela].
+const _maxFotos = 4;
+
 class NovoPedidoTela extends StatefulWidget {
   const NovoPedidoTela({
     super.key,
@@ -20,6 +23,7 @@ class NovoPedidoTela extends StatefulWidget {
     this.aoTrocarCategoria,
     this.aoMudarEndereco,
     this.aoAdicionarFoto,
+    this.aoCapturarFoto,
   });
 
   final FormularioPedido formulario;
@@ -29,6 +33,10 @@ class NovoPedidoTela extends StatefulWidget {
   final VoidCallback? aoTrocarCategoria;
   final VoidCallback? aoMudarEndereco;
   final VoidCallback? aoAdicionarFoto;
+
+  /// Abre câmera/galeria (com permissão e envio) e devolve a referência da foto. Quando vem,
+  /// vale no lugar de [aoAdicionarFoto] e as fotos entram no [RascunhoPedido].
+  final CapturarFoto? aoCapturarFoto;
 
   @override
   State<NovoPedidoTela> createState() => _NovoPedidoTelaState();
@@ -42,6 +50,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late FaixaPreco _faixa = widget.formulario.faixas.first;
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
   var _tentou = false;
+  final _fotosNovas = <String>[];
 
   @override
   void dispose() {
@@ -52,6 +61,13 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   void _emBreve(String titulo) => Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
       );
+
+  Future<void> _adicionarFoto() async {
+    final captura = widget.aoCapturarFoto;
+    if (captura == null) return _chamarOuEmBreve(widget.aoAdicionarFoto, 'Adicionar foto');
+    final ref = await captura();
+    if (ref != null && mounted) setState(() => _fotosNovas.add(ref));
+  }
 
   void _chamarOuEmBreve(VoidCallback? acao, String titulo) =>
       acao != null ? acao() : _emBreve(titulo);
@@ -75,6 +91,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         descricao: _descricao.text.trim(),
         prazo: _prazo,
         faixa: _faixa,
+        fotos: List.of(_fotosNovas),
       );
       if (widget.aoEnviar != null) {
         widget.aoEnviar!(rascunho);
@@ -181,11 +198,14 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
               Expanded(child: _FotoReservada(foto)),
               const SizedBox(width: EspacosTrato.x3),
             ],
-            Expanded(
-              child: _AdicionarFoto(
-                aoTocar: () => _chamarOuEmBreve(widget.aoAdicionarFoto, 'Adicionar foto'),
-              ),
-            ),
+            for (var i = 0; i < _fotosNovas.length; i++) ...[
+              Expanded(child: _FotoReservada('[Foto ${f.fotos.length + i + 1}]')),
+              const SizedBox(width: EspacosTrato.x3),
+            ],
+            if (f.fotos.length + _fotosNovas.length < _maxFotos)
+              Expanded(child: _AdicionarFoto(aoTocar: _adicionarFoto))
+            else
+              const Spacer(),
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),

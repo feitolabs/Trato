@@ -10,6 +10,10 @@ enum ResultadoInicio {
 
   /// O backend recusou o código. O app nunca confere o código sozinho.
   codigoIncorreto,
+
+  /// Sem internet: a prova ficou guardada no aparelho e sai quando a conexão voltar.
+  /// O serviço ainda NÃO começou; quem confirma é o backend.
+  guardadoOffline,
 }
 
 /// Porta entre a tela de check-in e câmera, GPS e backend. Nenhuma validação de prova

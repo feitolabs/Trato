@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>O Trato usa a câmera para fotografar documentos, a chegada ao serviço e notas de material.</string>
+	<string>A câmera registra a chegada e o serviço pronto, e confere seu documento e sua selfie na verificação.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>O Trato usa sua localização para confirmar que você chegou ao local do serviço.</string>
+	<string>A localização confirma que você está no endereço do serviço quando começa e quando termina. Usamos só com o app aberto.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

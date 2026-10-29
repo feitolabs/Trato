@@ -242,3 +242,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em develop: 497 no backend (1 pulado), 594 no app, verificação OK.
 - Falta: ligar no app as rotas novas (hoje as telas ainda usam os fakes nessas áreas), rota de URL assinada para upload de foto, validar câmera e GPS num aparelho real, e a chamada de `POST .../cobranca` só funciona com o serviço de pagamento instalado. Detalhe em `docs/STATUS-MVP.md` e `docs/app-ligacao.md`.
 
+## 29/10/2026 — Câmera e GPS reais atrás de interfaces (app)
+
+- `app/lib/dispositivo/`: `ServicoCamera` (foto, galeria, compressão, sem EXIF, SHA-256), `ServicoLocalizacao`, `ServicoPermissao` e a explicação antes do pedido (finalidade e retenção; "negada para sempre" leva às configurações). Real (`image_picker`, `geolocator`, `permission_handler`, versões fixas) e fake para cada um. `ServicosDispositivo.real/fake` monta tudo.
+- `ServicoUpload` (`dados/`): pede a URL assinada ao backend e faz o PUT. **Rota `POST /v1/arquivos/url-envio` não existe**; contrato proposto em `docs/app-camera-gps.md`.
+- Check-in com permissões, aviso de "longe do endereço" e modo offline (`FilaOffline`, `offline_capturada_em`); `CheckOutTela` nova; `NovoPedidoTela.aoCapturarFoto`. Verificação, nota de materiais e cadastro já recebiam `CapturarFoto`: falta só ligar em `rotas.dart` (fora desta tarefa).
+- Manifest do Android e Info.plist com câmera e localização "em uso"; `INTERNET` entrou no manifesto principal.
+- Testes: 35 novos (permissões, sem GPS, longe, offline, upload, EXIF, hash). `flutter analyze` limpo. No `verificar.py` as seções do app passam; as do backend só rodam com o `.venv` (que não está no worktree) e passaram com o `.venv` do projeto (497 testes).
