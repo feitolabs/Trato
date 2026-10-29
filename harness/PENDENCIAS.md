@@ -19,6 +19,7 @@ Não inventar regra: enquanto estiver aqui, não implementar.
 | P10 | **Verificação de identidade (documento + selfie):** qual fornecedor? | Escopo 3.1 | Fase 6 |
 | P11 | **SMS/WhatsApp:** qual provedor (Twilio, Zenvia…)? | Tela Confirmar celular | Fase 5 |
 | P12 | **Fontes do protótipo:** identifiquei como Archivo (títulos) e Figtree (corpo) pelo desenho das letras. Confirmar ou mandar os nomes certos. | Todas as telas | Tipografia |
+| P13 | **Ícones:** o protótipo usa ícones de traço fino (estilo Lucide). Hoje uso os Material Outlined, que são parecidos. Trocar pelo pacote Lucide na F2.5? | Todas as telas | Fidelidade ao design |
 
 ## Para advogado e contador (o agente não decide)
 

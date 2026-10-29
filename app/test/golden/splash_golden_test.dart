@@ -1,22 +1,13 @@
-import 'dart:io';
-
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/main.dart';
 
+import '../apoio/fontes.dart';
+
 /// Compara a splash com a imagem de referência em 3 tamanhos (celular pequeno,
 /// celular padrão do protótipo e tablet). Atualizar: flutter test --update-goldens
-Future<void> _carregarFonte(String familia, String arquivo) async {
-  final bytes = File('assets/fontes/$arquivo').readAsBytesSync();
-  final loader = FontLoader(familia)..addFont(Future.value(ByteData.sublistView(bytes)));
-  await loader.load();
-}
-
 void main() {
-  setUpAll(() async {
-    await _carregarFonte('Archivo', 'Archivo.ttf');
-    await _carregarFonte('Figtree', 'Figtree.ttf');
-  });
+  setUpAll(carregarFontesTrato);
 
   const tamanhos = {
     'celular_pequeno': Size(320, 568),

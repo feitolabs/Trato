@@ -56,3 +56,15 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Command-line Tools + licenças (João). iOS precisa de Mac.
 
 **Próxima tarefa:** F2.3 (componentes).
+
+## 28/10/2026 — F2.3 componentes
+
+**Feito**
+- `app/lib/componentes/`: BotaoPrimario, BotaoSecundario (com estado selecionado), BotaoLink, CampoTrato (rótulo, dica, ajuda, erro, "R$"/"h" fixos), CartaoTrato (claro, escuro, tocável), ChipStatus (info, alerta, sucesso, perigo, destaque), LinhaDoTempo, BarraAbasTrato (abas do cliente e do profissional).
+- Galeria em `lib/galeria/` (`--dart-define=GALERIA=true`), conferida no emulador Android e em golden (celular e celular pequeno).
+- 13 testes novos de componente; testes carregam fontes reais e ícones Material.
+
+**Pendente**
+- P13: ícones estilo Lucide.
+
+**Próxima tarefa:** F2.4 (responsividade: breakpoints e largura máxima no tablet).
