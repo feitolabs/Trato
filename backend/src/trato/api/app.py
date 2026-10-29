@@ -6,6 +6,7 @@ from fastapi import APIRouter, FastAPI
 
 from trato import __version__
 from trato.api import rotas_app, rotas_financeiro, rotas_pedidos, rotas_webhook
+from trato.api.admin import criar_router_admin
 from trato.api.contexto import Contexto
 from trato.api.erros import instalar_tratadores
 
@@ -16,6 +17,7 @@ def criar_router() -> APIRouter:
     roteador.include_router(rotas_app.router)
     roteador.include_router(rotas_financeiro.router)
     roteador.include_router(rotas_webhook.router)
+    roteador.include_router(criar_router_admin())
     return roteador
 
 
