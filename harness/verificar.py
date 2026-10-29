@@ -96,6 +96,31 @@ def checar_cores_soltas() -> bool:
     return ok
 
 
+# Textos proibidos pela decisão D13 (Auditoria V2). Só valem em texto de tela: comentários ficam livres.
+TEXTOS_PROIBIDOS = re.compile(
+    r"(?i)escrow|garantia total|profissional seguro|reembolso autom[aá]tico"
+    r"|menor taxa do mercado|atendimento 24\s*/\s*7|24\s*/\s*7|24 horas por dia"
+)
+
+
+def checar_textos_proibidos() -> bool:
+    """D13: o app não pode exibir promessas proibidas. Comentários (//) são ignorados;
+    `verificar: ignorar` na linha libera um caso justificado."""
+    titulo("App — textos proibidos (D13)")
+    ok = True
+    for arquivo in (APP / "lib").rglob("*.dart"):
+        for numero, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), start=1):
+            codigo = linha.split("//", 1)[0] if linha.lstrip().startswith("//") else linha
+            if linha.lstrip().startswith("//") or "verificar: ignorar" in linha:
+                continue
+            if TEXTOS_PROIBIDOS.search(codigo):
+                print(f"FALHA: texto proibido (D13) em {arquivo.relative_to(RAIZ)}:{numero}")
+                ok = False
+    if ok:
+        print("ok")
+    return ok
+
+
 def python_do_backend() -> str:
     venv = BACKEND / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     return str(venv) if venv.exists() else sys.executable
@@ -147,6 +172,7 @@ def main() -> int:
         checar_segredos(),
         checar_env_ignorado(),
         checar_cores_soltas(),
+        checar_textos_proibidos(),
         checar_backend(),
         checar_app(),
     ]
