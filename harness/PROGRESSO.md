@@ -175,3 +175,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Não ligado ainda (sem ponto de entrada óbvio): Novo pedido (tela 11), Carteira na aba do profissional (a casca tem a aba como "em breve"), `AreaProfissionalProvisoria` ficou sem uso. Sair do perfil sem ação definida.
 - `docs/COMO-RODAR.md` cobre F9.5 só em parte (falta `ENTREGA.md`).
 
+
+## 29/10/2026 — Simulador de margem V2 (`trato/margem/`)
+
+- Novo pacote `backend/src/trato/margem/`: `regras.py` (taxa única % com mínimo, ou tabela progressiva por faixas, modo marginal ou faixa inteira), `simulador.py` (margem = taxa − provedor − chargeback esperado − suporte − garantia − tributos − incentivo; usa o custo do Stripe de `pagamentos/custo.py`) e `relatorio.py` (gera as tabelas de `docs/simulacao-margem.md`). Tudo em centavos/bps inteiros, sem `float`, half-up uma vez por percentual.
+- Testes em `backend/tests/margem/` (55): Pix, cartão à vista, 3x e 6x, os dois tipos de regra, arredondamento e soma exata.
+- `docs/simulacao-margem.md`: tickets R$ 80 a R$ 3.000 × Pix/cartão/3x/6x para 5% fixa, 7,5% fixa e progressiva 7,5/5/3,5. **Custos do provedor são ESTIMATIVAS até haver proposta (P7); faixas e mínimo de R$ 5,00 são hipóteses (P2).** Resultado: Pix nunca negativo; cartão 6x negativo em tudo; 5% fixa perde no cartão até R$ 500; a progressiva fica negativa no 3x a partir de R$ 1.000.
+- Sem banco, sem `app/`, sem push.
