@@ -6,6 +6,7 @@ import 'tipografia.dart';
 
 export 'cores.dart';
 export 'espacos.dart';
+export 'responsivo.dart';
 export 'tipografia.dart';
 
 /// Tema Material do Trato, montado só com os tokens do protótipo.

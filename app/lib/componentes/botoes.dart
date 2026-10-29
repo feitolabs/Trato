@@ -87,14 +87,19 @@ class _ConteudoBotao extends StatelessWidget {
         child: CircularProgressIndicator(strokeWidth: 2),
       );
     }
-    if (icone == null) return Text(texto);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icone, size: EspacosTrato.x5),
-        const SizedBox(width: EspacosTrato.x2),
-        Flexible(child: Text(texto, overflow: TextOverflow.ellipsis)),
-      ],
+    // Botão tem altura fixa: em tela estreita com fonte grande o texto encolhe em vez de quebrar.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: icone == null
+          ? Text(texto, maxLines: 1)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icone, size: EspacosTrato.x5),
+                const SizedBox(width: EspacosTrato.x2),
+                Text(texto, maxLines: 1),
+              ],
+            ),
     );
   }
 }

@@ -19,6 +19,7 @@ class TratoApp extends StatelessWidget {
       title: 'Trato',
       debugShowCheckedModeBanner: false,
       theme: TemaTrato.claro,
+      builder: (context, filho) => EscalaFonteLimitada(child: filho!),
       home: _mostrarGaleria ? const GaleriaComponentes() : const TelaInicial(),
     );
   }
@@ -34,19 +35,25 @@ class TelaInicial extends StatelessWidget {
       backgroundColor: CoresTrato.petroleo,
       body: SafeArea(
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Trato',
-                style: TipografiaTrato.marca.copyWith(color: CoresTrato.creme),
-              ),
-              const SizedBox(height: EspacosTrato.x4),
-              Text(
-                'Serviço feito, dinheiro liberado.',
-                style: TipografiaTrato.lema.copyWith(color: CoresTrato.logoAzulClaro),
-              ),
-            ],
+          child: ConteudoResponsivo(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Trato',
+                    style: TipografiaTrato.marca.copyWith(color: CoresTrato.creme),
+                  ),
+                ),
+                const SizedBox(height: EspacosTrato.x4),
+                Text(
+                  'Serviço feito, dinheiro liberado.',
+                  textAlign: TextAlign.center,
+                  style: TipografiaTrato.lema.copyWith(color: CoresTrato.logoAzulClaro),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -44,7 +44,12 @@ class CampoTrato extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(rotulo, style: TipografiaTrato.corpoForte),
+        // Rótulo em uma linha só: encolhe em colunas estreitas em vez de quebrar a palavra.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(rotulo, style: TipografiaTrato.corpoForte, maxLines: 1),
+        ),
         const SizedBox(height: EspacosTrato.x2),
         TextField(
           controller: controlador,

@@ -33,9 +33,8 @@ class CartaoTrato extends StatelessWidget {
       color: escuro ? CoresTrato.petroleo : null,
       shape: escuro ? RoundedRectangleBorder(borderRadius: raio) : null,
       clipBehavior: Clip.antiAlias,
-      child: aoTocar == null
-          ? conteudo
-          : InkWell(onTap: aoTocar, borderRadius: raio, child: conteudo),
+      child:
+          aoTocar == null ? conteudo : InkWell(onTap: aoTocar, borderRadius: raio, child: conteudo),
     );
   }
 }
