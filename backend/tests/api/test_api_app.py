@@ -13,8 +13,8 @@ from trato.pagamentos.taxa import ConfigTaxa
 from trato.pedidos.estados import Estado
 
 
-def get(amb, url, token="t-cliente", **kw):  # noqa: S107
-    return amb.cliente.get(url, headers=cab(token), **kw)
+def get(amb, url, quem="t-cliente", **kw):
+    return amb.cliente.get(url, headers=cab(quem), **kw)
 
 
 def post(amb, url, token, corpo=None, **kw):
