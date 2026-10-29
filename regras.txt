@@ -1,0 +1,10 @@
+-usar como backend: python
+-usar como frontend: flutter
+-usar arquivos .env
+-n expor senhas hardcoded
+-usar como banco de dados: se conectar ao supabase, acessar o projeto do "Trato"
+-usar como repositório: se conectar ao GitHub e acessar o repositorio "Trato"
+-respeitar o design e protótipo
+-usar o expodev
+
+-objetivo: desenvolver o app pensando em android e ios, totalmente responsivo e intuitivo, obedecendo fielmente as regras do escopo e design

@@ -1,0 +1,17 @@
+observações extras que discutimos dps da criação do pdf do escopo:
+
+o app n se chamara mais worknet, e sim "trato", igual o prototipo
+
+1. taxa paga para o "Trato", usar tabela progressiva: mas a taxa base do serviço sera 7,5 % (taxa mínima pode ser configurável.)
+3. A WorkNet absorve o primeiro risco de chargeback. Com que reserva financeira? Isso vem do fundo de garantia ou do bolso dos sócios no início?: teria q ser o cliente ate 7 dias pra fazer reclamação ou judicial
+
+4. fazer calculo da porcentagem do stripe
+
+
+orçamento é grátis, mas paga 30% adiantado do valor acordado de inicio pro profissional começar, ao encerrar paga o restante. se passar 7 dias e tiver tudo ok, libera o saldo pro empregado... ou pagar progessivamemte conforme realizar o serviço.
+
+o dinheiro so é liberado ao encerrar
+
+se acontecer algum problema, entra em disputa.
+
+o profissional tem q pegar a notinha e enviar pro cliente, pra ver quanto custa cada material, ou algo n está previsto pra troca, então ter uma opção de ter aditivo e preço
