@@ -20,6 +20,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from trato.api.repositorios import DadosPedido
+from trato.api.repositorios_app import PedidoAberto
 from trato.pedidos.estados import (
     Acao,
     Ator,
@@ -134,6 +135,43 @@ class PedidosPostgres:
                 (achado,),
             ).fetchall()
         return tuple(self._montar(linha) for linha in linhas)
+
+    def listar_abertos(self, profissional_id: str) -> Sequence[PedidoAberto]:
+        """Pedidos abertos na categoria e na região (cidade, e bairro se o profissional fixou)
+        em que o profissional atua. Sem endereço: ele só aparece depois da contratação."""
+        achado = como_uuid(profissional_id)
+        if achado is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select p.id, p.titulo, p.descricao, p.bairro, p.categoria_id, "
+                "p.faixa_preco_min_centavos, p.faixa_preco_max_centavos, p.urgente, "
+                "p.prazo_desejado, p.criado_em from public.pedidos p "
+                "where p.status = 'aberto' "
+                "and exists (select 1 from public.profissional_categorias pc "
+                "            where pc.profissional_id = %s and pc.categoria_id = p.categoria_id "
+                "              and pc.suspensa_em is null) "
+                "and exists (select 1 from public.profissional_regioes pr "
+                "            where pr.profissional_id = %s and pr.cidade_id = p.cidade_id "
+                "              and (pr.bairro is null or pr.bairro = p.bairro)) "
+                "order by p.criado_em desc",
+                (achado, achado),
+            ).fetchall()
+        return tuple(
+            PedidoAberto(
+                str(l["id"]),
+                l["titulo"],
+                l["descricao"],
+                l["bairro"],
+                str(l["categoria_id"]),
+                l["faixa_preco_min_centavos"],
+                l["faixa_preco_max_centavos"],
+                l["urgente"],
+                l["prazo_desejado"],
+                l["criado_em"],
+            )  # fmt: skip
+            for l in linhas  # noqa: E741
+        )
 
     # --- escrita -----------------------------------------------------------------------
     def salvar(

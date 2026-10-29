@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from trato.api.repositorios_app import OrcamentoDoPedido, PedidoAberto
 from trato.disputas import ConfigDisputa, Disputa
 from trato.financeiro.ledger import Conta, Lancamento, SaldoPedido
 from trato.garantias import ConfigGarantia, Garantia, Retrabalho
@@ -121,9 +122,15 @@ class RepositorioPedidos(Protocol):
 
     def listar_do_usuario(self, usuario_id: str, como_cliente: bool) -> Sequence[Pedido]: ...
 
+    def listar_abertos(self, profissional_id: str) -> Sequence[PedidoAberto]:
+        """Pedidos que ainda recebem orçamentos e combinam com o profissional."""
+
 
 class RepositorioOrcamentos(Protocol):
     def obter(self, orcamento_id: str) -> Orcamento | None: ...
+
+    def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:
+        """Orçamentos enviados (e o aceito) do pedido, o mais barato primeiro."""
 
 
 class RepositorioContratos(Protocol):

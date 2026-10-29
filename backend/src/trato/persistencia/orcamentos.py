@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from trato.api.repositorios import Orcamento
+from trato.api.repositorios_app import OrcamentoDoPedido
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import DadosInvalidos, RegraDoBanco
@@ -58,6 +59,35 @@ class OrcamentosPostgres:
             profissional_id=str(linha["profissional_id"]),
             valor_centavos=int(linha["valor_total_centavos"]),
             categoria_id=str(linha["categoria_id"]),
+        )
+
+    def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:
+        """Última versão enviada (ou a aceita) de cada profissional, do mais barato ao mais caro."""
+        achado = como_uuid(pedido_id)
+        if achado is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select o.id, o.profissional_id, u.nome, o.versao, o.valor_total_centavos, "
+                "o.prazo_execucao_dias, o.garantia_dias, o.observacoes, o.enviado_em "
+                "from public.orcamentos o join public.usuarios u on u.id = o.profissional_id "
+                "where o.pedido_id = %s and o.status in ('enviado', 'aceito') "
+                "order by o.valor_total_centavos, o.enviado_em, o.id",
+                (achado,),
+            ).fetchall()
+        return tuple(
+            OrcamentoDoPedido(
+                str(l["id"]),
+                str(l["profissional_id"]),
+                l["nome"],
+                int(l["versao"]),
+                int(l["valor_total_centavos"]),
+                l["prazo_execucao_dias"],
+                l["garantia_dias"],
+                l["observacoes"],
+                l["enviado_em"],
+            )  # fmt: skip
+            for l in linhas  # noqa: E741
         )
 
     def enviar(

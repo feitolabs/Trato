@@ -11,6 +11,13 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from trato.api.auth import PapelUsuario, ProvedorAuth, Usuario
+from trato.api.memoria_app import (
+    AvaliacoesEmMemoria,
+    ConversasEmMemoria,
+    NotificacoesEmMemoria,
+    UsuariosEmMemoria,
+    VerificacoesEmMemoria,
+)
 from trato.api.repositorios import (
     EventoWebhook,
     ProvedorConfig,
@@ -21,6 +28,14 @@ from trato.api.repositorios import (
     RepositorioLedger,
     RepositorioOrcamentos,
     RepositorioPedidos,
+)
+from trato.api.repositorios_app import (
+    ProvedorTaxa,
+    RepositorioAvaliacoes,
+    RepositorioConversas,
+    RepositorioNotificacoes,
+    RepositorioUsuarios,
+    RepositorioVerificacoes,
 )
 from trato.config import obter_config
 from trato.pedidos.estados import Acao, Papel, Pedido
@@ -66,8 +81,21 @@ class Contexto:
         default_factory=lambda: _manipuladores_padrao()
     )
     apos_transicao: list[GanchoTransicao] = field(default_factory=list)
+    # Rotas do app. Em memória por padrão; a fábrica Postgres troca os que já têm tabela.
+    conversas: RepositorioConversas = field(default_factory=ConversasEmMemoria)
+    notificacoes: RepositorioNotificacoes = field(default_factory=NotificacoesEmMemoria)
+    usuarios: RepositorioUsuarios = field(default_factory=UsuariosEmMemoria)
+    verificacoes: RepositorioVerificacoes = field(default_factory=VerificacoesEmMemoria)
+    avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
+    # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
+    taxa: ProvedorTaxa | None = None
     # Só existem com persistência Postgres (a memória não os implementa).
     extras: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Antes da contratação a conversa mascara contatos: a memória pergunta ao repositório.
+        if isinstance(self.conversas, ConversasEmMemoria) and self.conversas.contratado is None:
+            self.conversas.contratado = lambda pid: self.contratos.obter_do_pedido(pid) is not None
 
 
 def obter_contexto(request: Request) -> Contexto:
