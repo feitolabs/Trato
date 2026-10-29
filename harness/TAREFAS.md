@@ -20,7 +20,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F1.4** Backend "olá mundo" (FastAPI `/saude`) lendo `.env`, com teste. *Pronto quando:* `pytest` passa.
 - [~] **F1.5** App Flutter "olá mundo". Android ok (APK debug roda no emulador API 37). *Falta:* iOS (precisa de Mac). *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
 - [ ] **F1.6** João coloca as chaves reais no `.env` (Supabase, Stripe teste). *Pronto quando:* backend sobe e lê as variáveis.
-- [~] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada. Leitura feita em 28/10/2026: projeto "Trato" (sa-east-1, Postgres 17) ativo, 0 tabelas, 0 migrations.
+- [x] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada. Leitura feita em 28/10/2026: projeto "Trato" (sa-east-1, Postgres 17) ativo, 0 tabelas, 0 migrations.
 - [ ] **F1.8** 🔒 Ligar `origin` ao GitHub "Trato" e dar push de `main` e `develop`. *Pronto quando:* branches no GitHub.
 
 ## Fase 2 — Design
@@ -41,7 +41,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [ ] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações.
 - [ ] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável.
 - [ ] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro.
-- [ ] **F3.9** Rodar advisors do Supabase e corrigir. *Pronto quando:* sem alerta de segurança.
+- [~] **F3.9** Rodar advisors do Supabase e corrigir. *Pronto quando:* sem alerta de segurança. *(rodado após a F3.2: só restam os 15 avisos "RLS sem policy", esperados até a F3.8)*
 
 ## Fase 4 — Backend Python
 

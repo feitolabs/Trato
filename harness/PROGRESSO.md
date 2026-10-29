@@ -144,3 +144,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Advisors de segurança: 15 INFO "RLS ligado sem policy" (esperado até a F3.8) e 2 WARN da função `public.rls_auto_enable()` (SECURITY DEFINER executável por anon/authenticated), que **já existia no projeto** (usada pelo gatilho de evento `ensure_rls` da plataforma). Não mexi: revogar o EXECUTE é mudança de permissão e precisa de OK do João.
 - Não testado no banco real: o comportamento do EXCLUDE (precisaria inserir linhas de teste). A existência da constraint foi confirmada.
 - Em paralelo, telas (só app/): F5.4 (início/buscar/perfil), F5.8-F5.9 (pedidos/chat), F5.10-F5.11 (conclusão/avaliação/disputa/garantia) e F6.3-F6.4 (calculadora/check-in).
+
+## 29/10/2026 — Revogado o acesso público a rls_auto_enable
+
+- Com o OK do João: `revoke execute on function public.rls_auto_enable() from public, anon, authenticated` (versão `20261029025741`). Antes, ACL padrão: anon e authenticated executavam.
+- Teste sem rastro: uma tabela criada dentro de um bloco que dá erro e desfaz tudo nasceu com RLS ligado, então o gatilho `ensure_rls` continua funcionando. Continuam 15 tabelas.
+- Advisors de segurança: os 2 WARN sumiram. Restam 15 INFO "RLS sem policy" (esperado até a F3.8).
+- Rollback em `supabase/rollback/rls_auto_enable_rollback.sql` (não executado).
