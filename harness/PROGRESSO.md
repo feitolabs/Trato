@@ -115,3 +115,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Leitura (sem escrita) no Supabase: projeto "Trato" `ornaoshsvuszquntkqsk`, região sa-east-1, Postgres 17.11, status ativo, **0 tabelas e 0 migrations**.
 - Plano da F3.2 apresentado ao João; **nada foi criado nem aplicado**.
 - Aviso: a sessão da F3.1 abriu por conta própria F4.7 (disputa), F4.8 (garantia) e uma F2.4 duplicada (responsividade, já integrada em develop). Nenhuma foi integrada.
+
+## 28/10/2026 — F3.2 escrita (não aplicada)
+
+- `supabase/migrations/20261028000100_f32_identidade_catalogo_config.sql`: 15 tabelas, RLS ligado em todas e sem policy, triggers de `atualizado_em`, validação de parâmetros e imutabilidade de configuração aprovada. **Só estrutura: nenhum dado, nenhuma taxa, nenhuma cidade.**
+- `supabase/rollback/F3.2_rollback.sql` desfaz tudo.
+- Testado num Postgres 16 local e descartável (`supabase/testes/testar_f32.py`): constraints, triggers, rollback e reaplicação OK. **Não testado:** o EXCLUDE de faixas sobrepostas (o Postgres embutido não tem btree_gist; o Supabase tem).
+- Nada foi enviado ao Supabase. Falta o OK do João para aplicar.
+- Seed de `config_definicoes` fora desta migration: precisa dos limites mínimo e máximo de cada parâmetro, que o João define.
+- Em paralelo: F5.2/F5.3 (telas de login e cadastro) na sessão f2-4-responsivo, F4.9 (rotinas) na f4-1, F4.7 e F4.8 em andamento.
