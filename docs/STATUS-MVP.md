@@ -17,7 +17,7 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Login, criar conta, recuperar senha | Demo (serviço de teste) | `ServicoAuth` pronto; o `main.dart` troca para o Supabase quando há `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O token do login ainda **não** é passado ao cliente HTTP (`SessaoTrato`), então a API real não recebe o usuário. Ver `docs/login-configuracao.md`. |
 | Google, Apple, SMS | Depende do João | Chaves e provedor (P11). |
 | Início, buscar, perfil do profissional | Demo | Categorias e profissionais de exemplo. |
-| Busca com serviço (`busca/`) | Demo, **não ligada** | Tela nova com estados; sem ponto de entrada em `rotas.dart` (a aba Buscar usa a tela antiga). |
+| Busca com serviço (`busca/`) | Demo, ligada | É a aba Buscar do cliente (`RotasTrato.abaBuscar`), abre o perfil público. Filtros e mapa da tela antiga (`BuscarTela`) saíram da aba; a busca real depende do backend. |
 | Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
 | Seus pedidos | API | Título genérico ("Pedido #XXXX"): a API não devolve título nem nome do profissional. |
 | Orçamentos recebidos e detalhe | Demo | Falta `GET /v1/pedidos/{id}/orcamentos`. O aceite já tem rota. |
@@ -41,14 +41,14 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 
 | Tela | Estado | Observação |
 |---|---|---|
-| Cadastro do profissional | Demo, sem protótipo | Sem câmera: a foto é uma referência de demonstração. Falta rota. |
-| Verificação (documento e selfie) | Demo, sem protótipo | Sem rota; câmera e bucket `verificacao` por ligar. Texto de retenção a definir com o jurídico. |
+| Cadastro do profissional | Demo, sem protótipo | A foto vem da câmera (só a referência; sem upload). Falta rota. |
+| Verificação (documento e selfie) | Demo, sem protótipo | Sem rota; upload para o bucket `verificacao` por ligar (câmera já captura). Texto de retenção a definir com o jurídico. |
 | Início, pedidos abertos, detalhe, recusar | Demo | Faltam as rotas de pedidos abertos. |
 | Filtros | Sem tela | "Em breve". |
 | Calculadora de orçamento | Demo | Taxa e líquido têm de vir do backend (`POST /v1/orcamentos/resumo` não existe). A taxa de 7,5% do fake é só demonstração. |
-| Check-in e check-out | Demo (envio pronto) | `fazer_check_in` e `fazer_check_out` existem na API. Falta câmera e GPS no aparelho. |
-| Enviar nota de materiais e criar aditivo | Demo, **não ligadas** | Telas prontas; falta o botão no pedido em execução do profissional. Sem protótipo. |
-| Responder disputa e atender retrabalho | Demo, **não ligadas** | Telas prontas; falta o ponto de entrada (notificação ou lista de pedidos). Sem protótipo. |
+| Check-in e check-out | Demo (envio pronto) | `fazer_check_in` e `fazer_check_out` existem na API. Câmera e GPS do aparelho já capturam (`app/lib/dispositivo/`); o envio da foto e da posição ao backend falta. |
+| Enviar nota de materiais e criar aditivo | Demo, ligadas | Ações do "pedido de hoje" (botão de check-in da Início). Cliente: links na tela do pedido em execução. Sem rota de nota/aditivo na API. |
+| Responder disputa e atender retrabalho | Demo, ligadas pela notificação | Abertas pelo toque na notificação (tipos `disputa` e `retrabalho`). Falta a entrada pela lista de pedidos do profissional e a rota na API. |
 | Carteira | API, como extrato | `GET /v1/extrato`. Sem saldo próprio e sem saque (D15). |
 | Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional. |
 | Agenda, mensagens do profissional | Sem tela | "Em breve". |
@@ -82,8 +82,7 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 
 ## Próximos passos técnicos (sem depender do João)
 
-1. Passar o token do Supabase Auth ao `SessaoTrato` (hoje o app logado não fala com a API real).
-2. Ligar os pontos de entrada que faltam: nota e aditivo (cliente e profissional), responder disputa, atender retrabalho, busca com serviço.
+1. ~~Token do Supabase Auth no `SessaoTrato`~~ feito (`LigacaoSessao`). ~~Pontos de entrada~~ feitos, menos disputa/retrabalho pela lista de pedidos do profissional.
 3. Criar as rotas que faltam no backend (orçamentos, cobrança, mensagens, notificações, perfil, pedidos abertos, verificação).
-4. Câmera, GPS e envio de fotos (buckets por URL assinada).
+4. Envio de fotos e posição ao backend (buckets por URL assinada): implementar `EnvioMidia` quando a rota existir. Câmera e GPS já capturam; textos de permissão em `AndroidManifest.xml` e `Info.plist`. Não testado em aparelho real.
 5. Busca de textos proibidos (D13) no `verificar`.

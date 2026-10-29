@@ -96,6 +96,10 @@ abstract class ServicoAuth {
 
   Stream<SessaoAuth?> get sessaoMudou;
 
+  /// Token de acesso da sessão atual, para a API. Só quem liga a sessão ao cliente HTTP
+  /// ([LigacaoSessao]) deve ler; nunca vai para log, tela ou código.
+  String? get tokenAtual;
+
   Future<SessaoAuth> entrarComEmail({required String email, required String senha});
 
   /// Cria a conta e já pede o código de 6 dígitos por SMS para o celular.

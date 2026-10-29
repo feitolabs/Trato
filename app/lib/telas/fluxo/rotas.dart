@@ -5,6 +5,21 @@ import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
 import '../../dados/repositorios_trato.dart';
 import '../../tema/tema.dart';
+import '../../dispositivo/check_in_dispositivo.dart';
+import '../../dispositivo/dispositivo.dart';
+import '../aditivo/aditivo.dart';
+import '../aditivo/criar_aditivo_tela.dart';
+import '../aditivo/responder_aditivo_tela.dart';
+import '../busca/busca_profissionais_tela.dart';
+import '../busca/modelos.dart';
+import '../busca/servico_fake.dart';
+import '../cliente/perfil_profissional_tela.dart';
+import '../disputa_profissional/atender_retrabalho_tela.dart';
+import '../disputa_profissional/disputa.dart';
+import '../disputa_profissional/responder_disputa_tela.dart';
+import '../nota_material/enviar_nota_tela.dart';
+import '../nota_material/nota_material.dart';
+import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_fake.dart';
 import '../lgpd/central_privacidade_tela.dart';
@@ -27,6 +42,7 @@ import '../conclusao/dados_exemplo.dart';
 import '../conclusao/garantia_tela.dart';
 import '../conclusao/relatar_problema_tela.dart';
 import '../em_breve_tela.dart';
+import '../notificacoes/modelos.dart';
 import '../notificacoes/notificacoes_tela.dart';
 import '../notificacoes/servico_repositorio.dart';
 import '../orcamentos/detalhe_orcamento_tela.dart';
@@ -52,6 +68,17 @@ import '../profissional_inicio/modelos.dart';
 abstract final class RotasTrato {
   /// Padrão: demonstração (dados de exemplo, sem rede). O `main.dart` troca conforme o modo.
   static RepositoriosTrato repos = RepositoriosTrato.demo();
+
+  /// Câmera, GPS e envio de arquivos. Padrão: fake (testes); o `main.dart` troca pelo real.
+  static DispositivoTrato dispositivo = DispositivoTrato.fake();
+
+  /// Serviços de nota, aditivo, disputa e busca. Ainda sem rota na API: seguem em demonstração
+  /// (docs/app-ligacao.md). Trocar aqui quando o backend tiver as rotas.
+  static ServicoNotaMaterial servicoNota = ServicoNotaMaterialFake(nota: notaMaterialExemplo);
+  static ServicoAditivo servicoAditivo = ServicoAditivoFake(detalhe: aditivoExemplo);
+  static ServicoDisputaProfissional servicoDisputa =
+      ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo);
+  static ServicoBusca servicoBusca = const ServicoBuscaFake();
 
   /// Id usado nos dados de exemplo, que não têm pedido real por trás.
   static const _idDemo = 'demo';
@@ -91,8 +118,8 @@ abstract final class RotasTrato {
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static void irParaProfissional(BuildContext context) => _abrirCadastroProfissional(context);
 
-  /// Sem câmera ainda: devolve uma referência de demonstração no lugar da foto.
-  static Future<String?> _fotoDemonstracao() async => 'demo://foto';
+  /// Foto pela câmera; devolve só a referência (o upload é do backend, por URL assinada).
+  static Future<String?> _fotografar() => dispositivo.fotografarEEnviar();
 
   static void _entrarNaCascaProfissional(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
@@ -102,19 +129,19 @@ abstract final class RotasTrato {
   }
 
   /// Cadastro → verificação (documento e selfie) → casca do profissional. Os serviços ainda são
-  /// de demonstração e a captura de foto fica sem câmera até o plugin entrar.
+  /// de demonstração e a foto vem da câmera do aparelho.
   static void _abrirCadastroProfissional(BuildContext context) => _abrir<void>(
         context,
         Builder(
           builder: (context) => CadastroProfissionalTela(
             servico: ServicoCadastroProfissionalFake(),
-            aoAdicionarFoto: _fotoDemonstracao,
+            aoAdicionarFoto: _fotografar,
             aoConcluir: () => _abrir<void>(
               context,
               VerificacaoTela(
                 servico: ServicoVerificacaoFake(),
-                aoCapturarDocumento: _fotoDemonstracao,
-                aoCapturarSelfie: _fotoDemonstracao,
+                aoCapturarDocumento: _fotografar,
+                aoCapturarSelfie: _fotografar,
                 aoConcluir: () => _entrarNaCascaProfissional(context),
               ),
             ),
@@ -123,6 +150,9 @@ abstract final class RotasTrato {
       );
 
   // --- Profissional ------------------------------------------------------------------
+
+  @visibleForTesting
+  static Widget cascaProfissionalParaTeste() => _cascaProfissional();
 
   static Widget _cascaProfissional() => Carregador<InicioProfissional>(
         carregar: repos.profissional.inicio,
@@ -135,13 +165,21 @@ abstract final class RotasTrato {
           ),
           abaCarteira: _abaCarteira(),
           abaPerfil: _abaPerfilProfissional(),
-          aoFazerCheckIn: () => _abrir<void>(
+          aoFazerCheckIn: () => _acoesPedidoProfissional(
             context,
-            CheckInTela(
-              servico: repos.profissional.servicoCheckIn(inicio.proximo?.pedidoId ?? _idDemo),
-              tituloBarra: inicio.proximo == null
-                  ? 'Check-in'
-                  : '${inicio.proximo!.titulo} · ${inicio.proximo!.quando}',
+            pedidoId: inicio.proximo?.pedidoId ?? _idDemo,
+            titulo: inicio.proximo?.titulo ?? 'Pedido de hoje',
+            aoCheckIn: () => _abrir<void>(
+              context,
+              CheckInTela(
+                servico: ServicoCheckInDispositivo(
+                  base: repos.profissional.servicoCheckIn(inicio.proximo?.pedidoId ?? _idDemo),
+                  dispositivo: dispositivo,
+                ),
+                tituloBarra: inicio.proximo == null
+                    ? 'Check-in'
+                    : '${inicio.proximo!.titulo} · ${inicio.proximo!.quando}',
+              ),
             ),
           ),
           aoFazerOrcamento: () => _abrir<void>(
@@ -150,6 +188,95 @@ abstract final class RotasTrato {
               servico: repos.profissional.servicoOrcamento(_idDemo),
               tituloPedido: inicio.pedidos.isEmpty ? 'Orçamento' : inicio.pedidos.first.titulo,
             ),
+          ),
+        ),
+      );
+
+  /// Ações do pedido de hoje: check-in, nota de materiais e aditivo.
+  static void _acoesPedidoProfissional(
+    BuildContext context, {
+    required String pedidoId,
+    required String titulo,
+    required VoidCallback aoCheckIn,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (folha) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+            ListTile(
+              leading: const Icon(Icons.place_outlined),
+              title: const Text('Fazer check-in'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                aoCheckIn();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Enviar nota de materiais'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                _abrir<void>(context, _enviarNota(pedidoId, titulo));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_task_outlined),
+              title: const Text('Criar aditivo'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                _abrir<void>(context, _criarAditivo(pedidoId, titulo));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _enviarNota(String pedidoId, String titulo) => Builder(
+        builder: (context) => EnviarNotaTela(
+          servico: servicoNota,
+          pedidoId: pedidoId,
+          tituloPedido: titulo,
+          aoCapturarFoto: _fotografar,
+          aoEnviada: () => Navigator.of(context).maybePop(),
+        ),
+      );
+
+  static Widget _criarAditivo(String pedidoId, String titulo) => Builder(
+        builder: (context) => CriarAditivoTela(
+          servico: servicoAditivo,
+          servicoLiquido: repos.profissional.servicoOrcamento(pedidoId),
+          pedidoId: pedidoId,
+          tituloPedido: titulo,
+          aoCriado: () => Navigator.of(context).maybePop(),
+        ),
+      );
+
+  /// Disputa aberta pelo cliente, vista pelo profissional (a partir da notificação).
+  static void abrirDisputa(BuildContext context, String disputaId) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => ResponderDisputaTela(
+            servico: servicoDisputa,
+            disputaId: disputaId,
+            aoAdicionarEvidencia: _fotografar,
+            aoRespondida: (_) => Navigator.of(context).maybePop(),
+          ),
+        ),
+      );
+
+  /// Retrabalho pedido pelo cliente: o profissional escolhe o horário.
+  static void abrirRetrabalho(BuildContext context, String disputaId) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => AtenderRetrabalhoTela(
+            servico: servicoDisputa,
+            disputaId: disputaId,
+            aoAgendado: (_) => Navigator.of(context).maybePop(),
           ),
         ),
       );
@@ -213,8 +340,35 @@ abstract final class RotasTrato {
         ),
       );
 
-  static Widget _notificacoes() => NotificacoesTela(
-        servico: ServicoNotificacoesRepositorio(repos.notificacoes),
+  static Widget _notificacoes() => Builder(
+        builder: (context) => NotificacoesTela(
+          servico: ServicoNotificacoesRepositorio(repos.notificacoes),
+          aoAbrirDestino: (n) {
+            final id = n.destinoId;
+            if (id == null) return;
+            switch (n.tipo) {
+              case TipoNotificacao.disputa:
+                abrirDisputa(context, id);
+              case TipoNotificacao.retrabalho:
+                abrirRetrabalho(context, id);
+              default:
+                break;
+            }
+          },
+        ),
+      );
+
+  /// Aba "Buscar" do cliente: busca por serviço e abertura do perfil do profissional.
+  static Widget abaBuscar() => Builder(
+        builder: (context) => BuscaProfissionaisTela(
+          servico: servicoBusca,
+          aoAbrirProfissional: (p) => _abrir<void>(
+            context,
+            p.detalhe == null
+                ? EmBreveTela(titulo: 'Perfil de ${p.nome}')
+                : PerfilProfissionalTela(profissional: p),
+          ),
+        ),
       );
 
   /// Aba "Pedidos" da casca do cliente.
@@ -394,6 +548,15 @@ abstract final class RotasTrato {
           aoTocarSos: () => _abrir<void>(context, const EmBreveTela(titulo: 'SOS')),
           aoConversar: () => _abrir<void>(context, _chat(pedidoId)),
           aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
+          aoVerNota: () => _abrir<void>(
+            context,
+            VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
+          ),
+          // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
+          aoVerAditivo: () => _abrir<void>(
+            context,
+            ResponderAditivoTela(servico: servicoAditivo, aditivoId: pedidoId),
+          ),
         ),
       );
 

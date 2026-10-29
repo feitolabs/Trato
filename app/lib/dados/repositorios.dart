@@ -97,11 +97,19 @@ class Notificacao {
     required this.texto,
     required this.quando,
     this.lida = false,
+    this.tipo,
+    this.destinoId,
   });
 
   final String id;
   final String titulo;
   final String texto;
+
+  /// Quando o backend informa: `disputa` ou `retrabalho` (abrem a tela do profissional).
+  final String? tipo;
+
+  /// Id da disputa (ou do pedido) que o toque abre.
+  final String? destinoId;
 
   /// Já formatado ("há 2 h").
   final String quando;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../fluxo/rotas.dart';
-import 'buscar_tela.dart';
 import 'inicio_tela.dart';
 
 /// Casca do app do cliente: barra inferior com as 5 abas (Início · Buscar · Pedidos ·
@@ -25,7 +24,7 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
   Widget build(BuildContext context) {
     final paginas = <Widget>[
       InicioTela(aoBuscar: () => _ir(1)),
-      const BuscarTela(),
+      RotasTrato.abaBuscar(),
       RotasTrato.abaPedidos(),
       RotasTrato.abaMensagens(),
       RotasTrato.abaPerfil(),

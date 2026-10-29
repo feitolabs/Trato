@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>O Trato usa a câmera para fotografar documentos, a chegada ao serviço e notas de material.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O Trato usa sua localização para confirmar que você chegou ao local do serviço.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

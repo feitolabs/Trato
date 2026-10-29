@@ -10,7 +10,9 @@ dependencies:
   crypto: ^3.0.8
   flutter:
     sdk: flutter
+  geolocator: ^13.0.2
   google_sign_in: 6.3.0
+  image_picker: ^1.1.2
   sign_in_with_apple: ^8.2.0
   supabase_flutter: ^2.18.3
   http: ^1.2.2

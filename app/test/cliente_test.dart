@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato/telas/busca/busca_profissionais_tela.dart';
 import 'package:trato/telas/cliente/buscar_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
@@ -45,7 +46,7 @@ void main() {
 
       await tester.tap(find.text('Buscar').last);
       await tester.pumpAndSettle();
-      expect(find.text('3 profissionais perto de Savassi'), findsOneWidget);
+      expect(find.byType(BuscaProfissionaisTela), findsOneWidget);
 
       await tester.tap(find.text('Pedidos'));
       await tester.pumpAndSettle();
@@ -62,7 +63,7 @@ void main() {
       await tester.tap(find.text('Serviço ou profissional'));
       await tester.pumpAndSettle();
 
-      expect(find.text('3 profissionais perto de Savassi'), findsOneWidget);
+      expect(find.byType(BuscaProfissionaisTela), findsOneWidget);
     });
   });
 
