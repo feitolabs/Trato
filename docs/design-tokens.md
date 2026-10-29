@@ -85,3 +85,10 @@ Código: `app/lib/tema/responsivo.dart`.
 - **Barra de abas:** fica em escala 1,0 (como as barras nativas) e o rótulo encolhe se faltar espaço.
 - **Botões e rótulos de campo:** sempre em uma linha; encolhem em vez de quebrar a palavra.
 - **Testes:** `test/responsivo_test.dart` abre a splash e a galeria em 320, 390, 430, 768 e 1280 de largura, com fonte 1,0 e 1,3; qualquer estouro de layout falha. Goldens em `test/golden/`.
+
+## Splash, onboarding e escolha de perfil (F2.5)
+
+- **Logo Feito Labs** (`LogoFeitoLabs`): grade 3x3 de peças de 113 com vão de 18 (proporção medida na splash), desenhada em código. Cores: creme, `logoAzul`, `logoAzulClaro` e círculo `laranja`.
+- **Splash:** logo (72 dp) + "FEITO LABS APRESENTA" (sobretítulo creme) no topo; "Trato" 72 + lema no centro; 3 pontos (ativo creme, inativos `pontoSobrePetroleo` `#2A5A64`) e "Toque para começar" (`azulClaro`) embaixo.
+- **Onboarding:** marca "Trato" 24/800 e link "Pular" no topo; ilustração `azulClaro` com raio 16 e 260 de altura; "1 DE 3"; título 28/800; texto 17 (`corpoGrande`); indicador em pílula (28x10 ativo, 10x10 inativo); botão "Próximo" e link "Já tenho conta".
+- **Escolha de perfil:** duas opções em cartão com ícone em quadrado 64 `azulClaro`; selecionada = fundo `azulSuave` e borda petróleo 1,5; o botão de baixo muda ("Criar conta de cliente" / "de profissional").

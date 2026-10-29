@@ -29,6 +29,9 @@ abstract final class TipografiaTrato {
 
   static final marca = _estilo(fonteTitulos, 72, 900, altura: 1, espacamento: -2);
   static final lema = _estilo(fonteCorpo, 18, 400, altura: 1.4);
+  static final marcaPequena = _estilo(fonteTitulos, 24, 800, altura: 1, espacamento: -0.5);
+  static final corpoGrande = _estilo(fonteCorpo, 17, 400, altura: 1.65);
+  static final tituloOpcao = _estilo(fonteTitulos, 20, 800, altura: 1.2, espacamento: -0.2);
   static final tituloGrande = _estilo(fonteTitulos, 28, 800, altura: 1.15, espacamento: -0.4);
   static final titulo = _estilo(fonteTitulos, 22, 800, altura: 1.2, espacamento: -0.2);
   static final tituloCartao = _estilo(fonteCorpo, 17, 700, altura: 1.3);

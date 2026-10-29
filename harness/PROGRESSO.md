@@ -80,3 +80,15 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 **Paralelo:** propostas as sessões F4.1 (estados do pedido) e F3.1 (modelo de dados, só documento), em worktrees próprias, sem merge.
 
 **Próxima tarefa:** F2.5 (splash + onboarding iguais ao protótipo, aprovação lado a lado).
+
+## 28/10/2026 — F2.5 splash, onboarding e escolha de perfil
+
+**Feito**
+- Splash completa (logo Feito Labs desenhado em código, pontos, "Toque para começar"), onboarding de 3 páginas (PageView, Pular, Próximo, Já tenho conta) e escolha de perfil, tudo com o tema e responsivo.
+- Fluxo: splash → onboarding → escolha de perfil → "em breve" (login e cadastro ficam na F5.2 e F5.3).
+- 13 testes novos (fluxo e goldens em 3 tamanhos); verificação OK. Conferido no emulador Android.
+
+**Pendente**
+- João aprovar lado a lado com o PDF (critério da F2.5). Textos das páginas 2 e 3 são meus (P14). Ícones ainda Material (P13).
+
+**Paralelo (em worktrees, sem merge):** F4.1 estados do pedido (commit e1be9cf, 82 testes), F3.1 modelo de dados (documento), F4.6 ledger, F4.3 e F4.5 (custo Stripe, webhook e idempotência) em andamento.
