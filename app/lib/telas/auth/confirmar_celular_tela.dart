@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
+import '../fluxo/rotas.dart';
+import '../onboarding/escolha_perfil_tela.dart';
 import 'estrutura_auth.dart';
 import 'validacao.dart';
 
@@ -13,7 +15,10 @@ import 'validacao.dart';
 /// O SMS e o WhatsApp ainda não têm backend: a contagem de reenvio é só visual e os
 /// botões abrem [EmBreveTela].
 class ConfirmarCelularTela extends StatefulWidget {
-  const ConfirmarCelularTela({super.key, required this.celular});
+  const ConfirmarCelularTela({super.key, required this.celular, this.perfil = PerfilUso.cliente});
+
+  /// Perfil escolhido no cadastro: decide para onde o usuário vai depois de confirmar.
+  final PerfilUso perfil;
 
   /// Celular como foi digitado no passo 1.
   final String celular;
@@ -54,7 +59,13 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
 
   void _confirmar() {
     setState(() => _tentou = true);
-    if (ValidacaoAuth.codigoSms(_codigo.text) == null) _emBreve('Conta criada');
+    if (ValidacaoAuth.codigoSms(_codigo.text) != null) return;
+    // Ainda sem backend: qualquer código no formato certo conclui o cadastro.
+    if (widget.perfil == PerfilUso.cliente) {
+      RotasTrato.irParaCliente(context);
+    } else {
+      RotasTrato.irParaProfissional(context);
+    }
   }
 
   @override

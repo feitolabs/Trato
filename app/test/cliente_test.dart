@@ -48,7 +48,10 @@ void main() {
 
       await tester.tap(find.text('Pedidos'));
       await tester.pumpAndSettle();
-      expect(find.byType(EmBreveTela), findsWidgets);
+      expect(find.text('Seus pedidos'), findsOneWidget);
+
+      await tester.tap(find.text('Mensagens'));
+      await tester.pumpAndSettle();
       expect(find.text('Esta tela chega nas próximas etapas.').hitTestable(), findsOneWidget);
     });
 

@@ -40,8 +40,7 @@ void main() {
   });
 
   group('Seus pedidos', () {
-    testWidgets('mostra os pedidos em andamento e troca de aba',
-        (tester) async {
+    testWidgets('mostra os pedidos em andamento e troca de aba', (tester) async {
       await _abrir(tester, const SeusPedidosTela());
       expect(find.text('Troca de tomadas e chuveiro'), findsOneWidget);
       expect(find.text('Disputa aberta · valor congelado'), findsOneWidget);
@@ -66,11 +65,9 @@ void main() {
   });
 
   group('Pedido em execução', () {
-    testWidgets('aprovar o aditivo troca os botões pelo resultado',
-        (tester) async {
+    testWidgets('aprovar o aditivo troca os botões pelo resultado', (tester) async {
       var aprovou = false;
-      await _abrir(
-          tester, PedidoExecucaoTela(aoAprovarAditivo: () => aprovou = true));
+      await _abrir(tester, PedidoExecucaoTela(aoAprovarAditivo: () => aprovou = true));
       expect(find.text('Aditivo aguardando sua resposta'), findsOneWidget);
       expect(find.textContaining('R\$ 45,00'), findsOneWidget);
       expect(find.text('Pagamento retido até a conclusão'), findsOneWidget);
@@ -84,8 +81,7 @@ void main() {
 
     testWidgets('recusar o aditivo', (tester) async {
       var recusou = false;
-      await _abrir(
-          tester, PedidoExecucaoTela(aoRecusarAditivo: () => recusou = true));
+      await _abrir(tester, PedidoExecucaoTela(aoRecusarAditivo: () => recusou = true));
       await tester.tap(find.text('Recusar'));
       await tester.pumpAndSettle();
       expect(recusou, isTrue);
@@ -93,8 +89,7 @@ void main() {
       expect(find.text('Aprovar aditivo'), findsNothing);
     });
 
-    testWidgets('SOS, Conversar e Ver conclusão chamam as ações',
-        (tester) async {
+    testWidgets('SOS, Conversar e Ver conclusão chamam as ações', (tester) async {
       final toques = <String>[];
       await _abrir(
         tester,
@@ -113,14 +108,10 @@ void main() {
   });
 
   group('Chat do pedido', () {
-    testWidgets('mostra o aviso, a mensagem de sistema e as bolhas',
-        (tester) async {
+    testWidgets('mostra o aviso, a mensagem de sistema e as bolhas', (tester) async {
       await _abrir(tester, const ChatPedidoTela());
-      expect(find.textContaining('Telefones e e-mails são ocultados'),
-          findsOneWidget);
-      expect(
-          find.text('Serviço iniciado com o seu código às 14h10.',
-              skipOffstage: false),
+      expect(find.textContaining('Telefones e e-mails são ocultados'), findsOneWidget);
+      expect(find.text('Serviço iniciado com o seu código às 14h10.', skipOffstage: false),
           findsOneWidget);
       expect(find.text('Vi aqui, vou olhar agora.'), findsOneWidget);
       expect(find.text('15h04 · lida'), findsOneWidget);
@@ -128,8 +119,7 @@ void main() {
 
     testWidgets('envia mensagem digitada e resposta rápida', (tester) async {
       final enviadas = <String>[];
-      await _abrir(tester,
-          ChatPedidoTela(aoEnviar: enviadas.add, horaAgora: () => '16h00'));
+      await _abrir(tester, ChatPedidoTela(aoEnviar: enviadas.add, horaAgora: () => '16h00'));
       await tester.enterText(find.byType(TextField), 'Obrigada!');
       await tester.tap(find.byTooltip('Enviar'));
       await tester.pumpAndSettle();

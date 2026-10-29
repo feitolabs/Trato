@@ -63,7 +63,8 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     setState(() => _tentou = true);
     if (!_valido) return;
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ConfirmarCelularTela(celular: _celular.text)),
+      MaterialPageRoute<void>(
+          builder: (_) => ConfirmarCelularTela(celular: _celular.text, perfil: widget.perfil)),
     );
   }
 

@@ -73,13 +73,11 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
   final int validadeDias;
 
   @override
-  State<CalculadoraOrcamentoTela> createState() =>
-      _CalculadoraOrcamentoTelaState();
+  State<CalculadoraOrcamentoTela> createState() => _CalculadoraOrcamentoTelaState();
 }
 
 class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
-  late final _deslocamento =
-      TextEditingController(text: widget.deslocamentoInicial);
+  late final _deslocamento = TextEditingController(text: widget.deslocamentoInicial);
   late final _horas = TextEditingController(text: widget.horasInicial);
   late final _valorHora = TextEditingController(text: widget.valorHoraInicial);
   late int _garantia = widget.garantiaInicialDias;
@@ -91,9 +89,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   ResumoOrcamento? _resumo;
   int _ultimoPedido = -1;
 
-  static final _somenteNumero = [
-    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
-  ];
+  static final _somenteNumero = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))];
 
   @override
   void initState() {
@@ -109,19 +105,15 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     super.dispose();
   }
 
-  int get _materialCentavos => _materialPorMim
-      ? _itens.fold(0, (soma, item) => soma + item.centavos)
-      : 0;
+  int get _materialCentavos =>
+      _materialPorMim ? _itens.fold(0, (soma, item) => soma + item.centavos) : 0;
 
   int get _total {
-    final desloc = _deslocamento.text.trim().isEmpty
-        ? 0
-        : (Dinheiro.lerCentavos(_deslocamento.text) ?? 0);
+    final desloc =
+        _deslocamento.text.trim().isEmpty ? 0 : (Dinheiro.lerCentavos(_deslocamento.text) ?? 0);
     final decimos = Dinheiro.lerDecimosDeHora(_horas.text) ?? 0;
     final valorHora = Dinheiro.lerCentavos(_valorHora.text) ?? 0;
-    return desloc +
-        Dinheiro.valorDasHoras(valorHora, decimos) +
-        _materialCentavos;
+    return desloc + Dinheiro.valorDasHoras(valorHora, decimos) + _materialCentavos;
   }
 
   void _mudou() {
@@ -146,16 +138,12 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   String? _erroDeslocamento() {
     final texto = _deslocamento.text.trim();
     if (texto.isEmpty) return null;
-    return Dinheiro.lerCentavos(texto) == null
-        ? 'Use só números, como 30 ou 30,50.'
-        : null;
+    return Dinheiro.lerCentavos(texto) == null ? 'Use só números, como 30 ou 30,50.' : null;
   }
 
   String? _erroHoras() {
     final decimos = Dinheiro.lerDecimosDeHora(_horas.text);
-    return (decimos == null || decimos <= 0)
-        ? 'Informe as horas, como 3 ou 2,5.'
-        : null;
+    return (decimos == null || decimos <= 0) ? 'Informe as horas, como 3 ou 2,5.' : null;
   }
 
   String? _erroValorHora() {
@@ -177,14 +165,11 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
 
   void _enviar() {
     setState(() => _mostrarErros = true);
-    if (_erroDeslocamento() != null ||
-        _erroHoras() != null ||
-        _erroValorHora() != null) {
+    if (_erroDeslocamento() != null || _erroHoras() != null || _erroValorHora() != null) {
       return;
     }
-    final desloc = _deslocamento.text.trim().isEmpty
-        ? 0
-        : Dinheiro.lerCentavos(_deslocamento.text)!;
+    final desloc =
+        _deslocamento.text.trim().isEmpty ? 0 : Dinheiro.lerCentavos(_deslocamento.text)!;
     widget.aoEnviar?.call(
       OrcamentoPronto(
         deslocamentoCentavos: desloc,
@@ -301,8 +286,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
 }
 
 class _CampoGarantia extends StatelessWidget {
-  const _CampoGarantia(
-      {required this.valor, required this.opcoes, required this.aoMudar});
+  const _CampoGarantia({required this.valor, required this.opcoes, required this.aoMudar});
 
   final int valor;
   final List<int> opcoes;
@@ -317,8 +301,7 @@ class _CampoGarantia extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child:
-              Text('Garantia', style: TipografiaTrato.corpoForte, maxLines: 1),
+          child: Text('Garantia', style: TipografiaTrato.corpoForte, maxLines: 1),
         ),
         const SizedBox(height: EspacosTrato.x2),
         DropdownButtonFormField<int>(
@@ -328,8 +311,7 @@ class _CampoGarantia extends StatelessWidget {
           icon: const Icon(Icons.keyboard_arrow_down),
           items: [
             for (final dias in opcoes)
-              DropdownMenuItem(
-                  value: dias, child: Text('$dias dias', maxLines: 1)),
+              DropdownMenuItem(value: dias, child: Text('$dias dias', maxLines: 1)),
           ],
           onChanged: (dias) {
             if (dias != null) aoMudar(dias);
@@ -370,8 +352,7 @@ class _CartaoMaterial extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
-                  child:
-                      BotaoLink(texto: 'Adicionar item', aoTocar: aoAdicionar),
+                  child: BotaoLink(texto: 'Adicionar item', aoTocar: aoAdicionar),
                 ),
               ),
             ],
@@ -381,11 +362,9 @@ class _CartaoMaterial extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x2),
               child: Row(
                 children: [
-                  Expanded(
-                      child: Text(item.nome, style: TipografiaTrato.corpo)),
+                  Expanded(child: Text(item.nome, style: TipografiaTrato.corpo)),
                   const SizedBox(width: EspacosTrato.x3),
-                  Text(Dinheiro.formatar(item.centavos),
-                      style: TipografiaTrato.corpoForte),
+                  Text(Dinheiro.formatar(item.centavos), style: TipografiaTrato.corpoForte),
                 ],
               ),
             ),
@@ -417,17 +396,14 @@ class _CartaoMaterial extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Checkbox(
-                      value: pedirSinal,
-                      onChanged: (v) => aoMarcarSinal(v ?? false)),
+                  Checkbox(value: pedirSinal, onChanged: (v) => aoMarcarSinal(v ?? false)),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.only(top: EspacosTrato.x3),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Pedir sinal para o material',
-                              style: TipografiaTrato.corpoForte),
+                          Text('Pedir sinal para o material', style: TipografiaTrato.corpoForte),
                           Text(
                             'Liberado quando você enviar a foto da nota.',
                             style: TipografiaTrato.legenda,
@@ -455,13 +431,10 @@ class _ResumoEscuro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final claro = TipografiaTrato.corpo.copyWith(color: CoresTrato.creme);
-    final claroForte =
-        TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
+    final claroForte = TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
     final r = resumo;
     // O rótulo com a porcentagem vem do dado do backend, nunca de um texto fixo.
-    final rotuloTaxa = r == null
-        ? 'Taxa Trato'
-        : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps)})';
+    final rotuloTaxa = r == null ? 'Taxa Trato' : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps)})';
     return CartaoTrato(
       escuro: true,
       child: Column(
@@ -508,8 +481,7 @@ class _ResumoEscuro extends StatelessWidget {
           Text(
             'A taxa só é cobrada quando o pagamento for liberado. '
             'Pedido cancelado antes do início não paga taxa.',
-            style:
-                TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
           ),
         ],
       ),
@@ -565,8 +537,7 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
     setState(() => _tentou = true);
     final centavos = Dinheiro.lerCentavos(_valor.text);
     if (_nome.text.trim().isEmpty || centavos == null || centavos <= 0) return;
-    Navigator.of(context)
-        .pop(ItemMaterial(nome: _nome.text.trim(), centavos: centavos));
+    Navigator.of(context).pop(ItemMaterial(nome: _nome.text.trim(), centavos: centavos));
   }
 
   @override
@@ -590,9 +561,7 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               rotulo: 'Item',
               controlador: _nome,
               dica: 'Ex.: 2 tomadas 20 A',
-              erro: _tentou && _nome.text.trim().isEmpty
-                  ? 'Informe o item.'
-                  : null,
+              erro: _tentou && _nome.text.trim().isEmpty ? 'Informe o item.' : null,
             ),
             const SizedBox(height: EspacosTrato.x4),
             CampoTrato(
@@ -600,12 +569,8 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               controlador: _valor,
               prefixo: 'R\$ ',
               teclado: TextInputType.number,
-              formatadores: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
-              ],
-              erro: _tentou && (centavos == null || centavos <= 0)
-                  ? 'Informe o valor.'
-                  : null,
+              formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+              erro: _tentou && (centavos == null || centavos <= 0) ? 'Informe o valor.' : null,
             ),
             const SizedBox(height: EspacosTrato.x5),
             BotaoPrimario(texto: 'Adicionar', aoTocar: _confirmar),

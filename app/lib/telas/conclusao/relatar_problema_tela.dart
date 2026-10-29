@@ -138,7 +138,8 @@ class _AvisoCongelado extends StatelessWidget {
                     style: base.copyWith(fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
-                    text: '${formatarReais(valorCentavos)} ficam retidos enquanto o problema é resolvido.',
+                    text:
+                        '${formatarReais(valorCentavos)} ficam retidos enquanto o problema é resolvido.',
                   ),
                 ],
                 style: base,

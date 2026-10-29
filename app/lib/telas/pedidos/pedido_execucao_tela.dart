@@ -66,10 +66,8 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                       const SizedBox(height: EspacosTrato.x4),
                       CartaoAditivo(
                         aditivo: _aditivo!,
-                        aoRecusar: () => _decidir(
-                            EstadoAditivo.recusado, widget.aoRecusarAditivo),
-                        aoAprovar: () => _decidir(
-                            EstadoAditivo.aprovado, widget.aoAprovarAditivo),
+                        aoRecusar: () => _decidir(EstadoAditivo.recusado, widget.aoRecusarAditivo),
+                        aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
                       ),
                     ],
                     const SizedBox(height: EspacosTrato.x6),
@@ -81,9 +79,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                       children: [
                         for (var i = 0; i < pedido.fotos.length; i++) ...[
                           if (i > 0) const SizedBox(width: EspacosTrato.x3),
-                          Expanded(
-                              child: EspacoFoto(
-                                  rotulo: pedido.fotos[i], altura: 100)),
+                          Expanded(child: EspacoFoto(rotulo: pedido.fotos[i], altura: 100)),
                         ],
                       ],
                     ),
@@ -91,9 +87,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 ),
               ),
             ),
-            _Rodape(
-                aoConversar: widget.aoConversar,
-                aoVerConclusao: widget.aoVerConclusao),
+            _Rodape(aoConversar: widget.aoConversar, aoVerConclusao: widget.aoVerConclusao),
           ],
         ),
       ),
@@ -123,8 +117,7 @@ class _Topo extends StatelessWidget {
               'Pedido $numero',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TipografiaTrato.corpo
-                  .copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
             ),
           ),
           BotaoSos(aoTocar: aoTocarSos),
@@ -161,9 +154,7 @@ class _Rodape extends StatelessWidget {
               ),
               const SizedBox(width: EspacosTrato.x3),
               Expanded(
-                  child: BotaoSecundario(
-                      texto: 'Ver conclusão',
-                      aoTocar: aoVerConclusao ?? () {})),
+                  child: BotaoSecundario(texto: 'Ver conclusão', aoTocar: aoVerConclusao ?? () {})),
             ],
           ),
         ),

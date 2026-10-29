@@ -81,11 +81,7 @@ abstract final class DadosExemplo {
     iniciais: 'CM',
     numeroPedido: '#4821',
     situacao: 'em execução',
-    respostasRapidas: [
-      'Tudo certo',
-      'Pode me mandar foto?',
-      'Que horas termina?'
-    ],
+    respostasRapidas: ['Tudo certo', 'Pode me mandar foto?', 'Que horas termina?'],
     mensagens: [
       MensagemChat(
         tipo: TipoMensagem.sistema,
@@ -100,8 +96,7 @@ abstract final class DadosExemplo {
       MensagemChat(tipo: TipoMensagem.foto, texto: '[Foto]', hora: '14h25'),
       MensagemChat(
         tipo: TipoMensagem.texto,
-        texto:
-            'O disjuntor do chuveiro está derretido. Enviei um aditivo de R\$ 45,00 '
+        texto: 'O disjuntor do chuveiro está derretido. Enviei um aditivo de R\$ 45,00 '
             'para você aprovar.',
         hora: '15h02',
       ),

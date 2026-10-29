@@ -48,10 +48,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     setState(() {
       _mensagens.add(
         MensagemChat(
-            tipo: TipoMensagem.texto,
-            texto: conteudo,
-            hora: widget.horaAgora(),
-            minha: true),
+            tipo: TipoMensagem.texto, texto: conteudo, hora: widget.horaAgora(), minha: true),
       );
       _controlador.clear();
     });
@@ -71,18 +68,15 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               child: ConteudoResponsivo(
                 child: ListView(
                   reverse: true,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
+                  padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
                   children: [
                     // reverse: a lista começa colada embaixo, perto do campo de envio.
-                    for (final m in _mensagens.reversed)
-                      _LinhaMensagem(mensagem: m),
+                    for (final m in _mensagens.reversed) _LinhaMensagem(mensagem: m),
                   ],
                 ),
               ),
             ),
-            _RespostasRapidas(
-                respostas: conversa.respostasRapidas, aoTocar: _enviar),
+            _RespostasRapidas(respostas: conversa.respostasRapidas, aoTocar: _enviar),
             _CampoEnvio(
               controlador: _controlador,
               aoEnviar: _enviar,
@@ -117,8 +111,7 @@ class _Cabecalho extends StatelessWidget {
               width: 48,
               height: 48,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                  color: CoresTrato.azulClaro, shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: CoresTrato.azulClaro, shape: BoxShape.circle),
               child: Text(conversa.iniciais, style: TipografiaTrato.corpoForte),
             ),
             const SizedBox(width: EspacosTrato.x3),
@@ -168,15 +161,13 @@ class _AvisoPrivacidade extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.shield_outlined,
-                size: 20, color: CoresTrato.azulTexto),
+            const Icon(Icons.shield_outlined, size: 20, color: CoresTrato.azulTexto),
             const SizedBox(width: EspacosTrato.x3),
             Expanded(
               child: Text(
                 'As mensagens ficam guardadas e servem de prova. '
                 'Telefones e e-mails são ocultados.',
-                style: TipografiaTrato.corpoPequeno
-                    .copyWith(color: CoresTrato.azulTexto),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
               ),
             ),
           ],
@@ -193,8 +184,7 @@ class _LinhaMensagem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final legendaHora =
-        TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
+    final legendaHora = TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
     if (mensagem.tipo == TipoMensagem.sistema) {
       return Padding(
         padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
@@ -203,8 +193,7 @@ class _LinhaMensagem extends StatelessWidget {
             Text(
               mensagem.texto ?? '',
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpoPequeno
-                  .copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x1),
             Text(mensagem.hora, style: legendaHora),
@@ -216,8 +205,7 @@ class _LinhaMensagem extends StatelessWidget {
     final minha = mensagem.minha;
     final larguraMaxima = MediaQuery.sizeOf(context).width * 0.72;
     final Widget corpo = mensagem.tipo == TipoMensagem.foto
-        ? EspacoFoto(
-            rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
+        ? EspacoFoto(rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
         : Container(
             padding: const EdgeInsets.symmetric(
               horizontal: EspacosTrato.x4,
@@ -239,15 +227,11 @@ class _LinhaMensagem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
       child: Column(
-        crossAxisAlignment:
-            minha ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: minha ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: larguraMaxima),
-              child: corpo),
+          ConstrainedBox(constraints: BoxConstraints(maxWidth: larguraMaxima), child: corpo),
           const SizedBox(height: EspacosTrato.x1),
-          Text(mensagem.lida ? '${mensagem.hora} · lida' : mensagem.hora,
-              style: legendaHora),
+          Text(mensagem.lida ? '${mensagem.hora} · lida' : mensagem.hora, style: legendaHora),
         ],
       ),
     );
@@ -267,8 +251,7 @@ class _RespostasRapidas extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding:
-            const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
+        padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
         itemCount: respostas.length,
         separatorBuilder: (_, __) => const SizedBox(width: EspacosTrato.x2),
         itemBuilder: (_, i) => Material(
@@ -279,9 +262,7 @@ class _RespostasRapidas extends StatelessWidget {
             onTap: () => aoTocar(respostas[i]),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-              child: Center(
-                  child:
-                      Text(respostas[i], style: TipografiaTrato.corpoPequeno)),
+              child: Center(child: Text(respostas[i], style: TipografiaTrato.corpoPequeno)),
             ),
           ),
         ),

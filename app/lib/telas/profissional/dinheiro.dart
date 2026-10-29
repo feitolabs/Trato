@@ -7,8 +7,7 @@ abstract final class Dinheiro {
     final absoluto = centavos.abs();
     final reais = (absoluto ~/ 100).toString();
     final cents = (absoluto % 100).toString().padLeft(2, '0');
-    final agrupado =
-        reais.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+    final agrupado = reais.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
     return '${negativo ? '-' : ''}R\$ $agrupado,$cents';
   }
 
@@ -40,8 +39,7 @@ abstract final class Dinheiro {
     final inteiro = bps ~/ 100;
     final resto = bps % 100;
     if (resto == 0) return '$inteiro%';
-    final casas =
-        resto.toString().padLeft(2, '0').replaceFirst(RegExp(r'0$'), '');
+    final casas = resto.toString().padLeft(2, '0').replaceFirst(RegExp(r'0$'), '');
     return '$inteiro,$casas%';
   }
 }

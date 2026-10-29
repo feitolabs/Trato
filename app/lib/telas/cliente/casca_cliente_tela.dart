@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../em_breve_tela.dart';
+import '../fluxo/rotas.dart';
 import 'buscar_tela.dart';
 import 'inicio_tela.dart';
 
@@ -26,7 +27,8 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
     final paginas = <Widget>[
       InicioTela(aoBuscar: () => _ir(1)),
       const BuscarTela(),
-      for (final aba in abasCliente.skip(2)) EmBreveTela(titulo: aba.rotulo),
+      RotasTrato.abaPedidos(),
+      for (final aba in abasCliente.skip(3)) EmBreveTela(titulo: aba.rotulo),
     ];
     return Scaffold(
       body: IndexedStack(index: _aba, children: paginas),
