@@ -7,7 +7,10 @@ Regras definidas aqui:
   dentro da garantia (outro defeito). Sem limite fixo de quantidade.
 - `atender_ate` = abertura + prazo de atendimento; o último instante vale,
   um segundo depois vence. Só aberto/aceito vencem (em execução já foi atendido).
-- Sem dinheiro aqui: quem paga o outro profissional é a P8 (em aberto).
+- Sem dinheiro aqui: quem paga o outro profissional é a P8 (em aberto). Por isso a
+  reatribuição (outro profissional, custeado pelo Trato) só vale com
+  `garantia_financiada_habilitada` ligada na configuração; desligada (padrão, D13), o caso
+  segue por suporte e análise de problemas.
 """
 
 from __future__ import annotations
@@ -90,11 +93,17 @@ def transicionar(
     novo: EstadoRetrabalho,
     agora: datetime,
     outro_profissional_id: str | None = None,
+    config: ConfigGarantia | None = None,
 ) -> Retrabalho:
     if novo not in TRANSICOES[retrabalho.estado]:
         raise ErroRetrabalho(f"transição inválida: {retrabalho.estado} -> {novo}")
     if novo is E.NAO_ATENDIDO and not deve_virar_nao_atendido(retrabalho, agora):
         raise ErroRetrabalho("prazo de atendimento ainda não venceu")
+    if novo is E.REATRIBUIDO and not (config and config.garantia_financiada_habilitada):
+        raise ErroRetrabalho(
+            "A reatribuição com custo para o Trato não está habilitada; "
+            "o caso segue por suporte e análise de problemas."
+        )
     if novo is E.REATRIBUIDO and not outro_profissional_id:
         raise ErroRetrabalho("informe o outro profissional")
     mudancas: dict[str, Any] = {"estado": novo}

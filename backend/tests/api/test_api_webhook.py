@@ -23,7 +23,7 @@ def enviar(amb, corpo: bytes, cabecalho: str | None):
 
 
 def test_evento_assinado_e_guardado(amb):
-    corpo = evento()
+    corpo = evento(tipo="customer.created")  # tipo sem manipulador: guardado, sem efeito
 
     r = enviar(amb, corpo, assinar(corpo))
 
@@ -31,7 +31,7 @@ def test_evento_assinado_e_guardado(amb):
     assert r.json() == {"recebido": True, "duplicado": False, "tratado": False}
     guardado = amb.contexto.eventos_webhook.listar()
     assert [(e.provedor, e.evento_id, e.tipo) for e in guardado] == [
-        ("stripe", "evt_1", "payment_intent.succeeded")
+        ("stripe", "evt_1", "customer.created")
     ]
 
 

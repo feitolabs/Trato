@@ -101,7 +101,7 @@ class GarantiaTela extends StatelessWidget {
         const SizedBox(height: EspacosTrato.x3),
         Text(
           'O profissional tem ${dados.prazoAtendimentoDias} dias para atender. '
-          'Se não atender, outro profissional assume.',
+          'Se não houver atendimento, o suporte analisa o caso.',
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),

@@ -9,7 +9,7 @@
 --  * Negar por padrão. anon não recebe NENHUM privilégio em nenhuma tabela.
 --  * O app só LÊ (N11): authenticated recebe só SELECT, e só nas colunas que a tela pode ver.
 --    Colunas sensíveis (CPF de outros, hash de código, IP de aceite, custo do Stripe, texto original
---    da mensagem, localização EXIF das fotos, chave Pix etc.) ficam fora da concessão: só o backend
+--    da mensagem, localização EXIF das fotos etc.) ficam fora da concessão: só o backend
 --    (service_role) lê. Toda escrita é do backend.
 --  * Nenhuma policy usa `using (true)`. Policies só para o papel authenticated.
 --  * Policy restritiva em todas as tabelas: conta bloqueada ou anonimizada não lê nada.
@@ -61,8 +61,7 @@ grant select (id, profissional_id, nivel_solicitado, status, motivo_recusa, cons
 grant select on public.pedidos, public.pedidos_endereco, public.pedido_respostas, public.pedido_historico,
   public.orcamentos, public.orcamento_itens, public.etapas, public.aditivos, public.notas_material,
   public.nota_material_itens, public.presencas, public.eventos_webhook, public.contas_ledger,
-  public.lancamentos, public.partidas, public.saldos_contas, public.repasses, public.chaves_pix,
-  public.saques, public.disputa_evidencias, public.garantias, public.retrabalhos, public.avaliacoes,
+  public.lancamentos, public.partidas, public.repasses, public.disputa_evidencias, public.garantias, public.retrabalhos, public.avaliacoes,
   public.avaliacao_criterios, public.conversas, public.notificacoes, public.notificacao_preferencias,
   public.auditoria
   to authenticated;
@@ -207,11 +206,6 @@ create policy partidas_select on public.partidas for select to authenticated
   using (privado.conta_e_minha(conta_id) or privado.eh_equipe('financeiro'));
 create policy repasses_select on public.repasses for select to authenticated
   using (profissional_id = (select auth.uid()) or privado.eh_equipe('financeiro', 'mediador'));
--- Chave Pix completa: só o dono (a equipe vê mascarada pelo backend).
-create policy chaves_pix_select on public.chaves_pix for select to authenticated
-  using (usuario_id = (select auth.uid()));
-create policy saques_select on public.saques for select to authenticated
-  using (profissional_id = (select auth.uid()) or privado.eh_equipe('financeiro'));
 
 -- Disputa, garantia, avaliação
 create policy disputas_select on public.disputas for select to authenticated

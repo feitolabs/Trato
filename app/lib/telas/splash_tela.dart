@@ -40,7 +40,7 @@ class SplashTela extends StatelessWidget {
                     ),
                     const SizedBox(height: EspacosTrato.x4),
                     Text(
-                      'Serviço feito, dinheiro liberado.',
+                      'Serviço combinado, tudo no app.',
                       textAlign: TextAlign.center,
                       style: TipografiaTrato.lema.copyWith(color: CoresTrato.logoAzulClaro),
                     ),

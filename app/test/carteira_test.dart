@@ -38,8 +38,8 @@ void main() {
     expect(find.text('Instalar 4 luminárias'), findsOneWidget);
     expect(find.text('R\$ 200,00 – R\$ 10,00 de taxa'), findsNWidgets(2));
     expect(find.text('R\$ 380,00'), findsOneWidget); // líquido do portão
-    expect(find.text('Liberado'), findsNWidgets(3));
-    expect(find.text('A liberar'), findsNWidgets(2)); // cartão de saldo + chip
+    expect(find.text('Confirmado'), findsNWidgets(3));
+    expect(find.text('A confirmar'), findsNWidgets(2)); // cartão de saldo + chip
   });
 
   testWidgets('a tela não calcula: taxa e líquido mudam só pelo dado',

@@ -44,6 +44,7 @@ def pedido_out(pedido: Pedido, usuario: Usuario) -> PedidoOut:
         acoes_permitidas=sorted(
             a.value for a in acoes_permitidas(pedido, papel_das_regras(usuario))
         ),
+        pagamento_confirmado=pedido.referencia_pagamento is not None,
         codigo_inicio=pedido.codigo_inicio if eh_cliente else None,
         codigo_conclusao=pedido.codigo_conclusao if eh_cliente else None,
     )
