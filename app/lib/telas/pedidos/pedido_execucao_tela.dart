@@ -5,6 +5,7 @@ import '../../tema/tema.dart';
 import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas.dart';
+import 'recursos_mvp.dart';
 
 /// Tela 16 — Serviço em execução. O app só mostra e pede: aprovar/recusar o aditivo
 /// chama os callbacks (o backend decide); o estado local é provisório.
@@ -57,7 +58,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: ChipStatus(
-                        texto: 'Pagamento retido até a conclusão',
+                        texto: 'Pagamento acompanhado no app',
                         tipo: TipoStatus.info,
                         icone: Icons.lock_outline,
                       ),
@@ -120,7 +121,7 @@ class _Topo extends StatelessWidget {
               style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
             ),
           ),
-          BotaoSos(aoTocar: aoTocarSos),
+          if (kSosHabilitado) BotaoSos(aoTocar: aoTocarSos),
         ],
       ),
     );

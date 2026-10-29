@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/pedidos/chat_pedido_tela.dart';
 import 'package:trato/telas/pedidos/modelos.dart';
+import 'package:trato/telas/pedidos/pecas.dart';
 import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
+import 'package:trato/telas/pedidos/recursos_mvp.dart';
 import 'package:trato/telas/pedidos/seus_pedidos_tela.dart';
 import 'package:trato/tema/tema.dart';
 
@@ -43,7 +45,7 @@ void main() {
     testWidgets('mostra os pedidos em andamento e troca de aba', (tester) async {
       await _abrir(tester, const SeusPedidosTela());
       expect(find.text('Troca de tomadas e chuveiro'), findsOneWidget);
-      expect(find.text('Disputa aberta · valor congelado'), findsOneWidget);
+      expect(find.text('Disputa aberta · em análise'), findsOneWidget);
       expect(find.text('Finalizado'), findsNothing);
 
       await tester.tap(find.text('Finalizados'));
@@ -70,7 +72,7 @@ void main() {
       await _abrir(tester, PedidoExecucaoTela(aoAprovarAditivo: () => aprovou = true));
       expect(find.text('Aditivo aguardando sua resposta'), findsOneWidget);
       expect(find.textContaining('R\$ 45,00'), findsOneWidget);
-      expect(find.text('Pagamento retido até a conclusão'), findsOneWidget);
+      expect(find.text('Pagamento acompanhado no app'), findsOneWidget);
 
       await tester.tap(find.text('Aprovar aditivo'));
       await tester.pumpAndSettle();
@@ -89,7 +91,17 @@ void main() {
       expect(find.text('Aprovar aditivo'), findsNothing);
     });
 
-    testWidgets('SOS, Conversar e Ver conclusão chamam as ações', (tester) async {
+    test('SOS fica fora do MVP (D13)', () {
+      expect(kSosHabilitado, isFalse);
+    });
+
+    testWidgets('botão SOS não aparece na execução com kSosHabilitado = false', (tester) async {
+      await _abrir(tester, PedidoExecucaoTela(aoTocarSos: () {}));
+      expect(find.text('SOS'), findsNothing);
+      expect(find.byType(BotaoSos), findsNothing);
+    });
+
+    testWidgets('Conversar e Ver conclusão chamam as ações', (tester) async {
       final toques = <String>[];
       await _abrir(
         tester,
@@ -99,10 +111,9 @@ void main() {
           aoVerConclusao: () => toques.add('conclusao'),
         ),
       );
-      await tester.tap(find.text('SOS'));
       await tester.tap(find.text('Conversar'));
       await tester.tap(find.text('Ver conclusão'));
-      expect(toques, ['sos', 'conversar', 'conclusao']);
+      expect(toques, ['conversar', 'conclusao']);
       expect(find.text('Linha do tempo'), findsOneWidget);
     });
   });
