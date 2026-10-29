@@ -1,36 +1,123 @@
 name: Verificar
 
-# Roda a mesma verificação local (python harness/verificar.py) em todo push e pull request.
-# Sem segredos: os testes de hoje não precisam de .env, Supabase nem Stripe.
+# Mesma verificação local (python harness/verificar.py), dividida em jobs paralelos:
+#   segredos   - busca de segredos e .env ignorado (só Python, sem dependências)
+#   backend    - venv + pip install do backend, ruff e pytest
+#   app        - Flutter (versão fixa), cores fora do tema, textos proibidos, analyze e test
+#   integracao - testes com Postgres embutido (pgserver); só em develop/main ou manual
+#
+# Não usa nenhum segredo: os testes rodam sem .env, sem Supabase e sem Stripe.
+# Ações fixadas por SHA do commit (o comentário diz a tag). Para atualizar: troque SHA e tag juntos.
+# Versão do Flutter: precisa ser a mesma de C:\flutter na máquina do João (ver docs/ENTREGA.md).
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  FLUTTER_VERSION: "3.47.8"
+
 jobs:
-  verificar:
+  segredos:
+    name: Segredos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Verificar segredos
+        run: python harness/verificar.py --etapa segredos
+
+  backend:
+    name: Backend (ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      # Mesmo caminho que harness/preparar-ambiente.sh; o verificar.py acha o backend/.venv sozinho.
+      - name: Criar o venv e instalar o backend (extras dev)
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/python -m pip install --upgrade pip
+          backend/.venv/bin/python -m pip install -e "backend[dev]"
+
+      - name: Verificar o backend
+        run: python harness/verificar.py --etapa backend
+
+  app:
+    name: App (Flutter)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Baixar o código
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Python 3.11
-        uses: actions/setup-python@v5.4.0
+      - name: Python (roda o verificar.py)
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Instalar o backend (com ferramentas de desenvolvimento)
-        run: python -m pip install -e "backend[dev]"
-
-      - name: Flutter estável
-        uses: subosito/flutter-action@v2.18.0
+      - name: Flutter
+        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff # v2.18.0
         with:
           channel: stable
-          flutter-version: "3.47.8"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true # guarda o SDK e o cache do pub
 
-      - name: Verificar (segredos, lint, testes do backend e do app)
-        run: python harness/verificar.py
+      - name: Verificar o app
+        run: python harness/verificar.py --etapa app
+
+  integracao:
+    name: Integração (Postgres embutido)
+    # Opcional: só em develop, main ou rodada manual (Actions > Verificar > Run workflow).
+    # A suíte usa o Postgres do pacote pgserver (migrations reais, banco descartável),
+    # por isso não há `services: postgres`. Nunca toca no Supabase.
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Instalar o backend (extras dev, inclui pgserver)
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/python -m pip install --upgrade pip
+          backend/.venv/bin/python -m pip install -e "backend[dev]"
+
+      - name: Testes de integração (nenhum pode ser pulado)
+        working-directory: backend
+        run: |
+          .venv/bin/python -c "import pgserver"
+          .venv/bin/python -m pytest tests/integracao -q -rs

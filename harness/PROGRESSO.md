@@ -255,3 +255,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 
 - Branch `claude/seeds-banco-c8bade`. Só arquivos: `supabase/seeds/` (`parametros.sql` único, `seed_cidades_categorias`, `seed_config_taxa`, `seed_contas_ledger`, `seed_equipe_admin` só como modelo comentado), rollbacks em `supabase/rollback/seed_*_rollback.sql`, teste `supabase/testes/testar_seeds.py` (62 verificações em Postgres local) e `docs/seeds.md` com o formato `PRECISO DO SEU OK` e a lista de valores do João.
 - Nada foi aplicado em banco real. Os seeds abortam sem gravar enquanto houver `A DEFINIR PELO JOÃO` (cidade, garantias, taxa, mínimo, P1, P7, administrador). Tabela progressiva fica desligada (D2 em espera); ledger só roda com P7 confirmado.
+
+
+## 29/10/2026 — Entrega: CI, ambiente e build (F9.3 preparado, F9.5)
+
+- `.github/workflows/verificar.yml` refeito: jobs `segredos`, `backend`, `app` e `integracao` (pgserver; só develop/main ou manual), ações fixadas por SHA, cache de pip e Flutter 3.47.8. Novo `build.yml` (manual): APK debug e iOS sem assinatura. Nenhum segredo; `actionlint` limpo. **Nunca rodou na nuvem.**
+- `verificar.py`: acha `$TRATO_PYTHON`, `backend/.venv` ou `.venv` da raiz, avisa o que falta (ruff, pytest…) e aceita `--etapa segredos|backend|app`. Novos `harness/preparar-ambiente.ps1/.sh` e `backend/requirements*.txt`.
+- Android/iOS: `INTERNET` no release, permissões de câmera e localização (ainda sem plugin), assinatura de release via `key.properties` (ignorado), textos de uso no Info.plist. `app/lib/` intocado.
+- Docs: `docs/BUILD.md` e `docs/ENTREGA.md` novos; `COMO-RODAR.md` atualizado. F9.5 `[x]`.
+- Verificação: etapas segredos, backend (490 testes) e app (586 testes) TUDO OK. Falta, com OK do João: push, primeiro run do CI, keystore, contas Play/Apple, ícone final.

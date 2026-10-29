@@ -1,0 +1,3 @@
+# Dependências de execução do backend (as mesmas do pyproject.toml).
+# Uso: pip install -r requirements.txt
+-e .

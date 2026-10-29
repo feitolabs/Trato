@@ -118,4 +118,4 @@ Derivada de `docs/v2-impacto.md`. Não depende de aplicar migrations.
 
 - [ ] **F9.1** Testes ponta a ponta. - [ ] **F9.2** Testes de tela em vários tamanhos.
 - [ ] **F9.3** 🔒 Build de teste Android e iOS. - [ ] **F9.4** 🔒 Piloto.
-- [ ] **F9.5** `docs/COMO-RODAR.md` e `docs/ENTREGA.md`. - [ ] **F9.6** 🔒 Release `v1.0.0` (merge em `main`, tag, push).
+- [x] **F9.5** `docs/COMO-RODAR.md` e `docs/ENTREGA.md` (e `docs/BUILD.md`). - [ ] **F9.6** 🔒 Release `v1.0.0` (merge em `main`, tag, push).
