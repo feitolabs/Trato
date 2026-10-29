@@ -7,7 +7,7 @@ import 'buscar_tela.dart';
 import 'inicio_tela.dart';
 
 /// Casca do app do cliente: barra inferior com as 5 abas (Início · Buscar · Pedidos ·
-/// Mensagens · Perfil). Abas ainda sem tela mostram [EmBreveTela]. Cada aba guarda seu estado.
+/// Mensagens · Perfil). A aba Mensagens ainda mostra [EmBreveTela]. Cada aba guarda seu estado.
 class CascaClienteTela extends StatefulWidget {
   const CascaClienteTela({super.key, this.abaInicial = 0});
 
@@ -28,7 +28,8 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
       InicioTela(aoBuscar: () => _ir(1)),
       const BuscarTela(),
       RotasTrato.abaPedidos(),
-      for (final aba in abasCliente.skip(3)) EmBreveTela(titulo: aba.rotulo),
+      EmBreveTela(titulo: abasCliente[3].rotulo),
+      RotasTrato.abaPerfil(),
     ];
     return Scaffold(
       body: IndexedStack(index: _aba, children: paginas),

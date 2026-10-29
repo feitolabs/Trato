@@ -10,9 +10,11 @@ import 'package:trato/telas/conclusao/relatar_problema_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/telas/pedidos/chat_pedido_tela.dart';
 import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
-import 'package:trato/telas/profissional/area_profissional_provisoria.dart';
-import 'package:trato/telas/profissional/calculadora_orcamento_tela.dart';
-import 'package:trato/telas/profissional/check_in_tela.dart';
+import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
+import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
+import 'package:trato/telas/pagamento/pagamento_tela.dart';
+import 'package:trato/telas/perfil_cliente/perfil_cliente_tela.dart';
+import 'package:trato/telas/profissional_inicio/casca_profissional_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 /// Percursos completos entre as telas, com os dados de exemplo.
@@ -109,21 +111,37 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    testWidgets('profissional cai na área provisória e abre orçamento e check-in', (tester) async {
+    testWidgets('profissional cai na casca do profissional e abre check-in', (tester) async {
       await _abrir(
         tester,
         const ConfirmarCelularTela(celular: '(31) 98888-4417', perfil: PerfilUso.profissional),
       );
       await tester.enterText(find.byType(TextField), '123456');
       await _tocar(tester, 'Confirmar código');
-      expect(find.byType(AreaProfissionalProvisoria), findsOneWidget);
-
-      await _tocar(tester, 'Fazer orçamento');
-      expect(find.byType(CalculadoraOrcamentoTela), findsOneWidget);
-      await _voltar(tester);
-
-      await _tocar(tester, 'Fazer check-in');
-      expect(find.byType(CheckInTela), findsOneWidget);
+      expect(find.byType(CascaProfissionalTela), findsOneWidget);
     });
+  });
+
+  testWidgets('pedido com orçamentos: detalhe do Carlos até o pagamento', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Pedidos');
+    await _tocar(tester, 'Instalar ventilador de teto');
+    expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
+
+    await tester.tap(find.text('Ver orçamento').at(1));
+    await tester.pumpAndSettle();
+    expect(find.byType(DetalheOrcamentoTela), findsOneWidget);
+
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Aceitar orçamento'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PagamentoTela), findsOneWidget);
+  });
+
+  testWidgets('aba Perfil do cliente abre o perfil', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Perfil');
+    expect(find.byType(PerfilClienteTela), findsOneWidget);
   });
 }
