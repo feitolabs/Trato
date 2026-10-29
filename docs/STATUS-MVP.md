@@ -86,3 +86,13 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 3. Criar as rotas que faltam no backend (orçamentos, cobrança, mensagens, notificações, perfil, pedidos abertos, verificação).
 4. Envio de fotos e posição ao backend (buckets por URL assinada): implementar `EnvioMidia` quando a rota existir. Câmera e GPS já capturam; textos de permissão em `AndroidManifest.xml` e `Info.plist`. Não testado em aparelho real.
 5. Busca de textos proibidos (D13) no `verificar`.
+
+## Painel administrativo (`admin/`, web)
+
+| Parte | Estado |
+|---|---|
+| Verificação, disputas, pagamentos (leitura), busca e suporte, configurações, auditoria (F7.1 a F7.6) | Demo: telas com dados de exemplo e controle por papel (`docs/painel-admin.md`) |
+| API administrativa no backend | Pronta e testada, em memória e contra Postgres local (`docs/api-admin.md`) |
+| Ligação painel ↔ API | Pendente: alinhar caminhos e formatos e trocar os fakes por repositórios HTTP (`--dart-define`) |
+| Perfis de acesso por função (F7.7) | Papéis no painel e na API; sem usuários de equipe reais (seed do administrador é "A DEFINIR PELO JOÃO") |
+

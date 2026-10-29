@@ -281,3 +281,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `harness/verificar.py` agora também confere `admin/lib` (cores soltas, textos D13) e roda `flutter analyze`/`flutter test` do painel.
 - Falta: backend `/v1/admin/*`, cliente HTTP do painel, MFA da equipe, botão de aprovação da segunda pessoa na disputa, deploy (precisa de OK).
 
+## 29/10/2026 — Painel admin web integrado
+
+- Em develop (sem push), verificado: `feature/f7-painel-admin` (`admin/`, Flutter web, F7.1 a F7.6 com dados de exemplo e controle por papel; `docs/painel-admin.md`). `verificar.py` agora também roda análise e testes do painel (59 testes).
+- Conflito em `harness/verificar.py` resolvido mantendo as etapas/argparse do CI e acrescentando `checar_app` e `checar_admin`; TAREFAS e PROGRESSO com os dois lados.
+- Testes em develop: 727 no backend (1 pulado), 629 no app, 59 no painel.
+- `claude/zealous-mirzakhani-a34c51` e `claude/zealous-shtern-57c8c4` têm só o "Initial commit" do GitHub (já em `main`): não há conteúdo a integrar; o trabalho dessas sessões entrou pelas branches `feature/fase-4-pendencias-backend` e `feature/fase-5-pendencias-app`.
+- Próximo: ligar o painel à API admin (alinhar `docs/painel-admin.md` com `docs/api-admin.md`, repositórios reais por `--dart-define` com fallback fake). Pedido enviado à sessão `painel-admin`.
+
