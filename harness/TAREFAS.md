@@ -37,7 +37,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração. Aplicada no Supabase Trato em 29/10/2026 (versão 20261029025430) com o OK do João. 15 tabelas, RLS em todas, 0 linhas de dados.
 - [~] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite). *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
 - [~] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
-- [~] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [~] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)* **Aguarda decisão A/B de custódia** (tarefa V2.4; ver `docs/v2-impacto.md`). Não aplicar antes.
 - [~] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
 - [~] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
 - [~] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
@@ -85,6 +85,19 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [ ] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações.
 
 *Pronto quando:* profissional de teste é aprovado, orça, executa, recebe e saca.
+
+## Fase V2 — Ajustes da Auditoria e Escopo V2 (D13)
+
+Derivada de `docs/v2-impacto.md`. Não depende de aplicar migrations.
+
+- [ ] **V2.1** Textos de tela. Trocar "5%", "dinheiro protegido", "garantia", "escrow" e afins por textos da V2 (ex.: "pagamento processado por parceiro", "suporte e análise de problemas"). Tirar o SOS da F5.13. *Pronto quando:* busca no `verificar` não acha os textos proibidos de D13 em `app/lib/`, e testes de widget passam. (P5, P14)
+- [ ] **V2.2** Backend "pago só após o provedor". O pedido e o app só viram "pago" com o webhook assinado do provedor; aceite não é pagamento. Liberação e repasse viram eventos do provedor. *Pronto quando:* testes mostram que nenhuma rota marca "pago" sem evento confirmado; reenvio não duplica. (usa F4.4, F4.5; ver P7)
+- [ ] **V2.3** Simulador de margem. Margem de contribuição por serviço = receita − custo de pagamento − chargeback esperado − suporte − garantia/retrabalho − tributos − incentivo, por ticket e método (Pix, cartão à vista, parcelado). *Pronto quando:* tabela de cenários com dados reais de 2 provedores. *Bloqueada por:* P16. Destrava P2 e F4.2.
+- [ ] **V2.4** 🔒 Decisão do caminho de custódia: **A (ledger espelho, recomendado)** ou **B (manter até o parceiro confirmar)**. *Pronto quando:* João registra a escolha em `DECISOES.md`; F3.5, F4.4, F4.6 e F6.6 ajustadas ao caminho. *Depende de:* P7, P16 e advogado de pagamentos.
+- [ ] **V2.5** Conciliação com o parceiro (ledger espelho × relatório do provedor) e alerta de diferença. *Só no caminho A.* *Pronto quando:* teste com extrato de exemplo acusa a diferença.
+- [ ] **V2.6** Painel admin web responsivo (substitui o app Ops): busca por pedido e usuário, revisão de verificação, fila de casos, conciliação, reembolso por alçada, auditoria. *Pronto quando:* caso de teste decidido no painel. *Depende de:* P9. Cobre parte da Fase 7.
+- [ ] **V2.7** Desligar por configuração o que a V2 adiou: etapas pagas, adiantamento de material, `verificado_plus`, saque próprio, score e ranking. *Pronto quando:* chaves de configuração documentadas e teste de que o fluxo não oferece essas opções. (F5.x/F6.x não devem exibir.)
+- [ ] **V2.8** Carga do piloto: 1 cidade e 2–3 categorias de baixo risco. 🔒 grava no banco. *Bloqueada por:* P15.
 
 ## Fase 7 — Painel administrativo (web) — depende de P9
 

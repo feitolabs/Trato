@@ -24,6 +24,10 @@ Quem responde: **Adv. pagamentos** (advogado de meios de pagamento), **Adv. cons
 | 8 | Fundo de garantia e reserva do profissional | Adv. pagamentos e seguros | Textos, garantia |
 | 9 | Termos de uso, privacidade e contrato do profissional | Adv. consumidor e dados | Cadastro e aceite |
 | 10 | Outros itens do checklist do escopo (20.2) | Vários | Antes do piloto |
+| 11 | **V2:** split ≠ custódia e enquadramento no Banco Central | Adv. pagamentos | Caminho A/B (V2.4), F3.5 |
+| 12 | **V2:** biometria como dado sensível (ANPD) | Adv. dados | Verificação (F6.1) |
+| 13 | **V2:** revisão de decisão automatizada | Adv. dados | Antifraude, bloqueios, disputa |
+| 14 | **V2:** Decreto 13.135/2026 (SAC) | Adv. consumidor | Atendimento, lançamento |
 
 ---
 
@@ -96,5 +100,35 @@ Não foram pedidos um a um, mas dependem de profissional e estão no escopo. Reg
 ---
 
 ## Próximo passo sugerido
-Contratar o **Adv. pagamentos** primeiro (itens 1 e 8): a resposta define se o desenho de dinheiro (F4.4 e F4.6)
+Contratar o **Adv. pagamentos** primeiro (itens 1, 8 e 11): a resposta define se o desenho de dinheiro (F4.4 e F4.6)
 pode seguir como está. Os itens 5 e 6 mudam só números e textos de configuração; os itens 3, 4 e 9 mudam os termos.
+
+---
+
+## Pontos novos da V2 (Auditoria e Escopo V2, 29/10/2026)
+
+> A V2 vale (D13), mas diz que não substitui parecer jurídico. Fontes citadas por ela (BCB, ANPD, Ministério da Justiça) **não foram reconferidas aqui**. Análise de impacto: `docs/v2-impacto.md`.
+
+### 11. Split não é custódia; enquadramento no Banco Central
+- **Pergunta:** dividir o pagamento (split) entre profissional e Trato, com retenção até a conclusão, exige autorização do Banco Central? O Trato é marketplace, subcredenciador ou outra figura? O parceiro cobre a liquidação centralizada? Quem responde por saldo negativo, chargeback e reembolso?
+- **Por que importa:** a V2 diz que "split" não é sinônimo de custódia nem de proteção contra chargeback, e proíbe criar saldo ou custódia própria sem confirmação contratual e técnica do parceiro. O modelo atual tem ledger, repasses e saques (F3.5). Também proíbe chamar de "escrow" sem base contratual e regulatória.
+- **Depende de:** P7 e P16; caminho A (ledger espelho) ou B (manter); tabelas `contas_ledger`, `lancamentos`, `repasses`, `saques`, `chaves_pix`; Carteira; F4.4.
+- **Enquanto isso:** F3.5 não é aplicada; o app não mostra "pago" antes do provedor e não usa "escrow", "dinheiro protegido" nem "reembolso automático".
+
+### 12. Biometria como dado pessoal sensível (ANPD)
+- **Pergunta:** a selfie e a biometria facial do profissional são dado sensível. Qual a necessidade, a base legal, os controles e a retenção? Dá para usar só o resultado do fornecedor, sem guardar a imagem? Antecedentes só em categorias de risco alto?
+- **Por que importa:** a V2 trata biometria como exceção de alto risco e pede verificação **proporcional ao risco da categoria**, com resultado mínimo guardado e sem cópia de documentos. Isso reforça o item 7.
+- **Depende de:** P10 e P15; `verificacoes`, `verificacao_documentos` (`excluir_em`), `perfis_profissional.nivel_verificacao` (`verificado_plus` fica desligado); bucket privado; RIPD.
+- **Enquanto isso:** nenhum documento ou selfie é coletado em produção; `excluir_em` segue sem prazo (N10).
+
+### 13. Revisão de decisão automatizada
+- **Pergunta:** quais decisões do Trato são automatizadas e afetam interesses do titular (bloqueio, suspensão, antifraude, liberação ou congelamento de repasse, nível de verificação)? Como oferecer o direito de pedir revisão (LGPD, segundo a ANPD citada pela V2) e quem revisa?
+- **Por que importa:** a V2 exige revisão humana para suspensão, fraude contestada e decisão de disputa, com justificativa e canal de resposta. Score e ranking automáticos estão fora do MVP.
+- **Depende de:** `auditoria`; `disputas` (decisão por analista com justificativa); painel admin (V2.6); antifraude (F8.2); política única (P17).
+- **Enquanto isso:** nenhuma decisão punitiva é automática; análise humana nas filas.
+
+### 14. Decreto 13.135/2026 (SAC)
+- **Pergunta:** o Trato se enquadra no decreto (entrada em vigor indicada para 2/11/2026)? Quais obrigações: atendimento humano, canais, protocolo, indicadores e entrega de dados dos modelos de atendimento à Senacon? Prazos?
+- **Por que importa:** a V2 pede confirmar o enquadramento antes do lançamento. Prometer "atendimento 24/7" está proibido (D13).
+- **Depende de:** P18; central de ajuda; operação do piloto. Complementa a linha do SAC do item 10 (que usa data e horário vindos do escopo antigo; **valem os da V2 após o advogado confirmar**).
+- **Enquanto isso:** nenhuma promessa de horário ou de resposta imediata nos textos.
