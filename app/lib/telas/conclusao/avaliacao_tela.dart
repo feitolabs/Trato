@@ -84,7 +84,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
         Align(
           alignment: Alignment.centerLeft,
           child: ChipStatus(
-            texto: 'Pagamento liberado · ${formatarReais(dados.valorLiberadoCentavos)}',
+            texto: 'Aguardando confirmação do pagamento · ${formatarReais(dados.valorLiberadoCentavos)}',
             tipo: TipoStatus.sucesso,
             icone: Icons.check,
           ),

@@ -47,7 +47,7 @@ void main() {
     testWidgets('mostra valor, passos de proteção e aviso de CPF', (tester) async {
       await _abrir(tester, const PagamentoTela());
       expect(find.text('R\$ 380,00'), findsOneWidget);
-      expect(find.text('Seu dinheiro fica protegido', skipOffstage: false), findsOneWidget);
+      expect(find.text('Como funciona o pagamento', skipOffstage: false), findsOneWidget);
       expect(find.textContaining('só no nome do seu CPF', skipOffstage: false), findsOneWidget);
       expect(find.text('Pagar R\$ 380,00 com Pix'), findsOneWidget);
     });
