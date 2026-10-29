@@ -12,17 +12,19 @@ from trato.api.repositorios import (
     EventoWebhook,
     Orcamento,
 )
+from trato.api.repositorios_app import OrcamentoDoPedido, PedidoAberto
 from trato.disputas import Disputa
 from trato.financeiro.ledger import Conta, Lancamento, Livro, SaldoPedido
 from trato.garantias import Garantia, Retrabalho
 from trato.pagamentos.idempotencia import RegistroEventosEmMemoria
-from trato.pedidos.estados import Evento, Pedido
+from trato.pedidos.estados import Estado, Evento, Pedido
 
 
 class PedidosEmMemoria:
     def __init__(self) -> None:
         self._pedidos: dict[str, Pedido] = {}
         self._eventos: dict[str, list[Evento]] = {}
+        self._dados: dict[str, DadosPedido] = {}
 
     def obter(self, pedido_id: str) -> Pedido | None:
         return self._pedidos.get(pedido_id)
@@ -31,6 +33,8 @@ class PedidosEmMemoria:
         self, pedido: Pedido, evento: Evento | None = None, dados: DadosPedido | None = None
     ) -> Pedido:
         self._pedidos[pedido.id] = pedido
+        if dados is not None:
+            self._dados.setdefault(pedido.id, dados)
         lista = self._eventos.setdefault(pedido.id, [])
         if evento is not None:
             lista.append(evento)
@@ -44,6 +48,28 @@ class PedidosEmMemoria:
         achados = [p for p in self._pedidos.values() if getattr(p, campo) == usuario_id]
         return sorted(achados, key=lambda p: p.aberto_em, reverse=True)
 
+    def listar_abertos(self, profissional_id: str) -> Sequence[PedidoAberto]:
+        abertos = [p for p in self._pedidos.values() if p.estado is Estado.ABERTO]
+        abertos.sort(key=lambda p: p.aberto_em, reverse=True)
+        saida = []
+        for p in abertos:
+            d = self._dados.get(p.id)
+            saida.append(
+                PedidoAberto(
+                    id=p.id,
+                    titulo=d.titulo if d else "Pedido",
+                    descricao=d.descricao if d else "",
+                    bairro=d.bairro if d else None,
+                    categoria_id=d.categoria_id if d else None,
+                    faixa_preco_min_centavos=d.faixa_preco_min_centavos if d else None,
+                    faixa_preco_max_centavos=d.faixa_preco_max_centavos if d else None,
+                    urgente=d.urgente if d else False,
+                    prazo_desejado=d.prazo_desejado if d else None,
+                    aberto_em=p.aberto_em,
+                )
+            )
+        return tuple(saida)
+
 
 class OrcamentosEmMemoria:
     def __init__(self, orcamentos: Sequence[Orcamento] = ()) -> None:
@@ -54,6 +80,16 @@ class OrcamentosEmMemoria:
 
     def obter(self, orcamento_id: str) -> Orcamento | None:
         return self._itens.get(orcamento_id)
+
+    def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:
+        achados = [o for o in self._itens.values() if o.pedido_id == pedido_id]
+        achados.sort(key=lambda o: (o.valor_centavos, o.id))
+        return tuple(
+            OrcamentoDoPedido(
+                o.id, o.profissional_id, None, 1, o.valor_centavos, None, None, None, None
+            )
+            for o in achados
+        )
 
 
 class ContratosEmMemoria:

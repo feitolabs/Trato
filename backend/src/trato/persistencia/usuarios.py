@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from trato.api.auth import PapelUsuario
+from trato.api.repositorios_app import PerfilDetalhe
 from trato.persistencia.comum import como_uuid
 from trato.persistencia.conexao import Banco
 
@@ -51,3 +52,22 @@ class UsuariosPostgres:
         else:
             papel = PapelUsuario.CLIENTE
         return PerfilUsuario(str(linha["id"]), linha["nome"], linha["status"], papel)
+
+    def detalhe(self, usuario_id: str) -> PerfilDetalhe | None:
+        """O que o app mostra no Perfil. Sem documento, telefone ou e-mail (ficam fora daqui)."""
+        base = self.perfil(usuario_id)
+        if base is None:
+            return None
+        nivel = nota = servicos = None
+        if base.papel is PapelUsuario.PROFISSIONAL:
+            with self._banco.transacao() as con:
+                linha = con.execute(
+                    "select nivel_verificacao, nota_publica, servicos_concluidos "
+                    "from public.perfis_profissional where usuario_id = %s",
+                    (base.id,),
+                ).fetchone()
+            if linha is not None:
+                nivel = linha["nivel_verificacao"]
+                nota = float(linha["nota_publica"]) if linha["nota_publica"] is not None else None
+                servicos = int(linha["servicos_concluidos"])
+        return PerfilDetalhe(base.id, base.nome, base.papel, base.status, nivel, nota, servicos)

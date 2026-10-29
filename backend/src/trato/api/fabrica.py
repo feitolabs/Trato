@@ -4,8 +4,9 @@
                                os testes montam o contexto com `api.memoria`.
   TRATO_PERSISTENCIA=postgres  Postgres do Supabase via DATABASE_URL + auth com o JWT do Supabase.
 
-Em modo postgres, ledger, disputas, garantias e eventos de webhook continuam EM MEMÓRIA: as
-tabelas deles (F3.5/F3.6) ainda não existem no banco e a F3.5 está sendo refeita (caminho A).
+Em modo postgres, ledger, disputas, garantias, avaliações e eventos de webhook continuam EM
+MEMÓRIA: as tabelas deles (F3.5/F3.6) ainda não existem no banco e a F3.5 está sendo refeita
+(caminho A).
 Reiniciar o servidor perde esses dados. Não usar assim em produção.
 """
 
@@ -28,6 +29,7 @@ from trato.api.memoria import (
     LedgerEmMemoria,
 )
 from trato.config import Config, obter_config
+from trato.persistencia.app_extras import TaxaPostgres, VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
@@ -64,6 +66,8 @@ def criar_contexto_postgres(
             segredo_hs256=config.supabase_jwt_secret.get_secret_value,
             jwks_url=config.supabase_jwks_url,
         )
+    conversas = ConversasPostgres(banco)
+    notificacoes = NotificacoesPostgres(banco)
     return Contexto(
         auth=auth,
         pedidos=PedidosPostgres(banco, lambda: segredo_codigos),
@@ -75,11 +79,16 @@ def criar_contexto_postgres(
         eventos_webhook=EventosWebhookEmMemoria(),
         config=ConfigPostgres(banco),
         agora=agora,
+        conversas=conversas,
+        notificacoes=notificacoes,
+        usuarios=usuarios,
+        verificacoes=VerificacoesPostgres(banco),
+        taxa=TaxaPostgres(banco),
         extras={
             "usuarios": usuarios,
             "execucao": ExecucaoPostgres(banco),
-            "conversas": ConversasPostgres(banco),
-            "notificacoes": NotificacoesPostgres(banco),
+            "conversas": conversas,
+            "notificacoes": notificacoes,
             "auditoria": AuditoriaPostgres(banco),
             "banco": banco,
         },
