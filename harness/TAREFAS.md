@@ -61,14 +61,14 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [ ] **F5.1** Splash, onboarding (3), escolha de perfil.
 - [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
 - [~] **F5.3** Cadastro em 2 passos + confirmação por SMS. *(telas prontas; falta ligar ao Supabase Auth, Google/Apple/biometria e SMS)*
-- [ ] **F5.4** Início, categorias, buscar, perfil do profissional.
+- [~] **F5.4** Início, categorias, buscar, perfil do profissional.
 - [ ] **F5.5** Novo pedido com perguntas guiadas, fotos, prazo, faixa de preço.
 - [ ] **F5.6** Orçamentos recebidos, detalhe, aceite com contrato digital.
 - [ ] **F5.7** Pagamento (Pix/cartão, 30% adiantado) e recibo.
-- [ ] **F5.8** Seus pedidos, pedido em execução (linha do tempo, código de início).
-- [ ] **F5.9** Aditivo (aprovar/recusar) e nota de materiais.
-- [ ] **F5.10** Conclusão (código), avaliação, garantia, retrabalho.
-- [ ] **F5.11** Relatar problema (disputa).
+- [~] **F5.8** Seus pedidos, pedido em execução (linha do tempo, código de início).
+- [~] **F5.9** Aditivo (aprovar/recusar) e nota de materiais.
+- [~] **F5.10** Conclusão (código), avaliação, garantia, retrabalho.
+- [~] **F5.11** Relatar problema (disputa).
 - [ ] **F5.12** Chat, notificações.
 - [ ] **F5.13** Perfil, ajuda, LGPD (exportar e excluir conta), SOS e compartilhar atendimento.
 
@@ -78,8 +78,8 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 - [ ] **F6.1** Cadastro e verificação (documento + selfie), status da análise.
 - [ ] **F6.2** Início, pedidos abertos com filtros, detalhe, recusar com motivo.
-- [ ] **F6.3** Calculadora de orçamento (taxa e líquido vindos do backend), etapas, sinal, validade, garantia.
-- [ ] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out.
+- [~] **F6.3** Calculadora de orçamento (taxa e líquido vindos do backend), etapas, sinal, validade, garantia.
+- [~] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out.
 - [ ] **F6.5** Enviar nota dos materiais e criar aditivo.
 - [ ] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ).
 - [ ] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações.

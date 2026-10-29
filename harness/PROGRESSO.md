@@ -151,3 +151,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Teste sem rastro: uma tabela criada dentro de um bloco que dá erro e desfaz tudo nasceu com RLS ligado, então o gatilho `ensure_rls` continua funcionando. Continuam 15 tabelas.
 - Advisors de segurança: os 2 WARN sumiram. Restam 15 INFO "RLS sem policy" (esperado até a F3.8).
 - Rollback em `supabase/rollback/rls_auto_enable_rollback.sql` (não executado).
+
+## 29/10/2026 — Telas do cliente e do profissional integradas
+
+- Em develop (sem push): F5.4 (`telas/cliente/`), F5.8-F5.9 (`telas/pedidos/`), F5.10-F5.11 (`telas/conclusao/`), F6.3-F6.4 (`telas/profissional/`). Verificação: 305 testes no backend, 260 no app.
+- Marcadas como em andamento (`[~]`): as telas existem com dados de exemplo, mas **não estão ligadas ao fluxo** nem ao backend. Falta ligar a casca do cliente ao login, as telas entre si e tudo à API.
+- Pendências vindas das sessões: P1 (48 h x 7 dias na conclusão), P2/P5 (taxa mostrada na calculadora vem de interface, hoje com implementação fake), P13 (ícones).
