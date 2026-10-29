@@ -16,15 +16,27 @@
 --  * Policies de equipe usam papéis (privado.eh_equipe). Quem lê o quê: docs/seguranca-banco.md.
 
 -- ---------------------------------------------------------------------------
--- 1. Fecha o que a plataforma abriu por padrão nas tabelas da F3.2
---    (as da F3.3 a F3.7 já nasceram fechadas).
+-- 1. Fecha o que a plataforma abriu por padrão nas tabelas da F3.2 (as da F3.3 a F3.7 já nasceram
+--    fechadas). Observado no projeto em 29/10/2026: anon, authenticated e service_role têm
+--    TRUNCATE, REFERENCES, TRIGGER e MAINTAIN nelas. A RLS não protege contra TRUNCATE.
+--    O backend (service_role) recebe só o que precisa; nunca TRUNCATE.
 -- ---------------------------------------------------------------------------
 revoke all on table public.usuarios, public.usuarios_privados, public.equipe, public.cidades,
   public.categorias, public.categoria_perguntas, public.perfis_profissional,
   public.profissional_categorias, public.profissional_regioes, public.verificacoes,
   public.verificacao_documentos, public.config_definicoes, public.config_versoes,
   public.config_parametros, public.config_faixas_taxa
-  from public, anon, authenticated;
+  from public, anon, authenticated, service_role;
+grant select, insert, update on table public.usuarios, public.usuarios_privados, public.equipe,
+  public.cidades, public.categorias, public.categoria_perguntas, public.perfis_profissional,
+  public.profissional_categorias, public.profissional_regioes, public.verificacoes,
+  public.verificacao_documentos, public.config_definicoes, public.config_versoes,
+  public.config_parametros, public.config_faixas_taxa
+  to service_role;
+-- Só estas aceitam DELETE (rascunho de configuração, vínculos do profissional, retenção de documento).
+grant delete on table public.config_versoes, public.config_parametros, public.config_faixas_taxa,
+  public.profissional_categorias, public.profissional_regioes, public.verificacao_documentos
+  to service_role;
 revoke all on all sequences in schema public from public, anon, authenticated;
 revoke execute on function public.definir_atualizado_em(), public.config_versoes_proteger(),
   public.config_parametros_validar(), public.config_faixas_proteger()

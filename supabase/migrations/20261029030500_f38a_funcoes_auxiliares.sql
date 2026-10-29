@@ -16,6 +16,8 @@
 --    (o padrão do Supabase dá tudo a eles). Quem precisar de acesso concede explicitamente.
 
 -- Mudança de padrão: tabelas, sequências e funções futuras do schema public nascem fechadas.
+-- (Observado no projeto em 29/10/2026: tabelas novas nascem com TRUNCATE, REFERENCES, TRIGGER e MAINTAIN
+-- para anon e authenticated. A RLS não protege contra TRUNCATE; por isso fechamos o padrão.)
 alter default privileges in schema public revoke all on tables from anon, authenticated;
 alter default privileges in schema public revoke all on sequences from anon, authenticated;
 alter default privileges in schema public revoke all on functions from anon, authenticated;
@@ -156,6 +158,7 @@ as $$
                      where v.pedido_id = p.id and v.profissional_id = (select auth.uid()))
          or (p.status = 'aberto'
              and (p.expira_em is null or p.expira_em > now())
+             and exists (select 1 from public.usuarios cu where cu.id = p.cliente_id and cu.status = 'ativo')
              and exists (select 1 from public.perfis_profissional pp
                           where pp.usuario_id = (select auth.uid()) and pp.status = 'aprovado')
              and exists (select 1 from public.profissional_categorias pc

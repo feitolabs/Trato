@@ -407,11 +407,17 @@ create trigger contratos_validar_trg before insert on public.contratos
   for each row execute function public.contratos_validar();
 
 -- ---------------------------------------------------------------------------
--- Acesso: ninguém do app lê ou escreve até a F3.8; o backend usa service_role.
--- Contrato e histórico nunca são apagados.
+-- Acesso. Privilégios EXPLÍCITOS, iguais em qualquer padrão da plataforma:
+--  * anon e authenticated: nada (a F3.8b concede só SELECT, por coluna);
+--  * service_role (backend): só o que a tabela precisa. Nunca TRUNCATE.
+--    Tabela imutável recebe apenas SELECT e INSERT.
 -- ---------------------------------------------------------------------------
 revoke all on table public.pedidos, public.pedidos_endereco, public.pedido_respostas,
   public.pedido_historico, public.midias, public.orcamentos, public.orcamento_itens, public.contratos
-  from public, anon, authenticated;
-revoke delete, truncate on table public.contratos from service_role;
-revoke update, delete, truncate on table public.pedido_historico, public.midias from service_role;
+  from public, anon, authenticated, service_role;
+grant select, insert, update on table public.pedidos, public.pedidos_endereco, public.pedido_respostas,
+  public.contratos to service_role;
+grant select, insert, update, delete on table public.orcamentos, public.orcamento_itens to service_role;
+grant select, insert on table public.pedido_historico, public.midias to service_role;
+revoke execute on function public.orcamentos_validar(), public.orcamento_itens_validar(),
+  public.contratos_validar() from public, anon, authenticated;

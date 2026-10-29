@@ -293,11 +293,18 @@ revoke execute on function public.verificar_cadeia_auditoria() from public, anon
 grant execute on function public.verificar_cadeia_auditoria() to service_role;
 
 -- ---------------------------------------------------------------------------
--- Acesso: sem app até a F3.8. Mensagens e auditoria não aceitam DELETE/TRUNCATE nem do service_role;
--- auditoria também não aceita INSERT/UPDATE direto (só por registrar_auditoria).
+-- Acesso. Privilégios EXPLÍCITOS, iguais em qualquer padrão da plataforma:
+--  * anon e authenticated: nada (a F3.8b concede só SELECT, por coluna);
+--  * service_role (backend): só o que a tabela precisa. Nunca TRUNCATE.
+--    Tabela imutável recebe apenas SELECT e INSERT.
 -- ---------------------------------------------------------------------------
 revoke all on table public.conversas, public.mensagens, public.notificacoes,
-  public.notificacao_preferencias, public.auditoria from public, anon, authenticated;
-revoke delete, truncate on table public.conversas, public.mensagens from service_role;
-revoke insert, update, delete, truncate on table public.auditoria from service_role;
+  public.notificacao_preferencias, public.auditoria from public, anon, authenticated, service_role;
+grant select, insert, update on table public.conversas, public.mensagens, public.notificacao_preferencias
+  to service_role;
+grant select, insert, update, delete on table public.notificacoes to service_role;
+-- Auditoria: o backend só LÊ. Quem grava é a função registrar_auditoria (dona da tabela).
+grant select on table public.auditoria to service_role;
 revoke all on sequence public.auditoria_id_seq from public, anon, authenticated, service_role;
+revoke execute on function public.conversas_validar(), public.mensagens_proteger(), public.mensagens_validar()
+  from public, anon, authenticated;

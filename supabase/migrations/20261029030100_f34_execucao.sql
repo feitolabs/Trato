@@ -236,7 +236,11 @@ declare
   esperado bigint;
   total bigint;
 begin
-  nota := case when tg_table_name = 'notas_material' then new.id else new.nota_id end;
+  if tg_table_name = 'notas_material' then
+    nota := new.id;
+  else
+    nota := new.nota_id;
+  end if;
   select total_centavos into esperado from public.notas_material where id = nota;
   select coalesce(sum(total_centavos), 0) into total from public.nota_material_itens where nota_id = nota;
   if total <> esperado then
@@ -360,9 +364,16 @@ create trigger presencas_validar_trg before insert on public.presencas
   for each row execute function public.presencas_validar();
 
 -- ---------------------------------------------------------------------------
--- Acesso: sem app até a F3.8. Presenças e itens de nota nunca mudam.
+-- Acesso. Privilégios EXPLÍCITOS, iguais em qualquer padrão da plataforma:
+--  * anon e authenticated: nada (a F3.8b concede só SELECT, por coluna);
+--  * service_role (backend): só o que a tabela precisa. Nunca TRUNCATE.
+--    Tabela imutável recebe apenas SELECT e INSERT.
 -- ---------------------------------------------------------------------------
 revoke all on table public.etapas, public.aditivos, public.notas_material, public.nota_material_itens,
-  public.agendamentos, public.presencas from public, anon, authenticated;
-revoke delete, truncate on table public.aditivos, public.notas_material from service_role;
-revoke update, delete, truncate on table public.presencas, public.nota_material_itens from service_role;
+  public.agendamentos, public.presencas from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.etapas to service_role;
+grant select, insert, update on table public.aditivos, public.notas_material, public.agendamentos to service_role;
+grant select, insert on table public.nota_material_itens, public.presencas to service_role;
+revoke execute on function public.etapas_validar(), public.aditivos_validar(), public.notas_material_validar(),
+  public.nota_material_itens_validar(), public.agendamentos_validar(), public.presencas_validar()
+  from public, anon, authenticated;

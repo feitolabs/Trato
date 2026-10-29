@@ -240,7 +240,11 @@ declare
   lc public.lancamentos%rowtype;
   diferencas integer;
 begin
-  lanc := case when tg_table_name = 'lancamentos' then new.id else new.lancamento_id end;
+  if tg_table_name = 'lancamentos' then
+    lanc := new.id;
+  else
+    lanc := new.lancamento_id;
+  end if;
 
   select coalesce(sum(valor_centavos) filter (where sentido = 'debito'), 0),
          coalesce(sum(valor_centavos) filter (where sentido = 'credito'), 0),
@@ -462,11 +466,19 @@ alter table public.lancamentos
   add constraint lancamentos_saque_fk foreign key (saque_id) references public.saques (id) on delete restrict;
 
 -- ---------------------------------------------------------------------------
--- Acesso: sem app até a F3.8. Ledger sem UPDATE/DELETE/TRUNCATE nem para o service_role.
+-- Acesso. Privilégios EXPLÍCITOS, iguais em qualquer padrão da plataforma:
+--  * anon e authenticated: nada (a F3.8b concede só SELECT, por coluna);
+--  * service_role (backend): só o que a tabela precisa. Nunca TRUNCATE.
+--    Tabela imutável recebe apenas SELECT e INSERT.
 -- ---------------------------------------------------------------------------
 revoke all on table public.pagamentos, public.eventos_webhook, public.contas_ledger, public.lancamentos,
   public.partidas, public.repasses, public.chaves_pix, public.saques, public.saldos_contas
+  from public, anon, authenticated, service_role;
+grant select, insert, update on table public.pagamentos, public.eventos_webhook, public.contas_ledger,
+  public.repasses, public.chaves_pix, public.saques to service_role;
+-- Ledger: só entra dado novo. Nem o service_role atualiza ou apaga.
+grant select, insert on table public.lancamentos, public.partidas to service_role;
+grant select on table public.saldos_contas to service_role;
+revoke execute on function public.pagamentos_validar(), public.lancamentos_preparar(), public.partidas_validar(),
+  public.chaves_pix_validar(), public.repasses_validar(), public.saques_validar()
   from public, anon, authenticated;
-revoke update, delete, truncate on table public.lancamentos, public.partidas from service_role;
-revoke delete, truncate on table public.pagamentos, public.eventos_webhook, public.contas_ledger,
-  public.repasses, public.chaves_pix, public.saques from service_role;

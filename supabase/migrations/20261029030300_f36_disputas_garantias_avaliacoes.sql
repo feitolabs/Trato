@@ -329,10 +329,16 @@ create trigger avaliacao_criterios_validar_trg before insert on public.avaliacao
   for each row execute function public.avaliacao_criterios_validar();
 
 -- ---------------------------------------------------------------------------
--- Acesso: sem app até a F3.8. Evidências e critérios nunca mudam.
+-- Acesso. Privilégios EXPLÍCITOS, iguais em qualquer padrão da plataforma:
+--  * anon e authenticated: nada (a F3.8b concede só SELECT, por coluna);
+--  * service_role (backend): só o que a tabela precisa. Nunca TRUNCATE.
+--    Tabela imutável recebe apenas SELECT e INSERT.
 -- ---------------------------------------------------------------------------
 revoke all on table public.disputas, public.disputa_evidencias, public.garantias, public.retrabalhos,
-  public.avaliacoes, public.avaliacao_criterios from public, anon, authenticated;
-revoke delete, truncate on table public.disputas, public.garantias, public.retrabalhos, public.avaliacoes
-  from service_role;
-revoke update, delete, truncate on table public.disputa_evidencias, public.avaliacao_criterios from service_role;
+  public.avaliacoes, public.avaliacao_criterios from public, anon, authenticated, service_role;
+grant select, insert, update on table public.disputas, public.garantias, public.retrabalhos,
+  public.avaliacoes to service_role;
+grant select, insert on table public.disputa_evidencias, public.avaliacao_criterios to service_role;
+revoke execute on function public.disputas_validar(), public.disputa_evidencias_validar(),
+  public.retrabalhos_validar(), public.avaliacoes_validar(), public.avaliacao_criterios_validar()
+  from public, anon, authenticated;
