@@ -182,3 +182,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em `backend/tests/margem/` (55): Pix, cartão à vista, 3x e 6x, os dois tipos de regra, arredondamento e soma exata.
 - `docs/simulacao-margem.md`: tickets R$ 80 a R$ 3.000 × Pix/cartão/3x/6x para 5% fixa, 7,5% fixa e progressiva 7,5/5/3,5. **Custos do provedor são ESTIMATIVAS até haver proposta (P7); faixas e mínimo de R$ 5,00 são hipóteses (P2).** Resultado: Pix nunca negativo; cartão 6x negativo em tudo; 5% fixa perde no cartão até R$ 500; a progressiva fica negativa no 3x a partir de R$ 1.000.
 - Sem banco, sem `app/`, sem push.
+
+
+## 29/10/2026 — Telas do profissional faltantes (F6.1, F6.5, F6.7, F5.9 cliente)
+
+- Branch `feature/telas-profissional-faltantes`. 10 telas novas em `telas/{profissional_cadastro,verificacao,nota_material,aditivo,disputa_profissional,perfil_publico}/` + peças comuns em `telas/profissional_apoio/`. Serviços por interface com fakes; callbacks a ligar em `rotas.dart` listados em `docs/telas-profissional.md`.
+- Protótipo não conferido página a página: todas marcadas "sem protótipo".
+- Testes: `test/telas_profissional_test.dart` (27) e goldens 14×3. Não mexi em main.dart, rotas.dart, componentes.dart nem tema.
