@@ -33,7 +33,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 ## Fase 3 — Banco de dados (cada migration 🔒)
 
-- [ ] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova.
+- [~] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova. *(documento escrito; falta o João aprovar)*
 - [ ] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração (taxa progressiva, prazos, limites).
 - [ ] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite).
 - [ ] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out.
@@ -45,12 +45,12 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 ## Fase 4 — Backend Python
 
-- [ ] **F4.1** Máquina de estados do pedido (10 estados, quem/quando/prova). *Pronto quando:* teste para cada transição válida e inválida.
+- [x] **F4.1** Máquina de estados do pedido (10 estados, quem/quando/prova). *Pronto quando:* teste para cada transição válida e inválida.
 - [!] **F4.2** Cálculo da taxa progressiva (base 7,5%, mínima configurável). *Bloqueado:* P2. *Pronto quando:* testes com tabela de exemplos.
-- [ ] **F4.3** Cálculo do custo Stripe (Pix e cartão) e margem do Trato. *Pronto quando:* testes por meio de pagamento.
+- [x] **F4.3** Cálculo do custo Stripe (Pix e cartão) e margem do Trato. *Pronto quando:* testes por meio de pagamento.
 - [!] **F4.4** Fluxo de pagamento: 30% adiantado, restante no fim, por etapas, aditivo. *Bloqueado:* P1, P4, P7.
-- [ ] **F4.5** Idempotência e webhooks Stripe assinados. *Pronto quando:* reenvio do mesmo evento não duplica lançamento.
-- [ ] **F4.6** Ledger de partidas dobradas e saldos derivados. *Pronto quando:* soma de débitos = créditos em todos os testes.
+- [x] **F4.5** Idempotência e webhooks Stripe assinados. *Pronto quando:* reenvio do mesmo evento não duplica lançamento.
+- [x] **F4.6** Ledger de partidas dobradas e saldos derivados. *Pronto quando:* soma de débitos = créditos em todos os testes.
 - [ ] **F4.7** Disputa (congela, 48 h, decisão em 5 dias úteis, resultados). *Pronto quando:* testes dos 4 resultados.
 - [ ] **F4.8** Garantia e retrabalho (prazo por categoria, 7 dias para atender). *Pronto quando:* testes.
 - [ ] **F4.9** Rotinas: liberação por prazo, expiração de pedido, lembretes. *Pronto quando:* testes com relógio simulado.

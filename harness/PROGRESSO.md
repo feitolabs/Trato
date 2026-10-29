@@ -92,3 +92,19 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - João aprovar lado a lado com o PDF (critério da F2.5). Textos das páginas 2 e 3 são meus (P14). Ícones ainda Material (P13).
 
 **Paralelo (em worktrees, sem merge):** F4.1 estados do pedido (commit e1be9cf, 82 testes), F3.1 modelo de dados (documento), F4.6 ledger, F4.3 e F4.5 (custo Stripe, webhook e idempotência) em andamento.
+
+## 28/10/2026 — Integração das sessões paralelas
+
+**Feito (merge em develop, sem push)**
+- F4.1 `backend/src/trato/pedidos/estados.py`: máquina de estados do pedido.
+- F4.6 `backend/src/trato/financeiro/ledger.py`: ledger de partidas dobradas em centavos, imutável, idempotente.
+- F4.3 `backend/src/trato/pagamentos/custo.py`: custo do meio de pagamento e margem do Trato (taxas por parâmetro).
+- F4.5 `pagamentos/webhook.py` e `idempotencia.py`: assinatura no formato Stripe e registro de eventos.
+- F3.1 `docs/modelo-de-dados.md`: proposta de modelo (nada aplicado no Supabase).
+- Develop: 163 testes no backend, 51 no app, verificação OK.
+
+**Pendente**
+- João aprovar o modelo de dados (F3.1) antes de qualquer migration (F3.2 em diante 🔒) e responder P2/P6 (seed de taxa e cidade).
+- F4.2 e F4.4 continuam bloqueadas por P1–P4 e P7.
+
+**Próxima tarefa:** F3.9/F3.2 dependem do OK do João; do lado do app, F5.2 (login) e F5.3 (cadastro).
