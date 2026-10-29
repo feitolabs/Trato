@@ -34,9 +34,15 @@ def segredo_webhook_do_env() -> str:
     return obter_config().stripe_webhook_secret.get_secret_value()
 
 
-# Ponto de extensão (F4.4): cada tipo de evento do Stripe (ex.: "payment_intent.succeeded")
-# ganha um manipulador que traduz o evento em ledger + transição do pedido.
+# Cada tipo de evento do Stripe ganha um manipulador que traduz o evento em ledger + transição
+# do pedido. Os de pagamento vêm de `webhook_pagamento.py` (D13: "pago" só pelo webhook).
 ManipuladorWebhook = Callable[[EventoWebhook, "Contexto"], None]
+
+
+def _manipuladores_padrao() -> dict[str, ManipuladorWebhook]:
+    from trato.api.webhook_pagamento import manipuladores_padrao
+
+    return manipuladores_padrao()
 
 
 @dataclass
@@ -52,7 +58,9 @@ class Contexto:
     config: ProvedorConfig
     agora: Callable[[], datetime] = agora_utc
     segredo_webhook: Callable[[], str] = segredo_webhook_do_env
-    manipuladores_webhook: dict[str, ManipuladorWebhook] = field(default_factory=dict)
+    manipuladores_webhook: dict[str, ManipuladorWebhook] = field(
+        default_factory=lambda: _manipuladores_padrao()
+    )
 
 
 def obter_contexto(request: Request) -> Contexto:

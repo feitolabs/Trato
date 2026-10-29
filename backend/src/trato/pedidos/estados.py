@@ -20,6 +20,7 @@ from enum import StrEnum
 class Estado(StrEnum):
     ABERTO = "aberto"
     ORCAMENTO_ACEITO = "orcamento_aceito"
+    AGUARDANDO_CONFIRMACAO = "aguardando_confirmacao"  # cliente pagou; falta o parceiro confirmar
     PAGO_E_RETIDO = "pago_e_retido"
     AGENDADO = "agendado"
     EM_ANDAMENTO = "em_andamento"
@@ -37,6 +38,7 @@ class Estado(StrEnum):
 _NOMES_ESTADO = {
     Estado.ABERTO: "Aberto",
     Estado.ORCAMENTO_ACEITO: "Orçamento aceito",
+    Estado.AGUARDANDO_CONFIRMACAO: "Aguardando confirmação do pagamento",
     Estado.PAGO_E_RETIDO: "Pago e retido",
     Estado.AGENDADO: "Agendado",
     Estado.EM_ANDAMENTO: "Em andamento",
@@ -67,7 +69,9 @@ class Acao(StrEnum):
     ACEITAR_ORCAMENTO = "aceitar_orcamento"
     EXPIRAR_PEDIDO = "expirar_pedido"
     EXPIRAR_PAGAMENTO = "expirar_pagamento"
+    INFORMAR_PAGAMENTO = "informar_pagamento"
     CONFIRMAR_PAGAMENTO = "confirmar_pagamento"
+    RECUSAR_PAGAMENTO = "recusar_pagamento"
     CONFIRMAR_AGENDA = "confirmar_agenda"
     REMARCAR = "remarcar"
     FAZER_CHECK_IN = "fazer_check_in"
@@ -294,8 +298,18 @@ REGRAS: dict[Acao, _Regra] = {
     Acao.EXPIRAR_PAGAMENTO: _Regra(
         "expirar o pagamento", {Papel.SISTEMA: _de(E.ORCAMENTO_ACEITO)}, None
     ),
+    # D13: o cliente só INFORMA que pagou; "pago" só existe depois da confirmação do parceiro
+    # (webhook assinado), que chega como SISTEMA, antes ou depois do aviso do cliente.
+    Acao.INFORMAR_PAGAMENTO: _Regra(
+        "informar o pagamento", {Papel.CLIENTE: _de(E.ORCAMENTO_ACEITO)}, None
+    ),
     Acao.CONFIRMAR_PAGAMENTO: _Regra(
-        "confirmar o pagamento", {Papel.SISTEMA: _de(E.ORCAMENTO_ACEITO)}, ProvaPagamento
+        "confirmar o pagamento",
+        {Papel.SISTEMA: _de(E.ORCAMENTO_ACEITO, E.AGUARDANDO_CONFIRMACAO)},
+        ProvaPagamento,
+    ),
+    Acao.RECUSAR_PAGAMENTO: _Regra(
+        "recusar o pagamento", {Papel.SISTEMA: _de(E.AGUARDANDO_CONFIRMACAO)}, None
     ),
     Acao.CONFIRMAR_AGENDA: _Regra(
         "confirmar a agenda", {Papel.PROFISSIONAL: _de(E.PAGO_E_RETIDO)}, ProvaAgenda
@@ -515,6 +529,14 @@ def _expirar_pagamento(pedido, ator, agora, prova, prazos, gerar):
     )
 
 
+def _informar_pagamento(pedido, ator, agora, prova, prazos, gerar):
+    return replace(pedido, estado=Estado.AGUARDANDO_CONFIRMACAO)
+
+
+def _recusar_pagamento(pedido, ator, agora, prova, prazos, gerar):
+    return replace(pedido, estado=Estado.ORCAMENTO_ACEITO)
+
+
 def _confirmar_pagamento(pedido, ator, agora, prova: ProvaPagamento, prazos, gerar):
     _exigir_texto(prova.referencia_pagamento, "a referência do pagamento")
     return replace(
@@ -625,7 +647,9 @@ _APLICAR = {
     Acao.ACEITAR_ORCAMENTO: _aceitar_orcamento,
     Acao.EXPIRAR_PEDIDO: _expirar_pedido,
     Acao.EXPIRAR_PAGAMENTO: _expirar_pagamento,
+    Acao.INFORMAR_PAGAMENTO: _informar_pagamento,
     Acao.CONFIRMAR_PAGAMENTO: _confirmar_pagamento,
+    Acao.RECUSAR_PAGAMENTO: _recusar_pagamento,
     Acao.CONFIRMAR_AGENDA: _confirmar_agenda,
     Acao.REMARCAR: _remarcar,
     Acao.FAZER_CHECK_IN: _fazer_check_in,

@@ -10,6 +10,7 @@ from trato.disputas.erros import (
 )
 from trato.disputas.maquina import Ator, Disputa, Estado, Motivo, abrir
 from trato.disputas.prazos import Prazos, adicionar_dias_uteis, calcular_prazos, dentro_da_janela
+from trato.disputas.prazos_legais import PrazoLegalInformativo, prazos_legais_informativos
 from trato.disputas.resultado import Decisao, Divisao, Resultado, dividir_valor
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "Estado",
     "Motivo",
     "PrazoExpirado",
+    "PrazoLegalInformativo",
     "Prazos",
     "Resultado",
     "ResultadoInvalido",
@@ -32,4 +34,5 @@ __all__ = [
     "calcular_prazos",
     "dentro_da_janela",
     "dividir_valor",
+    "prazos_legais_informativos",
 ]
