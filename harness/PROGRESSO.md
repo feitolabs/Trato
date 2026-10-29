@@ -182,3 +182,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em `backend/tests/margem/` (55): Pix, cartão à vista, 3x e 6x, os dois tipos de regra, arredondamento e soma exata.
 - `docs/simulacao-margem.md`: tickets R$ 80 a R$ 3.000 × Pix/cartão/3x/6x para 5% fixa, 7,5% fixa e progressiva 7,5/5/3,5. **Custos do provedor são ESTIMATIVAS até haver proposta (P7); faixas e mínimo de R$ 5,00 são hipóteses (P2).** Resultado: Pix nunca negativo; cartão 6x negativo em tudo; 5% fixa perde no cartão até R$ 500; a progressiva fica negativa no 3x a partir de R$ 1.000.
 - Sem banco, sem `app/`, sem push.
+
+
+## 29/10/2026 — F4.10 simulação ponta a ponta (provedor em modo teste)
+
+- Novo `backend/src/trato/pagamentos/provedor/` (interface `ProvedorPagamento`, `ProvedorFake`, `ProvedorStripeTeste` com transporte injetado, sem rede), `taxa.py` (bps + mínimo, progressiva desligada), `orquestrador.py` e `api/rotas_pagamento.py` (cobrança, aditivo, decisão da disputa). Único ajuste em código alheio: gancho `Contexto.apos_transicao`.
+- Testes: fluxo Aberto→Concluído pela API com webhook assinado, duplicado, fora de ordem, falha, cancelamento, disputa, retrabalho, aditivo. Relatório em `docs/f4-10-simulacao.md` (o que falta para o Stripe real; P2/P7).
+- Sem banco real, sem rede, sem push. Avaliação ainda não existe no backend.
