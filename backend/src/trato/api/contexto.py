@@ -22,7 +22,7 @@ from trato.api.repositorios import (
     RepositorioPedidos,
 )
 from trato.config import obter_config
-from trato.pedidos.estados import Papel
+from trato.pedidos.estados import Acao, Papel, Pedido
 
 
 def agora_utc() -> datetime:
@@ -37,6 +37,9 @@ def segredo_webhook_do_env() -> str:
 # Cada tipo de evento do Stripe ganha um manipulador que traduz o evento em ledger + transição
 # do pedido. Os de pagamento vêm de `webhook_pagamento.py` (D13: "pago" só pelo webhook).
 ManipuladorWebhook = Callable[[EventoWebhook, "Contexto"], None]
+# Gancho após uma transição já gravada: (pedido antes, pedido depois, ação, contexto).
+# Serve para efeitos financeiros que dependem da mudança (ex.: repartir a custódia ao concluir).
+GanchoTransicao = Callable[[Pedido, Pedido, Acao, "Contexto"], None]
 
 
 def _manipuladores_padrao() -> dict[str, ManipuladorWebhook]:
@@ -61,6 +64,7 @@ class Contexto:
     manipuladores_webhook: dict[str, ManipuladorWebhook] = field(
         default_factory=lambda: _manipuladores_padrao()
     )
+    apos_transicao: list[GanchoTransicao] = field(default_factory=list)
 
 
 def obter_contexto(request: Request) -> Contexto:

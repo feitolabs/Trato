@@ -194,6 +194,8 @@ def mudar_estado(
                 )
             )
     _concluir_efeitos(contexto, transicao.pedido)
+    for gancho in contexto.apos_transicao:
+        gancho(pedido, transicao.pedido, acao, contexto)
     return pedido_out(transicao.pedido, usuario)
 
 
