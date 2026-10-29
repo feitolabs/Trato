@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/cliente/buscar_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
+import 'package:trato/telas/mensagens/mensagens_tela.dart';
 import 'package:trato/telas/cliente/dados_exemplo.dart';
 import 'package:trato/telas/cliente/inicio_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
@@ -52,7 +53,7 @@ void main() {
 
       await tester.tap(find.text('Mensagens'));
       await tester.pumpAndSettle();
-      expect(find.text('Esta tela chega nas próximas etapas.').hitTestable(), findsOneWidget);
+      expect(find.byType(MensagensTela), findsOneWidget);
     });
 
     testWidgets('campo Buscar do Início leva à aba Buscar', (tester) async {
