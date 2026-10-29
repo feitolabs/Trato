@@ -1,0 +1,95 @@
+name: Build de teste
+
+# Manual (Actions > Build de teste > Run workflow). Gera APK debug (Android) e app iOS sem assinatura.
+# NÃO publica em loja e NÃO assina nada. Release assinado: ver docs/BUILD.md.
+#
+# Nomes de segredos/variáveis esperados (cadastre em Settings > Secrets and variables > Actions;
+# nenhum valor fica neste arquivo; sem eles o app compila em modo demo):
+#   vars.TRATO_API_URL         - endereço base da API
+#   secrets.SUPABASE_URL       - URL do projeto Supabase
+#   secrets.SUPABASE_ANON_KEY  - chave pública (anon/publishable) do Supabase
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.8"
+
+jobs:
+  android-debug:
+    name: Android (APK debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Java 17
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Flutter
+        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff # v2.18.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Compilar o APK debug
+        working-directory: app
+        env:
+          TRATO_API_URL: ${{ vars.TRATO_API_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter pub get
+          MODO=demo
+          if [ -n "$TRATO_API_URL" ]; then MODO=api; fi
+          flutter build apk --debug \
+            --dart-define=TRATO_MODO="$MODO" \
+            --dart-define=TRATO_API_URL="$TRATO_API_URL" \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+
+      - name: Guardar o APK
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: trato-debug-apk
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+
+  ios-sem-assinatura:
+    name: iOS (sem assinatura)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Flutter
+        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff # v2.18.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Compilar sem assinar
+        working-directory: app
+        env:
+          TRATO_API_URL: ${{ vars.TRATO_API_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter pub get
+          MODO=demo
+          if [ -n "$TRATO_API_URL" ]; then MODO=api; fi
+          flutter build ios --release --no-codesign \
+            --dart-define=TRATO_MODO="$MODO" \
+            --dart-define=TRATO_API_URL="$TRATO_API_URL" \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"

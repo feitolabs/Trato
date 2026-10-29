@@ -41,3 +41,13 @@ Thumbs.db
 
 # Claude Code (worktrees locais)
 .claude/worktrees/
+
+# Assinatura Android — NUNCA versionar (ver docs/BUILD.md)
+key.properties
+**/key.properties
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+# Valores de --dart-define por ambiente (ver docs/BUILD.md)
+dart-defines*.json

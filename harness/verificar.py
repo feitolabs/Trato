@@ -1,11 +1,12 @@
 """Verificação automática do Trato: segredos, backend (lint + testes) e app Flutter.
 
-Uso: python harness/verificar.py   (ou harness/verificar.ps1 / harness/verificar.sh)
+Uso: python harness/verificar.py [--etapa segredos|backend|app]   (ou harness/verificar.ps1 / harness/verificar.sh)
 Sai com código 1 se qualquer etapa falhar.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import shutil
@@ -122,8 +123,24 @@ def checar_textos_proibidos() -> bool:
 
 
 def python_do_backend() -> str:
-    venv = BACKEND / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
-    return str(venv) if venv.exists() else sys.executable
+    """Python do backend: $TRATO_PYTHON, backend/.venv, .venv da raiz ou o python que roda este script."""
+    if (env := os.environ.get("TRATO_PYTHON")) and Path(env).exists():
+        return env
+    sub = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+    for venv in (BACKEND / ".venv", RAIZ / ".venv"):
+        if (venv / sub).exists():
+            return str(venv / sub)
+    return sys.executable
+
+
+def faltam_modulos(py: str, modulos: list[str]) -> list[str]:
+    """Módulos que o python do backend não consegue importar."""
+    faltam = []
+    for modulo in modulos:
+        achou = subprocess.run([py, "-c", f"import {modulo}"], capture_output=True)
+        if achou.returncode != 0:
+            faltam.append(modulo)
+    return faltam
 
 
 def rodar(passo: str, comando: list[str], pasta: Path) -> bool:
@@ -137,6 +154,15 @@ def rodar(passo: str, comando: list[str], pasta: Path) -> bool:
 
 def checar_backend() -> bool:
     py = python_do_backend()
+    # fastapi/psycopg/jwt: dependências de execução; ruff/pytest/httpx: extras `dev`.
+    if faltam := faltam_modulos(py, ["ruff", "pytest", "httpx", "fastapi", "psycopg", "jwt"]):
+        titulo("Backend — ambiente")
+        print(f"FALHA: python usado: {py}")
+        print(f"FALHA: faltam no ambiente: {', '.join(faltam)}")
+        print("Prepare o ambiente uma vez (cria backend/.venv e instala tudo):")
+        print(r"  Windows:       .\harness\preparar-ambiente.ps1")
+        print("  macOS/Linux:   ./harness/preparar-ambiente.sh")
+        return False
     ok = rodar("Backend — lint (ruff)", [py, "-m", "ruff", "check", "."], BACKEND)
     ok = rodar("Backend — formatação (ruff)", [py, "-m", "ruff", "format", "--check", "."], BACKEND) and ok
     ok = rodar("Backend — testes (pytest)", [py, "-m", "pytest", "-q"], BACKEND) and ok
@@ -166,16 +192,25 @@ def checar_app() -> bool:
     return ok
 
 
+ETAPAS = {
+    "segredos": [checar_segredos, checar_env_ignorado],
+    "backend": [checar_backend],
+    "app": [checar_cores_soltas, checar_textos_proibidos, checar_app],
+}
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
-    resultados = [
-        checar_segredos(),
-        checar_env_ignorado(),
-        checar_cores_soltas(),
-        checar_textos_proibidos(),
-        checar_backend(),
-        checar_app(),
-    ]
+    parser = argparse.ArgumentParser(description="Verificação do Trato.")
+    parser.add_argument(
+        "--etapa",
+        choices=["todas", *ETAPAS],
+        default="todas",
+        help="roda só um grupo de checagens (o CI usa um job por grupo); padrão: todas",
+    )
+    escolha = parser.parse_args().etapa
+    grupos = list(ETAPAS) if escolha == "todas" else [escolha]
+    resultados = [checar() for grupo in grupos for checar in ETAPAS[grupo]]
     titulo("Resultado")
     if all(resultados):
         print("TUDO OK")

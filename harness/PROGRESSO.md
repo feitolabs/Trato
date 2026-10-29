@@ -236,3 +236,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `harness/verificar.py` ganhou "App — textos proibidos (D13)": falha se `app/lib/**/*.dart` tiver "escrow", "garantia total", "profissional seguro", "reembolso automático", "menor taxa do mercado" ou "24/7" fora de comentário. Linha com `verificar: ignorar` é liberada. V2.1 passa a `[x]`.
 - Em paralelo (sessões `app-pendencias` e `backend-pendencias`): token do login na API, pontos de entrada de telas, câmera/GPS, rotas de backend que faltam e testes com Postgres local.
 
+
+## 29/10/2026 — Entrega: CI, ambiente e build (F9.3 preparado, F9.5)
+
+- `.github/workflows/verificar.yml` refeito: jobs `segredos`, `backend`, `app` e `integracao` (pgserver; só develop/main ou manual), ações fixadas por SHA, cache de pip e Flutter 3.47.8. Novo `build.yml` (manual): APK debug e iOS sem assinatura. Nenhum segredo; `actionlint` limpo. **Nunca rodou na nuvem.**
+- `verificar.py`: acha `$TRATO_PYTHON`, `backend/.venv` ou `.venv` da raiz, avisa o que falta (ruff, pytest…) e aceita `--etapa segredos|backend|app`. Novos `harness/preparar-ambiente.ps1/.sh` e `backend/requirements*.txt`.
+- Android/iOS: `INTERNET` no release, permissões de câmera e localização (ainda sem plugin), assinatura de release via `key.properties` (ignorado), textos de uso no Info.plist. `app/lib/` intocado.
+- Docs: `docs/BUILD.md` e `docs/ENTREGA.md` novos; `COMO-RODAR.md` atualizado. F9.5 `[x]`.
+- Verificação: etapas segredos, backend (490 testes) e app (586 testes) TUDO OK. Falta, com OK do João: push, primeiro run do CI, keystore, contas Play/Apple, ícone final.
