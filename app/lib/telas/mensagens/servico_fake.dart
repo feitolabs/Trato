@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'modelos.dart';
 
 class ServicoMensagensFake implements ServicoMensagens {
@@ -29,7 +31,7 @@ class ServicoMensagensFake implements ServicoMensagens {
 
   @override
   Future<List<ConversaResumo>> listar() {
-    if (travar) return Future<List<ConversaResumo>>.delayed(const Duration(days: 1));
+    if (travar) return Completer<List<ConversaResumo>>().future;
     if (falhar) return Future.error(StateError('falha simulada'));
     return Future.value(itens);
   }

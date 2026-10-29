@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'modelos.dart';
 
 /// Serviço de mentira para testes e para rodar o app sem backend.
@@ -50,7 +52,7 @@ class ServicoNotificacoesFake implements ServicoNotificacoes {
 
   @override
   Future<List<Notificacao>> listar() {
-    if (travar) return Future<List<Notificacao>>.delayed(const Duration(days: 1));
+    if (travar) return Completer<List<Notificacao>>().future;
     if (falhar) return Future.error(StateError('falha simulada'));
     return Future.value([..._itens]);
   }

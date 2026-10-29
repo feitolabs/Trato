@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'modelos.dart';
 
 class ServicoAjudaFake implements ServicoAjuda {
@@ -31,7 +33,7 @@ class ServicoAjudaFake implements ServicoAjuda {
 
   @override
   Future<List<PerguntaFrequente>> perguntas() {
-    if (travar) return Future<List<PerguntaFrequente>>.delayed(const Duration(days: 1));
+    if (travar) return Completer<List<PerguntaFrequente>>().future;
     if (falhar) return Future.error(StateError('falha simulada'));
     return Future.value(itens);
   }

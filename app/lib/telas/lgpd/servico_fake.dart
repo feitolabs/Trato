@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'modelos.dart';
 
 class ServicoPrivacidadeFake implements ServicoPrivacidade {
@@ -45,7 +47,7 @@ class ServicoPrivacidadeFake implements ServicoPrivacidade {
 
   @override
   Future<List<Consentimento>> consentimentos() {
-    if (travar) return Future<List<Consentimento>>.delayed(const Duration(days: 1));
+    if (travar) return Completer<List<Consentimento>>().future;
     if (falhar) return Future.error(StateError('falha simulada'));
     return Future.value([..._itens]);
   }

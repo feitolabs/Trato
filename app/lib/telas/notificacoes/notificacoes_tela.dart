@@ -74,7 +74,7 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
       children: [
         Row(
           children: [
-            Expanded(
+            Flexible(
               child: Text(
                 _naoLidas == 0
                     ? 'Tudo lido'
@@ -83,7 +83,9 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
               ),
             ),
             if (_naoLidas > 0)
-              BotaoLink(texto: 'Marcar todas como lidas', aoTocar: _marcarTodas),
+              Flexible(
+                child: BotaoLink(texto: 'Marcar todas como lidas', aoTocar: _marcarTodas),
+              ),
           ],
         ),
         const SizedBox(height: EspacosTrato.x2),

@@ -31,7 +31,7 @@ Future<void> _abrir(
     MaterialApp(
       theme: TemaTrato.claro,
       builder: (context, filho) => EscalaFonteLimitada(child: filho!),
-      home: tela,
+      home: KeyedSubtree(key: UniqueKey(), child: tela),
     ),
   );
   await tester.pump();
@@ -137,8 +137,8 @@ void main() {
       await tester.tap(find.text('Continuar'));
       await tester.pump();
       expect(find.text('PASSO 2 DE 2'), findsOneWidget);
-      final botao = find.widgetWithText(ElevatedButton, 'Excluir minha conta');
-      expect(tester.widget<ElevatedButton>(botao).onPressed, isNull);
+      final botao = find.widgetWithText(FilledButton, 'Excluir minha conta');
+      expect(tester.widget<FilledButton>(botao).onPressed, isNull);
 
       await tester.enterText(find.byType(TextField), ExcluirContaTela.palavraConfirmacao);
       await tester.pump();
@@ -159,7 +159,7 @@ void main() {
       await tester.pump();
       await tester.enterText(find.byType(TextField), 'excluir');
       await tester.pump();
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Excluir minha conta'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Excluir minha conta'));
       await tester.pump();
       expect(find.textContaining('Não foi possível'), findsOneWidget);
       expect(excluida, isFalse);
