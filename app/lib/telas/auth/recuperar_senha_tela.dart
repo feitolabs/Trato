@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
 import 'estrutura_auth.dart';
 import 'validacao.dart';
 
-/// Tela 7 do protótipo: "Recuperar senha". Enviar código ainda não tem backend.
+/// Tela 7 do protótipo: "Recuperar senha". O [ServicoAuth] manda o e-mail de recuperação.
 class RecuperarSenhaTela extends StatefulWidget {
-  const RecuperarSenhaTela({super.key});
+  const RecuperarSenhaTela({super.key, this.servico});
+
+  /// Se nulo, usa [ServicoAuthPadrao.atual].
+  final ServicoAuth? servico;
 
   @override
   State<RecuperarSenhaTela> createState() => _RecuperarSenhaTelaState();
@@ -17,6 +21,11 @@ class RecuperarSenhaTela extends StatefulWidget {
 class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
   final _email = TextEditingController();
   var _tentou = false;
+  var _carregando = false;
+  var _enviado = false;
+  String? _erroServico;
+
+  ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
 
   @override
   void dispose() {
@@ -28,9 +37,27 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
         MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
       );
 
-  void _enviar() {
+  Future<void> _enviar() async {
+    if (_carregando) return;
     setState(() => _tentou = true);
-    if (ValidacaoAuth.email(_email.text) == null) _abrirEmBreve('Enviar código');
+    if (ValidacaoAuth.email(_email.text) != null) return;
+    setState(() {
+      _carregando = true;
+      _erroServico = null;
+      _enviado = false;
+    });
+    String? erro;
+    try {
+      await _servico.recuperarSenha(_email.text.trim());
+    } on ErroAuth catch (e) {
+      erro = e.mensagem;
+    }
+    if (!mounted) return;
+    setState(() {
+      _carregando = false;
+      _erroServico = erro;
+      _enviado = erro == null;
+    });
   }
 
   @override
@@ -64,7 +91,16 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
           aoMudar: (_) => setState(() {}),
         ),
         const SizedBox(height: EspacosTrato.x5),
-        BotaoPrimario(texto: 'Enviar código', aoTocar: _enviar),
+        MensagemErroAuth(_erroServico),
+        if (_enviado)
+          Padding(
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
+            child: Text(
+              'Pronto! Se este e-mail tem conta, você vai receber as instruções em instantes.',
+              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto),
+            ),
+          ),
+        BotaoPrimario(texto: 'Enviar código', aoTocar: _enviar, carregando: _carregando),
       ],
     );
   }

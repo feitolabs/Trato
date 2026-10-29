@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
@@ -10,9 +12,13 @@ import 'recuperar_senha_tela.dart';
 import 'validacao.dart';
 
 /// Tela 4 do protótipo: "Entrar na sua conta".
-/// Entrar, Google, Apple e biometria ainda não têm backend: abrem [EmBreveTela].
+/// Entrar com e-mail, Google e Apple usam o [ServicoAuth]; biometria ainda abre [EmBreveTela].
+/// Google e Apple só aparecem se o serviço diz que o provedor está habilitado (Apple só no iOS).
 class LoginTela extends StatefulWidget {
-  const LoginTela({super.key});
+  const LoginTela({super.key, this.servico});
+
+  /// Se nulo, usa [ServicoAuthPadrao.atual] (fake até haver chaves).
+  final ServicoAuth? servico;
 
   @override
   State<LoginTela> createState() => _LoginTelaState();
@@ -23,6 +29,14 @@ class _LoginTelaState extends State<LoginTela> {
   final _senha = TextEditingController();
   var _mostrarSenha = false;
   var _tentou = false;
+  var _carregando = false;
+  String? _erroServico;
+
+  ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
+
+  bool _mostra(ProvedorAuth p) =>
+      _servico.provedorHabilitado(p) &&
+      (p != ProvedorAuth.apple || defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
   void dispose() {
@@ -36,16 +50,49 @@ class _LoginTelaState extends State<LoginTela> {
 
   void _emBreve(String titulo) => _abrir(EmBreveTela(titulo: titulo));
 
-  String? get _erroIdentificador => _tentou
-      ? ValidacaoAuth.obrigatorio(_identificador.text, 'Informe e-mail, CPF ou telefone.')
-      : null;
+  String? get _erroIdentificador {
+    if (!_tentou) return null;
+    final vazio = ValidacaoAuth.obrigatorio(_identificador.text, 'Informe e-mail, CPF ou telefone.');
+    if (vazio != null) return vazio;
+    // Por enquanto o login real é só por e-mail (D14).
+    return ValidacaoAuth.email(_identificador.text) == null
+        ? null
+        : 'Entre com o e-mail da sua conta.';
+  }
 
   String? get _erroSenha =>
       _tentou ? ValidacaoAuth.obrigatorio(_senha.text, 'Informe sua senha.') : null;
 
+  /// Roda [acao]; se der certo vai para o app, se não mostra o erro em português.
+  Future<void> _tentar(Future<SessaoAuth> Function() acao) async {
+    setState(() {
+      _carregando = true;
+      _erroServico = null;
+    });
+    try {
+      await acao();
+    } on ErroAuth catch (e) {
+      if (!mounted) return;
+      // Cancelar o Google/Apple não é erro.
+      setState(() {
+        _carregando = false;
+        _erroServico = e.tipo == TipoErroAuth.cancelado ? null : e.mensagem;
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _carregando = false);
+    RotasTrato.irParaCliente(context);
+  }
+
   void _entrar() {
+    if (_carregando) return;
     setState(() => _tentou = true);
-    if (_erroIdentificador == null && _erroSenha == null) RotasTrato.irParaCliente(context);
+    if (_erroIdentificador != null || _erroSenha != null) return;
+    _tentar(() => _servico.entrarComEmail(
+          email: _identificador.text.trim(),
+          senha: _senha.text,
+        ));
   }
 
   @override
@@ -57,7 +104,10 @@ class _LoginTelaState extends State<LoginTela> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text('Não tem conta? ', style: TipografiaTrato.corpo),
-          BotaoLink(texto: 'Criar conta', aoTocar: () => _abrir(const EscolhaPerfilTela())),
+          BotaoLink(
+            texto: 'Criar conta',
+            aoTocar: () => _abrir(EscolhaPerfilTela(servico: widget.servico)),
+          ),
         ],
       ),
       children: [
@@ -87,18 +137,33 @@ class _LoginTelaState extends State<LoginTela> {
           alignment: Alignment.centerRight,
           child: BotaoLink(
             texto: 'Esqueci minha senha',
-            aoTocar: () => _abrir(const RecuperarSenhaTela()),
+            aoTocar: () => _abrir(RecuperarSenhaTela(servico: widget.servico)),
           ),
         ),
         const SizedBox(height: EspacosTrato.x3),
-        BotaoPrimario(texto: 'Entrar', aoTocar: _entrar),
+        MensagemErroAuth(_erroServico),
+        BotaoPrimario(texto: 'Entrar', aoTocar: _entrar, carregando: _carregando),
         const SizedBox(height: EspacosTrato.x4),
         const _DivisorOu(),
         const SizedBox(height: EspacosTrato.x4),
-        BotaoSecundario(texto: 'Entrar com Google', aoTocar: () => _emBreve('Entrar com Google')),
-        const SizedBox(height: EspacosTrato.x3),
-        BotaoSecundario(texto: 'Entrar com Apple', aoTocar: () => _emBreve('Entrar com Apple')),
-        const SizedBox(height: EspacosTrato.x3),
+        if (_mostra(ProvedorAuth.google)) ...[
+          BotaoSecundario(
+            texto: 'Entrar com Google',
+            aoTocar: _carregando
+                ? null
+                : () => _tentar(() => _servico.entrarComProvedor(ProvedorAuth.google)),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
+        if (_mostra(ProvedorAuth.apple)) ...[
+          BotaoSecundario(
+            texto: 'Entrar com Apple',
+            aoTocar: _carregando
+                ? null
+                : () => _tentar(() => _servico.entrarComProvedor(ProvedorAuth.apple)),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
         BotaoSecundario(
           texto: 'Entrar com biometria',
           icone: Icons.fingerprint,
