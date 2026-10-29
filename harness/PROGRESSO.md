@@ -273,3 +273,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Não integrada: `painel-admin` (sessão ainda rodando). Seeds dependem de valores "A DEFINIR PELO JOÃO" (cidade, garantias, taxa, mínimo, P1, P7, administrador) e do OK para aplicar.
 - Segue pendente: rota `POST /v1/arquivos/url-envio` (upload de foto), validar câmera e GPS em aparelho, keystore e contas das lojas, primeiro run do CI (depende de push).
 
+## 29/10/2026 — Painel admin web (F7.1 a F7.6, telas com dados de exemplo)
+
+- Branch `feature/f7-painel-admin`, sem push. Projeto novo `admin/` (Flutter Web, D13): login por papel, verificação, disputas, pagamentos somente leitura (D15), busca/suporte/categorias, configurações com aprovação dupla e reversão, auditoria com verificação da cadeia de hash.
+- Tema copiado de `app/lib/tema/` com aviso de origem (`admin/lib/tema/LEIA-ME.md`). `app/` e `backend/` não foram tocados.
+- Dados vêm de `ApiAdmin` (interface) com `ApiFake`; a API admin do backend ainda não existe. Contrato de endpoints, papéis e regras em `docs/painel-admin.md`.
+- `harness/verificar.py` agora também confere `admin/lib` (cores soltas, textos D13) e roda `flutter analyze`/`flutter test` do painel.
+- Falta: backend `/v1/admin/*`, cliente HTTP do painel, MFA da equipe, botão de aprovação da segunda pessoa na disputa, deploy (precisa de OK).
+

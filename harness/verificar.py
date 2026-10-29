@@ -17,6 +17,8 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 BACKEND = RAIZ / "backend"
 APP = RAIZ / "app"
+ADMIN = RAIZ / "admin"
+PROJETOS_FLUTTER = (APP, ADMIN)
 
 # Padrões de segredo. Nomes de variáveis sozinhos (ex.: STRIPE_SECRET_KEY=) não disparam.
 PADROES_SEGREDO = {
@@ -80,13 +82,18 @@ def checar_env_ignorado() -> bool:
     return False
 
 
+def _arquivos_dart() -> list[Path]:
+    """Dart de lib/ do app e do painel admin (build/ e .dart_tool/ ficam de fora)."""
+    return [a for pasta in PROJETOS_FLUTTER if (pasta / "lib").is_dir() for a in (pasta / "lib").rglob("*.dart")]
+
+
 def checar_cores_soltas() -> bool:
     """Regra 7: cor só no tema. Color(0x...) e Colors.* fora de app/lib/tema/ falham."""
-    titulo("App — cores fora do tema")
+    titulo("App e painel — cores fora do tema")
     padrao = re.compile(r"\bColor\(\s*0x|\bColor\.fromARGB\(|\bColor\.fromRGBO\(|\bColors\.(?!transparent\b)")
     ok = True
-    for arquivo in (APP / "lib").rglob("*.dart"):
-        if (APP / "lib" / "tema") in arquivo.parents:
+    for arquivo in _arquivos_dart():
+        if arquivo.parent.name == "tema" or "tema" in arquivo.relative_to(RAIZ).parts[:-1]:
             continue
         for numero, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), start=1):
             if padrao.search(linha):
@@ -107,9 +114,9 @@ TEXTOS_PROIBIDOS = re.compile(
 def checar_textos_proibidos() -> bool:
     """D13: o app não pode exibir promessas proibidas. Comentários (//) são ignorados;
     `verificar: ignorar` na linha libera um caso justificado."""
-    titulo("App — textos proibidos (D13)")
+    titulo("App e painel — textos proibidos (D13)")
     ok = True
-    for arquivo in (APP / "lib").rglob("*.dart"):
+    for arquivo in _arquivos_dart():
         for numero, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), start=1):
             codigo = linha.split("//", 1)[0] if linha.lstrip().startswith("//") else linha
             if linha.lstrip().startswith("//") or "verificar: ignorar" in linha:
@@ -180,22 +187,28 @@ def achar_flutter() -> str | None:
     return None
 
 
-def checar_app() -> bool:
+def checar_flutter(nome: str, pasta: Path) -> bool:
     flutter = achar_flutter()
     if not flutter:
-        titulo("App Flutter")
-        print("AVISO: Flutter SDK não instalado — análise e testes do app foram pulados.")
+        titulo(nome)
+        print(f"AVISO: Flutter SDK não instalado — análise e testes de {nome} foram pulados.")
         return True
-    ok = rodar("App — dependências", [flutter, "pub", "get"], APP)
-    ok = rodar("App — análise (flutter analyze)", [flutter, "analyze"], APP) and ok
-    ok = rodar("App — testes (flutter test)", [flutter, "test"], APP) and ok
+    if not pasta.is_dir():
+        return True
+    ok = rodar(f"{nome} — dependências", [flutter, "pub", "get"], pasta)
+    ok = rodar(f"{nome} — análise (flutter analyze)", [flutter, "analyze"], pasta) and ok
+    ok = rodar(f"{nome} — testes (flutter test)", [flutter, "test"], pasta) and ok
     return ok
+
+
+def checar_admin() -> bool:
+    return checar_flutter("Painel admin", ADMIN)
 
 
 ETAPAS = {
     "segredos": [checar_segredos, checar_env_ignorado],
     "backend": [checar_backend],
-    "app": [checar_cores_soltas, checar_textos_proibidos, checar_app],
+    "app": [checar_cores_soltas, checar_textos_proibidos, checar_app, checar_admin],
 }
 
 
