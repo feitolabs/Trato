@@ -18,7 +18,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [x] **F1.2** `.env.example` (só nomes) e `.gitignore` ignorando `.env`. *Pronto quando:* `git check-ignore .env` confirma.
 - [x] **F1.3** Checagem de segredos no `verificar`. *Pronto quando:* falha se achar chave no código.
 - [x] **F1.4** Backend "olá mundo" (FastAPI `/saude`) lendo `.env`, com teste. *Pronto quando:* `pytest` passa.
-- [~] **F1.5** App Flutter "olá mundo". Plataformas geradas, analyze e test ok. *Falta:* Android SDK (emulador) e Mac (iOS). *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
+- [~] **F1.5** App Flutter "olá mundo". Android ok (APK debug roda no emulador API 37). *Falta:* iOS (precisa de Mac). *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
 - [ ] **F1.6** João coloca as chaves reais no `.env` (Supabase, Stripe teste). *Pronto quando:* backend sobe e lê as variáveis.
 - [ ] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada.
 - [ ] **F1.8** 🔒 Ligar `origin` ao GitHub "Trato" e dar push de `main` e `develop`. *Pronto quando:* branches no GitHub.

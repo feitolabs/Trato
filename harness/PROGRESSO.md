@@ -44,3 +44,15 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Fontes a confirmar (P12).
 
 **Próxima tarefa:** F2.3 (componentes: botão, campo, cartão, chip, linha do tempo, barra de abas).
+
+## 28/10/2026 — Android rodando
+
+**Feito**
+- João instalou o Android Studio. SDK em `%LOCALAPPDATA%\Android\Sdk`, emulador `Medium_Phone_API_37.0`.
+- `flutter build apk --debug` ok (primeiro build ~10 min: Gradle 9.3.1, NDK 28.2 e Platform 36 baixados automaticamente).
+- APK instalado e aberto no emulador: splash igual ao protótipo e ao golden.
+
+**Pendente**
+- Command-line Tools + licenças (João). iOS precisa de Mac.
+
+**Próxima tarefa:** F2.3 (componentes).
