@@ -31,7 +31,7 @@ CFG = ConfigRotinas(
     prazo_confirmacao_cliente_acima_do_limite=72 * H,
     limite_valor_prazo_maior_centavos=150_000,
     prazo_liberacao=7 * D,
-    janela_reclamacao=7 * D,
+    janela_congelamento_repasse=7 * D,
     prazo_resposta_disputa=48 * H,
     prazo_decisao_disputa_dias_uteis=5,
     lembrete_confirmacao_apos=24 * H,
@@ -183,10 +183,12 @@ def test_sem_prazo_de_liberacao_nao_libera():
 
 
 def test_janela_de_reclamacao_so_bloqueia_se_configurado_assim():
-    cfg = ConfigRotinas(prazo_liberacao=48 * H, janela_reclamacao=7 * D)
+    cfg = ConfigRotinas(prazo_liberacao=48 * H, janela_congelamento_repasse=7 * D)
     assert len(liberacoes_por_prazo(T0 + 48 * H, [concluido()], cfg)) == 1
     espera = ConfigRotinas(
-        prazo_liberacao=48 * H, janela_reclamacao=7 * D, liberacao_espera_janela=True
+        prazo_liberacao=48 * H,
+        janela_congelamento_repasse=7 * D,
+        liberacao_espera_congelamento=True,
     )
     assert liberacoes_por_prazo(T0 + 48 * H, [concluido()], espera) == []
     assert len(liberacoes_por_prazo(T0 + 7 * D, [concluido()], espera)) == 1

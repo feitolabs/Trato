@@ -83,7 +83,7 @@ void main() {
       expect(disponivel, isFalse);
       await tester.tap(find.text('Fazer check-in'));
       await tester.tap(find.text('Filtros'));
-      await tester.tap(find.text('Retido'));
+      await tester.tap(find.text('Em andamento'));
       await tester.tap(find.text('Disjuntor desarmando'));
       expect([checkIn, filtros, carteira], [true, true, true]);
       expect(aberto!.id, 'ped-disjuntor');
@@ -185,7 +185,7 @@ void main() {
 
     testWidgets('tocar a carteira leva à aba Carteira', (tester) async {
       await _abrir(tester, const CascaProfissionalTela(), tamanho: const Size(390, 1200));
-      await tester.tap(find.text('Retido'));
+      await tester.tap(find.text('Em andamento'));
       await tester.pumpAndSettle();
       final barra = tester.widget<BarraAbasTrato>(find.byType(BarraAbasTrato));
       expect(barra.indiceAtual, 3);

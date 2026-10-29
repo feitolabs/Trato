@@ -182,6 +182,11 @@ class PedidoOut(BaseModel):
     janela: JanelaOut | None
     concluido_em: datetime | None
     acoes_permitidas: list[str]
+    pagamento_confirmado: bool = Field(
+        False,
+        description="Só vira true depois que o parceiro de pagamento confirma (webhook "
+        "assinado). Enquanto for false, o app não pode dizer que está pago.",
+    )
     codigo_inicio: str | None = Field(
         None, description="Só o cliente vê; ele informa ao profissional."
     )

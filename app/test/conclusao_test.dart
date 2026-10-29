@@ -52,7 +52,7 @@ void main() {
     for (final d in '7305'.split('')) {
       expect(find.text(d), findsOneWidget);
     }
-    expect(find.textContaining('Liberação automática em 48 horas'), findsOneWidget);
+    expect(find.textContaining('Confirmação automática em 48 horas'), findsOneWidget);
     await tester.tap(find.text('Confirmar serviço'));
     await tester.tap(find.text('Relatar problema'));
     expect(confirmou && relatou, isTrue);

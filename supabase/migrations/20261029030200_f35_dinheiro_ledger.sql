@@ -1,10 +1,13 @@
--- F3.5 — Dinheiro: pagamentos, webhooks, ledger de partidas dobradas, repasses, chaves Pix e saques.
--- Fonte: docs/modelo-de-dados.md, seção 7 (aprovado pelo João em 28/10/2026).
+-- F3.5 — Dinheiro, CAMINHO A (D15): pagamentos, webhooks, ledger espelho de partidas dobradas e repasses.
+-- Fonte: docs/modelo-de-dados.md, seção 7, refeita pela decisão D15 (harness/DECISOES.md, 29/10/2026):
+-- o Trato NÃO guarda saldo próprio e NÃO faz saque. O parceiro de pagamento custodia e liquida; o ledger
+-- só ESPELHA o que ele liquida, e a Carteira do app é um extrato.
+-- Saíram desta migration (em relação à versão antiga): chaves_pix, saques, a view saldos_contas e o
+-- lançamento do tipo 'saque'. A chave Pix e o KYC de recebimento ficam no parceiro.
 --
 -- STATUS: PREPARADA, NÃO APLICADA. Aplicar só com o OK explícito do João (CLAUDE.md).
--- Só DDL. Sem seed: as contas de sistema do ledger (caixa_parceiro, retido_servico, receita_trato,
--- despesa_stripe, a_pagar_profissional) NÃO são criadas aqui, porque o desenho das contas depende de
--- P7 (Stripe Connect), P4 (30%) e P8 (fundo). Quem cria as contas é uma migration de seed futura, com OK.
+-- Só DDL. Sem seed: as contas do ledger NÃO são criadas aqui, porque o desenho das contas depende do
+-- parceiro (P7), de P4 (30%) e de P8 (fundo). Quem cria as contas é uma migration de seed futura, com OK.
 -- RLS ligado e sem policy (F3.8). anon/authenticated sem acesso até a F3.8. Nenhuma tabela é escrita pelo app.
 -- Depende da F3.3 e da F3.4. Reversão: supabase/rollback/F3.5_rollback.sql
 --
@@ -12,7 +15,9 @@
 --   * partidas e lançamentos nunca sofrem UPDATE, DELETE nem TRUNCATE (trigger + REVOKE);
 --   * no fim da transação, soma dos débitos = soma dos créditos, com ao menos 2 partidas;
 --   * um lançamento só recebe partidas na transação em que nasceu;
---   * só estorno corrige: novo lançamento com as partidas invertidas; um lançamento só é estornado uma vez.
+--   * só estorno corrige: novo lançamento com as partidas invertidas; um lançamento só é estornado uma vez;
+--   * lançamento pode apontar o evento do parceiro que o originou (evento_webhook_id): é o espelho.
+-- Saldo não é coluna nem view: quem precisa de total (conciliação com o parceiro) soma as partidas no backend.
 
 -- ---------------------------------------------------------------------------
 -- 7.1 pagamentos — cobranças ao cliente (nada de dado de cartão: só ids do Stripe)
@@ -120,7 +125,7 @@ create trigger eventos_webhook_sem_delete before delete on public.eventos_webhoo
 alter table public.eventos_webhook enable row level security;
 
 -- ---------------------------------------------------------------------------
--- 7.3 Ledger imutável de partidas dobradas
+-- 7.3 Ledger imutável de partidas dobradas (espelho do que o parceiro liquida)
 -- ---------------------------------------------------------------------------
 create table public.contas_ledger (
   id         uuid primary key default gen_random_uuid(),
@@ -145,14 +150,15 @@ alter table public.contas_ledger enable row level security;
 
 create table public.lancamentos (
   id                 uuid primary key default gen_random_uuid(),
-  -- Partidas dobradas por serviço. Nulo só no saque (não pertence a um contrato).
-  contrato_id        uuid references public.contratos (id) on delete restrict,
+  -- Partidas dobradas por serviço: todo lançamento pertence a um contrato.
+  contrato_id        uuid not null references public.contratos (id) on delete restrict,
   pagamento_id       uuid references public.pagamentos (id) on delete restrict,
   repasse_id         uuid,  -- FK adicionada abaixo (repasses é criada depois)
-  saque_id           uuid,  -- FK adicionada abaixo
   disputa_id         uuid,  -- FK adicionada na F3.6
+  -- Evento do parceiro que originou o lançamento (espelho). Nulo = ação do backend sem evento.
+  evento_webhook_id  uuid references public.eventos_webhook (id) on delete restrict,
   tipo               text not null
-                       check (tipo in ('cobranca', 'retencao', 'taxa', 'custo_stripe', 'repasse', 'saque',
+                       check (tipo in ('cobranca', 'retencao', 'taxa', 'custo_stripe', 'repasse',
                                        'reembolso', 'estorno')),
   estorna_id         uuid unique references public.lancamentos (id) on delete restrict,
   chave_idempotencia text not null unique check (btrim(chave_idempotencia) <> ''),
@@ -160,11 +166,11 @@ create table public.lancamentos (
   ocorrido_em        timestamptz not null default now(),
   criado_por         uuid references public.usuarios (id) on delete restrict,  -- null = sistema
   criado_em          timestamptz not null default now(),
-  check ((tipo = 'estorno') = (estorna_id is not null)),
-  check (contrato_id is not null or tipo = 'saque')
+  check ((tipo = 'estorno') = (estorna_id is not null))
 );
 create index lancamentos_contrato_idx on public.lancamentos (contrato_id);
 create index lancamentos_pagamento_idx on public.lancamentos (pagamento_id) where pagamento_id is not null;
+create index lancamentos_evento_idx on public.lancamentos (evento_webhook_id) where evento_webhook_id is not null;
 create trigger lancamentos_imutavel before update or delete on public.lancamentos
   for each row execute function public.bloquear_alteracao();
 create trigger lancamentos_sem_truncate before truncate on public.lancamentos
@@ -292,24 +298,9 @@ create constraint trigger lancamentos_equilibrio after insert on public.lancamen
 create constraint trigger partidas_equilibrio after insert on public.partidas
   deferrable initially deferred for each row execute function public.ledger_conferir_equilibrio();
 
--- Saldo nunca é coluna: sai das partidas. security_invoker = a RLS de quem consulta vale
--- (o profissional só enxerga as próprias contas; ver F3.8).
-create view public.saldos_contas with (security_invoker = true) as
-select conta_id, codigo, natureza, usuario_id, debitos_centavos, creditos_centavos,
-       case when natureza in ('ativo', 'despesa')
-            then debitos_centavos - creditos_centavos
-            else creditos_centavos - debitos_centavos end as saldo_centavos
-from (
-  select c.id as conta_id, c.codigo, c.natureza, c.usuario_id,
-         coalesce(sum(p.valor_centavos) filter (where p.sentido = 'debito'), 0)::bigint as debitos_centavos,
-         coalesce(sum(p.valor_centavos) filter (where p.sentido = 'credito'), 0)::bigint as creditos_centavos
-    from public.contas_ledger c
-    left join public.partidas p on p.conta_id = c.id
-   group by c.id, c.codigo, c.natureza, c.usuario_id
-) s;
-
 -- ---------------------------------------------------------------------------
--- 7.4 repasses
+-- 7.4 repasses — ordem de liberação ao parceiro (D15). NÃO é saldo nem saque: o dinheiro está no parceiro;
+-- aqui fica só quando o Trato mandou liberar, quanto é a taxa e se uma disputa congelou a ordem.
 -- ---------------------------------------------------------------------------
 create table public.repasses (
   id                       uuid primary key default gen_random_uuid(),
@@ -325,6 +316,7 @@ create table public.repasses (
   status                   text not null default 'agendado'
                              check (status in ('agendado', 'congelado', 'liberado', 'estornado')),
   liberar_em               timestamptz,  -- P1: prazo ainda em decisão
+  provedor_transferencia_id text unique,  -- id da transferência no parceiro (espelho)
   congelado_por_disputa_id uuid,         -- FK adicionada na F3.6
   lancamento_id            uuid references public.lancamentos (id) on delete restrict,
   chave_idempotencia       text not null unique check (btrim(chave_idempotencia) <> ''),
@@ -370,115 +362,18 @@ create trigger repasses_validar_trg before insert on public.repasses
   for each row execute function public.repasses_validar();
 
 -- ---------------------------------------------------------------------------
--- 7.5 chaves_pix e saques
--- ---------------------------------------------------------------------------
-create table public.chaves_pix (
-  id                uuid primary key default gen_random_uuid(),
-  usuario_id        uuid not null references public.usuarios (id) on delete restrict,
-  tipo              text not null check (tipo in ('cpf', 'cnpj', 'email', 'telefone', 'aleatoria')),
-  chave             text not null check (btrim(chave) <> ''),
-  documento_titular text not null,
-  verificada_em     timestamptz,
-  ativa             boolean not null default true,
-  criada_em         timestamptz not null default now(),
-  unique (usuario_id, chave)
-);
-create trigger chaves_pix_proteger before update on public.chaves_pix
-  for each row execute function public.proteger_colunas('usuario_id', 'tipo', 'chave', 'documento_titular', 'criada_em');
-create trigger chaves_pix_sem_delete before delete on public.chaves_pix
-  for each row execute function public.bloquear_alteracao();
-alter table public.chaves_pix enable row level security;
-
--- O titular da chave precisa ser o próprio usuário (CPF ou CNPJ dele), escopo 8.1.
-create or replace function public.chaves_pix_validar()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-declare
-  doc text := regexp_replace(new.documento_titular, '\D', '', 'g');
-  cpf_dono text;
-  cnpj_dono text;
-begin
-  select regexp_replace(cpf, '\D', '', 'g') into cpf_dono
-    from public.usuarios_privados where usuario_id = new.usuario_id;
-  select regexp_replace(cnpj, '\D', '', 'g') into cnpj_dono
-    from public.perfis_profissional where usuario_id = new.usuario_id;
-  if doc = '' or doc is distinct from cpf_dono and doc is distinct from cnpj_dono then
-    raise exception 'O titular da chave Pix deve ser o próprio usuário (CPF ou CNPJ)' using errcode = 'check_violation';
-  end if;
-  return new;
-end;
-$$;
-create trigger chaves_pix_validar_trg before insert on public.chaves_pix
-  for each row execute function public.chaves_pix_validar();
-
-create table public.saques (
-  id                 uuid primary key default gen_random_uuid(),
-  profissional_id    uuid not null references public.perfis_profissional (usuario_id) on delete restrict,
-  chave_pix_id       uuid not null references public.chaves_pix (id) on delete restrict,
-  valor_centavos     bigint not null check (valor_centavos > 0),
-  taxa_saque_centavos bigint check (taxa_saque_centavos is null or taxa_saque_centavos >= 0),
-  status             text not null default 'solicitado'
-                       check (status in ('solicitado', 'em_analise', 'enviado', 'pago', 'falhou', 'estornado')),
-  stripe_payout_id   text unique,
-  chave_idempotencia text not null unique check (btrim(chave_idempotencia) <> ''),
-  solicitado_em      timestamptz not null default now(),
-  pago_em            timestamptz,
-  lancamento_id      uuid references public.lancamentos (id) on delete restrict,
-  check (status <> 'pago' or pago_em is not null)
-);
-create index saques_profissional_idx on public.saques (profissional_id, solicitado_em desc);
-create trigger saques_proteger before update on public.saques
-  for each row execute function public.proteger_colunas(
-    'profissional_id', 'chave_pix_id', 'valor_centavos', 'chave_idempotencia', 'solicitado_em');
-create trigger saques_sem_delete before delete on public.saques
-  for each row execute function public.bloquear_alteracao();
-create trigger saques_sem_truncate before truncate on public.saques
-  for each statement execute function public.bloquear_alteracao();
-alter table public.saques enable row level security;
-
--- Saque só para chave própria, ativa e verificada.
-create or replace function public.saques_validar()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-declare
-  chave public.chaves_pix%rowtype;
-begin
-  select * into chave from public.chaves_pix where id = new.chave_pix_id;
-  if chave.usuario_id is distinct from new.profissional_id then
-    raise exception 'A chave Pix não é do profissional' using errcode = 'check_violation';
-  end if;
-  if not chave.ativa or chave.verificada_em is null then
-    raise exception 'A chave Pix precisa estar ativa e verificada' using errcode = 'check_violation';
-  end if;
-  return new;
-end;
-$$;
-create trigger saques_validar_trg before insert on public.saques
-  for each row execute function public.saques_validar();
-
--- Agora que repasses e saques existem, fecha as FKs do lançamento.
-alter table public.lancamentos
-  add constraint lancamentos_repasse_fk foreign key (repasse_id) references public.repasses (id) on delete restrict,
-  add constraint lancamentos_saque_fk foreign key (saque_id) references public.saques (id) on delete restrict;
-
--- ---------------------------------------------------------------------------
 -- Acesso. Privilégios EXPLÍCITOS, iguais em qualquer padrão da plataforma:
 --  * anon e authenticated: nada (a F3.8b concede só SELECT, por coluna);
 --  * service_role (backend): só o que a tabela precisa. Nunca TRUNCATE.
 --    Tabela imutável recebe apenas SELECT e INSERT.
 -- ---------------------------------------------------------------------------
 revoke all on table public.pagamentos, public.eventos_webhook, public.contas_ledger, public.lancamentos,
-  public.partidas, public.repasses, public.chaves_pix, public.saques, public.saldos_contas
+  public.partidas, public.repasses
   from public, anon, authenticated, service_role;
 grant select, insert, update on table public.pagamentos, public.eventos_webhook, public.contas_ledger,
-  public.repasses, public.chaves_pix, public.saques to service_role;
+  public.repasses to service_role;
 -- Ledger: só entra dado novo. Nem o service_role atualiza ou apaga.
 grant select, insert on table public.lancamentos, public.partidas to service_role;
-grant select on table public.saldos_contas to service_role;
 revoke execute on function public.pagamentos_validar(), public.lancamentos_preparar(), public.partidas_validar(),
-  public.chaves_pix_validar(), public.repasses_validar(), public.saques_validar()
+  public.repasses_validar()
   from public, anon, authenticated;

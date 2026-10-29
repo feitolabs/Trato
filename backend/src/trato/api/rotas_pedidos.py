@@ -297,7 +297,7 @@ def responder_disputa(
     "/{pedido_id}/retrabalho",
     response_model=RetrabalhoOut,
     status_code=201,
-    summary="Pedir retrabalho (garantia)",
+    summary="Pedir retrabalho (suporte e análise de problemas)",
 )
 def pedir_retrabalho(
     pedido_id: str,

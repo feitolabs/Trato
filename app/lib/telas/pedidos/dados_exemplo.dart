@@ -8,7 +8,7 @@ abstract final class DadosExemplo {
     PedidoResumo(
       titulo: 'Troca de tomadas e chuveiro',
       subtitulo: 'Carlos Mendes · hoje, 14h',
-      statusTexto: 'Em execução · pagamento retido',
+      statusTexto: 'Em execução · pagamento acompanhado',
       statusTipo: TipoStatus.info,
     ),
     PedidoResumo(
@@ -20,7 +20,7 @@ abstract final class DadosExemplo {
     PedidoResumo(
       titulo: 'Vazamento na pia',
       subtitulo: 'Joana Ribeiro · 22/10',
-      statusTexto: 'Disputa aberta · valor congelado',
+      statusTexto: 'Disputa aberta · em análise',
       statusTipo: TipoStatus.alerta,
     ),
   ];
