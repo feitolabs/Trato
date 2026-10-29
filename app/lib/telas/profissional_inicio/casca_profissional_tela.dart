@@ -25,6 +25,7 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoPerguntar,
     this.aoRecusar,
     this.abaCarteira,
+    this.abaPerfil,
     this.carregarDetalhe,
     this.recusarPedido,
   });
@@ -37,6 +38,9 @@ class CascaProfissionalTela extends StatefulWidget {
 
   /// Conteúdo da aba Carteira (extrato). Sem isso, a aba mostra "Em breve".
   final Widget? abaCarteira;
+
+  /// Aba Perfil (perfil público e avaliações). Sem ela, mostra [EmBreveTela].
+  final Widget? abaPerfil;
 
   final int abaInicial;
   final InicioProfissional inicio;
@@ -98,7 +102,9 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       for (final (i, aba) in abasProfissional.indexed.skip(1))
         i == 3 && widget.abaCarteira != null
             ? widget.abaCarteira!
-            : EmBreveTela(titulo: aba.rotulo),
+            : i == 4 && widget.abaPerfil != null
+                ? widget.abaPerfil!
+                : EmBreveTela(titulo: aba.rotulo),
     ];
     return Scaffold(
       body: IndexedStack(index: _aba, children: paginas),

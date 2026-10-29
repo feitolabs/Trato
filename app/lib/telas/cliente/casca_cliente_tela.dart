@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
-import '../em_breve_tela.dart';
 import '../fluxo/rotas.dart';
 import 'buscar_tela.dart';
 import 'inicio_tela.dart';
 
 /// Casca do app do cliente: barra inferior com as 5 abas (Início · Buscar · Pedidos ·
-/// Mensagens · Perfil). A aba Mensagens ainda mostra [EmBreveTela]. Cada aba guarda seu estado.
+/// Mensagens · Perfil). Cada aba guarda seu estado.
 class CascaClienteTela extends StatefulWidget {
   const CascaClienteTela({super.key, this.abaInicial = 0});
 
@@ -28,7 +27,7 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
       InicioTela(aoBuscar: () => _ir(1)),
       const BuscarTela(),
       RotasTrato.abaPedidos(),
-      EmBreveTela(titulo: abasCliente[3].rotulo),
+      RotasTrato.abaMensagens(),
       RotasTrato.abaPerfil(),
     ];
     return Scaffold(

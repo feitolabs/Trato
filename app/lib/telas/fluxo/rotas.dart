@@ -5,6 +5,19 @@ import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
 import '../../dados/repositorios_trato.dart';
 import '../../tema/tema.dart';
+import '../ajuda/ajuda_tela.dart';
+import '../ajuda/servico_fake.dart';
+import '../lgpd/central_privacidade_tela.dart';
+import '../lgpd/servico_fake.dart';
+import '../mensagens/mensagens_tela.dart';
+import '../mensagens/servico_fake.dart';
+import '../perfil_publico/avaliacoes_recebidas_tela.dart';
+import '../perfil_publico/perfil_publico.dart';
+import '../perfil_publico/perfil_publico_tela.dart';
+import '../profissional_cadastro/cadastro.dart';
+import '../profissional_cadastro/cadastro_profissional_tela.dart';
+import '../verificacao/verificacao.dart';
+import '../verificacao/verificacao_tela.dart';
 import '../carteira/carteira_tela.dart';
 import '../carteira/modelos.dart';
 import '../cliente/casca_cliente_tela.dart';
@@ -76,12 +89,38 @@ abstract final class RotasTrato {
   }
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
-  static void irParaProfissional(BuildContext context) {
+  static void irParaProfissional(BuildContext context) => _abrirCadastroProfissional(context);
+
+  /// Sem câmera ainda: devolve uma referência de demonstração no lugar da foto.
+  static Future<String?> _fotoDemonstracao() async => 'demo://foto';
+
+  static void _entrarNaCascaProfissional(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => _cascaProfissional()),
       (rota) => false,
     );
   }
+
+  /// Cadastro → verificação (documento e selfie) → casca do profissional. Os serviços ainda são
+  /// de demonstração e a captura de foto fica sem câmera até o plugin entrar.
+  static void _abrirCadastroProfissional(BuildContext context) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => CadastroProfissionalTela(
+            servico: ServicoCadastroProfissionalFake(),
+            aoAdicionarFoto: _fotoDemonstracao,
+            aoConcluir: () => _abrir<void>(
+              context,
+              VerificacaoTela(
+                servico: ServicoVerificacaoFake(),
+                aoCapturarDocumento: _fotoDemonstracao,
+                aoCapturarSelfie: _fotoDemonstracao,
+                aoConcluir: () => _entrarNaCascaProfissional(context),
+              ),
+            ),
+          ),
+        ),
+      );
 
   // --- Profissional ------------------------------------------------------------------
 
@@ -95,6 +134,7 @@ abstract final class RotasTrato {
             () => repos.profissional.recusar(pedido.id, motivo),
           ),
           abaCarteira: _abaCarteira(),
+          abaPerfil: _abaPerfilProfissional(),
           aoFazerCheckIn: () => _abrir<void>(
             context,
             CheckInTela(
@@ -123,6 +163,18 @@ abstract final class RotasTrato {
         ),
       );
 
+  /// Aba "Perfil" da casca do profissional: perfil público e avaliações recebidas (demonstração).
+  static Widget _abaPerfilProfissional() => Builder(
+        builder: (context) => PerfilPublicoTela(
+          servico: ServicoPerfilPublicoFake(),
+          aoVerAvaliacoes: () => _abrir<void>(
+            context,
+            AvaliacoesRecebidasTela(servico: ServicoPerfilPublicoFake()),
+          ),
+          aoEditarCadastro: () => _abrirCadastroProfissional(context),
+        ),
+      );
+
   // --- Cliente: abas -----------------------------------------------------------------
 
   /// Aba "Perfil" da casca do cliente.
@@ -136,10 +188,28 @@ abstract final class RotasTrato {
                 irParaProfissional(context);
               case AcaoPerfil.notificacoes:
                 _abrir<void>(context, _notificacoes());
+              case AcaoPerfil.meusDados:
+                _abrir<void>(
+                  context,
+                  CentralPrivacidadeTela(
+                    servico: ServicoPrivacidadeFake(),
+                    aoContaExcluida: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  ),
+                );
+              case AcaoPerfil.centralAjuda:
+                _abrir<void>(context, const AjudaTela(servico: ServicoAjudaFake()));
               default:
                 _abrir<void>(context, EmBreveTela(titulo: acao.name));
             }
           },
+        ),
+      );
+
+  /// Aba "Mensagens" da casca do cliente: lista de conversas, cada uma abre o chat do pedido.
+  static Widget abaMensagens() => Builder(
+        builder: (context) => MensagensTela(
+          servico: const ServicoMensagensFake(),
+          aoAbrirConversa: (conversa) => _abrir<void>(context, _chat(conversa.pedidoId)),
         ),
       );
 

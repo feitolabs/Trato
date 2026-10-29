@@ -12,7 +12,11 @@ import 'package:trato/telas/pedidos/chat_pedido_tela.dart';
 import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
+import 'package:trato/telas/ajuda/ajuda_tela.dart';
+import 'package:trato/telas/mensagens/mensagens_tela.dart';
 import 'package:trato/telas/pagamento/pagamento_tela.dart';
+import 'package:trato/telas/profissional_cadastro/cadastro_profissional_tela.dart';
+import 'package:trato/telas/verificacao/verificacao_tela.dart';
 import 'package:trato/telas/perfil_cliente/perfil_cliente_tela.dart';
 import 'package:trato/telas/profissional_inicio/casca_profissional_tela.dart';
 import 'package:trato/tema/tema.dart';
@@ -111,13 +115,28 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    testWidgets('profissional cai na casca do profissional e abre check-in', (tester) async {
+    testWidgets('profissional passa por cadastro e verificação e cai na casca do profissional', (tester) async {
       await _abrir(
         tester,
         const ConfirmarCelularTela(celular: '(31) 98888-4417', perfil: PerfilUso.profissional),
       );
       await tester.enterText(find.byType(TextField), '123456');
       await _tocar(tester, 'Confirmar código');
+      expect(find.byType(CadastroProfissionalTela), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'Carlos Almeida');
+      await tester.enterText(find.byType(TextField).at(2), 'Belo Horizonte');
+      await _tocar(tester, 'Eletricista');
+      await _tocar(tester, 'Seg');
+      await _tocar(tester, 'Manhã');
+      await _tocar(tester, 'Salvar e continuar');
+      expect(find.byType(VerificacaoTela), findsOneWidget);
+
+      await _tocar(tester, 'Foto do documento');
+      await _tocar(tester, 'Selfie segurando o rosto');
+      await tester.tap(find.byKey(const Key('ciente_lgpd')));
+      await tester.pumpAndSettle();
+      await _tocar(tester, 'Enviar para análise');
       expect(find.byType(CascaProfissionalTela), findsOneWidget);
     });
   });
@@ -143,5 +162,18 @@ void main() {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Perfil');
     expect(find.byType(PerfilClienteTela), findsOneWidget);
+  });
+
+  testWidgets('aba Mensagens abre a lista e o chat do pedido', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Mensagens');
+    expect(find.byType(MensagensTela), findsOneWidget);
+  });
+
+  testWidgets('Perfil: dados e privacidade e ajuda abrem as telas', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Perfil');
+    await _tocar(tester, 'Central de ajuda');
+    expect(find.byType(AjudaTela), findsOneWidget);
   });
 }
