@@ -69,3 +69,19 @@ Escala: a tela do protótipo tem 292,5 pt de largura e corresponde a 390 dp (iPh
 - **Chip de status:** fundo suave + texto forte da mesma família (azul, âmbar, verde, vermelho, laranja), raio 8, Figtree 14/700.
 - **Linha do tempo:** círculo petróleo com ✓ (feito), círculo azul suave com borda (atual), círculo vazio (futuro), linha cinza ligando.
 - **Barra inferior:** 5 abas, ícone e rótulo; ativa com pílula `azulSuave` atrás do ícone e rótulo em negrito.
+
+## Responsividade (F2.4)
+
+Código: `app/lib/tema/responsivo.dart`.
+
+| Faixa | Largura | Margem lateral | Exemplo |
+|---|---|---|---|
+| `pequeno` | < 360 dp | 16 | iPhone SE 1ª geração, Androids compactos |
+| `celular` | 360–599 dp | 20 | Protótipo (390), maioria dos celulares |
+| `tablet` | ≥ 600 dp | 32 | Tablets, dobráveis abertos |
+
+- **Tablet:** o conteúdo fica centralizado com no máximo **560 dp** de largura (`ConteudoResponsivo`), para manter a leitura no tamanho do protótipo.
+- **Fonte do sistema:** respeitada de **0,9 a 1,3** (`EscalaFonteLimitada`). Acima disso o layout quebra; o limite é aplicado no `MaterialApp.builder`.
+- **Barra de abas:** fica em escala 1,0 (como as barras nativas) e o rótulo encolhe se faltar espaço.
+- **Botões e rótulos de campo:** sempre em uma linha; encolhem em vez de quebrar a palavra.
+- **Testes:** `test/responsivo_test.dart` abre a splash e a galeria em 320, 390, 430, 768 e 1280 de largura, com fonte 1,0 e 1,3; qualquer estouro de layout falha. Goldens em `test/golden/`.
