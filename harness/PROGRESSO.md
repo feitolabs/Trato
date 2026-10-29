@@ -236,3 +236,8 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `harness/verificar.py` ganhou "App — textos proibidos (D13)": falha se `app/lib/**/*.dart` tiver "escrow", "garantia total", "profissional seguro", "reembolso automático", "menor taxa do mercado" ou "24/7" fora de comentário. Linha com `verificar: ignorar` é liberada. V2.1 passa a `[x]`.
 - Em paralelo (sessões `app-pendencias` e `backend-pendencias`): token do login na API, pontos de entrada de telas, câmera/GPS, rotas de backend que faltam e testes com Postgres local.
 
+
+## 29/10/2026 — Seeds do banco preparados (sem aplicar)
+
+- Branch `claude/seeds-banco-c8bade`. Só arquivos: `supabase/seeds/` (`parametros.sql` único, `seed_cidades_categorias`, `seed_config_taxa`, `seed_contas_ledger`, `seed_equipe_admin` só como modelo comentado), rollbacks em `supabase/rollback/seed_*_rollback.sql`, teste `supabase/testes/testar_seeds.py` (62 verificações em Postgres local) e `docs/seeds.md` com o formato `PRECISO DO SEU OK` e a lista de valores do João.
+- Nada foi aplicado em banco real. Os seeds abortam sem gravar enquanto houver `A DEFINIR PELO JOÃO` (cidade, garantias, taxa, mínimo, P1, P7, administrador). Tabela progressiva fica desligada (D2 em espera); ledger só roda com P7 confirmado.
