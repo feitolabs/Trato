@@ -59,14 +59,14 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 ## Fase 5 — App do Cliente (MVP primeiro)
 
 - [~] **F5.1** Splash, onboarding (3), escolha de perfil. *(telas prontas e ligadas; falta conferir com o João, ver F2.5)*
-- [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(`ServicoAuth` com fake e Supabase; `main.dart` troca para o Supabase quando há chaves. Falta passar o token à API, Google/Apple/biometria e SMS. Ver `docs/login-configuracao.md`.)*
+- [~] **F5.2** Login (e-mail/CPF/telefone, Google, Apple, biometria), recuperar senha. *(`ServicoAuth` com fake e Supabase; `main.dart` troca para o Supabase quando há chaves. Falta passar o token à API, Google/Apple/biometria e SMS. Ver `docs/login-configuracao.md`.)* *(token do login agora é passado ao `SessaoTrato` — `app/lib/auth/ligacao_sessao.dart`.)*
 - [~] **F5.3** Cadastro em 2 passos + confirmação por SMS. *(cadastro e confirmação por `ServicoAuth`; falta Supabase real com chaves, Google/Apple e provedor de SMS, P11.)*
 - [~] **F5.4** Início, categorias, buscar, perfil do profissional.
 - [~] **F5.5** Novo pedido com perguntas guiadas, fotos, prazo, faixa de preço. *(tela pronta com dados de exemplo; falta o ponto de entrada no app e a API)*
 - [~] **F5.6** Orçamentos recebidos, detalhe, aceite com contrato digital. *(orçamentos recebidos e detalhe ligados ao pagamento no fluxo; contrato digital e API pendentes)*
 - [~] **F5.7** Pagamento (Pix/cartão, 30% adiantado) e recibo. *(tela de pagamento ligada ao aceite; falta recibo, Stripe e API)*
 - [~] **F5.8** Seus pedidos, pedido em execução (linha do tempo, código de início).
-- [~] **F5.9** Aditivo (aprovar/recusar) e nota de materiais. *(telas de nota e aditivo prontas nos dois lados, com fakes; falta ligar os botões nos pedidos em execução.)*
+- [~] **F5.9** Aditivo (aprovar/recusar) e nota de materiais. *(telas de nota e aditivo prontas nos dois lados, com fakes; falta ligar os botões nos pedidos em execução.)* *(pontos de entrada de nota e aditivo ligados em `rotas.dart` na rodada de pendências; fakes.)*
 - [~] **F5.10** Conclusão (código), avaliação, garantia, retrabalho.
 - [~] **F5.11** Relatar problema (disputa).
 - [~] **F5.12** Chat, notificações. *(notificações e lista de mensagens ligadas, com fakes e sem protótipo; falta API.)*
@@ -79,10 +79,10 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [~] **F6.1** Cadastro e verificação (documento + selfie), status da análise. *(cadastro e verificação ligados ao cadastro de profissional, com fakes e sem câmera; falta API e status da análise.)*
 - [~] **F6.2** Início, pedidos abertos com filtros, detalhe, recusar com motivo. *(início, detalhe e recusa com dados de exemplo; falta filtros e API)*
 - [~] **F6.3** Calculadora de orçamento (taxa e líquido vindos do backend), etapas, sinal, validade, garantia.
-- [~] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out.
-- [~] **F6.5** Enviar nota dos materiais e criar aditivo. *(telas prontas com fakes; falta o ponto de entrada no pedido em execução do profissional.)*
+- [~] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out. *(câmera e GPS reais atrás de interface em `app/lib/dispositivo/`, com fake nos testes; falta validar em aparelho.)*
+- [~] **F6.5** Enviar nota dos materiais e criar aditivo. *(telas prontas com fakes; falta o ponto de entrada no pedido em execução do profissional.)* *(pontos de entrada ligados em `rotas.dart`; fakes.)*
 - [~] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ). *(extrato ligado à aba Carteira da casca (D15), sem saque; no modo `api` usa `GET /v1/extrato`.)*
-- [~] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações. *(telas de responder disputa, atender retrabalho, perfil público e avaliações prontas; perfil e avaliações ligados à aba Perfil, as duas primeiras sem ponto de entrada.)*
+- [~] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações. *(telas de responder disputa, atender retrabalho, perfil público e avaliações prontas; perfil e avaliações ligados à aba Perfil, as duas primeiras sem ponto de entrada.)* *(responder disputa e atender retrabalho agora têm ponto de entrada; fakes.)*
 
 *Pronto quando:* profissional de teste é aprovado, orça, executa, recebe e saca.
 
