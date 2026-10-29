@@ -18,6 +18,7 @@ Não inventar regra: enquanto estiver aqui, não implementar.
 | P9 | **Painel administrativo:** web separado em Flutter Web ou outra stack? | Escopo 7, 23 | Fase 7 |
 | P10 | **Verificação de identidade (documento + selfie):** qual fornecedor? | Escopo 3.1 | Fase 6 |
 | P11 | **SMS/WhatsApp:** qual provedor (Twilio, Zenvia…)? | Tela Confirmar celular | Fase 5 |
+| P12 | **Fontes do protótipo:** identifiquei como Archivo (títulos) e Figtree (corpo) pelo desenho das letras. Confirmar ou mandar os nomes certos. | Todas as telas | Tipografia |
 
 ## Para advogado e contador (o agente não decide)
 
