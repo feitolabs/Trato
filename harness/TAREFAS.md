@@ -21,7 +21,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [~] **F1.5** App Flutter "olá mundo". Android ok (APK debug roda no emulador API 37). *Falta:* iOS (precisa de Mac). *Pronto quando:* `flutter analyze` e `flutter test` passam e roda no emulador Android e no simulador iOS.
 - [ ] **F1.6** João coloca as chaves reais no `.env` (Supabase, Stripe teste). *Pronto quando:* backend sobe e lê as variáveis.
 - [x] **F1.7** 🔒 Conectar ao Supabase "Trato" só lendo (listar tabelas). *Pronto quando:* lista retornada e registrada. Leitura feita em 28/10/2026: projeto "Trato" (sa-east-1, Postgres 17) ativo, 0 tabelas, 0 migrations.
-- [ ] **F1.8** 🔒 Ligar `origin` ao GitHub "Trato" e dar push de `main` e `develop`. *Pronto quando:* branches no GitHub.
+- [x] **F1.8** 🔒 Ligar `origin` ao GitHub "Trato" e dar push de `main` e `develop`. *Pronto quando:* branches no GitHub. *(push de `main` e `develop` feito em https://github.com/feitolabs/Trato; `origin` ligado.)*
 
 ## Fase 2 — Design
 
@@ -35,12 +35,12 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 - [x] **F3.1** `docs/modelo-de-dados.md` com as entidades da seção 11.2. *Pronto quando:* João aprova. (aprovado pelo João em 28/10/2026; as propostas provisórias N1, N8, N10, N11 valem até ele decidir diferente)
 - [x] **F3.2** 🔒 Migration: usuários, perfis, categorias, configuração. Aplicada no Supabase Trato em 29/10/2026 (versão 20261029025430) com o OK do João. 15 tabelas, RLS em todas, 0 linhas de dados.
-- [~] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite). *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
-- [~] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
-- [~] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)* **Aguarda decisão A/B de custódia** (tarefa V2.4; ver `docs/v2-impacto.md`). Não aplicar antes.
-- [~] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
-- [~] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
-- [~] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*
+- [x] **F3.3** 🔒 Migration: pedidos, orçamentos e itens, contratos (versão das regras congelada no aceite).  *(APLICADA no Supabase em 29/10/2026, versão 20261029170308.)*
+- [x] **F3.4** 🔒 Migration: etapas, aditivos, notas de material, agendamentos e check-in/out.  *(APLICADA no Supabase em 29/10/2026, versão 20261029170728.)*
+- [~] **F3.5** 🔒 Migration: pagamentos, ledger imutável, repasses e saques. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)*  *(D15, caminho A: a versão atual NÃO será aplicada; está sendo refeita para o ledger espelho, sem saldo próprio nem saque.)*
+- [~] **F3.6** 🔒 Migration: disputas e evidências, garantia e retrabalho, avaliações. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)* *(espera a F3.5 refeita; não aplicada.)*
+- [x] **F3.7** 🔒 Migration: chat, notificações, auditoria imutável.  *(APLICADA no Supabase em 29/10/2026, versão 20261029170820.)*
+- [~] **F3.8** 🔒 RLS em todas as tabelas (endereço completo só após contratação). *Pronto quando:* testes de acesso provam que um usuário não vê dados de outro. *(arquivo SQL pronto e testado em Postgres local; NÃO aplicada no Supabase, aguarda OK do João. Ver docs/seguranca-banco.md)* *(pendente: refazer as policies conforme a F3.5 refeita; não aplicada.)*
 - [~] **F3.9** Rodar advisors do Supabase e corrigir. *Pronto quando:* sem alerta de segurança. *(rodado após a F3.2: só restam os 15 avisos "RLS sem policy", esperados até a F3.8)*
 
 ## Fase 4 — Backend Python
@@ -81,7 +81,7 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 - [~] **F6.3** Calculadora de orçamento (taxa e líquido vindos do backend), etapas, sinal, validade, garantia.
 - [~] **F6.4** Agenda, navegação, check-in (foto, local, código), check-out.
 - [ ] **F6.5** Enviar nota dos materiais e criar aditivo.
-- [~] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ). *(tela da carteira com dados de exemplo; falta ligar à aba da casca do profissional e à API)*
+- [~] **F6.6** Carteira: retido, a liberar, liberado, extrato, saque Pix (mesmo CPF/CNPJ). *(tela da carteira com dados de exemplo; falta ligar à aba da casca do profissional e à API)* *(D15: a carteira vira extrato, sem saque próprio; ajustar a tela.)*
 - [ ] **F6.7** Responder disputa, atender retrabalho, perfil público, avaliações.
 
 *Pronto quando:* profissional de teste é aprovado, orça, executa, recebe e saca.
@@ -90,10 +90,10 @@ Status: `[ ]` a fazer · `[~]` em andamento · `[x]` pronta · `[!]` bloqueada (
 
 Derivada de `docs/v2-impacto.md`. Não depende de aplicar migrations.
 
-- [ ] **V2.1** Textos de tela. Trocar "5%", "dinheiro protegido", "garantia", "escrow" e afins por textos da V2 (ex.: "pagamento processado por parceiro", "suporte e análise de problemas"). Tirar o SOS da F5.13. *Pronto quando:* busca no `verificar` não acha os textos proibidos de D13 em `app/lib/`, e testes de widget passam. (P5, P14)
-- [ ] **V2.2** Backend "pago só após o provedor". O pedido e o app só viram "pago" com o webhook assinado do provedor; aceite não é pagamento. Liberação e repasse viram eventos do provedor. *Pronto quando:* testes mostram que nenhuma rota marca "pago" sem evento confirmado; reenvio não duplica. (usa F4.4, F4.5; ver P7)
-- [ ] **V2.3** Simulador de margem. Margem de contribuição por serviço = receita − custo de pagamento − chargeback esperado − suporte − garantia/retrabalho − tributos − incentivo, por ticket e método (Pix, cartão à vista, parcelado). *Pronto quando:* tabela de cenários com dados reais de 2 provedores. *Bloqueada por:* P16. Destrava P2 e F4.2.
-- [ ] **V2.4** 🔒 Decisão do caminho de custódia: **A (ledger espelho, recomendado)** ou **B (manter até o parceiro confirmar)**. *Pronto quando:* João registra a escolha em `DECISOES.md`; F3.5, F4.4, F4.6 e F6.6 ajustadas ao caminho. *Depende de:* P7, P16 e advogado de pagamentos.
+- [~] **V2.1** Textos de tela. Trocar "5%", "dinheiro protegido", "garantia", "escrow" e afins por textos da V2 (ex.: "pagamento processado por parceiro", "suporte e análise de problemas"). Tirar o SOS da F5.13. *Pronto quando:* busca no `verificar` não acha os textos proibidos de D13 em `app/lib/`, e testes de widget passam. (P5, P14) *(textos trocados e SOS atrás de `kSosHabilitado = false`, ver `docs/v2-textos-alterados.md`; falta a busca de textos proibidos no `verificar`.)*
+- [x] **V2.2** Backend "pago só após o provedor". O pedido e o app só viram "pago" com o webhook assinado do provedor; aceite não é pagamento. Liberação e repasse viram eventos do provedor. *Pronto quando:* testes mostram que nenhuma rota marca "pago" sem evento confirmado; reenvio não duplica. (usa F4.4, F4.5; ver P7) *(pedido só vira pago após webhook assinado, estado `aguardando_confirmacao`; garantia financiada desligada por padrão.)*
+- [~] **V2.3** Simulador de margem. Margem de contribuição por serviço = receita − custo de pagamento − chargeback esperado − suporte − garantia/retrabalho − tributos − incentivo, por ticket e método (Pix, cartão à vista, parcelado). *Pronto quando:* tabela de cenários com dados reais de 2 provedores. *Bloqueada por:* P16. Destrava P2 e F4.2. *(simulador em `trato/margem/` e `docs/simulacao-margem.md`; custos do provedor são estimativas até haver proposta, P7/P16.)*
+- [x] **V2.4** 🔒 Decisão do caminho de custódia: **A (ledger espelho, recomendado)** ou **B (manter até o parceiro confirmar)**. *Pronto quando:* João registra a escolha em `DECISOES.md`; F3.5, F4.4, F4.6 e F6.6 ajustadas ao caminho. *Depende de:* P7, P16 e advogado de pagamentos. *(João escolheu o caminho A em 29/10/2026, D15. F3.5 e F6.6 em ajuste; F4.4 e F4.6 seguem o ledger espelho.)*
 - [ ] **V2.5** Conciliação com o parceiro (ledger espelho × relatório do provedor) e alerta de diferença. *Só no caminho A.* *Pronto quando:* teste com extrato de exemplo acusa a diferença.
 - [ ] **V2.6** Painel admin web responsivo (substitui o app Ops): busca por pedido e usuário, revisão de verificação, fila de casos, conciliação, reembolso por alçada, auditoria. *Pronto quando:* caso de teste decidido no painel. *Depende de:* P9. Cobre parte da Fase 7.
 - [ ] **V2.7** Desligar por configuração o que a V2 adiou: etapas pagas, adiantamento de material, `verificado_plus`, saque próprio, score e ranking. *Pronto quando:* chaves de configuração documentadas e teste de que o fluxo não oferece essas opções. (F5.x/F6.x não devem exibir.)
