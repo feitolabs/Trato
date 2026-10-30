@@ -83,11 +83,13 @@ def test_resumo_calcula_taxa_e_liquido_no_backend(amb):
     amb.contexto.taxa = TaxaEmMemoria(ConfigTaxa(750, 500))
     r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 100_000})
     assert r.status_code == 200
-    assert r.json() == {
+    corpo = r.json()
+    assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
         "valor_centavos": 100_000,
         "taxa_centavos": 7_500,
         "liquido_centavos": 92_500,
     }
+    assert corpo["custo_provedor_estimado_centavos"] > 0
     # abaixo do mínimo cobra o mínimo; nunca mais que o valor
     r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
     assert r.json()["taxa_centavos"] == 500 and r.json()["liquido_centavos"] == 500
@@ -179,7 +181,11 @@ def test_me_devolve_o_perfil_sem_dados_pessoais(amb):
     )
     r = get(amb, "/v1/me", "t-prof")
     assert r.status_code == 200
-    assert r.json() == {
+    corpo = r.json()
+    assert corpo.pop("papeis") == ["cliente", "profissional"]
+    assert corpo.pop("tem_perfil_profissional") is True
+    assert corpo.pop("status_verificacao") is None
+    assert corpo == {
         "id": "pro-1", "nome": "Ana", "papel": "profissional", "status": "ativo",
         "nivel_verificacao": "verificado", "nota_publica": 4.8, "servicos_concluidos": 12,
     }  # fmt: skip

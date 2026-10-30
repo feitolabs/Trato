@@ -15,7 +15,7 @@ from trato.api.repositorios import (
     Orcamento,
     Repasse,
 )
-from trato.api.repositorios_app import OrcamentoDoPedido, PedidoAberto
+from trato.api.repositorios_app import OrcamentoDetalhe, OrcamentoDoPedido, PedidoAberto
 from trato.disputas import Disputa
 from trato.financeiro.ledger import Conta, Lancamento, Livro, SaldoPedido
 from trato.garantias import Garantia, Retrabalho
@@ -93,6 +93,15 @@ class OrcamentosEmMemoria:
             )
             for o in achados
         )
+
+    def detalhe(self, orcamento_id: str) -> OrcamentoDetalhe | None:
+        o = self._itens.get(orcamento_id)
+        if o is None:
+            return None
+        return OrcamentoDetalhe(
+            o.id, o.pedido_id, o.profissional_id, None, 1, "enviado", o.valor_centavos,
+            None, None, None, None, None, None, None,
+        )  # fmt: skip
 
 
 class ContratosEmMemoria:

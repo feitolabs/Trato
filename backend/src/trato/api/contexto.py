@@ -16,7 +16,9 @@ from trato.api.auth import PapelUsuario, ProvedorAuth, Usuario
 from trato.api.memoria_app import (
     AvaliacoesEmMemoria,
     ConversasEmMemoria,
+    NotasMaterialEmMemoria,
     NotificacoesEmMemoria,
+    RecusasEmMemoria,
     UsuariosEmMemoria,
     VerificacoesEmMemoria,
 )
@@ -36,7 +38,9 @@ from trato.api.repositorios_app import (
     ProvedorTaxa,
     RepositorioAvaliacoes,
     RepositorioConversas,
+    RepositorioNotasMaterial,
     RepositorioNotificacoes,
+    RepositorioRecusas,
     RepositorioUsuarios,
     RepositorioVerificacoes,
 )
@@ -101,6 +105,8 @@ class Contexto:
     usuarios: RepositorioUsuarios = field(default_factory=UsuariosEmMemoria)
     verificacoes: RepositorioVerificacoes = field(default_factory=VerificacoesEmMemoria)
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
+    recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
+    notas_material: RepositorioNotasMaterial = field(default_factory=NotasMaterialEmMemoria)
     # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
     taxa: ProvedorTaxa | None = None
     repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)

@@ -99,6 +99,41 @@ class UsuariosPostgres:
             papel = PapelUsuario.CLIENTE
         return PerfilUsuario(str(linha["id"]), linha["nome"], linha["status"], papel)
 
+    def atualizar_nome(self, usuario_id: str, nome: str) -> None:
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            raise DadosInvalidos("Usuário inválido.")
+        with self._banco.transacao() as con:
+            con.execute(
+                "update public.usuarios set nome = %s where id = %s",
+                (nome_de_exibicao(nome), achado),
+            )
+
+    def tem_perfil_profissional(self, usuario_id: str) -> bool:
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return False
+        with self._banco.transacao() as con:
+            return (
+                con.execute(
+                    "select 1 from public.perfis_profissional where usuario_id = %s", (achado,)
+                ).fetchone()
+                is not None
+            )
+
+    def status_verificacao(self, usuario_id: str) -> str | None:
+        """Status da verificação mais recente (enviada, em_analise, aprovada, recusada)."""
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return None
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select status from public.verificacoes where profissional_id = %s "
+                "order by enviada_em desc limit 1",
+                (achado,),
+            ).fetchone()
+        return linha["status"] if linha else None
+
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None:
         """O que o app mostra no Perfil. Sem documento, telefone ou e-mail (ficam fora daqui)."""
         base = self.perfil(usuario_id)

@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from trato.api.repositorios import Orcamento
-from trato.api.repositorios_app import OrcamentoDoPedido
+from trato.api.repositorios_app import ItemDoOrcamento, OrcamentoDetalhe, OrcamentoDoPedido
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import DadosInvalidos, RegraDoBanco
@@ -88,6 +88,54 @@ class OrcamentosPostgres:
                 l["enviado_em"],
             )  # fmt: skip
             for l in linhas  # noqa: E741
+        )
+
+    def detalhe(self, orcamento_id: str) -> OrcamentoDetalhe | None:
+        """Orçamento ENVIADO (ou aceito/recusado depois) com os itens; rascunho nunca sai."""
+        achado = como_uuid(orcamento_id)
+        if achado is None:
+            return None
+        with self._banco.transacao() as con:
+            o = con.execute(
+                "select o.id, o.pedido_id, o.profissional_id, u.nome, o.versao, o.status, "
+                "o.valor_total_centavos, o.prazo_execucao_dias, o.validade_ate, o.garantia_dias, "
+                "o.fora_do_escopo, o.sinal_material_centavos, o.observacoes, o.enviado_em "
+                "from public.orcamentos o join public.usuarios u on u.id = o.profissional_id "
+                "where o.id = %s and o.status <> 'rascunho'",
+                (achado,),
+            ).fetchone()
+            if o is None:
+                return None
+            itens = con.execute(
+                "select tipo, descricao, quantidade, valor_unitario_centavos, total_centavos "
+                "from public.orcamento_itens where orcamento_id = %s order by ordem, id",
+                (achado,),
+            ).fetchall()
+        return OrcamentoDetalhe(
+            str(o["id"]),
+            str(o["pedido_id"]),
+            str(o["profissional_id"]),
+            o["nome"],
+            int(o["versao"]),
+            o["status"],
+            int(o["valor_total_centavos"]),
+            o["prazo_execucao_dias"],
+            o["validade_ate"],
+            o["garantia_dias"],
+            o["fora_do_escopo"],
+            o["sinal_material_centavos"],
+            o["observacoes"],
+            o["enviado_em"],
+            tuple(
+                ItemDoOrcamento(
+                    i["tipo"],
+                    i["descricao"],
+                    str(i["quantidade"]),
+                    int(i["valor_unitario_centavos"]),
+                    int(i["total_centavos"]),
+                )  # fmt: skip
+                for i in itens
+            ),
         )
 
     def enviar(

@@ -47,6 +47,7 @@ from trato.persistencia.dinheiro import (
 from trato.persistencia.execucao import ExecucaoPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
+from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
 from trato.seguranca.config import parametros_docs
@@ -97,6 +98,7 @@ def criar_contexto_postgres(
         )
     conversas = ConversasPostgres(banco)
     notificacoes = NotificacoesPostgres(banco)
+    execucao = ExecucaoPostgres(banco)
     contexto = Contexto(
         auth=auth,
         pedidos=PedidosPostgres(banco, lambda: segredo_codigos),
@@ -115,10 +117,12 @@ def criar_contexto_postgres(
         taxa=TaxaPostgres(banco),
         avaliacoes=AvaliacoesPostgres(banco),
         repasses=RepassesPostgres(banco),
+        recusas=RecusasPostgres(banco),
+        notas_material=NotasMaterialPostgres(banco, execucao),
         transacao_banco=banco.transacao,
         extras={
             "usuarios": usuarios,
-            "execucao": ExecucaoPostgres(banco),
+            "execucao": execucao,
             "conversas": conversas,
             "notificacoes": notificacoes,
             "auditoria": AuditoriaPostgres(banco),
