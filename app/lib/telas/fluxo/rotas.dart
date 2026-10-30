@@ -77,8 +77,12 @@ abstract final class RotasTrato {
 
   /// Serviços de nota, aditivo, disputa e busca. Ainda sem rota na API: seguem em demonstração
   /// (docs/app-ligacao.md). Trocar aqui quando o backend tiver as rotas.
-  static ServicoNotaMaterial servicoNota = ServicoNotaMaterialFake(nota: notaMaterialExemplo);
-  static ServicoAditivo servicoAditivo = ServicoAditivoFake(detalhe: aditivoExemplo);
+  static final ServicoNotaMaterial _notaDemo = ServicoNotaMaterialFake(nota: notaMaterialExemplo);
+  static final ServicoAditivo _aditivoDemo = ServicoAditivoFake(detalhe: aditivoExemplo);
+
+  /// Modo `api`: nota e aditivo vêm de `repos`; fora dele, a demonstração.
+  static ServicoNotaMaterial get servicoNota => repos.notaMaterial ?? _notaDemo;
+  static ServicoAditivo get servicoAditivo => repos.aditivo ?? _aditivoDemo;
   static ServicoDisputaProfissional servicoDisputa =
       ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo);
   static ServicoBusca servicoBusca = const ServicoBuscaFake();
@@ -194,14 +198,15 @@ abstract final class RotasTrato {
         context,
         Builder(
           builder: (context) => CadastroProfissionalTela(
+            // Sem rota de categorias e cidades (catálogo): o cadastro segue em demonstração.
             servico: ServicoCadastroProfissionalFake(),
             aoAdicionarFoto: _fotografar,
             aoConcluir: () => _abrir<void>(
               context,
               VerificacaoTela(
-                servico: ServicoVerificacaoFake(),
-                aoCapturarDocumento: _fotografar,
-                aoCapturarSelfie: _fotografar,
+                servico: repos.verificacao ?? ServicoVerificacaoFake(),
+                aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
+                aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
                 aoConcluir: () => _entrarNaCascaProfissional(context),
               ),
             ),
@@ -598,7 +603,11 @@ abstract final class RotasTrato {
               AguardandoPagamentoTela(
                 cobranca: cobranca,
                 consultar: () => repos.pagamento.status(pedidoId),
-                aoConfirmar: () => _voltarAoInicio(context),
+                // Pago (confirmado pelo backend): mostra o pedido em andamento.
+                aoConfirmar: () => Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute<void>(builder: (_) => _pedidoEmExecucao(pedidoId)),
+                  (rota) => rota.isFirst,
+                ),
               ),
             );
           },

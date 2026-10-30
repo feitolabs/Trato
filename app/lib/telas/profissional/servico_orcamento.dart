@@ -3,7 +3,7 @@ class ResumoOrcamento {
   const ResumoOrcamento({
     required this.totalCentavos,
     required this.taxaCentavos,
-    required this.taxaBps,
+    this.taxaBps,
     required this.liquidoCentavos,
   });
 
@@ -11,7 +11,7 @@ class ResumoOrcamento {
   final int taxaCentavos;
 
   /// Percentual da taxa em pontos-base (750 = 7,5%). A tela só exibe.
-  final int taxaBps;
+  final int? taxaBps;
   final int liquidoCentavos;
 }
 

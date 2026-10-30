@@ -124,7 +124,40 @@ abstract interface class RepositorioPerfil {
   Future<PerfilCliente> carregar();
 }
 
+/// Filtros de `GET /v1/profissional/pedidos-abertos`. O backend aplica; o app só pede.
+class FiltroPedidosAbertos {
+  const FiltroPedidosAbertos({
+    this.categoriaId,
+    this.bairro,
+    this.precoMinCentavos,
+    this.precoMaxCentavos,
+    this.ordenar = 'recentes',
+    this.limite = 50,
+  });
+
+  final String? categoriaId;
+  final String? bairro;
+  final int? precoMinCentavos;
+  final int? precoMaxCentavos;
+
+  /// `recentes`, `antigos`, `urgentes`, `maior_valor` ou `menor_valor`.
+  final String ordenar;
+  final int limite;
+
+  Map<String, String> get consulta => {
+        if (categoriaId != null) 'categoria_id': categoriaId!,
+        if (bairro != null && bairro!.isNotEmpty) 'bairro': bairro!,
+        if (precoMinCentavos != null) 'preco_min_centavos': '$precoMinCentavos',
+        if (precoMaxCentavos != null) 'preco_max_centavos': '$precoMaxCentavos',
+        'ordenar': ordenar,
+        'limite': '$limite',
+      };
+}
+
 abstract interface class RepositorioProfissional {
+  /// Pedidos abertos com filtros (a tela de filtros ainda não existe).
+  Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro);
+
   Future<InicioProfissional> inicio();
   Future<DetalhePedido> detalhe(String pedidoId);
   Future<void> recusar(String pedidoId, MotivoRecusa motivo);

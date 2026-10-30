@@ -6,7 +6,7 @@ import 'modelos.dart';
 // de "[Foto]" e "[Cliente]" do PDF.
 
 const resumoPedidoExemplo = ResumoPedido(
-  numero: 4821,
+  numero: '4821',
   titulo: 'Troca de tomadas e chuveiro',
   recebidos: 3,
   limite: 5,

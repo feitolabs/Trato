@@ -203,7 +203,7 @@ class _CartaoLiquido extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           if (r != null) ...[
             _Linha('Valor do aditivo', Dinheiro.formatar(r.totalCentavos)),
-            _Linha('Taxa do Trato (${Dinheiro.formatarBps(r.taxaBps)})', '- ${Dinheiro.formatar(r.taxaCentavos)}'),
+            _Linha(r.taxaBps == null ? 'Taxa do Trato' : 'Taxa do Trato (${Dinheiro.formatarBps(r.taxaBps!)})', '- ${Dinheiro.formatar(r.taxaCentavos)}'),
             const Divider(),
             _Linha('Líquido', Dinheiro.formatar(r.liquidoCentavos), forte: true),
           ] else
