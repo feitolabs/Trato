@@ -127,6 +127,10 @@ class AvaliacoesEmMemoria:
     def salvar(self, avaliacao: Avaliacao) -> None:
         self._itens[(avaliacao.pedido_id, avaliacao.direcao)] = avaliacao
 
+    def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
+        achadas = [a for a in self._itens.values() if a.avaliado_id == avaliado_id]
+        return tuple(sorted(achadas, key=lambda a: a.criada_em, reverse=True))
+
 
 class TaxaEmMemoria:
     def __init__(self, config: ConfigTaxa) -> None:

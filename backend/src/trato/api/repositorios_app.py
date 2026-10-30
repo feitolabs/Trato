@@ -72,6 +72,8 @@ class PerfilDetalhe:
 class DocumentoVerificacao:
     tipo: str
     storage_path: str
+    sha256: str | None = None
+    excluir_em: datetime | None = None  # retenção limitada (LGPD)
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,7 @@ class Verificacao:
     status: str
     enviada_em: datetime
     documentos: tuple[DocumentoVerificacao, ...] = ()
+    motivo_recusa: str | None = None
 
 
 @dataclass(frozen=True)
@@ -129,6 +132,9 @@ class RepositorioAvaliacoes(Protocol):
     def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None: ...
 
     def salvar(self, avaliacao: Avaliacao) -> None: ...
+
+    def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
+        """Avaliações recebidas por uma pessoa, da mais recente para a mais antiga."""
 
 
 class ProvedorTaxa(Protocol):

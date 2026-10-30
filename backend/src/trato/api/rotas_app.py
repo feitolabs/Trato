@@ -7,7 +7,7 @@ pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nun
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -26,6 +26,8 @@ from trato.api.repositorios_app import (
 from trato.api.servicos import carregar_pedido, eh_participante
 from trato.pagamentos.custo import MeioPagamento
 from trato.pedidos.estados import Estado, Pedido
+from trato.profissional.config import ORDEM_NIVEIS, obter_config_profissional
+from trato.profissional.repositorio import slugs
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_etiquetas, limpar_texto
 
@@ -117,6 +119,12 @@ class VerificacaoOut(BaseModel):
     status: str
     enviada_em: datetime
     documentos: list[str] = Field(description="Só os tipos enviados; os arquivos ficam privados.")
+    status_app: str = Field(
+        description="O que o app mostra: em_analise, aprovado ou pendente (com `motivo`)."
+    )
+    motivo: str | None = Field(None, description="Por que ficou pendente, quando recusada.")
+    finalidade: str = Field(description="Para que os documentos são usados (consentimento LGPD).")
+    retencao_dias: int = Field(description="Quanto tempo os documentos ficam guardados.")
 
 
 class AvaliacaoOut(BaseModel):
@@ -143,10 +151,16 @@ class ResumoOrcamentoIn(_Entrada):
 
 class DocumentoIn(_Entrada):
     tipo: str
-    storage_path: str = Field(
+    upload_id: str | None = Field(
+        None,
+        max_length=64,
+        description="Id de um envio CONCLUÍDO em `/v1/uploads` (destino `verificacao`).",
+    )
+    storage_path: str | None = Field(
+        None,
         min_length=3,
         max_length=300,
-        description="Caminho do arquivo no bucket privado `verificacao`, não uma URL.",
+        description="Só sem o serviço de upload ligado: caminho no bucket privado, não uma URL.",
     )
 
 
@@ -446,6 +460,43 @@ def pedidos_abertos(
 # --- Verificação do profissional --------------------------------------------------------
 
 
+def _nivel_exigido(request: Request, usuario: Usuario, cfg) -> str:  # type: ignore[no-untyped-def]
+    """Nível mínimo pelas categorias do profissional (risco da categoria, em configuração)."""
+    modulo = getattr(request.app.state, "modulo_profissional", None)
+    perfil = modulo.repo.obter(usuario.id) if modulo else None
+    if perfil is None:
+        return cfg.verificacao_nivel_padrao
+    return cfg.nivel_exigido(slugs(modulo.catalogo, perfil.categorias))
+
+
+def _documentos_da_verificacao(
+    request: Request, corpo: VerificacaoIn, usuario: Usuario, excluir_em: datetime
+) -> list[DocumentoVerificacao]:
+    servico = getattr(request.app.state, "servico_uploads", None)
+    docs: list[DocumentoVerificacao] = []
+    usados: set[str] = set()
+    for d in corpo.documentos:
+        if servico is None:  # sem o serviço de upload: só a referência, como antes
+            if d.storage_path is None or not _caminho_valido(d.storage_path, usuario):
+                raise HTTPException(422, "O caminho de um arquivo não é válido.")
+            docs.append(DocumentoVerificacao(d.tipo, d.storage_path, None, excluir_em))
+            continue
+        sol = servico.repo.solicitacao(d.upload_id or "")
+        guardado = servico.repo.documentos.get(sol.registro_id or "") if sol else None
+        if (
+            sol is None
+            or guardado is None
+            or sol.dono_id != usuario.id
+            or sol.destino != "verificacao"
+            or sol.tipo_documento != d.tipo
+            or sol.id in usados
+        ):
+            raise HTTPException(422, "Um dos arquivos não foi enviado ou não confere com o tipo.")
+        usados.add(sol.id)
+        docs.append(DocumentoVerificacao(d.tipo, sol.caminho, guardado.sha256, excluir_em))
+    return docs
+
+
 def _caminho_valido(caminho: str, usuario: Usuario) -> bool:
     partes = caminho.split("/")
     if "://" in caminho or ".." in partes or caminho.startswith("/") or "" in partes:
@@ -455,8 +506,16 @@ def _caminho_valido(caminho: str, usuario: Usuario) -> bool:
     return len(partes) >= 2 and partes[0] == usuario.id
 
 
+_STATUS_APP = {"enviada": "em_analise", "em_analise": "em_analise", "aprovada": "aprovado"}
+
+
 def _verificacao_out(v) -> VerificacaoOut:
+    cfg = obter_config_profissional()
     return VerificacaoOut(
+        status_app=_STATUS_APP.get(v.status, "pendente"),
+        motivo=v.motivo_recusa if v.status == "recusada" else None,
+        finalidade=cfg.verificacao_finalidade,
+        retencao_dias=cfg.verificacao_retencao_dias,
         id=v.id,
         nivel_solicitado=v.nivel_solicitado,
         status=v.status,
@@ -477,6 +536,7 @@ def _verificacao_out(v) -> VerificacaoOut:
 )
 def enviar_verificacao(
     corpo: VerificacaoIn,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> VerificacaoOut:
@@ -484,19 +544,20 @@ def enviar_verificacao(
         raise HTTPException(422, "Precisamos do seu consentimento para tratar seus documentos.")
     if corpo.nivel_solicitado not in NIVEIS_VERIFICACAO:
         raise HTTPException(422, "Nível de verificação inválido.")
+    cfg = obter_config_profissional()
+    exigido = _nivel_exigido(request, usuario, cfg)
+    if ORDEM_NIVEIS.index(corpo.nivel_solicitado) < ORDEM_NIVEIS.index(exigido):
+        raise HTTPException(422, f"Para as suas categorias é preciso o nível {exigido}.")
     tipos = {d.tipo for d in corpo.documentos}
     if not tipos <= set(TIPOS_DOCUMENTO):
         raise HTTPException(422, "Tipo de documento inválido.")
-    if not {"documento_frente", "selfie"} <= tipos:
-        raise HTTPException(422, "Envie a frente do documento e uma selfie.")
-    if not all(_caminho_valido(d.storage_path, usuario) for d in corpo.documentos):
-        raise HTTPException(422, "O caminho de um arquivo não é válido.")
-    nova = contexto.verificacoes.enviar(
-        usuario.id,
-        corpo.nivel_solicitado,
-        [DocumentoVerificacao(d.tipo, d.storage_path) for d in corpo.documentos],
-        contexto.agora(),
-    )
+    faltam = set(cfg.verificacao_documentos_obrigatorios[corpo.nivel_solicitado]) - tipos
+    if faltam:
+        raise HTTPException(422, f"Faltam documentos: {', '.join(sorted(faltam))}.")
+    agora = contexto.agora()
+    excluir_em = agora + timedelta(days=cfg.verificacao_retencao_dias)
+    docs = _documentos_da_verificacao(request, corpo, usuario, excluir_em)
+    nova = contexto.verificacoes.enviar(usuario.id, corpo.nivel_solicitado, docs, agora)
     return _verificacao_out(nova)
 
 

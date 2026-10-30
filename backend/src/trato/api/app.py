@@ -5,7 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, FastAPI
 
 from trato import __version__
-from trato.api import rotas_app, rotas_financeiro, rotas_pedidos, rotas_webhook
+from trato.api import (
+    rotas_app,
+    rotas_financeiro,
+    rotas_pedidos,
+    rotas_profissional_cadastro,
+    rotas_upload,
+    rotas_webhook,
+)
 from trato.api.admin import criar_router_admin
 from trato.api.contexto import Contexto
 from trato.api.erros import instalar_tratadores
@@ -30,6 +37,8 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
 
     registrar_rotas(app, contexto)
     app.include_router(criar_router())
+    rotas_upload.registrar_rotas(app)
+    rotas_profissional_cadastro.registrar_rotas(app)
     instalar_tratadores(app)
     if contexto is not None:
         app.state.contexto = contexto

@@ -52,6 +52,7 @@ from trato.seguranca.cliente import dispositivo_do_cliente, ip_do_cliente
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.tentativas_codigo import CodigoBloqueado
 from trato.seguranca.texto_livre import limpar_texto
+from trato.uploads.provas import validar_prova_midia
 
 router = APIRouter(prefix="/v1/pedidos", tags=["pedidos"])
 
@@ -223,6 +224,9 @@ def mudar_estado(
         raise HTTPException(501, _NAO_DISPONIVEIS[acao])
 
     prova = _montar_prova(contexto, acao, corpo.prova if corpo else None, pedido)
+    servico_uploads = getattr(request.app.state, "servico_uploads", None)
+    if servico_uploads is not None:  # foto de check-in/out: mídia do servidor, hora e distância
+        prova = validar_prova_midia(servico_uploads, pedido, usuario.id, acao, prova)
     cfg = contexto.config.carregar()
     ip, dispositivo = ip_do_cliente(request), dispositivo_do_cliente(request)
     com_codigo = acao in _ACOES_COM_CODIGO
