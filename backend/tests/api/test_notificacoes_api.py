@@ -42,6 +42,7 @@ def test_tudo_exige_login(amb):
         ("put", "/v1/notificacoes/preferencias"),
         ("post", "/v1/notificacoes/x/lida"),
         ("post", "/v1/dispositivos"),
+        ("delete", "/v1/dispositivos"),
         ("get", "/v1/conversas"),
         ("post", "/v1/mensagens/1/lida"),
     ):
@@ -126,6 +127,22 @@ def test_registrar_dispositivo_e_receber_push(amb):
     assert s.repo.tokens(CLIENTE.id) == () and s.repo.tokens(OUTRO_CLIENTE.id) == (
         "token-do-aparelho-1",
     )
+
+
+def test_remover_dispositivo_so_do_dono_e_idempotente(amb):
+    s = servico_do(amb, CanalFake("push"))
+    corpo = {"token": "token-do-aparelho-1", "plataforma": "android"}
+    post(amb, "/v1/dispositivos", corpo=corpo)
+    pedido = {"token": "token-do-aparelho-1"}
+    # outra pessoa não desliga o aparelho alheio (e a resposta não revela de quem é)
+    r = amb.cliente.request("DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-outro-cliente"))
+    assert r.status_code == 204 and s.repo.tokens(CLIENTE.id) == ("token-do-aparelho-1",)
+    r = amb.cliente.request("DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-cliente"))
+    assert r.status_code == 204 and s.repo.tokens(CLIENTE.id) == ()
+    r = amb.cliente.request("DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-cliente"))
+    assert r.status_code == 204  # repetir é seguro
+    r = amb.cliente.request("DELETE", "/v1/dispositivos", json={"token": "x"}, headers=cab("t-cliente"))
+    assert r.status_code == 422
 
 
 def test_dispositivo_invalido(amb):

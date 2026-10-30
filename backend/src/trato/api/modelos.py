@@ -148,6 +148,8 @@ class AcaoPedidoIn(_Entrada):
             "aceitar_orcamento: {orcamento_id}. confirmar_agenda: {janela:{inicio,fim}}. "
             "fazer_check_in: {foto:{arquivo_id,tirada_em}, localizacao:{latitude,longitude}, "
             "codigo_inicio}. fazer_check_out: {foto_final, codigo_conclusao}. "
+            "offline_capturada_em (opcional, só check-in/out): quando o aparelho capturou, para ação reenviada; "
+            "é evidência, a hora oficial é a do servidor. "
             "cancelar: {motivo}. confirmar_conclusao e encerrar_disputa_por_acordo: sem prova."
         ),
     )

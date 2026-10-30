@@ -38,7 +38,7 @@ class SolicitacaoInvalida(Exception):
 class Destino:
     bucket: str
     categoria: str  # chave de `ConfigSeguranca.uploads` (tipos e tamanho)
-    registro: str  # "midia" | "documento" | "avatar"
+    registro: str  # "midia" | "documento" | "avatar" | "portfolio"
 
 
 # O destino decide bucket, regra de tipo/tamanho e onde registrar (docs/seguranca-banco.md).
@@ -54,6 +54,9 @@ DESTINOS: dict[str, Destino] = {
     "retrabalho": Destino("pedido-midias", "anexo_pedido", "midia"),
     "chat": Destino("chat-anexos", "anexo_pedido", "midia"),
     "avatar": Destino("avatar", "foto", "avatar"),
+    # Foto do portfólio do profissional: só imagem (EXIF/GPS removidos no `concluir`). Fica no
+    # bucket `avatar`, sob a pasta do dono (`<dono>/portfolio/...`), que a política já cobre.
+    "portfolio": Destino("avatar", "portfolio", "portfolio"),
     "verificacao": Destino("verificacao", "documento", "documento"),
 }
 # Quem pode enviar para cada finalidade de mídia do pedido (papel no pedido).
@@ -180,6 +183,8 @@ class ServicoUploads:
             caminho = f"{pedido_id}/{nome_seguro}"
         elif regra.registro == "avatar":
             caminho = f"{dono_id}/{nome_seguro}"
+        elif regra.registro == "portfolio":
+            caminho = f"{dono_id}/portfolio/{nome_seguro}"
         else:
             caminho = f"{dono_id}/pendente/{nome_seguro}"
         tipo = content_type.split(";")[0].strip().lower()

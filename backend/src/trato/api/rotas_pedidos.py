@@ -18,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 from trato import disputas
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
+from trato.api import offline
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import (
     AbrirDisputaIn,
@@ -52,6 +53,7 @@ from trato.seguranca.cliente import dispositivo_do_cliente, ip_do_cliente
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.tentativas_codigo import CodigoBloqueado
 from trato.seguranca.texto_livre import limpar_texto
+from trato.uploads.config import obter_config_uploads
 from trato.uploads.provas import validar_prova_midia
 
 router = APIRouter(prefix="/v1/pedidos", tags=["pedidos"])
@@ -223,7 +225,10 @@ def mudar_estado(
     if acao in _NAO_DISPONIVEIS:
         raise HTTPException(501, _NAO_DISPONIVEIS[acao])
 
-    prova = _montar_prova(contexto, acao, corpo.prova if corpo else None, pedido)
+    bruto, offline_em = offline.separar(
+        acao, corpo.prova if corpo else None, contexto.agora(), obter_config_uploads()
+    )
+    prova = _montar_prova(contexto, acao, bruto, pedido)
     servico_uploads = getattr(request.app.state, "servico_uploads", None)
     if servico_uploads is not None:  # foto de check-in/out: mídia do servidor, hora e distância
         prova = validar_prova_midia(servico_uploads, pedido, usuario.id, acao, prova)
@@ -273,6 +278,8 @@ def mudar_estado(
         _concluir_efeitos(contexto, gravado)
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, acao, contexto)
+        if offline_em is not None:
+            offline.registrar(contexto, usuario, pedido, acao, offline_em, contexto.agora())
     return pedido_out(gravado, usuario)
 
 
