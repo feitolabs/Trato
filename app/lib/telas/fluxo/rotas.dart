@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
+import '../../auth/servico_auth.dart';
 import '../../dados/repositorios_trato.dart';
+import '../../dados/sessao.dart';
+import '../auth/login_tela.dart';
 import '../../tema/tema.dart';
 import '../../dispositivo/check_in_dispositivo.dart';
 import '../../dispositivo/dispositivo.dart';
@@ -13,6 +16,7 @@ import '../aditivo/responder_aditivo_tela.dart';
 import '../busca/busca_profissionais_tela.dart';
 import '../busca/modelos.dart';
 import '../busca/servico_fake.dart';
+import '../cliente/modelos.dart' show Profissional;
 import '../cliente/perfil_profissional_tela.dart';
 import '../disputa_profissional/atender_retrabalho_tela.dart';
 import '../disputa_profissional/disputa.dart';
@@ -41,7 +45,6 @@ import '../conclusao/conclusao_tela.dart';
 import '../conclusao/dados_exemplo.dart';
 import '../conclusao/garantia_tela.dart';
 import '../conclusao/relatar_problema_tela.dart';
-import '../em_breve_tela.dart';
 import '../notificacoes/modelos.dart';
 import '../notificacoes/notificacoes_tela.dart';
 import '../notificacoes/servico_repositorio.dart';
@@ -80,6 +83,12 @@ abstract final class RotasTrato {
       ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo);
   static ServicoBusca servicoBusca = const ServicoBuscaFake();
 
+  /// Sessão do cliente HTTP, para o "Sair" limpar o token. O `main.dart` liga.
+  static SessaoTrato? sessao;
+
+  /// Há login guardado (a splash pula o onboarding)?
+  static bool get temSessao => ServicoAuthPadrao.atual.sessaoAtual != null;
+
   /// Id usado nos dados de exemplo, que não têm pedido real por trás.
   static const _idDemo = 'demo';
 
@@ -91,6 +100,12 @@ abstract final class RotasTrato {
 
   static void _aviso(BuildContext context, Object erro) {
     final texto = erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo.';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(texto)));
+  }
+
+  static void _avisoSimples(BuildContext context, String texto) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(texto)));
@@ -114,6 +129,51 @@ abstract final class RotasTrato {
       (rota) => false,
     );
   }
+
+  /// Entra na casca certa para o perfil do usuário: profissional ou cliente (padrão).
+  static void irParaInicio(BuildContext context, [SessaoAuth? quem]) {
+    final s = quem ?? ServicoAuthPadrao.atual.sessaoAtual;
+    if (s != null && s.ehProfissional) {
+      _entrarNaCascaProfissional(context);
+    } else {
+      irParaCliente(context);
+    }
+  }
+
+  /// Sair da conta: encerra o login, limpa o token e volta ao login sem histórico.
+  static Future<void> sair(BuildContext context) async {
+    final navegador = Navigator.of(context);
+    try {
+      await ServicoAuthPadrao.atual.sair();
+    } on Object {
+      // Mesmo sem rede, o token local é descartado abaixo.
+    }
+    sessao?.sair();
+    navegador.pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const LoginTela()),
+      (rota) => false,
+    );
+  }
+
+  /// Perfil público do profissional (a partir de orçamentos e da busca). Hoje a busca de
+  /// demonstração é quem sabe montar o perfil; sem perfil, avisa em vez de abrir tela vazia.
+  static Future<void> abrirPerfilProfissional(BuildContext context, String nome) async {
+    final navegador = Navigator.of(context);
+    var achados = <Profissional>[];
+    final ok = await _tentar(context, () async => achados = await servicoBusca.buscar(nome));
+    if (!ok) return;
+    final p = achados.where((x) => x.nome == nome && x.detalhe != null).firstOrNull;
+    if (p == null) {
+      if (context.mounted) _avisoSimples(context, _perfilIndisponivel);
+      return;
+    }
+    await navegador.push(
+      MaterialPageRoute<void>(builder: (_) => PerfilProfissionalTela(profissional: p)),
+    );
+  }
+
+  static const _perfilIndisponivel = 'Perfil indisponível por enquanto.';
+  static const _emAnalise = 'Este pedido está em análise. Avisamos aqui quando houver novidade.';
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static void irParaProfissional(BuildContext context) => _abrirCadastroProfissional(context);
@@ -230,6 +290,23 @@ abstract final class RotasTrato {
                 _abrir<void>(context, _criarAditivo(pedidoId, titulo));
               },
             ),
+            // Sem lista de disputas na API, o id do pedido faz de id da disputa (demonstração).
+            ListTile(
+              leading: const Icon(Icons.gavel_outlined),
+              title: const Text('Responder disputa'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                abrirDisputa(context, pedidoId);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.build_outlined),
+              title: const Text('Atender retrabalho'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                abrirRetrabalho(context, pedidoId);
+              },
+            ),
           ],
         ),
       ),
@@ -299,6 +376,7 @@ abstract final class RotasTrato {
             AvaliacoesRecebidasTela(servico: ServicoPerfilPublicoFake()),
           ),
           aoEditarCadastro: () => _abrirCadastroProfissional(context),
+          aoSair: () => sair(context),
         ),
       );
 
@@ -308,7 +386,8 @@ abstract final class RotasTrato {
   static Widget abaPerfil() => Carregador<PerfilCliente>(
         carregar: repos.perfil.carregar,
         construir: (context, perfil) => PerfilClienteTela(
-          perfil: perfil,
+          perfil: _soComDestino(perfil),
+          aoSair: () => sair(context),
           aoTocarItem: (acao) {
             switch (acao) {
               case AcaoPerfil.usarComoProfissional:
@@ -326,10 +405,36 @@ abstract final class RotasTrato {
               case AcaoPerfil.centralAjuda:
                 _abrir<void>(context, const AjudaTela(servico: ServicoAjudaFake()));
               default:
-                _abrir<void>(context, EmBreveTela(titulo: acao.name));
+                break;
             }
           },
         ),
+      );
+
+  /// Itens do Perfil sem tela ainda (dados pessoais, endereços, pagamento, favoritos, contatos,
+  /// termos) saem da lista em vez de abrir "Em breve". Voltam quando a tela existir.
+  static const _acoesComTela = {
+    AcaoPerfil.usarComoProfissional,
+    AcaoPerfil.notificacoes,
+    AcaoPerfil.meusDados,
+    AcaoPerfil.centralAjuda,
+  };
+
+  static PerfilCliente _soComDestino(PerfilCliente p) => PerfilCliente(
+        nome: p.nome,
+        iniciais: p.iniciais,
+        resumo: p.resumo,
+        grupos: [
+          for (final g in p.grupos)
+            if (g.itens.any((i) => _acoesComTela.contains(i.acao)))
+              GrupoPerfil(
+                titulo: g.titulo,
+                itens: [
+                  for (final i in g.itens)
+                    if (_acoesComTela.contains(i.acao)) i,
+                ],
+              ),
+        ],
       );
 
   /// Aba "Mensagens" da casca do cliente: lista de conversas, cada uma abre o chat do pedido.
@@ -362,12 +467,13 @@ abstract final class RotasTrato {
   static Widget abaBuscar() => Builder(
         builder: (context) => BuscaProfissionaisTela(
           servico: servicoBusca,
-          aoAbrirProfissional: (p) => _abrir<void>(
-            context,
-            p.detalhe == null
-                ? EmBreveTela(titulo: 'Perfil de ${p.nome}')
-                : PerfilProfissionalTela(profissional: p),
-          ),
+          aoAbrirProfissional: (p) {
+            if (p.detalhe == null) {
+              _avisoSimples(context, _perfilIndisponivel);
+              return;
+            }
+            _abrir<void>(context, PerfilProfissionalTela(profissional: p));
+          },
         ),
       );
 
@@ -429,7 +535,7 @@ abstract final class RotasTrato {
         case 'pago_e_retido' || 'agendado' || 'em_andamento' || 'em_confirmacao':
           _abrir<void>(context, _pedidoEmExecucao(id));
         default:
-          _abrir<void>(context, EmBreveTela(titulo: pedido.titulo));
+          _avisoSimples(context, _emAnalise);
       }
       return;
     }
@@ -440,8 +546,7 @@ abstract final class RotasTrato {
     } else if (pedido.statusTexto.contains('orçamentos recebidos')) {
       _abrir<void>(context, _orcamentosRecebidos(id));
     } else {
-      // Disputa em andamento ainda não tem tela.
-      _abrir<void>(context, EmBreveTela(titulo: pedido.titulo));
+      _avisoSimples(context, _emAnalise);
     }
   }
 
@@ -457,9 +562,10 @@ abstract final class RotasTrato {
             context,
             // O protótipo só traz o detalhe de alguns orçamentos.
             orcamento.detalhe == null
-                ? EmBreveTela(titulo: 'Orçamento de ${orcamento.profissional}')
+                ? _PerfilAoAbrir(nome: orcamento.profissional)
                 : DetalheOrcamentoTela(
                     orcamento: orcamento,
+                    aoVerPerfil: (o) => abrirPerfilProfissional(context, o.profissional),
                     aoAceitar: (o) async {
                       // Só pede ao backend; taxa e líquido são dele.
                       final ok = await _tentar(
@@ -506,7 +612,6 @@ abstract final class RotasTrato {
           construir: (context, dados) => GarantiaTela(
             dados: dados,
             aoPedirRetrabalho: () => _pedirRetrabalho(context, pedidoId),
-            aoVerContrato: () => _abrir<void>(context, const EmBreveTela(titulo: 'Contrato')),
           ),
         ),
       );
@@ -545,7 +650,6 @@ abstract final class RotasTrato {
         carregar: () => repos.pedidos.acompanhar(pedidoId),
         construir: (context, pedido) => PedidoExecucaoTela(
           pedido: pedido,
-          aoTocarSos: () => _abrir<void>(context, const EmBreveTela(titulo: 'SOS')),
           aoConversar: () => _abrir<void>(context, _chat(pedidoId)),
           aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
           aoVerNota: () => _abrir<void>(
@@ -605,4 +709,32 @@ abstract final class RotasTrato {
           },
         ),
       );
+}
+
+/// Orçamento sem detalhe no protótipo: abre direto o perfil público do profissional e, ao
+/// terminar, volta para a lista.
+class _PerfilAoAbrir extends StatefulWidget {
+  const _PerfilAoAbrir({required this.nome});
+
+  final String nome;
+
+  @override
+  State<_PerfilAoAbrir> createState() => _PerfilAoAbrirState();
+}
+
+class _PerfilAoAbrirState extends State<_PerfilAoAbrir> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final navegador = Navigator.of(context);
+      await RotasTrato.abrirPerfilProfissional(context, widget.nome);
+      if (mounted) navegador.maybePop();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: CircularProgressIndicator()));
 }

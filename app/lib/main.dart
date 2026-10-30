@@ -47,6 +47,7 @@ Future<void> main() async {
   // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
   LigacaoSessao(ServicoAuthPadrao.atual, sessaoTrato);
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
+  RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal();
   RotasTrato.repos = RepositoriosTrato.deConfig(ConfigTrato.doAmbiente(), sessaoTrato);
   runApp(const TratoApp());

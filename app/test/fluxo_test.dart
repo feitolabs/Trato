@@ -105,13 +105,13 @@ void main() {
     expect(find.byType(GarantiaTela), findsOneWidget);
   });
 
-  testWidgets('pedido sem tela própria abre "em breve", sem quebrar', (tester) async {
+  testWidgets('pedido sem tela própria mostra aviso, sem quebrar', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Pedidos');
 
     await _tocar(tester, 'Vazamento na pia');
 
-    expect(find.text('Esta tela chega nas próximas etapas.'), findsOneWidget);
+    expect(find.textContaining('Avisamos aqui quando houver novidade'), findsOneWidget);
   });
 
   group('cadastro', () {

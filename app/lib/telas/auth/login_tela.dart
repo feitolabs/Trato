@@ -70,12 +70,13 @@ class _LoginTelaState extends State<LoginTela> {
 
   /// Roda [acao]; se der certo vai para o app, se não mostra o erro em português.
   Future<void> _tentar(Future<SessaoAuth> Function() acao) async {
+    SessaoAuth sessao;
     setState(() {
       _carregando = true;
       _erroServico = null;
     });
     try {
-      await acao();
+      sessao = await acao();
     } on ErroAuth catch (e) {
       if (!mounted) return;
       // Cancelar o Google/Apple não é erro.
@@ -91,7 +92,7 @@ class _LoginTelaState extends State<LoginTela> {
       Navigator.of(context).pop();
       return;
     }
-    RotasTrato.irParaCliente(context);
+    RotasTrato.irParaInicio(context, sessao);
   }
 
   void _entrar() {

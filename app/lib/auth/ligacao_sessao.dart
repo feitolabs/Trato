@@ -9,6 +9,10 @@ class LigacaoSessao {
   LigacaoSessao(this._auth, this._sessao) {
     _atualizar(_auth.sessaoAtual);
     _inscricao = _auth.sessaoMudou.listen(_atualizar);
+    _sessao.renovar = () async {
+      final novo = await _auth.renovarToken();
+      return novo ?? _auth.tokenAtual;
+    };
   }
 
   final ServicoAuth _auth;
@@ -26,6 +30,7 @@ class LigacaoSessao {
 
   Future<void> encerrar() async {
     await _inscricao?.cancel();
+    _sessao.renovar = null;
     _sessao.sair();
   }
 }

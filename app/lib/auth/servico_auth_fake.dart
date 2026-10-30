@@ -27,6 +27,13 @@ class ServicoAuthFake implements ServicoAuth {
   final _controle = StreamController<SessaoAuth?>.broadcast();
 
   SessaoAuth? _sessao;
+  final Map<String, String?> _perfis = {};
+
+  /// Quantas renovações de token foram pedidas (para os testes).
+  int renovacoes = 0;
+
+  /// Se verdadeiro, [renovarToken] devolve nulo (refresh token vencido).
+  bool renovacaoFalha = false;
 
   /// Erro lançado uma vez na próxima chamada (ex.: `ErroAuth(TipoErroAuth.semInternet)`).
   ErroAuth? falharNaProxima;
@@ -64,13 +71,25 @@ class ServicoAuthFake implements ServicoAuth {
   String? get tokenAtual => _sessao == null ? null : 'token-de-teste-${_sessao!.id}';
 
   @override
+  Future<String?> renovarToken() async {
+    renovacoes++;
+    if (_sessao == null || renovacaoFalha) return null;
+    return 'token-renovado-$renovacoes-${_sessao!.id}';
+  }
+
+  @override
   Future<SessaoAuth> entrarComEmail({required String email, required String senha}) async {
     _checarFalha();
     final chave = _normalizar(email);
     final certa = _contas[chave];
     final ok = certa != null ? certa == senha : aceitaQualquerLogin;
     if (!ok) throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
-    return _entrou(SessaoAuth(id: 'fake-$chave', email: chave, celularConfirmado: true));
+    return _entrou(SessaoAuth(
+      id: 'fake-$chave',
+      email: chave,
+      celularConfirmado: true,
+      perfil: _perfis[chave],
+    ));
   }
 
   @override
@@ -80,7 +99,10 @@ class ServicoAuthFake implements ServicoAuth {
     if (_contas.containsKey(chave)) throw const ErroAuth(TipoErroAuth.emailJaUsado);
     _contas[chave] = dados.senha;
     _codigo.novoCadastro();
-    return _entrou(SessaoAuth(id: 'fake-$chave', email: chave, nome: dados.nome));
+    _perfis[chave] = dados.perfil;
+    return _entrou(
+      SessaoAuth(id: 'fake-$chave', email: chave, nome: dados.nome, perfil: dados.perfil),
+    );
   }
 
   @override
