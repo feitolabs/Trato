@@ -342,3 +342,7 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Seletor de provedor por `TRATO_PROVEDOR_PAGAMENTO` (`fake` padrão, `stripe` só `sk_test_`): `pagamentos/montagem.py`. `ServicoPagamento.recusar_aditivo` e `EstadoAditivo.RECUSADO` novos.
 - Migration NOVA `20261030130000_pedido_recusas.sql` (+ rollback), **só versionada, NÃO aplicada**: precisa do OK do João. Testada no Postgres local (pgserver).
 - Pendente: adaptador Postgres de cobranças/aditivos/termos para ligar o `ServicoPagamento` na fábrica (hoje a cobrança responde 503 em modo `postgres`); ligar as rotas no app.
+
+
+## 30/10/2026 — build-real
+Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feitos; ios.yml novo (actionlint ok, não executado); detalhes e bloqueios em docs/BUILD.md seção 6. Pendente: capturas das cascas (precisa login), ícone, keystore, iOS.
