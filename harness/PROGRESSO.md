@@ -372,3 +372,9 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Backend devolve ao app: `offline_capturada_em` no check-in/out reenviado (hoje 422 e tira da fila), caminho da foto na conclusão do upload da nota de materiais, destino `portfolio` em uploads, `taxa` em % no resumo do orçamento.
 - Limites: `POST /v1/contratos/{id}/cobranca` responde 503 em modo `postgres`; aprovar aditivo cria cobrança `aguardando_confirmacao` mas o app não tem a tela de pagar o aditivo.
 
+## 30/10/2026 — fix-sobras-seguranca
+
+- `docs/sobras-seguranca.md` lista cada sobra com estado. Corrigidos com teste: B3 (`texto_seguro`), B7 (cartão); B8 (job `pip-audit`); B2 em migration nova NÃO aplicada + rollback + checagens em `supabase/testes/testar_banco.py` (608 OK em Postgres local; mapa de rollbacks e lista de tabelas só-backend do teste atualizados).
+- `docs/roteiro-testes-reais.md` + `harness/teste_real_{rls,webhook,banco}.py`: sem criar conta nem gravar dado; `TRATO_TESTE_REAL=sim` obrigatório. Webhook testado em memória (`tests/api/test_sobras_script_webhook.py`); os outros não foram rodados contra o Supabase real.
+- Abertos com motivo: ServicoPagamento na fábrica (P7 + sessão backend-divergencias), aviso no bloqueio do código (A1), lock com hash, contadores em Redis, M6 (banir sessão no Auth), M11 (CPF), B6.
+

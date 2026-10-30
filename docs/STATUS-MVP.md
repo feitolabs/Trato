@@ -117,3 +117,11 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 | App: sessão em armazenamento seguro, lista permitida de `dart-define`, EXIF e afins (`fix-app`) | Corrigido e testado (`docs/fix-app.md`) |
 | Acesso: A1, A2, A8, M6, M7, M9 a M12, B1 (`fix-acesso`) | Corrigidos e testados (`docs/fix-acesso.md`); migration `20261030000000_fix_acesso_storage_pedido_historico.sql` **não aplicada**: precisa do OK do João. Sem xfail restante |
 
+## Sobras da revisão de segurança (30/10/2026)
+
+- Baixos B3 (erro do banco sem uuid) e B7 (cartão com captura e 3DS explícitos) corrigidos com teste; B8 ganhou o job
+  `pip-audit` no CI; B2 (colunas internas do dinheiro) está pronto em migration **não aplicada** (`20261030140000_b2_grants_por_coluna.sql`).
+- Nenhum `xfail` restante. Lista completa e estado de cada item: `docs/sobras-seguranca.md`.
+- Para provar com Supabase e Stripe reais: `docs/roteiro-testes-reais.md` e os scripts `harness/teste_real_*.py`
+  (isolamento entre dois usuários, webhook assinado e reenvio, `EXCLUDE` das faixas). Ainda **não** foram rodados contra o real.
+

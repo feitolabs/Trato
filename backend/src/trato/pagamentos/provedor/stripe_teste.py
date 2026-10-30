@@ -104,7 +104,12 @@ class ProvedorStripeTeste:
                 "confirm": "true",
             }
         else:
-            campos["payment_method_types[]"] = "card"
+            # Captura e 3DS explícitos (B7): o Stripe pede autenticação quando o banco exige.
+            campos |= {
+                "payment_method_types[]": "card",
+                "capture_method": "automatic",
+                "payment_method_options[card][request_three_d_secure]": "automatic",
+            }
         campos |= {f"metadata[{k}]": v for k, v in metadados.items()}
         corpo = self._chamar("POST", "/v1/payment_intents", campos, chave_idempotencia)
         return self._cobranca(corpo, meio)
