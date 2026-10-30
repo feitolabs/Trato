@@ -238,11 +238,11 @@ pedido: `403` (cliente) ou `404`.
 
 ## O que ainda falta (depende do João ou de outra tarefa)
 
-- **Migration NOVA, não aplicada:** `supabase/migrations/20261030140000_upload_destino_portfolio.sql`
+- **Migration APLICADA em 30/10/2026:** `supabase/migrations/20261030140000_upload_destino_portfolio.sql`
   (rollback em `supabase/rollback/upload_destino_portfolio_rollback.sql`). Só passa a importar quando
   as solicitações de upload forem gravadas em `upload_solicitacoes` (hoje ficam em memória).
 
-- **Migration NOVA, não aplicada:** `supabase/migrations/20261030130000_pedido_recusas.sql`
+- **Migration aplicada em 30/10/2026:** `supabase/migrations/20261030130000_pedido_recusas.sql`
   (rollback em `supabase/rollback/pedido_recusas_rollback.sql`). Sem ela, `POST .../recusar` em modo
   `postgres` responde erro. Precisa do OK do João (ver formato `PRECISO DO SEU OK` no relatório).
 - **Cobrança em modo `postgres`:** o `ServicoPagamento` ainda usa repositórios de cobrança, aditivo

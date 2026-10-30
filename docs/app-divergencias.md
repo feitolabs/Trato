@@ -60,7 +60,7 @@ do profissional. `POST /v1/pedidos/{id}/disputa/resposta` já existia; **novos**
 
 O que **não** deu para fechar, o motivo e o próximo passo:
 
-- **Migration NOVA, não aplicada:** `supabase/migrations/20261030140000_upload_destino_portfolio.sql`
+- **Migration APLICADA em 30/10/2026:** `supabase/migrations/20261030140000_upload_destino_portfolio.sql`
   (rollback em `supabase/rollback/upload_destino_portfolio_rollback.sql`; testada nos dois sentidos no
   Postgres descartável). Só importa quando as solicitações de upload forem gravadas em
   `upload_solicitacoes`: hoje o `ServicoUploads` guarda solicitações e mídias **em memória**, então

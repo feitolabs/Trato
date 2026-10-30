@@ -1,6 +1,6 @@
 -- Upload: novo destino `portfolio` em upload_solicitacoes.
 --
--- STATUS: NÃO APLICADA. Precisa do OK do João (formato PRECISO DO SEU OK no relatório).
+-- STATUS: APLICADA no Supabase em 30/10/2026 com o OK do João.
 -- Reversão: supabase/rollback/upload_destino_portfolio_rollback.sql
 --
 -- O backend já aceita `POST /v1/uploads` com destino `portfolio` (foto do portfólio do
