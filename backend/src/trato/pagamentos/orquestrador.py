@@ -189,6 +189,16 @@ class ServicoPagamento:
         self.aditivos.salvar(aprovado)
         return aprovado, cobranca
 
+    def recusar_aditivo(self, contexto: Contexto, pedido: Pedido, aditivo_id: str) -> Aditivo:
+        aditivo = self.aditivos.obter(aditivo_id)
+        if aditivo is None or aditivo.pedido_id != pedido.id:
+            raise ErroFluxo("Aditivo não encontrado.", 404)
+        if aditivo.estado is not EstadoAditivo.PROPOSTO:
+            raise ErroFluxo("Este aditivo já foi decidido.")
+        recusado = replace(aditivo, estado=EstadoAditivo.RECUSADO)
+        self.aditivos.salvar(recusado)
+        return recusado
+
     # --- webhooks ----------------------------------------------------------------------------
 
     def _pagamento_confirmado(

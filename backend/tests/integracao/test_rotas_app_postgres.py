@@ -67,11 +67,13 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
 
     # resumo: a taxa vem da faixa vigente do banco (750 bps para 90.000), nunca do app
     r = post(c, "/v1/orcamentos/resumo", "profissional", {"valor_centavos": 90_000})
-    assert r.json() == {
+    corpo = r.json()
+    assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
         "valor_centavos": 90_000,
         "taxa_centavos": 6_750,
         "liquido_centavos": 83_250,
     }
+    assert corpo["custo_provedor_estimado_centavos"] > 0
     r = post(c, "/v1/orcamentos/resumo", "profissional", {"valor_centavos": 200_000})
     assert r.json()["taxa_centavos"] == 12_000  # faixa de 600 bps acima de 100.000
 
@@ -196,7 +198,8 @@ def test_me_do_cliente_e_do_profissional(cenario):
     assert c.cliente.get("/v1/me").status_code == 401
     # nada de dado pessoal na resposta
     assert set(pro) == {
-        "id", "nome", "papel", "status", "nivel_verificacao", "nota_publica", "servicos_concluidos"
+        "id", "nome", "papel", "status", "nivel_verificacao", "nota_publica", "servicos_concluidos",
+        "papeis", "tem_perfil_profissional", "status_verificacao",
     }  # fmt: skip
 
 

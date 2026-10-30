@@ -28,6 +28,7 @@ class EstadoCobranca(StrEnum):
 class EstadoAditivo(StrEnum):
     PROPOSTO = "proposto"  # profissional pediu; nada é cobrado
     APROVADO = "aprovado"  # cliente aprovou no app; cobrança criada
+    RECUSADO = "recusado"  # cliente recusou; nada é cobrado
     PAGO = "pago"  # webhook confirmou
 
 

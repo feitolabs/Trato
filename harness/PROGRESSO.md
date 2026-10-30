@@ -336,3 +336,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Os `xfail(strict=True)` de acesso viraram testes verdes: não resta xfail na suíte. Com isso todos os achados da revisão de segurança (críticos a médios) têm correção em develop; ficam os itens "pendente" de cada `docs/fix-*.md` e os baixos do app/painel.
 - Testes em develop: 1054 no backend (1 pulado), 638 no app, 78 no painel.
 
+## 30/10/2026 — Rotas de orçamento, cobrança, garantia, aditivo, perfil e pedidos abertos (`claude/rotas-pedido-pagamento-10276d`)
+
+- Novas rotas em `api/rotas_pedido_contrato.py` (`/v1/contratos/{id}` = id do pedido): detalhe do orçamento, cobrança e estado do pagamento (nunca "pago" antes do webhook assinado), garantia, aditivos (propor, listar, aprovar/recusar só pelo cliente), nota de material, avaliação, `GET/PATCH /v1/me` (cria a linha se faltar), pedidos abertos com filtros e ordem, recusar pedido. Resumo do orçamento agora traz o custo estimado do provedor. Contrato de cada rota em `docs/api-rotas.md`.
+- Seletor de provedor por `TRATO_PROVEDOR_PAGAMENTO` (`fake` padrão, `stripe` só `sk_test_`): `pagamentos/montagem.py`. `ServicoPagamento.recusar_aditivo` e `EstadoAditivo.RECUSADO` novos.
+- Migration NOVA `20261030130000_pedido_recusas.sql` (+ rollback), **só versionada, NÃO aplicada**: precisa do OK do João. Testada no Postgres local (pgserver).
+- Pendente: adaptador Postgres de cobranças/aditivos/termos para ligar o `ServicoPagamento` na fábrica (hoje a cobrança responde 503 em modo `postgres`); ligar as rotas no app.

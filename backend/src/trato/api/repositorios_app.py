@@ -42,6 +42,55 @@ class OrcamentoDoPedido:
 
 
 @dataclass(frozen=True)
+class ItemDoOrcamento:
+    tipo: str
+    descricao: str
+    quantidade: str  # decimal em texto ("1.50"): o app só mostra
+    valor_unitario_centavos: int
+    total_centavos: int
+
+
+@dataclass(frozen=True)
+class OrcamentoDetalhe:
+    """Orçamento enviado, com itens, validade e o que ficou fora do escopo."""
+
+    id: str
+    pedido_id: str
+    profissional_id: str
+    profissional_nome: str | None
+    versao: int
+    status: str
+    valor_centavos: int
+    prazo_execucao_dias: int | None
+    validade_ate: datetime | None
+    garantia_dias: int | None
+    fora_do_escopo: str | None
+    sinal_material_centavos: int | None
+    observacoes: str | None
+    enviado_em: datetime | None
+    itens: tuple[ItemDoOrcamento, ...] = ()
+
+
+@dataclass(frozen=True)
+class RecusaPedido:
+    pedido_id: str
+    profissional_id: str
+    motivo: str
+    criada_em: datetime
+
+
+@dataclass(frozen=True)
+class NotaMaterial:
+    id: str
+    pedido_id: str
+    profissional_id: str
+    foto_storage_path: str
+    itens: tuple[tuple[str, str, int, int], ...]  # (descricao, quantidade, unitario, total)
+    total_centavos: int
+    enviada_em: datetime
+
+
+@dataclass(frozen=True)
 class PedidoAberto:
     """O que o profissional vê de um pedido que ainda recebe orçamentos (sem endereço exato)."""
 
@@ -111,6 +160,16 @@ class RepositorioNotificacoes(Protocol):
 class RepositorioUsuarios(Protocol):
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None: ...
 
+    def garantir(self, usuario_id: str, nome: object = None) -> object | None:
+        """Cria a linha em `usuarios` se faltar (idempotente)."""
+
+    def atualizar_nome(self, usuario_id: str, nome: str) -> None: ...
+
+    def status_verificacao(self, usuario_id: str) -> str | None:
+        """Status da verificação mais recente do profissional, ou None."""
+
+    def tem_perfil_profissional(self, usuario_id: str) -> bool: ...
+
 
 class RepositorioVerificacoes(Protocol):
     def enviar(
@@ -129,6 +188,19 @@ class RepositorioAvaliacoes(Protocol):
     def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None: ...
 
     def salvar(self, avaliacao: Avaliacao) -> None: ...
+
+
+class RepositorioRecusas(Protocol):
+    def recusar(self, recusa: RecusaPedido) -> None:
+        """Grava a recusa; recusar de novo o mesmo pedido não muda nada (idempotente)."""
+
+    def do_profissional(self, profissional_id: str) -> Sequence[RecusaPedido]: ...
+
+
+class RepositorioNotasMaterial(Protocol):
+    def registrar(self, nota: NotaMaterial) -> NotaMaterial: ...
+
+    def do_pedido(self, pedido_id: str) -> Sequence[NotaMaterial]: ...
 
 
 class ProvedorTaxa(Protocol):
