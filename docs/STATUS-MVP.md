@@ -85,7 +85,7 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 1. ~~Token do Supabase Auth no `SessaoTrato`~~ feito (`LigacaoSessao`). ~~Pontos de entrada~~ feitos, menos disputa/retrabalho pela lista de pedidos do profissional.
 3. Criar as rotas que faltam no backend (orçamentos, cobrança, mensagens, notificações, perfil, pedidos abertos, verificação).
 4. Envio de fotos e posição ao backend (buckets por URL assinada): implementar `EnvioMidia` quando a rota existir. Câmera e GPS já capturam; textos de permissão em `AndroidManifest.xml` e `Info.plist`. Não testado em aparelho real.
-5. Busca de textos proibidos (D13) no `verificar`.
+5. ~~Busca de textos proibidos (D13) no `verificar`~~ feita.
 
 ## Painel administrativo (`admin/`, web)
 
@@ -93,6 +93,16 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 |---|---|
 | Verificação, disputas, pagamentos (leitura), busca e suporte, configurações, auditoria (F7.1 a F7.6) | Demo: telas com dados de exemplo e controle por papel (`docs/painel-admin.md`) |
 | API administrativa no backend | Pronta e testada, em memória e contra Postgres local (`docs/api-admin.md`) |
-| Ligação painel ↔ API | Pendente: alinhar caminhos e formatos e trocar os fakes por repositórios HTTP (`--dart-define`) |
+| Ligação painel ↔ API | Feita: cliente HTTP escolhido por `--dart-define`, com fallback para os fakes (`docs/painel-admin.md`). Falta testar contra uma API admin com banco real |
 | Perfis de acesso por função (F7.7) | Papéis no painel e na API; sem usuários de equipe reais (seed do administrador é "A DEFINIR PELO JOÃO") |
+
+## Backend: notificações, segurança e LGPD (30/10/2026)
+
+| Parte | Estado |
+|---|---|
+| Notificações, conversas e agendador das rotinas | Pronto no backend, testado; ligar no app (hoje o app usa fakes nessas áreas) |
+| Mascaramento do chat, antifraude, limite de taxa (F8.1, F8.2) | Pronto no backend (`docs/backend-seguranca.md`) |
+| LGPD: exportar dados, exclusão em 2 passos, consentimentos (F8.3) | Serviços e rotas em memória; faltam adaptadores/migrations Postgres (OK do João) e prazos de retenção (jurídico) |
+| Revisão de segurança | Relatório e 13 testes xfail que reproduzem os achados críticos/altos em `docs/` e `backend/tests/`; correção ainda por fazer |
+| Fidelidade visual (app × PDF) | Aplicada em tema e componentes; `docs/fidelidade-visual.md`. Ícones (P13), fontes (P12) e onboarding 2/3 (P14) seguem com o João |
 

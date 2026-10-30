@@ -303,3 +303,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Corrigido em `app/lib/tema/` e componentes: margem 16 (24 no onboarding/login/cadastro), padding de cartão 16, contorno de controles `#A3ABA3`, campo 52, texto 16 no lugar de 17, legenda 14, chip 13, linha de lista 52; rótulos semânticos em checkboxes e cartões tocáveis. Goldens e `responsivo_test` atualizados.
 - Textos que o PDF contradiz com a D13 ficaram neutros. Ícones (P13), fontes (P12) e onboarding 2/3 (P14) seguem com o João.
 - Verificação: etapas segredos e app OK (629 testes); backend não rodou (faltam ruff/pytest etc. no ambiente; backend não foi tocado). Contraste apontado pelo verificador do Flutter tratado como falso positivo, sem validar em aparelho.
+
+## 30/10/2026 — Rodada de integração: painel ligado, notificações, segurança/LGPD, revisão e fidelidade visual
+
+- Em develop (sem push), cada uma verificada: `feature/f7-painel-ligacao`, `backend-notificacoes`, `revisao-seguranca` (relatório + 13 xfail que não quebram o `verificar`), `backend-seguranca-lgpd` e `app-fidelidade-visual`.
+- `backend-seguranca-lgpd` falhou na 1ª verificação só pelo scanner de segredos (JWT de exemplo em `tests/seguranca/test_http.py`); marquei a linha com `verificar: ignorar` e a verificação passou. Conflito em `harness/PROGRESSO.md` (fidelidade visual) resolvido com os dois lados.
+- Incidente: um lote em segundo plano que eu já tinha cancelado continuou rodando e integrou o painel e as notificações; verifiquei que ambos passaram e que não houve mistura de árvores. A 1ª tentativa da `lgpd` foi perdida por troca de branch no meio da verificação e refeita do zero.
+- Testes em develop: 883 no backend (1 pulado, 13 xfail), 629 no app, 76 no painel.
+- Segue pendente: correção dos achados da revisão de segurança, adaptadores Postgres da LGPD, ligar notificações/mensagens do backend no app, seeds, push e PR para `main`.
+
