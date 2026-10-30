@@ -4,6 +4,7 @@ import 'auth/config_auth.dart';
 import 'auth/ligacao_sessao.dart';
 import 'auth/servico_auth.dart';
 import 'auth/servico_auth_supabase.dart';
+import 'telas/auth/login_tela.dart';
 import 'dados/config.dart';
 import 'dados/repositorios_trato.dart';
 import 'dados/sessao.dart';
@@ -19,6 +20,22 @@ const _mostrarGaleria = bool.fromEnvironment('GALERIA');
 /// Sessão do usuário. O serviço de login entrega o token aqui; o cliente HTTP o envia.
 final sessaoTrato = SessaoTrato();
 
+/// Navegador raiz: permite abrir o login por cima da tela em uso quando a sessão expira.
+final navegadorTrato = GlobalKey<NavigatorState>();
+var _loginDeSessaoAberto = false;
+
+/// 401 da API: o token já foi limpo; encerra o login guardado e abre o login por cima da tela
+/// atual (push, não troca), então o que a pessoa digitou continua lá embaixo.
+void abrirLoginPorSessaoExpirada() {
+  final nav = navegadorTrato.currentState;
+  if (nav == null || _loginDeSessaoAberto) return;
+  _loginDeSessaoAberto = true;
+  ServicoAuthPadrao.atual.sair().catchError((_) {});
+  nav
+      .push(MaterialPageRoute<void>(builder: (_) => const LoginTela(sessaoExpirada: true)))
+      .whenComplete(() => _loginDeSessaoAberto = false);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Sem chaves do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY por --dart-define), o login fica no
@@ -29,6 +46,7 @@ Future<void> main() async {
   }
   // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
   LigacaoSessao(ServicoAuthPadrao.atual, sessaoTrato);
+  sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   RotasTrato.dispositivo = dispositivoReal();
   RotasTrato.repos = RepositoriosTrato.deConfig(ConfigTrato.doAmbiente(), sessaoTrato);
   runApp(const TratoApp());
@@ -41,6 +59,7 @@ class TratoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Trato',
+      navigatorKey: navegadorTrato,
       debugShowCheckedModeBanner: false,
       theme: TemaTrato.claro,
       builder: (context, filho) => EscalaFonteLimitada(child: filho!),

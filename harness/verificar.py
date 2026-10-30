@@ -72,6 +72,13 @@ def checar_segredos() -> bool:
     return ok
 
 
+def checar_defines() -> bool:
+    """M14: nenhum --dart-define com segredo (ver harness/verificar_defines.py)."""
+    import verificar_defines
+
+    return verificar_defines.main() == 0
+
+
 def checar_env_ignorado() -> bool:
     titulo(".env ignorado pelo git")
     resultado = subprocess.run(["git", "check-ignore", "-q", ".env"], cwd=RAIZ)
@@ -210,7 +217,7 @@ def checar_admin() -> bool:
 
 
 ETAPAS = {
-    "segredos": [checar_segredos, checar_env_ignorado],
+    "segredos": [checar_segredos, checar_env_ignorado, checar_defines],
     "backend": [checar_backend],
     "app": [checar_cores_soltas, checar_textos_proibidos, checar_app, checar_admin],
 }
