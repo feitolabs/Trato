@@ -24,6 +24,9 @@ def criar_router() -> APIRouter:
 def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
     """Liga as rotas v1 ao app. Sem `contexto`, as rotas respondem 503 até alguém ligá-lo
     (`app.state.contexto = ...`), o que acontece quando os adaptadores reais existirem."""
+    from trato.notificacoes import registrar_rotas  # antes: o GET /v1/notificacoes daqui vale
+
+    registrar_rotas(app, contexto)
     app.include_router(criar_router())
     instalar_tratadores(app)
     if contexto is not None:
