@@ -112,8 +112,8 @@ Derivada de `docs/v2-impacto.md`. Não depende de aplicar migrations.
 
 ## Fase 8 — Segurança, LGPD, conformidade
 
-- [ ] **F8.1** Mascarar telefone, endereço só após contratar. - [ ] **F8.2** Antifraude básico.
-- [ ] **F8.3** LGPD: consentimentos, exportar, excluir, retenção. - [ ] **F8.4** Regras das lojas.
+- [x] **F8.1** Mascarar telefone, endereço só após contratar. - [x] **F8.2** Antifraude básico (backend; ver `docs/backend-seguranca.md`).
+- [~] **F8.3** LGPD: consentimentos, exportar, excluir, retenção (serviços e rotas em memória; faltam migrations e adaptadores Postgres, precisam do OK do João). - [ ] **F8.4** Regras das lojas.
 - [ ] **F8.5** Advisors + varredura de segredos no repo. - [x] **F8.6** Lista para advogado e contador.
 
 ## Fase 9 — Entrega

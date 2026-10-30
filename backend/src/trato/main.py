@@ -3,9 +3,10 @@
 from trato import __version__
 from trato.api.fabrica import criar_app_da_config
 from trato.config import obter_config
+from trato.seguranca import registrar_rotas
 
 # TRATO_PERSISTENCIA=memoria (padrão) | postgres: ver docs/api-persistencia.md.
-app = criar_app_da_config()
+app = registrar_rotas(criar_app_da_config())  # Fase 8: segurança, antifraude e LGPD
 
 
 @app.get("/saude")

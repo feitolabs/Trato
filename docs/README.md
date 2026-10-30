@@ -6,6 +6,7 @@
 - `COMO-RODAR.md` — comandos para rodar tudo na máquina local.
 - `ENTREGA.md` — o que está pronto, CI, checklist e o que depende do João.
 - `BUILD.md` — build Android/iOS, assinatura e `--dart-define`.
+- `backend-seguranca.md` — segurança, antifraude e LGPD do backend (Fase 8).
 
 Documentos de produto (escopo, telas, regras) ficam na raiz do projeto.
 Tarefas, decisões e progresso ficam em `harness/`.

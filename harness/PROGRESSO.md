@@ -289,3 +289,9 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - `claude/zealous-mirzakhani-a34c51` e `claude/zealous-shtern-57c8c4` têm só o "Initial commit" do GitHub (já em `main`): não há conteúdo a integrar; o trabalho dessas sessões entrou pelas branches `feature/fase-4-pendencias-backend` e `feature/fase-5-pendencias-app`.
 - Próximo: ligar o painel à API admin (alinhar `docs/painel-admin.md` com `docs/api-admin.md`, repositórios reais por `--dart-define` com fallback fake). Pedido enviado à sessão `painel-admin`.
 
+
+## 30/10/2026 — Fase 8 no backend (segurança, antifraude, LGPD)
+
+- Pacotes novos `trato/seguranca/` e `trato/lgpd/`; ligação por uma linha em `main.py`. Mascaramento do chat (números por extenso, e-mail disfarçado, links, perfis, endereço), limite de taxa, proteção de SMS, conta duplicada, contorno (só flag), cabeçalhos, CORS fechado, tamanho de corpo, upload e logs sem dado pessoal.
+- LGPD: `GET /v1/me/dados`, `POST /v1/me/exclusao` (2 passos, carência), consentimentos. Ledger e auditoria nunca tocados.
+- `verificar.py`: 840 testes, ruff ok. Doc: `docs/backend-seguranca.md`. Pendente: migrations/adaptadores Postgres (OK do João) e prazos de retenção (jurídico).
