@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Protocol
 
-from trato.api.repositorios_app import OrcamentoDoPedido, PedidoAberto
+from trato.api.repositorios_app import OrcamentoDetalhe, OrcamentoDoPedido, PedidoAberto
 from trato.disputas import ConfigDisputa, Disputa
 from trato.financeiro.ledger import Conta, Lancamento, SaldoPedido
 from trato.garantias import ConfigGarantia, Garantia, Retrabalho
@@ -156,6 +156,9 @@ class RepositorioOrcamentos(Protocol):
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:
         """Orçamentos enviados (e o aceito) do pedido, o mais barato primeiro."""
+
+    def detalhe(self, orcamento_id: str) -> OrcamentoDetalhe | None:
+        """Orçamento com itens, validade e fora do escopo; rascunho nunca é devolvido."""
 
 
 class RepositorioContratos(Protocol):

@@ -20,18 +20,18 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Busca com serviço (`busca/`) | Demo, ligada | É a aba Buscar do cliente (`RotasTrato.abaBuscar`), abre o perfil público. Filtros e mapa da tela antiga (`BuscarTela`) saíram da aba; a busca real depende do backend. |
 | Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
 | Seus pedidos | API | Título genérico ("Pedido #XXXX"): a API não devolve título nem nome do profissional. |
-| Orçamentos recebidos e detalhe | Demo | Falta `GET /v1/pedidos/{id}/orcamentos`. O aceite já tem rota. |
-| Pagamento e aguardando confirmação | Demo | Falta a rota de cobrança no provedor de teste. O app nunca mostra "pago" antes do backend (D13). |
+| Orçamentos recebidos e detalhe | Rotas prontas | `GET /v1/pedidos/{id}/orcamentos` e `GET /v1/orcamentos/{id}` (itens, validade, fora do escopo). Falta o app trocar o demo (`docs/api-rotas.md`). |
+| Pagamento e aguardando confirmação | Rotas prontas | `POST /v1/contratos/{id}/cobranca` e `GET .../pagamento` (provedor fake por padrão, Stripe só de teste). Em modo `postgres` a cobrança ainda não é gravada no banco (503). O app nunca mostra "pago" antes do webhook (D13). |
 | Pedido em execução, código de início | API | Fotos do check-in não vêm da API. |
 | Aditivo e nota de materiais (lado do cliente) | Demo, **não ligadas** | `ver_nota_tela` e `responder_aditivo_tela` existem; falta ponto de entrada no pedido em execução. Sem protótipo. |
 | Conclusão, confirmar serviço | API | Valores de `GET .../saldo`. |
-| Avaliação | API (valores) | Não há rota para enviar; mostra "função ainda não disponível". |
+| Avaliação | API (valores) | `POST /v1/contratos/{id}/avaliacao` pronta; o app ainda mostra "função ainda não disponível". |
 | Relatar problema (disputa) | API | `POST .../disputa`. |
-| Garantia e retrabalho | Retrabalho: API. Garantia: Demo | Falta `GET .../garantia`. |
+| Garantia e retrabalho | Retrabalho: API. Garantia: rota pronta | `GET /v1/contratos/{id}/garantia`; falta ligar no app. |
 | Chat do pedido | Demo | Faltam `GET/POST /v1/pedidos/{id}/mensagens`. |
 | Mensagens (aba, lista de conversas) | Demo, sem protótipo | Abre o chat do pedido. Falta rota da lista. |
 | Notificações | Demo, sem protótipo | Falta `GET /v1/notificacoes`. Marcar como lida é local. |
-| Perfil do cliente | Demo | Falta `GET /v1/me`. |
+| Perfil do cliente | Rotas prontas | `GET` e `PATCH /v1/me`; falta ligar no app. |
 | Central de privacidade (LGPD) e excluir conta | Demo, sem protótipo | Texto de prazos a definir com o jurídico. Exclusão real depende do backend. |
 | Ajuda | Demo, sem protótipo | Perguntas frequentes provisórias. |
 | Termos e demais itens do Perfil | Sem tela | Abrem "Em breve". |

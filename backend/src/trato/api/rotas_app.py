@@ -21,10 +21,9 @@ from trato.api.repositorios_app import (
     TIPOS_DOCUMENTO,
     Avaliacao,
     DocumentoVerificacao,
-    PerfilDetalhe,
 )
 from trato.api.servicos import carregar_pedido, eh_participante
-from trato.pagamentos.custo import MeioPagamento
+from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_etiquetas, limpar_texto
@@ -90,6 +89,11 @@ class PerfilOut(BaseModel):
     nivel_verificacao: str | None
     nota_publica: float | None
     servicos_concluidos: int | None
+    papeis: list[str] = Field(default_factory=list)
+    tem_perfil_profissional: bool = False
+    status_verificacao: str | None = Field(
+        None, description="Verificação mais recente: enviada, em_analise, aprovada ou recusada."
+    )
 
 
 class PedidoAbertoOut(BaseModel):
@@ -106,9 +110,14 @@ class PedidoAbertoOut(BaseModel):
 
 
 class ResumoOrcamentoOut(BaseModel):
-    valor_centavos: int
-    taxa_centavos: int
-    liquido_centavos: int
+    valor_centavos: int = Field(description="Bruto: o total do orçamento.")
+    taxa_centavos: int = Field(description="Taxa do Trato pela configuração vigente.")
+    liquido_centavos: int = Field(description="O que o profissional recebe: bruto menos a taxa.")
+    custo_provedor_estimado_centavos: int = Field(
+        description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
+        "Sai da taxa do Trato; não reduz o líquido do profissional."
+    )
+    custo_provedor_estimativa: bool = True
 
 
 class VerificacaoOut(BaseModel):
@@ -196,6 +205,13 @@ def _pedido_visivel(
     if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.estado is Estado.ABERTO:
         return pedido
     raise HTTPException(404, "Pedido não encontrado.")
+
+
+def _custo_provedor_estimado() -> ConfigCustoPagamento:
+    """Custos do provedor ainda são ESTIMATIVAS até haver proposta comercial (P7)."""
+    from trato.margem.relatorio import CUSTO_PROVEDOR
+
+    return CUSTO_PROVEDOR
 
 
 # --- Orçamentos e pagamento -------------------------------------------------------------
@@ -298,10 +314,14 @@ def resumo_do_orcamento(
     if contexto.taxa is None:
         raise HTTPException(503, "A taxa ainda não foi configurada.")
     taxa = min(contexto.taxa.calcular(corpo.valor_centavos), corpo.valor_centavos)
+    custo = contexto.extras.get("custo_provedor") or _custo_provedor_estimado()
     return ResumoOrcamentoOut(
         valor_centavos=corpo.valor_centavos,
         taxa_centavos=taxa,
         liquido_centavos=corpo.valor_centavos - taxa,
+        custo_provedor_estimado_centavos=max(
+            calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento
+        ),
     )
 
 
@@ -414,33 +434,7 @@ def listar_notificacoes(
     ]
 
 
-@router.get("/me", response_model=PerfilOut, summary="Meu perfil")
-def meu_perfil(
-    usuario: Usuario = Depends(usuario_atual),
-    contexto: Contexto = Depends(obter_contexto),
-) -> PerfilOut:
-    perfil = contexto.usuarios.detalhe(usuario.id) or PerfilDetalhe(usuario.id, None, usuario.papel)
-    return PerfilOut(
-        id=perfil.id,
-        nome=perfil.nome,
-        papel=usuario.papel.value,
-        status=perfil.status,
-        nivel_verificacao=perfil.nivel_verificacao,
-        nota_publica=perfil.nota_publica,
-        servicos_concluidos=perfil.servicos_concluidos,
-    )
-
-
-@router.get(
-    "/profissional/pedidos-abertos",
-    response_model=list[PedidoAbertoOut],
-    summary="Pedidos abertos que combinam com o profissional",
-)
-def pedidos_abertos(
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
-    contexto: Contexto = Depends(obter_contexto),
-) -> list[PedidoAbertoOut]:
-    return [PedidoAbertoOut(**vars(p)) for p in contexto.pedidos.listar_abertos(usuario.id)]
+# `GET /v1/me`, `PATCH /v1/me` e `GET /v1/profissional/pedidos-abertos`: `rotas_pedido_contrato.py`.
 
 
 # --- Verificação do profissional --------------------------------------------------------

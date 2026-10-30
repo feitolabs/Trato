@@ -35,6 +35,8 @@ class Config(BaseSettings):
     # Segredo do servidor para os códigos de check-in/check-out (nunca vai ao banco em claro).
     trato_codigo_segredo: SecretStr = SecretStr("")
 
+    # fake (padrão) | stripe (modo teste). Ver `trato.pagamentos.montagem`.
+    trato_provedor_pagamento: str = "fake"
     stripe_secret_key: SecretStr = SecretStr("")
     stripe_publishable_key: str = ""
     stripe_webhook_secret: SecretStr = SecretStr("")

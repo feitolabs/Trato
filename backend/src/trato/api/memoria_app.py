@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
+from trato.api.auth import PapelUsuario
 from trato.api.repositorios_app import (
     Avaliacao,
     DocumentoVerificacao,
+    NotaMaterial,
     PerfilDetalhe,
+    RecusaPedido,
     Verificacao,
 )
 from trato.pagamentos.taxa import ConfigTaxa, calcular_taxa
@@ -87,12 +91,32 @@ class NotificacoesEmMemoria:
 class UsuariosEmMemoria:
     def __init__(self, perfis: Sequence[PerfilDetalhe] = ()) -> None:
         self._perfis = {p.id: p for p in perfis}
+        self.verificacoes: dict[str, str] = {}  # profissional_id -> status (testes preenchem)
+        self.profissionais: set[str] = set()
 
     def adicionar(self, perfil: PerfilDetalhe) -> None:
         self._perfis[perfil.id] = perfil
 
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None:
         return self._perfis.get(usuario_id)
+
+    def garantir(self, usuario_id: str, nome: object = None) -> PerfilDetalhe | None:
+        if usuario_id not in self._perfis:
+            self._perfis[usuario_id] = PerfilDetalhe(
+                usuario_id, nome if isinstance(nome, str) else None, PapelUsuario.CLIENTE
+            )
+        return self._perfis[usuario_id]
+
+    def atualizar_nome(self, usuario_id: str, nome: str) -> None:
+        atual = self.garantir(usuario_id)
+        if atual is not None:
+            self._perfis[usuario_id] = replace(atual, nome=nome)
+
+    def status_verificacao(self, usuario_id: str) -> str | None:
+        return self.verificacoes.get(usuario_id)
+
+    def tem_perfil_profissional(self, usuario_id: str) -> bool:
+        return usuario_id in self.profissionais
 
 
 class VerificacoesEmMemoria:
@@ -134,3 +158,26 @@ class TaxaEmMemoria:
 
     def calcular(self, valor_centavos: int) -> int:
         return calcular_taxa(valor_centavos, self._config)
+
+
+class RecusasEmMemoria:
+    def __init__(self) -> None:
+        self._itens: dict[tuple[str, str], RecusaPedido] = {}
+
+    def recusar(self, recusa: RecusaPedido) -> None:
+        self._itens.setdefault((recusa.pedido_id, recusa.profissional_id), recusa)
+
+    def do_profissional(self, profissional_id: str) -> Sequence[RecusaPedido]:
+        return tuple(r for (_, p), r in self._itens.items() if p == profissional_id)
+
+
+class NotasMaterialEmMemoria:
+    def __init__(self) -> None:
+        self._itens: list[NotaMaterial] = []
+
+    def registrar(self, nota: NotaMaterial) -> NotaMaterial:
+        self._itens.append(nota)
+        return nota
+
+    def do_pedido(self, pedido_id: str) -> Sequence[NotaMaterial]:
+        return tuple(n for n in self._itens if n.pedido_id == pedido_id)
