@@ -69,11 +69,12 @@ As rotas antigas `/v1/pedidos/{id}/aditivos...` seguem valendo.
 
 | Método e caminho | Quem pode | Corpo | Resposta |
 |---|---|---|---|
-| `POST /v1/contratos/{id}/notas-material` | só o profissional contratado, serviço em andamento | `{foto_storage_path, itens[] {descricao, quantidade (decimal, até 2 casas, > 0), valor_unitario_centavos}}` (1 a 50 itens) | `201` `{id, contrato_id, itens[] {descricao, quantidade, valor_unitario_centavos, total_centavos}, total_centavos, enviada_em}`. O total sai do backend (quantidade × unitário, meio para cima) |
+| `POST /v1/contratos/{id}/notas-material` | só o profissional contratado, serviço em andamento | `{midia_id` **ou** `foto_storage_path, itens[] {descricao, quantidade (decimal, até 2 casas, > 0), valor_unitario_centavos}}` (1 a 50 itens) | `201` `{id, contrato_id, itens[] {descricao, quantidade, valor_unitario_centavos, total_centavos}, total_centavos, enviada_em}`. O total sai do backend (quantidade × unitário, meio para cima) |
 | `GET /v1/contratos/{id}/notas-material` | cliente e profissional do contrato | — | lista no mesmo formato |
 
-`foto_storage_path` é o **caminho** da foto no bucket privado (o app envia o arquivo por URL assinada),
-nunca uma URL nem `..`.
+A foto vem do upload: mande o `midia_id` devolvido por `POST /v1/uploads/{id}/concluir` (seção
+"Nota de material: `midia_id` ou caminho"). `foto_storage_path` é o **caminho** no bucket privado,
+nunca uma URL nem `..`; fica para quando o serviço de upload não está ligado.
 
 ## Avaliação
 
@@ -104,7 +105,142 @@ cuja faixa cruza o intervalo pedido; pedido sem faixa sempre entra. Pedido que o
 não volta para a lista dele. Recusar não avisa o cliente nem muda o estado do pedido; repetir é seguro;
 pedido que ele não podia ver responde `404`.
 
+## Duas rotas de pagamento (qual usar quando)
+
+| Rota | Para que serve | Resposta |
+|---|---|---|
+| `GET /v1/pedidos/{id}/pagamento` | **Antes de cobrar**: o que mostrar na tela de pagar (valor e meios). Cliente do pedido ou equipe com permissão | `{pedido_id, estado, valor_centavos, pago_centavos, pagamento_confirmado, meios_disponiveis: ["pix","cartao"], cobranca_pendente_id}` |
+| `GET /v1/contratos/{id}/pagamento` | **Depois de cobrar**: o estado do pagamento (consultar até `pago: true`). Cliente e profissional | `{contrato_id, estado_pagamento, pago, valor_centavos, pago_centavos, cobranca_id, meio, estado_pedido}` |
+
+O app lê **valor e meios** da primeira e **só acredita em "pago"** na segunda (`pago: true`, que vem
+do webhook assinado). `pagamento_confirmado` da primeira tem o mesmo sentido, mas não é a rota de
+consulta. Valores sempre em centavos inteiros.
+
+## Mensagens
+
+| Método e caminho | Quem pode | Corpo / parâmetros | Resposta |
+|---|---|---|---|
+| `GET /v1/pedidos/{id}/mensagens` | cliente do pedido, profissional (do pedido ou que pode orçar), mediador em disputa | query `profissional_id` (cliente, antes de contratar) | lista `{id, autor_id, minha, texto, mascarada, enviada_em, lida_em}` |
+| `POST /v1/pedidos/{id}/mensagens` | cliente e profissional | `{texto}` (1 a 2000), query `profissional_id` (cliente) | `201` a mensagem |
+| `GET /v1/conversas` | cliente e profissional | — | lista `{id, pedido_id, outra_parte_id, encerrada, nao_lidas, ultima_mensagem, ultima_em, ultima_minha}` (mais recente primeiro) |
+| `POST /v1/mensagens/{id}/lida` | quem recebeu a mensagem | — | `{lida_em}` |
+| `POST /v1/conversas/{id}/lida` | participante | — | `{marcadas}` |
+
+Antes da contratação, e-mail, telefone, link e endereço no texto saem ocultos (`mascarada: true`).
+Conversa do **cliente** sem `profissional_id` só funciona depois do aceite (vale o contratado); antes
+disso o app precisa mandar `?profissional_id=` (sem ele: `422`). A conversa pertence a UM profissional.
+
+## Notificações, preferências e push
+
+| Método e caminho | Corpo | Resposta |
+|---|---|---|
+| `GET /v1/notificacoes?nao_lidas=&limite=` | — | lista `{id, tipo, canal, titulo, corpo, dados {link,…}, criada_em, lida, lida_em}` |
+| `POST /v1/notificacoes/{id}/lida` | — | a notificação com `lida: true`. Repetir devolve a mesma `lida_em`. De outra pessoa: `404` |
+| `GET /v1/notificacoes/preferencias` | — | `{categorias: {categoria: {app, push, email: bool}}}` (com o padrão aplicado) |
+| `PUT /v1/notificacoes/preferencias` | `{categorias: {categoria: {canal: bool}}}` | o mesmo formato. Troca só o que veio. Canal fora de `app/push/email`: `422` (SMS/WhatsApp não são preferência, D14) |
+| `POST /v1/dispositivos` | `{token (8 a 4096), plataforma: "android"\|"ios"\|"web"}` | `204`. O token é de UMA pessoa: registrar de novo move para quem registrou |
+| `DELETE /v1/dispositivos` | `{token}` | `204`. Só o dono desliga; token inexistente ou alheio também responde `204` (não revela de quem é). Chamar ao sair da conta |
+
+## Upload de arquivos (obrigatório para foto e documento)
+
+1. `POST /v1/uploads` `{destino, nome_arquivo, content_type, tamanho_bytes, pedido_id?, tipo_documento?}`
+   → `201` `{upload_id, url_envio, metodo: "PUT", expira_em_segundos, content_type}`.
+2. `PUT url_envio` com o arquivo (mesmo `content_type`).
+3. `POST /v1/uploads/{upload_id}/concluir` `{latitude?, longitude?}` → `{upload_id, destino, status,
+   midia_id, sha256, tamanho_bytes}`. O backend relê o arquivo, confere o tipo REAL, o tamanho, tira
+   EXIF/GPS de imagem e só então registra. Arquivo falso é apagado e recusado (`422`).
+
+Destinos: `pedido`, `antes`, `durante`, `depois`, `checkin`, `checkout`, `nota_material`, `disputa`,
+`retrabalho`, `chat`, `avatar`, `verificacao`, **`portfolio`**. Destinos de pedido exigem `pedido_id` e
+ser parte dele (`404` se não for; `403` se o papel não pode: check-in, check-out, nota, durante e
+depois só do profissional; `pedido` só do cliente). `portfolio` e `avatar` não têm pedido;
+`portfolio` é só do profissional, só imagem (JPEG, PNG, WebP), limite em `TRATO_SEG_UPLOADS`
+(padrão 8 MB), EXIF e GPS removidos, guardado em `<seu id>/portfolio/`.
+
+**O upload é obrigatório na verificação.** `POST /v1/profissional/verificacao` com o serviço de
+upload ligado só aceita `documentos: [{tipo, upload_id}]` de um envio **concluído**, do mesmo dono e do
+mesmo tipo (destino `verificacao`); caminho cru (`storage_path`) é recusado. Sem o serviço ligado
+(`503` no upload) o app não consegue verificar.
+
+## Check-in e check-out reenviados (offline)
+
+Dentro de `prova` de `fazer_check_in` e `fazer_check_out` o app pode mandar
+`"offline_capturada_em": "2026-10-29T09:15:00-03:00"` (ISO 8601 **com fuso**) quando reenvia uma ação
+guardada sem internet. Regras:
+
+- A hora **oficial** é sempre a do servidor (a foto leva a hora em que o servidor a recebeu). O campo é
+  só evidência para a mediação: nunca decide prazo, estado nem dinheiro.
+- Janela em configuração: no máximo `TRATO_UP_OFFLINE_JANELA_MAX_HORAS` (padrão 72) no passado e
+  `TRATO_UP_OFFLINE_TOLERANCIA_FUTURO_S` (padrão 300) no futuro. Fora da janela, no futuro ou sem fuso:
+  `422` e a ação não acontece.
+- Aceita a ação, o valor informado e a hora de recebimento entram na auditoria (`evidencia_offline`).
+- Em qualquer outra ação, o campo continua recusado (`422`).
+
+## Nota de material: `midia_id` ou caminho
+
+`POST /v1/contratos/{id}/notas-material` aceita **um** dos dois (os dois juntos ou nenhum: `422`):
+
+- `midia_id`: o que `POST /v1/uploads/{id}/concluir` devolveu (destino `nota_material`). O backend
+  confere que a mídia é **deste pedido, enviada por quem envia a nota e com finalidade
+  `nota_material`**; senão `422`. É o caminho feliz do app.
+- `foto_storage_path`: caminho no bucket (sem `..` nem URL), para quando o serviço de upload não está
+  ligado.
+
+## Cadastro, perfil e busca de profissionais
+
+Cadastro e perfil (`POST /v1/profissional/cadastro`, `GET/PATCH /v1/profissional/perfil`): ver
+`docs/api-rotas-profissional.md`. Aqui o que o app usa para ligar as telas:
+
+| Método e caminho | Quem pode | Resposta |
+|---|---|---|
+| `GET /v1/catalogo/categorias` | qualquer pessoa logada | lista `{id, nome, slug, icone, pai_id}` das categorias **ativas**, na ordem do catálogo. Os `id` vão em `categorias` do cadastro |
+| `GET /v1/catalogo/cidades` | qualquer pessoa logada | lista `{id, nome, uf}` das cidades **ativas**, em ordem alfabética. Os `id` vão em `regioes[].cidade_id` |
+| `GET /v1/profissionais` | cliente ou profissional | busca, abaixo |
+| `GET /v1/profissionais/{id}` | qualquer pessoa logada | perfil público: `{id, nome (abreviado), bio, nivel_verificacao, nota_publica, servicos_concluidos, categorias, regioes, cidades ("Belo Horizonte/MG"), no_trato_desde, disponibilidade, portfolio, avaliacoes[]}`. Só aprovado; senão `404` |
+
+**Busca** `GET /v1/profissionais?servico=&categoria_id=&cidade_id=&bairro=&pagina=1&limite=20`
+(`limite` 1 a 50). Só profissionais **aprovados** e de usuário ativo; categoria suspensa do
+profissional não conta. `servico` procura no nome da categoria (sem acento, sem maiúsculas, inclui as
+filhas); `categoria_id` é exato (os dois juntos: interseção); `cidade_id` e `bairro` filtram a região
+(quem atende a cidade toda também entra no bairro). Ordem: melhor nota (sem nota por último), mais
+serviços, id. Resposta:
+
+```json
+{"itens": [{"id": "…", "nome": "Maria S.", "bio": "…", "nivel_verificacao": "verificado",
+            "nota_publica": 4.9, "servicos_concluidos": 30, "categorias": ["<id>"]}],
+ "pagina": 1, "limite": 20, "total": 1, "tem_mais": false}
+```
+
+Sem documento, telefone, e-mail, endereço nem o nome completo. Abra o perfil por `id`.
+
+## Orçamento: selo do profissional e taxa
+
+- `GET /v1/pedidos/{id}/orcamentos` ganhou `profissional_nivel_verificacao`, `profissional_nota` e
+  `profissional_servicos_concluidos` (nulos se o perfil não tem o dado).
+- `POST /v1/orcamentos/resumo` ganhou `taxa_bps` e `taxa_percentual` (taxa **efetiva**: taxa ÷ valor,
+  já com faixas e mínimo; ex.: `7.5`). O app só mostra, não calcula.
+- `GET /v1/profissional/pedidos-abertos/{id}`: detalhe de um pedido aberto, mesma visibilidade da lista
+  (`404` fora dela), com `orcamentos_recebidos` e `ja_orcou`; sem endereço exato.
+
+## Profissional: responder disputa e atender retrabalho
+
+| Método e caminho | Quem pode | Resposta |
+|---|---|---|
+| `GET /v1/pedidos/{id}/disputa` | cliente, profissional, equipe | a disputa (`estado`, `resposta_ate`, valor congelado) |
+| `POST /v1/pedidos/{id}/disputa/resposta` | só o profissional contratado, dentro do prazo de resposta (configuração de disputas) | a disputa em `em_analise`. Sem corpo: é o "recebi e vou responder"; as provas dele vão pelo chat/evidência. Prazo vencido: `409` |
+| `GET /v1/pedidos/{id}/retrabalho` | cliente e profissional | lista `{pedido_id, estado, aberto_em, atender_ate, descricao, atendido_em}` |
+| `POST /v1/pedidos/{id}/retrabalho/atender` | só o profissional contratado | corpo `{etapa: "aceitar"\|"iniciar"\|"resolver"}`; devolve o retrabalho |
+
+Retrabalho: `aberto` → `aceito` → `em_execucao` → `resolvido`, nessa ordem (pular etapa: `409`).
+Repetir a mesma etapa é seguro. Depois de `atender_ate` (prazo da configuração) não dá mais para
+atender: `409`, e o caso segue por suporte e análise de problemas. Quem não é o profissional do
+pedido: `403` (cliente) ou `404`.
+
 ## O que ainda falta (depende do João ou de outra tarefa)
+
+- **Migration NOVA, não aplicada:** `supabase/migrations/20261030140000_upload_destino_portfolio.sql`
+  (rollback em `supabase/rollback/upload_destino_portfolio_rollback.sql`). Só passa a importar quando
+  as solicitações de upload forem gravadas em `upload_solicitacoes` (hoje ficam em memória).
 
 - **Migration NOVA, não aplicada:** `supabase/migrations/20261030130000_pedido_recusas.sql`
   (rollback em `supabase/rollback/pedido_recusas_rollback.sql`). Sem ela, `POST .../recusar` em modo
