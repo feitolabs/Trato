@@ -10,6 +10,8 @@ from trato.api import (
     rotas_financeiro,
     rotas_pedido_contrato,
     rotas_pedidos,
+    rotas_profissional_cadastro,
+    rotas_upload,
     rotas_webhook,
 )
 from trato.api.admin import criar_router_admin
@@ -37,6 +39,8 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
 
     registrar_rotas(app, contexto)
     app.include_router(criar_router())
+    rotas_upload.registrar_rotas(app)
+    rotas_profissional_cadastro.registrar_rotas(app)
     instalar_tratadores(app)
     if contexto is not None:
         app.state.contexto = contexto

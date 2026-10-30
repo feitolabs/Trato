@@ -58,8 +58,8 @@ class VerificacoesPostgres:
             for doc in documentos:
                 con.execute(
                     "insert into public.verificacao_documentos (verificacao_id, tipo, "
-                    "storage_path) values (%s, %s, %s)",
-                    (nova["id"], doc.tipo, doc.storage_path),
+                    "storage_path, sha256, excluir_em) values (%s, %s, %s, %s, %s)",
+                    (nova["id"], doc.tipo, doc.storage_path, doc.sha256, doc.excluir_em),
                 )
         return Verificacao(str(nova["id"]), pessoa, nivel, "enviada", agora, tuple(documentos))
 
@@ -67,7 +67,7 @@ class VerificacoesPostgres:
         pessoa = exigir_uuid(profissional_id, "profissional")
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select v.id, v.nivel_solicitado, v.status, v.enviada_em, "
+                "select v.id, v.nivel_solicitado, v.status, v.enviada_em, v.motivo_recusa, "
                 "coalesce(json_agg(json_build_object('tipo', d.tipo, 'caminho', d.storage_path) "
                 "order by d.criado_em, d.id) filter (where d.id is not null), '[]') as docs "
                 "from public.verificacoes v "
@@ -83,6 +83,7 @@ class VerificacoesPostgres:
                 l["status"],
                 l["enviada_em"],
                 tuple(DocumentoVerificacao(d["tipo"], d["caminho"]) for d in l["docs"]),
+                l["motivo_recusa"],
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )
