@@ -16,7 +16,7 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Splash, onboarding, escolha de perfil | Demo | Primeira abertura: splash → onboarding → escolha de perfil → cadastro → casca do perfil. Com sessão guardada, a splash vai direto à casca. O perfil escolhido fica nos dados da conta (`perfil` no Supabase Auth) e o login abre a casca do cliente ou do profissional. |
 | Login, criar conta, recuperar senha | Demo (serviço de teste) | `ServicoAuth` pronto; o `main.dart` troca para o Supabase quando há `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O token do login vai em toda chamada da API (`LigacaoSessao` → `SessaoTrato`); em 401 o app renova o token e repete a chamada uma vez, e se não renovar limpa a sessão e abre o login por cima da tela (o que foi digitado fica). Ver `docs/login-configuracao.md`. |
 | Google, Apple, SMS | Depende do João | Chaves e provedor (P11). |
-| Início, buscar, perfil do profissional | Demo | Sem rota de busca (#10) e o perfil público abre por nome (#11). |
+| Início, buscar, perfil do profissional | Demo | Backend pronto (busca #10, perfil público por id #11, `docs/api-rotas.md`); falta o app ligar. |
 | Busca com serviço (`busca/`) | Demo, ligada | É a aba Buscar do cliente (`RotasTrato.abaBuscar`), abre o perfil público. Filtros e mapa da tela antiga (`BuscarTela`) saíram da aba; a busca real depende do backend. |
 | Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
 | Seus pedidos | API | Título genérico ("Pedido #XXXX"): a API não devolve título nem nome do profissional. |
@@ -44,14 +44,14 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 
 | Tela | Estado | Observação |
 |---|---|---|
-| Cadastro do profissional | Demo, sem protótipo | Falta o catálogo de categorias e cidades (#12). A foto sobe pela câmera real. |
+| Cadastro do profissional | Demo, sem protótipo | Catálogo pronto no backend (#12, `GET /v1/catalogo/...`); falta o app ligar. A foto sobe pela câmera real. |
 | Verificação (documento e selfie) | API | Fotos por URL assinada (`POST /v1/uploads`, `PUT`, `concluir`) e `POST/GET /v1/profissional/verificacao`. Texto de retenção vem do backend quando já há verificação. Não testado em aparelho real. |
 | Início, pedidos abertos, detalhe, recusar | API | `GET /v1/profissional/pedidos-abertos` (filtros no repositório), nome por `/v1/me`, recusa `POST /v1/pedidos/{id}/recusar` (precisa da migration `pedido_recusas`). Carteira da Início fica em zero (#18). |
 | Filtros | Sem tela | Repositório pronto (`FiltroPedidosAbertos`); falta a tela. |
 | Calculadora de orçamento | API | `POST /v1/orcamentos/resumo`: taxa e líquido do backend, nada calculado no app. Sem o percentual (#17). |
 | Check-in e check-out | API (envio) | Câmera e GPS reais; foto por `POST /v1/uploads`; ação em `acoes/fazer_check_in`/`fazer_check_out`. Reenvio offline manda `offline_capturada_em`, que o backend recusa (#4). Não testado em aparelho real. |
 | Enviar nota de materiais e criar aditivo | API | `POST /v1/contratos/{id}/notas-material` e `.../aditivos`. O caminho da foto da nota ainda não vem do upload (#5). |
-| Responder disputa e atender retrabalho | Demo | Falta a rota do lado do profissional. |
+| Responder disputa e atender retrabalho | Demo | Backend pronto (`POST /v1/pedidos/{id}/disputa/resposta` e `.../retrabalho/atender`); falta o app ligar. |
 | Carteira | API, como extrato | `GET /v1/extrato`. Sem saldo próprio e sem saque (D15). |
 | Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional, com botão **Sair**. |
 | Agenda, mensagens do profissional | Sem tela | "Em breve". |

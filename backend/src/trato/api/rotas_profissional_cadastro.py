@@ -8,9 +8,11 @@ endereço; o nome sai abreviado). O texto livre passa pelo mascaramento de conta
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
@@ -20,6 +22,7 @@ from trato.profissional.config import ConfigProfissional, obter_config_profissio
 from trato.profissional.repositorio import (
     CatalogoEmMemoria,
     CatalogoProfissional,
+    FiltroBusca,
     ItemPortfolio,
     JanelaSemanal,
     PerfilProfissional,
@@ -104,6 +107,10 @@ class PerfilPublicoOut(BaseModel):
     disponibilidade: list[JanelaIO]
     portfolio: list[PortfolioIO]
     avaliacoes: list[AvaliacaoRecebidaOut]
+    no_trato_desde: datetime = Field(description="Quando o perfil foi criado.")
+    cidades: list[str] = Field(
+        default_factory=list, description='Cidades que atende, em texto ("Belo Horizonte/MG").'
+    )
 
 
 # --- Ligações ----------------------------------------------------------------------------
@@ -304,6 +311,136 @@ def _nome_abreviado(nome: str | None) -> str | None:
     return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
 
 
+# --- Catálogo e busca ----------------------------------------------------------------------
+
+
+class CategoriaOut(BaseModel):
+    id: str
+    nome: str
+    slug: str
+    icone: str | None
+    pai_id: str | None
+
+
+class CidadeOut(BaseModel):
+    id: str
+    nome: str
+    uf: str
+
+
+class ProfissionalBuscaOut(BaseModel):
+    id: str
+    nome: str | None = Field(description="Abreviado (primeiro nome e inicial do último).")
+    bio: str | None
+    nivel_verificacao: str
+    nota_publica: float | None
+    servicos_concluidos: int | None
+    categorias: list[str] = Field(description="Ids das categorias em que atua (não suspensas).")
+
+
+class BuscaProfissionaisOut(BaseModel):
+    itens: list[ProfissionalBuscaOut]
+    pagina: int
+    limite: int
+    total: int
+    tem_mais: bool
+
+
+@router.get(
+    "/catalogo/categorias",
+    response_model=list[CategoriaOut],
+    summary="Categorias ativas (para o cadastro e a busca)",
+    description="Só categorias ativas, na ordem do catálogo. Exige login; não traz dado pessoal.",
+)
+def catalogo_categorias(
+    _: Usuario = Depends(usuario_atual), modulo: Modulo = Depends(obter_modulo)
+) -> list[CategoriaOut]:
+    return [CategoriaOut(**vars(c)) for c in modulo.catalogo.categorias_publicas()]
+
+
+@router.get(
+    "/catalogo/cidades",
+    response_model=list[CidadeOut],
+    summary="Cidades ativas (para o cadastro e a busca)",
+    description="Só cidades onde o Trato atende, em ordem alfabética. Exige login.",
+)
+def catalogo_cidades(
+    _: Usuario = Depends(usuario_atual), modulo: Modulo = Depends(obter_modulo)
+) -> list[CidadeOut]:
+    return [CidadeOut(**vars(c)) for c in modulo.catalogo.cidades_publicas()]
+
+
+def _normalizar(texto: str) -> str:
+    sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    return " ".join(sem_acento.casefold().split())
+
+
+def _categorias_do_servico(modulo: Modulo, servico: str) -> set[str]:
+    """Ids das categorias cujo nome ou slug contém o texto (e as filhas delas)."""
+    busca = _normalizar(servico)
+    todas = modulo.catalogo.categorias_publicas()
+    achadas = {c.id for c in todas if busca in _normalizar(c.nome) or busca in _normalizar(c.slug)}
+    return achadas | {c.id for c in todas if c.pai_id in achadas}
+
+
+@router.get(
+    "/profissionais",
+    response_model=BuscaProfissionaisOut,
+    summary="Buscar profissionais por serviço, categoria ou bairro",
+    description=(
+        "Só profissionais APROVADOS. Sem documento, telefone, e-mail nem endereço; o nome sai "
+        "abreviado. `servico` procura no nome da categoria (sem acento, sem maiúsculas); "
+        "`categoria_id` é exato; `cidade_id` e `bairro` filtram a região (quem atende a cidade "
+        "toda também entra). Ordem: melhor nota, mais serviços. Paginada (`pagina` a partir de 1)."
+    ),
+)
+def buscar_profissionais(
+    servico: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
+    categoria_id: Annotated[str | None, Query(max_length=64)] = None,
+    cidade_id: Annotated[str | None, Query(max_length=64)] = None,
+    bairro: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
+    pagina: Annotated[int, Query(ge=1, le=1000)] = 1,
+    limite: Annotated[int, Query(ge=1, le=50)] = 20,
+    _: Usuario = Depends(_pessoa),
+    contexto: Contexto = Depends(obter_contexto),
+    modulo: Modulo = Depends(obter_modulo),
+) -> BuscaProfissionaisOut:
+    categorias: set[str] | None = None
+    if servico is not None:
+        categorias = _categorias_do_servico(modulo, servico)
+    if categoria_id is not None:
+        categorias = {categoria_id} if categorias is None else categorias & {categoria_id}
+    vazio = BuscaProfissionaisOut(itens=[], pagina=pagina, limite=limite, total=0, tem_mais=False)
+    if categorias is not None and not categorias:
+        return vazio
+    filtro = FiltroBusca(
+        categoria_ids=frozenset(categorias) if categorias is not None else None,
+        cidade_id=cidade_id,
+        bairro=bairro,
+        limite=limite,
+        deslocamento=(pagina - 1) * limite,
+    )
+    achados, total = modulo.repo.buscar(filtro, contexto.usuarios.detalhe)
+    return BuscaProfissionaisOut(
+        itens=[
+            ProfissionalBuscaOut(
+                id=r.usuario_id,
+                nome=_nome_abreviado(r.nome),
+                bio=r.bio,
+                nivel_verificacao=r.nivel_verificacao,
+                nota_publica=r.nota_publica,
+                servicos_concluidos=r.servicos_concluidos,
+                categorias=list(r.categorias),
+            )
+            for r in achados
+        ],
+        pagina=pagina,
+        limite=limite,
+        total=total,
+        tem_mais=pagina * limite < total,
+    )
+
+
 @router.get(
     "/profissionais/{profissional_id}",
     response_model=PerfilPublicoOut,
@@ -328,7 +465,14 @@ def perfil_publico(
     recebidas = getattr(contexto.avaliacoes, "recebidas", None)
     avaliacoes = recebidas(profissional_id) if recebidas else ()
     base = _perfil_out(modulo, perfil)
+    nomes = {
+        c.id: f"{c.nome}/{c.uf}" if c.uf else c.nome for c in modulo.catalogo.cidades_publicas()
+    }
     return PerfilPublicoOut(
+        no_trato_desde=perfil.criado_em,
+        cidades=list(
+            dict.fromkeys(nomes[r.cidade_id] for r in perfil.regioes if r.cidade_id in nomes)
+        ),
         id=perfil.usuario_id,
         nome=_nome_abreviado(detalhe.nome),
         bio=base.bio,
