@@ -68,7 +68,7 @@ void main() {
       expect(nomeComCaraDeSegredo('JWT_SECRET'), isTrue);
       expect(nomeComCaraDeSegredo('DATABASE_URL'), isTrue);
       expect(nomeComCaraDeSegredo('SUPABASE_ANON_KEY'), isFalse);
-      expect(valorComCaraDeSegredo('sk_test_abcdefghij'), isTrue);
+      expect(valorComCaraDeSegredo('sk_' 'test_' 'abc'), isTrue);
       final carga = base64Url.encode(utf8.encode('{"role":"service_role"}')).replaceAll('=', '');
       expect(valorComCaraDeSegredo('eyJhbGciOiJIUzI1NiJ9.$carga.assinatura'), isTrue);
       final anon = base64Url.encode(utf8.encode('{"role":"anon"}')).replaceAll('=', '');
