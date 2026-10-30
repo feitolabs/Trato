@@ -104,6 +104,8 @@ def _uploads_padrao() -> dict[str, RegraUpload]:
     imagens = ["image/jpeg", "image/png", "image/webp"]
     return {
         "foto": RegraUpload(tipos=imagens, tamanho_max_bytes=5 * 1024 * 1024),
+        # Portfólio: só imagem, em limite próprio (TRATO_SEG_UPLOADS pode trocar).
+        "portfolio": RegraUpload(tipos=imagens, tamanho_max_bytes=8 * 1024 * 1024),
         "documento": RegraUpload(
             tipos=[*imagens, "application/pdf"], tamanho_max_bytes=10 * 1024 * 1024
         ),

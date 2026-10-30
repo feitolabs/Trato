@@ -51,6 +51,11 @@ class OrcamentoOut(BaseModel):
     observacoes: str | None
     enviado_em: datetime | None
     aceito: bool
+    profissional_nivel_verificacao: str | None = Field(
+        None, description="Selo do profissional (basico, verificado, verificado_plus)."
+    )
+    profissional_nota: float | None = None
+    profissional_servicos_concluidos: int | None = None
 
 
 class PagamentoValoresOut(BaseModel):
@@ -114,6 +119,12 @@ class PedidoAbertoOut(BaseModel):
 class ResumoOrcamentoOut(BaseModel):
     valor_centavos: int = Field(description="Bruto: o total do orçamento.")
     taxa_centavos: int = Field(description="Taxa do Trato pela configuração vigente.")
+    taxa_bps: int = Field(
+        description="Taxa EFETIVA em pontos-base (taxa ÷ valor): já considera o mínimo e as faixas."
+    )
+    taxa_percentual: float = Field(
+        description="A mesma taxa efetiva em %, com 2 casas (ex.: 7.5). Para o app só mostrar."
+    )
     liquido_centavos: int = Field(description="O que o profissional recebe: bruto menos a taxa.")
     custo_provedor_estimado_centavos: int = Field(
         description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
@@ -254,8 +265,16 @@ def listar_orcamentos(
     itens = contexto.orcamentos.do_pedido(pedido.id)
     if usuario.papel is PapelUsuario.PROFISSIONAL:
         itens = [o for o in itens if o.profissional_id == usuario.id]
+    detalhes = {i: contexto.usuarios.detalhe(i) for i in {o.profissional_id for o in itens}}
     return [
         OrcamentoOut(
+            profissional_nivel_verificacao=getattr(
+                detalhes[o.profissional_id], "nivel_verificacao", None
+            ),
+            profissional_nota=getattr(detalhes[o.profissional_id], "nota_publica", None),
+            profissional_servicos_concluidos=getattr(
+                detalhes[o.profissional_id], "servicos_concluidos", None
+            ),
             id=o.id,
             profissional_id=o.profissional_id,
             profissional_nome=o.profissional_nome,
@@ -332,6 +351,8 @@ def resumo_do_orcamento(
     return ResumoOrcamentoOut(
         valor_centavos=corpo.valor_centavos,
         taxa_centavos=taxa,
+        taxa_bps=(taxa * 10_000 + corpo.valor_centavos // 2) // corpo.valor_centavos,
+        taxa_percentual=round(taxa * 100 / corpo.valor_centavos, 2),
         liquido_centavos=corpo.valor_centavos - taxa,
         custo_provedor_estimado_centavos=max(
             calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento
