@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -161,6 +161,10 @@ class AbrirDisputaIn(_Entrada):
     fotos: list[FotoIn] = []
 
 
+class AtenderRetrabalhoIn(_Entrada):
+    etapa: Literal["aceitar", "iniciar", "resolver"]
+
+
 class PedirRetrabalhoIn(_Entrada):
     descricao: str
     fotos: list[FotoIn] = []
@@ -259,6 +263,7 @@ class RetrabalhoOut(BaseModel):
     aberto_em: datetime
     atender_ate: datetime
     descricao: str
+    atendido_em: datetime | None = None
 
 
 class WebhookOut(BaseModel):

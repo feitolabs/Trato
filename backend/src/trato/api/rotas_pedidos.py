@@ -25,6 +25,7 @@ from trato.api.modelos import (
     AbrirPedidoIn,
     AcaoPedidoIn,
     AceitarOrcamentoIn,
+    AtenderRetrabalhoIn,
     CancelarIn,
     CheckInIn,
     CheckOutIn,
@@ -37,7 +38,15 @@ from trato.api.modelos import (
 )
 from trato.api.repositorios import Contrato
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
-from trato.garantias import abrir_garantia, abrir_retrabalho
+from trato.garantias import (
+    ErroRetrabalho,
+    EstadoRetrabalho,
+    abrir_garantia,
+    abrir_retrabalho,
+    deve_virar_nao_atendido,
+    transicionar,
+)
+from trato.garantias.retrabalho import EM_CURSO
 from trato.pedidos import estados
 from trato.pedidos.estados import (
     Acao,
@@ -429,3 +438,77 @@ def pedir_retrabalho(
         atender_ate=retrabalho.atender_ate,
         descricao=retrabalho.descricao,
     )
+
+
+def _retrabalho_out(pedido_id: str, r) -> RetrabalhoOut:  # type: ignore[no-untyped-def]
+    return RetrabalhoOut(
+        pedido_id=pedido_id,
+        estado=r.estado.value,
+        aberto_em=r.aberto_em,
+        atender_ate=r.atender_ate,
+        descricao=r.descricao,
+        atendido_em=r.atendido_em,
+    )
+
+
+@router.get(
+    "/{pedido_id}/retrabalho",
+    response_model=list[RetrabalhoOut],
+    summary="Retrabalhos do pedido (cliente e profissional)",
+)
+def ver_retrabalhos(
+    pedido_id: str,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> list[RetrabalhoOut]:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    return [_retrabalho_out(pedido.id, r) for r in contexto.garantias.retrabalhos(pedido.id)]
+
+
+_ETAPAS = {
+    "aceitar": (EstadoRetrabalho.ACEITO, {EstadoRetrabalho.ABERTO}),
+    "iniciar": (EstadoRetrabalho.EM_EXECUCAO, {EstadoRetrabalho.ACEITO}),
+    "resolver": (EstadoRetrabalho.RESOLVIDO, {EstadoRetrabalho.EM_EXECUCAO}),
+}
+
+
+@router.post(
+    "/{pedido_id}/retrabalho/atender",
+    response_model=RetrabalhoOut,
+    summary="Profissional atende o retrabalho (aceitar, iniciar, resolver)",
+    description=(
+        "Só o profissional contratado. A ordem é aceitar, iniciar, resolver. Depois do prazo de "
+        "atendimento (configuração) só dá para aceitar se ainda não venceu: vencido, o caso segue "
+        "por suporte e análise de problemas (409). Repetir a mesma etapa é seguro."
+    ),
+)
+def atender_retrabalho(
+    pedido_id: str,
+    corpo: AtenderRetrabalhoIn,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> RetrabalhoOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.profissional_id != usuario.id:
+        raise HTTPException(403, "Só o profissional contratado neste pedido atende o retrabalho.")
+    existentes = contexto.garantias.retrabalhos(pedido.id)
+    atual = next((r for r in reversed(existentes) if r.estado in EM_CURSO), None)
+    destino, origens = _ETAPAS[corpo.etapa]
+    if atual is None:
+        ultimo = existentes[-1] if existentes else None
+        if ultimo is not None and ultimo.estado is destino:
+            return _retrabalho_out(pedido.id, ultimo)  # repetir é seguro
+        raise HTTPException(409, "Este pedido não tem retrabalho em curso.")
+    if atual.estado is destino:
+        return _retrabalho_out(pedido.id, atual)
+    agora = contexto.agora()
+    if atual.estado not in origens:
+        raise ErroRetrabalho(f"Não dá para {corpo.etapa} um retrabalho {atual.estado.value}.")
+    if deve_virar_nao_atendido(atual, agora):
+        raise ErroRetrabalho(
+            "O prazo de atendimento acabou; o caso segue por suporte e análise de problemas."
+        )
+    novo = transicionar(atual, destino, agora)
+    with contexto.transacao():
+        contexto.garantias.salvar_retrabalho(pedido.id, novo)
+    return _retrabalho_out(pedido.id, novo)

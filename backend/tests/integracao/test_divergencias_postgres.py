@@ -203,3 +203,41 @@ def test_migration_nova_do_destino_portfolio_aplica_e_desfaz(mundo):
         con.execute(volta)
         with pytest.raises(Exception, match="upload_solicitacoes_destino_check"):
             con.execute(inserir, (c.ids["ana_pro"], f"{c.ids['ana_pro']}/portfolio/b.jpg"))
+
+
+def test_atender_retrabalho_grava_no_banco(cenario):
+    from datetime import UTC, datetime
+
+    from trato.garantias import ConfigGarantia, abrir_garantia, abrir_retrabalho
+
+    from .test_dinheiro_postgres import contratar
+
+    c = cenario
+    pedido_id = contratar(c)
+    agora = datetime.now(UTC)
+    garantia = abrir_garantia(agora, None, ConfigGarantia())
+    c.contexto.garantias.salvar_garantia(pedido_id, garantia)
+    c.contexto.garantias.salvar_retrabalho(
+        pedido_id, abrir_retrabalho(garantia, "Mancha voltou", agora, ConfigGarantia())
+    )
+    url = f"/v1/pedidos/{pedido_id}/retrabalho/atender"
+
+    def atender(etapa, quem="profissional"):
+        return c.cliente.post(url, json={"etapa": etapa}, headers=c.token(quem))
+
+    assert atender("aceitar", "cliente").status_code == 403
+    assert atender("aceitar", "profissional2").status_code == 404  # não é parte do pedido
+    assert atender("resolver").status_code == 409  # pulou etapas
+    for etapa, estado in (
+        ("aceitar", "aceito"),
+        ("iniciar", "em_execucao"),
+        ("resolver", "resolvido"),
+    ):
+        r = atender(etapa)
+        assert r.status_code == 200, r.text
+        assert r.json()["estado"] == estado
+    assert atender("resolver").json()["estado"] == "resolvido"  # repetir é seguro
+    [lido] = c.contexto.garantias.retrabalhos(pedido_id)  # a mesma linha, atualizada
+    assert lido.estado.value == "resolvido" and lido.atendido_em is not None
+    lista = c.cliente.get(f"/v1/pedidos/{pedido_id}/retrabalho", headers=c.token("cliente"))
+    assert [x["estado"] for x in lista.json()] == ["resolvido"]

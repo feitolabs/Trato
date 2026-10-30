@@ -761,6 +761,42 @@ def pedidos_abertos(
     return [PedidoAbertoOut(**vars(p)) for p in itens[:limite]]
 
 
+class PedidoAbertoDetalheOut(PedidoAbertoOut):
+    orcamentos_recebidos: int = Field(description="Quantos orçamentos enviados o pedido já tem.")
+    ja_orcou: bool = Field(description="Se este profissional já enviou orçamento.")
+
+
+@router.get(
+    "/profissional/pedidos-abertos/{pedido_id}",
+    response_model=PedidoAbertoDetalheOut,
+    summary="Detalhe de um pedido aberto (mesma visibilidade da lista)",
+    description="Pedido que não está na lista dele (outra categoria, região, recusado ou já "
+    "fechado) responde 404. Sem endereço exato.",
+)
+def pedido_aberto(
+    pedido_id: str,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PedidoAbertoDetalheOut:
+    recusados = {r.pedido_id for r in contexto.recusas.do_profissional(usuario.id)}
+    achado = next(
+        (
+            p
+            for p in contexto.pedidos.listar_abertos(usuario.id)
+            if p.id == pedido_id and p.id not in recusados
+        ),
+        None,
+    )
+    if achado is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    orcamentos = contexto.orcamentos.do_pedido(achado.id)
+    return PedidoAbertoDetalheOut(
+        **vars(achado),
+        orcamentos_recebidos=len(orcamentos),
+        ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
+    )
+
+
 @router.post(
     "/pedidos/{pedido_id}/recusar",
     response_model=RecusaOut,
