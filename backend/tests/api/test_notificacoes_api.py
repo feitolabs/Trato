@@ -135,13 +135,17 @@ def test_remover_dispositivo_so_do_dono_e_idempotente(amb):
     post(amb, "/v1/dispositivos", corpo=corpo)
     pedido = {"token": "token-do-aparelho-1"}
     # outra pessoa não desliga o aparelho alheio (e a resposta não revela de quem é)
-    r = amb.cliente.request("DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-outro-cliente"))
+    r = amb.cliente.request(
+        "DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-outro-cliente")
+    )
     assert r.status_code == 204 and s.repo.tokens(CLIENTE.id) == ("token-do-aparelho-1",)
     r = amb.cliente.request("DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-cliente"))
     assert r.status_code == 204 and s.repo.tokens(CLIENTE.id) == ()
     r = amb.cliente.request("DELETE", "/v1/dispositivos", json=pedido, headers=cab("t-cliente"))
     assert r.status_code == 204  # repetir é seguro
-    r = amb.cliente.request("DELETE", "/v1/dispositivos", json={"token": "x"}, headers=cab("t-cliente"))
+    r = amb.cliente.request(
+        "DELETE", "/v1/dispositivos", json={"token": "x"}, headers=cab("t-cliente")
+    )
     assert r.status_code == 422
 
 

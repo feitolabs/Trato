@@ -16,9 +16,9 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 from trato import disputas
+from trato.api import offline
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
-from trato.api import offline
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import (
     AbrirDisputaIn,
