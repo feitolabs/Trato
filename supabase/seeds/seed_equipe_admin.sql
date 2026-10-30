@@ -1,0 +1,29 @@
+-- =============================================================================
+-- Seed 4 — seed_equipe_admin  (SÓ MODELO COMENTADO. NÃO EXECUTA NADA.)
+-- Rollback: supabase/rollback/seed_equipe_admin_rollback.sql (também só modelo)
+--
+-- O primeiro administrador é criado PELO JOÃO, à mão. Este arquivo existe para ele saber os passos.
+-- Regra do projeto: nunca e-mail, senha, chave ou token no repositório. Nada aqui tem valor real;
+-- o uuid abaixo é um marcador e vira o uuid da pessoa criada no painel do Supabase.
+--
+-- Passos:
+--   1. No painel do Supabase (Authentication > Users), o João cria o usuário com o próprio e-mail
+--      e a própria senha. Isso não passa por este repositório nem por mim.
+--   2. Copia o uuid (coluna "User UID") desse usuário.
+--   3. Roda os dois comandos abaixo trocando <UUID_DO_ADMIN> pelo uuid copiado e <NOME> pelo nome.
+--      public.usuarios e public.equipe exigem que o usuário exista em auth.users.
+--   4. Coloca o mesmo uuid em config_criada_por, em parametros.sql, para o seed_config_taxa.
+--   5. Para a aprovação dupla da configuração é preciso uma SEGUNDA pessoa em public.equipe
+--      (ex.: papel 'financeiro'), criada do mesmo jeito. Não dá para uma pessoa só criar e aprovar.
+--
+-- -- insert into public.usuarios (id, nome)
+-- -- values ('<UUID_DO_ADMIN>', '<NOME>')
+-- -- on conflict (id) do nothing;
+-- --
+-- -- insert into public.equipe (usuario_id, papel)
+-- -- values ('<UUID_DO_ADMIN>', 'administrador')
+-- -- on conflict (usuario_id) do nothing;
+--
+-- Verificação depois de rodar (deve voltar 1 linha):
+-- -- select usuario_id, papel, ativo from public.equipe where papel = 'administrador';
+-- =============================================================================

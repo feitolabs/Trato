@@ -1,0 +1,3 @@
+# Execução + desenvolvimento (ruff, pytest, httpx, pgserver para a integração).
+# Uso: pip install -r requirements-dev.txt
+-e .[dev]

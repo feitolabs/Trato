@@ -1,0 +1,680 @@
+Padrão de privilégios da plataforma simulado: real
+PostgreSQL 16.2 on x86_64-pc-mingw64, compile
+
+== Aplicando as migrations em ordem ==
+aplicada 20261029025430_f32_identidade_catalogo_config.sql
+aplicada 20261029025741_revogar_execute_rls_auto_enable.sql
+aplicada 20261029030000_f33_pedidos_orcamentos_contratos.sql
+aplicada 20261029030100_f34_execucao.sql
+aplicada 20261029030200_f35_dinheiro_ledger.sql
+aplicada 20261029030300_f36_disputas_garantias_avaliacoes.sql
+aplicada 20261029030400_f37_chat_notificacoes_auditoria.sql
+aplicada 20261029030500_f38a_funcoes_auxiliares.sql
+aplicada 20261029030600_f38b_policies_rls.sql
+aplicada 20261029030700_f38c_storage.sql
+
+== (c) Documentos de verificação ==
+OK    documentos: cad vê
+OK    documentos: n1 não vê
+OK    documentos: n2 não vê
+OK    documentos: med não vê
+OK    documentos: fin não vê
+OK    documentos: seg não vê
+OK    documentos: adm não vê
+OK    documentos: dpo não vê
+OK    documentos: P1 não vê
+OK    documentos: A não vê
+OK    documentos: o próprio profissional não lê de volta
+OK    documentos: anon recusado
+OK    verificação: profissional vê a própria
+OK    verificação: outro profissional não vê
+OK    verificação: analista_id/fornecedor_ref ocultos do app
+OK    storage verificacao: cad lê
+OK    storage verificacao: n1 não lê
+OK    storage verificacao: med não lê
+OK    storage verificacao: fin não lê
+OK    storage verificacao: adm não lê
+OK    storage verificacao: P1 não lê
+OK    storage verificacao: A não lê
+
+== (a) Usuário A não lê dados do usuário B ==
+OK    A vê os próprios pedidos e nenhum de B
+OK    B vê só os próprios pedidos
+OK    A não lê o endereço do pedido de B
+OK    A lê o próprio endereço
+OK    conta bloqueada não lê nem o próprio pedido
+OK    conta bloqueada não lê o próprio usuário
+
+== (b) Profissional e endereço: antes do contrato ==
+OK    P1 (categoria e cidade certas) vê pedidos abertos PA e PB
+OK    P1 não vê o pedido aberto de um cliente bloqueado
+OK    P2 (outra categoria) não vê PA
+OK    P2 não vê nenhum pedido de cat1
+OK    P2 vê o pedido de cat2 (PC)
+OK    P3 (outra cidade) não vê PA nem PB
+OK    PX (em análise) não vê pedidos
+OK    P1 NÃO vê o endereço de PA antes do contrato
+OK    P1 vê o bairro (aproximado) em pedidos
+OK    n1 (atendimento) vê o pedido mas não o endereço
+
+== Orçamentos ==
+OK    A vê os 2 orçamentos enviados do próprio pedido, sem rascunho
+OK    B não vê orçamento de PA
+OK    P5 não vê o orçamento do concorrente P1
+OK    P1 vê os próprios (inclusive rascunho)
+OK    itens: P5 não vê itens do orçamento de P1
+OK    itens: A não vê itens do rascunho
+OK    itens: A vê itens do orçamento enviado
+OK    trigger: profissional em análise não envia orçamento
+OK    trigger: total do orçamento diferente da soma dos itens é recusado no commit
+OK    trigger: item não entra em orçamento já enviado
+OK    trigger: orçamento enviado não muda valor
+
+== (b) Endereço depois do contrato ==
+OK    P1 contratado, mas endereço ainda não liberado (liberado_em nulo): não vê
+OK    P1 contratado e endereço liberado: vê o endereço de PA
+OK    P5 (orçou e perdeu) não vê o endereço
+OK    P5 ainda enxerga o pedido (tem orçamento), sem endereço
+OK    P4 (contratado por B) não vê o endereço de PA
+OK    P4 vê o endereço do pedido que ele contratou (PB)
+OK    P2 e P3 nunca veem endereço
+OK    B não vê o endereço de PA
+OK    segurança vê o endereço durante o atendimento (contrato ativo)
+OK    atendimento N1 e financeiro não veem endereço
+OK    mediador sem disputa não vê endereço
+OK    contrato cancelado: P4 perde o endereço
+
+== Contrato (f) ==
+OK    contrato: valor não muda
+OK    contrato: config_versao_id não muda
+OK    contrato: regras_aplicadas não mudam
+OK    contrato: não pode ser apagado
+OK    contrato: status pode mudar
+OK    contrato: valor diferente do orçamento aceito é recusado na criação
+OK    A lê o contrato; B não
+OK    P1 lê o contrato; P5 e P2 não
+OK    contrato: IP do aceite e custo do Stripe ocultos do app
+OK    contrato: pedido não ganha segundo contrato
+
+== Configuração (f) ==
+OK    config aprovada: parâmetro não muda
+OK    config aprovada: versão não é apagada
+OK    config aprovada: motivo não muda
+OK    config: fin vê 1
+OK    config: adm vê 1
+OK    config: A vê 0
+OK    config: P1 vê 0
+OK    config: cad vê 0
+OK    config: n1 vê 0
+
+== (a) Chat ==
+OK    A lê as mensagens das suas duas conversas
+OK    A não lê a conversa de B
+OK    P1 lê só a conversa dele
+OK    P5 não lê a conversa de P1
+OK    texto original oculto do app (só corpo_exibido)
+OK    financeiro, N1 e cadastro não leem mensagens
+OK    mediador sem disputa não lê chat
+
+== Agenda e presença ==
+OK    hash do código oculto do app (profissional e cliente)
+OK    partes leem o agendamento; B e P5 não
+OK    check-out sem check-in é recusado
+OK    só o profissional do contrato registra presença
+OK    check-in e check-out entram
+OK    presença é imutável
+OK    partes leem presença; B não
+
+== (a) Pagamentos ==
+OK    A lê só o próprio pagamento
+OK    B lê só o dele
+OK    P1 lê o pagamento do contrato, sem pagador, meio nem custo
+OK    P5 e P2 não leem pagamento
+OK    pagamento só pelo cliente do contrato
+OK    chave de idempotência repetida é recusada
+OK    pagamento: valor não muda
+
+== (d) Ledger ==
+OK    lançamento equilibrado confirma (como service_role)
+OK    repasse com 3 partidas equilibradas confirma
+OK    lançamentos do outro contrato confirmam
+OK    partidas DESEQUILIBRADAS são recusadas no commit
+OK    lançamento com uma partida só é recusado
+OK    lançamento sem partidas é recusado
+OK    partida com valor zero é recusada
+OK    nova partida em lançamento já fechado é recusada
+OK    chave de idempotência repetida no lançamento é recusada
+OK    ledger [owner]: UPDATE em partidas falha
+OK    ledger [owner]: DELETE em partidas falha
+OK    ledger [owner]: UPDATE em lancamentos falha
+OK    ledger [owner]: DELETE em lancamentos falha
+OK    ledger [owner]: TRUNCATE em partidas falha
+OK    ledger [owner]: TRUNCATE em lancamentos falha
+OK    ledger [service_role]: UPDATE em partidas falha
+OK    ledger [service_role]: DELETE em partidas falha
+OK    ledger [service_role]: UPDATE em lancamentos falha
+OK    ledger [service_role]: DELETE em lancamentos falha
+OK    ledger [service_role]: TRUNCATE em partidas falha
+OK    ledger [service_role]: TRUNCATE em lancamentos falha
+OK    a mensagem de erro do owner vem do trigger de imutabilidade
+OK    estorno que NÃO inverte exatamente o original é recusado
+OK    estorno com as mesmas partidas (não invertidas) é recusado
+OK    estorno em contrato diferente do original é recusado
+OK    estorno correto (partidas invertidas) confirma
+OK    o estorno devolve o valor (retido_servico cai 150000)
+OK    um lançamento só é estornado uma vez
+OK    tipo estorno exige estorna_id
+
+== (a) Extrato de cada usuário (sem saldo pronto, D15) ==
+OK    P1 vê só a própria conta
+OK    as partidas de P1 somam 92500 (extrato)
+OK    P4 vê só a dele
+OK    não existe view de saldo, tabela de saques nem de chaves Pix (D15)
+OK    P1 não lê as contas nem as partidas de P4
+OK    P1 vê no extrato só lançamentos que tocam a conta dele
+OK    P1 não vê as contas de sistema (retido, caixa, receita)
+OK    cliente A não lê nada do ledger
+OK    financeiro lê o ledger inteiro
+OK    mediador, N1 e cadastro não leem o ledger
+
+== Repasses (ordem de liberação ao parceiro) ==
+OK    repasse: bruto = taxa + líquido
+OK    repasse só vai para o profissional do contrato
+OK    P1 lê o próprio repasse; P4, P5 e A não
+OK    financeiro lê repasses; mediador também (leitura)
+OK    repasse: id da transferência no parceiro é único
+OK    lançamento sem contrato é recusado (não há mais saque)
+OK    lançamento do tipo 'saque' é recusado
+OK    webhook: só o financeiro lê
+OK    lançamento espelha um evento do parceiro (evento_webhook_id)
+OK    lançamento com evento inexistente é recusado
+OK    webhook repetido (mesmo evento) é recusado
+OK    webhook com assinatura inválida não pode ser marcado como processado
+OK    financeiro lê webhooks; mediador não
+
+== Disputa ==
+OK    segunda disputa ativa no mesmo contrato é recusada
+OK    disputa só aberta pelas partes
+OK    partes e mediador leem a disputa; B e P5 não
+OK    disputa: relato_ma_fe/procedente/decidida_por ocultos do app
+OK    evidências: partes veem só as visíveis (sem nota interna)
+OK    evidências: mediador vê todas (inclui nota interna)
+OK    evidências: financeiro não vê nota interna
+OK    nota interna só da equipe
+OK    evidência é imutável
+OK    agora o mediador lê o endereço do pedido em disputa
+OK    mediador lê o chat só do pedido em disputa
+OK    mediador não lê o texto original da mensagem
+OK    financeiro continua sem ler chat
+OK    decisão acima da alçada sem 2ª pessoa é recusada
+OK    decisão de reembolso aprovada pela mesma pessoa é recusada
+OK    financeiro não decide mérito
+OK    aprovador precisa ser líder ou administrador
+OK    decisão acima da alçada com líder de suporte aprova
+OK    disputa decidida não muda mais
+OK    garantia/retrabalho: partes leem; B não
+OK    retrabalho só pelo cliente do contrato
+OK    retrabalho dentro da garantia entra
+OK    retrabalho: P1 e A leem; B não
+
+== Avaliações ==
+OK    avaliação: avaliador trocado é recusado
+OK    avaliação: critério de outra direção é recusado
+OK    avaliação: nota do cliente para o profissional é pública (B e P2 leem)
+OK    avaliação: nota do profissional para o cliente NÃO é pública (B e P2 não leem)
+OK    avaliação: o cliente, o avaliador e o profissional que orçou leem a nota do cliente
+OK    avaliação: critérios seguem a visibilidade
+OK    avaliação: nota não pode ser editada
+OK    avaliação em revisão some para terceiros e continua para o moderador
+
+== (e) Mensagens e auditoria imutáveis ==
+OK    mensagem [owner]: editar o texto falha
+OK    mensagem [owner]: apagar falha
+OK    mensagem [owner]: TRUNCATE falha
+OK    mensagem [service_role]: editar o texto falha
+OK    mensagem [service_role]: apagar falha
+OK    mensagem [service_role]: TRUNCATE falha
+OK    mensagem: lida_em pode ser preenchido uma vez
+OK    mensagem: lida_em não muda de novo
+OK    mensagem: só as partes escrevem na conversa
+OK    mensagem: anexo de outro pedido é recusado
+OK    conversa: pedido de outro cliente é recusado
+OK    mídia é imutável
+OK    histórico do pedido é imutável
+OK    auditoria: service_role registra contrato.aceito
+OK    auditoria: service_role registra checkin.registrado
+OK    auditoria: service_role registra repasse.liberado
+OK    auditoria: ação financeira sem motivo é recusada
+OK    auditoria: revelar dado pessoal sem motivo é recusado
+OK    auditoria: cadeia de hash íntegra
+OK    auditoria: hash_anterior encadeado
+OK    auditoria [owner]: UPDATE falha
+OK    auditoria [owner]: DELETE falha
+OK    auditoria [owner]: TRUNCATE falha
+OK    auditoria [service_role]: UPDATE falha
+OK    auditoria [service_role]: DELETE falha
+OK    auditoria [service_role]: TRUNCATE falha
+OK    auditoria: INSERT direto do service_role falha (só por registrar_auditoria)
+OK    auditoria: adulteração direta é detectada pela cadeia
+OK    auditoria: remoção de uma linha é detectada pela cadeia
+
+== Auditoria: quem lê ==
+OK    auditoria: adm lê
+OK    auditoria: dpo lê
+OK    auditoria: seg lê
+OK    auditoria: n1 não lê
+OK    auditoria: fin não lê
+OK    auditoria: A não lê
+OK    auditoria: P1 não lê
+OK    auditoria: mod não lê
+OK    auditoria e config: o jurídico lê
+
+== Notificações, usuários e perfis ==
+OK    notificações: cada um lê só as suas
+OK    preferências: cada um lê só as suas
+OK    equipe não lê notificação de usuário
+OK    CPF/telefone: A lê só o próprio
+OK    CPF/telefone: P1 não lê os de A (outra parte do contrato)
+OK    CPF/telefone: nem a equipe lê o de outras pessoas direto (só pelo backend)
+OK    usuarios: A vê o nome de P1 (aprovado) e o próprio, não o de B
+OK    usuarios: P1 vê o nome do cliente A (contrato) e não o de B
+OK    usuarios: P2 (sem relação) não vê o nome de A
+OK    usuarios: status/aceite de termos ocultos
+OK    perfis: A vê perfis aprovados e não o do PX em análise
+OK    perfis: CNPJ oculto de quem não é o app dono (nem o dono lê direto)
+OK    perfis: o PX em análise vê o próprio perfil
+OK    equipe: tabela só para o administrador e a própria linha
+OK    catálogo: cliente lê cidades e categorias ativas
+OK    catálogo: categoria inativa some para o cliente e aparece para a equipe
+OK    regiões/categorias do profissional: A vê as de P1 aprovado; não as do PX
+
+== Equipe de atendimento: o que pode ==
+OK    N1 consulta pedido, contrato e pagamento
+OK    N1 não vê documentos, ledger, webhooks, chat nem endereço
+OK    moderador não vê dados financeiros
+OK    cadastro não vê pedido, pagamento nem repasse
+OK    seguranca vê contrato (localização), mas não ledger
+
+== Storage (buckets privados) ==
+OK    buckets existem e são todos privados
+OK    foto do pedido: A, P1 e P5 (que orçou) leem
+OK    foto do pedido: B, P2, P3 e PX não leem
+OK    foto do pedido: anon não lê
+OK    chat: A e P1 leem o anexo da conversa deles; P5 não
+OK    chat: B lê só o anexo do chat dele
+OK    chat: mediador lê o anexo do pedido em disputa e não o do outro
+OK    chat: financeiro e N1 não leem anexos
+OK    app não grava no Storage (sem policy de INSERT)
+OK    app não apaga nem altera arquivos do Storage
+OK    avatar: A vê a foto de P1 (profissional aprovado)
+
+== (g) anon não lê nada; o app não escreve; funções seguras ==
+OK    RLS ligado em TODAS as 46 tabelas do schema public
+OK    anon não consegue ler nenhuma das 46 tabelas/views
+OK    authenticated (o app) não tem INSERT/UPDATE/DELETE/TRUNCATE em nenhuma tabela
+OK    anon não tem nenhum privilégio em nenhuma tabela
+OK    nenhuma policy usa using (true)
+OK    toda policy é só para authenticated
+OK    só policies de SELECT (o app não escreve)
+      (tabelas sem policy permissiva = ninguém do app lê: [])
+OK    somente tabelas de uso exclusivo do backend ficam sem policy de leitura
+OK    TODA função SECURITY DEFINER tem search_path vazio
+OK    NENHUMA função (public/privado) é executável por anon ou PUBLIC
+OK    nenhuma função SECURITY DEFINER do schema public é chamável pelo app (RPC)
+OK    rls_auto_enable não é executável por anon (lição do advisor)
+OK    service_role lê todas as 46 tabelas (o backend funciona)
+OK    service_role não tem TRUNCATE em nenhuma tabela
+OK    anon e authenticated não têm TRUNCATE em nenhuma tabela
+OK    service_role consegue gravar pedido e ler de volta (grants do backend)
+OK    anon não tem acesso ao schema privado
+OK    registrar_auditoria só é executável pelo service_role
+OK    service_role não tem UPDATE/DELETE/TRUNCATE em partidas, lançamentos e auditoria
+OK    service_role não tem UPDATE/DELETE/TRUNCATE em mensagens
+OK    tabelas novas nascem fechadas (privilégio padrão sem anon/authenticated)
+OK    anon não consegue chamar função do schema privado
+OK    authenticated chama as funções privadas só sobre si mesmo (um usuário comum recebe falso)
+
+== (h) Rollback de cada migration, na ordem inversa ==
+OK    rollback F3.8c deixa o banco exatamente como antes da migration
+OK    rollback F3.8b deixa o banco exatamente como antes da migration
+OK    rollback F3.8a deixa o banco exatamente como antes da migration
+OK    rollback F3.7 deixa o banco exatamente como antes da migration
+OK    rollback F3.6 deixa o banco exatamente como antes da migration
+OK    rollback F3.5 deixa o banco exatamente como antes da migration
+OK    rollback F3.4 deixa o banco exatamente como antes da migration
+OK    rollback F3.3 deixa o banco exatamente como antes da migration
+
+== (h) Reaplicando tudo depois do rollback ==
+OK    reaplicar F3.3 reproduz o mesmo estado
+OK    reaplicar F3.4 reproduz o mesmo estado
+OK    reaplicar F3.5 reproduz o mesmo estado
+OK    reaplicar F3.6 reproduz o mesmo estado
+OK    reaplicar F3.7 reproduz o mesmo estado
+OK    reaplicar F3.8a reproduz o mesmo estado
+OK    reaplicar F3.8b reproduz o mesmo estado
+OK    reaplicar F3.8c reproduz o mesmo estado
+
+== Segunda rodada completa da suíte, no banco reconstruído ==
+
+== (c) Documentos de verificação ==
+OK    documentos: cad vê
+OK    documentos: n1 não vê
+OK    documentos: n2 não vê
+OK    documentos: med não vê
+OK    documentos: fin não vê
+OK    documentos: seg não vê
+OK    documentos: adm não vê
+OK    documentos: dpo não vê
+OK    documentos: P1 não vê
+OK    documentos: A não vê
+OK    documentos: o próprio profissional não lê de volta
+OK    documentos: anon recusado
+OK    verificação: profissional vê a própria
+OK    verificação: outro profissional não vê
+OK    verificação: analista_id/fornecedor_ref ocultos do app
+OK    storage verificacao: cad lê
+OK    storage verificacao: n1 não lê
+OK    storage verificacao: med não lê
+OK    storage verificacao: fin não lê
+OK    storage verificacao: adm não lê
+OK    storage verificacao: P1 não lê
+OK    storage verificacao: A não lê
+
+== (a) Usuário A não lê dados do usuário B ==
+OK    A vê os próprios pedidos e nenhum de B
+OK    B vê só os próprios pedidos
+OK    A não lê o endereço do pedido de B
+OK    A lê o próprio endereço
+OK    conta bloqueada não lê nem o próprio pedido
+OK    conta bloqueada não lê o próprio usuário
+
+== (b) Profissional e endereço: antes do contrato ==
+OK    P1 (categoria e cidade certas) vê pedidos abertos PA e PB
+OK    P1 não vê o pedido aberto de um cliente bloqueado
+OK    P2 (outra categoria) não vê PA
+OK    P2 não vê nenhum pedido de cat1
+OK    P2 vê o pedido de cat2 (PC)
+OK    P3 (outra cidade) não vê PA nem PB
+OK    PX (em análise) não vê pedidos
+OK    P1 NÃO vê o endereço de PA antes do contrato
+OK    P1 vê o bairro (aproximado) em pedidos
+OK    n1 (atendimento) vê o pedido mas não o endereço
+
+== Orçamentos ==
+OK    A vê os 2 orçamentos enviados do próprio pedido, sem rascunho
+OK    B não vê orçamento de PA
+OK    P5 não vê o orçamento do concorrente P1
+OK    P1 vê os próprios (inclusive rascunho)
+OK    itens: P5 não vê itens do orçamento de P1
+OK    itens: A não vê itens do rascunho
+OK    itens: A vê itens do orçamento enviado
+OK    trigger: profissional em análise não envia orçamento
+OK    trigger: total do orçamento diferente da soma dos itens é recusado no commit
+OK    trigger: item não entra em orçamento já enviado
+OK    trigger: orçamento enviado não muda valor
+
+== (b) Endereço depois do contrato ==
+OK    P1 contratado, mas endereço ainda não liberado (liberado_em nulo): não vê
+OK    P1 contratado e endereço liberado: vê o endereço de PA
+OK    P5 (orçou e perdeu) não vê o endereço
+OK    P5 ainda enxerga o pedido (tem orçamento), sem endereço
+OK    P4 (contratado por B) não vê o endereço de PA
+OK    P4 vê o endereço do pedido que ele contratou (PB)
+OK    P2 e P3 nunca veem endereço
+OK    B não vê o endereço de PA
+OK    segurança vê o endereço durante o atendimento (contrato ativo)
+OK    atendimento N1 e financeiro não veem endereço
+OK    mediador sem disputa não vê endereço
+OK    contrato cancelado: P4 perde o endereço
+
+== Contrato (f) ==
+OK    contrato: valor não muda
+OK    contrato: config_versao_id não muda
+OK    contrato: regras_aplicadas não mudam
+OK    contrato: não pode ser apagado
+OK    contrato: status pode mudar
+OK    contrato: valor diferente do orçamento aceito é recusado na criação
+OK    A lê o contrato; B não
+OK    P1 lê o contrato; P5 e P2 não
+OK    contrato: IP do aceite e custo do Stripe ocultos do app
+OK    contrato: pedido não ganha segundo contrato
+
+== Configuração (f) ==
+OK    config aprovada: parâmetro não muda
+OK    config aprovada: versão não é apagada
+OK    config aprovada: motivo não muda
+OK    config: fin vê 1
+OK    config: adm vê 1
+OK    config: A vê 0
+OK    config: P1 vê 0
+OK    config: cad vê 0
+OK    config: n1 vê 0
+
+== (a) Chat ==
+OK    A lê as mensagens das suas duas conversas
+OK    A não lê a conversa de B
+OK    P1 lê só a conversa dele
+OK    P5 não lê a conversa de P1
+OK    texto original oculto do app (só corpo_exibido)
+OK    financeiro, N1 e cadastro não leem mensagens
+OK    mediador sem disputa não lê chat
+
+== Agenda e presença ==
+OK    hash do código oculto do app (profissional e cliente)
+OK    partes leem o agendamento; B e P5 não
+OK    check-out sem check-in é recusado
+OK    só o profissional do contrato registra presença
+OK    check-in e check-out entram
+OK    presença é imutável
+OK    partes leem presença; B não
+
+== (a) Pagamentos ==
+OK    A lê só o próprio pagamento
+OK    B lê só o dele
+OK    P1 lê o pagamento do contrato, sem pagador, meio nem custo
+OK    P5 e P2 não leem pagamento
+OK    pagamento só pelo cliente do contrato
+OK    chave de idempotência repetida é recusada
+OK    pagamento: valor não muda
+
+== (d) Ledger ==
+OK    lançamento equilibrado confirma (como service_role)
+OK    repasse com 3 partidas equilibradas confirma
+OK    lançamentos do outro contrato confirmam
+OK    partidas DESEQUILIBRADAS são recusadas no commit
+OK    lançamento com uma partida só é recusado
+OK    lançamento sem partidas é recusado
+OK    partida com valor zero é recusada
+OK    nova partida em lançamento já fechado é recusada
+OK    chave de idempotência repetida no lançamento é recusada
+OK    ledger [owner]: UPDATE em partidas falha
+OK    ledger [owner]: DELETE em partidas falha
+OK    ledger [owner]: UPDATE em lancamentos falha
+OK    ledger [owner]: DELETE em lancamentos falha
+OK    ledger [owner]: TRUNCATE em partidas falha
+OK    ledger [owner]: TRUNCATE em lancamentos falha
+OK    ledger [service_role]: UPDATE em partidas falha
+OK    ledger [service_role]: DELETE em partidas falha
+OK    ledger [service_role]: UPDATE em lancamentos falha
+OK    ledger [service_role]: DELETE em lancamentos falha
+OK    ledger [service_role]: TRUNCATE em partidas falha
+OK    ledger [service_role]: TRUNCATE em lancamentos falha
+OK    a mensagem de erro do owner vem do trigger de imutabilidade
+OK    estorno que NÃO inverte exatamente o original é recusado
+OK    estorno com as mesmas partidas (não invertidas) é recusado
+OK    estorno em contrato diferente do original é recusado
+OK    estorno correto (partidas invertidas) confirma
+OK    o estorno devolve o valor (retido_servico cai 150000)
+OK    um lançamento só é estornado uma vez
+OK    tipo estorno exige estorna_id
+
+== (a) Extrato de cada usuário (sem saldo pronto, D15) ==
+OK    P1 vê só a própria conta
+OK    as partidas de P1 somam 92500 (extrato)
+OK    P4 vê só a dele
+OK    não existe view de saldo, tabela de saques nem de chaves Pix (D15)
+OK    P1 não lê as contas nem as partidas de P4
+OK    P1 vê no extrato só lançamentos que tocam a conta dele
+OK    P1 não vê as contas de sistema (retido, caixa, receita)
+OK    cliente A não lê nada do ledger
+OK    financeiro lê o ledger inteiro
+OK    mediador, N1 e cadastro não leem o ledger
+
+== Repasses (ordem de liberação ao parceiro) ==
+OK    repasse: bruto = taxa + líquido
+OK    repasse só vai para o profissional do contrato
+OK    P1 lê o próprio repasse; P4, P5 e A não
+OK    financeiro lê repasses; mediador também (leitura)
+OK    repasse: id da transferência no parceiro é único
+OK    lançamento sem contrato é recusado (não há mais saque)
+OK    lançamento do tipo 'saque' é recusado
+OK    webhook: só o financeiro lê
+OK    lançamento espelha um evento do parceiro (evento_webhook_id)
+OK    lançamento com evento inexistente é recusado
+OK    webhook repetido (mesmo evento) é recusado
+OK    webhook com assinatura inválida não pode ser marcado como processado
+OK    financeiro lê webhooks; mediador não
+
+== Disputa ==
+OK    segunda disputa ativa no mesmo contrato é recusada
+OK    disputa só aberta pelas partes
+OK    partes e mediador leem a disputa; B e P5 não
+OK    disputa: relato_ma_fe/procedente/decidida_por ocultos do app
+OK    evidências: partes veem só as visíveis (sem nota interna)
+OK    evidências: mediador vê todas (inclui nota interna)
+OK    evidências: financeiro não vê nota interna
+OK    nota interna só da equipe
+OK    evidência é imutável
+OK    agora o mediador lê o endereço do pedido em disputa
+OK    mediador lê o chat só do pedido em disputa
+OK    mediador não lê o texto original da mensagem
+OK    financeiro continua sem ler chat
+OK    decisão acima da alçada sem 2ª pessoa é recusada
+OK    decisão de reembolso aprovada pela mesma pessoa é recusada
+OK    financeiro não decide mérito
+OK    aprovador precisa ser líder ou administrador
+OK    decisão acima da alçada com líder de suporte aprova
+OK    disputa decidida não muda mais
+OK    garantia/retrabalho: partes leem; B não
+OK    retrabalho só pelo cliente do contrato
+OK    retrabalho dentro da garantia entra
+OK    retrabalho: P1 e A leem; B não
+
+== Avaliações ==
+OK    avaliação: avaliador trocado é recusado
+OK    avaliação: critério de outra direção é recusado
+OK    avaliação: nota do cliente para o profissional é pública (B e P2 leem)
+OK    avaliação: nota do profissional para o cliente NÃO é pública (B e P2 não leem)
+OK    avaliação: o cliente, o avaliador e o profissional que orçou leem a nota do cliente
+OK    avaliação: critérios seguem a visibilidade
+OK    avaliação: nota não pode ser editada
+OK    avaliação em revisão some para terceiros e continua para o moderador
+
+== (e) Mensagens e auditoria imutáveis ==
+OK    mensagem [owner]: editar o texto falha
+OK    mensagem [owner]: apagar falha
+OK    mensagem [owner]: TRUNCATE falha
+OK    mensagem [service_role]: editar o texto falha
+OK    mensagem [service_role]: apagar falha
+OK    mensagem [service_role]: TRUNCATE falha
+OK    mensagem: lida_em pode ser preenchido uma vez
+OK    mensagem: lida_em não muda de novo
+OK    mensagem: só as partes escrevem na conversa
+OK    mensagem: anexo de outro pedido é recusado
+OK    conversa: pedido de outro cliente é recusado
+OK    mídia é imutável
+OK    histórico do pedido é imutável
+OK    auditoria: service_role registra contrato.aceito
+OK    auditoria: service_role registra checkin.registrado
+OK    auditoria: service_role registra repasse.liberado
+OK    auditoria: ação financeira sem motivo é recusada
+OK    auditoria: revelar dado pessoal sem motivo é recusado
+OK    auditoria: cadeia de hash íntegra
+OK    auditoria: hash_anterior encadeado
+OK    auditoria [owner]: UPDATE falha
+OK    auditoria [owner]: DELETE falha
+OK    auditoria [owner]: TRUNCATE falha
+OK    auditoria [service_role]: UPDATE falha
+OK    auditoria [service_role]: DELETE falha
+OK    auditoria [service_role]: TRUNCATE falha
+OK    auditoria: INSERT direto do service_role falha (só por registrar_auditoria)
+OK    auditoria: adulteração direta é detectada pela cadeia
+OK    auditoria: remoção de uma linha é detectada pela cadeia
+
+== Auditoria: quem lê ==
+OK    auditoria: adm lê
+OK    auditoria: dpo lê
+OK    auditoria: seg lê
+OK    auditoria: n1 não lê
+OK    auditoria: fin não lê
+OK    auditoria: A não lê
+OK    auditoria: P1 não lê
+OK    auditoria: mod não lê
+OK    auditoria e config: o jurídico lê
+
+== Notificações, usuários e perfis ==
+OK    notificações: cada um lê só as suas
+OK    preferências: cada um lê só as suas
+OK    equipe não lê notificação de usuário
+OK    CPF/telefone: A lê só o próprio
+OK    CPF/telefone: P1 não lê os de A (outra parte do contrato)
+OK    CPF/telefone: nem a equipe lê o de outras pessoas direto (só pelo backend)
+OK    usuarios: A vê o nome de P1 (aprovado) e o próprio, não o de B
+OK    usuarios: P1 vê o nome do cliente A (contrato) e não o de B
+OK    usuarios: P2 (sem relação) não vê o nome de A
+OK    usuarios: status/aceite de termos ocultos
+OK    perfis: A vê perfis aprovados e não o do PX em análise
+OK    perfis: CNPJ oculto de quem não é o app dono (nem o dono lê direto)
+OK    perfis: o PX em análise vê o próprio perfil
+OK    equipe: tabela só para o administrador e a própria linha
+OK    catálogo: cliente lê cidades e categorias ativas
+OK    catálogo: categoria inativa some para o cliente e aparece para a equipe
+OK    regiões/categorias do profissional: A vê as de P1 aprovado; não as do PX
+
+== Equipe de atendimento: o que pode ==
+OK    N1 consulta pedido, contrato e pagamento
+OK    N1 não vê documentos, ledger, webhooks, chat nem endereço
+OK    moderador não vê dados financeiros
+OK    cadastro não vê pedido, pagamento nem repasse
+OK    seguranca vê contrato (localização), mas não ledger
+
+== Storage (buckets privados) ==
+OK    buckets existem e são todos privados
+OK    foto do pedido: A, P1 e P5 (que orçou) leem
+OK    foto do pedido: B, P2, P3 e PX não leem
+OK    foto do pedido: anon não lê
+OK    chat: A e P1 leem o anexo da conversa deles; P5 não
+OK    chat: B lê só o anexo do chat dele
+OK    chat: mediador lê o anexo do pedido em disputa e não o do outro
+OK    chat: financeiro e N1 não leem anexos
+OK    app não grava no Storage (sem policy de INSERT)
+OK    app não apaga nem altera arquivos do Storage
+OK    avatar: A vê a foto de P1 (profissional aprovado)
+
+== (g) anon não lê nada; o app não escreve; funções seguras ==
+OK    RLS ligado em TODAS as 46 tabelas do schema public
+OK    anon não consegue ler nenhuma das 46 tabelas/views
+OK    authenticated (o app) não tem INSERT/UPDATE/DELETE/TRUNCATE em nenhuma tabela
+OK    anon não tem nenhum privilégio em nenhuma tabela
+OK    nenhuma policy usa using (true)
+OK    toda policy é só para authenticated
+OK    só policies de SELECT (o app não escreve)
+      (tabelas sem policy permissiva = ninguém do app lê: [])
+OK    somente tabelas de uso exclusivo do backend ficam sem policy de leitura
+OK    TODA função SECURITY DEFINER tem search_path vazio
+OK    NENHUMA função (public/privado) é executável por anon ou PUBLIC
+OK    nenhuma função SECURITY DEFINER do schema public é chamável pelo app (RPC)
+OK    rls_auto_enable não é executável por anon (lição do advisor)
+OK    service_role lê todas as 46 tabelas (o backend funciona)
+OK    service_role não tem TRUNCATE em nenhuma tabela
+OK    anon e authenticated não têm TRUNCATE em nenhuma tabela
+OK    service_role consegue gravar pedido e ler de volta (grants do backend)
+OK    anon não tem acesso ao schema privado
+OK    registrar_auditoria só é executável pelo service_role
+OK    service_role não tem UPDATE/DELETE/TRUNCATE em partidas, lançamentos e auditoria
+OK    service_role não tem UPDATE/DELETE/TRUNCATE em mensagens
+OK    tabelas novas nascem fechadas (privilégio padrão sem anon/authenticated)
+OK    anon não consegue chamar função do schema privado
+OK    authenticated chama as funções privadas só sobre si mesmo (um usuário comum recebe falso)
+
+RESUMO: 572 verificações OK, 0 com erro

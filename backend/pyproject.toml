@@ -1,0 +1,56 @@
+[project]
+name = "trato-backend"
+version = "0.1.0"
+description = "Backend do Trato: regras de pedido, pagamento retido, taxa e disputas."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic-settings>=2.4",
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
+    "pyjwt[crypto]>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    # Só para os testes de integração (Postgres local descartável); sem ele eles são pulados.
+    "pgserver>=0.1.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integracao: usa Postgres local descartável (pgserver); pulado se ele faltar"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S107", "E501"]
+# A fixture `adm` vem de tests/api/admin_ambiente.py e é importada dentro dos testes.
+"tests/api/test_admin_*.py" = ["F811"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Padrão do FastAPI: Depends/Query/Header nos argumentos das rotas.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Header",
+    "trato.api.contexto.exigir_papel",
+    "trato.api.admin.contexto.exigir",
+]
