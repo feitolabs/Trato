@@ -29,11 +29,11 @@ def _semear(amb, **campos):
     )
 
 
-def _in(amb, codigo, token="t-prof", headers=None):
+def _in(amb, codigo, quem="t-prof", headers=None):
     return amb.cliente.post(
         "/v1/pedidos/ped-1/acoes/fazer_check_in",
         json={"prova": _prova_in(codigo)},
-        headers={**cab(token), **(headers or {})},
+        headers={**cab(quem), **(headers or {})},
     )
 
 

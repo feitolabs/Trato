@@ -1,6 +1,5 @@
 -- Desfaz a migration do fix de acesso (supabase/migrations/20261030000000_fix_acesso_storage_pedido_historico.sql).
--- Só rodar com OK do João. As policies restritivas criadas para tabelas que já existiam sem elas ficam
--- (são inofensivas e só restringem conta bloqueada).
+-- Só rodar com OK do João.
 
 -- M7: volta a regra antiga de visibilidade do pedido e do histórico.
 drop policy if exists pedido_historico_select on public.pedido_historico;
@@ -40,7 +39,19 @@ create policy pedido_historico_select on public.pedido_historico for select to a
   using (privado.pode_ver_pedido(pedido_id));
 drop function if exists privado.pode_ver_historico(uuid);
 
--- M6
+-- M6: tira a restritiva que o preenchimento da migration pôs nas tabelas do agendador/push
+-- (se elas existirem); as demais já nasceram com a restritiva e não são mexidas.
+do $$
+declare
+  tabela text;
+begin
+  foreach tabela in array array['agendador_execucoes', 'dispositivos_push'] loop
+    if to_regclass('public.' || tabela) is not null then
+      execute format('drop policy if exists conta_ativa_obrigatoria on public.%I', tabela);
+    end if;
+  end loop;
+end;
+$$;
 drop event trigger if exists trato_conta_ativa_tabela_nova;
 drop function if exists privado.aplicar_conta_ativa_em_tabela_nova();
 drop policy if exists conta_ativa_obrigatoria on storage.objects;
