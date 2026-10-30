@@ -49,6 +49,7 @@ from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
+from trato.seguranca.config import parametros_docs
 
 PERSISTENCIAS = ("memoria", "postgres")
 
@@ -92,6 +93,7 @@ def criar_contexto_postgres(
             usuarios,
             segredo_hs256=config.supabase_jwt_secret.get_secret_value,
             jwks_url=config.supabase_jwks_url,
+            emissor=f"{config.supabase_url.rstrip('/')}/auth/v1" if config.supabase_url else "",
         )
     conversas = ConversasPostgres(banco)
     notificacoes = NotificacoesPostgres(banco)
@@ -135,7 +137,11 @@ def criar_app_da_config(config: Config | None = None) -> FastAPI:
     if modo not in PERSISTENCIAS:
         raise RuntimeError(f"TRATO_PERSISTENCIA inválido: {modo!r} (use memoria ou postgres).")
     if modo == "memoria":
-        return instalar(FastAPI(title="Trato API", version=__version__))
+        return instalar(
+            FastAPI(
+                title="Trato API", version=__version__, **parametros_docs(config.trato_ambiente)
+            )
+        )
 
     dsn = config.database_url.get_secret_value()
     if not dsn:
@@ -150,5 +156,10 @@ def criar_app_da_config(config: Config | None = None) -> FastAPI:
         finally:
             banco.fechar()
 
-    app = FastAPI(title="Trato API", version=__version__, lifespan=ciclo)
+    app = FastAPI(
+        title="Trato API",
+        version=__version__,
+        lifespan=ciclo,
+        **parametros_docs(config.trato_ambiente),
+    )
     return instalar(app, criar_contexto_postgres(banco, config))

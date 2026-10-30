@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato import disputas
+from trato.api.admin.contexto import Operador, exigir, obter_admin
+from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.servicos import ator_de, carregar_pedido
@@ -71,7 +73,7 @@ class AditivoAprovadoOut(BaseModel):
 
 class DecisaoIn(_Entrada):
     resultado: ResultadoDisputa
-    justificativa: str
+    justificativa: str = Field(min_length=3, max_length=2000)
     percentual_cliente_bps: int | None = None
     valor_cliente_centavos: int | None = None
 
@@ -145,11 +147,19 @@ def criar_cobranca(
 )
 def listar_cobrancas(
     pedido_id: str,
+    request: Request,
     servico: Servico,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[CobrancaOut]:
-    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    pedido = carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.PAGAMENTOS_VER,),
+        consulta="cobrancas",
+    )
     return [_cobranca_out(c) for c in servico.cobrancas.do_pedido(pedido.id)]
 
 
@@ -195,11 +205,19 @@ def aprovar_aditivo(
 @router.get("/{pedido_id}/aditivos", response_model=list[AditivoOut], summary="Aditivos do pedido")
 def listar_aditivos(
     pedido_id: str,
+    request: Request,
     servico: Servico,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[AditivoOut]:
-    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    pedido = carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.PAGAMENTOS_VER,),
+        consulta="aditivos",
+    )
     return [_aditivo_out(a) for a in servico.aditivos.do_pedido(pedido.id)]
 
 
@@ -208,19 +226,30 @@ def listar_aditivos(
     response_model=DecisaoOut,
     summary="Equipe decide a disputa (move o dinheiro)",
     description=(
-        "Só a equipe. Divide o valor congelado, pede o estorno ao provedor, espelha no ledger "
-        "e repartir a parte do profissional com a taxa do contrato. Acima da alçada a decisão "
-        "fica aguardando segunda pessoa (não implementado: devolve o estado)."
+        "Só a equipe com a permissão `disputas_decidir` (mediador, líder de suporte, "
+        "administrador). Divide o valor congelado, pede o estorno ao provedor, espelha no ledger "
+        "e reparte a parte do profissional com a taxa do contrato. A alçada é a de quem decide "
+        "(`equipe.alcada_centavos`, vazia = 0); acima dela fica aguardando segunda pessoa "
+        "(`/v1/admin/disputas/{id}/aprovacao`). A decisão entra na auditoria."
     ),
 )
 def decidir_disputa(
     pedido_id: str,
     corpo: DecisaoIn,
     servico: Servico,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.EQUIPE)),
+    request: Request,
+    operador: Operador = Depends(exigir(Permissao.DISPUTAS_DECIDIR)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DecisaoOut:
-    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    usuario = operador.usuario
+    pedido = carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.DISPUTAS_DECIDIR,),
+        consulta="disputa_decisao",
+    )
     disputa = contexto.disputas.obter(pedido.id)
     if disputa is None:
         raise HTTPException(404, "Este pedido não tem disputa.")
@@ -230,8 +259,22 @@ def decidir_disputa(
         corpo.percentual_cliente_bps,
         corpo.valor_cliente_centavos,
     )
-    alcada = servico.config().alcada_disputa_centavos
+    alcada = operador.membro.alcada_centavos or 0
     nova = disputa.decidir(disputas.Ator.ANALISTA, usuario.id, decisao, agora, alcada)
+    admin = obter_admin(request, contexto)
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao="financeiro.disputa_decisao",
+        entidade="pedidos",
+        entidade_id=pedido.id,
+        depois={
+            "resultado": decisao.resultado.value,
+            "valor_congelado_centavos": nova.valor_congelado,
+            "alcada_centavos": alcada,
+            "efetivada": nova.divisao is not None,
+        },
+        motivo=corpo.justificativa,
+    )
     if nova.divisao is None:  # aguardando segunda pessoa
         contexto.disputas.salvar(pedido.id, nova)
         return DecisaoOut(

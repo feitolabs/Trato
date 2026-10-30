@@ -11,11 +11,12 @@ from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 from trato import disputas
+from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import (
@@ -37,7 +38,20 @@ from trato.api.repositorios import Contrato
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.garantias import abrir_garantia, abrir_retrabalho
 from trato.pedidos import estados
-from trato.pedidos.estados import Acao, Estado, Papel, Pedido, Prova, ProvaDisputa, ProvaRetrabalho
+from trato.pedidos.estados import (
+    Acao,
+    CodigoNaoConfere,
+    Estado,
+    Papel,
+    Pedido,
+    Prova,
+    ProvaDisputa,
+    ProvaRetrabalho,
+)
+from trato.seguranca.cliente import dispositivo_do_cliente, ip_do_cliente
+from trato.seguranca.config import obter_config_seguranca
+from trato.seguranca.tentativas_codigo import CodigoBloqueado
+from trato.seguranca.texto_livre import limpar_texto
 
 router = APIRouter(prefix="/v1/pedidos", tags=["pedidos"])
 
@@ -51,6 +65,9 @@ _NAO_DISPONIVEIS = {
     Acao.DECIDIR_DISPUTA: "A decisão da disputa depende de definir como ela move o dinheiro "
     "(P4/P8).",
 }
+
+
+_ACOES_COM_CODIGO = frozenset({Acao.FAZER_CHECK_IN, Acao.FAZER_CHECK_OUT})
 
 
 def _so_sistema(acao: Acao) -> bool:
@@ -108,7 +125,23 @@ def abrir_pedido(
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
     pedido = estados.abrir_pedido(uuid.uuid4().hex, ator_de(usuario), contexto.agora())
-    gravado = contexto.pedidos.salvar(pedido, None, corpo.para_dados() if corpo else None)
+    dados = corpo.para_dados() if corpo else None
+    if dados is not None:  # M9: limite e mascaramento de contato no texto livre
+        cfg = obter_config_seguranca()
+        dados = replace(
+            dados,
+            titulo=limpar_texto(dados.titulo, "título", cfg.titulo_max_chars, cfg),
+            descricao=limpar_texto(dados.descricao, "descrição", cfg.descricao_max_chars, cfg),
+            respostas=tuple(
+                replace(
+                    r, resposta=limpar_texto(r.resposta, "resposta", cfg.resposta_max_chars, cfg)
+                )
+                if isinstance(r.resposta, str)
+                else r
+                for r in dados.respostas
+            ),
+        )
+    gravado = contexto.pedidos.salvar(pedido, None, dados)
     return pedido_out(gravado, usuario)
 
 
@@ -125,19 +158,31 @@ def listar_pedidos(
 @router.get("/{pedido_id}", response_model=PedidoOut, summary="Ver pedido")
 def ver_pedido(
     pedido_id: str,
+    request: Request,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
-    return pedido_out(carregar_pedido(contexto, pedido_id, usuario), usuario)
+    pedido = carregar_pedido(
+        contexto, pedido_id, usuario, request=request, equipe=(Permissao.PEDIDOS_BUSCAR,)
+    )
+    return pedido_out(pedido, usuario)
 
 
 @router.get("/{pedido_id}/eventos", response_model=list[EventoOut], summary="Histórico do pedido")
 def ver_eventos(
     pedido_id: str,
+    request: Request,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[EventoOut]:
-    carregar_pedido(contexto, pedido_id, usuario)
+    carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.PEDIDOS_BUSCAR,),
+        consulta="historico",
+    )
     return [
         EventoOut(
             acao=e.acao.value,
@@ -164,6 +209,7 @@ def ver_eventos(
 def mudar_estado(
     pedido_id: str,
     acao: Acao,
+    request: Request,
     corpo: AcaoPedidoIn | None = None,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
@@ -178,9 +224,28 @@ def mudar_estado(
 
     prova = _montar_prova(contexto, acao, corpo.prova if corpo else None, pedido)
     cfg = contexto.config.carregar()
-    transicao = estados.transicionar(
-        pedido, acao, ator_de(usuario), contexto.agora(), prova, cfg.prazos_pedido
-    )
+    ip, dispositivo = ip_do_cliente(request), dispositivo_do_cliente(request)
+    com_codigo = acao in _ACOES_COM_CODIGO
+    if com_codigo:  # A1: o código de 4 dígitos tem limite de tentativas
+        try:
+            contexto.limite_codigo.checar(pedido.id, ip)
+        except CodigoBloqueado as bloqueio:
+            raise HTTPException(
+                429,
+                "Muitas tentativas de código. Aguarde um pouco e tente de novo.",
+                headers={"Retry-After": str(bloqueio.retry_apos_s)},
+            ) from None
+    try:
+        transicao = estados.transicionar(
+            pedido, acao, ator_de(usuario), contexto.agora(), prova, cfg.prazos_pedido
+        )
+    except CodigoNaoConfere:
+        contexto.limite_codigo.errou(
+            pedido.id, ip, acao=acao.value, ator_id=usuario.id, dispositivo=dispositivo
+        )
+        raise
+    if com_codigo:
+        contexto.limite_codigo.acertou(pedido.id)
     # Uma transação só: contrato + pedido + garantia + efeitos no dinheiro (tudo ou nada).
     with contexto.transacao():
         if acao is Acao.ACEITAR_ORCAMENTO:
@@ -196,6 +261,8 @@ def mudar_estado(
                         orcamento.valor_centavos,
                         orcamento.categoria_id,
                         aceito_em=transicao.evento.em,
+                        aceite_ip=ip,  # prova do aceite (M10)
+                        aceite_dispositivo=dispositivo,
                     )
                 )
         gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
@@ -264,10 +331,18 @@ def abrir_disputa(
 @router.get("/{pedido_id}/disputa", response_model=DisputaOut, summary="Ver disputa")
 def ver_disputa(
     pedido_id: str,
+    request: Request,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaOut:
-    carregar_pedido(contexto, pedido_id, usuario)
+    carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.DISPUTAS_VER,),
+        consulta="disputa",
+    )
     disputa = contexto.disputas.obter(pedido_id)
     if disputa is None:
         raise HTTPException(404, "Este pedido não tem disputa.")

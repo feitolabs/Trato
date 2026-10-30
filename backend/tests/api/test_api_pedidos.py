@@ -43,7 +43,7 @@ def test_listar_e_ver_pedido(amb):
     lista = amb.cliente.get("/v1/pedidos", headers=cab("t-cliente")).json()
     assert [p["id"] for p in lista] == ["ped-1"]
     assert amb.cliente.get("/v1/pedidos/ped-1", headers=cab("t-prof")).status_code == 200
-    assert amb.cliente.get("/v1/pedidos/ped-1", headers=cab("t-equipe")).status_code == 200
+    assert amb.cliente.get("/v1/pedidos/ped-1", headers=cab("t-n1")).status_code == 200
 
 
 def test_estranho_nao_ve_o_pedido(amb):
@@ -207,7 +207,7 @@ def test_acoes_com_rota_propria_ou_em_aberto(amb):
     assert acao(amb, "t-cliente", "abrir_disputa").status_code == 400
     assert acao(amb, "t-cliente", "pedir_retrabalho").status_code == 400
     assert acao(amb, "t-cliente", "remarcar").status_code == 501
-    assert acao(amb, "t-equipe", "decidir_disputa").status_code == 501
+    assert acao(amb, "t-mediador", "decidir_disputa").status_code == 403
 
 
 def test_acao_desconhecida_da_422(amb):

@@ -472,7 +472,7 @@ def test_disputa_congela_e_reembolso_parcial_divide_o_valor(fluxo: Fluxo):
         fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-prof", decisao).status_code
         == 403
     )
-    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-equipe", decisao)
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     assert r.status_code == 200, r.text
     assert r.json()["para_cliente_centavos"] == 25_000
     assert r.json()["para_profissional_centavos"] == 75_000
@@ -491,7 +491,7 @@ def test_disputa_reembolso_total_cancela_e_devolve(fluxo: Fluxo):
     pid = fluxo.ate_em_confirmacao()
     _abrir_e_responder_disputa(fluxo, pid)
     decisao = {"resultado": "reembolso_total", "justificativa": "Serviço não feito."}
-    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-equipe", decisao)
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     assert r.status_code == 200 and r.json()["estado_pedido"] == "cancelado"
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == 0 and saldo["taxa_trato_centavos"] == 0
@@ -503,7 +503,7 @@ def test_disputa_liberar_tudo_conclui_com_taxa_cheia(fluxo: Fluxo):
     pid = fluxo.ate_em_confirmacao()
     _abrir_e_responder_disputa(fluxo, pid)
     decisao = {"resultado": "liberar_tudo", "justificativa": "Serviço conforme combinado."}
-    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-equipe", decisao)
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     assert r.json()["estado_pedido"] == "concluido"
     assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
     assert [c[0] for c in fluxo.fake.chamadas].count("estornar") == 0

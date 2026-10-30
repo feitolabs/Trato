@@ -121,6 +121,10 @@ class ProvaInvalida(TransicaoInvalida):
     """Faltou prova ou a prova não confere."""
 
 
+class CodigoNaoConfere(ProvaInvalida):
+    """O código de 4 dígitos do check-in/check-out está errado (conta no limite de tentativas)."""
+
+
 class ForaDoPrazo(TransicaoInvalida):
     """O prazo ainda não venceu (rotina) ou já venceu (pedido do usuário)."""
 
@@ -478,7 +482,7 @@ def _exigir_janela(janela: Janela, agora: datetime) -> None:
 
 def _exigir_codigo(informado: str, esperado: str | None, nome: str) -> None:
     if esperado is None or not hmac.compare_digest(informado.encode(), esperado.encode()):
-        raise ProvaInvalida(f"O código de {nome} não confere.")
+        raise CodigoNaoConfere(f"O código de {nome} não confere.")
 
 
 def _prazo(prazos: PrazosPedido, campo: str, rotulo: str) -> timedelta:

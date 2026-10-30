@@ -12,7 +12,7 @@ from trato.pagamentos.provedor import TipoEvento
 
 def _decidir_reembolso_total(fluxo: Fluxo, pid: str):  # noqa: F811
     decisao = {"resultado": "reembolso_total", "justificativa": "Serviço não feito."}
-    return fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-equipe", decisao)
+    return fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
 
 
 # --- A7: a intenção entra no ledger antes do provedor ----------------------------------------
