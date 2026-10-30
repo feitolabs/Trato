@@ -263,6 +263,15 @@ def montar() -> Ambiente:
     app = criar_app(contexto)
     instalar_admin(app, admin)
     _instalar_login_falso(app, papeis_por_email)
+    # O painel (Flutter Web) roda em outra porta: sem CORS o navegador bloqueia. Só origens locais.
+    from starlette.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[f"http://{h}:{p}" for h in ("127.0.0.1", "localhost") for p in (8080, 8081)],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "apikey"],
+    )
     return Ambiente(app, contexto, admin, assinador)
 
 
