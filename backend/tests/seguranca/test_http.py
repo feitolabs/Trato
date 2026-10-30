@@ -225,7 +225,7 @@ def test_rota_de_validacao_de_upload():
         "tel +55 11 98765-4321",
         "tel (11) 98765-4321",
         "Authorization: Bearer abc.def-123_456",
-        "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig_nature123",
+        "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig_nature123",  # verificar: ignorar (JWT de exemplo, não é segredo)
         "GET /v1/x?token=segredo123&cpf=12345678909 200",
     ],
 )
