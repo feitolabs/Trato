@@ -100,7 +100,7 @@ class ResumoPedido {
     required this.tempoRestante,
   });
 
-  final int numero;
+  final String numero;
   final String titulo;
   final int recebidos;
   final int limite;

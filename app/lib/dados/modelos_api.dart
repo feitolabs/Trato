@@ -44,7 +44,11 @@ class PedidoApi {
   final String? codigoConclusao;
 
   /// Número curto para exibir ("#4F2A"): só os 4 primeiros caracteres do id.
-  String get numero => '#${id.substring(0, id.length < 4 ? id.length : 4).toUpperCase()}';
+  String get numero => numeroDe(id);
+
+  /// "#AB12": as 4 primeiras letras do id. Só para mostrar.
+  static String numeroDe(String id) =>
+      '#${id.substring(0, id.length < 4 ? id.length : 4).toUpperCase()}';
 }
 
 class EventoApi {

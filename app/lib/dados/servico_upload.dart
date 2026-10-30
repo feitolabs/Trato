@@ -10,18 +10,28 @@ import 'erros.dart';
 /// Para que serve o arquivo. O backend usa para escolher a pasta, o tamanho máximo e o prazo
 /// de guarda (dado sensível fica em bucket privado).
 enum FinalidadeArquivo {
-  checkIn('check_in'),
-  checkOut('check_out'),
-  documento('documento'),
-  selfie('selfie'),
+  checkIn('checkin'),
+  checkOut('checkout'),
+  documento('verificacao'),
+  selfie('verificacao'),
   notaMaterial('nota_material'),
-  fotoPedido('foto_pedido'),
-  evidenciaDisputa('evidencia_disputa'),
+  fotoPedido('pedido'),
+  evidenciaDisputa('disputa'),
+
+  /// Sem destino no backend ainda (`docs/app-divergencias.md`).
   portfolio('portfolio');
 
   const FinalidadeArquivo(this.codigo);
 
+  /// O `destino` de `POST /v1/uploads`.
   final String codigo;
+
+  /// `tipo_documento` do envio de verificação.
+  String? get tipoDocumento => switch (this) {
+        documento => 'documento_frente',
+        selfie => 'selfie',
+        _ => null,
+      };
 }
 
 /// Arquivo já guardado pelo backend. [arquivoId] é a referência que as telas e rotas usam.
@@ -63,15 +73,16 @@ class ServicoUploadFake implements ServicoUpload {
   }
 }
 
-/// Envio real em dois passos.
+/// Envio real em três passos (`backend/src/trato/api/rotas_upload.py`).
 ///
-/// TODO(backend): a rota abaixo ainda NÃO existe. Contrato proposto em `docs/app-camera-gps.md`.
+/// 1. `POST /v1/uploads` `{destino, nome_arquivo, content_type, tamanho_bytes, pedido_id?,
+///    tipo_documento?}` → `{upload_id, url_envio, metodo, expira_em_segundos, content_type}`
+/// 2. `PUT url_envio` com os bytes, direto no armazenamento (nunca com chave no app).
+/// 3. `POST /v1/uploads/{upload_id}/concluir` `{latitude?, longitude?}`: o backend confere o
+///    conteúdo, tira EXIF e registra. Devolve `midia_id` (documento de verificação não devolve).
 ///
-/// 1. `POST /v1/arquivos/url-envio` `{finalidade, mime, tamanho_bytes, sha256, pedido_id?}`
-///    → `{arquivo_id, url, cabecalhos?}`
-/// 2. `PUT url` com os bytes (e os `cabecalhos`, se vierem) direto no armazenamento.
-///
-/// Enquanto a rota não existir, o passo 1 devolve 404 e vira [ErroTrato.indisponivel].
+/// [ArquivoEnviado.arquivoId] é o `midia_id` quando existe; senão, o `upload_id` (é o que a
+/// verificação do profissional usa).
 class ServicoUploadApi implements ServicoUpload {
   ServicoUploadApi(this._api, {http.Client? cliente}) : _cliente = cliente ?? http.Client();
 
@@ -84,6 +95,7 @@ class ServicoUploadApi implements ServicoUpload {
     FinalidadeArquivo finalidade, {
     String? pedidoId,
   }) async {
+    if (finalidade == FinalidadeArquivo.portfolio) throw ErroTrato.indisponivel;
     // Sempre sem EXIF/GPS antes de sair do aparelho (M8), mesmo que a foto venha de outro caminho.
     final ArquivoCapturado arquivo;
     try {
@@ -91,28 +103,27 @@ class ServicoUploadApi implements ServicoUpload {
     } on FormatException {
       throw const ErroTrato(TipoErro.recusado, 'Esta foto não pôde ser lida. Tire outra.');
     }
+    final tipoDocumento = finalidade.tipoDocumento;
     final resposta = await _api.post(
-      '/v1/arquivos/url-envio',
+      '/v1/uploads',
       corpo: {
-        'finalidade': finalidade.codigo,
-        'mime': arquivo.mime,
+        'destino': finalidade.codigo,
+        'nome_arquivo': '${finalidade.codigo}-${arquivo.sha256.substring(0, arquivo.sha256.length < 12 ? arquivo.sha256.length : 12)}.jpg',
+        'content_type': arquivo.mime,
         'tamanho_bytes': arquivo.tamanho,
-        'sha256': arquivo.sha256,
         if (pedidoId != null) 'pedido_id': pedidoId,
+        if (tipoDocumento != null) 'tipo_documento': tipoDocumento,
       },
-      // O mesmo conteúdo reenviado reaproveita o registro: seguro tentar de novo.
-      chaveIdempotencia: 'arquivo-${arquivo.sha256}-${finalidade.codigo}',
     );
     final mapa = resposta! as Map<String, dynamic>;
-    final url = Uri.parse(mapa['url'] as String);
-    final cabecalhos = {
-      'Content-Type': arquivo.mime,
-      for (final e in ((mapa['cabecalhos'] as Map<String, dynamic>?) ?? {}).entries)
-        e.key: '${e.value}',
-    };
+    final uploadId = mapa['upload_id'] as String;
     try {
       final r = await _cliente
-          .put(url, headers: cabecalhos, body: arquivo.bytes)
+          .put(
+            Uri.parse(mapa['url_envio'] as String),
+            headers: {'Content-Type': arquivo.mime},
+            body: arquivo.bytes,
+          )
           .timeout(const Duration(seconds: 60));
       if (r.statusCode < 200 || r.statusCode >= 300) throw ErroTrato.servidor;
     } on http.ClientException {
@@ -120,9 +131,8 @@ class ServicoUploadApi implements ServicoUpload {
     } on TimeoutException {
       throw ErroTrato.semInternet;
     }
-    return ArquivoEnviado(
-      arquivoId: mapa['arquivo_id'] as String,
-      caminho: mapa['caminho'] as String?,
-    );
+    final fim = await _api.post('/v1/uploads/$uploadId/concluir', corpo: <String, Object?>{});
+    final midia = (fim is Map<String, dynamic>) ? fim['midia_id'] as String? : null;
+    return ArquivoEnviado(arquivoId: midia ?? uploadId);
   }
 }

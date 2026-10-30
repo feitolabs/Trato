@@ -8,7 +8,10 @@ import 'telas/auth/login_tela.dart';
 import 'dados/config.dart';
 import 'dados/repositorios_trato.dart';
 import 'dados/sessao.dart';
+import 'dados/servico_upload.dart';
 import 'dispositivo/dispositivo_real.dart';
+import 'dispositivo/servico_camera_real.dart';
+import 'dispositivo/servico_localizacao_real.dart';
 import 'galeria/galeria_componentes.dart';
 import 'telas/fluxo/rotas.dart';
 import 'telas/splash_tela.dart';
@@ -45,11 +48,22 @@ Future<void> main() async {
     ServicoAuthPadrao.atual = await ServicoAuthSupabase.inicializar(configAuth);
   }
   // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
-  LigacaoSessao(ServicoAuthPadrao.atual, sessaoTrato);
+  LigacaoSessao(
+    ServicoAuthPadrao.atual,
+    sessaoTrato,
+    // Primeiro login: GET /v1/me cria o usuário no backend (idempotente).
+    aoEntrar: () => RotasTrato.repos.perfil.carregar(),
+  );
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal();
-  RotasTrato.repos = RepositoriosTrato.deConfig(ConfigTrato.doAmbiente(), sessaoTrato);
+  RotasTrato.repos = RepositoriosTrato.deConfig(
+    ConfigTrato.doAmbiente(),
+    sessaoTrato,
+    criarUpload: ServicoUploadApi.new,
+    camera: ServicoCameraReal(),
+    localizacao: const ServicoLocalizacaoReal(),
+  );
   runApp(const TratoApp());
 }
 

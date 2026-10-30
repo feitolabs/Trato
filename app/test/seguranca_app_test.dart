@@ -100,7 +100,9 @@ void main() {
           return http.Response('', 200);
         }
         return http.Response(
-          jsonEncode({'arquivo_id': 'a1', 'url': 'https://armazem.teste/x'}),
+          jsonEncode(req.url.path.endsWith('/concluir')
+              ? {'upload_id': 'a1', 'midia_id': 'm1'}
+              : {'upload_id': 'a1', 'url_envio': 'https://armazem.teste/x'}),
           200,
           headers: {'content-type': 'application/json'},
         );

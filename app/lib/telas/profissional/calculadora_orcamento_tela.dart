@@ -434,7 +434,9 @@ class _ResumoEscuro extends StatelessWidget {
     final claroForte = TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
     final r = resumo;
     // O rótulo com a porcentagem vem do dado do backend, nunca de um texto fixo.
-    final rotuloTaxa = r == null ? 'Taxa Trato' : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps)})';
+    final rotuloTaxa = r == null || r.taxaBps == null
+        ? 'Taxa Trato'
+        : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps!)})';
     return CartaoTrato(
       escuro: true,
       child: Column(

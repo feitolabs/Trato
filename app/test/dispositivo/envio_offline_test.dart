@@ -60,14 +60,11 @@ void main() {
   );
 
   group('ServicoUploadApi', () {
-    test('pede a URL assinada e envia os bytes nela (sem chave no app)', () async {
+    test('pede a URL assinada, envia os bytes nela e conclui (sem chave no app)', () async {
       final puts = <_Req>[];
       final cliente = MockClient((r) async {
-        if (r.method == 'PUT') {
-          puts.add(_Req('PUT', r.url, r.bodyBytes, r.headers));
-          return http.Response('', 200);
-        }
-        return _json({'arquivo_id': 'arq-9', 'url': 'https://storage.teste/x?assinatura=1'});
+        puts.add(_Req('PUT', r.url, r.bodyBytes, r.headers));
+        return http.Response('', 200);
       });
       final sessao = SessaoTrato()..entrar('valor-de-teste');
       final posts = <_Req>[];
@@ -76,20 +73,36 @@ void main() {
         sessao: sessao,
         cliente: MockClient((r) async {
           posts.add(_Req(r.method, r.url, jsonDecode(r.body), r.headers));
-          return _json({'arquivo_id': 'arq-9', 'url': 'https://storage.teste/x?assinatura=1'});
+          if (r.url.path.endsWith('/concluir')) {
+            return _json({
+              'upload_id': 'up-9',
+              'destino': 'verificacao',
+              'status': 'concluido',
+              'midia_id': null,
+              'tamanho_bytes': 1,
+            });
+          }
+          return _json({
+            'upload_id': 'up-9',
+            'url_envio': 'https://storage.teste/x?assinatura=1',
+            'metodo': 'PUT',
+            'expira_em_segundos': 300,
+            'content_type': 'image/jpeg',
+          }, 201);
         }),
       );
 
       final r = await ServicoUploadApi(api, cliente: cliente)
-          .enviar(foto, FinalidadeArquivo.documento, pedidoId: 'p1');
+          .enviar(foto, FinalidadeArquivo.documento);
 
-      expect(r.arquivoId, 'arq-9');
-      expect(posts.single.url.path, '/v1/arquivos/url-envio');
-      final corpo = posts.single.corpo! as Map<String, dynamic>;
-      expect(corpo['finalidade'], 'documento');
-      expect(corpo['sha256'], 'abc');
+      expect(r.arquivoId, 'up-9');
+      expect(posts.first.url.path, '/v1/uploads');
+      final corpo = posts.first.corpo! as Map<String, dynamic>;
+      expect(corpo['destino'], 'verificacao');
+      expect(corpo['tipo_documento'], 'documento_frente');
+      expect(corpo['content_type'], 'image/jpeg');
       expect(corpo['tamanho_bytes'], jpeg.length);
-      expect(corpo['pedido_id'], 'p1');
+      expect(posts.last.url.path, '/v1/uploads/up-9/concluir');
       expect(puts.single.url.host, 'storage.teste');
       expect(puts.single.corpo, jpeg);
       expect(puts.single.cabecalhos['content-type'], 'image/jpeg');
@@ -97,17 +110,29 @@ void main() {
           reason: 'o token do app não vai para o armazenamento');
     });
 
-    test('rota ainda inexistente no backend vira "indisponível"', () async {
+    test('serviço de envio desligado no backend (503) vira erro de servidor', () async {
       final sessao = SessaoTrato()..entrar('valor-de-teste');
       final api = ClienteApi(
         urlBase: 'https://api.teste',
         sessao: sessao,
-        cliente: MockClient((_) async => _json({'detail': 'Not Found'}, 404)),
+        cliente: MockClient((_) async => _json({'detail': 'O envio de arquivos ainda não foi ligado.'}, 503)),
       );
 
       await expectLater(
         ServicoUploadApi(api).enviar(foto, FinalidadeArquivo.checkIn),
         throwsA(isA<ErroTrato>()),
+      );
+    });
+
+    test('portfólio ainda não tem destino no backend', () async {
+      final api = ClienteApi(
+        urlBase: 'https://api.teste',
+        sessao: SessaoTrato(),
+        cliente: MockClient((_) async => throw StateError('não deveria chamar')),
+      );
+      await expectLater(
+        ServicoUploadApi(api).enviar(foto, FinalidadeArquivo.portfolio),
+        throwsA(isA<ErroTrato>().having((e) => e.tipo, 'tipo', TipoErro.indisponivel)),
       );
     });
   });

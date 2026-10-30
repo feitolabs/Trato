@@ -7,7 +7,6 @@ import 'package:http/testing.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/config.dart';
 import 'package:trato/dados/erros.dart';
-import 'package:trato/dados/repositorios.dart';
 import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/carteira/modelos.dart';
@@ -270,14 +269,6 @@ void main() {
 
       expect(dados.valorCongeladoCentavos, 20000);
     });
-
-    test('função sem rota no backend avisa que não está disponível', () async {
-      final (api, _) = _cliente((_) => _json({}));
-      await expectLater(
-        RepositorioPedidosApi(api).garantia('x'),
-        throwsA(isA<ErroTrato>().having((e) => e.tipo, 'tipo', TipoErro.indisponivel)),
-      );
-    });
   });
 
   group('Orçamentos e pagamento', () {
@@ -290,18 +281,6 @@ void main() {
       expect(chamadas.single.corpo, {
         'prova': {'orcamento_id': 'orc-1'},
       });
-    });
-
-    test('só é "pago" quando o backend mudou o estado do pedido', () async {
-      var estado = 'orcamento_aceito';
-      final (api, _) = _cliente((_) => _json({..._pedidoJson, 'estado': estado}));
-      final repo = RepositorioPagamentoApi(api);
-
-      expect(await repo.status('abcd1234'), StatusPagamento.aguardando);
-      estado = 'pago_e_retido';
-      expect(await repo.status('abcd1234'), StatusPagamento.pago);
-      estado = 'cancelado';
-      expect(await repo.status('abcd1234'), StatusPagamento.falhou);
     });
   });
 

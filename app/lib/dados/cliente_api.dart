@@ -28,6 +28,9 @@ class ClienteApi {
   Future<Object?> post(String caminho, {Object? corpo, String? chaveIdempotencia}) =>
       _enviar('POST', caminho, corpo: corpo, chaveIdempotencia: chaveIdempotencia);
 
+  Future<Object?> patch(String caminho, {Object? corpo}) =>
+      _enviar('PATCH', caminho, corpo: corpo);
+
   Uri _uri(String caminho, Map<String, String>? consulta) {
     final base = urlBase.endsWith('/') ? urlBase.substring(0, urlBase.length - 1) : urlBase;
     return Uri.parse('$base$caminho').replace(queryParameters: consulta);

@@ -355,3 +355,11 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Testes em develop: 1139 no backend (1 pulado), 647 no app, 78 no painel.
 - **Migrations novas, só em arquivo, NÃO aplicadas:** `20261030130000_pedido_recusas.sql` (tabela de recusas de pedido pelo profissional, imutável, RLS; rollback `pedido_recusas_rollback.sql`) e `20261030130000_profissional_disponibilidade_portfolio_uploads.sql` (colunas `disponibilidade`/`portfolio` em `perfis_profissional` e tabela `upload_solicitacoes`; rollback `profissional_disponibilidade_portfolio_uploads_rollback.sql`). **Atenção: as duas têm a mesma versão `20261030130000`**; renomear uma antes de aplicar (versão de migration é única no Supabase).
 
+
+## 30/10/2026 — app-rotas-novas: app ligado às rotas novas
+
+- Modo `api` agora usa a API em: orçamentos (lista e detalhe), pagamento (valor, cobrança Pix/cartão idempotente, consulta até `pago: true`), perfil `/me`, chat, notificações (lista), avaliação, garantia, aditivo e nota de materiais, pedidos abertos do profissional (com `FiltroPedidosAbertos`), recusa, calculadora (`/v1/orcamentos/resumo`, nada calculado no app), verificação do profissional e upload por URL assinada (`POST /v1/uploads`, `PUT`, `concluir`; `ServicoUploadApi` corrigido, a rota proposta antes não existia). `demo` segue padrão.
+- Primeiro login chama `GET /v1/me` (`LigacaoSessao.aoEntrar`). Depois de pago, o app abre o pedido em andamento (antes voltava ao início com a lista velha).
+- Para não inventar dado: `PedidoAberto.distanciaKm/orcaram/limiteOrcamentos` e `ResumoOrcamento.taxaBps` ficaram opcionais; `ResumoPedido.numero` virou texto.
+- Testes novos: `app/test/dados/contrato_api_test.dart` (contrato por repositório) e `fluxo_completo_test.dart` (pedido até avaliação com backend simulado). Divergências doc × backend e rotas que faltam: `docs/app-divergencias.md` (destaque: #4 `offline_capturada_em` é recusado pelo backend; #5 caminho da foto da nota).
+- Continua demo: cadastro do profissional, busca, perfil público, lista de conversas, responder disputa; sem rota: marcar notificação como lida, preferências, token de push. Não testado em aparelho real nem contra API real.

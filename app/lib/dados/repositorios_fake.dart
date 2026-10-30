@@ -162,6 +162,10 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   final List<MotivoRecusa> recusas = [];
 
   @override
+  Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro) async =>
+      inicioProfissionalExemplo.pedidos;
+
+  @override
   Future<InicioProfissional> inicio() async => inicioProfissionalExemplo;
 
   @override
