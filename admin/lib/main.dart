@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'app.dart';
-import 'dados/api_fake.dart';
+import 'dados/config_painel.dart';
 
 void main() {
-  // Enquanto a API admin não existe, o painel roda com dados de exemplo.
-  // Trocar por uma implementação HTTP de ApiAdmin (URL em TRATO_API_URL) quando o backend estiver pronto.
-  runApp(PainelApp(api: ApiFake(atraso: const Duration(milliseconds: 250))));
+  // Sem --dart-define=ADMIN_MODO=api o painel roda com dados de exemplo (ver config_painel.dart).
+  runApp(PainelApp(api: criarApi(ConfigPainel.doAmbiente)));
 }

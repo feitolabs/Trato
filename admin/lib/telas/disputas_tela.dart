@@ -65,7 +65,6 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
   DecisaoDisputa? _decisao;
   final _valor = TextEditingController();
   final _justificativa = TextEditingController();
-  final _segunda = TextEditingController();
   bool _tentou = false;
   bool _enviando = false;
 
@@ -73,7 +72,6 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
   void dispose() {
     _valor.dispose();
     _justificativa.dispose();
-    _segunda.dispose();
     super.dispose();
   }
 
@@ -98,8 +96,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
   Future<void> _registrar() async {
     setState(() => _tentou = true);
     final semJustificativa = _justificativa.text.trim().length < kMotivoMinimo;
-    final semSegunda = _acimaDaAlcada && !_segunda.text.contains('@');
-    if (_decisao == null || _erroValor != null || semJustificativa || semSegunda) return;
+    if (_decisao == null || _erroValor != null || semJustificativa) return;
     setState(() => _enviando = true);
     final api = context.api;
     try {
@@ -108,7 +105,6 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
         decisao: _decisao!,
         valorReembolsoCentavos: _decisao == DecisaoDisputa.reembolsoParcial ? lerReaisEmCentavos(_valor.text) : null,
         justificativa: _justificativa.text.trim(),
-        segundaPessoaEmail: _acimaDaAlcada ? _segunda.text.trim() : null,
       );
       if (mounted && r.mensagem != null) mostrarAviso(context, r.mensagem!);
       await widget.aoMudar();
@@ -168,9 +164,9 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
             ),
           ),
         if (podeDecidir) ..._formulario(d) else if (d.status == StatusDisputa.aguardandoSegundaPessoa)
-          const Padding(
-            padding: EdgeInsets.only(top: EspacosTrato.x4),
-            child: BannerInfo('Decisão acima da alçada: falta a aprovação da segunda pessoa.', tom: Tom.alerta),
+          Padding(
+            padding: const EdgeInsets.only(top: EspacosTrato.x4),
+            child: _AprovacaoSegundaPessoa(disputa: d, aoMudar: widget.aoMudar),
           )
         else if (!context.pode(Permissao.disputasDecidir))
           const Padding(
@@ -232,20 +228,10 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
       if (_acimaDaAlcada) ...[
         const SizedBox(height: EspacosTrato.x3),
         BannerInfo(
-          'Este valor passa da sua alçada (${formatarReais(alcada)}). Outra pessoa precisa aprovar '
-          '(líder de suporte ou administrador).',
+          'Este valor passa da sua alçada (${formatarReais(alcada)}). A decisão fica aguardando outra pessoa '
+          '(líder de suporte ou administrador), que aprova com a própria conta.',
           tom: Tom.alerta,
           icone: Icons.supervisor_account_outlined,
-        ),
-        const SizedBox(height: EspacosTrato.x3),
-        TextField(
-          controller: _segunda,
-          keyboardType: TextInputType.emailAddress,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            labelText: 'E-mail da segunda pessoa',
-            errorText: _tentou && !_segunda.text.contains('@') ? 'Informe quem vai aprovar.' : null,
-          ),
         ),
       ],
       const SizedBox(height: EspacosTrato.x4),
@@ -256,5 +242,46 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
         child: Text(_acimaDaAlcada ? 'Enviar para aprovação' : 'Registrar decisão'),
       ),
     ];
+  }
+}
+
+/// Decisão acima da alçada: outra pessoa (líder ou administrador) aprova com a própria conta.
+class _AprovacaoSegundaPessoa extends StatelessWidget {
+  const _AprovacaoSegundaPessoa({required this.disputa, required this.aoMudar});
+
+  final Disputa disputa;
+  final Future<void> Function() aoMudar;
+
+  Future<void> _aprovar(BuildContext context) async {
+    final api = context.api;
+    final motivo = await pedirMotivo(
+      context,
+      titulo: 'Aprovar a decisão',
+      descricao: 'Você confirma a decisão de outra pessoa. Quem decidiu não pode aprovar a própria decisão.',
+      rotuloConfirmar: 'Aprovar',
+    );
+    if (motivo == null || !context.mounted) return;
+    final ok = await executar(context, () async {
+      await api.aprovarDisputa(disputa.id, justificativa: motivo);
+    }, sucesso: 'Decisão aprovada.');
+    if (ok) await aoMudar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pode = context.pode(Permissao.disputasSegundaPessoa);
+    final propria = disputa.decididoPor != null && disputa.decididoPor == context.eu?.id;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const BannerInfo('Decisão acima da alçada: falta a aprovação de uma segunda pessoa.', tom: Tom.alerta),
+        if (pode && !propria) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          const AvisoAuditoria(),
+          const SizedBox(height: EspacosTrato.x3),
+          FilledButton(onPressed: () => _aprovar(context), child: const Text('Aprovar decisão')),
+        ],
+      ],
+    );
   }
 }

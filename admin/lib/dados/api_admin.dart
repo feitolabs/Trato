@@ -9,7 +9,8 @@ abstract interface class ApiAdmin {
 
   // F7.1 verificação
   Future<List<Verificacao>> listarVerificacoes();
-  Future<void> revelarDocumento(String verificacaoId, String documento, String motivo);
+  /// Devolve a URL assinada de curta duração (ou null, no exemplo).
+  Future<String?> revelarDocumento(String verificacaoId, String documento, String motivo);
   Future<void> decidirVerificacao(String id, {required bool aprovar, required String motivo});
 
   // F7.2 disputas
@@ -19,8 +20,10 @@ abstract interface class ApiAdmin {
     required DecisaoDisputa decisao,
     int? valorReembolsoCentavos,
     required String justificativa,
-    String? segundaPessoaEmail,
   });
+
+  /// Segunda pessoa (outra, não quem decidiu) aprova uma decisão acima da alçada.
+  Future<ResultadoDecisao> aprovarDisputa(String id, {required String justificativa});
 
   // F7.3 pagamentos (somente leitura)
   Future<ResumoConciliacao> resumoConciliacao();
@@ -38,6 +41,7 @@ abstract interface class ApiAdmin {
   Future<ConfigAtual> carregarConfig();
   Future<void> proporConfig(Map<String, int> valores, String motivo);
   Future<void> aprovarConfig(String versaoId, String motivo);
+  Future<void> publicarConfig(String versaoId, String motivo);
   Future<void> reverterConfig(String versaoId, String motivo);
 
   // F7.6 auditoria

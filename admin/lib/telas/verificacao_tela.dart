@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
@@ -36,7 +37,7 @@ class VerificacaoTela extends StatelessWidget {
                 final (texto, tom) = _chip(v.status);
                 return CartaoItem(
                   titulo: v.profissional,
-                  linhas: ['${v.categoria} · ${v.cidade}', 'Enviada em ${formatarData(v.enviadaEm)}'],
+                  linhas: [[v.categoria, v.cidade].where((t) => t.isNotEmpty).join(' · '), 'Enviada em ${formatarData(v.enviadaEm)}'],
                   chip: ChipEstado(texto, tom: tom),
                   selecionado: sel,
                 );
@@ -73,8 +74,15 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
       rotuloConfirmar: 'Revelar',
     );
     if (motivo == null || !mounted) return;
-    final ok = await executar(context, () => api.revelarDocumento(widget.verificacao.id, documento, motivo));
-    if (ok && mounted) setState(() => _reveladas.add(documento));
+    String? url;
+    final ok = await executar(context, () async {
+      url = await api.revelarDocumento(widget.verificacao.id, documento, motivo);
+    });
+    if (!ok || !mounted) return;
+    setState(() => _reveladas.add(documento));
+    // A URL assinada vale poucos segundos e abre em outra aba; nunca é mostrada nem guardada.
+    final aberta = url;
+    if (aberta != null) await launchUrl(Uri.parse(aberta), webOnlyWindowName: '_blank');
   }
 
   Future<void> _decidir(bool aprovar) async {
@@ -108,7 +116,7 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
         Text(v.profissional, style: TipografiaTrato.titulo),
         const SizedBox(height: EspacosTrato.x3),
         Linha('Categoria', v.categoria),
-        Linha('Cidade', v.cidade),
+        if (v.cidade.isNotEmpty) Linha('Cidade', v.cidade),
         Linha('CPF', v.cpfMascarado),
         Linha('Enviada em', formatarData(v.enviadaEm)),
         if (v.motivoDecisao != null) Linha('Motivo da decisão', v.motivoDecisao!),

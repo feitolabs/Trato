@@ -51,10 +51,10 @@ void main() {
     expect(find.text('Decidida'), findsWidgets);
   });
 
-  testWidgets('valor acima da alçada exige segunda pessoa', (tester) async {
+  testWidgets('valor acima da alçada fica aguardando outra pessoa', (tester) async {
     await abrirPainel(tester, papel: 'mediador', secao: 'disputas'); // alçada de exemplo: R\$ 500,00
     await escolher(tester, 'Reembolso total ao cliente');
-    expect(find.text('E-mail da segunda pessoa'), findsOneWidget);
+    expect(find.textContaining('aguardando outra pessoa'), findsOneWidget);
     await tester.enterText(
       find.widgetWithText(TextField, 'Justificativa (obrigatória)'),
       'Serviço não entregue como combinado',
@@ -62,11 +62,9 @@ void main() {
     await rolar(tester, find.text('Enviar para aprovação'));
     await tester.tap(find.text('Enviar para aprovação'));
     await tester.pumpAndSettle();
-    expect(find.text('Informe quem vai aprovar.'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextField, 'E-mail da segunda pessoa'), 'lider_suporte@teste.local');
-    await tester.tap(find.text('Enviar para aprovação'));
-    await tester.pumpAndSettle();
     expect(find.text('Aguardando segunda pessoa'), findsWidgets);
+    // o mediador não tem a permissão de aprovar
+    expect(find.text('Aprovar decisão'), findsNothing);
   });
 
   testWidgets('reembolso parcial maior que o valor em análise é recusado na tela', (tester) async {
