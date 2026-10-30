@@ -12,8 +12,12 @@ from datetime import datetime
 from trato.api.repositorios_app import DocumentoVerificacao, Verificacao
 from trato.persistencia.comum import exigir_uuid
 from trato.persistencia.conexao import Banco
-from trato.persistencia.config import taxa_bps_da_faixa, versao_vigente
-from trato.persistencia.contratos import BPS
+from trato.persistencia.config import (
+    parametros_globais,
+    taxa_da_versao,
+    taxa_do_valor,
+    versao_vigente,
+)
 from trato.persistencia.erros import NaoEncontrado, RegraDoBanco
 
 
@@ -85,12 +89,14 @@ class VerificacoesPostgres:
 
 
 class TaxaPostgres:
-    """Taxa pela faixa da versão VIGENTE da configuração (mesma conta do contrato)."""
+    """Taxa da versão VIGENTE da configuração: só para o ORÇAMENTO (calculadora). Depois do aceite
+    a taxa é a congelada no contrato (A3); a conta é a mesma do contrato (faixa + mínimo)."""
 
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
     def calcular(self, valor_centavos: int) -> int:
         with self._banco.transacao() as con:
-            bps = taxa_bps_da_faixa(con, versao_vigente(con), valor_centavos)
-        return (valor_centavos * bps + BPS // 2) // BPS
+            versao = versao_vigente(con)
+            config = taxa_da_versao(con, versao, valor_centavos, parametros_globais(con, versao))
+        return taxa_do_valor(config, valor_centavos)

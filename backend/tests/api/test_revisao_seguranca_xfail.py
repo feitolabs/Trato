@@ -35,12 +35,6 @@ RAIZ = Path(__file__).resolve().parents[3]
 # --- C1 (crítico): dinheiro em memória no modo postgres ------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="C1: em TRATO_PERSISTENCIA=postgres o ledger, as disputas e os eventos do webhook "
-    "ficam em memória (api/fabrica.py:76-79): reiniciar ou ter 2 workers perde/divide o dinheiro.",
-)
 def test_c1_modo_postgres_nao_guarda_dinheiro_em_memoria():
     from trato.api.fabrica import criar_contexto_postgres
     from trato.api.memoria import DisputasEmMemoria, EventosWebhookEmMemoria, LedgerEmMemoria
@@ -138,13 +132,6 @@ class _TaxaMutavel:
         return (valor * self.bps + 5_000) // 10_000
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A3: a decisão da disputa usa contexto.taxa.calcular() = versão VIGENTE na hora da "
-    "decisão (api/admin/rotas_disputas.py:216, persistencia/app_extras.py:92), e não a "
-    "taxa_bps_aplicada congelada no contrato.",
-)
 def test_a3_taxa_da_disputa_nao_muda_se_a_config_mudar_depois_do_aceite(amb):
     pedido = amb.semear_pedido(Estado.EM_DISPUTA, estado_antes_da_disputa=Estado.EM_CONFIRMACAO)
     livro = amb.contexto.ledger.livro
@@ -170,13 +157,6 @@ def test_a3_taxa_da_disputa_nao_muda_se_a_config_mudar_depois_do_aceite(amb):
 # --- A4 (alto): ledger Python x ledger do banco --------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A4: o enum TipoLancamento do Python tem tipos (liberacao, gorjeta) que o CHECK de "
-    "public.lancamentos.tipo não aceita (migration F3.5:158-160): ao ligar o ledger ao banco, "
-    "a liberação do repasse falha com check_violation.",
-)
 def test_a4_tipos_do_ledger_python_cabem_no_check_do_banco():
     sql = (RAIZ / "supabase/migrations/20261029030200_f35_dinheiro_ledger.sql").read_text(
         encoding="utf-8"
@@ -188,13 +168,6 @@ def test_a4_tipos_do_ledger_python_cabem_no_check_do_banco():
     assert {t.value for t in TipoLancamento} <= aceitos
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A4: o gatilho do banco exige que o estorno INVERTA o lançamento original inteiro "
-    "(ledger_conferir_equilibrio) e estorna_id é único; o Python faz estorno parcial "
-    "(ledger.py estornar_pedido). Reembolso parcial de disputa não cabe no banco.",
-)
 def test_a4_estorno_parcial_do_python_cabe_no_banco():
     livro = Livro()
     registrar_cobranca(livro, "p", 10_000, "c", AGORA)
@@ -211,13 +184,6 @@ def test_a4_estorno_parcial_do_python_cabe_no_banco():
 # --- A5 (alto): trava de idempotência da decisão compara o campo errado -----------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A5: _planejar_dinheiro() procura `i.id.startswith('disputa/<pedido>/')`, mas `id` é "
-    "um uuid; o que tem o prefixo é `chave` (api/admin/rotas_disputas.py:203). A trava nunca "
-    "dispara: refazer a decisão depois de falha no meio planeja o dinheiro de novo.",
-)
 def test_a5_refazer_a_decisao_nao_planeja_dinheiro_de_novo(amb):
     pedido = amb.semear_pedido(Estado.EM_DISPUTA, estado_antes_da_disputa=Estado.EM_CONFIRMACAO)
     registrar_cobranca(amb.contexto.ledger.livro, "ped-1", 100_000, "cob-ped-1", AGORA)
@@ -265,13 +231,6 @@ def test_a2_equipe_sem_permissao_nao_decide_disputa(fluxo: Fluxo):  # noqa: F811
 # --- A7 (alto): estorno no Stripe antes do ledger -------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A7: aplicar_dinheiro() estorna no provedor e soma `estornado_centavos` ANTES de gravar "
-    "no ledger (pagamentos/orquestrador.py:289-322). Se o ledger falha, o dinheiro já saiu e a "
-    "retentativa dá ErroFluxo('Não há pagamento confirmado suficiente').",
-)
 def test_a7_falha_no_ledger_depois_do_estorno_pode_ser_repetida(fluxo: Fluxo):  # noqa: F811
     pid = fluxo.ate_em_confirmacao()
     _abrir_e_responder_disputa(fluxo, pid)
@@ -295,13 +254,6 @@ def test_a7_falha_no_ledger_depois_do_estorno_pode_ser_repetida(fluxo: Fluxo):  
 # --- A6 (alto): transição sem compare-and-set -----------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A6: PedidosPostgres._salvar atualiza `where id = %s and status <> %s` "
-    "(persistencia/pedidos.py:204): não confere o estado ANTERIOR lido pela rota; duas "
-    "requisições simultâneas passam na máquina de estados e a última grava por cima.",
-)
 def test_a6_atualizacao_do_pedido_confere_o_estado_anterior():
     fonte = (RAIZ / "backend/src/trato/persistencia/pedidos.py").read_text(encoding="utf-8")
     trecho = fonte[fonte.index("update public.pedidos set status") :][:200]

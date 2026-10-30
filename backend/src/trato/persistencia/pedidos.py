@@ -36,7 +36,7 @@ from trato.persistencia.auditoria import registrar_na_transacao
 from trato.persistencia.codigos import codigo_do_agendamento, hash_do_codigo
 from trato.persistencia.comum import como_uuid, exigir_uuid, para_json
 from trato.persistencia.conexao import Banco
-from trato.persistencia.erros import DadosInvalidos, RegraDoBanco
+from trato.persistencia.erros import ConflitoDeEstado, DadosInvalidos, RegraDoBanco
 
 _PARA_BANCO = {Estado.PAGO_E_RETIDO: "pago_retido"}
 _DO_BANCO = {"pago_retido": Estado.PAGO_E_RETIDO}
@@ -192,7 +192,10 @@ class PedidosPostgres:
         self, pid: str, pedido: Pedido, evento: Evento | None, dados: DadosPedido | None
     ) -> Pedido:
         with self._banco.transacao() as con:
-            existe = con.execute("select 1 from public.pedidos where id = %s", (pid,)).fetchone()
+            # Trava a linha do pedido: duas requisições do mesmo pedido entram uma de cada vez.
+            existe = con.execute(
+                "select status from public.pedidos where id = %s for update", (pid,)
+            ).fetchone()
             if existe is None:
                 if dados is None:
                     raise DadosInvalidos(
@@ -200,10 +203,19 @@ class PedidosPostgres:
                     )
                 self._inserir(con, pid, pedido, dados)
             else:
-                con.execute(
-                    "update public.pedidos set status = %s where id = %s and status <> %s",
-                    (_banco(pedido.estado), pid, _banco(pedido.estado)),
-                )
+                # Compare-and-set: o estado de origem da transição tem de ser o que está gravado.
+                # Se outra requisição mudou o pedido no meio, esta perde (409) em vez de gravar
+                # por cima (A6).
+                if evento is not None and existe["status"] != _banco(evento.de):
+                    raise ConflitoDeEstado(
+                        "O pedido mudou enquanto você agia. Atualize a tela e tente de novo."
+                    )
+                alterou = con.execute(
+                    "update public.pedidos set status = %s where id = %s and status = %s",
+                    (_banco(pedido.estado), pid, existe["status"]),
+                ).rowcount
+                if not alterou:  # pragma: no cover - a linha está travada acima
+                    raise ConflitoDeEstado("O pedido mudou enquanto você agia.")
             if evento is not None:
                 self._registrar_evento(con, pid, evento)
             self._sincronizar_execucao(con, pid, pedido, evento)

@@ -1,9 +1,10 @@
 """Decisão de disputa pela equipe: alçada, segunda pessoa, espelho no ledger, auditoria."""
 
 import pytest
-from admin_ambiente import AGORA, PEDIDO, adm, cab  # noqa: F401
+from admin_ambiente import AGORA, PEDIDO, PROFISSIONAL, adm, cab  # noqa: F401
 
 from trato.api.admin.repositorios import FiltroAuditoria
+from trato.api.repositorios import Contrato
 from trato.financeiro.ledger import CUSTODIA
 from trato.pedidos.estados import Estado
 
@@ -103,16 +104,21 @@ def test_reembolso_parcial_por_percentual_divide_sem_perder_centavo(adm):
     d = r.json()["divisao"]
     assert (d["para_cliente_centavos"], d["para_profissional_centavos"]) == (25_000, 75_000)
     assert adm.pedido().estado is Estado.CONCLUIDO
-    soma = por_tipo(adm)
-    assert soma["estorno"] == 25_000 and soma["taxa"] == 5_625 and soma["retencao"] == 69_375
-    assert 25_000 + 5_625 + 69_375 == 100_000
+    # O banco só aceita estorno do lançamento inteiro: a cobrança é estornada toda e a parte
+    # mantida (75.000) é lançada de novo e repartida com a taxa congelada (7,5%).
+    saldo = adm.contexto.ledger.saldos_pedido(PEDIDO, PROFISSIONAL.id)
+    assert (saldo.cliente_pagou, saldo.taxa_trato, saldo.a_liberar) == (75_000, 5_625, 69_375)
+    assert saldo.retido == 0
+    assert 25_000 + saldo.taxa_trato + saldo.a_liberar == 100_000
 
 
 def test_reembolso_parcial_por_valor(adm):
     adm.semear_disputa()
     r = decidir(adm, "reembolso_parcial", valor_cliente_centavos=30_001)
     assert r.json()["divisao"]["para_cliente_centavos"] == 30_001
-    assert por_tipo(adm)["estorno"] == 30_001
+    saldo = adm.contexto.ledger.saldos_pedido(PEDIDO, PROFISSIONAL.id)
+    assert saldo.cliente_pagou == 100_000 - 30_001
+    assert saldo.taxa_trato + saldo.a_liberar == saldo.cliente_pagou
 
 
 def test_nova_visita_vira_retrabalho_e_o_valor_segue_retido(adm):
@@ -262,7 +268,8 @@ def test_pedido_fora_de_em_disputa_recusa_antes_de_mexer_no_ledger(adm):
 
 def test_sem_taxa_configurada_nao_decide_liberar_tudo(adm):
     adm.semear_disputa()
-    adm.contexto.taxa = None
+    # Contrato sem a taxa congelada no aceite: nada de recalcular pela configuração de hoje.
+    adm.contexto.contratos.salvar(Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, 100_000, "pintura"))
     assert decidir(adm, "liberar_tudo").status_code == 503
     assert adm.pedido().estado is Estado.EM_DISPUTA and len(adm.lancamentos()) == 1
     # Reembolso total não usa taxa: continua possível.

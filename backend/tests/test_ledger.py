@@ -163,7 +163,7 @@ def test_nao_libera_o_que_ainda_esta_retido():
     with pytest.raises(LancamentoInvalido):
         liberar(livro, PED, PROF, "lib1", T0)  # nada a liberar (valor 0)
     with pytest.raises(SaldoInsuficiente):
-        livro.lancar(Lancamento("x", PED, TipoLancamento.LIBERACAO, a_liberar(PROF),
+        livro.lancar(Lancamento("x", PED, TipoLancamento.REPASSE, a_liberar(PROF),
                                 liberado(PROF), 1, T0))  # fmt: skip
 
 
@@ -229,29 +229,32 @@ def test_partidas_fecham_em_todo_passo_do_fluxo():
 def test_estorno_total_de_um_lancamento():
     livro = cobrado()
     original = livro.lancamentos[0]
-    e = estornar(livro, original.id, None, "est1", T0)
+    e = estornar(livro, original.id, "est1", T0)
     assert e.tipo is TipoLancamento.ESTORNO and e.estorno_de == original.id
     assert livro.saldos_pedido(PED).retido == 0
     assert livro.saldos_pedido(PED).cliente_pagou == 0
     livro.verificar_partidas()
 
 
-def test_estorno_parcial_nao_passa_do_original():
+def test_estorno_inverte_o_lancamento_inteiro_e_so_uma_vez():
     livro = cobrado()
     original = livro.lancamentos[0]
-    estornar(livro, original.id, 4_000, "e1", T0)
-    estornar(livro, original.id, 6_000, "e2", T0)
-    with pytest.raises(EstornoInvalido, match="resta estornar"):
-        estornar(livro, original.id, 1, "e3", T0)
+    torto = Lancamento("p", PED, TipoLancamento.ESTORNO, CUSTODIA, CLIENTE, 4_000, T0,
+                       estorno_de=original.id)  # fmt: skip
+    with pytest.raises(EstornoInvalido, match="inteiro"):
+        livro.lancar(torto)
+    estornar(livro, original.id, "e1", T0)
+    with pytest.raises(EstornoInvalido, match="já foi estornado"):
+        estornar(livro, original.id, "e2", T0)
 
 
 def test_nao_estorna_estorno_nem_original_inexistente():
     livro = cobrado()
-    e = estornar(livro, livro.lancamentos[0].id, 100, "e1", T0)
+    e = estornar(livro, livro.lancamentos[0].id, "e1", T0)
     with pytest.raises(EstornoInvalido, match="estorno"):
-        estornar(livro, e.id, 100, "e2", T0)
+        estornar(livro, e.id, "e2", T0)
     with pytest.raises(EstornoInvalido, match="não existe"):
-        estornar(livro, "nada", 100, "e3", T0)
+        estornar(livro, "nada", "e3", T0)
 
 
 def test_estorno_com_contas_erradas_e_recusado():

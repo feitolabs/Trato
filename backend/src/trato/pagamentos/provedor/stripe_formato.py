@@ -37,7 +37,8 @@ def interpretar_evento_stripe(payload: Mapping[str, Any]) -> EventoProvedor | No
         valor = _inteiro(objeto.get("amount"))
     else:
         cobranca_id = objeto.get("id")
-        valor = _inteiro(objeto.get("amount"))
+        # Pago é o valor RECEBIDO (pode ser menor que o pedido); sem ele, o valor da cobrança.
+        valor = _inteiro(objeto.get("amount_received", objeto.get("amount")))
     return EventoProvedor(
         id=evento_id,
         tipo=tipo,
@@ -46,4 +47,5 @@ def interpretar_evento_stripe(payload: Mapping[str, Any]) -> EventoProvedor | No
         metadados=metadados,
         pedido_id=metadados.get("pedido_id") or objeto.get("transfer_group"),
         bruto=payload,
+        objeto_id=objeto.get("id") if isinstance(objeto.get("id"), str) else None,
     )

@@ -62,15 +62,22 @@ async def receber_stripe(
     manipulador = contexto.manipuladores_webhook.get(tipo)
 
     def processar() -> None:
+        # O evento é registrado ANTES: os lançamentos do ledger apontam para ele (espelho).
+        contexto.eventos_webhook.registrar(evento)
         if manipulador is not None:
             manipulador(evento, contexto)
-        contexto.eventos_webhook.registrar(evento)  # só guarda o que foi tratado sem erro
 
     try:
-        executou, _ = processar_uma_vez(
-            contexto.eventos_webhook, f"{PROVEDOR}:{evento_id}", processar
-        )
+        # Uma transação só: dedupe do evento + pedido + ledger. Se algo falha, nada fica.
+        with contexto.transacao():
+            executou, _ = processar_uma_vez(
+                contexto.eventos_webhook, f"{PROVEDOR}:{evento_id}", processar
+            )
     except EventoForaDeOrdem as erro:
         # A chave volta a ficar livre: o provedor reenvia quando o pedido estiver pronto.
+        contexto.eventos_webhook.descartar(evento)
         raise HTTPException(409, "Evento antes do tempo; tente de novo.") from erro
+    except BaseException:
+        contexto.eventos_webhook.descartar(evento)  # só guarda o que foi tratado sem erro
+        raise
     return WebhookOut(recebido=True, duplicado=not executou, tratado=manipulador is not None)

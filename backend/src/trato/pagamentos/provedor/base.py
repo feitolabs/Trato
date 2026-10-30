@@ -62,6 +62,9 @@ class EventoProvedor:
     metadados: Mapping[str, str]
     pedido_id: str | None = None
     bruto: Mapping[str, Any] = field(default_factory=dict)
+    # Id do objeto do evento no provedor (PaymentIntent, transferência, payout): na liquidação é
+    # o que liga o aviso ao repasse correspondente (M5).
+    objeto_id: str | None = None
 
 
 class ProvedorPagamento(Protocol):

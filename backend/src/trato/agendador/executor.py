@@ -179,7 +179,7 @@ class ExecutorContexto:
                 Lancamento(
                     acao.chave,
                     acao.pedido_id,
-                    TipoLancamento.LIBERACAO,
+                    TipoLancamento.REPASSE,
                     a_liberar(acao.profissional_id),
                     liberado(acao.profissional_id),
                     acao.valor_centavos,

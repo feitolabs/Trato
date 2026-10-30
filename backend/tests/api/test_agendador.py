@@ -73,7 +73,7 @@ def test_libera_o_saldo_depois_do_prazo_e_nao_repete(amb):
     assert (depois.a_liberar, depois.liberado) == (0, 92_500)
     assert agendador.rodar_uma_vez().executadas == 0
     liberacoes = [
-        x for x in amb.contexto.ledger.lancamentos("ped-1") if x.tipo is TipoLancamento.LIBERACAO
+        x for x in amb.contexto.ledger.lancamentos("ped-1") if x.tipo is TipoLancamento.REPASSE
     ]
     assert len(liberacoes) == 1
 
