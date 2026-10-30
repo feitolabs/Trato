@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,16 +12,16 @@ from psycopg.types.json import Jsonb
 from trato.persistencia.comum import como_uuid, exigir_uuid, para_json
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import NaoEncontrado, RegraDoBanco
+from trato.seguranca.mascaramento import AVISO_MASCARA as _AVISO_MASCARA
+from trato.seguranca.mascaramento import mascarar as _mascarar
 
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_TELEFONE = re.compile(r"(?:\+?\d[\s().-]*){8,}")
-AVISO_MASCARA = "[contato oculto até a contratação]"
+AVISO_MASCARA = _AVISO_MASCARA
 
 
 def mascarar_contatos(texto: str) -> str:
-    """Esconde e-mail e telefone antes da contratação (provisório N9: o texto original fica
-    guardado em `corpo`, só o `corpo_exibido` é mascarado)."""
-    return _TELEFONE.sub(AVISO_MASCARA, _EMAIL.sub(AVISO_MASCARA, texto))
+    """Esconde telefone, e-mail, link, perfil e endereço antes da contratação (o original fica em
+    `corpo`, só o `corpo_exibido` é mascarado). A regra mora em `trato.seguranca.mascaramento`."""
+    return _mascarar(texto).exibido
 
 
 @dataclass(frozen=True)
