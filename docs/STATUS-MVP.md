@@ -112,5 +112,5 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 |---|---|
 | Dinheiro: C1, A3 a A7, M1 a M5 (`fix-dinheiro`) | Corrigidos e testados; persistência de ledger, disputas, garantias, avaliações, webhooks e repasses no Postgres (local). Migration `20261030120000_ordens_estorno.sql` **não aplicada**: precisa do OK do João. |
 | App: sessão em armazenamento seguro, lista permitida de `dart-define`, EXIF e afins (`fix-app`) | Corrigido e testado (`docs/fix-app.md`) |
-| Acesso: A1, A2, A8 e demais (`fix-acesso`) | Em correção; os testes xfail estritos correspondentes seguem esperando |
+| Acesso: A1, A2, A8, M6, M7, M9 a M12, B1 (`fix-acesso`) | Corrigidos e testados (`docs/fix-acesso.md`); migration `20261030000000_fix_acesso_storage_pedido_historico.sql` **não aplicada**: precisa do OK do João. Sem xfail restante |
 

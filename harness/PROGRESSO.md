@@ -329,3 +329,10 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em develop: 897 no backend (1 pulado, 6 xfail), 638 no app, 78 no painel.
 - Não integrada por orientação: `claude/fix-acesso-adc4fc` (sessão retomada para corrigir 1 teste). Falta: aplicar a migration de ordens de estorno (OK do João), ligar `ServicoPagamento` à fábrica Postgres, correções de acesso (A1, A2, A8).
 
+## 30/10/2026 — Integrada a correção de acesso (`claude/fix-acesso-adc4fc`)
+
+- Em develop (sem push), verificada com o `.venv` do projeto: A1 (limite de tentativas do código de check-in/out), A2 (matriz de permissões da equipe nas rotas), A8/M6/M7 (migration nova), M9 (texto livre), M10 (aceite com IP e aparelho), M11 (usuário no primeiro login), M12 (docs) e B1 (emissor do JWT), mais dependabot. Detalhe em `docs/fix-acesso.md`.
+- Migration NOVA `20261030000000_fix_acesso_storage_pedido_historico.sql` (+ rollback): **só versionada, NÃO aplicada** no Supabase. Junto da `20261030120000_ordens_estorno.sql` (fix-dinheiro) e da `20261029040000_notificacoes_dispositivos_agendador.sql`, ficam três migrations aguardando OK do João.
+- Os `xfail(strict=True)` de acesso viraram testes verdes: não resta xfail na suíte. Com isso todos os achados da revisão de segurança (críticos a médios) têm correção em develop; ficam os itens "pendente" de cada `docs/fix-*.md` e os baixos do app/painel.
+- Testes em develop: 1054 no backend (1 pulado), 638 no app, 78 no painel.
+
