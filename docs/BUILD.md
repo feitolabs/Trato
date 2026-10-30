@@ -197,3 +197,24 @@ Observações: no Windows use o `.ps1` (o `preparar-ambiente.sh` no Git Bash pas
 4. **Conta Apple Developer**, Bundle ID, App Store Connect e chave de API (seção 3).
 5. **Mac ou CI macOS:** primeiro disparo manual do `ios.yml` (precisa do push para o GitHub, que é decisão dele).
 6. **Conta de teste** para capturar as cascas do cliente e do profissional no emulador.
+
+## 7. CI: goldens, regeneração e consulta ao Actions
+
+**Por que o golden é ignorado no CI.** Os 166 testes golden (`app/test/golden/`) comparam pixel a pixel com PNGs gerados no Windows. O runner Ubuntu rasteriza o texto de outro jeito, então todos falhavam lá (166 falhas no run 41081706382; no Windows os 638 passam). Por isso o job "App (Flutter)" define `TRATO_GOLDEN=ignorar`. Isso é tratado em `app/test/flutter_test_config.dart`: a imagem continua sendo gerada e comparada, a diferença só vira a linha `GOLDEN IGNORADO` no log, e **arquivo de referência ausente continua falhando**. Sem a variável (seu Windows, `python harness/verificar.py`) a comparação é exata, como sempre.
+
+**Regenerar goldens** (depois de mudar uma tela de propósito, no Windows):
+
+```bash
+cd app
+flutter test --update-goldens test/golden
+```
+
+Confira o diff das imagens no git antes de commitar.
+
+**Ver o resultado do Actions sem login.** Na aba Actions, abra o run e a página de resumo: o passo do app escreve em `$GITHUB_STEP_SUMMARY` os nomes dos testes que falharam e os 30 primeiros erros. Pela API pública, sem token:
+
+```bash
+curl -s https://api.github.com/repos/feitolabs/Trato/actions/runs/<ID>/jobs
+```
+
+O CI roda `flutter test --reporter expanded` (via `harness/verificar.py --etapa app`), então o log mostra cada teste.

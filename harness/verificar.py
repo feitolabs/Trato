@@ -166,6 +166,60 @@ def rodar(passo: str, comando: list[str], pasta: Path) -> bool:
     return True
 
 
+def rodar_testes_flutter(flutter: str, pasta: Path) -> bool:
+    """`flutter test`; no CI usa `--reporter expanded` e resume as falhas em $GITHUB_STEP_SUMMARY."""
+    resumo = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not os.environ.get("GITHUB_ACTIONS"):
+        return rodar(f"{pasta.name} — testes (flutter test)", [flutter, "test"], pasta)
+    titulo(f"{pasta.name} — testes (flutter test --reporter expanded)")
+    proc = subprocess.Popen(
+        [flutter, "test", "--reporter", "expanded"], cwd=pasta, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+    )
+    linhas: list[str] = []
+    for linha in proc.stdout or []:
+        print(linha, end="", flush=True)
+        linhas.append(linha.rstrip("\n"))
+    proc.wait()
+    if resumo:
+        escrever_resumo_testes(Path(resumo), linhas, proc.returncode)
+    if proc.returncode != 0:
+        print(f"FALHA: {pasta.name} — testes (flutter test)")
+        return False
+    return True
+
+
+def escrever_resumo_testes(destino: Path, linhas: list[str], codigo: int) -> None:
+    inicio = re.compile(r"^\d\d:\d\d \+\d+")
+    falhos: list[str] = []
+    blocos: list[str] = []
+    atual: list[str] | None = None
+    for linha in linhas:
+        if inicio.match(linha):
+            if atual is not None:
+                blocos.append("\n".join(atual))
+                atual = None
+            if "[E]" in linha:
+                nome = linha.split(": ", 1)[-1].replace("[E]", "").strip()
+                if nome not in falhos:
+                    falhos.append(nome)
+                atual = [linha]
+        elif atual is not None:
+            atual.append(linha)
+    if atual is not None:
+        blocos.append("\n".join(atual))
+    ultima = next((ln for ln in reversed(linhas) if inicio.match(ln)), "")
+    saida = [f"### App — flutter test: {'OK' if codigo == 0 else 'FALHOU'}", "", f"`{ultima}`", ""]
+    if falhos:
+        saida += [f"**{len(falhos)} teste(s) falharam**", "", "<details><summary>Nomes</summary>", ""]
+        saida += [f"- {n}" for n in falhos] + ["", "</details>", ""]
+        saida += [f"**Primeiros {min(30, len(blocos))} erros**", ""]
+        for bloco in blocos[:30]:
+            saida += ["```", bloco[:1500], "```"]
+    with destino.open("a", encoding="utf-8") as f:
+        f.write("\n".join(saida) + "\n")
+
+
 def checar_backend() -> bool:
     py = python_do_backend()
     # fastapi/psycopg/jwt: dependências de execução; ruff/pytest/httpx: extras `dev`.
@@ -204,7 +258,7 @@ def checar_flutter(nome: str, pasta: Path) -> bool:
         return True
     ok = rodar(f"{nome} — dependências", [flutter, "pub", "get"], pasta)
     ok = rodar(f"{nome} — análise (flutter analyze)", [flutter, "analyze"], pasta) and ok
-    ok = rodar(f"{nome} — testes (flutter test)", [flutter, "test"], pasta) and ok
+    ok = rodar_testes_flutter(flutter, pasta) and ok
     return ok
 
 
