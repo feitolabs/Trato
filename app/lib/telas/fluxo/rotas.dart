@@ -7,6 +7,7 @@ import '../../auth/servico_auth.dart';
 import '../../dados/repositorios_trato.dart';
 import '../../dados/sessao.dart';
 import '../auth/login_tela.dart';
+import '../onboarding/escolha_perfil_tela.dart' show PerfilUso;
 import '../../tema/tema.dart';
 import '../../dispositivo/check_in_dispositivo.dart';
 import '../../dispositivo/dispositivo.dart';
@@ -132,6 +133,15 @@ abstract final class RotasTrato {
       MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
       (rota) => false,
     );
+  }
+
+  /// Depois do cadastro (com sessão aberta): cliente vai à casca; profissional ao cadastro dele.
+  static void irParaDepoisDoCadastro(BuildContext context, PerfilUso perfil) {
+    if (perfil == PerfilUso.cliente) {
+      irParaCliente(context);
+    } else {
+      irParaProfissional(context);
+    }
   }
 
   /// Entra na casca certa para o perfil do usuário: profissional ou cliente (padrão).

@@ -372,3 +372,12 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Backend devolve ao app: `offline_capturada_em` no check-in/out reenviado (hoje 422 e tira da fila), caminho da foto na conclusão do upload da nota de materiais, destino `portfolio` em uploads, `taxa` em % no resumo do orçamento.
 - Limites: `POST /v1/contratos/{id}/cobranca` responde 503 em modo `postgres`; aprovar aditivo cria cobrança `aguardando_confirmacao` mas o app não tem a tela de pagar o aditivo.
 
+
+## 30/10/2026 — Cadastro e login reais com confirmação por e-mail (`claude/fix-cadastro-real-46a09c`)
+
+- Causa do "Algo deu errado" ao criar conta: o `criarConta` chamava `updateUser(phone)` depois do `signUp`, mas com confirmação de e-mail ligada não há sessão. Removido (D16: sem SMS no piloto).
+- `criarConta` devolve `ResultadoCadastro`: `CadastroComSessao` (entra direto) ou `CadastroAguardandoEmail`. Celular vai nos metadados do `signUp`; CPF e nascimento **não** vão (iriam no token; o `PATCH /v1/me` só aceita nome): seguem pendentes para o backend.
+- Nova tela `ConfirmarEmailTela` ("Confirme seu e-mail", "Já confirmei", "Reenviar e-mail" com 60 s, "Trocar e-mail"). A tela de SMS fica intacta, desligada por `kConfirmarCelularPorSms = false`.
+- Login trata `email_not_confirmed` com reenvio. Novos tipos de erro: `emailNaoConfirmado`, `limiteEmail`, `dadosInvalidos`, `cadastroDesativado`; erro desconhecido registra só tipo e código em log de depuração.
+- `GET /v1/me` no primeiro login só no modo `api`. Deep link `br.com.feitolabs.trato://login-callback` no `AndroidManifest.xml` e `Info.plist`. `docs/login-configuracao.md` atualizado.
+- Testes: `app/test/servico_auth_supabase_test.dart` (cliente com rede simulada) e fluxo em `auth_test.dart`. `verificar.py` OK. Falta o João: ligar a URL de redirecionamento no painel e testar no emulador.

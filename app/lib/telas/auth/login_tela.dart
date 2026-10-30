@@ -35,6 +35,8 @@ class _LoginTelaState extends State<LoginTela> {
   var _mostrarSenha = false;
   var _tentou = false;
   var _carregando = false;
+  var _precisaConfirmar = false;
+  String? _aviso;
   late String? _erroServico = widget.sessaoExpirada ? ErroTrato.sessaoExpirada.mensagem : null;
 
   ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
@@ -74,6 +76,8 @@ class _LoginTelaState extends State<LoginTela> {
     setState(() {
       _carregando = true;
       _erroServico = null;
+      _precisaConfirmar = false;
+      _aviso = null;
     });
     try {
       sessao = await acao();
@@ -83,6 +87,7 @@ class _LoginTelaState extends State<LoginTela> {
       setState(() {
         _carregando = false;
         _erroServico = e.tipo == TipoErroAuth.cancelado ? null : e.mensagem;
+        _precisaConfirmar = e.tipo == TipoErroAuth.emailNaoConfirmado;
       });
       return;
     }
@@ -93,6 +98,28 @@ class _LoginTelaState extends State<LoginTela> {
       return;
     }
     RotasTrato.irParaInicio(context, sessao);
+  }
+
+  Future<void> _reenviarConfirmacao() async {
+    if (_carregando) return;
+    setState(() {
+      _carregando = true;
+      _erroServico = null;
+      _aviso = null;
+    });
+    String? erro;
+    try {
+      await _servico.reenviarEmailConfirmacao(_identificador.text.trim());
+    } on ErroAuth catch (e) {
+      erro = e.mensagem;
+    }
+    if (!mounted) return;
+    setState(() {
+      _carregando = false;
+      _erroServico = erro;
+      _precisaConfirmar = erro != null;
+      if (erro == null) _aviso = 'Enviamos um e-mail novo. Abra o link e entre.';
+    });
   }
 
   void _entrar() {
@@ -152,6 +179,13 @@ class _LoginTelaState extends State<LoginTela> {
         ),
         const SizedBox(height: EspacosTrato.x3),
         MensagemErroAuth(_erroServico),
+        if (_precisaConfirmar)
+          BotaoLink(texto: 'Reenviar e-mail de confirmação', aoTocar: _reenviarConfirmacao),
+        if (_aviso != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
+            child: Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+          ),
         BotaoPrimario(texto: 'Entrar', aoTocar: _entrar, carregando: _carregando),
         const SizedBox(height: EspacosTrato.x4),
         const _DivisorOu(),

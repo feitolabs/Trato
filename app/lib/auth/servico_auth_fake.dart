@@ -10,6 +10,7 @@ class ServicoAuthFake implements ServicoAuth {
   ServicoAuthFake({
     Map<String, String> contas = const {},
     this.aceitaQualquerLogin = true,
+    this.exigeConfirmacaoEmail = false,
     this.codigoCelular = '123456',
     Set<ProvedorAuth> provedores = const {ProvedorAuth.google, ProvedorAuth.apple},
     DateTime Function()? agora,
@@ -20,6 +21,17 @@ class ServicoAuthFake implements ServicoAuth {
   /// Código que o fake considera certo.
   final String codigoCelular;
   final bool aceitaQualquerLogin;
+
+  /// Simula a confirmação de e-mail ligada: o cadastro não abre sessão e o login só funciona
+  /// depois de [confirmarEmail].
+  final bool exigeConfirmacaoEmail;
+  final Set<String> _naoConfirmados = {};
+
+  /// Quantos e-mails de confirmação foram reenviados (para os testes).
+  int emailsReenviados = 0;
+
+  /// Marca o e-mail como confirmado (o clique no link, nos testes).
+  void confirmarEmail(String email) => _naoConfirmados.remove(_normalizar(email));
 
   final Map<String, String> _contas;
   final Set<ProvedorAuth> _provedores;
@@ -84,6 +96,7 @@ class ServicoAuthFake implements ServicoAuth {
     final certa = _contas[chave];
     final ok = certa != null ? certa == senha : aceitaQualquerLogin;
     if (!ok) throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
+    if (_naoConfirmados.contains(chave)) throw const ErroAuth(TipoErroAuth.emailNaoConfirmado);
     return _entrou(SessaoAuth(
       id: 'fake-$chave',
       email: chave,
@@ -93,16 +106,26 @@ class ServicoAuthFake implements ServicoAuth {
   }
 
   @override
-  Future<SessaoAuth> criarConta(DadosCadastro dados) async {
+  Future<ResultadoCadastro> criarConta(DadosCadastro dados) async {
     _checarFalha();
     final chave = _normalizar(dados.email);
     if (_contas.containsKey(chave)) throw const ErroAuth(TipoErroAuth.emailJaUsado);
     _contas[chave] = dados.senha;
     _codigo.novoCadastro();
     _perfis[chave] = dados.perfil;
-    return _entrou(
+    if (exigeConfirmacaoEmail) {
+      _naoConfirmados.add(chave);
+      return CadastroAguardandoEmail(chave);
+    }
+    return CadastroComSessao(_entrou(
       SessaoAuth(id: 'fake-$chave', email: chave, nome: dados.nome, perfil: dados.perfil),
-    );
+    ));
+  }
+
+  @override
+  Future<void> reenviarEmailConfirmacao(String email) async {
+    _checarFalha();
+    emailsReenviados++;
   }
 
   @override

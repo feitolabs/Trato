@@ -52,7 +52,10 @@ Future<void> main() async {
     ServicoAuthPadrao.atual,
     sessaoTrato,
     // Primeiro login: GET /v1/me cria o usuário no backend (idempotente).
-    aoEntrar: () => RotasTrato.repos.perfil.carregar(),
+    // Só no modo api; em demo não chama nada.
+    aoEntrar: () async {
+      if (ConfigTrato.doAmbiente().usaApi) await RotasTrato.repos.perfil.carregar();
+    },
   );
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;

@@ -34,6 +34,19 @@
 	<string>O Trato usa sua localização para confirmar que o profissional chegou ao local do serviço.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O Trato acessa suas fotos para anexar imagens ao pedido, à nota de materiais ou à disputa.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>br.com.feitolabs.trato</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>br.com.feitolabs.trato</string>
+			</array>
+		</dict>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
