@@ -293,14 +293,17 @@ def decidir_disputa(
         DecisaoDisputa(corpo.resultado, corpo.justificativa),
     )
     divisao = nova.divisao
-    servico.aplicar_dinheiro(
-        contexto,
-        transicao.pedido,
-        devolver_ao_cliente=divisao.para_cliente,
-        repartir=transicao.pedido.estado is Estado.CONCLUIDO,
-    )
-    contexto.disputas.salvar(pedido.id, nova)
-    contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    with contexto.transacao():  # pedido + dinheiro + disputa: tudo ou nada; provedor só depois
+        servico.aplicar_dinheiro(
+            contexto,
+            transicao.pedido,
+            operacao=f"disputa/{int(disputa.aberta_em.timestamp())}",
+            devolver_ao_cliente=divisao.para_cliente,
+            repartir=transicao.pedido.estado is Estado.CONCLUIDO,
+            gatilho="decisao_disputa",
+        )
+        contexto.pedidos.salvar(transicao.pedido, transicao.evento)  # antes da disputa (histórico)
+        contexto.disputas.salvar(pedido.id, nova)
     return DecisaoOut(
         estado_disputa=nova.estado.value,
         estado_pedido=transicao.pedido.estado.value,

@@ -82,6 +82,7 @@ def confirmar_pagamento(evento: EventoWebhook, contexto: Contexto) -> None:
                 CUSTODIA,
                 valor,
                 agora,
+                evento_webhook_id=evento.evento_id,  # o lançamento aponta o evento (espelho)
             )
         ]
     )

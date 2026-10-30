@@ -12,7 +12,13 @@ from trato.api.repositorios import Contrato
 from trato.persistencia.auditoria import registrar_na_transacao
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
-from trato.persistencia.config import exigir, parametros_globais, taxa_bps_da_faixa, versao_vigente
+from trato.persistencia.config import (
+    exigir,
+    parametros_globais,
+    taxa_da_versao,
+    taxa_do_valor,
+    versao_vigente,
+)
 from trato.persistencia.erros import Duplicado, NaoEncontrado, RegraDoBanco
 
 BPS = 10_000
@@ -34,7 +40,9 @@ class ContratosPostgres:
         with self._banco.transacao() as con:
             linha = con.execute(
                 "select c.pedido_id, c.orcamento_id, c.profissional_id, c.valor_total_centavos, "
-                "c.aceito_em, p.categoria_id from public.contratos c "
+                "c.aceito_em, c.taxa_bps_aplicada, "
+                "c.regras_aplicadas -> 'parametros' ->> 'taxa_minima_centavos' as taxa_minima, "
+                "p.categoria_id from public.contratos c "
                 "join public.pedidos p on p.id = c.pedido_id where c.pedido_id = %s",
                 (achado,),
             ).fetchone()
@@ -47,6 +55,8 @@ class ContratosPostgres:
             valor_centavos=int(linha["valor_total_centavos"]),
             categoria_id=str(linha["categoria_id"]),
             aceito_em=linha["aceito_em"],
+            taxa_bps_aplicada=int(linha["taxa_bps_aplicada"]),
+            taxa_minima_centavos=int(linha["taxa_minima"] or 0),
         )
 
     def salvar(self, contrato: Contrato) -> None:
@@ -85,9 +95,10 @@ class ContratosPostgres:
             versao = versao_vigente(con)
             parametros = parametros_globais(con, versao)
             valor = int(orc["valor_total_centavos"])
-            taxa_bps = taxa_bps_da_faixa(con, versao, valor)
+            config_taxa = taxa_da_versao(con, versao, valor, parametros)
+            taxa_bps = config_taxa.taxa_bps
             adiantamento_bps = exigir(parametros, "adiantamento_bps")
-            taxa = _meio_para_cima(valor, taxa_bps)
+            taxa = taxa_do_valor(config_taxa, valor)  # percentual ou mínimo, como a calculadora
             adiantamento = _meio_para_cima(valor, adiantamento_bps)
             regras = {
                 "taxa_bps": taxa_bps,

@@ -4,10 +4,10 @@
                                os testes montam o contexto com `api.memoria`.
   TRATO_PERSISTENCIA=postgres  Postgres do Supabase via DATABASE_URL + auth com o JWT do Supabase.
 
-Em modo postgres, ledger, disputas, garantias, avaliações e eventos de webhook continuam EM
-MEMÓRIA: as tabelas deles (F3.5/F3.6) ainda não existem no banco e a F3.5 está sendo refeita
-(caminho A).
-Reiniciar o servidor perde esses dados. Não usar assim em produção.
+Em modo postgres TODO o dinheiro mora no banco (C1): ledger, lançamentos e partidas, disputas,
+garantias e retrabalhos, avaliações, eventos de webhook e repasses (tabelas da F3.5/F3.6). Cada
+operação financeira roda numa transação única (`Contexto.transacao`). Em produção a fábrica
+RECUSA subir se algum repositório de dinheiro for em memória (`exigir_dinheiro_no_banco`).
 """
 
 from __future__ import annotations
@@ -27,7 +27,9 @@ from trato.api.memoria import (
     EventosWebhookEmMemoria,
     GarantiasEmMemoria,
     LedgerEmMemoria,
+    RepassesEmMemoria,
 )
+from trato.api.memoria_app import AvaliacoesEmMemoria
 from trato.config import Config, obter_config
 from trato.persistencia.app_extras import TaxaPostgres, VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
@@ -35,13 +37,38 @@ from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
 from trato.persistencia.contratos import ContratosPostgres
 from trato.persistencia.conversas import ConversasPostgres, NotificacoesPostgres
+from trato.persistencia.dinheiro import (
+    AvaliacoesPostgres,
+    DisputasPostgres,
+    EventosWebhookPostgres,
+    GarantiasPostgres,
+    RepassesPostgres,
+)
 from trato.persistencia.execucao import ExecucaoPostgres
+from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
 from trato.seguranca.config import parametros_docs
 
 PERSISTENCIAS = ("memoria", "postgres")
+
+# Repositórios que guardam dinheiro (ou prova dele): nenhum pode ser em memória em produção.
+_DINHEIRO_EM_MEMORIA = (
+    LedgerEmMemoria,
+    DisputasEmMemoria,
+    GarantiasEmMemoria,
+    EventosWebhookEmMemoria,
+    RepassesEmMemoria,
+    AvaliacoesEmMemoria,
+)
+
+
+def exigir_dinheiro_no_banco(contexto: Contexto) -> None:
+    """Recusa subir se algum repositório de dinheiro for em memória (reiniciar perde dinheiro)."""
+    for nome in ("ledger", "disputas", "garantias", "eventos_webhook", "repasses", "avaliacoes"):
+        if isinstance(getattr(contexto, nome), _DINHEIRO_EM_MEMORIA):
+            raise RuntimeError(f"Repositório de dinheiro em memória em produção: {nome}.")
 
 
 def criar_contexto_postgres(
@@ -70,15 +97,15 @@ def criar_contexto_postgres(
         )
     conversas = ConversasPostgres(banco)
     notificacoes = NotificacoesPostgres(banco)
-    return Contexto(
+    contexto = Contexto(
         auth=auth,
         pedidos=PedidosPostgres(banco, lambda: segredo_codigos),
         orcamentos=OrcamentosPostgres(banco),
         contratos=ContratosPostgres(banco),
-        ledger=LedgerEmMemoria(),
-        disputas=DisputasEmMemoria(),
-        garantias=GarantiasEmMemoria(),
-        eventos_webhook=EventosWebhookEmMemoria(),
+        ledger=LedgerPostgres(banco),
+        disputas=DisputasPostgres(banco),
+        garantias=GarantiasPostgres(banco),
+        eventos_webhook=EventosWebhookPostgres(banco),
         config=ConfigPostgres(banco),
         agora=agora,
         conversas=conversas,
@@ -86,6 +113,9 @@ def criar_contexto_postgres(
         usuarios=usuarios,
         verificacoes=VerificacoesPostgres(banco),
         taxa=TaxaPostgres(banco),
+        avaliacoes=AvaliacoesPostgres(banco),
+        repasses=RepassesPostgres(banco),
+        transacao_banco=banco.transacao,
         extras={
             "usuarios": usuarios,
             "execucao": ExecucaoPostgres(banco),
@@ -95,6 +125,9 @@ def criar_contexto_postgres(
             "banco": banco,
         },
     )
+    if config.trato_ambiente.strip().lower() == "producao":
+        exigir_dinheiro_no_banco(contexto)
+    return contexto
 
 
 def criar_app_da_config(config: Config | None = None) -> FastAPI:

@@ -42,6 +42,14 @@ flutter run --dart-define-from-file=dart-defines.json
 
 > Atenção: tudo que vai em `--dart-define` fica dentro do aplicativo e pode ser extraído por quem tiver o APK/IPA. Por isso só cabem **valores públicos** (URL da API, chave anon). Segredos (Stripe, `service_role`, `DATABASE_URL`) ficam **só no backend**.
 
+### Lista permitida (M14)
+
+Só estas variáveis podem entrar no app: `TRATO_MODO`, `TRATO_API_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID` (e `GALERIA`, só desenvolvimento). No painel: `ADMIN_MODO`, `ADMIN_API_URL`, `ADMIN_SUPABASE_URL`, `ADMIN_SUPABASE_ANON_KEY`.
+
+- **Nunca** aponte `--dart-define-from-file` para o `.env` da raiz (tem `service_role`, `DATABASE_URL`, Stripe).
+- No código (`app/lib/dados/defines_publicos.dart`): em **debug** o app para com erro se achar variável com cara de segredo (`service_role`, `secret`, `sk_`, `JWT_SECRET`, `DATABASE_URL`, ou uma chave anon que na verdade é `service_role`); em **release** ela é ignorada.
+- `python harness/verificar.py --etapa segredos` roda `harness/verificar_defines.py`: falha se qualquer arquivo versionado apontar o `--dart-define-from-file` para um `.env` ou usar um arquivo de defines com chave proibida.
+
 O `.gitignore` do projeto já ignora `dart-defines*.json`, `.env*`, `key.properties`, `*.jks`, `*.keystore`, `*.p12` e `*.mobileprovision`.
 
 ## 2. Android

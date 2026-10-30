@@ -1,3 +1,5 @@
+import 'defines_publicos.dart';
+
 /// Configuração de execução do app. Tudo vem de `--dart-define`; nada de chave no código.
 ///
 /// - `TRATO_MODO=demo|api` (padrão `demo`): demo usa dados de exemplo e não toca na rede.
@@ -8,10 +10,10 @@ class ConfigTrato {
   const ConfigTrato({required this.modo, this.apiUrl = ''});
 
   /// Lê os `--dart-define` da compilação.
-  factory ConfigTrato.doAmbiente() => ConfigTrato(
-        modo: _modo(const String.fromEnvironment('TRATO_MODO', defaultValue: 'demo')),
-        apiUrl: const String.fromEnvironment('TRATO_API_URL'),
-      );
+  factory ConfigTrato.doAmbiente() {
+    final v = filtrarDefines(lerDefinesDoAmbiente());
+    return ConfigTrato(modo: _modo(v['TRATO_MODO'] ?? 'demo'), apiUrl: v['TRATO_API_URL'] ?? '');
+  }
 
   const ConfigTrato.demo() : this(modo: ModoTrato.demo);
 

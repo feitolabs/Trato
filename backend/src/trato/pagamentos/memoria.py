@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from trato.pagamentos.modelos import Aditivo, CobrancaLocal, TermosContrato
+from trato.pagamentos.modelos import Aditivo, CobrancaLocal, OrdemEstorno, TermosContrato
 
 
 class CobrancasEmMemoria:
@@ -35,6 +35,24 @@ class AditivosEmMemoria:
     def do_pedido(self, pedido_id: str) -> Sequence[Aditivo]:
         achados = [a for a in self._itens.values() if a.pedido_id == pedido_id]
         return sorted(achados, key=lambda a: a.criado_em)
+
+
+class OrdensEstornoEmMemoria:
+    def __init__(self) -> None:
+        self._itens: dict[str, OrdemEstorno] = {}
+
+    def salvar(self, ordem: OrdemEstorno) -> None:
+        self._itens[ordem.chave] = ordem
+
+    def pendentes(self, pedido_id: str | None = None) -> Sequence[OrdemEstorno]:
+        return [
+            o
+            for o in self._itens.values()
+            if o.estado == "pendente" and (pedido_id is None or o.pedido_id == pedido_id)
+        ]
+
+    def do_pedido(self, pedido_id: str) -> Sequence[OrdemEstorno]:
+        return [o for o in self._itens.values() if o.pedido_id == pedido_id]
 
 
 class TermosEmMemoria:

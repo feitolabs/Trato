@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 import psycopg
@@ -16,6 +17,12 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolTimeout
 
 from trato.persistencia.erros import ErroPersistencia, traduzir
+
+# Conexão da transação em curso neste contexto (thread/requisição). Com ela aberta, `transacao()`
+# reaproveita a mesma conexão: várias operações (ledger, disputa, pedido) viram UMA transação.
+_EM_CURSO: ContextVar[psycopg.Connection[dict[str, Any]] | None] = ContextVar(
+    "trato_transacao", default=None
+)
 
 
 class Banco:
@@ -57,12 +64,24 @@ class Banco:
 
     @contextmanager
     def transacao(self) -> Iterator[psycopg.Connection[dict[str, Any]]]:
-        """Uma transação curta. Sai com COMMIT; qualquer erro desfaz tudo e vira erro de domínio."""
+        """Uma transação curta. Sai com COMMIT; qualquer erro desfaz tudo e vira erro de domínio.
+
+        Aninhada (já há uma aberta neste contexto), reaproveita a conexão: quem confirma é a
+        transação mais externa. Assim uma operação financeira inteira grava tudo ou nada.
+        """
+        atual = _EM_CURSO.get()
+        if atual is not None:
+            yield atual
+            return
         try:
             with self._pool.connection() as con:
                 if self._papel:
                     con.execute(f"set local role {self._papel}")
-                yield con
+                marca = _EM_CURSO.set(con)
+                try:
+                    yield con
+                finally:
+                    _EM_CURSO.reset(marca)
         except psycopg.Error as erro:
             raise traduzir(erro) from erro
         except PoolTimeout as erro:

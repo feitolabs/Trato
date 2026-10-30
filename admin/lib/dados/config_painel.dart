@@ -1,3 +1,4 @@
+import 'defines_publicos.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_admin.dart';
@@ -19,12 +20,15 @@ import 'api_http.dart';
 class ConfigPainel {
   const ConfigPainel({this.modo = '', this.urlApi = '', this.urlSupabase = '', this.chaveAnon = ''});
 
-  static const doAmbiente = ConfigPainel(
-    modo: String.fromEnvironment('ADMIN_MODO'),
-    urlApi: String.fromEnvironment('ADMIN_API_URL'),
-    urlSupabase: String.fromEnvironment('ADMIN_SUPABASE_URL'),
-    chaveAnon: String.fromEnvironment('ADMIN_SUPABASE_ANON_KEY'),
-  );
+  /// Lê os `--dart-define` pela lista permitida (M14): em debug, segredo para o painel; em release é ignorado.
+  factory ConfigPainel.doAmbiente() => ConfigPainel.deValores(filtrarDefines(lerDefinesDoAmbiente()));
+
+  factory ConfigPainel.deValores(Map<String, String> v) => ConfigPainel(
+        modo: v['ADMIN_MODO'] ?? '',
+        urlApi: v['ADMIN_API_URL'] ?? '',
+        urlSupabase: v['ADMIN_SUPABASE_URL'] ?? '',
+        chaveAnon: v['ADMIN_SUPABASE_ANON_KEY'] ?? '',
+      );
 
   final String modo;
   final String urlApi;

@@ -27,6 +27,21 @@ class ConfigTaxa:
             raise ValueError("taxa_bps não pode passar de 10000 (100%)")
 
 
+class TaxaNaoCongelada(Exception):
+    """O contrato não traz a taxa congelada no aceite: nada de recalcular pela configuração."""
+
+
+def taxa_congelada(contrato) -> ConfigTaxa:
+    """A taxa que o contrato congelou no aceite (a versão de regras dele, `regras_aplicadas`).
+
+    `contrato` é o `Contrato` do domínio. Depois do aceite, toda taxa (disputa, liquidação,
+    cancelamento) sai daqui: a configuração vigente só vale para orçamentos novos (A3).
+    """
+    if contrato is None or contrato.taxa_bps_aplicada is None:
+        raise TaxaNaoCongelada("O contrato deste pedido não tem a taxa congelada no aceite.")
+    return ConfigTaxa(contrato.taxa_bps_aplicada, contrato.taxa_minima_centavos)
+
+
 class TabelaProgressivaNaoImplementada(NotImplementedError):
     """D2 em espera: a tabela progressiva depende de P2 (faixas e percentuais)."""
 

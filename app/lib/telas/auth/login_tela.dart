@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
@@ -15,10 +16,14 @@ import 'validacao.dart';
 /// Entrar com e-mail, Google e Apple usam o [ServicoAuth]; biometria ainda abre [EmBreveTela].
 /// Google e Apple só aparecem se o serviço diz que o provedor está habilitado (Apple só no iOS).
 class LoginTela extends StatefulWidget {
-  const LoginTela({super.key, this.servico});
+  const LoginTela({super.key, this.servico, this.sessaoExpirada = false});
 
   /// Se nulo, usa [ServicoAuthPadrao.atual] (fake até haver chaves).
   final ServicoAuth? servico;
+
+  /// Aberta por cima da tela em uso depois de um 401: avisa, e ao entrar só volta para a tela
+  /// de baixo (o que a pessoa digitou lá continua no lugar).
+  final bool sessaoExpirada;
 
   @override
   State<LoginTela> createState() => _LoginTelaState();
@@ -30,7 +35,7 @@ class _LoginTelaState extends State<LoginTela> {
   var _mostrarSenha = false;
   var _tentou = false;
   var _carregando = false;
-  String? _erroServico;
+  late String? _erroServico = widget.sessaoExpirada ? ErroTrato.sessaoExpirada.mensagem : null;
 
   ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
 
@@ -82,6 +87,10 @@ class _LoginTelaState extends State<LoginTela> {
     }
     if (!mounted) return;
     setState(() => _carregando = false);
+    if (widget.sessaoExpirada && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
     RotasTrato.irParaCliente(context);
   }
 

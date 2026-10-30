@@ -312,3 +312,20 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Testes em develop: 883 no backend (1 pulado, 13 xfail), 629 no app, 76 no painel.
 - Segue pendente: correção dos achados da revisão de segurança, adaptadores Postgres da LGPD, ligar notificações/mensagens do backend no app, seeds, push e PR para `main`.
 
+
+
+## 30/10/2026 — Correção dos achados de dinheiro da revisão (`claude/fix-dinheiro-bae05e`)
+
+- C1, A3, A4, A5, A6, A7 e M1-M5 corrigidos; 6 dos 13 `xfail` viraram testes verdes (C1, A3, A4 x2, A5, A6) e o A7 também (7 no total). Restam `xfail` só os de acesso (A1, A2, A8: sessão `fix-acesso`).
+- Dinheiro no Postgres: ledger/partidas, disputas, garantias e retrabalhos, avaliações, eventos de webhook e repasses (`persistencia/ledger.py`, `persistencia/dinheiro.py`); uma transação por operação (`Contexto.transacao`); a fábrica recusa repositório de dinheiro em memória em produção.
+- Ledger do Python alinhado ao do banco (tipos, estorno inteiro, `evento_webhook_id`); concorrência com `for update` + compare-and-set; estorno grava a intenção antes de chamar o provedor; taxa da disputa vem do contrato; webhook conferido (M1-M3, M5).
+- Migration NOVA `20261030120000_ordens_estorno.sql` (+ rollback + teste), NÃO aplicada: pedido de OK em `docs/fix-dinheiro.md`.
+- Testes de banco só em Postgres local (pgserver, venv fora do projeto). Pendente: ligar `ServicoPagamento` à fábrica Postgres (cobranças/aditivos/termos/ordens em tabela) e o pedido de transferência ao parceiro (P7).
+
+## 30/10/2026 — Integradas as correções da revisão de segurança: dinheiro e app
+
+- Em develop (sem push), cada uma verificada com o `.venv` do projeto: `claude/fix-dinheiro-bae05e` (C1, A3-A7, M1-M5 no Postgres; migration nova `20261030120000_ordens_estorno.sql` **só versionada, NÃO aplicada**, pedido de OK em `docs/fix-dinheiro.md`) e `claude/fix-app-a20a14` (sessão em armazenamento seguro, lista permitida de `dart-define` com `harness/verificar_defines.py`, EXIF e demais itens do app; `docs/fix-app.md`).
+- Coerência dos xfail: `backend/tests/api/test_revisao_seguranca_xfail.py` ficou com `xfail(strict=True)` só para A1, A2 e A8 (acesso), que são da `fix-acesso`; os de dinheiro viraram testes comuns verdes, sem XPASS escondido.
+- Testes em develop: 897 no backend (1 pulado, 6 xfail), 638 no app, 78 no painel.
+- Não integrada por orientação: `claude/fix-acesso-adc4fc` (sessão retomada para corrigir 1 teste). Falta: aplicar a migration de ordens de estorno (OK do João), ligar `ServicoPagamento` à fábrica Postgres, correções de acesso (A1, A2, A8).
+

@@ -246,27 +246,29 @@ def mudar_estado(
         raise
     if com_codigo:
         contexto.limite_codigo.acertou(pedido.id)
-    if acao is Acao.ACEITAR_ORCAMENTO:
-        # Contrato antes do pedido: se o contrato falhar (ex.: taxa não publicada), o pedido
-        # continua aberto. Gravar o contrato de novo com os mesmos dados não duplica.
-        orcamento = contexto.orcamentos.obter(transicao.pedido.orcamento_id or "")
-        if orcamento is not None:
-            contexto.contratos.salvar(
-                Contrato(
-                    pedido.id,
-                    orcamento.id,
-                    orcamento.profissional_id,
-                    orcamento.valor_centavos,
-                    orcamento.categoria_id,
-                    aceito_em=transicao.evento.em,
-                    aceite_ip=ip,  # prova do aceite (M10)
-                    aceite_dispositivo=dispositivo,
+    # Uma transação só: contrato + pedido + garantia + efeitos no dinheiro (tudo ou nada).
+    with contexto.transacao():
+        if acao is Acao.ACEITAR_ORCAMENTO:
+            # Contrato antes do pedido: se o contrato falhar (ex.: taxa não publicada), o pedido
+            # continua aberto. Gravar o contrato de novo com os mesmos dados não duplica.
+            orcamento = contexto.orcamentos.obter(transicao.pedido.orcamento_id or "")
+            if orcamento is not None:
+                contexto.contratos.salvar(
+                    Contrato(
+                        pedido.id,
+                        orcamento.id,
+                        orcamento.profissional_id,
+                        orcamento.valor_centavos,
+                        orcamento.categoria_id,
+                        aceito_em=transicao.evento.em,
+                        aceite_ip=ip,  # prova do aceite (M10)
+                        aceite_dispositivo=dispositivo,
+                    )
                 )
-            )
-    gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
-    _concluir_efeitos(contexto, gravado)
-    for gancho in contexto.apos_transicao:
-        gancho(pedido, gravado, acao, contexto)
+        gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        _concluir_efeitos(contexto, gravado)
+        for gancho in contexto.apos_transicao:
+            gancho(pedido, gravado, acao, contexto)
     return pedido_out(gravado, usuario)
 
 
@@ -320,8 +322,9 @@ def abrir_disputa(
         agora,
         contexto.config.carregar().disputas,
     )
-    contexto.disputas.salvar(pedido.id, disputa)
-    contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    with contexto.transacao():  # o pedido primeiro: a disputa lê a descrição do histórico dele
+        contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        contexto.disputas.salvar(pedido.id, disputa)
     return _disputa_out(pedido.id, disputa)
 
 
@@ -404,9 +407,10 @@ def pedir_retrabalho(
     retrabalho = abrir_retrabalho(
         garantia, corpo.descricao, agora, cfg.garantias, contexto.garantias.retrabalhos(pedido.id)
     )
-    contexto.garantias.salvar_garantia(pedido.id, garantia)
-    contexto.garantias.salvar_retrabalho(pedido.id, retrabalho)
-    contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    with contexto.transacao():
+        contexto.garantias.salvar_garantia(pedido.id, garantia)
+        contexto.garantias.salvar_retrabalho(pedido.id, retrabalho)
+        contexto.pedidos.salvar(transicao.pedido, transicao.evento)
     return RetrabalhoOut(
         pedido_id=pedido.id,
         estado=retrabalho.estado.value,

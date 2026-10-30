@@ -110,6 +110,17 @@ class Fluxo:
         r = self.acao(pid, "confirmar_conclusao", "t-cliente")
         assert r.status_code == 200 and r.json()["estado"] == "concluido", r.text
 
+    def repasse(self, pid):
+        (unico,) = self.ctx.repasses.do_pedido(pid)
+        return unico
+
+    def liquidar(self, pid, cobranca_id, **kw):
+        """Aviso de liquidação do provedor ligado ao repasse do pedido (valor = líquido)."""
+        repasse = self.repasse(pid)
+        kw.setdefault("repasse_id", repasse.id)
+        kw.setdefault("valor_centavos", repasse.valor_liquido_centavos)
+        return self.webhook(TipoEvento.LIQUIDACAO, cobranca_id, **kw)
+
     def tipos(self, pid):
         return [i.tipo for i in self.ctx.ledger.lancamentos(pid)]
 
@@ -164,8 +175,8 @@ def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     assert saldo["a_liberar_centavos"] == VALOR - TAXA_ESPERADA
     assert fluxo.ctx.garantias.obter_garantia(pid) is not None
 
-    # O provedor liquida; o ledger só espelha (caminho A).
-    r = fluxo.webhook(TipoEvento.LIQUIDACAO, cobranca["id"])
+    # O provedor liquida; o ledger só espelha (caminho A). O aviso aponta o repasse (M5).
+    r = fluxo.liquidar(pid, cobranca["id"])
     assert r.status_code == 200
     saldo = fluxo.saldo(pid)
     assert saldo["a_liberar_centavos"] == 0 and saldo["liberado_centavos"] == VALOR - TAXA_ESPERADA
@@ -290,29 +301,77 @@ def test_webhook_de_pagamento_com_valor_diferente_nao_confirma(fluxo: Fluxo):
         valor_centavos=1,
         instante=int(fluxo.amb.relogio.agora.timestamp()),
     )
-    assert quieto.post("/v1/webhooks/stripe", content=corpo, headers=cabs).status_code == 422
+    # M2: valor divergente responde 2xx (o provedor não reenvia em loop), não confirma o pedido
+    # e fica guardado para o financeiro revisar.
+    assert quieto.post("/v1/webhooks/stripe", content=corpo, headers=cabs).status_code == 200
     assert fluxo.pedido(pid)["estado"] == "orcamento_aceito"
+    assert fluxo.tipos(pid) == []
+    (guardado,) = fluxo.ctx.eventos_webhook.em_revisao()
+    assert "valor pago 1" in guardado[1]
 
 
-def test_liquidacao_fora_de_ordem_espera_e_aplica_no_reenvio(fluxo: Fluxo):
+def test_liquidacao_sem_repasse_nao_libera_e_vai_para_revisao(fluxo: Fluxo):
+    """M5: aviso de liquidação que não aponta um repasse nosso não move dinheiro nenhum."""
     pid = fluxo.aceitar()
     cobranca = fluxo.pagar(pid)
-    quieto = TestClient(fluxo.http.app, raise_server_exceptions=False)
-    instante = int(fluxo.amb.relogio.agora.timestamp())
-    corpo, cabs = fluxo.fake.evento_assinado(
-        TipoEvento.LIQUIDACAO, cobranca["id"], instante=instante
-    )
 
-    # chegou antes de concluir: não aplica e o provedor reenvia depois
-    assert quieto.post("/v1/webhooks/stripe", content=corpo, headers=cabs).status_code == 500
+    r = fluxo.webhook(TipoEvento.LIQUIDACAO, cobranca["id"])  # sem repasse_id
+    assert r.status_code == 200  # 2xx: o provedor não reenvia em loop
     assert fluxo.saldo(pid)["liberado_centavos"] == 0
+    (guardado,) = fluxo.ctx.eventos_webhook.em_revisao()
+    assert "sem repasse correspondente" in guardado[1]
 
-    fluxo.agendar(pid)
-    fluxo.iniciar(pid)
-    fluxo.encerrar_execucao(pid)
+
+def test_liquidacao_com_valor_ou_repasse_errado_nao_libera(fluxo: Fluxo):
+    pid = fluxo.ate_em_confirmacao()
+    cobranca = fluxo.servico.cobrancas.do_pedido(pid)[0]
     fluxo.concluir(pid)
-    assert quieto.post("/v1/webhooks/stripe", content=corpo, headers=cabs).status_code == 200
-    assert fluxo.saldo(pid)["liberado_centavos"] == VALOR - TAXA_ESPERADA
+    repasse = fluxo.repasse(pid)
+    assert repasse.valor_liquido_centavos == VALOR - TAXA_ESPERADA
+
+    errado = fluxo.liquidar(pid, cobranca.id, valor_centavos=repasse.valor_liquido_centavos + 1)
+    outro = fluxo.liquidar(pid, cobranca.id, repasse_id="nao-e-nosso", evento_id="evt_outro")
+    assert errado.status_code == outro.status_code == 200
+    assert fluxo.saldo(pid)["liberado_centavos"] == 0
+    assert fluxo.repasse(pid).status == "agendado"
+    assert len(fluxo.ctx.eventos_webhook.em_revisao()) == 2
+
+    certo = fluxo.liquidar(pid, cobranca.id, evento_id="evt_certo")
+    assert certo.status_code == 200
+    assert fluxo.saldo(pid)["liberado_centavos"] == repasse.valor_liquido_centavos
+    liberado_ = fluxo.repasse(pid)
+    assert liberado_.status == "liberado" and liberado_.lancamento_id is not None
+    assert liberado_.provedor_transferencia_id  # o id da transferência ficou ligado
+
+    de_novo = fluxo.liquidar(
+        pid, cobranca.id, evento_id="evt_repetido"
+    )  # outro evento, mesmo repasse
+    assert de_novo.status_code == 200
+    assert fluxo.saldo(pid)["liberado_centavos"] == repasse.valor_liquido_centavos  # não repete
+
+
+def test_liquidacao_de_repasse_com_pedido_em_disputa_espera(fluxo: Fluxo):
+    pid = fluxo.ate_em_confirmacao()
+    cobranca = fluxo.servico.cobrancas.do_pedido(pid)[0]
+    fluxo.concluir(pid)
+    repasse = fluxo.repasse(pid)
+    # pedido volta a não estar concluído (ex.: disputa dentro da janela): o aviso espera
+    pedido = fluxo.ctx.pedidos.obter(pid)
+    from dataclasses import replace
+
+    from trato.pedidos.estados import Estado
+
+    fluxo.ctx.pedidos.salvar(replace(pedido, estado=Estado.EM_DISPUTA))
+    quieto = TestClient(fluxo.http.app, raise_server_exceptions=False)
+    corpo, cabs = fluxo.fake.evento_assinado(
+        TipoEvento.LIQUIDACAO,
+        cobranca.id,
+        instante=int(fluxo.amb.relogio.agora.timestamp()),
+        repasse_id=repasse.id,
+        valor_centavos=repasse.valor_liquido_centavos,
+    )
+    assert quieto.post("/v1/webhooks/stripe", content=corpo, headers=cabs).status_code == 409
+    assert fluxo.ctx.ledger.saldo_da_conta(liberado(PROFISSIONAL.id)) == 0
 
 
 def test_pagamento_que_chega_depois_do_prazo_volta_ao_cliente(fluxo: Fluxo):
@@ -376,7 +435,7 @@ def test_cancelamento_depois_de_pagar_devolve_tudo(fluxo: Fluxo):
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == 0 and saldo["cliente_pagou_centavos"] == 0
     assert [c for c in fluxo.fake.chamadas if c[0] == "estornar"] == [
-        ("estornar", f"din/{pid}/1/{cobranca['id']}")
+        ("estornar", f"din/{pid}/cancelamento/{cobranca['id']}")
     ]
     assert fluxo.servico.cobrancas.obter(cobranca["id"]).estornado_centavos == VALOR
     fluxo.ctx.ledger.livro.verificar_partidas()
@@ -448,18 +507,6 @@ def test_disputa_liberar_tudo_conclui_com_taxa_cheia(fluxo: Fluxo):
     assert r.json()["estado_pedido"] == "concluido"
     assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
     assert [c[0] for c in fluxo.fake.chamadas].count("estornar") == 0
-
-
-def test_liquidacao_durante_disputa_espera(fluxo: Fluxo):
-    pid = fluxo.ate_em_confirmacao()
-    cobranca = fluxo.servico.cobrancas.do_pedido(pid)[0]
-    _abrir_e_responder_disputa(fluxo, pid)
-    quieto = TestClient(fluxo.http.app, raise_server_exceptions=False)
-    corpo, cabs = fluxo.fake.evento_assinado(
-        TipoEvento.LIQUIDACAO, cobranca.id, instante=int(fluxo.amb.relogio.agora.timestamp())
-    )
-    assert quieto.post("/v1/webhooks/stripe", content=corpo, headers=cabs).status_code == 500
-    assert fluxo.ctx.ledger.saldo_da_conta(liberado(PROFISSIONAL.id)) == 0
 
 
 def test_disputa_encerrada_por_acordo_reparte_normalmente(fluxo: Fluxo):

@@ -61,9 +61,13 @@ class MensagemErroAuth extends StatelessWidget {
     if (mensagem == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
-      child: Text(
-        mensagem!,
-        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.vermelhoTexto),
+      // Leitor de tela anuncia o erro assim que ele aparece.
+      child: Semantics(
+        liveRegion: true,
+        child: Text(
+          mensagem!,
+          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.vermelhoTexto),
+        ),
       ),
     );
   }

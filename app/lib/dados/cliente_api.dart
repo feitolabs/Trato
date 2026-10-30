@@ -76,7 +76,10 @@ class ClienteApi {
         throw ErroTrato.servidor;
       }
     }
-    if (codigo == 401) throw ErroTrato.sessaoExpirada;
+    if (codigo == 401) {
+      sessao.expirar();
+      throw ErroTrato.sessaoExpirada;
+    }
     if (codigo == 404) {
       throw ErroTrato(TipoErro.naoEncontrado, _detalhe(resposta) ?? 'Não encontramos isso.');
     }
