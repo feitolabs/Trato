@@ -1,6 +1,6 @@
 -- Recusa de pedido aberto pelo profissional ("não tenho interesse"). Fonte: docs/api-rotas.md.
 --
--- STATUS: PREPARADA, NÃO APLICADA. Aplicar só com o OK explícito do João (CLAUDE.md).
+-- STATUS: APLICADA no Supabase em 30/10/2026 com o OK do João.
 -- Só DDL. Depende da F3.3 (pedidos) e da F3.2 (perfis_profissional).
 -- Reversão: supabase/rollback/pedido_recusas_rollback.sql
 --
