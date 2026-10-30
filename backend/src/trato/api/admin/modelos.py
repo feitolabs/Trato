@@ -20,6 +20,15 @@ class Saida(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EuOut(Saida):
+    """Quem está logado no painel: o papel vem da tabela `equipe`, nunca do token."""
+
+    id: str
+    papel: str
+    nome: str | None = None
+    alcada_centavos: int = 0
+
+
 class ComMotivo(Entrada):
     motivo: Motivo
 

@@ -8,6 +8,7 @@ from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admi
 from trato.api.admin.modelos import (
     ComMotivo,
     DadosPessoaisOut,
+    EuOut,
     EventoPedidoOut,
     Pagina,
     PedidoDetalheOut,
@@ -19,6 +20,20 @@ from trato.api.admin.papeis import Permissao
 from trato.api.contexto import Contexto, obter_contexto
 
 router = APIRouter(prefix="/v1/admin", tags=["admin: usuários e pedidos"])
+
+
+@router.get("/eu", response_model=EuOut, summary="Quem sou eu (papel e alçada no painel)")
+def eu(
+    operador: Operador = Depends(exigir()),
+    admin: AdminContexto = Depends(obter_admin),
+) -> EuOut:
+    conhecido = admin.usuarios.obter(operador.id)
+    return EuOut(
+        id=operador.id,
+        papel=operador.membro.papel.value,
+        nome=conhecido.nome if conhecido else None,
+        alcada_centavos=operador.membro.alcada_centavos or 0,
+    )
 
 
 @router.get("/usuarios", response_model=Pagina[UsuarioOut], summary="Buscar usuários")
