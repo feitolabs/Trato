@@ -16,11 +16,15 @@ class PerfilPublicoTela extends StatelessWidget {
     required this.servico,
     this.aoVerAvaliacoes,
     this.aoEditarCadastro,
+    this.aoSair,
   });
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
   final VoidCallback? aoEditarCadastro;
+
+  /// Sai da conta (limpa a sessão). Sem ele, o botão não aparece.
+  final VoidCallback? aoSair;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +104,7 @@ class PerfilPublicoTela extends StatelessWidget {
             texto: 'Ver todas as avaliações',
             aoTocar: aoVerAvaliacoes,
           ),
+          if (aoSair != null) BotaoLink(texto: 'Sair', aoTocar: aoSair),
         ],
       ),
     );

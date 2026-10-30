@@ -55,6 +55,7 @@ class ServicoAuthSupabase implements ServicoAuth {
           email: u.email ?? '',
           nome: u.userMetadata?['nome'] as String?,
           celularConfirmado: u.phoneConfirmedAt != null,
+          perfil: u.userMetadata?['perfil'] as String?,
         );
 
   @override
@@ -66,6 +67,16 @@ class ServicoAuthSupabase implements ServicoAuth {
 
   @override
   String? get tokenAtual => _auth.currentSession?.accessToken;
+
+  @override
+  Future<String?> renovarToken() async {
+    try {
+      final r = await _auth.refreshSession();
+      return r.session?.accessToken;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// "(31) 98765-4417" vira "+5531987654417".
   static String celularE164(String celular) => '+55${celular.replaceAll(RegExp(r'\D'), '')}';
@@ -129,7 +140,7 @@ class ServicoAuthSupabase implements ServicoAuth {
         final r = await _auth.signUp(
           email: dados.email.trim(),
           password: dados.senha,
-          data: {'nome': dados.nome},
+          data: {'nome': dados.nome, if (dados.perfil != null) 'perfil': dados.perfil},
         );
         // Com confirmação de e-mail ligada, e-mail repetido volta sem erro e sem identidades.
         if (r.user?.identities?.isEmpty ?? false) {

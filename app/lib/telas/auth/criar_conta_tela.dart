@@ -82,6 +82,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         email: _email.text.trim(),
         senha: _senha.text,
         celular: _celular.text,
+        perfil: widget.perfil.name,
       ));
     } on ErroAuth catch (e) {
       erro = e.mensagem;

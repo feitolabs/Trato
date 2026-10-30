@@ -2,11 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../componentes/componentes.dart';
 import '../tema/tema.dart';
+import 'fluxo/rotas.dart';
 import 'onboarding/onboarding_tela.dart';
 
 /// Tela 1 do protótipo: logo Feito Labs, "Trato" e o lema. Toque em qualquer lugar para começar.
 class SplashTela extends StatelessWidget {
   const SplashTela({super.key});
+
+  /// Com sessão guardada, vai direto para a casca do perfil; sem ela, onboarding.
+  void _comecar(BuildContext context) {
+    if (RotasTrato.temSessao) {
+      RotasTrato.irParaInicio(context);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OnboardingTela()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,9 +26,7 @@ class SplashTela extends StatelessWidget {
       backgroundColor: CoresTrato.petroleo,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const OnboardingTela()),
-        ),
+        onTap: () => _comecar(context),
         child: SafeArea(
           child: Column(
             children: [

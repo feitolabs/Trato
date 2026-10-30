@@ -13,8 +13,8 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 
 | Tela | Estado | Observação |
 |---|---|---|
-| Splash, onboarding, escolha de perfil | Demo | Não precisam de API. |
-| Login, criar conta, recuperar senha | Demo (serviço de teste) | `ServicoAuth` pronto; o `main.dart` troca para o Supabase quando há `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O token do login ainda **não** é passado ao cliente HTTP (`SessaoTrato`), então a API real não recebe o usuário. Ver `docs/login-configuracao.md`. |
+| Splash, onboarding, escolha de perfil | Demo | Primeira abertura: splash → onboarding → escolha de perfil → cadastro → casca do perfil. Com sessão guardada, a splash vai direto à casca. O perfil escolhido fica nos dados da conta (`perfil` no Supabase Auth) e o login abre a casca do cliente ou do profissional. |
+| Login, criar conta, recuperar senha | Demo (serviço de teste) | `ServicoAuth` pronto; o `main.dart` troca para o Supabase quando há `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O token do login vai em toda chamada da API (`LigacaoSessao` → `SessaoTrato`); em 401 o app renova o token e repete a chamada uma vez, e se não renovar limpa a sessão e abre o login por cima da tela (o que foi digitado fica). Ver `docs/login-configuracao.md`. |
 | Google, Apple, SMS | Depende do João | Chaves e provedor (P11). |
 | Início, buscar, perfil do profissional | Demo | Categorias e profissionais de exemplo. |
 | Busca com serviço (`busca/`) | Demo, ligada | É a aba Buscar do cliente (`RotasTrato.abaBuscar`), abre o perfil público. Filtros e mapa da tela antiga (`BuscarTela`) saíram da aba; a busca real depende do backend. |
@@ -23,7 +23,7 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Orçamentos recebidos e detalhe | Rotas prontas | `GET /v1/pedidos/{id}/orcamentos` e `GET /v1/orcamentos/{id}` (itens, validade, fora do escopo). Falta o app trocar o demo (`docs/api-rotas.md`). |
 | Pagamento e aguardando confirmação | Rotas prontas | `POST /v1/contratos/{id}/cobranca` e `GET .../pagamento` (provedor fake por padrão, Stripe só de teste). Em modo `postgres` a cobrança ainda não é gravada no banco (503). O app nunca mostra "pago" antes do webhook (D13). |
 | Pedido em execução, código de início | API | Fotos do check-in não vêm da API. |
-| Aditivo e nota de materiais (lado do cliente) | Demo, **não ligadas** | `ver_nota_tela` e `responder_aditivo_tela` existem; falta ponto de entrada no pedido em execução. Sem protótipo. |
+| Aditivo e nota de materiais (lado do cliente) | Demo, ligadas | No pedido em execução: "Ver nota de materiais" e aprovar/recusar aditivo. Sem rota na API. Sem protótipo. |
 | Conclusão, confirmar serviço | API | Valores de `GET .../saldo`. |
 | Avaliação | API (valores) | `POST /v1/contratos/{id}/avaliacao` pronta; o app ainda mostra "função ainda não disponível". |
 | Relatar problema (disputa) | API | `POST .../disputa`. |
@@ -34,7 +34,10 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Perfil do cliente | Rotas prontas | `GET` e `PATCH /v1/me`; falta ligar no app. |
 | Central de privacidade (LGPD) e excluir conta | Demo, sem protótipo | Texto de prazos a definir com o jurídico. Exclusão real depende do backend. |
 | Ajuda | Demo, sem protótipo | Perguntas frequentes provisórias. |
-| Termos e demais itens do Perfil | Sem tela | Abrem "Em breve". |
+| Perfil: notificações, privacidade, ajuda, usar como profissional, **Sair** | Ligados | Sair encerra o login, limpa o token e volta ao login sem histórico. |
+| Perfil: dados pessoais, endereços, pagamento, favoritos, contatos, termos | Sem tela | Itens **removidos da lista** (não abrem mais "Em breve"); voltam quando a tela existir. |
+| Perfil público do profissional | Demo | Aberto pela busca e pelo detalhe do orçamento (link "Ver perfil"). Orçamento sem detalhe no protótipo abre direto o perfil. Sem perfil nos dados: aviso "Perfil indisponível". |
+| Pedido em disputa/estado sem tela (cliente) | Aviso | Mostra aviso de que está em análise (antes "Em breve"). |
 | SOS | Desligado | `kSosHabilitado = false` (D13). |
 
 ## Profissional
@@ -48,9 +51,9 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Calculadora de orçamento | Demo | Taxa e líquido têm de vir do backend (`POST /v1/orcamentos/resumo` não existe). A taxa de 7,5% do fake é só demonstração. |
 | Check-in e check-out | Demo (envio pronto) | `fazer_check_in` e `fazer_check_out` existem na API. Câmera e GPS do aparelho já capturam (`app/lib/dispositivo/`); o envio da foto e da posição ao backend falta. |
 | Enviar nota de materiais e criar aditivo | Demo, ligadas | Ações do "pedido de hoje" (botão de check-in da Início). Cliente: links na tela do pedido em execução. Sem rota de nota/aditivo na API. |
-| Responder disputa e atender retrabalho | Demo, ligadas pela notificação | Abertas pelo toque na notificação (tipos `disputa` e `retrabalho`). Falta a entrada pela lista de pedidos do profissional e a rota na API. |
+| Responder disputa e atender retrabalho | Demo, ligadas | Pela notificação (tipos `disputa` e `retrabalho`) e pelas ações do pedido de hoje na Início. Falta a rota na API (o id do pedido faz de id da disputa na demonstração). |
 | Carteira | API, como extrato | `GET /v1/extrato`. Sem saldo próprio e sem saque (D15). |
-| Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional. |
+| Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional, com botão **Sair**. |
 | Agenda, mensagens do profissional | Sem tela | "Em breve". |
 
 ## Backend (`backend/`)
@@ -82,7 +85,7 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 
 ## Próximos passos técnicos (sem depender do João)
 
-1. ~~Token do Supabase Auth no `SessaoTrato`~~ feito (`LigacaoSessao`). ~~Pontos de entrada~~ feitos, menos disputa/retrabalho pela lista de pedidos do profissional.
+1. ~~Token do Supabase Auth no `SessaoTrato`~~ feito (`LigacaoSessao`). ~~Pontos de entrada~~ feitos; renovação do token e 401 feitos.
 3. Criar as rotas que faltam no backend (orçamentos, cobrança, mensagens, notificações, perfil, pedidos abertos, verificação).
 4. Envio de fotos e posição ao backend (buckets por URL assinada): implementar `EnvioMidia` quando a rota existir. Câmera e GPS já capturam; textos de permissão em `AndroidManifest.xml` e `Info.plist`. Não testado em aparelho real.
 5. ~~Busca de textos proibidos (D13) no `verificar`~~ feita.

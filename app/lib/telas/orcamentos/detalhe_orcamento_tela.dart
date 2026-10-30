@@ -20,12 +20,16 @@ class DetalheOrcamentoTela extends StatefulWidget {
     this.aoAceitar,
     this.aoFazerContraproposta,
     this.aoConversar,
+    this.aoVerPerfil,
   });
 
   final Orcamento orcamento;
   final ValueChanged<Orcamento>? aoAceitar;
   final ValueChanged<Orcamento>? aoFazerContraproposta;
   final ValueChanged<Orcamento>? aoConversar;
+
+  /// Abre o perfil público do profissional. Sem ele, o link não aparece.
+  final ValueChanged<Orcamento>? aoVerPerfil;
 
   @override
   State<DetalheOrcamentoTela> createState() => _DetalheOrcamentoTelaState();
@@ -105,6 +109,11 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             ),
           ],
         ),
+        if (widget.aoVerPerfil != null)
+          BotaoLink(
+            texto: 'Ver perfil de ${o.profissional}',
+            aoTocar: () => widget.aoVerPerfil!(o),
+          ),
         const SizedBox(height: EspacosTrato.x4),
         CartaoTrato(
           child: Column(

@@ -40,28 +40,38 @@ class ClienteApi {
     Object? corpo,
     String? chaveIdempotencia,
   }) async {
-    final pedido = http.Request(metodo, _uri(caminho, consulta))
-      ..headers['Accept'] = 'application/json';
-    final token = sessao.token;
-    if (token != null && token.isNotEmpty) {
-      pedido.headers['Authorization'] = 'Bearer $token';
+    Future<http.Response> tentar() async {
+      final pedido = http.Request(metodo, _uri(caminho, consulta))
+        ..headers['Accept'] = 'application/json';
+      final token = sessao.token;
+      if (token != null && token.isNotEmpty) {
+        pedido.headers['Authorization'] = 'Bearer $token';
+      }
+      if (chaveIdempotencia != null) {
+        pedido.headers['Idempotency-Key'] = chaveIdempotencia;
+      }
+      if (corpo != null) {
+        pedido.headers['Content-Type'] = 'application/json; charset=utf-8';
+        pedido.body = jsonEncode(corpo);
+      }
+      try {
+        return await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
+      } on TimeoutException {
+        throw ErroTrato.semInternet;
+      } on SocketException {
+        throw ErroTrato.semInternet;
+      } on http.ClientException {
+        throw ErroTrato.semInternet;
+      }
     }
-    if (chaveIdempotencia != null) {
-      pedido.headers['Idempotency-Key'] = chaveIdempotencia;
-    }
-    if (corpo != null) {
-      pedido.headers['Content-Type'] = 'application/json; charset=utf-8';
-      pedido.body = jsonEncode(corpo);
-    }
-    final http.Response resposta;
-    try {
-      resposta = await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
-    } on TimeoutException {
-      throw ErroTrato.semInternet;
-    } on SocketException {
-      throw ErroTrato.semInternet;
-    } on http.ClientException {
-      throw ErroTrato.semInternet;
+
+    var resposta = await tentar();
+    // 401 com sessão: tenta renovar o token uma vez e repete a chamada (mesma chave de
+    // idempotência, então não duplica). Se não renovar, `_tratar` limpa a sessão.
+    if (resposta.statusCode == 401 && sessao.logada) {
+      final anterior = sessao.token;
+      final novo = await sessao.renovarToken();
+      if (novo != null && novo != anterior) resposta = await tentar();
     }
     return _tratar(resposta);
   }

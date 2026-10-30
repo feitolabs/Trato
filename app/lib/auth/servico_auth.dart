@@ -12,12 +12,18 @@ class SessaoAuth {
     required this.email,
     this.nome,
     this.celularConfirmado = false,
+    this.perfil,
   });
 
   final String id;
   final String email;
   final String? nome;
   final bool celularConfirmado;
+
+  /// Perfil escolhido no cadastro: `cliente` ou `profissional`. Nulo = cliente.
+  final String? perfil;
+
+  bool get ehProfissional => perfil == 'profissional';
 }
 
 /// Dados do cadastro (passo 1). CPF e nascimento não vão para o serviço de login:
@@ -28,6 +34,7 @@ class DadosCadastro {
     required this.email,
     required this.senha,
     required this.celular,
+    this.perfil,
   });
 
   final String nome;
@@ -36,6 +43,9 @@ class DadosCadastro {
 
   /// Como digitado, ex.: "(31) 98765-4417".
   final String celular;
+
+  /// `cliente` ou `profissional` (escolha da tela "Como você quer usar o Trato?").
+  final String? perfil;
 }
 
 enum TipoErroAuth {
@@ -99,6 +109,10 @@ abstract class ServicoAuth {
   /// Token de acesso da sessão atual, para a API. Só quem liga a sessão ao cliente HTTP
   /// ([LigacaoSessao]) deve ler; nunca vai para log, tela ou código.
   String? get tokenAtual;
+
+  /// Pede um token novo (o de acesso venceu ou a API recusou). Devolve o novo token, ou nulo
+  /// se não há como renovar (a sessão acabou). Usado pelo cliente HTTP uma vez por 401.
+  Future<String?> renovarToken();
 
   Future<SessaoAuth> entrarComEmail({required String email, required String senha});
 
