@@ -27,6 +27,18 @@ Não inventar regra: enquanto estiver aqui, não implementar.
 | P18 | **Decreto 13.135/2026 (SAC):** entrada em vigor indicada para 2/11/2026; fala de atendimento humano e dados dos modelos de atendimento à Senacon. O Trato se enquadra? Quais obrigações e prazos antes do lançamento? Perguntar ao advogado do consumidor. Não reconferi o texto. | Auditoria V2 seção 7 | Central de ajuda; operação |
 | P19 | **Responsáveis e datas dos bloqueios de lançamento:** a V2 (seção 7) pede dono e data para fluxo financeiro, preço e margem, regra única de serviço, responsabilidade e promessa, dados e verificação, atendimento e escopo geográfico, antes do primeiro pagamento real. | Auditoria V2 seção 7 | Go/no-go do piloto |
 
+## Sobras da revisão de segurança (30/10/2026)
+
+Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `docs/roteiro-testes-reais.md`.
+
+- **PRECISO DO SEU OK (migration, só em arquivo):** `20261030140000_b2_grants_por_coluna.sql` (B2). Seguem aguardando OK
+  `20261030000000_fix_acesso_…` e `20261030120000_ordens_estorno.sql`.
+- **Decisão sua:** B6 (um papel por conta), código de 6 dígitos (A1), CPF em claro ou só hash (M11), retenção de
+  documentos (A8, advogado).
+- **Depende de ambiente real:** rodar `harness/teste_real_rls.py`, `teste_real_webhook.py` e `teste_real_banco.py` com as suas chaves.
+- **Técnico aberto:** ligar `ServicoPagamento` na fábrica Postgres (depende de P7 e da sessão `backend-divergencias`);
+  aviso ao cliente no bloqueio do código; lock com hash do backend; contadores em Redis se houver mais de uma instância.
+
 ## Para advogado e contador (o agente não decide)
 
 - Custódia do valor retido: exige instituição de pagamento autorizada? (Stripe cobre?) A V2 reforça: split não é custódia; ver enquadramento no BCB.
