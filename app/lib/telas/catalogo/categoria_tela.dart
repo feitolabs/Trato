@@ -36,7 +36,9 @@ class _CategoriaTelaState extends State<CategoriaTela> {
   var _filtro = const FiltroProfissionais();
   late Future<List<Profissional>> _futuro = widget.carregar(_filtro);
 
-  void _recarregar() => setState(() => _futuro = widget.carregar(_filtro));
+  void _recarregar() => setState(() {
+        _futuro = widget.carregar(_filtro);
+      });
 
   Future<void> _filtros() async {
     final novo = await mostrarFiltrosProfissionais(context, atual: _filtro);

@@ -429,11 +429,13 @@ abstract final class RotasTrato {
   // --- Profissional ------------------------------------------------------------------
 
   @visibleForTesting
-  static Widget cascaProfissionalParaTeste() => _cascaProfissional();
+  static Widget cascaProfissionalParaTeste({int abaInicial = 0}) =>
+      _cascaProfissional(abaInicial: abaInicial);
 
-  static Widget _cascaProfissional() => Carregador<InicioProfissional>(
+  static Widget _cascaProfissional({int abaInicial = 0}) => Carregador<InicioProfissional>(
         carregar: repos.profissional.inicio,
         construir: (context, inicio) => CascaProfissionalTela(
+          abaInicial: abaInicial,
           inicio: inicio,
           carregarDetalhe: (pedido) => repos.profissional.detalhe(pedido.id),
           recusarPedido: (pedido, motivo) => _tentar(
@@ -1011,7 +1013,7 @@ class _PerfilAoAbrirState extends State<_PerfilAoAbrir> {
       if (!mounted) return;
       final navegador = Navigator.of(context);
       await RotasTrato.abrirPerfilDoOrcamento(context, widget.orcamento);
-      if (mounted) navegador.maybePop();
+      if (mounted && (ModalRoute.of(context)?.isActive ?? false)) navegador.pop();
     });
   }
 
