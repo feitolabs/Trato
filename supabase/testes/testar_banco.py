@@ -78,6 +78,7 @@ CONSULTAS_ESTADO = [
     """select 'default_acl '||coalesce(defaclnamespace::regnamespace::text,'')||' '||defaclobjtype::text||' '||defaclacl::text
          from pg_default_acl""",
     """select 'bucket '||id from storage.buckets""",
+    """select 'evento '||evtname from pg_event_trigger""",
 ]
 
 
@@ -166,17 +167,24 @@ def suite(b, rodada):
     b.exec("insert into storage.objects(bucket_id, name) values ('verificacao', %s)", (f"{PX}/{ver}/selfie.jpg",))
 
     print("\n== (c) Documentos de verificação ==")
-    for chave, esperado in [("cad", 1), ("n1", 0), ("n2", 0), ("med", 0), ("fin", 0), ("seg", 0), ("adm", 0),
+    # A8 (fix de acesso): NINGUÉM lê documento direto, nem a equipe de cadastro. A leitura é só
+    # por URL assinada do backend (service_role), com motivo e registro de quem viu.
+    for chave, esperado in [("cad", 0), ("n1", 0), ("n2", 0), ("med", 0), ("fin", 0), ("seg", 0), ("adm", 0),
                             ("dpo", 0), ("P1", 0), ("A", 0)]:
-        n = len(b.ve(S[chave], "select id from verificacao_documentos"))
+        r = b.tenta(S[chave], "select id from verificacao_documentos")
+        n = len(r[1]) if r[0] == "ok" else 0  # sem o grant de SELECT o banco recusa: também é "não vê"
         verifica(f"documentos: {chave} " + ("vê" if esperado else "não vê"), (n >= 1) if esperado else (n == 0), f"viu {n}")
-    verifica("documentos: o próprio profissional não lê de volta", len(b.ve(str(PX), "select id from verificacao_documentos")) == 0)
+    verifica("documentos: o backend (service_role) lê para assinar a URL curta",
+             len(b.ve(None, "select id from verificacao_documentos", papel="service_role")) >= 1)
+    verifica("documentos: a equipe de cadastro nem tem o grant de SELECT na tabela",
+             tem_erro(b.tenta(S["cad"], "select storage_path from verificacao_documentos")[1], "permission denied"))
+    verifica("documentos: o próprio profissional não lê de volta", b.tenta(str(PX), "select id from verificacao_documentos")[0] == "erro")
     verifica("documentos: anon recusado", b.tenta(None, "select * from verificacao_documentos", papel="anon")[0] == "erro")
     verifica("verificação: profissional vê a própria", len(b.ve(str(PX), "select id from verificacoes")) == 1)
     verifica("verificação: outro profissional não vê", len(b.ve(S["P1"], "select id from verificacoes")) == 0)
     verifica("verificação: analista_id/fornecedor_ref ocultos do app",
              tem_erro(b.tenta(str(PX), "select analista_id from verificacoes")[1], "permission denied"))
-    for chave, esperado in [("cad", 1), ("n1", 0), ("med", 0), ("fin", 0), ("adm", 0), ("P1", 0), ("A", 0)]:
+    for chave, esperado in [("cad", 0), ("n1", 0), ("med", 0), ("fin", 0), ("adm", 0), ("P1", 0), ("A", 0)]:
         n = len(b.ve(S[chave], "select name from storage.objects where bucket_id='verificacao'"))
         verifica(f"storage verificacao: {chave} " + ("lê" if esperado else "não lê"), n == esperado, f"viu {n}")
 
@@ -283,8 +291,14 @@ def suite(b, rodada):
     verifica("P1 contratado e endereço liberado: vê o endereço de PA",
              b.ve(S["P1"], "select logradouro from pedidos_endereco where pedido_id=%s", (PA,))[0][0].startswith("Rua das Flores"))
     verifica("P5 (orçou e perdeu) não vê o endereço", len(b.ve(S["P5"], "select 1 from pedidos_endereco")) == 0)
-    verifica("P5 ainda enxerga o pedido (tem orçamento), sem endereço",
-             PA in {r[0] for r in b.ve(S["P5"], "select id from pedidos")})
+    verifica("M7: P5 (orçou e perdeu) NÃO enxerga mais o pedido depois do contrato com P1",
+             PA not in {r[0] for r in b.ve(S["P5"], "select id from pedidos")})
+    verifica("M7: P1 (contratado) e A (dono) seguem vendo o pedido",
+             all(PA in {r[0] for r in b.ve(S[c], "select id from pedidos")} for c in ("P1", "A")))
+    verifica("M7: P5 não lê as respostas do pedido que perdeu",
+             len(b.ve(S["P5"], "select 1 from pedido_respostas where pedido_id=%s", (PA,))) == 0)
+    verifica("M7: a equipe de atendimento segue vendo o pedido",
+             PA in {r[0] for r in b.ve(S["n1"], "select id from pedidos")})
     verifica("P4 (contratado por B) não vê o endereço de PA", len(b.ve(S["P4"], "select 1 from pedidos_endereco where pedido_id=%s", (PA,))) == 0)
     verifica("P4 vê o endereço do pedido que ele contratou (PB)", len(b.ve(S["P4"], "select 1 from pedidos_endereco where pedido_id=%s", (PB,))) == 1)
     verifica("P2 e P3 nunca veem endereço", len(b.ve(S["P2"], "select 1 from pedidos_endereco")) + len(b.ve(S["P3"], "select 1 from pedidos_endereco")) == 0)
@@ -687,7 +701,7 @@ def suite(b, rodada):
     print("\n== Equipe de atendimento: o que pode ==")
     verifica("N1 consulta pedido, contrato e pagamento", all(len(b.ve(S["n1"], f"select 1 from {t}")) > 0 for t in ("pedidos", "contratos", "pagamentos")))
     verifica("N1 não vê documentos, ledger, webhooks, chat nem endereço",
-             sum(len(b.ve(S["n1"], f"select 1 from {t}")) for t in ("verificacao_documentos", "partidas", "eventos_webhook", "mensagens", "pedidos_endereco")) == 0)
+             sum(len(b.ve(S["n1"], f"select 1 from {t}")) for t in ("partidas", "eventos_webhook", "mensagens", "pedidos_endereco")) == 0)
     verifica("moderador não vê dados financeiros",
              sum(len(b.ve(S["mod"], f"select 1 from {t}")) for t in ("pagamentos", "partidas", "eventos_webhook", "repasses", "contratos")) == 0)
     verifica("cadastro não vê pedido, pagamento nem repasse",
@@ -700,7 +714,8 @@ def suite(b, rodada):
     cx = "select name from storage.objects where bucket_id='chat-anexos'"
     verifica("buckets existem e são todos privados",
              b.um("select count(*) from storage.buckets where id in ('verificacao','pedido-midias','chat-anexos','avatar') and public = false") == 4)
-    verifica("foto do pedido: A, P1 e P5 (que orçou) leem", all(len(b.ve(S[c], pm)) == 1 for c in ("A", "P1", "P5")))
+    verifica("foto do pedido: A e P1 leem; P5 (orçou e perdeu) não lê mais (M7)",
+             all(len(b.ve(S[c], pm)) == 1 for c in ("A", "P1")) and len(b.ve(S["P5"], pm)) == 0)
     verifica("foto do pedido: B, P2, P3 e PX não leem", sum(len(b.ve(S[c], pm)) for c in ("B", "P2", "P3")) + len(b.ve(str(PX), pm)) == 0)
     verifica("foto do pedido: anon não lê", b.tenta(None, pm, papel="anon")[0] == "erro" or len(b.ve(None, pm, papel="anon")) == 0)
     verifica("chat: A e P1 leem o anexo da conversa deles; P5 não", len(b.ve(S["A"], cx)) == 1 and len(b.ve(S["P1"], cx)) == 1 and len(b.ve(S["P5"], cx)) == 0)
@@ -712,6 +727,32 @@ def suite(b, rodada):
     verifica("app não apaga nem altera arquivos do Storage",
              len(b.ve(S["A"], "update storage.objects set name = name || 'x' where bucket_id='pedido-midias' returning 1")) == 0
              and len(b.ve(S["A"], "delete from storage.objects where bucket_id='pedido-midias' returning 1")) == 0)
+
+    print("\n== Fix de acesso: M6 (Storage e tabelas futuras) e M7 (histórico do pedido) ==")
+    # M6: com uma policy permissiva de teste, só a restritiva `conta_ativa_obrigatoria` separa A de D.
+    b.exec("insert into storage.objects(bucket_id, name) values ('avatar', %s)", (f"{S['D']}/m6.jpg",))
+    b.exec("create policy teste_m6_aberta on storage.objects for select to authenticated using (bucket_id = 'avatar')")
+    verifica("M6: conta ativa lê o Storage quando a policy permite",
+             len(b.ve(S["A"], "select name from storage.objects where bucket_id='avatar'")) >= 1)
+    verifica("M6: conta bloqueada NÃO lê o Storage nem quando a policy permite",
+             len(b.ve(S["D"], "select name from storage.objects where bucket_id='avatar'")) == 0)
+    b.exec("drop policy teste_m6_aberta on storage.objects")
+    b.exec("create table public.tabela_futura_teste (id int)")
+    verifica("M6: tabela criada DEPOIS nasce com RLS e a policy restritiva (gatilho de evento)",
+             b.um("select relrowsecurity from pg_class where oid = 'public.tabela_futura_teste'::regclass") is True
+             and b.um("select count(*) from pg_policies where tablename='tabela_futura_teste' "
+                      "and policyname='conta_ativa_obrigatoria' and permissive='RESTRICTIVE'") == 1)
+    b.exec("drop table public.tabela_futura_teste")
+    verifica("M6: toda tabela de public tem a policy restritiva",
+             b.um("select count(*) from pg_tables t where schemaname='public' and not exists "
+                  "(select 1 from pg_policies p where p.schemaname='public' and p.tablename=t.tablename "
+                  "and p.policyname='conta_ativa_obrigatoria')") == 0)
+    # M7: histórico (prova em JSON) só das partes e da equipe
+    b.exec("insert into pedido_historico(pedido_id, de_status, para_status) values (%s,'orcamento_aceito','agendado')", (PA,))
+    verifica("M7: histórico do pedido: A, P1 (contratado) e a equipe de atendimento leem",
+             all(len(b.ve(S[c], "select 1 from pedido_historico where pedido_id=%s", (PA,))) >= 1 for c in ("A", "P1", "n1", "fin", "med")))
+    verifica("M7: histórico do pedido: P5 (perdeu), B, P2 e cadastro NÃO leem",
+             sum(len(b.ve(S[c], "select 1 from pedido_historico where pedido_id=%s", (PA,))) for c in ("P5", "B", "P2", "cad")) == 0)
     b.exec("update usuarios set foto_path=%s where id=%s", (f"{S['P1']}/avatar.png", S["P1"]))
     b.exec("insert into storage.objects(bucket_id, name) values ('avatar', %s)", (f"{S['P1']}/avatar.png",))
     verifica("avatar: A vê a foto de P1 (profissional aprovado)",
@@ -742,7 +783,8 @@ def seguranca_global(b):
     verifica("só policies de SELECT (o app não escreve)", b.um("select count(*) from pg_policies where cmd <> 'SELECT'") == 0)
     sem_pol = [t for t in tabelas if b.um("select count(*) from pg_policies where schemaname='public' and tablename=%s and permissive='PERMISSIVE'", (t,)) == 0]
     print(f"      (tabelas sem policy permissiva = ninguém do app lê: {sem_pol})")
-    verifica("somente tabelas de uso exclusivo do backend ficam sem policy de leitura", set(sem_pol) == set(), str(sem_pol))
+    verifica("somente tabelas de uso exclusivo do backend ficam sem policy de leitura", set(sem_pol) == {"agendador_execucoes", "dispositivos_push", "verificacao_documentos"}, str(sem_pol))
+    # (as 2 primeiras são do agendador/push, só do backend; verificacao_documentos virou só-backend no fix de acesso, A8)
     sd = b.exec("""select n.nspname||'.'||p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
                     where n.nspname in ('public','privado') and p.prosecdef
                       and not (coalesce(p.proconfig, '{}') @> array['search_path=""'])""")
@@ -789,7 +831,8 @@ def main():
         print(b.um("select version()")[:45])
         passos = [m for m in b.migrations if not any(k in m.name for k in ("f32_", "revogar_execute"))]
         rollback_de = {"f33": "F3.3", "f34": "F3.4", "f35": "F3.5", "f36": "F3.6", "f37": "F3.7",
-                       "f38a": "F3.8a", "f38b": "F3.8b", "f38c": "F3.8c"}
+                       "f38a": "F3.8a", "f38b": "F3.8b", "f38c": "F3.8c",
+                       "notificacoes": "notificacoes_dispositivos", "fix_acesso": "fix_acesso"}
 
         def sigla(m):
             return [v for k, v in rollback_de.items() if f"_{k}_" in m.name][0]

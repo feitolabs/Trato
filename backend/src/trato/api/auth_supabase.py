@@ -28,7 +28,10 @@ class ProvedorAuthSupabase:
         jwks_url: str = "",
         audiencia: str = "authenticated",
         criar_no_primeiro_login: bool = True,
+        emissor: str = "",
     ) -> None:
+        # B1: com o emissor configurado (`<SUPABASE_URL>/auth/v1`), token de outro projeto cai.
+        self._emissor = emissor
         self._usuarios = usuarios
         self._criar_no_primeiro_login = criar_no_primeiro_login
         self._segredo = segredo_hs256
@@ -51,7 +54,8 @@ class ProvedorAuthSupabase:
             chave,
             algorithms=[algoritmo],
             audience=self._audiencia,
-            options={"require": ["exp", "sub"]},
+            issuer=self._emissor or None,
+            options={"require": ["exp", "sub", *(["iss"] if self._emissor else [])]},
         )
 
     def autenticar(self, token: str) -> Usuario | None:

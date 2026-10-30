@@ -66,6 +66,7 @@ def criar_contexto_postgres(
             usuarios,
             segredo_hs256=config.supabase_jwt_secret.get_secret_value,
             jwks_url=config.supabase_jwks_url,
+            emissor=f"{config.supabase_url.rstrip('/')}/auth/v1" if config.supabase_url else "",
         )
     conversas = ConversasPostgres(banco)
     notificacoes = NotificacoesPostgres(banco)
