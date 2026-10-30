@@ -118,6 +118,32 @@ class ConfigSeguranca(BaseSettings):
     limite_taxa_ativo: bool = True
     limites: list[RegraLimite] = Field(default_factory=_limites_padrao)
 
+    # --- Código de 4 dígitos do check-in/check-out (A1) ---------------------------------
+    # Por agendamento: tantos erros seguidos bloqueiam o código por um tempo. Depois do erro
+    # `codigo_erros_sem_espera` há espera crescente (backoff) entre as tentativas.
+    codigo_max_erros_agendamento: int = Field(default=5, gt=0)
+    codigo_janela_s: int = Field(default=86_400, gt=0)  # erros dos últimos 24 h contam
+    codigo_bloqueio_s: int = Field(default=900, ge=0)
+    codigo_erros_sem_espera: int = Field(default=2, ge=0)
+    codigo_backoff_base_s: int = Field(default=10, ge=0)
+    codigo_backoff_fator: float = Field(default=2.0, ge=1.0)
+    codigo_backoff_teto_s: int = Field(default=300, ge=0)
+    # Por IP (somando todos os agendamentos): contém quem testa vários pedidos.
+    codigo_max_erros_ip: int = Field(default=20, gt=0)
+    codigo_janela_ip_s: int = Field(default=3600, gt=0)
+    codigo_bloqueio_ip_s: int = Field(default=3600, ge=0)
+
+    # --- Ambiente e documentação (M12) ---------------------------------------------------
+    # /docs, /redoc e /openapi.json só existem nestes ambientes (TRATO_AMBIENTE).
+    ambientes_com_docs: list[str] = Field(
+        default_factory=lambda: ["desenvolvimento", "dev", "local", "teste"]
+    )
+
+    # --- Texto livre (M9) ----------------------------------------------------------------
+    etiqueta_max_chars: int = Field(default=40, gt=0)
+    etiquetas_max: int = Field(default=8, gt=0)
+    comentario_max_chars: int = Field(default=1000, gt=0)
+
     # --- SMS pumping (D14: SMS só na confirmação do celular) ----------------------------
     sms_ddis_permitidos: list[str] = Field(default_factory=lambda: ["55"])
     sms_max_por_numero_hora: int = Field(default=3, gt=0)

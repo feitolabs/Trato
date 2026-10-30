@@ -13,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
+from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.repositorios_app import (
@@ -162,8 +163,27 @@ class AvaliarIn(_Entrada):
 # --- Acesso -----------------------------------------------------------------------------
 
 
-def _pedido_visivel(contexto: Contexto, pedido_id: str, usuario: Usuario) -> Pedido:
-    """Como `carregar_pedido`, mas o profissional também vê pedido ABERTO (para orçar/conversar)."""
+def _pedido_visivel(
+    contexto: Contexto,
+    pedido_id: str,
+    usuario: Usuario,
+    request: Request | None = None,
+    *,
+    equipe: tuple[Permissao, ...] = (),
+    consulta: str = "pedido",
+    com_disputa: bool = False,
+) -> Pedido:
+    """Como `carregar_pedido`, mas o profissional também vê pedido ABERTO (para orçar/conversar).
+
+    A equipe só passa pela matriz de permissões (`equipe=`); `com_disputa` ainda exige que o
+    pedido tenha disputa (o chat só é do mediador que está julgando)."""
+    if usuario.papel is PapelUsuario.EQUIPE:
+        pedido = carregar_pedido(
+            contexto, pedido_id, usuario, request=request, equipe=equipe, consulta=consulta
+        )
+        if com_disputa and contexto.disputas.obter(pedido.id) is None:
+            raise HTTPException(403, "Seu papel na equipe não permite isso.")
+        return pedido
     pedido = contexto.pedidos.obter(pedido_id)
     if pedido is None:
         raise HTTPException(404, "Pedido não encontrado.")
@@ -185,10 +205,18 @@ def _pedido_visivel(contexto: Contexto, pedido_id: str, usuario: Usuario) -> Ped
 )
 def listar_orcamentos(
     pedido_id: str,
+    request: Request,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[OrcamentoOut]:
-    pedido = _pedido_visivel(contexto, pedido_id, usuario)
+    pedido = _pedido_visivel(
+        contexto,
+        pedido_id,
+        usuario,
+        request,
+        equipe=(Permissao.PEDIDOS_BUSCAR,),
+        consulta="orcamentos",
+    )
     itens = contexto.orcamentos.do_pedido(pedido.id)
     if usuario.papel is PapelUsuario.PROFISSIONAL:
         itens = [o for o in itens if o.profissional_id == usuario.id]
@@ -220,7 +248,14 @@ def valores_do_pagamento(
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.EQUIPE)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PagamentoValoresOut:
-    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    pedido = carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.PAGAMENTOS_VER,),
+        consulta="pagamento",
+    )
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
     servico = getattr(request.app.state, "servico_pagamento", None)
@@ -311,11 +346,20 @@ def _mensagens_out(contexto: Contexto, conversa: str, usuario: Usuario) -> list[
 )
 def listar_mensagens(
     pedido_id: str,
+    request: Request,
     profissional_id: Annotated[str | None, Query()] = None,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[MensagemOut]:
-    pedido = _pedido_visivel(contexto, pedido_id, usuario)
+    pedido = _pedido_visivel(
+        contexto,
+        pedido_id,
+        usuario,
+        request,
+        equipe=(Permissao.DISPUTAS_DECIDIR,),
+        consulta="chat",
+        com_disputa=True,
+    )
     conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
     return _mensagens_out(contexto, conversa, usuario)
 

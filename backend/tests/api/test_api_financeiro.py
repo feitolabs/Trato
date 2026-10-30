@@ -24,7 +24,7 @@ def test_saldo_do_pedido_com_dinheiro_retido(amb):
     amb.semear_pedido(Estado.PAGO_E_RETIDO)
     amb.semear_dinheiro(30_000)
 
-    corpo = amb.cliente.get("/v1/pedidos/ped-1/saldo", headers=cab("t-equipe")).json()
+    corpo = amb.cliente.get("/v1/pedidos/ped-1/saldo", headers=cab("t-financeiro")).json()
 
     assert corpo["retido_centavos"] == 30_000
 

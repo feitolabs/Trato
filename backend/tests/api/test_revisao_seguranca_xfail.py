@@ -59,12 +59,6 @@ def test_c1_modo_postgres_nao_guarda_dinheiro_em_memoria():
 # --- A1 (alto): código de 4 dígitos sem limite de tentativas ----------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A1: não há limite de tentativas do código de check-in/out (10 mil combinações): "
-    "o profissional acerta por força bruta (pedidos/estados.py:479, api/rotas_pedidos.py:445).",
-)
 def test_a1_codigo_certo_e_recusado_depois_de_muitos_erros(amb):
     amb.semear_pedido(
         Estado.AGENDADO,
@@ -82,22 +76,21 @@ def test_a1_codigo_certo_e_recusado_depois_de_muitos_erros(amb):
             "/v1/pedidos/ped-1/acoes/fazer_check_in", json={"prova": prova}, headers=cab("t-prof")
         )
 
+    respostas = []
     for n in range(30):  # 30 palpites errados seguidos
-        assert tentar(f"{n:04d}" if f"{n:04d}" != "4321" else "9999").status_code == 422
+        respostas.append(tentar(f"{n:04d}" if f"{n:04d}" != "4321" else "9999").status_code)
 
-    # Esperado: bloqueado (423/429). Hoje: o código certo passa e o pedido começa.
+    # Os primeiros erros ainda respondem 422; depois o limite (espera/bloqueio) responde 429.
+    assert respostas[0] == 422
+    assert set(respostas) <= {422, 429}
+    assert respostas.count(422) < 30
+    # O código CERTO também é recusado enquanto está bloqueado.
     assert tentar("4321").status_code in (403, 423, 429)
 
 
 # --- A2 (alto): equipe sem permissão lê o dinheiro dos pedidos --------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A2: carregar_pedido() deixa QUALQUER usuário de equipe ler pedido, saldo, extrato e "
-    "cobranças, sem passar pela matriz de permissões (api/servicos.py:13-16).",
-)
 @pytest.mark.parametrize("caminho", ["saldo", "extrato"])
 def test_a2_equipe_sem_permissao_nao_le_financeiro(amb, caminho):
     amb.semear_pedido(Estado.PAGO_E_RETIDO)
@@ -109,13 +102,6 @@ def test_a2_equipe_sem_permissao_nao_le_financeiro(amb, caminho):
     assert r.status_code == 403
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A2: GET /v1/pedidos/{id}/mensagens?profissional_id=... deixa qualquer equipe ler o "
-    "chat de qualquer pedido (api/rotas_app.py:276-285); o modelo só dá chat ao mediador "
-    "com disputa.",
-)
 def test_a2_equipe_sem_permissao_nao_le_chat(amb):
     amb.semear_pedido(Estado.PAGO_E_RETIDO)
     amb.contexto.conversas.abrir("ped-1", "pro-1")
@@ -244,13 +230,6 @@ def test_a5_refazer_a_decisao_nao_planeja_dinheiro_de_novo(amb):
 # --- A2 (continuação): decisão de disputa pela rota do app ------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A2: POST /v1/pedidos/{id}/disputa/decisao só exige papel EQUIPE "
-    "(api/rotas_pagamento.py:216-220): qualquer subpapel decide e move dinheiro, com a alçada "
-    "global e sem auditoria. A permissão certa é DISPUTAS_DECIDIR (api/admin/papeis.py).",
-)
 def test_a2_equipe_sem_permissao_nao_decide_disputa(fluxo: Fluxo):  # noqa: F811
     pid = fluxo.ate_em_confirmacao()
     _abrir_e_responder_disputa(fluxo, pid)
@@ -283,10 +262,10 @@ def test_a7_falha_no_ledger_depois_do_estorno_pode_ser_repetida(fluxo: Fluxo):  
 
     fluxo.ctx.ledger.lancar_varios = falha
     with pytest.raises(RuntimeError):
-        fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-equipe", decisao)
+        fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     fluxo.ctx.ledger.lancar_varios = original  # o banco voltou
 
-    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-equipe", decisao)
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
 
     assert r.status_code == 200
     assert VALOR == 100_000
@@ -312,13 +291,10 @@ def test_a6_atualizacao_do_pedido_confere_o_estado_anterior():
 # --- A8 (alto): documentos de verificação lidos direto pela equipe ---------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=(AssertionError, ChaveReutilizada),
-    reason="A8: a equipe de cadastro lê o bucket `verificacao` direto (policy "
-    "trato_verificacao_leitura, migration F3.8c) e a tabela verificacao_documentos: leitura sem "
-    "log de quem/quando/por quê (R1 em docs/seguranca-banco.md).",
-)
 def test_a8_equipe_nao_le_documentos_direto_no_storage():
-    sql = (RAIZ / "supabase/migrations/20261029030700_f38c_storage.sql").read_text(encoding="utf-8")
-    assert "trato_verificacao_leitura" not in sql
+    # As migrations já aplicadas não mudam: o fechamento vem em migration NOVA (em arquivo).
+    novas = sorted((RAIZ / "supabase/migrations").glob("*_fix_acesso_*.sql"))
+    assert novas, "migration nova do fix-acesso não encontrada"
+    sql = "\n".join(p.read_text(encoding="utf-8") for p in novas)
+    assert "drop policy if exists trato_verificacao_leitura on storage.objects" in sql
+    assert "drop policy if exists verificacao_documentos_select on public.verificacao_documentos" in sql

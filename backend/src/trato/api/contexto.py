@@ -91,8 +91,21 @@ class Contexto:
     taxa: ProvedorTaxa | None = None
     # Só existem com persistência Postgres (a memória não os implementa).
     extras: dict[str, Any] = field(default_factory=dict)
+    # Limite de tentativas do código de check-in/out (A1). Padrão: contadores em memória com a
+    # configuração `TRATO_SEG_CODIGO_*` e o relógio do contexto.
+    limite_codigo: Any = None
 
     def __post_init__(self) -> None:
+        if self.limite_codigo is None:
+            from trato.seguranca.config import obter_config_seguranca
+            from trato.seguranca.contadores import Contadores
+            from trato.seguranca.tentativas_codigo import LimiteCodigo
+
+            self.limite_codigo = LimiteCodigo(
+                obter_config_seguranca(),
+                Contadores(lambda: self.agora().timestamp()),
+                lambda: self.extras.get("auditoria"),
+            )
         # Antes da contratação a conversa mascara contatos: a memória pergunta ao repositório.
         if isinstance(self.conversas, ConversasEmMemoria) and self.conversas.contratado is None:
             self.conversas.contratado = lambda pid: self.contratos.obter_do_pedido(pid) is not None

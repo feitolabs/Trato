@@ -9,6 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from trato.api import Contexto, criar_app
+from trato.api.admin import AdminContexto, instalar_admin
+from trato.api.admin.memoria import AuditoriaEmMemoria as AuditoriaAdminEmMemoria
+from trato.api.admin.memoria import EquipeEmMemoria
+from trato.api.admin.papeis import PapelEquipe
+from trato.api.admin.repositorios import MembroEquipe
 from trato.api.auth import PapelUsuario, ProvedorAuthFalso, Usuario
 from trato.api.memoria import (
     ConfigEmMemoria,
@@ -35,7 +40,19 @@ PROFISSIONAL = Usuario("pro-1", PapelUsuario.PROFISSIONAL)
 OUTRO_PROFISSIONAL = Usuario("pro-2", PapelUsuario.PROFISSIONAL)
 EQUIPE = Usuario("eq-1", PapelUsuario.EQUIPE)
 
+# Equipe com papel real na tabela `equipe` (EQUIPE acima, "eq-1", NÃO está na tabela: sem poder).
+MEMBROS_EQUIPE = {
+    "t-mediador": MembroEquipe("eq-med", PapelEquipe.MEDIADOR, alcada_centavos=10**9),
+    "t-financeiro": MembroEquipe("eq-fin", PapelEquipe.FINANCEIRO),
+    "t-n1": MembroEquipe("eq-n1", PapelEquipe.ATENDENTE_N1),
+    "t-moderador": MembroEquipe("eq-mod", PapelEquipe.MODERADOR),
+    "t-juridico": MembroEquipe("eq-jur", PapelEquipe.JURIDICO),
+    "t-cadastro": MembroEquipe("eq-cad", PapelEquipe.CADASTRO),
+    "t-seguranca": MembroEquipe("eq-seg", PapelEquipe.SEGURANCA),
+}
+
 TOKENS = {
+    **{t: Usuario(m.usuario_id, PapelUsuario.EQUIPE) for t, m in MEMBROS_EQUIPE.items()},
     "t-cliente": CLIENTE,
     "t-outro-cliente": OUTRO_CLIENTE,
     "t-prof": PROFISSIONAL,
@@ -64,6 +81,7 @@ class Ambiente:
     cliente: TestClient
     contexto: Contexto
     relogio: Relogio
+    admin: AdminContexto | None = None
 
     def semear_pedido(self, estado: Estado, **campos) -> Pedido:
         base = Pedido(
@@ -123,7 +141,19 @@ def amb() -> Ambiente:
         agora=relogio,
         segredo_webhook=lambda: SEGREDO_WEBHOOK,
     )
-    return Ambiente(TestClient(criar_app(contexto)), contexto, relogio)
+    app = criar_app(contexto)
+    admin = AdminContexto(
+        equipe=EquipeEmMemoria(list(MEMBROS_EQUIPE.values())),
+        verificacoes=None,  # type: ignore[arg-type]
+        usuarios=None,  # type: ignore[arg-type]
+        pedidos=None,  # type: ignore[arg-type]
+        config=None,  # type: ignore[arg-type]
+        auditoria=AuditoriaAdminEmMemoria(relogio),
+    )
+    instalar_admin(app, admin)
+    ambiente = Ambiente(TestClient(app), contexto, relogio)
+    ambiente.admin = admin
+    return ambiente
 
 
 def janela_futura() -> dict[str, str]:

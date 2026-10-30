@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
+from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import (
@@ -54,10 +55,18 @@ def _extrato(itens: Sequence[Lancamento], limite: int, deslocamento: int) -> Ext
 )
 def saldo_do_pedido(
     pedido_id: str,
+    request: Request,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> SaldoPedidoOut:
-    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    pedido = carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.PAGAMENTOS_VER,),
+        consulta="saldo",
+    )
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
     return SaldoPedidoOut(
         pedido_id=pedido.id,
@@ -74,12 +83,20 @@ def saldo_do_pedido(
 )
 def extrato_do_pedido(
     pedido_id: str,
+    request: Request,
     limite: int = Query(20, ge=1, le=LIMITE_MAXIMO),
     deslocamento: int = Query(0, ge=0),
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> ExtratoOut:
-    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    pedido = carregar_pedido(
+        contexto,
+        pedido_id,
+        usuario,
+        request=request,
+        equipe=(Permissao.PAGAMENTOS_VER,),
+        consulta="extrato",
+    )
     return _extrato(contexto.ledger.lancamentos(pedido.id), limite, deslocamento)
 
 

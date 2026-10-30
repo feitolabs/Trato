@@ -69,6 +69,11 @@ class Contadores:
             falta = self._bloqueios.get(chave, 0) - self.agora()
             return int(falta) + 1 if falta > 0 else 0
 
+    def zerar(self, chave: str) -> None:
+        """Esquece os eventos da chave (não mexe em bloqueio já aplicado)."""
+        with self._trava:
+            self._eventos.pop(chave, None)
+
     def _limpar(self, agora: float) -> None:
         for chave in [c for c, f in self._eventos.items() if not f]:
             del self._eventos[chave]
