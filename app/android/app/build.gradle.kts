@@ -29,7 +29,7 @@ android {
         applicationId = "br.com.feitolabs.trato"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23 // flutter_secure_storage (Keystore) exige 23+
+        minSdk = flutter.minSdkVersion // padrão do Flutter 3.47 (>= 23, que o flutter_secure_storage exige)
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)

@@ -1,0 +1,53 @@
+name: iOS (sem assinatura)
+
+# Compila o app para iOS num Mac da nuvem, SEM assinar (--no-codesign), e guarda o resultado.
+# Não gera IPA instalável, não publica em loja e não usa nenhum segredo: o app compila em modo demo.
+# Roda só à mão (Actions > iOS (sem assinatura) > Run workflow) e em tags de versão (v1.2.3).
+# Próximo passo (certificados, Bundle ID, TestFlight): docs/BUILD.md, seção 3.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.8" # a mesma de verificar.yml e do C:\flutter do João
+
+jobs:
+  ios:
+    name: iOS (Flutter, sem assinatura)
+    runs-on: macos-14 # versão do runner fixa (macos-latest muda sozinho)
+    timeout-minutes: 45
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Flutter
+        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff # v2.18.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Compilar sem assinar
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build ios --release --no-codesign --dart-define=TRATO_MODO=demo
+
+      # Runner.app sem assinatura, empacotado como zip. Serve para provar que compila; não instala em aparelho.
+      - name: Empacotar o Runner.app
+        working-directory: app/build/ios/iphoneos
+        run: ditto -c -k --keepParent Runner.app "$RUNNER_TEMP/trato-ios-sem-assinatura.zip"
+
+      - name: Guardar o artefato
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: trato-ios-sem-assinatura
+          path: ${{ runner.temp }}/trato-ios-sem-assinatura.zip
+          retention-days: 7
+          if-no-files-found: error

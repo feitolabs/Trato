@@ -135,7 +135,9 @@ Tem Mac na nuvem e assinatura automática. Plano gratuito cobre uso pequeno.
 4. Rodar o build e instalar pelo TestFlight.
 
 ### Opção B: GitHub Actions em macOS
-O repositório já tem `.github/workflows/build.yml` (manual) que compila o iOS **sem assinatura** (`flutter build ios --release --no-codesign`). Serve para provar que o código compila no macOS, mas **não gera IPA instalável**. Para IPA assinado no Actions, é preciso configurar certificado de distribuição e perfil de provisionamento como *secrets* e um passo de assinatura (ou fastlane `match`); é mais trabalhoso que o Codemagic. Nomes de secrets a cadastrar, se escolher este caminho (nenhum valor no repositório): `IOS_CERT_P12`, `IOS_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE`, `APPSTORE_ISSUER_ID`, `APPSTORE_KEY_ID`, `APPSTORE_PRIVATE_KEY`.
+`.github/workflows/ios.yml` (validado com actionlint, **ainda não executado**, pois não houve push) roda `flutter build ios --release --no-codesign --dart-define=TRATO_MODO=demo` em `macos-14` com Flutter 3.47.8 fixo e guarda `Runner.app` em zip como artefato (7 dias). Dispara só em **Run workflow** (manual) e em tags `v*`; não usa nenhum segredo. Serve para provar que o código compila no macOS, mas **não gera IPA instalável**. (`build.yml` tem um job iOS parecido, também manual.) Para IPA assinado no Actions, é preciso certificado de distribuição e perfil como *secrets* e um passo de assinatura (ou fastlane `match`); é mais trabalhoso que o Codemagic. Nomes de secrets, se escolher este caminho (nenhum valor no repositório): `IOS_CERT_P12`, `IOS_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE`, `APPSTORE_ISSUER_ID`, `APPSTORE_KEY_ID`, `APPSTORE_PRIVATE_KEY`.
+
+**Passo seguinte depois do `ios.yml` verde:** (1) João cria conta Apple Developer, Bundle ID `br.com.feitolabs.trato` e o app no App Store Connect; (2) gera a chave de API do App Store Connect; (3) escolhe Codemagic (A) ou secrets no Actions (B); (4) primeiro `flutter build ipa` assinado, envio ao TestFlight, convite de testadores internos.
 
 ### Permissões iOS (`Info.plist`)
 Textos em português já escritos: `NSCameraUsageDescription` (fotos de início e fim), `NSLocationWhenInUseUsageDescription` (chegada ao local), `NSPhotoLibraryUsageDescription` (anexos). Valem quando os plugins forem adotados; sem uso, a Apple pode questionar na revisão.
@@ -154,3 +156,44 @@ Ainda **não há flavors nativos** (Gradle `productFlavors` / esquemas Xcode). H
 - `git status` sem `key.properties`, `.jks`, `.p12`, `dart-defines*.json`.
 - O APK/AAB de release **não** mostra "Android Debug" no certificado.
 - O app abre no aparelho real e mostra o nome "Trato".
+
+## 6. Builds reais executados (30/10/2026)
+
+Máquina: Windows 11, Flutter 3.47.8 (`C:lutter`), emulador `Medium_Phone_API_37.0`. Tempos com cache frio e outros processos pesados rodando ao mesmo tempo (os de Gradle são os mais longos); com cache quente, esperar bem menos.
+
+| Build | Comando (dentro de `app/`, salvo o painel) | Tempo | Resultado |
+|---|---|---|---|
+| APK debug | `flutter build apk --debug --dart-define-from-file=dart-defines.json` | 16m20s (baixou Platform 35 sozinho) | OK, `app-debug.apk` **160 MB** |
+| APK release (assinatura **debug**) | `flutter build apk --release --obfuscate --split-debug-info=build/debug-info --dart-define-from-file=dart-defines.json` | 23m15s | OK, `app-release.apk` **51,3 MB** |
+| Painel web (`admin/`) | `flutter build web --release` | 6m51s | OK, `build/web` 41 MB (a maior parte é CanvasKit) |
+| iOS | só em macOS | n/d | não executado (ver seção 3) |
+
+> **O release acima NÃO é distribuível.** Sem `key.properties` ele sai assinado com a chave debug. Serve só para teste local.
+
+Release para loja: use `--obfuscate --split-debug-info=build/debug-info` (acima). Guarde a pasta `build/debug-info` **fora do git** (ignorada pelo `build/`) por versão: sem ela não dá para ler stack traces de produção (`flutter symbolize`). O aviso "ELF library contains unobfuscated DWARF" do build é inofensivo; `--strip` é opcional.
+
+### Conferências feitas
+- `aapt2 dump permissions`: o release declara só `INTERNET`, `CAMERA`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` (a permissão `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` é interna do AndroidX). Rótulo `Trato`, pacote `br.com.feitolabs.trato`, versão 0.1.0 (1), `targetSdk` 36.
+- `minSdk`: o Flutter 3.47 reescreveu a linha para `flutter.minSdkVersion` (= 24, acima dos 23 que o `flutter_secure_storage` exige). Mantido.
+- Emulador: instalou e abriu o release; **logcat sem `FATAL`/exceção e buffer `crash` vazio**. Capturas em `docs/capturas-android/` (splash do app, onboarding, escolha de perfil, login).
+- **Não capturadas:** casca do cliente e do profissional. O `dart-defines.json` traz `SUPABASE_URL`, então o login é real, e passar dele exige e-mail e senha, que não foram digitados (nem conta criada). Para ver as cascas: João entra com uma conta de teste, ou compilar sem `SUPABASE_URL`/`TRATO_MODO=demo` para o app cair no modo demonstração (pendência: confirmar no código `app/lib/` se esse modo entra direto na casca; as outras sessões cuidam de `app/lib/`).
+- Painel web: `grep` no bundle por `service_role`, `sk_live`, `sk_test`, `whsec_`, `JWT_SECRET`, `DATABASE_URL`, JWT (`eyJ...`) e URL do Supabase: **sem valor de segredo**. As únicas ocorrências em `main.dart.js` são os *nomes* da lista de variáveis proibidas do próprio painel; `sk_`/`secret` fora disso são símbolos internos do CanvasKit (`*.wasm`).
+- Ícone: continua o padrão do Flutter (o splash do Android 12+ mostra o logo do Flutter). Falta a arte do Trato 1024×1024 (ver seção 2, Ícone).
+
+### CI rodado localmente (mesmas etapas do `verificar.yml`)
+| Etapa | Resultado |
+|---|---|
+| `harness/preparar-ambiente.ps1` numa pasta temporária (cópia limpa, `.venv` do zero) | OK, 3m18s |
+| `verificar.py --etapa backend` nesse `.venv` | OK, **1113 testes**, 7m03s |
+| `verificar.py --etapa segredos` (com `git init` na cópia) | OK |
+| `verificar.py --etapa app` (analyze + test de `app/` e `admin/`) | OK, 5m11s |
+
+Observações: no Windows use o `.ps1` (o `preparar-ambiente.sh` no Git Bash passa caminho POSIX ao pip e falha em `backend[dev]`); `verificar.py` precisa estar dentro de um repositório git. A rodada do GitHub Actions mostrada pelo João (job "App (Flutter)" falhou em "Verificar o app" após 2m20s, Segredos/Backend/Integração verdes) **não reproduziu aqui**: a mesma etapa passa no Windows. A causa está no log do passo "Verificar o app" (não no "Post Flutter"); diferenças prováveis são Linux (maiúsculas/minúsculas em caminhos, `\` vs `/`) ou o SHA de commit rodado ser mais antigo/novo que este.
+
+### Bloqueios que dependem do João
+1. **Licenças Android:** o build baixou e aceitou a Platform 35 sozinho (o Gradle usa as licenças já aceitas); se o `flutter doctor` ainda reclamar das *cmdline-tools*, instalar em Android Studio > SDK Manager > SDK Tools > "Android SDK Command-line Tools" e rodar, ele mesmo: `C:lutterinlutter doctor --android-licenses`.
+2. **Keystore de release** (seção 2): só ele gera e guarda.
+3. **Ícone final** (arte 1024×1024 do design).
+4. **Conta Apple Developer**, Bundle ID, App Store Connect e chave de API (seção 3).
+5. **Mac ou CI macOS:** primeiro disparo manual do `ios.yml` (precisa do push para o GitHub, que é decisão dele).
+6. **Conta de teste** para capturar as cascas do cliente e do profissional no emulador.

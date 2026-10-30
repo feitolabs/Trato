@@ -336,3 +336,6 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Os `xfail(strict=True)` de acesso viraram testes verdes: não resta xfail na suíte. Com isso todos os achados da revisão de segurança (críticos a médios) têm correção em develop; ficam os itens "pendente" de cada `docs/fix-*.md` e os baixos do app/painel.
 - Testes em develop: 1054 no backend (1 pulado), 638 no app, 78 no painel.
 
+
+## 30/10/2026 — build-real
+Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feitos; ios.yml novo (actionlint ok, não executado); detalhes e bloqueios em docs/BUILD.md seção 6. Pendente: capturas das cascas (precisa login), ícone, keystore, iOS.
