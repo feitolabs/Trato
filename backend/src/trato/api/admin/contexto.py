@@ -81,7 +81,8 @@ def exigir(*permissoes: Permissao) -> Callable[..., Operador]:
         membro = admin.equipe.obter(usuario.id)
         if membro is None or not membro.vigente:
             raise negado
-        if not any(pode(membro.papel, p) for p in permissoes):
+        # Sem permissões listadas = só exige ser da equipe e estar vigente (ex.: `/v1/admin/eu`).
+        if permissoes and not any(pode(membro.papel, p) for p in permissoes):
             raise negado
         return Operador(usuario, membro)
 

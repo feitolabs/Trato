@@ -95,7 +95,7 @@ disco, URL nem log) e some ao sair.
 
 | Tela | Rotas usadas | Observações do alinhamento |
 |---|---|---|
-| Login | Supabase `POST /auth/v1/token?grant_type=password` e `GET /v1/admin/eu` | O backend não tem sessão própria; **falta a rota `/eu`** (abaixo). |
+| Login | Supabase `POST /auth/v1/token?grant_type=password` e `GET /v1/admin/eu` | O backend não tem sessão própria; a rota `/eu` agora existe (ver `docs/painel-integracao.md`). |
 | Verificação | `GET /verificacoes`, `POST /verificacoes/{id}/documentos/{doc}/url`, `POST /verificacoes/{id}/decisao` | Corpo da decisão é `{aprovar, motivo}`. A URL assinada abre em outra aba e nunca é mostrada. Sem cidade/categoria na API: o painel mostra o nível pedido. |
 | Disputas | `GET /disputas` + `GET /disputas/{pedido_id}`, `POST .../decisao`, `POST .../aprovacao` | O id da disputa é o `pedido_id`. **Sem e-mail da segunda pessoa:** acima da alçada a disputa fica "Aguardando segunda pessoa" e outra conta (líder/administrador) aprova no próprio login. Parcial envia `valor_cliente_centavos`. |
 | Pagamentos | `GET /pagamentos`, `GET /pagamentos/resumo` | Só `GET`. Cartões: confirmado, reembolsado, em andamento (`retido_centavos`), divergências. |
