@@ -28,7 +28,7 @@ GOOGLE_IOS_CLIENT_ID=
 ```
 
 - `SUPABASE_ANON_KEY` é a chave **pública** (anon / publishable). **Nunca** use a `service_role` aqui: ela dá acesso total ao banco.
-- Rodar: `flutter run --dart-define-from-file=.env` (dentro de `app/`). Também vale `--dart-define=SUPABASE_URL=...` um a um.
+- Rodar: `flutter run --dart-define-from-file=dart-defines.json` (dentro de `app/`). Também vale `--dart-define=SUPABASE_URL=...` um a um.
 - Sem os valores, o app abre normalmente com o login de teste.
 
 ## 3. Painel do Supabase (projeto "Trato")

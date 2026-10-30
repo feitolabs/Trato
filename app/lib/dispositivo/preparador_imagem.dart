@@ -40,3 +40,34 @@ class PreparadorImagem {
     return ArquivoCapturado(bytes: bytes, sha256: sha256Hex(bytes), capturadaEm: capturadaEm);
   }
 }
+
+/// Há metadado no arquivo? JPEG com segmento APP1 (EXIF/XMP), APP13 (IPTC/Photoshop) ou
+/// comentário; qualquer coisa que não seja JPEG também conta (PNG/HEIC/WebP carregam metadado).
+bool temMetadados(Uint8List b) {
+  if (b.length < 4 || b[0] != 0xFF || b[1] != 0xD8) return true;
+  var i = 2;
+  while (i + 4 <= b.length) {
+    if (b[i] != 0xFF) return true; // estrutura estranha: não confia
+    final marcador = b[i + 1];
+    if (marcador == 0xFF) {
+      i++; // preenchimento
+      continue;
+    }
+    if (marcador == 0xDA || marcador == 0xD9) return false; // início dos pixels
+    if (marcador == 0xE1 || marcador == 0xED || marcador == 0xFE) return true;
+    if (marcador >= 0xE2 && marcador <= 0xEF && marcador != 0xE2) return true;
+    if (marcador >= 0xD0 && marcador <= 0xD8 || marcador == 0x01) {
+      i += 2;
+      continue;
+    }
+    i += 2 + ((b[i + 2] << 8) | b[i + 3]);
+  }
+  return false;
+}
+
+/// Última barreira antes do envio (revisão M8): se por qualquer caminho a foto chegou com
+/// metadado (EXIF/GPS), recodifica aqui. O backend deve revalidar quando existir a rota de upload.
+ArquivoCapturado garantirSemMetadados(ArquivoCapturado arquivo, {PreparadorImagem preparador = const PreparadorImagem()}) {
+  if (!temMetadados(arquivo.bytes)) return arquivo;
+  return preparador.preparar(arquivo.bytes, capturadaEm: arquivo.capturadaEm);
+}

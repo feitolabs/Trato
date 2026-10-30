@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
+import '../dispositivo/preparador_imagem.dart';
 import '../dispositivo/servico_camera.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
@@ -79,10 +80,17 @@ class ServicoUploadApi implements ServicoUpload {
 
   @override
   Future<ArquivoEnviado> enviar(
-    ArquivoCapturado arquivo,
+    ArquivoCapturado original,
     FinalidadeArquivo finalidade, {
     String? pedidoId,
   }) async {
+    // Sempre sem EXIF/GPS antes de sair do aparelho (M8), mesmo que a foto venha de outro caminho.
+    final ArquivoCapturado arquivo;
+    try {
+      arquivo = garantirSemMetadados(original);
+    } on FormatException {
+      throw const ErroTrato(TipoErro.recusado, 'Esta foto não pôde ser lida. Tire outra.');
+    }
     final resposta = await _api.post(
       '/v1/arquivos/url-envio',
       corpo: {

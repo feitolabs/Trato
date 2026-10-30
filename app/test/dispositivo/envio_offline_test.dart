@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image/image.dart' as img;
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/fila_offline.dart';
@@ -50,8 +51,10 @@ class _Rede {
 }
 
 void main() {
+  // JPEG de verdade e sem metadado: o envio recusa o que não é imagem (M8).
+  final jpeg = Uint8List.fromList(img.encodeJpg(img.Image(width: 4, height: 4)));
   final foto = ArquivoCapturado(
-    bytes: Uint8List.fromList([1, 2, 3]),
+    bytes: jpeg,
     sha256: 'abc',
     capturadaEm: DateTime.utc(2026, 10, 29, 17, 6),
   );
@@ -85,10 +88,10 @@ void main() {
       final corpo = posts.single.corpo! as Map<String, dynamic>;
       expect(corpo['finalidade'], 'documento');
       expect(corpo['sha256'], 'abc');
-      expect(corpo['tamanho_bytes'], 3);
+      expect(corpo['tamanho_bytes'], jpeg.length);
       expect(corpo['pedido_id'], 'p1');
       expect(puts.single.url.host, 'storage.teste');
-      expect(puts.single.corpo, [1, 2, 3]);
+      expect(puts.single.corpo, jpeg);
       expect(puts.single.cabecalhos['content-type'], 'image/jpeg');
       expect(puts.single.cabecalhos.containsKey('authorization'), isFalse,
           reason: 'o token do app não vai para o armazenamento');

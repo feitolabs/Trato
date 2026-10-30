@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import 'armazenamento_sessao.dart';
 import 'config_auth.dart';
 import 'controle_codigo_celular.dart';
 import 'servico_auth.dart';
@@ -24,7 +25,14 @@ class ServicoAuthSupabase implements ServicoAuth {
   /// Inicializa o Supabase. Chame no `main` antes de `runApp`, só se
   /// `config.supabaseConfigurado`.
   static Future<ServicoAuthSupabase> inicializar(ConfigAuth config) async {
-    await sb.Supabase.initialize(url: config.supabaseUrl, publishableKey: config.supabaseAnonKey);
+    // Sessão no Keychain/Keystore, nunca em SharedPreferences (revisão M13).
+    await sb.Supabase.initialize(
+      url: config.supabaseUrl,
+      publishableKey: config.supabaseAnonKey,
+      authOptions: sb.FlutterAuthClientOptions(
+        localStorage: LocalStorageSeguro(chave: LocalStorageSeguro.chaveDaUrl(config.supabaseUrl)),
+      ),
+    );
     return ServicoAuthSupabase(config);
   }
 
