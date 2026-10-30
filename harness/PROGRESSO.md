@@ -346,3 +346,12 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 
 ## 30/10/2026 — build-real
 Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feitos; ios.yml novo (actionlint ok, não executado); detalhes e bloqueios em docs/BUILD.md seção 6. Pendente: capturas das cascas (precisa login), ícone, keystore, iOS.
+
+## 30/10/2026 — Rotas do pedido e do pagamento, upload, app, painel e build real integrados
+
+- Em develop (sem push; o João já tinha feito push até 8fb4073), cada uma verificada com o `.venv` do projeto: `rotas-pedido-pagamento` (rotas do pedido, orçamento e pagamento), `rotas-profissional-upload` (cadastro do profissional, disponibilidade, portfólio, URL assinada de upload), `app-token-entradas` (app com token e pontos de entrada), `painel-integracao` (painel contra o backend, `backend/tests/integracao_painel/`), `build-real` (builds Android e web executados, `ios.yml` não executado) e `fix-actions` (CI ignora diferença de pixel dos goldens no Linux com `TRATO_GOLDEN=ignorar`).
+- Conflitos resolvidos mantendo os dois lados: `api/app.py` (imports), `docs/api-rotas.md` (add/add: o do upload ficou em `docs/api-rotas-profissional.md`), `harness/PROGRESSO.md` e `docs/BUILD.md` (a seção do CI virou a 7).
+- `fix-actions`: YAML dos três workflows lido com `yaml.safe_load` (sem actionlint instalado); o comparador de golden só muda com `TRATO_GOLDEN=ignorar`, que só está no job do app do `verificar.yml`; localmente a comparação segue exata (sem nenhuma linha "GOLDEN IGNORADO").
+- Testes em develop: 1139 no backend (1 pulado), 647 no app, 78 no painel.
+- **Migrations novas, só em arquivo, NÃO aplicadas:** `20261030130000_pedido_recusas.sql` (tabela de recusas de pedido pelo profissional, imutável, RLS; rollback `pedido_recusas_rollback.sql`) e `20261030130000_profissional_disponibilidade_portfolio_uploads.sql` (colunas `disponibilidade`/`portfolio` em `perfis_profissional` e tabela `upload_solicitacoes`; rollback `profissional_disponibilidade_portfolio_uploads_rollback.sql`). **Atenção: as duas têm a mesma versão `20261030130000`**; renomear uma antes de aplicar (versão de migration é única no Supabase).
+
