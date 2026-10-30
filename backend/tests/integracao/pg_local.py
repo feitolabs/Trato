@@ -13,8 +13,16 @@ from typing import Any
 import psycopg
 
 RAIZ = Path(__file__).resolve().parents[3]
-# Migrations que a persistência usa (F3.5 e F3.6 ainda não valem; F3.8 é de RLS/app).
-MIGRATIONS = ("f32_identidade", "revogar_execute", "f33_pedidos", "f34_execucao", "f37_chat")
+# Migrations que a persistência usa (F3.8 é de RLS/app).
+MIGRATIONS = (
+    "f32_identidade",
+    "revogar_execute",
+    "f33_pedidos",
+    "f34_execucao",
+    "f35_dinheiro",
+    "f36_disputas",
+    "f37_chat",
+)
 
 
 def _reaproveitar_do_banco_local() -> dict[str, Any]:

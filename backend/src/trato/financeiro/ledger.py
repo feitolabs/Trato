@@ -11,20 +11,24 @@
 - Sem banco, sem Stripe, sem HTTP. A taxa chega já calculada (F4.2); o prazo de
   liberação fica na rotina (F4.9). Aqui só se registra.
 
-Fluxo normal de um pedido (tipo: débito -> crédito):
+Os tipos são os do CHECK de `lancamentos.tipo` do banco (F3.5); o banco ainda aceita
+`custo_stripe` e `reembolso`, que o Python não lança. O que muda entre dois lançamentos do mesmo
+tipo é o par de contas (tipo: débito -> crédito):
     COBRANCA    cliente (externo) -> custódia          cliente pagou, valor retido
+    COBRANCA    cliente (externo) -> liberado          gorjeta: 100% do profissional, sem taxa
     RETENCAO    custódia -> a liberar (profissional)   parte do profissional, ao concluir
     TAXA        custódia -> taxa do Trato              parte do Trato, ao concluir
-    LIBERACAO   a liberar -> liberado (profissional)   passou o prazo / cliente confirmou
-    REPASSE     liberado -> profissional (externo)     saque por Pix
-    GORJETA     cliente (externo) -> liberado          100% do profissional, sem taxa
-    ESTORNO     inverte um lançamento anterior, no todo ou em parte
+    REPASSE     a liberar -> liberado (profissional)   liberação: passou o prazo / cliente confirmou
+    REPASSE     liberado -> profissional (externo)     o provedor pagou o profissional
+    ESTORNO     inverte EXATAMENTE as partidas de um lançamento (o banco confere isso)
 
-Estorno parcial do pedido (`estornar_pedido`): o cliente recebe V de volta e o dinheiro
-sai de onde o valor cobrado está hoje (custódia, parte do profissional e taxa), em
-proporção ao que cada uma tem. O arredondamento é determinístico: cada parte recebe o
-piso de V*peso/total; os centavos que sobram vão, um a um, para a parte com maior resto
-(empate: custódia, depois profissional, depois taxa). A soma das partes é exatamente V.
+O banco só aceita estorno do lançamento INTEIRO, e um único estorno por original. Por isso o
+estorno parcial do pedido (`estornar_pedido`) estorna os originais por inteiro e lança de novo,
+como lançamentos novos, a parte que o cliente NÃO recebeu de volta. O cliente recebe V e o
+resto volta a ficar onde estava (custódia, parte do profissional e taxa), em proporção ao que
+cada uma tem. O arredondamento é determinístico: cada parte recebe o piso de V*peso/total; os
+centavos que sobram vão, um a um, para a parte com maior resto (empate: custódia, depois
+profissional, depois taxa). A soma das partes é exatamente V.
 """
 
 from __future__ import annotations
@@ -53,20 +57,22 @@ class TipoLancamento(StrEnum):
     COBRANCA = "cobranca"
     RETENCAO = "retencao"
     TAXA = "taxa"
-    LIBERACAO = "liberacao"
     REPASSE = "repasse"
-    GORJETA = "gorjeta"
     ESTORNO = "estorno"
 
 
-# tipo -> (conta debitada, conta creditada). ESTORNO é validado contra o original.
+# tipo -> pares (conta debitada, conta creditada) válidos. ESTORNO é validado contra o original.
 _CONTAS_DO_TIPO = {
-    TipoLancamento.COBRANCA: (TipoConta.CLIENTE_EXTERNO, TipoConta.CUSTODIA),
-    TipoLancamento.RETENCAO: (TipoConta.CUSTODIA, TipoConta.A_LIBERAR),
-    TipoLancamento.TAXA: (TipoConta.CUSTODIA, TipoConta.TAXA_TRATO),
-    TipoLancamento.LIBERACAO: (TipoConta.A_LIBERAR, TipoConta.LIBERADO),
-    TipoLancamento.REPASSE: (TipoConta.LIBERADO, TipoConta.PROFISSIONAL_EXTERNO),
-    TipoLancamento.GORJETA: (TipoConta.CLIENTE_EXTERNO, TipoConta.LIBERADO),
+    TipoLancamento.COBRANCA: (
+        (TipoConta.CLIENTE_EXTERNO, TipoConta.CUSTODIA),
+        (TipoConta.CLIENTE_EXTERNO, TipoConta.LIBERADO),  # gorjeta
+    ),
+    TipoLancamento.RETENCAO: ((TipoConta.CUSTODIA, TipoConta.A_LIBERAR),),
+    TipoLancamento.TAXA: ((TipoConta.CUSTODIA, TipoConta.TAXA_TRATO),),
+    TipoLancamento.REPASSE: (
+        (TipoConta.A_LIBERAR, TipoConta.LIBERADO),  # liberação
+        (TipoConta.LIBERADO, TipoConta.PROFISSIONAL_EXTERNO),  # pagamento ao profissional
+    ),
 }
 
 
@@ -129,6 +135,9 @@ class Lancamento:
     data: datetime
     estorno_de: str | None = None  # id do lançamento original (só em ESTORNO)
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    # Evento assinado do provedor que originou o lançamento (espelho). Fora da conferência de
+    # reenvio: o mesmo lançamento pode chegar por outro caminho.
+    evento_webhook_id: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.valor, bool) or not isinstance(self.valor, int):
@@ -147,11 +156,10 @@ class Lancamento:
         else:
             if self.estorno_de is not None:
                 raise LancamentoInvalido("Só estorno aponta para um lançamento original.")
-            esperado = _CONTAS_DO_TIPO[self.tipo]
-            if (self.debito.tipo, self.credito.tipo) != esperado:
+            if (self.debito.tipo, self.credito.tipo) not in _CONTAS_DO_TIPO[self.tipo]:
                 raise LancamentoInvalido(
                     f"Contas incompatíveis com o tipo {self.tipo.value}: "
-                    f"esperado {esperado[0].value} -> {esperado[1].value}."
+                    f"{self.debito.tipo.value} -> {self.credito.tipo.value}."
                 )
 
     def _conteudo(self) -> tuple:
@@ -195,9 +203,12 @@ def _validar(itens: Sequence[Lancamento], novo: Lancamento) -> None:
             raise EstornoInvalido("O estorno precisa ser do mesmo pedido do original.")
         if (novo.debito, novo.credito) != (original.credito, original.debito):
             raise EstornoInvalido("O estorno precisa inverter débito e crédito do original.")
-        restante = original.valor - _ja_estornado(itens, original.id)
-        if novo.valor > restante:
-            raise EstornoInvalido(f"O estorno passa do que resta estornar ({restante} centavos).")
+        if _ja_estornado(itens, original.id):
+            raise EstornoInvalido("Este lançamento já foi estornado.")
+        if novo.valor != original.valor:
+            raise EstornoInvalido(
+                f"O estorno inverte o lançamento inteiro ({original.valor} centavos)."
+            )
     if novo.debito.tipo not in _EXTERNAS:
         disponivel = _saldo(itens, novo.debito, novo.pedido_id)
         if disponivel < novo.valor:
@@ -275,11 +286,25 @@ class Livro:
 
 
 def registrar_cobranca(
-    livro: Livro, pedido_id: str, valor: int, chave: str, data: datetime
+    livro: Livro,
+    pedido_id: str,
+    valor: int,
+    chave: str,
+    data: datetime,
+    evento_webhook_id: str | None = None,
 ) -> Lancamento:
     """Cliente pagou (confirmação do parceiro): o valor entra retido."""
     return livro.lancar(
-        Lancamento(chave, pedido_id, TipoLancamento.COBRANCA, CLIENTE, CUSTODIA, valor, data)
+        Lancamento(
+            chave,
+            pedido_id,
+            TipoLancamento.COBRANCA,
+            CLIENTE,
+            CUSTODIA,
+            valor,
+            data,
+            evento_webhook_id=evento_webhook_id,
+        )
     )
 
 
@@ -291,7 +316,7 @@ def registrar_gorjeta(
         Lancamento(
             chave,
             pedido_id,
-            TipoLancamento.GORJETA,
+            TipoLancamento.COBRANCA,
             CLIENTE,
             liberado(profissional_id),
             valor,
@@ -348,14 +373,15 @@ def liberar(
     chave: str,
     data: datetime,
     valor: int | None = None,
+    evento_webhook_id: str | None = None,
 ) -> Lancamento:
     """Passa o valor de 'a liberar' para 'liberado'. Quando liberar é decisão da rotina."""
     conta = a_liberar(profissional_id)
     montante = livro.saldo(conta, pedido_id) if valor is None else valor
     return livro.lancar(
         Lancamento(
-            chave, pedido_id, TipoLancamento.LIBERACAO, conta, liberado(profissional_id),
-            montante, data,
+            chave, pedido_id, TipoLancamento.REPASSE, conta, liberado(profissional_id),
+            montante, data, evento_webhook_id=evento_webhook_id,
         )
     )  # fmt: skip
 
@@ -381,25 +407,32 @@ def registrar_repasse(
 
 
 def estornar(
-    livro: Livro, original_id: str, valor: int | None, chave: str, data: datetime
+    livro: Livro,
+    original_id: str,
+    chave: str,
+    data: datetime,
+    evento_webhook_id: str | None = None,
 ) -> Lancamento:
-    """Estorna um lançamento, no todo (`valor=None`: o que resta) ou em parte."""
+    """Estorna um lançamento por inteiro: inverte exatamente as partidas dele (uma só vez)."""
     original = next((i for i in livro.lancamentos if i.id == original_id), None)
     if original is None:
         raise EstornoInvalido("O lançamento original do estorno não existe.")
-    if valor is None:
-        valor = original.valor - _ja_estornado(livro.lancamentos, original_id)
-    return livro.lancar(
-        Lancamento(
-            chave,
-            original.pedido_id,
-            TipoLancamento.ESTORNO,
-            original.credito,
-            original.debito,
-            valor,
-            data,
-            estorno_de=original_id,
-        )
+    return livro.lancar(_estorno_de(original, chave, data, evento_webhook_id))
+
+
+def _estorno_de(
+    original: Lancamento, chave: str, data: datetime, evento_webhook_id: str | None = None
+) -> Lancamento:
+    return Lancamento(
+        chave,
+        original.pedido_id,
+        TipoLancamento.ESTORNO,
+        original.credito,
+        original.debito,
+        original.valor,
+        data,
+        estorno_de=original.id,
+        evento_webhook_id=evento_webhook_id,
     )
 
 
@@ -420,71 +453,83 @@ def repartir_proporcional(total: int, pesos: Sequence[int]) -> list[int]:
     return partes
 
 
-def _restante(livro: Livro, original: Lancamento) -> int:
-    return original.valor - _ja_estornado(livro.lancamentos, original.id)
-
-
-def _estornar_em_cadeia(
-    livro: Livro, pedido_id: str, tipo: TipoLancamento, valor: int, chave: str, data: datetime
+def _em_aberto(
+    livro: Livro, pedido_id: str, tipo: TipoLancamento, credito: TipoConta | None
 ) -> list[Lancamento]:
-    """Monta estornos que consomem os originais do tipo, do mais antigo ao mais novo."""
-    saida: list[Lancamento] = []
-    falta = valor
-    for original in livro.lancamentos:
-        if falta == 0:
-            break
-        if original.pedido_id != pedido_id or original.tipo is not tipo:
-            continue
-        parte = min(falta, _restante(livro, original))
-        if parte <= 0:
-            continue
-        saida.append(
-            Lancamento(
-                f"{chave}/{tipo.value}/{original.id}",
-                pedido_id,
-                TipoLancamento.ESTORNO,
-                original.credito,
-                original.debito,
-                parte,
-                data,
-                estorno_de=original.id,
-            )
-        )
-        falta -= parte
-    if falta:
-        raise EstornoInvalido("Não há lançamento suficiente para estornar.")
-    return saida
+    """Originais do tipo ainda sem estorno, do mais antigo ao mais novo."""
+    return [
+        i
+        for i in livro.lancamentos
+        if i.pedido_id == pedido_id
+        and i.tipo is tipo
+        and (credito is None or i.credito.tipo is credito)
+        and not _ja_estornado(livro.lancamentos, i.id)
+    ]
 
 
 def estornar_pedido(
-    livro: Livro, pedido_id: str, valor: int, chave: str, data: datetime
+    livro: Livro,
+    pedido_id: str,
+    valor: int,
+    chave: str,
+    data: datetime,
+    evento_webhook_id: str | None = None,
 ) -> tuple[Lancamento, ...]:
     """Devolve `valor` ao cliente (parcial ou total), proporcional entre taxa e profissional.
 
-    Gera estornos de TAXA e RETENCAO (que devolvem o dinheiro à custódia) e depois de
-    COBRANCA (que paga o cliente). Grava tudo ou nada. Se parte do valor já foi liberada ou
-    sacada, falta saldo e o ledger recusa com `SaldoInsuficiente` (regra pendente, ver F4.8).
+    Estorna por INTEIRO os lançamentos em aberto de TAXA, RETENCAO e COBRANCA (a que foi para a
+    custódia; a gorjeta não entra) e, se o valor for parcial, lança de novo (COBRANCA, RETENCAO e
+    TAXA novas, chaves `<chave>/mantida/...`) a parte que o cliente NÃO recebeu. Grava tudo ou
+    nada e devolve só os estornos. Se parte do valor já foi liberada ou paga ao profissional,
+    falta saldo e o ledger recusa com `SaldoInsuficiente` (regra pendente, ver F4.8).
     """
-    originais = [i for i in livro.lancamentos if i.pedido_id == pedido_id]
-    por_tipo = {
-        tipo: sum(_restante(livro, i) for i in originais if i.tipo is tipo)
-        for tipo in (TipoLancamento.COBRANCA, TipoLancamento.RETENCAO, TipoLancamento.TAXA)
-    }
-    cobrado = por_tipo[TipoLancamento.COBRANCA]
+    ja_feitos = [i for i in livro.lancamentos if i.chave.startswith(f"{chave}/")]
+    if ja_feitos:  # reenvio da mesma operação: devolve o que já foi gravado
+        return tuple(i for i in ja_feitos if i.tipo is TipoLancamento.ESTORNO)
+    cobrancas = _em_aberto(livro, pedido_id, TipoLancamento.COBRANCA, TipoConta.CUSTODIA)
+    retencoes = _em_aberto(livro, pedido_id, TipoLancamento.RETENCAO, None)
+    taxas = _em_aberto(livro, pedido_id, TipoLancamento.TAXA, None)
+    cobrado = sum(i.valor for i in cobrancas)
     if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= cobrado:
         raise EstornoInvalido(f"O valor do estorno deve ficar entre 1 e {cobrado} centavos.")
     pesos = [
         livro.saldo(CUSTODIA, pedido_id),
-        por_tipo[TipoLancamento.RETENCAO],
-        por_tipo[TipoLancamento.TAXA],
+        sum(i.valor for i in retencoes),
+        sum(i.valor for i in taxas),
     ]
-    _, de_retencao, de_taxa = repartir_proporcional(valor, pesos)
-    novos: list[Lancamento] = []
-    for tipo, parte in (
-        (TipoLancamento.TAXA, de_taxa),
-        (TipoLancamento.RETENCAO, de_retencao),
-        (TipoLancamento.COBRANCA, valor),
-    ):
-        if parte:
-            novos += _estornar_em_cadeia(livro, pedido_id, tipo, parte, chave, data)
-    return livro.lancar_varios(novos)
+    devolvidos = repartir_proporcional(valor, pesos)
+    mantido = cobrado - valor
+
+    estornos = [
+        _estorno_de(i, f"{chave}/{i.tipo.value}/{i.id}", data, evento_webhook_id)
+        for i in (*taxas, *retencoes, *cobrancas)
+    ]
+    novos = list(estornos)
+    if mantido:
+        profissional = retencoes[0].credito.titular if retencoes else None
+        mantidos = (
+            (TipoLancamento.COBRANCA, CLIENTE, CUSTODIA, mantido),
+            (
+                TipoLancamento.RETENCAO,
+                CUSTODIA,
+                a_liberar(profissional) if profissional else None,
+                pesos[1] - devolvidos[1],
+            ),
+            (TipoLancamento.TAXA, CUSTODIA, TAXA_TRATO, pesos[2] - devolvidos[2]),
+        )
+        for tipo, conta_debito, conta_credito, quanto in mantidos:
+            if quanto > 0 and conta_credito is not None:
+                novos.append(
+                    Lancamento(
+                        f"{chave}/mantida/{tipo.value}",
+                        pedido_id,
+                        tipo,
+                        conta_debito,
+                        conta_credito,
+                        quanto,
+                        data,
+                        evento_webhook_id=evento_webhook_id,
+                    )
+                )
+    livro.lancar_varios(novos)
+    return tuple(estornos)

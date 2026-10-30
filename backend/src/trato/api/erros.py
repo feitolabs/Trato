@@ -27,6 +27,7 @@ _STATUS: tuple[tuple[type[Exception], int], ...] = (
     (ledger.LancamentoInvalido, 422),
     (ledger.LedgerErro, 409),
     (erros_pg.NaoEncontrado, 404),
+    (erros_pg.ConflitoDeEstado, 409),
     (erros_pg.Duplicado, 409),
     (erros_pg.RegraDoBanco, 409),
     (erros_pg.DadosInvalidos, 422),

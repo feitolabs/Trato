@@ -144,7 +144,9 @@ class AmbienteAdmin:
             Ator(PapelPedido.CLIENTE, CLIENTE.id), AGORA - timedelta(hours=2), prova,
         )  # fmt: skip
         self.contexto.pedidos.salvar(pedido, evento)
-        self.contexto.contratos.salvar(Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, valor, "pintura"))
+        self.contexto.contratos.salvar(
+            Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, valor, "pintura", taxa_bps_aplicada=750)
+        )
         registrar_cobranca(self.contexto.ledger.livro, PEDIDO, valor, "cob-ped-1", AGORA)
         cfg = self.contexto.config.carregar().disputas
         d = disputas.abrir(

@@ -22,6 +22,10 @@ class RegraDoBanco(ErroPersistencia):
     """Um gatilho ou restrição do banco recusou a gravação (imutável, total que não fecha...)."""
 
 
+class ConflitoDeEstado(ErroPersistencia):
+    """Outra requisição mudou o registro antes desta (compare-and-set falhou). Ler de novo."""
+
+
 class Duplicado(ErroPersistencia):
     """Já existe um registro igual (chave única)."""
 

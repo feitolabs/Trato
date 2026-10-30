@@ -134,6 +134,8 @@ class ProvedorFake:
         pedido_id: str | None = None,
         valor_centavos: int | None = None,
         segredo: str | None = None,
+        repasse_id: str | None = None,
+        objeto_id: str | None = None,
     ) -> tuple[bytes, dict[str, str]]:
         """Corpo e cabeçalhos de um webhook, como o provedor mandaria. Não muda o estado."""
         cobranca = self.consultar_cobranca(cobranca_id)
@@ -157,8 +159,10 @@ class ProvedorFake:
             }
         elif tipo is TipoEvento.LIQUIDACAO:
             metadados["cobranca_id"] = cobranca_id
+            if repasse_id is not None:
+                metadados["repasse_id"] = repasse_id
             objeto = {
-                "id": f"po_fake_{_curto(cobranca_id)}",
+                "id": objeto_id or f"po_fake_{_curto(cobranca_id)}",
                 "amount": valor,
                 "metadata": metadados,
             }

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Sequence
+from dataclasses import replace
+from datetime import datetime
 
 from trato.api.repositorios import (
     ConfigApi,
@@ -11,6 +13,7 @@ from trato.api.repositorios import (
     DadosPedido,
     EventoWebhook,
     Orcamento,
+    Repasse,
 )
 from trato.api.repositorios_app import OrcamentoDoPedido, PedidoAberto
 from trato.disputas import Disputa
@@ -162,9 +165,19 @@ class EventosWebhookEmMemoria(RegistroEventosEmMemoria):
     def __init__(self) -> None:
         super().__init__()
         self._eventos: list[EventoWebhook] = []
+        self._revisao: list[tuple[EventoWebhook, str]] = []
 
     def registrar(self, evento: EventoWebhook) -> None:
         self._eventos.append(evento)
+
+    def descartar(self, evento: EventoWebhook) -> None:
+        self._eventos = [e for e in self._eventos if e is not evento]
+
+    def marcar_revisao(self, evento: EventoWebhook, motivo: str) -> None:
+        self._revisao.append((evento, motivo))
+
+    def em_revisao(self) -> Sequence[tuple[EventoWebhook, str]]:
+        return tuple(self._revisao)
 
     def listar(self) -> Sequence[EventoWebhook]:
         return tuple(self._eventos)
@@ -176,3 +189,61 @@ class ConfigEmMemoria:
 
     def carregar(self) -> ConfigApi:
         return self._config
+
+
+class RepassesEmMemoria:
+    def __init__(self) -> None:
+        self._itens: dict[str, Repasse] = {}
+        self._trava = threading.Lock()
+
+    def criar(self, repasse: Repasse) -> Repasse:
+        with self._trava:
+            existente = self.por_chave(repasse.chave)
+            if existente is not None:
+                return existente
+            self._itens[repasse.id] = repasse
+            return repasse
+
+    def obter(self, repasse_id: str) -> Repasse | None:
+        return self._itens.get(repasse_id)
+
+    def por_chave(self, chave: str) -> Repasse | None:
+        return next((r for r in self._itens.values() if r.chave == chave), None)
+
+    def por_transferencia(self, provedor_transferencia_id: str) -> Repasse | None:
+        return next(
+            (
+                r
+                for r in self._itens.values()
+                if r.provedor_transferencia_id == provedor_transferencia_id
+            ),
+            None,
+        )
+
+    def do_pedido(self, pedido_id: str) -> Sequence[Repasse]:
+        return tuple(r for r in self._itens.values() if r.pedido_id == pedido_id)
+
+    def vincular_transferencia(self, repasse_id: str, provedor_transferencia_id: str) -> None:
+        with self._trava:
+            r = self._itens[repasse_id]
+            if r.provedor_transferencia_id is None:
+                self._itens[repasse_id] = replace(
+                    r, provedor_transferencia_id=provedor_transferencia_id
+                )
+
+    def marcar_liberado(self, repasse_id: str, lancamento_id: str, em: datetime) -> None:
+        from trato.persistencia.erros import ConflitoDeEstado
+
+        with self._trava:
+            r = self._itens[repasse_id]
+            if r.status != "agendado":
+                raise ConflitoDeEstado("Este repasse não está mais agendado.")
+            self._itens[repasse_id] = replace(
+                r, status="liberado", lancamento_id=lancamento_id, liberado_em=em
+            )
+
+    def congelar(self, repasse_id: str, disputa_id: str) -> None:
+        with self._trava:
+            r = self._itens[repasse_id]
+            if r.status == "agendado":
+                self._itens[repasse_id] = replace(r, status="congelado")

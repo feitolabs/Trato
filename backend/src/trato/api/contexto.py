@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -28,6 +30,7 @@ from trato.api.repositorios import (
     RepositorioLedger,
     RepositorioOrcamentos,
     RepositorioPedidos,
+    RepositorioRepasses,
 )
 from trato.api.repositorios_app import (
     ProvedorTaxa,
@@ -64,6 +67,17 @@ def _manipuladores_padrao() -> dict[str, ManipuladorWebhook]:
     return manipuladores_padrao()
 
 
+_APOS_COMMIT: ContextVar[list[Callable[[], None]] | None] = ContextVar(
+    "trato_apos_commit", default=None
+)
+
+
+def _repasses_em_memoria() -> RepositorioRepasses:
+    from trato.api.memoria import RepassesEmMemoria
+
+    return RepassesEmMemoria()
+
+
 @dataclass
 class Contexto:
     auth: ProvedorAuth
@@ -89,8 +103,41 @@ class Contexto:
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
     # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
     taxa: ProvedorTaxa | None = None
+    repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)
+    # Transação do armazenamento (reentrante). Em memória não faz nada; no Postgres é
+    # `Banco.transacao`. Use `contexto.transacao()`, que também roda os `depois_do_commit`.
+    transacao_banco: Callable[[], AbstractContextManager[object]] = nullcontext
     # Só existem com persistência Postgres (a memória não os implementa).
     extras: dict[str, Any] = field(default_factory=dict)
+
+    @contextmanager
+    def transacao(self) -> Iterator[None]:
+        """Uma operação financeira (pedido + ledger + disputa + evento) numa única transação.
+
+        Aninhada, entra na transação de fora. Ao confirmar a mais externa, roda o que foi pedido
+        com `depois_do_commit` (ex.: chamar o provedor só depois de o ledger estar gravado).
+        """
+        if _APOS_COMMIT.get() is not None:
+            with self.transacao_banco():
+                yield
+            return
+        pendentes: list[Callable[[], None]] = []
+        marca = _APOS_COMMIT.set(pendentes)
+        try:
+            with self.transacao_banco():
+                yield
+        finally:
+            _APOS_COMMIT.reset(marca)
+        for funcao in pendentes:  # só chega aqui se a transação confirmou
+            funcao()
+
+    def depois_do_commit(self, funcao: Callable[[], None]) -> None:
+        """Roda `funcao` quando a transação de fora confirmar (ou já, se não houver transação)."""
+        pendentes = _APOS_COMMIT.get()
+        if pendentes is None:
+            funcao()
+        else:
+            pendentes.append(funcao)
 
     def __post_init__(self) -> None:
         # Antes da contratação a conversa mascara contatos: a memória pergunta ao repositório.

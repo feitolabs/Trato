@@ -31,7 +31,9 @@ from trato.api.admin.rotas_pagamentos import lancamento_admin_out
 from trato.api.contexto import Contexto, obter_contexto
 from trato.disputas import Ator, Decisao, Disputa, Estado, Resultado
 from trato.financeiro.ledger import CUSTODIA, Lancamento, Livro, estornar_pedido, repartir_custodia
+from trato.financeiro.repasses import repasse_dos_lancamentos
 from trato.garantias import abrir_garantia
+from trato.pagamentos.taxa import TaxaNaoCongelada, calcular_taxa, taxa_congelada
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Pedido
 from trato.pedidos.estados import Ator as AtorPedido
@@ -196,11 +198,12 @@ def _planejar_dinheiro(contexto: Contexto, pedido: Pedido, d: Disputa) -> list[L
     """Lançamentos do espelho para a decisão, com as funções que o ledger já tem.
 
     Chaves determinísticas (`disputa/<pedido>/...`): refazer a chamada depois de uma falha no
-    meio não duplica nada (se já estão no ledger, não planeja de novo).
+    meio não duplica nada (se já estão no ledger, não planeja de novo). A taxa é a que o contrato
+    congelou no aceite, nunca a da configuração de hoje (A3).
     """
     prefixo = f"disputa/{pedido.id}/"
     existentes = contexto.ledger.lancamentos(pedido.id)
-    if any(i.id.startswith(prefixo) for i in existentes) or d.divisao is None:
+    if any(i.chave.startswith(prefixo) for i in existentes) or d.divisao is None:
         return []
     livro = Livro()
     if existentes:
@@ -211,9 +214,11 @@ def _planejar_dinheiro(contexto: Contexto, pedido: Pedido, d: Disputa) -> list[L
         estornar_pedido(livro, pedido.id, d.divisao.para_cliente, f"{prefixo}est", agora)
     restante = livro.saldo(CUSTODIA, pedido.id)
     if d.divisao.para_profissional > 0 and restante > 0:
-        if contexto.taxa is None:
-            raise HTTPException(503, "A taxa do Trato ainda não está ligada à configuração.")
-        taxa = contexto.taxa.calcular(restante)
+        try:
+            contrato = contexto.contratos.obter_do_pedido(pedido.id)
+            taxa = calcular_taxa(restante, taxa_congelada(contrato))
+        except TaxaNaoCongelada as erro:
+            raise HTTPException(503, str(erro)) from erro
         repartir_custodia(
             livro, pedido.id, pedido.profissional_id or "", taxa, f"{prefixo}rep", agora
         )
@@ -221,6 +226,19 @@ def _planejar_dinheiro(contexto: Contexto, pedido: Pedido, d: Disputa) -> list[L
 
 
 def _efetivar(
+    contexto: Contexto,
+    admin: AdminContexto,
+    operador: Operador,
+    pedido_id: str,
+    decidida: Disputa,
+    justificativa: str,
+) -> DisputaDetalheOut:
+    """Pedido, dinheiro, disputa e auditoria numa transação só: tudo ou nada (C1/A5)."""
+    with contexto.transacao():
+        return _efetivar_na_transacao(contexto, admin, operador, pedido_id, decidida, justificativa)
+
+
+def _efetivar_na_transacao(
     contexto: Contexto,
     admin: AdminContexto,
     operador: Operador,
@@ -249,6 +267,15 @@ def _efetivar(
     novos = _planejar_dinheiro(contexto, pedido, decidida)
     if novos:
         contexto.ledger.lancar_varios(novos)
+        repasse = repasse_dos_lancamentos(
+            pedido.id,
+            pedido.profissional_id or "",
+            novos,
+            "decisao_disputa",
+            f"disputa/{pedido.id}/repasse",
+        )
+        if repasse is not None:
+            contexto.repasses.criar(repasse)
     gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
     if gravado.estado is estados.Estado.CONCLUIDO and gravado.concluido_em is not None:
         if contexto.garantias.obter_garantia(gravado.id) is None:

@@ -77,7 +77,7 @@ class Ambiente:
         pedido = replace(base, **campos)
         self.contexto.pedidos.salvar(pedido)
         self.contexto.contratos.salvar(
-            Contrato(pedido.id, "orc-1", PROFISSIONAL.id, 100_000, "pintura")
+            Contrato(pedido.id, "orc-1", PROFISSIONAL.id, 100_000, "pintura", taxa_bps_aplicada=750)
         )
         return pedido
 

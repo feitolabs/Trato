@@ -66,6 +66,23 @@ class TermosContrato:
 
 
 @dataclass(frozen=True)
+class OrdemEstorno:
+    """Intenção de devolver dinheiro ao cliente, gravada ANTES de chamar o provedor (A7).
+
+    A chave é a de idempotência no provedor: reenviar a mesma ordem nunca devolve duas vezes.
+    `pendente` = ainda não confirmada pelo provedor; a reconciliação reenvia.
+    """
+
+    chave: str
+    pedido_id: str
+    cobranca_id: str
+    valor_centavos: int
+    criada_em: datetime
+    estado: str = "pendente"  # pendente | enviada
+    provedor_estorno_id: str | None = None
+
+
+@dataclass(frozen=True)
 class ConfigPagamento:
     """Parte da tabela de configuração que o fluxo de pagamento lê."""
 
@@ -87,6 +104,14 @@ class RepositorioAditivos(Protocol):
     def salvar(self, aditivo: Aditivo) -> None: ...
 
     def do_pedido(self, pedido_id: str) -> Sequence[Aditivo]: ...
+
+
+class RepositorioOrdensEstorno(Protocol):
+    def salvar(self, ordem: OrdemEstorno) -> None: ...
+
+    def pendentes(self, pedido_id: str | None = None) -> Sequence[OrdemEstorno]: ...
+
+    def do_pedido(self, pedido_id: str) -> Sequence[OrdemEstorno]: ...
 
 
 class RepositorioTermos(Protocol):
