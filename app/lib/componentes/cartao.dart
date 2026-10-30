@@ -17,7 +17,7 @@ class CartaoTrato extends StatelessWidget {
   Widget build(BuildContext context) {
     final raio = BorderRadius.circular(EspacosTrato.raioGrande);
     final conteudo = Padding(
-      padding: const EdgeInsets.all(EspacosTrato.x5),
+      padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
       child: aoTocar == null
           ? child
           : Row(
@@ -34,7 +34,11 @@ class CartaoTrato extends StatelessWidget {
       shape: escuro ? RoundedRectangleBorder(borderRadius: raio) : null,
       clipBehavior: Clip.antiAlias,
       child:
-          aoTocar == null ? conteudo : InkWell(onTap: aoTocar, borderRadius: raio, child: conteudo),
+          aoTocar == null
+          ? conteudo
+          : MergeSemantics(
+              child: InkWell(onTap: aoTocar, borderRadius: raio, child: conteudo),
+            ),
     );
   }
 }

@@ -148,12 +148,12 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
         const SizedBox(height: EspacosTrato.x3),
         Text.rich(
           TextSpan(
-            style: TipografiaTrato.corpoGrande,
+            style: TipografiaTrato.corpo,
             children: [
               const TextSpan(text: 'Enviamos um código de 6 números por SMS para '),
               TextSpan(
                 text: ValidacaoAuth.celularMascarado(widget.celular),
-                style: TipografiaTrato.corpoGrande.copyWith(fontWeight: FontWeight.w700),
+                style: TipografiaTrato.corpo.copyWith(fontWeight: FontWeight.w700),
               ),
               const TextSpan(text: '.'),
             ],
@@ -179,7 +179,7 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
         if (_restante > 0)
           Text(
             'Reenviar em $_tempo',
-            style: TipografiaTrato.corpoGrande.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
           )
         else
           BotaoLink(texto: 'Reenviar código', aoTocar: _reenviar),

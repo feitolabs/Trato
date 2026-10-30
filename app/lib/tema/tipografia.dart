@@ -34,13 +34,13 @@ abstract final class TipografiaTrato {
   static final tituloOpcao = _estilo(fonteTitulos, 20, 800, altura: 1.2, espacamento: -0.2);
   static final tituloGrande = _estilo(fonteTitulos, 28, 800, altura: 1.15, espacamento: -0.4);
   static final titulo = _estilo(fonteTitulos, 22, 800, altura: 1.2, espacamento: -0.2);
-  static final tituloCartao = _estilo(fonteCorpo, 17, 700, altura: 1.3);
+  static final tituloCartao = _estilo(fonteCorpo, 16, 700, altura: 1.3);
   static final corpo = _estilo(fonteCorpo, 16, 400, altura: 1.5);
   static final corpoForte = _estilo(fonteCorpo, 16, 700, altura: 1.3);
   static final corpoPequeno = _estilo(fonteCorpo, 14, 400, altura: 1.4);
   static final legenda = _estilo(
     fonteCorpo,
-    13,
+    14,
     400,
     altura: 1.4,
     cor: CoresTrato.textoSecundario,

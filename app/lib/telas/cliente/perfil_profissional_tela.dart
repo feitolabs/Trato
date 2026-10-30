@@ -103,7 +103,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                       children: [
                         const Icon(Icons.check, size: 22, color: CoresTrato.verdeTexto),
                         const SizedBox(width: EspacosTrato.x3),
-                        Expanded(child: Text(v, style: TipografiaTrato.corpoGrande)),
+                        Expanded(child: Text(v, style: TipografiaTrato.corpo)),
                       ],
                     ),
                   ),
@@ -285,7 +285,7 @@ class _CartaoAvaliacao extends StatelessWidget {
             ],
           ),
           const SizedBox(height: EspacosTrato.x2),
-          Text(avaliacao.comentario, style: TipografiaTrato.corpoGrande),
+          Text(avaliacao.comentario, style: TipografiaTrato.corpo),
           const SizedBox(height: EspacosTrato.x2),
           Text(avaliacao.detalhes, style: secundario),
         ],

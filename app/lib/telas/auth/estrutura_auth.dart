@@ -26,6 +26,7 @@ class EstruturaAuth extends StatelessWidget {
           : null,
       body: SafeArea(
         child: ConteudoResponsivo(
+          margem: EspacosTrato.margemOnboarding,
           child: Column(
             children: [
               Expanded(

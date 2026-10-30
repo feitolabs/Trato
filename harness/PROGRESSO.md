@@ -295,3 +295,11 @@ Diário do projeto. Uma entrada por sessão, mais recente no fim.
 - Pacotes novos `trato/seguranca/` e `trato/lgpd/`; ligação por uma linha em `main.py`. Mascaramento do chat (números por extenso, e-mail disfarçado, links, perfis, endereço), limite de taxa, proteção de SMS, conta duplicada, contorno (só flag), cabeçalhos, CORS fechado, tamanho de corpo, upload e logs sem dado pessoal.
 - LGPD: `GET /v1/me/dados`, `POST /v1/me/exclusao` (2 passos, carência), consentimentos. Ledger e auditoria nunca tocados.
 - `verificar.py`: 840 testes, ruff ok. Doc: `docs/backend-seguranca.md`. Pendente: migrations/adaptadores Postgres (OK do João) e prazos de retenção (jurídico).
+
+
+## 30/10/2026 — Fidelidade visual do app × PDF
+
+- `docs/fidelidade-visual.md` (tabela das 27 páginas, acessibilidade, P12/P13/P14) e 27 pares em `docs/fidelidade/`.
+- Corrigido em `app/lib/tema/` e componentes: margem 16 (24 no onboarding/login/cadastro), padding de cartão 16, contorno de controles `#A3ABA3`, campo 52, texto 16 no lugar de 17, legenda 14, chip 13, linha de lista 52; rótulos semânticos em checkboxes e cartões tocáveis. Goldens e `responsivo_test` atualizados.
+- Textos que o PDF contradiz com a D13 ficaram neutros. Ícones (P13), fontes (P12) e onboarding 2/3 (P14) seguem com o João.
+- Verificação: etapas segredos e app OK (629 testes); backend não rodou (faltam ruff/pytest etc. no ambiente; backend não foi tocado). Contraste apontado pelo verificador do Flutter tratado como falso positivo, sem validar em aparelho.

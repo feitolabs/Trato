@@ -107,8 +107,8 @@ class _CartaoGrupo extends StatelessWidget {
               const Divider(
                 height: 1,
                 thickness: 1,
-                indent: EspacosTrato.x5,
-                endIndent: EspacosTrato.x5,
+                indent: EspacosTrato.x4,
+                endIndent: EspacosTrato.x4,
                 color: CoresTrato.borda,
               ),
             _LinhaItem(item: grupo.itens[i], aoTocar: () => aoTocar?.call(grupo.itens[i].acao)),
@@ -130,7 +130,10 @@ class _LinhaItem extends StatelessWidget {
     return InkWell(
       onTap: aoTocar,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x5, vertical: EspacosTrato.x4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: EspacosTrato.x4,
+          vertical: (EspacosTrato.alturaLinhaLista - 24) / 2,
+        ),
         child: Row(
           children: [
             Expanded(child: Text(item.titulo, style: TipografiaTrato.corpo)),

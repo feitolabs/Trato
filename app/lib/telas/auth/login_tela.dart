@@ -185,7 +185,10 @@ class _DivisorOu extends StatelessWidget {
         const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x3),
-          child: Text('ou', style: TipografiaTrato.corpoPequeno),
+          child: Text(
+            'ou',
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          ),
         ),
         const Expanded(child: Divider()),
       ],

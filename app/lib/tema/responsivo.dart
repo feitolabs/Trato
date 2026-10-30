@@ -65,14 +65,27 @@ class EscalaFonteLimitada extends StatelessWidget {
 /// Centraliza o conteúdo da tela e aplica a margem lateral do tamanho atual.
 /// No tablet, o conteúdo fica com no máximo [Responsivo.larguraMaximaConteudo].
 class ConteudoResponsivo extends StatelessWidget {
-  const ConteudoResponsivo({super.key, required this.child, this.comMargem = true});
+  const ConteudoResponsivo({
+    super.key,
+    required this.child,
+    this.comMargem = true,
+    this.margem,
+  });
 
   final Widget child;
   final bool comMargem;
 
+  /// Margem fixa (ex.: 24 no onboarding e no login, como no protótipo). Em tablet vale a do tamanho.
+  final double? margem;
+
   @override
   Widget build(BuildContext context) {
-    final margem = comMargem ? Responsivo.margemLateral(TamanhoTela.de(context)) : 0.0;
+    final tamanho = TamanhoTela.de(context);
+    final margem = !comMargem
+        ? 0.0
+        : (this.margem != null && tamanho == TamanhoTela.celular)
+            ? this.margem!
+            : Responsivo.margemLateral(tamanho);
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
