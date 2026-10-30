@@ -42,6 +42,12 @@ usá-la, pede **motivo escrito** em tudo que é sensível e deixa **rastro na au
 | `config_aprovar` (aprovar e publicar) | administrador |
 | `auditoria_ver`, `auditoria_verificar_cadeia` | seguranca, juridico, dpo, administrador |
 
+## 0. Quem sou eu
+
+| Método e caminho | Papel | Resposta |
+|---|---|---|
+| `GET /v1/admin/eu` | qualquer membro vigente da equipe | `{id, papel, nome?, alcada_centavos}` (o painel chama logo após o login) |
+
 ## 1. Verificação de profissionais
 
 | Método e caminho | Papel | Corpo | Resposta |
