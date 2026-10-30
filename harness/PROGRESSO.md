@@ -363,3 +363,12 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Para não inventar dado: `PedidoAberto.distanciaKm/orcaram/limiteOrcamentos` e `ResumoOrcamento.taxaBps` ficaram opcionais; `ResumoPedido.numero` virou texto.
 - Testes novos: `app/test/dados/contrato_api_test.dart` (contrato por repositório) e `fluxo_completo_test.dart` (pedido até avaliação com backend simulado). Divergências doc × backend e rotas que faltam: `docs/app-divergencias.md` (destaque: #4 `offline_capturada_em` é recusado pelo backend; #5 caminho da foto da nota).
 - Continua demo: cadastro do profissional, busca, perfil público, lista de conversas, responder disputa; sem rota: marcar notificação como lida, preferências, token de push. Não testado em aparelho real nem contra API real.
+
+## 30/10/2026 — App usa a API real no modo `api` (`claude/app-rotas-novas-a68570`)
+
+- Em develop (sem push), verificada com o `.venv` do projeto: o app chama a API real no modo `api` para orçamentos, pagamento, perfil, profissional, aditivo e nota de materiais, entre outros (`docs/app-ligacao.md`); testes de contrato em `app/test/dados/contrato_api_test.dart`. Mantido o commit `d548c9d` (migrations de recusa e upload marcadas como aplicadas).
+- Testes em develop: 1139 no backend (1 pulado), 680 no app, 78 no painel.
+- `docs/app-divergencias.md` lista 22 divergências entre app, `docs/api-rotas.md` e backend. Ainda em demo no app: cadastro do profissional (faltam catálogo de categorias e cidades), busca e perfil público, lista de conversas, responder disputa. Faltam rotas: marcar notificação como lida, push, busca por serviço, título/descrição/faixa/serviços em `POST /v1/pedidos`, gorjeta, detalhe de pedido aberto, conversa do cliente antes de contratar (`?profissional_id=`).
+- Backend devolve ao app: `offline_capturada_em` no check-in/out reenviado (hoje 422 e tira da fila), caminho da foto na conclusão do upload da nota de materiais, destino `portfolio` em uploads, `taxa` em % no resumo do orçamento.
+- Limites: `POST /v1/contratos/{id}/cobranca` responde 503 em modo `postgres`; aprovar aditivo cria cobrança `aguardando_confirmacao` mas o app não tem a tela de pagar o aditivo.
+
