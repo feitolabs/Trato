@@ -1,8 +1,8 @@
 # Painel administrativo (web)
 
 > Projeto Flutter Web em `admin/` (D13: painel admin é web responsivo; não existe app Ops).
-> Hoje roda com **dados de exemplo** (`ApiFake`). A API admin do backend ainda não existe: a lista de
-> endpoints abaixo é o contrato que o backend precisa cumprir para ligar o painel.
+> Roda com **dados de exemplo** (`ApiFake`) ou com a API admin real (`ApiAdminHttp`), escolhida por `--dart-define`
+> (seção "Ligação com a API real"). O contrato do backend está em `docs/api-admin.md`.
 
 ## Como rodar
 
@@ -15,9 +15,7 @@ flutter analyze
 ```
 
 No exemplo, o papel vem do começo do e-mail (`financeiro@teste.local` entra como `financeiro`) e a senha só precisa ter
-8 caracteres ou mais. Não há senha real em lugar nenhum. A URL da API ficará em `TRATO_API_URL` (`admin/.env.example`,
-sem valor); trocar `ApiFake` por uma implementação HTTP de `ApiAdmin` (`admin/lib/dados/api_admin.dart`) é a única mudança
-necessária nas telas.
+8 caracteres ou mais. Não há senha real em lugar nenhum. Para usar a API real, veja "Ligação com a API real".
 
 ## Regras que o painel segue
 
@@ -76,85 +74,50 @@ Notas: só o administrador aprova configuração (e nunca a própria proposta). 
 suporte ou administrador (`docs/modelo-de-dados.md` 8.1). A tabela de permissões é do painel; o backend deve ter a sua
 (mesma regra) e não confiar no que o painel mostra.
 
-## Endpoints que o backend precisa expor
+## Ligação com a API real
 
-Prefixo `/v1/admin`. Todos exigem `Authorization: Bearer <token da sessão da equipe>` e devolvem:
-`401` (sem sessão), `403` (papel sem permissão), `422` (validação, com `detalhe` em português para mostrar na tela).
-Todo `POST`/`PUT` aceita `Idempotency-Key`. Toda ação sensível grava `auditoria` via `registrar_auditoria()` (com `motivo`,
-ator, IP e `request_id`). Valores de dinheiro: **centavos inteiros**.
+O contrato que o backend cumpre hoje está em `docs/api-admin.md`. O painel foi alinhado a ele (o lado do painel
+mudou; `backend/` não). Implementação: `admin/lib/dados/api_http.dart` (`ApiAdminHttp`).
 
-### Sessão
+### Como escolher a API
 
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `POST /v1/admin/sessao` | `{email, senha}` | `{token, usuario:{id, nome, email, papel, alcada_centavos}}` | qualquer papel ativo em `equipe` (senão 403) |
-| `DELETE /v1/admin/sessao` | — | `204` | autenticado |
+Por `--dart-define` (nada vai para o git; `admin/.env.example` só lista os nomes):
 
-### F7.1 Verificação
+```bash
+flutter run -d chrome --dart-define=ADMIN_MODO=api --dart-define=ADMIN_API_URL=https://api... --dart-define=ADMIN_SUPABASE_URL=https://xxxx.supabase.co --dart-define=ADMIN_SUPABASE_ANON_KEY=<chave pública>
+```
 
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `GET /v1/admin/verificacoes?status=` | — | `[{id, profissional, categoria, cidade, enviada_em, cpf_mascarado, documentos:[rotulo], status, motivo_decisao}]` | `cadastro`, `seguranca`, `administrador` |
-| `POST /v1/admin/verificacoes/{id}/documentos/{rotulo}/revelar` | `{motivo}` | `{url_assinada, expira_em}` (curta, ex.: 60 s) | `cadastro` |
-| `POST /v1/admin/verificacoes/{id}/decisao` | `{decisao: "aprovar"\|"recusar", motivo}` | `{status}` | `cadastro` |
+Sem `ADMIN_MODO=api`, ou com algum valor faltando, o painel usa os dados de exemplo (`ApiFake`). Só a chave
+**pública** (anon) entra no painel; a chave de serviço nunca. O token da sessão fica só em memória (não vai para
+disco, URL nem log) e some ao sair.
 
-### F7.2 Disputas
+### Mapa tela -> rota
 
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `GET /v1/admin/disputas?status=` | — | `[{id, pedido, cliente, profissional, motivo, descricao, valor_em_analise_centavos, decisao_ate, status, evidencias:[{autor, tipo, texto, nota_interna}], linha_do_tempo:[{quando, autor, texto}], decisao, valor_reembolso_centavos}]` | `atendente_n2`, `lider_suporte`, `mediador`, `administrador` |
-| `POST /v1/admin/disputas/{id}/decisao` | `{decisao: "liberar_tudo"\|"reembolso_total"\|"reembolso_parcial"\|"nova_visita", valor_reembolso_centavos?, justificativa, segunda_pessoa_email?}` | `{status: "decidida"\|"aguardando_segunda_pessoa", mensagem}` | `mediador`, `lider_suporte`, `administrador` |
-| `POST /v1/admin/disputas/{id}/aprovacao` | `{aprovar: bool, motivo}` | `{status}` | `lider_suporte`, `administrador`; **não** pode ser quem decidiu |
+| Tela | Rotas usadas | Observações do alinhamento |
+|---|---|---|
+| Login | Supabase `POST /auth/v1/token?grant_type=password` e `GET /v1/admin/eu` | O backend não tem sessão própria; **falta a rota `/eu`** (abaixo). |
+| Verificação | `GET /verificacoes`, `POST /verificacoes/{id}/documentos/{doc}/url`, `POST /verificacoes/{id}/decisao` | Corpo da decisão é `{aprovar, motivo}`. A URL assinada abre em outra aba e nunca é mostrada. Sem cidade/categoria na API: o painel mostra o nível pedido. |
+| Disputas | `GET /disputas` + `GET /disputas/{pedido_id}`, `POST .../decisao`, `POST .../aprovacao` | O id da disputa é o `pedido_id`. **Sem e-mail da segunda pessoa:** acima da alçada a disputa fica "Aguardando segunda pessoa" e outra conta (líder/administrador) aprova no próprio login. Parcial envia `valor_cliente_centavos`. |
+| Pagamentos | `GET /pagamentos`, `GET /pagamentos/resumo` | Só `GET`. Cartões: confirmado, reembolsado, em andamento (`retido_centavos`), divergências. |
+| Busca | `GET /usuarios`, `POST /usuarios/{id}/dados-pessoais`, `GET /pedidos` | A lista não traz e-mail nem CPF mascarados; o botão "Revelar" mostra CPF, telefone e nascimento (sem e-mail). |
+| Configurações | `GET /config/definicoes`, `/config/versoes` + `/{id}`, `POST /config/versoes` + `/enviar`, `/aprovar` + `/publicar`, `/reverter` | Propor = criar rascunho (a partir da vigente) e enviar. Aprovar = aprovar e publicar; se a publicação falhar (vigência agendada), a versão fica "Aprovada, falta publicar" com botão **Publicar**. `criada_por` é id, não e-mail. As faixas da taxa (`faixas`) ainda não têm tela. |
+| Auditoria | `GET /auditoria`, `POST /auditoria/verificar-cadeia` | O filtro "Quem" usa `ator_id`. A lista não traz o hash da linha (some da tela); a verificação devolve íntegra ou o primeiro registro quebrado. |
 
-O backend confere a alçada (`equipe.alcada_centavos`, vinda da configuração), o teto do valor em análise e a regra
-"acima da alçada exige segunda pessoa" (`docs/modelo-de-dados.md` 8.1). A tela ainda não tem botão para a segunda pessoa
-aprovar (`/aprovacao`): é um passo a adicionar quando o endpoint existir.
+Erros: 401 mostra "sessão acabou", 403 mostra a mensagem do backend (papel), 422 mostra o `detail`.
 
-### F7.3 Pagamentos (somente leitura)
+### O que falta no backend (não alterei `backend/`)
 
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `GET /v1/admin/pagamentos/conciliacao` | — | `{confirmado_centavos, aguardando_centavos, divergencias, atualizado_em}` | `financeiro`, `administrador` |
-| `GET /v1/admin/pagamentos/extrato?de=&ate=&status=&pagina=` | — | `[{id, data, descricao, valor_centavos, status: "aguardando_confirmacao"\|"confirmado"\|"falhou"\|"reembolsado", pedido, ref_provedor, divergente}]` | `financeiro`, `administrador` |
+1. `GET /v1/admin/eu` -> `{id, nome, email, papel, alcada_centavos}`, lido da linha ativa em `equipe`. Sem ele o painel
+   não sabe o papel e **o modo api não consegue entrar**. É a única rota que impede o uso.
+2. Categorias: `GET /v1/admin/categorias` e `PUT /v1/admin/categorias/{id}` com `{ativa, motivo}` (papéis moderador e
+   administrador). Hoje a aba mostra "Esta função ainda não existe no servidor."
+3. Chamados de suporte: `GET /v1/admin/suporte/chamados` (atendente_n1/n2, lider_suporte, administrador). Idem.
+4. Opcionais para melhorar a tela: `categoria`/`cidade` na verificação; `cpf_mascarado` e e-mail mascarado nas listas de
+   usuários; nome (e-mail) de quem criou/aprovou a versão de configuração; `hash` na lista da auditoria.
 
-Sem `POST`, sem saque, sem saldo (D15). Os dados vêm do espelho do ledger, não de chamada ao provedor.
+## Pendências
 
-### F7.4 Busca, suporte e categorias
-
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `GET /v1/admin/usuarios?q=` | — | `[{id, nome, tipo, status, email_mascarado, cpf_mascarado}]` | `atendente_n1/n2`, `lider_suporte`, `cadastro`, `moderador`, `seguranca`, `dpo`, `administrador` |
-| `POST /v1/admin/usuarios/{id}/dados-pessoais/revelar` | `{motivo}` | `{email, cpf, telefone}` (audita `dado_pessoal.revelado`) | `cadastro`, `seguranca`, `dpo` |
-| `GET /v1/admin/pedidos?q=` | — | `[{id, titulo, cliente, status, valor_centavos}]` | `atendente_n1/n2`, `lider_suporte`, `mediador`, `moderador`, `financeiro`, `administrador` |
-| `GET /v1/admin/suporte/chamados?status=` | — | `[{id, assunto, solicitante, status, aberto_em}]` | `atendente_n1/n2`, `lider_suporte`, `administrador` |
-| `GET /v1/admin/categorias` | — | `[{id, nome, ativa, profissionais}]` | `moderador`, `administrador` |
-| `PUT /v1/admin/categorias/{id}` | `{ativa: bool, motivo}` | `{id, ativa}` | `moderador`, `administrador` |
-
-### F7.5 Configurações
-
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `GET /v1/admin/config` | — | `{definicoes:[{chave, descricao, unidade, minimo, maximo, exige_dupla_aprovacao}], versoes:[{id, numero, status, motivo, criada_por, criada_em, aprovada_por, valores:{chave: inteiro}}]}` | `financeiro`, `juridico`, `administrador` |
-| `POST /v1/admin/config/versoes` | `{valores:{chave: inteiro}, motivo}` | `{id, numero, status: "aguardando_aprovacao"}` | `financeiro`, `administrador` |
-| `POST /v1/admin/config/versoes/{id}/aprovacao` | `{motivo}` | `{status: "vigente"}` | `administrador`; `422` se for quem criou |
-| `POST /v1/admin/config/versoes/{id}/reversao` | `{motivo}` | `{id, numero}` (nova versão copiando a antiga, aguardando aprovação) | `financeiro`, `administrador` |
-
-O backend valida `minimo`/`maximo` de cada chave, a aprovação por outra pessoa (`criada_por <> aprovada_por`), a vigência
-agendada e que a versão aprovada é imutável. O painel mostra os limites que a API manda e não guarda valor nenhum.
-
-### F7.6 Auditoria
-
-| Método e caminho | Corpo | Resposta | Papel |
-|---|---|---|---|
-| `GET /v1/admin/auditoria?acao=&ator=&de=&ate=&pagina=` | — | `[{id, ocorrida_em, ator, acao, entidade, motivo, hash}]` | `seguranca`, `juridico`, `dpo`, `administrador` |
-| `POST /v1/admin/auditoria/verificar-cadeia` | — | `{ok, verificadas, primeira_quebra_id}` (grava `auditoria.cadeia_verificada`) | `seguranca`, `juridico`, `dpo`, `administrador` |
-
-Depende da cadeia de hash da auditoria (N16 em `docs/modelo-de-dados.md`), hoje uma proposta.
-
-## Pendências para ligar de verdade
-
-1. Backend: implementar os endpoints acima e a autenticação da equipe (Supabase Auth + papel em `equipe`), com MFA para
-   a equipe antes de produção (decisão do João).
-2. Painel: implementação HTTP de `ApiAdmin`, paginação, e o botão de aprovação da segunda pessoa na disputa.
+1. Rota `/eu` e demais itens acima; depois testar o modo api contra o backend de verdade.
+2. MFA da equipe antes de produção (decisão do João); paginação nas telas (hoje pedem 100 itens).
 3. Deploy do painel (Flutter Web build) e CORS: pedem o OK do João.
 4. Se o tema do app mudar, copiar de novo para `admin/lib/tema/` (ou extrair um pacote compartilhado).

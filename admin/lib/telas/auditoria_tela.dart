@@ -78,7 +78,8 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
           Padding(
             padding: const EdgeInsets.fromLTRB(EspacosTrato.x6, 0, EspacosTrato.x6, EspacosTrato.x3),
             child: cadeia.ok
-                ? BannerInfo('Cadeia íntegra: ${cadeia.verificadas} registros conferidos.', tom: Tom.ok, icone: Icons.verified_outlined)
+                ? BannerInfo(
+                    cadeia.verificadas == null ? 'Cadeia íntegra.' : 'Cadeia íntegra: ${cadeia.verificadas} registros conferidos.', tom: Tom.ok, icone: Icons.verified_outlined)
                 : BannerInfo(
                     'Cadeia quebrada a partir do registro ${cadeia.primeiraQuebraId}. Avise segurança e jurídico.',
                     tom: Tom.erro,
@@ -110,7 +111,7 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
                 child: TextField(
                   controller: _ator,
                   onSubmitted: (_) => _filtrar(),
-                  decoration: const InputDecoration(labelText: 'Quem (e-mail)'),
+                  decoration: const InputDecoration(labelText: 'Quem (id)'),
                 ),
               ),
               SizedBox(width: 120, child: FilledButton(onPressed: _filtrar, child: const Text('Filtrar'))),
@@ -144,7 +145,7 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
                         ),
                         Text('${e.ator} · ${formatarData(e.ocorridaEm)} · ${e.entidade}', style: TipografiaTrato.legenda),
                         if (e.motivo != null) Text('Motivo: ${e.motivo}', style: TipografiaTrato.corpoPequeno),
-                        Text('hash ${e.hash}', style: TipografiaTrato.legenda),
+                        if (e.hash != null) Text('hash ${e.hash}', style: TipografiaTrato.legenda),
                       ],
                     ),
                   ),

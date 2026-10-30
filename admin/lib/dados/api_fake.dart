@@ -85,9 +85,10 @@ class ApiFake implements ApiAdmin {
   Future<List<Verificacao>> listarVerificacoes() => _ler(() => _verificacoes, const []);
 
   @override
-  Future<void> revelarDocumento(String verificacaoId, String documento, String motivo) async {
+  Future<String?> revelarDocumento(String verificacaoId, String documento, String motivo) async {
     await Future<void>.delayed(atraso);
-    _registrar('dado_pessoal.revelado', 'verificacao:$verificacaoId', motivo);
+    _registrar('dado_pessoal.documento_revelado', 'verificacao:$verificacaoId', motivo);
+    return null;
   }
 
   @override
@@ -113,7 +114,6 @@ class ApiFake implements ApiAdmin {
     required DecisaoDisputa decisao,
     int? valorReembolsoCentavos,
     required String justificativa,
-    String? segundaPessoaEmail,
   }) async {
     await Future<void>.delayed(atraso);
     final d = _disputas.firstWhere((x) => x.id == id);
@@ -123,16 +123,27 @@ class ApiFake implements ApiAdmin {
       _ => null,
     };
     final acima = (valor ?? 0) > (_eu?.alcadaCentavos ?? 0);
-    if (acima && (segundaPessoaEmail == null || segundaPessoaEmail.isEmpty)) {
-      throw const ErroApi('Valor acima da alçada: informe a segunda pessoa.');
-    }
     final novo = acima ? StatusDisputa.aguardandoSegundaPessoa : StatusDisputa.decidida;
-    _disputas = [for (final x in _disputas) x.id == id ? x.comDecisao(novo, decisao, valor) : x];
+    _disputas = [for (final x in _disputas) x.id == id ? x.comDecisao(novo, decisao, valor, por: _eu?.id) : x];
     _registrar('disputa.decidida', 'disputa:$id', justificativa);
     return ResultadoDecisao(
       status: novo,
-      mensagem: acima ? 'Enviada para $segundaPessoaEmail aprovar.' : 'Decisão registrada.',
+      mensagem: acima ? 'Acima da alçada: aguarda a aprovação de outra pessoa.' : 'Decisão registrada.',
     );
+  }
+
+  @override
+  Future<ResultadoDecisao> aprovarDisputa(String id, {required String justificativa}) async {
+    await Future<void>.delayed(atraso);
+    final d = _disputas.firstWhere((x) => x.id == id);
+    if (d.decididoPor == _eu?.id) {
+      throw const ErroApi('Quem decidiu não aprova a própria decisão.', proibido: true);
+    }
+    _disputas = [
+      for (final x in _disputas) x.id == id ? x.comDecisao(StatusDisputa.decidida, x.decisao!, x.valorReembolsoCentavos) : x,
+    ];
+    _registrar('financeiro.disputa_decidida', 'disputa:$id', justificativa);
+    return const ResultadoDecisao(status: StatusDisputa.decidida, mensagem: 'Decisão aprovada.');
   }
 
   // ---------- F7.3 ----------
@@ -140,11 +151,18 @@ class ApiFake implements ApiAdmin {
   Future<ResumoConciliacao> resumoConciliacao() => _ler(
         () => ResumoConciliacao(
           confirmadoCentavos: 1284500,
-          aguardandoCentavos: 96000,
+          estornadoCentavos: 12000,
+          emAndamentoCentavos: 96000,
           divergencias: 1,
           atualizadoEm: _base,
         ),
-        ResumoConciliacao(confirmadoCentavos: 0, aguardandoCentavos: 0, divergencias: 0, atualizadoEm: _base),
+        ResumoConciliacao(
+          confirmadoCentavos: 0,
+          estornadoCentavos: 0,
+          emAndamentoCentavos: 0,
+          divergencias: 0,
+          atualizadoEm: _base,
+        ),
       );
 
   @override
@@ -372,7 +390,7 @@ class ApiFake implements ApiAdmin {
         numero: 3,
         status: StatusVersao.aguardandoAprovacao,
         motivo: 'Ajuste do prazo de confirmação depois da revisão jurídica',
-        criadaPor: 'financeiro@teste.local',
+        criadaPor: 'eq-financeiro',
         criadaEm: _base.subtract(const Duration(hours: 2)),
         valores: {...vigente, 'prazo_confirmacao_horas': 72},
       ),
@@ -381,8 +399,8 @@ class ApiFake implements ApiAdmin {
         numero: 2,
         status: StatusVersao.vigente,
         motivo: 'Valores do piloto',
-        criadaPor: 'financeiro@teste.local',
-        aprovadaPor: 'administrador@teste.local',
+        criadaPor: 'eq-financeiro',
+        aprovadaPor: 'eq-administrador',
         criadaEm: _base.subtract(const Duration(days: 3)),
         valores: vigente,
       ),
@@ -391,8 +409,8 @@ class ApiFake implements ApiAdmin {
         numero: 1,
         status: StatusVersao.substituida,
         motivo: 'Valores iniciais',
-        criadaPor: 'financeiro@teste.local',
-        aprovadaPor: 'administrador@teste.local',
+        criadaPor: 'eq-financeiro',
+        aprovadaPor: 'eq-administrador',
         criadaEm: _base.subtract(const Duration(days: 20)),
         valores: {...vigente, 'taxa_base_bps': 800},
       ),
@@ -425,7 +443,7 @@ class ApiFake implements ApiAdmin {
         numero: numero,
         status: StatusVersao.aguardandoAprovacao,
         motivo: motivo,
-        criadaPor: _eu?.email ?? '',
+        criadaPor: _eu?.id ?? '',
         criadaEm: _base.add(Duration(hours: numero)),
         valores: valores,
       ),
@@ -438,13 +456,13 @@ class ApiFake implements ApiAdmin {
   Future<void> aprovarConfig(String versaoId, String motivo) async {
     await Future<void>.delayed(atraso);
     final alvo = _versoes.firstWhere((v) => v.id == versaoId);
-    if (alvo.criadaPor == _eu?.email) {
+    if (alvo.criadaPor == _eu?.id) {
       throw const ErroApi('Quem propôs a mudança não pode aprová-la. Peça a outra pessoa.');
     }
     _versoes = [
       for (final v in _versoes)
         if (v.id == versaoId)
-          v.comStatus(StatusVersao.vigente, aprovadaPor: _eu?.email)
+          v.comStatus(StatusVersao.vigente, aprovadaPor: _eu?.id)
         else if (v.status == StatusVersao.vigente)
           v.comStatus(StatusVersao.substituida)
         else
@@ -452,6 +470,9 @@ class ApiFake implements ApiAdmin {
     ];
     _registrar('config.publicada', 'config:$versaoId', motivo);
   }
+
+  @override
+  Future<void> publicarConfig(String versaoId, String motivo) => aprovarConfig(versaoId, motivo);
 
   @override
   Future<void> reverterConfig(String versaoId, String motivo) async {
@@ -486,7 +507,7 @@ class ApiFake implements ApiAdmin {
         EntradaAuditoria(
           id: 1,
           ocorridaEm: _base.subtract(const Duration(days: 1)),
-          ator: 'administrador@teste.local',
+          ator: 'eq-administrador',
           acao: 'config.publicada',
           entidade: 'config:v2',
           motivo: 'Valores do piloto',

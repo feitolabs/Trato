@@ -109,6 +109,7 @@ class Disputa {
     this.status = StatusDisputa.emAnalise,
     this.decisao,
     this.valorReembolsoCentavos,
+    this.decididoPor,
   });
 
   final String id;
@@ -125,7 +126,10 @@ class Disputa {
   final DecisaoDisputa? decisao;
   final int? valorReembolsoCentavos;
 
-  Disputa comDecisao(StatusDisputa novo, DecisaoDisputa d, int? reembolso) => Disputa(
+  /// Id de quem decidiu (a segunda pessoa precisa ser outra).
+  final String? decididoPor;
+
+  Disputa comDecisao(StatusDisputa novo, DecisaoDisputa d, int? reembolso, {String? por}) => Disputa(
         id: id,
         pedido: pedido,
         cliente: cliente,
@@ -139,6 +143,7 @@ class Disputa {
         status: novo,
         decisao: d,
         valorReembolsoCentavos: reembolso,
+        decididoPor: por ?? decididoPor,
       );
 }
 
@@ -150,7 +155,7 @@ class ResultadoDecisao {
 }
 
 /// Estado do pagamento no provedor. O painel nunca mostra "pago" antes de `confirmado` (D13).
-enum StatusProvedor { aguardandoConfirmacao, confirmado, falhou, reembolsado }
+enum StatusProvedor { aguardandoConfirmacao, confirmado, falhou, reembolsado, reembolsadoParcial }
 
 class LancamentoEspelho {
   const LancamentoEspelho({
@@ -179,12 +184,14 @@ class LancamentoEspelho {
 class ResumoConciliacao {
   const ResumoConciliacao({
     required this.confirmadoCentavos,
-    required this.aguardandoCentavos,
+    required this.estornadoCentavos,
+    required this.emAndamentoCentavos,
     required this.divergencias,
     required this.atualizadoEm,
   });
   final int confirmadoCentavos;
-  final int aguardandoCentavos;
+  final int estornadoCentavos;
+  final int emAndamentoCentavos;
   final int divergencias;
   final DateTime atualizadoEm;
 }
@@ -195,22 +202,23 @@ class UsuarioBusca {
     required this.nome,
     required this.tipo,
     required this.status,
-    required this.emailMascarado,
-    required this.cpfMascarado,
+    this.emailMascarado,
+    this.cpfMascarado,
   });
   final String id;
   final String nome;
   final String tipo;
   final String status;
-  final String emailMascarado;
-  final String cpfMascarado;
+  final String? emailMascarado;
+  final String? cpfMascarado;
 }
 
 class DadosPessoais {
-  const DadosPessoais({required this.email, required this.cpf, required this.telefone});
-  final String email;
+  const DadosPessoais({this.email, required this.cpf, required this.telefone, this.nascimento});
+  final String? email;
   final String cpf;
   final String telefone;
+  final String? nascimento;
 }
 
 class PedidoBusca {
@@ -283,7 +291,7 @@ class ConfigDefinicao {
   final bool exigeDuplaAprovacao;
 }
 
-enum StatusVersao { rascunho, aguardandoAprovacao, vigente, substituida, revertida }
+enum StatusVersao { rascunho, aguardandoAprovacao, aprovada, vigente, substituida, revertida }
 
 class ConfigVersao {
   const ConfigVersao({
@@ -333,7 +341,7 @@ class EntradaAuditoria {
     required this.acao,
     required this.entidade,
     required this.motivo,
-    required this.hash,
+    this.hash,
   });
   final int id;
   final DateTime ocorridaEm;
@@ -343,13 +351,13 @@ class EntradaAuditoria {
   final String? motivo;
 
   /// Hash da linha (a cadeia é conferida pelo backend).
-  final String hash;
+  final String? hash;
 }
 
 class ResultadoCadeia {
-  const ResultadoCadeia({required this.ok, required this.verificadas, this.primeiraQuebraId});
+  const ResultadoCadeia({required this.ok, this.verificadas, this.primeiraQuebraId});
   final bool ok;
-  final int verificadas;
+  final int? verificadas;
   final int? primeiraQuebraId;
 }
 

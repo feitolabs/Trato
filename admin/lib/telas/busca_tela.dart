@@ -171,9 +171,10 @@ class _CartaoUsuarioState extends State<_CartaoUsuario> {
               ],
             ),
             const SizedBox(height: EspacosTrato.x2),
-            Linha('E-mail', d?.email ?? u.emailMascarado),
-            Linha('CPF', d?.cpf ?? u.cpfMascarado),
+            if ((d?.email ?? u.emailMascarado) != null) Linha('E-mail', (d?.email ?? u.emailMascarado)!),
+            if ((d?.cpf ?? u.cpfMascarado) != null) Linha('CPF', (d?.cpf ?? u.cpfMascarado)!),
             if (d != null) Linha('Telefone', d.telefone),
+            if (d?.nascimento != null) Linha('Nascimento', d!.nascimento!),
             if (d == null && context.pode(Permissao.dadosPessoaisRevelar))
               Align(
                 alignment: Alignment.centerLeft,

@@ -26,7 +26,7 @@ void main() {
   testWidgets('filtro sem resultado mostra vazio', (tester) async {
     await abrirPainel(tester, papel: 'seguranca');
     await irPara(tester, 'auditoria');
-    await tester.enterText(find.widgetWithText(TextField, 'Quem (e-mail)'), 'ninguem');
+    await tester.enterText(find.widgetWithText(TextField, 'Quem (id)'), 'ninguem');
     await tester.tap(find.text('Filtrar'));
     await tester.pumpAndSettle();
     expect(find.text('Nenhum registro com esse filtro.'), findsOneWidget);

@@ -15,6 +15,7 @@ class ConfigTela extends StatelessWidget {
   static (String, Tom) _chip(StatusVersao s) => switch (s) {
         StatusVersao.rascunho => ('Rascunho', Tom.neutro),
         StatusVersao.aguardandoAprovacao => ('Aguardando aprovação', Tom.alerta),
+        StatusVersao.aprovada => ('Aprovada, falta publicar', Tom.alerta),
         StatusVersao.vigente => ('Vigente', Tom.ok),
         StatusVersao.substituida => ('Substituída', Tom.neutro),
         StatusVersao.revertida => ('Revertida', Tom.info),
@@ -59,6 +60,19 @@ class _ConfigConteudo extends StatelessWidget {
     if (ok) await aoMudar();
   }
 
+  Future<void> _publicar(BuildContext context, ConfigVersao v) async {
+    final api = context.api;
+    final motivo = await pedirMotivo(
+      context,
+      titulo: 'Publicar versão ${v.numero}',
+      descricao: 'A versão passa a valer para novos contratos.',
+      rotuloConfirmar: 'Publicar',
+    );
+    if (motivo == null || !context.mounted) return;
+    final ok = await executar(context, () => api.publicarConfig(v.id, motivo), sucesso: 'Versão publicada.');
+    if (ok) await aoMudar();
+  }
+
   Future<void> _reverter(BuildContext context, ConfigVersao v) async {
     final api = context.api;
     final motivo = await pedirMotivo(
@@ -75,7 +89,7 @@ class _ConfigConteudo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vigente = config.versoes.where((v) => v.status == StatusVersao.vigente).firstOrNull;
-    final meuEmail = context.eu?.email;
+    final meuId = context.eu?.id;
     return ListView(
       padding: const EdgeInsets.fromLTRB(EspacosTrato.x6, 0, EspacosTrato.x6, EspacosTrato.x8),
       children: [
@@ -127,7 +141,7 @@ class _ConfigConteudo extends StatelessWidget {
                   if (v.status == StatusVersao.aguardandoAprovacao && context.pode(Permissao.configAprovar))
                     Padding(
                       padding: const EdgeInsets.only(top: EspacosTrato.x3),
-                      child: v.criadaPor == meuEmail
+                      child: v.criadaPor == meuId
                           ? const BannerInfo(
                               'Você propôs esta versão. Outra pessoa precisa aprovar (aprovação dupla).',
                               tom: Tom.alerta,
@@ -142,6 +156,20 @@ class _ConfigConteudo extends StatelessWidget {
                                 ),
                               ),
                             ),
+                    ),
+                  if (v.status == StatusVersao.aprovada && context.pode(Permissao.configAprovar))
+                    Padding(
+                      padding: const EdgeInsets.only(top: EspacosTrato.x3),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: 200,
+                          child: FilledButton(
+                            onPressed: () => _publicar(context, v),
+                            child: const Text('Publicar versão'),
+                          ),
+                        ),
+                      ),
                     ),
                   if ((v.status == StatusVersao.substituida || v.status == StatusVersao.revertida) &&
                       context.pode(Permissao.configPropor))

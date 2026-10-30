@@ -16,6 +16,7 @@ class PagamentosTela extends StatelessWidget {
         StatusProvedor.confirmado => ('Confirmado pelo provedor', Tom.ok),
         StatusProvedor.falhou => ('Falhou', Tom.erro),
         StatusProvedor.reembolsado => ('Reembolsado', Tom.info),
+        StatusProvedor.reembolsadoParcial => ('Reembolsado em parte', Tom.info),
       };
 
   @override
@@ -53,7 +54,8 @@ class PagamentosTela extends StatelessWidget {
                     runSpacing: EspacosTrato.x3,
                     children: [
                       _Resumo('Confirmado pelo provedor', formatarReais(resumo.confirmadoCentavos)),
-                      _Resumo('Aguardando confirmação', formatarReais(resumo.aguardandoCentavos)),
+                      _Resumo('Reembolsado', formatarReais(resumo.estornadoCentavos)),
+                      _Resumo('Em andamento', formatarReais(resumo.emAndamentoCentavos)),
                       _Resumo('Divergências', '${resumo.divergencias}',
                           alerta: resumo.divergencias > 0),
                     ],
