@@ -2,37 +2,32 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
 import 'avatar_iniciais.dart';
 import 'modelos.dart';
 
-/// Tela 10 do protótipo: perfil do profissional. Só abre para quem tem [Profissional.detalhe].
-/// As fotos de trabalhos e o texto da avaliação são os marcadores do protótipo ("[Foto]").
+/// Tela 10 do protótipo: perfil público do profissional. Só abre para quem tem
+/// [Profissional.detalhe]. Abre da busca, da categoria e do orçamento.
+///
+/// O selo de verificação mostra só o que foi conferido no cadastro; a tela não promete
+/// segurança. [aoPedirOrcamento] abre o Novo pedido; [aoVerAvaliacoes] abre a lista completa.
 class PerfilProfissionalTela extends StatelessWidget {
-  PerfilProfissionalTela({super.key, required this.profissional})
-      : assert(profissional.detalhe != null);
+  PerfilProfissionalTela({
+    super.key,
+    required this.profissional,
+    this.aoPedirOrcamento,
+    this.aoVerAvaliacoes,
+  }) : assert(profissional.detalhe != null);
 
   final Profissional profissional;
-
-  void _emBreve(BuildContext context, String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
-      );
+  final ValueChanged<Profissional>? aoPedirOrcamento;
+  final ValueChanged<Profissional>? aoVerAvaliacoes;
 
   @override
   Widget build(BuildContext context) {
     final p = profissional;
     final d = p.detalhe!;
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          IconButton(
-            tooltip: 'Favoritar',
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () => _emBreve(context, 'Favoritos'),
-          ),
-          const SizedBox(width: EspacosTrato.x2),
-        ],
-      ),
+      appBar: AppBar(),
       body: SafeArea(
         child: ConteudoResponsivo(
           child: SingleChildScrollView(
@@ -54,7 +49,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                           SeloVerificacao(p.verificacao),
                           const SizedBox(height: EspacosTrato.x1),
                           Text(
-                            'Eletricista · no Trato desde ${d.noTratoDesde}',
+                            '${p.especialidade} · no Trato desde ${d.noTratoDesde}',
                             style: TipografiaTrato.corpoPequeno
                                 .copyWith(color: CoresTrato.textoSecundario),
                           ),
@@ -92,6 +87,29 @@ class PerfilProfissionalTela extends StatelessWidget {
                     Expanded(child: _Indicador(rotulo: 'Responde em', valor: d.respondeEm)),
                   ],
                 ),
+                if (d.bio != null && d.bio!.isNotEmpty) ...[
+                  const SizedBox(height: EspacosTrato.x6),
+                  Text('Sobre', style: TipografiaTrato.titulo),
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(d.bio!, style: TipografiaTrato.corpo),
+                ],
+                if (d.servicos.isNotEmpty) ...[
+                  const SizedBox(height: EspacosTrato.x6),
+                  Text('Serviços', style: TipografiaTrato.titulo),
+                  const SizedBox(height: EspacosTrato.x3),
+                  Wrap(
+                    spacing: EspacosTrato.x2,
+                    runSpacing: EspacosTrato.x2,
+                    children: [
+                      for (final servico in d.servicos)
+                        Chip(
+                          label: Text(servico, style: TipografiaTrato.corpoPequeno),
+                          backgroundColor: CoresTrato.superficie,
+                          side: const BorderSide(color: CoresTrato.borda),
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: EspacosTrato.x6),
                 Text('Verificações', style: TipografiaTrato.titulo),
                 const SizedBox(height: EspacosTrato.x3),
@@ -107,14 +125,23 @@ class PerfilProfissionalTela extends StatelessWidget {
                       ],
                     ),
                   ),
-                const SizedBox(height: EspacosTrato.x3),
+                Text(
+                  'O selo mostra o que foi conferido no cadastro. Compare os orçamentos e '
+                  'converse antes de decidir.',
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                ),
+                const SizedBox(height: EspacosTrato.x6),
                 Text('Trabalhos', style: TipografiaTrato.titulo),
                 const SizedBox(height: EspacosTrato.x3),
                 Row(
                   children: [
                     for (var i = 0; i < d.fotosTrabalhos; i++) ...[
                       if (i > 0) const SizedBox(width: EspacosTrato.x3),
-                      const Expanded(child: _FotoReservada()),
+                      Expanded(
+                        child: _FotoReservada(
+                          legenda: i < d.trabalhos.length ? d.trabalhos[i] : 'Trabalho ${i + 1}',
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -122,15 +149,16 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(child: Text('Avaliações', style: TipografiaTrato.titulo)),
-                    BotaoLink(
-                      texto: 'Ver as ${d.totalAvaliacoes}',
-                      aoTocar: () => _emBreve(context, 'Avaliações de ${p.nome}'),
-                    ),
+                    if (aoVerAvaliacoes != null)
+                      BotaoLink(
+                        texto: 'Ver as ${d.totalAvaliacoes}',
+                        aoTocar: () => aoVerAvaliacoes!(p),
+                      ),
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x2),
                 for (final a in d.avaliacoes) ...[
-                  _CartaoAvaliacao(avaliacao: a),
+                  CartaoAvaliacao(avaliacao: a),
                   const SizedBox(height: EspacosTrato.x3),
                 ],
               ],
@@ -159,7 +187,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: Responsivo.larguraMaximaConteudo),
                 child: BotaoPrimario(
                   texto: 'Pedir orçamento ao ${p.primeiroNome}',
-                  aoTocar: () => _emBreve(context, 'Novo pedido'),
+                  aoTocar: aoPedirOrcamento == null ? null : () => aoPedirOrcamento!(p),
                 ),
               ),
             ),
@@ -218,9 +246,12 @@ class _Indicador extends StatelessWidget {
   }
 }
 
-/// Marcador de foto do protótipo (quadrado azul-claro com "[Foto]").
+/// Espaço da foto de um trabalho do portfólio: quadrado azul-claro com a legenda. A foto em si
+/// chega por URL assinada quando o portfólio tiver imagens.
 class _FotoReservada extends StatelessWidget {
-  const _FotoReservada();
+  const _FotoReservada({required this.legenda});
+
+  final String legenda;
 
   @override
   Widget build(BuildContext context) {
@@ -233,10 +264,12 @@ class _FotoReservada extends StatelessWidget {
           color: CoresTrato.azulClaro,
           borderRadius: BorderRadius.circular(EspacosTrato.raio),
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
+        child: Semantics(
+          label: 'Trabalho: $legenda',
           child: Text(
-            '[Foto]',
+            legenda,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TipografiaTrato.corpoPequeno.copyWith(
               color: CoresTrato.petroleo,
               fontWeight: FontWeight.w600,
@@ -248,8 +281,8 @@ class _FotoReservada extends StatelessWidget {
   }
 }
 
-class _CartaoAvaliacao extends StatelessWidget {
-  const _CartaoAvaliacao({required this.avaliacao});
+class CartaoAvaliacao extends StatelessWidget {
+  const CartaoAvaliacao({super.key, required this.avaliacao});
 
   final Avaliacao avaliacao;
 

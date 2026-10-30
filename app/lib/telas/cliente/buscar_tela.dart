@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
 import 'avatar_iniciais.dart';
 import 'dados_exemplo.dart';
 import 'modelos.dart';
@@ -46,10 +45,15 @@ class _BuscarTelaState extends State<BuscarTela> {
   }
 
   void _abrirPerfil(Profissional p) {
-    final tela = p.detalhe == null
-        ? EmBreveTela(titulo: 'Perfil de ${p.nome}')
-        : PerfilProfissionalTela(profissional: p);
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => tela));
+    if (p.detalhe == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Perfil indisponível por enquanto.')));
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => PerfilProfissionalTela(profissional: p)),
+    );
   }
 
   @override

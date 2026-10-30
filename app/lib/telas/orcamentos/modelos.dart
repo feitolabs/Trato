@@ -60,7 +60,11 @@ class Orcamento {
     required this.garantia,
     required this.observacao,
     this.detalhe,
+    this.profissionalId,
   });
+
+  /// Id do profissional na API; com ele, o perfil público abre direto. Nulo nos dados de exemplo.
+  final String? profissionalId;
 
   final String id;
   final String profissional;

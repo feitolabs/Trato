@@ -388,6 +388,7 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
       garantia: garantia == null ? '' : '$garantia dias',
       observacao: (j['observacoes'] as String?) ?? '',
       detalhe: detalhe,
+      profissionalId: j['profissional_id'] as String?,
     );
   }
 

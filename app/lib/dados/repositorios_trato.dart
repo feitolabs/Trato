@@ -7,6 +7,9 @@ import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'config.dart';
 import 'repositorios.dart';
+import 'repositorios_catalogo.dart';
+import 'repositorios_catalogo_api.dart';
+import 'repositorios_catalogo_fake.dart';
 import 'repositorios_api.dart';
 import 'repositorios_fake.dart';
 import 'servico_upload.dart';
@@ -16,7 +19,7 @@ import 'sessao.dart';
 /// Todos os repositórios do app num lugar só. O `rotas.dart` entrega o que precisa a cada
 /// tela; as telas não sabem se estão falando com a API ou com dados de exemplo.
 class RepositoriosTrato {
-  const RepositoriosTrato({
+  RepositoriosTrato({
     required this.pedidos,
     required this.orcamentos,
     required this.pagamento,
@@ -28,7 +31,13 @@ class RepositoriosTrato {
     this.notaMaterial,
     this.verificacao,
     this.capturaVerificacao,
-  });
+    RepositorioCatalogo? catalogo,
+    RepositorioServicosCliente? servicos,
+    RepositorioAgenda? agenda,
+    this.modoApi = false,
+  })  : _catalogo = catalogo,
+        _servicos = servicos,
+        _agenda = agenda;
 
   /// Modo demonstração: só dados de exemplo, sem rede.
   factory RepositoriosTrato.demo() => RepositoriosTrato(
@@ -39,6 +48,9 @@ class RepositoriosTrato {
         notificacoes: RepositorioNotificacoesFake(),
         perfil: RepositorioPerfilFake(),
         profissional: RepositorioProfissionalFake(),
+        catalogo: RepositorioCatalogoFake(),
+        servicos: RepositorioServicosClienteFake(),
+        agenda: RepositorioAgendaFake(),
       );
 
   /// Modo API. Cada área usa a API quando o backend já tem a rota; o que não tem rota segue em
@@ -51,26 +63,33 @@ class RepositoriosTrato {
     CapturaCheckIn Function(String pedidoId)? capturaDoPedido,
     ServicoUpload? upload,
     ServicoCamera? camera,
-  }) =>
-      RepositoriosTrato(
-        pedidos: RepositorioPedidosApi(api),
+  }) {
+    final pedidos = RepositorioPedidosApi(api);
+    final profissional = RepositorioProfissionalApi(
+      api,
+      captura: captura,
+      capturaDoPedido: capturaDoPedido,
+      upload: upload,
+    );
+    return RepositoriosTrato(
+        modoApi: true,
+        catalogo: RepositorioCatalogoApi(api),
+        servicos: RepositorioServicosClienteApi(api, pedidos),
+        agenda: RepositorioAgendaApi(profissional),
+        pedidos: pedidos,
         orcamentos: RepositorioOrcamentosApi(api),
         pagamento: RepositorioPagamentoApi(api),
         chat: RepositorioChatApi(api),
         notificacoes: RepositorioNotificacoesApi(api),
         perfil: RepositorioPerfilApi(api),
-        profissional: RepositorioProfissionalApi(
-          api,
-          captura: captura,
-          capturaDoPedido: capturaDoPedido,
-          upload: upload,
-        ),
+        profissional: profissional,
         aditivo: ServicoAditivoApi(api),
         notaMaterial: ServicoNotaMaterialApi(api),
         verificacao: ServicoVerificacaoApi(api),
         capturaVerificacao:
             camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
-      );
+    );
+  }
 
   factory RepositoriosTrato.deConfig(
     ConfigTrato config,
@@ -99,6 +118,10 @@ class RepositoriosTrato {
     );
   }
 
+  /// Verdadeiro no modo `api`. Algumas telas só aparecem onde há dados de verdade por trás
+  /// (ex.: conversa antes de contratar, que o backend ainda não tem).
+  final bool modoApi;
+
   /// Só no modo API; `null` = a rota segue com o serviço de demonstração.
   final ServicoAditivo? aditivo;
   final ServicoNotaMaterial? notaMaterial;
@@ -112,4 +135,13 @@ class RepositoriosTrato {
   final RepositorioNotificacoes notificacoes;
   final RepositorioPerfil perfil;
   final RepositorioProfissional profissional;
+
+  /// Catálogo, serviços do cliente e agenda: sem eles (testes antigos), usa a demonstração.
+  final RepositorioCatalogo? _catalogo;
+  final RepositorioServicosCliente? _servicos;
+  final RepositorioAgenda? _agenda;
+
+  late final RepositorioCatalogo catalogo = _catalogo ?? RepositorioCatalogoFake();
+  late final RepositorioServicosCliente servicos = _servicos ?? RepositorioServicosClienteFake();
+  late final RepositorioAgenda agenda = _agenda ?? RepositorioAgendaFake();
 }

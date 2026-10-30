@@ -77,6 +77,15 @@ class InicioProfissional {
   final ProximoAtendimento? proximo;
   final ResumoCarteira carteira;
   final List<PedidoAberto> pedidos;
+
+  /// Mesmo início com outra lista de pedidos abertos (depois de aplicar filtros).
+  InicioProfissional comPedidos(List<PedidoAberto> novos) => InicioProfissional(
+        nome: nome,
+        disponivelAgora: disponivelAgora,
+        proximo: proximo,
+        carteira: carteira,
+        pedidos: novos,
+      );
 }
 
 /// Linha "rótulo e valor" da tabela de detalhes (Serviços, Tomadas, Prazo...).

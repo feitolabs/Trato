@@ -123,6 +123,8 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
           titulo: 'Carlos Mendes chegou',
           texto: 'Check-in feito às 14h06. Passe o código de início para começar.',
           quando: 'há 2 h',
+          tipo: 'pedido',
+          destinoId: 'srv-tomadas',
         ),
         Notificacao(
           id: 'n2',
@@ -130,6 +132,8 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
           texto: 'Você recebeu 2 orçamentos para "Instalar ventilador de teto".',
           quando: 'ontem',
           lida: true,
+          tipo: 'orcamento',
+          destinoId: 'srv-orcamentos',
         ),
         Notificacao(
           id: 'n3',
@@ -137,7 +141,7 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
           texto: 'O cliente abriu uma disputa. Responda dentro do prazo.',
           quando: 'ontem',
           tipo: 'disputa',
-          destinoId: 'disp-1',
+          destinoId: 'srv-vazamento',
         ),
         Notificacao(
           id: 'n4',
@@ -145,7 +149,25 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
           texto: 'Escolha um horário para refazer o serviço.',
           quando: 'há 3 dias',
           tipo: 'retrabalho',
-          destinoId: 'disp-1',
+          destinoId: 'srv-vazamento',
+        ),
+        Notificacao(
+          id: 'n5',
+          titulo: 'Nova mensagem de Carlos Mendes',
+          texto: 'Posso passar amanhã às 9h?',
+          quando: 'há 3 dias',
+          lida: true,
+          tipo: 'mensagem',
+          destinoId: 'pedido-1',
+        ),
+        Notificacao(
+          id: 'n6',
+          titulo: 'Pagamento pendente',
+          texto: 'O orçamento de "Instalar 4 luminárias" aguarda o seu pagamento.',
+          quando: 'há 4 dias',
+          lida: true,
+          tipo: 'pagamento',
+          destinoId: 'srv-pagamento',
         ),
       ];
 }

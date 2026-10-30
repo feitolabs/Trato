@@ -4,7 +4,6 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
-import '../em_breve_tela.dart';
 import '../pedido_novo/pecas_pedido.dart';
 import 'dados_exemplo.dart';
 import 'detalhe_orcamento_tela.dart';
@@ -13,7 +12,7 @@ import 'modelos.dart';
 /// Tela 12 do protótipo: "Orçamentos recebidos", com ordenação por valor, nota ou data.
 ///
 /// [aoVerOrcamento] abre o detalhe. Sem ele, abre [DetalheOrcamentoTela] quando o orçamento
-/// tem detalhe e [EmBreveTela] quando não tem.
+/// tem detalhe e não faz nada quando não tem.
 final _padrao = orcamentosExemplo;
 
 class OrcamentosRecebidosTela extends StatefulWidget {
@@ -53,10 +52,10 @@ class _OrcamentosRecebidosTelaState extends State<OrcamentosRecebidosTela> {
       widget.aoVerOrcamento!(o);
       return;
     }
-    final tela = o.detalhe == null
-        ? EmBreveTela(titulo: 'Orçamento de ${o.profissional}')
-        : DetalheOrcamentoTela(orcamento: o);
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => tela));
+    if (o.detalhe == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DetalheOrcamentoTela(orcamento: o)),
+    );
   }
 
   @override

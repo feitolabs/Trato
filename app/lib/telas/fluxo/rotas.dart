@@ -15,8 +15,23 @@ import '../aditivo/criar_aditivo_tela.dart';
 import '../aditivo/responder_aditivo_tela.dart';
 import '../busca/busca_profissionais_tela.dart';
 import '../busca/modelos.dart';
-import '../busca/servico_fake.dart';
-import '../cliente/modelos.dart' show Profissional;
+import '../../dados/repositorios_catalogo.dart';
+import '../../dados/repositorios_catalogo_fake.dart' show ServicosExemplo;
+import '../agenda/agenda_tela.dart';
+import '../catalogo/avaliacoes_profissional_tela.dart';
+import '../catalogo/categoria_tela.dart';
+import '../catalogo/todas_categorias_tela.dart';
+import '../cliente/dados_exemplo.dart' as cliente_exemplo;
+import '../cliente/inicio_tela.dart';
+import '../cliente/modelos.dart' show CategoriaServico, DadosInicio, Profissional;
+import '../legal/texto_legal_tela.dart';
+import '../mensagens/modelos.dart' show ServicoMensagens;
+import '../mensagens/servico_pedidos.dart';
+import '../orcamentos/modelos.dart' show Orcamento;
+import '../pedido_novo/modelos.dart' show FormularioPedido;
+import '../servicos/detalhe_servico_tela.dart';
+import '../servicos/modelos.dart';
+import '../servicos/servicos_recentes_tela.dart';
 import '../cliente/perfil_profissional_tela.dart';
 import '../disputa_profissional/atender_retrabalho_tela.dart';
 import '../disputa_profissional/disputa.dart';
@@ -85,7 +100,15 @@ abstract final class RotasTrato {
   static ServicoAditivo get servicoAditivo => repos.aditivo ?? _aditivoDemo;
   static ServicoDisputaProfissional servicoDisputa =
       ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo);
-  static ServicoBusca servicoBusca = const ServicoBuscaFake();
+
+  /// Busca por texto: pede ao catálogo (modo `api`: demonstração até a rota de busca existir).
+  static ServicoBusca get servicoBusca => _ServicoBuscaCatalogo(repos.catalogo);
+
+  /// Lista de conversas da aba Mensagens. No modo `api` vem dos pedidos (uma conversa por
+  /// pedido contratado); na demonstração, dados de exemplo.
+  static ServicoMensagens get _servicoMensagens => repos.modoApi
+      ? ServicoMensagensDosPedidos(repos.pedidos)
+      : const ServicoMensagensFake();
 
   /// Sessão do cliente HTTP, para o "Sair" limpar o token. O `main.dart` liga.
   static SessaoTrato? sessao;
@@ -159,25 +182,214 @@ abstract final class RotasTrato {
     );
   }
 
-  /// Perfil público do profissional (a partir de orçamentos e da busca). Hoje a busca de
-  /// demonstração é quem sabe montar o perfil; sem perfil, avisa em vez de abrir tela vazia.
+  /// Perfil público de quem enviou o orçamento. Com o id do profissional (API), abre direto;
+  /// sem ele, procura pelo nome no catálogo.
+  static Future<void> abrirPerfilDoOrcamento(BuildContext context, Orcamento o) async {
+    if (o.profissionalId != null) {
+      abrirPerfil(
+        context,
+        Profissional(
+          id: o.profissionalId,
+          nome: o.profissional,
+          iniciais: o.iniciais,
+          verificacao: o.verificacao,
+          especialidade: '',
+          servicosConcluidos: o.servicosConcluidos,
+          nota: o.nota,
+          distanciaKm: 0,
+        ),
+      );
+      return;
+    }
+    await abrirPerfilProfissional(context, o.profissional);
+  }
+
+  /// Procura o profissional pelo nome no catálogo; sem perfil, avisa em vez de abrir tela vazia.
   static Future<void> abrirPerfilProfissional(BuildContext context, String nome) async {
-    final navegador = Navigator.of(context);
     var achados = <Profissional>[];
-    final ok = await _tentar(context, () async => achados = await servicoBusca.buscar(nome));
+    final ok = await _tentar(context, () async => achados = await repos.catalogo.buscar(nome));
     if (!ok) return;
-    final p = achados.where((x) => x.nome == nome && x.detalhe != null).firstOrNull;
+    final p = achados.where((x) => x.nome == nome).firstOrNull;
     if (p == null) {
       if (context.mounted) _avisoSimples(context, _perfilIndisponivel);
       return;
     }
-    await navegador.push(
-      MaterialPageRoute<void>(builder: (_) => PerfilProfissionalTela(profissional: p)),
+    if (context.mounted) abrirPerfil(context, p);
+  }
+
+  /// Perfil público de [p] (da busca, da categoria, do orçamento ou do serviço). Sem os dados
+  /// completos, busca pelo id no catálogo.
+  static void abrirPerfil(BuildContext context, Profissional p) => _abrir<void>(
+        context,
+        Carregador<Profissional>(
+          carregar: () async => p.detalhe != null || p.id == null
+              ? p
+              : await repos.catalogo.perfil(p.id!),
+          vazio: (perfil) => perfil.detalhe == null,
+          tituloVazio: 'Perfil indisponível',
+          textoVazio: 'Este perfil ainda não tem as informações completas.',
+          construir: (context, perfil) => PerfilProfissionalTela(
+            profissional: perfil,
+            aoPedirOrcamento: (x) => _pedirOrcamentoA(context, x),
+            aoVerAvaliacoes: (x) => _abrir<void>(
+              context,
+              AvaliacoesProfissionalTela(profissional: x),
+            ),
+          ),
+        ),
+      );
+
+  /// "Pedir orçamento" no perfil: abre o Novo pedido na categoria do profissional.
+  static Future<void> _pedirOrcamentoA(BuildContext context, Profissional p) async {
+    CategoriaServico? categoria;
+    final ok = await _tentar(context, () async {
+      final todas = await repos.catalogo.categorias();
+      categoria = todas.where((c) => c.id == p.categoriaId).firstOrNull;
+    });
+    if (!ok || !context.mounted) return;
+    abrirNovoPedido(context, categoria: categoria);
+  }
+
+  // --- Cliente: catálogo, serviços, notificações, termos ------------------------------
+
+  /// Novo pedido. Sem [categoria], o cliente escolhe uma antes (passo 1).
+  static void abrirNovoPedido(BuildContext context, {CategoriaServico? categoria}) =>
+      _abrir<void>(context, categoria == null ? _escolherCategoria() : _novoPedido(categoria));
+
+  static Widget _escolherCategoria() => Builder(
+        builder: (context) => TodasCategoriasTela(
+          titulo: 'Que serviço você precisa?',
+          carregar: repos.catalogo.categorias,
+          aoEscolher: (c) => Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => _novoPedido(c)),
+          ),
+        ),
+      );
+
+  static void abrirTodasCategorias(BuildContext context) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => TodasCategoriasTela(
+            carregar: repos.catalogo.categorias,
+            aoEscolher: (c) => abrirCategoria(context, c),
+          ),
+        ),
+      );
+
+  static void abrirCategoria(BuildContext context, CategoriaServico categoria) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => CategoriaTela(
+            categoria: categoria,
+            carregar: (filtro) => repos.catalogo.profissionais(categoria.id, filtro),
+            aoAbrirProfissional: (p) => abrirPerfil(context, p),
+            aoPedirOrcamento: (_) => abrirNovoPedido(context, categoria: categoria),
+          ),
+        ),
+      );
+
+  static void abrirServicos(BuildContext context) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => ServicosRecentesTela(
+            carregar: repos.servicos.recentes,
+            aoAbrir: (s) => abrirServico(context, s.pedidoId ?? _idDemo),
+          ),
+        ),
+      );
+
+  /// Detalhe do serviço (pedido) com as ações possíveis em cada estado.
+  static void abrirServico(BuildContext context, String pedidoId) => _abrir<void>(
+        context,
+        Carregador<DetalheServico>(
+          carregar: () => repos.servicos.detalhe(pedidoId),
+          construir: (context, dados) => DetalheServicoTela(
+            dados: dados,
+            aoAcao: (acao) => _acaoDoServico(context, acao, pedidoId),
+            aoVerProfissional: (pro) => abrirPerfil(
+              context,
+              Profissional(
+                id: pro.id,
+                nome: pro.nome,
+                iniciais: pro.iniciais,
+                verificacao: pro.verificacao ?? 'Verificado',
+                especialidade: '',
+                servicosConcluidos: 0,
+                nota: 0,
+                distanciaKm: 0,
+              ),
+            ),
+          ),
+        ),
+      );
+
+  static void _acaoDoServico(BuildContext context, AcaoServico acao, String pedidoId) {
+    switch (acao) {
+      case AcaoServico.verOrcamentos:
+        _abrir<void>(context, _orcamentosRecebidos(pedidoId));
+      case AcaoServico.pagar:
+        _abrir<void>(context, _pagamento(pedidoId));
+      case AcaoServico.acompanhar:
+        _abrir<void>(context, _pedidoEmExecucao(pedidoId));
+      case AcaoServico.conversar:
+        _abrir<void>(context, _chat(pedidoId));
+      case AcaoServico.avaliar:
+        _abrir<void>(context, _avaliacao(pedidoId));
+      case AcaoServico.verGarantia:
+        abrirGarantia(context, pedidoId: pedidoId);
+      case AcaoServico.abrirProblema:
+        _abrir<void>(context, _relatarProblema(pedidoId));
+    }
+  }
+
+  /// Notificações. [profissional] muda para onde o toque leva (disputa e retrabalho abrem as
+  /// telas do profissional; o cliente vê o serviço).
+  static void abrirNotificacoes(BuildContext context, {bool profissional = false}) =>
+      _abrir<void>(context, _notificacoes(profissional: profissional));
+
+  /// Termos de uso e política de privacidade (rascunhos; a tela avisa que serão revisados).
+  static void abrirTermos(BuildContext context) => _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => TermosEPoliticaTela(aoAbrir: (t) => abrirTextoLegal(context, t)),
+        ),
+      );
+
+  static void abrirTextoLegal(BuildContext context, TextoLegal texto) =>
+      _abrir<void>(context, TextoLegalTela.de(texto));
+
+  /// Aba "Início" do cliente: carrega nome, categorias, pedido em andamento e serviços recentes.
+  static Widget abaInicio({required VoidCallback aoBuscar}) => Carregador<DadosInicio>(
+        carregar: _carregarInicio,
+        construir: (context, dados) => InicioTela(
+          aoBuscar: aoBuscar,
+          dados: dados,
+          aoAbrirNotificacoes: () => abrirNotificacoes(context),
+          aoNovoPedido: () => abrirNovoPedido(context),
+          aoAbrirPedidoEmAndamento: (p) => abrirServico(context, p.pedidoId ?? _idDemo),
+          aoAbrirCategoria: (c) => abrirCategoria(context, c),
+          aoVerTodasCategorias: () => abrirTodasCategorias(context),
+          aoAbrirServico: (s) => abrirServico(context, s.pedidoId ?? _idDemo),
+          aoVerServicos: () => abrirServicos(context),
+        ),
+      );
+
+  static Future<DadosInicio> _carregarInicio() async {
+    final (perfil, categorias, andamento, recentes) = await (
+      repos.perfil.carregar(),
+      repos.catalogo.categorias(),
+      repos.servicos.emAndamento(),
+      repos.servicos.recentes(),
+    ).wait;
+    return DadosInicio(
+      nome: perfil.nome.trim().split(' ').first,
+      categorias: categorias,
+      emAndamento: andamento,
+      recentes: recentes,
     );
   }
 
   static const _perfilIndisponivel = 'Perfil indisponível por enquanto.';
-  static const _emAnalise = 'Este pedido está em análise. Avisamos aqui quando houver novidade.';
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static void irParaProfissional(BuildContext context) => _abrirCadastroProfissional(context);
@@ -230,6 +442,19 @@ abstract final class RotasTrato {
           ),
           abaCarteira: _abaCarteira(),
           abaPerfil: _abaPerfilProfissional(),
+          abaAgenda: _abaAgenda(),
+          abaConversas: Builder(
+            builder: (context) => ListaConversas(
+              servico: repos.modoApi
+                  ? ServicoMensagensDoProfissional(repos.profissional)
+                  : const ServicoMensagensFake(),
+              textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
+              aoAbrirConversa: (c) => _abrir<void>(context, _chat(c.pedidoId)),
+            ),
+          ),
+          carregarPedidos: repos.profissional.pedidosAbertos,
+          carregarCategorias: repos.catalogo.categorias,
+          aoAbrirNotificacoes: () => abrirNotificacoes(context, profissional: true),
           aoFazerCheckIn: () => _acoesPedidoProfissional(
             context,
             pedidoId: inicio.proximo?.pedidoId ?? _idDemo,
@@ -252,6 +477,28 @@ abstract final class RotasTrato {
             CalculadoraOrcamentoTela(
               servico: repos.profissional.servicoOrcamento(_idDemo),
               tituloPedido: inicio.pedidos.isEmpty ? 'Orçamento' : inicio.pedidos.first.titulo,
+            ),
+          ),
+        ),
+      );
+
+  /// Aba Agenda: atendimentos por dia; cada um abre as ações do pedido (check-in, nota, aditivo).
+  static Widget _abaAgenda() => Builder(
+        builder: (context) => AgendaTela(
+          carregar: repos.agenda.listar,
+          aoFazerCheckIn: (a) => _acoesPedidoProfissional(
+            context,
+            pedidoId: a.pedidoId,
+            titulo: a.titulo,
+            aoCheckIn: () => _abrir<void>(
+              context,
+              CheckInTela(
+                servico: ServicoCheckInDispositivo(
+                  base: repos.profissional.servicoCheckIn(a.pedidoId),
+                  dispositivo: dispositivo,
+                ),
+                tituloBarra: '${a.titulo} · ${a.horario}',
+              ),
             ),
           ),
         ),
@@ -398,7 +645,9 @@ abstract final class RotasTrato {
               case AcaoPerfil.usarComoProfissional:
                 irParaProfissional(context);
               case AcaoPerfil.notificacoes:
-                _abrir<void>(context, _notificacoes());
+                abrirNotificacoes(context);
+              case AcaoPerfil.termos:
+                abrirTermos(context);
               case AcaoPerfil.meusDados:
                 _abrir<void>(
                   context,
@@ -416,13 +665,15 @@ abstract final class RotasTrato {
         ),
       );
 
-  /// Itens do Perfil sem tela ainda (dados pessoais, endereços, pagamento, favoritos, contatos,
-  /// termos) saem da lista em vez de abrir "Em breve". Voltam quando a tela existir.
+  /// Itens do Perfil sem tela ainda (dados pessoais, endereços, pagamento, favoritos, contatos)
+  /// saem da lista em vez de abrir uma tela vazia. Voltam quando a tela existir
+  /// (`docs/placeholders.md`).
   static const _acoesComTela = {
     AcaoPerfil.usarComoProfissional,
     AcaoPerfil.notificacoes,
     AcaoPerfil.meusDados,
     AcaoPerfil.centralAjuda,
+    AcaoPerfil.termos,
   };
 
   static PerfilCliente _soComDestino(PerfilCliente p) => PerfilCliente(
@@ -445,12 +696,12 @@ abstract final class RotasTrato {
   /// Aba "Mensagens" da casca do cliente: lista de conversas, cada uma abre o chat do pedido.
   static Widget abaMensagens() => Builder(
         builder: (context) => MensagensTela(
-          servico: const ServicoMensagensFake(),
+          servico: _servicoMensagens,
           aoAbrirConversa: (conversa) => _abrir<void>(context, _chat(conversa.pedidoId)),
         ),
       );
 
-  static Widget _notificacoes() => Builder(
+  static Widget _notificacoes({required bool profissional}) => Builder(
         builder: (context) => NotificacoesTela(
           servico: ServicoNotificacoesRepositorio(repos.notificacoes),
           aoAbrirDestino: (n) {
@@ -458,10 +709,16 @@ abstract final class RotasTrato {
             if (id == null) return;
             switch (n.tipo) {
               case TipoNotificacao.disputa:
-                abrirDisputa(context, id);
+                profissional ? abrirDisputa(context, id) : abrirServico(context, id);
               case TipoNotificacao.retrabalho:
-                abrirRetrabalho(context, id);
-              default:
+                profissional ? abrirRetrabalho(context, id) : abrirServico(context, id);
+              case TipoNotificacao.orcamento:
+                _abrir<void>(context, _orcamentosRecebidos(id));
+              case TipoNotificacao.mensagem:
+                _abrir<void>(context, _chat(id));
+              case TipoNotificacao.pedido || TipoNotificacao.pagamento:
+                if (!profissional) abrirServico(context, id);
+              case TipoNotificacao.sistema:
                 break;
             }
           },
@@ -469,16 +726,17 @@ abstract final class RotasTrato {
       );
 
   /// Aba "Buscar" do cliente: busca por serviço e abertura do perfil do profissional.
-  static Widget abaBuscar() => Builder(
-        builder: (context) => BuscaProfissionaisTela(
+  static Widget abaBuscar() => Carregador<List<CategoriaServico>>(
+        // Se o catálogo falhar, a busca por texto continua com as categorias do protótipo.
+        carregar: () => repos.catalogo.categorias().catchError(
+              (Object _) => cliente_exemplo.categorias.take(7).toList(),
+            ),
+        construir: (context, cats) => BuscaProfissionaisTela(
           servico: servicoBusca,
-          aoAbrirProfissional: (p) {
-            if (p.detalhe == null) {
-              _avisoSimples(context, _perfilIndisponivel);
-              return;
-            }
-            _abrir<void>(context, PerfilProfissionalTela(profissional: p));
-          },
+          sugestoes: [...cats.take(7), const CategoriaServico('Ver todas', Icons.grid_view)],
+          aoAbrirProfissional: (p) => abrirPerfil(context, p),
+          aoEscolherCategoria: (c) => abrirCategoria(context, c),
+          aoVerTodas: () => abrirTodasCategorias(context),
         ),
       );
 
@@ -501,15 +759,21 @@ abstract final class RotasTrato {
             foregroundColor: CoresTrato.creme,
             icon: const Icon(Icons.add),
             label: const Text('Novo pedido'),
-            onPressed: () => _abrir<void>(context, _novoPedido()),
+            onPressed: () => abrirNovoPedido(context),
           ),
         ),
       );
 
   // --- Cliente: pedido ---------------------------------------------------------------
 
-  static Widget _novoPedido() => Builder(
-        builder: (context) => NovoPedidoTela(
+  static Widget _novoPedido(CategoriaServico categoria) => Carregador<FormularioPedido>(
+        carregar: () => repos.catalogo.formulario(categoria.id),
+        construir: (context, formulario) => NovoPedidoTela(
+          formulario: formulario,
+          aoCapturarFoto: _fotografar,
+          aoTrocarCategoria: () => Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => _escolherCategoria()),
+          ),
           aoEnviar: (rascunho) async {
             final navegador = Navigator.of(context);
             final mensagens = ScaffoldMessenger.of(context);
@@ -540,7 +804,7 @@ abstract final class RotasTrato {
         case 'pago_e_retido' || 'agendado' || 'em_andamento' || 'em_confirmacao':
           _abrir<void>(context, _pedidoEmExecucao(id));
         default:
-          _avisoSimples(context, _emAnalise);
+          abrirServico(context, id);
       }
       return;
     }
@@ -551,7 +815,7 @@ abstract final class RotasTrato {
     } else if (pedido.statusTexto.contains('orçamentos recebidos')) {
       _abrir<void>(context, _orcamentosRecebidos(id));
     } else {
-      _avisoSimples(context, _emAnalise);
+      abrirServico(context, pedido.id ?? ServicosExemplo.vazamento);
     }
   }
 
@@ -567,10 +831,18 @@ abstract final class RotasTrato {
             context,
             // O protótipo só traz o detalhe de alguns orçamentos.
             orcamento.detalhe == null
-                ? _PerfilAoAbrir(nome: orcamento.profissional)
+                ? _PerfilAoAbrir(orcamento: orcamento)
                 : DetalheOrcamentoTela(
                     orcamento: orcamento,
-                    aoVerPerfil: (o) => abrirPerfilProfissional(context, o.profissional),
+                    aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
+                    // Conversa e contraproposta acontecem no chat do pedido; antes de
+                    // contratar o backend ainda não tem essa rota (só no modo demonstração).
+                    aoConversar: repos.modoApi
+                        ? null
+                        : (_) => _abrir<void>(context, _chat(pedidoId)),
+                    aoFazerContraproposta: repos.modoApi
+                        ? null
+                        : (_) => _abrir<void>(context, _chat(pedidoId)),
                     aoAceitar: (o) async {
                       // Só pede ao backend; taxa e líquido são dele.
                       final ok = await _tentar(
@@ -723,9 +995,9 @@ abstract final class RotasTrato {
 /// Orçamento sem detalhe no protótipo: abre direto o perfil público do profissional e, ao
 /// terminar, volta para a lista.
 class _PerfilAoAbrir extends StatefulWidget {
-  const _PerfilAoAbrir({required this.nome});
+  const _PerfilAoAbrir({required this.orcamento});
 
-  final String nome;
+  final Orcamento orcamento;
 
   @override
   State<_PerfilAoAbrir> createState() => _PerfilAoAbrirState();
@@ -738,7 +1010,7 @@ class _PerfilAoAbrirState extends State<_PerfilAoAbrir> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final navegador = Navigator.of(context);
-      await RotasTrato.abrirPerfilProfissional(context, widget.nome);
+      await RotasTrato.abrirPerfilDoOrcamento(context, widget.orcamento);
       if (mounted) navegador.maybePop();
     });
   }
@@ -746,4 +1018,14 @@ class _PerfilAoAbrirState extends State<_PerfilAoAbrir> {
   @override
   Widget build(BuildContext context) =>
       const Scaffold(body: Center(child: CircularProgressIndicator()));
+}
+
+/// Busca por texto ligada ao catálogo (modo `api`: demonstração até existir a rota de busca).
+class _ServicoBuscaCatalogo implements ServicoBusca {
+  const _ServicoBuscaCatalogo(this._catalogo);
+
+  final RepositorioCatalogo _catalogo;
+
+  @override
+  Future<List<Profissional>> buscar(String termo) => _catalogo.buscar(termo);
 }
