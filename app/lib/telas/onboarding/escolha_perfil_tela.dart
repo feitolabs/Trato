@@ -53,6 +53,7 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
       appBar: AppBar(),
       body: SafeArea(
         child: ConteudoResponsivo(
+          margem: EspacosTrato.margemOnboarding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

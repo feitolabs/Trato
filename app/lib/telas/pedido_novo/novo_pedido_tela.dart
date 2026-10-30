@@ -185,7 +185,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           minLines: 3,
           maxLines: 6,
           keyboardType: TextInputType.multiline,
-          style: TipografiaTrato.corpoGrande,
+          style: TipografiaTrato.corpo,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(errorText: _erroDescricao),
         ),

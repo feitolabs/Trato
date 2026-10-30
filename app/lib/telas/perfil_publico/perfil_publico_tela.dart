@@ -70,7 +70,7 @@ class PerfilPublicoTela extends StatelessWidget {
           const TituloSecao('Sobre'),
           Text(
             p.sobre.isEmpty ? 'Você ainda não escreveu sobre você.' : p.sobre,
-            style: TipografiaTrato.corpoGrande,
+            style: TipografiaTrato.corpo,
           ),
           const TituloSecao('Trabalhos'),
           if (p.fotosPortfolio == 0)

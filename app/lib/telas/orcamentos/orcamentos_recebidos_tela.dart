@@ -70,7 +70,7 @@ class _OrcamentosRecebidosTelaState extends State<OrcamentosRecebidosTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           p.titulo,
-          style: TipografiaTrato.corpoGrande.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x5),
         AvisoInfo(

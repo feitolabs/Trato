@@ -73,7 +73,7 @@ class InicioTela extends StatelessWidget {
                       Text(
                         'Receba até 5 orçamentos de profissionais com identidade verificada. '
                         'O pagamento é processado por parceiro e acompanhado no app.',
-                        style: TipografiaTrato.corpoGrande.copyWith(color: CoresTrato.creme),
+                        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
                       ),
                       const SizedBox(height: EspacosTrato.x5),
                       BotaoSecundario(

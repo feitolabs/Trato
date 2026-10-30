@@ -252,7 +252,7 @@ class _LinhaMarcar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        MergeSemantics(child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(value: marcado, onChanged: (v) => aoMudar(v ?? false)),
@@ -264,7 +264,7 @@ class _LinhaMarcar extends StatelessWidget {
               ),
             ),
           ],
-        ),
+        )),
         if (erro != null)
           Text(erro!, style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto)),
       ],

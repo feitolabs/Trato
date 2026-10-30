@@ -8,6 +8,9 @@ abstract final class CoresTrato {
   static const superficie = Color(0xFFFBF8F1);
   static const borda = Color(0xFFD8CFBE);
 
+  /// Contorno de campos e botões secundários (mais escuro que o dos cartões; medido no protótipo).
+  static const bordaControle = Color(0xFFA3ABA3);
+
   static const azulClaro = Color(0xFF8FC1C8);
   static const azulSuave = Color(0xFFDCEBEE);
   static const azulTexto = Color(0xFF0B6067);

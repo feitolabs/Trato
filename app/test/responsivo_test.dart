@@ -31,9 +31,9 @@ void main() {
       expect(TamanhoTela.daLargura(1280), TamanhoTela.tablet);
     });
 
-    test('margem lateral cresce com a tela', () {
+    test('margem lateral cresce com a tela (16 no celular, como o protótipo)', () {
       expect(Responsivo.margemLateral(TamanhoTela.pequeno), 16);
-      expect(Responsivo.margemLateral(TamanhoTela.celular), 20);
+      expect(Responsivo.margemLateral(TamanhoTela.celular), 16);
       expect(Responsivo.margemLateral(TamanhoTela.tablet), 32);
     });
   });
@@ -60,7 +60,7 @@ void main() {
       ),
     );
 
-    expect(tester.getSize(find.byKey(chave)).width, 390 - 2 * 20);
+    expect(tester.getSize(find.byKey(chave)).width, 390 - 2 * 16);
   });
 
   testWidgets('escala de fonte do sistema é limitada a 1,3', (tester) async {

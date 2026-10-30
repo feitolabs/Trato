@@ -75,7 +75,9 @@ class _OnboardingTelaState extends State<OnboardingTela> {
 
   @override
   Widget build(BuildContext context) {
-    final margem = Responsivo.margemLateral(TamanhoTela.de(context)) + EspacosTrato.x1;
+    final margem = TamanhoTela.de(context) == TamanhoTela.celular
+        ? EspacosTrato.margemOnboarding
+        : Responsivo.margemLateral(TamanhoTela.de(context)) + EspacosTrato.x1;
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(

@@ -155,7 +155,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
           ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        Row(
+        MergeSemantics(child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(value: _leu, onChanged: (v) => setState(() => _leu = v ?? false)),
@@ -166,12 +166,12 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                 child: Text(
                   'Li o escopo, a garantia e as regras de cancelamento. '
                   'Ao aceitar, este orçamento vira o contrato do serviço.',
-                  style: TipografiaTrato.corpoGrande,
+                  style: TipografiaTrato.corpo,
                 ),
               ),
             ),
           ],
-        ),
+        )),
         if (_tentou && !_leu)
           Text(
             'Marque que leu para aceitar o orçamento.',
@@ -192,7 +192,7 @@ class _BlocoRegra extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(EspacosTrato.x5),
+      padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

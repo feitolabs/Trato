@@ -393,7 +393,7 @@ class _CartaoMaterial extends StatelessWidget {
             InkWell(
               onTap: () => aoMarcarSinal(!pedirSinal),
               borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
-              child: Row(
+              child: MergeSemantics(child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Checkbox(value: pedirSinal, onChanged: (v) => aoMarcarSinal(v ?? false)),
@@ -413,7 +413,7 @@ class _CartaoMaterial extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
+              )),
             ),
           ],
         ],

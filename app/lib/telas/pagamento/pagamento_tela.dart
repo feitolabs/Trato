@@ -231,7 +231,7 @@ class _Passo extends StatelessWidget {
           ),
         ),
         const SizedBox(width: EspacosTrato.x3),
-        Expanded(child: Text(texto, style: TipografiaTrato.corpoGrande.copyWith(height: 1.5))),
+        Expanded(child: Text(texto, style: TipografiaTrato.corpo)),
       ],
     );
   }

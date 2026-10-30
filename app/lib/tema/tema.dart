@@ -31,7 +31,9 @@ abstract final class TemaTrato {
     );
 
     final raio = BorderRadius.circular(EspacosTrato.raio);
-    const bordaCampo = BorderSide(color: CoresTrato.borda, width: EspacosTrato.bordaFina);
+    const bordaCartao = BorderSide(color: CoresTrato.borda, width: EspacosTrato.bordaFina);
+    const bordaCampo =
+        BorderSide(color: CoresTrato.bordaControle, width: EspacosTrato.bordaControle);
 
     return ThemeData(
       useMaterial3: true,
@@ -91,7 +93,7 @@ abstract final class TemaTrato {
         hintStyle: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoDica),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: EspacosTrato.x4,
-          vertical: EspacosTrato.x4,
+          vertical: (EspacosTrato.alturaCampo - 24) / 2,
         ),
         border: OutlineInputBorder(borderRadius: raio, borderSide: bordaCampo),
         enabledBorder: OutlineInputBorder(borderRadius: raio, borderSide: bordaCampo),
@@ -106,7 +108,7 @@ abstract final class TemaTrato {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-          side: bordaCampo,
+          side: bordaCartao,
         ),
       ),
       dividerTheme: const DividerThemeData(color: CoresTrato.borda, thickness: 1),

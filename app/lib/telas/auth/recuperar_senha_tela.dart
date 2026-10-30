@@ -80,7 +80,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
         const SizedBox(height: EspacosTrato.x3),
         Text(
           'Informe o e-mail da sua conta. Enviamos um código para criar uma senha nova.',
-          style: TipografiaTrato.corpoGrande,
+          style: TipografiaTrato.corpo,
         ),
         const SizedBox(height: EspacosTrato.x6),
         CampoTrato(

@@ -14,7 +14,8 @@ Escala: a tela do protótipo tem 292,5 pt de largura e corresponde a 390 dp (iPh
 | `petroleo` (primária) | `#0E3A43` | Splash, botões primários, títulos, texto principal, cartão "Descreva o problema", resumo da calculadora |
 | `creme` (fundo) | `#F4EEE2` | Fundo de todas as telas; texto sobre petróleo |
 | `superficie` | `#FBF8F1` | Cartões, campos, botões secundários, barra inferior |
-| `borda` | `#D8CFBE` | Contorno de cartões, campos e botões secundários |
+| `borda` | `#D8CFBE` | Contorno de cartões e divisores |
+| `bordaControle` | `#A3ABA3` | Contorno de campos e botões secundários (1,5 dp) |
 | `azulClaro` | `#8FC1C8` | Ilustrações e espaços de foto |
 | `azulSuave` | `#DCEBEE` | Fundo de chip informativo ("Em execução · pagamento retido"), aba ativa da barra, opção selecionada |
 | `azulTexto` | `#0B6067` | Texto de chip informativo, links ("Pular", "Já tenho conta", "Adicionar item"), garantia ativa |
@@ -34,11 +35,11 @@ Escala: a tela do protótipo tem 292,5 pt de largura e corresponde a 390 dp (iPh
 | `lema` | Figtree | 18 / 400 | "Serviço feito, dinheiro liberado." |
 | `tituloGrande` | Archivo | 28 / 800, altura 1,15 | "Descreva o problema, receba orçamentos", "Seus pedidos" |
 | `titulo` | Archivo | 22 / 800 | "Categorias", "Linha do tempo", "Material" |
-| `tituloCartao` | Figtree | 17 / 700 | "Troca de tomadas e chuveiro" |
+| `tituloCartao` | Figtree | 16 / 700 | "Troca de tomadas e chuveiro" |
 | `corpo` | Figtree | 16 / 400, altura 1,5 | Textos e campos |
 | `corpoForte` | Figtree | 16 / 700 | Botões, rótulos de campo |
 | `corpoPequeno` | Figtree | 14 / 400 | Descrições de cartão, chips |
-| `legenda` | Figtree | 13 / 400 | Dicas abaixo dos campos |
+| `legenda` | Figtree | 14 / 400 | Dicas abaixo dos campos |
 | `sobretitulo` | Figtree | 13 / 700, espaçamento 1,5, maiúsculas | "1 DE 3", "FEITO LABS APRESENTA" |
 
 > **A confirmar com o João (P12):** as fontes foram identificadas pelo desenho das letras
@@ -49,7 +50,7 @@ Escala: a tela do protótipo tem 292,5 pt de largura e corresponde a 390 dp (iPh
 
 | Token | Valor | Uso |
 |---|---|---|
-| `margemTela` | 20 | Margem lateral (16 em telas densas, 24 no onboarding) |
+| `margemTela` | 16 | Margem lateral das telas do app (24 no onboarding, escolha de perfil e login/cadastro; medido no PDF) |
 | `espaco` | 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48 | Escala de espaçamento |
 | `raioPequeno` | 8 | Chips |
 | `raio` | 12 | Botões, campos, cartões de categoria |
@@ -65,7 +66,7 @@ Escala: a tela do protótipo tem 292,5 pt de largura e corresponde a 390 dp (iPh
 - **Botão secundário:** fundo superfície, borda `borda`, texto petróleo.
 - **Link:** `azulTexto`, sublinhado, Figtree 16/700.
 - **Campo:** fundo superfície, borda `borda`, raio 12, rótulo acima (Figtree 16/700).
-- **Cartão:** fundo superfície, borda `borda`, raio 16, padding 20.
+- **Cartão:** fundo superfície, borda `borda`, raio 16, padding 16.
 - **Chip de status:** fundo suave + texto forte da mesma família (azul, âmbar, verde, vermelho, laranja), raio 8, Figtree 14/700.
 - **Linha do tempo:** círculo petróleo com ✓ (feito), círculo azul suave com borda (atual), círculo vazio (futuro), linha cinza ligando.
 - **Barra inferior:** 5 abas, ícone e rótulo; ativa com pílula `azulSuave` atrás do ícone e rótulo em negrito.
@@ -92,3 +93,5 @@ Código: `app/lib/tema/responsivo.dart`.
 - **Splash:** logo (72 dp) + "FEITO LABS APRESENTA" (sobretítulo creme) no topo; "Trato" 72 + lema no centro; 3 pontos (ativo creme, inativos `pontoSobrePetroleo` `#2A5A64`) e "Toque para começar" (`azulClaro`) embaixo.
 - **Onboarding:** marca "Trato" 24/800 e link "Pular" no topo; ilustração `azulClaro` com raio 16 e 260 de altura; "1 DE 3"; título 28/800; texto 17 (`corpoGrande`); indicador em pílula (28x10 ativo, 10x10 inativo); botão "Próximo" e link "Já tenho conta".
 - **Escolha de perfil:** duas opções em cartão com ícone em quadrado 64 `azulClaro`; selecionada = fundo `azulSuave` e borda petróleo 1,5; o botão de baixo muda ("Criar conta de cliente" / "de profissional").
+
+> Revisão de fidelidade (30/10/2026): margem, padding de cartão, contorno de controles e tamanhos de texto foram remedidos; ver `docs/fidelidade-visual.md`.

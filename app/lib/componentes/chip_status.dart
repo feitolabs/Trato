@@ -35,6 +35,7 @@ class ChipStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final estilo = TipografiaTrato.corpoPequeno.copyWith(
+      fontSize: 13,
       color: tipo.texto,
       fontWeight: FontWeight.w700,
       fontVariations: const [FontVariation('wght', 700)],
