@@ -219,9 +219,10 @@ def test_fluxo_completo(cenario):
     nid = notificacoes.criar(
         c.ids["cliente"], "pedido.concluido", "Serviço concluído", dados={"pedido_id": pedido_id}
     )
-    assert [n.id for n in notificacoes.listar(c.ids["cliente"], apenas_nao_lidas=True)] == [nid]
+    # o gancho das transições também notifica o cliente durante o fluxo
+    assert nid in [n.id for n in notificacoes.listar(c.ids["cliente"], apenas_nao_lidas=True)]
     notificacoes.marcar_lida(nid, c.ids["cliente"], agora())
-    assert notificacoes.listar(c.ids["cliente"], apenas_nao_lidas=True) == ()
+    assert nid not in [n.id for n in notificacoes.listar(c.ids["cliente"], apenas_nao_lidas=True)]
 
     # 9) auditoria: uma linha por transição, na ordem, e a cadeia continua íntegra
     trilha = c.contexto.extras["auditoria"].da_entidade("pedido", pedido_id)

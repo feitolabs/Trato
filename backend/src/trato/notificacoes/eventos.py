@@ -1,7 +1,7 @@
 """Catálogo de eventos do domínio que viram notificação.
 
-Texto curto, sem prometer o que o Trato não faz (D13): nada de "escrow", "garantia total",
-"reembolso automático". O código de início NUNCA vai no texto nem no `dados`: a notificação só
+Texto curto e sem prometer o que o Trato não faz (D13: ver a lista de textos proibidos em
+harness/DECISOES.md). O código de início NUNCA vai no texto nem no `dados`: a notificação só
 leva o usuário até a tela onde ele aparece.
 """
 
