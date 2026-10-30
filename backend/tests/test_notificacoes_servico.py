@@ -233,7 +233,7 @@ def test_fcm_monta_a_carga_e_trata_token_morto():
 
     def transporte(url, cab, corpo):
         chamadas.append((url, cab, corpo))
-        return 404 if corpo["message"]["token"] == "morto" else 200
+        return 404 if corpo["message"]["token"] == "morto" else 200  # noqa: S105
 
     fcm = PushFcm(cfg(push_ativo=True, fcm_projeto_id="proj"), transporte, lambda: "acesso")
     assert fcm.disponivel
@@ -243,7 +243,7 @@ def test_fcm_monta_a_carga_e_trata_token_morto():
     assert corpo["message"]["data"] == {"pedido_id": "p1", "n": "3"}
     with pytest.raises(Exception, match="inválido") as erro:
         fcm.enviar(Mensagem(ANA, "Oi", None, {}, ("morto",)))
-    assert erro.value.token == "morto"
+    assert erro.value.token == "morto"  # noqa: S105
 
 
 def test_apns_monta_carga_e_cabecalhos():
