@@ -7,7 +7,7 @@ vindo do token), então papel revogado ou inativo é negado na hora.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from fastapi import Depends, HTTPException, Request
 
@@ -24,8 +24,7 @@ from trato.api.admin.repositorios import (
 )
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, obter_contexto, usuario_atual
-
-SEGUNDOS_URL_DOCUMENTO = 60  # URL assinada curta
+from trato.seguranca.config import obter_config_seguranca
 
 
 @dataclass
@@ -38,7 +37,10 @@ class AdminContexto:
     auditoria: RepositorioAuditoriaAdmin
     # Sem assinador, a URL do documento responde 503 (o bucket privado não é aberto às cegas).
     assinador: AssinadorUrl | None = None
-    segundos_url: int = SEGUNDOS_URL_DOCUMENTO
+    # Vem de `TRATO_SEG_URL_DOCUMENTO_SEGUNDOS` (padrão 60): URL assinada curta.
+    segundos_url: int = field(
+        default_factory=lambda: obter_config_seguranca().url_documento_segundos
+    )
 
 
 @dataclass(frozen=True)

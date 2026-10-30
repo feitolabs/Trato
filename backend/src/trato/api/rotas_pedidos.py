@@ -49,7 +49,9 @@ from trato.pedidos.estados import (
     ProvaRetrabalho,
 )
 from trato.seguranca.cliente import dispositivo_do_cliente, ip_do_cliente
+from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.tentativas_codigo import CodigoBloqueado
+from trato.seguranca.texto_livre import limpar_texto
 
 router = APIRouter(prefix="/v1/pedidos", tags=["pedidos"])
 
@@ -123,7 +125,23 @@ def abrir_pedido(
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
     pedido = estados.abrir_pedido(uuid.uuid4().hex, ator_de(usuario), contexto.agora())
-    gravado = contexto.pedidos.salvar(pedido, None, corpo.para_dados() if corpo else None)
+    dados = corpo.para_dados() if corpo else None
+    if dados is not None:  # M9: limite e mascaramento de contato no texto livre
+        cfg = obter_config_seguranca()
+        dados = replace(
+            dados,
+            titulo=limpar_texto(dados.titulo, "título", cfg.titulo_max_chars, cfg),
+            descricao=limpar_texto(dados.descricao, "descrição", cfg.descricao_max_chars, cfg),
+            respostas=tuple(
+                replace(
+                    r, resposta=limpar_texto(r.resposta, "resposta", cfg.resposta_max_chars, cfg)
+                )
+                if isinstance(r.resposta, str)
+                else r
+                for r in dados.respostas
+            ),
+        )
+    gravado = contexto.pedidos.salvar(pedido, None, dados)
     return pedido_out(gravado, usuario)
 
 

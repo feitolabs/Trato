@@ -36,7 +36,9 @@ def _semear(amb):
     cfg = amb.contexto.config.carregar().disputas
     amb.contexto.disputas.salvar(
         "ped-1",
-        disputas.abrir(disputas.Ator.CLIENTE, 100_000, disputas.Motivo.MAL_FEITO, AGORA, AGORA, cfg),
+        disputas.abrir(
+            disputas.Ator.CLIENTE, 100_000, disputas.Motivo.MAL_FEITO, AGORA, AGORA, cfg
+        ),
     )
     amb.contexto.conversas.abrir("ped-1", "pro-1")
 
@@ -79,7 +81,12 @@ def test_cobrancas_e_aditivos_so_com_pagamentos_ver(fluxo, rota, token):  # noqa
 @pytest.mark.parametrize("token", TOKENS_EQUIPE)
 def test_decidir_disputa_exige_disputas_decidir(fluxo, token):  # noqa: F811
     pid = fluxo.ate_em_confirmacao()
-    fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa", "t-cliente", {"motivo": "mal_feito", "descricao": "Parede manchada"})
+    fluxo.chamar(
+        "POST",
+        f"/v1/pedidos/{pid}/disputa",
+        "t-cliente",
+        {"motivo": "mal_feito", "descricao": "Parede manchada"},
+    )
     decisao = {"resultado": "reembolso_total", "justificativa": "Serviço não feito."}
     r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", token, decisao)
     if _permitido(token, Permissao.DISPUTAS_DECIDIR):
@@ -114,8 +121,12 @@ def test_quem_nao_e_parte_nao_le_nada(amb, rota, token, esperado):
 
 def test_leitura_da_equipe_fica_na_auditoria(amb):
     _semear(amb)
-    assert amb.cliente.get("/v1/pedidos/ped-1/extrato", headers=cab("t-financeiro")).status_code == 200
-    assert amb.cliente.get("/v1/pedidos/ped-1/extrato", headers=cab("t-juridico")).status_code == 403
+    assert (
+        amb.cliente.get("/v1/pedidos/ped-1/extrato", headers=cab("t-financeiro")).status_code == 200
+    )
+    assert (
+        amb.cliente.get("/v1/pedidos/ped-1/extrato", headers=cab("t-juridico")).status_code == 403
+    )
     achados, _ = amb.admin.auditoria.listar(_filtro(), 50, 0)
     consultas = [e for e in achados if e.acao == "pedido.consulta_equipe"]
     assert [(e.ator_id, e.depois["consulta"]) for e in consultas] == [("eq-fin", "extrato")]
@@ -133,4 +144,6 @@ def test_equipe_revogada_perde_o_acesso_na_hora(amb):
     _semear(amb)
     membro = MEMBROS_EQUIPE["t-financeiro"]
     amb.admin.equipe.salvar(replace(membro, revogado_em=AGORA - timedelta(minutes=1)))
-    assert amb.cliente.get("/v1/pedidos/ped-1/saldo", headers=cab("t-financeiro")).status_code == 403
+    assert (
+        amb.cliente.get("/v1/pedidos/ped-1/saldo", headers=cab("t-financeiro")).status_code == 403
+    )

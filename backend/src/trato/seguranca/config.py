@@ -71,6 +71,32 @@ def _limites_padrao() -> list[RegraLimite]:
             bloqueio_s=600,
         ),  # fmt: skip
         RegraLimite(nome="webhooks", prefixo="/v1/webhooks", escopo="ip", maximo=600, janela_s=60),
+        # Rotas sensíveis (M12/A8): escrita que gera custo, dado pessoal ou dinheiro.
+        RegraLimite(
+            nome="verificacao_envio",
+            prefixo="/v1/profissional/verificacao",
+            metodos=["POST"],
+            escopo="usuario",
+            maximo=5,
+            janela_s=3600,
+        ),
+        RegraLimite(
+            nome="documentos_url",
+            prefixo="/v1/admin/verificacoes",
+            metodos=["POST"],
+            escopo="usuario",
+            maximo=30,
+            janela_s=3600,
+            bloqueio_s=3600,
+        ),
+        RegraLimite(
+            nome="admin_escrita",
+            prefixo="/v1/admin",
+            metodos=["POST", "PUT", "PATCH", "DELETE"],
+            escopo="usuario",
+            maximo=120,
+            janela_s=60,
+        ),
     ]
 
 
@@ -143,6 +169,13 @@ class ConfigSeguranca(BaseSettings):
     etiqueta_max_chars: int = Field(default=40, gt=0)
     etiquetas_max: int = Field(default=8, gt=0)
     comentario_max_chars: int = Field(default=1000, gt=0)
+    titulo_max_chars: int = Field(default=120, gt=0)
+    descricao_max_chars: int = Field(default=2000, gt=0)
+    resposta_max_chars: int = Field(default=500, gt=0)
+
+    # --- Documentos de verificação (A8) --------------------------------------------------
+    # Validade da URL assinada que a equipe de cadastro recebe (curta de propósito).
+    url_documento_segundos: int = Field(default=60, gt=0)
 
     # --- SMS pumping (D14: SMS só na confirmação do celular) ----------------------------
     sms_ddis_permitidos: list[str] = Field(default_factory=lambda: ["55"])
@@ -184,6 +217,15 @@ class ConfigSeguranca(BaseSettings):
         if any(o.strip() in ("*", "null") for o in origens):
             raise ValueError("CORS restrito: liste as origens; '*' e 'null' não são aceitos.")
         return [o.rstrip("/") for o in origens]
+
+
+def parametros_docs(ambiente: str, config: ConfigSeguranca | None = None) -> dict[str, str | None]:
+    """Argumentos do `FastAPI(...)` que desligam /docs, /redoc e /openapi.json fora dos
+    ambientes de `ambientes_com_docs`. Ambiente desconhecido = desligado."""
+    config = config or obter_config_seguranca()
+    if ambiente.strip().lower() in {a.lower() for a in config.ambientes_com_docs}:
+        return {}
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
 
 
 @lru_cache

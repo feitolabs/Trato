@@ -9,6 +9,8 @@ from trato.api import rotas_app, rotas_financeiro, rotas_pedidos, rotas_webhook
 from trato.api.admin import criar_router_admin
 from trato.api.contexto import Contexto
 from trato.api.erros import instalar_tratadores
+from trato.config import obter_config
+from trato.seguranca.config import parametros_docs
 
 
 def criar_router() -> APIRouter:
@@ -35,4 +37,5 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
 
 
 def criar_app(contexto: Contexto | None = None) -> FastAPI:
-    return instalar(FastAPI(title="Trato API", version=__version__), contexto)
+    docs = parametros_docs(obter_config().trato_ambiente)
+    return instalar(FastAPI(title="Trato API", version=__version__, **docs), contexto)

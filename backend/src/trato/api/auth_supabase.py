@@ -27,8 +27,10 @@ class ProvedorAuthSupabase:
         segredo_hs256: Callable[[], str] | None = None,
         jwks_url: str = "",
         audiencia: str = "authenticated",
+        criar_no_primeiro_login: bool = True,
     ) -> None:
         self._usuarios = usuarios
+        self._criar_no_primeiro_login = criar_no_primeiro_login
         self._segredo = segredo_hs256
         self._jwks = PyJWKClient(jwks_url, cache_keys=True) if jwks_url else None
         self._audiencia = audiencia
@@ -57,7 +59,13 @@ class ProvedorAuthSupabase:
             claims = self._decodificar(token)
         except jwt.PyJWTError:
             return None
-        perfil = self._usuarios.perfil(str(claims["sub"]))
+        sub = str(claims["sub"])
+        perfil = self._usuarios.perfil(sub)
+        if perfil is None and self._criar_no_primeiro_login and not claims.get("is_anonymous"):
+            # Primeiro login: cria a linha (cliente). O papel vem do banco; do token só o nome.
+            meta = claims.get("user_metadata")
+            nome = (meta.get("full_name") or meta.get("name")) if isinstance(meta, dict) else None
+            perfil = self._usuarios.garantir(sub, nome)
         if perfil is None or perfil.status not in STATUS_QUE_ENTRAM:
             return None
         return Usuario(perfil.id, perfil.papel)

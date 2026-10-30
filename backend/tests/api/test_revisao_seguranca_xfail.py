@@ -297,4 +297,7 @@ def test_a8_equipe_nao_le_documentos_direto_no_storage():
     assert novas, "migration nova do fix-acesso não encontrada"
     sql = "\n".join(p.read_text(encoding="utf-8") for p in novas)
     assert "drop policy if exists trato_verificacao_leitura on storage.objects" in sql
-    assert "drop policy if exists verificacao_documentos_select on public.verificacao_documentos" in sql
+    assert (
+        "drop policy if exists verificacao_documentos_select on public.verificacao_documentos"
+        in sql
+    )

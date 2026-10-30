@@ -26,6 +26,8 @@ from trato.api.repositorios_app import (
 from trato.api.servicos import carregar_pedido, eh_participante
 from trato.pagamentos.custo import MeioPagamento
 from trato.pedidos.estados import Estado, Pedido
+from trato.seguranca.config import obter_config_seguranca
+from trato.seguranca.texto_livre import limpar_etiquetas, limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["app"])
 
@@ -156,8 +158,10 @@ class VerificacaoIn(_Entrada):
 
 class AvaliarIn(_Entrada):
     nota_geral: StrictInt = Field(ge=1, le=5)
-    comentario: str | None = Field(None, max_length=1000)
-    etiquetas: list[str] = Field(default_factory=list, max_length=8)
+    # Tamanhos finais vêm da configuração (`TRATO_SEG_COMENTARIO_MAX_CHARS` etc.); estes tetos
+    # só protegem a validação contra corpo absurdo.
+    comentario: str | None = Field(None, max_length=20_000)
+    etiquetas: list[str] = Field(default_factory=list, max_length=200)
 
 
 # --- Acesso -----------------------------------------------------------------------------
@@ -535,14 +539,21 @@ def avaliar(
         raise HTTPException(409, "Este pedido não tem profissional contratado.")
     if contexto.avaliacoes.obter(pedido.id, direcao) is not None:
         raise HTTPException(409, "Você já avaliou este serviço.")
+    cfg_seg = obter_config_seguranca()
+    comentario = (
+        limpar_texto(corpo.comentario, "comentário", cfg_seg.comentario_max_chars, cfg_seg) or None
+        if corpo.comentario
+        else None
+    )
+    etiquetas = limpar_etiquetas(corpo.etiquetas, cfg_seg)
     nova = Avaliacao(
         pedido_id=pedido.id,
         direcao=direcao,
         avaliador_id=usuario.id,
         avaliado_id=avaliado,
         nota_geral=corpo.nota_geral,
-        comentario=(corpo.comentario or "").strip() or None,
-        etiquetas=tuple(e.strip() for e in corpo.etiquetas if e.strip()),
+        comentario=comentario,
+        etiquetas=etiquetas,
         criada_em=contexto.agora(),
     )
     contexto.avaliacoes.salvar(nova)
