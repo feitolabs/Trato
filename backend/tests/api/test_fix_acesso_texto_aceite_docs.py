@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import AGORA, cab
+from conftest import AGORA, PROFISSIONAL, cab
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -112,8 +112,6 @@ def test_ip_so_vem_do_x_forwarded_for_se_a_configuracao_confia_no_proxy():
 
 
 def _orcamento(pedido_id):
-    from conftest import PROFISSIONAL
-
     from trato.api.repositorios import Orcamento
 
     return Orcamento("orc-m10", pedido_id, PROFISSIONAL.id, 50_000, "pintura")
