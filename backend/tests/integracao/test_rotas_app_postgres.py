@@ -94,8 +94,36 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
         == 404
     )  # noqa: E501 - ainda não orçou
 
-    # orçamento do profissional; o cliente vê (do mais barato ao mais caro) e conversa
-    orcamento_id = enviar_orcamento(c, pedido_id)
+    # orçamento do profissional via HTTP; o cliente vê (do mais barato ao mais caro) e conversa
+    r_orc = post(
+        c,
+        f"/v1/pedidos/{pedido_id}/orcamentos",
+        "profissional",
+        {
+            "itens": [
+                {
+                    "tipo": "horas",
+                    "descricao": "Mão de obra",
+                    "quantidade": "8",
+                    "valor_unitario_centavos": 10_000,
+                },
+                {
+                    "tipo": "material",
+                    "descricao": "Tinta",
+                    "quantidade": "2.5",
+                    "valor_unitario_centavos": 4_000,
+                },
+            ],
+            "etapas": [
+                {"descricao": "Preparar paredes", "valor_centavos": 40_000},
+                {"descricao": "Pintar", "valor_centavos": 50_000},
+            ],
+            "prazo_execucao_dias": 5,
+            "garantia_dias": 90,
+        },
+    )
+    assert r_orc.status_code == 201, r_orc.text
+    orcamento_id = r_orc.json()["id"]
     enviar_orcamento(c, pedido_id, "profissional2")
     lista = get(c, f"/v1/pedidos/{pedido_id}/orcamentos", "cliente").json()
     assert len(lista) == 2 and {o["profissional_nome"] for o in lista} == {

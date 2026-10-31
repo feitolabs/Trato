@@ -69,6 +69,81 @@ def test_orcamentos_de_pedido_alheio_dao_404(amb):
     assert get(amb, "/v1/pedidos/ped-1/orcamentos", "ruim").status_code == 401
 
 
+def test_profissional_envia_orcamento_com_sucesso(amb):
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Mão de obra pintura",
+                "quantidade": "8",
+                "valor_unitario_centavos": 10_000,
+            },
+            {
+                "tipo": "material",
+                "descricao": "Lixas e fitas",
+                "quantidade": "1",
+                "valor_unitario_centavos": 5_000,
+            },
+        ],
+        "prazo_execucao_dias": 3,
+        "garantia_dias": 90,
+        "observacoes": "Levo escada e lonas.",
+    }
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", corpo)
+    assert r.status_code == 201, r.text
+    dados = r.json()
+    assert dados["versao"] == 2
+    assert dados["status"] == "enviado"
+    assert dados["valor_total_centavos"] == 85_000
+    assert dados["pedido_id"] == "ped-1"
+    assert dados["profissional_id"] == PROFISSIONAL.id
+
+    # O cliente vê o orçamento listado
+    lista = get(amb, "/v1/pedidos/ped-1/orcamentos", "t-cliente").json()
+    orc_enviado = next(o for o in lista if o["id"] == dados["id"])
+    assert orc_enviado["valor_centavos"] == 85_000
+    assert orc_enviado["prazo_execucao_dias"] == 3
+
+
+def test_cliente_nao_pode_enviar_orcamento(amb):
+    amb.semear_pedido(Estado.ABERTO)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Tentativa",
+                "quantidade": "1",
+                "valor_unitario_centavos": 1000,
+            }
+        ]
+    }
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-cliente", corpo)
+    assert r.status_code == 403
+
+
+def test_enviar_orcamento_para_pedido_fechado_da_409(amb):
+    amb.semear_pedido(Estado.ORCAMENTO_ACEITO)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Tarde demais",
+                "quantidade": "1",
+                "valor_unitario_centavos": 1000,
+            }
+        ]
+    }
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", corpo)
+    assert r.status_code == 409
+
+
+def test_enviar_orcamento_sem_itens_da_422(amb):
+    amb.semear_pedido(Estado.ABERTO)
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", {"itens": []})
+    assert r.status_code == 422
+
+
 # --- valores do pagamento ---------------------------------------------------------------
 
 
