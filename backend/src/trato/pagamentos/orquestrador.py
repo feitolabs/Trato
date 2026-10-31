@@ -322,7 +322,7 @@ class ServicoPagamento:
         contexto.eventos_webhook.marcar_revisao(bruto, f"{motivo}; conciliado no ledger")
 
     def _liquidacao(self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook) -> None:
-        """`payout.paid`/`transfer.paid`: libera SÓ o repasse a que o aviso se refere (M5).
+        """`payout.paid`: libera SÓ o repasse a que o aviso se refere (M5).
 
         O repasse é achado pelo id da transferência no provedor (ou, na primeira vez, pelo
         `repasse_id` que o Trato pôs nos metadados ao pedir a transferência). O valor tem de ser

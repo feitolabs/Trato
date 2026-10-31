@@ -1,0 +1,94 @@
+# Teste real contra o Supabase (backend em `postgres`) — 31/10/2026
+
+Backend subido da worktree com `TRATO_PERSISTENCIA=postgres` em `127.0.0.1:8000` (`.env` copiado do repo principal,
+git-ignorado, valores nunca impressos). Stripe em modo teste.
+
+## Dados de teste criados no banco
+
+**Nenhum.** Esta rodada só **leu** o banco. Motivo: o fluxo ponta a ponta grava coisas que não se apagam
+(ver "Precisa do OK do João"). Nada a limpar.
+
+## O que passou
+
+| Verificação | Resultado |
+|---|---|
+| Backend sobe com Postgres real | OK. `GET /saude` = 200 (`supabase_configurado: true`, `stripe_modo_teste: true`). **Não existe `/health`**, só `/saude`. |
+| Conexão ao Supabase (`DATABASE_URL`, PostgreSQL 17.11) | OK, leitura em transação `read_only` |
+| Rotas protegidas sem token | OK: `/v1/me`, `/v1/pedidos`, `/v1/catalogo/*`, `/v1/admin/config/vigente` dão 401 |
+| Webhook sem assinatura / assinatura inválida | OK: 400 "Assinatura do webhook inválida." (nada gravado) |
+| Migrations aplicadas x `supabase/migrations/` | Nomes batem para as 13 primeiras (versões/timestamps diferem: o Supabase regravou os números; sem impacto) |
+| `transfer.paid` | Corrigido (abaixo), com teste |
+
+## Migrations: o que falta no banco
+
+Aplicadas (16): f32, revogar_execute, f33, f34, f37, f35, f36, f38a/b/c, `seed_cidade_categorias_contas_ledger`,
+notificacoes_dispositivos_agendador, ordens_estorno, fix_acesso, pedido_recusas, profissional_disponibilidade_portfolio_uploads.
+
+**Faltam** (existem em `develop`, não no banco):
+- `20261030140000_b2_grants_por_coluna.sql`
+- `20261030140000_upload_destino_portfolio.sql`
+
+**Diferença de rastreio:** a migration `seed_cidade_categorias_contas_ledger` está aplicada no banco (cidade BH inativa,
+3 categorias, 4 contas do ledger) mas **não existe como arquivo em `supabase/migrations/`** (os seeds estão em `supabase/seeds/`).
+
+## Estado dos dados (contagens)
+
+`usuarios` 0, `equipe` 0, `config_definicoes` 0, `config_versoes` 0, `contas_ledger` 4, `categorias` 3,
+`cidades` 1 (Belo Horizonte, `ativa = false`), `pedidos` 0, `lancamentos` 0, `eventos_webhook` 0.
+
+**Falta antes de qualquer pagamento funcionar:** seed 2 (config/taxa), que depende de (a) primeiro administrador em `equipe`
+(+ um segundo membro para a aprovação dupla), (b) valores de `taxa_bps`, `taxa_minima_centavos`, `prazo_liberacao_dias`
+(P1/P2, do João). Sem versão vigente a API responde 503 nas rotas de dinheiro (comportamento desejado). Cidade inativa
+também impede criar pedido.
+
+## `transfer.paid` (corrigido)
+
+`transfer.paid` não é evento do Stripe. Eventos reais de transferência: `transfer.created`, `transfer.updated`,
+`transfer.reversed`; liquidação em banco: `payout.paid`. Removido de `TIPOS_STRIPE`
+(`backend/src/trato/pagamentos/provedor/stripe_formato.py`) e dos docs; `payout.paid` continua como liquidação.
+Teste: `backend/tests/test_eventos_stripe_validos.py`. Comando do `stripe listen` fica:
+
+```bash
+stripe listen --events payment_intent.succeeded,payment_intent.payment_failed,charge.refunded,payout.paid --forward-to http://127.0.0.1:8000/v1/webhooks/stripe
+```
+
+`transfer.created`/`transfer.reversed` **não são tratados**; se o modelo de contas (P7) usar Connect com transferências,
+decidir qual deles libera o repasse e se `transfer.reversed` estorna. Decisão do João.
+
+## Achados
+
+1. **Falta rota de orçamento do profissional.** Não há `POST` para criar/enviar orçamento (só `GET` e `POST /orcamentos/resumo`).
+   O fluxo pedido → orçamento → aceite não fecha pela API; só dá para testar semeando orçamento por SQL.
+2. **Catálogo exige login** (`/v1/catalogo/categorias` e `/cidades` = 401). Se a tela de cadastro precisar listar categorias
+   antes do login, a rota tem de ser pública. Confirmar a intenção.
+3. **Erro de log do uvicorn** (`ValueError: not enough values to unpack (expected 5, got 0)` em `uvicorn/logging.py`)
+   quando o log de acesso é escrito sem terminal (redirecionado para arquivo). Não afeta as respostas. Origem a investigar
+   (provável conflito do `logging` configurado com o formatter de acesso do uvicorn).
+6. **A suíte em memória quebra se houver `.env` real na raiz.** Com o `.env` do João copiado para a worktree, `verificar` deu
+   46 falhas em `backend/tests/api` (422/401 onde se esperava 200/503: o app de teste lê `TRATO_PERSISTENCIA=postgres`,
+   provedor Stripe e segredos do ambiente). Sem o `.env`, os mesmos testes passam. Os testes deveriam limpar essas variáveis
+   (fixture `monkeypatch.delenv`) para rodar igual com ou sem `.env`. **Não corrigido** (toca muitos testes): fica como pendência.
+   Por isso o `.env` foi removido da worktree antes do `verificar` final.
+4. `docs/api-persistencia.md` ainda cita a migration "que falta" para `aguardando_confirmacao`; conferir se já foi coberta.
+5. Migrations aplicadas não têm o mesmo número de versão dos arquivos; o `supabase db push` pode tentar reaplicá-las.
+   Alinhar com `supabase migration repair` antes de usar a CLI.
+
+## O que depende do João (PRECISO DO SEU OK)
+
+```
+PRECISO DO SEU OK
+O que:    Rodar o fluxo de pagamento ponta a ponta no Supabase REAL: criar 2 usuários no Auth (teste_cliente@example.test,
+          teste_profissional@example.test), 2 em `equipe` (admin + financeiro), uma versão de config VIGENTE com valores
+          de teste, pedido/orçamento/contrato semeados, PaymentIntent no Stripe teste (4242...) e webhook assinado.
+Por que:  Provar cobrança, webhook, ledger espelhado e idempotência em ambiente real.
+Risco:    IRREVERSÍVEL em parte: versão de config vigente é imutável (só se corrige publicando outra); lançamentos
+          do ledger e `eventos_webhook` são imutáveis. Usuários do Auth e linhas de pedido podem ser apagados.
+          Uma taxa de teste vigente poderia valer para dados reais se não for substituída antes do piloto.
+Como desfazer: apagar usuários/pedidos de teste (script a propor); config e ledger ficam como histórico "teste_"
+          (ou usar um branch do Supabase / projeto descartável, que evita o risco: recomendado).
+Posso continuar?
+```
+
+Alternativa sem risco: rodar o mesmo roteiro num **branch do Supabase** ou no Postgres local (`backend/tests/integracao`,
+que já cobre o fluxo completo e a idempotência do webhook), e deixar o banco real para depois de fechar a taxa.
+O João também precisa rodar `stripe listen` (comando acima) para o teste com webhook real.
