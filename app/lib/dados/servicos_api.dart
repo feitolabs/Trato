@@ -1,14 +1,16 @@
 import '../dispositivo/servico_camera.dart';
 import '../telas/aditivo/aditivo.dart';
+import '../telas/disputa_profissional/disputa.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
 import 'servico_upload.dart';
 
-// Serviços das telas de aditivo, nota de materiais e verificação, falando com a API. Só pedem e
-// mostram: o total da nota, o estado do aditivo e a cobrança são do backend.
+// Serviços das telas de aditivo, nota de materiais, disputa e verificação, falando com a API.
+// Só pedem e mostram: o total da nota, o estado do aditivo e a cobrança são do backend.
 
+Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
 List<Map<String, dynamic>> _lista(Object? json) =>
     [for (final item in json! as List) item as Map<String, dynamic>];
 
@@ -194,5 +196,66 @@ class CapturaVerificacao {
     final foto = await _camera.tirarFoto(frontal: true);
     if (foto == null) return null;
     return (await _upload.enviar(foto, FinalidadeArquivo.selfie)).arquivoId;
+  }
+}
+
+/// Disputa e retrabalho do lado do profissional falando com a API.
+class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
+  ServicoDisputaProfissionalApi(this._api);
+
+  final ClienteApi _api;
+
+  @override
+  Future<DetalheDisputa?> carregarDisputa(String disputaId) async {
+    try {
+      final j = _mapa(await _api.get('/v1/pedidos/$disputaId/disputa'));
+      return DetalheDisputa(
+        id: disputaId,
+        titulo:
+            'Disputa do pedido #${disputaId.substring(0, disputaId.length < 6 ? disputaId.length : 6).toUpperCase()}',
+        cliente: 'Cliente',
+        motivo: (j['motivo'] as String?) ?? 'Disputa',
+        descricao: (j['descricao'] as String?) ?? '',
+        solucaoPedida: 'Análise do suporte',
+        prazoRespostaHoras: 48,
+        valorCongeladoCentavos: (j['valor_congelado_centavos'] as int?) ?? 0,
+      );
+    } on ErroTrato catch (e) {
+      if (e.tipo == TipoErro.naoEncontrado) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> responder(RespostaDisputa resposta) async {
+    await _api.post('/v1/pedidos/${resposta.disputaId}/disputa/resposta');
+  }
+
+  @override
+  Future<DadosRetrabalho?> carregarRetrabalho(String disputaId) async {
+    try {
+      final lista = _lista(await _api.get('/v1/pedidos/$disputaId/retrabalho'));
+      if (lista.isEmpty) return null;
+      final ultimo = lista.last;
+      return DadosRetrabalho(
+        disputaId: disputaId,
+        titulo:
+            'Retrabalho do pedido #${disputaId.substring(0, disputaId.length < 6 ? disputaId.length : 6).toUpperCase()}',
+        descricaoProblema: (ultimo['descricao'] as String?) ?? 'Retrabalho solicitado',
+        prazoAtendimentoDias: 7,
+        opcoesHorario: const ['Manhã', 'Tarde'],
+      );
+    } on ErroTrato catch (e) {
+      if (e.tipo == TipoErro.naoEncontrado) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> agendarRetrabalho(AgendamentoRetrabalho agendamento) async {
+    await _api.post(
+      '/v1/pedidos/${agendamento.disputaId}/retrabalho/atender',
+      corpo: {'etapa': 'aceitar'},
+    );
   }
 }

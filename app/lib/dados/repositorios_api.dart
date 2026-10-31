@@ -135,8 +135,27 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<String> criar(RascunhoPedido rascunho) async {
-    // O backend só abre o pedido; os detalhes (serviços, descrição) ainda não têm campo na API.
-    final criado = PedidoApi.deJson(_mapa(await _api.post('/v1/pedidos')));
+    final corpo = <String, dynamic>{
+      'categoria_id': rascunho.categoriaId ?? 'eletrica',
+      'cidade_id': 'belo-horizonte',
+      'titulo': rascunho.servicos.isNotEmpty ? rascunho.servicos.join(', ') : 'Pedido de serviço',
+      'descricao': rascunho.descricao.trim().isNotEmpty
+          ? rascunho.descricao.trim()
+          : 'Serviço solicitado pelo cliente',
+      'faixa_preco_min_centavos': rascunho.faixa.minimoCentavos,
+      'faixa_preco_max_centavos': rascunho.faixa.maximoCentavos,
+      'respostas': [
+        if (rascunho.servicos.isNotEmpty)
+          {'pergunta_id': 'servicos', 'resposta': rascunho.servicos.join(', ')},
+        if (rascunho.quantidade > 0)
+          {'pergunta_id': 'quantidade', 'resposta': rascunho.quantidade.toString()},
+        if (rascunho.voltagem.isNotEmpty)
+          {'pergunta_id': 'voltagem', 'resposta': rascunho.voltagem},
+        if (rascunho.prazo.isNotEmpty)
+          {'pergunta_id': 'prazo', 'resposta': rascunho.prazo},
+      ],
+    };
+    final criado = PedidoApi.deJson(_mapa(await _api.post('/v1/pedidos', corpo: corpo)));
     return criado.id;
   }
 

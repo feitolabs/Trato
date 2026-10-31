@@ -47,7 +47,7 @@ O estado completo (com observações) está em `docs/STATUS-MVP.md`; o que o bac
 
 | Tela | Modo `api` | Rotas |
 |------|-----------|-------|
-| Novo pedido | **API** | `POST /v1/pedidos` (só abre; serviços, descrição e faixa ainda não têm campo) |
+| Novo pedido | **API** | `POST /v1/pedidos` (envia categoria, título, descrição, faixa de preço e respostas) |
 | Seus pedidos | **API** | `GET /v1/pedidos` |
 | Orçamentos / detalhe | **API** | `GET /v1/pedidos/{id}/orcamentos`, `GET /v1/orcamentos/{id}`, aceite em `acoes/aceitar_orcamento` |
 | Pagamento | **API** | `GET /v1/pedidos/{id}/pagamento`, `POST /v1/contratos/{id}/cobranca` |
@@ -67,12 +67,12 @@ O estado completo (com observações) está em `docs/STATUS-MVP.md`; o que o bac
 | Profissional: Carteira | **API**, como **extrato** (D15) | `GET /v1/extrato` |
 | Detalhe do serviço, serviços recentes, pedido em andamento (Início) | **API** | `GET /v1/pedidos`, `/v1/pedidos/{id}`, `/saldo`, `/eventos` |
 | Perfil público do profissional (cliente) | **API** (por id) | `GET /v1/profissionais/{id}`; o orçamento já traz `profissional_id`. Profissionais de exemplo (`prof-...`) seguem em demo |
-| Categorias, lista por categoria, busca, perguntas do Novo pedido | Demo | faltam rotas de catálogo e de busca (`docs/app-divergencias.md`) |
+| Categorias, lista por categoria e busca | **API** com fallback | `GET /v1/profissionais` (por serviço, categoria ou bairro); categorias e perguntas do formulário usam [demo] |
 | Agenda e conversas do profissional | Parcial | só o próximo atendimento (`inicio`); faltam rotas de agenda e de lista de conversas |
 | Lista de conversas do cliente | **API** por pedido | uma conversa por pedido contratado, sem texto da última mensagem |
 | Termos e política | Local | `app/assets/legal/` (cópias de `docs/juridico/`, rascunho; teste confere igualdade) |
 | Cadastro do profissional | Demo | falta catálogo de categorias e cidades |
-| Responder disputa (profissional) | Demo | falta a rota |
+| Responder disputa e retrabalho (profissional) | **API** | `POST /v1/pedidos/{id}/disputa/resposta`, `POST /v1/pedidos/{id}/retrabalho/atender` |
 | Marcar notificação como lida, preferências, token de push | — | sem rota |
 
 ## Sessão e token

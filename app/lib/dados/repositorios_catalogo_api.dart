@@ -38,12 +38,62 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   @override
   Future<List<CategoriaServico>> categorias() => _demo.categorias();
 
-  @override
-  Future<List<Profissional>> profissionais(String categoriaId, FiltroProfissionais filtro) =>
-      _demo.profissionais(categoriaId, filtro);
+  Profissional _converterBusca(Map<String, dynamic> j) {
+    final id = (j['id'] as String?) ?? '';
+    final nome = (j['nome'] as String?) ?? 'Profissional';
+    final nivel = (j['nivel_verificacao'] as String?) ?? '';
+    final categorias = [for (final c in (j['categorias'] as List? ?? const [])) '$c'];
+    final notaPublica = (j['nota_publica'] as num?)?.toDouble() ?? 0.0;
+    final servicosConcluidos = (j['servicos_concluidos'] as int?) ?? 0;
+    return Profissional(
+      id: id,
+      nome: nome,
+      iniciais: _iniciais(nome),
+      verificacao: nivel.contains('plus') ? 'Verificado Plus' : 'Verificado',
+      especialidade: categorias.join(', '),
+      servicosConcluidos: servicosConcluidos,
+      nota: notaPublica,
+      distanciaKm: 0,
+      regiao: 'Belo Horizonte',
+    );
+  }
 
   @override
-  Future<List<Profissional>> buscar(String termo) => _demo.buscar(termo);
+  Future<List<Profissional>> profissionais(String categoriaId, FiltroProfissionais filtro) async {
+    try {
+      final consulta = <String, String>{
+        'categoria_id': categoriaId,
+        if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
+      };
+      final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
+      final itens = [
+        for (final item in (resposta['itens'] as List? ?? const []))
+          _converterBusca(item as Map<String, dynamic>),
+      ];
+      if (itens.isNotEmpty) return itens;
+    } on Object {
+      // Sem dados ou rota indisponível: segue com demo
+    }
+    return _demo.profissionais(categoriaId, filtro);
+  }
+
+  @override
+  Future<List<Profissional>> buscar(String termo) async {
+    final limpo = termo.trim();
+    if (limpo.length >= 2) {
+      try {
+        final resposta = _mapa(await _api.get('/v1/profissionais', consulta: {'servico': limpo}));
+        final itens = [
+          for (final item in (resposta['itens'] as List? ?? const []))
+            _converterBusca(item as Map<String, dynamic>),
+        ];
+        if (itens.isNotEmpty) return itens;
+      } on Object {
+        // Sem dados ou rota indisponível: segue com demo
+      }
+    }
+    return _demo.buscar(termo);
+  }
 
   @override
   Future<FormularioPedido> formulario(String categoriaId) => _demo.formulario(categoriaId);

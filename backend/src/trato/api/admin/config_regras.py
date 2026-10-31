@@ -143,5 +143,6 @@ def exigir_outra_pessoa(versao: VersaoConfig, aprovador_id: str) -> None:
 
 
 def exigir_vigencia_chegou(versao: VersaoConfig, agora: datetime) -> None:
-    if versao.vigente_desde is not None and versao.vigente_desde > agora:
+    # Tolerância de até 2 segundos para desvio de relógio entre Postgres now() e a aplicação
+    if versao.vigente_desde is not None and (versao.vigente_desde - agora).total_seconds() > 2.0:
         raise RegraDoBanco("A data de início de vigência dessa versão ainda não chegou.")

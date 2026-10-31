@@ -96,11 +96,13 @@ abstract final class RotasTrato {
   static final ServicoNotaMaterial _notaDemo = ServicoNotaMaterialFake(nota: notaMaterialExemplo);
   static final ServicoAditivo _aditivoDemo = ServicoAditivoFake(detalhe: aditivoExemplo);
 
-  /// Modo `api`: nota e aditivo vêm de `repos`; fora dele, a demonstração.
+  /// Modo `api`: nota, aditivo e disputa vêm de `repos`; fora dele, a demonstração.
   static ServicoNotaMaterial get servicoNota => repos.notaMaterial ?? _notaDemo;
   static ServicoAditivo get servicoAditivo => repos.aditivo ?? _aditivoDemo;
-  static ServicoDisputaProfissional servicoDisputa =
+  static final ServicoDisputaProfissional _disputaDemo =
       ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo);
+  static ServicoDisputaProfissional get servicoDisputa =>
+      repos.disputaProfissional ?? _disputaDemo;
 
   /// Busca por texto: pede ao catálogo (modo `api`: demonstração até a rota de busca existir).
   static ServicoBusca get servicoBusca => _ServicoBuscaCatalogo(repos.catalogo);

@@ -2,6 +2,7 @@ import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';
 import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
+import '../telas/disputa_profissional/disputa.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
@@ -31,6 +32,7 @@ class RepositoriosTrato {
     this.notaMaterial,
     this.verificacao,
     this.capturaVerificacao,
+    this.disputaProfissional,
     RepositorioCatalogo? catalogo,
     RepositorioServicosCliente? servicos,
     RepositorioAgenda? agenda,
@@ -38,6 +40,8 @@ class RepositoriosTrato {
   })  : _catalogo = catalogo,
         _servicos = servicos,
         _agenda = agenda;
+
+  final ServicoDisputaProfissional? disputaProfissional;
 
   /// Modo demonstração: só dados de exemplo, sem rede.
   factory RepositoriosTrato.demo() => RepositoriosTrato(
@@ -51,6 +55,8 @@ class RepositoriosTrato {
         catalogo: RepositorioCatalogoFake(),
         servicos: RepositorioServicosClienteFake(),
         agenda: RepositorioAgendaFake(),
+        disputaProfissional:
+            ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
       );
 
   /// Modo API. Cada área usa a API quando o backend já tem a rota; o que não tem rota segue em
@@ -86,6 +92,7 @@ class RepositoriosTrato {
         aditivo: ServicoAditivoApi(api),
         notaMaterial: ServicoNotaMaterialApi(api),
         verificacao: ServicoVerificacaoApi(api),
+        disputaProfissional: ServicoDisputaProfissionalApi(api),
         capturaVerificacao:
             camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
     );
