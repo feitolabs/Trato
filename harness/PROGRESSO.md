@@ -442,3 +442,20 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - **Verificação**, comando `backend/.venv/Scripts/python harness/verificar.py`, saída fresca: 31/10 de 18:28 a 18:39:21 (1182 testes de backend, 1 pulado = integração; 735 app; 78 painel) e, depois da correção e com o `pgserver`, de 18:42:29 a 18:55:41: TUDO OK, **1260 testes de backend, 0 pulados**, 735 no app e 78 no painel. Integração à parte (`pytest tests/integracao tests/integracao_painel`, 18:41): 108 passed, 0 skipped.
 - Conclusão para o histórico: os "verdes" de backend das rodadas anteriores (1139 a 1182 testes) não incluíam a integração com Postgres. A integração só foi rodada de fato em 31/10 18:41; vale registrar se alguma branch anterior tem teste de integração que não foi exercitado pelo integrador.
 
+## 31/10/2026 — Envio de Orçamento: Rota Backend e App Flutter Conectados
+
+- **Passo 1 (Backend - `feature/f6-enviar-orcamento-api`, merge `d2a4ac2`):**
+  - Implementada a rota `POST /v1/pedidos/{pedido_id}/orcamentos` em `backend/src/trato/api/rotas_app.py`.
+  - Sanitização via `limpar_texto` e validação com `ItemOrcamentoIn`, `EtapaPropostaIn` e `CriarOrcamentoIn`.
+  - Implementado `enviar` em `OrcamentosEmMemoria` e no protocolo `RepositorioOrcamentos`.
+  - Adicionada migration `profissional_disponibilidade_portfolio_uploads` ao `MIGRATIONS` em `backend/tests/integracao/pg_local.py` corrigindo ausência da coluna `disponibilidade`.
+  - Testes unitários de rota e testes de integração com Postgres real adicionados e passando.
+
+- **Passo 2 (Flutter App - `feature/f6-enviar-orcamento-app`):**
+  - Em `app/lib/telas/profissional/servico_orcamento.dart`: adicionados `ItemMaterial`, `OrcamentoPronto` e método `enviar(OrcamentoPronto pronto)` à interface `ServicoOrcamento`.
+  - Em `app/lib/telas/profissional/servico_orcamento_fake.dart`: implementado `enviar` e histórico de orçamentos enviados.
+  - Em `app/lib/telas/profissional/calculadora_orcamento_tela.dart`: reexportação de modelos, suporte a envio assíncrono com indicador de carregamento e prevenção de duplo clique.
+  - Em `app/lib/dados/repositorios_api.dart`: `ServicoOrcamentoApi` implementa `enviar(OrcamentoPronto pronto)` montando os itens (mão de obra, deslocamento, materiais, sinal de materiais) e chamando `POST /v1/pedidos/{pedido_id}/orcamentos`.
+  - Em `app/lib/telas/profissional_inicio/casca_profissional_tela.dart` e `app/lib/telas/fluxo/rotas.dart`: conectado fluxo da tela inicial e detalhe do pedido para abrir a calculadora passando o `pedidoId` e enviando via API com tratamento de erros.
+  - Testes: adicionados testes em `app/test/dados/dados_api_test.dart` e `app/test/profissional_test.dart`. Verificação do harness passou 100% (1.264 backend, 736 app, 78 admin).
+

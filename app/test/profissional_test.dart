@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/profissional/calculadora_orcamento_tela.dart';
@@ -195,6 +197,22 @@ void main() {
         find.text('Válido por 3 dias · você pode editar até o cliente aceitar'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('enviar assíncrono exibe indicador de carregamento no botão', (tester) async {
+      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final completer = Completer<void>();
+      await _abrir(tester, _calculadora(servico, aoEnviar: (o) => completer.future));
+
+      await tester.tap(find.text('Enviar orçamento'));
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      completer.complete();
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('adicionar item soma ao total', (tester) async {
