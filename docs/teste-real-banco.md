@@ -168,3 +168,10 @@ Com serviço de R$ 30,00 (mínimo sugerido): taxa R$ 3,00; cartão à vista cust
 Falta a decisão se a taxa mínima também se soma ao pedido (assume-se que sim, como a taxa de 7,5%).
 Resumo da config de dinheiro decidida: `taxa_bps = 750`, `taxa_minima_centavos = 300`, `prazo_liberacao_dias = 0`,
 `prazo_confirmacao_cliente_horas = 48`, `janela_chargeback_dias = 7`, adicional do parcelado 400 bps. Nada disso foi gravado no banco real.
+
+## Decisão do João: base dos 4% e reembolso do acréscimo (31/10/2026)
+
+- Os 4% do parcelado incidem sobre o **valor total** (serviço + taxa do Trato). Ex.: R$ 107,50 × 4% = R$ 4,30; cliente paga R$ 111,80 parcelado.
+- O acréscimo **não é reembolsado** (o Stripe também não devolve o custo dele). Em reembolso total no parcelado, o cliente recebe só o valor do serviço
+  (R$ 100,00 neste exemplo); taxa de R$ 7,50 e acréscimo de R$ 4,30 ficam com o Trato.
+Ainda não decidido: o acréscimo vale para qualquer número de parcelas (2x a 12x)? Sujeito à validação jurídica do Emanoel (art. 49 do CDC, arrependimento em 7 dias).
