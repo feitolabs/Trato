@@ -484,15 +484,35 @@ abstract final class RotasTrato {
               ),
             ),
           ),
-          aoFazerOrcamento: () => _abrir<void>(
-            context,
-            CalculadoraOrcamentoTela(
-              servico: repos.profissional.servicoOrcamento(_idDemo),
-              tituloPedido: inicio.pedidos.isEmpty ? 'Orçamento' : inicio.pedidos.first.titulo,
-            ),
-          ),
+          aoFazerOrcamento: () {
+            final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
+            final id = pedido?.id ?? _idDemo;
+            final titulo = pedido?.titulo ?? 'Orçamento';
+            _abrirOrcamento(context, id, titulo);
+          },
+          aoFazerOrcamentoDoPedido: (pedido) => _abrirOrcamento(context, pedido.id, pedido.titulo),
         ),
       );
+
+  static void _abrirOrcamento(BuildContext context, String pedidoId, String titulo) {
+    final servico = repos.profissional.servicoOrcamento(pedidoId);
+    _abrir<void>(
+      context,
+      CalculadoraOrcamentoTela(
+        servico: servico,
+        tituloPedido: titulo,
+        aoEnviar: (pronto) async {
+          final ok = await _tentar(context, () => servico.enviar(pronto));
+          if (ok && context.mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Orçamento enviado com sucesso!')),
+            );
+          }
+        },
+      ),
+    );
+  }
 
   /// Aba Agenda: atendimentos por dia; cada um abre as ações do pedido (check-in, nota, aditivo).
   static Widget _abaAgenda() => Builder(

@@ -61,7 +61,7 @@ O estado completo (com observações) está em `docs/STATUS-MVP.md`; o que o bac
 | Notificações | **API** (lista) | `GET /v1/notificacoes` |
 | Perfil do cliente | **API** | `GET/PATCH /v1/me` |
 | Profissional: início, pedidos abertos, detalhe, recusar | **API** | `GET /v1/me`, `GET /v1/profissional/pedidos-abertos`, `POST /v1/pedidos/{id}/recusar` |
-| Profissional: calculadora | **API** | `POST /v1/orcamentos/resumo` |
+| Profissional: calculadora | **API** | `POST /v1/orcamentos/resumo`, `POST /v1/pedidos/{id}/orcamentos` |
 | Profissional: check-in / check-out | **API** | `POST /v1/uploads` (+ `PUT` + `concluir`), `acoes/fazer_check_in`, `acoes/fazer_check_out` |
 | Profissional: verificação | **API** | `POST /v1/uploads` (destino `verificacao`), `POST/GET /v1/profissional/verificacao` |
 | Profissional: Carteira | **API**, como **extrato** (D15) | `GET /v1/extrato` |

@@ -7,6 +7,7 @@ import '../telas/pagamento/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
 import '../telas/pedidos/modelos.dart';
 import '../telas/perfil_cliente/modelos.dart';
+import '../telas/profissional/dinheiro.dart';
 import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
@@ -713,7 +714,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   String _curto(String id) => '#${id.substring(0, id.length < 4 ? id.length : 4).toUpperCase()}';
 
   @override
-  ServicoOrcamento servicoOrcamento(String pedidoId) => ServicoOrcamentoApi(_api);
+  ServicoOrcamento servicoOrcamento(String pedidoId) =>
+      ServicoOrcamentoApi(_api, pedidoId: pedidoId);
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId) =>
@@ -726,12 +728,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       );
 }
 
-/// `POST /v1/orcamentos/resumo` `{valor_centavos}`. Taxa e líquido vêm do backend; o app não
-/// calcula nada (a taxa em % não vem na resposta, então a tela mostra só "Taxa Trato").
+/// `POST /v1/orcamentos/resumo` `{valor_centavos}` e `POST /v1/pedidos/{pedido_id}/orcamentos`.
+/// Taxa e líquido vêm do backend; o app não calcula nada.
 class ServicoOrcamentoApi implements ServicoOrcamento {
-  ServicoOrcamentoApi(this._api);
+  ServicoOrcamentoApi(this._api, {this.pedidoId});
 
   final ClienteApi _api;
+  final String? pedidoId;
 
   @override
   Future<ResumoOrcamento> resumir(int totalCentavos) async {
@@ -744,6 +747,68 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
       taxaBps: j['taxa_bps'] as int?,
       liquidoCentavos: j['liquido_centavos'] as int,
       clientePagaCentavos: j['total_cliente_centavos'] as int?,
+    );
+  }
+
+  @override
+  Future<void> enviar(OrcamentoPronto pronto) async {
+    final id = pedidoId;
+    if (id == null || id.isEmpty) {
+      throw const ErroTrato(
+        TipoErro.recusado,
+        'Identificador do pedido obrigatório para enviar orçamento',
+      );
+    }
+
+    final itens = <Map<String, dynamic>>[];
+    final valorHoras = Dinheiro.valorDasHoras(pronto.valorHoraCentavos, pronto.decimosDeHora);
+    if (valorHoras > 0) {
+      itens.add({
+        'descricao': 'Mão de obra',
+        'quantidade': 1,
+        'preco_unitario_centavos': valorHoras,
+      });
+    }
+    if (pronto.deslocamentoCentavos > 0) {
+      itens.add({
+        'descricao': 'Deslocamento',
+        'quantidade': 1,
+        'preco_unitario_centavos': pronto.deslocamentoCentavos,
+      });
+    }
+    if (pronto.materialPorMim) {
+      for (final item in pronto.itens) {
+        if (item.centavos > 0) {
+          itens.add({
+            'descricao': item.nome,
+            'quantidade': 1,
+            'preco_unitario_centavos': item.centavos,
+          });
+        }
+      }
+    }
+    if (itens.isEmpty && pronto.totalCentavos > 0) {
+      itens.add({
+        'descricao': 'Serviço',
+        'quantidade': 1,
+        'preco_unitario_centavos': pronto.totalCentavos,
+      });
+    }
+
+    final totalMaterial = pronto.materialPorMim
+        ? pronto.itens.fold(0, (s, i) => s + i.centavos)
+        : 0;
+    final sinal = pronto.pedirSinalMaterial ? totalMaterial : 0;
+
+    await _api.post(
+      '/v1/pedidos/$id/orcamentos',
+      corpo: {
+        'itens': itens,
+        'prazo_dias': 3,
+        'validade_dias': 3,
+        'sinal_material_centavos': sinal,
+        'garantia_dias': pronto.garantiaDias,
+      },
     );
   }
 }

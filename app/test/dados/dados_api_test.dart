@@ -13,6 +13,7 @@ import 'package:trato/telas/carteira/modelos.dart';
 import 'package:trato/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
+import 'package:trato/telas/profissional/servico_orcamento.dart';
 
 const _pedidoJson = {
   'id': 'abcd1234',
@@ -368,6 +369,87 @@ void main() {
       expect(
         (chamadas.single.corpo!['prova'] as Map)['codigo_conclusao'],
         '7310',
+      );
+    });
+  });
+
+  group('ServicoOrcamentoApi', () {
+    test('resumir pede a taxa e o total ao backend', () async {
+      final (api, chamadas) = _cliente(
+        (_) => _json({
+          'valor_centavos': 30000,
+          'taxa_centavos': 2250,
+          'taxa_bps': 750,
+          'liquido_centavos': 30000,
+          'total_cliente_centavos': 32250,
+        }),
+      );
+
+      final servico = ServicoOrcamentoApi(api, pedidoId: 'ped-1');
+      final resumo = await servico.resumir(30000);
+
+      expect(chamadas.single.caminho, '/v1/orcamentos/resumo');
+      expect(chamadas.single.corpo, {'valor_centavos': 30000});
+      expect(resumo.totalCentavos, 30000);
+      expect(resumo.taxaCentavos, 2250);
+      expect(resumo.taxaBps, 750);
+      expect(resumo.liquidoCentavos, 30000);
+      expect(resumo.clientePagaCentavos, 32250);
+    });
+
+    test('enviar serializa itens e chama POST /v1/pedidos/{id}/orcamentos', () async {
+      final (api, chamadas) = _cliente((_) => _json({'id': 'orc-1', 'versao': 1}));
+
+      final servico = ServicoOrcamentoApi(api, pedidoId: 'ped-123');
+      await servico.enviar(
+        const OrcamentoPronto(
+          deslocamentoCentavos: 3000,
+          decimosDeHora: 25,
+          valorHoraCentavos: 8000,
+          garantiaDias: 90,
+          itens: [
+            ItemMaterial(nome: 'Tomadas', centavos: 4500),
+          ],
+          materialPorMim: true,
+          pedirSinalMaterial: true,
+          totalCentavos: 27500,
+        ),
+      );
+
+      expect(chamadas.single.caminho, '/v1/pedidos/ped-123/orcamentos');
+      final corpo = chamadas.single.corpo!;
+      expect(corpo['garantia_dias'], 90);
+      expect(corpo['prazo_dias'], 3);
+      expect(corpo['validade_dias'], 3);
+      expect(corpo['sinal_material_centavos'], 4500);
+      final itens = corpo['itens'] as List;
+      expect(itens.length, 3);
+      expect(itens[0]['descricao'], 'Mão de obra');
+      expect(itens[0]['preco_unitario_centavos'], 20000); // 8000 * 25 / 10
+      expect(itens[1]['descricao'], 'Deslocamento');
+      expect(itens[1]['preco_unitario_centavos'], 3000);
+      expect(itens[2]['descricao'], 'Tomadas');
+      expect(itens[2]['preco_unitario_centavos'], 4500);
+    });
+
+    test('enviar sem pedidoId lança ErroTrato', () async {
+      final (api, _) = _cliente((_) => _json({}));
+      final servico = ServicoOrcamentoApi(api);
+
+      expect(
+        () => servico.enviar(
+          const OrcamentoPronto(
+            deslocamentoCentavos: 0,
+            decimosDeHora: 10,
+            valorHoraCentavos: 5000,
+            garantiaDias: 30,
+            itens: [],
+            materialPorMim: false,
+            pedirSinalMaterial: false,
+            totalCentavos: 5000,
+          ),
+        ),
+        throwsA(isA<ErroTrato>()),
       );
     });
   });
