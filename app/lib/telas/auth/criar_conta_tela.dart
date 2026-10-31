@@ -6,7 +6,9 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../em_breve_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
+import '../fluxo/rotas.dart';
 import 'confirmar_celular_tela.dart';
+import 'confirmar_email_tela.dart';
 import 'estrutura_auth.dart';
 import 'validacao.dart';
 
@@ -76,8 +78,9 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       _erroServico = null;
     });
     String? erro;
+    ResultadoCadastro? resultado;
     try {
-      await _servico.criarConta(DadosCadastro(
+      resultado = await _servico.criarConta(DadosCadastro(
         nome: _nome.text.trim(),
         email: _email.text.trim(),
         senha: _senha.text,
@@ -93,15 +96,34 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       _erroServico = erro;
     });
     if (erro != null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ConfirmarCelularTela(
-          celular: _celular.text,
-          perfil: widget.perfil,
-          servico: widget.servico,
-        ),
-      ),
-    );
+    switch (resultado!) {
+      case CadastroAguardandoEmail(:final email):
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ConfirmarEmailTela(
+              email: email,
+              senha: _senha.text,
+              perfil: widget.perfil,
+              servico: widget.servico,
+            ),
+          ),
+        );
+      case CadastroComSessao():
+        // SMS desligado no piloto (D16): sem confirmação de e-mail, entra direto.
+        if (kConfirmarCelularPorSms) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ConfirmarCelularTela(
+                celular: _celular.text,
+                perfil: widget.perfil,
+                servico: widget.servico,
+              ),
+            ),
+          );
+        } else {
+          RotasTrato.irParaDepoisDoCadastro(context, widget.perfil);
+        }
+    }
   }
 
   @override

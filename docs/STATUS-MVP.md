@@ -15,7 +15,7 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 |---|---|---|
 | Splash, onboarding, escolha de perfil | Demo | Primeira abertura: splash → onboarding → escolha de perfil → cadastro → casca do perfil. Com sessão guardada, a splash vai direto à casca. O perfil escolhido fica nos dados da conta (`perfil` no Supabase Auth) e o login abre a casca do cliente ou do profissional. |
 | Login, criar conta, recuperar senha | Demo (serviço de teste) | `ServicoAuth` pronto; o `main.dart` troca para o Supabase quando há `SUPABASE_URL` e `SUPABASE_ANON_KEY`. O token do login vai em toda chamada da API (`LigacaoSessao` → `SessaoTrato`); em 401 o app renova o token e repete a chamada uma vez, e se não renovar limpa a sessão e abre o login por cima da tela (o que foi digitado fica). Ver `docs/login-configuracao.md`. |
-| Google, Apple, SMS | Depende do João | Chaves e provedor (P11). |
+| Google, Apple | Depende do João | Chaves. SMS desligado (D16); cadastro confirma por e-mail. |
 | Início, buscar, perfil do profissional | Demo | Backend pronto (busca #10, perfil público por id #11, `docs/api-rotas.md`); falta o app ligar. |
 | Busca com serviço (`busca/`) | Demo, ligada | É a aba Buscar do cliente (`RotasTrato.abaBuscar`), abre o perfil público. Filtros e mapa da tela antiga (`BuscarTela`) saíram da aba; a busca real depende do backend. |
 | Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
@@ -79,7 +79,7 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 | P7 / P16 | Parceiro de pagamento e propostas de dois provedores; contas do ledger |
 | Chaves | `.env` com Supabase (URL, anon, service_role, `DATABASE_URL`, JWT), Stripe de teste, segredo do webhook |
 | Google e Apple | Credenciais de login (`docs/login-configuracao.md`) |
-| SMS | Escolha do provedor (P11) e hook no Supabase Auth |
+| SMS | Desligado no piloto (D16); só volta com provedor (P11) e hook |
 | Seeds | Autorizar a carga de cidade, categorias, taxa e contas do ledger |
 | Design | Conferir as telas "sem protótipo" contra o PDF |
 

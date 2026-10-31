@@ -385,3 +385,13 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Incidente: o script auxiliar `verif.sh` (em `%TEMP%`) foi apagado por alguém e a primeira checagem desta rodada reaproveitou, sem querer, um log antigo; foi refeita do zero. Passo a usar só o comando oficial, com o lock do Flutter feito na própria linha de comando. Causa do sumiço não identificada.
 - Migrations: `20261030140000_upload_destino_portfolio.sql` (APLICADA pelo João; cabeçalho mantido). **Nova, NÃO aplicada:** `20261030140000_b2_grants_por_coluna.sql` (grants de leitura por coluna nas tabelas do dinheiro, só privilégio; rollback `b2_grants_por_coluna_rollback.sql`). **As duas têm a mesma versão `20261030140000`**: renomear a nova antes de aplicar. Seguem esperando OK: `20261029040000_notificacoes_dispositivos_agendador.sql`, `20261030000000_fix_acesso_storage_pedido_historico.sql`, `20261030120000_ordens_estorno.sql`.
 
+
+
+## 30/10/2026 — Cadastro e login reais com confirmação por e-mail (`claude/fix-cadastro-real-46a09c`)
+
+- Causa do "Algo deu errado" ao criar conta: o `criarConta` chamava `updateUser(phone)` depois do `signUp`, mas com confirmação de e-mail ligada não há sessão. Removido (D16: sem SMS no piloto).
+- `criarConta` devolve `ResultadoCadastro`: `CadastroComSessao` (entra direto) ou `CadastroAguardandoEmail`. Celular vai nos metadados do `signUp`; CPF e nascimento **não** vão (iriam no token; o `PATCH /v1/me` só aceita nome): seguem pendentes para o backend.
+- Nova tela `ConfirmarEmailTela` ("Confirme seu e-mail", "Já confirmei", "Reenviar e-mail" com 60 s, "Trocar e-mail"). A tela de SMS fica intacta, desligada por `kConfirmarCelularPorSms = false`.
+- Login trata `email_not_confirmed` com reenvio. Novos tipos de erro: `emailNaoConfirmado`, `limiteEmail`, `dadosInvalidos`, `cadastroDesativado`; erro desconhecido registra só tipo e código em log de depuração.
+- `GET /v1/me` no primeiro login só no modo `api`. Deep link `br.com.feitolabs.trato://login-callback` no `AndroidManifest.xml` e `Info.plist`. `docs/login-configuracao.md` atualizado.
+- Testes: `app/test/servico_auth_supabase_test.dart` (cliente com rede simulada) e fluxo em `auth_test.dart`. `verificar.py` OK. Falta o João: ligar a URL de redirecionamento no painel e testar no emulador.

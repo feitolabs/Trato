@@ -19,13 +19,28 @@ void main() {
   group('ServicoAuthFake', () {
     test('criar conta abre a sessão; sair fecha', () async {
       final s = ServicoAuthFake();
-      final sessao = await s.criarConta(_dados);
+      final r = await s.criarConta(_dados);
+      final sessao = (r as CadastroComSessao).sessao;
       expect(sessao.email, 'mariana@email.com');
       expect(sessao.celularConfirmado, isFalse);
       expect(s.sessaoAtual, isNotNull);
 
       await s.sair();
       expect(s.sessaoAtual, isNull);
+    });
+
+    test('com confirmação de e-mail: cadastro aguarda, login recusa até confirmar', () async {
+      final s = ServicoAuthFake(exigeConfirmacaoEmail: true);
+      final r = await s.criarConta(_dados);
+      expect(r, isA<CadastroAguardandoEmail>());
+      expect(s.sessaoAtual, isNull);
+      await expectLater(
+        s.entrarComEmail(email: 'mariana@email.com', senha: _credencial),
+        throwsA(_erro(TipoErroAuth.emailNaoConfirmado)),
+      );
+      s.confirmarEmail('mariana@email.com');
+      expect((await s.entrarComEmail(email: 'mariana@email.com', senha: _credencial)).email,
+          'mariana@email.com');
     });
 
     test('e-mail repetido (sem diferenciar maiúsculas) dá emailJaUsado', () async {
