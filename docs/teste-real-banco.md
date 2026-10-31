@@ -189,3 +189,42 @@ Consequências para o código: o adicional por parcela não é constante no sist
 Em aberto: a página pública do Stripe não traz o custo do parcelado (`docs/provedores-pagamento.md`), então ele precisa vir da proposta/contrato do provedor
 antes de lançar; o Mercado Pago e o Pagar.me têm tabelas próprias. Pergunta para o Emanoel: repassar o custo do parcelamento ao consumidor exige informar o valor
 total e o custo antes da contratação (CDC, transparência)?
+
+## Resultado do teste real de pagamento (31/10/2026, branch com o pagamento ligado ao Postgres)
+
+Migration `20261031000000_pagamentos_instrucao.sql` (`alter table public.pagamentos add column instrucao text`): **aplicada pelo João no SQL Editor**
+(a ferramenta `apply_migration` foi negada pelo app duas vezes e não foi contornada). Coluna confirmada por leitura. A linha em `supabase_migrations` pode faltar
+(só anotado, nada gravado lá). Rollback: `supabase/rollback/pagamentos_instrucao_rollback.sql`.
+
+`python harness/teste_real_fluxo.py fluxo` (Supabase real + Stripe modo teste + `stripe listen` do João, webhook REAL chegou, sem fallback local):
+
+| Verificação | Resultado |
+|---|---|
+| Login real (Supabase Auth) e `GET /v1/me` | OK |
+| Cliente cria pedido; vê o orçamento de 10000 centavos | OK |
+| Resumo de taxa vem do backend (750 = 7,5%) | OK |
+| Cliente aceita o orçamento | OK |
+| Cobrança criada no Stripe (PaymentIntent de teste), repetir devolve a mesma | OK (após o bug abaixo) |
+| D13: antes do webhook `pago = false` (`aguardando_confirmacao`) | OK |
+| Stripe: cartão 4242 (`pm_card_visa`) confirmado | OK (`succeeded`) |
+| Webhook assinado real: `pago = true` | OK |
+| Ledger espelhou: 1 lançamento `cobranca` com 2 partidas; `pagamentos` = `confirmado` 10000; 1 evento `payment_intent.succeeded` | OK (consulta SQL) |
+| Reenvio do mesmo evento (`harness/teste_real_fluxo.py reenvio`): 200 `duplicado: true`, contagens iguais (1, 1, 2, 1) | OK |
+| Assinatura errada: 400 | OK |
+
+**Bug achado e corrigido no teste:** o Stripe recusa `payment_method_types` ("no longer supported"), então toda cobrança dava 500. O provedor
+(`pagamentos/provedor/stripe_teste.py`) agora usa `automatic_payment_methods` (teste ajustado em `tests/test_pagamentos_provedor.py`). O Pix **não** foi
+testado de verdade no Stripe (a conta pode não ter Pix; "por convite"): conferir.
+
+**Atenção:** o valor cobrado foi 10000 (o do orçamento), o modelo antigo. A taxa somada (10750) depende da sessão
+[Taxa somada e parcelado repassado](#local_8c2a732c-45f2-469e-91b3-c6e3ee719ac5), ainda não mesclada. Os testes de integração do pagamento no Postgres
+local (`test_pagamento_postgres.py`) foram PULADOS aqui (sem `pgserver`); o teste real cobre o essencial, mas rode a suíte com `pgserver` antes de confiar.
+
+### Dados de teste agora no banco real (nada foi apagado)
+
+4 usuários Auth + `usuarios` (`teste_cliente`, `teste_profissional`, `teste_admin`, `teste_financeiro`, @example.test), 2 em `equipe`, 1 config vigente de teste
+(7,5% em qualquer valor; sem taxa mínima, sem `prazo_liberacao_dias`), `teste_Cidade`, `teste_Pintura` e 1 pergunta, **3 pedidos** `teste_ Pintar a sala`
+com 3 orçamentos e 3 contratos (os dois primeiros ficaram parados; 1 deles tem o pagamento), 1 `pagamentos` confirmado, 1 lançamento `cobranca`
+com 2 partidas e 1 `eventos_webhook`. Do lado do Stripe (modo teste): PaymentIntents `teste` no painel de teste, que não precisam de limpeza.
+
+**Limpeza (proposta, NÃO executada):** `docs/teste-real-banco-limpeza.sql` (gerado pelo `harness/teste_real_fluxo.py limpeza`). Só o João roda, no SQL Editor.

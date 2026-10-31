@@ -204,18 +204,35 @@ def fluxo() -> None:
     ok("depois do webhook, pago = true", r.status_code == 200 and r.json()["pago"] is True, str(r.json().get("estado_pagamento")))
     with banco() as con:
         n = con.execute("select count(*), coalesce(sum(p.valor_centavos) filter (where p.sentido='debito'),0) from public.lancamentos l "
-                        "join public.partidas p on p.lancamento_id=l.id where l.contrato_id=%s", (pedido,)).fetchone()
+                        "join public.partidas p on p.lancamento_id=l.id join public.contratos k on k.id=l.contrato_id where k.pedido_id=%s", (pedido,)).fetchone()
         ok("ledger espelhou a entrada (partidas dobradas)", n[0] >= 2, f"{n[0]} partida(s), débitos somam {n[1]} centavos")
         ev = con.execute("select count(*) from public.eventos_webhook").fetchone()[0]
         ok("eventos_webhook guardou o evento", ev >= 1, f"{ev} linha(s)")
     antes = n[0]
     if not estado["webhook_real"]:
         with banco() as con:
-            depois = con.execute("select count(*) from public.lancamentos where contrato_id=%s", (pedido,)).fetchone()[0]
+            depois = con.execute("select count(*) from public.lancamentos l join public.contratos k on k.id=l.contrato_id where k.pedido_id=%s", (pedido,)).fetchone()[0]
         ok("idempotência: lançamentos não duplicaram após o reenvio", depois == antes, f"{antes} -> {depois}")
     falhas = [x for x in resultados if not x[1]]
     print(f"\n{len(resultados) - len(falhas)} OK, {len(falhas)} FALHOU")
     sys.exit(1 if falhas else 0)
+
+
+def reenvio() -> None:
+    """Reenvia (com assinatura local) o último evento guardado e confere que nada se repete."""
+    c = httpx.Client(base_url=API, timeout=60)
+    with banco() as con:
+        evt = con.execute("select payload from public.eventos_webhook order by recebido_em desc limit 1").fetchone()[0]
+        antes = tuple(con.execute(f"select count(*) from public.{t}").fetchone()[0] for t in ("eventos_webhook", "lancamentos", "partidas", "pagamentos"))
+    corpo = json.dumps(evt).encode()
+    r = c.post("/v1/webhooks/stripe", content=corpo, headers={"Stripe-Signature": assinar(corpo, os.environ["STRIPE_WEBHOOK_SECRET"]), "Content-Type": "application/json"})
+    ok("reenvio do mesmo evento: 200 e duplicado", r.status_code == 200 and r.json().get("duplicado") is True, r.text[:100])
+    with banco() as con:
+        depois = tuple(con.execute(f"select count(*) from public.{t}").fetchone()[0] for t in ("eventos_webhook", "lancamentos", "partidas", "pagamentos"))
+    ok("idempotência: eventos, lançamentos, partidas e pagamentos não mudaram", antes == depois, f"{antes} -> {depois}")
+    r = c.post("/v1/webhooks/stripe", content=corpo, headers={"Stripe-Signature": assinar(corpo, "whsec_errado"), "Content-Type": "application/json"})
+    ok("assinatura errada é recusada (400)", r.status_code == 400)
+    sys.exit(1 if any(not x[1] for x in resultados) else 0)
 
 
 SEMENTES = ("contas_ledger", "categorias", "categoria_perguntas", "cidades")  # existiam antes do teste: não se apagam inteiras
@@ -241,4 +258,4 @@ def limpeza() -> None:
 
 
 if __name__ == "__main__":
-    {"setup": setup, "fluxo": fluxo, "limpeza": limpeza}.get(sys.argv[1] if len(sys.argv) > 1 else "", lambda: sys.exit(__doc__))()
+    {"setup": setup, "fluxo": fluxo, "reenvio": reenvio, "limpeza": limpeza}.get(sys.argv[1] if len(sys.argv) > 1 else "", lambda: sys.exit(__doc__))()

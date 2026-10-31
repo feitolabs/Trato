@@ -103,7 +103,10 @@ def test_stripe_monta_chamadas_e_le_respostas_simuladas():
     assert cobranca.status is StatusCobranca.AGUARDANDO and cobranca.instrucao == "000201pix"
     _, _, campos, cabs = chamadas[0]
     assert campos["amount"] == "5000" and campos["metadata[pedido_id]"] == "p1"
-    assert campos["payment_method_types[]"] == "pix" and cabs == {"Idempotency-Key": "cob/p1/1"}
+    assert campos["payment_method_data[type]"] == "pix" and "payment_method_types[]" not in campos
+    assert campos["automatic_payment_methods[enabled]"] == "true" and cabs == {
+        "Idempotency-Key": "cob/p1/1"
+    }
 
     estorno = stripe.estornar("pi_1", 2_000, "est/1")
     assert estorno.confirmado and chamadas[1][2] == {"payment_intent": "pi_1", "amount": "2000"}
