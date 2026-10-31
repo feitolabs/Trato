@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Protocol
 
 from trato.api.repositorios_app import OrcamentoDetalhe, OrcamentoDoPedido, PedidoAberto
@@ -20,6 +21,27 @@ from trato.financeiro.ledger import Conta, Lancamento, SaldoPedido
 from trato.garantias import ConfigGarantia, Garantia, Retrabalho
 from trato.pagamentos.idempotencia import RegistroEventos
 from trato.pedidos.estados import Evento, Pedido, PrazosPedido
+
+
+@dataclass(frozen=True)
+class ItemOrcamento:
+    tipo: str  # deslocamento | horas | material | outro
+    descricao: str
+    quantidade: Decimal
+    valor_unitario_centavos: int
+
+    @property
+    def total_centavos(self) -> int:
+        """Quantidade x unitário, arredondado para o centavo (meio para cima)."""
+        return int(
+            (self.quantidade * self.valor_unitario_centavos).to_integral_value(ROUND_HALF_UP)
+        )
+
+
+@dataclass(frozen=True)
+class EtapaProposta:
+    descricao: str
+    valor_centavos: int
 
 
 @dataclass(frozen=True)
@@ -159,6 +181,22 @@ class RepositorioOrcamentos(Protocol):
 
     def detalhe(self, orcamento_id: str) -> OrcamentoDetalhe | None:
         """Orçamento com itens, validade e fora do escopo; rascunho nunca é devolvido."""
+
+    def enviar(
+        self,
+        *,
+        pedido_id: str,
+        profissional_id: str,
+        itens: Sequence[ItemOrcamento],
+        agora: datetime,
+        etapas: Sequence[EtapaProposta] = (),
+        prazo_execucao_dias: int | None = None,
+        validade_ate: datetime | None = None,
+        garantia_dias: int | None = None,
+        fora_do_escopo: str | None = None,
+        sinal_material_centavos: int | None = None,
+        observacoes: str | None = None,
+    ) -> str: ...
 
 
 class RepositorioContratos(Protocol):

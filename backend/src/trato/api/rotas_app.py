@@ -8,14 +8,16 @@ pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nun
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
     TIPOS_DOCUMENTO,
@@ -56,6 +58,39 @@ class OrcamentoOut(BaseModel):
     )
     profissional_nota: float | None = None
     profissional_servicos_concluidos: int | None = None
+
+
+class ItemOrcamentoIn(BaseModel):
+    tipo: str = Field(description="deslocamento | horas | material | outro")
+    descricao: str = Field(min_length=1, max_length=200)
+    quantidade: Decimal = Field(gt=0, description="Ex.: 1, 2.5")
+    valor_unitario_centavos: int = Field(ge=0, description="Em centavos")
+
+
+class EtapaPropostaIn(BaseModel):
+    descricao: str = Field(min_length=1, max_length=200)
+    valor_centavos: int = Field(gt=0)
+
+
+class CriarOrcamentoIn(BaseModel):
+    itens: list[ItemOrcamentoIn] = Field(min_length=1)
+    prazo_execucao_dias: int | None = Field(default=None, ge=1, le=365)
+    validade_ate: datetime | None = None
+    garantia_dias: int | None = Field(default=None, ge=0, le=730)
+    fora_do_escopo: str | None = Field(default=None, max_length=1000)
+    sinal_material_centavos: int | None = Field(default=None, ge=0)
+    observacoes: str | None = Field(default=None, max_length=1000)
+    etapas: list[EtapaPropostaIn] = Field(default_factory=list)
+
+
+class CriarOrcamentoOut(BaseModel):
+    id: str
+    pedido_id: str
+    profissional_id: str
+    versao: int
+    status: str
+    valor_total_centavos: int
+    enviado_em: datetime | None = None
 
 
 class OpcaoParcelamentoOut(BaseModel):
@@ -317,6 +352,86 @@ def listar_orcamentos(
         )
         for o in itens
     ]
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos",
+    response_model=CriarOrcamentoOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Enviar orçamento para um pedido",
+    description="Profissional autenticado envia um orçamento para um pedido aberto.",
+)
+def enviar_orcamento(
+    pedido_id: str,
+    dados: CriarOrcamentoIn,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> CriarOrcamentoOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
+
+    agora = contexto.agora()
+    itens = [
+        ItemOrcamento(
+            tipo=i.tipo.strip().lower(),
+            descricao=limpar_texto(i.descricao, "descricao", 200),
+            quantidade=i.quantidade,
+            valor_unitario_centavos=i.valor_unitario_centavos,
+        )
+        for i in dados.itens
+    ]
+    etapas = [
+        EtapaProposta(
+            descricao=limpar_texto(e.descricao, "etapa", 200),
+            valor_centavos=e.valor_centavos,
+        )
+        for e in dados.etapas
+    ]
+    orcamento_id = contexto.orcamentos.enviar(
+        pedido_id=pedido.id,
+        profissional_id=usuario.id,
+        itens=itens,
+        agora=agora,
+        etapas=etapas,
+        prazo_execucao_dias=dados.prazo_execucao_dias,
+        validade_ate=dados.validade_ate,
+        garantia_dias=dados.garantia_dias,
+        fora_do_escopo=(
+            limpar_texto(dados.fora_do_escopo, "fora_do_escopo", 1000)
+            if dados.fora_do_escopo
+            else None
+        ),
+        sinal_material_centavos=dados.sinal_material_centavos,
+        observacoes=(
+            limpar_texto(dados.observacoes, "observacoes", 1000) if dados.observacoes else None
+        ),
+    )
+    detalhe = contexto.orcamentos.detalhe(orcamento_id)
+    if detalhe is None:
+        orc = contexto.orcamentos.obter(orcamento_id)
+        return CriarOrcamentoOut(
+            id=orcamento_id,
+            pedido_id=pedido.id,
+            profissional_id=usuario.id,
+            versao=1,
+            status="enviado",
+            valor_total_centavos=(
+                orc.valor_centavos if orc else sum(i.total_centavos for i in itens)
+            ),
+            enviado_em=agora,
+        )
+    return CriarOrcamentoOut(
+        id=detalhe.id,
+        pedido_id=detalhe.pedido_id,
+        profissional_id=detalhe.profissional_id,
+        versao=detalhe.versao,
+        status=detalhe.status,
+        valor_total_centavos=detalhe.valor_centavos,
+        enviado_em=detalhe.enviado_em,
+    )
 
 
 @router.get(
