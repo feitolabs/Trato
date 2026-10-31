@@ -228,7 +228,7 @@ def test_cobranca_webhook_ledger_e_idempotencia(pg):
     antes = (len(lanc), len(contexto.ledger.lancamentos(pedido_id)))
     # a taxa sai da custódia na confirmação: fica retido só o serviço
     assert contexto.ledger.saldo_da_conta(CUSTODIA, pedido_id) == VALOR_ORCAMENTO
-    assert contexto.ledger.saldos_pedido(pedido_id).taxa_trato == TAXA_ORCAMENTO
+    assert contexto.ledger.saldos_pedido(pedido_id, None).taxa_trato == TAXA_ORCAMENTO
 
     # o MESMO evento de novo: 200, duplicado, nada novo no ledger nem no pedido
     r = webhook(c, TipoEvento.PAGAMENTO_CONFIRMADO, cob["id"], evento_id=evento)
