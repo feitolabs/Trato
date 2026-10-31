@@ -115,3 +115,13 @@ Posso continuar?
 Alternativa sem risco: rodar o mesmo roteiro num **branch do Supabase** ou no Postgres local (`backend/tests/integracao`,
 que já cobre o fluxo completo e a idempotência do webhook), e deixar o banco real para depois de fechar a taxa.
 O João também precisa rodar `stripe listen` (comando acima) para o teste com webhook real.
+
+## Decisão do João: regra de liberação (31/10/2026)
+
+- O repasse é liberado **assim que o cliente confirma** o serviço: `prazo_liberacao_dias = 0`.
+- Sem confirmação em **48 h**, o sistema confirma sozinho: `prazo_confirmacao_cliente_horas = 48`.
+- O cliente tem **7 dias para reclamar**: `janela_chargeback_dias = 7`.
+
+Para aplicar na config real: o mínimo de `prazo_liberacao_dias` em `supabase/seeds/parametros.sql` hoje é 1 (e `supabase/testes/testar_seeds.py`
+exige que 0 seja rejeitado). Falta baixar o mínimo para 0 e ajustar esse teste junto, e só então rodar o seed 2. A config de teste já no banco
+(`teste_`) **não** tem `prazo_liberacao_dias`. Pendente do João: taxa mínima em centavos (0 se não houver) e confirmar `taxa_bps = 750`.
