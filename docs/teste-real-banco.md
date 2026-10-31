@@ -155,3 +155,8 @@ Exemplo: cliente pagou R$ 107,50 (serviço R$ 100,00 + taxa R$ 7,50); reembolso 
 Em aberto (não decidido): o acréscimo de 4% do parcelado também fica com o Trato? Reembolso parcial em disputa: a taxa fica integral ou proporcional?
 Para o Emanoel: se o serviço não foi prestado (cancelamento antes de começar, direito de arrependimento do CDC), reter a taxa é permitido?
 Hoje o código devolve só o valor do serviço em reembolso (a taxa nunca volta) e já faz isso na disputa; conferir ao mudar para taxa somada.
+
+Posição do João: reter a taxa também vale quando o serviço nem começou e o cliente cancela. **Risco jurídico a confirmar com o Emanoel antes de lançar:** o art. 49
+do CDC (contratação fora do estabelecimento, como no app) dá 7 dias de arrependimento e manda devolver "os valores eventualmente pagos, a qualquer título".
+Isso pode incluir a taxa do Trato no arrependimento. Não é parecer jurídico; é um ponto a validar. Se confirmado, o desenho passa a ser: arrependimento
+dentro de 7 dias e antes do serviço começar devolve tudo; depois disso a taxa não volta.
