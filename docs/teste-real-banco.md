@@ -125,3 +125,15 @@ O João também precisa rodar `stripe listen` (comando acima) para o teste com w
 Para aplicar na config real: o mínimo de `prazo_liberacao_dias` em `supabase/seeds/parametros.sql` hoje é 1 (e `supabase/testes/testar_seeds.py`
 exige que 0 seja rejeitado). Falta baixar o mínimo para 0 e ajustar esse teste junto, e só então rodar o seed 2. A config de teste já no banco
 (`teste_`) **não** tem `prazo_liberacao_dias`. Pendente do João: taxa mínima em centavos (0 se não houver) e confirmar `taxa_bps = 750`.
+
+## Decisão do João: quem paga a taxa (31/10/2026)
+
+A taxa do Trato é **7,5% sobre o total do pedido e é SOMADA ao pedido** (o cliente paga serviço + taxa). **Não é subtraída do profissional**:
+o profissional recebe o valor do orçamento inteiro; a taxa é a receita do Trato.
+
+**Conflito com o código atual:** hoje a taxa é *deduzida* (`pagamentos/taxa.py`, `POST /v1/orcamentos/resumo`: valor 10000, taxa 750,
+líquido 9250; a cobrança do cliente é o valor do orçamento). O texto de `contexto.md` ("total, taxa e líquido do profissional") também parte da dedução.
+Pelo modelo novo: cobrança = valor + taxa (ex.: 10000 + 750 = 10750); líquido do profissional = 10000; Trato = 750.
+Muda: valor da cobrança no Stripe, lançamentos do ledger (retenção/taxa/repasse), reembolso e disputa (quanto devolver da taxa), a
+calculadora de orçamento e as telas do app. Não alterado nesta rodada. Detalhes que o João ainda precisa fechar: o custo do Stripe sai da taxa
+do Trato (como hoje)? Em reembolso total a taxa é devolvida ao cliente? A taxa mínima também se soma?
