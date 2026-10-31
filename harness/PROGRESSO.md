@@ -459,3 +459,11 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
   - Em `app/lib/telas/profissional_inicio/casca_profissional_tela.dart` e `app/lib/telas/fluxo/rotas.dart`: conectado fluxo da tela inicial e detalhe do pedido para abrir a calculadora passando o `pedidoId` e enviando via API com tratamento de erros.
   - Testes: adicionados testes em `app/test/dados/dados_api_test.dart` e `app/test/profissional_test.dart`. Verificação do harness passou 100% (1.264 backend, 736 app, 78 admin).
 
+- **Passo 3 (Flutter App - `feature/f7-ligar-telas-restantes-app`):**
+  - Implementado `ServicoDisputaProfissionalApi` em `app/lib/dados/servicos_api.dart` conectando a resposta do profissional a disputas (`POST /v1/pedidos/{id}/disputa/resposta`) e agendamento de retrabalho (`POST /v1/pedidos/{id}/retrabalho/atender`).
+  - Integrado `disputaProfissional` em `RepositoriosTrato` e `rotas.dart`.
+  - Atualizado `RepositorioPedidosApi.criar` para enviar payload completo de `RascunhoPedido` ao backend (`categoria_id`, `cidade_id`, `titulo`, `descricao`, `faixa_preco_min_centavos`, `faixa_preco_max_centavos`, `respostas`).
+  - Atualizado `RepositorioCatalogoApi` para consumir `GET /v1/profissionais` com filtros de `servico`, `categoria_id` e `bairro`, mantendo fallback gracioso para os dados locais de demonstração caso a base esteja vazia.
+  - Ajustada tolerância de clock skew entre Postgres e Python em `config_regras.py` para evitar rejeições espúrias por microssegundos durante publicação imediata de versão de configuração.
+  - Testes adicionados em `app/test/dados/dados_api_test.dart`. Verificação do harness passou 100% (1.264 backend, 742 app, 78 admin).
+
