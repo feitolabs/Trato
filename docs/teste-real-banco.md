@@ -147,3 +147,11 @@ Exemplo (serviço R$ 100,00, taxa R$ 7,50, total R$ 107,50): à vista = R$ 107,5
 Em aberto: os 4% incidem sobre o total (serviço + taxa) ou só sobre o serviço? É igual para qualquer número de parcelas? Os 4% voltam ao cliente em
 reembolso? Confira se 4% cobre o custo do Stripe no parcelado (a página pública não traz o valor do parcelamento: conferir antes de lançar).
 No código, o campo `adicional_parcelamento_bps` (`pagamentos/custo.py`) já existe, hoje vazio; 4% = 400 bps.
+
+## Decisão do João: a taxa não é reembolsada (31/10/2026)
+
+Em reembolso, a **taxa do Trato (7,5%) não volta** para o cliente; é o padrão de mercado. Só o valor do serviço é devolvido.
+Exemplo: cliente pagou R$ 107,50 (serviço R$ 100,00 + taxa R$ 7,50); reembolso total devolve R$ 100,00.
+Em aberto (não decidido): o acréscimo de 4% do parcelado também fica com o Trato? Reembolso parcial em disputa: a taxa fica integral ou proporcional?
+Para o Emanoel: se o serviço não foi prestado (cancelamento antes de começar, direito de arrependimento do CDC), reter a taxa é permitido?
+Hoje o código devolve só o valor do serviço em reembolso (a taxa nunca volta) e já faz isso na disputa; conferir ao mudar para taxa somada.
