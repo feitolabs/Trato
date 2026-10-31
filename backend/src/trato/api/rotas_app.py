@@ -58,10 +58,29 @@ class OrcamentoOut(BaseModel):
     profissional_servicos_concluidos: int | None = None
 
 
+class OpcaoParcelamentoOut(BaseModel):
+    parcelas: int
+    custo_centavos: int = Field(description="Custo do provedor repassado ao cliente.")
+    total_centavos: int = Field(description="Serviço + taxa + custo, em centavos.")
+    valor_parcela_centavos: int
+
+
 class PagamentoValoresOut(BaseModel):
     pedido_id: str
     estado: str
-    valor_centavos: int | None = Field(None, description="Valor do contrato, em centavos.")
+    valor_centavos: int | None = Field(
+        None, description="Valor do SERVIÇO (o orçamento), em centavos."
+    )
+    taxa_centavos: int | None = Field(None, description="Taxa do Trato, SOMADA ao serviço.")
+    total_a_pagar_centavos: int | None = Field(
+        None,
+        description="Pix e cartão à vista: serviço + taxa. O Trato absorve o custo do provedor.",
+    )
+    opcoes_parcelamento: list[OpcaoParcelamentoOut] = Field(
+        default_factory=list,
+        description="Cartão parcelado: total por número de parcelas (custo do provedor repassado). "
+        "Vazia = parcelado desligado.",
+    )
     pago_centavos: int = Field(description="O que o ledger mostra como pago (webhook assinado).")
     pagamento_confirmado: bool
     meios_disponiveis: list[str]
@@ -117,18 +136,28 @@ class PedidoAbertoOut(BaseModel):
 
 
 class ResumoOrcamentoOut(BaseModel):
-    valor_centavos: int = Field(description="Bruto: o total do orçamento.")
-    taxa_centavos: int = Field(description="Taxa do Trato pela configuração vigente.")
+    valor_centavos: int = Field(
+        description="O valor do orçamento (serviço). O profissional recebe tudo."
+    )
+    taxa_centavos: int = Field(
+        description="Taxa do Trato (configuração vigente), SOMADA ao orçamento: o cliente paga."
+    )
+    total_cliente_centavos: int = Field(
+        description="O que o cliente paga à vista: orçamento + taxa."
+    )
+    receita_trato_centavos: int = Field(description="A taxa é a receita do Trato.")
     taxa_bps: int = Field(
         description="Taxa EFETIVA em pontos-base (taxa ÷ valor): já considera o mínimo e as faixas."
     )
     taxa_percentual: float = Field(
         description="A mesma taxa efetiva em %, com 2 casas (ex.: 7.5). Para o app só mostrar."
     )
-    liquido_centavos: int = Field(description="O que o profissional recebe: bruto menos a taxa.")
+    liquido_centavos: int = Field(
+        description="O que o profissional recebe: o valor do orçamento inteiro, sem desconto."
+    )
     custo_provedor_estimado_centavos: int = Field(
         description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
-        "Sai da taxa do Trato; não reduz o líquido do profissional."
+        "Pix e cartão à vista: o Trato absorve, sai da taxa. Não reduz o líquido do profissional."
     )
     custo_provedor_estimativa: bool = True
 
@@ -322,10 +351,21 @@ def valores_do_pagamento(
             ),
             None,
         )
+    taxa = total = None
+    opcoes: list[OpcaoParcelamentoOut] = []
+    if contrato is not None and servico is not None:
+        conta = servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos)
+        taxa, total = conta.taxa_centavos, conta.cobrado_centavos
+        opcoes = [
+            OpcaoParcelamentoOut(**vars(o)) for o in servico.config().parcelamento.opcoes(total)
+        ]
     return PagamentoValoresOut(
         pedido_id=pedido.id,
         estado=pedido.estado.value,
         valor_centavos=contrato.valor_centavos if contrato else None,
+        taxa_centavos=taxa,
+        total_a_pagar_centavos=total,
+        opcoes_parcelamento=opcoes,
         pago_centavos=saldo.cliente_pagou,
         pagamento_confirmado=pedido.referencia_pagamento is not None,
         meios_disponiveis=[m.value for m in MeioPagamento],
@@ -353,7 +393,9 @@ def resumo_do_orcamento(
         taxa_centavos=taxa,
         taxa_bps=(taxa * 10_000 + corpo.valor_centavos // 2) // corpo.valor_centavos,
         taxa_percentual=round(taxa * 100 / corpo.valor_centavos, 2),
-        liquido_centavos=corpo.valor_centavos - taxa,
+        liquido_centavos=corpo.valor_centavos,
+        total_cliente_centavos=corpo.valor_centavos + taxa,
+        receita_trato_centavos=taxa,
         custo_provedor_estimado_centavos=max(
             calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento
         ),

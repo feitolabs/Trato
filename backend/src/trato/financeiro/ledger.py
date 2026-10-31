@@ -14,13 +14,20 @@
 Os tipos são os do CHECK de `lancamentos.tipo` do banco (F3.5); o banco ainda aceita
 `custo_stripe` e `reembolso`, que o Python não lança. O que muda entre dois lançamentos do mesmo
 tipo é o par de contas (tipo: débito -> crédito):
-    COBRANCA    cliente (externo) -> custódia          cliente pagou, valor retido
+    COBRANCA    cliente (externo) -> custódia          cliente pagou serviço + taxa (+ parcelamento)
+    TAXA        custódia -> taxa do Trato              na confirmação do pagamento: taxa + custo
+                                                       de parcelamento saem da custódia, que fica
+                                                       só com o valor do SERVIÇO (taxa SOMADA ao
+                                                       pedido, decisão do João de 31/10/2026)
     COBRANCA    cliente (externo) -> liberado          gorjeta: 100% do profissional, sem taxa
-    RETENCAO    custódia -> a liberar (profissional)   parte do profissional, ao concluir
-    TAXA        custódia -> taxa do Trato              parte do Trato, ao concluir
+    RETENCAO    custódia -> a liberar (profissional)   o serviço do profissional, ao concluir
     REPASSE     a liberar -> liberado (profissional)   liberação: passou o prazo / cliente confirmou
     REPASSE     liberado -> profissional (externo)     o provedor pagou o profissional
     ESTORNO     inverte EXATAMENTE as partidas de um lançamento (o banco confere isso)
+
+A taxa e o custo de parcelamento NÃO são reembolsados: o estorno parcial devolve só o valor do
+serviço (custódia e parte do profissional). Exceção configurável e pendente de validação jurídica:
+`taxa_reembolsavel` em `estornar_pedido`.
 
 O banco só aceita estorno do lançamento INTEIRO, e um único estorno por original. Por isso o
 estorno parcial do pedido (`estornar_pedido`) estorna os originais por inteiro e lança de novo,
@@ -325,6 +332,32 @@ def registrar_gorjeta(
     )
 
 
+def separar_taxa(
+    livro: Livro,
+    pedido_id: str,
+    valor: int,
+    chave: str,
+    data: datetime,
+    evento_webhook_id: str | None = None,
+) -> Lancamento:
+    """Tira da custódia a parte do Trato (taxa + custo de parcelamento repassado ao provedor).
+
+    Roda logo depois do `registrar_cobranca`: o que fica retido é só o valor do serviço.
+    """
+    return livro.lancar(
+        Lancamento(
+            chave,
+            pedido_id,
+            TipoLancamento.TAXA,
+            CUSTODIA,
+            TAXA_TRATO,
+            valor,
+            data,
+            evento_webhook_id=evento_webhook_id,
+        )
+    )
+
+
 def repartir_custodia(
     livro: Livro,
     pedido_id: str,
@@ -474,8 +507,14 @@ def estornar_pedido(
     chave: str,
     data: datetime,
     evento_webhook_id: str | None = None,
+    taxa_reembolsavel: int = 0,
 ) -> tuple[Lancamento, ...]:
-    """Devolve `valor` ao cliente (parcial ou total), proporcional entre taxa e profissional.
+    """Devolve `valor` ao cliente (parcial ou total) a partir do valor do SERVIÇO.
+
+    A taxa do Trato (e o custo de parcelamento) não voltam: `valor` pode ir até o que cobrado menos
+    a taxa. `taxa_reembolsavel` (padrão 0; regra pendente de validação jurídica) é a parte da taxa
+    que PODE voltar junto, somada ao limite. A divisão do `valor` é proporcional entre custódia,
+    parte do profissional e essa parte da taxa.
 
     Estorna por INTEIRO os lançamentos em aberto de TAXA, RETENCAO e COBRANCA (a que foi para a
     custódia; a gorjeta não entra) e, se o valor for parcial, lança de novo (COBRANCA, RETENCAO e
@@ -490,12 +529,18 @@ def estornar_pedido(
     retencoes = _em_aberto(livro, pedido_id, TipoLancamento.RETENCAO, None)
     taxas = _em_aberto(livro, pedido_id, TipoLancamento.TAXA, None)
     cobrado = sum(i.valor for i in cobrancas)
-    if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= cobrado:
-        raise EstornoInvalido(f"O valor do estorno deve ficar entre 1 e {cobrado} centavos.")
+    taxa_total = sum(i.valor for i in taxas)
+    if not 0 <= taxa_reembolsavel <= taxa_total:
+        raise EstornoInvalido("A parte reembolsável da taxa deve ficar entre 0 e a taxa cobrada.")
+    maximo = cobrado - taxa_total + taxa_reembolsavel
+    if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= maximo:
+        raise EstornoInvalido(
+            f"O valor do estorno deve ficar entre 1 e {maximo} centavos (a taxa não volta)."
+        )
     pesos = [
         livro.saldo(CUSTODIA, pedido_id),
         sum(i.valor for i in retencoes),
-        sum(i.valor for i in taxas),
+        taxa_reembolsavel,
     ]
     devolvidos = repartir_proporcional(valor, pesos)
     mantido = cobrado - valor
@@ -515,7 +560,7 @@ def estornar_pedido(
                 a_liberar(profissional) if profissional else None,
                 pesos[1] - devolvidos[1],
             ),
-            (TipoLancamento.TAXA, CUSTODIA, TAXA_TRATO, pesos[2] - devolvidos[2]),
+            (TipoLancamento.TAXA, CUSTODIA, TAXA_TRATO, taxa_total - devolvidos[2]),
         )
         for tipo, conta_debito, conta_credito, quanto in mantidos:
             if quanto > 0 and conta_credito is not None:

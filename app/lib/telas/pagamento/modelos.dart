@@ -11,13 +11,39 @@ class OpcaoPagamento {
   final String descricao;
 }
 
+/// Cartão parcelado: o total por número de parcelas (custo do provedor repassado ao cliente).
+/// Vem pronto do backend; lista vazia = parcelado desligado.
+class OpcaoParcelamento {
+  const OpcaoParcelamento({
+    required this.parcelas,
+    required this.custoCentavos,
+    required this.totalCentavos,
+    required this.valorParcelaCentavos,
+  });
+
+  final int parcelas;
+  final int custoCentavos;
+  final int totalCentavos;
+  final int valorParcelaCentavos;
+}
+
 class DadosPagamento {
   const DadosPagamento({
     required this.subtitulo,
     required this.valorAgoraCentavos,
     required this.opcoes,
     this.rotuloValor,
+    this.servicoCentavos,
+    this.taxaCentavos,
+    this.parcelamento = const [],
   });
+
+  /// Valor do serviço e taxa do Trato (somada), para mostrar a conta antes de pagar. Null = não mostra.
+  final int? servicoCentavos;
+  final int? taxaCentavos;
+
+  /// Total por número de parcelas no cartão. Vazio enquanto o parcelado estiver desligado.
+  final List<OpcaoParcelamento> parcelamento;
 
   /// "Carlos Mendes · Troca de tomadas e chuveiro".
   final String subtitulo;

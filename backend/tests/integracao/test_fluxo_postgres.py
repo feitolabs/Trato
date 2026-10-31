@@ -111,7 +111,7 @@ def test_fluxo_completo(cenario):
             "from public.contratos where pedido_id = %s",
             (pedido_id,),
         ).fetchone()
-        assert ctr[0:5] == (90_000, 750, 6_750, 83_250, 27_000)
+        assert ctr[0:5] == (90_000, 750, 6_750, 90_000, 27_000)  # líquido = orçamento (taxa somada)
         assert ctr[5]["adiantamento_bps"] == 3000
         # as etapas propostas foram vinculadas ao contrato
         assert (

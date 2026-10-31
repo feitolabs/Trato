@@ -20,7 +20,8 @@ class ServicoOrcamentoFake implements ServicoOrcamento {
       totalCentavos: totalCentavos,
       taxaCentavos: taxa,
       taxaBps: taxaBps,
-      liquidoCentavos: totalCentavos - taxa,
+      liquidoCentavos: totalCentavos,
+      clientePagaCentavos: totalCentavos + taxa,
     );
   }
 }

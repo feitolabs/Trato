@@ -94,8 +94,10 @@ def test_m3_reembolso_feito_no_painel_do_provedor_entra_no_ledger_e_gera_alerta(
 
     assert r.status_code == 200
     saldo = fluxo.saldo(pid)
-    assert saldo["cliente_pagou_centavos"] == VALOR - 30_000
+    # o cliente pagou serviço + taxa; o reembolso por fora sai do serviço, a taxa não se mexe
+    assert saldo["cliente_pagou_centavos"] == VALOR + 7_500 - 30_000
     assert saldo["retido_centavos"] == VALOR - 30_000
+    assert saldo["taxa_trato_centavos"] == 7_500
     assert fluxo.servico.cobrancas.obter(cobranca["id"]).estornado_centavos == 30_000
     (alerta,) = fluxo.ctx.eventos_webhook.em_revisao()
     assert "por fora" in alerta[1] and "conciliado" in alerta[1]

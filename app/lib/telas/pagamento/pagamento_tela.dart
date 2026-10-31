@@ -75,6 +75,16 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         ),
                       ),
                     ],
+                    if (dados.servicoCentavos != null && dados.taxaCentavos != null) ...[
+                      const SizedBox(height: EspacosTrato.x3),
+                      Text(
+                        'Serviço ${Dinheiro.formatar(dados.servicoCentavos!)} + '
+                        'taxa do Trato ${Dinheiro.formatar(dados.taxaCentavos!)}',
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: CoresTrato.textoSecundario,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Como você quer pagar?', style: TipografiaTrato.corpoForte),
                     const SizedBox(height: EspacosTrato.x3),
@@ -84,6 +94,21 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         selecionada: opcao.metodo == _metodo,
                         aoTocar: () => setState(() => _metodo = opcao.metodo),
                       ),
+                      const SizedBox(height: EspacosTrato.x3),
+                    ],
+                    if (_metodo == MetodoPagamento.cartao && dados.parcelamento.isNotEmpty) ...[
+                      Text('Cartão parcelado', style: TipografiaTrato.corpoForte),
+                      const SizedBox(height: EspacosTrato.x2),
+                      for (final p in dados.parcelamento)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: EspacosTrato.x1),
+                          child: Text(
+                            '${p.parcelas}x de ${Dinheiro.formatar(p.valorParcelaCentavos)} · '
+                            'total ${Dinheiro.formatar(p.totalCentavos)} '
+                            '(inclui ${Dinheiro.formatar(p.custoCentavos)} de custo do parcelamento)',
+                            style: TipografiaTrato.corpoPequeno,
+                          ),
+                        ),
                       const SizedBox(height: EspacosTrato.x3),
                     ],
                     const SizedBox(height: EspacosTrato.x3),

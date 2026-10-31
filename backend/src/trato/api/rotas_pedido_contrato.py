@@ -78,7 +78,10 @@ class CobrancaContratoOut(BaseModel):
     cobranca_id: str
     estado_pagamento: str = Field(description="Sempre `aguardando_confirmacao` aqui; nunca `pago`.")
     meio: str
-    valor_centavos: int
+    valor_centavos: int = Field(
+        description="O que o cliente paga: serviço + taxa do Trato (+ custo do parcelado)."
+    )
+    parcelas: int = 1
     tipo_instrucao: str = Field(description="`pix_copia_e_cola` ou `cartao_segredo_do_cliente`.")
     instrucao: str | None = Field(None, description="O que o app usa para pagar.")
     criada_em: datetime
@@ -90,7 +93,10 @@ class PagamentoContratoOut(BaseModel):
         description="`sem_cobranca`, `aguardando_confirmacao`, `pago`, `falhou` ou `cancelada`."
     )
     pago: bool = Field(description="Verdadeiro só depois do webhook assinado do provedor.")
-    valor_centavos: int | None
+    valor_centavos: int | None = Field(description="O valor do SERVIÇO (o orçamento).")
+    total_a_pagar_centavos: int | None = Field(
+        None, description="Serviço + taxa do Trato (à vista). Sem custo de parcelamento."
+    )
     pago_centavos: int
     cobranca_id: str | None = None
     meio: str | None = None
@@ -153,6 +159,12 @@ class RecusaOut(BaseModel):
 
 class CobrarContratoIn(_Entrada):
     meio: MeioPagamento
+    parcelas: StrictInt = Field(
+        1,
+        ge=1,
+        le=12,
+        description="Só cartão; parcelado desligado até o custo do provedor estar configurado.",
+    )
 
 
 class AditivoNovoIn(_Entrada):
@@ -230,6 +242,7 @@ def _cobranca_out(contrato_id: str, cobranca) -> CobrancaContratoOut:
         estado_pagamento="aguardando_confirmacao",
         meio=cobranca.meio.value,
         valor_centavos=cobranca.valor_centavos,
+        parcelas=cobranca.parcelas,
         tipo_instrucao="pix_copia_e_cola" if pix else "cartao_segredo_do_cliente",
         instrucao=cobranca.instrucao,
         criada_em=cobranca.criada_em,
@@ -292,7 +305,9 @@ def criar_cobranca(
     pedido, contrato = _contrato_do_usuario(contexto, contrato_id, usuario)
     if pedido.estado not in ESTADOS_COBRAVEIS or pedido.referencia_pagamento is not None:
         raise HTTPException(409, "O pedido não está esperando pagamento.")
-    cobranca = servico.cobrar(contexto, pedido, contrato.valor_centavos, corpo.meio)
+    cobranca = servico.cobrar(
+        contexto, pedido, contrato.valor_centavos, corpo.meio, parcelas=corpo.parcelas
+    )
     return _cobranca_out(pedido.id, cobranca)
 
 
@@ -332,6 +347,11 @@ def estado_do_pagamento(
         estado_pagamento=estado,
         pago=pago,
         valor_centavos=contrato.valor_centavos,
+        total_a_pagar_centavos=(
+            servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos).cobrado_centavos
+            if servico is not None
+            else None
+        ),
         pago_centavos=saldo.cliente_pagou,
         cobranca_id=principal.id if principal else None,
         meio=principal.meio.value if principal else None,

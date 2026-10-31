@@ -419,3 +419,9 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Migration NOVA `20261031000000_pagamentos_instrucao.sql` (+ rollback), NÃO aplicada no Supabase: precisa do OK do João. O backend real precisa dela e da `ordens_estorno` (já aplicada) para cobrar.
 - `tests/conftest.py`: suíte independe do `.env`/variáveis da máquina (achado 6 resolvido).
 - `tests/integracao/test_pagamento_postgres.py`: cobrança, webhook assinado, ledger espelhado, idempotência do mesmo evento, valor divergente, falha, aditivo e ordem de estorno.
+
+## Taxa somada ao pedido e parcelado (sessão taxa-somada, 31/10/2026)
+- Decisão do João: cliente paga serviço + taxa; profissional recebe o orçamento inteiro; Trato absorve Pix/cartão à vista; parcelado = custo real do provedor repassado (tabela vazia = desligado); taxa e custo do parcelado não são reembolsados. Detalhe, perguntas e regra jurídica pendente: `docs/taxa-somada-parcelado.md`.
+- Backend: `taxa.montar_total`, `parcelamento.py`, `ServicoPagamento.total_a_cobrar/cobrar`, ledger `separar_taxa` (taxa sai da custódia no pagamento) e `estornar_pedido` sem devolver taxa; disputa/conclusão sem desconto; `contratos.liquido = valor`; rotas `/pagamento` e `/orcamentos/resumo` com os novos campos.
+- App: calculadora, aditivo e tela de pagamento mostram taxa somada, total do cliente e o que o profissional recebe; parcelado só aparece se o backend mandar opções.
+- Sem migration e sem escrita no banco. Testes de `tests/integracao/` atualizados por leitura, NÃO executados (sem `pgserver`).
