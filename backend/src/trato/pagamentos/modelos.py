@@ -8,12 +8,13 @@ do banco.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
 from trato.pagamentos.custo import MeioPagamento
+from trato.pagamentos.parcelamento import ConfigParcelamento
 from trato.pagamentos.taxa import ConfigTaxa
 
 
@@ -44,6 +45,10 @@ class CobrancaLocal:
     instrucao: str | None = None
     pago_em: datetime | None = None
     estornado_centavos: int = 0
+    parcelas: int = 1  # cartão em N vezes (hoje só 1: o parcelado está desligado)
+    # Parte da cobrança que é o SERVIÇO; o resto é taxa do Trato + custo de parcelamento. Não vem
+    # do banco (sem coluna): na releitura, o orquestrador usa o valor do contrato ou do aditivo.
+    servico_centavos: int | None = None
 
 
 @dataclass(frozen=True)
@@ -89,6 +94,11 @@ class ConfigPagamento:
 
     taxa: ConfigTaxa
     alcada_disputa_centavos: int  # acima disso a decisão da disputa pede segunda pessoa
+    # Custo do parcelado repassado ao cliente. Vazio = parcelado desligado (João, 31/10/2026).
+    parcelamento: ConfigParcelamento = field(default_factory=ConfigParcelamento)
+    # PENDENTE de validação jurídica (art. 49 do CDC): cancelar antes de o serviço começar devolve
+    # também a taxa do Trato? Padrão False = a taxa nunca volta (decisão do João). Não decidido.
+    cancelamento_devolve_taxa: bool = False
 
 
 class RepositorioCobrancas(Protocol):

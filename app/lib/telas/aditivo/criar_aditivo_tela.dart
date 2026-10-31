@@ -199,13 +199,14 @@ class _CartaoLiquido extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Quanto você recebe', style: TipografiaTrato.corpoForte),
+          Text('Quanto você recebe e quanto o cliente paga', style: TipografiaTrato.corpoForte),
           const SizedBox(height: EspacosTrato.x2),
           if (r != null) ...[
             _Linha('Valor do aditivo', Dinheiro.formatar(r.totalCentavos)),
-            _Linha(r.taxaBps == null ? 'Taxa do Trato' : 'Taxa do Trato (${Dinheiro.formatarBps(r.taxaBps!)})', '- ${Dinheiro.formatar(r.taxaCentavos)}'),
+            _Linha(r.taxaBps == null ? 'Taxa do Trato (paga pelo cliente)' : 'Taxa do Trato ${Dinheiro.formatarBps(r.taxaBps!)} (paga pelo cliente)', Dinheiro.formatar(r.taxaCentavos)),
+            _Linha('Cliente paga', Dinheiro.formatar(r.clientePagaCentavos)),
             const Divider(),
-            _Linha('Líquido', Dinheiro.formatar(r.liquidoCentavos), forte: true),
+            _Linha('Você recebe', Dinheiro.formatar(r.liquidoCentavos), forte: true),
           ] else
             Text(
               falhou

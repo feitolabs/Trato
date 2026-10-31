@@ -421,7 +421,18 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     final meios = [for (final m in (j['meios_disponiveis'] as List)) m as String];
     return DadosPagamento(
       subtitulo: 'Pedido ${PedidoApi.numeroDe(pedidoId)}',
-      valorAgoraCentavos: valor,
+      valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
+      servicoCentavos: valor,
+      taxaCentavos: j['taxa_centavos'] as int?,
+      parcelamento: [
+        for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
+          OpcaoParcelamento(
+            parcelas: (o as Map)['parcelas'] as int,
+            custoCentavos: o['custo_centavos'] as int,
+            totalCentavos: o['total_centavos'] as int,
+            valorParcelaCentavos: o['valor_parcela_centavos'] as int,
+          ),
+      ],
       opcoes: [
         if (meios.contains('pix'))
           const OpcaoPagamento(
@@ -730,7 +741,9 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     return ResumoOrcamento(
       totalCentavos: j['valor_centavos'] as int,
       taxaCentavos: j['taxa_centavos'] as int,
+      taxaBps: j['taxa_bps'] as int?,
       liquidoCentavos: j['liquido_centavos'] as int,
+      clientePagaCentavos: j['total_cliente_centavos'] as int?,
     );
   }
 }

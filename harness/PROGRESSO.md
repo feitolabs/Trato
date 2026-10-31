@@ -427,3 +427,9 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Migration `20261031000000_pagamentos_instrucao.sql` (coluna da instrução de pagamento; rollback `pagamentos_instrucao_rollback.sql`) já **aplicada pelo João** no banco real; cabeçalho atualizado para "APLICADA", não reaplicar. `supabase/seeds/parametros.sql` e `supabase/testes/testar_seeds.py` mudaram junto (prazo mínimo 0).
 - Fora, por orientação: `claude/optimistic-margulis-e4b7a2` (taxa somada, ainda em testes).
 
+
+## Taxa somada ao pedido e parcelado (sessão taxa-somada, 31/10/2026)
+- Decisão do João: cliente paga serviço + taxa; profissional recebe o orçamento inteiro; Trato absorve Pix/cartão à vista; parcelado = custo real do provedor repassado (tabela vazia = desligado); taxa e custo do parcelado não são reembolsados. Detalhe, perguntas e regra jurídica pendente: `docs/taxa-somada-parcelado.md`.
+- Backend: `taxa.montar_total`, `parcelamento.py`, `ServicoPagamento.total_a_cobrar/cobrar`, ledger `separar_taxa` (taxa sai da custódia no pagamento) e `estornar_pedido` sem devolver taxa; disputa/conclusão sem desconto; `contratos.liquido = valor`; rotas `/pagamento` e `/orcamentos/resumo` com os novos campos.
+- App: calculadora, aditivo e tela de pagamento mostram taxa somada, total do cliente e o que o profissional recebe; parcelado só aparece se o backend mandar opções.
+- Sem migration e sem escrita no banco. Testes de `tests/integracao/` atualizados por leitura, NÃO executados (sem `pgserver`).

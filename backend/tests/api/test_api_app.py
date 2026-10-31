@@ -80,7 +80,8 @@ def test_valores_do_pagamento_antes_e_depois_de_pagar(amb):
     assert corpo["valor_centavos"] == 100_000
     assert corpo["pago_centavos"] == 0 and corpo["pagamento_confirmado"] is False
     assert corpo["meios_disponiveis"] == ["pix", "cartao"]
-    assert "taxa_centavos" not in corpo  # a taxa é do profissional, não aparece para o cliente
+    # sem o serviço de pagamento ligado neste ambiente não há conta da taxa; o app só exibe
+    assert corpo["taxa_centavos"] is None and corpo["opcoes_parcelamento"] == []
 
     amb.semear_dinheiro()
     assert get(amb, "/v1/pedidos/ped-1/pagamento").json()["pago_centavos"] == 100_000
@@ -103,12 +104,13 @@ def test_resumo_calcula_taxa_e_liquido_no_backend(amb):
     assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
         "valor_centavos": 100_000,
         "taxa_centavos": 7_500,
-        "liquido_centavos": 92_500,
+        "liquido_centavos": 100_000,  # a taxa é SOMADA: o profissional recebe o orçamento inteiro
     }
+    assert corpo["total_cliente_centavos"] == 107_500 and corpo["receita_trato_centavos"] == 7_500
     assert corpo["custo_provedor_estimado_centavos"] > 0
     # abaixo do mínimo cobra o mínimo; nunca mais que o valor
     r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
-    assert r.json()["taxa_centavos"] == 500 and r.json()["liquido_centavos"] == 500
+    assert r.json()["taxa_centavos"] == 500 and r.json()["liquido_centavos"] == 1_000
 
 
 def test_resumo_recusa_valor_ruim_papel_errado_e_taxa_nao_configurada(amb):

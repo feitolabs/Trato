@@ -5,10 +5,17 @@ class ResumoOrcamento {
     required this.taxaCentavos,
     this.taxaBps,
     required this.liquidoCentavos,
-  });
+    int? clientePagaCentavos,
+  }) : clientePagaCentavos = clientePagaCentavos ?? totalCentavos + taxaCentavos;
 
+  /// O valor do orçamento (serviço). O profissional recebe tudo: [liquidoCentavos] == [totalCentavos].
   final int totalCentavos;
+
+  /// Taxa do Trato. É SOMADA ao orçamento e paga pelo cliente; não sai do profissional.
   final int taxaCentavos;
+
+  /// O que o cliente paga à vista: orçamento + taxa. Vem do backend.
+  final int clientePagaCentavos;
 
   /// Percentual da taxa em pontos-base (750 = 7,5%). A tela só exibe.
   final int? taxaBps;

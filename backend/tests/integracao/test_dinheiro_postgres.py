@@ -394,7 +394,9 @@ def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):
     saldo = ledger.saldos_pedido(pedido_id, c.ids["profissional"])
     parte_mantida = VALOR - VALOR * 2_500 // 10_000
     assert saldo.cliente_pagou == parte_mantida
-    assert saldo.taxa_trato == calcular_taxa(parte_mantida, ConfigTaxa(750, 0))
+    # A taxa SOMADA sai da custódia no pagamento: a decisão não calcula nem desconta taxa, o
+    # profissional recebe o que sobrou do serviço (aqui o pagamento foi só do serviço, sem taxa).
+    assert saldo.taxa_trato == 0 and saldo.a_liberar == parte_mantida
     assert saldo.retido == 0
     assert c.contexto.pedidos.obter(pedido_id).estado is estados.Estado.CONCLUIDO
     with c.local.admin() as con:

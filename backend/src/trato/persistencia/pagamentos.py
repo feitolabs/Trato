@@ -33,6 +33,7 @@ from trato.pagamentos.modelos import (
     OrdemEstorno,
     TermosContrato,
 )
+from trato.pagamentos.parcelamento import ConfigParcelamento
 from trato.pagamentos.taxa import ConfigTaxa
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
@@ -375,7 +376,20 @@ class ConfigPagamentoPostgres:
         if faixa is None:
             raise ConfigNaoPublicada("As faixas de taxa (P2) ainda não foram publicadas.")
         taxa = ConfigTaxa(int(faixa["taxa_bps"]), parametros.get("taxa_minima_centavos", 0))
-        return ConfigPagamento(taxa, parametros.get("alcada_disputa_centavos", 0))
+        # Custo do parcelado repassado ao cliente: parâmetros opcionais
+        # `custo_parcelamento_<N>x_bps` (N de 2 a 12), do provedor. Nenhum cadastrado = parcelado
+        # desligado (João, 31/10/2026).
+        custos = {
+            n: parametros[chave]
+            for n in range(2, 13)
+            if (chave := f"custo_parcelamento_{n}x_bps") in parametros
+        }
+        return ConfigPagamento(
+            taxa,
+            parametros.get("alcada_disputa_centavos", 0),
+            parcelamento=ConfigParcelamento(custos),
+            cancelamento_devolve_taxa=bool(parametros.get("cancelamento_devolve_taxa", 0)),
+        )
 
 
 __all__ = [

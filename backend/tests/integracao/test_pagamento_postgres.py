@@ -33,6 +33,9 @@ from .test_fluxo_postgres import abrir_pedido, enviar_orcamento
 pytestmark = pytest.mark.integracao
 
 VALOR_ORCAMENTO = 80_000 + 10_000  # 8 x 10.000 + 2,5 x 4.000, como em `enviar_orcamento`
+# A taxa é SOMADA ao orçamento (João, 31/10/2026): 7,5% (750 bps, faixa até 100.000) de 90.000.
+TAXA_ORCAMENTO = 6_750
+COBRADO = VALOR_ORCAMENTO + TAXA_ORCAMENTO
 
 
 def _aplicar(con, subir: str, descer: str, pronto: str) -> list[str]:
@@ -165,7 +168,7 @@ def test_cobranca_webhook_ledger_e_idempotencia(pg):
     r = cobrar(c, pedido_id)
     assert r.status_code == 201, r.text
     cob = r.json()
-    assert cob["valor_centavos"] == VALOR_ORCAMENTO and cob["status"] == "aguardando"
+    assert cob["valor_centavos"] == COBRADO and cob["status"] == "aguardando"
     assert cob["instrucao"]
     # repetir devolve a MESMA cobrança pendente, com a instrução
     outra = cobrar(c, pedido_id).json()
@@ -177,7 +180,7 @@ def test_cobranca_webhook_ledger_e_idempotencia(pg):
         "from public.pagamentos where stripe_payment_intent_id = %s",
         (cob["id"],),
     )
-    assert linha[0] == "pendente" and linha[1] == VALOR_ORCAMENTO and linha[2] == "saldo"
+    assert linha[0] == "pendente" and linha[1] == COBRADO and linha[2] == "saldo"
     assert linha[3] == "pix" and linha[4] is None and linha[5] == cob["instrucao"]
 
     # D13: criar a cobrança NÃO paga o pedido
@@ -223,7 +226,9 @@ def test_cobranca_webhook_ledger_e_idempotencia(pg):
     )
     assert soma[0] == 0
     antes = (len(lanc), len(contexto.ledger.lancamentos(pedido_id)))
+    # a taxa sai da custódia na confirmação: fica retido só o serviço
     assert contexto.ledger.saldo_da_conta(CUSTODIA, pedido_id) == VALOR_ORCAMENTO
+    assert contexto.ledger.saldos_pedido(pedido_id).taxa_trato == TAXA_ORCAMENTO
 
     # o MESMO evento de novo: 200, duplicado, nada novo no ledger nem no pedido
     r = webhook(c, TipoEvento.PAGAMENTO_CONFIRMADO, cob["id"], evento_id=evento)
@@ -263,7 +268,7 @@ def test_valor_divergente_nao_paga_e_fica_para_revisao(pg):
         c,
         TipoEvento.PAGAMENTO_CONFIRMADO,
         cob["id"],
-        valor_centavos=VALOR_ORCAMENTO - 1,
+        valor_centavos=COBRADO - 1,
         evento_id=f"evt_{uuid.uuid4().hex}",
     )
     assert r.status_code == 200
