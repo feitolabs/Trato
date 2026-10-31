@@ -419,3 +419,11 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Migration NOVA `20261031000000_pagamentos_instrucao.sql` (+ rollback), NÃO aplicada no Supabase: precisa do OK do João. O backend real precisa dela e da `ordens_estorno` (já aplicada) para cobrar.
 - `tests/conftest.py`: suíte independe do `.env`/variáveis da máquina (achado 6 resolvido).
 - `tests/integracao/test_pagamento_postgres.py`: cobrança, webhook assinado, ledger espelhado, idempotência do mesmo evento, valor divergente, falha, aditivo e ordem de estorno.
+
+## 31/10/2026 — Pagamento no Postgres integrado (`claude/charming-clarke-fce4b0`)
+
+- Em develop (sem push), merge `9face5b`: pagamento ligado ao Postgres (repositórios, configuração vigente, fábrica), `prazo_liberacao_dias` aceita 0 (liberar quando o cliente confirma), cobrança Stripe sem `payment_method_types` (automatic payment methods), remoção do evento inexistente `transfer.paid`, roteiro de teste real no Supabase (`docs/teste-real-banco.md`) e as decisões de taxa registradas em docs (taxa somada ao pedido, mínimo R$ 3,00, taxa não reembolsada, parcelado repassa o custo do provedor).
+- **Verificação**, comando `backend/.venv/Scripts/python harness/verificar.py` (lock inline, sem script auxiliar), em 31/10 de 17:04:34 a 17:11:05: TUDO OK, 1170 testes de backend (1 pulado), 735 no app, 78 no painel. Conferido: nenhum `.env` versionado nem copiado em worktree; o `.env` da raiz é ignorado pelo git e o `conftest.py` o desliga nos testes.
+- Migration `20261031000000_pagamentos_instrucao.sql` (coluna da instrução de pagamento; rollback `pagamentos_instrucao_rollback.sql`) já **aplicada pelo João** no banco real; cabeçalho atualizado para "APLICADA", não reaplicar. `supabase/seeds/parametros.sql` e `supabase/testes/testar_seeds.py` mudaram junto (prazo mínimo 0).
+- Fora, por orientação: `claude/optimistic-margulis-e4b7a2` (taxa somada, ainda em testes).
+
