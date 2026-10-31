@@ -175,3 +175,17 @@ Resumo da config de dinheiro decidida: `taxa_bps = 750`, `taxa_minima_centavos =
 - O acréscimo **não é reembolsado** (o Stripe também não devolve o custo dele). Em reembolso total no parcelado, o cliente recebe só o valor do serviço
   (R$ 100,00 neste exemplo); taxa de R$ 7,50 e acréscimo de R$ 4,30 ficam com o Trato.
 Ainda não decidido: o acréscimo vale para qualquer número de parcelas (2x a 12x)? Sujeito à validação jurídica do Emanoel (art. 49 do CDC, arrependimento em 7 dias).
+
+## CORREÇÃO (31/10/2026): o parcelado repassa o custo REAL do provedor, não 4% fixos
+
+O João esclareceu: **ele não define a taxa de juros do parcelado; quem define é o provedor (terceiro), e o Trato também não absorve esse custo.**
+Isto SUBSTITUI o "4% a mais" e a "base dos 4%" registrados acima (eram exemplos, não decisão).
+- No cartão parcelado, o cliente paga o **custo de parcelamento cobrado pelo provedor** para aquele número de parcelas, repassado integralmente.
+- No Pix e no cartão à vista continua valendo: o Trato absorve o custo do provedor (sai da taxa de 7,5%).
+- Taxa de 7,5% (mín. R$ 3,00) não muda e continua não reembolsável; o custo repassado do parcelamento também não volta (o provedor não devolve).
+
+Consequências para o código: o adicional por parcela não é constante no sistema; vem de uma tabela de **custo do provedor por número de parcelas** (hoje
+`adicional_parcelamento_bps` em `pagamentos/custo.py`, vazio) ou do cálculo do próprio provedor, e o app mostra ao cliente, antes de pagar, o total por parcelas.
+Em aberto: a página pública do Stripe não traz o custo do parcelado (`docs/provedores-pagamento.md`), então ele precisa vir da proposta/contrato do provedor
+antes de lançar; o Mercado Pago e o Pagar.me têm tabelas próprias. Pergunta para o Emanoel: repassar o custo do parcelamento ao consumidor exige informar o valor
+total e o custo antes da contratação (CDC, transparência)?
