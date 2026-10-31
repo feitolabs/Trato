@@ -160,3 +160,11 @@ Posição do João: reter a taxa também vale quando o serviço nem começou e o
 do CDC (contratação fora do estabelecimento, como no app) dá 7 dias de arrependimento e manda devolver "os valores eventualmente pagos, a qualquer título".
 Isso pode incluir a taxa do Trato no arrependimento. Não é parecer jurídico; é um ponto a validar. Se confirmado, o desenho passa a ser: arrependimento
 dentro de 7 dias e antes do serviço começar devolve tudo; depois disso a taxa não volta.
+
+## Decisão do João: taxa mínima (31/10/2026)
+
+`taxa_minima_centavos = 300` (R$ 3,00), conforme o exemplo aceito pelo João ("pode ser"); alterável na tabela de configuração.
+Com serviço de R$ 30,00 (mínimo sugerido): taxa R$ 3,00; cartão à vista custa ~R$ 1,71 sobre R$ 33,00; sobra ~R$ 1,29. Pix sobra mais.
+Falta a decisão se a taxa mínima também se soma ao pedido (assume-se que sim, como a taxa de 7,5%).
+Resumo da config de dinheiro decidida: `taxa_bps = 750`, `taxa_minima_centavos = 300`, `prazo_liberacao_dias = 0`,
+`prazo_confirmacao_cliente_horas = 48`, `janela_chargeback_dias = 7`, adicional do parcelado 400 bps. Nada disso foi gravado no banco real.
