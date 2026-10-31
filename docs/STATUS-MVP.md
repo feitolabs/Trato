@@ -58,10 +58,10 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Verificação (documento e selfie) | API | Fotos por URL assinada (`POST /v1/uploads`, `PUT`, `concluir`) e `POST/GET /v1/profissional/verificacao`. Texto de retenção vem do backend quando já há verificação. Não testado em aparelho real. |
 | Início, pedidos abertos, detalhe, recusar | API | `GET /v1/profissional/pedidos-abertos` (filtros no repositório), nome por `/v1/me`, recusa `POST /v1/pedidos/{id}/recusar` (precisa da migration `pedido_recusas`). Carteira da Início fica em zero (#18). |
 | Filtros dos pedidos abertos | API | Tela com categoria, bairro, faixa de preço e ordem; aplica `GET /v1/profissional/pedidos-abertos`. Sem protótipo. |
-| Calculadora de orçamento | API | `POST /v1/orcamentos/resumo`: taxa e líquido do backend, nada calculado no app. Sem o percentual (#17). |
+| Calculadora de orçamento | API | `POST /v1/orcamentos/resumo` para simular e `POST /v1/pedidos/{id}/orcamentos` para envio (`ServicoOrcamentoApi`). |
 | Check-in e check-out | API (envio) | Câmera e GPS reais; foto por `POST /v1/uploads`; ação em `acoes/fazer_check_in`/`fazer_check_out`. Reenvio offline manda `offline_capturada_em`, que o backend recusa (#4). Não testado em aparelho real. |
 | Enviar nota de materiais e criar aditivo | API | `POST /v1/contratos/{id}/notas-material` e `.../aditivos`. O caminho da foto da nota ainda não vem do upload (#5). |
-| Responder disputa e atender retrabalho | Demo | Backend pronto (`POST /v1/pedidos/{id}/disputa/resposta` e `.../retrabalho/atender`); falta o app ligar. |
+| Responder disputa e atender retrabalho | API | `ServicoDisputaProfissionalApi` ligado a `POST /v1/pedidos/{id}/disputa/resposta` e `POST /v1/pedidos/{id}/retrabalho/atender`. |
 | Carteira | API, como extrato | `GET /v1/extrato`. Sem saldo próprio e sem saque (D15). |
 | Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional, com botão **Sair**. |
 | Pedidos (aba) | API | Pedidos abertos com filtros e, ao lado, as conversas. Sem protótipo. |
