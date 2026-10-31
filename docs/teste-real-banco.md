@@ -3,10 +3,26 @@
 Backend subido da worktree com `TRATO_PERSISTENCIA=postgres` em `127.0.0.1:8000` (`.env` copiado do repo principal,
 git-ignorado, valores nunca impressos). Stripe em modo teste.
 
-## Dados de teste criados no banco
+## Dados de teste criados no banco (rodada 2, com OK do João)
 
-**Nenhum.** Esta rodada só **leu** o banco. Motivo: o fluxo ponta a ponta grava coisas que não se apagam
-(ver "Precisa do OK do João"). Nada a limpar.
+Criados por `python harness/teste_real_fluxo.py setup` e `fluxo`. Todos com prefixo `teste_`; e-mails `@example.test`.
+
+| O quê | Quantidade | Detalhe |
+|---|---|---|
+| Usuários no Supabase Auth + `public.usuarios` | 4 | `teste_cliente`, `teste_profissional`, `teste_admin`, `teste_financeiro` (@example.test) |
+| `equipe` | 2 | admin (administrador) e financeiro |
+| Config versionada **vigente** (valores de TESTE) | 1 versão, 10 parâmetros, 1 faixa | taxa 7,5% (750 bps) em qualquer valor; **não é decisão de taxa**; motivo começa com `teste_` |
+| Cidade / categoria / pergunta | 1 / 1 / 1 | `teste_Cidade`, `teste_Pintura` (seeds reais ficam intactos) |
+| Pedido + orçamento + contrato | 1 / 1 / 1 | pedido "teste_ Pintar a sala", orçamento de 10000 centavos aceito |
+| Stripe | nada criado | a cobrança parou antes (achado 7) |
+| Ledger, `eventos_webhook`, `pagamentos` | 0 | |
+
+Estado antes: todas essas tabelas com 0 linhas (exceto seeds: `contas_ledger` 4, `categorias` 3, `categoria_perguntas` 15, `cidades` 1).
+
+**Como limpar (só o João, como dono):** rode `docs/teste-real-banco-limpeza.sql` no SQL Editor do Supabase. Ele desliga gatilhos
+só na transação (`session_replication_role = replica`), apaga as tabelas que estavam vazias, as linhas `teste_*` e os usuários
+`teste_*@example.test`. Não toca nos seeds. **Não executei** esse SQL e não testei o `replica` neste banco; se o Supabase negar, apague
+os usuários pelo painel (Authentication) e peça-me uma limpeza por outra via. Depois confira: tabelas voltam a 0, `contas_ledger` 4, `categorias` 3, `cidades` 1.
 
 ## O que passou
 
@@ -56,6 +72,13 @@ stripe listen --events payment_intent.succeeded,payment_intent.payment_failed,ch
 decidir qual deles libera o repasse e se `transfer.reversed` estorna. Decisão do João.
 
 ## Achados
+
+7. **BLOQUEIO: o pagamento não está ligado ao Postgres.** `criar_app_da_config` nunca chama `instalar_pagamento`, e não existem
+   repositórios Postgres de cobrança, aditivo e termos (só `CobrancasEmMemoria`, `AditivosEmMemoria`, `TermosEmMemoria`). No app real:
+   `POST /v1/contratos/{id}/cobranca` responde **503 "Pagamento ainda não configurado"** e os manipuladores de webhook do
+   `payment_intent.*` não são registrados. Provado no fluxo real: login, pedido, orçamento, resumo de taxa (750 = 7,5%) e aceite deram OK;
+   a cobrança deu 503. Falta: repositórios Postgres (tabela `pagamentos` etc.), `ConfigPagamento` lida da config vigente, e ligar tudo em
+   `fabrica.criar_app_da_config`. Tarefa própria (dinheiro); o resto do roteiro (Stripe 4242, webhook, ledger, idempotência) depende disso.
 
 1. **Falta rota de orçamento do profissional.** Não há `POST` para criar/enviar orçamento (só `GET` e `POST /orcamentos/resumo`).
    O fluxo pedido → orçamento → aceite não fecha pela API; só dá para testar semeando orçamento por SQL.
