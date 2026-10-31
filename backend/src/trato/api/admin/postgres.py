@@ -35,7 +35,7 @@ from trato.api.admin.repositorios import (
 from trato.persistencia.auditoria import registrar_na_transacao
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
-from trato.persistencia.erros import ErroPersistencia, NaoEncontrado, RegraDoBanco
+from trato.persistencia.erros import ErroPersistencia, NaoEncontrado, RegraDoBanco, texto_seguro
 
 # Nomes do domínio (API) <-> nomes do banco para o estado do pedido.
 _ESTADO_PARA_BANCO = {"pago_e_retido": "pago_retido"}
@@ -468,7 +468,7 @@ def _recusa_do_banco(erro: ErroPersistencia) -> ErroPersistencia:
     """Gatilhos da configuração fazem `raise exception` com texto nosso; mostramos esse texto."""
     causa = erro.__cause__
     if isinstance(causa, psycopg.errors.RaiseException) and causa.diag.message_primary:
-        return RegraDoBanco(causa.diag.message_primary)
+        return RegraDoBanco(texto_seguro(causa.diag.message_primary, "O banco recusou a gravação."))
     return erro
 
 

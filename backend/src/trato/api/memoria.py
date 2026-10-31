@@ -167,7 +167,13 @@ class GarantiasEmMemoria:
         return tuple(self._retrabalhos.get(pedido_id, ()))
 
     def salvar_retrabalho(self, pedido_id: str, retrabalho: Retrabalho) -> None:
-        self._retrabalhos.setdefault(pedido_id, []).append(retrabalho)
+        """Abre o retrabalho ou, se já existe (mesma hora de abertura), grava a nova situação."""
+        lista = self._retrabalhos.setdefault(pedido_id, [])
+        for i, atual in enumerate(lista):
+            if atual.aberto_em == retrabalho.aberto_em:
+                lista[i] = retrabalho
+                return
+        lista.append(retrabalho)
 
 
 class EventosWebhookEmMemoria(RegistroEventosEmMemoria):

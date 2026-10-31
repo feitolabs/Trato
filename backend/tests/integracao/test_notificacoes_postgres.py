@@ -185,6 +185,22 @@ def test_dispositivo_move_de_dono_e_reenvio_no_banco(c, servico, push):
     assert servico.notificar(Evento.AVALIACAO, c.ids["bia"], chave=k) == []
 
 
+def test_remover_dispositivo_no_banco_so_pelo_dono(c, servico, push):
+    c.cliente.post(
+        "/v1/dispositivos",
+        json={"token": "token-remover-pg-1", "plataforma": "android"},
+        headers=c.token("ana"),
+    )
+    corpo = {"token": "token-remover-pg-1"}
+    r = c.cliente.request("DELETE", "/v1/dispositivos", json=corpo, headers=c.token("bia"))
+    assert r.status_code == 204 and "token-remover-pg-1" in servico.repo.tokens(c.ids["ana"])
+    r = c.cliente.request("DELETE", "/v1/dispositivos", json=corpo, headers=c.token("ana"))
+    assert r.status_code == 204 and "token-remover-pg-1" not in servico.repo.tokens(c.ids["ana"])
+    r = c.cliente.request("DELETE", "/v1/dispositivos", json=corpo, headers=c.token("ana"))
+    assert r.status_code == 204
+    assert c.cliente.request("DELETE", "/v1/dispositivos", json=corpo).status_code == 401
+
+
 def test_token_invalido_desativa_no_banco(c, servico, push):
     c.cliente.post(
         "/v1/dispositivos",

@@ -783,7 +783,8 @@ def seguranca_global(b):
     verifica("só policies de SELECT (o app não escreve)", b.um("select count(*) from pg_policies where cmd <> 'SELECT'") == 0)
     sem_pol = [t for t in tabelas if b.um("select count(*) from pg_policies where schemaname='public' and tablename=%s and permissive='PERMISSIVE'", (t,)) == 0]
     print(f"      (tabelas sem policy permissiva = ninguém do app lê: {sem_pol})")
-    verifica("somente tabelas de uso exclusivo do backend ficam sem policy de leitura", set(sem_pol) == {"agendador_execucoes", "dispositivos_push", "verificacao_documentos"}, str(sem_pol))
+    verifica("somente tabelas de uso exclusivo do backend ficam sem policy de leitura", set(sem_pol) == {"agendador_execucoes", "dispositivos_push", "ordens_estorno", "upload_solicitacoes",
+                                              "verificacao_documentos"}, str(sem_pol))
     # (as 2 primeiras são do agendador/push, só do backend; verificacao_documentos virou só-backend no fix de acesso, A8)
     sd = b.exec("""select n.nspname||'.'||p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
                     where n.nspname in ('public','privado') and p.prosecdef
@@ -808,6 +809,15 @@ def seguranca_global(b):
              b.tenta(None, """with c as (select id from usuarios limit 1), g as (select id from categorias limit 1), d as (select id from cidades limit 1)
                 insert into pedidos(cliente_id, categoria_id, cidade_id, titulo, descricao)
                 select c.id, g.id, d.id, 't', 'd' from c, g, d returning id""", papel="service_role")[0] == "ok")
+    # B2: colunas internas fora do SELECT do app (authenticated), nas tabelas do dinheiro.
+    internas = [("aditivos", "decidido_por"), ("lancamentos", "criado_por"), ("lancamentos", "descricao"),
+                ("repasses", "provedor_transferencia_id"), ("repasses", "congelado_por_disputa_id"),
+                ("retrabalhos", "custo_centavos"), ("eventos_webhook", "payload"), ("eventos_webhook", "erro")]
+    vazou = [f"{t}.{c}" for t, c in internas
+             if b.um("select has_column_privilege('authenticated', %s, %s, 'select')", (f"public.{t}", c))]
+    verifica("B2: authenticated não lê as colunas internas do dinheiro", not vazou, str(vazou))
+    verifica("B2: service_role continua lendo as colunas internas",
+             all(b.um("select has_column_privilege('service_role', %s, %s, 'select')", (f"public.{t}", c)) for t, c in internas))
     verifica("anon não tem acesso ao schema privado", not b.um("select has_schema_privilege('anon','privado','usage')"))
     verifica("registrar_auditoria só é executável pelo service_role",
              b.um("select has_function_privilege('service_role','public.registrar_auditoria(uuid,text,text,text,uuid,jsonb,jsonb,text,text,text,text)','execute')")
@@ -832,10 +842,13 @@ def main():
         passos = [m for m in b.migrations if not any(k in m.name for k in ("f32_", "revogar_execute"))]
         rollback_de = {"f33": "F3.3", "f34": "F3.4", "f35": "F3.5", "f36": "F3.6", "f37": "F3.7",
                        "f38a": "F3.8a", "f38b": "F3.8b", "f38c": "F3.8c",
-                       "notificacoes": "notificacoes_dispositivos", "fix_acesso": "fix_acesso"}
+                       "notificacoes": "notificacoes_dispositivos", "fix_acesso": "fix_acesso", "b2": "b2_grants_por_coluna",
+                       "ordens_estorno": "ordens_estorno", "pedido_recusas": "pedido_recusas",
+                       "profissional_disponibilidade": "profissional_disponibilidade_portfolio_uploads"}
 
         def sigla(m):
-            return [v for k, v in rollback_de.items() if f"_{k}_" in m.name][0]
+            return [v for k, v in rollback_de.items() if f"_{k}_" in m.name or m.name.endswith(f"_{k}.sql")
+                    or f"_{k}" in m.name][0]
 
         print("\n== Aplicando as migrations em ordem ==")
         estados = []

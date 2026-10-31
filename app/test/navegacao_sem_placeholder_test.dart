@@ -17,7 +17,7 @@ import 'package:trato/tema/tema.dart';
 /// fluxo de cadastro e acesso.
 const _placeholder = 'chega nas próximas etapas';
 const _profundidade = 3;
-const _limiteDeTelas = 90;
+const _limiteDeTelas = 45;
 
 class _Explorador {
   _Explorador(this.tester, this.raiz);
@@ -43,6 +43,8 @@ class _Explorador {
   Future<void> _montar() async {
     RotasTrato.repos = RepositoriosTrato.demo();
     ServicoAuthPadrao.atual = ServicoAuthFake();
+    // Solta a árvore anterior antes de montar a nova (a memória cresce com muitas montagens).
+    await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(
       MaterialApp(key: UniqueKey(), theme: TemaTrato.claro, home: raiz()),
     );

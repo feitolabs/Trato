@@ -33,6 +33,22 @@ def test_cliente_ve_orcamentos_do_pedido_do_mais_barato_ao_mais_caro(amb):
     assert not any(o["aceito"] for o in r.json())
 
 
+def test_orcamento_traz_selo_nota_e_servicos_do_profissional(amb):
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    amb.contexto.usuarios.adicionar(
+        PerfilDetalhe(
+            PROFISSIONAL.id, "Zé", PapelUsuario.PROFISSIONAL, "ativo", "verificado", 4.8, 12
+        )
+    )
+    amb.contexto.orcamentos.adicionar(Orcamento("orc-2", "ped-1", "pro-2", 80_000))
+    por_id = {o["id"]: o for o in get(amb, "/v1/pedidos/ped-1/orcamentos").json()}
+    assert por_id["orc-1"]["profissional_nivel_verificacao"] == "verificado"
+    assert por_id["orc-1"]["profissional_nota"] == 4.8
+    assert por_id["orc-1"]["profissional_servicos_concluidos"] == 12
+    # quem não tem perfil publicado volta com nulos, não com erro
+    assert por_id["orc-2"]["profissional_nota"] is None
+
+
 def test_orcamento_aceito_vem_marcado(amb):
     amb.semear_pedido(Estado.ORCAMENTO_ACEITO)
     r = get(amb, "/v1/pedidos/ped-1/orcamentos")

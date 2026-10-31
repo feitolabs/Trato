@@ -24,6 +24,10 @@ class ConfigUploads(BaseSettings):
     solicitacao_validade_segundos: int = Field(default=3600, gt=0)
     # Check-in: distância máxima entre o aparelho e o local do pedido (calculada no servidor).
     checkin_distancia_max_m: int = Field(default=500, gt=0)
+    # Reenvio offline (`offline_capturada_em`): só evidência. Mais velho que a janela é recusado;
+    # no futuro além da tolerância (relógio do aparelho adiantado) também.
+    offline_janela_max_horas: int = Field(default=72, gt=0)
+    offline_tolerancia_futuro_s: int = Field(default=300, ge=0)
 
 
 @lru_cache

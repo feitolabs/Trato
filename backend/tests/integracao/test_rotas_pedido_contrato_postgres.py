@@ -154,6 +154,12 @@ def test_pedidos_abertos_filtros_visibilidade_e_recusa(atuacao, com_recusas):
     assert pedido_id in [p["id"] for p in visto]
     # mesma regra da RLS: profissional2 não atua na categoria
     assert pedido_id not in [p["id"] for p in get(c, url, "profissional2").json()]
+    # detalhe: mesma visibilidade, com quantos já orçaram e sem endereço exato
+    detalhe = get(c, f"{url}/{pedido_id}", "profissional")
+    assert detalhe.status_code == 200 and detalhe.json()["id"] == pedido_id
+    assert detalhe.json()["orcamentos_recebidos"] == 0 and detalhe.json()["ja_orcou"] is False
+    assert "endereco" not in detalhe.text and "logradouro" not in detalhe.text
+    assert get(c, f"{url}/{pedido_id}", "profissional2").status_code == 404
     # filtros
     por_categoria = get(c, url, "profissional", params={"categoria_id": c.categoria_id}).json()
     assert pedido_id in [p["id"] for p in por_categoria]

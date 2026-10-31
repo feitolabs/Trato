@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -148,6 +148,8 @@ class AcaoPedidoIn(_Entrada):
             "aceitar_orcamento: {orcamento_id}. confirmar_agenda: {janela:{inicio,fim}}. "
             "fazer_check_in: {foto:{arquivo_id,tirada_em}, localizacao:{latitude,longitude}, "
             "codigo_inicio}. fazer_check_out: {foto_final, codigo_conclusao}. "
+            "offline_capturada_em (opcional, só check-in/out): quando o aparelho capturou a "
+            "ação reenviada; é evidência, a hora oficial é a do servidor. "
             "cancelar: {motivo}. confirmar_conclusao e encerrar_disputa_por_acordo: sem prova."
         ),
     )
@@ -157,6 +159,10 @@ class AbrirDisputaIn(_Entrada):
     motivo: MotivoDisputa
     descricao: str
     fotos: list[FotoIn] = []
+
+
+class AtenderRetrabalhoIn(_Entrada):
+    etapa: Literal["aceitar", "iniciar", "resolver"]
 
 
 class PedirRetrabalhoIn(_Entrada):
@@ -257,6 +263,7 @@ class RetrabalhoOut(BaseModel):
     aberto_em: datetime
     atender_ate: datetime
     descricao: str
+    atendido_em: datetime | None = None
 
 
 class WebhookOut(BaseModel):

@@ -23,6 +23,7 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Detalhe do serviço | API | `GET /v1/pedidos/{id}`, `/saldo`, `/eventos`. Linha do tempo, profissional, valores do backend e ações por estado (orçamentos, pagar, acompanhar, conversar, avaliar, garantia, abrir problema). Sem protótipo. |
 | Serviços recentes (lista) | API | `GET /v1/pedidos`. Sem protótipo. |
 | Busca (`busca/`, resultados por texto) | Demo, ligada ao catálogo | Aba Buscar: campo, categorias (→ Categoria) e "Ver todas"; resultados com nota, serviços e região; abre o perfil. Depende da rota de busca (#10) no modo `api`. |
+| Busca e perfil público (backend) | Pronto no backend | Rotas de busca (#10) e perfil por id (#11) existem (`docs/api-rotas.md`); o app liga o perfil por id e mantém a busca em demo até ligar a rota de busca. |
 | Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
 | Seus pedidos | API | Título genérico ("Pedido #XXXX"): a API não devolve título nem nome do profissional. |
 | Orçamentos recebidos e detalhe | API | `GET /v1/pedidos/{id}/orcamentos` + `GET /v1/orcamentos/{id}`; aceite em `acoes/aceitar_orcamento`. Selo, nota e total de serviços do profissional não vêm da API (mostra "—"). |
@@ -50,14 +51,14 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 
 | Tela | Estado | Observação |
 |---|---|---|
-| Cadastro do profissional | Demo, sem protótipo | Falta o catálogo de categorias e cidades (#12). A foto sobe pela câmera real. |
+| Cadastro do profissional | Demo, sem protótipo | Catálogo pronto no backend (#12, `GET /v1/catalogo/...`); falta o app ligar. A foto sobe pela câmera real. |
 | Verificação (documento e selfie) | API | Fotos por URL assinada (`POST /v1/uploads`, `PUT`, `concluir`) e `POST/GET /v1/profissional/verificacao`. Texto de retenção vem do backend quando já há verificação. Não testado em aparelho real. |
 | Início, pedidos abertos, detalhe, recusar | API | `GET /v1/profissional/pedidos-abertos` (filtros no repositório), nome por `/v1/me`, recusa `POST /v1/pedidos/{id}/recusar` (precisa da migration `pedido_recusas`). Carteira da Início fica em zero (#18). |
 | Filtros dos pedidos abertos | API | Tela com categoria, bairro, faixa de preço e ordem; aplica `GET /v1/profissional/pedidos-abertos`. Sem protótipo. |
 | Calculadora de orçamento | API | `POST /v1/orcamentos/resumo`: taxa e líquido do backend, nada calculado no app. Sem o percentual (#17). |
 | Check-in e check-out | API (envio) | Câmera e GPS reais; foto por `POST /v1/uploads`; ação em `acoes/fazer_check_in`/`fazer_check_out`. Reenvio offline manda `offline_capturada_em`, que o backend recusa (#4). Não testado em aparelho real. |
 | Enviar nota de materiais e criar aditivo | API | `POST /v1/contratos/{id}/notas-material` e `.../aditivos`. O caminho da foto da nota ainda não vem do upload (#5). |
-| Responder disputa e atender retrabalho | Demo | Falta a rota do lado do profissional. |
+| Responder disputa e atender retrabalho | Demo | Backend pronto (`POST /v1/pedidos/{id}/disputa/resposta` e `.../retrabalho/atender`); falta o app ligar. |
 | Carteira | API, como extrato | `GET /v1/extrato`. Sem saldo próprio e sem saque (D15). |
 | Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional, com botão **Sair**. |
 | Pedidos (aba) | API | Pedidos abertos com filtros e, ao lado, as conversas. Sem protótipo. |
@@ -124,4 +125,12 @@ Migrations F3.2 a F3.8c aplicadas (informado pelo João/sessão principal): 46 t
 | Dinheiro: C1, A3 a A7, M1 a M5 (`fix-dinheiro`) | Corrigidos e testados; persistência de ledger, disputas, garantias, avaliações, webhooks e repasses no Postgres (local). Migration `20261030120000_ordens_estorno.sql` **não aplicada**: precisa do OK do João. |
 | App: sessão em armazenamento seguro, lista permitida de `dart-define`, EXIF e afins (`fix-app`) | Corrigido e testado (`docs/fix-app.md`) |
 | Acesso: A1, A2, A8, M6, M7, M9 a M12, B1 (`fix-acesso`) | Corrigidos e testados (`docs/fix-acesso.md`); migration `20261030000000_fix_acesso_storage_pedido_historico.sql` **não aplicada**: precisa do OK do João. Sem xfail restante |
+
+## Sobras da revisão de segurança (30/10/2026)
+
+- Baixos B3 (erro do banco sem uuid) e B7 (cartão com captura e 3DS explícitos) corrigidos com teste; B8 ganhou o job
+  `pip-audit` no CI; B2 (colunas internas do dinheiro) está pronto em migration **não aplicada** (`20261030140000_b2_grants_por_coluna.sql`).
+- Nenhum `xfail` restante. Lista completa e estado de cada item: `docs/sobras-seguranca.md`.
+- Para provar com Supabase e Stripe reais: `docs/roteiro-testes-reais.md` e os scripts `harness/teste_real_*.py`
+  (isolamento entre dois usuários, webhook assinado e reenvio, `EXCLUDE` das faixas). Ainda **não** foram rodados contra o real.
 
