@@ -30,19 +30,16 @@ profissional) e falha se o texto aparecer.
 | idem (aba Agenda) | barra inferior | Agenda por dia com check-in |
 | idem (abas Carteira e Perfil sem conteúdo) | barra inferior | Extrato / perfil público (demonstração se não ligadas) |
 
-## 2. Ainda usam `EmBreveTela` (não tocados nesta tarefa)
+## 2. Telas de acesso (`telas/auth/`) — resolvidas
 
-Pertencem a `fix-cadastro-real` (`app/lib/auth/`, `app/lib/telas/auth/`, trecho de cadastro de
-`rotas.dart`). Passada final depois que ela entrar em `develop`:
-
-| Arquivo | Uso | Destino previsto |
+| Arquivo | Uso | Destino |
 |---|---|---|
-| `telas/auth/criar_conta_tela.dart:56` | Termos e Política | `RotasTrato.abrirTextoLegal(context, TextoLegal.termos / .privacidade)` (tela pronta) |
-| `telas/auth/recuperar_senha_tela.dart:37` | recuperar senha / ajuda | tela de recuperação (fix-cadastro-real) |
-| `telas/auth/login_tela.dart:56` | biometria | remover o botão ou ligar a biometria |
-| `telas/auth/confirmar_celular_tela.dart:73` | reenvio por WhatsApp | remover o item (WhatsApp externo não está no MVP) |
+| `criar_conta_tela.dart` | Termos e Política | `TextoLegalTela` (rascunhos de `docs/juridico/`, com aviso de revisão) |
+| `recuperar_senha_tela.dart` | "Fale com o suporte" | Central de ajuda (`AjudaTela`) |
+| `login_tela.dart` | biometria | botão **removido** (fora do MVP) |
+| `confirmar_celular_tela.dart` | reenvio por WhatsApp | item **removido** (código só por SMS) |
 
-`EmBreveTela` continua no código só por causa deles. Quando forem trocados, apagar a tela e o teste.
+Nenhum uso de `EmBreveTela` resta em `app/lib/`; a classe foi apagada.
 
 ## 3. Telas que existiam sem ponto de entrada ou só com dado fixo
 

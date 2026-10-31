@@ -5,7 +5,6 @@ import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
 import '../fluxo/rotas.dart';
 import 'estrutura_auth.dart';
@@ -13,7 +12,7 @@ import 'recuperar_senha_tela.dart';
 import 'validacao.dart';
 
 /// Tela 4 do protótipo: "Entrar na sua conta".
-/// Entrar com e-mail, Google e Apple usam o [ServicoAuth]; biometria ainda abre [EmBreveTela].
+/// Entrar com e-mail, Google e Apple usam o [ServicoAuth]; biometria fica fora do MVP.
 /// Google e Apple só aparecem se o serviço diz que o provedor está habilitado (Apple só no iOS).
 class LoginTela extends StatefulWidget {
   const LoginTela({super.key, this.servico, this.sessaoExpirada = false});
@@ -52,8 +51,6 @@ class _LoginTelaState extends State<LoginTela> {
 
   void _abrir(Widget tela) =>
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => tela));
-
-  void _emBreve(String titulo) => _abrir(EmBreveTela(titulo: titulo));
 
   String? get _erroIdentificador {
     if (!_tentou) return null;
@@ -174,11 +171,6 @@ class _LoginTelaState extends State<LoginTela> {
           ),
           const SizedBox(height: EspacosTrato.x3),
         ],
-        BotaoSecundario(
-          texto: 'Entrar com biometria',
-          icone: Icons.fingerprint,
-          aoTocar: () => _emBreve('Entrar com biometria'),
-        ),
         const SizedBox(height: EspacosTrato.x4),
       ],
     );
