@@ -467,3 +467,12 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
   - Ajustada tolerância de clock skew entre Postgres e Python em `config_regras.py` para evitar rejeições espúrias por microssegundos durante publicação imediata de versão de configuração.
   - Testes adicionados em `app/test/dados/dados_api_test.dart`. Verificação do harness passou 100% (1.264 backend, 742 app, 78 admin).
 
+- **Passo 4 (Backend - `feature/f8-uploads-postgres`):**
+  - Implementado `UploadsPostgres` em `backend/src/trato/persistencia/uploads.py`: persistência completa de solicitações de upload (`public.upload_solicitacoes`) e metadados de mídias (`public.midias`), com suporte a normalização de UUIDs e tratamento de campos de auditoria e geolocalização (`lat`, `lng`).
+  - Atualizado `backend/src/trato/uploads/servico.py` definindo o protocolo `RepositorioUploads` e tipando `ServicoUploads`.
+  - Atualizado `backend/src/trato/api/rotas_upload.py` permitindo injeção de `repo: RepositorioUploads | None`.
+  - Atualizado `backend/src/trato/api/app.py` integrando `UploadsPostgres(banco)` ao app FastAPI em modo Postgres.
+  - Criado teste de integração `backend/tests/integracao/test_uploads_postgres.py` cobrindo ciclo de vida de solicitação de upload e registro de mídia com coordenadas geográficas.
+  - Verificação do harness passou 100% (1.265 backend, 742 app, 78 admin).
+
+

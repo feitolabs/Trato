@@ -14,6 +14,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
+from typing import Protocol
 
 from trato.seguranca.config import ConfigSeguranca
 from trato.seguranca.upload import ErroUpload, validar_conteudo, validar_metadados
@@ -108,6 +109,15 @@ class DocumentoGuardado:
     criado_em: datetime
 
 
+class RepositorioUploads(Protocol):
+    def salvar_solicitacao(self, s: Solicitacao) -> None: ...
+    def solicitacao(self, solicitacao_id: str) -> Solicitacao | None: ...
+    def salvar_midia(self, m: Midia) -> None: ...
+    def midia(self, midia_id: str) -> Midia | None: ...
+    def salvar_documento(self, d: DocumentoGuardado) -> None: ...
+    def documento_por_caminho(self, caminho: str) -> DocumentoGuardado | None: ...
+
+
 class UploadsEmMemoria:
     """Solicitações, mídias e documentos de verificação. Não é o armazenamento real."""
 
@@ -148,7 +158,7 @@ class ServicoUploads:
     def __init__(
         self,
         armazenamento: ArmazenamentoArquivos,
-        repo: UploadsEmMemoria,
+        repo: RepositorioUploads,
         seguranca: ConfigSeguranca,
         config: ConfigUploads,
         agora: Callable[[], datetime],

@@ -23,6 +23,7 @@ from trato.uploads.servico import (
     DESTINOS,
     SO_CLIENTE,
     SO_PROFISSIONAL,
+    RepositorioUploads,
     ServicoUploads,
     SolicitacaoInvalida,
     UploadNegado,
@@ -180,7 +181,7 @@ def concluir_upload(
 def registrar_rotas(
     app: FastAPI,
     armazenamento: ArmazenamentoArquivos | None = None,
-    repo: UploadsEmMemoria | None = None,
+    repo: RepositorioUploads | None = None,
 ) -> None:
     """Liga as rotas. Sem `armazenamento`, usa o Supabase Storage se houver configuração; sem
     nenhum dos dois, as rotas respondem 503 (nunca falam com o Storage real por acidente)."""
