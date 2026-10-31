@@ -137,3 +137,13 @@ Pelo modelo novo: cobrança = valor + taxa (ex.: 10000 + 750 = 10750); líquido 
 Muda: valor da cobrança no Stripe, lançamentos do ledger (retenção/taxa/repasse), reembolso e disputa (quanto devolver da taxa), a
 calculadora de orçamento e as telas do app. Não alterado nesta rodada. Detalhes que o João ainda precisa fechar: o custo do Stripe sai da taxa
 do Trato (como hoje)? Em reembolso total a taxa é devolvida ao cliente? A taxa mínima também se soma?
+
+## Decisão do João: custo do Stripe e parcelado (31/10/2026)
+
+- O Trato **absorve** o custo do Stripe no **Pix** e no **cartão à vista** (sai da taxa de 7,5%).
+- No **parcelado**, na hora de pagar, o cliente paga **4% a mais** por ser a prazo.
+
+Exemplo (serviço R$ 100,00, taxa R$ 7,50, total R$ 107,50): à vista = R$ 107,50; parcelado = R$ 107,50 + 4% = R$ 111,80 (se os 4% incidirem sobre o total).
+Em aberto: os 4% incidem sobre o total (serviço + taxa) ou só sobre o serviço? É igual para qualquer número de parcelas? Os 4% voltam ao cliente em
+reembolso? Confira se 4% cobre o custo do Stripe no parcelado (a página pública não traz o valor do parcelamento: conferir antes de lançar).
+No código, o campo `adicional_parcelamento_bps` (`pagamentos/custo.py`) já existe, hoje vazio; 4% = 400 bps.
