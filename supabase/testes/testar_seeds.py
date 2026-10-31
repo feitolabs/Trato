@@ -60,7 +60,7 @@ def preenche(admin, **extra):
     }
     p.update({k: v for k, v in extra.items() if not k.startswith("cfg_")})
     sql = "".join(f"update seed_param set valor = {lit(v)} where chave = {lit(k)};\n" for k, v in p.items())
-    cfg = {"taxa_bps": (750, 0, 2000), "taxa_minima_centavos": (500, 0, 5000), "prazo_liberacao_dias": (7, 1, 30)}
+    cfg = {"taxa_bps": (750, 0, 2000), "taxa_minima_centavos": (500, 0, 5000), "prazo_liberacao_dias": (7, 0, 30)}
     for k, v in extra.items():
         if k.startswith("cfg_"):
             cfg[k[4:]] = v
@@ -151,7 +151,7 @@ def main():
         verifica("idempotente: nada muda ao aplicar duas vezes", estado(b) == e1, f"{e1} -> {estado(b)}")
 
         # (c) constraints
-        for chave, valor, trecho in (("taxa_bps", 3000, "acima do máximo"), ("prazo_liberacao_dias", 0, "abaixo do mínimo")):
+        for chave, valor, trecho in (("taxa_bps", 3000, "acima do máximo"), ("prazo_liberacao_dias", -1, "abaixo do mínimo")):
             # em outro banco lógico não dá; força uma versão nova só neste teste, desfeita pela transação
             msg = b.falha(f"""begin; insert into config_versoes(status, criada_por, motivo) values ('rascunho','{adm}','t');
                 insert into config_parametros(versao_id, chave, valor)
@@ -191,7 +191,7 @@ def main():
         verifica("rollback devolve o banco ao estado vazio", estado(b) == zero, str(estado(b)))
 
         # valor acima do máximo em versão nova: o trigger de parâmetros barra e nada é gravado
-        msg = roda(b, SEED["seed_config_taxa"], admin=adm, cfg_prazo_liberacao_dias=(99, 1, 30))
+        msg = roda(b, SEED["seed_config_taxa"], admin=adm, cfg_prazo_liberacao_dias=(99, 0, 30))
         verifica("valor 99 > máximo 30 é recusado pelo trigger", tem(msg, "acima do máximo"), msg)
         verifica("...e a versão não fica pela metade", n(b, "select count(*) from config_versoes") == 0)
 

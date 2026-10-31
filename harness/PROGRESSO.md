@@ -411,3 +411,11 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - **APK debug** a partir de develop: `flutter build apk --debug --dart-define-from-file=dart-defines.json` (dentro de `app/`, arquivo fora do git, valores não impressos), 22:14 a 22:16:30, `app-debug.apk` com 182 MB, sucesso. O emulador `Medium_Phone_API_37.0` não estava aberto: subi às 22:17 (`emulator-5554`), `adb install -r` às 22:17:53 (`Success`), abri `br.com.feitolabs.trato` pelo launcher. Às 22:18:28/22:18:48: buffer `crash` vazio, 0 `FATAL EXCEPTION`, processo vivo; a captura mostra o splash nativo (logo padrão do Flutter) e em seguida a tela de abertura do Trato ("Feito Labs apresenta", "Toque para começar"). Não naveguei além disso nem testei login.
 - Segue: ícone e splash nativo com a arte do Trato, validar login e cascas num aparelho com conta de teste, push e PR para `main`.
 
+
+## Pagamento ligado ao Postgres (sessão pagamento-postgres)
+- `persistencia/pagamentos.py`: `CobrancasPostgres`, `AditivosPostgres`, `OrdensEstornoPostgres`, `TermosPostgres` (termos = o contrato já congela a taxa) e `ConfigPagamentoPostgres` (versão vigente; alçada = parâmetro `alcada_disputa_centavos`, ausente = 0).
+- `api/fabrica.py`: `montar_servico_pagamento` + `instalar_pagamento` em `criar_app_da_config` (modo postgres). `escolher_provedor` decide fake/stripe.
+- `orquestrador.aprovar_aditivo`: salva o aditivo aprovado ANTES de cobrar, numa transação (o gatilho do banco exige).
+- Migration NOVA `20261031000000_pagamentos_instrucao.sql` (+ rollback), NÃO aplicada no Supabase: precisa do OK do João. O backend real precisa dela e da `ordens_estorno` (já aplicada) para cobrar.
+- `tests/conftest.py`: suíte independe do `.env`/variáveis da máquina (achado 6 resolvido).
+- `tests/integracao/test_pagamento_postgres.py`: cobrança, webhook assinado, ledger espelhado, idempotência do mesmo evento, valor divergente, falha, aditivo e ordem de estorno.

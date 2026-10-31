@@ -12,8 +12,9 @@ TIPOS_STRIPE: dict[str, TipoEvento] = {
     "payment_intent.payment_failed": TipoEvento.PAGAMENTO_FALHOU,
     "charge.refunded": TipoEvento.ESTORNO_CONFIRMADO,
     # Liquidação ao profissional: o evento real depende do modelo de contas (P7).
+    # `transfer.paid` NÃO existe no Stripe (o CLI recusa); os de transferência são
+    # `transfer.created`/`.updated`/`.reversed`; a liquidação no banco é `payout.paid`.
     "payout.paid": TipoEvento.LIQUIDACAO,
-    "transfer.paid": TipoEvento.LIQUIDACAO,
 }
 
 
