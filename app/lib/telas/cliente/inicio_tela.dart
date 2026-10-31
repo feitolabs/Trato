@@ -2,22 +2,49 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
+import '../servicos/servicos_recentes_tela.dart';
 import 'dados_exemplo.dart';
 import 'modelos.dart';
 
 /// Tela 8 do protótipo: Início do cliente. [aoBuscar] leva à aba Buscar.
+///
+/// Os dados vêm de [dados] (catálogo e pedidos); cada atalho chama o callback correspondente,
+/// que quem liga as rotas transforma em tela. Sem [dados], mostra os textos do protótipo.
 class InicioTela extends StatelessWidget {
-  const InicioTela({super.key, required this.aoBuscar});
+  const InicioTela({
+    super.key,
+    required this.aoBuscar,
+    this.dados,
+    this.aoAbrirNotificacoes,
+    this.aoNovoPedido,
+    this.aoAbrirPedidoEmAndamento,
+    this.aoAbrirCategoria,
+    this.aoVerTodasCategorias,
+    this.aoAbrirServico,
+    this.aoVerServicos,
+  });
 
   final VoidCallback aoBuscar;
-
-  void _emBreve(BuildContext context, String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
-      );
+  final DadosInicio? dados;
+  final VoidCallback? aoAbrirNotificacoes;
+  final VoidCallback? aoNovoPedido;
+  final ValueChanged<PedidoEmAndamento>? aoAbrirPedidoEmAndamento;
+  final ValueChanged<CategoriaServico>? aoAbrirCategoria;
+  final VoidCallback? aoVerTodasCategorias;
+  final ValueChanged<ServicoRecente>? aoAbrirServico;
+  final VoidCallback? aoVerServicos;
 
   @override
   Widget build(BuildContext context) {
+    final nome = dados?.nome ?? nomeDoCliente;
+    final andamento = dados == null ? pedidoEmAndamento : dados!.emAndamento;
+    final recentes = dados?.recentes ?? servicosRecentes;
+    final grade = dados == null
+        ? categorias
+        : [
+            ...dados!.categorias.take(7),
+            if (dados!.categorias.isNotEmpty) const CategoriaServico('Ver todas', Icons.grid_view),
+          ];
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
@@ -34,7 +61,7 @@ class InicioTela extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Olá, $nomeDoCliente',
+                            nome.isEmpty ? 'Olá' : 'Olá, $nome',
                             style: TipografiaTrato.corpoPequeno
                                 .copyWith(color: CoresTrato.textoSecundario),
                           ),
@@ -44,7 +71,7 @@ class InicioTela extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: EspacosTrato.x3),
-                    _BotaoSino(aoTocar: () => _emBreve(context, 'Notificações')),
+                    _BotaoSino(aoTocar: aoAbrirNotificacoes),
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x6),
@@ -78,47 +105,67 @@ class InicioTela extends StatelessWidget {
                       const SizedBox(height: EspacosTrato.x5),
                       BotaoSecundario(
                         texto: 'Pedir orçamento',
-                        aoTocar: () => _emBreve(context, 'Novo pedido'),
+                        aoTocar: aoNovoPedido,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: EspacosTrato.x4),
-                CartaoTrato(
-                  aoTocar: () => _emBreve(context, pedidoEmAndamento.titulo),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(pedidoEmAndamento.titulo, style: TipografiaTrato.tituloCartao),
-                      const SizedBox(height: EspacosTrato.x2),
-                      Text(
-                        pedidoEmAndamento.situacao,
-                        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
-                      ),
-                      const SizedBox(height: EspacosTrato.x2),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child:
-                            ChipStatus(texto: pedidoEmAndamento.aviso, tipo: TipoStatus.destaque),
-                      ),
-                    ],
+                if (andamento != null)
+                  CartaoTrato(
+                    aoTocar: aoAbrirPedidoEmAndamento == null
+                        ? null
+                        : () => aoAbrirPedidoEmAndamento!(andamento),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(andamento.titulo, style: TipografiaTrato.tituloCartao),
+                        const SizedBox(height: EspacosTrato.x2),
+                        Text(
+                          andamento.situacao,
+                          style:
+                              TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                        ),
+                        if (andamento.aviso.isNotEmpty) ...[
+                          const SizedBox(height: EspacosTrato.x2),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: ChipStatus(texto: andamento.aviso, tipo: TipoStatus.destaque),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
                 const SizedBox(height: EspacosTrato.x6),
                 Text('Categorias', style: TipografiaTrato.titulo),
                 const SizedBox(height: EspacosTrato.x3),
                 _GradeCategorias(
-                  aoTocar: (c) => _emBreve(context, c.nome),
+                  itens: grade,
+                  aoTocar: (c) {
+                    if (c.nome == 'Ver todas') {
+                      aoVerTodasCategorias?.call();
+                    } else {
+                      aoAbrirCategoria?.call(c);
+                    }
+                  },
                 ),
-                const SizedBox(height: EspacosTrato.x6),
-                Text('Serviços recentes', style: TipografiaTrato.titulo),
-                const SizedBox(height: EspacosTrato.x3),
-                for (final servico in servicosRecentes) ...[
-                  _CartaoServicoRecente(
-                    servico: servico,
-                    aoTocar: () => _emBreve(context, servico.titulo),
+                if (recentes.isNotEmpty) ...[
+                  const SizedBox(height: EspacosTrato.x6),
+                  Row(
+                    children: [
+                      Expanded(child: Text('Serviços recentes', style: TipografiaTrato.titulo)),
+                      if (aoVerServicos != null)
+                        BotaoLink(texto: 'Ver todos', aoTocar: aoVerServicos),
+                    ],
                   ),
                   const SizedBox(height: EspacosTrato.x3),
+                  for (final servico in recentes) ...[
+                    CartaoServicoRecente(
+                      servico: servico,
+                      aoTocar: () => aoAbrirServico?.call(servico),
+                    ),
+                    const SizedBox(height: EspacosTrato.x3),
+                  ],
                 ],
               ],
             ),
@@ -132,7 +179,7 @@ class InicioTela extends StatelessWidget {
 class _BotaoSino extends StatelessWidget {
   const _BotaoSino({required this.aoTocar});
 
-  final VoidCallback aoTocar;
+  final VoidCallback? aoTocar;
 
   @override
   Widget build(BuildContext context) {
@@ -157,8 +204,9 @@ class _BotaoSino extends StatelessWidget {
 
 /// 4 categorias por linha. O rótulo encolhe em vez de quebrar.
 class _GradeCategorias extends StatelessWidget {
-  const _GradeCategorias({required this.aoTocar});
+  const _GradeCategorias({required this.itens, required this.aoTocar});
 
+  final List<CategoriaServico> itens;
   final ValueChanged<CategoriaServico> aoTocar;
 
   static const _porLinha = 4;
@@ -167,14 +215,16 @@ class _GradeCategorias extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (var inicio = 0; inicio < categorias.length; inicio += _porLinha) ...[
+        for (var inicio = 0; inicio < itens.length; inicio += _porLinha) ...[
           if (inicio > 0) const SizedBox(height: EspacosTrato.x2),
           Row(
             children: [
               for (var i = inicio; i < inicio + _porLinha; i++) ...[
                 if (i > inicio) const SizedBox(width: EspacosTrato.x2),
                 Expanded(
-                  child: _Categoria(categoria: categorias[i], aoTocar: aoTocar),
+                  child: i < itens.length
+                      ? _Categoria(categoria: itens[i], aoTocar: aoTocar)
+                      : const SizedBox.shrink(),
                 ),
               ],
             ],
@@ -227,52 +277,6 @@ class _Categoria extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CartaoServicoRecente extends StatelessWidget {
-  const _CartaoServicoRecente({required this.servico, required this.aoTocar});
-
-  final ServicoRecente servico;
-  final VoidCallback aoTocar;
-
-  @override
-  Widget build(BuildContext context) {
-    return CartaoTrato(
-      aoTocar: aoTocar,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: EspacosTrato.x2,
-            runSpacing: EspacosTrato.x2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(servico.titulo, style: TipografiaTrato.tituloCartao),
-              const ChipStatus(texto: 'Finalizado', tipo: TipoStatus.sucesso, icone: Icons.check),
-            ],
-          ),
-          const SizedBox(height: EspacosTrato.x2),
-          Text(
-            '${servico.profissional} · ${servico.data}',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
-          ),
-          const SizedBox(height: EspacosTrato.x3),
-          Row(
-            children: [
-              const Icon(Icons.verified_user_outlined, size: 20, color: CoresTrato.azulTexto),
-              const SizedBox(width: EspacosTrato.x2),
-              Expanded(
-                child: Text(
-                  servico.garantia,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

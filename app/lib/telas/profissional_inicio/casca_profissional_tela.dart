@@ -2,18 +2,29 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
-import '../em_breve_tela.dart';
+import '../../dados/erros.dart';
+import '../../dados/repositorios.dart' show FiltroPedidosAbertos;
+import '../agenda/agenda_tela.dart';
+import '../carteira/carteira_tela.dart';
+import '../cliente/modelos.dart' show CategoriaServico;
+import '../mensagens/mensagens_tela.dart';
+import '../mensagens/servico_fake.dart';
+import '../perfil_publico/perfil_publico.dart';
+import '../perfil_publico/perfil_publico_tela.dart';
 import 'detalhe_pedido_tela.dart';
 import 'dados_exemplo.dart';
+import 'filtros_pedidos_tela.dart';
 import 'inicio_profissional_tela.dart';
 import 'modelos.dart';
+import 'pedidos_profissional_tela.dart';
 
 /// Casca do app do profissional: barra inferior com as 5 abas (Início · Pedidos · Agenda ·
-/// Carteira · Perfil). Só o Início tem tela aqui; as outras mostram [EmBreveTela]
-/// (a Carteira vem de outra tarefa). Cada aba guarda seu estado.
+/// Carteira · Perfil). Pedidos traz os pedidos abertos (com filtros) e as conversas. Cada aba
+/// guarda seu estado.
 ///
 /// Os callbacks de ações que dependem de outras telas (orçamento, check-in, recusa)
-/// ficam em aberto para quem integra ligar.
+/// ficam em aberto para quem integra ligar. Sem as abas de [abaAgenda], [abaCarteira],
+/// [abaPerfil] e [abaConversas], a casca mostra as telas com dados de demonstração.
 class CascaProfissionalTela extends StatefulWidget {
   const CascaProfissionalTela({
     super.key,
@@ -26,8 +37,13 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoRecusar,
     this.abaCarteira,
     this.abaPerfil,
+    this.abaAgenda,
+    this.abaConversas,
     this.carregarDetalhe,
     this.recusarPedido,
+    this.carregarPedidos,
+    this.carregarCategorias,
+    this.aoAbrirNotificacoes,
   });
 
   /// Carrega o detalhe do pedido tocado (API). Sem isso, mostra [detalhe].
@@ -36,11 +52,26 @@ class CascaProfissionalTela extends StatefulWidget {
   /// Recusa o pedido tocado. Sem isso, usa [aoRecusar].
   final Future<void> Function(PedidoAberto pedido, MotivoRecusa motivo)? recusarPedido;
 
-  /// Conteúdo da aba Carteira (extrato). Sem isso, a aba mostra "Em breve".
+  /// Pede ao backend os pedidos abertos com o filtro escolhido. Sem isso, o filtro não muda a lista.
+  final Future<List<PedidoAberto>> Function(FiltroPedidosAbertos filtro)? carregarPedidos;
+
+  /// Categorias oferecidas na tela de filtros.
+  final Future<List<CategoriaServico>> Function()? carregarCategorias;
+
+  /// Conteúdo da aba Carteira (extrato).
   final Widget? abaCarteira;
 
-  /// Aba Perfil (perfil público e avaliações). Sem ela, mostra [EmBreveTela].
+  /// Aba Perfil (perfil público e avaliações).
   final Widget? abaPerfil;
+
+  /// Aba Agenda (lista por dia com check-in).
+  final Widget? abaAgenda;
+
+  /// Lista de conversas, dentro da aba Pedidos.
+  final Widget? abaConversas;
+
+  /// Abre as notificações (sino do Início).
+  final VoidCallback? aoAbrirNotificacoes;
 
   final int abaInicial;
   final InicioProfissional inicio;
@@ -58,8 +89,18 @@ class CascaProfissionalTela extends StatefulWidget {
 
 class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   late int _aba = widget.abaInicial;
+  late InicioProfissional _inicio = widget.inicio;
+  var _filtro = const FiltroPedidosAbertos();
+  var _carregandoPedidos = false;
 
   void _ir(int indice) => setState(() => _aba = indice);
+
+  int get _filtrosAtivos => [
+        if (_filtro.categoriaId != null) 1,
+        if (_filtro.bairro != null) 1,
+        if (_filtro.precoMinCentavos != null || _filtro.precoMaxCentavos != null) 1,
+        if (_filtro.ordenar != 'recentes') 1,
+      ].length;
 
   void _abrirDetalhe(PedidoAberto pedido) {
     Widget tela(DetalhePedido dados) => DetalhePedidoTela(
@@ -85,26 +126,76 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     );
   }
 
-  void _filtros() => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const EmBreveTela(titulo: 'Filtros')),
-      );
+  Future<void> _filtros() async {
+    final navegador = Navigator.of(context);
+    final mensagens = ScaffoldMessenger.of(context);
+    final categorias = await widget.carregarCategorias?.call().catchError(
+              (Object _) => <CategoriaServico>[],
+            ) ??
+        <CategoriaServico>[];
+    if (!mounted) return;
+    final novo = await navegador.push<FiltroPedidosAbertos>(
+      MaterialPageRoute(
+        builder: (_) => FiltrosPedidosAbertosTela(atual: _filtro, categorias: categorias),
+      ),
+    );
+    if (novo == null || !mounted) return;
+    setState(() {
+      _filtro = novo;
+      _carregandoPedidos = true;
+    });
+    try {
+      final lista = await widget.carregarPedidos?.call(novo);
+      if (!mounted) return;
+      setState(() {
+        if (lista != null) _inicio = _inicio.comPedidos(lista);
+        _carregandoPedidos = false;
+      });
+    } on Object catch (erro) {
+      if (!mounted) return;
+      setState(() => _carregandoPedidos = false);
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              erro is ErroTrato ? erro.mensagem : 'Não foi possível aplicar os filtros. Tente de novo.',
+            ),
+          ),
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final paginas = <Widget>[
       InicioProfissionalTela(
-        dados: widget.inicio,
+        dados: _inicio,
         aoFazerCheckIn: widget.aoFazerCheckIn,
         aoAbrirCarteira: () => _ir(3),
         aoAbrirFiltros: _filtros,
         aoAbrirPedido: _abrirDetalhe,
+        aoAbrirNotificacoes: widget.aoAbrirNotificacoes,
       ),
-      for (final (i, aba) in abasProfissional.indexed.skip(1))
-        i == 3 && widget.abaCarteira != null
-            ? widget.abaCarteira!
-            : i == 4 && widget.abaPerfil != null
-                ? widget.abaPerfil!
-                : EmBreveTela(titulo: aba.rotulo),
+      PedidosProfissionalTela(
+        pedidos: _inicio.pedidos,
+        carregando: _carregandoPedidos,
+        filtrosAtivos: _filtrosAtivos,
+        aoAbrirFiltros: _filtros,
+        aoAbrirPedido: _abrirDetalhe,
+        conversas: widget.abaConversas ??
+            const ListaConversas(
+              servico: ServicoMensagensFake(),
+              textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
+            ),
+      ),
+      widget.abaAgenda ??
+          AgendaTela(
+            carregar: () async => const [],
+            aoFazerCheckIn: (_) => widget.aoFazerCheckIn?.call(),
+          ),
+      widget.abaCarteira ?? const CarteiraTela(soExtrato: true),
+      widget.abaPerfil ?? PerfilPublicoTela(servico: ServicoPerfilPublicoFake()),
     ];
     return Scaffold(
       body: IndexedStack(index: _aba, children: paginas),

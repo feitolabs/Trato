@@ -18,7 +18,11 @@ class InicioProfissionalTela extends StatefulWidget {
     this.aoAbrirCarteira,
     this.aoAbrirFiltros,
     this.aoAbrirPedido,
+    this.aoAbrirNotificacoes,
   });
+
+  /// Abre as notificações. Sem isso, o sino não aparece.
+  final VoidCallback? aoAbrirNotificacoes;
 
   final InicioProfissional dados;
   final ValueChanged<bool>? aoAlterarDisponivel;
@@ -45,12 +49,44 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Olá, ${dados.nome}',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Olá, ${dados.nome}',
+                            style: TipografiaTrato.corpoPequeno
+                                .copyWith(color: CoresTrato.textoSecundario),
+                          ),
+                          const SizedBox(height: EspacosTrato.x1),
+                          Text('Pedidos perto de você', style: TipografiaTrato.tituloGrande),
+                        ],
+                      ),
+                    ),
+                    if (widget.aoAbrirNotificacoes != null) ...[
+                      const SizedBox(width: EspacosTrato.x3),
+                      Semantics(
+                        button: true,
+                        label: 'Notificações',
+                        child: Material(
+                          color: CoresTrato.superficie,
+                          shape: const CircleBorder(side: BorderSide(color: CoresTrato.borda)),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: widget.aoAbrirNotificacoes,
+                            child: const SizedBox.square(
+                              dimension: 48,
+                              child: Icon(Icons.notifications_none, color: CoresTrato.petroleo),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: EspacosTrato.x1),
-                Text('Pedidos perto de você', style: TipografiaTrato.tituloGrande),
                 const SizedBox(height: EspacosTrato.x4),
                 _CartaoDisponivel(
                   ligado: _disponivel,
@@ -74,7 +110,7 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                 ),
                 const SizedBox(height: EspacosTrato.x2),
                 for (final pedido in dados.pedidos) ...[
-                  _CartaoPedido(
+                  CartaoPedidoAberto(
                     pedido: pedido,
                     aoTocar: widget.aoAbrirPedido == null
                         ? null
@@ -224,8 +260,8 @@ class _Valor extends StatelessWidget {
   }
 }
 
-class _CartaoPedido extends StatelessWidget {
-  const _CartaoPedido({required this.pedido, required this.aoTocar});
+class CartaoPedidoAberto extends StatelessWidget {
+  const CartaoPedidoAberto({super.key, required this.pedido, required this.aoTocar});
 
   final PedidoAberto pedido;
   final VoidCallback? aoTocar;

@@ -36,6 +36,7 @@ Só os **nomes** estão no `.env.example`. Nunca coloque token, senha ou chave n
 - `repositorios.dart`: **interfaces** por área (pedidos, orçamentos, pagamento, chat, notificações, perfil, profissional).
 - `repositorios_api.dart`: implementação que fala com a API. `servicos_api.dart`: aditivo, nota de materiais e verificação.
 - `repositorios_fake.dart`: implementação de demonstração (os dados de exemplo das telas).
+- `repositorios_catalogo.dart` (interfaces), `repositorios_catalogo_api.dart` e `repositorios_catalogo_fake.dart` (+ `catalogo_exemplo.dart`): catálogo de categorias e profissionais, serviços do cliente (lista e detalhe) e agenda do profissional. `RepositoriosTrato.catalogo/servicos/agenda`.
 - `repositorios_trato.dart`: escolhe API ou fake por área, conforme o modo.
 - `carregador.dart`: widget que dá a toda tela ligada os estados **carregando**, **erro** (com "Tentar de novo") e **vazio**.
 
@@ -64,9 +65,14 @@ O estado completo (com observações) está em `docs/STATUS-MVP.md`; o que o bac
 | Profissional: check-in / check-out | **API** | `POST /v1/uploads` (+ `PUT` + `concluir`), `acoes/fazer_check_in`, `acoes/fazer_check_out` |
 | Profissional: verificação | **API** | `POST /v1/uploads` (destino `verificacao`), `POST/GET /v1/profissional/verificacao` |
 | Profissional: Carteira | **API**, como **extrato** (D15) | `GET /v1/extrato` |
+| Detalhe do serviço, serviços recentes, pedido em andamento (Início) | **API** | `GET /v1/pedidos`, `/v1/pedidos/{id}`, `/saldo`, `/eventos` |
+| Perfil público do profissional (cliente) | **API** (por id) | `GET /v1/profissionais/{id}`; o orçamento já traz `profissional_id`. Profissionais de exemplo (`prof-...`) seguem em demo |
+| Categorias, lista por categoria, busca, perguntas do Novo pedido | Demo | faltam rotas de catálogo e de busca (`docs/app-divergencias.md`) |
+| Agenda e conversas do profissional | Parcial | só o próximo atendimento (`inicio`); faltam rotas de agenda e de lista de conversas |
+| Lista de conversas do cliente | **API** por pedido | uma conversa por pedido contratado, sem texto da última mensagem |
+| Termos e política | Local | `app/assets/legal/` (cópias de `docs/juridico/`, rascunho; teste confere igualdade) |
 | Cadastro do profissional | Demo | falta catálogo de categorias e cidades |
-| Busca e perfil público | Demo | falta rota de busca; perfil abre por nome |
-| Lista de conversas, responder disputa (profissional) | Demo | faltam as rotas |
+| Responder disputa (profissional) | Demo | falta a rota |
 | Marcar notificação como lida, preferências, token de push | — | sem rota |
 
 ## Sessão e token

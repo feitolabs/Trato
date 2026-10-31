@@ -4,6 +4,7 @@ import 'package:trato/telas/aditivo/criar_aditivo_tela.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
+import 'package:trato/telas/servicos/detalhe_servico_tela.dart';
 import 'package:trato/telas/disputa_profissional/atender_retrabalho_tela.dart';
 import 'package:trato/telas/disputa_profissional/responder_disputa_tela.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
@@ -105,13 +106,14 @@ void main() {
     expect(find.byType(GarantiaTela), findsOneWidget);
   });
 
-  testWidgets('pedido sem tela própria mostra aviso, sem quebrar', (tester) async {
+  testWidgets('pedido em disputa abre o detalhe do serviço, sem placeholder', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Pedidos');
 
     await _tocar(tester, 'Vazamento na pia');
 
-    expect(find.textContaining('Avisamos aqui quando houver novidade'), findsOneWidget);
+    expect(find.byType(DetalheServicoTela), findsOneWidget);
+    expect(find.text('Disputa aberta · em análise'), findsOneWidget);
   });
 
   group('cadastro', () {
@@ -200,11 +202,28 @@ void main() {
     expect(find.byType(ResponderAditivoTela), findsOneWidget);
   });
 
-  testWidgets('notificação de disputa e de retrabalho abrem as telas do profissional',
-      (tester) async {
+  testWidgets('notificações do cliente abrem o serviço, o orçamento e o chat', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Perfil');
     await _tocar(tester, 'Notificações');
+
+    await _tocar(tester, 'Disputa aberta no seu serviço');
+    expect(find.byType(DetalheServicoTela), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Novo orçamento');
+    expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Nova mensagem de Carlos Mendes');
+    expect(find.byType(ChatPedidoTela), findsOneWidget);
+  });
+
+  testWidgets('notificação de disputa e de retrabalho abrem as telas do profissional',
+      (tester) async {
+    await _abrir(tester, RotasTrato.cascaProfissionalParaTeste());
+    await tester.tap(find.bySemanticsLabel('Notificações'));
+    await tester.pumpAndSettle();
 
     await _tocar(tester, 'Disputa aberta no seu serviço');
     expect(find.byType(ResponderDisputaTela), findsOneWidget);

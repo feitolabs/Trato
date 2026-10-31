@@ -29,6 +29,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    # Cópias de docs/juridico/ (rascunho); um teste confere que continuam iguais.
+    - assets/legal/
+
   fonts:
     - family: Archivo
       fonts:

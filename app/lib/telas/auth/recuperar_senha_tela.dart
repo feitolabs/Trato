@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
+import '../ajuda/ajuda_tela.dart';
+import '../ajuda/servico_fake.dart';
 import 'estrutura_auth.dart';
 import 'validacao.dart';
 
@@ -33,8 +34,8 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
     super.dispose();
   }
 
-  void _abrirEmBreve(String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
+  void _abrirAjuda() => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const AjudaTela(servico: ServicoAjudaFake())),
       );
 
   Future<void> _enviar() async {
@@ -71,7 +72,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
             'Sem acesso ao e-mail? ',
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
           ),
-          BotaoLink(texto: 'Fale com o suporte', aoTocar: () => _abrirEmBreve('Suporte')),
+          BotaoLink(texto: 'Fale com o suporte', aoTocar: _abrirAjuda),
         ],
       ),
       children: [

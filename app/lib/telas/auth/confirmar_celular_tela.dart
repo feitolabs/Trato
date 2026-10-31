@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
 import '../fluxo/rotas.dart';
 import '../onboarding/escolha_perfil_tela.dart';
 import 'estrutura_auth.dart';
@@ -14,7 +13,7 @@ import 'validacao.dart';
 
 /// Tela 6 do protótipo: "Confirme seu celular", passo 2 de 2.
 /// O código de 6 números vai por SMS (D14). Tentativas e reenvios são limitados pelo
-/// [ServicoAuth]; o reenvio só libera depois de 60 s. WhatsApp ainda abre [EmBreveTela].
+/// [ServicoAuth]; o reenvio só libera depois de 60 s. O código só chega por SMS (WhatsApp fica fora do MVP).
 class ConfirmarCelularTela extends StatefulWidget {
   const ConfirmarCelularTela({
     super.key,
@@ -68,10 +67,6 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
     _codigo.dispose();
     super.dispose();
   }
-
-  void _emBreve(String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
-      );
 
   String get _tempo => '${_restante ~/ 60}:${(_restante % 60).toString().padLeft(2, '0')}';
 
@@ -185,7 +180,6 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
           BotaoLink(texto: 'Reenviar código', aoTocar: _reenviar),
         if (_aviso != null)
           Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
-        BotaoLink(texto: 'Receber por WhatsApp', aoTocar: () => _emBreve('Receber por WhatsApp')),
         BotaoLink(texto: 'Mudar número', aoTocar: () => Navigator.of(context).pop()),
         const SizedBox(height: EspacosTrato.x4),
         Container(

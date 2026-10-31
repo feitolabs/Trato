@@ -34,7 +34,19 @@ class DetalhePerfil {
     required this.verificacoes,
     required this.avaliacoes,
     this.fotosTrabalhos = 3,
+    this.bio,
+    this.servicos = const [],
+    this.trabalhos = const [],
   });
+
+  /// Texto de apresentação escrito pelo profissional (já filtrado pelo backend).
+  final String? bio;
+
+  /// Serviços que o profissional oferece.
+  final List<String> servicos;
+
+  /// Legendas dos trabalhos do portfólio (as fotos vêm da URL assinada quando houver).
+  final List<String> trabalhos;
 
   final int noTratoDesde;
   final int totalAvaliacoes;
@@ -57,7 +69,21 @@ class Profissional {
     this.respostaCurta,
     this.atendeHoje = false,
     this.detalhe,
+    this.id,
+    this.regiao,
+    this.categoriaId,
+    this.precoAPartirCentavos,
   });
+
+  /// Id do profissional na API (nulo nos dados do protótipo).
+  final String? id;
+
+  /// Bairro ou região de atendimento, ex.: "Savassi e Funcionários".
+  final String? regiao;
+  final String? categoriaId;
+
+  /// Referência de preço mostrada na lista; o valor do serviço é o do orçamento.
+  final int? precoAPartirCentavos;
 
   final String nome;
   final String iniciais;
@@ -78,10 +104,22 @@ class Profissional {
 }
 
 class CategoriaServico {
-  const CategoriaServico(this.nome, this.icone);
+  const CategoriaServico(
+    this.nome,
+    this.icone, {
+    this.id = '',
+    this.servicos = const [],
+    this.descricao = '',
+  });
 
+  /// Id da categoria no catálogo (vazio nos dados do protótipo).
+  final String id;
   final String nome;
   final IconData icone;
+
+  /// Serviços típicos da categoria, usados no Novo pedido.
+  final List<String> servicos;
+  final String descricao;
 }
 
 class PedidoEmAndamento {
@@ -89,7 +127,11 @@ class PedidoEmAndamento {
     required this.titulo,
     required this.situacao,
     required this.aviso,
+    this.pedidoId,
   });
+
+  /// Id do pedido na API (nulo nos dados do protótipo).
+  final String? pedidoId;
 
   final String titulo;
   final String situacao;
@@ -101,11 +143,39 @@ class ServicoRecente {
     required this.titulo,
     required this.profissional,
     required this.data,
-    required this.garantia,
+    this.garantia,
+    this.pedidoId,
+    this.statusTexto = 'Finalizado',
   });
+
+  /// Situação do serviço mostrada no chip ("Finalizado", "Em execução"...).
+  final String statusTexto;
+
+  /// Id do pedido na API (nulo nos dados do protótipo).
+  final String? pedidoId;
 
   final String titulo;
   final String profissional;
   final String data;
-  final String garantia;
+
+  /// Texto pronto da garantia; ausente quando o backend não informa.
+  final String? garantia;
+}
+
+/// Tudo o que o Início do cliente mostra, já carregado do catálogo e dos pedidos.
+class DadosInicio {
+  const DadosInicio({
+    required this.nome,
+    required this.categorias,
+    this.emAndamento,
+    this.recentes = const [],
+  });
+
+  /// Primeiro nome do cliente.
+  final String nome;
+
+  /// Categorias ativas (a tela mostra as primeiras e o atalho "Ver todas").
+  final List<CategoriaServico> categorias;
+  final PedidoEmAndamento? emAndamento;
+  final List<ServicoRecente> recentes;
 }

@@ -38,6 +38,7 @@ void main() {
             home: widget,
           ),
         );
+        await tester.pumpAndSettle();
 
         await expectLater(find.byType(MaterialApp), matchesGoldenFile('cliente_${tela}_$nome.png'));
       });

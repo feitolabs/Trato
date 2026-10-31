@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 // Modelos do Novo pedido. Provisórios: as perguntas guiadas de cada categoria virão do backend.
 
 /// Faixa de preço em centavos inteiros ("R$ 200 a R$ 500"). Só exibe: não há regra no app.
@@ -27,6 +29,8 @@ class FormularioPedido {
     required this.endereco,
     required this.avisoEndereco,
     required this.avisoPrazo,
+    this.categoriaId,
+    this.icone = Icons.bolt,
   });
 
   /// Ex.: "Elétrica · Tomadas e chuveiro".
@@ -48,6 +52,12 @@ class FormularioPedido {
   final String endereco;
   final String avisoEndereco;
   final String avisoPrazo;
+
+  /// Id da categoria no catálogo; nulo no formulário de exemplo.
+  final String? categoriaId;
+
+  /// Ícone da categoria, mostrado ao lado do nome.
+  final IconData icone;
 }
 
 /// O que o cliente preencheu, devolvido em `aoEnviar`.
@@ -60,7 +70,11 @@ class RascunhoPedido {
     required this.prazo,
     required this.faixa,
     this.fotos = const [],
+    this.categoriaId,
   });
+
+  /// Categoria escolhida (id do catálogo); nula quando vem do formulário de exemplo.
+  final String? categoriaId;
 
   final List<String> servicos;
   final int quantidade;

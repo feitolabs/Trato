@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
+import '../legal/texto_legal_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
 import '../fluxo/rotas.dart';
 import 'confirmar_celular_tela.dart';
@@ -13,7 +13,7 @@ import 'estrutura_auth.dart';
 import 'validacao.dart';
 
 /// Tela 5 do protótipo: "Criar conta", passo 1 de 2.
-/// Termos e política abrem [EmBreveTela] até os textos legais existirem.
+/// Termos e política abrem os textos legais (rascunhos, com aviso de revisão).
 class CriarContaTela extends StatefulWidget {
   const CriarContaTela({super.key, this.perfil = PerfilUso.cliente, this.servico});
 
@@ -33,9 +33,9 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   final _celular = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
-  late final _toqueTermos = TapGestureRecognizer()..onTap = () => _emBreve('Termos de uso');
+  late final _toqueTermos = TapGestureRecognizer()..onTap = () => _abrirTexto(TextoLegal.termos);
   late final _toquePolitica = TapGestureRecognizer()
-    ..onTap = () => _emBreve('Política de privacidade');
+    ..onTap = () => _abrirTexto(TextoLegal.privacidade);
   var _aceitouTermos = false;
   var _avisosWhatsapp = false;
   var _tentou = false;
@@ -54,8 +54,8 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     super.dispose();
   }
 
-  void _emBreve(String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
+  void _abrirTexto(TextoLegal texto) => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => TextoLegalTela.de(texto)),
       );
 
   String? _erro(String? Function() validar) => _tentou ? validar() : null;

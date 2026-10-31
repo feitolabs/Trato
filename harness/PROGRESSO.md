@@ -372,6 +372,14 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Backend devolve ao app: `offline_capturada_em` no check-in/out reenviado (hoje 422 e tira da fila), caminho da foto na conclusão do upload da nota de materiais, destino `portfolio` em uploads, `taxa` em % no resumo do orçamento.
 - Limites: `POST /v1/contratos/{id}/cobranca` responde 503 em modo `postgres`; aprovar aditivo cria cobrança `aguardando_confirmacao` mas o app não tem a tela de pagar o aditivo.
 
+
+## 30/10/2026 — app-zero-placeholders: app navegável sem placeholder
+
+- Telas novas (cliente): todas as categorias, categoria com filtros, resultados da busca ligados ao catálogo, serviços recentes e detalhe do serviço (ações por estado), perfil público do profissional (bio, serviços, avaliações, sem prometer segurança), notificações com destino por tipo, Início ligado a dados. Profissional: filtros dos pedidos abertos, aba Pedidos (abertos + conversas), Agenda com check-in. Termos de uso e política (rascunho) em `telas/legal/`, ainda **não ligados em criar conta** (`fix-cadastro-real`).
+- Repositórios novos (interface + API + fake): catálogo, serviços do cliente, agenda. Catálogo, busca e agenda seguem em demo no modo `api` (faltam rotas).
+- Restam 4 `EmBreveTela` em `telas/auth/` (da `fix-cadastro-real`); plano em `docs/placeholders.md`.
+- Teste `navegacao_sem_placeholder_test.dart` explora os toques das 5 abas do cliente e do profissional (~4 min); achou 2 bugs reais (setState com Future; pop em rota já removida), corrigidos.
+- APK debug gerado e instalado no emulador (abre no onboarding); **não passei do onboarding** porque exige criar conta/digitar credenciais. Capturas das telas internas ficaram pendentes (nenhuma PNG em `docs/telas-capturas/`).
 ## 30/10/2026 — fix-sobras-seguranca
 
 - `docs/sobras-seguranca.md` lista cada sobra com estado. Corrigidos com teste: B3 (`texto_seguro`), B7 (cartão); B8 (job `pip-audit`); B2 em migration nova NÃO aplicada + rollback + checagens em `supabase/testes/testar_banco.py` (608 OK em Postgres local; mapa de rollbacks e lista de tabelas só-backend do teste atualizados).

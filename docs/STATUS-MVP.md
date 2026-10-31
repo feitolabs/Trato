@@ -1,6 +1,6 @@
 # Status do MVP — tela por tela
 
-Atualizado em 30/10/2026, depois de ligar o app às rotas novas. Divergências: `docs/app-divergencias.md`.
+Atualizado em 30/10/2026, depois de ligar o app às rotas novas e de eliminar os placeholders (`docs/placeholders.md`). Divergências: `docs/app-divergencias.md`.
 
 Legenda do app:
 - **API**: no modo `api` (`--dart-define=TRATO_MODO=api`) chama a API de verdade.
@@ -18,6 +18,15 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Google, Apple | Depende do João | Chaves. SMS desligado (D16); cadastro confirma por e-mail. |
 | Início, buscar, perfil do profissional | Demo | Backend pronto (busca #10, perfil público por id #11, `docs/api-rotas.md`); falta o app ligar. |
 | Busca com serviço (`busca/`) | Demo, ligada | É a aba Buscar do cliente (`RotasTrato.abaBuscar`), abre o perfil público. Filtros e mapa da tela antiga (`BuscarTela`) saíram da aba; a busca real depende do backend. |
+| Google, Apple, SMS | Depende do João | Chaves e provedor (P11). |
+| Início | Ligado | Nome, categorias, pedido em andamento e serviços recentes vêm dos repositórios; sino → Notificações; "Pedir orçamento" → escolha da categoria → Novo pedido; categoria → lista; "Ver todas" → todas as categorias; serviço → detalhe. |
+| Todas as categorias | Demo (sem rota de catálogo) | Grade com busca, só as ativas do catálogo. Sem protótipo. |
+| Categoria | Demo (sem rota) | Cabeçalho, filtros (bairro, preço, avaliação, hoje), nota, serviços concluídos, região e "Pedir orçamento" (abre o Novo pedido na categoria). Sem protótipo. |
+| Perfil do profissional (cliente) | API (id) / Demo | `GET /v1/profissionais/{id}`; abre de busca, categoria, orçamento e serviço. Bio, serviços, trabalhos (legenda), avaliações e selo sem prometer segurança. Fotos do portfólio: legendas, sem imagem ainda. |
+| Detalhe do serviço | API | `GET /v1/pedidos/{id}`, `/saldo`, `/eventos`. Linha do tempo, profissional, valores do backend e ações por estado (orçamentos, pagar, acompanhar, conversar, avaliar, garantia, abrir problema). Sem protótipo. |
+| Serviços recentes (lista) | API | `GET /v1/pedidos`. Sem protótipo. |
+| Busca (`busca/`, resultados por texto) | Demo, ligada ao catálogo | Aba Buscar: campo, categorias (→ Categoria) e "Ver todas"; resultados com nota, serviços e região; abre o perfil. Depende da rota de busca (#10) no modo `api`. |
+| Busca e perfil público (backend) | Pronto no backend | Rotas de busca (#10) e perfil por id (#11) existem (`docs/api-rotas.md`); o app liga o perfil por id e mantém a busca em demo até ligar a rota de busca. |
 | Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
 | Seus pedidos | API | Título genérico ("Pedido #XXXX"): a API não devolve título nem nome do profissional. |
 | Orçamentos recebidos e detalhe | API | `GET /v1/pedidos/{id}/orcamentos` + `GET /v1/orcamentos/{id}`; aceite em `acoes/aceitar_orcamento`. Selo, nota e total de serviços do profissional não vêm da API (mostra "—"). |
@@ -29,15 +38,16 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Relatar problema (disputa) | API | `POST .../disputa`. |
 | Garantia e retrabalho | API | `GET /v1/contratos/{id}/garantia` e `POST .../retrabalho`. Textos "o que cobre" são de tela. |
 | Chat do pedido | API | `GET/POST /v1/pedidos/{id}/mensagens`. Antes de contratar, o cliente precisa de `?profissional_id=` (divergência 21). |
-| Mensagens (aba, lista de conversas) | Demo, sem protótipo | Falta rota da lista (`docs/app-divergencias.md` #13). |
-| Notificações | API (lista) | `GET /v1/notificacoes`. Marcar como lida, preferências e token de push: sem rota (#8, #9). |
+| Mensagens (aba, lista de conversas) | Demo / `api` por pedido | No modo `api` uma conversa por pedido contratado (sem texto da última mensagem); falta a rota da lista (#13). Sem protótipo. |
+| Notificações | API (lista) | `GET /v1/notificacoes`; o toque abre o serviço, o orçamento, o chat, o pagamento ou a disputa conforme o tipo. Marcar como lida, preferências e token de push: sem rota (#8, #9). |
 | Perfil do cliente | API | `GET /v1/me` (o primeiro login chama a rota e cria o usuário) e `PATCH /v1/me` no repositório; falta a tela de editar o nome. |
 | Central de privacidade (LGPD) e excluir conta | Demo, sem protótipo | Texto de prazos a definir com o jurídico. Exclusão real depende do backend. |
 | Ajuda | Demo, sem protótipo | Perguntas frequentes provisórias. |
 | Perfil: notificações, privacidade, ajuda, usar como profissional, **Sair** | Ligados | Sair encerra o login, limpa o token e volta ao login sem histórico. |
-| Perfil: dados pessoais, endereços, pagamento, favoritos, contatos, termos | Sem tela | Itens **removidos da lista** (não abrem mais "Em breve"); voltam quando a tela existir. |
+| Perfil: termos e políticas | Ligado | Termos de uso e Política de privacidade (rascunho de `docs/juridico/`, com aviso de revisão). |
+| Perfil: dados pessoais, endereços, pagamento, favoritos, contatos | Sem tela | Itens **removidos da lista**; fora do MVP até haver rota (`docs/placeholders.md`). |
 | Perfil público do profissional | Demo | Ver #11. Sem perfil nos dados: aviso "Perfil indisponível". |
-| Pedido em disputa/estado sem tela (cliente) | Aviso | Mostra aviso de que está em análise (antes "Em breve"). |
+| Pedido em disputa/retrabalho/cancelado (cliente) | Ligado | Abre o detalhe do serviço. |
 | SOS | Desligado | `kSosHabilitado = false` (D13). |
 
 ## Profissional
@@ -47,14 +57,16 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Cadastro do profissional | Demo, sem protótipo | Catálogo pronto no backend (#12, `GET /v1/catalogo/...`); falta o app ligar. A foto sobe pela câmera real. |
 | Verificação (documento e selfie) | API | Fotos por URL assinada (`POST /v1/uploads`, `PUT`, `concluir`) e `POST/GET /v1/profissional/verificacao`. Texto de retenção vem do backend quando já há verificação. Não testado em aparelho real. |
 | Início, pedidos abertos, detalhe, recusar | API | `GET /v1/profissional/pedidos-abertos` (filtros no repositório), nome por `/v1/me`, recusa `POST /v1/pedidos/{id}/recusar` (precisa da migration `pedido_recusas`). Carteira da Início fica em zero (#18). |
-| Filtros | Sem tela | Repositório pronto (`FiltroPedidosAbertos`); falta a tela. |
+| Filtros dos pedidos abertos | API | Tela com categoria, bairro, faixa de preço e ordem; aplica `GET /v1/profissional/pedidos-abertos`. Sem protótipo. |
 | Calculadora de orçamento | API | `POST /v1/orcamentos/resumo`: taxa e líquido do backend, nada calculado no app. Sem o percentual (#17). |
 | Check-in e check-out | API (envio) | Câmera e GPS reais; foto por `POST /v1/uploads`; ação em `acoes/fazer_check_in`/`fazer_check_out`. Reenvio offline manda `offline_capturada_em`, que o backend recusa (#4). Não testado em aparelho real. |
 | Enviar nota de materiais e criar aditivo | API | `POST /v1/contratos/{id}/notas-material` e `.../aditivos`. O caminho da foto da nota ainda não vem do upload (#5). |
 | Responder disputa e atender retrabalho | Demo | Backend pronto (`POST /v1/pedidos/{id}/disputa/resposta` e `.../retrabalho/atender`); falta o app ligar. |
 | Carteira | API, como extrato | `GET /v1/extrato`. Sem saldo próprio e sem saque (D15). |
 | Perfil público e avaliações recebidas | Demo, sem protótipo | Na aba Perfil da casca do profissional, com botão **Sair**. |
-| Agenda, mensagens do profissional | Sem tela | "Em breve". |
+| Pedidos (aba) | API | Pedidos abertos com filtros e, ao lado, as conversas. Sem protótipo. |
+| Agenda (aba) | Demo / `api` parcial | Lista por dia com check-in; no modo `api` só o próximo atendimento (falta rota de agenda). Sem protótipo. |
+| Mensagens do profissional | Demo / `api` parcial | Segmento "Conversas" da aba Pedidos; no modo `api` só o atendimento de hoje. |
 
 ## Backend (`backend/`)
 

@@ -20,9 +20,17 @@ void main() {
     'tablet': Size(768, 1700),
   };
   final telas = <String, Widget>{
-    'novo_pedido': const NovoPedidoTela(),
+    'novo_pedido': NovoPedidoTela(
+      aoTrocarCategoria: () {},
+      aoMudarEndereco: () {},
+      aoAdicionarFoto: () {},
+    ),
     'orcamentos': OrcamentosRecebidosTela(),
-    'detalhe_orcamento': DetalheOrcamentoTela(orcamento: orcamentosExemplo[1]),
+    'detalhe_orcamento': DetalheOrcamentoTela(
+      orcamento: orcamentosExemplo[1],
+      aoConversar: (_) {},
+      aoFazerContraproposta: (_) {},
+    ),
   };
 
   for (final MapEntry(key: tela, value: widget) in telas.entries) {

@@ -18,7 +18,15 @@ class BuscaProfissionaisTela extends StatefulWidget {
     this.aoAbrirProfissional,
     this.termoInicial = '',
     this.sugestoes = categorias,
+    this.aoEscolherCategoria,
+    this.aoVerTodas,
   });
+
+  /// Toque numa categoria das sugestões. Sem isso, o toque busca pelo nome da categoria.
+  final ValueChanged<CategoriaServico>? aoEscolherCategoria;
+
+  /// Toque em "Ver todas" nas sugestões.
+  final VoidCallback? aoVerTodas;
 
   final ServicoBusca servico;
   final ValueChanged<Profissional>? aoAbrirProfissional;
@@ -153,7 +161,15 @@ class _Sugestoes extends StatelessWidget {
                   label: Text(c.nome, style: TipografiaTrato.corpoPequeno),
                   backgroundColor: CoresTrato.superficie,
                   side: const BorderSide(color: CoresTrato.borda),
-                  onPressed: () => aoEscolher(c.nome),
+                  onPressed: () {
+                    if (c.nome == 'Ver todas' && widget.aoVerTodas != null) {
+                      widget.aoVerTodas!();
+                    } else if (widget.aoEscolherCategoria != null && c.nome != 'Ver todas') {
+                      widget.aoEscolherCategoria!(c);
+                    } else {
+                      aoEscolher(c.nome);
+                    }
+                  },
                 ),
             ],
           ),
@@ -204,8 +220,9 @@ class _CartaoResultado extends StatelessWidget {
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
                         '${p.nota.toStringAsFixed(1).replaceAll('.', ',')} · '
-                        '${p.servicosConcluidos} serviços · '
-                        '${p.distanciaKm.toStringAsFixed(1).replaceAll('.', ',')} km',
+                        '${p.servicosConcluidos} serviços'
+                        '${p.regiao != null ? ' · ${p.regiao}' : ''}'
+                        '${p.distanciaKm > 0 ? ' · ${p.distanciaKm.toStringAsFixed(1).replaceAll('.', ',')} km' : ''}',
                         style: TipografiaTrato.legenda,
                       ),
                     ],

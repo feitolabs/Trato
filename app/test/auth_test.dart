@@ -10,7 +10,7 @@ import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/auth/recuperar_senha_tela.dart';
 import 'package:trato/telas/auth/validacao.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
-import 'package:trato/telas/em_breve_tela.dart';
+import 'package:trato/telas/ajuda/ajuda_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/tema/tema.dart';
 
@@ -100,7 +100,6 @@ void main() {
 
       expect(find.text('Informe e-mail, CPF ou telefone.'), findsOneWidget);
       expect(find.text('Informe sua senha.'), findsOneWidget);
-      expect(find.byType(EmBreveTela), findsNothing);
     });
 
     testWidgets('Mostrar alterna a visibilidade da senha', (tester) async {
@@ -124,10 +123,9 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    testWidgets('Entrar com biometria abre "em breve"', (tester) async {
+    testWidgets('não oferece biometria (fora do MVP)', (tester) async {
       await _abrir(tester, const LoginTela());
-      await _tocar(tester, 'Entrar com biometria');
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.text('Entrar com biometria'), findsNothing);
     });
 
     testWidgets('senha errada mostra o erro em português e não sai da tela', (tester) async {
@@ -536,10 +534,10 @@ void main() {
       expect(find.textContaining('você vai receber as instruções'), findsNothing);
     });
 
-    testWidgets('Fale com o suporte abre "em breve"', (tester) async {
+    testWidgets('Fale com o suporte abre a central de ajuda', (tester) async {
       await _abrir(tester, const RecuperarSenhaTela());
       await _tocar(tester, 'Fale com o suporte');
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(AjudaTela), findsOneWidget);
     });
   });
 

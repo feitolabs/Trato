@@ -172,15 +172,20 @@ void main() {
   });
 
   group('Casca do profissional', () {
-    testWidgets('tem as 5 abas; as sem tela mostram Em breve', (tester) async {
+    testWidgets('tem as 5 abas e nenhuma mostra tela provisória', (tester) async {
       await _abrir(tester, const CascaProfissionalTela(), tamanho: const Size(390, 844));
       expect(find.byType(BarraAbasTrato), findsOneWidget);
       for (final aba in abasProfissional) {
         expect(find.text(aba.rotulo), findsWidgets);
       }
-      await tester.tap(find.text('Agenda'));
-      await tester.pumpAndSettle();
-      expect(find.text('Esta tela chega nas próximas etapas.'), findsWidgets);
+      for (final aba in abasProfissional) {
+        await tester.tap(find.descendant(
+          of: find.byType(BarraAbasTrato),
+          matching: find.text(aba.rotulo),
+        ));
+        await tester.pumpAndSettle();
+        expect(find.text('Esta tela chega nas próximas etapas.'), findsNothing);
+      }
     });
 
     testWidgets('tocar a carteira leva à aba Carteira', (tester) async {
