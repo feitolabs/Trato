@@ -30,7 +30,10 @@ from trato.api.memoria import (
     RepassesEmMemoria,
 )
 from trato.api.memoria_app import AvaliacoesEmMemoria
+from trato.api.rotas_pagamento import instalar_pagamento
 from trato.config import Config, obter_config
+from trato.pagamentos.montagem import escolher_provedor
+from trato.pagamentos.orquestrador import ServicoPagamento
 from trato.persistencia.app_extras import TaxaPostgres, VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
 from trato.persistencia.conexao import Banco
@@ -47,6 +50,13 @@ from trato.persistencia.dinheiro import (
 from trato.persistencia.execucao import ExecucaoPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
+from trato.persistencia.pagamentos import (
+    AditivosPostgres,
+    CobrancasPostgres,
+    ConfigPagamentoPostgres,
+    OrdensEstornoPostgres,
+    TermosPostgres,
+)
 from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
@@ -134,6 +144,18 @@ def criar_contexto_postgres(
     return contexto
 
 
+def montar_servico_pagamento(banco: Banco, config: Config) -> ServicoPagamento:
+    """O serviço de pagamento com tudo no Postgres e o provedor escolhido pela configuração."""
+    return ServicoPagamento(
+        escolher_provedor(config),
+        ConfigPagamentoPostgres(banco),
+        CobrancasPostgres(banco),
+        AditivosPostgres(banco),
+        TermosPostgres(),
+        OrdensEstornoPostgres(banco),
+    )
+
+
 def criar_app_da_config(config: Config | None = None) -> FastAPI:
     """O app de produção/desenvolvimento, conforme `TRATO_PERSISTENCIA`."""
     config = config or obter_config()
@@ -166,4 +188,6 @@ def criar_app_da_config(config: Config | None = None) -> FastAPI:
         lifespan=ciclo,
         **parametros_docs(config.trato_ambiente),
     )
-    return instalar(app, criar_contexto_postgres(banco, config))
+    contexto = criar_contexto_postgres(banco, config)
+    instalar(app, contexto)
+    return instalar_pagamento(app, contexto, montar_servico_pagamento(banco, config))

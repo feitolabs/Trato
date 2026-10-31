@@ -185,8 +185,11 @@ class ServicoPagamento:
         if pedido.estado is not Estado.EM_ANDAMENTO:
             raise ErroFluxo("Só dá para aprovar aditivo com o serviço em andamento.")
         aprovado = replace(aditivo, estado=EstadoAditivo.APROVADO, aprovado_em=contexto.agora())
-        cobranca = self.cobrar(contexto, pedido, aprovado.valor_centavos, meio, aprovado.id)
-        self.aditivos.salvar(aprovado)
+        # Uma transação só: o banco exige o aditivo aprovado antes de aceitar a cobrança dele, e
+        # se a cobrança falhar a aprovação volta junto (o cliente pode tentar de novo).
+        with contexto.transacao():
+            self.aditivos.salvar(aprovado)
+            cobranca = self.cobrar(contexto, pedido, aprovado.valor_centavos, meio, aprovado.id)
         return aprovado, cobranca
 
     def recusar_aditivo(self, contexto: Contexto, pedido: Pedido, aditivo_id: str) -> Aditivo:
