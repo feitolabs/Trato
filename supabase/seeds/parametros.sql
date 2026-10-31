@@ -88,7 +88,7 @@ insert into seed_config (chave, valor, minimo, maximo, obrigatorio) values
   -- Tabela progressiva (D2): em ESPERA. O seed só aceita 0 (desligada).
   ('taxa_progressiva_ativa',            0,    0,    1,    true),   -- 0 = desligada. Não mude sem aprovar P2/D2
   -- Prazo de liberação (P1: 48 h ou 7 dias?). Preencha SÓ o que o João escolher; o outro fica NULL.
-  ('prazo_liberacao_dias',              null, 1,    30,   true),   -- A DEFINIR PELO JOÃO (P1). Limites: SUGESTÃO DO AGENTE
+  ('prazo_liberacao_dias',              null, 0,    30,   true),   -- João (31/10/2026): liberar assim que o cliente confirma = 0 dias; falta ele mandar gravar o valor. Mínimo 0 permitido
   ('prazo_confirmacao_cliente_horas',   null, 12,   168,  false),  -- A DEFINIR PELO JOÃO (P1), opcional. Limites: SUGESTÃO DO AGENTE
   -- Disputa e retrabalho
   ('janela_chargeback_dias',            7,    1,    30,   true),   -- SUGESTÃO DO ESCOPO (D3: 7 dias). Limites: SUGESTÃO DO AGENTE
