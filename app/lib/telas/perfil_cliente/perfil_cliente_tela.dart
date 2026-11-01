@@ -8,20 +8,81 @@ import 'modelos.dart';
 
 /// Tela 22 — Perfil do cliente. Cada item avisa [aoTocarItem]; "Usar como profissional"
 /// é o item [AcaoPerfil.usarComoProfissional]. A barra inferior é da casca do app.
-class PerfilClienteTela extends StatelessWidget {
+class PerfilClienteTela extends StatefulWidget {
   const PerfilClienteTela({
     super.key,
     this.perfil = DadosExemplo.perfil,
     this.aoTocarItem,
     this.aoSair,
+    this.aoCapturarFotoPerfil,
   });
 
   final PerfilCliente perfil;
   final ValueChanged<AcaoPerfil>? aoTocarItem;
   final VoidCallback? aoSair;
+  final Future<String?> Function()? aoCapturarFotoPerfil;
+
+  @override
+  State<PerfilClienteTela> createState() => _PerfilClienteTelaState();
+}
+
+class _PerfilClienteTelaState extends State<PerfilClienteTela> {
+  static String? _fotoSalvaSessao;
+  String? _fotoAtual;
+
+  @override
+  void initState() {
+    super.initState();
+    _fotoAtual = widget.perfil.fotoReferencia ?? _fotoSalvaSessao;
+  }
+
+  Future<void> _tocarAvatar() async {
+    final capturar = widget.aoCapturarFotoPerfil;
+    if (capturar == null) return;
+    final temFoto = _fotoAtual != null && _fotoAtual!.isNotEmpty;
+    if (temFoto) {
+      final acao = await showModalBottomSheet<String>(
+        context: context,
+        builder: (folha) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.zoom_in, color: CoresTrato.petroleo),
+                title: const Text('Ver foto de perfil'),
+                onTap: () => Navigator.of(folha).pop('ver'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined, color: CoresTrato.petroleo),
+                title: const Text('Trocar foto de perfil'),
+                onTap: () => Navigator.of(folha).pop('trocar'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || acao == null) return;
+      if (acao == 'ver') {
+        await abrirPreviewImagem(
+          context,
+          referencia: _fotoAtual!,
+          legenda: widget.perfil.nome,
+        );
+        return;
+      }
+    }
+    final nova = await capturar();
+    if (nova != null && mounted) {
+      setState(() {
+        _fotoAtual = nova;
+        _fotoSalvaSessao = nova;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final perfil = widget.perfil;
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
@@ -30,7 +91,12 @@ class PerfilClienteTela extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  AvatarIniciais(iniciais: perfil.iniciais, tamanho: 72),
+                  AvatarIniciais(
+                    iniciais: perfil.iniciais,
+                    tamanho: 72,
+                    fotoReferencia: _fotoAtual,
+                    aoTocar: widget.aoCapturarFotoPerfil == null ? null : _tocarAvatar,
+                  ),
                   const SizedBox(width: EspacosTrato.x4),
                   Expanded(
                     child: Column(
@@ -53,12 +119,12 @@ class PerfilClienteTela extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x5),
                 Text(grupo.titulo, style: TipografiaTrato.sobretitulo),
                 const SizedBox(height: EspacosTrato.x3),
-                _CartaoGrupo(grupo: grupo, aoTocar: aoTocarItem),
+                _CartaoGrupo(grupo: grupo, aoTocar: widget.aoTocarItem),
               ],
               const SizedBox(height: EspacosTrato.x6),
               Row(
                 children: [
-                  BotaoLink(texto: 'Sair', aoTocar: aoSair),
+                  BotaoLink(texto: 'Sair', aoTocar: widget.aoSair),
                   Expanded(
                     child: Align(
                       alignment: Alignment.centerRight,

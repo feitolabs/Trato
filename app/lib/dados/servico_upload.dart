@@ -17,6 +17,7 @@ enum FinalidadeArquivo {
   notaMaterial('nota_material'),
   fotoPedido('pedido'),
   evidenciaDisputa('disputa'),
+  avatar('avatar'),
 
   /// Sem destino no backend ainda (`docs/app-divergencias.md`).
   portfolio('portfolio');

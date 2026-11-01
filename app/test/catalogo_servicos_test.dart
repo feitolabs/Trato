@@ -283,10 +283,10 @@ void main() {
       }
     });
 
-    testWidgets('mostra o texto com o aviso de rascunho', (tester) async {
+    testWidgets('mostra o texto com o aviso legal', (tester) async {
       await _abrir(tester, TextoLegalTela.de(TextoLegal.termos));
       expect(find.text('Termos de uso'), findsOneWidget);
-      expect(find.textContaining('rascunho e será revisado'), findsOneWidget);
+      expect(find.textContaining('Belo Horizonte/MG'), findsWidgets);
       expect(find.textContaining('Quem somos'), findsOneWidget);
     });
 

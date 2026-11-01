@@ -26,8 +26,8 @@ String _iniciais(String nome) {
   return partes.length == 1 ? primeira : primeira + partes.last[0].toUpperCase();
 }
 
-/// Catálogo. Só `GET /v1/profissionais/{id}` existe no backend; categorias, lista por
-/// categoria, busca e perguntas do pedido ainda não têm rota e usam [demo].
+/// Catálogo ligado à API real (`GET /v1/catalogo/categorias`, `GET /v1/profissionais` e
+/// `GET /v1/profissionais/{id}`).
 class RepositorioCatalogoApi implements RepositorioCatalogo {
   RepositorioCatalogoApi(this._api, {RepositorioCatalogo? demo})
       : _demo = demo ?? RepositorioCatalogoFake();
@@ -36,7 +36,28 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   final RepositorioCatalogo _demo;
 
   @override
-  Future<List<CategoriaServico>> categorias() => _demo.categorias();
+  Future<List<CategoriaServico>> categorias() async {
+    final baseDemo = await _demo.categorias();
+    try {
+      final resposta = await _api.get('/v1/catalogo/categorias');
+      if (resposta is List && resposta.isNotEmpty) {
+        final iconesPorId = {for (final c in baseDemo) c.id: c.icone};
+        return [
+          for (final item in resposta.cast<Map<String, dynamic>>())
+            CategoriaServico(
+              (item['nome'] as String?) ?? 'Serviço',
+              iconesPorId[item['id'] as String?] ??
+                  iconesPorId[item['slug'] as String?] ??
+                  baseDemo.first.icone,
+              id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
+            ),
+        ];
+      }
+    } on Object {
+      // Sem rede ou rota offline: usa as categorias padrão.
+    }
+    return baseDemo;
+  }
 
   Profissional _converterBusca(Map<String, dynamic> j) {
     final id = (j['id'] as String?) ?? '';
@@ -66,13 +87,12 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
         if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
       };
       final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
-      final itens = [
+      return [
         for (final item in (resposta['itens'] as List? ?? const []))
           _converterBusca(item as Map<String, dynamic>),
       ];
-      if (itens.isNotEmpty) return itens;
     } on Object {
-      // Sem dados ou rota indisponível: segue com demo
+      // Sem conexão com a API: segue com demo
     }
     return _demo.profissionais(categoriaId, filtro);
   }
@@ -83,13 +103,12 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     if (limpo.length >= 2) {
       try {
         final resposta = _mapa(await _api.get('/v1/profissionais', consulta: {'servico': limpo}));
-        final itens = [
+        return [
           for (final item in (resposta['itens'] as List? ?? const []))
             _converterBusca(item as Map<String, dynamic>),
         ];
-        if (itens.isNotEmpty) return itens;
       } on Object {
-        // Sem dados ou rota indisponível: segue com demo
+        // Sem conexão com a API: segue com demo
       }
     }
     return _demo.buscar(termo);

@@ -150,9 +150,21 @@ class _CheckInTelaState extends State<CheckInTela> {
         Text('Três passos para começar o serviço.', style: TipografiaTrato.corpo),
         const SizedBox(height: EspacosTrato.x5),
         _CartaoPasso(
-          miniatura: const ColoredBox(color: CoresTrato.azulClaro),
+          miniatura: foto == null
+              ? const ColoredBox(color: CoresTrato.azulClaro)
+              : ToquePreviewImagem(
+                  referencia: foto.referencia ?? 'Foto de chegada · ${foto.hora}',
+                  legenda: 'Foto de chegada · ${foto.hora}',
+                  child: construirImagemReal(foto.referencia) ??
+                      const ColoredBox(
+                        color: CoresTrato.azulClaro,
+                        child: Center(
+                          child: Icon(Icons.zoom_in, size: 20, color: CoresTrato.petroleo),
+                        ),
+                      ),
+                ),
           titulo: 'Foto de chegada',
-          detalhe: foto?.hora ?? 'Tire uma foto do local',
+          detalhe: foto == null ? 'Tire uma foto do local' : '${foto.hora} · toque na foto para ver',
           feito: foto != null,
           textoAcao: 'Tirar foto',
           aoTocarAcao: _tirarFoto,

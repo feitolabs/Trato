@@ -1,12 +1,32 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../tema/tema.dart';
 
-/// Verifica se [referencia] aponta para um arquivo de imagem existente no dispositivo.
+/// Cache em memória de imagens capturadas/enviadas (ex.: `upload_id` -> bytes JPEG ou caminho),
+/// permitindo que o preview e a miniatura funcionem mesmo quando o serviço devolve um id do backend.
+final Map<String, Uint8List> _bytesPorReferencia = {};
+final Map<String, String> _caminhoPorReferencia = {};
+
+/// Registra os bytes ou caminho local associados a uma [referencia] (ex.: `upload_id` ou `arquivoId`).
+void registrarImagemEmMemoria(String referencia, {Uint8List? bytes, String? caminhoLocal}) {
+  if (referencia.isEmpty) return;
+  if (bytes != null && bytes.isNotEmpty) {
+    _bytesPorReferencia[referencia] = bytes;
+  }
+  if (caminhoLocal != null && caminhoLocal.isNotEmpty) {
+    _caminhoPorReferencia[referencia] = caminhoLocal;
+  }
+}
+
+/// Verifica se [referencia] aponta para um arquivo de imagem existente no dispositivo ou em memória.
 bool temArquivoImagem(String? referencia) {
   if (referencia == null || referencia.isEmpty) return false;
+  if (_bytesPorReferencia.containsKey(referencia)) return true;
+  final caminhoMapeado = _caminhoPorReferencia[referencia];
+  if (caminhoMapeado != null && temArquivoImagem(caminhoMapeado)) return true;
   if (referencia.startsWith('[') ||
       referencia.startsWith('fake://') ||
       referencia.startsWith('http://') ||
@@ -26,9 +46,25 @@ bool ehUrlImagem(String? referencia) {
   return referencia.startsWith('http://') || referencia.startsWith('https://');
 }
 
-/// Constrói um widget [Image] se [referencia] for um arquivo local real ou URL; caso contrário, null.
+/// Constrói um widget [Image] se [referencia] for um arquivo local real, bytes em memória ou URL;
+/// caso contrário, devolve null.
 Widget? construirImagemReal(String? referencia, {BoxFit fit = BoxFit.cover}) {
   if (referencia == null || referencia.isEmpty) return null;
+  final bytes = _bytesPorReferencia[referencia];
+  if (bytes != null) {
+    return Image.memory(
+      bytes,
+      fit: fit,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    );
+  }
+  final caminhoMapeado = _caminhoPorReferencia[referencia];
+  if (caminhoMapeado != null && caminhoMapeado != referencia) {
+    final img = construirImagemReal(caminhoMapeado, fit: fit);
+    if (img != null) return img;
+  }
   if (ehUrlImagem(referencia)) {
     return Image.network(
       referencia,
@@ -59,7 +95,7 @@ String rotuloAmigavelFoto(String texto) {
 }
 
 /// Detector de toque leve por ponteiro para abrir o preview da imagem sem interferir em
-/// varreduras de botões de navegação.
+/// varreduras de botões de navegação, funcionando também dentro de listas roláveis.
 class ToquePreviewImagem extends StatefulWidget {
   const ToquePreviewImagem({
     super.key,
@@ -78,16 +114,23 @@ class ToquePreviewImagem extends StatefulWidget {
 
 class _ToquePreviewImagemState extends State<ToquePreviewImagem> {
   Offset? _inicio;
+  DateTime? _instante;
 
   @override
   Widget build(BuildContext context) {
     return Listener(
       behavior: HitTestBehavior.opaque,
-      onPointerDown: (e) => _inicio = e.position,
+      onPointerDown: (e) {
+        _inicio = e.position;
+        _instante = DateTime.now();
+      },
       onPointerUp: (e) {
         final pos = _inicio;
+        final t0 = _instante;
         _inicio = null;
-        if (pos != null && (e.position - pos).distance < 18) {
+        _instante = null;
+        final duracaoMs = t0 == null ? 0 : DateTime.now().difference(t0).inMilliseconds;
+        if (pos != null && (e.position - pos).distance < 32 && duracaoMs < 700) {
           abrirPreviewImagem(
             context,
             referencia: widget.referencia,

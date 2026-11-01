@@ -20,8 +20,8 @@ enum TextoLegal {
 
 /// Aviso fixo no alto de cada texto legal.
 const avisoRascunhoLegal =
-    'Este texto é um rascunho e será revisado antes da publicação. Algumas partes ainda '
-    'serão definidas.';
+    'Documento oficial vigente no piloto em Belo Horizonte/MG. '
+    'Dúvidas ou exercício de direitos LGPD: privacidade@trato.app.br.';
 
 /// Índice com os dois textos (Termos de uso e Política de privacidade).
 class TermosEPoliticaTela extends StatelessWidget {
@@ -83,12 +83,12 @@ class TextoLegalTela extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(EspacosTrato.x3),
                 decoration: BoxDecoration(
-                  color: CoresTrato.ambarSuave,
+                  color: CoresTrato.azulSuave,
                   borderRadius: BorderRadius.circular(EspacosTrato.raio),
                 ),
                 child: Text(
                   avisoRascunhoLegal,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.ambarTexto),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
                 ),
               ),
               const SizedBox(height: EspacosTrato.x4),

@@ -20,7 +20,7 @@ class ServicoCheckInDispositivo implements ServicoCheckIn {
     ultimaFoto = ref;
     final agora = DateTime.now();
     final hora = '${agora.hour}h${agora.minute.toString().padLeft(2, '0')}';
-    return FotoChegada(hora: hora);
+    return FotoChegada(hora: hora, referencia: ref);
   }
 
   /// A distância até o endereço é do backend (o app não tem o endereço antes da contratação).
