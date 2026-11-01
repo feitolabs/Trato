@@ -13,12 +13,14 @@ class CadastroProfissionalTela extends StatelessWidget {
     super.key,
     required this.servico,
     this.aoAdicionarFoto,
+    this.aoAdicionarFotos,
     this.aoConcluir,
     this.nomeInicial = '',
   });
 
   final ServicoCadastroProfissional servico;
   final CapturarFoto? aoAdicionarFoto;
+  final Future<List<String>> Function()? aoAdicionarFotos;
 
   /// Chamado depois que o serviço salvou com sucesso.
   final VoidCallback? aoConcluir;
@@ -36,6 +38,7 @@ class CadastroProfissionalTela extends StatelessWidget {
         opcoes: opcoes,
         servico: servico,
         aoAdicionarFoto: aoAdicionarFoto,
+        aoAdicionarFotos: aoAdicionarFotos,
         aoConcluir: aoConcluir,
         nomeInicial: nomeInicial,
       ),
@@ -48,6 +51,7 @@ class _Formulario extends StatefulWidget {
     required this.opcoes,
     required this.servico,
     required this.aoAdicionarFoto,
+    required this.aoAdicionarFotos,
     required this.aoConcluir,
     required this.nomeInicial,
   });
@@ -55,6 +59,7 @@ class _Formulario extends StatefulWidget {
   final OpcoesCadastro opcoes;
   final ServicoCadastroProfissional servico;
   final CapturarFoto? aoAdicionarFoto;
+  final Future<List<String>> Function()? aoAdicionarFotos;
   final VoidCallback? aoConcluir;
   final String nomeInicial;
 
@@ -66,6 +71,7 @@ class _FormularioState extends State<_Formulario> {
   late final _nome = TextEditingController(text: widget.nomeInicial);
   final _sobre = TextEditingController();
   final _cidade = TextEditingController();
+  final _scrollController = ScrollController();
   final _categorias = <String>{};
   final _dias = <String>{};
   final _periodos = <String>{};
@@ -80,7 +86,18 @@ class _FormularioState extends State<_Formulario> {
     _nome.dispose();
     _sobre.dispose();
     _cidade.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _rolarParaTopo() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   String? get _erroNome => _nome.text.trim().length < 3 ? 'Informe seu nome completo' : null;
@@ -98,6 +115,13 @@ class _FormularioState extends State<_Formulario> {
       });
 
   Future<void> _adicionarFoto() async {
+    if (widget.aoAdicionarFotos != null) {
+      final refs = await widget.aoAdicionarFotos!();
+      if (refs.isNotEmpty && mounted) {
+        setState(() => _portfolio.addAll(refs));
+      }
+      return;
+    }
     final ref = await widget.aoAdicionarFoto?.call();
     if (ref != null && mounted) setState(() => _portfolio.add(ref));
   }
@@ -107,7 +131,10 @@ class _FormularioState extends State<_Formulario> {
       _tentou = true;
       _erroEnvio = null;
     });
-    if (!_valido) return;
+    if (!_valido) {
+      _rolarParaTopo();
+      return;
+    }
     setState(() => _enviando = true);
     try {
       await widget.servico.salvar(DadosCadastroProfissional(
@@ -129,6 +156,7 @@ class _FormularioState extends State<_Formulario> {
         _enviando = false;
         _erroEnvio = 'Não foi possível salvar. Tente de novo.';
       });
+      _rolarParaTopo();
     }
   }
 
@@ -141,6 +169,7 @@ class _FormularioState extends State<_Formulario> {
   Widget build(BuildContext context) {
     final o = widget.opcoes;
     return CorpoRolavel(
+      scrollController: _scrollController,
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

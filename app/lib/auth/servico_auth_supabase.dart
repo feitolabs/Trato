@@ -253,6 +253,9 @@ class ServicoAuthSupabase implements ServicoAuth {
             'nome': dados.nome,
             'celular': celularE164(dados.celular),
             if (dados.perfil != null) 'perfil': dados.perfil,
+            'termos_aceitos': dados.termosAceitos,
+            'termos_aceitos_em': DateTime.now().toUtc().toIso8601String(),
+            'termos_versao': '1.0',
           },
         );
         // Com confirmação de e-mail ligada, e-mail repetido volta sem erro e sem identidades.

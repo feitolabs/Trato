@@ -142,7 +142,7 @@ void main() {
 
       await _tocar(tester, 'Entrar');
 
-      expect(find.text('E-mail ou senha incorretos.'), findsOneWidget);
+      expect(find.text('E-mail, CPF, celular ou senha incorretos.'), findsOneWidget);
       expect(find.byType(CascaClienteTela), findsNothing);
       expect(servico.sessaoAtual, isNull);
     });
@@ -181,7 +181,10 @@ void main() {
 
       await _tocar(tester, 'Entrar');
 
-      expect(find.text('Informe um e-mail, CPF ou telefone válido.'), findsOneWidget);
+      expect(
+        find.text('Informe um e-mail válido, CPF (11 números) ou telefone com DDD.'),
+        findsOneWidget,
+      );
       expect(find.byType(CascaClienteTela), findsNothing);
 
       await _digitar(tester, 'E-mail, CPF ou telefone', '12345678909');

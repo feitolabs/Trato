@@ -17,6 +17,40 @@ class CapturaFotoCamera implements CapturaFoto {
   final ImagePicker _picker;
   final GlobalKey<NavigatorState>? navegador;
 
+  Future<String?> _tirarFotoCamera() async {
+    var status = await ph.Permission.camera.status;
+    if (!status.isGranted && !status.isLimited) {
+      status = await ph.Permission.camera.request();
+    }
+    if (!status.isGranted && !status.isLimited) {
+      final c = navegador?.currentContext;
+      if (c != null && c.mounted) {
+        ScaffoldMessenger.of(c)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Permissão de câmera necessária para tirar foto. Você também pode escolher da galeria.',
+              ),
+              action: status.isPermanentlyDenied
+                  ? const SnackBarAction(
+                      label: 'Ajustes',
+                      onPressed: ph.openAppSettings,
+                    )
+                  : null,
+            ),
+          );
+      }
+      return null;
+    }
+    final arquivo = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    return arquivo?.path;
+  }
+
   @override
   Future<String?> fotografar() async {
     try {
@@ -28,40 +62,49 @@ class CapturaFotoCamera implements CapturaFoto {
         origem = escolhida;
       }
       if (origem == ImageSource.camera) {
-        var status = await ph.Permission.camera.status;
-        if (!status.isGranted && !status.isLimited) {
-          status = await ph.Permission.camera.request();
-        }
-        if (!status.isGranted && !status.isLimited) {
-          final c = navegador?.currentContext;
-          if (c != null && c.mounted) {
-            ScaffoldMessenger.of(c)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                SnackBar(
-                  content: const Text(
-                    'Permissão de câmera necessária para tirar foto. Você também pode escolher da galeria.',
-                  ),
-                  action: status.isPermanentlyDenied
-                      ? const SnackBarAction(
-                          label: 'Ajustes',
-                          onPressed: ph.openAppSettings,
-                        )
-                      : null,
-                ),
-              );
-          }
-          return null;
-        }
+        return await _tirarFotoCamera();
       }
       final arquivo = await _picker.pickImage(
-        source: origem,
+        source: ImageSource.gallery,
         maxWidth: 1600,
         imageQuality: 85,
       );
       return arquivo?.path;
     } on Object {
       return null;
+    }
+  }
+
+  @override
+  Future<List<String>> fotografarMultiplas() async {
+    try {
+      final ctx = navegador?.currentContext;
+      var origem = ImageSource.gallery;
+      if (ctx != null && ctx.mounted) {
+        final escolhida = await _escolherOrigem(ctx);
+        if (escolhida == null) return const [];
+        origem = escolhida;
+      }
+      if (origem == ImageSource.camera) {
+        final unico = await _tirarFotoCamera();
+        return unico != null ? [unico] : const [];
+      }
+      try {
+        final arquivos = await _picker.pickMultiImage(
+          maxWidth: 1600,
+          imageQuality: 85,
+        );
+        return [for (final a in arquivos) a.path];
+      } catch (_) {
+        final arquivo = await _picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1600,
+          imageQuality: 85,
+        );
+        return arquivo != null ? [arquivo.path] : const [];
+      }
+    } on Object {
+      return const [];
     }
   }
 

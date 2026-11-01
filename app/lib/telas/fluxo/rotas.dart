@@ -406,6 +406,7 @@ abstract final class RotasTrato {
 
   /// Foto pela câmera; devolve só a referência (o upload é do backend, por URL assinada).
   static Future<String?> _fotografar() => dispositivo.fotografarEEnviar();
+  static Future<List<String>> _selecionarFotos() => dispositivo.fotografarMultiplasEEnviar();
 
   static void _entrarNaCascaProfissional(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
@@ -421,6 +422,7 @@ abstract final class RotasTrato {
           builder: (context) => CadastroProfissionalTela(
             servico: repos.cadastroProfissional ?? ServicoCadastroProfissionalFake(),
             aoAdicionarFoto: _fotografar,
+            aoAdicionarFotos: _selecionarFotos,
             aoConcluir: () => _abrir<void>(
               context,
               VerificacaoTela(

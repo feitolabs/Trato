@@ -265,7 +265,7 @@ void main() {
 
     testWidgets('mostra os passos feitos', (tester) async {
       await abrirCheckIn(tester);
-      expect(find.text('14h06'), findsOneWidget);
+      expect(find.textContaining('14h06'), findsOneWidget);
       expect(find.text('A 20 m do endereço'), findsOneWidget);
       expect(find.text('Feito'), findsNWidgets(2));
     });

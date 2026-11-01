@@ -277,12 +277,11 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     final direto = _idPorNomeCategoria[nome];
     if (direto != null) return direto;
     final limpo = nome.toLowerCase();
-    if (limpo.contains('eletric')) return 'eletrica';
-    if (limpo.contains('encan') || limpo.contains('hidraul')) return 'hidraulica';
-    if (limpo.contains('pint')) return 'pintura';
-    if (limpo.contains('diar') || limpo.contains('limp')) return 'limpeza';
-    if (limpo.contains('mont')) return 'montagem';
-    return limpo.replaceAll(RegExp(r'\s+'), '-');
+    for (final entry in _idPorNomeCategoria.entries) {
+      final k = entry.key.toLowerCase();
+      if (limpo.contains(k) || k.contains(limpo)) return entry.value;
+    }
+    return _idPorNomeCategoria.values.firstOrNull ?? 'eletrica';
   }
 
   String _resolverCidadeId(String cidade) {
@@ -292,7 +291,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     for (final entry in _idPorNomeCidade.entries) {
       if (limpo.contains(entry.key) || entry.key.contains(limpo)) return entry.value;
     }
-    return 'belo-horizonte';
+    return _idPorNomeCidade.values.firstOrNull ?? 'de470309-afb7-49ac-9471-54e8387d4a88';
   }
 
   @override
@@ -304,8 +303,13 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     final categoriasIds = [
       for (final c in dados.categorias) _resolverCategoriaId(c),
     ];
+    final cidadeId = _resolverCidadeId(dados.cidade);
+    final bairroNome = dados.cidade.trim();
     final regioes = [
-      {'cidade_id': _resolverCidadeId(dados.cidade)},
+      {
+        'cidade_id': cidadeId,
+        if (bairroNome.isNotEmpty) 'bairro': bairroNome,
+      },
     ];
     final disponibilidade = <Map<String, Object>>[
       for (final d in dados.dias)
@@ -325,8 +329,9 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
           'descricao': dados.portfolio[i],
         },
     ];
+    final padraoCat = _idPorNomeCategoria.values.firstOrNull ?? 'eletrica';
     final corpo = <String, Object?>{
-      'categorias': categoriasIds.isEmpty ? ['eletrica'] : categoriasIds,
+      'categorias': categoriasIds.isEmpty ? [padraoCat] : categoriasIds,
       'regioes': regioes,
       'disponibilidade': disponibilidade,
       'bio': dados.sobre.trim(),

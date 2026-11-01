@@ -29,10 +29,16 @@ class PaginaTrato extends StatelessWidget {
 
 /// Conteúdo que rola com margem responsiva e rodapé fixo em superfície.
 class CorpoRolavel extends StatelessWidget {
-  const CorpoRolavel({super.key, required this.children, this.rodape});
+  const CorpoRolavel({
+    super.key,
+    required this.children,
+    this.rodape,
+    this.scrollController,
+  });
 
   final List<Widget> children;
   final Widget? rodape;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +48,7 @@ class CorpoRolavel extends StatelessWidget {
           child: SafeArea(
             bottom: false,
             child: SingleChildScrollView(
+              controller: scrollController,
               padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
               child: ConteudoResponsivo(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),

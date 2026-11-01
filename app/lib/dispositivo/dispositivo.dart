@@ -12,6 +12,7 @@ class PosicaoGps {
 /// permissão. As telas nunca conhecem o plugin.
 abstract interface class CapturaFoto {
   Future<String?> fotografar();
+  Future<List<String>> fotografarMultiplas();
 }
 
 /// Localização. Null se negada, desligada ou sem sinal.
@@ -56,6 +57,16 @@ class DispositivoTrato {
     if (local == null) return null;
     return envio.enviar(local);
   }
+
+  /// Seleciona uma ou mais fotos e as prepara para o backend.
+  Future<List<String>> fotografarMultiplasEEnviar() async {
+    final locais = await camera.fotografarMultiplas();
+    final enviados = <String>[];
+    for (final loc in locais) {
+      enviados.add(await envio.enviar(loc));
+    }
+    return enviados;
+  }
 }
 
 /// PROVISÓRIO — só teste e demonstração.
@@ -70,6 +81,12 @@ class CapturaFotoFake implements CapturaFoto {
     if (cancelar) return null;
     tiradas++;
     return 'fake://foto/$tiradas';
+  }
+
+  @override
+  Future<List<String>> fotografarMultiplas() async {
+    final uma = await fotografar();
+    return uma != null ? [uma] : const [];
   }
 }
 

@@ -34,6 +34,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   final _email = TextEditingController();
   final _senha = TextEditingController();
   final _confirmarSenha = TextEditingController();
+  final _scrollController = ScrollController();
   var _mostrarSenha = false;
   var _mostrarConfirmarSenha = false;
   late final _toqueTermos = TapGestureRecognizer()..onTap = () => _abrirTexto(TextoLegal.termos);
@@ -52,9 +53,20 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     for (final c in [_nome, _cpf, _nascimento, _celular, _email, _senha, _confirmarSenha]) {
       c.dispose();
     }
+    _scrollController.dispose();
     _toqueTermos.dispose();
     _toquePolitica.dispose();
     super.dispose();
+  }
+
+  void _rolarParaInicio() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _abrirTexto(TextoLegal texto) => Navigator.of(context).push(
@@ -81,7 +93,10 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   Future<void> _criar() async {
     if (_carregando) return;
     setState(() => _tentou = true);
-    if (!_valido) return;
+    if (!_valido) {
+      _rolarParaInicio();
+      return;
+    }
     setState(() {
       _carregando = true;
       _erroServico = null;
@@ -96,6 +111,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         celular: _celular.text,
         cpf: _cpf.text,
         perfil: widget.perfil.name,
+        termosAceitos: _aceitouTermos,
       ));
     } on ErroAuth catch (e) {
       erro = e.mensagem;
@@ -105,7 +121,10 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       _carregando = false;
       _erroServico = erro;
     });
-    if (erro != null) return;
+    if (erro != null) {
+      _rolarParaInicio();
+      return;
+    }
     switch (resultado!) {
       case CadastroAguardandoEmail(:final email):
         Navigator.of(context).push(
@@ -147,6 +166,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     );
     return EstruturaAuth(
       tituloBarra: 'Passo 1 de 2',
+      scrollController: _scrollController,
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

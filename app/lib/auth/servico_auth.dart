@@ -37,6 +37,7 @@ class DadosCadastro {
     required this.celular,
     this.cpf = '',
     this.perfil,
+    this.termosAceitos = true,
   });
 
   final String nome;
@@ -51,6 +52,9 @@ class DadosCadastro {
 
   /// `cliente` ou `profissional` (escolha da tela "Como você quer usar o Trato?").
   final String? perfil;
+
+  /// Aceite explícito dos Termos de Uso e Política de Privacidade.
+  final bool termosAceitos;
 }
 
 /// Resultado do cadastro: entrou direto (confirmação de e-mail desligada) ou falta confirmar
@@ -103,7 +107,7 @@ class ErroAuth implements Exception {
   String get mensagem => _mensagem ?? _padrao[tipo]!;
 
   static const _padrao = <TipoErroAuth, String>{
-    TipoErroAuth.credenciaisInvalidas: 'E-mail ou senha incorretos.',
+    TipoErroAuth.credenciaisInvalidas: 'E-mail, CPF, celular ou senha incorretos.',
     TipoErroAuth.emailJaUsado: 'Este e-mail já tem uma conta. Tente entrar.',
     TipoErroAuth.semInternet: 'Sem internet. Confira sua conexão e tente de novo.',
     TipoErroAuth.senhaFraca: 'Senha fraca. Use 8 ou mais caracteres, com letra e número.',

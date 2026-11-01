@@ -31,6 +31,7 @@ class LoginTela extends StatefulWidget {
 class _LoginTelaState extends State<LoginTela> {
   final _identificador = TextEditingController();
   final _senha = TextEditingController();
+  final _scrollController = ScrollController();
   var _mostrarSenha = false;
   var _tentou = false;
   var _carregando = false;
@@ -48,7 +49,18 @@ class _LoginTelaState extends State<LoginTela> {
   void dispose() {
     _identificador.dispose();
     _senha.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _rolarParaInicio() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _abrir(Widget tela) =>
@@ -79,6 +91,7 @@ class _LoginTelaState extends State<LoginTela> {
         _erroServico = e.tipo == TipoErroAuth.cancelado ? null : e.mensagem;
         _precisaConfirmar = e.tipo == TipoErroAuth.emailNaoConfirmado;
       });
+      _rolarParaInicio();
       return;
     }
     if (!mounted) return;
@@ -115,7 +128,10 @@ class _LoginTelaState extends State<LoginTela> {
   void _entrar() {
     if (_carregando) return;
     setState(() => _tentou = true);
-    if (_erroIdentificador != null || _erroSenha != null) return;
+    if (_erroIdentificador != null || _erroSenha != null) {
+      _rolarParaInicio();
+      return;
+    }
     _tentar(() => _servico.entrarComEmail(
           email: _identificador.text.trim(),
           senha: _senha.text,
@@ -126,6 +142,7 @@ class _LoginTelaState extends State<LoginTela> {
   Widget build(BuildContext context) {
     return EstruturaAuth(
       comVoltar: false,
+      scrollController: _scrollController,
       rodape: Wrap(
         alignment: WrapAlignment.center,
         crossAxisAlignment: WrapCrossAlignment.center,

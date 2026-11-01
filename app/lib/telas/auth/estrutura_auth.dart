@@ -11,12 +11,14 @@ class EstruturaAuth extends StatelessWidget {
     this.rodape,
     this.tituloBarra,
     this.comVoltar = true,
+    this.scrollController,
   });
 
   final List<Widget> children;
   final Widget? rodape;
   final String? tituloBarra;
   final bool comVoltar;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +35,7 @@ class EstruturaAuth extends StatelessWidget {
               children: [
                 Expanded(
                   child: SingleChildScrollView(
+                    controller: scrollController,
                     padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

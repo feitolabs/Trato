@@ -4,6 +4,7 @@ import '../telas/cliente/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
 import '../telas/servicos/modelos.dart';
 import 'cliente_api.dart';
+import 'catalogo_exemplo.dart';
 import 'erros.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
@@ -108,7 +109,41 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   @override
-  Future<FormularioPedido> formulario(String categoriaId) => _demo.formulario(categoriaId);
+  Future<FormularioPedido> formulario(String categoriaId) async {
+    try {
+      final cats = await categorias();
+      final c = cats.where((x) => x.id == categoriaId).firstOrNull;
+      if (c != null) return formularioDaCategoria(c);
+    } catch (_) {
+      // Falha ao obter da API: segue para demo ou genérico.
+    }
+    try {
+      return await _demo.formulario(categoriaId);
+    } catch (_) {
+      return FormularioPedido(
+        categoriaId: categoriaId,
+        categoria: 'Serviço solicitado',
+        servicos: const ['Orçamento geral'],
+        servicosIniciais: const {'Orçamento geral'},
+        perguntaQuantidade: 'Quantos itens ou ambientes?',
+        dicaQuantidade: 'Uma estimativa já ajuda',
+        quantidadeInicial: 1,
+        perguntaVoltagem: 'Voltagem',
+        voltagens: const [],
+        voltagemInicial: '',
+        descricaoInicial: '',
+        fotos: const [],
+        prazos: const ['Esta semana', 'Sem pressa'],
+        faixas: const [
+          FaixaPreco(minimoCentavos: 10000, maximoCentavos: 30000),
+          FaixaPreco(minimoCentavos: 30000, maximoCentavos: 80000),
+        ],
+        endereco: 'Seu endereço atual',
+        avisoEndereco: 'O endereço completo só aparece para o profissional contratado.',
+        avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
+      );
+    }
+  }
 
   @override
   Future<Profissional> perfil(String profissionalId) async {

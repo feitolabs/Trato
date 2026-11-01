@@ -62,7 +62,7 @@ abstract final class ValidacaoAuth {
     }
     final d = somenteDigitos(v);
     if (d.length >= 10 && d.length <= 13) return null;
-    return 'Informe um e-mail, CPF ou telefone válido.';
+    return 'Informe um e-mail válido, CPF (11 números) ou telefone com DDD.';
   }
 
   /// 8 ou mais caracteres, com pelo menos uma letra e um número.
