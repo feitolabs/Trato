@@ -475,4 +475,16 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
   - Criado teste de integração `backend/tests/integracao/test_uploads_postgres.py` cobrindo ciclo de vida de solicitação de upload e registro de mídia com coordenadas geográficas.
   - Verificação do harness passou 100% (1.265 backend, 742 app, 78 admin).
 
+- **Passo 5 (Supabase Seeds & Configuração Oficial no Banco Real - `feature/f9-seeds-config`):**
+  - Parâmetros dos seeds consolidados em `supabase/seeds/parametros.sql` (Belo Horizonte - MG inativa para controle do piloto; categorias Limpeza residencial e Montagem de móveis com 30 dias de garantia; contas de sistema do ledger no caminho A).
+  - Execução e idempotência validadas contra Postgres local isolado (pgserver).
+  - Carga dos seeds aplicada com autorização do João no Supabase real (`seed_cidades_categorias`, `seed_config_taxa` e `seed_contas_ledger`).
+  - Nova versão oficial da configuração (`412b74f6-ae63-4668-ab6d-dae3e5bcdf6a`) aprovada pelo financeiro e publicada como vigente no banco real:
+    - Taxa única de 7,5% (`taxa_bps = 750`), taxa mínima R$ 3,00 (`taxa_minima_centavos = 300`).
+    - Liberação imediata ao cliente confirmar (`prazo_liberacao_dias = 0`).
+    - Janela de reclamação do cliente: 7 dias (`janela_chargeback_dias = 7`).
+    - Prazos operacionais: confirmação cliente 48h, congelamento de repasse em disputa 72h, resposta 48h, decisão 5 dias úteis, retrabalho 7 dias.
+    - Faixa de taxa global sem teto cadastrada e validada em `ConfigPostgres` e `ConfigPagamentoPostgres`.
+
+
 
