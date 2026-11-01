@@ -40,6 +40,7 @@ class ConfirmarEmailTela extends StatefulWidget {
 
 class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
   Timer? _timer;
+  StreamSubscription<SessaoAuth?>? _subSessao;
   var _restante = ConfirmarEmailTela.segundosParaReenviar;
   var _carregando = false;
   String? _erroServico;
@@ -51,6 +52,11 @@ class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
   void initState() {
     super.initState();
     _iniciarContagem();
+    _subSessao = _servico.sessaoMudou.listen((sessao) {
+      if (sessao != null && mounted) {
+        RotasTrato.irParaDepoisDoCadastro(context, widget.perfil);
+      }
+    });
   }
 
   void _iniciarContagem() {
@@ -63,6 +69,7 @@ class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
 
   @override
   void dispose() {
+    _subSessao?.cancel();
     _timer?.cancel();
     super.dispose();
   }
