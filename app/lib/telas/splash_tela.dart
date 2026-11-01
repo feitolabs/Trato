@@ -65,10 +65,14 @@ class SplashTela extends StatelessWidget {
                 corAtiva: CoresTrato.creme,
                 corInativa: CoresTrato.pontoSobrePetroleo,
               ),
-              const SizedBox(height: EspacosTrato.x4),
+              const SizedBox(height: EspacosTrato.x5),
               Text(
                 'Toque para começar',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulClaro),
+                style: TipografiaTrato.lema.copyWith(
+                  color: CoresTrato.creme,
+                  fontWeight: FontWeight.w600,
+                  fontVariations: const [FontVariation('wght', 600)],
+                ),
               ),
               const SizedBox(height: EspacosTrato.x8),
             ],
