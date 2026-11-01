@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
+from trato.persistencia.comum import como_uuid
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.repositorios_app import PerfilDetalhe
 from trato.profissional.config import ConfigProfissional, obter_config_profissional

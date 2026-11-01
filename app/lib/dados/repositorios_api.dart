@@ -27,9 +27,12 @@ String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
 String _hora(DateTime d) => '${d.hour}h${_doisDigitos(d.minute)}';
 
-Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
-List<Map<String, dynamic>> _lista(Object? json) =>
-    [for (final item in json! as List) item as Map<String, dynamic>];
+Map<String, dynamic> _mapa(Object? json) =>
+    json is Map<String, dynamic> ? json : (json is Map ? Map<String, dynamic>.from(json) : const <String, dynamic>{});
+List<Map<String, dynamic>> _lista(Object? json) => [
+      for (final item in (json is List ? json : const []))
+        if (item is Map) Map<String, dynamic>.from(item)
+    ];
 
 const _estadosFinalizados = {'concluido', 'cancelado'};
 
@@ -136,8 +139,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<String> criar(RascunhoPedido rascunho) async {
     final corpo = <String, dynamic>{
-      'categoria_id': rascunho.categoriaId ?? 'eletrica',
-      'cidade_id': rascunho.cidadeId ?? 'belo-horizonte',
+      'categoria_id': rascunho.categoriaId ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8',
+      'cidade_id': rascunho.cidadeId ?? 'de470309-afb7-49ac-9471-54e8387d4a88',
       if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
       if (rascunho.prazoDesejado != null)
         'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
@@ -697,16 +700,23 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// carteira da Início não tem rota (D15: só extrato): fica zerada.
   @override
   Future<InicioProfissional> inicio() async {
-    final me = _mapa(await _api.get('/v1/me'));
+    Map<String, dynamic> me = const {};
+    try {
+      me = _mapa(await _api.get('/v1/me'));
+    } catch (_) {}
     var abertos = <PedidoAberto>[];
     try {
       abertos = await pedidosAbertos(const FiltroPedidosAbertos(limite: 20));
-    } on ErroTrato catch (erro) {
-      if (erro.tipo == TipoErro.sessaoExpirada) rethrow;
-    }
+    } catch (_) {}
     ProximoAtendimento? proximo;
     try {
-      final meus = [for (final j in _lista(await _api.get('/v1/pedidos'))) PedidoApi.deJson(j)];
+      final itensBrutos = _lista(await _api.get('/v1/pedidos'));
+      final meus = <PedidoApi>[];
+      for (final j in itensBrutos) {
+        try {
+          meus.add(PedidoApi.deJson(j));
+        } catch (_) {}
+      }
       for (final p in meus) {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
           proximo = ProximoAtendimento(
@@ -718,11 +728,11 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
           break;
         }
       }
-    } on ErroTrato catch (erro) {
-      if (erro.tipo == TipoErro.sessaoExpirada) rethrow;
-    }
+    } catch (_) {}
+    final nomeMe = ((me['nome'] as String?) ?? '').trim();
+    final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
     return InicioProfissional(
-      nome: ((me['nome'] as String?) ?? '').split(' ').first,
+      nome: primeiroNome.isEmpty ? 'Profissional' : primeiroNome,
       disponivelAgora: true,
       carteira: const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0),
       pedidos: abertos,
@@ -759,18 +769,22 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// Extrato do ledger (D15). Cada lançamento vira uma linha; o app não soma nada.
   @override
   Future<List<ItemExtrato>> extrato() async {
-    final json = _mapa(await _api.get('/v1/extrato', consulta: {'limite': '50'}));
-    return [
-      for (final l in ExtratoApi.deJson(json).itens)
-        ItemExtrato(
-          titulo: 'Pedido ${_curto(l.pedidoId)} · ${l.tipo.replaceAll('_', ' ')}',
-          detalheData: _dia(l.data.toLocal()),
-          brutoCentavos: l.valorCentavos,
-          textoTaxa: l.estornoDe != null ? 'Estorno' : 'Lançamento do ledger',
-          liquidoCentavos: l.valorCentavos,
-          status: StatusExtrato.liberado,
-        ),
-    ];
+    try {
+      final json = _mapa(await _api.get('/v1/extrato', consulta: {'limite': '50'}));
+      return [
+        for (final l in ExtratoApi.deJson(json).itens)
+          ItemExtrato(
+            titulo: 'Pedido ${_curto(l.pedidoId)} · ${l.tipo.replaceAll('_', ' ')}',
+            detalheData: _dia(l.data.toLocal()),
+            brutoCentavos: l.valorCentavos,
+            textoTaxa: l.estornoDe != null ? 'Estorno' : 'Lançamento do ledger',
+            liquidoCentavos: l.valorCentavos,
+            status: StatusExtrato.liberado,
+          ),
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 
   String _curto(String id) => '#${id.substring(0, id.length < 4 ? id.length : 4).toUpperCase()}';

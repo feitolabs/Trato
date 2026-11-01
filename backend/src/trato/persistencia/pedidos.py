@@ -268,7 +268,40 @@ class PedidosPostgres:
     def _inserir(
         self, con: psycopg.Connection[Any], pid: str, pedido: Pedido, d: DadosPedido
     ) -> None:
-        categoria = exigir_uuid(d.categoria_id, "categoria")
+        # Resolve categoria: se não for UUID direto, busca por slug/nome ou primeira ativa
+        cat_uuid = como_uuid(d.categoria_id)
+        if cat_uuid and con.execute("select 1 from public.categorias where id = %s", (cat_uuid,)).fetchone():
+            categoria = cat_uuid
+        else:
+            cat_slug = str(d.categoria_id or "").strip().lower()
+            cat_row = con.execute(
+                "select id from public.categorias where lower(slug) = %s "
+                "or lower(replace(nome, ' ', '-')) = %s or lower(nome) = %s limit 1",
+                (cat_slug, cat_slug, cat_slug),
+            ).fetchone()
+            if cat_row:
+                categoria = str(cat_row["id"])
+            else:
+                cat_padrao = con.execute("select id from public.categorias where ativa order by ordem, nome limit 1").fetchone()
+                categoria = str(cat_padrao["id"]) if cat_padrao else exigir_uuid(d.categoria_id, "categoria")
+
+        # Resolve cidade: se não for UUID direto, busca por slug/nome ou primeira ativa
+        cid_uuid = como_uuid(d.cidade_id)
+        if cid_uuid and con.execute("select 1 from public.cidades where id = %s", (cid_uuid,)).fetchone():
+            cidade = cid_uuid
+        else:
+            cid_slug = str(d.cidade_id or "").strip().lower()
+            cid_row = con.execute(
+                "select id from public.cidades where lower(replace(nome, ' ', '-')) = %s "
+                "or lower(nome) = %s or lower(replace(nome, ' ', '')) = %s limit 1",
+                (cid_slug, cid_slug, cid_slug),
+            ).fetchone()
+            if cid_row:
+                cidade = str(cid_row["id"])
+            else:
+                cid_padrao = con.execute("select id from public.cidades where ativa order by nome limit 1").fetchone()
+                cidade = str(cid_padrao["id"]) if cid_padrao else exigir_uuid(d.cidade_id, "cidade")
+
         con.execute(
             "insert into public.pedidos (id, cliente_id, categoria_id, cidade_id, bairro, "
             "local_aprox_lat, local_aprox_lng, titulo, descricao, prazo_desejado, "
@@ -278,7 +311,7 @@ class PedidosPostgres:
                 pid,
                 exigir_uuid(pedido.cliente_id, "cliente"),
                 categoria,
-                exigir_uuid(d.cidade_id, "cidade"),
+                cidade,
                 d.bairro,
                 d.local_aprox_lat,
                 d.local_aprox_lng,
@@ -293,17 +326,20 @@ class PedidosPostgres:
             ),
         )
         for resposta in d.respostas:
+            p_uuid = como_uuid(resposta.pergunta_id)
+            if not p_uuid:
+                continue
             pergunta = con.execute(
                 "select texto from public.categoria_perguntas "
                 "where id = %s and categoria_id = %s and ativa",
-                (exigir_uuid(resposta.pergunta_id, "pergunta"), categoria),
+                (p_uuid, categoria),
             ).fetchone()
             if pergunta is None:
                 raise DadosInvalidos("Uma das perguntas não existe nesta categoria.")
             con.execute(
                 "insert into public.pedido_respostas (pedido_id, pergunta_id, pergunta_texto, "
                 "resposta) values (%s, %s, %s, %s)",
-                (pid, resposta.pergunta_id, pergunta["texto"], Jsonb(resposta.resposta)),
+                (pid, p_uuid, pergunta["texto"], Jsonb(resposta.resposta)),
             )
         e = d.endereco
         if e is not None:

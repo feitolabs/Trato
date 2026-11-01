@@ -112,8 +112,27 @@ class ProfissionaisPostgres:
             for j in perfil.disponibilidade
         ]
         portfolio = [{"titulo": i.titulo, "descricao": i.descricao} for i in perfil.portfolio]
-        categorias = [exigir_uuid(c, "categoria") for c in dict.fromkeys(perfil.categorias)]
         with self._banco.transacao() as con:
+            # Resolve categorias: se não for UUID, busca por slug/nome
+            categorias: list[str] = []
+            for c in dict.fromkeys(perfil.categorias):
+                c_uuid = como_uuid(c)
+                if c_uuid:
+                    categorias.append(c_uuid)
+                else:
+                    c_slug = str(c or "").strip().lower()
+                    row = con.execute(
+                        "select id from public.categorias where lower(slug) = %s "
+                        "or lower(replace(nome, ' ', '-')) = %s or lower(nome) = %s limit 1",
+                        (c_slug, c_slug, c_slug),
+                    ).fetchone()
+                    if row:
+                        categorias.append(str(row["id"]))
+            if not categorias:
+                padrao_cat = con.execute("select id from public.categorias where ativa order by ordem, nome limit 1").fetchone()
+                if padrao_cat:
+                    categorias.append(str(padrao_cat["id"]))
+
             # Status e nível só a equipe muda: o conflito não os toca.
             con.execute(
                 "insert into public.perfis_profissional (usuario_id, status, nivel_verificacao, "
@@ -138,10 +157,23 @@ class ProfissionaisPostgres:
                 "delete from public.profissional_regioes where profissional_id = %s", (usuario,)
             )
             for r in dict.fromkeys(perfil.regioes):
+                r_cidade_uuid = como_uuid(r.cidade_id)
+                if not r_cidade_uuid:
+                    r_slug = str(r.cidade_id or "").strip().lower()
+                    cid_row = con.execute(
+                        "select id from public.cidades where lower(replace(nome, ' ', '-')) = %s "
+                        "or lower(nome) = %s limit 1",
+                        (r_slug, r_slug),
+                    ).fetchone()
+                    if cid_row:
+                        r_cidade_uuid = str(cid_row["id"])
+                    else:
+                        cid_padrao = con.execute("select id from public.cidades where ativa order by nome limit 1").fetchone()
+                        r_cidade_uuid = str(cid_padrao["id"]) if cid_padrao else exigir_uuid(r.cidade_id, "cidade")
                 con.execute(
                     "insert into public.profissional_regioes (profissional_id, cidade_id, bairro) "
                     "values (%s, %s, %s) on conflict do nothing",
-                    (usuario, exigir_uuid(r.cidade_id, "cidade"), r.bairro),
+                    (usuario, r_cidade_uuid, r.bairro),
                 )
 
     def buscar(

@@ -429,6 +429,7 @@ abstract final class RotasTrato {
         context,
         Builder(
           builder: (context) => CadastroProfissionalTela(
+            nomeInicial: ServicoAuthPadrao.atual.sessaoAtual?.nome ?? '',
             servico: repos.cadastroProfissional ?? ServicoCadastroProfissionalFake(),
             aoAdicionarFoto: _fotografar,
             aoAdicionarFotos: _selecionarFotos,

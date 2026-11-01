@@ -54,6 +54,14 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   final _fotosNovas = <String>[];
   CidadeOpcao? _cidade;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.formulario.cidades.isNotEmpty) {
+      _cidade = widget.formulario.cidades.first;
+    }
+  }
+
   void _selecionarPressa(bool comPressa) {
     setState(() {
       _comPressa = comPressa;
@@ -158,8 +166,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         faixa: _faixa,
         fotos: List.of(_fotosNovas),
         categoriaId: widget.formulario.categoriaId,
-        cidadeId: _cidade?.id,
-        bairro: _cidade?.nome,
+        cidadeId: _cidade?.id ?? (widget.formulario.cidades.isNotEmpty ? widget.formulario.cidades.first.id : 'de470309-afb7-49ac-9471-54e8387d4a88'),
+        bairro: _cidade?.nome ?? (widget.formulario.cidades.isNotEmpty ? widget.formulario.cidades.first.nome : 'Belo Horizonte'),
       );
       widget.aoEnviar?.call(rascunho);
     }

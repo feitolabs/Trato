@@ -50,6 +50,7 @@ class VerificacoesPostgres:
                 is not None
             ):
                 raise RegraDoBanco("Você já tem uma verificação em análise.")
+
             nova = con.execute(
                 "insert into public.verificacoes (profissional_id, nivel_solicitado, "
                 "consentimento_lgpd_em, enviada_em) values (%s, %s, %s, %s) returning id",

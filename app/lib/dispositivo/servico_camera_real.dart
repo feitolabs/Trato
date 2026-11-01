@@ -49,14 +49,22 @@ class ServicoCameraReal implements ServicoCamera {
     if (arquivo == null) return null;
     final original = await arquivo.readAsBytes();
     final agora = DateTime.now().toUtc();
-    // Decodificar e recomprimir é pesado: fora da thread da interface.
-    final preparado = await compute(_preparar, (preparador, original, agora));
-    registrarImagemEmMemoria(
-      preparado.sha256,
-      bytes: preparado.bytes,
-      caminhoLocal: arquivo.path,
-    );
-    return preparado;
+    try {
+      // Decodificar e recomprimir é pesado: fora da thread da interface.
+      final preparado = await compute(_preparar, (preparador, original, agora));
+      registrarImagemEmMemoria(
+        preparado.sha256,
+        bytes: preparado.bytes,
+        caminhoLocal: arquivo.path,
+      );
+      return preparado;
+    } on Object {
+      // Fallback seguro se o decodificador falhar em formato específico da câmera
+      final sha = sha256Hex(original);
+      final fallback = ArquivoCapturado(bytes: original, sha256: sha, capturadaEm: agora);
+      registrarImagemEmMemoria(sha, bytes: original, caminhoLocal: arquivo.path);
+      return fallback;
+    }
   }
 }
 

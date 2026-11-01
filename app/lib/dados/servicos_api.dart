@@ -168,17 +168,25 @@ class ServicoVerificacaoApi implements ServicoVerificacao {
   /// mostrar o aviso de privacidade (LGPD) e a pessoa tocar em enviar.
   @override
   Future<void> enviar(EnvioVerificacao envio) async {
-    await _api.post(
-      '/v1/profissional/verificacao',
-      corpo: {
-        'nivel_solicitado': 'verificado',
-        'consentimento_lgpd': true,
-        'documentos': [
-          {'tipo': 'documento_frente', 'upload_id': envio.documento},
-          {'tipo': 'selfie', 'upload_id': envio.selfie},
-        ],
-      },
-    );
+    try {
+      await _api.post(
+        '/v1/profissional/verificacao',
+        corpo: {
+          'nivel_solicitado': 'verificado',
+          'consentimento_lgpd': true,
+          'documentos': [
+            {'tipo': 'documento_frente', 'upload_id': envio.documento},
+            {'tipo': 'selfie', 'upload_id': envio.selfie},
+          ],
+        },
+      );
+    } on ErroTrato catch (e) {
+      // Se já está em análise ou já foi enviada, considera concluído com sucesso.
+      if (e.codigoHttp == 409 || e.mensagem.contains('já tem uma verificação')) {
+        return;
+      }
+      rethrow;
+    }
   }
 }
 
@@ -283,7 +291,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       final k = entry.key.toLowerCase();
       if (limpo.contains(k) || k.contains(limpo)) return entry.value;
     }
-    return _idPorNomeCategoria.values.firstOrNull ?? 'eletrica';
+    return _idPorNomeCategoria.values.firstOrNull ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8';
   }
 
   String _resolverCidadeId(String cidade) {
@@ -331,7 +339,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
           'descricao': dados.portfolio[i],
         },
     ];
-    final padraoCat = _idPorNomeCategoria.values.firstOrNull ?? 'eletrica';
+    final padraoCat = _idPorNomeCategoria.values.firstOrNull ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8';
     final corpo = <String, Object?>{
       'categorias': categoriasIds.isEmpty ? [padraoCat] : categoriasIds,
       'regioes': regioes,

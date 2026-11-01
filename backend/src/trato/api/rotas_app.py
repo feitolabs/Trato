@@ -661,7 +661,7 @@ def _documentos_da_verificacao(
             or sol.status != "concluida"
             or str(sol.dono_id).replace("-", "") != str(usuario.id).replace("-", "")
             or sol.destino != "verificacao"
-            or sol.tipo_documento != d.tipo
+            or (sol.tipo_documento and sol.tipo_documento != d.tipo)
             or sol.id in usados
         ):
             raise HTTPException(422, "Um dos arquivos não foi enviado ou não confere com o tipo.")
