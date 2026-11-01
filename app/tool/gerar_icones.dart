@@ -17,28 +17,89 @@ void main() {
     exit(1);
   }
 
-  print('Imagem original carregada: ${original.width}x${original.height}');
+  final p0 = original.getPixel(0, 0);
+  final r = p0.r.toInt();
+  final g = p0.g.toInt();
+  final b = p0.b.toInt();
+  final hexColor = '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
+  print('Imagem carregada: ${original.width}x${original.height}. Cor de fundo: $hexColor (R=$r, G=$g, B=$b)');
+
+  void salvarImagem(String caminho, img.Image imagem) {
+    final codificada = img.encodePng(imagem);
+    final arquivo = File(caminho);
+    arquivo.parent.createSync(recursive: true);
+    arquivo.writeAsBytesSync(codificada);
+    print('Gerado: $caminho (${imagem.width}x${imagem.height})');
+  }
 
   void salvar(String caminho, int largura, int altura) {
     final redimensionada = (largura == original.width && altura == original.height)
         ? original
         : img.copyResize(original, width: largura, height: altura, interpolation: img.Interpolation.linear);
-    final codificada = img.encodePng(redimensionada);
-    final arquivo = File(caminho);
-    arquivo.parent.createSync(recursive: true);
-    arquivo.writeAsBytesSync(codificada);
-    print('Gerado: $caminho (${largura}x$altura)');
+    salvarImagem(caminho, redimensionada);
   }
 
-  // 1. Android mipmaps
-  final androidRes = 'android/app/src/main/res';
-  salvar('$androidRes/mipmap-mdpi/ic_launcher.png', 48, 48);
-  salvar('$androidRes/mipmap-hdpi/ic_launcher.png', 72, 72);
-  salvar('$androidRes/mipmap-xhdpi/ic_launcher.png', 96, 96);
-  salvar('$androidRes/mipmap-xxhdpi/ic_launcher.png', 144, 144);
-  salvar('$androidRes/mipmap-xxxhdpi/ic_launcher.png', 192, 192);
+  img.Image gerarCircular(int size) {
+    final redim = img.copyResize(original, width: size, height: size, interpolation: img.Interpolation.linear);
+    final circ = img.Image(width: size, height: size, numChannels: 4);
+    final raio = size / 2.0;
+    final raioSq = raio * raio;
+    for (int y = 0; y < size; y++) {
+      for (int x = 0; x < size; x++) {
+        final dx = x - raio + 0.5;
+        final dy = y - raio + 0.5;
+        if (dx * dx + dy * dy <= raioSq) {
+          circ.setPixel(x, y, redim.getPixel(x, y));
+        } else {
+          circ.setPixelRgba(x, y, 0, 0, 0, 0);
+        }
+      }
+    }
+    return circ;
+  }
 
-  // 2. iOS AppIcon
+  img.Image gerarForeground(int canvasSize, int iconSize) {
+    final fg = img.Image(width: canvasSize, height: canvasSize, numChannels: 4);
+    img.fill(fg, color: img.ColorRgba8(r, g, b, 255));
+    final logoReduzido = img.copyResize(original, width: iconSize, height: iconSize, interpolation: img.Interpolation.linear);
+    final dx = (canvasSize - iconSize) ~/ 2;
+    final dy = (canvasSize - iconSize) ~/ 2;
+    img.compositeImage(fg, logoReduzido, dstX: dx, dstY: dy);
+    return fg;
+  }
+
+  final androidRes = 'android/app/src/main/res';
+
+  // 1. Android ícones padrão (legado)
+  final densities = <String, int>{
+    'mdpi': 48,
+    'hdpi': 72,
+    'xhdpi': 96,
+    'xxhdpi': 144,
+    'xxxhdpi': 192,
+  };
+
+  for (final entry in densities.entries) {
+    salvar('$androidRes/mipmap-${entry.key}/ic_launcher.png', entry.value, entry.value);
+    salvarImagem('$androidRes/mipmap-${entry.key}/ic_launcher_round.png', gerarCircular(entry.value));
+  }
+
+  // 2. Android adaptive icons (108dp base: safe-zone 72dp = 66.7%)
+  final fgDensities = <String, int>{
+    'mdpi': 108,
+    'hdpi': 162,
+    'xhdpi': 216,
+    'xxhdpi': 324,
+    'xxxhdpi': 432,
+  };
+
+  for (final entry in fgDensities.entries) {
+    final canvasSize = entry.value;
+    final iconSize = (canvasSize * (72.0 / 108.0)).round();
+    salvarImagem('$androidRes/mipmap-${entry.key}/ic_launcher_foreground.png', gerarForeground(canvasSize, iconSize));
+  }
+
+  // 3. iOS AppIcon
   final iosIcons = 'ios/Runner/Assets.xcassets/AppIcon.appiconset';
   salvar('$iosIcons/Icon-App-20x20@1x.png', 20, 20);
   salvar('$iosIcons/Icon-App-20x20@2x.png', 40, 40);
@@ -56,8 +117,8 @@ void main() {
   salvar('$iosIcons/Icon-App-83.5x83.5@2x.png', 167, 167);
   salvar('$iosIcons/Icon-App-1024x1024@1x.png', 1024, 1024);
 
-  // 3. Asset do app
+  // 4. Asset do app
   salvar('assets/logo/trato_logo.png', 1024, 1024);
 
-  print('Todos os ícones foram gerados com sucesso!');
+  print('Todos os ícones (padrão, circular e adaptativo) foram gerados com sucesso!');
 }
