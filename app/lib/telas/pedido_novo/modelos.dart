@@ -111,7 +111,11 @@ class RascunhoPedido {
     this.categoriaId,
     this.cidadeId,
     this.bairro,
+    this.prazoDesejado,
   });
+
+  /// Data que o cliente informou em "Sem pressa" / "Com pressa".
+  final DateTime? prazoDesejado;
 
   /// Cidade escolhida (id do catálogo); nula no formulário de exemplo.
   final String? cidadeId;

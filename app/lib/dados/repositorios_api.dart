@@ -139,6 +139,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       'categoria_id': rascunho.categoriaId ?? 'eletrica',
       'cidade_id': rascunho.cidadeId ?? 'belo-horizonte',
       if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
+      if (rascunho.prazoDesejado != null)
+        'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
       'titulo': rascunho.servicos.isNotEmpty ? rascunho.servicos.join(', ') : 'Pedido de serviço',
       'descricao': rascunho.descricao.trim().isNotEmpty
           ? rascunho.descricao.trim()

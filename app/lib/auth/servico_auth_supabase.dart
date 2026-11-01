@@ -262,6 +262,22 @@ class ServicoAuthSupabase implements ServicoAuth {
         if (r.user?.identities?.isEmpty ?? false) {
           throw const ErroAuth(TipoErroAuth.emailJaUsado);
         }
+        if (r.user != null && _api != null) {
+          try {
+            await _api!.post(
+              '/v1/cadastro/vincular',
+              corpo: {
+                'usuario_id': r.user!.id,
+                'email': dados.email.trim(),
+                'nome': dados.nome,
+                'cpf': cpf,
+                'telefone': celularE164(dados.celular),
+              },
+            );
+          } on Object catch (e) {
+            debugPrint('Aviso: vincular_cadastro falhou: $e');
+          }
+        }
         final sessao = r.session == null ? null : _paraSessao(r.user);
         if (sessao != null) {
           await _gravarCpf(cpf, token: r.session!.accessToken);

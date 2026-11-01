@@ -45,12 +45,40 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late final Set<String> _servicos = {...widget.formulario.servicosIniciais};
   late int _quantidade = widget.formulario.quantidadeInicial;
   late String _voltagem = widget.formulario.voltagemInicial;
-  late String _prazo = widget.formulario.prazos.first;
+  /// `false` = sem pressa (padrão); `true` = com pressa.
+  bool _comPressa = false;
+  late DateTime _dataPrazo = DateTime.now().add(const Duration(days: 7));
   late FaixaPreco _faixa = widget.formulario.faixas.first;
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
   var _tentou = false;
   final _fotosNovas = <String>[];
   CidadeOpcao? _cidade;
+
+  void _selecionarPressa(bool comPressa) {
+    setState(() {
+      _comPressa = comPressa;
+      final hoje = DateTime.now();
+      _dataPrazo = hoje.add(Duration(days: comPressa ? 2 : 7));
+    });
+  }
+
+  static String _formatarData(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  String? get _erroPrazo => null;
+
+  Future<void> _escolherDataPrazo() async {
+    final hoje = DateTime.now();
+    final inicio = DateTime(hoje.year, hoje.month, hoje.day);
+    final data = await showDatePicker(
+      context: context,
+      initialDate: _dataPrazo ?? inicio.add(const Duration(days: 1)),
+      firstDate: inicio,
+      lastDate: inicio.add(const Duration(days: 365)),
+      helpText: _comPressa == true ? 'Para quando você precisa?' : 'Até quando está bom?',
+    );
+    if (data != null && mounted) setState(() => _dataPrazo = data);
+  }
 
   bool get _exigeCidade => widget.formulario.cidades.isNotEmpty;
 
@@ -115,6 +143,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   void _enviar() {
     setState(() => _tentou = true);
     if (_exigeCidade && _cidade == null) return;
+    if (_erroPrazo != null) return;
     if (_servicos.isNotEmpty && _descricao.text.trim().isNotEmpty) {
       final rascunho = RascunhoPedido(
         servicos: [
@@ -124,7 +153,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         quantidade: _quantidade,
         voltagem: _voltagem,
         descricao: _descricao.text.trim(),
-        prazo: _prazo,
+        prazo: '${_comPressa ? 'Com pressa' : 'Sem pressa'} · ${_formatarData(_dataPrazo)}',
+        prazoDesejado: _dataPrazo,
         faixa: _faixa,
         fotos: List.of(_fotosNovas),
         categoriaId: widget.formulario.categoriaId,
@@ -248,29 +278,44 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),
+        const RotuloSecao('Prazo'),
+        const SizedBox(height: EspacosTrato.x3),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: _CampoLista<String>(
-                rotulo: 'Prazo',
-                valor: _prazo,
-                opcoes: f.prazos,
-                texto: (p) => p,
-                aoMudar: (p) => setState(() => _prazo = p),
+              child: _OpcaoRadio(
+                texto: 'Sem pressa',
+                marcada: _comPressa == false,
+                aoTocar: () => _selecionarPressa(false),
               ),
             ),
-            const SizedBox(width: EspacosTrato.x3),
+            const SizedBox(width: EspacosTrato.x2),
             Expanded(
-              child: _CampoLista<FaixaPreco>(
-                rotulo: 'Quanto pensa gastar?',
-                valor: _faixa,
-                opcoes: f.faixas,
-                texto: _rotuloFaixa,
-                aoMudar: (v) => setState(() => _faixa = v),
+              child: _OpcaoRadio(
+                texto: 'Com pressa',
+                marcada: _comPressa == true,
+                aoTocar: () => _selecionarPressa(true),
               ),
             ),
           ],
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Text(
+          _comPressa ? 'Para quando você precisa?' : 'Até quando está bom para você?',
+          style: secundario,
+        ),
+        const SizedBox(height: EspacosTrato.x2),
+        BotaoSecundario(
+          texto: _formatarData(_dataPrazo),
+          aoTocar: _escolherDataPrazo,
+        ),
+        const SizedBox(height: EspacosTrato.x5),
+        _CampoLista<FaixaPreco>(
+          rotulo: 'Quanto pensa gastar?',
+          valor: _faixa,
+          opcoes: f.faixas,
+          texto: _rotuloFaixa,
+          aoMudar: (v) => setState(() => _faixa = v),
         ),
         const SizedBox(height: EspacosTrato.x5),
         if (_exigeCidade)

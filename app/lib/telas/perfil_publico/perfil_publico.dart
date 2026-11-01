@@ -45,6 +45,7 @@ class PerfilPublico {
 abstract interface class ServicoPerfilPublico {
   Future<PerfilPublico> carregarPerfil();
   Future<List<Avaliacao>> carregarAvaliacoes();
+  Future<bool> temPerfilProfissional();
 }
 
 /// PROVISÓRIO — só para teste e demonstração.
@@ -70,6 +71,9 @@ class ServicoPerfilPublicoFake implements ServicoPerfilPublico {
     if (falharAoCarregar) throw Exception('falha de teste');
     return avaliacoes;
   }
+
+  @override
+  Future<bool> temPerfilProfissional() async => true;
 }
 
 const avaliacoesRecebidasExemplo = [

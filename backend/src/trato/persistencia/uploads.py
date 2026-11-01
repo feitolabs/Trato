@@ -181,8 +181,15 @@ class UploadsPostgres:
 
         return self._memoria.midia(midia_id)
 
+    @property
+    def documentos(self) -> dict[str, DocumentoGuardado]:
+        return self._memoria.documentos
+
     def salvar_documento(self, d: DocumentoGuardado) -> None:
         self._memoria.salvar_documento(d)
 
     def documento_por_caminho(self, caminho: str) -> DocumentoGuardado | None:
         return self._memoria.documento_por_caminho(caminho)
+
+    def documento_por_id(self, doc_id: str) -> DocumentoGuardado | None:
+        return self._memoria.documentos.get(doc_id)

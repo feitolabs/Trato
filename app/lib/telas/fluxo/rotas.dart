@@ -402,7 +402,16 @@ abstract final class RotasTrato {
   static const _perfilIndisponivel = 'Perfil indisponível por enquanto.';
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
-  static void irParaProfissional(BuildContext context) => _abrirCadastroProfissional(context);
+  static Future<void> irParaProfissional(BuildContext context) async {
+    final tem = await repos.perfilPublico?.temPerfilProfissional() ?? false;
+    if (tem && context.mounted) {
+      _entrarNaCascaProfissional(context);
+      return;
+    }
+    if (context.mounted) {
+      _abrirCadastroProfissional(context);
+    }
+  }
 
   /// Foto pela câmera; devolve só a referência (o upload é do backend, por URL assinada).
   static Future<String?> _fotografar() => dispositivo.fotografarEEnviar();
@@ -676,6 +685,7 @@ abstract final class RotasTrato {
               AvaliacoesRecebidasTela(servico: servico),
             ),
             aoEditarCadastro: () => _abrirCadastroProfissional(context),
+            aoUsarComoCliente: () => irParaCliente(context),
             aoSair: () => sair(context),
           );
         },
@@ -702,9 +712,18 @@ abstract final class RotasTrato {
                 _abrir<void>(
                   context,
                   CentralPrivacidadeTela(
-                    servico: ServicoPrivacidadeFake(),
+                    servico: repos.privacidade ?? ServicoPrivacidadeFake(),
                     aoAbrirTermos: () => abrirTermos(context),
-                    aoContaExcluida: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                    aoContaExcluida: () async {
+                      await sair(context);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sua conta foi excluída e você foi desconectado.'),
+                          ),
+                        );
+                      }
+                    },
                   ),
                 );
               case AcaoPerfil.centralAjuda:

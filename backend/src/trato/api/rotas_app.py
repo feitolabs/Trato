@@ -654,18 +654,20 @@ def _documentos_da_verificacao(
             docs.append(DocumentoVerificacao(d.tipo, d.storage_path, None, excluir_em))
             continue
         sol = servico.repo.solicitacao(d.upload_id or "")
-        guardado = servico.repo.documentos.get(sol.registro_id or "") if sol else None
+        docs_map = getattr(servico.repo, "documentos", {})
+        guardado = docs_map.get(sol.registro_id or "") if sol and hasattr(docs_map, "get") else None
         if (
             sol is None
-            or guardado is None
-            or sol.dono_id != usuario.id
+            or sol.status != "concluida"
+            or str(sol.dono_id).replace("-", "") != str(usuario.id).replace("-", "")
             or sol.destino != "verificacao"
             or sol.tipo_documento != d.tipo
             or sol.id in usados
         ):
             raise HTTPException(422, "Um dos arquivos não foi enviado ou não confere com o tipo.")
         usados.add(sol.id)
-        docs.append(DocumentoVerificacao(d.tipo, sol.caminho, guardado.sha256, excluir_em))
+        sha = guardado.sha256 if guardado else None
+        docs.append(DocumentoVerificacao(d.tipo, sol.caminho, sha, excluir_em))
     return docs
 
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../profissional_apoio/apoio.dart';
 import 'verificacao.dart';
@@ -62,6 +63,7 @@ class _Corpo extends StatefulWidget {
 }
 
 class _CorpoState extends State<_Corpo> {
+  final _scrollController = ScrollController();
   String? _documento;
   String? _selfie;
   bool _ciente = false;
@@ -71,6 +73,24 @@ class _CorpoState extends State<_Corpo> {
 
   late StatusVerificacao _status = widget.situacao.status;
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _rolarParaErro() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   bool get _podeEnviar => _status == StatusVerificacao.naoEnviada || _status == StatusVerificacao.pendente;
   bool get _completo => _documento != null && _selfie != null && _ciente;
 
@@ -79,11 +99,12 @@ class _CorpoState extends State<_Corpo> {
     try {
       final ref = await captura?.call();
       if (ref != null && mounted) setState(() => guardar(ref));
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        _erro = 'Não foi possível capturar ou enviar a imagem. Tente novamente.';
+        _erro = e is ErroTrato ? e.mensagem : 'Não foi possível capturar ou enviar a imagem. Tente novamente.';
       });
+      _rolarParaErro();
     }
   }
 
@@ -101,12 +122,13 @@ class _CorpoState extends State<_Corpo> {
         _status = StatusVerificacao.emAnalise;
       });
       widget.aoConcluir?.call();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        _erro = 'Não foi possível enviar. Tente de novo.';
+        _erro = e is ErroTrato ? e.mensagem : 'Não foi possível enviar. Tente de novo.';
       });
+      _rolarParaErro();
     }
   }
 
@@ -114,6 +136,7 @@ class _CorpoState extends State<_Corpo> {
   Widget build(BuildContext context) {
     final l = widget.lgpd;
     return CorpoRolavel(
+      scrollController: _scrollController,
       rodape: _podeEnviar
           ? Column(
               mainAxisSize: MainAxisSize.min,

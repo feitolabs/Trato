@@ -17,12 +17,14 @@ class PerfilPublicoTela extends StatefulWidget {
     this.aoVerAvaliacoes,
     this.aoEditarCadastro,
     this.aoSair,
+    this.aoUsarComoCliente,
     this.aoCapturarFotoPerfil,
   });
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
   final VoidCallback? aoEditarCadastro;
+  final VoidCallback? aoUsarComoCliente;
 
   /// Sai da conta (limpa a sessão). Sem ele, o botão não aparece.
   final VoidCallback? aoSair;
@@ -171,6 +173,8 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
               texto: 'Ver todas as avaliações',
               aoTocar: widget.aoVerAvaliacoes,
             ),
+            if (widget.aoUsarComoCliente != null)
+              BotaoLink(texto: 'Usar como cliente', aoTocar: widget.aoUsarComoCliente),
             if (widget.aoSair != null) BotaoLink(texto: 'Sair', aoTocar: widget.aoSair),
           ],
         );

@@ -2,6 +2,8 @@ import '../componentes/imagem_trato.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_profissional/disputa.dart';
+import '../telas/lgpd/modelos.dart';
+import '../telas/lgpd/servico_fake.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
@@ -424,6 +426,16 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
     return perfil.ultimasAvaliacoes;
   }
 
+  @override
+  Future<bool> temPerfilProfissional() async {
+    try {
+      final p = await _api.get('/v1/profissional/perfil');
+      return p is Map;
+    } catch (_) {
+      return false;
+    }
+  }
+
   List<Avaliacao> _converterAvaliacoes(List<dynamic> brutas) => [
         for (final a in brutas)
           if (a is Map)
@@ -495,5 +507,69 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
       '/v1/pedidos/${agendamento.disputaId}/retrabalho/atender',
       corpo: {'etapa': 'aceitar'},
     );
+  }
+}
+
+/// Central de privacidade e exclusão da conta (LGPD) falando com a API real:
+/// `GET /v1/me/consentimentos`, `POST /v1/me/consentimentos`, `GET /v1/me/dados`, `POST /v1/me/exclusao`.
+class ServicoPrivacidadeApi implements ServicoPrivacidade {
+  ServicoPrivacidadeApi(this._api);
+
+  final ClienteApi _api;
+
+  @override
+  Future<List<Consentimento>> consentimentos() async {
+    try {
+      final res = await _api.get('/v1/me/consentimentos');
+      final mapa = (res is Map<String, dynamic>) ? res : <String, dynamic>{};
+      final vigentes = (mapa['vigentes'] is List) ? mapa['vigentes'] as List : const [];
+      final ativosPorFinalidade = <String, bool>{};
+      for (final v in vigentes) {
+        if (v is Map && v['finalidade'] is String && v['aceito'] is bool) {
+          ativosPorFinalidade[v['finalidade'] as String] = v['aceito'] as bool;
+        }
+      }
+      return [
+        for (final item in ServicoPrivacidadeFake.exemplo)
+          Consentimento(
+            id: item.id,
+            titulo: item.titulo,
+            descricao: item.descricao,
+            ativo: ativosPorFinalidade[item.id] ?? item.ativo,
+            obrigatorio: item.obrigatorio,
+          ),
+      ];
+    } catch (_) {
+      return ServicoPrivacidadeFake.exemplo;
+    }
+  }
+
+  @override
+  Future<void> alterarConsentimento(String id, {required bool ativo}) async {
+    await _api.post(
+      '/v1/me/consentimentos',
+      corpo: {
+        'finalidade': id,
+        'aceito': ativo,
+        'versao_texto': '1.0',
+      },
+    );
+  }
+
+  @override
+  Future<void> solicitarExportacao() async {
+    await _api.get('/v1/me/dados');
+  }
+
+  @override
+  Future<void> solicitarExclusao() async {
+    // 1º passo: pede a exclusão para obter o token de confirmação
+    final r1 = await _api.post('/v1/me/exclusao');
+    final mapa1 = (r1 is Map<String, dynamic>) ? r1 : <String, dynamic>{};
+    final token = mapa1['token_confirmacao'] as String?;
+    if (token != null && token.isNotEmpty) {
+      // 2º passo: confirma com o token emitido
+      await _api.post('/v1/me/exclusao', corpo: {'token_confirmacao': token});
+    }
   }
 }

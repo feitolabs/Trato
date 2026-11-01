@@ -62,7 +62,8 @@ void main() {
       expect(find.text('Voltagem do chuveiro'), findsOneWidget);
       expect(find.text('[Foto 1]'), findsOneWidget);
       expect(find.text('Adicionar'), findsOneWidget);
-      expect(find.text('Até sexta, 30/10'), findsOneWidget);
+      expect(find.text('Sem pressa'), findsOneWidget);
+      expect(find.text('Com pressa'), findsOneWidget);
       expect(find.text('R\$ 200 a R\$ 500'), findsOneWidget);
       expect(
           find.textContaining('até 5 orçamentos em 48 horas', findRichText: true), findsOneWidget);
@@ -112,6 +113,7 @@ void main() {
 
       await tester.tap(find.text('127 V'));
       await tester.tap(find.byTooltip('Aumentar'));
+      await tester.tap(find.text('Sem pressa'));
       await tester.pump();
       await _tocar(tester, find.text('Próximo'));
 

@@ -48,6 +48,7 @@ from trato.persistencia.dinheiro import (
     RepassesPostgres,
 )
 from trato.persistencia.execucao import ExecucaoPostgres
+from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
 from trato.persistencia.pagamentos import (
@@ -141,6 +142,7 @@ def criar_contexto_postgres(
             "conversas": conversas,
             "notificacoes": notificacoes,
             "auditoria": AuditoriaPostgres(banco),
+            "lgpd": criar_repositorios_lgpd_postgres(banco),
             "banco": banco,
         },
     )
