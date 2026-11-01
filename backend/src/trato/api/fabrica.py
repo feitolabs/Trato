@@ -98,12 +98,17 @@ def criar_contexto_postgres(
     if auth is None:
         from trato.api.auth_supabase import ProvedorAuthSupabase
 
-        if not (config.supabase_jwt_secret.get_secret_value() or config.supabase_jwks_url):
+        jwks_url = config.supabase_jwks_url or (
+            f"{config.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+            if config.supabase_url
+            else ""
+        )
+        if not (config.supabase_jwt_secret.get_secret_value() or jwks_url):
             raise RuntimeError("Defina SUPABASE_JWT_SECRET ou SUPABASE_JWKS_URL no .env.")
         auth = ProvedorAuthSupabase(
             usuarios,
             segredo_hs256=config.supabase_jwt_secret.get_secret_value,
-            jwks_url=config.supabase_jwks_url,
+            jwks_url=jwks_url,
             emissor=f"{config.supabase_url.rstrip('/')}/auth/v1" if config.supabase_url else "",
         )
     conversas = ConversasPostgres(banco)

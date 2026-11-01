@@ -695,7 +695,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   @override
   Future<InicioProfissional> inicio() async {
     final me = _mapa(await _api.get('/v1/me'));
-    final abertos = await pedidosAbertos(const FiltroPedidosAbertos(limite: 20));
+    var abertos = <PedidoAberto>[];
+    try {
+      abertos = await pedidosAbertos(const FiltroPedidosAbertos(limite: 20));
+    } on ErroTrato catch (erro) {
+      if (erro.tipo == TipoErro.sessaoExpirada) rethrow;
+    }
     ProximoAtendimento? proximo;
     try {
       final meus = [for (final j in _lista(await _api.get('/v1/pedidos'))) PedidoApi.deJson(j)];

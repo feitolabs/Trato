@@ -27,15 +27,18 @@ final sessaoTrato = SessaoTrato();
 final navegadorTrato = GlobalKey<NavigatorState>();
 var _loginDeSessaoAberto = false;
 
-/// 401 da API: o token já foi limpo; encerra o login guardado e abre o login por cima da tela
-/// atual (push, não troca), então o que a pessoa digitou continua lá embaixo.
+/// 401 da API: o token já foi limpo; encerra o login guardado e troca a pilha para o login
+/// (sem permitir voltar com o botão do Android para telas sem sessão).
 void abrirLoginPorSessaoExpirada() {
   final nav = navegadorTrato.currentState;
   if (nav == null || _loginDeSessaoAberto) return;
   _loginDeSessaoAberto = true;
   ServicoAuthPadrao.atual.sair().catchError((_) {});
   nav
-      .push(MaterialPageRoute<void>(builder: (_) => const LoginTela(sessaoExpirada: true)))
+      .pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const LoginTela(sessaoExpirada: true)),
+        (rota) => false,
+      )
       .whenComplete(() => _loginDeSessaoAberto = false);
 }
 

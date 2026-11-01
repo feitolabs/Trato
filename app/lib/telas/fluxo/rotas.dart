@@ -387,12 +387,10 @@ abstract final class RotasTrato {
       );
 
   static Future<DadosInicio> _carregarInicio() async {
-    final (perfil, categorias, andamento, recentes) = await (
-      repos.perfil.carregar(),
-      repos.catalogo.categorias(),
-      repos.servicos.emAndamento(),
-      repos.servicos.recentes(),
-    ).wait;
+    final perfil = await repos.perfil.carregar();
+    final categorias = await repos.catalogo.categorias();
+    final andamento = await repos.servicos.emAndamento();
+    final recentes = await repos.servicos.recentes();
     return DadosInicio(
       nome: perfil.nome.trim().split(' ').first,
       categorias: categorias,

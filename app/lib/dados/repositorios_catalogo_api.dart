@@ -81,37 +81,30 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   @override
   Future<List<Profissional>> profissionais(String categoriaId, FiltroProfissionais filtro) async {
-    try {
-      final consulta = <String, String>{
-        'categoria_id': categoriaId,
-        if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
-      };
-      final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
-      return [
-        for (final item in (resposta['itens'] as List? ?? const []))
-          _converterBusca(item as Map<String, dynamic>),
-      ];
-    } on Object {
-      // Sem conexão com a API: segue com demo
-    }
-    return _demo.profissionais(categoriaId, filtro);
+    final consulta = <String, String>{
+      'categoria_id': categoriaId,
+      if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
+    };
+    final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
+    return [
+      for (final item in (resposta['itens'] as List? ?? const []))
+        _converterBusca(item as Map<String, dynamic>),
+    ];
   }
 
   @override
   Future<List<Profissional>> buscar(String termo) async {
     final limpo = termo.trim();
-    if (limpo.length >= 2) {
-      try {
-        final resposta = _mapa(await _api.get('/v1/profissionais', consulta: {'servico': limpo}));
-        return [
-          for (final item in (resposta['itens'] as List? ?? const []))
-            _converterBusca(item as Map<String, dynamic>),
-        ];
-      } on Object {
-        // Sem conexão com a API: segue com demo
-      }
-    }
-    return _demo.buscar(termo);
+    final consulta = <String, String>{
+      if (limpo.length >= 2) 'servico': limpo,
+    };
+    final resposta = _mapa(
+      await _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
+    );
+    return [
+      for (final item in (resposta['itens'] as List? ?? const []))
+        _converterBusca(item as Map<String, dynamic>),
+    ];
   }
 
   @override

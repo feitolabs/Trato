@@ -68,7 +68,11 @@ class ProvedorAuthSupabase:
         if perfil is None and self._criar_no_primeiro_login and not claims.get("is_anonymous"):
             # Primeiro login: cria a linha (cliente). O papel vem do banco; do token só o nome.
             meta = claims.get("user_metadata")
-            nome = (meta.get("full_name") or meta.get("name")) if isinstance(meta, dict) else None
+            nome = (
+                (meta.get("nome") or meta.get("full_name") or meta.get("name"))
+                if isinstance(meta, dict)
+                else None
+            )
             perfil = self._usuarios.garantir(sub, nome)
         if perfil is None or perfil.status not in STATUS_QUE_ENTRAM:
             return None

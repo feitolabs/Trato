@@ -20,29 +20,32 @@ class EstruturaAuth extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: comVoltar || tituloBarra != null
-          ? AppBar(title: tituloBarra == null ? null : Text(tituloBarra!))
-          : null,
-      body: SafeArea(
-        child: ConteudoResponsivo(
-          margem: EspacosTrato.margemOnboarding,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: children,
+    return PopScope(
+      canPop: comVoltar,
+      child: Scaffold(
+        appBar: comVoltar || tituloBarra != null
+            ? AppBar(title: tituloBarra == null ? null : Text(tituloBarra!))
+            : null,
+        body: SafeArea(
+          child: ConteudoResponsivo(
+            margem: EspacosTrato.margemOnboarding,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: children,
+                    ),
                   ),
                 ),
-              ),
-              if (rodape != null) ...[
-                rodape!,
-                const SizedBox(height: EspacosTrato.x4),
+                if (rodape != null) ...[
+                  rodape!,
+                  const SizedBox(height: EspacosTrato.x4),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
