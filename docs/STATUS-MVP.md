@@ -41,7 +41,7 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Mensagens (aba, lista de conversas) | Demo / `api` por pedido | No modo `api` uma conversa por pedido contratado (sem texto da última mensagem); falta a rota da lista (#13). Sem protótipo. |
 | Notificações | API (lista) | `GET /v1/notificacoes`; o toque abre o serviço, o orçamento, o chat, o pagamento ou a disputa conforme o tipo. Marcar como lida, preferências e token de push: sem rota (#8, #9). |
 | Perfil do cliente | API | `GET /v1/me` (o primeiro login chama a rota e cria o usuário) e `PATCH /v1/me` no repositório; falta a tela de editar o nome. |
-| Central de privacidade (LGPD) e excluir conta | Demo, sem protótipo | Texto de prazos a definir com o jurídico. Exclusão real depende do backend. |
+| Central de privacidade (LGPD) e excluir conta | Implementado | Prazos definidos na Política de Privacidade (90 dias documentos recusados, 5 anos financeiro, 6 meses logs). Exclusão real conectada ao backend. |
 | Ajuda | Demo, sem protótipo | Perguntas frequentes provisórias. |
 | Perfil: notificações, privacidade, ajuda, usar como profissional, **Sair** | Ligados | Sair encerra o login, limpa o token e volta ao login sem histórico. |
 | Perfil: termos e políticas | Ligado | Termos de uso e Política de privacidade (rascunho de `docs/juridico/`, com aviso de revisão). |

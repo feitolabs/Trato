@@ -46,8 +46,8 @@ provisórios. Fotos: o app devolve só uma referência (String); o envio ao buck
 ## Cuidados de texto (V2, D13 a D15)
 
 - Verificação: "confere se o documento é seu; não garante a qualidade de nenhum serviço". Sem "profissional
-  seguro" nem "verificado plus". Finalidade, retenção e quem vê (LGPD) vêm do serviço (`TextoLgpd`); o texto de
-  exemplo tem o prazo marcado como **a definir com o jurídico** (ver `docs/advogado-e-contador.md`).
+  seguro" nem "verificado plus". Finalidade, retenção e quem vê (LGPD) vêm do serviço (`TextoLgpd`); prazo
+  conforme a Política de Privacidade (enquanto a conta estiver ativa, e até 90 dias em caso de recusa/substituição).
 - Aditivo: "só vale se o cliente aprovar no app". O app nunca mostra o aditivo como "pago".
 - Disputa: usa "valor congelado até a decisão" (igual ao Relatar problema). Sem "escrow" nem "garantia total".
 - Taxa mostrada no aditivo (`Taxa do Trato (7,5%)`) é só o que o backend devolveu.

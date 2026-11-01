@@ -70,7 +70,7 @@ class ServicoVerificacaoFake implements ServicoVerificacao {
 
 const textoLgpdExemplo = TextoLgpd(
   finalidade: 'Conferir se o documento e o rosto são da mesma pessoa que fez o cadastro.',
-  retencao: 'Guardamos pelo tempo que a lei pede. Depois disso, apagamos. '
-      '(Prazo exato: a definir com o jurídico.)',
+  retencao: 'Guardamos enquanto você mantiver sua conta ativa. '
+      'Se a análise for recusada ou substituída, apagamos em até 90 dias.',
   quemVe: 'Só a equipe de análise do Trato. Os clientes não veem seu documento.',
 );

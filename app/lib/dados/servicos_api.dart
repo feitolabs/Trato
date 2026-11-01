@@ -158,7 +158,8 @@ class ServicoVerificacaoApi implements ServicoVerificacao {
     final v = todas.last;
     return TextoLgpd(
       finalidade: v['finalidade'] as String,
-      retencao: 'Guardamos por ${v['retencao_dias']} dias e depois apagamos.',
+      retencao: 'Guardamos enquanto você mantiver sua conta ativa. '
+          'Se a análise for recusada ou substituída, apagamos em até ${v['retencao_dias'] ?? 90} dias.',
       quemVe: textoLgpdExemplo.quemVe,
     );
   }
