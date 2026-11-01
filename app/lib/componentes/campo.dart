@@ -58,13 +58,15 @@ class CampoTrato extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Rótulo em uma linha só: encolhe em colunas estreitas em vez de quebrar a palavra.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(rotulo, style: TipografiaTrato.corpoForte, maxLines: 1),
-        ),
-        const SizedBox(height: EspacosTrato.x2),
+        if (rotulo.isNotEmpty) ...[
+          // Rótulo em uma linha só: encolhe em colunas estreitas em vez de quebrar a palavra.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(rotulo, style: TipografiaTrato.corpoForte, maxLines: 1),
+          ),
+          const SizedBox(height: EspacosTrato.x2),
+        ],
         TextField(
           controller: controlador,
           obscureText: senha,
@@ -80,8 +82,24 @@ class CampoTrato extends StatelessWidget {
             // prefixText/suffixText somem sem foco; no protótipo "R$" e "h" ficam sempre visíveis.
             prefixIcon: prefixo != null
                 ? _TextoFixo(prefixo!, inicio: true)
-                : (iconeInicio == null ? null : Icon(iconeInicio)),
-            prefixIconConstraints: const BoxConstraints(),
+                : (iconeInicio == null
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(
+                          left: EspacosTrato.x4,
+                          right: EspacosTrato.x3,
+                        ),
+                        child: Icon(
+                          iconeInicio,
+                          size: 22,
+                          color: CoresTrato.petroleo,
+                        ),
+                      )),
+            prefixIconConstraints: prefixo != null
+                ? const BoxConstraints()
+                : (iconeInicio != null
+                    ? const BoxConstraints(minWidth: 48, minHeight: EspacosTrato.alturaCampo)
+                    : const BoxConstraints()),
             suffixIcon: textoAcao != null
                 ? _Acao(textoAcao!, aoTocarAcao)
                 : (sufixo == null ? null : _TextoFixo(sufixo!, inicio: false)),

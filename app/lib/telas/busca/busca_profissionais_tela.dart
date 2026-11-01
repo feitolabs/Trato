@@ -79,7 +79,11 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
             onSubmitted: _buscar,
             decoration: InputDecoration(
               hintText: 'Serviço ou profissional',
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Padding(
+                padding: EdgeInsets.only(left: EspacosTrato.x4, right: EspacosTrato.x3),
+                child: Icon(Icons.search, size: 22, color: CoresTrato.petroleo),
+              ),
+              prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: EspacosTrato.alturaCampo),
               suffixIcon: IconButton(
                 tooltip: 'Buscar',
                 icon: const Icon(Icons.arrow_forward),

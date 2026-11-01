@@ -14,9 +14,14 @@ String reaisCurto(int centavos) {
   return cents == 0 ? 'R\$ $inteiro' : 'R\$ $inteiro,${cents.toString().padLeft(2, '0')}';
 }
 
-/// "R$ 200 a R$ 500" ou "Sem faixa".
-String textoFaixa(PedidoAberto p) =>
-    p.temFaixa ? '${reaisCurto(p.faixaMinCentavos!)} a ${reaisCurto(p.faixaMaxCentavos!)}' : 'Sem faixa';
+/// "R$ 200 a R$ 500", "R$ 350" ou "Sem faixa".
+String textoFaixa(PedidoAberto p) {
+  if (!p.temFaixa) return 'Sem faixa';
+  if (p.faixaMinCentavos == p.faixaMaxCentavos) {
+    return reaisCurto(p.faixaMinCentavos!);
+  }
+  return '${reaisCurto(p.faixaMinCentavos!)} a ${reaisCurto(p.faixaMaxCentavos!)}';
+}
 
 /// "2,1 km".
 String textoDistancia(double? km) =>

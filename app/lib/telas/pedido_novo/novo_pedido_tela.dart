@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
+import '../profissional/dinheiro.dart' show Dinheiro;
 import '../profissional_apoio/apoio.dart' show CapturarFoto;
 import 'dados_exemplo.dart';
 import 'modelos.dart';
@@ -50,6 +52,9 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late DateTime _dataPrazo = DateTime.now().add(const Duration(days: 7));
   late FaixaPreco _faixa = widget.formulario.faixas.first;
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
+  final _controladorValorProprio = TextEditingController();
+  bool _informarValorProprio = false;
+  String? _erroValor;
   var _tentou = false;
   final _fotosNovas = <String>[];
   CidadeOpcao? _cidade;
@@ -127,9 +132,24 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     if (escolhida != null && mounted) setState(() => _cidade = escolhida);
   }
 
+  static int? _lerCentavos(String texto) {
+    final limpo = texto.trim();
+    if (limpo.isEmpty) return null;
+    if (limpo.contains(',')) {
+      final semMilhar = limpo.replaceAll('.', '').replaceAll(',', '.');
+      return Dinheiro.lerCentavos(semMilhar);
+    }
+    if (RegExp(r'^\d{1,3}(\.\d{3})+$').hasMatch(limpo)) {
+      final semPonto = limpo.replaceAll('.', '');
+      return Dinheiro.lerCentavos(semPonto);
+    }
+    return Dinheiro.lerCentavos(limpo);
+  }
+
   @override
   void dispose() {
     _descricao.dispose();
+    _controladorValorProprio.dispose();
     super.dispose();
   }
 
@@ -152,6 +172,14 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     setState(() => _tentou = true);
     if (_exigeCidade && _cidade == null) return;
     if (_erroPrazo != null) return;
+    if (_informarValorProprio) {
+      final c = _lerCentavos(_controladorValorProprio.text);
+      if (c == null || c <= 0) {
+        setState(() => _erroValor = 'Informe o valor que você quer gastar.');
+        return;
+      }
+      _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+    }
     if (_servicos.isNotEmpty && _descricao.text.trim().isNotEmpty) {
       final rascunho = RascunhoPedido(
         servicos: [
@@ -174,8 +202,10 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   }
 
   static String _rotuloFaixa(FaixaPreco f) =>
-      '${formatarReais(f.minimoCentavos).replaceAll(',00', '')} a '
-      '${formatarReais(f.maximoCentavos).replaceAll(',00', '')}';
+      f.minimoCentavos == f.maximoCentavos
+          ? formatarReais(f.minimoCentavos)
+          : '${formatarReais(f.minimoCentavos).replaceAll(',00', '')} a '
+              '${formatarReais(f.maximoCentavos).replaceAll(',00', '')}';
 
   @override
   Widget build(BuildContext context) {
@@ -318,13 +348,79 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           aoTocar: _escolherDataPrazo,
         ),
         const SizedBox(height: EspacosTrato.x5),
-        _CampoLista<FaixaPreco>(
-          rotulo: 'Quanto pensa gastar?',
-          valor: _faixa,
-          opcoes: f.faixas,
-          texto: _rotuloFaixa,
-          aoMudar: (v) => setState(() => _faixa = v),
+        const RotuloSecao('Quanto pensa gastar?'),
+        const SizedBox(height: EspacosTrato.x3),
+        Row(
+          children: [
+            Expanded(
+              child: _OpcaoRadio(
+                texto: 'Faixa estimada',
+                marcada: !_informarValorProprio,
+                aoTocar: () {
+                  setState(() {
+                    _informarValorProprio = false;
+                    _erroValor = null;
+                    if (_faixa.minimoCentavos == _faixa.maximoCentavos && f.faixas.isNotEmpty) {
+                      _faixa = f.faixas.first;
+                    }
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: EspacosTrato.x2),
+            Expanded(
+              child: _OpcaoRadio(
+                texto: 'Informar meu valor',
+                marcada: _informarValorProprio,
+                aoTocar: () {
+                  setState(() {
+                    _informarValorProprio = true;
+                    if (_controladorValorProprio.text.trim().isNotEmpty) {
+                      final c = _lerCentavos(_controladorValorProprio.text);
+                      if (c != null && c > 0) {
+                        _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+                      }
+                    }
+                  });
+                },
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: EspacosTrato.x3),
+        if (!_informarValorProprio) ...[
+          _CampoLista<FaixaPreco>(
+            rotulo: 'Escolha uma faixa',
+            valor: _faixa,
+            opcoes: f.faixas,
+            texto: _rotuloFaixa,
+            aoMudar: (v) => setState(() => _faixa = v),
+          ),
+        ] else ...[
+          CampoTrato(
+            rotulo: 'Valor que pretende gastar',
+            controlador: _controladorValorProprio,
+            dica: 'Ex.: 300,00',
+            prefixo: 'R\$ ',
+            teclado: const TextInputType.numberWithOptions(decimal: true),
+            formatadores: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+            ],
+            erro: _tentou ? _erroValor : null,
+            ajuda: 'Os profissionais receberão o seu valor como estimativa inicial.',
+            aoMudar: (v) {
+              final c = _lerCentavos(v);
+              setState(() {
+                if (c != null && c > 0) {
+                  _erroValor = null;
+                  _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+                } else {
+                  _erroValor = 'Informe um valor válido maior que zero.';
+                }
+              });
+            },
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         if (_exigeCidade)
           InkWell(

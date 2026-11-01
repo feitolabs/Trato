@@ -125,6 +125,22 @@ void main() {
       expect(recebido!.faixa.maximoCentavos, 50000);
     });
 
+    testWidgets('informar meu valor preenche faixa exata com centavos informados', (tester) async {
+      RascunhoPedido? recebido;
+      await _abrir(tester, NovoPedidoTela(aoEnviar: (r) => recebido = r));
+
+      await _tocar(tester, find.text('Informar meu valor'));
+      expect(find.text('Valor que pretende gastar'), findsOneWidget);
+
+      await tester.enterText(find.widgetWithText(TextField, 'Ex.: 300,00'), '350,00');
+      await tester.pump();
+      await _tocar(tester, find.text('Próximo'));
+
+      expect(recebido, isNotNull);
+      expect(recebido!.faixa.minimoCentavos, 35000);
+      expect(recebido!.faixa.maximoCentavos, 35000);
+    });
+
     for (final texto in ['Trocar', 'Mudar', 'Adicionar']) {
       testWidgets('sem callback, $texto não aparece', (tester) async {
         await _abrir(tester, const NovoPedidoTela());

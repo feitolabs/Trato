@@ -77,7 +77,11 @@ class _BuscarTelaState extends State<BuscarTela> {
                   style: TipografiaTrato.corpo,
                   decoration: const InputDecoration(
                     hintText: 'Serviço ou profissional',
-                    prefixIcon: Icon(Icons.search),
+                    prefixIcon: Padding(
+                      padding: EdgeInsets.only(left: EspacosTrato.x4, right: EspacosTrato.x3),
+                      child: Icon(Icons.search, size: 22, color: CoresTrato.petroleo),
+                    ),
+                    prefixIconConstraints: BoxConstraints(minWidth: 48, minHeight: EspacosTrato.alturaCampo),
                   ),
                 ),
                 const SizedBox(height: EspacosTrato.x4),
