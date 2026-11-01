@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: trato-backend
+    runtime: python
+    buildCommand: "pip install -e ."
+    startCommand: "uvicorn trato.api.fabrica:criar_app_da_config --factory --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: TRATO_AMBIENTE
+        value: producao
+      - key: TRATO_PERSISTENCIA
+        value: postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: TRATO_CODIGO_SEGREDO
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
