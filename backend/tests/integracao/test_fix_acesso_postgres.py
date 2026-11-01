@@ -125,7 +125,9 @@ def test_dados_privados_so_uma_vez_e_cpf_de_outro_e_recusado(cenario):
     for uid in (a, b):
         c.contexto.usuarios.garantir(uid)
     cpf = f"9{uuid.uuid4().int % 10**10:010d}"
+    assert c.contexto.usuarios.cpf_disponivel(cpf) is True
     assert c.contexto.usuarios.registrar_dados_privados(a, cpf, None) is True
+    assert c.contexto.usuarios.cpf_disponivel(cpf) is False
     assert c.contexto.usuarios.registrar_dados_privados(a, cpf, None) is False  # idempotente
     with pytest.raises(Duplicado):
         c.contexto.usuarios.registrar_dados_privados(b, cpf, None)

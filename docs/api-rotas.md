@@ -92,6 +92,12 @@ cliente e profissional, **uma vez cada**, só com o pedido concluído. Corpo
 |---|---|---|---|
 | `GET /v1/me` | qualquer pessoa logada | — | `{id, nome, papel, papeis[], status, nivel_verificacao, nota_publica, servicos_concluidos, tem_perfil_profissional, status_verificacao}`. Cria a linha em `usuarios` se faltar (idempotente). Nunca devolve CPF, telefone nem e-mail |
 | `PATCH /v1/me` | cliente e profissional | `{nome}` (2 a 120 caracteres) | o mesmo perfil já atualizado. O papel não pode ser trocado por aqui |
+| `POST /v1/cadastro/cpf` | qualquer pessoa, **sem login** | `{cpf}` (com ou sem máscara) | `{disponivel}`. Só diz se o CPF está livre; nunca revela de quem é. `422` se o CPF é inválido. Limitado por IP |
+| `POST /v1/me/dados-pessoais` | qualquer pessoa logada | `{cpf}` (com ou sem máscara) | `204`. Grava o CPF uma vez; repetir com o mesmo CPF é seguro. CPF de outra conta responde `409` |
+
+O app confere `/v1/cadastro/cpf` **antes** do `signUp` e grava em `/v1/me/dados-pessoais` no primeiro
+login (logo após a confirmação do e-mail). A chave única de `usuarios_privados` fecha a corrida entre
+dois cadastros simultâneos; o CPF nunca vai para o Supabase Auth nem para o token.
 
 `papeis` é a lista do que a pessoa pode ser (`cliente`; mais `profissional` se tem perfil de
 profissional). `status_verificacao`: `enviada`, `em_analise`, `aprovada`, `recusada` ou `null`.

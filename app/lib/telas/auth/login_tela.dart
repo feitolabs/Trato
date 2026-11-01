@@ -54,15 +54,8 @@ class _LoginTelaState extends State<LoginTela> {
   void _abrir(Widget tela) =>
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => tela));
 
-  String? get _erroIdentificador {
-    if (!_tentou) return null;
-    final vazio = ValidacaoAuth.obrigatorio(_identificador.text, 'Informe e-mail, CPF ou telefone.');
-    if (vazio != null) return vazio;
-    // Por enquanto o login real é só por e-mail (D14).
-    return ValidacaoAuth.email(_identificador.text) == null
-        ? null
-        : 'Entre com o e-mail da sua conta.';
-  }
+  String? get _erroIdentificador =>
+      _tentou ? ValidacaoAuth.identificadorLogin(_identificador.text) : null;
 
   String? get _erroSenha =>
       _tentou ? ValidacaoAuth.obrigatorio(_senha.text, 'Informe sua senha.') : null;
@@ -153,8 +146,7 @@ class _LoginTelaState extends State<LoginTela> {
         CampoTrato(
           rotulo: 'E-mail, CPF ou telefone',
           controlador: _identificador,
-          dica: 'voce@email.com',
-          ajuda: 'Use o e-mail cadastrado na sua conta.',
+          dica: 'voce@email.com, CPF ou celular',
           teclado: TextInputType.emailAddress,
           erro: _erroIdentificador,
           aoMudar: (_) => setState(() {}),

@@ -54,6 +54,14 @@ class UsuariosPostgres:
             return None
         return self.perfil(usuario_id)
 
+    def cpf_disponivel(self, cpf: str) -> bool:
+        """Verdadeiro se nenhuma conta tem esse CPF (comparação com os 11 dígitos)."""
+        with self._banco.transacao() as con:
+            achado = con.execute(
+                "select 1 from public.usuarios_privados where cpf = %s limit 1", (cpf,)
+            ).fetchone()
+        return achado is None
+
     def registrar_dados_privados(
         self, usuario_id: str, cpf: str, telefone: str | None = None
     ) -> bool:
@@ -68,7 +76,52 @@ class UsuariosPostgres:
                 "values (%s, %s, %s) on conflict (usuario_id) do nothing returning usuario_id",
                 (achado, cpf, telefone),
             ).fetchone()
+            if criada is None and telefone:
+                con.execute(
+                    "update public.usuarios_privados set telefone = %s "
+                    "where usuario_id = %s and telefone is null",
+                    (telefone, achado),
+                )
         return criada is not None
+
+    def email_por_identificador(self, digitos: str) -> str | None:
+        """Resolve o e-mail de login pelo CPF (11 dígitos) ou telefone (10 a 13 dígitos)."""
+        with self._banco.transacao() as con:
+            if len(digitos) == 11:
+                linha = con.execute(
+                    "select privado.email_por_cpf(%s) as email", (digitos,)
+                ).fetchone()
+                if linha and linha["email"]:
+                    return str(linha["email"])
+            tel = digitos[2:] if digitos.startswith("55") and len(digitos) in (12, 13) else digitos
+            linha_tel = con.execute(
+                "select privado.email_por_telefone(%s) as email", (tel,)
+            ).fetchone()
+            if linha_tel and linha_tel["email"]:
+                return str(linha_tel["email"])
+        return None
+
+    def vincular_cadastro(
+        self,
+        usuario_id: str,
+        email: str,
+        nome: str,
+        cpf: str,
+        telefone: str | None = None,
+    ) -> bool:
+        """Confere em `auth.users` se `(usuario_id, email)` confere e grava `usuarios_privados`."""
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            raise DadosInvalidos("Usuário inválido.")
+        with self._banco.transacao() as con:
+            confere = con.execute(
+                "select privado.confirmar_email_do_usuario(%s, %s) as ok",
+                (achado, email.strip()),
+            ).fetchone()
+            if not (confere and confere["ok"]):
+                return False
+        self.garantir(usuario_id, nome)
+        return self.registrar_dados_privados(usuario_id, cpf, telefone)
 
     def perfil(self, usuario_id: str) -> PerfilUsuario | None:
         """Quem é e o que pode ser: equipe ativa > profissional aprovado > cliente.

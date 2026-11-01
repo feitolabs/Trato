@@ -94,6 +94,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         email: _email.text.trim(),
         senha: _senha.text,
         celular: _celular.text,
+        cpf: _cpf.text,
         perfil: widget.perfil.name,
       ));
     } on ErroAuth catch (e) {
@@ -112,6 +113,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
             builder: (_) => ConfirmarEmailTela(
               email: email,
               senha: _senha.text,
+              cpf: _cpf.text,
               perfil: widget.perfil,
               servico: widget.servico,
             ),
@@ -164,36 +166,26 @@ class _CriarContaTelaState extends State<CriarContaTela> {
           aoMudar: atualizar,
         ),
         const SizedBox(height: EspacosTrato.x4),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: CampoTrato(
-                rotulo: 'CPF',
-                controlador: _cpf,
-                dica: '000.000.000-00',
-                teclado: TextInputType.number,
-                formatadores: const [MascaraNumerica.cpf],
-                erro: _erro(() => ValidacaoAuth.cpf(_cpf.text)),
-                aoMudar: atualizar,
-              ),
-            ),
-            const SizedBox(width: EspacosTrato.x3),
-            Expanded(
-              child: CampoTrato(
-                rotulo: 'Nascimento',
-                controlador: _nascimento,
-                dica: 'dd/mm/aaaa',
-                teclado: TextInputType.number,
-                formatadores: const [MascaraNumerica.data],
-                erro: _erro(() => ValidacaoAuth.nascimento(_nascimento.text)),
-                aoMudar: atualizar,
-              ),
-            ),
-          ],
+        CampoTrato(
+          rotulo: 'CPF',
+          controlador: _cpf,
+          dica: '000.000.000-00',
+          teclado: TextInputType.number,
+          formatadores: const [MascaraNumerica.cpf],
+          erro: _erro(() => ValidacaoAuth.cpf(_cpf.text)),
+          aoMudar: atualizar,
         ),
-        const SizedBox(height: EspacosTrato.x2),
-        Text('O Trato é para maiores de 18 anos.', style: TipografiaTrato.legenda),
+        const SizedBox(height: EspacosTrato.x4),
+        CampoTrato(
+          rotulo: 'Nascimento',
+          controlador: _nascimento,
+          dica: 'dd/mm/aaaa',
+          ajuda: 'O Trato é para maiores de 18 anos.',
+          teclado: TextInputType.number,
+          formatadores: const [MascaraNumerica.data],
+          erro: _erro(() => ValidacaoAuth.nascimento(_nascimento.text)),
+          aoMudar: atualizar,
+        ),
         const SizedBox(height: EspacosTrato.x4),
         CampoTrato(
           rotulo: 'Celular',

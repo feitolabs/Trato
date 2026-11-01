@@ -11,6 +11,7 @@ const _dados = DadosCadastro(
   email: 'Mariana@Email.com',
   senha: _credencial,
   celular: '(31) 98765-4417',
+  cpf: '123.456.789-09',
 );
 
 Matcher _erro(TipoErroAuth tipo) => isA<ErroAuth>().having((e) => e.tipo, 'tipo', tipo);
@@ -47,6 +48,41 @@ void main() {
       final s = ServicoAuthFake();
       await s.criarConta(_dados);
       await expectLater(s.criarConta(_dados), throwsA(_erro(TipoErroAuth.emailJaUsado)));
+    });
+
+    test('CPF repetido dá cpfJaUsado, com ou sem máscara', () async {
+      final s = ServicoAuthFake();
+      await s.criarConta(_dados);
+      expect(await s.cpfDisponivel('12345678909'), isFalse);
+      await expectLater(
+        s.criarConta(const DadosCadastro(
+          nome: 'Outra Pessoa',
+          email: 'outra@email.com',
+          senha: _credencial,
+          celular: '(11) 91234-5678',
+          cpf: '12345678909',
+        )),
+        throwsA(_erro(TipoErroAuth.cpfJaUsado)),
+      );
+      expect(await s.cpfDisponivel('529.982.247-25'), isTrue);
+    });
+
+    test('registrarCpf grava na conta logada e não aceita CPF de outra conta', () async {
+      final s = ServicoAuthFake();
+      await s.criarConta(_dados);
+      await s.sair();
+      await s.criarConta(const DadosCadastro(
+        nome: 'Outra Pessoa',
+        email: 'outra@email.com',
+        senha: _credencial,
+        celular: '(11) 91234-5678',
+        cpf: '111.444.777-35',
+      ));
+      await s.sair();
+
+      await s.entrarComEmail(email: 'mariana@email.com', senha: _credencial);
+      await s.registrarCpf('123.456.789-09'); // o mesmo da conta: não faz nada
+      await expectLater(s.registrarCpf('11144477735'), throwsA(_erro(TipoErroAuth.cpfJaUsado)));
     });
 
     test('login: conta criada entra; senha errada não', () async {

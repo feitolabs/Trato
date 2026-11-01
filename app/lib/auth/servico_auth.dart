@@ -35,6 +35,7 @@ class DadosCadastro {
     required this.email,
     required this.senha,
     required this.celular,
+    this.cpf = '',
     this.perfil,
   });
 
@@ -44,6 +45,9 @@ class DadosCadastro {
 
   /// Como digitado, ex.: "(31) 98765-4417".
   final String celular;
+
+  /// Como digitado, ex.: "123.456.789-09". Não vai para o login: o backend grava.
+  final String cpf;
 
   /// `cliente` ou `profissional` (escolha da tela "Como você quer usar o Trato?").
   final String? perfil;
@@ -81,6 +85,8 @@ enum TipoErroAuth {
   provedorIndisponivel,
   emailNaoConfirmado,
   limiteEmail,
+  cpfJaUsado,
+  cpfNaoVerificado,
   dadosInvalidos,
   cadastroDesativado,
   cancelado,
@@ -108,6 +114,8 @@ class ErroAuth implements Exception {
     TipoErroAuth.provedorIndisponivel: 'Este tipo de entrada ainda não está disponível.',
     TipoErroAuth.emailNaoConfirmado: 'Confirme seu e-mail para entrar.',
     TipoErroAuth.limiteEmail: 'Muitos e-mails enviados. Espere alguns minutos e tente de novo.',
+    TipoErroAuth.cpfJaUsado: 'Este CPF já está cadastrado em outra conta.',
+    TipoErroAuth.cpfNaoVerificado: 'Não foi possível verificar o CPF agora. Tente de novo.',
     TipoErroAuth.dadosInvalidos: 'Confira os dados e tente de novo.',
     TipoErroAuth.cadastroDesativado: 'O cadastro está indisponível no momento.',
     TipoErroAuth.cancelado: 'Entrada cancelada.',
@@ -146,8 +154,16 @@ abstract class ServicoAuth {
   Future<SessaoAuth> entrarComEmail({required String email, required String senha});
 
   /// Cria a conta. Com sessão, entra direto; sem sessão (confirmação de e-mail ligada),
-  /// devolve [CadastroAguardandoEmail].
+  /// devolve [CadastroAguardandoEmail]. Antes de criar, confere se o CPF está livre; se já
+  /// estiver em outra conta, lança [ErroAuth] com `cpfJaUsado`.
   Future<ResultadoCadastro> criarConta(DadosCadastro dados);
+
+  /// Diz se o CPF pode ser usado numa conta nova. Não revela de quem é o CPF.
+  Future<bool> cpfDisponivel(String cpf);
+
+  /// Grava o CPF na conta logada (depois do primeiro login). Repetir o mesmo CPF não faz nada;
+  /// CPF de outra conta lança [ErroAuth] com `cpfJaUsado`.
+  Future<void> registrarCpf(String cpf);
 
   /// Reenvia o e-mail de confirmação do cadastro.
   Future<void> reenviarEmailConfirmacao(String email);

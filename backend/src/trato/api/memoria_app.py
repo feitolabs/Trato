@@ -19,7 +19,7 @@ from trato.api.repositorios_app import (
 )
 from trato.pagamentos.taxa import ConfigTaxa, calcular_taxa
 from trato.persistencia.conversas import Mensagem, Notificacao, mascarar_contatos
-from trato.persistencia.erros import NaoEncontrado
+from trato.persistencia.erros import Duplicado, NaoEncontrado
 
 
 class ConversasEmMemoria:
@@ -91,6 +91,9 @@ class NotificacoesEmMemoria:
 class UsuariosEmMemoria:
     def __init__(self, perfis: Sequence[PerfilDetalhe] = ()) -> None:
         self._perfis = {p.id: p for p in perfis}
+        self._cpfs: dict[str, str] = {}  # cpf (11 dígitos) -> usuario_id
+        self._telefones: dict[str, str] = {}  # telefone (dígitos) -> usuario_id
+        self.emails: dict[str, str] = {}  # usuario_id -> email
         self.verificacoes: dict[str, str] = {}  # profissional_id -> status (testes preenchem)
         self.profissionais: set[str] = set()
 
@@ -117,6 +120,45 @@ class UsuariosEmMemoria:
 
     def tem_perfil_profissional(self, usuario_id: str) -> bool:
         return usuario_id in self.profissionais
+
+    def cpf_disponivel(self, cpf: str) -> bool:
+        return cpf not in self._cpfs
+
+    def registrar_dados_privados(
+        self, usuario_id: str, cpf: str, telefone: str | None = None
+    ) -> bool:
+        dono = self._cpfs.get(cpf)
+        if dono is not None and dono != usuario_id:
+            raise Duplicado("Este CPF já está cadastrado em outra conta.")
+        if dono == usuario_id:
+            return False
+        self._cpfs[cpf] = usuario_id
+        if telefone:
+            digitos_tel = "".join(c for c in telefone if c.isdigit())
+            if digitos_tel.startswith("55") and len(digitos_tel) in (12, 13):
+                digitos_tel = digitos_tel[2:]
+            if digitos_tel:
+                self._telefones[digitos_tel] = usuario_id
+        return True
+
+    def email_por_identificador(self, digitos: str) -> str | None:
+        uid = self._cpfs.get(digitos)
+        if uid is None:
+            tel = digitos[2:] if digitos.startswith("55") and len(digitos) in (12, 13) else digitos
+            uid = self._telefones.get(tel)
+        return self.emails.get(uid) if uid else None
+
+    def vincular_cadastro(
+        self,
+        usuario_id: str,
+        email: str,
+        nome: str,
+        cpf: str,
+        telefone: str | None = None,
+    ) -> bool:
+        self.emails[usuario_id] = email.strip().lower()
+        self.garantir(usuario_id, nome)
+        return self.registrar_dados_privados(usuario_id, cpf, telefone)
 
 
 class VerificacoesEmMemoria:

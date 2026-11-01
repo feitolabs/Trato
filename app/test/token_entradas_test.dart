@@ -143,6 +143,7 @@ void main() {
         email: 'carlos@pro.com',
         senha: _chave,
         celular: '(31) 98765-4417',
+        cpf: '123.456.789-09',
         perfil: 'profissional',
       ));
       await auth.sair();

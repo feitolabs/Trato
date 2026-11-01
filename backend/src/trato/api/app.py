@@ -7,6 +7,7 @@ from fastapi import APIRouter, FastAPI
 from trato import __version__
 from trato.api import (
     rotas_app,
+    rotas_cadastro,
     rotas_financeiro,
     rotas_legal,
     rotas_pedido_contrato,
@@ -25,6 +26,7 @@ from trato.seguranca.config import parametros_docs
 def criar_router() -> APIRouter:
     roteador = APIRouter()
     roteador.include_router(rotas_legal.router)
+    roteador.include_router(rotas_cadastro.router)
     roteador.include_router(rotas_pedidos.router)
     roteador.include_router(rotas_app.router)
     roteador.include_router(rotas_pedido_contrato.router)

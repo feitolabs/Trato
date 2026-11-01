@@ -173,6 +173,27 @@ class RepositorioUsuarios(Protocol):
 
     def tem_perfil_profissional(self, usuario_id: str) -> bool: ...
 
+    def cpf_disponivel(self, cpf: str) -> bool:
+        """Verdadeiro se nenhuma conta tem esse CPF (já normalizado em 11 dígitos)."""
+
+    def registrar_dados_privados(
+        self, usuario_id: str, cpf: str, telefone: str | None = None
+    ) -> bool:
+        """Grava CPF (e telefone) uma única vez; falso se a pessoa já tinha a linha."""
+
+    def email_por_identificador(self, digitos: str) -> str | None:
+        """Busca o e-mail de login da conta pelo CPF (11 dígitos) ou telefone (10 a 13 dígitos)."""
+
+    def vincular_cadastro(
+        self,
+        usuario_id: str,
+        email: str,
+        nome: str,
+        cpf: str,
+        telefone: str | None = None,
+    ) -> bool:
+        """Vincula nome, CPF e telefone à conta recém-criada em `auth.users` se o e-mail conferir."""
+
 
 class RepositorioVerificacoes(Protocol):
     def enviar(

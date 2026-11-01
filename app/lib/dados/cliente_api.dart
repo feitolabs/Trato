@@ -30,6 +30,7 @@ class ClienteApi {
     Map<String, String>? consulta,
     Object? corpo,
     String? chaveIdempotencia,
+    String? token,
   }) =>
       _enviar(
         'POST',
@@ -37,6 +38,7 @@ class ClienteApi {
         consulta: consulta,
         corpo: corpo,
         chaveIdempotencia: chaveIdempotencia,
+        token: token,
       );
 
   Future<Object?> patch(String caminho, {Object? corpo}) =>
@@ -53,13 +55,14 @@ class ClienteApi {
     Map<String, String>? consulta,
     Object? corpo,
     String? chaveIdempotencia,
+    String? token,
   }) async {
     Future<http.Response> tentar() async {
       final pedido = http.Request(metodo, _uri(caminho, consulta))
         ..headers['Accept'] = 'application/json';
-      final token = sessao.token;
-      if (token != null && token.isNotEmpty) {
-        pedido.headers['Authorization'] = 'Bearer $token';
+      final efetivo = token ?? sessao.token;
+      if (efetivo != null && efetivo.isNotEmpty) {
+        pedido.headers['Authorization'] = 'Bearer $efetivo';
       }
       if (chaveIdempotencia != null) {
         pedido.headers['Idempotency-Key'] = chaveIdempotencia;
@@ -105,7 +108,11 @@ class ClienteApi {
       throw ErroTrato.sessaoExpirada;
     }
     if (codigo == 404) {
-      throw ErroTrato(TipoErro.naoEncontrado, _detalhe(resposta) ?? 'Não encontramos isso.');
+      throw ErroTrato(
+        TipoErro.naoEncontrado,
+        _detalhe(resposta) ?? 'Não encontramos isso.',
+        codigoHttp: codigo,
+      );
     }
     if (codigo == 501) throw ErroTrato.indisponivel;
     if (codigo >= 500) throw ErroTrato.servidor;
@@ -113,6 +120,7 @@ class ClienteApi {
     throw ErroTrato(
       TipoErro.recusado,
       _detalhe(resposta) ?? 'Não foi possível concluir. Confira os dados e tente de novo.',
+      codigoHttp: codigo,
     );
   }
 

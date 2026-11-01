@@ -11,8 +11,21 @@ abstract final class ValidacaoAuth {
   static String? nome(String valor) =>
       valor.trim().length < 3 ? 'Informe seu nome completo.' : null;
 
-  static String? cpf(String valor) =>
-      somenteDigitos(valor).length == 11 ? null : 'O CPF tem 11 números.';
+  static String? cpf(String valor) {
+    final d = somenteDigitos(valor);
+    if (d.length != 11) return 'O CPF tem 11 números.';
+    if (d.split('').every((c) => c == d[0])) return 'CPF inválido.';
+    for (var posicao = 9; posicao < 11; posicao++) {
+      var soma = 0;
+      for (var i = 0; i < posicao; i++) {
+        soma += int.parse(d[i]) * (posicao + 1 - i);
+      }
+      final resto = soma % 11;
+      final digito = resto < 2 ? 0 : 11 - resto;
+      if (d[posicao] != '$digito') return 'CPF inválido.';
+    }
+    return null;
+  }
 
   /// Data no formato dd/mm/aaaa, de quem tem 18 anos ou mais ("O Trato é para maiores de 18 anos").
   static String? nascimento(String valor, {DateTime? hoje}) {
@@ -38,6 +51,18 @@ abstract final class ValidacaoAuth {
     final v = valor.trim();
     if (v.isEmpty) return 'Informe seu e-mail.';
     return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v) ? null : 'E-mail inválido.';
+  }
+
+  /// Valida o identificador de login: e-mail, CPF (11 dígitos) ou telefone com DDD (10 a 13 dígitos).
+  static String? identificadorLogin(String valor) {
+    final v = valor.trim();
+    if (v.isEmpty) return 'Informe e-mail, CPF ou telefone.';
+    if (v.contains('@') || RegExp(r'[A-Za-z]').hasMatch(v)) {
+      return email(v);
+    }
+    final d = somenteDigitos(v);
+    if (d.length >= 10 && d.length <= 13) return null;
+    return 'Informe um e-mail, CPF ou telefone válido.';
   }
 
   /// 8 ou mais caracteres, com pelo menos uma letra e um número.

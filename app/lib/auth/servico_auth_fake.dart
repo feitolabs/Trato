@@ -34,6 +34,8 @@ class ServicoAuthFake implements ServicoAuth {
   void confirmarEmail(String email) => _naoConfirmados.remove(_normalizar(email));
 
   final Map<String, String> _contas;
+  final Map<String, String> _donoDoCpf = {}; // CPF (11 dígitos) -> conta
+  final Map<String, String> _cpfDaConta = {}; // conta -> CPF (11 dígitos)
   final Set<ProvedorAuth> _provedores;
   final ControleCodigoCelular _codigo;
   final _controle = StreamController<SessaoAuth?>.broadcast();
@@ -54,6 +56,20 @@ class ServicoAuthFake implements ServicoAuth {
   int get codigosEnviados => _codigo.envios;
 
   static String _normalizar(String email) => email.trim().toLowerCase();
+
+  static String _digitos(String valor) => valor.replaceAll(RegExp(r'\D'), '');
+
+  void _ocuparCpf(String conta, String cpf) {
+    final digitos = _digitos(cpf);
+    final atual = _cpfDaConta[conta];
+    if (atual == digitos) return;
+    final dono = _donoDoCpf[digitos];
+    if ((dono != null && dono != conta) || atual != null) {
+      throw const ErroAuth(TipoErroAuth.cpfJaUsado);
+    }
+    _donoDoCpf[digitos] = conta;
+    _cpfDaConta[conta] = digitos;
+  }
 
   void _checarFalha() {
     final erro = falharNaProxima;
@@ -92,7 +108,14 @@ class ServicoAuthFake implements ServicoAuth {
   @override
   Future<SessaoAuth> entrarComEmail({required String email, required String senha}) async {
     _checarFalha();
-    final chave = _normalizar(email);
+    var chave = _normalizar(email);
+    if (!chave.contains('@')) {
+      final digitos = _digitos(chave);
+      final dono = _donoDoCpf[digitos];
+      if (dono != null && dono.startsWith('fake-')) {
+        chave = dono.substring(5);
+      }
+    }
     final certa = _contas[chave];
     final ok = certa != null ? certa == senha : aceitaQualquerLogin;
     if (!ok) throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
@@ -110,6 +133,8 @@ class ServicoAuthFake implements ServicoAuth {
     _checarFalha();
     final chave = _normalizar(dados.email);
     if (_contas.containsKey(chave)) throw const ErroAuth(TipoErroAuth.emailJaUsado);
+    final conta = 'fake-$chave';
+    _ocuparCpf(conta, dados.cpf);
     _contas[chave] = dados.senha;
     _codigo.novoCadastro();
     _perfis[chave] = dados.perfil;
@@ -118,8 +143,22 @@ class ServicoAuthFake implements ServicoAuth {
       return CadastroAguardandoEmail(chave);
     }
     return CadastroComSessao(_entrou(
-      SessaoAuth(id: 'fake-$chave', email: chave, nome: dados.nome, perfil: dados.perfil),
+      SessaoAuth(id: conta, email: chave, nome: dados.nome, perfil: dados.perfil),
     ));
+  }
+
+  @override
+  Future<bool> cpfDisponivel(String cpf) async {
+    _checarFalha();
+    return !_donoDoCpf.containsKey(_digitos(cpf));
+  }
+
+  @override
+  Future<void> registrarCpf(String cpf) async {
+    _checarFalha();
+    final sessao = _sessao;
+    if (sessao == null) throw const ErroAuth(TipoErroAuth.desconhecido);
+    _ocuparCpf(sessao.id, cpf);
   }
 
   @override

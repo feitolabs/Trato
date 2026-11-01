@@ -71,6 +71,34 @@ def _limites_padrao() -> list[RegraLimite]:
             bloqueio_s=600,
         ),  # fmt: skip
         RegraLimite(nome="webhooks", prefixo="/v1/webhooks", escopo="ip", maximo=600, janela_s=60),
+        # Consulta pública de CPF: limita a descoberta de quais CPFs têm conta.
+        RegraLimite(
+            nome="cadastro_cpf",
+            prefixo="/v1/cadastro/cpf",
+            metodos=["POST"],
+            escopo="ip",
+            maximo=10,
+            janela_s=60,
+            bloqueio_s=600,
+        ),
+        RegraLimite(
+            nome="cadastro_identificador",
+            prefixo="/v1/cadastro/identificador",
+            metodos=["POST"],
+            escopo="ip",
+            maximo=15,
+            janela_s=60,
+            bloqueio_s=600,
+        ),
+        RegraLimite(
+            nome="cadastro_vincular",
+            prefixo="/v1/cadastro/vincular",
+            metodos=["POST"],
+            escopo="ip",
+            maximo=10,
+            janela_s=60,
+            bloqueio_s=600,
+        ),
         # Rotas sensíveis (M12/A8): escrita que gera custo, dado pessoal ou dinheiro.
         RegraLimite(
             nome="verificacao_envio",

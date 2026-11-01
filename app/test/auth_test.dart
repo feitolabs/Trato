@@ -15,6 +15,7 @@ import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 const _celularDigitado = '(31) 98765-4417';
+const _senha = 'segredo123';
 
 Future<void> _abrir(WidgetTester tester, Widget tela,
     {Size tamanho = const Size(390, 1600)}) async {
@@ -49,8 +50,10 @@ Future<void> _tocar(WidgetTester tester, String texto) async {
 
 void main() {
   group('validação', () {
-    test('cpf, celular e código exigem a quantidade de números', () {
-      expect(ValidacaoAuth.cpf('123.456.789-01'), isNull);
+    test('cpf confere os dígitos verificadores; celular e código exigem números', () {
+      expect(ValidacaoAuth.cpf('123.456.789-09'), isNull);
+      expect(ValidacaoAuth.cpf('123.456.789-01'), isNotNull);
+      expect(ValidacaoAuth.cpf('111.111.111-11'), isNotNull);
       expect(ValidacaoAuth.cpf('123.456.789'), isNotNull);
       expect(ValidacaoAuth.celular(_celularDigitado), isNull);
       expect(ValidacaoAuth.celular('(31) 9876'), isNotNull);
@@ -171,15 +174,19 @@ void main() {
       expect(find.byType(CascaClienteTela), findsNothing);
     });
 
-    testWidgets('identificador que não é e-mail pede o e-mail', (tester) async {
+    testWidgets('aceita entrar com CPF ou telefone e barra identificador curto', (tester) async {
       await _abrir(tester, const LoginTela());
-      await _digitar(tester, 'E-mail, CPF ou telefone', '12345678901');
+      await _digitar(tester, 'E-mail, CPF ou telefone', '12345');
       await _digitar(tester, 'Senha', 'segredo123');
 
       await _tocar(tester, 'Entrar');
 
-      expect(find.text('Entre com o e-mail da sua conta.'), findsOneWidget);
+      expect(find.text('Informe um e-mail, CPF ou telefone válido.'), findsOneWidget);
       expect(find.byType(CascaClienteTela), findsNothing);
+
+      await _digitar(tester, 'E-mail, CPF ou telefone', '12345678909');
+      await _tocar(tester, 'Entrar');
+      expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
     testWidgets('Google habilitado entra', (tester) async {
@@ -265,7 +272,7 @@ void main() {
   group('criar conta', () {
     Future<void> preencher(WidgetTester tester) async {
       await _digitar(tester, 'Nome completo', 'Mariana Alves');
-      await _digitar(tester, 'CPF', '12345678901');
+      await _digitar(tester, 'CPF', '12345678909');
       await _digitar(tester, 'Nascimento', '15031990');
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
@@ -340,6 +347,24 @@ void main() {
       expect(find.byType(ConfirmarCelularTela), findsNothing);
     });
 
+    testWidgets('CPF já usado mostra o erro e fica no passo 1', (tester) async {
+      final servico = ServicoAuthFake();
+      await servico.criarConta(const DadosCadastro(
+        nome: 'Outra Pessoa',
+        email: 'outra@email.com',
+        senha: _senha,
+        celular: '(11) 91234-5678',
+        cpf: '123.456.789-09',
+      ));
+      await servico.sair();
+      await _abrir(tester, CriarContaTela(servico: servico));
+
+      await aceitarETocar(tester);
+
+      expect(find.text('Este CPF já está cadastrado em outra conta.'), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsNothing);
+    });
+
     testWidgets('sem internet mostra o erro e fica no passo 1', (tester) async {
       final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
       await _abrir(tester, CriarContaTela(servico: servico));
@@ -367,7 +392,7 @@ void main() {
       final servico = ServicoAuthFake(exigeConfirmacaoEmail: true);
       await _abrir(tester, CriarContaTela(servico: servico));
       await _digitar(tester, 'Nome completo', 'Mariana Alves');
-      await _digitar(tester, 'CPF', '12345678901');
+      await _digitar(tester, 'CPF', '12345678909');
       await _digitar(tester, 'Nascimento', '15031990');
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');

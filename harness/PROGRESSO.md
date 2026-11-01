@@ -486,5 +486,42 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
     - Prazos operacionais: confirmação cliente 48h, congelamento de repasse em disputa 72h, resposta 48h, decisão 5 dias úteis, retrabalho 7 dias.
     - Faixa de taxa global sem teto cadastrada e validada em `ConfigPostgres` e `ConfigPagamentoPostgres`.
 
+## 01/11/2026 — Um CPF, uma conta
+
+**Bug:** dava para criar duas contas com o mesmo CPF. O CPF era validado só na tela (11 números)
+e nunca chegava ao backend; `usuarios_privados.cpf` (unique) existia, mas ninguém gravava.
+
+**Decisão (João):** conferir o CPF **antes** do `signUp` e gravar depois do primeiro login. A
+consulta pública só devolve `disponivel`; a unique do banco fecha a corrida entre dois cadastros.
+
+**Feito**
+- Backend: `seguranca/cpf.py` (dígitos verificadores), `POST /v1/cadastro/cpf` (público, limite
+  por IP) e `POST /v1/me/dados-pessoais` (autenticado, 204, idempotente, 409 para CPF de outra
+  conta); `cpf_disponivel`/`registrar_dados_privados` nos repositórios de memória e Postgres;
+  regra `cadastro_cpf` no limite de taxa. Testes em `tests/seguranca/test_cpf.py`,
+  `tests/api/test_cpf_cadastro.py` e integração Postgres.
+- App: `DadosCadastro.cpf`; pré-checagem no `ServicoAuthSupabase` e gravação em
+  `ConfirmarEmailTela` (antes de entrar no app); `ValidacaoAuth.cpf` confere os dígitos;
+  `ClienteApi.post` aceita token explícito e `ErroTrato.codigoHttp` distingue 409/422/429;
+  o fake também bloqueia CPF repetido. No modo `demo` (sem API) o cadastro segue como antes.
+- Docs: `api-rotas.md`, `fix-acesso.md`, `sobras-seguranca.md` (M11 parcial) e
+  `login-configuracao.md`.
+
+**Verificação**
+- `verificar --etapa segredos`: TUDO OK.
+- Backend: ruff e ruff format OK nos arquivos alterados; `pytest` completo 1.282 passed.
+- App: `flutter analyze` sem problemas; testes de auth/serviço/token 87 passed.
+- `verificar.py` completo ainda falha em itens **anteriores a esta tarefa**: cores soltas fora do
+  tema (6 arquivos), goldens desatualizados de login/criar conta/check-in, texto do check-in
+  (`14h06` virou parte de uma frase) e ruff em `rotas_legal.py`. Nada disso veio desta mudança.
+
+**Limites conhecidos**
+- Contas criadas antes deste fix não têm CPF gravado e não bloqueiam um CPF repetido.
+- No fluxo com confirmação de e-mail, se a gravação do CPF falhar por rede, a conta já criada no
+  Auth fica órfã (o app desloga e o CPF não é gravado); tentar de novo com o mesmo e-mail é
+  bloqueado pelo `signUp`. A consulta prévia evita o caso comum; a corrida rara fica fechada pela
+  unique, mas o segundo usuário não consegue concluir o cadastro.
+- Guardar o CPF em claro ou só o hash continua pendente (M11).
+
 
 

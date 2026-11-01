@@ -74,11 +74,14 @@ Não há confirmação por SMS. A tela antiga (`ConfirmarCelularTela`) e o códi
 
 Com URL, chave pública e e-mail ligados você já testa: criar conta → abrir o link do e-mail → "Já confirmei" → entrar, sair, recuperar senha. Google precisa do passo 4. Apple precisa de Mac e conta paga.
 
-Sempre use contas de teste. Não grave dados no banco por aqui: o app só conversa com o Supabase Auth.
+Sempre use contas de teste. No modo `demo` o app só conversa com o Supabase Auth; no modo `api` ele
+confere o CPF antes do `signUp` e grava o CPF no backend no primeiro login.
 
 ## 8. O que o login ainda não faz
 
-- CPF e data de nascimento são validados na tela, mas **não** vão para o Supabase Auth (dado sensível). Devem ir ao perfil pelo backend.
+- CPF e data de nascimento são validados na tela e **não** vão para o Supabase Auth (dado sensível). O CPF vai
+  ao backend (`POST /v1/cadastro/cpf` antes do `signUp` e `POST /v1/me/dados-pessoais` no primeiro login); a
+  data de nascimento ainda não é enviada.
 - Login por CPF ou telefone: hoje só e-mail.
 - Biometria: continua "em breve".
 - O primeiro login com sessão chama `GET /v1/me` (cria o usuário no backend) só no modo `api`; em `demo` não chama nada.

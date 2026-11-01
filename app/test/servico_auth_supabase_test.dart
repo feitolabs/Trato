@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import 'package:trato/auth/config_auth.dart';
 import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/auth/servico_auth_supabase.dart';
+import 'package:trato/dados/cliente_api.dart';
+import 'package:trato/dados/sessao.dart';
 
 const _senha = 'segredo123';
 const _outra = 'errada123';
@@ -16,6 +18,7 @@ const _dados = DadosCadastro(
   email: 'mariana@email.com',
   senha: _senha,
   celular: '(31) 98765-4417',
+  cpf: '123.456.789-09',
   perfil: 'cliente',
 );
 
@@ -47,15 +50,27 @@ http.Response _json(int status, Object corpo) => http.Response(
 http.Response _erro(int status, String codigo, [Map<String, dynamic>? extra]) =>
     _json(status, {'error_code': codigo, 'msg': 'mensagem interna', ...?extra});
 
-/// Cliente do Supabase com a rede trocada por [resposta]; guarda os pedidos feitos.
+http.Response _apiPadrao(http.Request pedido) {
+  if (pedido.url.path == '/v1/cadastro/cpf') {
+    return _json(200, {'disponivel': true});
+  }
+  if (pedido.url.path == '/v1/me/dados-pessoais') return http.Response('', 204);
+  return _json(404, {'detail': 'rota de teste não configurada'});
+}
+
+/// Cliente do Supabase e da API com a rede trocada; guarda os pedidos feitos.
 ({
   ServicoAuthSupabase servico,
   List<http.Request> pedidos,
+  List<http.Request> apiPedidos,
   sb.SupabaseClient cliente
 }) _montar(
-  http.Response Function(http.Request) resposta,
-) {
+  http.Response Function(http.Request) resposta, {
+  http.Response Function(http.Request)? api,
+  bool comApi = true,
+}) {
   final pedidos = <http.Request>[];
+  final apiPedidos = <http.Request>[];
   final cliente = sb.SupabaseClient(
     'https://teste.supabase.co',
     'chave-publica-de-teste',
@@ -67,9 +82,22 @@ http.Response _erro(int status, String codigo, [Map<String, dynamic>? extra]) =>
       return resposta(r);
     }),
   );
+  final clienteApi = ClienteApi(
+    urlBase: 'https://api.teste',
+    sessao: SessaoTrato(),
+    cliente: MockClient((r) async {
+      apiPedidos.add(r);
+      return (api ?? _apiPadrao)(r);
+    }),
+  );
   return (
-    servico: ServicoAuthSupabase(const ConfigAuth(), cliente: cliente),
+    servico: ServicoAuthSupabase(
+      const ConfigAuth(),
+      cliente: cliente,
+      api: comApi ? clienteApi : null,
+    ),
     pedidos: pedidos,
+    apiPedidos: apiPedidos,
     cliente: cliente
   );
 }
@@ -90,6 +118,79 @@ void main() {
       final r = await m.servico.criarConta(_dados);
       expect(r, isA<CadastroComSessao>());
       expect((r as CadastroComSessao).sessao.email, 'mariana@email.com');
+      await m.cliente.dispose();
+    });
+
+    test('com sessão: grava o CPF na API com o token do cadastro', () async {
+      final m = _montar((_) => _json(200, {
+            'access_token': 'a.b.c',
+            'token_type': 'bearer',
+            'expires_in': 3600,
+            'refresh_token': 'r',
+            'user': _usuario(),
+          }));
+      await m.servico.criarConta(_dados);
+
+      expect(
+        m.apiPedidos.map((r) => r.url.path),
+        ['/v1/cadastro/cpf', '/v1/me/dados-pessoais'],
+      );
+      final salvar = m.apiPedidos.last;
+      expect(salvar.headers['Authorization'], 'Bearer a.b.c');
+      expect(jsonDecode(salvar.body), {'cpf': '12345678909'});
+      await m.cliente.dispose();
+    });
+
+    test('modo demo (sem API) cadastra sem conferir nem gravar o CPF', () async {
+      final m = _montar(
+        (_) => _json(200, {
+          'access_token': 'a.b.c',
+          'token_type': 'bearer',
+          'expires_in': 3600,
+          'refresh_token': 'r',
+          'user': _usuario(),
+        }),
+        comApi: false,
+      );
+      final r = await m.servico.criarConta(_dados);
+      expect(r, isA<CadastroComSessao>());
+      expect(m.apiPedidos, isEmpty);
+      await m.cliente.dispose();
+    });
+
+    test('CPF de outra conta nem chega a criar a conta', () async {
+      final m = _montar(
+        (_) => _json(200, _usuario()),
+        api: (_) => _json(200, {'disponivel': false}),
+      );
+      await expectLater(
+        m.servico.criarConta(_dados),
+        throwsA(_erroAuth(TipoErroAuth.cpfJaUsado)),
+      );
+      expect(m.pedidos, isEmpty);
+      await m.cliente.dispose();
+    });
+
+    test('409 ao gravar o CPF desloga e vira cpfJaUsado', () async {
+      final m = _montar(
+        (r) => r.url.path == '/auth/v1/logout'
+            ? http.Response('', 204)
+            : _json(200, {
+                'access_token': 'a.b.c',
+                'token_type': 'bearer',
+                'expires_in': 3600,
+                'refresh_token': 'r',
+                'user': _usuario(),
+              }),
+        api: (r) => r.url.path == '/v1/me/dados-pessoais'
+            ? _json(409, {'detail': 'Este CPF já está cadastrado em outra conta.'})
+            : _json(200, {'disponivel': true}),
+      );
+      await expectLater(
+        m.servico.criarConta(_dados),
+        throwsA(_erroAuth(TipoErroAuth.cpfJaUsado)),
+      );
+      expect(m.pedidos.any((r) => r.url.path == '/auth/v1/logout'), isTrue);
       await m.cliente.dispose();
     });
 
@@ -118,6 +219,9 @@ void main() {
       expect(data.containsKey('nascimento'), isFalse);
       expect(data['nome'], 'Mariana Alves');
       expect(m.pedidos.where((r) => r.method == 'PUT'), isEmpty);
+      // Sem sessão: só a conferência do CPF; a gravação espera o primeiro login.
+      expect(m.apiPedidos.single.url.path, '/v1/cadastro/cpf');
+      expect(jsonDecode(m.apiPedidos.single.body), {'cpf': '12345678909'});
       await m.cliente.dispose();
     });
 
@@ -125,6 +229,36 @@ void main() {
       final m = _montar((_) => _json(200, _usuario(identidades: const [])));
       await expectLater(m.servico.criarConta(_dados),
           throwsA(_erroAuth(TipoErroAuth.emailJaUsado)));
+      await m.cliente.dispose();
+    });
+  });
+
+  group('registrarCpf', () {
+    test('grava na conta logada com o token da sessão', () async {
+      final m = _montar((_) => _json(200, {
+            'access_token': 'a.b.c',
+            'token_type': 'bearer',
+            'expires_in': 3600,
+            'refresh_token': 'r',
+            'user': _usuario(),
+          }));
+      await m.servico.entrarComEmail(email: 'mariana@email.com', senha: _senha);
+      await m.servico.registrarCpf('123.456.789-09');
+
+      final salvar = m.apiPedidos.single;
+      expect(salvar.url.path, '/v1/me/dados-pessoais');
+      expect(salvar.headers['Authorization'], 'Bearer a.b.c');
+      expect(jsonDecode(salvar.body), {'cpf': '12345678909'});
+      await m.cliente.dispose();
+    });
+
+    test('sem sessão devolve cpfNaoVerificado e não chama a API', () async {
+      final m = _montar((_) => _json(200, _usuario()));
+      await expectLater(
+        m.servico.registrarCpf('123.456.789-09'),
+        throwsA(_erroAuth(TipoErroAuth.cpfNaoVerificado)),
+      );
+      expect(m.apiPedidos, isEmpty);
       await m.cliente.dispose();
     });
   });

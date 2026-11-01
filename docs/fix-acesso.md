@@ -23,7 +23,7 @@ erros, e documento só sai por URL curta com motivo e registro.
 | **M7** perdedor do orçamento | `privado.pode_ver_pedido`: orçamento/conversa só valem enquanto **não há contrato com outro profissional**. `pedido_historico` passa a usar `privado.pode_ver_historico` (cliente, profissional do contrato e equipe de atendimento; quem só orçou não lê). | migration |
 | **M9** texto livre | Título (120), descrição (2000), respostas em texto (500), comentário (1000), até 8 etiquetas de até 40 caracteres: limites em `TRATO_SEG_*`, estouro = 422, e **mascaramento de telefone/e-mail/link/rua na entrada** (o mesmo do chat). | `seguranca/texto_livre.py`, `rotas_pedidos.py`, `rotas_app.py` |
 | **M10** aceite | O contrato grava `aceite_ip` e `aceite_dispositivo` (`X-Dispositivo-Id`, ou o user-agent cortado). `X-Forwarded-For` só vale com `TRATO_SEG_CONFIAR_X_FORWARDED_FOR=true` (atrás de proxy de confiança) e usa o **último** item. | `rotas_pedidos.py`, `seguranca/cliente.py` |
-| **M11** primeiro login | `ProvedorAuthSupabase` cria `public.usuarios` (cliente, `ativo`) no primeiro token válido, com `insert ... on conflict do nothing` (idempotente, seguro com logins simultâneos). O **papel nunca vem do token**; do `user_metadata` só entra o nome de exibição. Login anônimo e `sub` fora de `auth.users` não criam nada. `usuarios_privados` exige CPF (`not null`), então fica para o passo de cadastro: `UsuariosPostgres.registrar_dados_privados` é idempotente e recusa CPF de outra pessoa. **Falta** a rota que coleta o CPF (depende do desenho do cadastro: ver "Fora do escopo"). | `api/auth_supabase.py`, `persistencia/usuarios.py` |
+| **M11** primeiro login | `ProvedorAuthSupabase` cria `public.usuarios` (cliente, `ativo`) no primeiro token válido, com `insert ... on conflict do nothing` (idempotente, seguro com logins simultâneos). O **papel nunca vem do token**; do `user_metadata` só entra o nome de exibição. Login anônimo e `sub` fora de `auth.users` não criam nada. `usuarios_privados` exige CPF (`not null`), então fica para o passo de cadastro: `UsuariosPostgres.registrar_dados_privados` é idempotente e recusa CPF de outra pessoa. O CPF agora é consultado antes do `signUp` e gravado no primeiro login (`rotas_cadastro.py`); falta só o aceite dos termos. | `api/auth_supabase.py`, `persistencia/usuarios.py`, `api/rotas_cadastro.py` |
 | **M12** borda | Limite de taxa já existia (`seguranca/`); incluí regras para as rotas sensíveis (envio de verificação, URL de documento, escrita do admin). CORS só por lista (`TRATO_SEG_CORS_ORIGENS`, sem `*`). `/docs`, `/redoc` e `/openapi.json` **só existem** em `TRATO_SEG_AMBIENTES_COM_DOCS` (padrão: desenvolvimento, dev, local, teste); ambiente desconhecido = desligado. | `seguranca/config.py`, `api/app.py`, `api/fabrica.py` |
 | **B1** | `iss` conferido quando `SUPABASE_URL` está no `.env` (`<url>/auth/v1`); token de outro projeto cai. | `api/auth_supabase.py` |
 | **B8** (parte) | `.github/dependabot.yml` (pip, pub e Actions, semanal, só abre PR). | `.github/dependabot.yml` |
@@ -101,9 +101,10 @@ Posso continuar? (aplicar só com o seu "sim")
   O JWT de conta bloqueada já é recusado pelo backend (consulta o banco a cada chamada); o que falta é a
   leitura direta pelo PostgREST até o token expirar, e a policy restritiva cobre isso.
 - **A8:** retenção de documentos (`verificacao_documentos.excluir_em`, N10) é decisão do advogado/DPO.
-- **M11:** falta a rota que coleta o CPF e grava `usuarios_privados` (o repositório está pronto e testado). CPF
-  precisa de validação de dígitos e decisão sobre guardar em claro ou só o hash (o schema hoje guarda o texto).
-  Também falta o aceite dos termos (`aceite_termos_versao/em`).
+- **M11:** CPF resolvido: `POST /v1/cadastro/cpf` (consulta pública, com limite por IP) antes do `signUp` e
+  `POST /v1/me/dados-pessoais` (autenticada) no primeiro login; o backend valida os dígitos e a unique de
+  `usuarios_privados` fecha a corrida. Falta o aceite dos termos (`aceite_termos_versao/em`) e a decisão sobre
+  guardar o CPF em claro ou só o hash (o schema hoje guarda o texto).
 - **Baixos (B\*):**
   - B1 e B8 (Dependabot): feitos aqui. B8 ainda sem `pip-audit` no CI e sem lock com hash (mexe no CI/`pyproject`).
   - B2 (concessão por coluna em `repasses`, `lancamentos`…): exige migration de grants por coluna e acompanhar

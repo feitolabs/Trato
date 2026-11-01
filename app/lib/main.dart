@@ -5,6 +5,7 @@ import 'auth/ligacao_sessao.dart';
 import 'auth/servico_auth.dart';
 import 'auth/servico_auth_supabase.dart';
 import 'telas/auth/login_tela.dart';
+import 'dados/cliente_api.dart';
 import 'dados/config.dart';
 import 'dados/repositorios_trato.dart';
 import 'dados/sessao.dart';
@@ -44,27 +45,32 @@ void abrirLoginPorSessaoExpirada() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
+  final config = ConfigTrato.doAmbiente();
   // Sem chaves do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY por --dart-define), o login fica no
   // serviço de teste. Ver docs/login-configuracao.md. O token do login vai para a [sessaoTrato].
   final configAuth = ConfigAuth.doAmbiente();
   if (configAuth.supabaseConfigurado) {
-    ServicoAuthPadrao.atual = await ServicoAuthSupabase.inicializar(configAuth);
+    ServicoAuthPadrao.atual = await ServicoAuthSupabase.inicializar(
+      configAuth,
+      // O CPF sai do Auth (não vai no token) e é conferido/gravado pela API do Trato.
+      api: config.usaApi ? ClienteApi(urlBase: config.apiUrl, sessao: sessaoTrato) : null,
+    );
   }
-  // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
   LigacaoSessao(
     ServicoAuthPadrao.atual,
     sessaoTrato,
     // Primeiro login: GET /v1/me cria o usuário no backend (idempotente).
     // Só no modo api; em demo não chama nada.
     aoEntrar: () async {
-      if (ConfigTrato.doAmbiente().usaApi) await RotasTrato.repos.perfil.carregar();
+      if (config.usaApi) await RotasTrato.repos.perfil.carregar();
     },
   );
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
   RotasTrato.repos = RepositoriosTrato.deConfig(
-    ConfigTrato.doAmbiente(),
+    config,
     sessaoTrato,
     criarUpload: ServicoUploadApi.new,
     camera: ServicoCameraReal(),

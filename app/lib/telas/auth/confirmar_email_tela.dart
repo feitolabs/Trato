@@ -17,6 +17,7 @@ class ConfirmarEmailTela extends StatefulWidget {
     super.key,
     required this.email,
     required this.senha,
+    required this.cpf,
     this.perfil = PerfilUso.cliente,
     this.servico,
   });
@@ -28,6 +29,9 @@ class ConfirmarEmailTela extends StatefulWidget {
 
   /// Só fica na memória desta tela, para o "Já confirmei" entrar sem pedir de novo.
   final String senha;
+
+  /// CPF digitado no passo 1. Vai para o backend depois do primeiro login.
+  final String cpf;
 
   /// Perfil escolhido no cadastro: decide para onde o usuário vai depois de confirmar.
   final PerfilUso perfil;
@@ -43,6 +47,7 @@ class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
   StreamSubscription<SessaoAuth?>? _subSessao;
   var _restante = ConfirmarEmailTela.segundosParaReenviar;
   var _carregando = false;
+  var _seguindo = false;
   String? _erroServico;
   String? _aviso;
 
@@ -53,10 +58,30 @@ class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
     super.initState();
     _iniciarContagem();
     _subSessao = _servico.sessaoMudou.listen((sessao) {
-      if (sessao != null && mounted) {
-        RotasTrato.irParaDepoisDoCadastro(context, widget.perfil);
-      }
+      if (sessao != null) _seguir();
     });
+  }
+
+  /// Grava o CPF na conta logada e só então entra no app. CPF de outra conta não passa.
+  Future<void> _seguir() async {
+    if (_seguindo || !mounted) return;
+    _seguindo = true;
+    String? erro;
+    try {
+      await _servico.registrarCpf(widget.cpf);
+    } on ErroAuth catch (e) {
+      erro = e.mensagem;
+    }
+    if (!mounted) return;
+    if (erro == null) {
+      RotasTrato.irParaDepoisDoCadastro(context, widget.perfil);
+      return;
+    }
+    setState(() {
+      _carregando = false;
+      _erroServico = erro;
+    });
+    _seguindo = false;
   }
 
   void _iniciarContagem() {
@@ -115,12 +140,15 @@ class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
           : e.mensagem;
     }
     if (!mounted) return;
+    if (erro == null) {
+      // O listener de sessão pode ter chamado _seguir; o guard evita gravar duas vezes.
+      await _seguir();
+      return;
+    }
     setState(() {
       _carregando = false;
       _erroServico = erro;
     });
-    if (erro != null) return;
-    RotasTrato.irParaDepoisDoCadastro(context, widget.perfil);
   }
 
   String get _tempo => '${_restante ~/ 60}:${(_restante % 60).toString().padLeft(2, '0')}';

@@ -9,6 +9,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../dados/cliente_api.dart';
+import '../dados/erros.dart';
 import 'armazenamento_sessao.dart';
 import 'config_auth.dart';
 import 'controle_codigo_celular.dart';
@@ -22,13 +24,18 @@ const kUrlRetornoEmail = 'br.com.feitolabs.trato://login-callback';
 /// provedores ligados no painel (docs/login-configuracao.md).
 /// Testado com cliente simulado (`test/servico_auth_supabase_test.dart`).
 class ServicoAuthSupabase implements ServicoAuth {
-  ServicoAuthSupabase(this._config, {sb.SupabaseClient? cliente, ControleCodigoCelular? codigo})
-      : _cliente = cliente ?? sb.Supabase.instance.client,
-        _codigo = codigo ?? ControleCodigoCelular();
+  ServicoAuthSupabase(
+    this._config, {
+    sb.SupabaseClient? cliente,
+    ControleCodigoCelular? codigo,
+    ClienteApi? api,
+  })  : _cliente = cliente ?? sb.Supabase.instance.client,
+        _codigo = codigo ?? ControleCodigoCelular(),
+        _api = api;
 
   /// Inicializa o Supabase. Chame no `main` antes de `runApp`, só se
-  /// `config.supabaseConfigurado`.
-  static Future<ServicoAuthSupabase> inicializar(ConfigAuth config) async {
+  /// `config.supabaseConfigurado`. [api] é a API do Trato, que guarda o CPF (fora do login).
+  static Future<ServicoAuthSupabase> inicializar(ConfigAuth config, {ClienteApi? api}) async {
     // Sessão no Keychain/Keystore, nunca em SharedPreferences (revisão M13).
     await sb.Supabase.initialize(
       url: config.supabaseUrl,
@@ -37,12 +44,14 @@ class ServicoAuthSupabase implements ServicoAuth {
         localStorage: LocalStorageSeguro(chave: LocalStorageSeguro.chaveDaUrl(config.supabaseUrl)),
       ),
     );
-    return ServicoAuthSupabase(config);
+    return ServicoAuthSupabase(config, api: api);
   }
 
   final ConfigAuth _config;
   final sb.SupabaseClient _cliente;
   final ControleCodigoCelular _codigo;
+  final ClienteApi? _api;
+  String? _cpfPendente;
 
   sb.GoTrueClient get _auth => _cliente.auth;
 
@@ -85,6 +94,49 @@ class ServicoAuthSupabase implements ServicoAuth {
   /// "(31) 98765-4417" vira "+5531987654417".
   static String celularE164(String celular) => '+55${celular.replaceAll(RegExp(r'\D'), '')}';
 
+  static String _digitos(String valor) => valor.replaceAll(RegExp(r'\D'), '');
+
+  ErroAuth _deApi(ErroTrato erro) => erro.tipo == TipoErro.semInternet
+      ? const ErroAuth(TipoErroAuth.semInternet)
+      : ErroAuth(TipoErroAuth.dadosInvalidos, erro.mensagem);
+
+  /// Antes de criar a conta: o backend diz se o CPF já pertence a outra conta.
+  /// Sem API (modo demo), não há onde conferir nem gravar: o cadastro segue como antes.
+  Future<void> _exigirCpfLivre(String cpf) async {
+    final api = _api;
+    if (api == null) return;
+    try {
+      final resposta = await api.post('/v1/cadastro/cpf', corpo: {'cpf': cpf});
+      if (!(resposta is Map && resposta['disponivel'] == true)) {
+        throw const ErroAuth(TipoErroAuth.cpfJaUsado);
+      }
+    } on ErroTrato catch (e) {
+      throw _deApi(e);
+    }
+  }
+
+  /// Depois do primeiro login: grava o CPF uma única vez. Se já for de outra conta, desloga.
+  /// Sem API (modo demo), não grava: o CPF fica só na tela.
+  Future<void> _gravarCpf(String cpf, {String? token}) async {
+    final api = _api;
+    if (api == null) return;
+    final acesso = token ?? _auth.currentSession?.accessToken;
+    if (acesso == null || acesso.isEmpty) {
+      throw const ErroAuth(TipoErroAuth.cpfNaoVerificado);
+    }
+    try {
+      await api.post('/v1/me/dados-pessoais', corpo: {'cpf': cpf}, token: acesso);
+    } on ErroTrato catch (e) {
+      try {
+        await _auth.signOut();
+      } catch (_) {
+        // Sem sessão para encerrar: o erro abaixo já impede de prosseguir.
+      }
+      if (e.codigoHttp == 409) throw const ErroAuth(TipoErroAuth.cpfJaUsado);
+      throw _deApi(e);
+    }
+  }
+
   Future<T> _proteger<T>(Future<T> Function() acao) async {
     try {
       return await acao();
@@ -99,6 +151,11 @@ class ServicoAuthSupabase implements ServicoAuth {
   @visibleForTesting
   static ErroAuth traduzirErro(Object e) {
     if (e is ErroAuth) return e;
+    if (e is ErroTrato) {
+      return e.tipo == TipoErro.semInternet
+          ? const ErroAuth(TipoErroAuth.semInternet)
+          : ErroAuth(TipoErroAuth.dadosInvalidos, e.mensagem);
+    }
     if (e is SocketException || e is sb.AuthRetryableFetchException) {
       return const ErroAuth(TipoErroAuth.semInternet);
     }
@@ -142,20 +199,56 @@ class ServicoAuthSupabase implements ServicoAuth {
     return const ErroAuth(TipoErroAuth.desconhecido);
   }
 
+  Future<String> _resolverIdentificador(String identificador) async {
+    final api = _api;
+    if (api == null) throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
+    try {
+      final resposta = await api.post(
+        '/v1/cadastro/identificador',
+        corpo: {'identificador': _digitos(identificador)},
+      );
+      final email = resposta is Map ? resposta['email'] as String? : null;
+      if (email == null || email.isEmpty) {
+        throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
+      }
+      return email;
+    } on ErroTrato catch (e) {
+      if (e.tipo == TipoErro.semInternet) {
+        throw const ErroAuth(TipoErroAuth.semInternet);
+      }
+      throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
+    }
+  }
+
   @override
   Future<SessaoAuth> entrarComEmail({required String email, required String senha}) =>
       _proteger(() async {
-        final r = await _auth.signInWithPassword(email: email.trim(), password: senha);
+        final limpo = email.trim();
+        final emailLogin = limpo.contains('@') ? limpo : await _resolverIdentificador(limpo);
+        final r = await _auth.signInWithPassword(email: emailLogin, password: senha);
+        final pendente = _cpfPendente;
+        _cpfPendente = null;
+        if (pendente != null && pendente.isNotEmpty && r.session != null) {
+          try {
+            await _gravarCpf(pendente, token: r.session!.accessToken);
+          } on Object {
+            // Se falhar, não impede o login.
+          }
+        }
         return _paraSessao(r.user) ?? (throw const ErroAuth(TipoErroAuth.desconhecido));
       });
 
   @override
   Future<ResultadoCadastro> criarConta(DadosCadastro dados) => _proteger(() async {
+        final cpf = _digitos(dados.cpf);
+        // Um CPF, uma conta: confere antes de criar a conta no Auth.
+        await _exigirCpfLivre(cpf);
         final r = await _auth.signUp(
           email: dados.email.trim(),
           password: dados.senha,
           emailRedirectTo: kUrlRetornoEmail,
           // Metadados do usuário: não exigem sessão (nada de updateUser/SMS, D16).
+          // O CPF NÃO vai aqui: iria no token. O backend grava depois do login.
           data: {
             'nome': dados.nome,
             'celular': celularE164(dados.celular),
@@ -167,8 +260,33 @@ class ServicoAuthSupabase implements ServicoAuth {
           throw const ErroAuth(TipoErroAuth.emailJaUsado);
         }
         final sessao = r.session == null ? null : _paraSessao(r.user);
-        if (sessao != null) return CadastroComSessao(sessao);
+        if (sessao != null) {
+          await _gravarCpf(cpf, token: r.session!.accessToken);
+          return CadastroComSessao(sessao);
+        }
+        _cpfPendente = cpf;
         return CadastroAguardandoEmail(dados.email.trim());
+      });
+
+  @override
+  Future<bool> cpfDisponivel(String cpf) => _proteger(() async {
+        final api = _api;
+        if (api == null) return true; // modo demo: sem backend, não há o que conferir
+        try {
+          final resposta = await api.post(
+            '/v1/cadastro/cpf',
+            corpo: {'cpf': _digitos(cpf)},
+          );
+          return resposta is Map && resposta['disponivel'] == true;
+        } on ErroTrato catch (e) {
+          throw _deApi(e);
+        }
+      });
+
+  @override
+  Future<void> registrarCpf(String cpf) => _proteger(() {
+        _cpfPendente = null;
+        return _gravarCpf(_digitos(cpf));
       });
 
   @override
