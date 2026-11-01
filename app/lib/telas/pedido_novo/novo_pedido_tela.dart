@@ -190,7 +190,12 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
               const SizedBox(width: EspacosTrato.x3),
             ],
             for (var i = 0; i < _fotosNovas.length; i++) ...[
-              Expanded(child: _FotoReservada('[Foto ${f.fotos.length + i + 1}]')),
+              Expanded(
+                child: _FotoReservada(
+                  '[Foto ${f.fotos.length + i + 1}]',
+                  referencia: _fotosNovas[i],
+                ),
+              ),
               const SizedBox(width: EspacosTrato.x3),
             ],
             if (f.fotos.length + _fotosNovas.length < _maxFotos && _podeAdicionarFoto)
@@ -366,30 +371,62 @@ class _OpcaoRadio extends StatelessWidget {
 }
 
 class _FotoReservada extends StatelessWidget {
-  const _FotoReservada(this.rotulo);
+  const _FotoReservada(this.rotulo, {this.referencia});
 
   final String rotulo;
+  final String? referencia;
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1,
-      child: Container(
-        padding: const EdgeInsets.all(EspacosTrato.x2),
-        alignment: Alignment.bottomLeft,
-        decoration: BoxDecoration(
-          color: CoresTrato.azulClaro,
-          borderRadius: BorderRadius.circular(EspacosTrato.raio),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            rotulo,
-            style: TipografiaTrato.corpoPequeno.copyWith(
-              color: CoresTrato.petroleo,
-              fontWeight: FontWeight.w600,
-            ),
+    final imagemReal = construirImagemReal(referencia);
+    return ToquePreviewImagem(
+      referencia: referencia ?? rotulo,
+      legenda: rotulo,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
+          padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
+          alignment: Alignment.bottomLeft,
+          decoration: BoxDecoration(
+            color: CoresTrato.azulClaro,
+            borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
+          child: imagemReal != null
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    imagemReal,
+                    Positioned(
+                      left: 6,
+                      bottom: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          rotulo,
+                          style: TipografiaTrato.legenda.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    rotulo,
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.petroleo,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
         ),
       ),
     );

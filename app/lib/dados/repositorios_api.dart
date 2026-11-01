@@ -533,6 +533,11 @@ class RepositorioChatApi implements RepositorioChat {
   Future<void> enviar(String pedidoId, String texto) async {
     await _api.post('/v1/pedidos/$pedidoId/mensagens', corpo: {'texto': texto});
   }
+
+  @override
+  Future<void> enviarFoto(String pedidoId, String referencia) async {
+    await _api.post('/v1/pedidos/$pedidoId/mensagens', corpo: {'texto': referencia});
+  }
 }
 
 /// `GET /v1/notificacoes`. Marcar como lida, preferências e registro do token de push não

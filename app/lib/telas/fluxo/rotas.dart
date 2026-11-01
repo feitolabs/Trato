@@ -493,6 +493,11 @@ abstract final class RotasTrato {
             _abrirOrcamento(context, id, titulo);
           },
           aoFazerOrcamentoDoPedido: (pedido) => _abrirOrcamento(context, pedido.id, pedido.titulo),
+          aoPerguntar: () {
+            final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
+            _abrir<void>(context, _chat(pedido?.id ?? _idDemo));
+          },
+          aoPerguntarDoPedido: (pedido) => _abrir<void>(context, _chat(pedido.id)),
         ),
       );
 
@@ -558,6 +563,14 @@ abstract final class RotasTrato {
               onTap: () {
                 Navigator.of(folha).pop();
                 aoCheckIn();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Conversar com o cliente'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                _abrir<void>(context, _chat(pedidoId));
               },
             ),
             ListTile(
@@ -932,26 +945,10 @@ abstract final class RotasTrato {
       );
 
   static Future<void> _pedirRetrabalho(BuildContext context, String pedidoId) async {
-    final controlador = TextEditingController();
     final descricao = await showDialog<String>(
       context: context,
-      builder: (dialogo) => AlertDialog(
-        title: const Text('Pedir retrabalho'),
-        content: TextField(
-          controller: controlador,
-          maxLines: 4,
-          decoration: const InputDecoration(labelText: 'O que precisa ser refeito?'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogo).pop(), child: const Text('Cancelar')),
-          TextButton(
-            onPressed: () => Navigator.of(dialogo).pop(controlador.text.trim()),
-            child: const Text('Enviar'),
-          ),
-        ],
-      ),
+      builder: (_) => const _DialogoPedirRetrabalho(),
     );
-    controlador.dispose();
     if (descricao == null || descricao.isEmpty || !context.mounted) return;
     final ok = await _tentar(context, () => repos.pedidos.pedirRetrabalho(pedidoId, descricao));
     if (ok && context.mounted) {
@@ -983,7 +980,9 @@ abstract final class RotasTrato {
         carregar: () => repos.chat.conversa(pedidoId),
         construir: (context, conversa) => ChatPedidoTela(
           conversa: conversa,
+          aoCapturarFoto: _fotografar,
           aoEnviar: (texto) => _tentar(context, () => repos.chat.enviar(pedidoId, texto)),
+          aoEnviarFoto: (ref) => _tentar(context, () => repos.chat.enviarFoto(pedidoId, ref)),
         ),
       );
 
@@ -1017,6 +1016,7 @@ abstract final class RotasTrato {
         carregar: () => repos.pedidos.dadosRelato(pedidoId),
         construir: (context, dados) => RelatarProblemaTela(
           dados: dados,
+          aoCapturarFoto: _fotografar,
           aoEnviar: (relato) async {
             final ok =
                 await _tentar(context, () => repos.pedidos.relatarProblema(pedidoId, relato));
@@ -1024,6 +1024,47 @@ abstract final class RotasTrato {
           },
         ),
       );
+}
+
+/// Diálogo com estado próprio para o `TextEditingController` ser descartado só quando a
+/// animação de saída do `showDialog` terminar (evita erro `_dependents.isEmpty` no `EditableText`).
+class _DialogoPedirRetrabalho extends StatefulWidget {
+  const _DialogoPedirRetrabalho();
+
+  @override
+  State<_DialogoPedirRetrabalho> createState() => _DialogoPedirRetrabalhoState();
+}
+
+class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
+  final _controlador = TextEditingController();
+
+  @override
+  void dispose() {
+    _controlador.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Pedir retrabalho'),
+      content: TextField(
+        controller: _controlador,
+        maxLines: 4,
+        decoration: const InputDecoration(labelText: 'O que precisa ser refeito?'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controlador.text.trim()),
+          child: const Text('Enviar'),
+        ),
+      ],
+    );
+  }
 }
 
 /// Orçamento sem detalhe no protótipo: abre direto o perfil público do profissional e, ao

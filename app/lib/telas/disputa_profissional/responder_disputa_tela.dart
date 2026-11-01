@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
+import '../conclusao/apoio_conclusao.dart' show EspacoFoto, LinhaValor, formatarReais;
 import '../conclusao/campo_longo.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart';
@@ -244,6 +244,22 @@ class _CorpoState extends State<_Corpo> {
               : '${_evidencias.length} ${_evidencias.length == 1 ? 'foto anexada' : 'fotos anexadas'}.',
           style: TipografiaTrato.legenda,
         ),
+        if (_evidencias.isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          Wrap(
+            spacing: EspacosTrato.x2,
+            runSpacing: EspacosTrato.x2,
+            children: [
+              for (var i = 0; i < _evidencias.length; i++)
+                EspacoFoto(
+                  legenda: '[Foto ${i + 1}]',
+                  referencia: _evidencias[i],
+                  altura: 80,
+                  largura: 80,
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x2),
         BotaoSecundario(
           texto: 'Anexar foto',

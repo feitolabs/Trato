@@ -342,6 +342,7 @@ class CampoFoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tem = referencia != null;
+    final imagemReal = construirImagemReal(referencia);
     return Semantics(
       button: true,
       label: tem ? '$rotulo, enviada. Toque para trocar' : '$rotulo. Toque para tirar a foto',
@@ -363,11 +364,23 @@ class CampoFoto extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  tem ? Icons.check_circle_outline : Icons.photo_camera_outlined,
-                  color: CoresTrato.petroleo,
-                ),
-                const SizedBox(height: EspacosTrato.x2),
+                if (imagemReal != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(EspacosTrato.raio - 4),
+                    child: SizedBox(
+                      height: 88,
+                      width: double.infinity,
+                      child: imagemReal,
+                    ),
+                  ),
+                  const SizedBox(height: EspacosTrato.x2),
+                ] else ...[
+                  Icon(
+                    tem ? Icons.check_circle_outline : Icons.photo_camera_outlined,
+                    color: CoresTrato.petroleo,
+                  ),
+                  const SizedBox(height: EspacosTrato.x2),
+                ],
                 Text(
                   tem ? '$rotulo enviada' : rotulo,
                   style: TipografiaTrato.corpoForte,

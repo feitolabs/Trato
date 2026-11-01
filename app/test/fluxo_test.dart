@@ -260,4 +260,53 @@ void main() {
     await _tocar(tester, 'Criar aditivo');
     expect(find.byType(CriarAditivoTela), findsOneWidget);
   });
+
+  testWidgets('garantia: Pedir retrabalho envia e fecha diálogo sem erro de _dependents',
+      (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Pedidos');
+    await _tocar(tester, 'Finalizados');
+    await _tocar(tester, 'Pintura da sala (exemplo)');
+    expect(find.byType(GarantiaTela), findsOneWidget);
+
+    await _tocar(tester, 'Pedir retrabalho');
+    await tester.enterText(find.byType(TextField), 'A tinta descascou perto do rodapé.');
+    await _tocar(tester, 'Enviar');
+
+    expect(find.text('Pedido de retrabalho enviado.'), findsOneWidget);
+  });
+
+  testWidgets('chat: persiste mensagens e fotos enviadas e abre pelo profissional', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Mensagens');
+    await _tocar(tester, 'Carlos Menezes');
+    expect(find.byType(ChatPedidoTela), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Olá Carlos, estarei em casa às 14h.');
+    await tester.tap(find.byTooltip('Enviar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Olá Carlos, estarei em casa às 14h.'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Enviar foto'));
+    await tester.pumpAndSettle();
+    expect(find.text('Foto anexada'), findsOneWidget);
+
+    // Volta e reabre para garantir que a conversa persistiu no repositório:
+    await _voltar(tester);
+    await _tocar(tester, 'Carlos Menezes');
+    expect(find.text('Olá Carlos, estarei em casa às 14h.'), findsOneWidget);
+  });
+
+  testWidgets('preview de imagem abre ao tocar em qualquer foto de pedido ou conclusão',
+      (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Pedidos');
+    await _tocar(tester, 'Troca de tomadas e chuveiro');
+    expect(find.byType(PedidoExecucaoTela), findsOneWidget);
+
+    await _tocar(tester, '[Antes]');
+    expect(find.text('Registro fotográfico anexado ao pedido no Trato.'), findsOneWidget);
+    await tester.tap(find.byTooltip('Fechar visualização'));
+    await tester.pumpAndSettle();
+  });
 }

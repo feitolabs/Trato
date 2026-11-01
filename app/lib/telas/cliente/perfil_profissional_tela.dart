@@ -255,24 +255,28 @@ class _FotoReservada extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1,
-      child: Container(
-        alignment: Alignment.bottomLeft,
-        padding: const EdgeInsets.all(EspacosTrato.x2),
-        decoration: BoxDecoration(
-          color: CoresTrato.azulClaro,
-          borderRadius: BorderRadius.circular(EspacosTrato.raio),
-        ),
-        child: Semantics(
-          label: 'Trabalho: $legenda',
-          child: Text(
-            legenda,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TipografiaTrato.corpoPequeno.copyWith(
-              color: CoresTrato.petroleo,
-              fontWeight: FontWeight.w600,
+    return ToquePreviewImagem(
+      referencia: legenda,
+      legenda: legenda,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          alignment: Alignment.bottomLeft,
+          padding: const EdgeInsets.all(EspacosTrato.x2),
+          decoration: BoxDecoration(
+            color: CoresTrato.azulClaro,
+            borderRadius: BorderRadius.circular(EspacosTrato.raio),
+          ),
+          child: Semantics(
+            label: 'Trabalho: $legenda',
+            child: Text(
+              legenda,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TipografiaTrato.corpoPequeno.copyWith(
+                color: CoresTrato.petroleo,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),

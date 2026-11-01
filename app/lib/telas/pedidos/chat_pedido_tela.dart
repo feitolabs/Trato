@@ -13,12 +13,16 @@ class ChatPedidoTela extends StatefulWidget {
     this.conversa = DadosExemplo.conversa,
     this.aoEnviar,
     this.aoTocarCamera,
+    this.aoCapturarFoto,
+    this.aoEnviarFoto,
     this.horaAgora = _horaPadrao,
   });
 
   final ConversaPedido conversa;
   final ValueChanged<String>? aoEnviar;
   final VoidCallback? aoTocarCamera;
+  final Future<String?> Function()? aoCapturarFoto;
+  final ValueChanged<String>? aoEnviarFoto;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
   final String Function() horaAgora;
@@ -55,6 +59,26 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     widget.aoEnviar?.call(conteudo);
   }
 
+  Future<void> _tocarCamera() async {
+    widget.aoTocarCamera?.call();
+    if (widget.aoCapturarFoto != null) {
+      final ref = await widget.aoCapturarFoto!();
+      if (ref != null && mounted) {
+        setState(() {
+          _mensagens.add(
+            MensagemChat(
+              tipo: TipoMensagem.foto,
+              texto: ref,
+              hora: widget.horaAgora(),
+              minha: true,
+            ),
+          );
+        });
+        widget.aoEnviarFoto?.call(ref);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversa = widget.conversa;
@@ -80,7 +104,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
             _CampoEnvio(
               controlador: _controlador,
               aoEnviar: _enviar,
-              aoTocarCamera: widget.aoTocarCamera,
+              aoTocarCamera: _tocarCamera,
             ),
           ],
         ),

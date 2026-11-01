@@ -35,6 +35,7 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoFazerOrcamento,
     this.aoFazerOrcamentoDoPedido,
     this.aoPerguntar,
+    this.aoPerguntarDoPedido,
     this.aoRecusar,
     this.abaCarteira,
     this.abaPerfil,
@@ -85,6 +86,9 @@ class CascaProfissionalTela extends StatefulWidget {
   /// Chamado para fazer orçamento do pedido aberto tocado.
   final ValueChanged<PedidoAberto>? aoFazerOrcamentoDoPedido;
   final VoidCallback? aoPerguntar;
+
+  /// Chamado para tirar dúvidas no chat do pedido aberto tocado.
+  final ValueChanged<PedidoAberto>? aoPerguntarDoPedido;
   final ValueChanged<MotivoRecusa>? aoRecusar;
 
   @override
@@ -112,7 +116,9 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
           aoFazerOrcamento: widget.aoFazerOrcamentoDoPedido != null
               ? () => widget.aoFazerOrcamentoDoPedido!(pedido)
               : widget.aoFazerOrcamento,
-          aoPerguntar: widget.aoPerguntar,
+          aoPerguntar: widget.aoPerguntarDoPedido != null
+              ? () => widget.aoPerguntarDoPedido!(pedido)
+              : widget.aoPerguntar,
           aoRecusar: (motivo) {
             widget.aoRecusar?.call(motivo);
             widget.recusarPedido?.call(pedido, motivo);
