@@ -33,6 +33,9 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   final _celular = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
+  final _confirmarSenha = TextEditingController();
+  var _mostrarSenha = false;
+  var _mostrarConfirmarSenha = false;
   late final _toqueTermos = TapGestureRecognizer()..onTap = () => _abrirTexto(TextoLegal.termos);
   late final _toquePolitica = TapGestureRecognizer()
     ..onTap = () => _abrirTexto(TextoLegal.privacidade);
@@ -46,7 +49,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   @override
   void dispose() {
-    for (final c in [_nome, _cpf, _nascimento, _celular, _email, _senha]) {
+    for (final c in [_nome, _cpf, _nascimento, _celular, _email, _senha, _confirmarSenha]) {
       c.dispose();
     }
     _toqueTermos.dispose();
@@ -60,6 +63,11 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   String? _erro(String? Function() validar) => _tentou ? validar() : null;
 
+  String? _validarConfirmacaoSenha() {
+    if (_confirmarSenha.text.isEmpty) return null;
+    return _confirmarSenha.text == _senha.text ? null : 'As senhas não conferem.';
+  }
+
   bool get _valido =>
       ValidacaoAuth.nome(_nome.text) == null &&
       ValidacaoAuth.cpf(_cpf.text) == null &&
@@ -67,6 +75,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       ValidacaoAuth.celular(_celular.text) == null &&
       ValidacaoAuth.email(_email.text) == null &&
       ValidacaoAuth.senhaNova(_senha.text) == null &&
+      _validarConfirmacaoSenha() == null &&
       _aceitouTermos;
 
   Future<void> _criar() async {
@@ -208,9 +217,21 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         CampoTrato(
           rotulo: 'Senha',
           controlador: _senha,
-          senha: true,
+          senha: !_mostrarSenha,
+          textoAcao: _mostrarSenha ? 'Ocultar' : 'Mostrar',
+          aoTocarAcao: () => setState(() => _mostrarSenha = !_mostrarSenha),
           ajuda: 'Pelo menos 8 caracteres, com letra e número.',
           erro: _erro(() => ValidacaoAuth.senhaNova(_senha.text)),
+          aoMudar: atualizar,
+        ),
+        const SizedBox(height: EspacosTrato.x4),
+        CampoTrato(
+          rotulo: 'Confirmar senha',
+          controlador: _confirmarSenha,
+          senha: !_mostrarConfirmarSenha,
+          textoAcao: _mostrarConfirmarSenha ? 'Ocultar' : 'Mostrar',
+          aoTocarAcao: () => setState(() => _mostrarConfirmarSenha = !_mostrarConfirmarSenha),
+          erro: _validarConfirmacaoSenha(),
           aoMudar: atualizar,
         ),
         const SizedBox(height: EspacosTrato.x4),

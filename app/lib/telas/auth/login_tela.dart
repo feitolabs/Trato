@@ -153,6 +153,8 @@ class _LoginTelaState extends State<LoginTela> {
         CampoTrato(
           rotulo: 'E-mail, CPF ou telefone',
           controlador: _identificador,
+          dica: 'voce@email.com',
+          ajuda: 'Use o e-mail cadastrado na sua conta.',
           teclado: TextInputType.emailAddress,
           erro: _erroIdentificador,
           aoMudar: (_) => setState(() {}),

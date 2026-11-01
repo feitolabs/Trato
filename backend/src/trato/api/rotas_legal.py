@@ -307,6 +307,68 @@ HTML_TERMOS = f"""<!DOCTYPE html>
 """
 
 
+HTML_EMAIL_CONFIRMADO = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>E-mail Confirmado — Trato Feito</title>
+  {_ESTILO_BASE}
+  <style>
+    .caixa-sucesso {{
+      text-align: center;
+      padding: 40px 24px;
+    }}
+    .icone-ok {{
+      display: inline-flex;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background-color: var(--petroleo);
+      color: var(--creme);
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 16px;
+    }}
+    .botao-app {{
+      display: inline-block;
+      margin-top: 20px;
+      background-color: var(--laranja);
+      color: #FFFFFF;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: 999px;
+    }}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Trato Feito</h1>
+    <p>Serviços residenciais com segurança e transparência</p>
+  </header>
+  <main class="caixa-sucesso">
+    <div class="icone-ok">✓</div>
+    <h2>E-mail confirmado com sucesso!</h2>
+    <p>Sua conta no <strong>Trato</strong> já está ativa e pronta para uso.</p>
+    <p>Volte para o aplicativo no seu celular e toque em <strong>"Já confirmei"</strong> ou faça login normalmente.</p>
+    <a class="botao-app" href="br.com.feitolabs.trato://login-callback">Abrir o aplicativo Trato</a>
+  </main>
+  <footer>
+    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@trato.app.br
+  </footer>
+</body>
+</html>
+"""
+
+
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/email-confirmado", response_class=HTMLResponse, include_in_schema=False)
+def pagina_email_confirmado() -> HTMLResponse:
+    return HTMLResponse(content=HTML_EMAIL_CONFIRMADO, status_code=200)
+
+
 @router.get("/privacidade", response_class=HTMLResponse, include_in_schema=False)
 def pagina_privacidade() -> HTMLResponse:
     return HTMLResponse(content=HTML_PRIVACIDADE, status_code=200)
