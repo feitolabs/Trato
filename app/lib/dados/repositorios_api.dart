@@ -137,7 +137,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<String> criar(RascunhoPedido rascunho) async {
     final corpo = <String, dynamic>{
       'categoria_id': rascunho.categoriaId ?? 'eletrica',
-      'cidade_id': 'belo-horizonte',
+      'cidade_id': rascunho.cidadeId ?? 'belo-horizonte',
+      if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
       'titulo': rascunho.servicos.isNotEmpty ? rascunho.servicos.join(', ') : 'Pedido de serviço',
       'descricao': rascunho.descricao.trim().isNotEmpty
           ? rascunho.descricao.trim()

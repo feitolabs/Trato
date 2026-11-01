@@ -108,8 +108,35 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     ];
   }
 
+  /// `GET /v1/catalogo/cidades`. Sem cidades, o pedido não tem onde ser aberto.
+  Future<List<CidadeOpcao>> _cidades() async {
+    final brutas = await _api.get('/v1/catalogo/cidades');
+    return [
+      for (final c in (brutas as List? ?? const []))
+        if (c is Map && c['id'] is String && c['nome'] is String)
+          CidadeOpcao(
+            id: c['id'] as String,
+            nome: c['nome'] as String,
+            uf: (c['uf'] as String?) ?? '',
+          ),
+    ];
+  }
+
   @override
   Future<FormularioPedido> formulario(String categoriaId) async {
+    final base = await _formularioBase(categoriaId);
+    // Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
+    final cidades = await _cidades();
+    if (cidades.isEmpty) {
+      throw const ErroTrato(
+        TipoErro.indisponivel,
+        'Ainda não atendemos nenhuma cidade. Volte daqui a pouco.',
+      );
+    }
+    return base.comCidades(cidades);
+  }
+
+  Future<FormularioPedido> _formularioBase(String categoriaId) async {
     try {
       final cats = await categorias();
       final c = cats.where((x) => x.id == categoriaId).firstOrNull;

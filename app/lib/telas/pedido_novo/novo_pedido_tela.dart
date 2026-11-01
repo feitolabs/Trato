@@ -50,6 +50,46 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
   var _tentou = false;
   final _fotosNovas = <String>[];
+  CidadeOpcao? _cidade;
+
+  bool get _exigeCidade => widget.formulario.cidades.isNotEmpty;
+
+  String? get _erroCidade =>
+      _tentou && _exigeCidade && _cidade == null ? 'Selecione a cidade do serviço.' : null;
+
+  Future<void> _escolherCidade() async {
+    final escolhida = await showModalBottomSheet<CidadeOpcao>(
+      context: context,
+      builder: (folha) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                EspacosTrato.x4,
+                EspacosTrato.x4,
+                EspacosTrato.x4,
+                EspacosTrato.x2,
+              ),
+              child: Text('Onde será o serviço?', style: TipografiaTrato.titulo),
+            ),
+            for (final c in widget.formulario.cidades)
+              ListTile(
+                leading: Icon(
+                  c.id == _cidade?.id ? Icons.check_circle : Icons.location_city_outlined,
+                  color: CoresTrato.petroleo,
+                ),
+                title: Text(c.rotulo),
+                onTap: () => Navigator.of(folha).pop(c),
+              ),
+            const SizedBox(height: EspacosTrato.x2),
+          ],
+        ),
+      ),
+    );
+    if (escolhida != null && mounted) setState(() => _cidade = escolhida);
+  }
 
   @override
   void dispose() {
@@ -74,6 +114,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
 
   void _enviar() {
     setState(() => _tentou = true);
+    if (_exigeCidade && _cidade == null) return;
     if (_servicos.isNotEmpty && _descricao.text.trim().isNotEmpty) {
       final rascunho = RascunhoPedido(
         servicos: [
@@ -87,6 +128,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         faixa: _faixa,
         fotos: List.of(_fotosNovas),
         categoriaId: widget.formulario.categoriaId,
+        cidadeId: _cidade?.id,
+        bairro: _cidade?.nome,
       );
       widget.aoEnviar?.call(rascunho);
     }
@@ -230,7 +273,36 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),
-        CartaoTrato(
+        if (_exigeCidade)
+          InkWell(
+            borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+            onTap: _escolherCidade,
+            child: CartaoTrato(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
+                  const SizedBox(width: EspacosTrato.x3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _cidade?.rotulo ?? 'Selecionar cidade',
+                          style: TipografiaTrato.corpoForte,
+                        ),
+                        Text(f.avisoEndereco, style: secundario),
+                        if (_erroCidade != null) _MensagemErro(_erroCidade!),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.keyboard_arrow_down, color: CoresTrato.petroleo),
+                ],
+              ),
+            ),
+          )
+        else
+          CartaoTrato(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

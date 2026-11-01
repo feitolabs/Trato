@@ -10,6 +10,17 @@ class FaixaPreco {
   final int maximoCentavos;
 }
 
+/// Cidade atendida, escolhida no Novo pedido (`GET /v1/catalogo/cidades`).
+class CidadeOpcao {
+  const CidadeOpcao({required this.id, required this.nome, this.uf = ''});
+
+  final String id;
+  final String nome;
+  final String uf;
+
+  String get rotulo => uf.isEmpty ? nome : '$nome · $uf';
+}
+
 /// Perguntas e opções do formulário da categoria escolhida.
 class FormularioPedido {
   const FormularioPedido({
@@ -31,7 +42,11 @@ class FormularioPedido {
     required this.avisoPrazo,
     this.categoriaId,
     this.icone = Icons.bolt,
+    this.cidades = const [],
   });
+
+  /// Cidades para escolher. Vazio = formulário de exemplo, sem seleção de cidade.
+  final List<CidadeOpcao> cidades;
 
   /// Ex.: "Elétrica · Tomadas e chuveiro".
   final String categoria;
@@ -58,6 +73,29 @@ class FormularioPedido {
 
   /// Ícone da categoria, mostrado ao lado do nome.
   final IconData icone;
+
+  /// Cópia deste formulário com a lista de cidades para escolher.
+  FormularioPedido comCidades(List<CidadeOpcao> novas) => FormularioPedido(
+        categoria: categoria,
+        servicos: servicos,
+        servicosIniciais: servicosIniciais,
+        perguntaQuantidade: perguntaQuantidade,
+        dicaQuantidade: dicaQuantidade,
+        quantidadeInicial: quantidadeInicial,
+        perguntaVoltagem: perguntaVoltagem,
+        voltagens: voltagens,
+        voltagemInicial: voltagemInicial,
+        descricaoInicial: descricaoInicial,
+        fotos: fotos,
+        prazos: prazos,
+        faixas: faixas,
+        endereco: endereco,
+        avisoEndereco: avisoEndereco,
+        avisoPrazo: avisoPrazo,
+        categoriaId: categoriaId,
+        icone: icone,
+        cidades: novas,
+      );
 }
 
 /// O que o cliente preencheu, devolvido em `aoEnviar`.
@@ -71,7 +109,13 @@ class RascunhoPedido {
     required this.faixa,
     this.fotos = const [],
     this.categoriaId,
+    this.cidadeId,
+    this.bairro,
   });
+
+  /// Cidade escolhida (id do catálogo); nula no formulário de exemplo.
+  final String? cidadeId;
+  final String? bairro;
 
   /// Categoria escolhida (id do catálogo); nula quando vem do formulário de exemplo.
   final String? categoriaId;
