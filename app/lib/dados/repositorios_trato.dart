@@ -4,6 +4,8 @@ import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/nota_material/nota_material.dart';
+import '../telas/perfil_publico/perfil_publico.dart';
+import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'config.dart';
@@ -33,6 +35,8 @@ class RepositoriosTrato {
     this.verificacao,
     this.capturaVerificacao,
     this.disputaProfissional,
+    this.cadastroProfissional,
+    this.perfilPublico,
     RepositorioCatalogo? catalogo,
     RepositorioServicosCliente? servicos,
     RepositorioAgenda? agenda,
@@ -42,6 +46,8 @@ class RepositoriosTrato {
         _agenda = agenda;
 
   final ServicoDisputaProfissional? disputaProfissional;
+  final ServicoCadastroProfissional? cadastroProfissional;
+  final ServicoPerfilPublico? perfilPublico;
 
   /// Modo demonstração: só dados de exemplo, sem rede.
   factory RepositoriosTrato.demo() => RepositoriosTrato(
@@ -93,6 +99,8 @@ class RepositoriosTrato {
         notaMaterial: ServicoNotaMaterialApi(api),
         verificacao: ServicoVerificacaoApi(api),
         disputaProfissional: ServicoDisputaProfissionalApi(api),
+        cadastroProfissional: ServicoCadastroProfissionalApi(api),
+        perfilPublico: ServicoPerfilPublicoApi(api),
         capturaVerificacao:
             camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
     );

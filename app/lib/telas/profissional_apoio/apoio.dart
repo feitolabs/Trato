@@ -323,8 +323,7 @@ class _Pilula extends StatelessWidget {
   }
 }
 
-/// Espaço de foto com ação (tocar para tirar/trocar). A imagem real entra depois: por ora
-/// mostra a legenda da referência devolvida por [CapturarFoto].
+/// Espaço de foto com ação (tocar para tirar/trocar) e visualização da imagem capturada.
 class CampoFoto extends StatelessWidget {
   const CampoFoto({
     super.key,
@@ -365,18 +364,58 @@ class CampoFoto extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (imagemReal != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(EspacosTrato.raio - 4),
-                    child: SizedBox(
-                      height: 88,
-                      width: double.infinity,
-                      child: imagemReal,
+                  ToquePreviewImagem(
+                    referencia: referencia!,
+                    legenda: rotulo,
+                    child: Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(EspacosTrato.raio - 4),
+                          child: SizedBox(
+                            height: 96,
+                            width: double.infinity,
+                            child: imagemReal,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(EspacosTrato.raioPilula),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.zoom_in, size: 14, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Ampliar',
+                                  style: TipografiaTrato.legenda.copyWith(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: EspacosTrato.x2),
+                ] else if (tem) ...[
+                  ToquePreviewImagem(
+                    referencia: referencia!,
+                    legenda: rotulo,
+                    child: const Icon(
+                      Icons.check_circle_outline,
+                      color: CoresTrato.petroleo,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x2),
                 ] else ...[
-                  Icon(
-                    tem ? Icons.check_circle_outline : Icons.photo_camera_outlined,
+                  const Icon(
+                    Icons.photo_camera_outlined,
                     color: CoresTrato.petroleo,
                   ),
                   const SizedBox(height: EspacosTrato.x2),
@@ -389,7 +428,7 @@ class CampoFoto extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  tem ? 'Toque para trocar' : 'Toque para tirar a foto',
+                  tem ? 'Toque na foto para ampliar ou aqui para trocar' : 'Toque para tirar a foto',
                   style: TipografiaTrato.legenda.copyWith(color: CoresTrato.petroleo),
                   textAlign: TextAlign.center,
                 ),

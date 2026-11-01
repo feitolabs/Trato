@@ -110,6 +110,22 @@ class EspacoFoto extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   imagemReal,
+                  const Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: EdgeInsets.all(6),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.zoom_in, size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
                   Align(
                     alignment: Alignment.bottomLeft,
                     child: Container(

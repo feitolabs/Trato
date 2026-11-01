@@ -506,10 +506,30 @@ class RepositorioChatApi implements RepositorioChat {
   final ClienteApi _api;
   final TextosPadraoTelas textos;
 
+  static bool _ehMensagemFoto(String texto) {
+    final t = texto.trim();
+    return t.startsWith('[Foto') ||
+        t.startsWith('midia://') ||
+        t.startsWith('arq-') ||
+        t.startsWith('up-') ||
+        ehUrlImagem(t) ||
+        temArquivoImagem(t);
+  }
+
+  Map<String, String>? _consulta(String? profissionalId) =>
+      profissionalId == null || profissionalId.isEmpty
+          ? null
+          : {'profissional_id': profissionalId};
+
   @override
-  Future<ConversaPedido> conversa(String pedidoId) async {
+  Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId}) async {
     final pedido = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
-    final mensagens = _lista(await _api.get('/v1/pedidos/$pedidoId/mensagens'));
+    final mensagens = _lista(
+      await _api.get(
+        '/v1/pedidos/$pedidoId/mensagens',
+        consulta: _consulta(profissionalId),
+      ),
+    );
     return ConversaPedido(
       nome: 'Pedido ${pedido.numero}',
       iniciais: '#',
@@ -518,7 +538,9 @@ class RepositorioChatApi implements RepositorioChat {
       mensagens: [
         for (final m in mensagens)
           MensagemChat(
-            tipo: TipoMensagem.texto,
+            tipo: _ehMensagemFoto((m['texto'] as String?) ?? '')
+                ? TipoMensagem.foto
+                : TipoMensagem.texto,
             hora: _hora(DateTime.parse(m['enviada_em'] as String).toLocal()),
             texto: m['texto'] as String,
             minha: m['minha'] == true,
@@ -530,13 +552,21 @@ class RepositorioChatApi implements RepositorioChat {
   }
 
   @override
-  Future<void> enviar(String pedidoId, String texto) async {
-    await _api.post('/v1/pedidos/$pedidoId/mensagens', corpo: {'texto': texto});
+  Future<void> enviar(String pedidoId, String texto, {String? profissionalId}) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/mensagens',
+      consulta: _consulta(profissionalId),
+      corpo: {'texto': texto},
+    );
   }
 
   @override
-  Future<void> enviarFoto(String pedidoId, String referencia) async {
-    await _api.post('/v1/pedidos/$pedidoId/mensagens', corpo: {'texto': referencia});
+  Future<void> enviarFoto(String pedidoId, String referencia, {String? profissionalId}) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/mensagens',
+      consulta: _consulta(profissionalId),
+      corpo: {'texto': referencia},
+    );
   }
 }
 
@@ -902,7 +932,12 @@ class ServicoCheckInApi implements ServicoCheckIn {
   @override
   Future<FotoChegada?> tirarFoto() async {
     final foto = _foto = await captura.foto();
-    return foto == null ? null : FotoChegada(hora: _hora(foto.tiradaEm.toLocal()));
+    return foto == null
+        ? null
+        : FotoChegada(
+            hora: _hora(foto.tiradaEm.toLocal()),
+            referencia: foto.arquivoId ?? foto.local?.sha256,
+          );
   }
 
   /// A conferência é do backend; a distância aqui, quando existe, é só informativa.
@@ -1042,7 +1077,12 @@ class ServicoCheckOutApi implements ServicoCheckOut {
   @override
   Future<FotoChegada?> tirarFotoFinal() async {
     final foto = _foto = await _captura.foto();
-    return foto == null ? null : FotoChegada(hora: _hora(foto.tiradaEm.toLocal()));
+    return foto == null
+        ? null
+        : FotoChegada(
+            hora: _hora(foto.tiradaEm.toLocal()),
+            referencia: foto.arquivoId ?? foto.local?.sha256,
+          );
   }
 
   @override

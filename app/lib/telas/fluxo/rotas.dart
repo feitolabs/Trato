@@ -110,7 +110,7 @@ abstract final class RotasTrato {
   /// Lista de conversas da aba Mensagens. No modo `api` vem dos pedidos (uma conversa por
   /// pedido contratado); na demonstração, dados de exemplo.
   static ServicoMensagens get _servicoMensagens => repos.modoApi
-      ? ServicoMensagensDosPedidos(repos.pedidos)
+      ? ServicoMensagensDosPedidos(repos.pedidos, chat: repos.chat)
       : const ServicoMensagensFake();
 
   /// Sessão do cliente HTTP, para o "Sair" limpar o token. O `main.dart` liga.
@@ -416,14 +416,12 @@ abstract final class RotasTrato {
     );
   }
 
-  /// Cadastro → verificação (documento e selfie) → casca do profissional. Os serviços ainda são
-  /// de demonstração e a foto vem da câmera do aparelho.
+  /// Cadastro → verificação (documento e selfie) → casca do profissional.
   static void _abrirCadastroProfissional(BuildContext context) => _abrir<void>(
         context,
         Builder(
           builder: (context) => CadastroProfissionalTela(
-            // Sem rota de categorias e cidades (catálogo): o cadastro segue em demonstração.
-            servico: ServicoCadastroProfissionalFake(),
+            servico: repos.cadastroProfissional ?? ServicoCadastroProfissionalFake(),
             aoAdicionarFoto: _fotografar,
             aoConcluir: () => _abrir<void>(
               context,
@@ -460,7 +458,7 @@ abstract final class RotasTrato {
           abaConversas: Builder(
             builder: (context) => ListaConversas(
               servico: repos.modoApi
-                  ? ServicoMensagensDoProfissional(repos.profissional)
+                  ? ServicoMensagensDoProfissional(repos.profissional, chat: repos.chat)
                   : const ServicoMensagensFake(),
               textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
               aoAbrirConversa: (c) => _abrir<void>(context, _chat(c.pedidoId)),
@@ -666,17 +664,21 @@ abstract final class RotasTrato {
         ),
       );
 
-  /// Aba "Perfil" da casca do profissional: perfil público e avaliações recebidas (demonstração).
+  /// Aba "Perfil" da casca do profissional: perfil público e avaliações recebidas.
   static Widget _abaPerfilProfissional() => Builder(
-        builder: (context) => PerfilPublicoTela(
-          servico: ServicoPerfilPublicoFake(),
-          aoVerAvaliacoes: () => _abrir<void>(
-            context,
-            AvaliacoesRecebidasTela(servico: ServicoPerfilPublicoFake()),
-          ),
-          aoEditarCadastro: () => _abrirCadastroProfissional(context),
-          aoSair: () => sair(context),
-        ),
+        builder: (context) {
+          final servico = repos.perfilPublico ?? ServicoPerfilPublicoFake();
+          return PerfilPublicoTela(
+            servico: servico,
+            aoCapturarFotoPerfil: _fotografar,
+            aoVerAvaliacoes: () => _abrir<void>(
+              context,
+              AvaliacoesRecebidasTela(servico: servico),
+            ),
+            aoEditarCadastro: () => _abrirCadastroProfissional(context),
+            aoSair: () => sair(context),
+          );
+        },
       );
 
   // --- Cliente: abas -----------------------------------------------------------------
@@ -686,6 +688,7 @@ abstract final class RotasTrato {
         carregar: repos.perfil.carregar,
         construir: (context, perfil) => PerfilClienteTela(
           perfil: _soComDestino(perfil),
+          aoCapturarFotoPerfil: _fotografar,
           aoSair: () => sair(context),
           aoTocarItem: (acao) {
             switch (acao) {
@@ -700,6 +703,7 @@ abstract final class RotasTrato {
                   context,
                   CentralPrivacidadeTela(
                     servico: ServicoPrivacidadeFake(),
+                    aoAbrirTermos: () => abrirTermos(context),
                     aoContaExcluida: () => Navigator.of(context).popUntil((r) => r.isFirst),
                   ),
                 );
@@ -882,14 +886,14 @@ abstract final class RotasTrato {
                 : DetalheOrcamentoTela(
                     orcamento: orcamento,
                     aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
-                    // Conversa e contraproposta acontecem no chat do pedido; antes de
-                    // contratar o backend ainda não tem essa rota (só no modo demonstração).
-                    aoConversar: repos.modoApi
-                        ? null
-                        : (_) => _abrir<void>(context, _chat(pedidoId)),
-                    aoFazerContraproposta: repos.modoApi
-                        ? null
-                        : (_) => _abrir<void>(context, _chat(pedidoId)),
+                    aoConversar: (o) => _abrir<void>(
+                      context,
+                      _chat(pedidoId, profissionalId: o.profissionalId),
+                    ),
+                    aoFazerContraproposta: (o) => _abrir<void>(
+                      context,
+                      _chat(pedidoId, profissionalId: o.profissionalId),
+                    ),
                     aoAceitar: (o) async {
                       // Só pede ao backend; taxa e líquido são dele.
                       final ok = await _tentar(
@@ -976,13 +980,22 @@ abstract final class RotasTrato {
         ),
       );
 
-  static Widget _chat(String pedidoId) => Carregador<ConversaPedido>(
-        carregar: () => repos.chat.conversa(pedidoId),
+  static Widget _chat(String pedidoId, {String? profissionalId}) => Carregador<ConversaPedido>(
+        carregar: () => repos.chat.conversa(pedidoId, profissionalId: profissionalId),
         construir: (context, conversa) => ChatPedidoTela(
           conversa: conversa,
           aoCapturarFoto: _fotografar,
-          aoEnviar: (texto) => _tentar(context, () => repos.chat.enviar(pedidoId, texto)),
-          aoEnviarFoto: (ref) => _tentar(context, () => repos.chat.enviarFoto(pedidoId, ref)),
+          aoRecarregar: repos.modoApi
+              ? () => repos.chat.conversa(pedidoId, profissionalId: profissionalId)
+              : null,
+          aoEnviar: (texto) => _tentar(
+            context,
+            () => repos.chat.enviar(pedidoId, texto, profissionalId: profissionalId),
+          ),
+          aoEnviarFoto: (ref) => _tentar(
+            context,
+            () => repos.chat.enviarFoto(pedidoId, ref, profissionalId: profissionalId),
+          ),
         ),
       );
 

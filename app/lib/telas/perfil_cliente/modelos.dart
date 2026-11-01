@@ -35,6 +35,7 @@ class PerfilCliente {
     required this.iniciais,
     required this.resumo,
     required this.grupos,
+    this.fotoReferencia,
   });
 
   final String nome;
@@ -43,4 +44,5 @@ class PerfilCliente {
   /// "Nota 4,8 como cliente · 6 serviços" (a nota é calculada pelo backend).
   final String resumo;
   final List<GrupoPerfil> grupos;
+  final String? fotoReferencia;
 }

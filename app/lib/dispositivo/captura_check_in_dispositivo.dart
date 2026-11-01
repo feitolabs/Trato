@@ -1,3 +1,4 @@
+import '../componentes/imagem_trato.dart';
 import '../dados/erros.dart';
 import '../dados/repositorios_api.dart';
 import '../dados/servico_upload.dart';
@@ -34,8 +35,10 @@ class CapturaCheckInDispositivo implements CapturaCheckIn {
   Future<FotoCapturada?> foto() async {
     final arquivo = await camera.tirarFoto();
     if (arquivo == null) return null;
+    registrarImagemEmMemoria(arquivo.sha256, bytes: arquivo.bytes);
     try {
       final enviado = await upload.enviar(arquivo, finalidadeFoto, pedidoId: pedidoId);
+      registrarImagemEmMemoria(enviado.arquivoId, bytes: arquivo.bytes);
       return FotoCapturada(arquivoId: enviado.arquivoId, tiradaEm: arquivo.capturadaEm);
     } on ErroTrato catch (erro) {
       if (erro.tipo != TipoErro.semInternet) rethrow;

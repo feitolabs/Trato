@@ -254,10 +254,11 @@ class RepositorioChatFake implements RepositorioChat {
   }
 
   @override
-  Future<ConversaPedido> conversa(String pedidoId) async => _obter(pedidoId);
+  Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId}) async =>
+      _obter(pedidoId);
 
   @override
-  Future<void> enviar(String pedidoId, String texto) async {
+  Future<void> enviar(String pedidoId, String texto, {String? profissionalId}) async {
     enviadas.add(texto);
     final chave = _normalizarId(pedidoId);
     final atual = _obter(chave);
@@ -280,7 +281,7 @@ class RepositorioChatFake implements RepositorioChat {
   }
 
   @override
-  Future<void> enviarFoto(String pedidoId, String referencia) async {
+  Future<void> enviarFoto(String pedidoId, String referencia, {String? profissionalId}) async {
     enviadas.add(referencia);
     final chave = _normalizarId(pedidoId);
     final atual = _obter(chave);

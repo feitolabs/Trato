@@ -48,7 +48,7 @@ class ServicoAuthSupabase implements ServicoAuth {
 
   @override
   bool provedorHabilitado(ProvedorAuth provedor) => switch (provedor) {
-        ProvedorAuth.google => _config.googleConfigurado,
+        ProvedorAuth.google => true,
         ProvedorAuth.apple => defaultTargetPlatform == TargetPlatform.iOS,
       };
 
@@ -194,13 +194,22 @@ class ServicoAuthSupabase implements ServicoAuth {
   Future<sb.AuthResponse> _entrarGoogle() async {
     final google = GoogleSignIn(
       clientId: _config.googleIosClientId.isEmpty ? null : _config.googleIosClientId,
-      serverClientId: _config.googleWebClientId,
+      serverClientId: _config.googleWebClientId.isEmpty ? null : _config.googleWebClientId,
     );
-    final conta = await google.signIn();
+    final GoogleSignInAccount? conta;
+    try {
+      conta = await google.signIn();
+    } on Object catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('canceled') || msg.contains('cancelled') || msg.contains('sign_in_canceled')) {
+        throw const ErroAuth(TipoErroAuth.cancelado);
+      }
+      throw const ErroAuth(TipoErroAuth.provedorIndisponivel);
+    }
     if (conta == null) throw const ErroAuth(TipoErroAuth.cancelado);
     final aut = await conta.authentication;
     final idToken = aut.idToken;
-    if (idToken == null) throw const ErroAuth(TipoErroAuth.desconhecido);
+    if (idToken == null) throw const ErroAuth(TipoErroAuth.provedorIndisponivel);
     return _auth.signInWithIdToken(
       provider: sb.OAuthProvider.google,
       idToken: idToken,
