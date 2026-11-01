@@ -8,14 +8,16 @@ pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nun
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
     TIPOS_DOCUMENTO,
@@ -51,12 +53,69 @@ class OrcamentoOut(BaseModel):
     observacoes: str | None
     enviado_em: datetime | None
     aceito: bool
+    profissional_nivel_verificacao: str | None = Field(
+        None, description="Selo do profissional (basico, verificado, verificado_plus)."
+    )
+    profissional_nota: float | None = None
+    profissional_servicos_concluidos: int | None = None
+
+
+class ItemOrcamentoIn(BaseModel):
+    tipo: str = Field(description="deslocamento | horas | material | outro")
+    descricao: str = Field(min_length=1, max_length=200)
+    quantidade: Decimal = Field(gt=0, description="Ex.: 1, 2.5")
+    valor_unitario_centavos: int = Field(ge=0, description="Em centavos")
+
+
+class EtapaPropostaIn(BaseModel):
+    descricao: str = Field(min_length=1, max_length=200)
+    valor_centavos: int = Field(gt=0)
+
+
+class CriarOrcamentoIn(BaseModel):
+    itens: list[ItemOrcamentoIn] = Field(min_length=1)
+    prazo_execucao_dias: int | None = Field(default=None, ge=1, le=365)
+    validade_ate: datetime | None = None
+    garantia_dias: int | None = Field(default=None, ge=0, le=730)
+    fora_do_escopo: str | None = Field(default=None, max_length=1000)
+    sinal_material_centavos: int | None = Field(default=None, ge=0)
+    observacoes: str | None = Field(default=None, max_length=1000)
+    etapas: list[EtapaPropostaIn] = Field(default_factory=list)
+
+
+class CriarOrcamentoOut(BaseModel):
+    id: str
+    pedido_id: str
+    profissional_id: str
+    versao: int
+    status: str
+    valor_total_centavos: int
+    enviado_em: datetime | None = None
+
+
+class OpcaoParcelamentoOut(BaseModel):
+    parcelas: int
+    custo_centavos: int = Field(description="Custo do provedor repassado ao cliente.")
+    total_centavos: int = Field(description="Serviço + taxa + custo, em centavos.")
+    valor_parcela_centavos: int
 
 
 class PagamentoValoresOut(BaseModel):
     pedido_id: str
     estado: str
-    valor_centavos: int | None = Field(None, description="Valor do contrato, em centavos.")
+    valor_centavos: int | None = Field(
+        None, description="Valor do SERVIÇO (o orçamento), em centavos."
+    )
+    taxa_centavos: int | None = Field(None, description="Taxa do Trato, SOMADA ao serviço.")
+    total_a_pagar_centavos: int | None = Field(
+        None,
+        description="Pix e cartão à vista: serviço + taxa. O Trato absorve o custo do provedor.",
+    )
+    opcoes_parcelamento: list[OpcaoParcelamentoOut] = Field(
+        default_factory=list,
+        description="Cartão parcelado: total por número de parcelas (custo do provedor repassado). "
+        "Vazia = parcelado desligado.",
+    )
     pago_centavos: int = Field(description="O que o ledger mostra como pago (webhook assinado).")
     pagamento_confirmado: bool
     meios_disponiveis: list[str]
@@ -112,12 +171,28 @@ class PedidoAbertoOut(BaseModel):
 
 
 class ResumoOrcamentoOut(BaseModel):
-    valor_centavos: int = Field(description="Bruto: o total do orçamento.")
-    taxa_centavos: int = Field(description="Taxa do Trato pela configuração vigente.")
-    liquido_centavos: int = Field(description="O que o profissional recebe: bruto menos a taxa.")
+    valor_centavos: int = Field(
+        description="O valor do orçamento (serviço). O profissional recebe tudo."
+    )
+    taxa_centavos: int = Field(
+        description="Taxa do Trato (configuração vigente), SOMADA ao orçamento: o cliente paga."
+    )
+    total_cliente_centavos: int = Field(
+        description="O que o cliente paga à vista: orçamento + taxa."
+    )
+    receita_trato_centavos: int = Field(description="A taxa é a receita do Trato.")
+    taxa_bps: int = Field(
+        description="Taxa EFETIVA em pontos-base (taxa ÷ valor): já considera o mínimo e as faixas."
+    )
+    taxa_percentual: float = Field(
+        description="A mesma taxa efetiva em %, com 2 casas (ex.: 7.5). Para o app só mostrar."
+    )
+    liquido_centavos: int = Field(
+        description="O que o profissional recebe: o valor do orçamento inteiro, sem desconto."
+    )
     custo_provedor_estimado_centavos: int = Field(
         description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
-        "Sai da taxa do Trato; não reduz o líquido do profissional."
+        "Pix e cartão à vista: o Trato absorve, sai da taxa. Não reduz o líquido do profissional."
     )
     custo_provedor_estimativa: bool = True
 
@@ -254,8 +329,16 @@ def listar_orcamentos(
     itens = contexto.orcamentos.do_pedido(pedido.id)
     if usuario.papel is PapelUsuario.PROFISSIONAL:
         itens = [o for o in itens if o.profissional_id == usuario.id]
+    detalhes = {i: contexto.usuarios.detalhe(i) for i in {o.profissional_id for o in itens}}
     return [
         OrcamentoOut(
+            profissional_nivel_verificacao=getattr(
+                detalhes[o.profissional_id], "nivel_verificacao", None
+            ),
+            profissional_nota=getattr(detalhes[o.profissional_id], "nota_publica", None),
+            profissional_servicos_concluidos=getattr(
+                detalhes[o.profissional_id], "servicos_concluidos", None
+            ),
             id=o.id,
             profissional_id=o.profissional_id,
             profissional_nome=o.profissional_nome,
@@ -269,6 +352,86 @@ def listar_orcamentos(
         )
         for o in itens
     ]
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos",
+    response_model=CriarOrcamentoOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Enviar orçamento para um pedido",
+    description="Profissional autenticado envia um orçamento para um pedido aberto.",
+)
+def enviar_orcamento(
+    pedido_id: str,
+    dados: CriarOrcamentoIn,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> CriarOrcamentoOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
+
+    agora = contexto.agora()
+    itens = [
+        ItemOrcamento(
+            tipo=i.tipo.strip().lower(),
+            descricao=limpar_texto(i.descricao, "descricao", 200),
+            quantidade=i.quantidade,
+            valor_unitario_centavos=i.valor_unitario_centavos,
+        )
+        for i in dados.itens
+    ]
+    etapas = [
+        EtapaProposta(
+            descricao=limpar_texto(e.descricao, "etapa", 200),
+            valor_centavos=e.valor_centavos,
+        )
+        for e in dados.etapas
+    ]
+    orcamento_id = contexto.orcamentos.enviar(
+        pedido_id=pedido.id,
+        profissional_id=usuario.id,
+        itens=itens,
+        agora=agora,
+        etapas=etapas,
+        prazo_execucao_dias=dados.prazo_execucao_dias,
+        validade_ate=dados.validade_ate,
+        garantia_dias=dados.garantia_dias,
+        fora_do_escopo=(
+            limpar_texto(dados.fora_do_escopo, "fora_do_escopo", 1000)
+            if dados.fora_do_escopo
+            else None
+        ),
+        sinal_material_centavos=dados.sinal_material_centavos,
+        observacoes=(
+            limpar_texto(dados.observacoes, "observacoes", 1000) if dados.observacoes else None
+        ),
+    )
+    detalhe = contexto.orcamentos.detalhe(orcamento_id)
+    if detalhe is None:
+        orc = contexto.orcamentos.obter(orcamento_id)
+        return CriarOrcamentoOut(
+            id=orcamento_id,
+            pedido_id=pedido.id,
+            profissional_id=usuario.id,
+            versao=1,
+            status="enviado",
+            valor_total_centavos=(
+                orc.valor_centavos if orc else sum(i.total_centavos for i in itens)
+            ),
+            enviado_em=agora,
+        )
+    return CriarOrcamentoOut(
+        id=detalhe.id,
+        pedido_id=detalhe.pedido_id,
+        profissional_id=detalhe.profissional_id,
+        versao=detalhe.versao,
+        status=detalhe.status,
+        valor_total_centavos=detalhe.valor_centavos,
+        enviado_em=detalhe.enviado_em,
+    )
 
 
 @router.get(
@@ -303,10 +466,21 @@ def valores_do_pagamento(
             ),
             None,
         )
+    taxa = total = None
+    opcoes: list[OpcaoParcelamentoOut] = []
+    if contrato is not None and servico is not None:
+        conta = servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos)
+        taxa, total = conta.taxa_centavos, conta.cobrado_centavos
+        opcoes = [
+            OpcaoParcelamentoOut(**vars(o)) for o in servico.config().parcelamento.opcoes(total)
+        ]
     return PagamentoValoresOut(
         pedido_id=pedido.id,
         estado=pedido.estado.value,
         valor_centavos=contrato.valor_centavos if contrato else None,
+        taxa_centavos=taxa,
+        total_a_pagar_centavos=total,
+        opcoes_parcelamento=opcoes,
         pago_centavos=saldo.cliente_pagou,
         pagamento_confirmado=pedido.referencia_pagamento is not None,
         meios_disponiveis=[m.value for m in MeioPagamento],
@@ -332,7 +506,11 @@ def resumo_do_orcamento(
     return ResumoOrcamentoOut(
         valor_centavos=corpo.valor_centavos,
         taxa_centavos=taxa,
-        liquido_centavos=corpo.valor_centavos - taxa,
+        taxa_bps=(taxa * 10_000 + corpo.valor_centavos // 2) // corpo.valor_centavos,
+        taxa_percentual=round(taxa * 100 / corpo.valor_centavos, 2),
+        liquido_centavos=corpo.valor_centavos,
+        total_cliente_centavos=corpo.valor_centavos + taxa,
+        receita_trato_centavos=taxa,
         custo_provedor_estimado_centavos=max(
             calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento
         ),

@@ -15,7 +15,7 @@ from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
@@ -78,7 +78,10 @@ class CobrancaContratoOut(BaseModel):
     cobranca_id: str
     estado_pagamento: str = Field(description="Sempre `aguardando_confirmacao` aqui; nunca `pago`.")
     meio: str
-    valor_centavos: int
+    valor_centavos: int = Field(
+        description="O que o cliente paga: serviço + taxa do Trato (+ custo do parcelado)."
+    )
+    parcelas: int = 1
     tipo_instrucao: str = Field(description="`pix_copia_e_cola` ou `cartao_segredo_do_cliente`.")
     instrucao: str | None = Field(None, description="O que o app usa para pagar.")
     criada_em: datetime
@@ -90,7 +93,10 @@ class PagamentoContratoOut(BaseModel):
         description="`sem_cobranca`, `aguardando_confirmacao`, `pago`, `falhou` ou `cancelada`."
     )
     pago: bool = Field(description="Verdadeiro só depois do webhook assinado do provedor.")
-    valor_centavos: int | None
+    valor_centavos: int | None = Field(description="O valor do SERVIÇO (o orçamento).")
+    total_a_pagar_centavos: int | None = Field(
+        None, description="Serviço + taxa do Trato (à vista). Sem custo de parcelamento."
+    )
     pago_centavos: int
     cobranca_id: str | None = None
     meio: str | None = None
@@ -153,6 +159,12 @@ class RecusaOut(BaseModel):
 
 class CobrarContratoIn(_Entrada):
     meio: MeioPagamento
+    parcelas: StrictInt = Field(
+        1,
+        ge=1,
+        le=12,
+        description="Só cartão; parcelado desligado até o custo do provedor estar configurado.",
+    )
 
 
 class AditivoNovoIn(_Entrada):
@@ -171,10 +183,26 @@ class ItemNotaIn(_Entrada):
 
 
 class NotaMaterialIn(_Entrada):
-    foto_storage_path: str = Field(
-        min_length=3, max_length=300, description="Caminho da foto da notinha no bucket privado."
+    foto_storage_path: str | None = Field(
+        None,
+        min_length=3,
+        max_length=300,
+        description="Caminho da foto da notinha no bucket privado (sem o serviço de upload).",
+    )
+    midia_id: str | None = Field(
+        None,
+        min_length=1,
+        max_length=64,
+        description="`midia_id` devolvido por `POST /v1/uploads/{id}/concluir` (destino "
+        "`nota_material`). O backend confere que a mídia é deste pedido e de quem envia.",
     )
     itens: list[ItemNotaIn] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def _uma_foto(self) -> NotaMaterialIn:
+        if (self.foto_storage_path is None) == (self.midia_id is None):
+            raise ValueError("Mande `midia_id` ou `foto_storage_path` (um dos dois).")
+        return self
 
 
 class RecusarIn(_Entrada):
@@ -214,6 +242,7 @@ def _cobranca_out(contrato_id: str, cobranca) -> CobrancaContratoOut:
         estado_pagamento="aguardando_confirmacao",
         meio=cobranca.meio.value,
         valor_centavos=cobranca.valor_centavos,
+        parcelas=cobranca.parcelas,
         tipo_instrucao="pix_copia_e_cola" if pix else "cartao_segredo_do_cliente",
         instrucao=cobranca.instrucao,
         criada_em=cobranca.criada_em,
@@ -276,7 +305,9 @@ def criar_cobranca(
     pedido, contrato = _contrato_do_usuario(contexto, contrato_id, usuario)
     if pedido.estado not in ESTADOS_COBRAVEIS or pedido.referencia_pagamento is not None:
         raise HTTPException(409, "O pedido não está esperando pagamento.")
-    cobranca = servico.cobrar(contexto, pedido, contrato.valor_centavos, corpo.meio)
+    cobranca = servico.cobrar(
+        contexto, pedido, contrato.valor_centavos, corpo.meio, parcelas=corpo.parcelas
+    )
     return _cobranca_out(pedido.id, cobranca)
 
 
@@ -316,6 +347,11 @@ def estado_do_pagamento(
         estado_pagamento=estado,
         pago=pago,
         valor_centavos=contrato.valor_centavos,
+        total_a_pagar_centavos=(
+            servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos).cobrado_centavos
+            if servico is not None
+            else None
+        ),
         pago_centavos=saldo.cliente_pagou,
         cobranca_id=principal.id if principal else None,
         meio=principal.meio.value if principal else None,
@@ -546,6 +582,26 @@ def _caminho_da_foto_valido(caminho: str) -> bool:
     return not ("://" in caminho or ".." in partes or caminho.startswith("/") or "" in partes)
 
 
+def _foto_da_nota(request: Request, corpo: NotaMaterialIn, pedido: Pedido, usuario: Usuario) -> str:
+    """Caminho da foto: o `midia_id` do upload (conferido) ou o caminho que o app mandou."""
+    if corpo.midia_id is not None:
+        servico = getattr(request.app.state, "servico_uploads", None)
+        if servico is None:
+            raise HTTPException(503, "O envio de arquivos ainda não foi ligado.")
+        midia = servico.repo.midia(corpo.midia_id)
+        if (
+            midia is None
+            or midia.pedido_id != pedido.id
+            or midia.enviada_por != usuario.id
+            or midia.finalidade != "nota_material"
+        ):
+            raise HTTPException(422, "A foto da nota não foi enviada ou não é deste pedido.")
+        return midia.storage_path
+    if not _caminho_da_foto_valido(corpo.foto_storage_path or ""):
+        raise HTTPException(422, "O caminho da foto não é válido.")
+    return corpo.foto_storage_path or ""
+
+
 def _nota_out(nota: NotaMaterial) -> NotaMaterialOut:
     return NotaMaterialOut(
         id=nota.id,
@@ -569,6 +625,7 @@ def _nota_out(nota: NotaMaterial) -> NotaMaterialOut:
 def enviar_nota_material(
     contrato_id: str,
     corpo: NotaMaterialIn,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> NotaMaterialOut:
@@ -577,8 +634,7 @@ def enviar_nota_material(
         raise HTTPException(403, "Só o profissional contratado neste pedido envia nota.")
     if pedido.estado is not Estado.EM_ANDAMENTO:
         raise HTTPException(409, "Só dá para enviar nota com o serviço em andamento.")
-    if not _caminho_da_foto_valido(corpo.foto_storage_path):
-        raise HTTPException(422, "O caminho da foto não é válido.")
+    foto = _foto_da_nota(request, corpo, pedido, usuario)
     seguranca = obter_config_seguranca()
     linhas = []
     for item in corpo.itens:
@@ -603,7 +659,7 @@ def enviar_nota_material(
             "",
             pedido.id,
             usuario.id,
-            corpo.foto_storage_path,
+            foto,
             tuple(linhas),
             total_nota,
             contexto.agora(),
@@ -723,6 +779,42 @@ def pedidos_abertos(
     else:
         itens.sort(key=lambda p: p.aberto_em, reverse=True)
     return [PedidoAbertoOut(**vars(p)) for p in itens[:limite]]
+
+
+class PedidoAbertoDetalheOut(PedidoAbertoOut):
+    orcamentos_recebidos: int = Field(description="Quantos orçamentos enviados o pedido já tem.")
+    ja_orcou: bool = Field(description="Se este profissional já enviou orçamento.")
+
+
+@router.get(
+    "/profissional/pedidos-abertos/{pedido_id}",
+    response_model=PedidoAbertoDetalheOut,
+    summary="Detalhe de um pedido aberto (mesma visibilidade da lista)",
+    description="Pedido que não está na lista dele (outra categoria, região, recusado ou já "
+    "fechado) responde 404. Sem endereço exato.",
+)
+def pedido_aberto(
+    pedido_id: str,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PedidoAbertoDetalheOut:
+    recusados = {r.pedido_id for r in contexto.recusas.do_profissional(usuario.id)}
+    achado = next(
+        (
+            p
+            for p in contexto.pedidos.listar_abertos(usuario.id)
+            if p.id == pedido_id and p.id not in recusados
+        ),
+        None,
+    )
+    if achado is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    orcamentos = contexto.orcamentos.do_pedido(achado.id)
+    return PedidoAbertoDetalheOut(
+        **vars(achado),
+        orcamentos_recebidos=len(orcamentos),
+        ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
+    )
 
 
 @router.post(

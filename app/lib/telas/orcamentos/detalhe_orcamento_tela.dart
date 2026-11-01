@@ -5,14 +5,13 @@ import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../cliente/modelos.dart' show formatarNota;
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
-import '../em_breve_tela.dart';
 import '../pedido_novo/pecas_pedido.dart';
 import 'modelos.dart';
 
 /// Tela 13 do protótipo: detalhe do orçamento, com aceite e contraproposta.
 ///
 /// Só mostra o que vier de [orcamento]; o 30% adiantado e a taxa são do backend. Os callbacks
-/// são opcionais; sem eles, abrem [EmBreveTela]. [aoAceitar] só dispara com o aceite marcado.
+/// são opcionais; sem eles, o botão não aparece. [aoAceitar] só dispara com o aceite marcado.
 class DetalheOrcamentoTela extends StatefulWidget {
   const DetalheOrcamentoTela({
     super.key,
@@ -39,16 +38,9 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   var _leu = false;
   var _tentou = false;
 
-  void _emBreve(String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
-      );
-
-  void _chamar(ValueChanged<Orcamento>? acao, String titulo) =>
-      acao != null ? acao(widget.orcamento) : _emBreve(titulo);
-
   void _aceitar() {
     setState(() => _tentou = true);
-    if (_leu) _chamar(widget.aoAceitar, 'Pagamento');
+    if (_leu) widget.aoAceitar?.call(widget.orcamento);
   }
 
   @override
@@ -59,15 +51,17 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
     return EstruturaPedido(
       tituloBarra: 'Válido até ${d.validoAte}',
       acoesBarra: [
-        TextButton.icon(
-          onPressed: () => _chamar(widget.aoConversar, 'Chat'),
-          icon: const Icon(Icons.chat_bubble_outline, size: EspacosTrato.x5),
-          label: const Text('Conversar'),
-          style: TextButton.styleFrom(
-            textStyle: TipografiaTrato.corpoForte.copyWith(decoration: TextDecoration.none),
+        if (widget.aoConversar != null) ...[
+          TextButton.icon(
+            onPressed: () => widget.aoConversar!(o),
+            icon: const Icon(Icons.chat_bubble_outline, size: EspacosTrato.x5),
+            label: const Text('Conversar'),
+            style: TextButton.styleFrom(
+              textStyle: TipografiaTrato.corpoForte.copyWith(decoration: TextDecoration.none),
+            ),
           ),
-        ),
-        const SizedBox(width: EspacosTrato.x2),
+          const SizedBox(width: EspacosTrato.x2),
+        ],
       ],
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
@@ -76,10 +70,11 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             texto: 'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
             aoTocar: _aceitar,
           ),
-          BotaoLink(
-            texto: 'Fazer contraproposta',
-            aoTocar: () => _chamar(widget.aoFazerContraproposta, 'Contraproposta'),
-          ),
+          if (widget.aoFazerContraproposta != null)
+            BotaoLink(
+              texto: 'Fazer contraproposta',
+              aoTocar: () => widget.aoFazerContraproposta!(o),
+            ),
         ],
       ),
       children: [

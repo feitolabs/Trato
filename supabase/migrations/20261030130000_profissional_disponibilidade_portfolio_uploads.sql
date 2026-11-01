@@ -1,6 +1,6 @@
 -- Cadastro do profissional: disponibilidade, portfólio e solicitações de upload.
 --
--- STATUS: PREPARADA, NÃO APLICADA. Aplicar só com o OK explícito do João (CLAUDE.md).
+-- STATUS: APLICADA no Supabase em 30/10/2026 com o OK do João (inclui os privilégios explícitos do final).
 -- Reversão: supabase/rollback/profissional_disponibilidade_portfolio_uploads_rollback.sql
 --
 -- * perfis_profissional.disponibilidade / portfolio: json simples, validado pela API
@@ -33,3 +33,7 @@ create table public.upload_solicitacoes (
 );
 create index upload_solicitacoes_dono_idx on public.upload_solicitacoes (dono_id, criada_em desc);
 alter table public.upload_solicitacoes enable row level security;
+
+-- Privilégios explícitos (igual às demais tabelas): anon/authenticated nada; service_role sem DELETE/TRUNCATE.
+revoke all on table public.upload_solicitacoes from public, anon, authenticated, service_role;
+grant select, insert, update on table public.upload_solicitacoes to service_role;

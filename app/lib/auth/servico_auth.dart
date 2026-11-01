@@ -26,8 +26,9 @@ class SessaoAuth {
   bool get ehProfissional => perfil == 'profissional';
 }
 
-/// Dados do cadastro (passo 1). CPF e nascimento não vão para o serviço de login:
-/// ficam para o perfil, gravado pelo backend.
+/// Dados do cadastro (passo 1). O celular vai como metadado do usuário no Supabase (sem exigir
+/// sessão). CPF e nascimento não vão para o login (dado sensível, iria no token): ficam para
+/// o perfil, gravado pelo backend.
 class DadosCadastro {
   const DadosCadastro({
     required this.nome,
@@ -48,6 +49,26 @@ class DadosCadastro {
   final String? perfil;
 }
 
+/// Resultado do cadastro: entrou direto (confirmação de e-mail desligada) ou falta confirmar
+/// o e-mail (caso real hoje).
+sealed class ResultadoCadastro {
+  const ResultadoCadastro();
+}
+
+class CadastroComSessao extends ResultadoCadastro {
+  const CadastroComSessao(this.sessao);
+  final SessaoAuth sessao;
+}
+
+class CadastroAguardandoEmail extends ResultadoCadastro {
+  const CadastroAguardandoEmail(this.email);
+  final String email;
+}
+
+/// Liga/desliga a confirmação do celular por SMS (D16: desligada no piloto). O código da tela
+/// e do serviço continua no app; a tela só entra no fluxo se isto for `true`.
+const kConfirmarCelularPorSms = false;
+
 enum TipoErroAuth {
   credenciaisInvalidas,
   emailJaUsado,
@@ -58,6 +79,10 @@ enum TipoErroAuth {
   reenvioMuitoCedo,
   reenviosEsgotados,
   provedorIndisponivel,
+  emailNaoConfirmado,
+  limiteEmail,
+  dadosInvalidos,
+  cadastroDesativado,
   cancelado,
   desconhecido,
 }
@@ -81,6 +106,10 @@ class ErroAuth implements Exception {
     TipoErroAuth.reenvioMuitoCedo: 'Aguarde um pouco para pedir outro código.',
     TipoErroAuth.reenviosEsgotados: 'Você já pediu códigos demais. Tente mais tarde.',
     TipoErroAuth.provedorIndisponivel: 'Este tipo de entrada ainda não está disponível.',
+    TipoErroAuth.emailNaoConfirmado: 'Confirme seu e-mail para entrar.',
+    TipoErroAuth.limiteEmail: 'Muitos e-mails enviados. Espere alguns minutos e tente de novo.',
+    TipoErroAuth.dadosInvalidos: 'Confira os dados e tente de novo.',
+    TipoErroAuth.cadastroDesativado: 'O cadastro está indisponível no momento.',
     TipoErroAuth.cancelado: 'Entrada cancelada.',
     TipoErroAuth.desconhecido: 'Algo deu errado. Tente de novo.',
   };
@@ -116,8 +145,12 @@ abstract class ServicoAuth {
 
   Future<SessaoAuth> entrarComEmail({required String email, required String senha});
 
-  /// Cria a conta e já pede o código de 6 dígitos por SMS para o celular.
-  Future<SessaoAuth> criarConta(DadosCadastro dados);
+  /// Cria a conta. Com sessão, entra direto; sem sessão (confirmação de e-mail ligada),
+  /// devolve [CadastroAguardandoEmail].
+  Future<ResultadoCadastro> criarConta(DadosCadastro dados);
+
+  /// Reenvia o e-mail de confirmação do cadastro.
+  Future<void> reenviarEmailConfirmacao(String email);
 
   Future<SessaoAuth> entrarComProvedor(ProvedorAuth provedor);
 

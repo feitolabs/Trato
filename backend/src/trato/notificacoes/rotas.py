@@ -63,6 +63,12 @@ class DispositivoIn(BaseModel):
     plataforma: str
 
 
+class RemoverDispositivoIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=8, max_length=4096)
+
+
 class ConversaOut(BaseModel):
     id: str
     pedido_id: str
@@ -220,6 +226,17 @@ def registrar_dispositivo(
     servico.repo.registrar_dispositivo(
         usuario.id, corpo.token.strip(), corpo.plataforma, servico.agora()
     )
+
+
+@router.delete("/dispositivos", status_code=204, summary="Remover token de push (sair/desligar)")
+def remover_dispositivo(
+    corpo: RemoverDispositivoIn,
+    usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
+    servico: ServicoNotificacoes = Depends(_servico),
+) -> None:
+    """Idempotente: token que não existe ou é de outra pessoa responde 204 do mesmo jeito (não
+    revela de quem é). Só o dono consegue desligar o próprio token."""
+    servico.repo.desativar_dispositivo(corpo.token.strip(), usuario.id)
 
 
 # --- conversas ------------------------------------------------------------------------------

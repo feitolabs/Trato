@@ -21,7 +21,7 @@ numa transação só (ou nada).
 | **M2** 422 em loop | Divergência é guardada para revisão (`marcar_revisao`, coluna `eventos_webhook.erro`) e responde 200. | `orquestrador.py`, `persistencia/dinheiro.py` | `test_webhook_de_pagamento_com_valor_diferente_nao_confirma` |
 | **M3** `charge.refunded` | Concilia: o que passa do que o Trato mandou devolver entra no ledger como estorno e gera alerta; se não der para lançar (já liberado), só alerta (200). | `orquestrador.py` | `test_m3_*` |
 | **M4** taxa única | `taxa_da_versao` + `calcular_taxa` (percentual **ou mínimo**, nunca acima do valor) usados no contrato, na calculadora (`TaxaPostgres`) e na liquidação. O mínimo é o parâmetro `taxa_minima_centavos` da versão (ausente = sem mínimo). | `persistencia/config.py`, `contratos.py`, `app_extras.py` | `test_taxa_do_postgres_respeita_o_minimo_como_a_calculadora` |
-| **M5** liquidação | `payout.paid`/`transfer.paid` só liberam o **repasse** a que o aviso se refere (id da transferência, ou `repasse_id` nos metadados na 1ª vez), com o valor líquido exato. Sem repasse ou valor errado: revisão + 200. Repasse é liberado uma vez só. | `orquestrador.py`, `financeiro/repasses.py`, `persistencia/dinheiro.py` | `test_liquidacao_*`, `test_repasse_e_liberado_uma_vez_so` |
+| **M5** liquidação | `payout.paid` só liberam o **repasse** a que o aviso se refere (id da transferência, ou `repasse_id` nos metadados na 1ª vez), com o valor líquido exato. Sem repasse ou valor errado: revisão + 200. Repasse é liberado uma vez só. | `orquestrador.py`, `financeiro/repasses.py`, `persistencia/dinheiro.py` | `test_liquidacao_*`, `test_repasse_e_liberado_uma_vez_so` |
 
 ## Como rodar
 

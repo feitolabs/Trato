@@ -104,7 +104,7 @@ Como ler: `arquivo:linha` é onde está o problema. "Teste" é o `xfail` que rep
 ### M4. Duas fontes da taxa e mínimo ignorado no caminho Postgres
 `pagamentos/taxa.py:34-43` (`calcular_taxa`: percentual **ou o mínimo**, nunca acima do valor) x `persistencia/contratos.py:21-23,90` e `persistencia/app_extras.py:92-96` (só bps da faixa, **sem mínimo**, sem teto). A calculadora do profissional (`rotas_app.py:254-266`) usa um caminho, o contrato outro e a liquidação outro. A regra "base 7,5%, mínima configurável" (CLAUDE.md) não está no caminho que vai ao banco. *Correção:* um único serviço de taxa que recebe a versão de configuração e é usado nos três lugares; teste de igualdade.
 
-### M5. Liquidação (`payout.paid`/`transfer.paid`) libera dinheiro por um evento genérico
+### M5. Liquidação (`payout.paid`) libera dinheiro por um evento genérico
 `orquestrador.py:240-260` + `stripe_formato.py:11-17`: qualquer evento assinado com `metadata.cobranca_id` ou `transfer_group = <pedido>` move `a_liberar → liberado` sem conferir valor nem destinatário. Hoje depende do modelo de contas (P7). *Correção:* só liberar com evento ligado a uma ordem de repasse nossa (valor e conta batendo).
 
 ### M6. Conta bloqueada continua lendo o Storage, e a policy restritiva não cobre tabelas futuras

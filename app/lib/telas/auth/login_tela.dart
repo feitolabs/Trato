@@ -5,7 +5,6 @@ import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
-import '../em_breve_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
 import '../fluxo/rotas.dart';
 import 'estrutura_auth.dart';
@@ -13,7 +12,7 @@ import 'recuperar_senha_tela.dart';
 import 'validacao.dart';
 
 /// Tela 4 do protótipo: "Entrar na sua conta".
-/// Entrar com e-mail, Google e Apple usam o [ServicoAuth]; biometria ainda abre [EmBreveTela].
+/// Entrar com e-mail, Google e Apple usam o [ServicoAuth]; biometria fica fora do MVP.
 /// Google e Apple só aparecem se o serviço diz que o provedor está habilitado (Apple só no iOS).
 class LoginTela extends StatefulWidget {
   const LoginTela({super.key, this.servico, this.sessaoExpirada = false});
@@ -35,6 +34,8 @@ class _LoginTelaState extends State<LoginTela> {
   var _mostrarSenha = false;
   var _tentou = false;
   var _carregando = false;
+  var _precisaConfirmar = false;
+  String? _aviso;
   late String? _erroServico = widget.sessaoExpirada ? ErroTrato.sessaoExpirada.mensagem : null;
 
   ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
@@ -52,8 +53,6 @@ class _LoginTelaState extends State<LoginTela> {
 
   void _abrir(Widget tela) =>
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => tela));
-
-  void _emBreve(String titulo) => _abrir(EmBreveTela(titulo: titulo));
 
   String? get _erroIdentificador {
     if (!_tentou) return null;
@@ -74,6 +73,8 @@ class _LoginTelaState extends State<LoginTela> {
     setState(() {
       _carregando = true;
       _erroServico = null;
+      _precisaConfirmar = false;
+      _aviso = null;
     });
     try {
       sessao = await acao();
@@ -83,6 +84,7 @@ class _LoginTelaState extends State<LoginTela> {
       setState(() {
         _carregando = false;
         _erroServico = e.tipo == TipoErroAuth.cancelado ? null : e.mensagem;
+        _precisaConfirmar = e.tipo == TipoErroAuth.emailNaoConfirmado;
       });
       return;
     }
@@ -93,6 +95,28 @@ class _LoginTelaState extends State<LoginTela> {
       return;
     }
     RotasTrato.irParaInicio(context, sessao);
+  }
+
+  Future<void> _reenviarConfirmacao() async {
+    if (_carregando) return;
+    setState(() {
+      _carregando = true;
+      _erroServico = null;
+      _aviso = null;
+    });
+    String? erro;
+    try {
+      await _servico.reenviarEmailConfirmacao(_identificador.text.trim());
+    } on ErroAuth catch (e) {
+      erro = e.mensagem;
+    }
+    if (!mounted) return;
+    setState(() {
+      _carregando = false;
+      _erroServico = erro;
+      _precisaConfirmar = erro != null;
+      if (erro == null) _aviso = 'Enviamos um e-mail novo. Abra o link e entre.';
+    });
   }
 
   void _entrar() {
@@ -152,6 +176,13 @@ class _LoginTelaState extends State<LoginTela> {
         ),
         const SizedBox(height: EspacosTrato.x3),
         MensagemErroAuth(_erroServico),
+        if (_precisaConfirmar)
+          BotaoLink(texto: 'Reenviar e-mail de confirmação', aoTocar: _reenviarConfirmacao),
+        if (_aviso != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
+            child: Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+          ),
         BotaoPrimario(texto: 'Entrar', aoTocar: _entrar, carregando: _carregando),
         const SizedBox(height: EspacosTrato.x4),
         const _DivisorOu(),
@@ -174,11 +205,6 @@ class _LoginTelaState extends State<LoginTela> {
           ),
           const SizedBox(height: EspacosTrato.x3),
         ],
-        BotaoSecundario(
-          texto: 'Entrar com biometria',
-          icone: Icons.fingerprint,
-          aoTocar: () => _emBreve('Entrar com biometria'),
-        ),
         const SizedBox(height: EspacosTrato.x4),
       ],
     );

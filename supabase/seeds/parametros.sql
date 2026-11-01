@@ -41,65 +41,62 @@ create temp table seed_faixa (
 -- 1) seed_cidades_categorias
 -- ---------------------------------------------------------------------------
 insert into seed_param (chave, valor) values
-  -- Cidade do piloto (P6/P15). O harness sugere Belo Horizonte, mas NÃO está confirmada.
-  ('cidade_nome',   null),   -- A DEFINIR PELO JOÃO (sugestão não confirmada: Belo Horizonte)
-  ('cidade_uf',     null),   -- A DEFINIR PELO JOÃO (sugestão não confirmada: MG)
+  -- Cidade do piloto (P6/P15: Belo Horizonte - MG, inativa até abertura do piloto).
+  ('cidade_nome',   'Belo Horizonte'),
+  ('cidade_uf',     'MG'),
   ('cidade_ativa',  'false'),-- 'true' abre a cidade para pedidos. Fica 'false' até o João decidir abrir o piloto
-  ('cidade_lat',    null),   -- opcional (centro do mapa)
-  ('cidade_lng',    null),   -- opcional
+  ('cidade_lat',    '-19.9167'),   -- centro de BH
+  ('cidade_lng',    '-43.9345'),
 
-  -- Categorias de baixo risco (P15: 2 ou 3). Nomes são SUGESTÃO DO AGENTE; o João troca à vontade.
+  -- Categorias de baixo risco (P15: 2 ou 3).
   -- NUNCA: obra estrutural, gás, elétrica de quadro, atividade regulada. O seed recusa esses nomes.
-  -- As perguntas guiadas de cada vaga estão em seed_cidades_categorias.sql (vaga 1 = limpeza,
-  -- vaga 2 = montagem de móveis, vaga 3 = pintura interna). Se trocar a categoria, troque as perguntas.
   ('cat1_incluir',  'true'),
   ('cat1_nome',     'Limpeza residencial'),
   ('cat1_slug',     'limpeza-residencial'),
-  ('cat1_garantia_dias', null),   -- A DEFINIR PELO JOÃO: prazo de garantia/retrabalho da categoria (dias)
+  ('cat1_garantia_dias', '30'),   -- prazo de garantia/retrabalho da categoria (dias)
   ('cat2_incluir',  'true'),
   ('cat2_nome',     'Montagem de móveis'),
   ('cat2_slug',     'montagem-de-moveis'),
-  ('cat2_garantia_dias', null),   -- A DEFINIR PELO JOÃO
-  ('cat3_incluir',  'false'),     -- terceira categoria é opcional; 'true' para incluir
+  ('cat2_garantia_dias', '30'),
+  ('cat3_incluir',  'false'),     -- terceira categoria desativada no piloto inicial
   ('cat3_nome',     'Pintura de interiores'),
   ('cat3_slug',     'pintura-interna'),
-  ('cat3_garantia_dias', null);   -- A DEFINIR PELO JOÃO (só se cat3_incluir = 'true')
+  ('cat3_garantia_dias', null);
 
 -- ---------------------------------------------------------------------------
 -- 2) seed_config_taxa
 -- ---------------------------------------------------------------------------
 insert into seed_param (chave, valor) values
-  -- Quem cria o rascunho: id (uuid) de uma pessoa JÁ cadastrada em public.equipe (o primeiro
-  -- administrador, criado pelo João; ver seed_equipe_admin.sql). Quem APROVA tem de ser OUTRA pessoa.
-  ('config_criada_por', null);    -- A DEFINIR PELO JOÃO (uuid em equipe)
+  -- Criador do rascunho em public.equipe (administrador)
+  ('config_criada_por', '65be99cc-6ac3-4a75-842f-4af14a14680f');
 
 -- ---------------------------------------------------------------------------
 -- 3) seed_contas_ledger
 -- ---------------------------------------------------------------------------
 insert into seed_param (chave, valor) values
-  -- Só vira 'true' depois que o João responder o P7 (parceiro de pagamento e custódia, caminho A).
-  ('ledger_p7_confirmado', 'false');   -- A DEFINIR PELO JOÃO
+  -- Caminho A (D15): confirmado pelo João.
+  ('ledger_p7_confirmado', 'true');
 
 -- chave, valor, minimo, maximo, obrigatorio
 insert into seed_config (chave, valor, minimo, maximo, obrigatorio) values
-  -- Regra ÚNICA de taxa (V2/D13; P2). Limites minimo/maximo = trava de segurança que o João escolhe.
-  ('taxa_bps',                          null, null, null, true),   -- A DEFINIR PELO JOÃO (P2). Ex.: 750 = 7,5%. Limites também A DEFINIR
-  ('taxa_minima_centavos',              null, null, null, true),   -- A DEFINIR PELO JOÃO (P2). 0 = sem mínimo. Limites também A DEFINIR
+  -- Regra ÚNICA de taxa (V2/D13; P2: 7,5% = 750 bps; mínimo R$ 3,00 = 300 centavos)
+  ('taxa_bps',                          750,  0,    2000, true),
+  ('taxa_minima_centavos',              300,  0,    5000, true),
   -- Tabela progressiva (D2): em ESPERA. O seed só aceita 0 (desligada).
-  ('taxa_progressiva_ativa',            0,    0,    1,    true),   -- 0 = desligada. Não mude sem aprovar P2/D2
-  -- Prazo de liberação (P1: 48 h ou 7 dias?). Preencha SÓ o que o João escolher; o outro fica NULL.
-  ('prazo_liberacao_dias',              null, 1,    30,   true),   -- A DEFINIR PELO JOÃO (P1). Limites: SUGESTÃO DO AGENTE
-  ('prazo_confirmacao_cliente_horas',   null, 12,   168,  false),  -- A DEFINIR PELO JOÃO (P1), opcional. Limites: SUGESTÃO DO AGENTE
+  ('taxa_progressiva_ativa',            0,    0,    1,    true),
+  -- Prazo de liberação: liberar assim que o cliente confirma = 0 dias
+  ('prazo_liberacao_dias',              0,    0,    30,   true),
+  ('prazo_confirmacao_cliente_horas',   48,   12,   168,  false),
   -- Disputa e retrabalho
-  ('janela_chargeback_dias',            7,    1,    30,   true),   -- SUGESTÃO DO ESCOPO (D3: 7 dias). Limites: SUGESTÃO DO AGENTE
-  ('prazo_congelar_disputa_horas',      null, 24,   168,  false),  -- A DEFINIR PELO JOÃO (escopo 3.5 diz 72; conflito N17/P17), opcional
-  ('prazo_resposta_disputa_horas',      48,   12,   168,  true),   -- SUGESTÃO DO ESCOPO (resposta em 48 h)
-  ('prazo_decisao_disputa_dias_uteis',  5,    1,    15,   true),   -- SUGESTÃO DO ESCOPO (decisão em 5 dias úteis)
-  ('prazo_retrabalho_atendimento_dias', 7,    1,    30,   true),   -- SUGESTÃO DO ESCOPO (retrabalho em 7 dias)
-  ('garantia_retrabalho_dias_padrao',   30,   7,    365,  true),   -- SUGESTÃO DO ESCOPO (30 dias); cada categoria pode ter o seu
+  ('janela_chargeback_dias',            7,    1,    30,   true),
+  ('prazo_congelar_disputa_horas',      null, 24,   168,  false),
+  ('prazo_resposta_disputa_horas',      48,   12,   168,  true),
+  ('prazo_decisao_disputa_dias_uteis',  5,    1,    15,   true),
+  ('prazo_retrabalho_atendimento_dias', 7,    1,    30,   true),
+  ('garantia_retrabalho_dias_padrao',   30,   7,    365,  true),
   -- Limites de operação
-  ('valor_minimo_servico_centavos',     3000, 1000, 100000, true), -- SUGESTÃO DO ESCOPO (R$ 30,00). Limites: SUGESTÃO DO AGENTE
-  ('limite_orcamentos_por_pedido',      5,    1,    20,   true);   -- SUGESTÃO DO ESCOPO (5 orçamentos). Limites: SUGESTÃO DO AGENTE
+  ('valor_minimo_servico_centavos',     3000, 1000, 100000, true),
+  ('limite_orcamentos_por_pedido',      5,    1,    20,   true);
 
 -- Faixas da tabela progressiva (D2). Ficam vazias: só entram se o João preencher as três colunas
 -- de uma linha. Mesmo preenchidas, a tabela continua DESLIGADA (taxa_progressiva_ativa = 0).

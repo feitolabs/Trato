@@ -437,7 +437,7 @@ O item `deslocamento` é o que fica com o profissional num cancelamento tardio (
 | `valor_total_centavos` | bigint | |
 | `taxa_bps_aplicada` | integer | Resultado da tabela progressiva no aceite |
 | `taxa_trato_centavos` | bigint | |
-| `liquido_profissional_centavos` | bigint | `total − taxa` (**P3**: se o cliente paga acréscimo, a conta muda) |
+| `liquido_profissional_centavos` | bigint | **= `valor_total_centavos`** (31/10/2026: a taxa é SOMADA, o profissional recebe o orçamento inteiro; o cliente paga `valor_total + taxa_trato`) |
 | `adiantamento_centavos` | bigint | 30% (D5) |
 | `custo_stripe_estimado_centavos` | bigint | D4: Pix e cartão; mostra a sobra do Trato |
 | `config_versao_id` | uuid FK `config_versoes` | **Versão das regras congelada** |
@@ -622,10 +622,10 @@ Exemplo do desenho (valores ilustrativos; o cálculo real depende de P1–P4):
 
 | Evento | Débito | Crédito |
 |---|---|---|
-| Cobrança confirmada (R$ 100) | `caixa_parceiro` 100 | `retido_servico` 100 |
+| Cobrança confirmada (serviço R$ 100 + taxa R$ 7,50 = R$ 107,50) | `caixa_parceiro` 107,50 | `retido_servico` 107,50 |
+| Taxa sai da custódia na confirmação (taxa + custo repassado do parcelado) | `retido_servico` 7,50 | `receita_trato` 7,50 |
 | Custo Stripe (R$ 2) | `despesa_stripe` 2 | `caixa_parceiro` 2 |
-| Liberação: taxa | `retido_servico` T | `receita_trato` T |
-| Liberação: líquido | `retido_servico` L | `a_pagar_profissional` L |
+| Liberação: o serviço inteiro (a taxa já saiu) | `retido_servico` 100 | `a_pagar_profissional` 100 |
 | Repasse liquidado pelo parceiro ao profissional (espelho do evento; **o Trato não faz saque**, D15) | `a_pagar_profissional` L | `caixa_parceiro` L |
 | Estorno de qualquer um | partidas invertidas do original | |
 
@@ -835,7 +835,7 @@ URLs assinadas e curtas, geradas pelo backend.
 |---|---|---|
 | **P1** | 48 h ou 7 dias para liberar? | Chaves `prazo_liberacao_dias`, `prazo_confirmacao_cliente_horas`, `repasses.liberar_em` |
 | **P2** | Faixas e taxa mínima | Conteúdo de `config_faixas_taxa` e `taxa_minima_*`; o seed fica vazio |
-| **P3** | Quem paga taxa e custo Stripe | `contratos.liquido_profissional_centavos`, `pagamentos.acrescimo_cliente_centavos` |
+| **P3** | Quem paga taxa e custo Stripe | **DECIDIDO em 31/10/2026**: taxa somada ao pedido; Trato absorve o Pix e o cartão à vista; cliente paga o custo real do parcelado. Ver `docs/taxa-somada-parcelado.md`. `acrescimo_cliente_centavos` fica sem uso (o custo do parcelado é derivado: cobrança − serviço − taxa) |
 | **P4** | Os 30% vão direto ao profissional ou ficam retidos? | Lançamentos do adiantamento, gatilho `sinal_material`, `orcamentos.sinal_material_centavos` |
 | **P6** | Cidade do piloto | Seed de `cidades` |
 | **P7** | Stripe Connect com Pix e retenção no Brasil | `stripe_account_id`, `repasses.provedor_transferencia_id`, modelo de contas do ledger |

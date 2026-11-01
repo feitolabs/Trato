@@ -22,6 +22,7 @@ MIGRATIONS = (
     "f35_dinheiro",
     "f36_disputas",
     "f37_chat",
+    "profissional_disponibilidade_portfolio_uploads",
 )
 
 

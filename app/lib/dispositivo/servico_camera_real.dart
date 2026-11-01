@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 
+import '../componentes/imagem_trato.dart';
 import 'preparador_imagem.dart';
 import 'servico_camera.dart';
 
-/// Câmera e galeria do aparelho via `image_picker`. A permissão é pedida antes, por
-/// [garantirPermissao]; aqui só se captura e se trata a imagem.
+/// Câmera e galeria do aparelho via `image_picker`. Solicita permissão de câmera se necessário
+/// e faz fallback automático para a galeria caso a câmera seja negada ou indisponível.
 class ServicoCameraReal implements ServicoCamera {
   ServicoCameraReal({ImagePicker? picker, this.preparador = const PreparadorImagem()})
       : _picker = picker ?? ImagePicker();
@@ -22,12 +24,39 @@ class ServicoCameraReal implements ServicoCamera {
       _capturar(ImageSource.gallery, CameraDevice.rear);
 
   Future<ArquivoCapturado?> _capturar(ImageSource origem, CameraDevice camera) async {
-    final arquivo = await _picker.pickImage(source: origem, preferredCameraDevice: camera);
+    var fonte = origem;
+    if (fonte == ImageSource.camera) {
+      try {
+        var status = await ph.Permission.camera.status;
+        if (!status.isGranted && !status.isLimited) {
+          status = await ph.Permission.camera.request();
+        }
+        if (!status.isGranted && !status.isLimited) {
+          fonte = ImageSource.gallery;
+        }
+      } on Object {
+        // Segue com a tentativa padrão do image_picker.
+      }
+    }
+    XFile? arquivo;
+    try {
+      arquivo = await _picker.pickImage(source: fonte, preferredCameraDevice: camera);
+    } on Object {
+      if (fonte == ImageSource.camera) {
+        arquivo = await _picker.pickImage(source: ImageSource.gallery);
+      }
+    }
     if (arquivo == null) return null;
     final original = await arquivo.readAsBytes();
     final agora = DateTime.now().toUtc();
     // Decodificar e recomprimir é pesado: fora da thread da interface.
-    return compute(_preparar, (preparador, original, agora));
+    final preparado = await compute(_preparar, (preparador, original, agora));
+    registrarImagemEmMemoria(
+      preparado.sha256,
+      bytes: preparado.bytes,
+      caminhoLocal: arquivo.path,
+    );
+    return preparado;
   }
 }
 

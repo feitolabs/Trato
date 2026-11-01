@@ -73,7 +73,9 @@ class RepositorioServicoNotificacoes(Protocol):
 
     def tokens(self, usuario_id: str) -> Sequence[str]: ...
 
-    def desativar_dispositivo(self, token: str) -> None: ...
+    def desativar_dispositivo(self, token: str, usuario_id: str | None = None) -> None:
+        """Desliga o token. Com `usuario_id`, só se for dele (a rota sempre passa); sem ele, é o
+        envio de push que desliga um token que o provedor recusou."""
 
 
 class RepositorioEmMemoria:
@@ -158,5 +160,7 @@ class RepositorioEmMemoria:
     def tokens(self, usuario_id: str) -> Sequence[str]:
         return tuple(t for t, (u, _) in self._dispositivos.items() if u == usuario_id)
 
-    def desativar_dispositivo(self, token: str) -> None:
-        self._dispositivos.pop(token, None)
+    def desativar_dispositivo(self, token: str, usuario_id: str | None = None) -> None:
+        dono = self._dispositivos.get(token)
+        if dono is not None and usuario_id in (None, dono[0]):
+            del self._dispositivos[token]

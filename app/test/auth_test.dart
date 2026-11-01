@@ -4,12 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/auth/servico_auth_fake.dart';
 import 'package:trato/telas/auth/confirmar_celular_tela.dart';
+import 'package:trato/telas/auth/confirmar_email_tela.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/auth/recuperar_senha_tela.dart';
 import 'package:trato/telas/auth/validacao.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
-import 'package:trato/telas/em_breve_tela.dart';
+import 'package:trato/telas/ajuda/ajuda_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/tema/tema.dart';
 
@@ -99,7 +100,6 @@ void main() {
 
       expect(find.text('Informe e-mail, CPF ou telefone.'), findsOneWidget);
       expect(find.text('Informe sua senha.'), findsOneWidget);
-      expect(find.byType(EmBreveTela), findsNothing);
     });
 
     testWidgets('Mostrar alterna a visibilidade da senha', (tester) async {
@@ -123,10 +123,9 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    testWidgets('Entrar com biometria abre "em breve"', (tester) async {
+    testWidgets('não oferece biometria (fora do MVP)', (tester) async {
       await _abrir(tester, const LoginTela());
-      await _tocar(tester, 'Entrar com biometria');
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.text('Entrar com biometria'), findsNothing);
     });
 
     testWidgets('senha errada mostra o erro em português e não sai da tela', (tester) async {
@@ -236,6 +235,21 @@ void main() {
       }
     });
 
+    testWidgets('e-mail não confirmado avisa e oferece reenviar', (tester) async {
+      final servico = ServicoAuthFake()
+        ..falharNaProxima = const ErroAuth(TipoErroAuth.emailNaoConfirmado);
+      await _abrir(tester, LoginTela(servico: servico));
+      await tester.enterText(find.byType(TextField).at(0), 'mariana@email.com');
+      await tester.enterText(find.byType(TextField).at(1), 'segredo123');
+      await tester.tap(find.text('Entrar').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Confirme seu e-mail para entrar.'), findsOneWidget);
+      await _tocar(tester, 'Reenviar e-mail de confirmação');
+      expect(servico.emailsReenviados, 1);
+      expect(find.textContaining('Enviamos um e-mail novo'), findsOneWidget);
+    });
+
     testWidgets('Esqueci minha senha e Criar conta levam às telas certas', (tester) async {
       await _abrir(tester, const LoginTela());
       await _tocar(tester, 'Esqueci minha senha');
@@ -280,7 +294,24 @@ void main() {
       expect(find.byType(ConfirmarCelularTela), findsNothing);
     });
 
-    testWidgets('formulário certo leva ao passo 2 com o celular mascarado', (tester) async {
+    testWidgets('formulário certo leva a "Confirme seu e-mail" (passo 2)', (tester) async {
+      await _abrir(
+        tester,
+        CriarContaTela(servico: ServicoAuthFake(exigeConfirmacaoEmail: true)),
+      );
+      await preencher(tester);
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+
+      await _tocar(tester, 'Criar conta');
+
+      expect(find.byType(ConfirmarEmailTela), findsOneWidget);
+      expect(find.byType(ConfirmarCelularTela), findsNothing);
+      expect(find.text('Passo 2 de 2'), findsOneWidget);
+      expect(find.textContaining('mariana@email.com', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('sem confirmação de e-mail entra direto na casca, sem tela de SMS', (tester) async {
       await _abrir(tester, const CriarContaTela());
       await preencher(tester);
       await tester.tap(find.byType(Checkbox).first);
@@ -288,9 +319,8 @@ void main() {
 
       await _tocar(tester, 'Criar conta');
 
-      expect(find.byType(ConfirmarCelularTela), findsOneWidget);
-      expect(find.text('Passo 2 de 2'), findsOneWidget);
-      expect(find.textContaining('(31) 9••••-4417', findRichText: true), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsOneWidget);
+      expect(find.byType(ConfirmarCelularTela), findsNothing);
     });
 
     Future<void> aceitarETocar(WidgetTester tester) async {
@@ -328,7 +358,60 @@ void main() {
 
       expect(servico.sessaoAtual?.email, 'mariana@email.com');
       expect(servico.sessaoAtual?.nome, 'Mariana Alves');
-      expect(find.byType(ConfirmarCelularTela), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsOneWidget);
+    });
+  });
+
+  group('confirmar e-mail', () {
+    Future<ServicoAuthFake> cadastrar(WidgetTester tester) async {
+      final servico = ServicoAuthFake(exigeConfirmacaoEmail: true);
+      await _abrir(tester, CriarContaTela(servico: servico));
+      await _digitar(tester, 'Nome completo', 'Mariana Alves');
+      await _digitar(tester, 'CPF', '12345678901');
+      await _digitar(tester, 'Nascimento', '15031990');
+      await _digitar(tester, 'Celular', '31987654417');
+      await _digitar(tester, 'E-mail', 'mariana@email.com');
+      await _digitar(tester, 'Senha', 'segredo123');
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+      await _tocar(tester, 'Criar conta');
+      return servico;
+    }
+
+    testWidgets('cadastro → Confirme seu e-mail → Já confirmei → casca', (tester) async {
+      final servico = await cadastrar(tester);
+      expect(find.text('Confirme seu e-mail'), findsOneWidget);
+
+      // Antes de abrir o link: fica na tela, com aviso.
+      await _tocar(tester, 'Já confirmei');
+      expect(find.byType(ConfirmarEmailTela), findsOneWidget);
+      expect(find.textContaining('Ainda não confirmamos'), findsOneWidget);
+
+      servico.confirmarEmail('mariana@email.com');
+      await _tocar(tester, 'Já confirmei');
+
+      expect(find.byType(CascaClienteTela), findsOneWidget);
+      expect(servico.sessaoAtual?.email, 'mariana@email.com');
+    });
+
+    testWidgets('reenviar só libera depois de 60 s e a espera recomeça', (tester) async {
+      final servico = await cadastrar(tester);
+      expect(find.text('Reenviar e-mail'), findsNothing);
+      expect(find.text('Reenviar e-mail em 1:00'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 60));
+      await _tocar(tester, 'Reenviar e-mail');
+
+      expect(servico.emailsReenviados, 1);
+      expect(find.text('Enviamos um e-mail novo.'), findsOneWidget);
+      expect(find.text('Reenviar e-mail em 1:00'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 60));
+    });
+
+    testWidgets('Trocar e-mail volta ao formulário', (tester) async {
+      await cadastrar(tester);
+      await _tocar(tester, 'Trocar e-mail');
+      expect(find.byType(CriarContaTela), findsOneWidget);
     });
   });
 
@@ -451,10 +534,10 @@ void main() {
       expect(find.textContaining('você vai receber as instruções'), findsNothing);
     });
 
-    testWidgets('Fale com o suporte abre "em breve"', (tester) async {
+    testWidgets('Fale com o suporte abre a central de ajuda', (tester) async {
       await _abrir(tester, const RecuperarSenhaTela());
       await _tocar(tester, 'Fale com o suporte');
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(AjudaTela), findsOneWidget);
     });
   });
 

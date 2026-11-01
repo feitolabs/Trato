@@ -1,18 +1,28 @@
-import '../telas/carteira/modelos.dart';
-import '../telas/profissional/servico_check_in.dart';
-import '../telas/profissional/servico_orcamento.dart';
-import '../telas/profissional_inicio/modelos.dart';
+import '../dispositivo/captura_check_in_dispositivo.dart';
+import '../dispositivo/servico_camera.dart';
+import '../dispositivo/servico_localizacao.dart';
+import '../telas/aditivo/aditivo.dart';
+import '../telas/disputa_profissional/disputa.dart';
+import '../telas/nota_material/nota_material.dart';
+import '../telas/perfil_publico/perfil_publico.dart';
+import '../telas/profissional_cadastro/cadastro.dart';
+import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'config.dart';
 import 'repositorios.dart';
+import 'repositorios_catalogo.dart';
+import 'repositorios_catalogo_api.dart';
+import 'repositorios_catalogo_fake.dart';
 import 'repositorios_api.dart';
 import 'repositorios_fake.dart';
+import 'servico_upload.dart';
+import 'servicos_api.dart';
 import 'sessao.dart';
 
 /// Todos os repositórios do app num lugar só. O `rotas.dart` entrega o que precisa a cada
 /// tela; as telas não sabem se estão falando com a API ou com dados de exemplo.
 class RepositoriosTrato {
-  const RepositoriosTrato({
+  RepositoriosTrato({
     required this.pedidos,
     required this.orcamentos,
     required this.pagamento,
@@ -20,7 +30,24 @@ class RepositoriosTrato {
     required this.notificacoes,
     required this.perfil,
     required this.profissional,
-  });
+    this.aditivo,
+    this.notaMaterial,
+    this.verificacao,
+    this.capturaVerificacao,
+    this.disputaProfissional,
+    this.cadastroProfissional,
+    this.perfilPublico,
+    RepositorioCatalogo? catalogo,
+    RepositorioServicosCliente? servicos,
+    RepositorioAgenda? agenda,
+    this.modoApi = false,
+  })  : _catalogo = catalogo,
+        _servicos = servicos,
+        _agenda = agenda;
+
+  final ServicoDisputaProfissional? disputaProfissional;
+  final ServicoCadastroProfissional? cadastroProfissional;
+  final ServicoPerfilPublico? perfilPublico;
 
   /// Modo demonstração: só dados de exemplo, sem rede.
   factory RepositoriosTrato.demo() => RepositoriosTrato(
@@ -31,27 +58,90 @@ class RepositoriosTrato {
         notificacoes: RepositorioNotificacoesFake(),
         perfil: RepositorioPerfilFake(),
         profissional: RepositorioProfissionalFake(),
+        catalogo: RepositorioCatalogoFake(),
+        servicos: RepositorioServicosClienteFake(),
+        agenda: RepositorioAgendaFake(),
+        disputaProfissional:
+            ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
       );
 
-  /// Modo API. Cada área usa a API quando o backend já tem a rota; as demais seguem em
-  /// demonstração (lista em `docs/app-ligacao.md`). Quando a rota existir, troque o fake
-  /// pelo `...Api` aqui.
-  factory RepositoriosTrato.api(ClienteApi api) => RepositoriosTrato(
-        pedidos: RepositorioPedidosApi(api),
-        orcamentos: RepositorioOrcamentosFake(),
-        pagamento: RepositorioPagamentoFake(),
-        chat: RepositorioChatFake(),
-        notificacoes: RepositorioNotificacoesFake(),
-        perfil: RepositorioPerfilFake(),
-        profissional: RepositorioProfissionalMisto(
-          demonstracao: RepositorioProfissionalFake(),
-          api: RepositorioProfissionalApi(api),
-        ),
-      );
+  /// Modo API. Cada área usa a API quando o backend já tem a rota; o que não tem rota segue em
+  /// demonstração (lista em `docs/app-ligacao.md` e `docs/app-divergencias.md`).
+  /// [captura] e [upload] (câmera e envio por URL assinada) são usados no check-in e na
+  /// verificação; sem eles o app não captura nada.
+  factory RepositoriosTrato.api(
+    ClienteApi api, {
+    CapturaCheckIn captura = const CapturaIndisponivel(),
+    CapturaCheckIn Function(String pedidoId)? capturaDoPedido,
+    ServicoUpload? upload,
+    ServicoCamera? camera,
+  }) {
+    final pedidos = RepositorioPedidosApi(api);
+    final profissional = RepositorioProfissionalApi(
+      api,
+      captura: captura,
+      capturaDoPedido: capturaDoPedido,
+      upload: upload,
+    );
+    return RepositoriosTrato(
+        modoApi: true,
+        catalogo: RepositorioCatalogoApi(api),
+        servicos: RepositorioServicosClienteApi(api, pedidos),
+        agenda: RepositorioAgendaApi(profissional),
+        pedidos: pedidos,
+        orcamentos: RepositorioOrcamentosApi(api),
+        pagamento: RepositorioPagamentoApi(api),
+        chat: RepositorioChatApi(api),
+        notificacoes: RepositorioNotificacoesApi(api),
+        perfil: RepositorioPerfilApi(api),
+        profissional: profissional,
+        aditivo: ServicoAditivoApi(api),
+        notaMaterial: ServicoNotaMaterialApi(api),
+        verificacao: ServicoVerificacaoApi(api),
+        disputaProfissional: ServicoDisputaProfissionalApi(api),
+        cadastroProfissional: ServicoCadastroProfissionalApi(api),
+        perfilPublico: ServicoPerfilPublicoApi(api),
+        capturaVerificacao:
+            camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
+    );
+  }
 
-  factory RepositoriosTrato.deConfig(ConfigTrato config, SessaoTrato sessao) => config.usaApi
-      ? RepositoriosTrato.api(ClienteApi(urlBase: config.apiUrl, sessao: sessao))
-      : RepositoriosTrato.demo();
+  factory RepositoriosTrato.deConfig(
+    ConfigTrato config,
+    SessaoTrato sessao, {
+    CapturaCheckIn captura = const CapturaIndisponivel(),
+    ServicoUpload Function(ClienteApi api)? criarUpload,
+    ServicoCamera? camera,
+    ServicoLocalizacao? localizacao,
+  }) {
+    if (!config.usaApi) return RepositoriosTrato.demo();
+    final api = ClienteApi(urlBase: config.apiUrl, sessao: sessao);
+    final upload = criarUpload?.call(api);
+    return RepositoriosTrato.api(
+      api,
+      captura: captura,
+      capturaDoPedido: camera != null && localizacao != null && upload != null
+          ? (pedidoId) => CapturaCheckInDispositivo(
+                camera: camera,
+                localizacao: localizacao,
+                upload: upload,
+                pedidoId: pedidoId,
+              )
+          : null,
+      upload: upload,
+      camera: camera,
+    );
+  }
+
+  /// Verdadeiro no modo `api`. Algumas telas só aparecem onde há dados de verdade por trás
+  /// (ex.: conversa antes de contratar, que o backend ainda não tem).
+  final bool modoApi;
+
+  /// Só no modo API; `null` = a rota segue com o serviço de demonstração.
+  final ServicoAditivo? aditivo;
+  final ServicoNotaMaterial? notaMaterial;
+  final ServicoVerificacao? verificacao;
+  final CapturaVerificacao? capturaVerificacao;
 
   final RepositorioPedidos pedidos;
   final RepositorioOrcamentos orcamentos;
@@ -60,31 +150,13 @@ class RepositoriosTrato {
   final RepositorioNotificacoes notificacoes;
   final RepositorioPerfil perfil;
   final RepositorioProfissional profissional;
-}
 
-/// Profissional: o extrato vem da API (a rota existe); o resto segue em demonstração.
-class RepositorioProfissionalMisto implements RepositorioProfissional {
-  RepositorioProfissionalMisto({required this.demonstracao, required this.api});
+  /// Catálogo, serviços do cliente e agenda: sem eles (testes antigos), usa a demonstração.
+  final RepositorioCatalogo? _catalogo;
+  final RepositorioServicosCliente? _servicos;
+  final RepositorioAgenda? _agenda;
 
-  final RepositorioProfissional demonstracao;
-  final RepositorioProfissional api;
-
-  @override
-  Future<InicioProfissional> inicio() => demonstracao.inicio();
-
-  @override
-  Future<DetalhePedido> detalhe(String pedidoId) => demonstracao.detalhe(pedidoId);
-
-  @override
-  Future<void> recusar(String pedidoId, MotivoRecusa motivo) =>
-      demonstracao.recusar(pedidoId, motivo);
-
-  @override
-  Future<List<ItemExtrato>> extrato() => api.extrato();
-
-  @override
-  ServicoOrcamento servicoOrcamento(String pedidoId) => demonstracao.servicoOrcamento(pedidoId);
-
-  @override
-  ServicoCheckIn servicoCheckIn(String pedidoId) => demonstracao.servicoCheckIn(pedidoId);
+  late final RepositorioCatalogo catalogo = _catalogo ?? RepositorioCatalogoFake();
+  late final RepositorioServicosCliente servicos = _servicos ?? RepositorioServicosClienteFake();
+  late final RepositorioAgenda agenda = _agenda ?? RepositorioAgendaFake();
 }

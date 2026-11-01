@@ -20,6 +20,8 @@ class PerfilPublico {
     required this.cidade,
     required this.fotosPortfolio,
     required this.ultimasAvaliacoes,
+    this.fotoReferencia,
+    this.listaFotosPortfolio = const [],
   });
 
   final String nome;
@@ -36,6 +38,8 @@ class PerfilPublico {
   final String cidade;
   final int fotosPortfolio;
   final List<Avaliacao> ultimasAvaliacoes;
+  final String? fotoReferencia;
+  final List<String> listaFotosPortfolio;
 }
 
 abstract interface class ServicoPerfilPublico {

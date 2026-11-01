@@ -3,36 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal
 
-from trato.api.repositorios import Orcamento
+from trato.api.repositorios import EtapaProposta, ItemOrcamento, Orcamento
 from trato.api.repositorios_app import ItemDoOrcamento, OrcamentoDetalhe, OrcamentoDoPedido
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import DadosInvalidos, RegraDoBanco
 
-
-@dataclass(frozen=True)
-class ItemOrcamento:
-    tipo: str  # deslocamento | horas | material | outro
-    descricao: str
-    quantidade: Decimal
-    valor_unitario_centavos: int
-
-    @property
-    def total_centavos(self) -> int:
-        """Quantidade x unitário, arredondado para o centavo (meio para cima)."""
-        return int(
-            (self.quantidade * self.valor_unitario_centavos).to_integral_value(ROUND_HALF_UP)
-        )
-
-
-@dataclass(frozen=True)
-class EtapaProposta:
-    descricao: str
-    valor_centavos: int
+__all__ = ["EtapaProposta", "ItemOrcamento", "OrcamentosPostgres"]
 
 
 class OrcamentosPostgres:

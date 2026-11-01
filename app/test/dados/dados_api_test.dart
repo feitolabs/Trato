@@ -7,13 +7,17 @@ import 'package:http/testing.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/config.dart';
 import 'package:trato/dados/erros.dart';
-import 'package:trato/dados/repositorios.dart';
 import 'package:trato/dados/repositorios_api.dart';
+import 'package:trato/dados/repositorios_catalogo.dart';
+import 'package:trato/dados/repositorios_catalogo_api.dart';
+import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/carteira/modelos.dart';
 import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import 'package:trato/telas/disputa_profissional/disputa.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
+import 'package:trato/telas/profissional/servico_orcamento.dart';
 
 const _pedidoJson = {
   'id': 'abcd1234',
@@ -270,14 +274,6 @@ void main() {
 
       expect(dados.valorCongeladoCentavos, 20000);
     });
-
-    test('função sem rota no backend avisa que não está disponível', () async {
-      final (api, _) = _cliente((_) => _json({}));
-      await expectLater(
-        RepositorioPedidosApi(api).garantia('x'),
-        throwsA(isA<ErroTrato>().having((e) => e.tipo, 'tipo', TipoErro.indisponivel)),
-      );
-    });
   });
 
   group('Orçamentos e pagamento', () {
@@ -290,18 +286,6 @@ void main() {
       expect(chamadas.single.corpo, {
         'prova': {'orcamento_id': 'orc-1'},
       });
-    });
-
-    test('só é "pago" quando o backend mudou o estado do pedido', () async {
-      var estado = 'orcamento_aceito';
-      final (api, _) = _cliente((_) => _json({..._pedidoJson, 'estado': estado}));
-      final repo = RepositorioPagamentoApi(api);
-
-      expect(await repo.status('abcd1234'), StatusPagamento.aguardando);
-      estado = 'pago_e_retido';
-      expect(await repo.status('abcd1234'), StatusPagamento.pago);
-      estado = 'cancelado';
-      expect(await repo.status('abcd1234'), StatusPagamento.falhou);
     });
   });
 
@@ -390,6 +374,233 @@ void main() {
         (chamadas.single.corpo!['prova'] as Map)['codigo_conclusao'],
         '7310',
       );
+    });
+  });
+
+  group('ServicoOrcamentoApi', () {
+    test('resumir pede a taxa e o total ao backend', () async {
+      final (api, chamadas) = _cliente(
+        (_) => _json({
+          'valor_centavos': 30000,
+          'taxa_centavos': 2250,
+          'taxa_bps': 750,
+          'liquido_centavos': 30000,
+          'total_cliente_centavos': 32250,
+        }),
+      );
+
+      final servico = ServicoOrcamentoApi(api, pedidoId: 'ped-1');
+      final resumo = await servico.resumir(30000);
+
+      expect(chamadas.single.caminho, '/v1/orcamentos/resumo');
+      expect(chamadas.single.corpo, {'valor_centavos': 30000});
+      expect(resumo.totalCentavos, 30000);
+      expect(resumo.taxaCentavos, 2250);
+      expect(resumo.taxaBps, 750);
+      expect(resumo.liquidoCentavos, 30000);
+      expect(resumo.clientePagaCentavos, 32250);
+    });
+
+    test('enviar serializa itens e chama POST /v1/pedidos/{id}/orcamentos', () async {
+      final (api, chamadas) = _cliente((_) => _json({'id': 'orc-1', 'versao': 1}));
+
+      final servico = ServicoOrcamentoApi(api, pedidoId: 'ped-123');
+      await servico.enviar(
+        const OrcamentoPronto(
+          deslocamentoCentavos: 3000,
+          decimosDeHora: 25,
+          valorHoraCentavos: 8000,
+          garantiaDias: 90,
+          itens: [
+            ItemMaterial(nome: 'Tomadas', centavos: 4500),
+          ],
+          materialPorMim: true,
+          pedirSinalMaterial: true,
+          totalCentavos: 27500,
+        ),
+      );
+
+      expect(chamadas.single.caminho, '/v1/pedidos/ped-123/orcamentos');
+      final corpo = chamadas.single.corpo!;
+      expect(corpo['garantia_dias'], 90);
+      expect(corpo['prazo_dias'], 3);
+      expect(corpo['validade_dias'], 3);
+      expect(corpo['sinal_material_centavos'], 4500);
+      final itens = corpo['itens'] as List;
+      expect(itens.length, 3);
+      expect(itens[0]['descricao'], 'Mão de obra');
+      expect(itens[0]['preco_unitario_centavos'], 20000); // 8000 * 25 / 10
+      expect(itens[1]['descricao'], 'Deslocamento');
+      expect(itens[1]['preco_unitario_centavos'], 3000);
+      expect(itens[2]['descricao'], 'Tomadas');
+      expect(itens[2]['preco_unitario_centavos'], 4500);
+    });
+
+    test('enviar sem pedidoId lança ErroTrato', () async {
+      final (api, _) = _cliente((_) => _json({}));
+      final servico = ServicoOrcamentoApi(api);
+
+      expect(
+        () => servico.enviar(
+          const OrcamentoPronto(
+            deslocamentoCentavos: 0,
+            decimosDeHora: 10,
+            valorHoraCentavos: 5000,
+            garantiaDias: 30,
+            itens: [],
+            materialPorMim: false,
+            pedirSinalMaterial: false,
+            totalCentavos: 5000,
+          ),
+        ),
+        throwsA(isA<ErroTrato>()),
+      );
+    });
+  });
+
+  group('RepositorioPedidosApi.criar com dados completos', () {
+    test('envia categoria, cidade, titulo, descricao, faixa e respostas', () async {
+      final (api, chamadas) = _cliente((_) => _json(_pedidoJson));
+      final repo = RepositorioPedidosApi(api);
+
+      final id = await repo.criar(
+        const RascunhoPedido(
+          categoriaId: 'hidraulica',
+          servicos: ['Torneira', 'Válvula'],
+          quantidade: 2,
+          voltagem: '',
+          descricao: 'Troca de torneira com vazamento',
+          prazo: 'Até amanhã',
+          faixa: FaixaPreco(minimoCentavos: 10000, maximoCentavos: 25000),
+        ),
+      );
+
+      expect(id, 'abcd1234');
+      expect(chamadas.single.caminho, '/v1/pedidos');
+      final corpo = chamadas.single.corpo!;
+      expect(corpo['categoria_id'], 'hidraulica');
+      expect(corpo['cidade_id'], 'belo-horizonte');
+      expect(corpo['titulo'], 'Torneira, Válvula');
+      expect(corpo['descricao'], 'Troca de torneira com vazamento');
+      expect(corpo['faixa_preco_min_centavos'], 10000);
+      expect(corpo['faixa_preco_max_centavos'], 25000);
+      final respostas = corpo['respostas'] as List;
+      expect(respostas.length, 3);
+    });
+  });
+
+  group('ServicoDisputaProfissionalApi', () {
+    test('carregarDisputa lê dados de /v1/pedidos/{id}/disputa', () async {
+      final (api, chamadas) = _cliente(
+        (_) => _json({
+          'pedido_id': 'ped-1',
+          'motivo': 'diferente_do_combinado',
+          'descricao': 'Serviço incompleto',
+          'valor_congelado_centavos': 15000,
+        }),
+      );
+
+      final servico = ServicoDisputaProfissionalApi(api);
+      final detalhe = await servico.carregarDisputa('ped-1');
+
+      expect(chamadas.single.caminho, '/v1/pedidos/ped-1/disputa');
+      expect(detalhe, isNotNull);
+      expect(detalhe!.id, 'ped-1');
+      expect(detalhe.valorCongeladoCentavos, 15000);
+      expect(detalhe.descricao, 'Serviço incompleto');
+    });
+
+    test('responder chama POST /v1/pedidos/{id}/disputa/resposta', () async {
+      final (api, chamadas) = _cliente((_) => _json({'ok': true}));
+      final servico = ServicoDisputaProfissionalApi(api);
+
+      await servico.responder(
+        const RespostaDisputa(
+          disputaId: 'ped-1',
+          tipo: TipoRespostaDisputa.discordar,
+          mensagem: 'Serviço realizado conforme contratado.',
+        ),
+      );
+
+      expect(chamadas.single.caminho, '/v1/pedidos/ped-1/disputa/resposta');
+    });
+
+    test('agendarRetrabalho chama POST /v1/pedidos/{id}/retrabalho/atender com aceitar', () async {
+      final (api, chamadas) = _cliente((_) => _json({'ok': true}));
+      final servico = ServicoDisputaProfissionalApi(api);
+
+      await servico.agendarRetrabalho(
+        const AgendamentoRetrabalho(
+          disputaId: 'ped-2',
+          horario: 'Manhã',
+          mensagem: 'Vou retornar no sábado pela manhã',
+        ),
+      );
+
+      expect(chamadas.single.caminho, '/v1/pedidos/ped-2/retrabalho/atender');
+      expect(chamadas.single.corpo, {'etapa': 'aceitar'});
+    });
+  });
+
+  group('RepositorioCatalogoApi com busca e filtro reais', () {
+    test('buscar consulta /v1/profissionais com termo servico', () async {
+      final (api, chamadas) = _cliente(
+        (_) => _json({
+          'itens': [
+            {
+              'id': 'prof-123',
+              'nome': 'Carlos Silva',
+              'bio': 'Eletricista predial',
+              'nivel_verificacao': 'verificado_plus',
+              'nota_publica': 4.9,
+              'servicos_concluidos': 42,
+              'categorias': ['eletrica'],
+            },
+          ],
+          'pagina': 1,
+          'limite': 20,
+          'total': 1,
+          'tem_mais': false,
+        }),
+      );
+
+      final repo = RepositorioCatalogoApi(api);
+      final resultados = await repo.buscar('eletricista');
+
+      expect(chamadas.single.caminho, '/v1/profissionais?servico=eletricista');
+      expect(resultados.length, 1);
+      expect(resultados.single.id, 'prof-123');
+      expect(resultados.single.nome, 'Carlos Silva');
+      expect(resultados.single.nota, 4.9);
+      expect(resultados.single.servicosConcluidos, 42);
+    });
+
+    test('profissionais filtra por categoria e bairro', () async {
+      final (api, chamadas) = _cliente(
+        (_) => _json({
+          'itens': [
+            {
+              'id': 'prof-456',
+              'nome': 'Ana Souza',
+              'nivel_verificacao': 'verificado',
+              'nota_publica': 5.0,
+              'servicos_concluidos': 15,
+              'categorias': ['pintura'],
+            },
+          ],
+          'total': 1,
+        }),
+      );
+
+      final repo = RepositorioCatalogoApi(api);
+      final lista = await repo.profissionais(
+        'pintura',
+        const FiltroProfissionais(bairro: 'Centro'),
+      );
+
+      expect(chamadas.single.caminho, '/v1/profissionais?categoria_id=pintura&bairro=Centro');
+      expect(lista.single.id, 'prof-456');
+      expect(lista.single.nome, 'Ana Souza');
     });
   });
 }

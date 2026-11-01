@@ -46,7 +46,12 @@ def test_resumo_traz_taxa_liquido_e_custo_estimado_do_provedor(amb):
     r = chamar(amb, "POST", "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 100_000})
     assert r.status_code == 200, r.text
     corpo = r.json()
-    assert corpo["taxa_centavos"] == 7_500 and corpo["liquido_centavos"] == 92_500
+    assert corpo["taxa_centavos"] == 7_500 and corpo["liquido_centavos"] == 100_000
+    assert corpo["total_cliente_centavos"] == 107_500
+    assert corpo["taxa_bps"] == 750 and corpo["taxa_percentual"] == 7.5
+    # mínimo configurável: 7,5% de R$ 10,00 = 75 centavos, mas o mínimo é 500 (50%)
+    pequeno = chamar(amb, "POST", "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
+    assert pequeno.json()["taxa_centavos"] == 500 and pequeno.json()["taxa_percentual"] == 50.0
     assert corpo["custo_provedor_estimado_centavos"] > 0
     assert corpo["custo_provedor_estimativa"] is True
     assert (
@@ -72,7 +77,7 @@ def test_cobranca_nunca_devolve_pago_antes_do_webhook(fluxo: Fluxo):  # noqa: F8
     cobranca = r.json()
     assert cobranca["estado_pagamento"] == "aguardando_confirmacao"
     assert cobranca["tipo_instrucao"] == "pix_copia_e_cola" and cobranca["instrucao"]
-    assert cobranca["valor_centavos"] == 100_000
+    assert cobranca["valor_centavos"] == 107_500  # serviço + taxa (7,5%) SOMADA
 
     # repetir devolve a mesma cobrança pendente (idempotente)
     outra = fluxo.chamar(
@@ -98,7 +103,8 @@ def test_cobranca_nunca_devolve_pago_antes_do_webhook(fluxo: Fluxo):  # noqa: F8
     )
     depois = fluxo.chamar("GET", f"/v1/contratos/{pid}/pagamento", "t-prof").json()
     assert depois["estado_pagamento"] == "pago" and depois["pago"] is True
-    assert depois["pago_centavos"] == 100_000
+    assert depois["pago_centavos"] == 107_500 and depois["valor_centavos"] == 100_000
+    assert depois["total_a_pagar_centavos"] == 107_500
     # pago: não cobra de novo
     assert (
         fluxo.chamar(
@@ -399,6 +405,23 @@ def test_pedidos_abertos_filtros_e_ordem(abertos):
         == 422
     )
     assert chamar(abertos, "GET", url, "t-cliente").status_code == 403
+
+
+def test_detalhe_do_pedido_aberto_com_quantos_orcaram(abertos):
+    base = "/v1/profissional/pedidos-abertos"
+    r = chamar(abertos, "GET", base + "/a", "t-prof")
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert corpo["id"] == "a" and corpo["titulo"] == "Pedido a" and corpo["bairro"] == "Centro"
+    assert corpo["orcamentos_recebidos"] == 0 and corpo["ja_orcou"] is False
+    assert "endereco" not in corpo and "cliente_id" not in corpo
+    assert chamar(abertos, "GET", base + "/nao-existe", "t-prof").status_code == 404
+    assert chamar(abertos, "GET", base + "/a", "t-cliente").status_code == 403
+    assert abertos.cliente.get(base + "/a").status_code == 401
+    # recusado some do detalhe, como da lista (e continua para os outros)
+    chamar(abertos, "POST", "/v1/pedidos/a/recusar", "t-prof", {"motivo": "Sem agenda"})
+    assert chamar(abertos, "GET", base + "/a", "t-prof").status_code == 404
+    assert chamar(abertos, "GET", base + "/a", "t-outro-prof").status_code == 200
 
 
 def test_recusar_tira_da_lista_so_dele_e_e_idempotente(abertos):

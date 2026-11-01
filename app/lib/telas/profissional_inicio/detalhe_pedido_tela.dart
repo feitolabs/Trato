@@ -41,7 +41,9 @@ class DetalhePedidoTela extends StatelessWidget {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text('${dados.fechaEm} · ${pedido.orcaram} de ${pedido.limiteOrcamentos} orçaram'),
+        title: Text(
+          [dados.fechaEm, textoOrcamentos(pedido)].where((t) => t.isNotEmpty).join(' · '),
+        ),
       ),
       body: Column(
         children: [

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
@@ -5,20 +7,29 @@ import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas.dart';
 
-/// Tela 17 — Chat do pedido. Mensagens novas ficam só na memória da tela (provisório):
-/// o envio real, a guarda como prova e a ocultação de telefones são do backend.
+/// Tela 17 — Chat do pedido. O envio real, a guarda como prova e a ocultação de telefones e
+/// e-mails são do backend (`GET/POST /v1/pedidos/{id}/mensagens`). Quando [aoRecarregar] é
+/// fornecido, a tela busca novas mensagens periodicamente.
 class ChatPedidoTela extends StatefulWidget {
   const ChatPedidoTela({
     super.key,
     this.conversa = DadosExemplo.conversa,
     this.aoEnviar,
     this.aoTocarCamera,
+    this.aoCapturarFoto,
+    this.aoEnviarFoto,
+    this.aoRecarregar,
+    this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
 
   final ConversaPedido conversa;
   final ValueChanged<String>? aoEnviar;
   final VoidCallback? aoTocarCamera;
+  final Future<String?> Function()? aoCapturarFoto;
+  final ValueChanged<String>? aoEnviarFoto;
+  final Future<ConversaPedido> Function()? aoRecarregar;
+  final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
   final String Function() horaAgora;
@@ -34,10 +45,34 @@ class ChatPedidoTela extends StatefulWidget {
 
 class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   final _controlador = TextEditingController();
-  late final List<MensagemChat> _mensagens = [...widget.conversa.mensagens];
+  late List<MensagemChat> _mensagens = [...widget.conversa.mensagens];
+  Timer? _relogio;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.aoRecarregar != null) {
+      _relogio = Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
+    }
+  }
+
+  Future<void> _sincronizar() async {
+    final recarregar = widget.aoRecarregar;
+    if (recarregar == null || !mounted) return;
+    try {
+      final atualizada = await recarregar();
+      if (!mounted) return;
+      if (atualizada.mensagens.length >= _mensagens.length) {
+        setState(() => _mensagens = [...atualizada.mensagens]);
+      }
+    } on Object {
+      // Silencioso em segundo plano; próxima leitura tenta novamente.
+    }
+  }
 
   @override
   void dispose() {
+    _relogio?.cancel();
     _controlador.dispose();
     super.dispose();
   }
@@ -53,6 +88,26 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       _controlador.clear();
     });
     widget.aoEnviar?.call(conteudo);
+  }
+
+  Future<void> _tocarCamera() async {
+    widget.aoTocarCamera?.call();
+    if (widget.aoCapturarFoto != null) {
+      final ref = await widget.aoCapturarFoto!();
+      if (ref != null && mounted) {
+        setState(() {
+          _mensagens.add(
+            MensagemChat(
+              tipo: TipoMensagem.foto,
+              texto: ref,
+              hora: widget.horaAgora(),
+              minha: true,
+            ),
+          );
+        });
+        widget.aoEnviarFoto?.call(ref);
+      }
+    }
   }
 
   @override
@@ -80,7 +135,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
             _CampoEnvio(
               controlador: _controlador,
               aoEnviar: _enviar,
-              aoTocarCamera: widget.aoTocarCamera,
+              aoTocarCamera: _tocarCamera,
             ),
           ],
         ),

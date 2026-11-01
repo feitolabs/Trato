@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,36 +9,7 @@ import '../auth/estrutura_auth.dart';
 import 'dinheiro.dart';
 import 'servico_orcamento.dart';
 
-class ItemMaterial {
-  const ItemMaterial({required this.nome, required this.centavos});
-
-  final String nome;
-  final int centavos;
-}
-
-/// O que a tela entrega ao tocar em "Enviar orçamento". O total é só soma para exibir;
-/// quem confere e grava é o backend.
-class OrcamentoPronto {
-  const OrcamentoPronto({
-    required this.deslocamentoCentavos,
-    required this.decimosDeHora,
-    required this.valorHoraCentavos,
-    required this.garantiaDias,
-    required this.itens,
-    required this.materialPorMim,
-    required this.pedirSinalMaterial,
-    required this.totalCentavos,
-  });
-
-  final int deslocamentoCentavos;
-  final int decimosDeHora;
-  final int valorHoraCentavos;
-  final int garantiaDias;
-  final List<ItemMaterial> itens;
-  final bool materialPorMim;
-  final bool pedirSinalMaterial;
-  final int totalCentavos;
-}
+export 'servico_orcamento.dart' show ItemMaterial, OrcamentoPronto;
 
 /// Tela 25: "Seu orçamento". Soma deslocamento + horas x valor + material (só para exibir).
 /// Taxa e líquido NÃO são calculados aqui: vêm de [servico] (regra de dinheiro é do backend).
@@ -58,7 +31,7 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
 
   final ServicoOrcamento servico;
   final String tituloPedido;
-  final ValueChanged<OrcamentoPronto>? aoEnviar;
+  final FutureOr<void> Function(OrcamentoPronto pronto)? aoEnviar;
   final String? deslocamentoInicial;
   final String? horasInicial;
   final String? valorHoraInicial;
@@ -85,6 +58,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   bool _materialPorMim = true;
   bool _pedirSinal = false;
   bool _mostrarErros = false;
+  bool _enviando = false;
 
   ResumoOrcamento? _resumo;
   int _ultimoPedido = -1;
@@ -163,25 +137,31 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _mudou();
   }
 
-  void _enviar() {
+  Future<void> _enviar() async {
+    if (_enviando) return;
     setState(() => _mostrarErros = true);
     if (_erroDeslocamento() != null || _erroHoras() != null || _erroValorHora() != null) {
       return;
     }
     final desloc =
         _deslocamento.text.trim().isEmpty ? 0 : Dinheiro.lerCentavos(_deslocamento.text)!;
-    widget.aoEnviar?.call(
-      OrcamentoPronto(
-        deslocamentoCentavos: desloc,
-        decimosDeHora: Dinheiro.lerDecimosDeHora(_horas.text)!,
-        valorHoraCentavos: Dinheiro.lerCentavos(_valorHora.text)!,
-        garantiaDias: _garantia,
-        itens: List.unmodifiable(_itens),
-        materialPorMim: _materialPorMim,
-        pedirSinalMaterial: _materialPorMim && _pedirSinal,
-        totalCentavos: _total,
-      ),
+    final pronto = OrcamentoPronto(
+      deslocamentoCentavos: desloc,
+      decimosDeHora: Dinheiro.lerDecimosDeHora(_horas.text)!,
+      valorHoraCentavos: Dinheiro.lerCentavos(_valorHora.text)!,
+      garantiaDias: _garantia,
+      itens: List.unmodifiable(_itens),
+      materialPorMim: _materialPorMim,
+      pedirSinalMaterial: _materialPorMim && _pedirSinal,
+      totalCentavos: _total,
     );
+    if (widget.aoEnviar == null) return;
+    setState(() => _enviando = true);
+    try {
+      await widget.aoEnviar!(pronto);
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
   }
 
   @override
@@ -192,7 +172,11 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          BotaoPrimario(texto: 'Enviar orçamento', aoTocar: _enviar),
+          BotaoPrimario(
+            texto: 'Enviar orçamento',
+            carregando: _enviando,
+            aoTocar: _enviando ? null : _enviar,
+          ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
             'Válido por ${widget.validadeDias} dias · você pode editar até o cliente aceitar',
@@ -434,7 +418,9 @@ class _ResumoEscuro extends StatelessWidget {
     final claroForte = TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
     final r = resumo;
     // O rótulo com a porcentagem vem do dado do backend, nunca de um texto fixo.
-    final rotuloTaxa = r == null ? 'Taxa Trato' : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps)})';
+    final rotuloTaxa = r == null || r.taxaBps == null
+        ? 'Taxa Trato (paga pelo cliente)'
+        : 'Taxa Trato ${Dinheiro.formatarBps(r.taxaBps!)} (paga pelo cliente)';
     return CartaoTrato(
       escuro: true,
       child: Column(
@@ -442,14 +428,14 @@ class _ResumoEscuro extends StatelessWidget {
         children: [
           _LinhaResumo(
             rotulo: 'Cliente paga',
-            valor: totalCentavos > 0 ? Dinheiro.formatar(totalCentavos) : '—',
+            valor: r != null ? Dinheiro.formatar(r.clientePagaCentavos) : '—',
             estiloRotulo: claro,
             estiloValor: claroForte,
           ),
           const SizedBox(height: EspacosTrato.x2),
           _LinhaResumo(
             rotulo: rotuloTaxa,
-            valor: r == null ? '—' : '– ${Dinheiro.formatar(r.taxaCentavos)}',
+            valor: r == null ? '—' : Dinheiro.formatar(r.taxaCentavos),
             estiloRotulo: claro,
             estiloValor: claro,
           ),
@@ -479,8 +465,8 @@ class _ResumoEscuro extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
-            'A taxa é cobrada após a confirmação do pagamento pelo parceiro. '
-            'Pedido cancelado antes do início não paga taxa.',
+            'A taxa do Trato é somada ao seu orçamento e paga pelo cliente: você recebe o valor '
+            'inteiro do orçamento.',
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
           ),
         ],

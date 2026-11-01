@@ -39,8 +39,18 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
 
     registrar_rotas(app, contexto)
     app.include_router(criar_router())
-    rotas_upload.registrar_rotas(app)
-    rotas_profissional_cadastro.registrar_rotas(app)
+    banco = contexto.extras.get("banco") if contexto is not None else None
+    if banco is not None:  # com Postgres, o perfil, catálogo e uploads moram no banco
+        from trato.persistencia.profissionais import CatalogoPostgres, ProfissionaisPostgres
+        from trato.persistencia.uploads import UploadsPostgres
+
+        rotas_upload.registrar_rotas(app, repo=UploadsPostgres(banco))
+        rotas_profissional_cadastro.registrar_rotas(
+            app, ProfissionaisPostgres(banco), CatalogoPostgres(banco)
+        )
+    else:
+        rotas_upload.registrar_rotas(app)
+        rotas_profissional_cadastro.registrar_rotas(app)
     instalar_tratadores(app)
     if contexto is not None:
         app.state.contexto = contexto

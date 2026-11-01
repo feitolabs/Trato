@@ -75,8 +75,16 @@ class _CorpoState extends State<_Corpo> {
   bool get _completo => _documento != null && _selfie != null && _ciente;
 
   Future<void> _capturar(CapturarFoto? captura, void Function(String) guardar) async {
-    final ref = await captura?.call();
-    if (ref != null && mounted) setState(() => guardar(ref));
+    setState(() => _erro = null);
+    try {
+      final ref = await captura?.call();
+      if (ref != null && mounted) setState(() => guardar(ref));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _erro = 'Não foi possível capturar ou enviar a imagem. Tente novamente.';
+      });
+    }
   }
 
   Future<void> _enviar() async {

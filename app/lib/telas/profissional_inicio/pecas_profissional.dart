@@ -19,12 +19,15 @@ String textoFaixa(PedidoAberto p) =>
     p.temFaixa ? '${reaisCurto(p.faixaMinCentavos!)} a ${reaisCurto(p.faixaMaxCentavos!)}' : 'Sem faixa';
 
 /// "2,1 km".
-String textoDistancia(double km) => '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
+String textoDistancia(double? km) =>
+    km == null ? 'distância indisponível' : '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
 
 /// "3 de 5 orçaram", "1 de 5 orçou", "Ninguém orçou".
 String textoOrcamentos(PedidoAberto p) {
-  if (p.orcaram == 0) return 'Ninguém orçou';
-  return '${p.orcaram} de ${p.limiteOrcamentos} ${p.orcaram == 1 ? 'orçou' : 'orçaram'}';
+  final orcaram = p.orcaram;
+  if (orcaram == null || p.limiteOrcamentos == null) return '';
+  if (orcaram == 0) return 'Ninguém orçou';
+  return '$orcaram de ${p.limiteOrcamentos} ${orcaram == 1 ? 'orçou' : 'orçaram'}';
 }
 
 /// Opção em cartão com marca de seleção única (motivos de recusa).

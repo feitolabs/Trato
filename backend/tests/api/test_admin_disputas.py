@@ -75,7 +75,9 @@ def test_liberar_tudo_conclui_reparte_a_custodia_e_audita(adm):
     assert corpo["estado"] == "decidida" and corpo["decidido_por"] == "eq-mediador"
     assert corpo["divisao"]["para_profissional_centavos"] == 100_000
     assert adm.pedido().estado is Estado.CONCLUIDO
-    assert por_tipo(adm) == {"cobranca": 100_000, "retencao": 92_500, "taxa": 7_500}
+    # O ambiente semeia só o serviço na custódia (a taxa SOMADA já teria saído no pagamento):
+    # a disputa não calcula nem desconta taxa, o profissional recebe o que o mediador deu.
+    assert por_tipo(adm) == {"cobranca": 100_000, "retencao": 100_000}
     assert adm.contexto.ledger.saldo_da_conta(CUSTODIA, PEDIDO) == 0
     assert adm.contexto.garantias.obter_garantia(PEDIDO) is not None
     reg, _ = adm.admin.auditoria.listar(FiltroAuditoria(acao="financeiro."), 5, 0)
@@ -105,9 +107,9 @@ def test_reembolso_parcial_por_percentual_divide_sem_perder_centavo(adm):
     assert (d["para_cliente_centavos"], d["para_profissional_centavos"]) == (25_000, 75_000)
     assert adm.pedido().estado is Estado.CONCLUIDO
     # O banco só aceita estorno do lançamento inteiro: a cobrança é estornada toda e a parte
-    # mantida (75.000) é lançada de novo e repartida com a taxa congelada (7,5%).
+    # mantida (75.000) é lançada de novo e vai inteira ao profissional (sem desconto de taxa).
     saldo = adm.contexto.ledger.saldos_pedido(PEDIDO, PROFISSIONAL.id)
-    assert (saldo.cliente_pagou, saldo.taxa_trato, saldo.a_liberar) == (75_000, 5_625, 69_375)
+    assert (saldo.cliente_pagou, saldo.taxa_trato, saldo.a_liberar) == (75_000, 0, 75_000)
     assert saldo.retido == 0
     assert 25_000 + saldo.taxa_trato + saldo.a_liberar == 100_000
 
@@ -266,14 +268,13 @@ def test_pedido_fora_de_em_disputa_recusa_antes_de_mexer_no_ledger(adm):
     assert adm.contexto.disputas.obter(PEDIDO).estado.value == "em_analise"
 
 
-def test_sem_taxa_configurada_nao_decide_liberar_tudo(adm):
+def test_decisao_nao_depende_da_taxa_do_contrato(adm):
     adm.semear_disputa()
-    # Contrato sem a taxa congelada no aceite: nada de recalcular pela configuração de hoje.
+    # A taxa SOMADA sai da custódia no pagamento: a disputa não recalcula taxa (nem pela
+    # configuração de hoje), então um contrato sem taxa congelada não trava a decisão.
     adm.contexto.contratos.salvar(Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, 100_000, "pintura"))
-    assert decidir(adm, "liberar_tudo").status_code == 503
-    assert adm.pedido().estado is Estado.EM_DISPUTA and len(adm.lancamentos()) == 1
-    # Reembolso total não usa taxa: continua possível.
-    assert decidir(adm, "reembolso_total").status_code == 200
+    assert decidir(adm, "liberar_tudo").status_code == 200
+    assert adm.pedido().estado is Estado.CONCLUIDO
 
 
 def test_falha_no_meio_e_refeita_sem_duplicar_o_ledger(adm, monkeypatch):
@@ -291,7 +292,7 @@ def test_falha_no_meio_e_refeita_sem_duplicar_o_ledger(adm, monkeypatch):
     with pytest.raises(RuntimeError):
         decidir(adm, "liberar_tudo")
     depois_da_falha = list(adm.lancamentos())
-    assert len(depois_da_falha) == 3  # cobrança + retenção + taxa já no espelho
+    assert len(depois_da_falha) == 2  # cobrança + retenção já no espelho
 
     r = decidir(adm, "liberar_tudo")
 

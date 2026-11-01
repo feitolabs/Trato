@@ -231,6 +231,7 @@ class _FormularioState extends State<_Formulario> {
               for (var i = 0; i < _portfolio.length; i++)
                 _MiniFoto(
                   numero: i + 1,
+                  referencia: _portfolio[i],
                   aoRemover: () => setState(() => _portfolio.removeAt(i)),
                 ),
             ],
@@ -247,23 +248,55 @@ class _FormularioState extends State<_Formulario> {
 }
 
 class _MiniFoto extends StatelessWidget {
-  const _MiniFoto({required this.numero, required this.aoRemover});
+  const _MiniFoto({
+    required this.numero,
+    required this.aoRemover,
+    this.referencia,
+  });
 
   final int numero;
+  final String? referencia;
   final VoidCallback aoRemover;
 
   @override
   Widget build(BuildContext context) {
+    final imagemReal = construirImagemReal(referencia);
     return Container(
       width: 96,
       height: 96,
+      clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
       decoration: BoxDecoration(
         color: CoresTrato.azulClaro,
         borderRadius: BorderRadius.circular(EspacosTrato.raio),
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          Center(child: Text('Foto $numero', style: TipografiaTrato.corpoPequeno)),
+          if (imagemReal != null)
+            ToquePreviewImagem(
+              referencia: referencia ?? 'Foto $numero',
+              legenda: 'Foto $numero',
+              child: imagemReal,
+            ),
+          Center(
+            child: Container(
+              padding: imagemReal != null
+                  ? const EdgeInsets.symmetric(horizontal: 6, vertical: 2)
+                  : EdgeInsets.zero,
+              decoration: imagemReal != null
+                  ? BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    )
+                  : null,
+              child: Text(
+                'Foto $numero',
+                style: imagemReal != null
+                    ? TipografiaTrato.legenda.copyWith(color: Colors.white)
+                    : TipografiaTrato.corpoPequeno,
+              ),
+            ),
+          ),
           Positioned(
             top: 0,
             right: 0,

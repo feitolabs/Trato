@@ -14,9 +14,13 @@ import 'config_auth.dart';
 import 'controle_codigo_celular.dart';
 import 'servico_auth.dart';
 
+/// Link de retorno do e-mail de confirmação (deep link do app). Precisa estar na lista de URLs
+/// de redirecionamento do painel do Supabase (docs/login-configuracao.md).
+const kUrlRetornoEmail = 'br.com.feitolabs.trato://login-callback';
+
 /// Login de verdade, pelo Supabase Auth. Precisa de [ConfigAuth] preenchida e dos
 /// provedores ligados no painel (docs/login-configuracao.md).
-/// Não tem teste automático: depende do projeto Supabase real.
+/// Testado com cliente simulado (`test/servico_auth_supabase_test.dart`).
 class ServicoAuthSupabase implements ServicoAuth {
   ServicoAuthSupabase(this._config, {sb.SupabaseClient? cliente, ControleCodigoCelular? codigo})
       : _cliente = cliente ?? sb.Supabase.instance.client,
@@ -44,7 +48,7 @@ class ServicoAuthSupabase implements ServicoAuth {
 
   @override
   bool provedorHabilitado(ProvedorAuth provedor) => switch (provedor) {
-        ProvedorAuth.google => _config.googleConfigurado,
+        ProvedorAuth.google => true,
         ProvedorAuth.apple => defaultTargetPlatform == TargetPlatform.iOS,
       };
 
@@ -104,6 +108,9 @@ class ServicoAuthSupabase implements ServicoAuth {
       if (codigo == 'invalid_credentials' || msg.contains('invalid login credentials')) {
         return const ErroAuth(TipoErroAuth.credenciaisInvalidas);
       }
+      if (codigo == 'email_not_confirmed' || msg.contains('email not confirmed')) {
+        return const ErroAuth(TipoErroAuth.emailNaoConfirmado);
+      }
       if (codigo == 'user_already_exists' ||
           codigo == 'email_exists' ||
           codigo == 'phone_exists' ||
@@ -114,9 +121,14 @@ class ServicoAuthSupabase implements ServicoAuth {
       if (codigo == 'otp_expired' || msg.contains('invalid') && msg.contains('token')) {
         return const ErroAuth(TipoErroAuth.codigoInvalido);
       }
+      if (codigo == 'over_email_send_rate_limit') {
+        return const ErroAuth(TipoErroAuth.limiteEmail);
+      }
       if (codigo == 'over_sms_send_rate_limit' || codigo == 'over_request_rate_limit') {
         return const ErroAuth(TipoErroAuth.reenviosEsgotados);
       }
+      if (codigo == 'validation_failed') return const ErroAuth(TipoErroAuth.dadosInvalidos);
+      if (codigo == 'signup_disabled') return const ErroAuth(TipoErroAuth.cadastroDesativado);
       if (codigo == 'provider_disabled' || codigo == 'sms_send_failed') {
         return const ErroAuth(TipoErroAuth.provedorIndisponivel);
       }
@@ -125,6 +137,8 @@ class ServicoAuthSupabase implements ServicoAuth {
     if (texto.contains('SocketException') || texto.contains('ClientException')) {
       return const ErroAuth(TipoErroAuth.semInternet);
     }
+    // Só tipo e código, nunca a mensagem (pode ter e-mail ou telefone).
+    debugPrint('Auth: erro não mapeado (${e.runtimeType}, código ${e is sb.AuthException ? e.code : '-'})');
     return const ErroAuth(TipoErroAuth.desconhecido);
   }
 
@@ -136,21 +150,34 @@ class ServicoAuthSupabase implements ServicoAuth {
       });
 
   @override
-  Future<SessaoAuth> criarConta(DadosCadastro dados) => _proteger(() async {
+  Future<ResultadoCadastro> criarConta(DadosCadastro dados) => _proteger(() async {
         final r = await _auth.signUp(
           email: dados.email.trim(),
           password: dados.senha,
-          data: {'nome': dados.nome, if (dados.perfil != null) 'perfil': dados.perfil},
+          emailRedirectTo: kUrlRetornoEmail,
+          // Metadados do usuário: não exigem sessão (nada de updateUser/SMS, D16).
+          data: {
+            'nome': dados.nome,
+            'celular': celularE164(dados.celular),
+            if (dados.perfil != null) 'perfil': dados.perfil,
+          },
         );
         // Com confirmação de e-mail ligada, e-mail repetido volta sem erro e sem identidades.
         if (r.user?.identities?.isEmpty ?? false) {
           throw const ErroAuth(TipoErroAuth.emailJaUsado);
         }
-        // Pede o SMS: o Supabase manda o código para o celular e espera a confirmação.
-        await _auth.updateUser(sb.UserAttributes(phone: celularE164(dados.celular)));
-        _codigo.novoCadastro();
-        return _paraSessao(r.user) ?? (throw const ErroAuth(TipoErroAuth.desconhecido));
+        final sessao = r.session == null ? null : _paraSessao(r.user);
+        if (sessao != null) return CadastroComSessao(sessao);
+        return CadastroAguardandoEmail(dados.email.trim());
       });
+
+  @override
+  Future<void> reenviarEmailConfirmacao(String email) =>
+      _proteger(() => _auth.resend(
+            type: sb.OtpType.signup,
+            email: email.trim(),
+            emailRedirectTo: kUrlRetornoEmail,
+          ));
 
   @override
   Future<SessaoAuth> entrarComProvedor(ProvedorAuth provedor) => _proteger(() async {
@@ -167,13 +194,22 @@ class ServicoAuthSupabase implements ServicoAuth {
   Future<sb.AuthResponse> _entrarGoogle() async {
     final google = GoogleSignIn(
       clientId: _config.googleIosClientId.isEmpty ? null : _config.googleIosClientId,
-      serverClientId: _config.googleWebClientId,
+      serverClientId: _config.googleWebClientId.isEmpty ? null : _config.googleWebClientId,
     );
-    final conta = await google.signIn();
+    final GoogleSignInAccount? conta;
+    try {
+      conta = await google.signIn();
+    } on Object catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('canceled') || msg.contains('cancelled') || msg.contains('sign_in_canceled')) {
+        throw const ErroAuth(TipoErroAuth.cancelado);
+      }
+      throw const ErroAuth(TipoErroAuth.provedorIndisponivel);
+    }
     if (conta == null) throw const ErroAuth(TipoErroAuth.cancelado);
     final aut = await conta.authentication;
     final idToken = aut.idToken;
-    if (idToken == null) throw const ErroAuth(TipoErroAuth.desconhecido);
+    if (idToken == null) throw const ErroAuth(TipoErroAuth.provedorIndisponivel);
     return _auth.signInWithIdToken(
       provider: sb.OAuthProvider.google,
       idToken: idToken,

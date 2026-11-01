@@ -33,6 +33,22 @@ def test_cliente_ve_orcamentos_do_pedido_do_mais_barato_ao_mais_caro(amb):
     assert not any(o["aceito"] for o in r.json())
 
 
+def test_orcamento_traz_selo_nota_e_servicos_do_profissional(amb):
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    amb.contexto.usuarios.adicionar(
+        PerfilDetalhe(
+            PROFISSIONAL.id, "Zé", PapelUsuario.PROFISSIONAL, "ativo", "verificado", 4.8, 12
+        )
+    )
+    amb.contexto.orcamentos.adicionar(Orcamento("orc-2", "ped-1", "pro-2", 80_000))
+    por_id = {o["id"]: o for o in get(amb, "/v1/pedidos/ped-1/orcamentos").json()}
+    assert por_id["orc-1"]["profissional_nivel_verificacao"] == "verificado"
+    assert por_id["orc-1"]["profissional_nota"] == 4.8
+    assert por_id["orc-1"]["profissional_servicos_concluidos"] == 12
+    # quem não tem perfil publicado volta com nulos, não com erro
+    assert por_id["orc-2"]["profissional_nota"] is None
+
+
 def test_orcamento_aceito_vem_marcado(amb):
     amb.semear_pedido(Estado.ORCAMENTO_ACEITO)
     r = get(amb, "/v1/pedidos/ped-1/orcamentos")
@@ -53,6 +69,81 @@ def test_orcamentos_de_pedido_alheio_dao_404(amb):
     assert get(amb, "/v1/pedidos/ped-1/orcamentos", "ruim").status_code == 401
 
 
+def test_profissional_envia_orcamento_com_sucesso(amb):
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Mão de obra pintura",
+                "quantidade": "8",
+                "valor_unitario_centavos": 10_000,
+            },
+            {
+                "tipo": "material",
+                "descricao": "Lixas e fitas",
+                "quantidade": "1",
+                "valor_unitario_centavos": 5_000,
+            },
+        ],
+        "prazo_execucao_dias": 3,
+        "garantia_dias": 90,
+        "observacoes": "Levo escada e lonas.",
+    }
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", corpo)
+    assert r.status_code == 201, r.text
+    dados = r.json()
+    assert dados["versao"] == 2
+    assert dados["status"] == "enviado"
+    assert dados["valor_total_centavos"] == 85_000
+    assert dados["pedido_id"] == "ped-1"
+    assert dados["profissional_id"] == PROFISSIONAL.id
+
+    # O cliente vê o orçamento listado
+    lista = get(amb, "/v1/pedidos/ped-1/orcamentos", "t-cliente").json()
+    orc_enviado = next(o for o in lista if o["id"] == dados["id"])
+    assert orc_enviado["valor_centavos"] == 85_000
+    assert orc_enviado["prazo_execucao_dias"] == 3
+
+
+def test_cliente_nao_pode_enviar_orcamento(amb):
+    amb.semear_pedido(Estado.ABERTO)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Tentativa",
+                "quantidade": "1",
+                "valor_unitario_centavos": 1000,
+            }
+        ]
+    }
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-cliente", corpo)
+    assert r.status_code == 403
+
+
+def test_enviar_orcamento_para_pedido_fechado_da_409(amb):
+    amb.semear_pedido(Estado.ORCAMENTO_ACEITO)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Tarde demais",
+                "quantidade": "1",
+                "valor_unitario_centavos": 1000,
+            }
+        ]
+    }
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", corpo)
+    assert r.status_code == 409
+
+
+def test_enviar_orcamento_sem_itens_da_422(amb):
+    amb.semear_pedido(Estado.ABERTO)
+    r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", {"itens": []})
+    assert r.status_code == 422
+
+
 # --- valores do pagamento ---------------------------------------------------------------
 
 
@@ -64,7 +155,8 @@ def test_valores_do_pagamento_antes_e_depois_de_pagar(amb):
     assert corpo["valor_centavos"] == 100_000
     assert corpo["pago_centavos"] == 0 and corpo["pagamento_confirmado"] is False
     assert corpo["meios_disponiveis"] == ["pix", "cartao"]
-    assert "taxa_centavos" not in corpo  # a taxa é do profissional, não aparece para o cliente
+    # sem o serviço de pagamento ligado neste ambiente não há conta da taxa; o app só exibe
+    assert corpo["taxa_centavos"] is None and corpo["opcoes_parcelamento"] == []
 
     amb.semear_dinheiro()
     assert get(amb, "/v1/pedidos/ped-1/pagamento").json()["pago_centavos"] == 100_000
@@ -87,12 +179,13 @@ def test_resumo_calcula_taxa_e_liquido_no_backend(amb):
     assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
         "valor_centavos": 100_000,
         "taxa_centavos": 7_500,
-        "liquido_centavos": 92_500,
+        "liquido_centavos": 100_000,  # a taxa é SOMADA: o profissional recebe o orçamento inteiro
     }
+    assert corpo["total_cliente_centavos"] == 107_500 and corpo["receita_trato_centavos"] == 7_500
     assert corpo["custo_provedor_estimado_centavos"] > 0
     # abaixo do mínimo cobra o mínimo; nunca mais que o valor
     r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
-    assert r.json()["taxa_centavos"] == 500 and r.json()["liquido_centavos"] == 500
+    assert r.json()["taxa_centavos"] == 500 and r.json()["liquido_centavos"] == 1_000
 
 
 def test_resumo_recusa_valor_ruim_papel_errado_e_taxa_nao_configurada(amb):

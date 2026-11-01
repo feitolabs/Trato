@@ -153,8 +153,13 @@ class NotificacoesServicoPostgres:
             ).fetchall()
         return tuple(l["token"] for l in linhas)  # noqa: E741
 
-    def desativar_dispositivo(self, token: str) -> None:
+    def desativar_dispositivo(self, token: str, usuario_id: str | None = None) -> None:
+        dono = como_uuid(usuario_id) if usuario_id is not None else None
+        if usuario_id is not None and dono is None:
+            return
         with self._banco.transacao() as con:
             con.execute(
-                "update public.dispositivos_push set ativo = false where token = %s", (token,)
+                "update public.dispositivos_push set ativo = false where token = %s "
+                "and (%s::uuid is null or usuario_id = %s::uuid)",
+                (token, dono, dono),
             )

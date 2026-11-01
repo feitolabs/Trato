@@ -160,6 +160,8 @@ void main() {
 
       await tester.tap(find.text('Novo pedido'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Elétrica'));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'Trocar duas tomadas da cozinha');
       final enviar = find.text('Próximo');
       await tester.ensureVisible(enviar.last);

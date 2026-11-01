@@ -35,7 +35,11 @@ class VerNotaTela extends StatelessWidget {
             ),
             if (n.fotoNota != null) ...[
               const TituloSecao('Foto da nota'),
-              const EspacoFoto(legenda: 'Nota enviada pelo profissional', altura: 160),
+              EspacoFoto(
+            legenda: 'Nota enviada pelo profissional',
+            referencia: n.fotoNota,
+            altura: 160,
+          ),
             ],
             const TituloSecao('Itens'),
             CartaoTrato(

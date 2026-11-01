@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import uuid
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
@@ -11,16 +12,24 @@ from trato.api.repositorios import (
     ConfigApi,
     Contrato,
     DadosPedido,
+    EtapaProposta,
     EventoWebhook,
+    ItemOrcamento,
     Orcamento,
     Repasse,
 )
-from trato.api.repositorios_app import OrcamentoDetalhe, OrcamentoDoPedido, PedidoAberto
+from trato.api.repositorios_app import (
+    ItemDoOrcamento,
+    OrcamentoDetalhe,
+    OrcamentoDoPedido,
+    PedidoAberto,
+)
 from trato.disputas import Disputa
 from trato.financeiro.ledger import Conta, Lancamento, Livro, SaldoPedido
 from trato.garantias import Garantia, Retrabalho
 from trato.pagamentos.idempotencia import RegistroEventosEmMemoria
 from trato.pedidos.estados import Estado, Evento, Pedido
+from trato.persistencia.erros import DadosInvalidos
 
 
 class PedidosEmMemoria:
@@ -77,14 +86,74 @@ class PedidosEmMemoria:
 class OrcamentosEmMemoria:
     def __init__(self, orcamentos: Sequence[Orcamento] = ()) -> None:
         self._itens = {o.id: o for o in orcamentos}
+        self._detalhes: dict[str, OrcamentoDetalhe] = {}
+        for o in orcamentos:
+            self._detalhes[o.id] = OrcamentoDetalhe(
+                id=o.id,
+                pedido_id=o.pedido_id,
+                profissional_id=o.profissional_id,
+                profissional_nome=None,
+                versao=1,
+                status="enviado",
+                valor_centavos=o.valor_centavos,
+                prazo_execucao_dias=None,
+                validade_ate=None,
+                garantia_dias=None,
+                fora_do_escopo=None,
+                sinal_material_centavos=None,
+                observacoes=None,
+                enviado_em=None,
+                itens=(),
+            )
 
-    def adicionar(self, orcamento: Orcamento) -> None:
+    def adicionar(self, orcamento: Orcamento, detalhe: OrcamentoDetalhe | None = None) -> None:
         self._itens[orcamento.id] = orcamento
+        if detalhe is not None:
+            self._detalhes[orcamento.id] = detalhe
+        elif orcamento.id not in self._detalhes:
+            self._detalhes[orcamento.id] = OrcamentoDetalhe(
+                id=orcamento.id,
+                pedido_id=orcamento.pedido_id,
+                profissional_id=orcamento.profissional_id,
+                profissional_nome=None,
+                versao=1,
+                status="enviado",
+                valor_centavos=orcamento.valor_centavos,
+                prazo_execucao_dias=None,
+                validade_ate=None,
+                garantia_dias=None,
+                fora_do_escopo=None,
+                sinal_material_centavos=None,
+                observacoes=None,
+                enviado_em=None,
+                itens=(),
+            )
 
     def obter(self, orcamento_id: str) -> Orcamento | None:
         return self._itens.get(orcamento_id)
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:
+        if self._detalhes:
+            achados_det = [
+                d
+                for d in self._detalhes.values()
+                if d.pedido_id == pedido_id and d.status in ("enviado", "aceito")
+            ]
+            achados_det.sort(key=lambda d: (d.valor_centavos, d.id))
+            return tuple(
+                OrcamentoDoPedido(
+                    d.id,
+                    d.profissional_id,
+                    d.profissional_nome,
+                    d.versao,
+                    d.valor_centavos,
+                    d.prazo_execucao_dias,
+                    d.garantia_dias,
+                    d.observacoes,
+                    d.enviado_em,
+                )
+                for d in achados_det
+            )
         achados = [o for o in self._itens.values() if o.pedido_id == pedido_id]
         achados.sort(key=lambda o: (o.valor_centavos, o.id))
         return tuple(
@@ -95,13 +164,119 @@ class OrcamentosEmMemoria:
         )
 
     def detalhe(self, orcamento_id: str) -> OrcamentoDetalhe | None:
+        det = self._detalhes.get(orcamento_id)
+        if det is not None:
+            if det.status == "rascunho":
+                return None
+            return det
         o = self._itens.get(orcamento_id)
         if o is None:
             return None
         return OrcamentoDetalhe(
-            o.id, o.pedido_id, o.profissional_id, None, 1, "enviado", o.valor_centavos,
-            None, None, None, None, None, None, None,
-        )  # fmt: skip
+            o.id,
+            o.pedido_id,
+            o.profissional_id,
+            None,
+            1,
+            "enviado",
+            o.valor_centavos,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    def enviar(
+        self,
+        *,
+        pedido_id: str,
+        profissional_id: str,
+        itens: Sequence[ItemOrcamento],
+        agora: datetime,
+        etapas: Sequence[EtapaProposta] = (),
+        prazo_execucao_dias: int | None = None,
+        validade_ate: datetime | None = None,
+        garantia_dias: int | None = None,
+        fora_do_escopo: str | None = None,
+        sinal_material_centavos: int | None = None,
+        observacoes: str | None = None,
+    ) -> str:
+        if not itens:
+            raise DadosInvalidos("O orçamento precisa de ao menos um item.")
+        novo_id = str(uuid.uuid4())
+        total = sum(i.total_centavos for i in itens)
+
+        versoes_anteriores = [
+            d.versao
+            for d in self._detalhes.values()
+            if d.pedido_id == pedido_id and d.profissional_id == profissional_id
+        ]
+        versao = max(versoes_anteriores, default=0) + 1
+
+        for o_id, det in list(self._detalhes.items()):
+            if (
+                det.pedido_id == pedido_id
+                and det.profissional_id == profissional_id
+                and det.status == "enviado"
+            ):
+                self._detalhes[o_id] = OrcamentoDetalhe(
+                    id=det.id,
+                    pedido_id=det.pedido_id,
+                    profissional_id=det.profissional_id,
+                    profissional_nome=det.profissional_nome,
+                    versao=det.versao,
+                    status="substituido",
+                    valor_centavos=det.valor_centavos,
+                    prazo_execucao_dias=det.prazo_execucao_dias,
+                    validade_ate=det.validade_ate,
+                    garantia_dias=det.garantia_dias,
+                    fora_do_escopo=det.fora_do_escopo,
+                    sinal_material_centavos=det.sinal_material_centavos,
+                    observacoes=det.observacoes,
+                    enviado_em=det.enviado_em,
+                    itens=det.itens,
+                )
+
+        itens_tupla = tuple(
+            ItemDoOrcamento(
+                tipo=i.tipo,
+                descricao=i.descricao,
+                quantidade=str(i.quantidade),
+                valor_unitario_centavos=i.valor_unitario_centavos,
+                total_centavos=i.total_centavos,
+            )
+            for i in itens
+        )
+
+        detalhe = OrcamentoDetalhe(
+            id=novo_id,
+            pedido_id=pedido_id,
+            profissional_id=profissional_id,
+            profissional_nome=None,
+            versao=versao,
+            status="enviado",
+            valor_centavos=total,
+            prazo_execucao_dias=prazo_execucao_dias,
+            validade_ate=validade_ate,
+            garantia_dias=garantia_dias,
+            fora_do_escopo=fora_do_escopo,
+            sinal_material_centavos=sinal_material_centavos,
+            observacoes=observacoes,
+            enviado_em=agora,
+            itens=itens_tupla,
+        )
+        self._detalhes[novo_id] = detalhe
+        self._itens[novo_id] = Orcamento(
+            id=novo_id,
+            pedido_id=pedido_id,
+            profissional_id=profissional_id,
+            valor_centavos=total,
+            categoria_id="cat_demo",
+        )
+        return novo_id
 
 
 class ContratosEmMemoria:
@@ -167,7 +342,13 @@ class GarantiasEmMemoria:
         return tuple(self._retrabalhos.get(pedido_id, ()))
 
     def salvar_retrabalho(self, pedido_id: str, retrabalho: Retrabalho) -> None:
-        self._retrabalhos.setdefault(pedido_id, []).append(retrabalho)
+        """Abre o retrabalho ou, se já existe (mesma hora de abertura), grava a nova situação."""
+        lista = self._retrabalhos.setdefault(pedido_id, [])
+        for i, atual in enumerate(lista):
+            if atual.aberto_em == retrabalho.aberto_em:
+                lista[i] = retrabalho
+                return
+        lista.append(retrabalho)
 
 
 class EventosWebhookEmMemoria(RegistroEventosEmMemoria):

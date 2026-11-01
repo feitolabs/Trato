@@ -7,7 +7,11 @@ import 'package:trato/telas/mensagens/mensagens_tela.dart';
 import 'package:trato/telas/cliente/dados_exemplo.dart';
 import 'package:trato/telas/cliente/inicio_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
-import 'package:trato/telas/em_breve_tela.dart';
+import 'package:trato/telas/catalogo/categoria_tela.dart';
+import 'package:trato/telas/catalogo/todas_categorias_tela.dart';
+import 'package:trato/telas/cliente/modelos.dart' show Profissional;
+import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
+import 'package:trato/telas/servicos/detalhe_servico_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 Future<void> _abrir(
@@ -28,6 +32,7 @@ Future<void> _abrir(
       home: tela,
     ),
   );
+  await tester.pumpAndSettle();
 }
 
 Future<void> _tocar(WidgetTester tester, Finder alvo) async {
@@ -83,12 +88,39 @@ void main() {
       expect(find.text('Garantia ativa até 31/12/2026'), findsOneWidget);
     });
 
-    testWidgets('Pedir orçamento abre "em breve"', (tester) async {
+    testWidgets('Pedir orçamento abre a escolha da categoria e depois o Novo pedido',
+        (tester) async {
       await _abrir(tester, const CascaClienteTela());
 
       await _tocar(tester, find.text('Pedir orçamento'));
+      expect(find.byType(TodasCategoriasTela), findsOneWidget);
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      await _tocar(tester, find.text('Hidráulica'));
+      expect(find.byType(NovoPedidoTela), findsOneWidget);
+      expect(find.text('Hidráulica'), findsOneWidget);
+    });
+
+    testWidgets('categoria do Início abre a lista de profissionais', (tester) async {
+      await _abrir(tester, const CascaClienteTela());
+
+      await _tocar(tester, find.text('Elétrica'));
+
+      expect(find.byType(CategoriaTela), findsOneWidget);
+      expect(find.text('Carlos Mendes'), findsOneWidget);
+    });
+
+    testWidgets('Ver todas abre todas as categorias; serviço recente abre o detalhe',
+        (tester) async {
+      await _abrir(tester, const CascaClienteTela());
+
+      await _tocar(tester, find.text('Ver todas'));
+      expect(find.byType(TodasCategoriasTela), findsOneWidget);
+      expect(find.text('Jardinagem'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await _tocar(tester, find.text('Pintura da sala'));
+      expect(find.byType(DetalheServicoTela), findsOneWidget);
     });
   });
 
@@ -140,18 +172,22 @@ void main() {
       expect(find.byType(PerfilProfissionalTela), findsOneWidget);
     });
 
-    testWidgets('quem ainda não tem perfil no protótipo abre "em breve"', (tester) async {
+    testWidgets('quem ainda não tem perfil no protótipo avisa que está indisponível',
+        (tester) async {
       await _abrir(tester, const BuscarTela());
 
       await _tocar(tester, find.text('André Lopes'));
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.text('Perfil indisponível por enquanto.'), findsOneWidget);
     });
   });
 
   group('perfil do profissional', () {
     testWidgets('mostra nota, serviços, verificações, trabalhos e avaliações', (tester) async {
-      await _abrir(tester, PerfilProfissionalTela(profissional: profissionais.first));
+      await _abrir(
+        tester,
+        PerfilProfissionalTela(profissional: profissionais.first, aoVerAvaliacoes: (_) {}),
+      );
 
       expect(find.text('Carlos Mendes'), findsOneWidget);
       expect(find.text('Verificado Plus'), findsOneWidget);
@@ -159,16 +195,31 @@ void main() {
       expect(find.text('Serviços concluídos'), findsOneWidget);
       expect(find.text('98%'), findsOneWidget);
       expect(find.text('Documento e selfie com prova de vida'), findsOneWidget);
-      expect(find.text('[Foto]'), findsNWidgets(3));
+      expect(find.text('Trabalho 1'), findsOneWidget);
+      expect(find.text('Trabalho 3'), findsOneWidget);
       expect(find.text('Ver as 64'), findsOneWidget);
     });
 
-    testWidgets('botão traz o primeiro nome e abre "em breve"', (tester) async {
-      await _abrir(tester, PerfilProfissionalTela(profissional: profissionais.first));
+    testWidgets('botão traz o primeiro nome e chama aoPedirOrcamento', (tester) async {
+      Profissional? pedido;
+      await _abrir(
+        tester,
+        PerfilProfissionalTela(
+          profissional: profissionais.first,
+          aoPedirOrcamento: (p) => pedido = p,
+        ),
+      );
 
       await _tocar(tester, find.text('Pedir orçamento ao Carlos'));
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(pedido?.nome, 'Carlos Mendes');
+    });
+
+    testWidgets('o selo de verificação não promete segurança', (tester) async {
+      await _abrir(tester, PerfilProfissionalTela(profissional: profissionais.first));
+
+      expect(find.textContaining('conferido no cadastro'), findsOneWidget);
+      expect(find.textContaining('seguro', findRichText: true), findsNothing);
     });
   });
 

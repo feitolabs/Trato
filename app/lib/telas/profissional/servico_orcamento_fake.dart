@@ -12,6 +12,9 @@ class ServicoOrcamentoFake implements ServicoOrcamento {
   /// Totais pedidos, na ordem. Usado nos testes para conferir o que a tela mandou.
   final List<int> pedidos = [];
 
+  /// Orçamentos enviados, na ordem.
+  final List<OrcamentoPronto> enviados = [];
+
   @override
   Future<ResumoOrcamento> resumir(int totalCentavos) async {
     pedidos.add(totalCentavos);
@@ -20,7 +23,13 @@ class ServicoOrcamentoFake implements ServicoOrcamento {
       totalCentavos: totalCentavos,
       taxaCentavos: taxa,
       taxaBps: taxaBps,
-      liquidoCentavos: totalCentavos - taxa,
+      liquidoCentavos: totalCentavos,
+      clientePagaCentavos: totalCentavos + taxa,
     );
+  }
+
+  @override
+  Future<void> enviar(OrcamentoPronto pronto) async {
+    enviados.add(pronto);
   }
 }

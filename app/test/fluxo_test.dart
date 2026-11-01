@@ -4,6 +4,7 @@ import 'package:trato/telas/aditivo/criar_aditivo_tela.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
+import 'package:trato/telas/servicos/detalhe_servico_tela.dart';
 import 'package:trato/telas/disputa_profissional/atender_retrabalho_tela.dart';
 import 'package:trato/telas/disputa_profissional/responder_disputa_tela.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
@@ -105,13 +106,14 @@ void main() {
     expect(find.byType(GarantiaTela), findsOneWidget);
   });
 
-  testWidgets('pedido sem tela própria mostra aviso, sem quebrar', (tester) async {
+  testWidgets('pedido em disputa abre o detalhe do serviço, sem placeholder', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Pedidos');
 
     await _tocar(tester, 'Vazamento na pia');
 
-    expect(find.textContaining('Avisamos aqui quando houver novidade'), findsOneWidget);
+    expect(find.byType(DetalheServicoTela), findsOneWidget);
+    expect(find.text('Disputa aberta · em análise'), findsOneWidget);
   });
 
   group('cadastro', () {
@@ -200,11 +202,28 @@ void main() {
     expect(find.byType(ResponderAditivoTela), findsOneWidget);
   });
 
-  testWidgets('notificação de disputa e de retrabalho abrem as telas do profissional',
-      (tester) async {
+  testWidgets('notificações do cliente abrem o serviço, o orçamento e o chat', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Perfil');
     await _tocar(tester, 'Notificações');
+
+    await _tocar(tester, 'Disputa aberta no seu serviço');
+    expect(find.byType(DetalheServicoTela), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Novo orçamento');
+    expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
+    await _voltar(tester);
+
+    await _tocar(tester, 'Nova mensagem de Carlos Mendes');
+    expect(find.byType(ChatPedidoTela), findsOneWidget);
+  });
+
+  testWidgets('notificação de disputa e de retrabalho abrem as telas do profissional',
+      (tester) async {
+    await _abrir(tester, RotasTrato.cascaProfissionalParaTeste());
+    await tester.tap(find.bySemanticsLabel('Notificações'));
+    await tester.pumpAndSettle();
 
     await _tocar(tester, 'Disputa aberta no seu serviço');
     expect(find.byType(ResponderDisputaTela), findsOneWidget);
@@ -240,5 +259,54 @@ void main() {
     await _tocar(tester, 'Fazer check-in');
     await _tocar(tester, 'Criar aditivo');
     expect(find.byType(CriarAditivoTela), findsOneWidget);
+  });
+
+  testWidgets('garantia: Pedir retrabalho envia e fecha diálogo sem erro de _dependents',
+      (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Pedidos');
+    await _tocar(tester, 'Finalizados');
+    await _tocar(tester, 'Pintura da sala (exemplo)');
+    expect(find.byType(GarantiaTela), findsOneWidget);
+
+    await _tocar(tester, 'Pedir retrabalho');
+    await tester.enterText(find.byType(TextField), 'A tinta descascou perto do rodapé.');
+    await _tocar(tester, 'Enviar');
+
+    expect(find.text('Pedido de retrabalho enviado.'), findsOneWidget);
+  });
+
+  testWidgets('chat: persiste mensagens e fotos enviadas e abre pelo profissional', (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Mensagens');
+    await _tocar(tester, 'Carlos Menezes');
+    expect(find.byType(ChatPedidoTela), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Olá Carlos, estarei em casa às 14h.');
+    await tester.tap(find.byTooltip('Enviar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Olá Carlos, estarei em casa às 14h.'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Enviar foto'));
+    await tester.pumpAndSettle();
+    expect(find.text('Foto anexada'), findsOneWidget);
+
+    // Volta e reabre para garantir que a conversa persistiu no repositório:
+    await _voltar(tester);
+    await _tocar(tester, 'Carlos Menezes');
+    expect(find.text('Olá Carlos, estarei em casa às 14h.'), findsOneWidget);
+  });
+
+  testWidgets('preview de imagem abre ao tocar em qualquer foto de pedido ou conclusão',
+      (tester) async {
+    await _abrir(tester, const CascaClienteTela());
+    await _tocar(tester, 'Pedidos');
+    await _tocar(tester, 'Troca de tomadas e chuveiro');
+    expect(find.byType(PedidoExecucaoTela), findsOneWidget);
+
+    await _tocar(tester, '[Antes]');
+    expect(find.text('Registro fotográfico anexado ao pedido no Trato.'), findsOneWidget);
+    await tester.tap(find.byTooltip('Fechar visualização'));
+    await tester.pumpAndSettle();
   });
 }

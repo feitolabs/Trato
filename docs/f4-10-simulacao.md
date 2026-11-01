@@ -70,7 +70,7 @@ na custódia e na taxa) · taxa congelada no aceite não muda com a configuraç�
   sobre a parte do profissional (aplica o mínimo também). Regra de aditivo (N3) = mesma regra única.
 - **Cancelamento = estorno total** (sem multa), pois não há política definida.
 - **Estorno espelhado na hora** em que o provedor confirma a chamada de estorno; o webhook
-  `charge.refunded` só confirma. O evento de **liquidação** (`payout.paid`/`transfer.paid`,
+  `charge.refunded` só confirma. O evento de **liquidação** (`payout.paid`,
   com `metadata.cobranca_id`) é o que Stripe real enviará conforme o modelo de contas (P7).
 - Evento que chega cedo demais levanta erro → 500 → provedor reenvia (a chave de idempotência é
   liberada).

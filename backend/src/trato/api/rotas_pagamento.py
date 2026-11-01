@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from trato import disputas
 from trato.api.admin.contexto import Operador, exigir, obter_admin
@@ -34,13 +34,22 @@ class _Entrada(BaseModel):
 
 class CobrarIn(_Entrada):
     meio: MeioPagamento
+    parcelas: StrictInt = Field(
+        1,
+        ge=1,
+        le=12,
+        description="Só cartão. Parcelado desligado até o custo do provedor estar configurado.",
+    )
 
 
 class CobrancaOut(BaseModel):
     id: str
     pedido_id: str
     aditivo_id: str | None
-    valor_centavos: int
+    valor_centavos: int = Field(
+        description="O que o cliente paga: serviço + taxa (+ custo do parcelado)."
+    )
+    parcelas: int = 1
     meio: str
     status: str = Field(
         description="`aguardando` até o webhook assinado; o app não mostra pago antes."
@@ -102,6 +111,7 @@ def _cobranca_out(c: CobrancaLocal) -> CobrancaOut:
         pedido_id=c.pedido_id,
         aditivo_id=c.aditivo_id,
         valor_centavos=c.valor_centavos,
+        parcelas=c.parcelas,
         meio=c.meio.value,
         status=c.status.value,
         instrucao=c.instrucao,
@@ -138,7 +148,9 @@ def criar_cobranca(
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     if contrato is None:
         raise ErroFluxo("Pedido sem contrato.", 409)
-    cobranca = servico.cobrar(contexto, pedido, contrato.valor_centavos, corpo.meio)
+    cobranca = servico.cobrar(
+        contexto, pedido, contrato.valor_centavos, corpo.meio, parcelas=corpo.parcelas
+    )
     return _cobranca_out(cobranca)
 
 

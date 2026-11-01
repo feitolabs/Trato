@@ -4,30 +4,88 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'modelos.dart';
 
-/// Espaço de foto do protótipo: bloco azul-claro com o rótulo embaixo à esquerda.
+/// Espaço de foto do protótipo: bloco azul-claro com o rótulo embaixo à esquerda ou imagem real.
 class EspacoFoto extends StatelessWidget {
-  const EspacoFoto({super.key, required this.rotulo, this.largura, this.altura = 96});
+  const EspacoFoto({
+    super.key,
+    required this.rotulo,
+    this.largura,
+    this.altura = 96,
+    this.referencia,
+  });
 
   final String rotulo;
   final double? largura;
   final double altura;
+  final String? referencia;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: largura,
-      height: altura,
-      padding: const EdgeInsets.all(EspacosTrato.x2),
-      alignment: Alignment.bottomLeft,
-      decoration: BoxDecoration(
-        color: CoresTrato.azulClaro,
-        borderRadius: BorderRadius.circular(EspacosTrato.raio),
-      ),
-      child: Text(
-        rotulo,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TipografiaTrato.corpoPequeno.copyWith(fontWeight: FontWeight.w600),
+    final ref = referencia ?? rotulo;
+    final imagemReal = construirImagemReal(ref);
+    final textoExibido = rotuloAmigavelFoto(rotulo);
+    return ToquePreviewImagem(
+      referencia: ref,
+      legenda: textoExibido,
+      child: Container(
+        width: largura,
+        height: altura,
+        clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
+        padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
+        alignment: Alignment.bottomLeft,
+        decoration: BoxDecoration(
+          color: CoresTrato.azulClaro,
+          borderRadius: BorderRadius.circular(EspacosTrato.raio),
+        ),
+        child: imagemReal != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  imagemReal,
+                  const Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: EdgeInsets.all(6),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.zoom_in, size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Container(
+                      width: double.infinity,
+                      color: Colors.black54,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: EspacosTrato.x2,
+                        vertical: EspacosTrato.x1,
+                      ),
+                      child: Text(
+                        textoExibido,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: CoresTrato.creme,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Text(
+                textoExibido,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TipografiaTrato.corpoPequeno.copyWith(fontWeight: FontWeight.w600),
+              ),
       ),
     );
   }

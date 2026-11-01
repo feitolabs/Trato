@@ -26,22 +26,41 @@ class MensagensTela extends StatelessWidget {
     return MolduraTelaComum(
       titulo: 'Mensagens',
       comVoltar: comVoltar,
-      child: CarregadorTela<List<ConversaResumo>>(
-        carregar: servico.listar,
-        construir: (context, itens, _) => itens.isEmpty
-            ? const EstadoVazio(
-                icone: Icons.chat_bubble_outline,
-                titulo: 'Nenhuma conversa ainda',
-                texto: 'Ao pedir um serviço, a conversa com o profissional aparece aqui.',
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-                itemCount: itens.length,
-                separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-                itemBuilder: (_, i) =>
-                    _LinhaConversa(item: itens[i], aoTocar: () => aoAbrirConversa?.call(itens[i])),
-              ),
-      ),
+      child: ListaConversas(servico: servico, aoAbrirConversa: aoAbrirConversa),
+    );
+  }
+}
+
+/// Só a lista de conversas (sem título nem moldura), para a aba Pedidos do profissional.
+class ListaConversas extends StatelessWidget {
+  const ListaConversas({
+    super.key,
+    required this.servico,
+    this.aoAbrirConversa,
+    this.textoVazio = 'Ao pedir um serviço, a conversa com o profissional aparece aqui.',
+  });
+
+  final ServicoMensagens servico;
+  final ValueChanged<ConversaResumo>? aoAbrirConversa;
+  final String textoVazio;
+
+  @override
+  Widget build(BuildContext context) {
+    return CarregadorTela<List<ConversaResumo>>(
+      carregar: servico.listar,
+      construir: (context, itens, _) => itens.isEmpty
+          ? EstadoVazio(
+              icone: Icons.chat_bubble_outline,
+              titulo: 'Nenhuma conversa ainda',
+              texto: textoVazio,
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+              itemCount: itens.length,
+              separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+              itemBuilder: (_, i) =>
+                  _LinhaConversa(item: itens[i], aoTocar: () => aoAbrirConversa?.call(itens[i])),
+            ),
     );
   }
 }

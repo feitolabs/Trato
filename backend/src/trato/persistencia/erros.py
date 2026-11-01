@@ -6,8 +6,24 @@ Postgres vira um erro nosso, com mensagem em português e sem vazar nome de tabe
 
 from __future__ import annotations
 
+import logging
+import re
+
 import psycopg
 from psycopg import errors as pg
+
+_log = logging.getLogger(__name__)
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+
+def texto_seguro(mensagem: str | None, padrao: str) -> str:
+    """Texto do gatilho para a resposta, sem uuid (o detalhe vai para o log)."""
+    if not mensagem:
+        return padrao
+    if _UUID.search(mensagem):
+        _log.warning("Recusa do banco com identificador: %s", mensagem)
+        return padrao
+    return mensagem
 
 
 class ErroPersistencia(Exception):
@@ -53,7 +69,7 @@ def traduzir(erro: psycopg.Error) -> ErroPersistencia:
     if isinstance(erro, pg.CheckViolation | pg.RestrictViolation):
         if erro.diag.constraint_name:  # CHECK da tabela: a mensagem do Postgres cita colunas
             return RegraDoBanco("O valor informado não é permitido.")
-        return RegraDoBanco(erro.diag.message_primary or "O banco recusou a gravação.")
+        return RegraDoBanco(texto_seguro(erro.diag.message_primary, "O banco recusou a gravação."))
     if isinstance(erro, pg.DataError):
         return DadosInvalidos("Dado em formato inválido.")
     if isinstance(erro, pg.InsufficientPrivilege):

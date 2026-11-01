@@ -82,7 +82,7 @@ A publicação (aprovada → vigente) é do backend. Taxa e prazos financeiros t
 | `config_criada_por` | uuid de quem está em `public.equipe` (o primeiro administrador, seed 4) | NULL |
 | `taxa_bps` | Taxa única (P2). Ex.: 750 = 7,5%. **Mais** minimo e maximo da trava | NULL |
 | `taxa_minima_centavos` | Taxa mínima por serviço em centavos (0 = sem mínimo) (P2). **Mais** minimo e maximo | NULL |
-| `prazo_liberacao_dias` | Liberação do pagamento (P1: 7 dias ou 48 h?) | NULL (limites 1..30, sugestão do agente) |
+| `prazo_liberacao_dias` | Liberação do pagamento (P1: 7 dias ou 48 h?) | NULL (limites 0..30; o João decidiu liberar assim que o cliente confirma = 0, 31/10/2026) |
 | `prazo_confirmacao_cliente_horas` | Confirmação do cliente (P1), opcional | NULL (12..168) |
 | `prazo_congelar_disputa_horas` | Prazo para abrir disputa e congelar o repasse (escopo 72 h × D3: P17/N17), opcional | NULL (24..168) |
 | `janela_chargeback_dias` | Janela de reclamação | 7 (D3) |

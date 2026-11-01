@@ -1,0 +1,58 @@
+-- LIMPEZA do teste real. Rode no SQL Editor do Supabase (dono do banco). NADA aqui roda sozinho.
+-- Estado antes do teste: todas estas tabelas tinham 0 linhas. Seeds (contas_ledger, categorias, cidades) ficam.
+-- Ledger, config e eventos_webhook são imutáveis por gatilho: replica desliga gatilhos e FKs só nesta transação.
+begin;
+set local session_replication_role = replica;
+delete from public.categoria_perguntas where texto like 'teste\_%';
+delete from public.categorias where slug like 'teste-%';
+delete from public.cidades where nome like 'teste\_%';
+delete from public."aditivos";
+delete from public."agendador_execucoes";
+delete from public."agendamentos";
+delete from public."auditoria";
+delete from public."avaliacao_criterios";
+delete from public."avaliacoes";
+delete from public."config_definicoes";
+delete from public."config_faixas_taxa";
+delete from public."config_parametros";
+delete from public."config_versoes";
+delete from public."contratos";
+delete from public."conversas";
+delete from public."dispositivos_push";
+delete from public."disputa_evidencias";
+delete from public."disputas";
+delete from public."equipe";
+delete from public."etapas";
+delete from public."eventos_webhook";
+delete from public."garantias";
+delete from public."lancamentos";
+delete from public."mensagens";
+delete from public."midias";
+delete from public."nota_material_itens";
+delete from public."notas_material";
+delete from public."notificacao_preferencias";
+delete from public."notificacoes";
+delete from public."orcamento_itens";
+delete from public."orcamentos";
+delete from public."ordens_estorno";
+delete from public."pagamentos";
+delete from public."partidas";
+delete from public."pedido_historico";
+delete from public."pedido_recusas";
+delete from public."pedido_respostas";
+delete from public."pedidos";
+delete from public."pedidos_endereco";
+delete from public."perfis_profissional";
+delete from public."presencas";
+delete from public."profissional_categorias";
+delete from public."profissional_regioes";
+delete from public."repasses";
+delete from public."retrabalhos";
+delete from public."upload_solicitacoes";
+delete from public."usuarios";
+delete from public."usuarios_privados";
+delete from public."verificacao_documentos";
+delete from public."verificacoes";
+delete from auth.users where email like 'teste\_%@example.test';
+commit;
+-- Conferir: select count(*) de cada tabela acima deve voltar 0; contas_ledger 4, categorias 3, cidades 1.

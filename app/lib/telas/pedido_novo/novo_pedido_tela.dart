@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
-import '../em_breve_tela.dart';
 import '../profissional_apoio/apoio.dart' show CapturarFoto;
 import 'dados_exemplo.dart';
 import 'modelos.dart';
@@ -12,7 +11,7 @@ import 'pecas_pedido.dart';
 /// Tela 11 do protótipo: "Conte o que precisa", passo 2 de 3.
 ///
 /// Só coleta e mostra: quem decide o que acontece depois é o backend. Os callbacks são
-/// opcionais; sem eles, o botão correspondente abre [EmBreveTela].
+/// opcionais; sem eles, o botão correspondente não aparece.
 const _maxFotos = 4;
 
 class NovoPedidoTela extends StatefulWidget {
@@ -58,19 +57,14 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     super.dispose();
   }
 
-  void _emBreve(String titulo) => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => EmBreveTela(titulo: titulo)),
-      );
+  bool get _podeAdicionarFoto => widget.aoCapturarFoto != null || widget.aoAdicionarFoto != null;
 
   Future<void> _adicionarFoto() async {
     final captura = widget.aoCapturarFoto;
-    if (captura == null) return _chamarOuEmBreve(widget.aoAdicionarFoto, 'Adicionar foto');
+    if (captura == null) return widget.aoAdicionarFoto?.call();
     final ref = await captura();
     if (ref != null && mounted) setState(() => _fotosNovas.add(ref));
   }
-
-  void _chamarOuEmBreve(VoidCallback? acao, String titulo) =>
-      acao != null ? acao() : _emBreve(titulo);
 
   String? get _erroServicos =>
       _tentou && _servicos.isEmpty ? 'Escolha pelo menos um serviço.' : null;
@@ -92,12 +86,9 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         prazo: _prazo,
         faixa: _faixa,
         fotos: List.of(_fotosNovas),
+        categoriaId: widget.formulario.categoriaId,
       );
-      if (widget.aoEnviar != null) {
-        widget.aoEnviar!(rascunho);
-      } else {
-        _emBreve('Próximo passo do pedido');
-      }
+      widget.aoEnviar?.call(rascunho);
     }
   }
 
@@ -118,13 +109,11 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         const SizedBox(height: EspacosTrato.x2),
         Row(
           children: [
-            const Icon(Icons.bolt, size: 22, color: CoresTrato.petroleo),
+            Icon(f.icone, size: 22, color: CoresTrato.petroleo),
             const SizedBox(width: EspacosTrato.x2),
             Expanded(child: Text(f.categoria, style: secundario)),
-            BotaoLink(
-              texto: 'Trocar',
-              aoTocar: () => _chamarOuEmBreve(widget.aoTrocarCategoria, 'Trocar categoria'),
-            ),
+            if (widget.aoTrocarCategoria != null)
+              BotaoLink(texto: 'Trocar', aoTocar: widget.aoTrocarCategoria),
           ],
         ),
         const SizedBox(height: EspacosTrato.x4),
@@ -160,23 +149,25 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             _Contador(valor: _quantidade, aoMudar: (v) => setState(() => _quantidade = v)),
           ],
         ),
-        const SizedBox(height: EspacosTrato.x5),
-        RotuloSecao(f.perguntaVoltagem),
-        const SizedBox(height: EspacosTrato.x3),
-        Row(
-          children: [
-            for (var i = 0; i < f.voltagens.length; i++) ...[
-              if (i > 0) const SizedBox(width: EspacosTrato.x2),
-              Expanded(
-                child: _OpcaoRadio(
-                  texto: f.voltagens[i],
-                  marcada: f.voltagens[i] == _voltagem,
-                  aoTocar: () => setState(() => _voltagem = f.voltagens[i]),
+        if (f.voltagens.isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          RotuloSecao(f.perguntaVoltagem),
+          const SizedBox(height: EspacosTrato.x3),
+          Row(
+            children: [
+              for (var i = 0; i < f.voltagens.length; i++) ...[
+                if (i > 0) const SizedBox(width: EspacosTrato.x2),
+                Expanded(
+                  child: _OpcaoRadio(
+                    texto: f.voltagens[i],
+                    marcada: f.voltagens[i] == _voltagem,
+                    aoTocar: () => setState(() => _voltagem = f.voltagens[i]),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         const RotuloSecao('Descreva o problema'),
         const SizedBox(height: EspacosTrato.x3),
@@ -199,10 +190,15 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
               const SizedBox(width: EspacosTrato.x3),
             ],
             for (var i = 0; i < _fotosNovas.length; i++) ...[
-              Expanded(child: _FotoReservada('[Foto ${f.fotos.length + i + 1}]')),
+              Expanded(
+                child: _FotoReservada(
+                  '[Foto ${f.fotos.length + i + 1}]',
+                  referencia: _fotosNovas[i],
+                ),
+              ),
               const SizedBox(width: EspacosTrato.x3),
             ],
-            if (f.fotos.length + _fotosNovas.length < _maxFotos)
+            if (f.fotos.length + _fotosNovas.length < _maxFotos && _podeAdicionarFoto)
               Expanded(child: _AdicionarFoto(aoTocar: _adicionarFoto))
             else
               const Spacer(),
@@ -247,10 +243,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                     Row(
                       children: [
                         Expanded(child: Text(f.endereco, style: TipografiaTrato.corpoForte)),
-                        BotaoLink(
-                          texto: 'Mudar',
-                          aoTocar: () => _chamarOuEmBreve(widget.aoMudarEndereco, 'Mudar endereço'),
-                        ),
+                        if (widget.aoMudarEndereco != null)
+                          BotaoLink(texto: 'Mudar', aoTocar: widget.aoMudarEndereco),
                       ],
                     ),
                     Text(f.avisoEndereco, style: secundario),
@@ -377,30 +371,62 @@ class _OpcaoRadio extends StatelessWidget {
 }
 
 class _FotoReservada extends StatelessWidget {
-  const _FotoReservada(this.rotulo);
+  const _FotoReservada(this.rotulo, {this.referencia});
 
   final String rotulo;
+  final String? referencia;
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1,
-      child: Container(
-        padding: const EdgeInsets.all(EspacosTrato.x2),
-        alignment: Alignment.bottomLeft,
-        decoration: BoxDecoration(
-          color: CoresTrato.azulClaro,
-          borderRadius: BorderRadius.circular(EspacosTrato.raio),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            rotulo,
-            style: TipografiaTrato.corpoPequeno.copyWith(
-              color: CoresTrato.petroleo,
-              fontWeight: FontWeight.w600,
-            ),
+    final imagemReal = construirImagemReal(referencia);
+    return ToquePreviewImagem(
+      referencia: referencia ?? rotulo,
+      legenda: rotulo,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
+          padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
+          alignment: Alignment.bottomLeft,
+          decoration: BoxDecoration(
+            color: CoresTrato.azulClaro,
+            borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
+          child: imagemReal != null
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    imagemReal,
+                    Positioned(
+                      left: 6,
+                      bottom: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          rotulo,
+                          style: TipografiaTrato.legenda.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    rotulo,
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.petroleo,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
         ),
       ),
     );

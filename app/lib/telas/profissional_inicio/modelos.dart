@@ -36,10 +36,10 @@ class PedidoAberto {
     required this.id,
     required this.titulo,
     required this.bairro,
-    required this.distanciaKm,
+    this.distanciaKm,
     required this.prazo,
-    required this.orcaram,
-    required this.limiteOrcamentos,
+    this.orcaram,
+    this.limiteOrcamentos,
     this.faixaMinCentavos,
     this.faixaMaxCentavos,
     this.urgente = false,
@@ -48,12 +48,12 @@ class PedidoAberto {
   final String id;
   final String titulo;
   final String bairro;
-  final double distanciaKm;
+  final double? distanciaKm;
 
   /// Texto pronto. Ex.: "até sexta, 30/10", "hoje", "próxima semana".
   final String prazo;
-  final int orcaram;
-  final int limiteOrcamentos;
+  final int? orcaram;
+  final int? limiteOrcamentos;
 
   /// Faixa que o cliente pensa gastar; ausente = "Sem faixa".
   final int? faixaMinCentavos;
@@ -77,6 +77,15 @@ class InicioProfissional {
   final ProximoAtendimento? proximo;
   final ResumoCarteira carteira;
   final List<PedidoAberto> pedidos;
+
+  /// Mesmo início com outra lista de pedidos abertos (depois de aplicar filtros).
+  InicioProfissional comPedidos(List<PedidoAberto> novos) => InicioProfissional(
+        nome: nome,
+        disponivelAgora: disponivelAgora,
+        proximo: proximo,
+        carteira: carteira,
+        pedidos: novos,
+      );
 }
 
 /// Linha "rótulo e valor" da tabela de detalhes (Serviços, Tomadas, Prazo...).

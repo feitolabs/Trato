@@ -355,3 +355,136 @@ Builds reais Android (debug 160 MB, release 51,3 MB), painel web e CI local feit
 - Testes em develop: 1139 no backend (1 pulado), 647 no app, 78 no painel.
 - **Migrations novas, só em arquivo, NÃO aplicadas:** `20261030130000_pedido_recusas.sql` (tabela de recusas de pedido pelo profissional, imutável, RLS; rollback `pedido_recusas_rollback.sql`) e `20261030130000_profissional_disponibilidade_portfolio_uploads.sql` (colunas `disponibilidade`/`portfolio` em `perfis_profissional` e tabela `upload_solicitacoes`; rollback `profissional_disponibilidade_portfolio_uploads_rollback.sql`). **Atenção: as duas têm a mesma versão `20261030130000`**; renomear uma antes de aplicar (versão de migration é única no Supabase).
 
+
+## 30/10/2026 — app-rotas-novas: app ligado às rotas novas
+
+- Modo `api` agora usa a API em: orçamentos (lista e detalhe), pagamento (valor, cobrança Pix/cartão idempotente, consulta até `pago: true`), perfil `/me`, chat, notificações (lista), avaliação, garantia, aditivo e nota de materiais, pedidos abertos do profissional (com `FiltroPedidosAbertos`), recusa, calculadora (`/v1/orcamentos/resumo`, nada calculado no app), verificação do profissional e upload por URL assinada (`POST /v1/uploads`, `PUT`, `concluir`; `ServicoUploadApi` corrigido, a rota proposta antes não existia). `demo` segue padrão.
+- Primeiro login chama `GET /v1/me` (`LigacaoSessao.aoEntrar`). Depois de pago, o app abre o pedido em andamento (antes voltava ao início com a lista velha).
+- Para não inventar dado: `PedidoAberto.distanciaKm/orcaram/limiteOrcamentos` e `ResumoOrcamento.taxaBps` ficaram opcionais; `ResumoPedido.numero` virou texto.
+- Testes novos: `app/test/dados/contrato_api_test.dart` (contrato por repositório) e `fluxo_completo_test.dart` (pedido até avaliação com backend simulado). Divergências doc × backend e rotas que faltam: `docs/app-divergencias.md` (destaque: #4 `offline_capturada_em` é recusado pelo backend; #5 caminho da foto da nota).
+- Continua demo: cadastro do profissional, busca, perfil público, lista de conversas, responder disputa; sem rota: marcar notificação como lida, preferências, token de push. Não testado em aparelho real nem contra API real.
+
+## 30/10/2026 — App usa a API real no modo `api` (`claude/app-rotas-novas-a68570`)
+
+- Em develop (sem push), verificada com o `.venv` do projeto: o app chama a API real no modo `api` para orçamentos, pagamento, perfil, profissional, aditivo e nota de materiais, entre outros (`docs/app-ligacao.md`); testes de contrato em `app/test/dados/contrato_api_test.dart`. Mantido o commit `d548c9d` (migrations de recusa e upload marcadas como aplicadas).
+- Testes em develop: 1139 no backend (1 pulado), 680 no app, 78 no painel.
+- `docs/app-divergencias.md` lista 22 divergências entre app, `docs/api-rotas.md` e backend. Ainda em demo no app: cadastro do profissional (faltam catálogo de categorias e cidades), busca e perfil público, lista de conversas, responder disputa. Faltam rotas: marcar notificação como lida, push, busca por serviço, título/descrição/faixa/serviços em `POST /v1/pedidos`, gorjeta, detalhe de pedido aberto, conversa do cliente antes de contratar (`?profissional_id=`).
+- Backend devolve ao app: `offline_capturada_em` no check-in/out reenviado (hoje 422 e tira da fila), caminho da foto na conclusão do upload da nota de materiais, destino `portfolio` em uploads, `taxa` em % no resumo do orçamento.
+- Limites: `POST /v1/contratos/{id}/cobranca` responde 503 em modo `postgres`; aprovar aditivo cria cobrança `aguardando_confirmacao` mas o app não tem a tela de pagar o aditivo.
+
+
+## 30/10/2026 — app-zero-placeholders: app navegável sem placeholder
+
+- Telas novas (cliente): todas as categorias, categoria com filtros, resultados da busca ligados ao catálogo, serviços recentes e detalhe do serviço (ações por estado), perfil público do profissional (bio, serviços, avaliações, sem prometer segurança), notificações com destino por tipo, Início ligado a dados. Profissional: filtros dos pedidos abertos, aba Pedidos (abertos + conversas), Agenda com check-in. Termos de uso e política (rascunho) em `telas/legal/`, ainda **não ligados em criar conta** (`fix-cadastro-real`).
+- Repositórios novos (interface + API + fake): catálogo, serviços do cliente, agenda. Catálogo, busca e agenda seguem em demo no modo `api` (faltam rotas).
+- Restam 4 `EmBreveTela` em `telas/auth/` (da `fix-cadastro-real`); plano em `docs/placeholders.md`.
+- Teste `navegacao_sem_placeholder_test.dart` explora os toques das 5 abas do cliente e do profissional (~4 min); achou 2 bugs reais (setState com Future; pop em rota já removida), corrigidos.
+- APK debug gerado e instalado no emulador (abre no onboarding); **não passei do onboarding** porque exige criar conta/digitar credenciais. Capturas das telas internas ficaram pendentes (nenhuma PNG em `docs/telas-capturas/`).
+## 30/10/2026 — fix-sobras-seguranca
+
+- `docs/sobras-seguranca.md` lista cada sobra com estado. Corrigidos com teste: B3 (`texto_seguro`), B7 (cartão); B8 (job `pip-audit`); B2 em migration nova NÃO aplicada + rollback + checagens em `supabase/testes/testar_banco.py` (608 OK em Postgres local; mapa de rollbacks e lista de tabelas só-backend do teste atualizados).
+- `docs/roteiro-testes-reais.md` + `harness/teste_real_{rls,webhook,banco}.py`: sem criar conta nem gravar dado; `TRATO_TESTE_REAL=sim` obrigatório. Webhook testado em memória (`tests/api/test_sobras_script_webhook.py`); os outros não foram rodados contra o Supabase real.
+- Abertos com motivo: ServicoPagamento na fábrica (P7 + sessão backend-divergencias), aviso no bloqueio do código (A1), lock com hash, contadores em Redis, M6 (banir sessão no Auth), M11 (CPF), B6.
+
+## 30/10/2026 — Divergências do app e sobras de segurança integradas
+
+- Em develop (sem push): `claude/backend-divergencias-b752c8` (catálogo público, busca de profissionais, adaptador Postgres do perfil, atender retrabalho, detalhe do pedido aberto, taxa efetiva no resumo, reenvio offline como evidência, destino `portfolio`; `docs/api-rotas.md` com as rotas do app) e `claude/fix-sobras-seguranca-b65e0b` (B2, B3, B7, pip-audit, `docs/sobras-seguranca.md`, `docs/roteiro-testes-reais.md`, scripts `harness/teste_real_*.py` e `subir-backend-teste.py`).
+- **Verificação real**, comando `backend/.venv/Scripts/python harness/verificar.py`, saída fresca, sem reaproveitar log: `backend-divergencias` em 30/10 18:30 (1162 testes de backend, 1 pulado; 680 no app; 78 no painel; TUDO OK; log em `%TEMP%/verificacao-develop-18h30.log`) e `fix-sobras-seguranca` em 30/10 18:41 a 18:45 (1167 testes de backend, 1 pulado; 680 no app; 78 no painel; TUDO OK). O estado atual de develop é esse último.
+- Incidente: o script auxiliar `verif.sh` (em `%TEMP%`) foi apagado por alguém e a primeira checagem desta rodada reaproveitou, sem querer, um log antigo; foi refeita do zero. Passo a usar só o comando oficial, com o lock do Flutter feito na própria linha de comando. Causa do sumiço não identificada.
+- Migrations: `20261030140000_upload_destino_portfolio.sql` (APLICADA pelo João; cabeçalho mantido). **Nova, NÃO aplicada:** `20261030140000_b2_grants_por_coluna.sql` (grants de leitura por coluna nas tabelas do dinheiro, só privilégio; rollback `b2_grants_por_coluna_rollback.sql`). **As duas têm a mesma versão `20261030140000`**: renomear a nova antes de aplicar. Seguem esperando OK: `20261029040000_notificacoes_dispositivos_agendador.sql`, `20261030000000_fix_acesso_storage_pedido_historico.sql`, `20261030120000_ordens_estorno.sql`.
+
+
+
+## 30/10/2026 — Cadastro e login reais com confirmação por e-mail (`claude/fix-cadastro-real-46a09c`)
+
+- Causa do "Algo deu errado" ao criar conta: o `criarConta` chamava `updateUser(phone)` depois do `signUp`, mas com confirmação de e-mail ligada não há sessão. Removido (D16: sem SMS no piloto).
+- `criarConta` devolve `ResultadoCadastro`: `CadastroComSessao` (entra direto) ou `CadastroAguardandoEmail`. Celular vai nos metadados do `signUp`; CPF e nascimento **não** vão (iriam no token; o `PATCH /v1/me` só aceita nome): seguem pendentes para o backend.
+- Nova tela `ConfirmarEmailTela` ("Confirme seu e-mail", "Já confirmei", "Reenviar e-mail" com 60 s, "Trocar e-mail"). A tela de SMS fica intacta, desligada por `kConfirmarCelularPorSms = false`.
+- Login trata `email_not_confirmed` com reenvio. Novos tipos de erro: `emailNaoConfirmado`, `limiteEmail`, `dadosInvalidos`, `cadastroDesativado`; erro desconhecido registra só tipo e código em log de depuração.
+- `GET /v1/me` no primeiro login só no modo `api`. Deep link `br.com.feitolabs.trato://login-callback` no `AndroidManifest.xml` e `Info.plist`. `docs/login-configuracao.md` atualizado.
+- Testes: `app/test/servico_auth_supabase_test.dart` (cliente com rede simulada) e fluxo em `auth_test.dart`. `verificar.py` OK. Falta o João: ligar a URL de redirecionamento no painel e testar no emulador.
+
+## 30/10/2026 — Cadastro real e app sem placeholders integrados; APK debug no emulador
+
+- Em develop (sem push), nesta ordem: `claude/fix-cadastro-real-46a09c` (cadastro real com confirmação de e-mail, sem SMS, D16; merge `61eae9c`) e `claude/app-zero-placeholders-8aeedd` (telas de catálogo, serviço, agenda, filtros e termos; `EmBreveTela` removida; teste de navegação sem placeholder; merge `cbc3a60`). Conflitos só em `harness/PROGRESSO.md` e `docs/STATUS-MVP.md`, resolvidos com os dois lados. Tropeço meu: o `res.py` auxiliar tinha sumido e comitei marcadores de conflito em `PROGRESSO.md`; corrigido antes de verificar, `git grep` limpo.
+- **Verificação**, comando `backend/.venv/Scripts/python harness/verificar.py` (lock do Flutter inline, sem script auxiliar), TUDO OK nas duas: `fix-cadastro-real` em 30/10 21:55 a 22:01 (1167 testes de backend, 1 pulado; 702 no app; 78 no painel) e `app-zero-placeholders` em 22:07:38 a 22:14:31 (1167 backend, 1 pulado; 735 app; 78 painel). Estado atual de develop: `cbc3a60`.
+- **APK debug** a partir de develop: `flutter build apk --debug --dart-define-from-file=dart-defines.json` (dentro de `app/`, arquivo fora do git, valores não impressos), 22:14 a 22:16:30, `app-debug.apk` com 182 MB, sucesso. O emulador `Medium_Phone_API_37.0` não estava aberto: subi às 22:17 (`emulator-5554`), `adb install -r` às 22:17:53 (`Success`), abri `br.com.feitolabs.trato` pelo launcher. Às 22:18:28/22:18:48: buffer `crash` vazio, 0 `FATAL EXCEPTION`, processo vivo; a captura mostra o splash nativo (logo padrão do Flutter) e em seguida a tela de abertura do Trato ("Feito Labs apresenta", "Toque para começar"). Não naveguei além disso nem testei login.
+- Segue: ícone e splash nativo com a arte do Trato, validar login e cascas num aparelho com conta de teste, push e PR para `main`.
+
+
+## Pagamento ligado ao Postgres (sessão pagamento-postgres)
+- `persistencia/pagamentos.py`: `CobrancasPostgres`, `AditivosPostgres`, `OrdensEstornoPostgres`, `TermosPostgres` (termos = o contrato já congela a taxa) e `ConfigPagamentoPostgres` (versão vigente; alçada = parâmetro `alcada_disputa_centavos`, ausente = 0).
+- `api/fabrica.py`: `montar_servico_pagamento` + `instalar_pagamento` em `criar_app_da_config` (modo postgres). `escolher_provedor` decide fake/stripe.
+- `orquestrador.aprovar_aditivo`: salva o aditivo aprovado ANTES de cobrar, numa transação (o gatilho do banco exige).
+- Migration NOVA `20261031000000_pagamentos_instrucao.sql` (+ rollback), NÃO aplicada no Supabase: precisa do OK do João. O backend real precisa dela e da `ordens_estorno` (já aplicada) para cobrar.
+- `tests/conftest.py`: suíte independe do `.env`/variáveis da máquina (achado 6 resolvido).
+- `tests/integracao/test_pagamento_postgres.py`: cobrança, webhook assinado, ledger espelhado, idempotência do mesmo evento, valor divergente, falha, aditivo e ordem de estorno.
+
+## 31/10/2026 — Pagamento no Postgres integrado (`claude/charming-clarke-fce4b0`)
+
+- Em develop (sem push), merge `9face5b`: pagamento ligado ao Postgres (repositórios, configuração vigente, fábrica), `prazo_liberacao_dias` aceita 0 (liberar quando o cliente confirma), cobrança Stripe sem `payment_method_types` (automatic payment methods), remoção do evento inexistente `transfer.paid`, roteiro de teste real no Supabase (`docs/teste-real-banco.md`) e as decisões de taxa registradas em docs (taxa somada ao pedido, mínimo R$ 3,00, taxa não reembolsada, parcelado repassa o custo do provedor).
+- **Verificação**, comando `backend/.venv/Scripts/python harness/verificar.py` (lock inline, sem script auxiliar), em 31/10 de 17:04:34 a 17:11:05: TUDO OK, 1170 testes de backend (1 pulado), 735 no app, 78 no painel. Conferido: nenhum `.env` versionado nem copiado em worktree; o `.env` da raiz é ignorado pelo git e o `conftest.py` o desliga nos testes.
+- Migration `20261031000000_pagamentos_instrucao.sql` (coluna da instrução de pagamento; rollback `pagamentos_instrucao_rollback.sql`) já **aplicada pelo João** no banco real; cabeçalho atualizado para "APLICADA", não reaplicar. `supabase/seeds/parametros.sql` e `supabase/testes/testar_seeds.py` mudaram junto (prazo mínimo 0).
+- Fora, por orientação: `claude/optimistic-margulis-e4b7a2` (taxa somada, ainda em testes).
+
+
+## Taxa somada ao pedido e parcelado (sessão taxa-somada, 31/10/2026)
+- Decisão do João: cliente paga serviço + taxa; profissional recebe o orçamento inteiro; Trato absorve Pix/cartão à vista; parcelado = custo real do provedor repassado (tabela vazia = desligado); taxa e custo do parcelado não são reembolsados. Detalhe, perguntas e regra jurídica pendente: `docs/taxa-somada-parcelado.md`.
+- Backend: `taxa.montar_total`, `parcelamento.py`, `ServicoPagamento.total_a_cobrar/cobrar`, ledger `separar_taxa` (taxa sai da custódia no pagamento) e `estornar_pedido` sem devolver taxa; disputa/conclusão sem desconto; `contratos.liquido = valor`; rotas `/pagamento` e `/orcamentos/resumo` com os novos campos.
+- App: calculadora, aditivo e tela de pagamento mostram taxa somada, total do cliente e o que o profissional recebe; parcelado só aparece se o backend mandar opções.
+- Sem migration e sem escrita no banco. Testes de `tests/integracao/` atualizados por leitura, NÃO executados (sem `pgserver`).
+
+## 31/10/2026 — Taxa somada e parcelado repassado integrados (`claude/optimistic-margulis-e4b7a2`)
+
+- Em develop (sem push): taxa do Trato somada ao pedido e custo de parcelamento repassado (tabela de taxas). **O commit de merge é `e4c05c9`, que ficou com a mensagem "tmp" por engano meu** (não reescrevi histórico); o commit seguinte `33ef4fe` é a correção de teste abaixo. Conflito só em `harness/PROGRESSO.md`, resolvido com os dois lados; sem migration nesta branch.
+- **Defeito de integração achado e corrigido:** a branch do pagamento no Postgres (`charming-clarke`) tinha um teste de integração chamando `saldos_pedido(pedido_id)` com 1 argumento; a taxa somada passou a exigir `profissional_id`. O código de produção já estava consistente; corrigi só o teste (`tests/integracao/test_pagamento_postgres.py`, passa `None`).
+- **Por que não apareceu antes:** o `pgserver` não estava instalado no `.venv` do projeto, e os testes de integração com Postgres local (`backend/tests/integracao`, `integracao_painel`) são pulados sozinhos sem ele. Todas as verificações anteriores neste `.venv` rodaram sem essa integração. **Agora o `pgserver` está instalado no `.venv`** (declarado no `pyproject.toml`) e a integração roda dentro do `verificar.py`, sem `.env` real (o `conftest.py` o desliga). Em máquina nova, `harness/preparar-ambiente` instala o `pgserver`; sem ele a integração é pulada em silêncio, então vale conferir "skipped" no resultado.
+- **Verificação**, comando `backend/.venv/Scripts/python harness/verificar.py`, saída fresca: 31/10 de 18:28 a 18:39:21 (1182 testes de backend, 1 pulado = integração; 735 app; 78 painel) e, depois da correção e com o `pgserver`, de 18:42:29 a 18:55:41: TUDO OK, **1260 testes de backend, 0 pulados**, 735 no app e 78 no painel. Integração à parte (`pytest tests/integracao tests/integracao_painel`, 18:41): 108 passed, 0 skipped.
+- Conclusão para o histórico: os "verdes" de backend das rodadas anteriores (1139 a 1182 testes) não incluíam a integração com Postgres. A integração só foi rodada de fato em 31/10 18:41; vale registrar se alguma branch anterior tem teste de integração que não foi exercitado pelo integrador.
+
+## 31/10/2026 — Envio de Orçamento: Rota Backend e App Flutter Conectados
+
+- **Passo 1 (Backend - `feature/f6-enviar-orcamento-api`, merge `d2a4ac2`):**
+  - Implementada a rota `POST /v1/pedidos/{pedido_id}/orcamentos` em `backend/src/trato/api/rotas_app.py`.
+  - Sanitização via `limpar_texto` e validação com `ItemOrcamentoIn`, `EtapaPropostaIn` e `CriarOrcamentoIn`.
+  - Implementado `enviar` em `OrcamentosEmMemoria` e no protocolo `RepositorioOrcamentos`.
+  - Adicionada migration `profissional_disponibilidade_portfolio_uploads` ao `MIGRATIONS` em `backend/tests/integracao/pg_local.py` corrigindo ausência da coluna `disponibilidade`.
+  - Testes unitários de rota e testes de integração com Postgres real adicionados e passando.
+
+- **Passo 2 (Flutter App - `feature/f6-enviar-orcamento-app`):**
+  - Em `app/lib/telas/profissional/servico_orcamento.dart`: adicionados `ItemMaterial`, `OrcamentoPronto` e método `enviar(OrcamentoPronto pronto)` à interface `ServicoOrcamento`.
+  - Em `app/lib/telas/profissional/servico_orcamento_fake.dart`: implementado `enviar` e histórico de orçamentos enviados.
+  - Em `app/lib/telas/profissional/calculadora_orcamento_tela.dart`: reexportação de modelos, suporte a envio assíncrono com indicador de carregamento e prevenção de duplo clique.
+  - Em `app/lib/dados/repositorios_api.dart`: `ServicoOrcamentoApi` implementa `enviar(OrcamentoPronto pronto)` montando os itens (mão de obra, deslocamento, materiais, sinal de materiais) e chamando `POST /v1/pedidos/{pedido_id}/orcamentos`.
+  - Em `app/lib/telas/profissional_inicio/casca_profissional_tela.dart` e `app/lib/telas/fluxo/rotas.dart`: conectado fluxo da tela inicial e detalhe do pedido para abrir a calculadora passando o `pedidoId` e enviando via API com tratamento de erros.
+  - Testes: adicionados testes em `app/test/dados/dados_api_test.dart` e `app/test/profissional_test.dart`. Verificação do harness passou 100% (1.264 backend, 736 app, 78 admin).
+
+- **Passo 3 (Flutter App - `feature/f7-ligar-telas-restantes-app`):**
+  - Implementado `ServicoDisputaProfissionalApi` em `app/lib/dados/servicos_api.dart` conectando a resposta do profissional a disputas (`POST /v1/pedidos/{id}/disputa/resposta`) e agendamento de retrabalho (`POST /v1/pedidos/{id}/retrabalho/atender`).
+  - Integrado `disputaProfissional` em `RepositoriosTrato` e `rotas.dart`.
+  - Atualizado `RepositorioPedidosApi.criar` para enviar payload completo de `RascunhoPedido` ao backend (`categoria_id`, `cidade_id`, `titulo`, `descricao`, `faixa_preco_min_centavos`, `faixa_preco_max_centavos`, `respostas`).
+  - Atualizado `RepositorioCatalogoApi` para consumir `GET /v1/profissionais` com filtros de `servico`, `categoria_id` e `bairro`, mantendo fallback gracioso para os dados locais de demonstração caso a base esteja vazia.
+  - Ajustada tolerância de clock skew entre Postgres e Python em `config_regras.py` para evitar rejeições espúrias por microssegundos durante publicação imediata de versão de configuração.
+  - Testes adicionados em `app/test/dados/dados_api_test.dart`. Verificação do harness passou 100% (1.264 backend, 742 app, 78 admin).
+
+- **Passo 4 (Backend - `feature/f8-uploads-postgres`):**
+  - Implementado `UploadsPostgres` em `backend/src/trato/persistencia/uploads.py`: persistência completa de solicitações de upload (`public.upload_solicitacoes`) e metadados de mídias (`public.midias`), com suporte a normalização de UUIDs e tratamento de campos de auditoria e geolocalização (`lat`, `lng`).
+  - Atualizado `backend/src/trato/uploads/servico.py` definindo o protocolo `RepositorioUploads` e tipando `ServicoUploads`.
+  - Atualizado `backend/src/trato/api/rotas_upload.py` permitindo injeção de `repo: RepositorioUploads | None`.
+  - Atualizado `backend/src/trato/api/app.py` integrando `UploadsPostgres(banco)` ao app FastAPI em modo Postgres.
+  - Criado teste de integração `backend/tests/integracao/test_uploads_postgres.py` cobrindo ciclo de vida de solicitação de upload e registro de mídia com coordenadas geográficas.
+  - Verificação do harness passou 100% (1.265 backend, 742 app, 78 admin).
+
+- **Passo 5 (Supabase Seeds & Configuração Oficial no Banco Real - `feature/f9-seeds-config`):**
+  - Parâmetros dos seeds consolidados em `supabase/seeds/parametros.sql` (Belo Horizonte - MG inativa para controle do piloto; categorias Limpeza residencial e Montagem de móveis com 30 dias de garantia; contas de sistema do ledger no caminho A).
+  - Execução e idempotência validadas contra Postgres local isolado (pgserver).
+  - Carga dos seeds aplicada com autorização do João no Supabase real (`seed_cidades_categorias`, `seed_config_taxa` e `seed_contas_ledger`).
+  - Nova versão oficial da configuração (`412b74f6-ae63-4668-ab6d-dae3e5bcdf6a`) aprovada pelo financeiro e publicada como vigente no banco real:
+    - Taxa única de 7,5% (`taxa_bps = 750`), taxa mínima R$ 3,00 (`taxa_minima_centavos = 300`).
+    - Liberação imediata ao cliente confirmar (`prazo_liberacao_dias = 0`).
+    - Janela de reclamação do cliente: 7 dias (`janela_chargeback_dias = 7`).
+    - Prazos operacionais: confirmação cliente 48h, congelamento de repasse em disputa 72h, resposta 48h, decisão 5 dias úteis, retrabalho 7 dias.
+    - Faixa de taxa global sem teto cadastrada e validada em `ConfigPostgres` e `ConfigPagamentoPostgres`.
+
+
+

@@ -23,6 +23,7 @@ from trato.uploads.servico import (
     DESTINOS,
     SO_CLIENTE,
     SO_PROFISSIONAL,
+    RepositorioUploads,
     ServicoUploads,
     SolicitacaoInvalida,
     UploadNegado,
@@ -110,6 +111,8 @@ def pedir_upload(
     regra = DESTINOS.get(corpo.destino)
     if regra is None:
         raise HTTPException(422, "Destino de arquivo desconhecido.")
+    if regra.registro == "portfolio" and usuario.papel is not PapelUsuario.PROFISSIONAL:
+        raise HTTPException(403, "Só profissionais enviam fotos de portfólio.")
     pedido_id = None
     if regra.registro == "midia":
         pedido_id = _pedido_do_envio(contexto, corpo, usuario).id
@@ -178,7 +181,7 @@ def concluir_upload(
 def registrar_rotas(
     app: FastAPI,
     armazenamento: ArmazenamentoArquivos | None = None,
-    repo: UploadsEmMemoria | None = None,
+    repo: RepositorioUploads | None = None,
 ) -> None:
     """Liga as rotas. Sem `armazenamento`, usa o Supabase Storage se houver configuração; sem
     nenhum dos dois, as rotas respondem 503 (nunca falam com o Storage real por acidente)."""

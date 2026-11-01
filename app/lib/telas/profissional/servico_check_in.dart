@@ -1,8 +1,9 @@
-/// Foto de chegada já tirada. [hora] pronta para exibir ("14h06").
+/// Foto de chegada já tirada. [hora] pronta para exibir ("14h06") e [referencia] opcional.
 class FotoChegada {
-  const FotoChegada({required this.hora});
+  const FotoChegada({required this.hora, this.referencia});
 
   final String hora;
+  final String? referencia;
 }
 
 enum ResultadoInicio {

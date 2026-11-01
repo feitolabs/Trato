@@ -15,6 +15,7 @@ class RelatarProblemaTela extends StatefulWidget {
     this.descricaoInicial,
     this.aoEnviar,
     this.aoAdicionarMidia,
+    this.aoCapturarFoto,
   });
 
   final DadosRelatoProblema dados;
@@ -22,6 +23,7 @@ class RelatarProblemaTela extends StatefulWidget {
   final String? descricaoInicial;
   final ValueChanged<EnvioRelato>? aoEnviar;
   final VoidCallback? aoAdicionarMidia;
+  final Future<String?> Function()? aoCapturarFoto;
 
   @override
   State<RelatarProblemaTela> createState() => _RelatarProblemaTelaState();
@@ -31,6 +33,7 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
   late String? _motivo = widget.motivoInicial;
   late String _solucao = widget.dados.solucoes.first;
   late final _descricao = TextEditingController(text: widget.descricaoInicial);
+  final _fotos = <String>[];
 
   @override
   void dispose() {
@@ -44,6 +47,16 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
     widget.aoEnviar?.call(
       EnvioRelato(motivo: _motivo!, descricao: _descricao.text.trim(), solucao: _solucao),
     );
+  }
+
+  Future<void> _adicionarMidia() async {
+    widget.aoAdicionarMidia?.call();
+    if (widget.aoCapturarFoto != null) {
+      final ref = await widget.aoCapturarFoto!();
+      if (ref != null && mounted) {
+        setState(() => _fotos.add(ref));
+      }
+    }
   }
 
   @override
@@ -80,11 +93,19 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
         const SizedBox(height: EspacosTrato.x5),
         Text('Fotos ou vídeo', style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x3),
-        Row(
+        Wrap(
+          spacing: EspacosTrato.x2,
+          runSpacing: EspacosTrato.x2,
           children: [
             const EspacoFoto(legenda: '[Foto]', altura: 100, largura: 100),
-            const SizedBox(width: EspacosTrato.x2),
-            _AdicionarMidia(aoTocar: widget.aoAdicionarMidia ?? () {}),
+            for (var i = 0; i < _fotos.length; i++)
+              EspacoFoto(
+                legenda: '[Foto ${i + 2}]',
+                referencia: _fotos[i],
+                altura: 100,
+                largura: 100,
+              ),
+            _AdicionarMidia(aoTocar: _adicionarMidia),
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),

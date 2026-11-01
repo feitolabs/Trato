@@ -97,7 +97,7 @@ Ao abrir a tela do pedido, chamar `ServicoCheckInApi.reenviarPendentes()` para e
   e tira da fila. Recusa do backend (código errado, longe do local) também tira da fila: o app não decide.
 
 ## Depende do backend (TODO)
-1. **`POST /v1/arquivos/url-envio` não existe.** `ServicoUploadApi` já está pronto contra este contrato proposto:
+1. **(Resolvido — ver `docs/app-divergencias.md` #2.)** O backend ficou com `POST /v1/uploads` → `PUT` → `POST /v1/uploads/{id}/concluir` e `ServicoUploadApi` já usa essas rotas. Abaixo, a proposta antiga: **`POST /v1/arquivos/url-envio` não existe.** `ServicoUploadApi` já está pronto contra este contrato proposto:
    - Pedido: `{finalidade, mime, tamanho_bytes, sha256, pedido_id?}` com `Idempotency-Key`.
    - Resposta: `{arquivo_id, url, cabecalhos?, caminho?}`. A `url` é de uso único e curta (minutos).
    - O app então faz `PUT url` com os bytes, **sem** o token da API.

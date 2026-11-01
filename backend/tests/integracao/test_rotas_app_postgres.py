@@ -71,8 +71,9 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
         "valor_centavos": 90_000,
         "taxa_centavos": 6_750,
-        "liquido_centavos": 83_250,
+        "liquido_centavos": 90_000,  # taxa SOMADA: o profissional recebe o orçamento inteiro
     }
+    assert corpo["total_cliente_centavos"] == 96_750
     assert corpo["custo_provedor_estimado_centavos"] > 0
     r = post(c, "/v1/orcamentos/resumo", "profissional", {"valor_centavos": 200_000})
     assert r.json()["taxa_centavos"] == 12_000  # faixa de 600 bps acima de 100.000
@@ -93,8 +94,36 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
         == 404
     )  # noqa: E501 - ainda não orçou
 
-    # orçamento do profissional; o cliente vê (do mais barato ao mais caro) e conversa
-    orcamento_id = enviar_orcamento(c, pedido_id)
+    # orçamento do profissional via HTTP; o cliente vê (do mais barato ao mais caro) e conversa
+    r_orc = post(
+        c,
+        f"/v1/pedidos/{pedido_id}/orcamentos",
+        "profissional",
+        {
+            "itens": [
+                {
+                    "tipo": "horas",
+                    "descricao": "Mão de obra",
+                    "quantidade": "8",
+                    "valor_unitario_centavos": 10_000,
+                },
+                {
+                    "tipo": "material",
+                    "descricao": "Tinta",
+                    "quantidade": "2.5",
+                    "valor_unitario_centavos": 4_000,
+                },
+            ],
+            "etapas": [
+                {"descricao": "Preparar paredes", "valor_centavos": 40_000},
+                {"descricao": "Pintar", "valor_centavos": 50_000},
+            ],
+            "prazo_execucao_dias": 5,
+            "garantia_dias": 90,
+        },
+    )
+    assert r_orc.status_code == 201, r_orc.text
+    orcamento_id = r_orc.json()["id"]
     enviar_orcamento(c, pedido_id, "profissional2")
     lista = get(c, f"/v1/pedidos/{pedido_id}/orcamentos", "cliente").json()
     assert len(lista) == 2 and {o["profissional_nome"] for o in lista} == {

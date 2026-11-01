@@ -96,15 +96,24 @@ class ProvedorStripeTeste:
     ) -> CobrancaProvedor:
         if parcelas != 1:
             raise ErroProvedor("Parcelamento ainda não está ligado nesta integração.")
-        campos = {"amount": str(valor_centavos), "currency": "brl"}
+        # A API atual do Stripe recusa `payment_method_types`: meios vêm do painel (31/10/2026).
+        campos = {
+            "amount": str(valor_centavos),
+            "currency": "brl",
+            "automatic_payment_methods[enabled]": "true",
+            "automatic_payment_methods[allow_redirects]": "never",
+        }
         if meio is MeioPagamento.PIX:
             campos |= {
-                "payment_method_types[]": "pix",
                 "payment_method_data[type]": "pix",
                 "confirm": "true",
             }
         else:
-            campos["payment_method_types[]"] = "card"
+            # Captura e 3DS explícitos (B7): o Stripe pede autenticação quando o banco exige.
+            campos |= {
+                "capture_method": "automatic",
+                "payment_method_options[card][request_three_d_secure]": "automatic",
+            }
         campos |= {f"metadata[{k}]": v for k, v in metadados.items()}
         corpo = self._chamar("POST", "/v1/payment_intents", campos, chave_idempotencia)
         return self._cobranca(corpo, meio)

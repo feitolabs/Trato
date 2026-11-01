@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/telas/em_breve_tela.dart';
 import 'package:trato/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/modelos.dart';
@@ -8,6 +7,13 @@ import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
+
+/// Novo pedido com todos os atalhos ligados (como no protótipo e no app).
+Widget _novoPedidoCompleto() => NovoPedidoTela(
+      aoTrocarCategoria: () {},
+      aoMudarEndereco: () {},
+      aoAdicionarFoto: () {},
+    );
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -45,7 +51,7 @@ List<String> _ordemNaTela(WidgetTester tester) {
 void main() {
   group('novo pedido', () {
     testWidgets('mostra os textos do protótipo', (tester) async {
-      await _abrir(tester, const NovoPedidoTela());
+      await _abrir(tester, _novoPedidoCompleto());
 
       expect(find.text('Passo 2 de 3'), findsOneWidget);
       expect(find.text('Conte o que precisa'), findsOneWidget);
@@ -117,13 +123,18 @@ void main() {
       expect(recebido!.faixa.maximoCentavos, 50000);
     });
 
-    for (final texto in ['Trocar', 'Mudar', 'Adicionar', 'Próximo']) {
-      testWidgets('sem callback, $texto abre "em breve"', (tester) async {
+    for (final texto in ['Trocar', 'Mudar', 'Adicionar']) {
+      testWidgets('sem callback, $texto não aparece', (tester) async {
         await _abrir(tester, const NovoPedidoTela());
-        await _tocar(tester, find.text(texto));
-        expect(find.byType(EmBreveTela), findsOneWidget);
+        expect(find.text(texto), findsNothing);
       });
     }
+
+    testWidgets('sem callback, Próximo não abre outra tela', (tester) async {
+      await _abrir(tester, const NovoPedidoTela());
+      await _tocar(tester, find.text('Próximo'));
+      expect(find.byType(NovoPedidoTela), findsOneWidget);
+    });
   });
 
   group('orçamentos recebidos', () {
@@ -165,12 +176,13 @@ void main() {
       expect(find.byType(DetalheOrcamentoTela), findsOneWidget);
     });
 
-    testWidgets('orçamento sem detalhe abre "em breve"', (tester) async {
+    testWidgets('orçamento sem detalhe não abre tela nenhuma', (tester) async {
       await _abrir(tester, OrcamentosRecebidosTela());
 
       await _tocar(tester, find.text('Ver orçamento').first);
 
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.byType(DetalheOrcamentoTela), findsNothing);
+      expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
     });
 
     testWidgets('aoVerOrcamento recebe o orçamento tocado', (tester) async {
@@ -187,7 +199,14 @@ void main() {
     final carlos = orcamentosExemplo.firstWhere((o) => o.id == 'carlos');
 
     testWidgets('mostra itens, total e regras do protótipo', (tester) async {
-      await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos));
+      await _abrir(
+        tester,
+        DetalheOrcamentoTela(
+          orcamento: carlos,
+          aoFazerContraproposta: (_) {},
+          aoConversar: (_) {},
+        ),
+      );
 
       expect(find.text('Válido até 31/10'), findsOneWidget);
       expect(find.text('Carlos Mendes'), findsOneWidget);
@@ -242,16 +261,16 @@ void main() {
       expect(conversar, 1);
     });
 
-    testWidgets('sem callbacks, aceitar e contraproposta abrem "em breve"', (tester) async {
+    testWidgets('sem callbacks, conversar e contraproposta não aparecem', (tester) async {
       await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos));
-      await _tocar(tester, find.text('Fazer contraproposta'));
-      expect(find.byType(EmBreveTela), findsOneWidget);
+      expect(find.text('Fazer contraproposta'), findsNothing);
+      expect(find.text('Conversar'), findsNothing);
     });
   });
 
   // Qualquer estouro de layout faz o teste falhar.
   final telas = <String, Widget Function()>{
-    'novo pedido': () => const NovoPedidoTela(),
+    'novo pedido': _novoPedidoCompleto,
     'orçamentos': () => OrcamentosRecebidosTela(),
     'detalhe': () => DetalheOrcamentoTela(orcamento: orcamentosExemplo[1]),
   };
