@@ -107,12 +107,200 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
 
 class RepositorioChatFake implements RepositorioChat {
   final List<String> enviadas = [];
+  final Map<String, ConversaPedido> _conversas = {};
+
+  static String _horaAtual() {
+    final agora = DateTime.now();
+    return '${agora.hour}h${agora.minute.toString().padLeft(2, '0')}';
+  }
+
+  static String _normalizarId(String pedidoId) => switch (pedidoId) {
+        'pedido-1' ||
+        'srv-tomadas' ||
+        'srv-orcamentos' ||
+        'ped-tomadas' ||
+        'demo' ||
+        'demo-4821' =>
+          'pedido-1',
+        'pedido-2' || 'srv-pintura' => 'pedido-2',
+        'srv-vazamento' => 'srv-vazamento',
+        'srv-limpeza' => 'srv-limpeza',
+        'srv-pagamento' || 'ped-luminarias' => 'srv-pagamento',
+        'ped-disjuntor' => 'ped-disjuntor',
+        _ => pedidoId,
+      };
+
+  static ConversaPedido _conversaInicial(String chave) => switch (chave) {
+        'pedido-2' => const ConversaPedido(
+            nome: 'Rafael Souza',
+            iniciais: 'RS',
+            numeroPedido: '#5E10',
+            situacao: 'finalizado',
+            respostasRapidas: ['Ficou ótimo!', 'Obrigado pelo atendimento', 'Vou avaliar agora'],
+            mensagens: [
+              MensagemChat(
+                tipo: TipoMensagem.sistema,
+                texto: 'Serviço concluído e confirmado em 02/10.',
+                hora: '16h30',
+              ),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'Finalizei a pintura das duas demãos na sala.',
+                hora: '16h20',
+              ),
+              MensagemChat(tipo: TipoMensagem.foto, texto: '[Depois]', hora: '16h21'),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'Obrigado! Qualquer coisa me chame.',
+                hora: '16h35',
+              ),
+            ],
+          ),
+        'srv-vazamento' => const ConversaPedido(
+            nome: 'Joana Ribeiro',
+            iniciais: 'JR',
+            numeroPedido: '#B2F7',
+            situacao: 'em análise',
+            respostasRapidas: [
+              'Podemos agendar retorno?',
+              'Vou enviar foto do sifão',
+              'Qual horário você pode?',
+            ],
+            mensagens: [
+              MensagemChat(
+                tipo: TipoMensagem.sistema,
+                texto: 'Relato aberto · valor retido até a solução.',
+                hora: '11h00',
+              ),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'Olá! Vi seu relato sobre o pingamento no sifão. Posso passar amanhã às 10h para revisar a vedação.',
+                hora: '11h15',
+              ),
+              MensagemChat(tipo: TipoMensagem.foto, texto: '[Foto]', hora: '11h16'),
+            ],
+          ),
+        'srv-limpeza' => const ConversaPedido(
+            nome: 'Lia Carvalho',
+            iniciais: 'LC',
+            numeroPedido: '#3C19',
+            situacao: 'finalizado',
+            respostasRapidas: ['Tudo certo!', 'Obrigada'],
+            mensagens: [
+              MensagemChat(
+                tipo: TipoMensagem.sistema,
+                texto: 'Serviço concluído em 18/09.',
+                hora: '17h00',
+              ),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'Limpeza pós-obra concluída em todos os cômodos.',
+                hora: '16h50',
+              ),
+            ],
+          ),
+        'srv-pagamento' => const ConversaPedido(
+            nome: 'André Lopes',
+            iniciais: 'AL',
+            numeroPedido: '#C90D',
+            situacao: 'aguardando pagamento',
+            respostasRapidas: [
+              'Já vou confirmar o pagamento',
+              'Você traz a escada?',
+              'Pode ser na quinta às 9h?',
+            ],
+            mensagens: [
+              MensagemChat(
+                tipo: TipoMensagem.sistema,
+                texto: 'Orçamento aceito. Confirme o pagamento para agendar.',
+                hora: '09h40',
+              ),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'Bom dia! Assim que confirmar o pagamento já reservo sua manhã.',
+                hora: '09h45',
+              ),
+            ],
+          ),
+        'ped-disjuntor' => const ConversaPedido(
+            nome: 'Cliente Renata',
+            iniciais: 'CR',
+            numeroPedido: '#8D14',
+            situacao: 'recebendo orçamentos',
+            respostasRapidas: [
+              'Qual a amperagem do disjuntor?',
+              'Consigo atender hoje à tarde',
+              'Pode enviar foto do quadro?',
+            ],
+            mensagens: [
+              MensagemChat(
+                tipo: TipoMensagem.sistema,
+                texto: 'Tire dúvidas com o cliente antes de enviar seu orçamento.',
+                hora: '13h00',
+              ),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'Olá! O disjuntor geral desarma sempre que ligo o chuveiro e o forno juntos.',
+                hora: '13h05',
+              ),
+            ],
+          ),
+        _ => ped.DadosExemplo.conversa,
+      };
+
+  ConversaPedido _obter(String pedidoId) {
+    final chave = _normalizarId(pedidoId);
+    return _conversas.putIfAbsent(chave, () => _conversaInicial(chave));
+  }
 
   @override
-  Future<ConversaPedido> conversa(String pedidoId) async => ped.DadosExemplo.conversa;
+  Future<ConversaPedido> conversa(String pedidoId) async => _obter(pedidoId);
 
   @override
-  Future<void> enviar(String pedidoId, String texto) async => enviadas.add(texto);
+  Future<void> enviar(String pedidoId, String texto) async {
+    enviadas.add(texto);
+    final chave = _normalizarId(pedidoId);
+    final atual = _obter(chave);
+    _conversas[chave] = ConversaPedido(
+      nome: atual.nome,
+      iniciais: atual.iniciais,
+      numeroPedido: atual.numeroPedido,
+      situacao: atual.situacao,
+      respostasRapidas: atual.respostasRapidas,
+      mensagens: [
+        ...atual.mensagens,
+        MensagemChat(
+          tipo: TipoMensagem.texto,
+          texto: texto,
+          hora: _horaAtual(),
+          minha: true,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> enviarFoto(String pedidoId, String referencia) async {
+    enviadas.add(referencia);
+    final chave = _normalizarId(pedidoId);
+    final atual = _obter(chave);
+    _conversas[chave] = ConversaPedido(
+      nome: atual.nome,
+      iniciais: atual.iniciais,
+      numeroPedido: atual.numeroPedido,
+      situacao: atual.situacao,
+      respostasRapidas: atual.respostasRapidas,
+      mensagens: [
+        ...atual.mensagens,
+        MensagemChat(
+          tipo: TipoMensagem.foto,
+          texto: referencia,
+          hora: _horaAtual(),
+          minha: true,
+        ),
+      ],
+    );
+  }
 }
 
 class RepositorioNotificacoesFake implements RepositorioNotificacoes {

@@ -88,6 +88,7 @@ abstract interface class RepositorioPagamento {
 abstract interface class RepositorioChat {
   Future<ConversaPedido> conversa(String pedidoId);
   Future<void> enviar(String pedidoId, String texto);
+  Future<void> enviarFoto(String pedidoId, String referencia);
 }
 
 class Notificacao {

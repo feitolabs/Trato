@@ -59,7 +59,7 @@ Future<void> main() async {
   );
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
-  RotasTrato.dispositivo = dispositivoReal();
+  RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
   RotasTrato.repos = RepositoriosTrato.deConfig(
     ConfigTrato.doAmbiente(),
     sessaoTrato,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../componentes/imagem_trato.dart';
 import '../../tema/tema.dart';
 
 /// "R$ 1.234,56" a partir de centavos inteiros. Só formata: o cálculo é do backend.
@@ -71,33 +72,75 @@ class EstruturaConclusao extends StatelessWidget {
   }
 }
 
-/// Espaço de foto do protótipo (azul claro com legenda). Troca por imagem real depois.
+/// Espaço de foto do protótipo (azul claro com legenda ou imagem real com preview ao tocar).
 class EspacoFoto extends StatelessWidget {
-  const EspacoFoto({super.key, required this.legenda, this.altura = 140, this.largura});
+  const EspacoFoto({
+    super.key,
+    required this.legenda,
+    this.altura = 140,
+    this.largura,
+    this.referencia,
+  });
 
   final String legenda;
   final double altura;
   final double? largura;
+  final String? referencia;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: altura,
-      width: largura,
-      padding: const EdgeInsets.all(EspacosTrato.x2),
-      alignment: Alignment.bottomLeft,
-      decoration: BoxDecoration(
-        color: CoresTrato.azulClaro,
-        borderRadius: BorderRadius.circular(EspacosTrato.raio),
-      ),
-      child: Text(
-        legenda,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TipografiaTrato.corpoPequeno.copyWith(
-          color: CoresTrato.petroleo,
-          fontWeight: FontWeight.w700,
+    final ref = referencia ?? legenda;
+    final imagemReal = construirImagemReal(ref);
+    final textoExibido = rotuloAmigavelFoto(legenda);
+    return ToquePreviewImagem(
+      referencia: ref,
+      legenda: textoExibido,
+      child: Container(
+        height: altura,
+        width: largura,
+        clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
+        padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
+        alignment: Alignment.bottomLeft,
+        decoration: BoxDecoration(
+          color: CoresTrato.azulClaro,
+          borderRadius: BorderRadius.circular(EspacosTrato.raio),
         ),
+        child: imagemReal != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  imagemReal,
+                  Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Container(
+                      width: double.infinity,
+                      color: Colors.black54,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: EspacosTrato.x2,
+                        vertical: EspacosTrato.x1,
+                      ),
+                      child: Text(
+                        textoExibido,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: CoresTrato.creme,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Text(
+                legenda,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TipografiaTrato.corpoPequeno.copyWith(
+                  color: CoresTrato.petroleo,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
       ),
     );
   }
