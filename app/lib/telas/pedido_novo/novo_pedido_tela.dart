@@ -30,7 +30,7 @@ class NovoPedidoTela extends StatefulWidget {
   final FormularioPedido formulario;
 
   /// Chamado com o que foi preenchido, depois de passar nas checagens da tela.
-  final ValueChanged<RascunhoPedido>? aoEnviar;
+  final dynamic Function(RascunhoPedido)? aoEnviar;
   final VoidCallback? aoTrocarCategoria;
   final VoidCallback? aoMudarEndereco;
   final VoidCallback? aoAdicionarFoto;
@@ -56,6 +56,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   bool _informarValorProprio = false;
   String? _erroValor;
   var _tentou = false;
+  var _enviando = false;
   final _fotosNovas = <String>[];
   CidadeOpcao? _cidade;
 
@@ -168,7 +169,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   String? get _erroDescricao =>
       _tentou && _descricao.text.trim().isEmpty ? 'Conte o que está acontecendo.' : null;
 
-  void _enviar() {
+  Future<void> _enviar() async {
+    if (_enviando) return;
     setState(() => _tentou = true);
     if (_exigeCidade && _cidade == null) return;
     if (_erroPrazo != null) return;
@@ -197,7 +199,12 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         cidadeId: _cidade?.id ?? (widget.formulario.cidades.isNotEmpty ? widget.formulario.cidades.first.id : 'de470309-afb7-49ac-9471-54e8387d4a88'),
         bairro: _cidade?.nome ?? (widget.formulario.cidades.isNotEmpty ? widget.formulario.cidades.first.nome : 'Belo Horizonte'),
       );
-      widget.aoEnviar?.call(rascunho);
+      setState(() => _enviando = true);
+      try {
+        await widget.aoEnviar?.call(rascunho);
+      } finally {
+        if (mounted) setState(() => _enviando = false);
+      }
     }
   }
 
@@ -213,7 +220,11 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     return EstruturaPedido(
       tituloBarra: 'Passo 2 de 3',
-      rodape: BotaoPrimario(texto: 'Próximo', aoTocar: _enviar),
+      rodape: BotaoPrimario(
+        texto: 'Próximo',
+        carregando: _enviando,
+        aoTocar: _enviando ? null : _enviar,
+      ),
       children: [
         const SizedBox(height: EspacosTrato.x2),
         Text('Conte o que precisa', style: TipografiaTrato.tituloGrande),

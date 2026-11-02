@@ -144,8 +144,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<String> criar(RascunhoPedido rascunho) async {
     final corpo = <String, dynamic>{
-      'categoria_id': rascunho.categoriaId ?? 'eletrica',
-      'cidade_id': rascunho.cidadeId ?? 'belo-horizonte',
+      'categoria_id': rascunho.categoriaId ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8',
+      'cidade_id': rascunho.cidadeId ?? 'de470309-afb7-49ac-9471-54e8387d4a88',
       if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
       if (rascunho.prazoDesejado != null)
         'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
@@ -169,33 +169,35 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final criado = PedidoApi.deJson(_mapa(await _api.post('/v1/pedidos', corpo: corpo)));
     final up = upload;
     if (up != null && rascunho.fotos.isNotEmpty) {
-      for (final ref in rascunho.fotos) {
-        try {
-          final bytes = obterBytesImagem(ref);
-          if (bytes != null && bytes.isNotEmpty) {
-            final cap = ArquivoCapturado(
-              bytes: bytes,
-              sha256: crypto.sha256.convert(bytes).toString(),
-              capturadaEm: DateTime.now().toUtc(),
-            );
-            await up.enviar(cap, FinalidadeArquivo.fotoPedido, pedidoId: criado.id);
-          } else if (temArquivoImagem(ref)) {
-            final caminho = obterCaminhoImagem(ref) ?? ref;
-            final f = File(caminho);
-            if (f.existsSync()) {
-              final b = await f.readAsBytes();
+      await Future.wait(
+        rascunho.fotos.map((ref) async {
+          try {
+            final bytes = obterBytesImagem(ref);
+            if (bytes != null && bytes.isNotEmpty) {
               final cap = ArquivoCapturado(
-                bytes: b,
-                sha256: crypto.sha256.convert(b).toString(),
+                bytes: bytes,
+                sha256: crypto.sha256.convert(bytes).toString(),
                 capturadaEm: DateTime.now().toUtc(),
               );
               await up.enviar(cap, FinalidadeArquivo.fotoPedido, pedidoId: criado.id);
+            } else if (temArquivoImagem(ref)) {
+              final caminho = obterCaminhoImagem(ref) ?? ref;
+              final f = File(caminho);
+              if (f.existsSync()) {
+                final b = await f.readAsBytes();
+                final cap = ArquivoCapturado(
+                  bytes: b,
+                  sha256: crypto.sha256.convert(b).toString(),
+                  capturadaEm: DateTime.now().toUtc(),
+                );
+                await up.enviar(cap, FinalidadeArquivo.fotoPedido, pedidoId: criado.id);
+              }
             }
+          } catch (_) {
+            // Erro no upload de foto secundária não impede a criação do pedido
           }
-        } catch (_) {
-          // Erro no upload de foto secundária não impede a criação do pedido
-        }
-      }
+        }),
+      );
     }
     return criado.id;
   }

@@ -96,7 +96,6 @@ class ServicoUploadApi implements ServicoUpload {
     FinalidadeArquivo finalidade, {
     String? pedidoId,
   }) async {
-    if (finalidade == FinalidadeArquivo.portfolio) throw ErroTrato.indisponivel;
     // Sempre sem EXIF/GPS antes de sair do aparelho (M8), mesmo que a foto venha de outro caminho.
     final ArquivoCapturado arquivo;
     try {

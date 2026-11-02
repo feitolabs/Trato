@@ -21,7 +21,7 @@ class RelatarProblemaTela extends StatefulWidget {
   final DadosRelatoProblema dados;
   final String? motivoInicial;
   final String? descricaoInicial;
-  final ValueChanged<EnvioRelato>? aoEnviar;
+  final dynamic Function(EnvioRelato)? aoEnviar;
   final VoidCallback? aoAdicionarMidia;
   final Future<String?> Function()? aoCapturarFoto;
 
@@ -34,6 +34,7 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
   late String _solucao = widget.dados.solucoes.first;
   late final _descricao = TextEditingController(text: widget.descricaoInicial);
   final _fotos = <String>[];
+  var _enviando = false;
 
   @override
   void dispose() {
@@ -43,10 +44,16 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
 
   bool get _pode => _motivo != null && _descricao.text.trim().isNotEmpty;
 
-  void _enviar() {
-    widget.aoEnviar?.call(
-      EnvioRelato(motivo: _motivo!, descricao: _descricao.text.trim(), solucao: _solucao),
-    );
+  Future<void> _enviar() async {
+    if (_enviando) return;
+    setState(() => _enviando = true);
+    try {
+      await widget.aoEnviar?.call(
+        EnvioRelato(motivo: _motivo!, descricao: _descricao.text.trim(), solucao: _solucao),
+      );
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
   }
 
   Future<void> _adicionarMidia() async {
@@ -66,7 +73,8 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
       tituloBarra: dados.titulo,
       rodape: BotaoPrimario(
         texto: 'Enviar relato',
-        aoTocar: _pode ? _enviar : null,
+        carregando: _enviando,
+        aoTocar: (_pode && !_enviando) ? _enviar : null,
       ),
       children: [
         Text('Relatar problema', style: TipografiaTrato.tituloGrande),

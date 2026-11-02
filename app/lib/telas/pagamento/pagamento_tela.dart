@@ -17,7 +17,7 @@ class PagamentoTela extends StatefulWidget {
   });
 
   final DadosPagamento dados;
-  final ValueChanged<MetodoPagamento>? aoPagar;
+  final dynamic Function(MetodoPagamento)? aoPagar;
 
   /// Padrão: `Navigator.maybePop`.
   final VoidCallback? aoVoltar;
@@ -28,6 +28,17 @@ class PagamentoTela extends StatefulWidget {
 
 class _PagamentoTelaState extends State<PagamentoTela> {
   late MetodoPagamento _metodo = widget.dados.opcoes.first.metodo;
+  var _pagando = false;
+
+  Future<void> _pagar() async {
+    if (_pagando) return;
+    setState(() => _pagando = true);
+    try {
+      await widget.aoPagar?.call(_metodo);
+    } finally {
+      if (mounted) setState(() => _pagando = false);
+    }
+  }
 
   static const _passos = [
     'Você paga e o app mostra "Aguardando confirmação do pagamento" até o parceiro confirmar.',
@@ -160,7 +171,8 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                   padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
                   child: BotaoPrimario(
                     texto: 'Pagar $valor $comoPagar',
-                    aoTocar: () => widget.aoPagar?.call(_metodo),
+                    carregando: _pagando,
+                    aoTocar: _pagando ? null : _pagar,
                   ),
                 ),
               ),

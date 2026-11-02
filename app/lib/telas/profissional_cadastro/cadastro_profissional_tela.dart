@@ -127,6 +127,7 @@ class _FormularioState extends State<_Formulario> {
   }
 
   Future<void> _salvar() async {
+    if (_enviando) return;
     setState(() {
       _tentou = true;
       _erroEnvio = null;

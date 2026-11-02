@@ -479,7 +479,7 @@ void main() {
       expect(chamadas.single.caminho, '/v1/pedidos');
       final corpo = chamadas.single.corpo!;
       expect(corpo['categoria_id'], 'hidraulica');
-      expect(corpo['cidade_id'], 'belo-horizonte');
+      expect(corpo['cidade_id'], 'de470309-afb7-49ac-9471-54e8387d4a88');
       expect(corpo['titulo'], 'Torneira, Válvula');
       expect(corpo['descricao'], 'Troca de torneira com vazamento');
       expect(corpo['faixa_preco_min_centavos'], 10000);

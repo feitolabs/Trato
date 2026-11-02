@@ -85,6 +85,7 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
   }
 
   Future<void> _enviar() async {
+    if (_enviando) return;
     setState(() {
       _tentou = true;
       _erro = null;

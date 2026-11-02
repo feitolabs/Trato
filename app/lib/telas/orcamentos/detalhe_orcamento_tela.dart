@@ -23,7 +23,7 @@ class DetalheOrcamentoTela extends StatefulWidget {
   });
 
   final Orcamento orcamento;
-  final ValueChanged<Orcamento>? aoAceitar;
+  final dynamic Function(Orcamento)? aoAceitar;
   final ValueChanged<Orcamento>? aoFazerContraproposta;
   final ValueChanged<Orcamento>? aoConversar;
 
@@ -37,10 +37,18 @@ class DetalheOrcamentoTela extends StatefulWidget {
 class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   var _leu = false;
   var _tentou = false;
+  var _aceitando = false;
 
-  void _aceitar() {
+  Future<void> _aceitar() async {
+    if (_aceitando) return;
     setState(() => _tentou = true);
-    if (_leu) widget.aoAceitar?.call(widget.orcamento);
+    if (!_leu) return;
+    setState(() => _aceitando = true);
+    try {
+      await widget.aoAceitar?.call(widget.orcamento);
+    } finally {
+      if (mounted) setState(() => _aceitando = false);
+    }
   }
 
   @override
@@ -68,7 +76,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
         children: [
           BotaoPrimario(
             texto: 'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
-            aoTocar: _aceitar,
+            carregando: _aceitando,
+            aoTocar: _aceitando ? null : _aceitar,
           ),
           if (widget.aoFazerContraproposta != null)
             BotaoLink(

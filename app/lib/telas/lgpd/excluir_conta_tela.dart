@@ -35,6 +35,7 @@ class _ExcluirContaTelaState extends State<ExcluirContaTela> {
   bool get _confirmado => _confirmacao.text.trim().toUpperCase() == ExcluirContaTela.palavraConfirmacao;
 
   Future<void> _excluir() async {
+    if (_enviando) return;
     setState(() {
       _enviando = true;
       _erro = null;

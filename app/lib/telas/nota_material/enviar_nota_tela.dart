@@ -67,6 +67,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   }
 
   Future<void> _enviar() async {
+    if (_enviando) return;
     setState(() {
       _enviando = true;
       _erroEnvio = null;

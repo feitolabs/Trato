@@ -843,29 +843,40 @@ abstract final class RotasTrato {
 
   // --- Cliente: pedido ---------------------------------------------------------------
 
-  static Widget _novoPedido(CategoriaServico categoria) => Carregador<FormularioPedido>(
-        carregar: () => repos.catalogo.formulario(categoria.id),
-        construir: (context, formulario) => NovoPedidoTela(
-          formulario: formulario,
-          aoCapturarFoto: _fotografar,
-          aoTrocarCategoria: () => Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(builder: (_) => _escolherCategoria()),
-          ),
-          aoEnviar: (rascunho) async {
+  static Widget _novoPedido(CategoriaServico categoria) {
+    var enviandoPedido = false;
+    return Carregador<FormularioPedido>(
+      carregar: () => repos.catalogo.formulario(categoria.id),
+      construir: (context, formulario) => NovoPedidoTela(
+        formulario: formulario,
+        aoCapturarFoto: _fotografar,
+        aoTrocarCategoria: () => Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => _escolherCategoria()),
+        ),
+        aoEnviar: (rascunho) async {
+          if (enviandoPedido) return;
+          enviandoPedido = true;
+          try {
             final navegador = Navigator.of(context);
             final mensagens = ScaffoldMessenger.of(context);
             String? id;
             final ok = await _tentar(context, () async => id = await repos.pedidos.criar(rascunho));
-            if (!ok || id == null) return;
-            navegador.pop();
+            if (!ok || id == null || !context.mounted) return;
+            if (navegador.canPop()) {
+              navegador.pop();
+            }
             mensagens
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 const SnackBar(content: Text('Pedido enviado. Os orçamentos chegam aqui.')),
               );
-          },
-        ),
-      );
+          } finally {
+            enviandoPedido = false;
+          }
+        },
+      ),
+    );
+  }
 
   static void abrirPedido(BuildContext context, PedidoResumo pedido) {
     final id = pedido.id ?? _idDemo;
@@ -935,33 +946,42 @@ abstract final class RotasTrato {
         ),
       );
 
-  static Widget _pagamento(String pedidoId) => Carregador<DadosPagamento>(
+  static Widget _pagamento(String pedidoId) {
+    var iniciandoPagamento = false;
+    return Carregador<DadosPagamento>(
         carregar: () => repos.pagamento.dados(pedidoId),
         construir: (context, dados) => PagamentoTela(
           dados: dados,
           aoPagar: (metodo) async {
-            Cobranca? cobranca;
-            final ok = await _tentar(
-              context,
-              () async => cobranca = await repos.pagamento.criarCobranca(pedidoId, metodo),
-            );
-            if (!ok || !context.mounted) return;
-            // O app fica esperando; quem diz "pago" é o backend.
-            _abrir<void>(
-              context,
-              AguardandoPagamentoTela(
-                cobranca: cobranca,
-                consultar: () => repos.pagamento.status(pedidoId),
-                // Pago (confirmado pelo backend): mostra o pedido em andamento.
-                aoConfirmar: () => Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(builder: (_) => _pedidoEmExecucao(pedidoId)),
-                  (rota) => rota.isFirst,
+            if (iniciandoPagamento) return;
+            iniciandoPagamento = true;
+            try {
+              Cobranca? cobranca;
+              final ok = await _tentar(
+                context,
+                () async => cobranca = await repos.pagamento.criarCobranca(pedidoId, metodo),
+              );
+              if (!ok || !context.mounted) return;
+              // O app fica esperando; quem diz "pago" é o backend.
+              _abrir<void>(
+                context,
+                AguardandoPagamentoTela(
+                  cobranca: cobranca,
+                  consultar: () => repos.pagamento.status(pedidoId),
+                  // Pago (confirmado pelo backend): mostra o pedido em andamento.
+                  aoConfirmar: () => Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute<void>(builder: (_) => _pedidoEmExecucao(pedidoId)),
+                    (rota) => rota.isFirst,
+                  ),
                 ),
-              ),
-            );
+              );
+            } finally {
+              iniciandoPagamento = false;
+            }
           },
         ),
       );
+  }
 
   static void abrirGarantia(BuildContext context, {String pedidoId = _idDemo}) => _abrir<void>(
         context,

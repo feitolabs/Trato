@@ -22,7 +22,7 @@ class AvaliacaoTela extends StatefulWidget {
 
   /// Notas já marcadas ao abrir (o protótipo mostra 5, 5, 4, 5, 0). Sem isso, tudo zerado.
   final List<int>? notasIniciais;
-  final ValueChanged<EnvioAvaliacao>? aoEnviar;
+  final dynamic Function(EnvioAvaliacao)? aoEnviar;
   final VoidCallback? aoAvaliarDepois;
 
   @override
@@ -35,6 +35,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
   );
   final _comentario = TextEditingController();
   final _outraGorjeta = TextEditingController();
+  var _enviando = false;
 
   /// null = "Não"; -1 = "Outro"; senão o valor sugerido em centavos.
   int? _gorjeta;
@@ -57,14 +58,20 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
     return _gorjeta!;
   }
 
-  void _enviar() {
-    widget.aoEnviar?.call(
-      EnvioAvaliacao(
-        notas: List.unmodifiable(_notas),
-        comentario: _comentario.text.trim(),
-        gorjetaCentavos: _gorjetaCentavos,
-      ),
-    );
+  Future<void> _enviar() async {
+    if (_enviando) return;
+    setState(() => _enviando = true);
+    try {
+      await widget.aoEnviar?.call(
+        EnvioAvaliacao(
+          notas: List.unmodifiable(_notas),
+          comentario: _comentario.text.trim(),
+          gorjetaCentavos: _gorjetaCentavos,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
   }
 
   @override
@@ -74,7 +81,11 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          BotaoPrimario(texto: 'Enviar avaliação', aoTocar: _enviar),
+          BotaoPrimario(
+            texto: 'Enviar avaliação',
+            carregando: _enviando,
+            aoTocar: _enviando ? null : _enviar,
+          ),
           const SizedBox(height: EspacosTrato.x1),
           BotaoLink(texto: 'Avaliar depois', aoTocar: widget.aoAvaliarDepois ?? () {}),
         ],

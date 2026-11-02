@@ -94,6 +94,7 @@ class _CorpoState extends State<_Corpo> {
   }
 
   Future<void> _enviar() async {
+    if (_enviando) return;
     setState(() {
       _tentou = true;
       _erro = null;
