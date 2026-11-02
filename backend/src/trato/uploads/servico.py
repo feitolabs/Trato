@@ -188,18 +188,19 @@ class ServicoUploads:
         nome_seguro = validar_metadados(
             self.seguranca, regra.categoria, content_type, tamanho_bytes, nome
         )
+        sol_id = uuid.uuid4().hex
         if regra.registro == "midia":
             # O caminho começa pelo pedido (convenção do Storage); o dono fica na solicitação.
-            caminho = f"{pedido_id}/{nome_seguro}"
+            caminho = f"{pedido_id}/{sol_id[:8]}_{nome_seguro}"
         elif regra.registro == "avatar":
-            caminho = f"{dono_id}/{nome_seguro}"
+            caminho = f"{dono_id}/{sol_id[:8]}_{nome_seguro}"
         elif regra.registro == "portfolio":
-            caminho = f"{dono_id}/portfolio/{nome_seguro}"
+            caminho = f"{dono_id}/portfolio/{sol_id[:8]}_{nome_seguro}"
         else:
-            caminho = f"{dono_id}/pendente/{nome_seguro}"
+            caminho = f"{dono_id}/pendente/{sol_id[:8]}_{nome_seguro}"
         tipo = content_type.split(";")[0].strip().lower()
         sol = Solicitacao(
-            uuid.uuid4().hex, dono_id, destino, regra.bucket, caminho, tipo, tamanho_bytes,
+            sol_id, dono_id, destino, regra.bucket, caminho, tipo, tamanho_bytes,
             self.agora(), pedido_id, tipo_documento,
         )  # fmt: skip
         self.repo.salvar_solicitacao(sol)

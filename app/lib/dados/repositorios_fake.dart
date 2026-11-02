@@ -364,6 +364,9 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
 class RepositorioPerfilFake implements RepositorioPerfil {
   @override
   Future<PerfilCliente> carregar() async => per.DadosExemplo.perfil;
+
+  @override
+  String? get nomeSalvo => per.DadosExemplo.perfil.nome;
 }
 
 class RepositorioProfissionalFake implements RepositorioProfissional {

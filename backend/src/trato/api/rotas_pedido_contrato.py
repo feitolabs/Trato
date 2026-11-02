@@ -597,9 +597,10 @@ def _foto_da_nota(request: Request, corpo: NotaMaterialIn, pedido: Pedido, usuar
         ):
             raise HTTPException(422, "A foto da nota não foi enviada ou não é deste pedido.")
         return midia.storage_path
-    if not _caminho_da_foto_valido(corpo.foto_storage_path or ""):
+    caminho = (corpo.foto_storage_path or "").lstrip("/")
+    if not _caminho_da_foto_valido(caminho):
         raise HTTPException(422, "O caminho da foto não é válido.")
-    return corpo.foto_storage_path or ""
+    return caminho
 
 
 def _nota_out(nota: NotaMaterial) -> NotaMaterialOut:

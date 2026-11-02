@@ -124,12 +124,24 @@ class ClienteApi {
     );
   }
 
-  /// `detail` do FastAPI: texto (regras de negócio) ou lista (validação). Só texto vai à tela.
+  /// `detail` do FastAPI: texto (regras de negócio) ou lista (validação).
   String? _detalhe(http.Response resposta) {
     try {
       final json = jsonDecode(utf8.decode(resposta.bodyBytes));
-      if (json is Map && json['detail'] is String) {
-        return json['detail'] as String;
+      if (json is Map) {
+        final d = json['detail'];
+        if (d is String && d.trim().isNotEmpty) return d;
+        if (d is List && d.isNotEmpty) {
+          final msgs = <String>[];
+          for (final item in d) {
+            if (item is Map && item['msg'] is String) {
+              msgs.add(item['msg'] as String);
+            } else if (item is String) {
+              msgs.add(item);
+            }
+          }
+          if (msgs.isNotEmpty) return msgs.join('. ');
+        }
       }
     } on FormatException {
       // corpo que não é JSON: usa a mensagem padrão

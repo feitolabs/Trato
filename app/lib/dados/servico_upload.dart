@@ -122,7 +122,10 @@ class ServicoUploadApi implements ServicoUpload {
       final r = await _cliente
           .put(
             Uri.parse(mapa['url_envio'] as String),
-            headers: {'Content-Type': arquivo.mime},
+            headers: {
+              'Content-Type': arquivo.mime,
+              'x-upsert': 'true',
+            },
             body: arquivo.bytes,
           )
           .timeout(const Duration(seconds: 60));

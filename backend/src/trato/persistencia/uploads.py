@@ -40,6 +40,14 @@ class UploadsPostgres:
 
         try:
             with self._banco.transacao() as con:
+                # Remove tentativa pendente anterior no mesmo caminho para evitar colisão na unique constraint
+                con.execute(
+                    """
+                    delete from public.upload_solicitacoes
+                    where bucket = %s and caminho = %s and id <> %s and status = 'pendente'
+                    """,
+                    (s.bucket, s.caminho, sol_id),
+                )
                 con.execute(
                     """
                     insert into public.upload_solicitacoes (
@@ -65,7 +73,8 @@ class UploadsPostgres:
                         s.criada_em,
                     ),
                 )
-        except Exception:
+        except Exception as err:
+            logger.warning("Falha ao salvar solicitacao de upload no banco: %s", err)
             self._memoria.salvar_solicitacao(s)
 
     def solicitacao(self, solicitacao_id: str) -> Solicitacao | None:

@@ -114,15 +114,18 @@ class ServicoAuthFake implements ServicoAuth {
       final dono = _donoDoCpf[digitos];
       if (dono != null && dono.startsWith('fake-')) {
         chave = dono.substring(5);
+      } else if (dono != null) {
+        chave = dono;
       }
     }
     final certa = _contas[chave];
     final ok = certa != null ? certa == senha : aceitaQualquerLogin;
     if (!ok) throw const ErroAuth(TipoErroAuth.credenciaisInvalidas);
     if (_naoConfirmados.contains(chave)) throw const ErroAuth(TipoErroAuth.emailNaoConfirmado);
+    final emailEfetivo = chave.contains('@') ? chave : '$chave@trato.app';
     return _entrou(SessaoAuth(
       id: 'fake-$chave',
-      email: chave,
+      email: emailEfetivo,
       celularConfirmado: true,
       perfil: _perfis[chave],
     ));

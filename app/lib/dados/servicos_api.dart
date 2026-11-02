@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:crypto/crypto.dart' as crypto;
+
 import '../componentes/imagem_trato.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/aditivo/aditivo.dart';
@@ -78,11 +82,17 @@ class ServicoAditivoApi implements ServicoAditivo {
 
 /// Nota de materiais. O total sai do backend (quantidade × unitário); o app não soma.
 class ServicoNotaMaterialApi implements ServicoNotaMaterial {
-  ServicoNotaMaterialApi(this._api, {this.tituloPedido = 'Pedido', this.nomeProfissional = ''});
+  ServicoNotaMaterialApi(
+    this._api, {
+    this.tituloPedido = 'Pedido',
+    this.nomeProfissional = '',
+    this.upload,
+  });
 
   final ClienteApi _api;
   final String tituloPedido;
   final String nomeProfissional;
+  final ServicoUpload? upload;
 
   /// `GET /v1/contratos/{id}/notas-material`: a nota mais recente, ou `null`.
   @override
@@ -106,15 +116,51 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
   /// a quantidade vai como 1 e o valor como unitário.
   @override
   Future<void> enviar(EnvioNota envio) async {
+    String? midiaId;
+    final fotoPath = envio.fotoNota;
+    final up = upload;
+    if (up != null && fotoPath.isNotEmpty) {
+      try {
+        final bytes = obterBytesImagem(fotoPath);
+        if (bytes != null && bytes.isNotEmpty) {
+          final cap = ArquivoCapturado(
+            bytes: bytes,
+            sha256: crypto.sha256.convert(bytes).toString(),
+            capturadaEm: DateTime.now().toUtc(),
+          );
+          final res = await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
+          midiaId = res.arquivoId;
+        } else if (temArquivoImagem(fotoPath)) {
+          final caminho = obterCaminhoImagem(fotoPath) ?? fotoPath;
+          final f = File(caminho);
+          if (f.existsSync()) {
+            final b = await f.readAsBytes();
+            final cap = ArquivoCapturado(
+              bytes: b,
+              sha256: crypto.sha256.convert(b).toString(),
+              capturadaEm: DateTime.now().toUtc(),
+            );
+            final res = await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
+            midiaId = res.arquivoId;
+          }
+        }
+      } catch (_) {}
+    }
+
+    final corpo = <String, dynamic>{
+      if (midiaId != null)
+        'midia_id': midiaId
+      else
+        'foto_storage_path': fotoPath.replaceAll(RegExp(r'^/+'), ''),
+      'itens': [
+        for (final i in envio.itens)
+          {'descricao': i.descricao, 'quantidade': 1, 'valor_unitario_centavos': i.centavos},
+      ],
+    };
+
     await _api.post(
       '/v1/contratos/${envio.pedidoId}/notas-material',
-      corpo: {
-        'foto_storage_path': envio.fotoNota,
-        'itens': [
-          for (final i in envio.itens)
-            {'descricao': i.descricao, 'quantidade': 1, 'valor_unitario_centavos': i.centavos},
-        ],
-      },
+      corpo: corpo,
     );
   }
 }
@@ -351,7 +397,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     try {
       await _api.post('/v1/profissional/cadastro', corpo: corpo);
     } on ErroTrato catch (e) {
-      if (e.tipo == TipoErro.recusado) {
+      if (e.codigoHttp == 409 || e.mensagem.contains('já tem cadastro')) {
         await _api.patch('/v1/profissional/perfil', corpo: corpo);
       } else {
         rethrow;

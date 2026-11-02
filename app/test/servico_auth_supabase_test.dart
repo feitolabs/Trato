@@ -133,7 +133,7 @@ void main() {
 
       expect(
         m.apiPedidos.map((r) => r.url.path),
-        ['/v1/cadastro/cpf', '/v1/me/dados-pessoais'],
+        ['/v1/cadastro/cpf', '/v1/cadastro/vincular', '/v1/me/dados-pessoais'],
       );
       final salvar = m.apiPedidos.last;
       expect(salvar.headers['Authorization'], 'Bearer a.b.c');
@@ -219,9 +219,12 @@ void main() {
       expect(data.containsKey('nascimento'), isFalse);
       expect(data['nome'], 'Mariana Alves');
       expect(m.pedidos.where((r) => r.method == 'PUT'), isEmpty);
-      // Sem sessão: só a conferência do CPF; a gravação espera o primeiro login.
-      expect(m.apiPedidos.single.url.path, '/v1/cadastro/cpf');
-      expect(jsonDecode(m.apiPedidos.single.body), {'cpf': '12345678909'});
+      // Sem sessão: conferência do CPF e vinculo cadastral; gravação autenticada espera o primeiro login.
+      expect(
+        m.apiPedidos.map((r) => r.url.path),
+        ['/v1/cadastro/cpf', '/v1/cadastro/vincular'],
+      );
+      expect(jsonDecode(m.apiPedidos.first.body), {'cpf': '12345678909'});
       await m.cliente.dispose();
     });
 

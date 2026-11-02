@@ -123,6 +123,7 @@ abstract interface class RepositorioNotificacoes {
 
 abstract interface class RepositorioPerfil {
   Future<PerfilCliente> carregar();
+  String? get nomeSalvo;
 }
 
 /// Filtros de `GET /v1/profissional/pedidos-abertos`. O backend aplica; o app só pede.

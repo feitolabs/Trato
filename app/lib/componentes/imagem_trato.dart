@@ -21,6 +21,18 @@ void registrarImagemEmMemoria(String referencia, {Uint8List? bytes, String? cami
   }
 }
 
+/// Obtém os bytes da imagem em memória associada a [referencia], se disponível.
+Uint8List? obterBytesImagem(String? referencia) {
+  if (referencia == null || referencia.isEmpty) return null;
+  return _bytesPorReferencia[referencia];
+}
+
+/// Obtém o caminho local da imagem associada a [referencia], se disponível.
+String? obterCaminhoImagem(String? referencia) {
+  if (referencia == null || referencia.isEmpty) return null;
+  return _caminhoPorReferencia[referencia];
+}
+
 /// Verifica se [referencia] aponta para um arquivo de imagem existente no dispositivo ou em memória.
 bool temArquivoImagem(String? referencia) {
   if (referencia == null || referencia.isEmpty) return false;

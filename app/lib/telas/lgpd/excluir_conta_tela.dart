@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
@@ -42,6 +43,9 @@ class _ExcluirContaTelaState extends State<ExcluirContaTela> {
       await widget.servico.solicitarExclusao();
       if (!mounted) return;
       widget.aoContaExcluida?.call();
+    } on ErroTrato catch (e) {
+      if (!mounted) return;
+      setState(() => _erro = e.mensagem);
     } catch (_) {
       if (!mounted) return;
       setState(() => _erro = 'Não foi possível pedir a exclusão agora. Tente de novo.');

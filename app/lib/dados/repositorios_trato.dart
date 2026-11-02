@@ -79,7 +79,7 @@ class RepositoriosTrato {
     ServicoUpload? upload,
     ServicoCamera? camera,
   }) {
-    final pedidos = RepositorioPedidosApi(api);
+    final pedidos = RepositorioPedidosApi(api, upload: upload);
     final profissional = RepositorioProfissionalApi(
       api,
       captura: captura,
@@ -99,7 +99,7 @@ class RepositoriosTrato {
         perfil: RepositorioPerfilApi(api),
         profissional: profissional,
         aditivo: ServicoAditivoApi(api),
-        notaMaterial: ServicoNotaMaterialApi(api),
+        notaMaterial: ServicoNotaMaterialApi(api, upload: upload),
         verificacao: ServicoVerificacaoApi(api),
         disputaProfissional: ServicoDisputaProfissionalApi(api),
         cadastroProfissional: ServicoCadastroProfissionalApi(api),
