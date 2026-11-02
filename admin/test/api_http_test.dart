@@ -301,10 +301,21 @@ void main() {
       expect(s.chamada('GET', '/v1/admin/pedidos').url.queryParameters.containsKey('q'), isFalse);
     });
 
-    test('categorias e chamados ainda não existem no servidor', () async {
-      expect(api.listarCategorias(), throwsA(isA<ErroApi>()));
-      expect(api.listarChamados(), throwsA(isA<ErroApi>()));
-      expect(api.alterarCategoria('c', ativa: false, motivo: 'motivo qualquer'), throwsA(isA<ErroApi>()));
+    test('telas ligadas à API categorias e chamados', () async {
+      s.respostas['GET /v1/admin/categorias'] = (
+        200,
+        [
+          {'id': 'cat-1', 'nome': 'Pintura', 'ativa': true, 'profissionais': 3}
+        ],
+      );
+      s.respostas['PATCH /v1/admin/categorias/cat-1'] = (200, {'id': 'cat-1', 'ativa': false});
+      s.respostas['GET /v1/admin/chamados'] = (200, <Map<String, dynamic>>[]);
+
+      final cats = await api.listarCategorias();
+      expect(cats.single.nome, 'Pintura');
+      await api.alterarCategoria('cat-1', ativa: false, motivo: 'motivo qualquer');
+      final chamados = await api.listarChamados();
+      expect(chamados, isEmpty);
     });
 
     test('configuração: carrega, propõe (criar + enviar), aprova (aprovar + publicar)', () async {

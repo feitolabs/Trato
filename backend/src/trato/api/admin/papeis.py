@@ -39,14 +39,16 @@ class Permissao(StrEnum):
     CONFIG_APROVAR = "config_aprovar"
     AUDITORIA_VER = "auditoria_ver"
     AUDITORIA_VERIFICAR_CADEIA = "auditoria_verificar_cadeia"
+    CATEGORIAS_EDITAR = "categorias_editar"
+    SUPORTE_VER = "suporte_ver"
 
 
 P = PapelEquipe
 X = Permissao
 
 MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
-    P.ATENDENTE_N1: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR}),
-    P.ATENDENTE_N2: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR, X.DISPUTAS_VER}),
+    P.ATENDENTE_N1: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR, X.SUPORTE_VER}),
+    P.ATENDENTE_N2: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR, X.DISPUTAS_VER, X.SUPORTE_VER}),
     P.LIDER_SUPORTE: frozenset(
         {
             X.USUARIOS_BUSCAR,
@@ -54,6 +56,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.DISPUTAS_VER,
             X.DISPUTAS_DECIDIR,
             X.DISPUTAS_SEGUNDA_PESSOA,
+            X.SUPORTE_VER,
         }
     ),
     P.MEDIADOR: frozenset({X.PEDIDOS_BUSCAR, X.DISPUTAS_VER, X.DISPUTAS_DECIDIR}),
@@ -66,7 +69,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.DADOS_PESSOAIS_REVELAR,
         }
     ),
-    P.MODERADOR: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR}),
+    P.MODERADOR: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR, X.CATEGORIAS_EDITAR}),
     P.FINANCEIRO: frozenset({X.PAGAMENTOS_VER, X.PEDIDOS_BUSCAR, X.CONFIG_VER, X.CONFIG_PROPOR}),
     P.SEGURANCA: frozenset(
         {

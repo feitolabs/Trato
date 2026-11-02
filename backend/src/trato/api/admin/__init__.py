@@ -11,6 +11,7 @@ from fastapi import APIRouter, FastAPI
 
 from trato.api.admin import (
     rotas_auditoria,
+    rotas_catalogo,
     rotas_config,
     rotas_disputas,
     rotas_pagamentos,
@@ -29,6 +30,7 @@ def criar_router_admin() -> APIRouter:
         rotas_usuarios,
         rotas_config,
         rotas_auditoria,
+        rotas_catalogo,
     ):
         roteador.include_router(modulo.router)
     return roteador

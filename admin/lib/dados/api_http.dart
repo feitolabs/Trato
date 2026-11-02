@@ -422,14 +422,44 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
-  Future<List<Chamado>> listarChamados() => Future.error(const ErroApi(_semRota));
+  Future<List<Chamado>> listarChamados() async {
+    final corpo = await _chamar('GET', '/v1/admin/chamados');
+    final itens = _itens(corpo);
+    return [
+      for (final c in itens)
+        Chamado(
+          id: c['id'] as String,
+          assunto: c['assunto'] as String,
+          solicitante: c['solicitante'] as String,
+          status: c['status'] as String,
+          aberto: _data(c['aberto_em'] ?? c['aberto']),
+        ),
+    ];
+  }
 
   @override
-  Future<List<CategoriaAdmin>> listarCategorias() => Future.error(const ErroApi(_semRota));
+  Future<List<CategoriaAdmin>> listarCategorias() async {
+    final corpo = await _chamar('GET', '/v1/admin/categorias');
+    final itens = _itens(corpo);
+    return [
+      for (final c in itens)
+        CategoriaAdmin(
+          id: c['id'] as String,
+          nome: c['nome'] as String,
+          ativa: c['ativa'] as bool? ?? true,
+          profissionais: _int(c['profissionais']),
+        ),
+    ];
+  }
 
   @override
-  Future<void> alterarCategoria(String id, {required bool ativa, required String motivo}) =>
-      Future.error(const ErroApi(_semRota));
+  Future<void> alterarCategoria(String id, {required bool ativa, required String motivo}) async {
+    await _chamar(
+      'PATCH',
+      '/v1/admin/categorias/$id',
+      corpo: {'ativa': ativa, 'motivo': motivo},
+    );
+  }
 
   // ---------- F7.5 configurações ----------
 
