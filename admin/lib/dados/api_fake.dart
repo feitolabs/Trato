@@ -54,13 +54,27 @@ class ApiFake implements ApiAdmin {
     if (!nome.contains('@') || senha.length < 8) {
       throw const ErroApi('E-mail ou senha incorretos.');
     }
-    final papel = Papel.doCodigo(nome.split('@').first);
+    final Papel? papel;
+    final String rotuloUsuario;
+    if (nome == 'cardosojoaovitor47@gmail.com') {
+      papel = Papel.administrador;
+      rotuloUsuario = 'João Vitor Cardoso';
+    } else if (nome == 'emanoel.cabral@trato.feitolabs.com.br') {
+      papel = Papel.administrador;
+      rotuloUsuario = 'Emanoel Cabral';
+    } else if (nome == 'gabriel.victor@trato.feitolabs.com.br') {
+      papel = Papel.administrador;
+      rotuloUsuario = 'Gabriel Victor';
+    } else {
+      papel = Papel.doCodigo(nome.split('@').first);
+      rotuloUsuario = papel?.rotulo ?? '';
+    }
     if (papel == null) {
       throw const ErroApi('Esta conta não tem papel na equipe.', proibido: true);
     }
     _eu = UsuarioEquipe(
       id: 'eq-${papel.codigo}',
-      nome: papel.rotulo,
+      nome: rotuloUsuario,
       email: nome,
       papel: papel,
       alcadaCentavos: switch (papel) {
