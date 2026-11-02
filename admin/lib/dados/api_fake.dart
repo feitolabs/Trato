@@ -313,10 +313,133 @@ class ApiFake implements ApiAdmin {
   Future<List<CategoriaAdmin>> listarCategorias() => _ler(() => _categorias, const []);
 
   @override
+  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _registrar('usuario.status_alterado', 'usuario:$usuarioId', motivo);
+  }
+
+  @override
   Future<void> alterarCategoria(String id, {required bool ativa, required String motivo}) async {
     await Future<void>.delayed(atraso);
     _categorias = [for (final c in _categorias) c.id == id ? c.comAtiva(ativa) : c];
     _registrar(ativa ? 'categoria.ativada' : 'categoria.desativada', 'categoria:$id', motivo);
+  }
+
+  @override
+  Future<CategoriaAdmin> criarCategoria({
+    required String nome,
+    String? slug,
+    String? icone,
+    int? garantiaDias,
+    int ordem = 0,
+    bool ativa = true,
+    required String motivo,
+  }) async {
+    await Future<void>.delayed(atraso);
+    final cat = CategoriaAdmin(
+      id: 'c-${_categorias.length + 1}',
+      nome: nome,
+      slug: slug ?? nome.toLowerCase(),
+      icone: icone,
+      garantiaDias: garantiaDias,
+      ordem: ordem,
+      ativa: ativa,
+      profissionais: 0,
+    );
+    _categorias = [..._categorias, cat];
+    _registrar('categoria.criada', 'categoria:${cat.id}', motivo);
+    return cat;
+  }
+
+  @override
+  Future<CategoriaAdmin> editarCategoria(
+    String id, {
+    String? nome,
+    String? slug,
+    String? icone,
+    int? garantiaDias,
+    int? ordem,
+    bool? ativa,
+    required String motivo,
+  }) async {
+    await Future<void>.delayed(atraso);
+    CategoriaAdmin? atualizada;
+    _categorias = [
+      for (final c in _categorias)
+        if (c.id == id)
+          atualizada = CategoriaAdmin(
+            id: c.id,
+            nome: nome ?? c.nome,
+            slug: slug ?? c.slug,
+            icone: icone ?? c.icone,
+            garantiaDias: garantiaDias ?? c.garantiaDias,
+            ordem: ordem ?? c.ordem,
+            ativa: ativa ?? c.ativa,
+            profissionais: c.profissionais,
+          )
+        else
+          c,
+    ];
+    _registrar('categoria.editada', 'categoria:$id', motivo);
+    return atualizada ?? _categorias.first;
+  }
+
+  @override
+  Future<void> excluirCategoria(String id, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _categorias = [for (final c in _categorias) if (c.id != id) c];
+    _registrar('categoria.excluida', 'categoria:$id', motivo);
+  }
+
+  late List<CidadeAdmin> _cidades = [
+    const CidadeAdmin(id: 'cid-1', nome: 'Belo Horizonte', uf: 'MG', ativa: true),
+    const CidadeAdmin(id: 'cid-2', nome: 'Divinópolis', uf: 'MG', ativa: true),
+  ];
+
+  @override
+  Future<List<CidadeAdmin>> listarCidades() => _ler(() => _cidades, const []);
+
+  @override
+  Future<CidadeAdmin> criarCidade({
+    required String nome,
+    required String uf,
+    bool ativa = true,
+    double? centroLat,
+    double? centroLng,
+    required String motivo,
+  }) async {
+    await Future<void>.delayed(atraso);
+    final cid = CidadeAdmin(
+      id: 'cid-${_cidades.length + 1}',
+      nome: nome,
+      uf: uf,
+      ativa: ativa,
+      centroLat: centroLat,
+      centroLng: centroLng,
+    );
+    _cidades = [..._cidades, cid];
+    _registrar('cidade.criada', 'cidade:${cid.id}', motivo);
+    return cid;
+  }
+
+  @override
+  Future<void> alterarCidade(String id, {required bool ativa, required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _cidades = [
+      for (final c in _cidades)
+        if (c.id == id)
+          CidadeAdmin(
+            id: c.id,
+            nome: c.nome,
+            uf: c.uf,
+            ativa: ativa,
+            centroLat: c.centroLat,
+            centroLng: c.centroLng,
+          )
+        else
+          c,
+    ];
+    _registrar(ativa ? 'cidade.ativada' : 'cidade.desativada', 'cidade:$id', motivo);
   }
 
   // ---------- F7.5 ----------

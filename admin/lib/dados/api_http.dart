@@ -407,6 +407,15 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
+  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo}) async {
+    await _chamar(
+      'POST',
+      '/v1/admin/usuarios/$usuarioId/status',
+      corpo: {'status': status, 'motivo': motivo},
+    );
+  }
+
+  @override
   Future<List<PedidoBusca>> buscarPedidos(String termo) async {
     final corpo = await _chamar('GET', '/v1/admin/pedidos', consulta: {'q': termo.trim(), 'limite': '100'});
     return [
@@ -457,6 +466,143 @@ class ApiAdminHttp implements ApiAdmin {
     await _chamar(
       'PATCH',
       '/v1/admin/categorias/$id',
+      corpo: {'ativa': ativa, 'motivo': motivo},
+    );
+  }
+
+  @override
+  Future<CategoriaAdmin> criarCategoria({
+    required String nome,
+    String? slug,
+    String? icone,
+    int? garantiaDias,
+    int ordem = 0,
+    bool ativa = true,
+    required String motivo,
+  }) async {
+    final r = _mapa(await _chamar(
+      'POST',
+      '/v1/admin/categorias',
+      corpo: {
+        'nome': nome,
+        'slug': slug,
+        'icone': icone,
+        'garantia_retrabalho_dias': garantiaDias,
+        'ordem': ordem,
+        'ativa': ativa,
+        'motivo': motivo,
+      },
+    ));
+    return CategoriaAdmin(
+      id: r['id'] as String,
+      nome: r['nome'] as String,
+      slug: (r['slug'] as String?) ?? '',
+      icone: r['icone'] as String?,
+      garantiaDias: r['garantia_retrabalho_dias'] as int?,
+      ordem: _int(r['ordem']),
+      ativa: r['ativa'] as bool? ?? true,
+      profissionais: _int(r['profissionais']),
+    );
+  }
+
+  @override
+  Future<CategoriaAdmin> editarCategoria(
+    String id, {
+    String? nome,
+    String? slug,
+    String? icone,
+    int? garantiaDias,
+    int? ordem,
+    bool? ativa,
+    required String motivo,
+  }) async {
+    final r = _mapa(await _chamar(
+      'PUT',
+      '/v1/admin/categorias/$id',
+      corpo: {
+        if (nome != null) 'nome': nome,
+        if (slug != null) 'slug': slug,
+        if (icone != null) 'icone': icone,
+        if (garantiaDias != null) 'garantia_retrabalho_dias': garantiaDias,
+        if (ordem != null) 'ordem': ordem,
+        if (ativa != null) 'ativa': ativa,
+        'motivo': motivo,
+      },
+    ));
+    return CategoriaAdmin(
+      id: r['id'] as String,
+      nome: r['nome'] as String,
+      slug: (r['slug'] as String?) ?? '',
+      icone: r['icone'] as String?,
+      garantiaDias: r['garantia_retrabalho_dias'] as int?,
+      ordem: _int(r['ordem']),
+      ativa: r['ativa'] as bool? ?? true,
+      profissionais: _int(r['profissionais']),
+    );
+  }
+
+  @override
+  Future<void> excluirCategoria(String id, {required String motivo}) async {
+    await _chamar(
+      'DELETE',
+      '/v1/admin/categorias/$id',
+      consulta: {'motivo': motivo},
+    );
+  }
+
+  @override
+  Future<List<CidadeAdmin>> listarCidades() async {
+    final corpo = await _chamar('GET', '/v1/admin/cidades');
+    final itens = _itens(corpo);
+    return [
+      for (final c in itens)
+        CidadeAdmin(
+          id: c['id'] as String,
+          nome: c['nome'] as String,
+          uf: c['uf'] as String,
+          ativa: c['ativa'] as bool? ?? true,
+          centroLat: (c['centro_lat'] as num?)?.toDouble(),
+          centroLng: (c['centro_lng'] as num?)?.toDouble(),
+        ),
+    ];
+  }
+
+  @override
+  Future<CidadeAdmin> criarCidade({
+    required String nome,
+    required String uf,
+    bool ativa = true,
+    double? centroLat,
+    double? centroLng,
+    required String motivo,
+  }) async {
+    final r = _mapa(await _chamar(
+      'POST',
+      '/v1/admin/cidades',
+      corpo: {
+        'nome': nome,
+        'uf': uf,
+        'ativa': ativa,
+        'centro_lat': centroLat,
+        'centro_lng': centroLng,
+        'motivo': motivo,
+      },
+    ));
+    return CidadeAdmin(
+      id: r['id'] as String,
+      nome: r['nome'] as String,
+      uf: r['uf'] as String,
+      ativa: r['ativa'] as bool? ?? true,
+      centroLat: (r['centro_lat'] as num?)?.toDouble(),
+      centroLng: (r['centro_lng'] as num?)?.toDouble(),
+    );
+  }
+
+  @override
+  Future<void> alterarCidade(String id, {required bool ativa, required String motivo}) async {
+    await _chamar(
+      'PATCH',
+      '/v1/admin/cidades/$id',
       corpo: {'ativa': ativa, 'motivo': motivo},
     );
   }

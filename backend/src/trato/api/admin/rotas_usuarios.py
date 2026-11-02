@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
@@ -18,6 +19,7 @@ from trato.api.admin.modelos import (
 )
 from trato.api.admin.papeis import PapelEquipe, Permissao
 from trato.api.contexto import Contexto, obter_contexto
+from trato.persistencia.comum import como_uuid
 
 router = APIRouter(prefix="/v1/admin", tags=["admin: usuários e pedidos"])
 
@@ -70,6 +72,46 @@ def detalhe_usuario(
     achado = admin.usuarios.obter(usuario_id)
     if achado is None:
         raise HTTPException(404, "Usuário não encontrado.")
+    return UsuarioOut.model_validate(achado)
+
+
+class AlterarStatusUsuarioIn(BaseModel):
+    status: str = Field(pattern="^(ativo|restrito|bloqueado)$")
+    motivo: str = Field(min_length=3, max_length=500)
+
+
+@router.post(
+    "/usuarios/{usuario_id}/status",
+    response_model=UsuarioOut,
+    summary="Alterar status do usuário (ativo, restrito, bloqueado)",
+)
+def alterar_status_usuario(
+    usuario_id: str,
+    corpo: AlterarStatusUsuarioIn,
+    operador: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> UsuarioOut:
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    if banco is None:
+        raise HTTPException(503, "Banco de dados não configurado.")
+    uid = como_uuid(usuario_id)
+    if uid is None:
+        raise HTTPException(404, "Usuário não encontrado.")
+    with banco.transacao() as con:
+        usuario = con.execute("SELECT id, nome, status FROM public.usuarios WHERE id = %s", (uid,)).fetchone()
+        if usuario is None:
+            raise HTTPException(404, "Usuário não encontrado.")
+        con.execute("UPDATE public.usuarios SET status = %s, atualizado_em = now() WHERE id = %s", (corpo.status, uid))
+        admin.auditoria.registrar(
+            ator_id=operador.id,
+            acao="usuario.status_alterado",
+            entidade="usuarios",
+            entidade_id=str(uid),
+            depois={"status": corpo.status, "nome": usuario["nome"]},
+            motivo=corpo.motivo,
+        )
+    achado = admin.usuarios.obter(usuario_id)
     return UsuarioOut.model_validate(achado)
 
 

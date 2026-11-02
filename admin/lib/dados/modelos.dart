@@ -252,14 +252,52 @@ class Chamado {
 }
 
 class CategoriaAdmin {
-  const CategoriaAdmin({required this.id, required this.nome, required this.ativa, required this.profissionais});
+  const CategoriaAdmin({
+    required this.id,
+    required this.nome,
+    required this.ativa,
+    required this.profissionais,
+    this.slug = '',
+    this.icone,
+    this.garantiaDias,
+    this.ordem = 0,
+  });
   final String id;
   final String nome;
   final bool ativa;
   final int profissionais;
+  final String slug;
+  final String? icone;
+  final int? garantiaDias;
+  final int ordem;
 
-  CategoriaAdmin comAtiva(bool valor) =>
-      CategoriaAdmin(id: id, nome: nome, ativa: valor, profissionais: profissionais);
+  CategoriaAdmin comAtiva(bool valor) => CategoriaAdmin(
+        id: id,
+        nome: nome,
+        ativa: valor,
+        profissionais: profissionais,
+        slug: slug,
+        icone: icone,
+        garantiaDias: garantiaDias,
+        ordem: ordem,
+      );
+}
+
+class CidadeAdmin {
+  const CidadeAdmin({
+    required this.id,
+    required this.nome,
+    required this.uf,
+    required this.ativa,
+    this.centroLat,
+    this.centroLng,
+  });
+  final String id;
+  final String nome;
+  final String uf;
+  final bool ativa;
+  final double? centroLat;
+  final double? centroLng;
 }
 
 enum UnidadeConfig {

@@ -29,13 +29,46 @@ abstract interface class ApiAdmin {
   Future<ResumoConciliacao> resumoConciliacao();
   Future<List<LancamentoEspelho>> extrato();
 
-  // F7.4 busca, suporte, categorias
+  // F7.4 busca, suporte, categorias, cidades e usuários
   Future<List<UsuarioBusca>> buscarUsuarios(String termo);
   Future<DadosPessoais> revelarDadosPessoais(String usuarioId, String motivo);
+  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo});
   Future<List<PedidoBusca>> buscarPedidos(String termo);
   Future<List<Chamado>> listarChamados();
   Future<List<CategoriaAdmin>> listarCategorias();
+  Future<CategoriaAdmin> criarCategoria({
+    required String nome,
+    String? slug,
+    String? icone,
+    int? garantiaDias,
+    int ordem = 0,
+    bool ativa = true,
+    required String motivo,
+  });
+  Future<CategoriaAdmin> editarCategoria(
+    String id, {
+    String? nome,
+    String? slug,
+    String? icone,
+    int? garantiaDias,
+    int? ordem,
+    bool? ativa,
+    required String motivo,
+  });
   Future<void> alterarCategoria(String id, {required bool ativa, required String motivo});
+  Future<void> excluirCategoria(String id, {required String motivo});
+
+  // Gestão de cidades (expansão regional)
+  Future<List<CidadeAdmin>> listarCidades();
+  Future<CidadeAdmin> criarCidade({
+    required String nome,
+    required String uf,
+    bool ativa = true,
+    double? centroLat,
+    double? centroLng,
+    required String motivo,
+  });
+  Future<void> alterarCidade(String id, {required bool ativa, required String motivo});
 
   // F7.5 configurações
   Future<ConfigAtual> carregarConfig();
