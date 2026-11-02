@@ -86,10 +86,55 @@ class MiddlewareProtecao:
         id_requisicao = uuid.uuid4().hex
         extras = [*cabecalhos_seguranca(seg, caminho), (b"x-request-id", id_requisicao.encode())]
 
+        # Idempotência (Idempotency-Key) em operações mutantes
+        chave_idemp_bruta = cab.get(b"idempotency-key")
+        chave_idemp: str | None = None
+        if chave_idemp_bruta and metodo in ("POST", "PATCH", "PUT"):
+            txt_idemp = chave_idemp_bruta.decode("latin-1").strip()
+            if txt_idemp:
+                usuario_idemp = _usuario(seg, cab) or seg.hash_opaco(_ip(seg, escopo, cab))
+                chave_idemp = f"{usuario_idemp}:{txt_idemp}"
+
+        if chave_idemp:
+            salva = seg.checar_idempotencia(chave_idemp)
+            if salva is not None:
+                st, cabs_salvos, corpo_salvo = salva
+                repassar_cabs = [
+                    *cabs_salvos,
+                    *extras,
+                    (b"x-idempotent-replay", b"true"),
+                ]
+                await enviar({"type": "http.response.start", "status": st, "headers": repassar_cabs})
+                await enviar({"type": "http.response.body", "body": corpo_salvo})
+                return
+
+            if not seg.iniciar_idempotencia(chave_idemp):
+                corpo = json.dumps(
+                    {"detail": "Operação já em processamento com esta chave de idempotência."},
+                    ensure_ascii=False,
+                ).encode()
+                cabs = [
+                    (b"content-type", b"application/json; charset=utf-8"),
+                    *extras,
+                ]
+                await enviar({"type": "http.response.start", "status": 409, "headers": cabs})
+                await enviar({"type": "http.response.body", "body": corpo})
+                return
+
+        resp_status = 200
+        resp_headers: list[tuple[bytes, bytes]] = []
+        resp_corpo = bytearray()
+
         async def enviar_com_cabecalhos(msg: MutableMapping[str, Any]) -> None:
+            nonlocal resp_status, resp_headers
             if msg["type"] == "http.response.start":
+                resp_status = msg.get("status", 200)
                 ja = {k.lower() for k, _ in msg.get("headers", [])}
-                msg["headers"] = [*msg.get("headers", []), *(h for h in extras if h[0] not in ja)]
+                novos = [*msg.get("headers", []), *(h for h in extras if h[0] not in ja)]
+                msg["headers"] = novos
+                resp_headers = [(k, v) for k, v in novos]
+            elif msg["type"] == "http.response.body" and chave_idemp:
+                resp_corpo.extend(msg.get("body", b""))
             await enviar(msg)
 
         async def recusar(status: int, texto: str, retry: int | None = None) -> None:
@@ -136,7 +181,14 @@ class MiddlewareProtecao:
                     raise HTTPException(413, "Requisição grande demais.")
             return msg
 
-        await self.app(escopo, receber_limitado, enviar_com_cabecalhos)
+        try:
+            await self.app(escopo, receber_limitado, enviar_com_cabecalhos)
+            if chave_idemp:
+                seg.concluir_idempotencia(chave_idemp, resp_status, resp_headers, bytes(resp_corpo))
+        except Exception:
+            if chave_idemp:
+                seg.cancelar_idempotencia(chave_idemp)
+            raise
 
     async def _registrar_excesso(self, decisao) -> None:  # type: ignore[no-untyped-def]
         """Uma linha de auditoria por regra a cada janela (senão um ataque enche a trilha)."""

@@ -15,11 +15,13 @@ class ClienteApi {
     required this.sessao,
     http.Client? cliente,
     this.tempoLimite = const Duration(seconds: 15),
+    this.intervaloBaseRetry = const Duration(milliseconds: 200),
   }) : _cliente = cliente ?? http.Client();
 
   final String urlBase;
   final SessaoTrato sessao;
   final Duration tempoLimite;
+  final Duration intervaloBaseRetry;
   final http.Client _cliente;
 
   Future<Object?> get(String caminho, {Map<String, String>? consulta}) =>
@@ -71,18 +73,33 @@ class ClienteApi {
         pedido.headers['Content-Type'] = 'application/json; charset=utf-8';
         pedido.body = jsonEncode(corpo);
       }
-      try {
-        return await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
-      } on TimeoutException {
-        throw ErroTrato.semInternet;
-      } on SocketException {
-        throw ErroTrato.semInternet;
-      } on http.ClientException {
-        throw ErroTrato.semInternet;
-      }
+      return await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
     }
 
-    var resposta = await tentar();
+    Future<http.Response> executarComRetry() async {
+      final permitirRetry = metodo == 'GET' || chaveIdempotencia != null;
+      final maxTentativas = permitirRetry ? 3 : 1;
+      var delayMs = intervaloBaseRetry.inMilliseconds;
+
+      for (var tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+        try {
+          return await tentar();
+        } on TimeoutException {
+          if (tentativa == maxTentativas) throw ErroTrato.semInternet;
+        } on SocketException {
+          if (tentativa == maxTentativas) throw ErroTrato.semInternet;
+        } on http.ClientException {
+          if (tentativa == maxTentativas) throw ErroTrato.semInternet;
+        }
+        if (delayMs > 0) {
+          await Future.delayed(Duration(milliseconds: delayMs));
+          delayMs *= 2;
+        }
+      }
+      throw ErroTrato.semInternet;
+    }
+
+    var resposta = await executarComRetry();
     // 401 com sessão: tenta renovar o token uma vez e repete a chamada (mesma chave de
     // idempotência, então não duplica). Se não renovar, `_tratar` limpa a sessão.
     if (resposta.statusCode == 401 && sessao.logada) {

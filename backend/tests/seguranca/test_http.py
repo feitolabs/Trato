@@ -256,3 +256,24 @@ def test_filtro_global_de_logs(caplog: pytest.LogCaptureFixture):
         )
     assert "ana@x.com" not in caplog.text and "123.456" not in caplog.text
     assert "[email]" in caplog.text
+
+
+def test_idempotencia_em_metodos_mutantes():
+    amb = montar()
+    headers = {**cab("t-cli"), "Idempotency-Key": "teste-idemp-123"}
+    corpo = {
+        "categoria_id": "eletrica",
+        "cidade_id": "belo-horizonte",
+        "titulo": "Troca de tomada",
+        "descricao": "Instalar tomada 220v",
+    }
+    # Primeira chamada
+    r1 = amb.cliente.post("/v1/pedidos", json=corpo, headers=headers)
+    assert r1.status_code in (200, 201)
+    # Segunda chamada com a mesma chave: deve devolver replay idêntico sem recriar
+    r2 = amb.cliente.post("/v1/pedidos", json=corpo, headers=headers)
+    assert r2.status_code == r1.status_code
+    assert r2.headers.get("x-idempotent-replay") == "true"
+    assert r2.json() == r1.json()
+
+

@@ -167,9 +167,13 @@ class RepositorioPedidos(Protocol):
 
     def eventos(self, pedido_id: str) -> Sequence[Evento]: ...
 
-    def listar_do_usuario(self, usuario_id: str, como_cliente: bool) -> Sequence[Pedido]: ...
+    def listar_do_usuario(
+        self, usuario_id: str, como_cliente: bool, limite: int = 100, offset: int = 0
+    ) -> Sequence[Pedido]: ...
 
-    def listar_abertos(self, profissional_id: str) -> Sequence[PedidoAberto]:
+    def listar_abertos(
+        self, profissional_id: str, limite: int = 100, offset: int = 0
+    ) -> Sequence[PedidoAberto]:
         """Pedidos que ainda recebem orçamentos e combinam com o profissional."""
 
 

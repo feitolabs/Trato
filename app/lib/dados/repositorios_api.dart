@@ -166,7 +166,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
           {'pergunta_id': 'prazo', 'resposta': rascunho.prazo},
       ],
     };
-    final criado = PedidoApi.deJson(_mapa(await _api.post('/v1/pedidos', corpo: corpo)));
+    final chaveIdemp =
+        'pedido-${DateTime.now().millisecondsSinceEpoch}-${rascunho.servicos.join('_')}-${rascunho.descricao.hashCode}';
+    final criado = PedidoApi.deJson(
+      _mapa(await _api.post('/v1/pedidos', corpo: corpo, chaveIdempotencia: chaveIdemp)),
+    );
     final up = upload;
     if (up != null && rascunho.fotos.isNotEmpty) {
       await Future.wait(

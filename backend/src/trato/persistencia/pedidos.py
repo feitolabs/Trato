@@ -124,24 +124,32 @@ class PedidosPostgres:
             )
         return tuple(eventos)
 
-    def listar_do_usuario(self, usuario_id: str, como_cliente: bool) -> Sequence[Pedido]:
+    def listar_do_usuario(
+        self, usuario_id: str, como_cliente: bool, limite: int = 100, offset: int = 0
+    ) -> Sequence[Pedido]:
         achado = como_uuid(usuario_id)
         if achado is None:
             return ()
         campo = "p.cliente_id" if como_cliente else "c.profissional_id"
+        limite_efetivo = max(1, min(limite, 200))
+        offset_efetivo = max(0, offset)
         with self._banco.transacao() as con:
             linhas = con.execute(
-                f"{_SELECT_PEDIDO} where {campo} = %s order by p.criado_em desc",  # noqa: S608
-                (achado,),
+                f"{_SELECT_PEDIDO} where {campo} = %s order by p.criado_em desc limit %s offset %s",  # noqa: S608
+                (achado, limite_efetivo, offset_efetivo),
             ).fetchall()
         return tuple(self._montar(linha) for linha in linhas)
 
-    def listar_abertos(self, profissional_id: str) -> Sequence[PedidoAberto]:
+    def listar_abertos(
+        self, profissional_id: str, limite: int = 100, offset: int = 0
+    ) -> Sequence[PedidoAberto]:
         """Pedidos abertos na categoria e na região (cidade, e bairro se o profissional fixou)
         em que o profissional atua. Sem endereço: ele só aparece depois da contratação."""
         achado = como_uuid(profissional_id)
         if achado is None:
             return ()
+        limite_efetivo = max(1, min(limite, 200))
+        offset_efetivo = max(0, offset)
         with self._banco.transacao() as con:
             linhas = con.execute(
                 "select p.id, p.titulo, p.descricao, p.bairro, p.categoria_id, "
@@ -154,8 +162,8 @@ class PedidosPostgres:
                 "and exists (select 1 from public.profissional_regioes pr "
                 "            where pr.profissional_id = %s and pr.cidade_id = p.cidade_id "
                 "              and (pr.bairro is null or pr.bairro = p.bairro)) "
-                "order by p.criado_em desc",
-                (achado, achado),
+                "order by p.criado_em desc limit %s offset %s",
+                (achado, achado, limite_efetivo, offset_efetivo),
             ).fetchall()
         return tuple(
             PedidoAberto(

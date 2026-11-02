@@ -55,16 +55,21 @@ class PedidosEmMemoria:
     def eventos(self, pedido_id: str) -> Sequence[Evento]:
         return tuple(self._eventos.get(pedido_id, ()))
 
-    def listar_do_usuario(self, usuario_id: str, como_cliente: bool) -> Sequence[Pedido]:
+    def listar_do_usuario(
+        self, usuario_id: str, como_cliente: bool, limite: int = 100, offset: int = 0
+    ) -> Sequence[Pedido]:
         campo = "cliente_id" if como_cliente else "profissional_id"
         achados = [p for p in self._pedidos.values() if getattr(p, campo) == usuario_id]
-        return sorted(achados, key=lambda p: p.aberto_em, reverse=True)
+        ordenados = sorted(achados, key=lambda p: p.aberto_em, reverse=True)
+        return ordenados[offset : offset + limite]
 
-    def listar_abertos(self, profissional_id: str) -> Sequence[PedidoAberto]:
+    def listar_abertos(
+        self, profissional_id: str, limite: int = 100, offset: int = 0
+    ) -> Sequence[PedidoAberto]:
         abertos = [p for p in self._pedidos.values() if p.estado is Estado.ABERTO]
         abertos.sort(key=lambda p: p.aberto_em, reverse=True)
         saida = []
-        for p in abertos:
+        for p in abertos[offset : offset + limite]:
             d = self._dados.get(p.id)
             saida.append(
                 PedidoAberto(
