@@ -399,7 +399,24 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
       }
     }
 
-    final categorias = [for (final c in (prof?['categorias'] as List? ?? const [])) '$c'];
+    final mapaNomesCategorias = <String, String>{};
+    try {
+      final cats = _lista(await _api.get('/v1/catalogo/categorias'));
+      for (final c in cats) {
+        if (c['id'] is String && c['nome'] is String) {
+          mapaNomesCategorias[c['id'] as String] = c['nome'] as String;
+        }
+      }
+    } catch (_) {}
+
+    final categoriasRaw = [for (final c in (prof?['categorias'] as List? ?? const [])) '$c'];
+    final categoriasNomes = [
+      for (final c in categoriasRaw)
+        if (mapaNomesCategorias.containsKey(c))
+          mapaNomesCategorias[c]!
+        else if (!c.contains('-'))
+          c,
+    ];
     final portfolioBruto = (prof?['portfolio'] as List? ?? const []).cast<Map<String, dynamic>>();
     final fotosPortfolio = [
       for (final item in portfolioBruto)
@@ -407,15 +424,24 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
             ? item['descricao'] as String
             : (item['titulo'] as String? ?? 'Foto')),
     ];
+    final status = (prof?['status'] as String?) ?? '';
     final nivel = (prof?['nivel_verificacao'] as String?) ?? '';
-    final verificacao = nivel.isEmpty
-        ? null
-        : (nivel.contains('plus') ? 'Identidade e antecedentes conferidos' : 'Identidade conferida');
+    final estaAprovado = status == 'aprovado';
+    final String? verificacao;
+    if (!estaAprovado || nivel == 'basico' || nivel.isEmpty) {
+      verificacao = null;
+    } else if (nivel.contains('plus')) {
+      verificacao = 'Identidade e antecedentes conferidos';
+    } else if (nivel == 'verificado') {
+      verificacao = 'Identidade conferida';
+    } else {
+      verificacao = null;
+    }
 
     return PerfilPublico(
       nome: nomeExibicao,
       iniciais: _iniciaisNome(nomeExibicao),
-      categoria: categorias.isEmpty ? 'Profissional' : categorias.join(' · '),
+      categoria: categoriasNomes.isEmpty ? 'Profissional' : categoriasNomes.join(' · '),
       verificacao: verificacao,
       noTratoDesde: noTratoDesde,
       nota: nota,
@@ -526,16 +552,41 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
 
   final ClienteApi _api;
 
+  static const _mapaUiParaBackend = {
+    'dados_pedido': 'termos_de_uso',
+    'localizacao': 'localizacao_no_servico',
+    'avisos': 'comunicacoes_marketing',
+  };
+
+  static const _mapaBackendParaUi = {
+    'termos_de_uso': 'dados_pedido',
+    'politica_privacidade': 'dados_pedido',
+    'localizacao_no_servico': 'localizacao',
+    'comunicacoes_marketing': 'avisos',
+  };
+
   @override
   Future<List<Consentimento>> consentimentos() async {
     try {
       final res = await _api.get('/v1/me/consentimentos');
       final mapa = (res is Map<String, dynamic>) ? res : <String, dynamic>{};
-      final vigentes = (mapa['vigentes'] is List) ? mapa['vigentes'] as List : const [];
       final ativosPorFinalidade = <String, bool>{};
-      for (final v in vigentes) {
-        if (v is Map && v['finalidade'] is String && v['aceito'] is bool) {
-          ativosPorFinalidade[v['finalidade'] as String] = v['aceito'] as bool;
+      final vigentes = mapa['vigentes'];
+      if (vigentes is Map) {
+        for (final entry in vigentes.entries) {
+          final chave = entry.key.toString();
+          final val = entry.value;
+          final aceito = val is Map ? (val['aceito'] as bool? ?? false) : false;
+          final chaveUi = _mapaBackendParaUi[chave] ?? chave;
+          ativosPorFinalidade[chaveUi] = aceito;
+        }
+      } else if (vigentes is List) {
+        for (final v in vigentes) {
+          if (v is Map && v['finalidade'] is String && v['aceito'] is bool) {
+            final f = v['finalidade'] as String;
+            final chaveUi = _mapaBackendParaUi[f] ?? f;
+            ativosPorFinalidade[chaveUi] = v['aceito'] as bool;
+          }
         }
       }
       return [
@@ -555,10 +606,11 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
 
   @override
   Future<void> alterarConsentimento(String id, {required bool ativo}) async {
+    final finalidadeBackend = _mapaUiParaBackend[id] ?? id;
     await _api.post(
       '/v1/me/consentimentos',
       corpo: {
-        'finalidade': id,
+        'finalidade': finalidadeBackend,
         'aceito': ativo,
         'versao_texto': '1.0',
       },

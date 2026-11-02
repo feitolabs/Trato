@@ -211,6 +211,12 @@ class ServicoLgpd:
         return {"anonimizadas": feitas, "adiadas": adiadas}
 
     # --- Consentimentos ---------------------------------------------------------------
+    ALIAS_FINALIDADES: dict[str, str] = {
+        "avisos": "comunicacoes_marketing",
+        "localizacao": "localizacao_no_servico",
+        "dados_pedido": "termos_de_uso",
+    }
+
     def registrar_consentimento(
         self,
         usuario: Usuario,
@@ -220,7 +226,8 @@ class ServicoLgpd:
         agora: datetime,
         ip: str | None,
     ) -> Consentimento:
-        regra = self._cfg.finalidades.get(finalidade)
+        finalidade_efetiva = self.ALIAS_FINALIDADES.get(finalidade, finalidade)
+        regra = self._cfg.finalidades.get(finalidade_efetiva)
         if regra is None:
             raise ErroLgpd(422, "Finalidade desconhecida.")
         if regra.obrigatoria and not aceito:
@@ -228,13 +235,13 @@ class ServicoLgpd:
                 422,
                 "Esse aceite é necessário para usar o Trato. Para sair, peça a exclusão da conta.",
             )
-        linha = Consentimento(usuario.id, finalidade, aceito, versao_texto, agora, ip)
+        linha = Consentimento(usuario.id, finalidade_efetiva, aceito, versao_texto, agora, ip)
         self._r.consentimentos.registrar(linha)
         self._motivo(
             usuario,
             "consentimento.registrado" if aceito else "consentimento.revogado",
             "Escolha do titular sobre o tratamento de dados",
-            finalidade=finalidade,
+            finalidade=finalidade_efetiva,
             versao_texto=versao_texto,
         )
         return linha

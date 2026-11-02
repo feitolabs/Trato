@@ -269,6 +269,19 @@ def test_consentimento_exige_login_e_rejeita_campos_extras():
     )
 
 
+def test_consentimento_aceita_alias_avisos_e_localizacao():
+    amb = montar()
+    corpo = {"finalidade": "avisos", "aceito": True, "versao_texto": "1.0"}
+    r = amb.cliente.post(CONS, json=corpo, headers=cab("t-cli"))
+    assert r.status_code == 201
+    assert r.json()["finalidade"] == "comunicacoes_marketing"
+
+    corpo_loc = {"finalidade": "localizacao", "aceito": False, "versao_texto": "1.0"}
+    r_loc = amb.cliente.post(CONS, json=corpo_loc, headers=cab("t-cli"))
+    assert r_loc.status_code == 201
+    assert r_loc.json()["finalidade"] == "localizacao_no_servico"
+
+
 def test_modo_postgres_sem_adaptador_responde_503_em_vez_de_perder_dado(monkeypatch):
     from trato.config import obter_config
 

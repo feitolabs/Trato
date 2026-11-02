@@ -391,11 +391,17 @@ abstract final class RotasTrato {
     final categorias = await repos.catalogo.categorias();
     final andamento = await repos.servicos.emAndamento();
     final recentes = await repos.servicos.recentes();
+    final recentesFiltrados = [
+      for (final r in recentes)
+        if ((andamento?.pedidoId == null || r.pedidoId != andamento?.pedidoId) &&
+            (andamento == null || r.titulo != andamento.titulo))
+          r,
+    ];
     return DadosInicio(
       nome: perfil.nome.trim().split(' ').first,
       categorias: categorias,
       emAndamento: andamento,
-      recentes: recentes,
+      recentes: recentesFiltrados,
     );
   }
 

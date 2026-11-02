@@ -38,7 +38,13 @@ class InicioTela extends StatelessWidget {
   Widget build(BuildContext context) {
     final nome = dados?.nome ?? nomeDoCliente;
     final andamento = dados == null ? pedidoEmAndamento : dados!.emAndamento;
-    final recentes = dados?.recentes ?? servicosRecentes;
+    final recentesBrutos = dados?.recentes ?? servicosRecentes;
+    final recentes = [
+      for (final r in recentesBrutos)
+        if ((andamento?.pedidoId == null || r.pedidoId != andamento?.pedidoId) &&
+            (andamento == null || r.titulo != andamento.titulo))
+          r,
+    ];
     final grade = dados == null
         ? categorias
         : [

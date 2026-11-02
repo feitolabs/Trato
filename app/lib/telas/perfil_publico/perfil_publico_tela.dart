@@ -166,16 +166,51 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 'Você ainda não recebeu avaliações.',
                 style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
               )
-            else
+            else ...[
               for (final a in p.ultimasAvaliacoes.take(2)) CartaoAvaliacao(avaliacao: a),
-            const SizedBox(height: EspacosTrato.x2),
-            BotaoLink(
-              texto: 'Ver todas as avaliações',
-              aoTocar: widget.aoVerAvaliacoes,
-            ),
-            if (widget.aoUsarComoCliente != null)
-              BotaoLink(texto: 'Usar como cliente', aoTocar: widget.aoUsarComoCliente),
-            if (widget.aoSair != null) BotaoLink(texto: 'Sair', aoTocar: widget.aoSair),
+              if (widget.aoVerAvaliacoes != null) ...[
+                const SizedBox(height: EspacosTrato.x2),
+                BotaoLink(
+                  texto: 'Ver todas as avaliações',
+                  aoTocar: widget.aoVerAvaliacoes,
+                ),
+              ],
+            ],
+            if (widget.aoUsarComoCliente != null || widget.aoSair != null) ...[
+              const SizedBox(height: EspacosTrato.x6),
+              const TituloSecao('Conta'),
+              Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    if (widget.aoUsarComoCliente != null)
+                      ListTile(
+                        leading: const Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
+                        title: Text('Usar como cliente', style: TipografiaTrato.corpoForte),
+                        subtitle: Text('Trocar para contratar serviços', style: TipografiaTrato.legenda),
+                        trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                        onTap: widget.aoUsarComoCliente,
+                      ),
+                    if (widget.aoUsarComoCliente != null && widget.aoSair != null)
+                      const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: CoresTrato.borda,
+                        indent: EspacosTrato.x4,
+                        endIndent: EspacosTrato.x4,
+                      ),
+                    if (widget.aoSair != null)
+                      ListTile(
+                        leading: const Icon(Icons.logout, color: CoresTrato.petroleo),
+                        title: Text('Sair', style: TipografiaTrato.corpoForte),
+                        trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                        onTap: widget.aoSair,
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
         );
       },
