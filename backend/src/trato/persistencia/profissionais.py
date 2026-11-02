@@ -129,7 +129,9 @@ class ProfissionaisPostgres:
                     if row:
                         categorias.append(str(row["id"]))
             if not categorias:
-                padrao_cat = con.execute("select id from public.categorias where ativa order by ordem, nome limit 1").fetchone()
+                padrao_cat = con.execute(
+                    "select id from public.categorias where ativa order by ordem, nome limit 1"
+                ).fetchone()
                 if padrao_cat:
                     categorias.append(str(padrao_cat["id"]))
 
@@ -168,8 +170,14 @@ class ProfissionaisPostgres:
                     if cid_row:
                         r_cidade_uuid = str(cid_row["id"])
                     else:
-                        cid_padrao = con.execute("select id from public.cidades where ativa order by nome limit 1").fetchone()
-                        r_cidade_uuid = str(cid_padrao["id"]) if cid_padrao else exigir_uuid(r.cidade_id, "cidade")
+                        cid_padrao = con.execute(
+                            "select id from public.cidades where ativa order by nome limit 1"
+                        ).fetchone()
+                        r_cidade_uuid = (
+                            str(cid_padrao["id"])
+                            if cid_padrao
+                            else exigir_uuid(r.cidade_id, "cidade")
+                        )
                 con.execute(
                     "insert into public.profissional_regioes (profissional_id, cidade_id, bairro) "
                     "values (%s, %s, %s) on conflict do nothing",

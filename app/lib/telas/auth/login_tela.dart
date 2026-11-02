@@ -70,7 +70,7 @@ class _LoginTelaState extends State<LoginTela> {
       _tentou ? ValidacaoAuth.identificadorLogin(_identificador.text) : null;
 
   String? get _erroSenha =>
-      _tentou ? ValidacaoAuth.obrigatorio(_senha.text, 'Informe sua senha.') : null;
+      _tentou ? ValidacaoAuth.obrigatorio(_senha.text, 'Senha não informada. Digite sua senha para entrar.') : null;
 
   /// Roda [acao]; se der certo vai para o app, se não mostra o erro em português.
   Future<void> _tentar(Future<SessaoAuth> Function() acao) async {

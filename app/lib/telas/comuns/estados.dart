@@ -6,10 +6,16 @@ import '../../tema/tema.dart';
 /// Carrega dados de um serviço e mostra carregando, erro (com "Tentar de novo") ou o conteúdo.
 /// Quem decide o que é "vazio" é o [construir] (use [EstadoVazio]).
 class CarregadorTela<T> extends StatefulWidget {
-  const CarregadorTela({super.key, required this.carregar, required this.construir});
+  const CarregadorTela({
+    super.key,
+    required this.carregar,
+    required this.construir,
+    this.esqueleto,
+  });
 
   final Future<T> Function() carregar;
   final Widget Function(BuildContext context, T dados, VoidCallback recarregar) construir;
+  final Widget Function(BuildContext context)? esqueleto;
 
   @override
   State<CarregadorTela<T>> createState() => _CarregadorTelaState<T>();
@@ -26,7 +32,10 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
       future: _futuro,
       builder: (context, snap) {
         if (snap.hasError) return EstadoErro(aoTentarNovamente: _recarregar);
-        if (!snap.hasData) return const EstadoCarregando();
+        if (!snap.hasData) {
+          if (widget.esqueleto != null) return widget.esqueleto!(context);
+          return const EstadoCarregando();
+        }
         return widget.construir(context, snap.data as T, _recarregar);
       },
     );
@@ -34,10 +43,13 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
 }
 
 class EstadoCarregando extends StatelessWidget {
-  const EstadoCarregando({super.key});
+  const EstadoCarregando({super.key, this.esqueleto});
+
+  final Widget? esqueleto;
 
   @override
   Widget build(BuildContext context) {
+    if (esqueleto != null) return esqueleto!;
     return Center(
       child: Semantics(
         label: 'Carregando',

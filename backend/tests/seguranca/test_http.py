@@ -275,5 +275,3 @@ def test_idempotencia_em_metodos_mutantes():
     assert r2.status_code == r1.status_code
     assert r2.headers.get("x-idempotent-replay") == "true"
     assert r2.json() == r1.json()
-
-

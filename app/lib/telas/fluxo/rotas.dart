@@ -1021,7 +1021,15 @@ abstract final class RotasTrato {
           // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
           aoVerAditivo: () => _abrir<void>(
             context,
-            ResponderAditivoTela(servico: servicoAditivo, aditivoId: pedidoId),
+            ResponderAditivoTela(
+              servico: servicoAditivo,
+              aditivoId: pedidoId,
+              aoResponder: (aprovado) {
+                if (aprovado && context.mounted) {
+                  _abrir<void>(context, _pagamento(pedidoId));
+                }
+              },
+            ),
           ),
         ),
       );

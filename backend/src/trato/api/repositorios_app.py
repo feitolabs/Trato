@@ -192,7 +192,9 @@ class RepositorioUsuarios(Protocol):
         cpf: str,
         telefone: str | None = None,
     ) -> bool:
-        """Vincula nome, CPF e telefone à conta recém-criada em `auth.users` se o e-mail conferir."""
+        """Vincula nome, CPF e telefone à conta recém-criada em `auth.users`
+        se o e-mail conferir.
+        """
 
 
 class RepositorioVerificacoes(Protocol):

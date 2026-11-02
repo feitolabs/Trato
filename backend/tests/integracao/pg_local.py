@@ -23,6 +23,7 @@ MIGRATIONS = (
     "f36_disputas",
     "f37_chat",
     "profissional_disponibilidade_portfolio_uploads",
+    "lgpd_exclusao_consentimentos",
 )
 
 

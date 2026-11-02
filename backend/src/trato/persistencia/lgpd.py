@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from psycopg.types.json import Jsonb
@@ -43,7 +42,9 @@ class FonteLgpdPostgres(FonteDadosPessoais):
                 (uid,),
             ).fetchone()
             if em_andamento_cliente and em_andamento_cliente["total"] > 0:
-                pendencias.append(f"{em_andamento_cliente['total']} pedido(s) em andamento como cliente")
+                pendencias.append(
+                    f"{em_andamento_cliente['total']} pedido(s) em andamento como cliente"
+                )
 
             # Pedidos em andamento onde a pessoa é o profissional contratado
             em_andamento_prof = con.execute(
@@ -57,7 +58,9 @@ class FonteLgpdPostgres(FonteDadosPessoais):
                 (uid,),
             ).fetchone()
             if em_andamento_prof and em_andamento_prof["total"] > 0:
-                pendencias.append(f"{em_andamento_prof['total']} contrato(s) em execução como profissional")
+                pendencias.append(
+                    f"{em_andamento_prof['total']} contrato(s) em execução como profissional"
+                )
 
             # Disputas abertas
             disputas = con.execute(
@@ -66,7 +69,8 @@ class FonteLgpdPostgres(FonteDadosPessoais):
                   from public.disputas d
                   join public.pedidos p on p.id = d.pedido_id
                  where (p.cliente_id = %s or exists (
-                     select 1 from public.contratos c where c.pedido_id = p.id and c.profissional_id = %s
+                     select 1 from public.contratos c
+                      where c.pedido_id = p.id and c.profissional_id = %s
                  ))
                    and d.status in ('aberta', 'em_analise', 'aguardando_partes')
                 """,
@@ -274,4 +278,3 @@ def criar_repositorios_lgpd_postgres(banco: Banco) -> RepositoriosLgpd:
         consentimentos=ConsentimentosPostgres(banco),
         exclusoes=ExclusoesPostgres(banco),
     )
-

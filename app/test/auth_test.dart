@@ -101,8 +101,11 @@ void main() {
 
       await _tocar(tester, 'Entrar');
 
-      expect(find.text('Informe e-mail, CPF ou telefone.'), findsOneWidget);
-      expect(find.text('Informe sua senha.'), findsOneWidget);
+      expect(
+        find.text('Campo não preenchido. Digite seu e-mail, CPF ou celular para continuar.'),
+        findsOneWidget,
+      );
+      expect(find.text('Senha não informada. Digite sua senha para entrar.'), findsOneWidget);
     });
 
     testWidgets('Mostrar alterna a visibilidade da senha', (tester) async {
@@ -182,7 +185,9 @@ void main() {
       await _tocar(tester, 'Entrar');
 
       expect(
-        find.text('Informe um e-mail válido, CPF (11 números) ou telefone com DDD.'),
+        find.text(
+          'Identificador incompleto. Digite um e-mail válido, CPF (11 números) ou telefone com DDD.',
+        ),
         findsOneWidget,
       );
       expect(find.byType(CascaClienteTela), findsNothing);
@@ -288,9 +293,20 @@ void main() {
 
       await _tocar(tester, 'Criar conta');
 
-      expect(find.text('Informe seu nome completo.'), findsOneWidget);
-      expect(find.text('O CPF tem 11 números.'), findsOneWidget);
-      expect(find.text('Aceite os termos para continuar.'), findsOneWidget);
+      expect(
+        find.text('Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('CPF incompleto. Digite os 11 números do seu documento.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Termos não aceitos. Marque a caixa para concordar com os Termos de uso e continuar.',
+        ),
+        findsOneWidget,
+      );
       expect(find.byType(ConfirmarCelularTela), findsNothing);
     });
 
@@ -300,7 +316,12 @@ void main() {
 
       await _tocar(tester, 'Criar conta');
 
-      expect(find.text('Aceite os termos para continuar.'), findsOneWidget);
+      expect(
+        find.text(
+          'Termos não aceitos. Marque a caixa para concordar com os Termos de uso e continuar.',
+        ),
+        findsOneWidget,
+      );
       expect(find.byType(ConfirmarCelularTela), findsNothing);
     });
 
@@ -448,7 +469,10 @@ void main() {
       await _abrir(tester, const ConfirmarCelularTela(celular: _celularDigitado));
 
       await _tocar(tester, 'Confirmar código');
-      expect(find.text('O código tem 6 números.'), findsOneWidget);
+      expect(
+        find.text('Código incompleto. Digite os 6 números recebidos por SMS.'),
+        findsOneWidget,
+      );
 
       await _digitar(tester, 'Código', '123456');
       await _tocar(tester, 'Confirmar código');
@@ -543,12 +567,18 @@ void main() {
 
       await _digitar(tester, 'E-mail', 'mariana');
       await _tocar(tester, 'Enviar código');
-      expect(find.text('E-mail inválido.'), findsOneWidget);
+      expect(
+        find.text('E-mail incompleto ou sem arroba. Digite no formato nome@exemplo.com.'),
+        findsOneWidget,
+      );
 
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _tocar(tester, 'Enviar código');
       expect(find.textContaining('você vai receber as instruções'), findsOneWidget);
-      expect(find.text('E-mail inválido.'), findsNothing);
+      expect(
+        find.text('E-mail incompleto ou sem arroba. Digite no formato nome@exemplo.com.'),
+        findsNothing,
+      );
     });
 
     testWidgets('sem internet ao recuperar mostra o erro', (tester) async {

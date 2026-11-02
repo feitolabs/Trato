@@ -112,17 +112,23 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   String? _erroDeslocamento() {
     final texto = _deslocamento.text.trim();
     if (texto.isEmpty) return null;
-    return Dinheiro.lerCentavos(texto) == null ? 'Use só números, como 30 ou 30,50.' : null;
+    return Dinheiro.lerCentavos(texto) == null
+        ? 'Valor de deslocamento inválido. Use só números, como 30 ou 30,50.'
+        : null;
   }
 
   String? _erroHoras() {
     final decimos = Dinheiro.lerDecimosDeHora(_horas.text);
-    return (decimos == null || decimos <= 0) ? 'Informe as horas, como 3 ou 2,5.' : null;
+    return (decimos == null || decimos <= 0)
+        ? 'Quantidade de horas não informada. Digite as horas, como 3 ou 2,5.'
+        : null;
   }
 
   String? _erroValorHora() {
     final valor = Dinheiro.lerCentavos(_valorHora.text);
-    return (valor == null || valor <= 0) ? 'Informe o valor da hora.' : null;
+    return (valor == null || valor <= 0)
+        ? 'Valor da hora não informado. Digite o valor por hora de trabalho (ex.: 80,00).'
+        : null;
   }
 
   Future<void> _adicionarItem() async {
@@ -547,7 +553,9 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               rotulo: 'Item',
               controlador: _nome,
               dica: 'Ex.: 2 tomadas 20 A',
-              erro: _tentou && _nome.text.trim().isEmpty ? 'Informe o item.' : null,
+              erro: _tentou && _nome.text.trim().isEmpty
+                  ? 'Descrição do material vazia. Digite o nome do item (ex.: 2 tomadas 20 A).'
+                  : null,
             ),
             const SizedBox(height: EspacosTrato.x4),
             CampoTrato(
@@ -556,7 +564,9 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               prefixo: 'R\$ ',
               teclado: TextInputType.number,
               formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-              erro: _tentou && (centavos == null || centavos <= 0) ? 'Informe o valor.' : null,
+              erro: _tentou && (centavos == null || centavos <= 0)
+                  ? 'Valor do material não informado. Digite um valor em reais maior que zero.'
+                  : null,
             ),
             const SizedBox(height: EspacosTrato.x5),
             BotaoPrimario(texto: 'Adicionar', aoTocar: _confirmar),

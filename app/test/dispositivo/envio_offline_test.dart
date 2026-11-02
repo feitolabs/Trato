@@ -124,16 +124,36 @@ void main() {
       );
     });
 
-    test('portfólio ainda não tem destino no backend', () async {
+    test('portfólio envia com destino portfolio no backend', () async {
+      String? destinoEnviado;
       final api = ClienteApi(
         urlBase: 'https://api.teste',
         sessao: SessaoTrato(),
-        cliente: MockClient((_) async => throw StateError('não deveria chamar')),
+        cliente: MockClient((req) async {
+          if (req.url.path == '/v1/uploads') {
+            final corpo = jsonDecode(req.body) as Map<String, dynamic>;
+            destinoEnviado = corpo['destino'] as String?;
+            return _json({
+              'upload_id': 'up-1',
+              'url_envio': 'https://storage.teste/up-1',
+              'metodo': 'PUT',
+              'expira_em_segundos': 300,
+              'content_type': 'image/jpeg',
+            });
+          }
+          if (req.url.path == '/v1/uploads/up-1/concluir') {
+            return _json({'midia_id': 'mid-port-1'});
+          }
+          return _json({'ok': true});
+        }),
       );
-      await expectLater(
-        ServicoUploadApi(api).enviar(foto, FinalidadeArquivo.portfolio),
-        throwsA(isA<ErroTrato>().having((e) => e.tipo, 'tipo', TipoErro.indisponivel)),
-      );
+      final enviado = await ServicoUploadApi(
+        api,
+        cliente: MockClient((_) async => http.Response('', 200)),
+      ).enviar(foto, FinalidadeArquivo.portfolio);
+
+      expect(destinoEnviado, 'portfolio');
+      expect(enviado.arquivoId, 'mid-port-1');
     });
   });
 

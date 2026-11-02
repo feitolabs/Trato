@@ -49,9 +49,12 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   void _adicionarItem() {
     final desc = _descricao.text.trim();
     final centavos = Dinheiro.lerCentavos(_valor.text);
-    if (desc.isEmpty) return setState(() => _erroItem = 'Diga o que é o item');
+    if (desc.isEmpty) {
+      return setState(() => _erroItem = 'Descrição vazia. Digite o que é o item.');
+    }
     if (centavos == null || centavos <= 0) {
-      return setState(() => _erroItem = 'Informe o valor do item, ex.: 46,50');
+      return setState(() => _erroItem =
+          'Valor não informado. Digite um valor em reais maior que zero (ex.: 46,50).');
     }
     setState(() {
       _itens.add(ItemNota(descricao: desc, centavos: centavos));
@@ -86,7 +89,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        _erroEnvio = 'Não foi possível enviar a nota. Tente de novo.';
+        _erroEnvio = 'Não foi possível enviar a nota. Confira sua conexão e tente de novo.';
       });
     }
   }

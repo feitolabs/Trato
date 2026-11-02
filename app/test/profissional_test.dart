@@ -161,8 +161,16 @@ void main() {
       await tester.pump();
 
       expect(enviado, isNull);
-      expect(find.text('Informe as horas, como 3 ou 2,5.'), findsOneWidget);
-      expect(find.text('Informe o valor da hora.'), findsOneWidget);
+      expect(
+        find.text('Quantidade de horas não informada. Digite as horas, como 3 ou 2,5.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Valor da hora não informado. Digite o valor por hora de trabalho (ex.: 80,00).',
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('validação: deslocamento inválido', (tester) async {
@@ -172,7 +180,10 @@ void main() {
       await tester.tap(find.text('Enviar orçamento'));
       await tester.pump();
       expect(enviado, isNull);
-      expect(find.text('Use só números, como 30 ou 30,50.'), findsOneWidget);
+      expect(
+        find.text('Valor de deslocamento inválido. Use só números, como 30 ou 30,50.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('enviar entrega o orçamento em centavos inteiros', (tester) async {
@@ -238,8 +249,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Adicionar'));
       await tester.pump();
-      expect(find.text('Informe o item.'), findsOneWidget);
-      expect(find.text('Informe o valor.'), findsOneWidget);
+      expect(
+        find.text('Descrição do material vazia. Digite o nome do item (ex.: 2 tomadas 20 A).'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Valor do material não informado. Digite um valor em reais maior que zero.'),
+        findsOneWidget,
+      );
     });
   });
 

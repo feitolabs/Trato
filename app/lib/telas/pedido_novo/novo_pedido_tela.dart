@@ -86,7 +86,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     final inicio = DateTime(hoje.year, hoje.month, hoje.day);
     final data = await showDatePicker(
       context: context,
-      initialDate: _dataPrazo ?? inicio.add(const Duration(days: 1)),
+      initialDate: _dataPrazo,
       firstDate: inicio,
       lastDate: inicio.add(const Duration(days: 365)),
       helpText: _comPressa == true ? 'Para quando você precisa?' : 'Até quando está bom?',
@@ -97,7 +97,9 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   bool get _exigeCidade => widget.formulario.cidades.isNotEmpty;
 
   String? get _erroCidade =>
-      _tentou && _exigeCidade && _cidade == null ? 'Selecione a cidade do serviço.' : null;
+      _tentou && _exigeCidade && _cidade == null
+          ? 'Cidade não selecionada. Escolha a cidade onde o serviço será realizado.'
+          : null;
 
   Future<void> _escolherCidade() async {
     final escolhida = await showModalBottomSheet<CidadeOpcao>(
@@ -164,10 +166,14 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   }
 
   String? get _erroServicos =>
-      _tentou && _servicos.isEmpty ? 'Escolha pelo menos um serviço.' : null;
+      _tentou && _servicos.isEmpty
+          ? 'Nenhum serviço selecionado. Escolha pelo menos uma das opções acima.'
+          : null;
 
   String? get _erroDescricao =>
-      _tentou && _descricao.text.trim().isEmpty ? 'Conte o que está acontecendo.' : null;
+      _tentou && _descricao.text.trim().isEmpty
+          ? 'Descrição não preenchida. Explique em detalhes o que precisa ser feito.'
+          : null;
 
   Future<void> _enviar() async {
     if (_enviando) return;
@@ -177,7 +183,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     if (_informarValorProprio) {
       final c = _lerCentavos(_controladorValorProprio.text);
       if (c == null || c <= 0) {
-        setState(() => _erroValor = 'Informe o valor que você quer gastar.');
+        setState(() => _erroValor =
+            'Valor não preenchido. Digite um valor em reais maior que zero (ex.: R\$ 80,00).');
         return;
       }
       _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
@@ -635,13 +642,13 @@ class _FotoReservada extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black54,
+                          color: CoresTrato.overlayFoto,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           rotulo,
                           style: TipografiaTrato.legenda.copyWith(
-                            color: Colors.white,
+                            color: CoresTrato.textoSobreFoto,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

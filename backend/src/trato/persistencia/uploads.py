@@ -40,7 +40,8 @@ class UploadsPostgres:
 
         try:
             with self._banco.transacao() as con:
-                # Remove tentativa pendente anterior no mesmo caminho para evitar colisão na unique constraint
+                # Remove tentativa pendente anterior no mesmo caminho para evitar colisão
+                # na constraint unique.
                 con.execute(
                     """
                     delete from public.upload_solicitacoes

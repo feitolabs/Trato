@@ -94,7 +94,10 @@ void main() {
       await tester.pump();
       await _tocar(tester, find.text('Próximo'));
 
-      expect(find.text('Escolha pelo menos um serviço.'), findsOneWidget);
+      expect(
+        find.text('Nenhum serviço selecionado. Escolha pelo menos uma das opções acima.'),
+        findsOneWidget,
+      );
       expect(recebido, isNull);
     });
 
@@ -104,7 +107,10 @@ void main() {
       await tester.enterText(find.byType(TextField), '   ');
       await _tocar(tester, find.text('Próximo'));
 
-      expect(find.text('Conte o que está acontecendo.'), findsOneWidget);
+      expect(
+        find.text('Descrição não preenchida. Explique em detalhes o que precisa ser feito.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('Próximo devolve o que foi preenchido', (tester) async {

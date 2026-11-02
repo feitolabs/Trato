@@ -34,4 +34,10 @@ abstract final class CoresTrato {
 
   static const logoAzul = Color(0xFF60B3C3);
   static const logoAzulClaro = Color(0xFFA8D3DA);
+
+  /// Fundo e sobreposições para visualização de fotos.
+  static const fundoModalFoto = Color(0xDE000000);
+  static const fundoFotoPreto = Color(0xFF000000);
+  static const overlayFoto = Color(0x8A000000);
+  static const textoSobreFoto = Color(0xFFFFFFFF);
 }

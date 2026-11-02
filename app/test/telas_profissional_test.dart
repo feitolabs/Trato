@@ -116,8 +116,14 @@ void main() {
         ),
       );
       await _tocar(t, find.text('Salvar e continuar'));
-      expect(find.text('Informe seu nome completo'), findsOneWidget);
-      expect(find.text('Escolha pelo menos uma categoria'), findsOneWidget);
+      expect(
+        find.text('Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Nenhuma categoria selecionada. Escolha pelo menos uma área de atuação.'),
+        findsOneWidget,
+      );
       expect(fake.salvos, isEmpty);
 
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
@@ -147,7 +153,12 @@ void main() {
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));
       await _tocar(t, find.text('Salvar e continuar'));
-      expect(find.text('Não foi possível salvar. Tente de novo.'), findsOneWidget);
+      expect(
+        find.text(
+          'Não foi possível salvar os dados. Confira sua conexão e tente novamente.',
+        ),
+        findsOneWidget,
+      );
     });
   });
 
@@ -239,7 +250,7 @@ void main() {
       expect(botao().onPressed, isNull);
 
       await _tocar(t, find.text('Adicionar item'));
-      expect(find.text('Diga o que é o item'), findsOneWidget);
+      expect(find.text('Descrição vazia. Digite o que é o item.'), findsOneWidget);
 
       await t.enterText(find.byType(TextField).at(0), '2 tomadas');
       await t.enterText(find.byType(TextField).at(1), '46,50');
@@ -282,7 +293,12 @@ void main() {
       expect(find.textContaining('só vale se o cliente aprovar'), findsOneWidget);
       await _tocar(t, find.text('Enviar aditivo ao cliente'));
       expect(fake.criados, isEmpty);
-      expect(find.text('Informe o valor, ex.: 45,00'), findsOneWidget);
+      expect(
+        find.text(
+          'Valor não informado. Digite um valor em reais maior que zero (ex.: 45,00).',
+        ),
+        findsOneWidget,
+      );
 
       await t.enterText(find.byType(TextField).at(0), 'Cabo trocado por desgaste');
       await t.enterText(find.byType(TextField).at(1), '100');
@@ -346,7 +362,12 @@ void main() {
       await _tocar(t, find.text('Propor reembolso parcial'));
       await _tocar(t, find.text('Enviar resposta'));
       expect(fake.respostas, isEmpty);
-      expect(find.text('Escreva uma resposta curta'), findsOneWidget);
+      expect(
+        find.text(
+          'Resposta muito curta. Escreva pelo menos 5 caracteres explicando sua posição.',
+        ),
+        findsOneWidget,
+      );
 
       await t.enterText(find.byType(TextField).at(0), '50');
       await t.enterText(find.byType(TextField).at(1), 'Aceito devolver parte do valor');

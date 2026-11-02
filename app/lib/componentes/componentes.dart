@@ -1,8 +1,11 @@
 export 'barra_abas.dart';
 export 'botoes.dart';
 export 'campo.dart';
+export 'carregamento_latencia.dart';
 export 'cartao.dart';
 export 'chip_status.dart';
+export 'espera_longa.dart';
+export 'esqueleto.dart';
 export 'imagem_trato.dart';
 export 'indicador_paginas.dart';
 export 'linha_do_tempo.dart';

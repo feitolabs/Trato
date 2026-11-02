@@ -48,8 +48,8 @@ from trato.persistencia.dinheiro import (
     RepassesPostgres,
 )
 from trato.persistencia.execucao import ExecucaoPostgres
-from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.ledger import LedgerPostgres
+from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
 from trato.persistencia.pagamentos import (
     AditivosPostgres,

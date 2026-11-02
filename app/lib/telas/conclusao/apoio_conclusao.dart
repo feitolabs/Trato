@@ -116,12 +116,12 @@ class EspacoFoto extends StatelessWidget {
                       padding: EdgeInsets.all(6),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.black54,
+                          color: CoresTrato.overlayFoto,
                           shape: BoxShape.circle,
                         ),
                         child: Padding(
                           padding: EdgeInsets.all(4),
-                          child: Icon(Icons.zoom_in, size: 16, color: Colors.white),
+                          child: Icon(Icons.zoom_in, size: 16, color: CoresTrato.textoSobreFoto),
                         ),
                       ),
                     ),
@@ -130,7 +130,7 @@ class EspacoFoto extends StatelessWidget {
                     alignment: Alignment.bottomLeft,
                     child: Container(
                       width: double.infinity,
-                      color: Colors.black54,
+                      color: CoresTrato.overlayFoto,
                       padding: const EdgeInsets.symmetric(
                         horizontal: EspacosTrato.x2,
                         vertical: EspacosTrato.x1,

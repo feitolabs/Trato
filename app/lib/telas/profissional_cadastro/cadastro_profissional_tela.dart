@@ -100,8 +100,12 @@ class _FormularioState extends State<_Formulario> {
     }
   }
 
-  String? get _erroNome => _nome.text.trim().length < 3 ? 'Informe seu nome completo' : null;
-  String? get _erroCidade => _cidade.text.trim().isEmpty ? 'Informe a cidade ou bairro' : null;
+  String? get _erroNome => _nome.text.trim().length < 3
+      ? 'Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'
+      : null;
+  String? get _erroCidade => _cidade.text.trim().isEmpty
+      ? 'Região não informada. Digite a cidade ou o bairro onde você atende.'
+      : null;
 
   bool get _valido =>
       _erroNome == null &&
@@ -155,7 +159,7 @@ class _FormularioState extends State<_Formulario> {
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        _erroEnvio = 'Não foi possível salvar. Tente de novo.';
+        _erroEnvio = 'Não foi possível salvar os dados. Confira sua conexão e tente novamente.';
       });
       _rolarParaTopo();
     }
@@ -217,7 +221,8 @@ class _FormularioState extends State<_Formulario> {
           selecionadas: _categorias,
           aoAlternar: (v) => _alternar(_categorias, v),
         ),
-        if (_tentou && _categorias.isEmpty) _erro('Escolha pelo menos uma categoria'),
+        if (_tentou && _categorias.isEmpty)
+          _erro('Nenhuma categoria selecionada. Escolha pelo menos uma área de atuação.'),
         const TituloSecao('Área atendida'),
         CampoTrato(
           rotulo: 'Cidade ou bairro base',
@@ -239,14 +244,16 @@ class _FormularioState extends State<_Formulario> {
           selecionadas: _dias,
           aoAlternar: (v) => _alternar(_dias, v),
         ),
-        if (_tentou && _dias.isEmpty) _erro('Escolha pelo menos um dia'),
+        if (_tentou && _dias.isEmpty)
+          _erro('Nenhum dia selecionado. Escolha pelo menos um dia da semana para atendimento.'),
         const SizedBox(height: EspacosTrato.x3),
         OpcoesPilula(
           opcoes: o.periodos,
           selecionadas: _periodos,
           aoAlternar: (v) => _alternar(_periodos, v),
         ),
-        if (_tentou && _periodos.isEmpty) _erro('Escolha pelo menos um período'),
+        if (_tentou && _periodos.isEmpty)
+          _erro('Nenhum período selecionado. Escolha manhã, tarde ou noite para seus atendimentos.'),
         const TituloSecao('Portfólio', ajuda: 'Fotos de trabalhos que você já fez (opcional).'),
         if (_portfolio.isEmpty)
           Text(
@@ -315,14 +322,14 @@ class _MiniFoto extends StatelessWidget {
                   : EdgeInsets.zero,
               decoration: imagemReal != null
                   ? BoxDecoration(
-                      color: Colors.black54,
+                      color: CoresTrato.overlayFoto,
                       borderRadius: BorderRadius.circular(4),
                     )
                   : null,
               child: Text(
                 'Foto $numero',
                 style: imagemReal != null
-                    ? TipografiaTrato.legenda.copyWith(color: Colors.white)
+                    ? TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSobreFoto)
                     : TipografiaTrato.corpoPequeno,
               ),
             ),

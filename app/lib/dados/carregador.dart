@@ -11,6 +11,7 @@ class Carregador<T> extends StatefulWidget {
     super.key,
     required this.carregar,
     required this.construir,
+    this.esqueleto,
     this.vazio,
     this.tituloVazio = 'Nada por aqui ainda',
     this.textoVazio = '',
@@ -18,6 +19,9 @@ class Carregador<T> extends StatefulWidget {
 
   final Future<T> Function() carregar;
   final Widget Function(BuildContext context, T dado) construir;
+
+  /// Esqueleto opcional para loading (Skeleton loading).
+  final Widget Function(BuildContext context)? esqueleto;
 
   /// Diz se o dado conta como "vazio". Sem isso, nunca mostra o estado vazio.
   final bool Function(T dado)? vazio;
@@ -43,6 +47,9 @@ class _CarregadorState<T> extends State<Carregador<T>> {
       future: _futuro,
       builder: (context, foto) {
         if (foto.connectionState != ConnectionState.done) {
+          if (widget.esqueleto != null) {
+            return widget.esqueleto!(context);
+          }
           return const EstadoTela(carregando: true);
         }
         if (foto.hasError) {
@@ -69,12 +76,14 @@ class EstadoTela extends StatelessWidget {
   const EstadoTela({
     super.key,
     this.carregando = false,
+    this.esqueleto,
     this.titulo,
     this.texto,
     this.aoTentarNovamente,
   });
 
   final bool carregando;
+  final Widget? esqueleto;
   final String? titulo;
   final String? texto;
   final VoidCallback? aoTentarNovamente;
@@ -98,10 +107,11 @@ class EstadoTela extends StatelessWidget {
               Expanded(
                 child: Center(
                   child: carregando
-                      ? Semantics(
-                          label: 'Carregando',
-                          child: const CircularProgressIndicator(color: CoresTrato.petroleo),
-                        )
+                      ? esqueleto ??
+                          Semantics(
+                            label: 'Carregando',
+                            child: const CircularProgressIndicator(color: CoresTrato.petroleo),
+                          )
                       : Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [

@@ -264,7 +264,7 @@ class ServicoAuthSupabase implements ServicoAuth {
         }
         if (r.user != null && _api != null) {
           try {
-            await _api!.post(
+            await _api.post(
               '/v1/cadastro/vincular',
               corpo: {
                 'usuario_id': r.user!.id,

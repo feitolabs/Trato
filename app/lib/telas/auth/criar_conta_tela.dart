@@ -77,7 +77,9 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   String? _validarConfirmacaoSenha() {
     if (_confirmarSenha.text.isEmpty) return null;
-    return _confirmarSenha.text == _senha.text ? null : 'As senhas não conferem.';
+    return _confirmarSenha.text == _senha.text
+        ? null
+        : 'As senhas não conferem. Digite exatamente a mesma senha nos dois campos.';
   }
 
   bool get _valido =>
@@ -250,7 +252,9 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         _LinhaMarcar(
           marcado: _aceitouTermos,
           aoMudar: (v) => setState(() => _aceitouTermos = v),
-          erro: _tentou && !_aceitouTermos ? 'Aceite os termos para continuar.' : null,
+          erro: _tentou && !_aceitouTermos
+              ? 'Termos não aceitos. Marque a caixa para concordar com os Termos de uso e continuar.'
+              : null,
           texto: Text.rich(
             TextSpan(
               style: estiloTexto,

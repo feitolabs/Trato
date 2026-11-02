@@ -93,7 +93,7 @@ O que **não** deu para fechar, o motivo e o próximo passo:
 
 - `POST /v1/contratos/{id}/cobranca` responde `503` em modo `postgres` (cobrança só em memória): o app
   mostra o erro do servidor.
-- Aprovar aditivo cria uma cobrança `aguardando_confirmacao`, mas o app **ainda não tem a tela de
-  pagar o aditivo**: a aprovação funciona, o pagamento do aditivo não.
+- Aprovar aditivo cria uma cobrança `aguardando_confirmacao`, e agora o app direciona o
+  cliente diretamente para a tela de pagamento (`_pagamento(pedidoId)`).
 - Migrations `pedido_recusas` e `profissional_disponibilidade_portfolio_uploads`: a segunda já está
   aplicada; recusar pedido segue dependendo da primeira em modo `postgres`.

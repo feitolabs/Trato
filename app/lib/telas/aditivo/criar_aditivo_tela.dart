@@ -55,8 +55,12 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
     return (c == null || c <= 0) ? null : c;
   }
 
-  String? get _erroMotivo => _motivo.text.trim().length < 5 ? 'Explique o motivo em poucas palavras' : null;
-  String? get _erroValor => _centavos == null ? 'Informe o valor, ex.: 45,00' : null;
+  String? get _erroMotivo => _motivo.text.trim().length < 5
+      ? 'Motivo muito curto. Explique o motivo do aditivo com pelo menos 5 caracteres.'
+      : null;
+  String? get _erroValor => _centavos == null
+      ? 'Valor não informado. Digite um valor em reais maior que zero (ex.: 45,00).'
+      : null;
 
   Future<void> _atualizarResumo() async {
     final c = _centavos;

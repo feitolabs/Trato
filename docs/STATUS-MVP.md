@@ -27,12 +27,12 @@ O app sempre abre em `demo`. Sem `TRATO_API_URL`, o modo `api` cai em `demo`. De
 | Serviços recentes (lista) | API | `GET /v1/pedidos`. Sem protótipo. |
 | Busca (`busca/`, resultados por texto) | Demo, ligada ao catálogo | Aba Buscar: campo, categorias (→ Categoria) e "Ver todas"; resultados com nota, serviços e região; abre o perfil. Depende da rota de busca (#10) no modo `api`. |
 | Busca e perfil público (backend) | Pronto no backend | Rotas de busca (#10) e perfil por id (#11) existem (`docs/api-rotas.md`); o app liga o perfil por id e mantém a busca em demo até ligar a rota de busca. |
-| Novo pedido (tela 11) | API | `POST /v1/pedidos`. A API ainda não tem campos de serviços, descrição nem faixa de preço. |
+| Novo pedido (tela 11) | API | `POST /v1/pedidos`. Integrado com seleção de cidade real, perguntas/serviços, faixa de preço/valor personalizado e descrição. |
 | Seus pedidos | API | Título genérico ("Pedido #XXXX"): a API não devolve título nem nome do profissional. |
 | Orçamentos recebidos e detalhe | API | `GET /v1/pedidos/{id}/orcamentos` + `GET /v1/orcamentos/{id}`; aceite em `acoes/aceitar_orcamento`. Selo, nota e total de serviços do profissional não vêm da API (mostra "—"). |
 | Pagamento e aguardando confirmação | API | Valor e meios em `GET /v1/pedidos/{id}/pagamento`; `POST /v1/contratos/{id}/cobranca` (idempotente); consulta `GET /v1/contratos/{id}/pagamento` até `pago: true`. Depois de pago o app abre o pedido em andamento. Nunca marca pago sozinho (D13). Em modo `postgres` a cobrança ainda dá 503 no backend. |
 | Pedido em execução, código de início | API | Fotos do check-in não vêm da API. |
-| Aditivo e nota de materiais (lado do cliente) | API | `GET/POST /v1/contratos/{id}/aditivos...` e `notas-material`. Aprovar cria a cobrança do aditivo, mas o app ainda não tem a tela de pagá-la. Sem protótipo. |
+| Aditivo e nota de materiais (lado do cliente) | API | `GET/POST /v1/contratos/{id}/aditivos...` e `notas-material`. Aprovar o aditivo direciona o cliente diretamente para o pagamento da cobrança gerada. Sem protótipo. |
 | Conclusão, confirmar serviço | API | Valores de `GET .../saldo`. |
 | Avaliação | API | `POST /v1/contratos/{id}/avaliacao` (nota geral = média dos critérios). Gorjeta não tem rota: o app avisa e não envia. |
 | Relatar problema (disputa) | API | `POST .../disputa`. |

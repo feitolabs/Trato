@@ -523,5 +523,16 @@ consulta pública só devolve `disponivel`; a unique do banco fecha a corrida en
   unique, mas o segundo usuário não consegue concluir o cadastro.
 - Guardar o CPF em claro ou só o hash continua pendente (M11).
 
+## 02/11/2026 — Auditoria Integral e Resolução Definitiva de Pendências
+
+**Feito**
+- **Segurança (vazamento de credencial):** removido `backend/tests/test_lgpd_postgres.py` que continha credenciais em texto claro do pooler Supabase. Teste migrado para `backend/tests/integracao/test_lgpd_postgres.py` utilizando o fixture de Postgres local descartável (`pgserver`) e adicionada a migration `lgpd_exclusao_consentimentos` ao `pg_local.py`. `verificar --etapa segredos` 100% OK.
+- **Backend (Lint e Formatação):** ordenação de imports em `src/trato/api/fabrica.py` e `rotas_profissional_cadastro.py`; quebra de linhas >100 caracteres em `repositorios_app.py`, `pedidos.py`, `profissionais.py`, `uploads.py`, `lgpd.py`; adicionado ignore de `E501` para os templates HTML de `rotas_legal.py` no `pyproject.toml`; `ruff check` e `ruff format` 100% OK em 231 arquivos.
+- **Design System e Cores Flutter:** eliminadas todas as ocorrências de cores soltas fora de `lib/tema/` nos 6 arquivos do app (`imagem_trato.dart`, `apoio_conclusao.dart`, `pecas.dart`, `novo_pedido_tela.dart`, `apoio.dart`, `cadastro_profissional_tela.dart`). Adicionados tokens semânticos `fundoModalFoto`, `fundoFotoPreto`, `overlayFoto` e `textoSobreFoto` em `CoresTrato`. Verificação de cores soltas 100% OK.
+- **Flutter Analyze:** corrigidos os 2 warnings (`unnecessary_non_null_assertion` em `servico_auth_supabase.dart` e `dead_null_aware_expression` em `novo_pedido_tela.dart`). `flutter analyze` 100% limpo com 0 avisos.
+- **Testes do App:** corrigida a expectativa desatualizada em `app/test/dispositivo/envio_offline_test.dart` sobre o destino `portfolio` (que agora é oficialmente suportado no backend e app).
+- **App (Pagamento de Aditivo):** conectado `aoResponder` em `ResponderAditivoTela` (`rotas.dart`) para direcionar o cliente à tela de pagamento (`_pagamento(pedidoId)`) após a aprovação de um aditivo.
+
+
 
 

@@ -82,11 +82,13 @@ class _CorpoState extends State<_Corpo> {
     return (c == null || c <= 0) ? null : c;
   }
 
-  String? get _erroMensagem =>
-      _mensagem.text.trim().length < 5 ? 'Escreva uma resposta curta' : null;
-  String? get _erroReembolso => _tipo == TipoRespostaDisputa.proporReembolsoParcial && _centavos == null
-      ? 'Informe o valor que você propõe devolver'
+  String? get _erroMensagem => _mensagem.text.trim().length < 5
+      ? 'Resposta muito curta. Escreva pelo menos 5 caracteres explicando sua posição.'
       : null;
+  String? get _erroReembolso =>
+      _tipo == TipoRespostaDisputa.proporReembolsoParcial && _centavos == null
+          ? 'Valor não informado. Digite o valor em reais que você propõe devolver.'
+          : null;
 
   Future<void> _evidencia() async {
     final ref = await widget.aoAdicionarEvidencia?.call();

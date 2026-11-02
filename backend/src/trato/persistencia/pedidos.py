@@ -278,7 +278,10 @@ class PedidosPostgres:
     ) -> None:
         # Resolve categoria: se não for UUID direto, busca por slug/nome ou primeira ativa
         cat_uuid = como_uuid(d.categoria_id)
-        if cat_uuid and con.execute("select 1 from public.categorias where id = %s", (cat_uuid,)).fetchone():
+        if (
+            cat_uuid
+            and con.execute("select 1 from public.categorias where id = %s", (cat_uuid,)).fetchone()
+        ):
             categoria = cat_uuid
         else:
             cat_slug = str(d.categoria_id or "").strip().lower()
@@ -290,12 +293,21 @@ class PedidosPostgres:
             if cat_row:
                 categoria = str(cat_row["id"])
             else:
-                cat_padrao = con.execute("select id from public.categorias where ativa order by ordem, nome limit 1").fetchone()
-                categoria = str(cat_padrao["id"]) if cat_padrao else exigir_uuid(d.categoria_id, "categoria")
+                cat_padrao = con.execute(
+                    "select id from public.categorias where ativa order by ordem, nome limit 1"
+                ).fetchone()
+                categoria = (
+                    str(cat_padrao["id"])
+                    if cat_padrao
+                    else exigir_uuid(d.categoria_id, "categoria")
+                )
 
         # Resolve cidade: se não for UUID direto, busca por slug/nome ou primeira ativa
         cid_uuid = como_uuid(d.cidade_id)
-        if cid_uuid and con.execute("select 1 from public.cidades where id = %s", (cid_uuid,)).fetchone():
+        if (
+            cid_uuid
+            and con.execute("select 1 from public.cidades where id = %s", (cid_uuid,)).fetchone()
+        ):
             cidade = cid_uuid
         else:
             cid_slug = str(d.cidade_id or "").strip().lower()
@@ -307,7 +319,9 @@ class PedidosPostgres:
             if cid_row:
                 cidade = str(cid_row["id"])
             else:
-                cid_padrao = con.execute("select id from public.cidades where ativa order by nome limit 1").fetchone()
+                cid_padrao = con.execute(
+                    "select id from public.cidades where ativa order by nome limit 1"
+                ).fetchone()
                 cidade = str(cid_padrao["id"]) if cid_padrao else exigir_uuid(d.cidade_id, "cidade")
 
         con.execute(

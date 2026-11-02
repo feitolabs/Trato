@@ -218,7 +218,9 @@ class ServicoUploads:
         lng: float | None = None,
     ) -> Solicitacao:
         sol = self.repo.solicitacao(solicitacao_id)
-        if sol is None or str(sol.dono_id).replace("-", "") != str(dono_id).replace("-", ""):  # não revela que existe
+        if sol is None or str(sol.dono_id).replace("-", "") != str(dono_id).replace(
+            "-", ""
+        ):  # não revela que existe
             raise UploadNegado("Envio não encontrado.")
         if sol.status == "concluida":
             return sol

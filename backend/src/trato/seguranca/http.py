@@ -104,7 +104,9 @@ class MiddlewareProtecao:
                     *extras,
                     (b"x-idempotent-replay", b"true"),
                 ]
-                await enviar({"type": "http.response.start", "status": st, "headers": repassar_cabs})
+                await enviar(
+                    {"type": "http.response.start", "status": st, "headers": repassar_cabs}
+                )
                 await enviar({"type": "http.response.body", "body": corpo_salvo})
                 return
 

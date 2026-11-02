@@ -165,9 +165,9 @@ Future<void> abrirPreviewImagem(
   final imagemReal = construirImagemReal(referencia, fit: BoxFit.contain);
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black87,
+    barrierColor: CoresTrato.fundoModalFoto,
     builder: (dialogo) => Dialog.fullscreen(
-      backgroundColor: Colors.black,
+      backgroundColor: CoresTrato.fundoFotoPreto,
       child: SafeArea(
         child: Column(
           children: [
