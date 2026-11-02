@@ -331,6 +331,9 @@ class DisputasEmMemoria:
     def salvar(self, pedido_id: str, disputa: Disputa) -> None:
         self._itens[pedido_id] = disputa
 
+    def listar(self) -> list[tuple[str, Disputa]]:
+        return list(self._itens.items())
+
 
 class GarantiasEmMemoria:
     def __init__(self) -> None:

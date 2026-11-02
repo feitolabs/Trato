@@ -99,3 +99,49 @@ def armazenamento_da_config() -> ArmazenamentoArquivos | None:
     if not cfg.supabase_url or not chave:
         return None
     return ArmazenamentoSupabase(cfg.supabase_url, chave)
+
+
+class AssinadorSupabaseStorage:
+    """Gera URLs assinadas de curta duração para visualização de documentos privados no painel."""
+
+    def __init__(
+        self,
+        url: str,
+        chave_servico: str,
+        bucket: str = "verificacao",
+        cliente: Any = None,
+    ) -> None:
+        import httpx
+
+        self._base = url.rstrip("/") + "/storage/v1"
+        self._url_base = url.rstrip("/")
+        self._bucket = bucket
+        self._http = cliente or httpx.Client(
+            headers={"Authorization": f"Bearer {chave_servico}", "apikey": chave_servico},
+            timeout=20,
+        )
+
+    def assinar(self, caminho: str, segundos: int) -> str:
+        resp = self._http.post(
+            f"{self._base}/object/sign/{self._bucket}/{caminho.lstrip('/')}",
+            json={"expiresIn": segundos},
+        )
+        resp.raise_for_status()
+        dados = resp.json()
+        signed_url = str(dados.get("signedURL") or dados.get("signedUrl") or "")
+        if signed_url.startswith("http://") or signed_url.startswith("https://"):
+            return signed_url
+        if signed_url.startswith("/"):
+            return f"{self._url_base}{signed_url}"
+        return f"{self._base}/{signed_url}"
+
+
+def assinador_da_config(bucket: str = "verificacao") -> AssinadorSupabaseStorage | None:
+    """Assinador de URLs curtas se `SUPABASE_URL` e a chave de serviço existirem; senão `None`."""
+    from trato.config import obter_config
+
+    cfg = obter_config()
+    chave = cfg.supabase_service_role_key.get_secret_value()
+    if not cfg.supabase_url or not chave:
+        return None
+    return AssinadorSupabaseStorage(cfg.supabase_url, chave, bucket=bucket)

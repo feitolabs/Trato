@@ -240,6 +240,26 @@ class DisputasPostgres:
             else None,
         )
 
+    def listar(self) -> list[tuple[str, Disputa]]:
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select d.id, d.pedido_id, d.motivo, d.status, d.valor_congelado_centavos, "
+                "d.resposta_ate, d.decisao_ate, d.decisao, d.valor_reembolso_centavos, "
+                "d.decidida_por, d.aprovada_por, d.aberta_em, d.decidida_em, "
+                "min(e.criado_em) as respondeu_em "
+                "from public.disputas d "
+                "left join public.disputa_evidencias e "
+                "  on e.disputa_id = d.id and e.tipo = 'resposta' "
+                "group by d.id, d.pedido_id, d.motivo, d.status, d.valor_congelado_centavos, "
+                "d.resposta_ate, d.decisao_ate, d.decisao, d.valor_reembolso_centavos, "
+                "d.decidida_por, d.aprovada_por, d.aberta_em, d.decidida_em "
+                "order by d.aberta_em desc"
+            ).fetchall()
+            return [
+                (str(linha["pedido_id"]), self._montar(linha, linha["respondeu_em"]))
+                for linha in linhas
+            ]
+
     def salvar(self, pedido_id: str, disputa: Disputa) -> None:
         pid = exigir_uuid(pedido_id, "pedido")
         with self._banco.transacao() as con:

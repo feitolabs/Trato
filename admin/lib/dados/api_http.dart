@@ -45,31 +45,52 @@ class ApiAdminHttp implements ApiAdmin {
     Uri uri, {
     Object? corpo,
     Map<String, String> cabecalhos = const {},
+    int maxTentativas = 3,
   }) async {
-    final pedido = http.Request(metodo, uri)
-      ..headers['Accept'] = 'application/json'
-      ..headers.addAll(cabecalhos);
-    if (corpo != null) {
-      pedido.headers['Content-Type'] = 'application/json; charset=utf-8';
-      pedido.body = jsonEncode(corpo);
-    }
-    try {
-      final r = await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
-      final texto = utf8.decode(r.bodyBytes);
-      Object? json;
-      if (texto.isNotEmpty) {
-        try {
-          json = jsonDecode(texto);
-        } on FormatException {
-          json = null;
-        }
+    final ehIdempotente = metodo == 'GET' || metodo == 'HEAD';
+    final limiteTentativas = ehIdempotente ? maxTentativas : 1;
+
+    for (var tentativa = 1; tentativa <= limiteTentativas; tentativa++) {
+      final pedido = http.Request(metodo, uri)
+        ..headers['Accept'] = 'application/json'
+        ..headers.addAll(cabecalhos);
+      if (corpo != null) {
+        pedido.headers['Content-Type'] = 'application/json; charset=utf-8';
+        pedido.body = jsonEncode(corpo);
       }
-      return _Resposta(r.statusCode, json);
-    } on TimeoutException {
-      throw const ErroApi('O servidor demorou para responder. Tente de novo.');
-    } on http.ClientException {
-      throw const ErroApi('Não foi possível falar com o servidor.');
+      try {
+        final r = await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
+        if (ehIdempotente &&
+            (r.statusCode == 502 || r.statusCode == 503 || r.statusCode == 504) &&
+            tentativa < limiteTentativas) {
+          await Future<void>.delayed(Duration(milliseconds: 250 * tentativa));
+          continue;
+        }
+        final texto = utf8.decode(r.bodyBytes);
+        Object? json;
+        if (texto.isNotEmpty) {
+          try {
+            json = jsonDecode(texto);
+          } on FormatException {
+            json = null;
+          }
+        }
+        return _Resposta(r.statusCode, json);
+      } on TimeoutException {
+        if (tentativa < limiteTentativas) {
+          await Future<void>.delayed(Duration(milliseconds: 250 * tentativa));
+          continue;
+        }
+        throw const ErroApi('O servidor demorou para responder. Tente de novo.');
+      } on http.ClientException {
+        if (tentativa < limiteTentativas) {
+          await Future<void>.delayed(Duration(milliseconds: 250 * tentativa));
+          continue;
+        }
+        throw const ErroApi('Não foi possível falar com o servidor.');
+      }
     }
+    throw const ErroApi('Não foi possível falar com o servidor.');
   }
 
   Uri _uri(String caminho, [Map<String, String?> consulta = const {}]) {

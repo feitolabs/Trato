@@ -62,8 +62,10 @@ def obter_admin(request: Request, contexto: Contexto = Depends(obter_contexto)) 
         if banco is None:
             raise HTTPException(503, "API administrativa ainda sem os repositórios ligados.")
         from trato.api.admin.postgres import criar_admin_postgres
+        from trato.uploads.armazenamento import assinador_da_config
 
-        admin = criar_admin_postgres(banco)
+        assinador = contexto.extras.get("assinador") or assinador_da_config()
+        admin = criar_admin_postgres(banco, assinador=assinador)
         request.app.state.admin = admin
     return admin
 

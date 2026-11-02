@@ -374,6 +374,8 @@ def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):
 
     aberta = DisputasPostgres(c.banco).obter(pedido_id)
     assert aberta is not None and aberta.valor_congelado == VALOR
+    todas_disputas = DisputasPostgres(c.banco).listar()
+    assert any(pid == pedido_id for pid, _ in todas_disputas)
     with c.local.admin() as con:
         assert con.execute(
             "select descricao, status from public.disputas where pedido_id = %s", (pedido_id,)
