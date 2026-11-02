@@ -80,4 +80,86 @@ abstract interface class ApiAdmin {
   // F7.6 auditoria
   Future<List<EntradaAuditoria>> listarAuditoria({String? acao, String? ator});
   Future<ResultadoCadeia> verificarCadeia();
+
+  // Módulo 1: Dashboard
+  Future<MetricasDashboard> metricasDashboard();
+  Future<SeriesDashboard> seriesDashboard({int dias = 7});
+
+  // Módulo 2: Perguntas Dinâmicas da Categoria
+  Future<List<PerguntaCategoriaAdmin>> listarPerguntasCategoria(String categoriaId);
+  Future<PerguntaCategoriaAdmin> criarPerguntaCategoria(
+    String categoriaId, {
+    required String texto,
+    required String tipo,
+    List<String>? opcoes,
+    bool obrigatoria = false,
+    int ordem = 0,
+    required String motivo,
+  });
+  Future<PerguntaCategoriaAdmin> editarPerguntaCategoria(
+    String categoriaId,
+    String perguntaId, {
+    String? texto,
+    String? tipo,
+    List<String>? opcoes,
+    bool? obrigatoria,
+    int? ordem,
+    bool? ativa,
+    required String motivo,
+  });
+  Future<void> desativarPerguntaCategoria(String categoriaId, String perguntaId, {required String motivo});
+
+  // Módulo 3: Central Antifraude e Risco
+  Future<List<AlertaRisco>> listarAlertasRisco();
+  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo});
+  Future<void> travarSaque(String usuarioId, {required String motivo});
+  Future<void> resolverAlertaRisco(String alertaId, {required String motivo});
+
+  // Módulo 4: Notificações em Massa & Campanhas
+  Future<List<CampanhaNotificacao>> listarCampanhasNotificacao();
+  Future<CampanhaNotificacao> dispararCampanhaNotificacao({
+    required String titulo,
+    required String mensagem,
+    required String segmento,
+    String? categoriaId,
+    String? cidadeId,
+    required String motivo,
+  });
+
+  // Módulo 5: Gestão de Cupons
+  Future<List<CupomAdmin>> listarCupons();
+  Future<CupomAdmin> criarCupom({
+    required String codigo,
+    required String tipo,
+    required int valor,
+    int valorMinimoCentavos = 0,
+    int? limiteUsos,
+    String? validoAte,
+    required String motivo,
+  });
+  Future<CupomAdmin> alterarStatusCupom(String cupomId, {required bool ativo, required String motivo});
+  Future<void> excluirCupom(String cupomId, {required String motivo});
+
+  // Módulo 6: Equipe Interna
+  Future<List<MembroEquipeAdmin>> listarEquipe();
+  Future<MembroEquipeAdmin> adicionarMembroEquipe({
+    required String nome,
+    required String email,
+    required String papel,
+    int alcadaCentavos = 0,
+    required String motivo,
+  });
+  Future<MembroEquipeAdmin> editarMembroEquipe(
+    String usuarioId, {
+    String? papel,
+    int? alcadaCentavos,
+    bool? ativo,
+    required String motivo,
+  });
+  Future<void> revogarMembroEquipe(String usuarioId, {required String motivo});
+
+  // Módulo 7: Exportação de Relatórios CSV
+  String urlRelatorioFinanceiroCsv();
+  String urlRelatorioPedidosCsv();
+  String urlRelatorioRepassesCsv();
 }

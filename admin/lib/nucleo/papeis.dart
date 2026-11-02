@@ -48,6 +48,13 @@ enum Permissao {
   configAprovar,
   auditoriaVer,
   auditoriaVerificarCadeia,
+  dashboardVer,
+  riscoVer,
+  riscoDecidir,
+  notificacoesEnviar,
+  cuponsGerenciar,
+  equipeGerenciar,
+  relatoriosExportar,
 }
 
 const _matriz = <Papel, Set<Permissao>>{
@@ -65,6 +72,7 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.disputasVer,
     Permissao.disputasDecidir,
     Permissao.disputasSegundaPessoa,
+    Permissao.dashboardVer,
   },
   Papel.mediador: {
     Permissao.pedidosBuscar,
@@ -78,12 +86,21 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.usuariosBuscar,
     Permissao.dadosPessoaisRevelar,
   },
-  Papel.moderador: {Permissao.usuariosBuscar, Permissao.pedidosBuscar, Permissao.categoriasEditar},
+  Papel.moderador: {
+    Permissao.usuariosBuscar,
+    Permissao.pedidosBuscar,
+    Permissao.categoriasEditar,
+    Permissao.notificacoesEnviar,
+    Permissao.cuponsGerenciar,
+  },
   Papel.financeiro: {
     Permissao.pagamentosVer,
     Permissao.pedidosBuscar,
     Permissao.configVer,
     Permissao.configPropor,
+    Permissao.dashboardVer,
+    Permissao.cuponsGerenciar,
+    Permissao.relatoriosExportar,
   },
   Papel.seguranca: {
     Permissao.verificacoesVer,
@@ -91,6 +108,8 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.dadosPessoaisRevelar,
     Permissao.auditoriaVer,
     Permissao.auditoriaVerificarCadeia,
+    Permissao.riscoVer,
+    Permissao.riscoDecidir,
   },
   Papel.juridico: {
     Permissao.configVer,

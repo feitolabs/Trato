@@ -13,8 +13,14 @@ from trato.api.admin import (
     rotas_auditoria,
     rotas_catalogo,
     rotas_config,
+    rotas_cupons,
+    rotas_dashboard,
     rotas_disputas,
+    rotas_equipe,
+    rotas_notificacoes,
     rotas_pagamentos,
+    rotas_relatorios,
+    rotas_risco,
     rotas_usuarios,
     rotas_verificacoes,
 )
@@ -24,6 +30,7 @@ from trato.api.admin.contexto import AdminContexto
 def criar_router_admin() -> APIRouter:
     roteador = APIRouter()
     for modulo in (
+        rotas_dashboard,
         rotas_verificacoes,
         rotas_disputas,
         rotas_pagamentos,
@@ -31,6 +38,11 @@ def criar_router_admin() -> APIRouter:
         rotas_config,
         rotas_auditoria,
         rotas_catalogo,
+        rotas_risco,
+        rotas_notificacoes,
+        rotas_cupons,
+        rotas_equipe,
+        rotas_relatorios,
     ):
         roteador.include_router(modulo.router)
     return roteador

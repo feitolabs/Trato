@@ -409,3 +409,189 @@ class ErroApi implements Exception {
   @override
   String toString() => mensagem;
 }
+
+// =============================================================================
+// MÓDULO 1: DASHBOARD EXECUTIVO
+// =============================================================================
+
+class MetricasDashboard {
+  const MetricasDashboard({
+    required this.gmvCentavos,
+    required this.receitaTaxaCentavos,
+    required this.pedidosTotal,
+    required this.pedidosConcluidos,
+    required this.pedidosEmAndamento,
+    required this.pedidosAbertos,
+    required this.pedidosDisputa,
+    required this.clientesTotal,
+    required this.profissionaisTotal,
+    required this.profissionaisPendentes,
+    required this.cidadesAtivas,
+    required this.categoriasAtivas,
+  });
+
+  final int gmvCentavos;
+  final int receitaTaxaCentavos;
+  final int pedidosTotal;
+  final int pedidosConcluidos;
+  final int pedidosEmAndamento;
+  final int pedidosAbertos;
+  final int pedidosDisputa;
+  final int clientesTotal;
+  final int profissionaisTotal;
+  final int profissionaisPendentes;
+  final int cidadesAtivas;
+  final int categoriasAtivas;
+}
+
+class PontoSerieDashboard {
+  const PontoSerieDashboard({required this.data, required this.pedidos, required this.gmvCentavos});
+  final String data;
+  final int pedidos;
+  final int gmvCentavos;
+}
+
+class EtapaFunilDashboard {
+  const EtapaFunilDashboard({required this.etapa, required this.quantidade, required this.taxaConversaoPct});
+  final String etapa;
+  final int quantidade;
+  final double taxaConversaoPct;
+}
+
+class SeriesDashboard {
+  const SeriesDashboard({required this.historicoDias, required this.funil});
+  final List<PontoSerieDashboard> historicoDias;
+  final List<EtapaFunilDashboard> funil;
+}
+
+// =============================================================================
+// MÓDULO 2: QUESTIONÁRIOS DINÂMICOS DA CATEGORIA
+// =============================================================================
+
+class PerguntaCategoriaAdmin {
+  const PerguntaCategoriaAdmin({
+    required this.id,
+    required this.categoriaId,
+    required this.texto,
+    required this.tipo,
+    this.opcoes,
+    this.obrigatoria = false,
+    this.ordem = 0,
+    this.ativa = true,
+  });
+
+  final String id;
+  final String categoriaId;
+  final String texto;
+  final String tipo;
+  final List<String>? opcoes;
+  final bool obrigatoria;
+  final int ordem;
+  final bool ativa;
+}
+
+// =============================================================================
+// MÓDULO 3: CENTRAL ANTIFRAUDE E GESTÃO DE RISCO
+// =============================================================================
+
+class AlertaRisco {
+  const AlertaRisco({
+    required this.id,
+    this.usuarioId,
+    this.usuarioNome,
+    required this.tipo,
+    required this.severidade,
+    required this.detalhes,
+    this.resolvido = false,
+    required this.criadoEm,
+  });
+
+  final String id;
+  final String? usuarioId;
+  final String? usuarioNome;
+  final String tipo;
+  final String severidade;
+  final String detalhes;
+  final bool resolvido;
+  final String criadoEm;
+}
+
+// =============================================================================
+// MÓDULO 4: NOTIFICAÇÕES EM MASSA & CAMPANHAS
+// =============================================================================
+
+class CampanhaNotificacao {
+  const CampanhaNotificacao({
+    required this.id,
+    required this.titulo,
+    required this.mensagem,
+    required this.segmento,
+    this.categoriaId,
+    this.cidadeId,
+    required this.totalDestinatarios,
+    required this.criadoEm,
+  });
+
+  final String id;
+  final String titulo;
+  final String mensagem;
+  final String segmento;
+  final String? categoriaId;
+  final String? cidadeId;
+  final int totalDestinatarios;
+  final String criadoEm;
+}
+
+// =============================================================================
+// MÓDULO 5: GESTÃO DE CUPONS DE DESCONTO
+// =============================================================================
+
+class CupomAdmin {
+  const CupomAdmin({
+    required this.id,
+    required this.codigo,
+    required this.tipo,
+    required this.valor,
+    required this.valorMinimoCentavos,
+    this.limiteUsos,
+    required this.usosAtuais,
+    this.validoAte,
+    required this.ativo,
+    required this.criadoEm,
+  });
+
+  final String id;
+  final String codigo;
+  final String tipo;
+  final int valor;
+  final int valorMinimoCentavos;
+  final int? limiteUsos;
+  final int usosAtuais;
+  final String? validoAte;
+  final bool ativo;
+  final String criadoEm;
+}
+
+// =============================================================================
+// MÓDULO 6: GESTÃO DE EQUIPE INTERNA
+// =============================================================================
+
+class MembroEquipeAdmin {
+  const MembroEquipeAdmin({
+    required this.usuarioId,
+    required this.nome,
+    required this.email,
+    required this.papel,
+    required this.ativo,
+    required this.alcadaCentavos,
+    required this.criadoEm,
+  });
+
+  final String usuarioId;
+  final String nome;
+  final String email;
+  final String papel;
+  final bool ativo;
+  final int alcadaCentavos;
+  final String criadoEm;
+}

@@ -7,8 +7,14 @@ import '../tema/tema.dart';
 import 'auditoria_tela.dart';
 import 'busca_tela.dart';
 import 'config_tela.dart';
+import 'cupons_tela.dart';
+import 'dashboard_tela.dart';
 import 'disputas_tela.dart';
+import 'equipe_tela.dart';
+import 'notificacoes_tela.dart';
 import 'pagamentos_tela.dart';
+import 'relatorios_tela.dart';
+import 'risco_tela.dart';
 import 'verificacao_tela.dart';
 
 /// Uma seção do menu. Só aparece se o papel logado tiver alguma das [permissoes].
@@ -28,6 +34,7 @@ final List<Secao> todasSecoes = [
   Secao('disputas', 'Disputas', Icons.gavel_outlined, [Permissao.disputasVer], () => const DisputasTela()),
   Secao('pagamentos', 'Pagamentos', Icons.account_balance_outlined, [Permissao.pagamentosVer],
       () => const PagamentosTela()),
+  Secao('dashboard', 'Dashboard', Icons.dashboard_outlined, [Permissao.dashboardVer], () => const DashboardTela()),
   Secao(
     'busca',
     'Busca e suporte',
@@ -35,6 +42,13 @@ final List<Secao> todasSecoes = [
     [Permissao.usuariosBuscar, Permissao.pedidosBuscar, Permissao.suporteVer, Permissao.categoriasEditar],
     () => const BuscaTela(),
   ),
+  Secao('risco', 'Risco e Antifraude', Icons.shield_outlined, [Permissao.riscoVer], () => const RiscoTela()),
+  Secao('notificacoes', 'Comunicação & Push', Icons.campaign_outlined, [Permissao.notificacoesEnviar],
+      () => const NotificacoesTela()),
+  Secao('cupons', 'Cupons & Promoções', Icons.local_offer_outlined, [Permissao.cuponsGerenciar], () => const CuponsTela()),
+  Secao('equipe', 'Gestão da Equipe', Icons.badge_outlined, [Permissao.equipeGerenciar], () => const EquipeTela()),
+  Secao('relatorios', 'Relatórios Fiscais', Icons.receipt_long_outlined, [Permissao.relatoriosExportar],
+      () => const RelatoriosTela()),
   Secao('config', 'Configurações', Icons.tune, [Permissao.configVer], () => const ConfigTela()),
   Secao('auditoria', 'Auditoria', Icons.fact_check_outlined, [Permissao.auditoriaVer], () => const AuditoriaTela()),
 ];

@@ -41,6 +41,13 @@ class Permissao(StrEnum):
     AUDITORIA_VERIFICAR_CADEIA = "auditoria_verificar_cadeia"
     CATEGORIAS_EDITAR = "categorias_editar"
     SUPORTE_VER = "suporte_ver"
+    DASHBOARD_VER = "dashboard_ver"
+    RISCO_VER = "risco_ver"
+    RISCO_DECIDIR = "risco_decidir"
+    NOTIFICACOES_ENVIAR = "notificacoes_enviar"
+    CUPONS_GERENCIAR = "cupons_gerenciar"
+    EQUIPE_GERENCIAR = "equipe_gerenciar"
+    RELATORIOS_EXPORTAR = "relatorios_exportar"
 
 
 P = PapelEquipe
@@ -57,6 +64,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.DISPUTAS_DECIDIR,
             X.DISPUTAS_SEGUNDA_PESSOA,
             X.SUPORTE_VER,
+            X.DASHBOARD_VER,
         }
     ),
     P.MEDIADOR: frozenset({X.PEDIDOS_BUSCAR, X.DISPUTAS_VER, X.DISPUTAS_DECIDIR}),
@@ -69,8 +77,26 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.DADOS_PESSOAIS_REVELAR,
         }
     ),
-    P.MODERADOR: frozenset({X.USUARIOS_BUSCAR, X.PEDIDOS_BUSCAR, X.CATEGORIAS_EDITAR}),
-    P.FINANCEIRO: frozenset({X.PAGAMENTOS_VER, X.PEDIDOS_BUSCAR, X.CONFIG_VER, X.CONFIG_PROPOR}),
+    P.MODERADOR: frozenset(
+        {
+            X.USUARIOS_BUSCAR,
+            X.PEDIDOS_BUSCAR,
+            X.CATEGORIAS_EDITAR,
+            X.NOTIFICACOES_ENVIAR,
+            X.CUPONS_GERENCIAR,
+        }
+    ),
+    P.FINANCEIRO: frozenset(
+        {
+            X.PAGAMENTOS_VER,
+            X.PEDIDOS_BUSCAR,
+            X.CONFIG_VER,
+            X.CONFIG_PROPOR,
+            X.DASHBOARD_VER,
+            X.CUPONS_GERENCIAR,
+            X.RELATORIOS_EXPORTAR,
+        }
+    ),
     P.SEGURANCA: frozenset(
         {
             X.VERIFICACOES_VER,
@@ -78,6 +104,8 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.DADOS_PESSOAIS_REVELAR,
             X.AUDITORIA_VER,
             X.AUDITORIA_VERIFICAR_CADEIA,
+            X.RISCO_VER,
+            X.RISCO_DECIDIR,
         }
     ),
     P.JURIDICO: frozenset({X.CONFIG_VER, X.AUDITORIA_VER, X.AUDITORIA_VERIFICAR_CADEIA}),

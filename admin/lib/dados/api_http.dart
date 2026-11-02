@@ -719,6 +719,415 @@ class ApiAdminHttp implements ApiAdmin {
     final r = _mapa(await _chamar('POST', '/v1/admin/auditoria/verificar-cadeia'));
     return ResultadoCadeia(ok: r['integra'] == true, primeiraQuebraId: (r['primeira_falha_id'] as num?)?.toInt());
   }
+
+  // ---------- Módulo 1: Dashboard ----------
+
+  @override
+  Future<MetricasDashboard> metricasDashboard() async {
+    final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/metricas'));
+    return MetricasDashboard(
+      gmvCentavos: _int(m['gmv_centavos']),
+      receitaTaxaCentavos: _int(m['receita_taxa_centavos']),
+      pedidosTotal: _int(m['pedidos_total']),
+      pedidosConcluidos: _int(m['pedidos_concluidos']),
+      pedidosEmAndamento: _int(m['pedidos_em_andamento']),
+      pedidosAbertos: _int(m['pedidos_abertos']),
+      pedidosDisputa: _int(m['pedidos_disputa']),
+      clientesTotal: _int(m['clientes_total']),
+      profissionaisTotal: _int(m['profissionais_total']),
+      profissionaisPendentes: _int(m['profissionais_pendentes']),
+      cidadesAtivas: _int(m['cidades_ativas']),
+      categoriasAtivas: _int(m['categorias_ativas']),
+    );
+  }
+
+  @override
+  Future<SeriesDashboard> seriesDashboard({int dias = 7}) async {
+    final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/series', consulta: {'dias': '$dias'}));
+    final hist = (m['historico_dias'] as List<dynamic>? ?? []);
+    final funil = (m['funil'] as List<dynamic>? ?? []);
+    return SeriesDashboard(
+      historicoDias: [
+        for (final p in hist)
+          PontoSerieDashboard(
+            data: p['data'] as String? ?? '',
+            pedidos: _int(p['pedidos']),
+            gmvCentavos: _int(p['gmv_centavos']),
+          ),
+      ],
+      funil: [
+        for (final f in funil)
+          EtapaFunilDashboard(
+            etapa: f['etapa'] as String? ?? '',
+            quantidade: _int(f['quantidade']),
+            taxaConversaoPct: (f['taxa_conversao_pct'] as num?)?.toDouble() ?? 0.0,
+          ),
+      ],
+    );
+  }
+
+  // ---------- Módulo 2: Perguntas Dinâmicas da Categoria ----------
+
+  @override
+  Future<List<PerguntaCategoriaAdmin>> listarPerguntasCategoria(String categoriaId) async {
+    final itens = _itens(await _chamar('GET', '/v1/admin/categorias/$categoriaId/perguntas'));
+    return [
+      for (final p in itens)
+        PerguntaCategoriaAdmin(
+          id: p['id'] as String,
+          categoriaId: p['categoria_id'] as String,
+          texto: p['texto'] as String,
+          tipo: p['tipo'] as String,
+          opcoes: (p['opcoes'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+          obrigatoria: p['obrigatoria'] as bool? ?? false,
+          ordem: _int(p['ordem']),
+          ativa: p['ativa'] as bool? ?? true,
+        ),
+    ];
+  }
+
+  @override
+  Future<PerguntaCategoriaAdmin> criarPerguntaCategoria(
+    String categoriaId, {
+    required String texto,
+    required String tipo,
+    List<String>? opcoes,
+    bool obrigatoria = false,
+    int ordem = 0,
+    required String motivo,
+  }) async {
+    final p = _mapa(await _chamar(
+      'POST',
+      '/v1/admin/categorias/$categoriaId/perguntas',
+      corpo: {
+        'texto': texto,
+        'tipo': tipo,
+        if (opcoes != null) 'opcoes': opcoes,
+        'obrigatoria': obrigatoria,
+        'ordem': ordem,
+        'motivo': motivo,
+      },
+    ));
+    return PerguntaCategoriaAdmin(
+      id: p['id'] as String,
+      categoriaId: p['categoria_id'] as String,
+      texto: p['texto'] as String,
+      tipo: p['tipo'] as String,
+      opcoes: (p['opcoes'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      obrigatoria: p['obrigatoria'] as bool? ?? false,
+      ordem: _int(p['ordem']),
+      ativa: p['ativa'] as bool? ?? true,
+    );
+  }
+
+  @override
+  Future<PerguntaCategoriaAdmin> editarPerguntaCategoria(
+    String categoriaId,
+    String perguntaId, {
+    String? texto,
+    String? tipo,
+    List<String>? opcoes,
+    bool? obrigatoria,
+    int? ordem,
+    bool? ativa,
+    required String motivo,
+  }) async {
+    final p = _mapa(await _chamar(
+      'PUT',
+      '/v1/admin/categorias/$categoriaId/perguntas/$perguntaId',
+      corpo: {
+        if (texto != null) 'texto': texto,
+        if (tipo != null) 'tipo': tipo,
+        if (opcoes != null) 'opcoes': opcoes,
+        if (obrigatoria != null) 'obrigatoria': obrigatoria,
+        if (ordem != null) 'ordem': ordem,
+        if (ativa != null) 'ativa': ativa,
+        'motivo': motivo,
+      },
+    ));
+    return PerguntaCategoriaAdmin(
+      id: p['id'] as String,
+      categoriaId: p['categoria_id'] as String,
+      texto: p['texto'] as String,
+      tipo: p['tipo'] as String,
+      opcoes: (p['opcoes'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      obrigatoria: p['obrigatoria'] as bool? ?? false,
+      ordem: _int(p['ordem']),
+      ativa: p['ativa'] as bool? ?? true,
+    );
+  }
+
+  @override
+  Future<void> desativarPerguntaCategoria(String categoriaId, String perguntaId, {required String motivo}) async {
+    await _chamar('DELETE', '/v1/admin/categorias/$categoriaId/perguntas/$perguntaId', consulta: {'motivo': motivo});
+  }
+
+  // ---------- Módulo 3: Central Antifraude e Risco ----------
+
+  @override
+  Future<List<AlertaRisco>> listarAlertasRisco() async {
+    final itens = _itens(await _chamar('GET', '/v1/admin/risco/alertas'));
+    return [
+      for (final a in itens)
+        AlertaRisco(
+          id: a['id'] as String,
+          usuarioId: a['usuario_id'] as String?,
+          usuarioNome: a['usuario_nome'] as String?,
+          tipo: a['tipo'] as String,
+          severidade: a['severidade'] as String,
+          detalhes: a['detalhes'] as String,
+          resolvido: a['resolvido'] as bool? ?? false,
+          criadoEm: a['criado_em'] as String? ?? '',
+        ),
+    ];
+  }
+
+  @override
+  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/risco/bloqueio-preventivo', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
+  }
+
+  @override
+  Future<void> travarSaque(String usuarioId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/risco/travar-saque', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
+  }
+
+  @override
+  Future<void> resolverAlertaRisco(String alertaId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/risco/alertas/$alertaId/resolver', corpo: {'motivo': motivo});
+  }
+
+  // ---------- Módulo 4: Notificações em Massa & Campanhas ----------
+
+  @override
+  Future<List<CampanhaNotificacao>> listarCampanhasNotificacao() async {
+    final itens = _itens(await _chamar('GET', '/v1/admin/notificacoes/campanhas'));
+    return [
+      for (final c in itens)
+        CampanhaNotificacao(
+          id: c['id'] as String,
+          titulo: c['titulo'] as String,
+          mensagem: c['mensagem'] as String,
+          segmento: c['segmento'] as String,
+          categoriaId: c['categoria_id'] as String?,
+          cidadeId: c['cidade_id'] as String?,
+          totalDestinatarios: _int(c['total_destinatarios']),
+          criadoEm: c['criado_em'] as String? ?? '',
+        ),
+    ];
+  }
+
+  @override
+  Future<CampanhaNotificacao> dispararCampanhaNotificacao({
+    required String titulo,
+    required String mensagem,
+    required String segmento,
+    String? categoriaId,
+    String? cidadeId,
+    required String motivo,
+  }) async {
+    final c = _mapa(await _chamar(
+      'POST',
+      '/v1/admin/notificacoes/disparar',
+      corpo: {
+        'titulo': titulo,
+        'mensagem': mensagem,
+        'segmento': segmento,
+        if (categoriaId != null) 'categoria_id': categoriaId,
+        if (cidadeId != null) 'cidade_id': cidadeId,
+        'motivo': motivo,
+      },
+    ));
+    return CampanhaNotificacao(
+      id: c['id'] as String,
+      titulo: c['titulo'] as String,
+      mensagem: c['mensagem'] as String,
+      segmento: c['segmento'] as String,
+      categoriaId: c['categoria_id'] as String?,
+      cidadeId: c['cidade_id'] as String?,
+      totalDestinatarios: _int(c['total_destinatarios']),
+      criadoEm: c['criado_em'] as String? ?? '',
+    );
+  }
+
+  // ---------- Módulo 5: Gestão de Cupons ----------
+
+  @override
+  Future<List<CupomAdmin>> listarCupons() async {
+    final itens = _itens(await _chamar('GET', '/v1/admin/cupons'));
+    return [
+      for (final c in itens)
+        CupomAdmin(
+          id: c['id'] as String,
+          codigo: c['codigo'] as String,
+          tipo: c['tipo'] as String,
+          valor: _int(c['valor']),
+          valorMinimoCentavos: _int(c['valor_minimo_centavos']),
+          limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
+          usosAtuais: _int(c['usos_atuais']),
+          validoAte: c['valido_ate'] as String?,
+          ativo: c['ativo'] as bool? ?? true,
+          criadoEm: c['criado_em'] as String? ?? '',
+        ),
+    ];
+  }
+
+  @override
+  Future<CupomAdmin> criarCupom({
+    required String codigo,
+    required String tipo,
+    required int valor,
+    int valorMinimoCentavos = 0,
+    int? limiteUsos,
+    String? validoAte,
+    required String motivo,
+  }) async {
+    final c = _mapa(await _chamar(
+      'POST',
+      '/v1/admin/cupons',
+      corpo: {
+        'codigo': codigo,
+        'tipo': tipo,
+        'valor': valor,
+        'valor_minimo_centavos': valorMinimoCentavos,
+        if (limiteUsos != null) 'limite_usos': limiteUsos,
+        if (validoAte != null) 'valido_ate': validoAte,
+        'motivo': motivo,
+      },
+    ));
+    return CupomAdmin(
+      id: c['id'] as String,
+      codigo: c['codigo'] as String,
+      tipo: c['tipo'] as String,
+      valor: _int(c['valor']),
+      valorMinimoCentavos: _int(c['valor_minimo_centavos']),
+      limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
+      usosAtuais: _int(c['usos_atuais']),
+      validoAte: c['valido_ate'] as String?,
+      ativo: c['ativo'] as bool? ?? true,
+      criadoEm: c['criado_em'] as String? ?? '',
+    );
+  }
+
+  @override
+  Future<CupomAdmin> alterarStatusCupom(String cupomId, {required bool ativo, required String motivo}) async {
+    final c = _mapa(await _chamar(
+      'PATCH',
+      '/v1/admin/cupons/$cupomId/status',
+      corpo: {'ativo': ativo, 'motivo': motivo},
+    ));
+    return CupomAdmin(
+      id: c['id'] as String,
+      codigo: c['codigo'] as String,
+      tipo: c['tipo'] as String,
+      valor: _int(c['valor']),
+      valorMinimoCentavos: _int(c['valor_minimo_centavos']),
+      limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
+      usosAtuais: _int(c['usos_atuais']),
+      validoAte: c['valido_ate'] as String?,
+      ativo: c['ativo'] as bool? ?? true,
+      criadoEm: c['criado_em'] as String? ?? '',
+    );
+  }
+
+  @override
+  Future<void> excluirCupom(String cupomId, {required String motivo}) async {
+    await _chamar('DELETE', '/v1/admin/cupons/$cupomId', consulta: {'motivo': motivo});
+  }
+
+  // ---------- Módulo 6: Equipe Interna ----------
+
+  @override
+  Future<List<MembroEquipeAdmin>> listarEquipe() async {
+    final itens = _itens(await _chamar('GET', '/v1/admin/equipe'));
+    return [
+      for (final m in itens)
+        MembroEquipeAdmin(
+          usuarioId: m['usuario_id'] as String,
+          nome: m['nome'] as String,
+          email: m['email'] as String,
+          papel: m['papel'] as String,
+          ativo: m['ativo'] as bool? ?? true,
+          alcadaCentavos: _int(m['alcada_centavos']),
+          criadoEm: m['criado_em'] as String? ?? '',
+        ),
+    ];
+  }
+
+  @override
+  Future<MembroEquipeAdmin> adicionarMembroEquipe({
+    required String nome,
+    required String email,
+    required String papel,
+    int alcadaCentavos = 0,
+    required String motivo,
+  }) async {
+    final m = _mapa(await _chamar(
+      'POST',
+      '/v1/admin/equipe',
+      corpo: {
+        'nome': nome,
+        'email': email,
+        'papel': papel,
+        'alcada_centavos': alcadaCentavos,
+        'motivo': motivo,
+      },
+    ));
+    return MembroEquipeAdmin(
+      usuarioId: m['usuario_id'] as String,
+      nome: m['nome'] as String,
+      email: m['email'] as String,
+      papel: m['papel'] as String,
+      ativo: m['ativo'] as bool? ?? true,
+      alcadaCentavos: _int(m['alcada_centavos']),
+      criadoEm: m['criado_em'] as String? ?? '',
+    );
+  }
+
+  @override
+  Future<MembroEquipeAdmin> editarMembroEquipe(
+    String usuarioId, {
+    String? papel,
+    int? alcadaCentavos,
+    bool? ativo,
+    required String motivo,
+  }) async {
+    final m = _mapa(await _chamar(
+      'PATCH',
+      '/v1/admin/equipe/$usuarioId',
+      corpo: {
+        if (papel != null) 'papel': papel,
+        if (alcadaCentavos != null) 'alcada_centavos': alcadaCentavos,
+        if (ativo != null) 'ativo': ativo,
+        'motivo': motivo,
+      },
+    ));
+    return MembroEquipeAdmin(
+      usuarioId: m['usuario_id'] as String,
+      nome: m['nome'] as String,
+      email: m['email'] as String,
+      papel: m['papel'] as String,
+      ativo: m['ativo'] as bool? ?? true,
+      alcadaCentavos: _int(m['alcada_centavos']),
+      criadoEm: m['criado_em'] as String? ?? '',
+    );
+  }
+
+  @override
+  Future<void> revogarMembroEquipe(String usuarioId, {required String motivo}) async {
+    await _chamar('DELETE', '/v1/admin/equipe/$usuarioId', consulta: {'motivo': motivo});
+  }
+
+  // ---------- Módulo 7: Exportação de Relatórios CSV ----------
+
+  @override
+  String urlRelatorioFinanceiroCsv() => '$_api/v1/admin/relatorios/financeiro';
+
+  @override
+  String urlRelatorioPedidosCsv() => '$_api/v1/admin/relatorios/pedidos';
+
+  @override
+  String urlRelatorioRepassesCsv() => '$_api/v1/admin/relatorios/repasses';
 }
 
 class _Resposta {

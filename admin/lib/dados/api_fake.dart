@@ -56,7 +56,7 @@ class ApiFake implements ApiAdmin {
     }
     final Papel? papel;
     final String rotuloUsuario;
-    if (nome == 'cardosojoaovitor47@gmail.com') {
+    if (nome == 'cardosojoaovitor47@gmail.com' || nome == 'cardosojoavitor47@gmail.com') {
       papel = Papel.administrador;
       rotuloUsuario = 'João Vitor Cardoso';
     } else if (nome == 'emanoel.cabral@trato.feitolabs.com.br') {
@@ -739,4 +739,447 @@ class ApiFake implements ApiAdmin {
         CategoriaAdmin(id: 'c-2', nome: 'Pintura', ativa: true, profissionais: 22),
         CategoriaAdmin(id: 'c-3', nome: 'Jardinagem', ativa: false, profissionais: 3),
       ];
+
+  // ===========================================================================
+  // MÓDULOS 1 A 7 NA API FAKE
+  // ===========================================================================
+
+  @override
+  Future<MetricasDashboard> metricasDashboard() => _ler(
+        () => const MetricasDashboard(
+          gmvCentavos: 12540000,
+          receitaTaxaCentavos: 1504800,
+          pedidosTotal: 142,
+          pedidosConcluidos: 98,
+          pedidosEmAndamento: 24,
+          pedidosAbertos: 16,
+          pedidosDisputa: 4,
+          clientesTotal: 340,
+          profissionaisTotal: 85,
+          profissionaisPendentes: 3,
+          cidadesAtivas: 2,
+          categoriasAtivas: 12,
+        ),
+        const MetricasDashboard(
+          gmvCentavos: 0,
+          receitaTaxaCentavos: 0,
+          pedidosTotal: 0,
+          pedidosConcluidos: 0,
+          pedidosEmAndamento: 0,
+          pedidosAbertos: 0,
+          pedidosDisputa: 0,
+          clientesTotal: 0,
+          profissionaisTotal: 0,
+          profissionaisPendentes: 0,
+          cidadesAtivas: 0,
+          categoriasAtivas: 0,
+        ),
+      );
+
+  @override
+  Future<SeriesDashboard> seriesDashboard({int dias = 7}) => _ler(
+        () => const SeriesDashboard(
+          historicoDias: [
+            PontoSerieDashboard(data: '2026-10-27', pedidos: 8, gmvCentavos: 96000),
+            PontoSerieDashboard(data: '2026-10-28', pedidos: 12, gmvCentavos: 144000),
+            PontoSerieDashboard(data: '2026-10-29', pedidos: 15, gmvCentavos: 210000),
+            PontoSerieDashboard(data: '2026-10-30', pedidos: 11, gmvCentavos: 135000),
+            PontoSerieDashboard(data: '2026-10-31', pedidos: 19, gmvCentavos: 280000),
+            PontoSerieDashboard(data: '2026-11-01', pedidos: 22, gmvCentavos: 310000),
+            PontoSerieDashboard(data: '2026-11-02', pedidos: 14, gmvCentavos: 185000),
+          ],
+          funil: [
+            EtapaFunilDashboard(etapa: '1. Pedidos Criados', quantidade: 142, taxaConversaoPct: 100.0),
+            EtapaFunilDashboard(etapa: '2. Propostas Recebidas', quantidade: 128, taxaConversaoPct: 90.1),
+            EtapaFunilDashboard(etapa: '3. Pedidos Fechados', quantidade: 105, taxaConversaoPct: 73.9),
+            EtapaFunilDashboard(etapa: '4. Serviços Concluídos', quantidade: 98, taxaConversaoPct: 69.0),
+          ],
+        ),
+        const SeriesDashboard(historicoDias: [], funil: []),
+      );
+
+  final List<PerguntaCategoriaAdmin> _perguntas = [
+    const PerguntaCategoriaAdmin(
+      id: 'p-1',
+      categoriaId: 'c-1',
+      texto: 'Qual a voltagem do local?',
+      tipo: 'escolha_unica',
+      opcoes: ['110V', '220V', 'Bivolt'],
+      obrigatoria: true,
+      ordem: 1,
+      ativa: true,
+    ),
+    const PerguntaCategoriaAdmin(
+      id: 'p-2',
+      categoriaId: 'c-1',
+      texto: 'O imóvel possui escada disponível?',
+      tipo: 'sim_nao',
+      obrigatoria: false,
+      ordem: 2,
+      ativa: true,
+    ),
+  ];
+
+  @override
+  Future<List<PerguntaCategoriaAdmin>> listarPerguntasCategoria(String categoriaId) => _ler(
+        () => _perguntas.where((p) => p.categoriaId == categoriaId).toList(),
+        [],
+      );
+
+  @override
+  Future<PerguntaCategoriaAdmin> criarPerguntaCategoria(
+    String categoriaId, {
+    required String texto,
+    required String tipo,
+    List<String>? opcoes,
+    bool obrigatoria = false,
+    int ordem = 0,
+    required String motivo,
+  }) async {
+    final p = PerguntaCategoriaAdmin(
+      id: 'p-${_perguntas.length + 1}',
+      categoriaId: categoriaId,
+      texto: texto,
+      tipo: tipo,
+      opcoes: opcoes,
+      obrigatoria: obrigatoria,
+      ordem: ordem,
+      ativa: true,
+    );
+    _perguntas.add(p);
+    _registrar('categoria.pergunta_criada', 'categoria_perguntas', motivo);
+    return p;
+  }
+
+  @override
+  Future<PerguntaCategoriaAdmin> editarPerguntaCategoria(
+    String categoriaId,
+    String perguntaId, {
+    String? texto,
+    String? tipo,
+    List<String>? opcoes,
+    bool? obrigatoria,
+    int? ordem,
+    bool? ativa,
+    required String motivo,
+  }) async {
+    final idx = _perguntas.indexWhere((p) => p.id == perguntaId);
+    if (idx < 0) throw const ErroApi('Pergunta não encontrada.');
+    final anterior = _perguntas[idx];
+    final atualizado = PerguntaCategoriaAdmin(
+      id: anterior.id,
+      categoriaId: anterior.categoriaId,
+      texto: texto ?? anterior.texto,
+      tipo: tipo ?? anterior.tipo,
+      opcoes: opcoes ?? anterior.opcoes,
+      obrigatoria: obrigatoria ?? anterior.obrigatoria,
+      ordem: ordem ?? anterior.ordem,
+      ativa: ativa ?? anterior.ativa,
+    );
+    _perguntas[idx] = atualizado;
+    _registrar('categoria.pergunta_editada', 'categoria_perguntas', motivo);
+    return atualizado;
+  }
+
+  @override
+  Future<void> desativarPerguntaCategoria(String categoriaId, String perguntaId, {required String motivo}) async {
+    final idx = _perguntas.indexWhere((p) => p.id == perguntaId);
+    if (idx >= 0) {
+      final p = _perguntas[idx];
+      _perguntas[idx] = PerguntaCategoriaAdmin(
+        id: p.id,
+        categoriaId: p.categoriaId,
+        texto: p.texto,
+        tipo: p.tipo,
+        opcoes: p.opcoes,
+        obrigatoria: p.obrigatoria,
+        ordem: p.ordem,
+        ativa: false,
+      );
+      _registrar('categoria.pergunta_desativada', 'categoria_perguntas', motivo);
+    }
+  }
+
+  final List<AlertaRisco> _alertasRisco = [
+    const AlertaRisco(
+      id: 'r-1',
+      usuarioId: 'u-101',
+      usuarioNome: 'Lucas Santos',
+      tipo: 'taxa_cancelamento',
+      severidade: 'alta',
+      detalhes: 'Profissional cancelou 4 dos últimos 10 pedidos aceitos.',
+      resolvido: false,
+      criadoEm: '2026-11-01T14:30:00Z',
+    ),
+    const AlertaRisco(
+      id: 'r-2',
+      usuarioId: 'u-204',
+      usuarioNome: 'Mariana Lima',
+      tipo: 'disputas_frequentes',
+      severidade: 'media',
+      detalhes: 'Cliente abriu disputa em 2 pedidos consecutivos.',
+      resolvido: false,
+      criadoEm: '2026-11-02T10:15:00Z',
+    ),
+  ];
+
+  @override
+  Future<List<AlertaRisco>> listarAlertasRisco() => _ler(() => List.of(_alertasRisco), []);
+
+  @override
+  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo}) async {
+    _registrar('risco.bloqueio_preventivo', 'usuarios', motivo);
+  }
+
+  @override
+  Future<void> travarSaque(String usuarioId, {required String motivo}) async {
+    _registrar('risco.saque_travado', 'perfis_profissional', motivo);
+  }
+
+  @override
+  Future<void> resolverAlertaRisco(String alertaId, {required String motivo}) async {
+    final idx = _alertasRisco.indexWhere((a) => a.id == alertaId);
+    if (idx >= 0) {
+      final a = _alertasRisco[idx];
+      _alertasRisco[idx] = AlertaRisco(
+        id: a.id,
+        usuarioId: a.usuarioId,
+        usuarioNome: a.usuarioNome,
+        tipo: a.tipo,
+        severidade: a.severidade,
+        detalhes: a.detalhes,
+        resolvido: true,
+        criadoEm: a.criadoEm,
+      );
+      _registrar('risco.alerta_resolvido', 'alertas_risco', motivo);
+    }
+  }
+
+  final List<CampanhaNotificacao> _campanhas = [
+    const CampanhaNotificacao(
+      id: 'cmp-1',
+      titulo: 'Alta demanda em Campinas!',
+      mensagem: 'Muitos clientes buscando eletricistas e pintores agora.',
+      segmento: 'profissionais',
+      totalDestinatarios: 85,
+      criadoEm: '2026-11-01T16:00:00Z',
+    ),
+  ];
+
+  @override
+  Future<List<CampanhaNotificacao>> listarCampanhasNotificacao() => _ler(() => List.of(_campanhas), []);
+
+  @override
+  Future<CampanhaNotificacao> dispararCampanhaNotificacao({
+    required String titulo,
+    required String mensagem,
+    required String segmento,
+    String? categoriaId,
+    String? cidadeId,
+    required String motivo,
+  }) async {
+    final c = CampanhaNotificacao(
+      id: 'cmp-${_campanhas.length + 1}',
+      titulo: titulo,
+      mensagem: mensagem,
+      segmento: segmento,
+      categoriaId: categoriaId,
+      cidadeId: cidadeId,
+      totalDestinatarios: 120,
+      criadoEm: DateTime.now().toIso8601String(),
+    );
+    _campanhas.insert(0, c);
+    _registrar('notificacao.campanha_disparada', 'campanhas_notificacao', motivo);
+    return c;
+  }
+
+  final List<CupomAdmin> _cupons = [
+    const CupomAdmin(
+      id: 'cup-1',
+      codigo: 'PRIMEIRACOMPRA',
+      tipo: 'percentual',
+      valor: 10,
+      valorMinimoCentavos: 0,
+      limiteUsos: 100,
+      usosAtuais: 14,
+      ativo: true,
+      criadoEm: '2026-10-29T10:00:00Z',
+    ),
+    const CupomAdmin(
+      id: 'cup-2',
+      codigo: 'BEMVINDO20',
+      tipo: 'fixo',
+      valor: 2000,
+      valorMinimoCentavos: 5000,
+      limiteUsos: 200,
+      usosAtuais: 35,
+      ativo: true,
+      criadoEm: '2026-10-30T10:00:00Z',
+    ),
+  ];
+
+  @override
+  Future<List<CupomAdmin>> listarCupons() => _ler(() => List.of(_cupons), []);
+
+  @override
+  Future<CupomAdmin> criarCupom({
+    required String codigo,
+    required String tipo,
+    required int valor,
+    int valorMinimoCentavos = 0,
+    int? limiteUsos,
+    String? validoAte,
+    required String motivo,
+  }) async {
+    final c = CupomAdmin(
+      id: 'cup-${_cupons.length + 1}',
+      codigo: codigo.toUpperCase(),
+      tipo: tipo,
+      valor: valor,
+      valorMinimoCentavos: valorMinimoCentavos,
+      limiteUsos: limiteUsos,
+      usosAtuais: 0,
+      validoAte: validoAte,
+      ativo: true,
+      criadoEm: DateTime.now().toIso8601String(),
+    );
+    _cupons.insert(0, c);
+    _registrar('cupom.criado', 'cupons', motivo);
+    return c;
+  }
+
+  @override
+  Future<CupomAdmin> alterarStatusCupom(String cupomId, {required bool ativo, required String motivo}) async {
+    final idx = _cupons.indexWhere((c) => c.id == cupomId);
+    if (idx < 0) throw const ErroApi('Cupom não encontrado.');
+    final c = _cupons[idx];
+    final novo = CupomAdmin(
+      id: c.id,
+      codigo: c.codigo,
+      tipo: c.tipo,
+      valor: c.valor,
+      valorMinimoCentavos: c.valorMinimoCentavos,
+      limiteUsos: c.limiteUsos,
+      usosAtuais: c.usosAtuais,
+      validoAte: c.validoAte,
+      ativo: ativo,
+      criadoEm: c.criadoEm,
+    );
+    _cupons[idx] = novo;
+    _registrar(ativo ? 'cupom.ativado' : 'cupom.desativado', 'cupons', motivo);
+    return novo;
+  }
+
+  @override
+  Future<void> excluirCupom(String cupomId, {required String motivo}) async {
+    _cupons.removeWhere((c) => c.id == cupomId);
+    _registrar('cupom.excluido', 'cupons', motivo);
+  }
+
+  final List<MembroEquipeAdmin> _equipe = [
+    const MembroEquipeAdmin(
+      usuarioId: 'eq-1',
+      nome: 'João Vitor Cardoso',
+      email: 'cardosojoaovitor47@gmail.com',
+      papel: 'administrador',
+      ativo: true,
+      alcadaCentavos: 10000000000,
+      criadoEm: '2026-10-29T09:00:00Z',
+    ),
+    const MembroEquipeAdmin(
+      usuarioId: 'eq-2',
+      nome: 'Emanoel Cabral',
+      email: 'emanoel.cabral@trato.feitolabs.com.br',
+      papel: 'administrador',
+      ativo: true,
+      alcadaCentavos: 10000000000,
+      criadoEm: '2026-10-29T09:00:00Z',
+    ),
+    const MembroEquipeAdmin(
+      usuarioId: 'eq-3',
+      nome: 'Gabriel Victor',
+      email: 'gabriel.victor@trato.feitolabs.com.br',
+      papel: 'administrador',
+      ativo: true,
+      alcadaCentavos: 10000000000,
+      criadoEm: '2026-10-29T09:00:00Z',
+    ),
+  ];
+
+  @override
+  Future<List<MembroEquipeAdmin>> listarEquipe() => _ler(() => List.of(_equipe), []);
+
+  @override
+  Future<MembroEquipeAdmin> adicionarMembroEquipe({
+    required String nome,
+    required String email,
+    required String papel,
+    int alcadaCentavos = 0,
+    required String motivo,
+  }) async {
+    final m = MembroEquipeAdmin(
+      usuarioId: 'eq-${_equipe.length + 1}',
+      nome: nome,
+      email: email,
+      papel: papel,
+      ativo: true,
+      alcadaCentavos: alcadaCentavos,
+      criadoEm: DateTime.now().toIso8601String(),
+    );
+    _equipe.add(m);
+    _registrar('equipe.membro_adicionado', 'equipe', motivo);
+    return m;
+  }
+
+  @override
+  Future<MembroEquipeAdmin> editarMembroEquipe(
+    String usuarioId, {
+    String? papel,
+    int? alcadaCentavos,
+    bool? ativo,
+    required String motivo,
+  }) async {
+    final idx = _equipe.indexWhere((m) => m.usuarioId == usuarioId);
+    if (idx < 0) throw const ErroApi('Membro da equipe não encontrado.');
+    final ant = _equipe[idx];
+    final atualizado = MembroEquipeAdmin(
+      usuarioId: ant.usuarioId,
+      nome: ant.nome,
+      email: ant.email,
+      papel: papel ?? ant.papel,
+      ativo: ativo ?? ant.ativo,
+      alcadaCentavos: alcadaCentavos ?? ant.alcadaCentavos,
+      criadoEm: ant.criadoEm,
+    );
+    _equipe[idx] = atualizado;
+    _registrar('equipe.membro_atualizado', 'equipe', motivo);
+    return atualizado;
+  }
+
+  @override
+  Future<void> revogarMembroEquipe(String usuarioId, {required String motivo}) async {
+    final idx = _equipe.indexWhere((m) => m.usuarioId == usuarioId);
+    if (idx >= 0) {
+      final ant = _equipe[idx];
+      _equipe[idx] = MembroEquipeAdmin(
+        usuarioId: ant.usuarioId,
+        nome: ant.nome,
+        email: ant.email,
+        papel: ant.papel,
+        ativo: false,
+        alcadaCentavos: ant.alcadaCentavos,
+        criadoEm: ant.criadoEm,
+      );
+      _registrar('equipe.acesso_revogado', 'equipe', motivo);
+    }
+  }
+
+  @override
+  String urlRelatorioFinanceiroCsv() => 'https://api.trato.local/v1/admin/relatorios/financeiro';
+
+  @override
+  String urlRelatorioPedidosCsv() => 'https://api.trato.local/v1/admin/relatorios/pedidos';
+
+  @override
+  String urlRelatorioRepassesCsv() => 'https://api.trato.local/v1/admin/relatorios/repasses';
 }

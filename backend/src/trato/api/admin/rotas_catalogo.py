@@ -440,6 +440,40 @@ def alterar_status_cidade(
 
 
 # =============================================================================
+# MODELOS DE PERGUNTAS DINÂMICAS DE CATEGORIA
+# =============================================================================
+
+class PerguntaAdminOut(BaseModel):
+    id: str
+    categoria_id: str
+    texto: str
+    tipo: str
+    opcoes: list[str] | None = None
+    obrigatoria: bool = False
+    ordem: int = 0
+    ativa: bool = True
+
+
+class CriarPerguntaIn(BaseModel):
+    texto: str = Field(min_length=3, max_length=300)
+    tipo: str = Field(..., pattern="^(texto|numero|escolha_unica|multipla|sim_nao)$")
+    opcoes: list[str] | None = None
+    obrigatoria: bool = False
+    ordem: int = 0
+    motivo: str = Field(min_length=3, max_length=500)
+
+
+class EditarPerguntaIn(BaseModel):
+    texto: str | None = Field(default=None, min_length=3, max_length=300)
+    tipo: str | None = Field(default=None, pattern="^(texto|numero|escolha_unica|multipla|sim_nao)$")
+    opcoes: list[str] | None = None
+    obrigatoria: bool | None = None
+    ordem: int | None = None
+    ativa: bool | None = None
+    motivo: str = Field(min_length=3, max_length=500)
+
+
+# =============================================================================
 # ROTAS: SUPORTE
 # =============================================================================
 
@@ -449,3 +483,183 @@ def listar_chamados(
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[ChamadoOut]:
     return []
+
+
+# =============================================================================
+# ROTAS: PERGUNTAS DINÂMICAS DA CATEGORIA
+# =============================================================================
+
+@router.get("/categorias/{categoria_id}/perguntas", response_model=list[PerguntaAdminOut], summary="Listar perguntas dinâmicas da categoria")
+def listar_perguntas_categoria(
+    categoria_id: str,
+    operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> list[PerguntaAdminOut]:
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    if banco is None:
+        raise HTTPException(503, "Banco de dados não configurado.")
+    uid = como_uuid(categoria_id)
+    if uid is None:
+        raise HTTPException(404, "Categoria não encontrada.")
+    with banco.transacao() as con:
+        linhas = con.execute(
+            """
+            SELECT id, categoria_id, texto, tipo, opcoes, obrigatoria, ordem, ativa
+            FROM public.categoria_perguntas
+            WHERE categoria_id = %s
+            ORDER BY ordem ASC, criado_em ASC
+            """,
+            (uid,),
+        ).fetchall()
+        return [
+            PerguntaAdminOut(
+                id=str(r["id"]),
+                categoria_id=str(r["categoria_id"]),
+                texto=r["texto"],
+                tipo=r["tipo"],
+                opcoes=r["opcoes"] if isinstance(r["opcoes"], list) else None,
+                obrigatoria=r["obrigatoria"],
+                ordem=r["ordem"],
+                ativa=r["ativa"],
+            )
+            for r in linhas
+        ]
+
+
+@router.post("/categorias/{categoria_id}/perguntas", response_model=PerguntaAdminOut, status_code=201, summary="Criar nova pergunta dinâmica")
+def criar_pergunta_categoria(
+    categoria_id: str,
+    corpo: CriarPerguntaIn,
+    operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PerguntaAdminOut:
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    if banco is None:
+        raise HTTPException(503, "Banco de dados não configurado.")
+    uid = como_uuid(categoria_id)
+    if uid is None:
+        raise HTTPException(404, "Categoria não encontrada.")
+    with banco.transacao() as con:
+        cat = con.execute("SELECT id, nome FROM public.categorias WHERE id = %s", (uid,)).fetchone()
+        if cat is None:
+            raise HTTPException(404, "Categoria não encontrada.")
+        import json
+        opcoes_json = json.dumps(corpo.opcoes) if corpo.opcoes else None
+        res = con.execute(
+            """
+            INSERT INTO public.categoria_perguntas (categoria_id, texto, tipo, opcoes, obrigatoria, ordem, ativa)
+            VALUES (%s, %s, %s, %s, %s, %s, true)
+            RETURNING id, categoria_id, texto, tipo, opcoes, obrigatoria, ordem, ativa
+            """,
+            (uid, corpo.texto, corpo.tipo, opcoes_json, corpo.obrigatoria, corpo.ordem),
+        ).fetchone()
+        admin.auditoria.registrar(
+            ator_id=operador.id,
+            acao="categoria.pergunta_criada",
+            entidade="categoria_perguntas",
+            entidade_id=str(res["id"]),
+            depois={"categoria": cat["nome"], "texto": corpo.texto, "tipo": corpo.tipo},
+            motivo=corpo.motivo,
+        )
+        return PerguntaAdminOut(
+            id=str(res["id"]),
+            categoria_id=str(res["categoria_id"]),
+            texto=res["texto"],
+            tipo=res["tipo"],
+            opcoes=corpo.opcoes,
+            obrigatoria=res["obrigatoria"],
+            ordem=res["ordem"],
+            ativa=res["ativa"],
+        )
+
+
+@router.put("/categorias/{categoria_id}/perguntas/{pergunta_id}", response_model=PerguntaAdminOut, summary="Editar pergunta dinâmica")
+def editar_pergunta_categoria(
+    categoria_id: str,
+    pergunta_id: str,
+    corpo: EditarPerguntaIn,
+    operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PerguntaAdminOut:
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    if banco is None:
+        raise HTTPException(503, "Banco de dados não configurado.")
+    uid = como_uuid(categoria_id)
+    pid = como_uuid(pergunta_id)
+    if uid is None or pid is None:
+        raise HTTPException(404, "Pergunta ou categoria não encontrada.")
+    with banco.transacao() as con:
+        p_antiga = con.execute(
+            "SELECT * FROM public.categoria_perguntas WHERE id = %s AND categoria_id = %s",
+            (pid, uid),
+        ).fetchone()
+        if p_antiga is None:
+            raise HTTPException(404, "Pergunta não encontrada.")
+        texto = corpo.texto if corpo.texto is not None else p_antiga["texto"]
+        tipo = corpo.tipo if corpo.tipo is not None else p_antiga["tipo"]
+        obrigatoria = corpo.obrigatoria if corpo.obrigatoria is not None else p_antiga["obrigatoria"]
+        ordem = corpo.ordem if corpo.ordem is not None else p_antiga["ordem"]
+        ativa = corpo.ativa if corpo.ativa is not None else p_antiga["ativa"]
+        import json
+        opcoes_json = json.dumps(corpo.opcoes) if corpo.opcoes is not None else (json.dumps(p_antiga["opcoes"]) if p_antiga["opcoes"] else None)
+
+        con.execute(
+            """
+            UPDATE public.categoria_perguntas
+            SET texto = %s, tipo = %s, opcoes = %s, obrigatoria = %s, ordem = %s, ativa = %s, atualizado_em = now()
+            WHERE id = %s
+            """,
+            (texto, tipo, opcoes_json, obrigatoria, ordem, ativa, pid),
+        )
+        admin.auditoria.registrar(
+            ator_id=operador.id,
+            acao="categoria.pergunta_editada",
+            entidade="categoria_perguntas",
+            entidade_id=str(pid),
+            depois={"texto": texto, "tipo": tipo, "ativa": ativa},
+            motivo=corpo.motivo,
+        )
+        return PerguntaAdminOut(
+            id=str(pid),
+            categoria_id=str(uid),
+            texto=texto,
+            tipo=tipo,
+            opcoes=corpo.opcoes if corpo.opcoes is not None else (p_antiga["opcoes"] if isinstance(p_antiga["opcoes"], list) else None),
+            obrigatoria=obrigatoria,
+            ordem=ordem,
+            ativa=ativa,
+        )
+
+
+@router.delete("/categorias/{categoria_id}/perguntas/{pergunta_id}", summary="Desativar pergunta da categoria")
+def desativar_pergunta_categoria(
+    categoria_id: str,
+    pergunta_id: str,
+    motivo: str = Query(..., min_length=3),
+    operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> dict[str, str]:
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    if banco is None:
+        raise HTTPException(503, "Banco de dados não configurado.")
+    uid = como_uuid(categoria_id)
+    pid = como_uuid(pergunta_id)
+    if uid is None or pid is None:
+        raise HTTPException(404, "Pergunta ou categoria não encontrada.")
+    with banco.transacao() as con:
+        con.execute(
+            "UPDATE public.categoria_perguntas SET ativa = false, atualizado_em = now() WHERE id = %s AND categoria_id = %s",
+            (pid, uid),
+        )
+        admin.auditoria.registrar(
+            ator_id=operador.id,
+            acao="categoria.pergunta_desativada",
+            entidade="categoria_perguntas",
+            entidade_id=str(pid),
+            depois={"ativa": False},
+            motivo=motivo,
+        )
+        return {"mensagem": "Pergunta desativada com sucesso."}

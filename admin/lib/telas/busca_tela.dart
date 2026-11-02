@@ -338,6 +338,13 @@ class _AbaCategorias extends StatelessWidget {
     if (ok) await recarregar();
   }
 
+  Future<void> _gerenciarPerguntas(BuildContext context, CategoriaAdmin c) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _DialogPerguntas(categoria: c),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CarregaDados<List<CategoriaAdmin>>(
@@ -379,6 +386,11 @@ class _AbaCategorias extends StatelessWidget {
                       children: [
                         ChipEstado(c.ativa ? 'Ativa' : 'Inativa', tom: c.ativa ? Tom.ok : Tom.neutro),
                         const SizedBox(width: EspacosTrato.x2),
+                        IconButton(
+                          icon: const Icon(Icons.help_outline, size: 20),
+                          tooltip: 'Perguntas do pedido',
+                          onPressed: () => _gerenciarPerguntas(context, c),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, size: 20),
                           tooltip: 'Editar categoria',
@@ -719,4 +731,187 @@ Future<(String, String)?> _dialogAlterarStatus(BuildContext context, String nome
       ),
     ),
   );
+}
+
+class _DialogPerguntas extends StatefulWidget {
+  const _DialogPerguntas({required this.categoria});
+  final CategoriaAdmin categoria;
+
+  @override
+  State<_DialogPerguntas> createState() => _DialogPerguntasState();
+}
+
+class _DialogPerguntasState extends State<_DialogPerguntas> {
+  int _versao = 0;
+
+  Future<void> _adicionar(BuildContext context) async {
+    final textoCtrl = TextEditingController();
+    var tipo = 'texto';
+    var obrigatoria = false;
+    final opcoesCtrl = TextEditingController();
+    final motivoCtrl = TextEditingController();
+
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: Text('Nova pergunta para "${widget.categoria.nome}"'),
+          content: SizedBox(
+            width: 440,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: textoCtrl,
+                    decoration: const InputDecoration(labelText: 'Texto da pergunta *', hintText: 'Ex: Qual a voltagem do imóvel?'),
+                  ),
+                  const SizedBox(height: EspacosTrato.x3),
+                  DropdownButtonFormField<String>(
+                    value: tipo,
+                    items: const [
+                      DropdownMenuItem(value: 'texto', child: Text('Resposta em Texto')),
+                      DropdownMenuItem(value: 'numero', child: Text('Número / Quantidade')),
+                      DropdownMenuItem(value: 'escolha_unica', child: Text('Escolha Única (Opções)')),
+                      DropdownMenuItem(value: 'multipla', child: Text('Múltipla Escolha (Várias Opções)')),
+                      DropdownMenuItem(value: 'sim_nao', child: Text('Sim ou Não')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setSt(() => tipo = v);
+                    },
+                    decoration: const InputDecoration(labelText: 'Tipo de resposta'),
+                  ),
+                  if (tipo == 'escolha_unica' || tipo == 'multipla') ...[
+                    const SizedBox(height: EspacosTrato.x3),
+                    TextField(
+                      controller: opcoesCtrl,
+                      decoration: const InputDecoration(labelText: 'Opções separadas por vírgula', hintText: 'Ex: 110V, 220V, Bivolt'),
+                    ),
+                  ],
+                  const SizedBox(height: EspacosTrato.x3),
+                  CheckboxListTile(
+                    title: const Text('Pergunta obrigatória para o cliente'),
+                    value: obrigatoria,
+                    onChanged: (v) => setSt(() => obrigatoria = v ?? false),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: EspacosTrato.x2),
+                  TextField(
+                    controller: motivoCtrl,
+                    decoration: const InputDecoration(labelText: 'Motivo *', hintText: 'Justificativa para auditoria'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                final txt = textoCtrl.text.trim();
+                final mot = motivoCtrl.text.trim();
+                if (txt.length < 3 || mot.length < 3) {
+                  mostrarAviso(ctx, 'Preencha o texto e o motivo.');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Adicionar pergunta'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (res != true || !mounted) return;
+
+    final opcoes = (tipo == 'escolha_unica' || tipo == 'multipla')
+        ? opcoesCtrl.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+        : null;
+
+    final ok = await executar(
+      context,
+      () => context.api.criarPerguntaCategoria(
+        widget.categoria.id,
+        texto: textoCtrl.text.trim(),
+        tipo: tipo,
+        opcoes: opcoes,
+        obrigatoria: obrigatoria,
+        motivo: motivoCtrl.text.trim(),
+      ),
+      sucesso: 'Pergunta adicionada com sucesso.',
+    );
+    if (ok && mounted) setState(() => _versao++);
+  }
+
+  Future<void> _desativar(PerguntaCategoriaAdmin p) async {
+    final motivo = await pedirMotivo(
+      context,
+      titulo: 'Desativar pergunta',
+      descricao: 'A pergunta deixará de ser feita para novos pedidos desta categoria.',
+      rotuloConfirmar: 'Desativar',
+    );
+    if (motivo == null || !mounted) return;
+    final ok = await executar(
+      context,
+      () => context.api.desativarPerguntaCategoria(widget.categoria.id, p.id, motivo: motivo),
+      sucesso: 'Pergunta desativada.',
+    );
+    if (ok && mounted) setState(() => _versao++);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Expanded(child: Text('Perguntas: ${widget.categoria.nome}')),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
+            onPressed: () => _adicionar(context),
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('Nova pergunta'),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 600,
+        height: 400,
+        child: CarregaDados<List<PerguntaCategoriaAdmin>>(
+          key: ValueKey('perguntas-${widget.categoria.id}-$_versao'),
+          carregar: () => context.api.listarPerguntasCategoria(widget.categoria.id),
+          estaVazio: (l) => l.isEmpty,
+          mensagemVazia: 'Nenhuma pergunta cadastrada para esta categoria.',
+          construir: (context, lista, _) => ListView.separated(
+            itemCount: lista.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final p = lista[i];
+              return ListTile(
+                title: Text(p.texto, style: TipografiaTrato.corpoForte),
+                subtitle: Text('Tipo: ${p.tipo} · ${p.obrigatoria ? "Obrigatória" : "Opcional"} ${p.opcoes != null ? "· Opções: ${p.opcoes!.join(", ")}" : ""}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ChipEstado(p.ativa ? 'Ativa' : 'Inativa', tom: p.ativa ? Tom.ok : Tom.neutro),
+                    if (p.ativa) ...[
+                      const SizedBox(width: EspacosTrato.x2),
+                      IconButton(
+                        icon: const Icon(Icons.block, size: 18),
+                        tooltip: 'Desativar pergunta',
+                        onPressed: () => _desativar(p),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar')),
+      ],
+    );
+  }
 }
