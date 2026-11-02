@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from trato import __version__
 from trato.api import (
@@ -20,7 +21,7 @@ from trato.api.admin import criar_router_admin
 from trato.api.contexto import Contexto
 from trato.api.erros import instalar_tratadores
 from trato.config import obter_config
-from trato.seguranca.config import parametros_docs
+from trato.seguranca.config import obter_config_seguranca, parametros_docs
 
 
 def criar_router() -> APIRouter:
@@ -56,6 +57,15 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
         rotas_upload.registrar_rotas(app)
         rotas_profissional_cadastro.registrar_rotas(app)
     instalar_tratadores(app)
+    cfg_seg = obter_config_seguranca()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cfg_seg.cors_origens or [],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=cfg_seg.cors_metodos or ["*"],
+        allow_headers=cfg_seg.cors_cabecalhos or ["*"],
+    )
     if contexto is not None:
         app.state.contexto = contexto
     return app

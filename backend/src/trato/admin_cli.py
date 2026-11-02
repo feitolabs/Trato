@@ -70,6 +70,18 @@ def verificar_auditoria(banco: Banco) -> None:
         sys.exit(1)
 
 
+def banco_da_config() -> Banco:
+    from trato.config import obter_config
+
+    cfg = obter_config()
+    dsn = cfg.database_url.get_secret_value() or cfg.supabase_db_url.get_secret_value()
+    if not dsn:
+        print("Erro: DATABASE_URL ou SUPABASE_DB_URL não configurada no .env", file=sys.stderr)
+        sys.exit(1)
+    papel = cfg.trato_banco_papel if cfg.trato_banco_papel != "service_role" else ""
+    return Banco(dsn, papel=papel)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CLI de Gestão Administrativa do Trato")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -81,7 +93,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    banco = Banco()
+    banco = banco_da_config()
 
     if args.comando == "seed-fundadores":
         aplicar_seed_fundadores(banco)
