@@ -16,7 +16,7 @@ from trato.api.admin.modelos import (
     PessoaOut,
     UsuarioOut,
 )
-from trato.api.admin.papeis import Permissao
+from trato.api.admin.papeis import PapelEquipe, Permissao
 from trato.api.contexto import Contexto, obter_contexto
 
 router = APIRouter(prefix="/v1/admin", tags=["admin: usuários e pedidos"])
@@ -28,11 +28,16 @@ def eu(
     admin: AdminContexto = Depends(obter_admin),
 ) -> EuOut:
     conhecido = admin.usuarios.obter(operador.id)
+    alcada = operador.membro.alcada_centavos
+    if operador.membro.papel == PapelEquipe.ADMINISTRADOR:
+        alcada = alcada or 100_000_000_00
+    else:
+        alcada = alcada or 0
     return EuOut(
         id=operador.id,
         papel=operador.membro.papel.value,
         nome=conhecido.nome if conhecido else None,
-        alcada_centavos=operador.membro.alcada_centavos or 0,
+        alcada_centavos=alcada,
     )
 
 

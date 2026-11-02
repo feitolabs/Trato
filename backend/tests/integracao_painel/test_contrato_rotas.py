@@ -104,7 +104,7 @@ def test_verificacao_aprovar(painel):
     assert r.status_code == 200 and r.json()["status"] == "aprovada"
 
 
-@pytest.mark.parametrize("papel", ["seguranca", "administrador"])
+@pytest.mark.parametrize("papel", ["seguranca"])
 def test_so_cadastro_decide_e_abre_documento(painel, papel):
     v = painel.chamar("cadastro", "GET", "/v1/admin/verificacoes").json()["itens"][0]
     assert painel.chamar(papel, "GET", "/v1/admin/verificacoes").status_code == 200  # ver pode
@@ -117,6 +117,19 @@ def test_so_cadastro_decide_e_abre_documento(painel, papel):
     assert r.status_code == 403
     caminho = f"/v1/admin/verificacoes/{v['id']}/documentos/{v['documentos'][0]['id']}/url"
     assert painel.chamar(papel, "POST", caminho, json={"motivo": "Tentando"}).status_code == 403
+
+
+def test_administrador_tem_autonomia_total_verificacao(painel):
+    v = painel.chamar("cadastro", "GET", "/v1/admin/verificacoes").json()["itens"][0]
+    caminho = f"/v1/admin/verificacoes/{v['id']}/documentos/{v['documentos'][0]['id']}/url"
+    assert painel.chamar("administrador", "POST", caminho, json={"motivo": "Acesso fundador"}).status_code == 200
+    r = painel.chamar(
+        "administrador",
+        "POST",
+        f"/v1/admin/verificacoes/{v['id']}/decisao",
+        json={"aprovar": True, "motivo": "Aprovado pelo fundador"},
+    )
+    assert r.status_code == 200
 
 
 def test_verificacao_motivo_obrigatorio_422_401_403(painel):

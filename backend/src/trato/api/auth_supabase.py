@@ -55,6 +55,7 @@ class ProvedorAuthSupabase:
             algorithms=[algoritmo],
             audience=self._audiencia,
             issuer=self._emissor or None,
+            leeway=60,
             options={"require": ["exp", "sub", *(["iss"] if self._emissor else [])]},
         )
 

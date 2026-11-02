@@ -88,16 +88,16 @@ BEGIN
     status = 'ativo',
     atualizado_em = v_agora;
 
-  -- Inserir / Atualizar em public.equipe como administrador
+  -- Inserir / Atualizar em public.equipe como administrador (alçada irrestrita de fundadores)
   INSERT INTO public.equipe (usuario_id, papel, ativo, alcada_centavos, criado_em, revogado_em)
   VALUES
-    (v_joao_id, 'administrador', true, NULL, v_agora, NULL),
-    (v_emanoel_id, 'administrador', true, NULL, v_agora, NULL),
-    (v_gabriel_id, 'administrador', true, NULL, v_agora, NULL)
+    (v_joao_id, 'administrador', true, 10000000000, v_agora, NULL),
+    (v_emanoel_id, 'administrador', true, 10000000000, v_agora, NULL),
+    (v_gabriel_id, 'administrador', true, 10000000000, v_agora, NULL)
   ON CONFLICT (usuario_id) DO UPDATE SET
     papel = 'administrador',
     ativo = true,
-    alcada_centavos = NULL,
+    alcada_centavos = 10000000000,
     revogado_em = NULL;
 
   RAISE NOTICE 'Administradores vinculados com sucesso: João (%), Emanoel (%), Gabriel (%)',

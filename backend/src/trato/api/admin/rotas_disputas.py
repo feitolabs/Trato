@@ -329,7 +329,11 @@ def decidir(
     decisao = Decisao(
         Resultado(corpo.resultado.value), corpo.percentual_cliente_bps, corpo.valor_cliente_centavos
     )
-    alcada = operador.membro.alcada_centavos or 0
+    alcada = operador.membro.alcada_centavos
+    if operador.membro.papel == PapelEquipe.ADMINISTRADOR:
+        alcada = alcada or 100_000_000_00  # Administrador tem autonomia total e alçada irrestrita
+    else:
+        alcada = alcada or 0
     nova = disputa.decidir(Ator.ANALISTA, operador.id, decisao, agora, alcada)
     if nova.estado is Estado.DECIDIDA:
         return _efetivar(contexto, admin, operador, pedido_id, nova, corpo.justificativa)
@@ -367,7 +371,11 @@ def aprovar(
 ) -> DisputaDetalheOut:
     disputa = _obter(contexto, pedido_id)
     aprovada = disputa.aprovar(Ator.ANALISTA, operador.id, contexto.agora())
-    alcada = operador.membro.alcada_centavos or 0
+    alcada = operador.membro.alcada_centavos
+    if operador.membro.papel == PapelEquipe.ADMINISTRADOR:
+        alcada = alcada or 100_000_000_00  # Administrador tem autonomia total e alçada irrestrita
+    else:
+        alcada = alcada or 0
     if operador.membro.papel is not PapelEquipe.ADMINISTRADOR and alcada < aprovada.valor_congelado:
         raise disputas.AlcadaInvalida("O valor da disputa está acima da alçada de quem aprova.")
     return _efetivar(contexto, admin, operador, pedido_id, aprovada, corpo.justificativa)

@@ -103,20 +103,6 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.auditoriaVer,
     Permissao.auditoriaVerificarCadeia,
   },
-  Papel.administrador: {
-    Permissao.verificacoesVer,
-    Permissao.disputasVer,
-    Permissao.disputasDecidir,
-    Permissao.disputasSegundaPessoa,
-    Permissao.pagamentosVer,
-    Permissao.usuariosBuscar,
-    Permissao.pedidosBuscar,
-    Permissao.suporteVer,
-    Permissao.categoriasEditar,
-    Permissao.configVer,
-    Permissao.configPropor,
-    Permissao.configAprovar,
-    Permissao.auditoriaVer,
-    Permissao.auditoriaVerificarCadeia,
-  },
+  // Administrador tem autonomia irrestrita em todas as telas e ações do painel
+  Papel.administrador: {...Permissao.values},
 };

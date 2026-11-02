@@ -86,22 +86,8 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.AUDITORIA_VERIFICAR_CADEIA,
         }
     ),
-    P.ADMINISTRADOR: frozenset(
-        {
-            X.VERIFICACOES_VER,
-            X.DISPUTAS_VER,
-            X.DISPUTAS_DECIDIR,
-            X.DISPUTAS_SEGUNDA_PESSOA,
-            X.PAGAMENTOS_VER,
-            X.USUARIOS_BUSCAR,
-            X.PEDIDOS_BUSCAR,
-            X.CONFIG_VER,
-            X.CONFIG_PROPOR,
-            X.CONFIG_APROVAR,
-            X.AUDITORIA_VER,
-            X.AUDITORIA_VERIFICAR_CADEIA,
-        }
-    ),
+    # Administrador tem autonomia irrestrita em todas as permissões do sistema
+    P.ADMINISTRADOR: frozenset(Permissao),
 }
 del P, X
 
