@@ -125,4 +125,5 @@ class ConfigPostgres:
                 ),
                 garantia_dias_por_categoria=por_categoria,
             ),
+            valor_maximo_servico_centavos=p.get("valor_maximo_servico_centavos"),
         )

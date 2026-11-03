@@ -130,6 +130,20 @@ def _concluir_efeitos(contexto: Contexto, pedido: Pedido) -> None:
     contexto.garantias.salvar_garantia(pedido.id, garantia)
 
 
+def _exigir_dentro_do_teto(dados: Any, contexto: Contexto) -> None:
+    """RN-07: o valor do pedido é validado na criação contra o teto das Configurações."""
+    teto = contexto.config.carregar().valor_maximo_servico_centavos
+    maior = max(
+        (v for v in (dados.faixa_preco_min_centavos, dados.faixa_preco_max_centavos) if v),
+        default=0,
+    )
+    if teto is not None and maior > teto:
+        reais = f"{teto // 100:,}".replace(",", ".") + f",{teto % 100:02d}"
+        raise HTTPException(
+            422, f"O valor do pedido passa do teto permitido (R$ {reais}). Informe um valor menor."
+        )
+
+
 @router.post("", response_model=PedidoOut, status_code=201, summary="Abrir pedido")
 def abrir_pedido(
     corpo: AbrirPedidoIn | None = None,
@@ -138,6 +152,8 @@ def abrir_pedido(
 ) -> PedidoOut:
     pedido = estados.abrir_pedido(uuid.uuid4().hex, ator_de(usuario), contexto.agora())
     dados = corpo.para_dados() if corpo else None
+    if dados is not None:
+        _exigir_dentro_do_teto(dados, contexto)
     if dados is not None:  # M9: limite e mascaramento de contato no texto livre
         cfg = obter_config_seguranca()
         dados = replace(

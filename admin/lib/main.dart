@@ -14,5 +14,5 @@ void main() {
           urlSupabase: 'https://ornaoshsvuszquntkqsk.supabase.co',
           chaveAnon: 'sb_publishable_GwIISqsEKuOu6iK4IBlRvQ__TVCCgj8',
         );
-  runApp(PainelApp(api: criarApi(config)));
+  runApp(PainelApp(api: criarApi(config), ambienteTeste: !config.ehProducao));
 }

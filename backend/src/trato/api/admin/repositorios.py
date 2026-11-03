@@ -38,6 +38,8 @@ class FiltroAuditoria:
     entidade_id: str | None = None
     desde: datetime | None = None
     ate: datetime | None = None
+    # Parte do nome de quem agiu (a tela filtra por "Quem" sem pedir o id).
+    ator_busca: str | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,9 @@ class EntradaAuditoria:
     motivo: str | None
     antes: Any = None
     depois: Any = None
+    # Nomes legíveis (RF-AUD-02): a tela mostra "Emanuel Cabral aprovou…", não códigos e UUIDs.
+    ator_nome: str | None = None
+    entidade_nome: str | None = None
 
 
 class RepositorioAuditoriaAdmin(Protocol):
@@ -86,6 +91,15 @@ class DocumentoAdmin:
 
 
 @dataclass(frozen=True)
+class EnvioAnteriorAdmin:
+    """Um envio anterior do mesmo profissional (RF-VER-02: histórico de envios)."""
+
+    enviado_em: datetime
+    status: str
+    motivo: str | None = None
+
+
+@dataclass(frozen=True)
 class VerificacaoAdmin:
     id: str
     profissional_id: str
@@ -97,6 +111,11 @@ class VerificacaoAdmin:
     motivo_recusa: str | None = None
     cpf_mascarado: str | None = None
     documentos: tuple[DocumentoAdmin, ...] = ()
+    # Separa o NÍVEL de verificação das CATEGORIAS de serviço que o profissional pediu (seção 9).
+    publico_id: str = ""
+    categorias: tuple[str, ...] = ()
+    cidade: str | None = None
+    envios_anteriores: tuple[EnvioAnteriorAdmin, ...] = ()
 
 
 class RepositorioVerificacoesAdmin(Protocol):
@@ -133,6 +152,49 @@ class UsuarioAdmin:
 
 
 @dataclass(frozen=True)
+class ComplementoUsuarioAdmin:
+    """O que a lista de usuários mostra além do nome: contato mascarado, cidade e o ID curto."""
+
+    publico_id: str = ""
+    email_mascarado: str | None = None
+    telefone_mascarado: str | None = None
+    cidade: str | None = None
+
+
+@dataclass(frozen=True)
+class CategoriaDoProfissional:
+    categoria_id: str
+    nome: str
+    ativa_no_perfil: bool
+    ativa_na_plataforma: bool
+
+
+@dataclass(frozen=True)
+class EventoUsuarioAdmin:
+    em: datetime
+    texto: str
+
+
+@dataclass(frozen=True)
+class ItemDiagnostico:
+    ok: bool
+    titulo: str
+    detalhe: str
+
+
+@dataclass(frozen=True)
+class DiagnosticoAdmin:
+    """Por que um pedido aparece (ou não) para um profissional (RN-01, RF-BUS-03)."""
+
+    pedido_id: str
+    pedido_numero: int | None
+    pedido_titulo: str
+    categoria: str
+    aparece: bool
+    itens: tuple[ItemDiagnostico, ...]
+
+
+@dataclass(frozen=True)
 class DadosPessoaisAdmin:
     cpf: str | None
     telefone: str | None
@@ -151,6 +213,11 @@ class PedidoResumoAdmin:
     profissional_id: str | None
     valor_centavos: int | None
     criado_em: datetime | None
+    # Para a lista mostrar "PED-10482 · Pintura · Belo Horizonte" em vez de só o UUID (RF-BUS-04).
+    numero: int | None = None
+    categoria: str | None = None
+    cidade: str | None = None
+    profissional_nome: str | None = None
 
 
 class RepositorioUsuariosAdmin(Protocol):
@@ -161,6 +228,17 @@ class RepositorioUsuariosAdmin(Protocol):
     def obter(self, usuario_id: str) -> UsuarioAdmin | None: ...
 
     def nomes(self, ids: Sequence[str]) -> dict[str, str]: ...
+
+    def complementos(self, usuarios: Sequence[UsuarioAdmin]) -> dict[str, ComplementoUsuarioAdmin]:
+        """Contato MASCARADO, cidade e ID curto de vários usuários de uma vez."""
+
+    def categorias(self, usuario_id: str) -> Sequence[CategoriaDoProfissional]:
+        """Categorias cadastradas no perfil do profissional, ativas ou não."""
+
+    def historico(self, usuario_id: str, limite: int) -> Sequence[EventoUsuarioAdmin]: ...
+
+    def diagnosticar(self, usuario_id: str, pedido: str) -> DiagnosticoAdmin | None:
+        """Aplica a regra RN-01 e explica cada causa. Nulo = pedido não encontrado."""
 
     def dados_pessoais(
         self, usuario_id: str, ator_id: str, motivo: str
@@ -178,6 +256,9 @@ class RepositorioPedidosAdmin(Protocol):
         limite: int,
         deslocamento: int,
     ) -> tuple[Sequence[PedidoResumoAdmin], int]: ...
+
+    def rotulos(self, pedido_ids: Sequence[str]) -> dict[str, tuple[int | None, str]]:
+        """(número curto, título) dos pedidos, para as telas que só têm o id."""
 
 
 # --- Configuração versionada -------------------------------------------------------------------

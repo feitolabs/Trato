@@ -19,12 +19,18 @@ from trato.api.admin import config_regras as regras
 from trato.api.admin.contexto import AdminContexto
 from trato.api.admin.papeis import PapelEquipe
 from trato.api.admin.repositorios import (
+    CategoriaDoProfissional,
+    ComplementoUsuarioAdmin,
     DadosPessoaisAdmin,
     DefinicaoConfig,
+    DiagnosticoAdmin,
     DocumentoAdmin,
     EntradaAuditoria,
+    EnvioAnteriorAdmin,
+    EventoUsuarioAdmin,
     FaixaTaxa,
     FiltroAuditoria,
+    ItemDiagnostico,
     MembroEquipe,
     ParametroConfig,
     PedidoResumoAdmin,
@@ -65,18 +71,23 @@ class EquipePostgres:
             return None
         with self._banco.transacao() as con:
             linha = con.execute(
-                "select papel, ativo, revogado_em, alcada_centavos from public.equipe "
-                "where usuario_id = %s",
+                "select e.papel, e.ativo, e.revogado_em, e.alcada_centavos, a.teto_centavos "
+                "from public.equipe e left join public.papeis_alcada a on a.papel = e.papel "
+                "where e.usuario_id = %s",
                 (achado,),
             ).fetchone()
         if linha is None:
             return None
+        alcada = None if linha["alcada_centavos"] is None else int(linha["alcada_centavos"])
+        # A alçada de cada pessoa nunca passa do teto do papel (RP-02).
+        if alcada is not None and linha["teto_centavos"] is not None:
+            alcada = min(alcada, int(linha["teto_centavos"]))
         return MembroEquipe(
             achado,
             PapelEquipe(linha["papel"]),
             bool(linha["ativo"]),
             linha["revogado_em"],
-            None if linha["alcada_centavos"] is None else int(linha["alcada_centavos"]),
+            alcada,
         )
 
 
@@ -118,6 +129,8 @@ class AuditoriaAdminPostgres:
         onde = (
             "(%(acao)s::text is null or acao like %(acao_like)s escape '\\') "
             "and (%(ator)s::uuid is null or ator_id = %(ator)s::uuid) "
+            "and (%(ator_busca)s::text is null or ator_id in "
+            "     (select id from public.usuarios where nome ilike %(ator_like)s escape '\')) "
             "and (%(entidade)s::text is null or entidade = %(entidade)s) "
             "and (%(entidade_id)s::uuid is null or entidade_id = %(entidade_id)s::uuid) "
             "and (%(desde)s::timestamptz is null or ocorrida_em >= %(desde)s::timestamptz) "
@@ -127,6 +140,8 @@ class AuditoriaAdminPostgres:
             "acao": filtro.acao,
             "acao_like": (_like(filtro.acao)[1:-1] + "%" if filtro.acao else None),
             "ator": ator,
+            "ator_busca": filtro.ator_busca,
+            "ator_like": _like(filtro.ator_busca) if filtro.ator_busca else None,
             "entidade": filtro.entidade,
             "entidade_id": entidade_id,
             "desde": filtro.desde,
@@ -144,6 +159,7 @@ class AuditoriaAdminPostgres:
                 f"where {onde} order by id desc limit %(limite)s offset %(deslocamento)s",
                 params,
             ).fetchall()
+            atores, entidades = _nomes_da_auditoria(con, linhas)
         return (
             tuple(
                 EntradaAuditoria(
@@ -157,6 +173,8 @@ class AuditoriaAdminPostgres:
                     l["motivo"],
                     l["antes"],
                     l["depois"],
+                    atores.get(_txt(l["ator_id"]) or ""),
+                    entidades.get((l["entidade"], _txt(l["entidade_id"]))),
                 )  # fmt: skip
                 for l in linhas  # noqa: E741
             ),
@@ -168,6 +186,50 @@ class AuditoriaAdminPostgres:
             return con.execute(
                 "select public.verificar_cadeia_auditoria() as primeira_falha"
             ).fetchone()["primeira_falha"]
+
+
+# entidade da auditoria -> consulta que devolve (id, nome legível) dos ids pedidos.
+_NOMES_DE_ENTIDADE = {
+    "usuarios": "select id, nome from public.usuarios where id = any(%s)",
+    "perfis_profissional": "select id, nome from public.usuarios where id = any(%s)",
+    "equipe": "select id, nome from public.usuarios where id = any(%s)",
+    "usuarios_privados": "select id, nome from public.usuarios where id = any(%s)",
+    "categorias": "select id, nome from public.categorias where id = any(%s)",
+    "cidades": "select id, nome || ' - ' || uf as nome from public.cidades where id = any(%s)",
+    "cupons": "select id, codigo as nome from public.cupons where id = any(%s)",
+    "pedidos": "select id, 'PED-' || numero || ' · ' || titulo as nome "
+    "from public.pedidos where id = any(%s)",
+    "verificacoes": "select v.id, u.nome from public.verificacoes v "
+    "join public.usuarios u on u.id = v.profissional_id where v.id = any(%s)",
+    "campanhas_notificacao": "select id, titulo as nome from public.campanhas_notificacao "
+    "where id = any(%s)",
+    "config_versoes": "select id, 'Versão ' || numero as nome from public.config_versoes "
+    "where id = any(%s)",
+}
+
+
+def _nomes_da_auditoria(
+    con: Any, linhas: Sequence[dict[str, Any]]
+) -> tuple[dict[str, str], dict[tuple[str | None, str | None], str]]:
+    """(nome de cada ator, nome de cada entidade) da página. Sem nome, a tela usa o código."""
+    atores_ids = list({l["ator_id"] for l in linhas if l["ator_id"]})  # noqa: E741
+    atores: dict[str, str] = {}
+    if atores_ids:
+        atores = {
+            str(r["id"]): r["nome"]
+            for r in con.execute(
+                "select id, nome from public.usuarios where id = any(%s)", (atores_ids,)
+            ).fetchall()
+        }
+    entidades: dict[tuple[str | None, str | None], str] = {}
+    por_tipo: dict[str, list[Any]] = {}
+    for l in linhas:  # noqa: E741
+        if l["entidade"] in _NOMES_DE_ENTIDADE and l["entidade_id"]:
+            por_tipo.setdefault(l["entidade"], []).append(l["entidade_id"])
+    for tipo, ids in por_tipo.items():
+        for r in con.execute(_NOMES_DE_ENTIDADE[tipo], (list(set(ids)),)).fetchall():
+            entidades[(tipo, str(r["id"]))] = r["nome"]
+    return atores, entidades
 
 
 def _mascarar_cpf(cpf: str | None) -> str | None:
@@ -191,12 +253,73 @@ class VerificacoesAdminPostgres:
             ).fetchone()["n"]
             linhas = con.execute(
                 "select v.id, v.profissional_id, u.nome, v.nivel_solicitado, v.status, "
-                "v.enviada_em, v.decidida_em, v.motivo_recusa "
+                "v.enviada_em, v.decidida_em, v.motivo_recusa, p.cpf "
                 "from public.verificacoes v join public.usuarios u on u.id = v.profissional_id "
+                "left join public.usuarios_privados p on p.usuario_id = v.profissional_id "
                 "where v.status = any(%s) order by v.enviada_em limit %s offset %s",
                 (list(status), limite, deslocamento),
             ).fetchall()
-        return tuple(self._de_linha(l) for l in linhas), int(total)  # noqa: E741
+            complementos = self._complementos(con, linhas)
+        return (
+            tuple(
+                self._de_linha(
+                    l, cpf_mascarado=_mascarar_cpf(l["cpf"]), **complementos[str(l["id"])]
+                )  # noqa: E741
+                for l in linhas  # noqa: E741
+            ),
+            int(total),
+        )
+
+    @staticmethod
+    def _complementos(con: Any, linhas: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Documentos, categorias, cidade e envios anteriores de várias verificações de uma vez."""
+        if not linhas:
+            return {}
+        v_ids = [l["id"] for l in linhas]  # noqa: E741
+        p_ids = list({l["profissional_id"] for l in linhas})  # noqa: E741
+        docs = con.execute(
+            "select verificacao_id, id, tipo, validade_em from public.verificacao_documentos "
+            "where verificacao_id = any(%s) order by criado_em, id",
+            (v_ids,),
+        ).fetchall()
+        cats = con.execute(
+            "select pc.profissional_id, c.nome from public.profissional_categorias pc "
+            "join public.categorias c on c.id = pc.categoria_id "
+            "where pc.profissional_id = any(%s) order by c.nome",
+            (p_ids,),
+        ).fetchall()
+        cidades = con.execute(
+            "select r.profissional_id, min(ci.nome || ' - ' || ci.uf) as cidade "
+            "from public.profissional_regioes r join public.cidades ci on ci.id = r.cidade_id "
+            "where r.profissional_id = any(%s) group by r.profissional_id",
+            (p_ids,),
+        ).fetchall()
+        anteriores = con.execute(
+            "select profissional_id, id, enviada_em, status, motivo_recusa "
+            "from public.verificacoes where profissional_id = any(%s) order by enviada_em desc",
+            (p_ids,),
+        ).fetchall()
+        saida: dict[str, dict[str, Any]] = {}
+        for l in linhas:  # noqa: E741
+            pid = l["profissional_id"]
+            saida[str(l["id"])] = {
+                "publico_id": "PRO-" + str(pid).replace("-", "")[:4].upper(),
+                "documentos": tuple(
+                    DocumentoAdmin(str(d["id"]), d["tipo"], _txt(d["validade_em"]))
+                    for d in docs
+                    if d["verificacao_id"] == l["id"]
+                ),
+                "categorias": tuple(c["nome"] for c in cats if c["profissional_id"] == pid),
+                "cidade": next((c["cidade"] for c in cidades if c["profissional_id"] == pid), None),
+                "envios_anteriores": tuple(
+                    EnvioAnteriorAdmin(a["enviada_em"], a["status"], a["motivo_recusa"])
+                    for a in anteriores
+                    if a["profissional_id"] == pid
+                    and a["id"] != l["id"]
+                    and a["status"] in ("aprovada", "recusada")
+                ),
+            }
+        return saida
 
     @staticmethod
     def _de_linha(l: dict[str, Any], **extra: Any) -> VerificacaoAdmin:  # noqa: E741
@@ -227,18 +350,8 @@ class VerificacoesAdminPostgres:
             ).fetchone()
             if linha is None:
                 return None
-            docs = con.execute(
-                "select id, tipo, validade_em from public.verificacao_documentos "
-                "where verificacao_id = %s order by criado_em, id",
-                (achado,),
-            ).fetchall()
-        return self._de_linha(
-            linha,
-            cpf_mascarado=_mascarar_cpf(linha["cpf"]),
-            documentos=tuple(
-                DocumentoAdmin(str(d["id"]), d["tipo"], _txt(d["validade_em"])) for d in docs
-            ),
-        )
+            complemento = self._complementos(con, [linha])[str(linha["id"])]
+        return self._de_linha(linha, cpf_mascarado=_mascarar_cpf(linha["cpf"]), **complemento)
 
     def caminho_do_documento(self, verificacao_id: str, documento_id: str) -> str | None:
         v, d = como_uuid(verificacao_id), como_uuid(documento_id)
@@ -363,6 +476,170 @@ class UsuariosAdminPostgres:
             ).fetchall()
         return {str(l["id"]): l["nome"] for l in linhas}  # noqa: E741
 
+    def complementos(self, usuarios: Sequence[UsuarioAdmin]) -> dict[str, ComplementoUsuarioAdmin]:
+        ids = [i for i in (como_uuid(u.id) for u in usuarios) if i is not None]
+        if not ids:
+            return {}
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select u.id, au.email, p.telefone, "
+                "(select min(ci.nome) from public.profissional_regioes r "
+                " join public.cidades ci on ci.id = r.cidade_id where r.profissional_id = u.id) "
+                "as cidade "
+                "from public.usuarios u "
+                "left join auth.users au on au.id = u.id "
+                "left join public.usuarios_privados p on p.usuario_id = u.id "
+                "where u.id = any(%s)",
+                (ids,),
+            ).fetchall()
+        por_id = {str(l["id"]): l for l in linhas}  # noqa: E741
+        prefixo = {"profissional": "PRO", "cliente": "CLI", "equipe": "EQP"}
+        return {
+            u.id: ComplementoUsuarioAdmin(
+                publico_id=f"{prefixo.get(u.tipo, 'USR')}-{u.id.replace('-', '')[:4].upper()}",
+                email_mascarado=_mascarar_email((por_id.get(u.id) or {}).get("email")),
+                telefone_mascarado=_mascarar_telefone((por_id.get(u.id) or {}).get("telefone")),
+                cidade=(por_id.get(u.id) or {}).get("cidade"),
+            )
+            for u in usuarios
+        }
+
+    def categorias(self, usuario_id: str) -> Sequence[CategoriaDoProfissional]:
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select c.id, c.nome, pc.suspensa_em is null as no_perfil, c.ativa "
+                "from public.profissional_categorias pc "
+                "join public.categorias c on c.id = pc.categoria_id "
+                "where pc.profissional_id = %s order by c.nome",
+                (achado,),
+            ).fetchall()
+        return tuple(
+            CategoriaDoProfissional(str(l["id"]), l["nome"], bool(l["no_perfil"]), bool(l["ativa"]))
+            for l in linhas  # noqa: E741
+        )
+
+    def historico(self, usuario_id: str, limite: int) -> Sequence[EventoUsuarioAdmin]:
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select a.ocorrida_em, a.acao, a.depois, coalesce(u.nome, 'Sistema') as ator "
+                "from public.auditoria a left join public.usuarios u on u.id = a.ator_id "
+                "where a.entidade_id = %s or a.depois->>'profissional_id' = %s::text "
+                "order by a.ocorrida_em desc limit %s",
+                (achado, str(achado), limite),
+            ).fetchall()
+            concluidos = con.execute(
+                "select h.ocorrida_em, p.numero from public.pedido_historico h "
+                "join public.pedidos p on p.id = h.pedido_id "
+                "join public.contratos c on c.pedido_id = p.id "
+                "where h.para_status = 'concluido' and c.profissional_id = %s "
+                "order by h.ocorrida_em desc limit %s",
+                (achado, limite),
+            ).fetchall()
+        eventos = [
+            EventoUsuarioAdmin(l["ocorrida_em"], f"{_frase_da_acao(l['acao'])} por {l['ator']}")
+            for l in linhas  # noqa: E741
+        ]
+        eventos += [
+            EventoUsuarioAdmin(c["ocorrida_em"], f"Pedido PED-{c['numero']} concluído")
+            for c in concluidos
+        ]
+        eventos.sort(key=lambda e: e.em, reverse=True)
+        return tuple(eventos[:limite])
+
+    def diagnosticar(self, usuario_id: str, pedido: str) -> DiagnosticoAdmin | None:
+        prof = como_uuid(usuario_id)
+        if prof is None:
+            return None
+        numero = _numero_do_pedido(pedido)
+        ref = como_uuid(pedido)
+        with self._banco.transacao() as con:
+            ped = con.execute(
+                "select p.id, p.numero, p.titulo, p.categoria_id, c.nome as categoria, c.ativa "
+                "from public.pedidos p join public.categorias c on c.id = p.categoria_id "
+                "where (%s::bigint is not null and p.numero = %s::bigint) "
+                "   or (%s::uuid is not null and p.id = %s::uuid)",
+                (numero, numero, ref, ref),
+            ).fetchone()
+            if ped is None:
+                return None
+            cadastro = con.execute(
+                "select suspensa_em from public.profissional_categorias "
+                "where profissional_id = %s and categoria_id = %s",
+                (prof, ped["categoria_id"]),
+            ).fetchone()
+            perfil = con.execute(
+                "select p.status, v.decidida_em from public.perfis_profissional p "
+                "left join lateral (select decidida_em from public.verificacoes "
+                "   where profissional_id = p.usuario_id and status = 'aprovada' "
+                "   order by decidida_em desc limit 1) v on true "
+                "where p.usuario_id = %s",
+                (prof,),
+            ).fetchone()
+            conta = con.execute(
+                "select status from public.usuarios where id = %s", (prof,)
+            ).fetchone()
+        nome = ped["categoria"]
+        itens: list[ItemDiagnostico] = []
+        if cadastro is None:
+            itens.append(ItemDiagnostico(
+                False, "Não tem a categoria.",
+                f"O pedido é de {nome}, e essa categoria não está cadastrada no perfil dele.",
+            ))  # fmt: skip
+        elif cadastro["suspensa_em"] is not None:
+            itens.append(ItemDiagnostico(
+                False, "Não tem a categoria ativa.",
+                f"O pedido é de {nome}, e essa categoria está inativa no perfil dele.",
+            ))  # fmt: skip
+        else:
+            itens.append(ItemDiagnostico(
+                True, "Categoria ativa no perfil.",
+                f"{nome} está cadastrada e ativa no perfil dele.",
+            ))  # fmt: skip
+        if ped["ativa"]:
+            itens.append(ItemDiagnostico(
+                True, "Categoria ativa na plataforma.",
+                f"{nome} não foi desativada em Categorias.",
+            ))  # fmt: skip
+        else:
+            itens.append(ItemDiagnostico(
+                False, "Categoria desativada pela plataforma.",
+                f"{nome} foi desativada em Categorias: não gera pedidos novos.",
+            ))  # fmt: skip
+        if perfil is not None and perfil["status"] == "aprovado":
+            quando = perfil["decidida_em"]
+            itens.append(ItemDiagnostico(
+                True, "Profissional verificado.",
+                "Aprovado" + (f" em {quando:%d/%m/%Y}." if quando else "."),
+            ))  # fmt: skip
+        else:
+            itens.append(ItemDiagnostico(
+                False, "Profissional ainda não verificado.",
+                "O pedido só aparece depois que a verificação for aprovada.",
+            ))  # fmt: skip
+        if conta is not None and conta["status"] == "ativo":
+            itens.append(ItemDiagnostico(
+                True, "Sem bloqueio na conta.", "Nenhum bloqueio preventivo ativo.",
+            ))  # fmt: skip
+        else:
+            estado = conta["status"] if conta else "desconhecido"
+            itens.append(ItemDiagnostico(
+                False, "Conta com bloqueio.", f"A conta está com status \"{estado}\".",
+            ))  # fmt: skip
+        return DiagnosticoAdmin(
+            pedido_id=str(ped["id"]),
+            pedido_numero=ped["numero"],
+            pedido_titulo=ped["titulo"],
+            categoria=nome,
+            aparece=all(i.ok for i in itens),
+            itens=tuple(itens),
+        )
+
     def dados_pessoais(
         self, usuario_id: str, ator_id: str, motivo: str
     ) -> DadosPessoaisAdmin | None:
@@ -398,6 +675,41 @@ class UsuariosAdminPostgres:
         )  # fmt: skip
 
 
+def _mascarar_email(email: str | None) -> str | None:
+    if not email or "@" not in email:
+        return None
+    local, _, dominio = email.partition("@")
+    return f"{local[:1]}•••••@{dominio}" if local else None
+
+
+def _mascarar_telefone(telefone: str | None) -> str | None:
+    digitos = "".join(c for c in (telefone or "") if c.isdigit())
+    if len(digitos) < 10:
+        return None
+    nacional = digitos[-11:] if len(digitos) > 11 else digitos
+    return f"({nacional[:2]}) •••••-{nacional[-4:]}"
+
+
+_FRASES_DA_ACAO = {
+    "verificacao.aprovada": "Verificação aprovada",
+    "verificacao.recusada": "Verificação recusada",
+    "usuario.status_alterado": "Status da conta alterado",
+    "dado_pessoal.revelado": "Dados pessoais revelados",
+    "risco.saque_travado": "Saques travados",
+    "risco.bloqueio_preventivo": "Bloqueio preventivo aplicado",
+}
+
+
+def _frase_da_acao(acao: str) -> str:
+    return _FRASES_DA_ACAO.get(acao, acao.replace(".", " ").replace("_", " ").capitalize())
+
+
+def _numero_do_pedido(termo: str) -> str | None:
+    """ "PED-10482", "ped 10482" ou "10482" -> "10482"; qualquer outra coisa não é número."""
+    limpo = termo.strip().upper().removeprefix("PED").lstrip("- ")
+    return limpo if limpo.isdigit() else None
+
+
 class PedidosAdminPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
@@ -428,6 +740,7 @@ class PedidosAdminPostgres:
             "cliente": cliente,
             "profissional": profissional,
             "termo": termo,
+            "numero": _numero_do_pedido(termo) if termo else None,
             "like": _like(termo) if termo else None,
             "limite": limite,
             "deslocamento": deslocamento,
@@ -436,8 +749,12 @@ class PedidosAdminPostgres:
             total = con.execute(f"select count(*) as n {juncao}{onde}", params).fetchone()["n"]
             linhas = con.execute(
                 "select p.id, p.titulo, p.status, p.cliente_id, u.nome as cliente_nome, "
-                "c.profissional_id, c.valor_total_centavos, p.criado_em "
-                f"{juncao}join public.usuarios u on u.id = p.cliente_id {onde} "
+                "c.profissional_id, c.valor_total_centavos, p.criado_em, p.numero, "
+                "cat.nome as categoria, ci.nome as cidade, up.nome as profissional_nome "
+                f"{juncao}join public.usuarios u on u.id = p.cliente_id "
+                "left join public.categorias cat on cat.id = p.categoria_id "
+                "left join public.cidades ci on ci.id = p.cidade_id "
+                f"left join public.usuarios up on up.id = c.profissional_id {onde} "
                 "order by p.criado_em desc, p.id limit %(limite)s offset %(deslocamento)s",
                 params,
             ).fetchall()
@@ -452,11 +769,25 @@ class PedidosAdminPostgres:
                     _txt(l["profissional_id"]),
                     None if l["valor_total_centavos"] is None else int(l["valor_total_centavos"]),
                     l["criado_em"],
+                    l["numero"],
+                    l["categoria"],
+                    l["cidade"],
+                    l["profissional_nome"],
                 )  # fmt: skip
                 for l in linhas  # noqa: E741
             ),
             int(total),
         )
+
+    def rotulos(self, pedido_ids: Sequence[str]) -> dict[str, tuple[int | None, str]]:
+        ids = [i for i in (como_uuid(p) for p in pedido_ids) if i is not None]
+        if not ids:
+            return {}
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select id, numero, titulo from public.pedidos where id = any(%s)", (ids,)
+            ).fetchall()
+        return {str(l["id"]): (l["numero"], l["titulo"]) for l in linhas}  # noqa: E741
 
 
 _COLUNAS_VERSAO = (

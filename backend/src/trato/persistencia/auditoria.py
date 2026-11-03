@@ -10,6 +10,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from trato.persistencia.captura_auditoria import anotar_id_gravado
 from trato.persistencia.comum import como_uuid, para_json
 from trato.persistencia.conexao import Banco
 
@@ -63,6 +64,7 @@ def registrar_na_transacao(
             request_id,
         ),
     ).fetchone()
+    anotar_id_gravado(int(linha["id"]))
     return int(linha["id"])
 
 

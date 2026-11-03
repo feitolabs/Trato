@@ -24,8 +24,11 @@ from trato.api.contexto import Contexto, obter_contexto
 router = APIRouter(prefix="/v1/admin/config", tags=["admin: configuração"])
 
 
-def _saida(v: VersaoConfig) -> VersaoConfigOut:
+def _saida(v: VersaoConfig, nomes: dict[str, str] | None = None) -> VersaoConfigOut:
+    nomes = nomes or {}
     return VersaoConfigOut(
+        criada_por_nome=nomes.get(v.criada_por),
+        aprovada_por_nome=nomes.get(v.aprovada_por or ""),
         id=v.id,
         numero=v.numero,
         status=v.status,
@@ -38,6 +41,13 @@ def _saida(v: VersaoConfig) -> VersaoConfigOut:
         parametros=[ParametroIO(**vars(p)) for p in v.parametros],
         faixas=[FaixaIO(**vars(f)) for f in v.faixas],
     )
+
+
+def _com_nomes(admin: AdminContexto, versoes: list[VersaoConfig]) -> list[VersaoConfigOut]:
+    """Versões com o NOME de quem propôs e de quem aprovou (a tela não mostra UUID)."""
+    ids = list({i for v in versoes for i in (v.criada_por, v.aprovada_por) if i})
+    nomes = admin.usuarios.nomes(ids)
+    return [_saida(v, nomes) for v in versoes]
 
 
 @router.get("/definicoes", response_model=list[DefinicaoOut], summary="Catálogo de parâmetros")
@@ -58,7 +68,7 @@ def vigente(
     atual = admin.config.vigente()
     if atual is None:
         raise HTTPException(404, "Ainda não há versão de configuração vigente.")
-    return _saida(atual)
+    return _com_nomes(admin, [atual])[0]
 
 
 @router.get("/versoes", response_model=list[VersaoConfigOut], summary="Histórico de versões")
@@ -66,7 +76,7 @@ def versoes(
     _: Operador = Depends(exigir(Permissao.CONFIG_VER)),
     admin: AdminContexto = Depends(obter_admin),
 ) -> list[VersaoConfigOut]:
-    return [_saida(v) for v in admin.config.versoes()]
+    return _com_nomes(admin, list(admin.config.versoes()))
 
 
 @router.get("/versoes/{versao_id}", response_model=VersaoConfigOut, summary="Uma versão completa")
@@ -78,7 +88,7 @@ def versao(
     achada = admin.config.versao(versao_id)
     if achada is None:
         raise HTTPException(404, "Versão de configuração não encontrada.")
-    return _saida(achada)
+    return _com_nomes(admin, [achada])[0]
 
 
 @router.post(
@@ -165,7 +175,7 @@ def reverter(
 def descartar(
     versao_id: str,
     corpo: ComMotivo,
-    operador: Operador = Depends(exigir(Permissao.CONFIG_PROPOR)),
+    operador: Operador = Depends(exigir(Permissao.CONFIG_PROPOR, Permissao.CONFIG_APROVAR)),
     admin: AdminContexto = Depends(obter_admin),
 ) -> None:
     admin.config.descartar_rascunho(versao_id, operador.id, corpo.motivo)

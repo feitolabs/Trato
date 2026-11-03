@@ -38,6 +38,7 @@ enum Permissao {
   disputasDecidir,
   disputasSegundaPessoa,
   pagamentosVer,
+  pagamentosConciliar,
   usuariosBuscar,
   dadosPessoaisRevelar,
   pedidosBuscar,
@@ -95,6 +96,7 @@ const _matriz = <Papel, Set<Permissao>>{
   },
   Papel.financeiro: {
     Permissao.pagamentosVer,
+    Permissao.pagamentosConciliar,
     Permissao.pedidosBuscar,
     Permissao.configVer,
     Permissao.configPropor,

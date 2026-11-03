@@ -19,6 +19,7 @@ router = APIRouter(prefix="/v1/admin/auditoria", tags=["admin: auditoria"])
 def listar(
     acao: str | None = Query(None, max_length=100, description="Prefixo: `config.` etc."),
     ator_id: str | None = None,
+    ator: str | None = Query(None, max_length=100, description="Parte do nome de quem agiu."),
     entidade: str | None = None,
     entidade_id: str | None = None,
     desde: datetime | None = None,
@@ -28,7 +29,7 @@ def listar(
     _: Operador = Depends(exigir(Permissao.AUDITORIA_VER)),
     admin: AdminContexto = Depends(obter_admin),
 ) -> Pagina[EntradaAuditoriaOut]:
-    filtro = FiltroAuditoria(acao, ator_id, entidade, entidade_id, desde, ate)
+    filtro = FiltroAuditoria(acao, ator_id, entidade, entidade_id, desde, ate, ator)
     itens, total = admin.auditoria.listar(filtro, limite, deslocamento)
     return Pagina(
         itens=[EntradaAuditoriaOut.model_validate(i) for i in itens],

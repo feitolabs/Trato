@@ -51,9 +51,17 @@ def _todas(contexto: Contexto) -> list[tuple[str, Disputa]]:
     return list(getattr(repo, "_itens", {}).items())
 
 
-def _resumo(pedido_id: str, d: Disputa, contexto: Contexto) -> DisputaResumoOut:
+def _resumo(
+    pedido_id: str,
+    d: Disputa,
+    contexto: Contexto,
+    rotulos: dict[str, tuple[int | None, str]] | None = None,
+) -> DisputaResumoOut:
+    numero, titulo = (rotulos or {}).get(pedido_id, (None, None))
     return DisputaResumoOut(
         pedido_id=pedido_id,
+        pedido_numero=numero,
+        pedido_titulo=titulo,
         estado=d.estado.value,
         motivo=d.motivo.value,
         valor_congelado_centavos=d.valor_congelado,
@@ -120,7 +128,7 @@ def _detalhe(
         for e in eventos
         if e.prova is not None
     ]
-    resumo = _resumo(pedido_id, d, contexto)
+    resumo = _resumo(pedido_id, d, contexto, admin.pedidos.rotulos([pedido_id]))
     return DisputaDetalheOut(
         **resumo.model_dump(),
         estado_pedido=pedido.estado.value if pedido else None,
@@ -167,6 +175,7 @@ def fila(
     deslocamento: int = Query(0, ge=0),
     _: Operador = Depends(exigir(Permissao.DISPUTAS_VER)),
     contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
 ) -> Pagina[DisputaResumoOut]:
     achadas = [
         (pid, d)
@@ -175,8 +184,9 @@ def fila(
     ]
     achadas.sort(key=lambda par: par[1].prazos.decisao_ate)  # o prazo mais curto primeiro
     pagina = achadas[deslocamento : deslocamento + limite]
+    rotulos = admin.pedidos.rotulos([pid for pid, _ in pagina])
     return Pagina(
-        itens=[_resumo(pid, d, contexto) for pid, d in pagina],
+        itens=[_resumo(pid, d, contexto, rotulos) for pid, d in pagina],
         total=len(achadas),
         limite=limite,
         deslocamento=deslocamento,

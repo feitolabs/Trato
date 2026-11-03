@@ -31,6 +31,7 @@ class Permissao(StrEnum):
     DISPUTAS_DECIDIR = "disputas_decidir"
     DISPUTAS_SEGUNDA_PESSOA = "disputas_segunda_pessoa"
     PAGAMENTOS_VER = "pagamentos_ver"
+    PAGAMENTOS_CONCILIAR = "pagamentos_conciliar"
     USUARIOS_BUSCAR = "usuarios_buscar"
     DADOS_PESSOAIS_REVELAR = "dados_pessoais_revelar"
     PEDIDOS_BUSCAR = "pedidos_buscar"
@@ -89,6 +90,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
     P.FINANCEIRO: frozenset(
         {
             X.PAGAMENTOS_VER,
+            X.PAGAMENTOS_CONCILIAR,
             X.PEDIDOS_BUSCAR,
             X.CONFIG_VER,
             X.CONFIG_PROPOR,

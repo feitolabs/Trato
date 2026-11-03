@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato_admin/app.dart';
+import 'package:trato_admin/dados/api_fake.dart';
 import 'package:trato_admin/nucleo/papeis.dart';
 
 import 'ajuda.dart';
@@ -27,7 +29,7 @@ void main() {
     testWidgets('conta sem papel na equipe não entra', (tester) async {
       await abrirPainel(tester, papel: 'cliente');
       expect(find.text('Esta conta não tem papel na equipe.'), findsOneWidget);
-      expect(find.text('Painel da equipe'), findsOneWidget);
+      expect(find.text('PAINEL ADMIN'), findsOneWidget);
     });
 
     testWidgets('entra, mostra o papel e sai', (tester) async {
@@ -35,7 +37,7 @@ void main() {
       expect(find.text('Financeiro'), findsWidgets);
       await tester.tap(find.text('Sair'));
       await tester.pumpAndSettle();
-      expect(find.text('Painel da equipe'), findsOneWidget);
+      expect(find.text('PAINEL ADMIN'), findsOneWidget);
     });
   });
 
@@ -75,14 +77,45 @@ void main() {
       expect(Permissao.values.map((p) => p.name).where((n) => n.contains('saque') || n.contains('saldo')), isEmpty);
     });
 
-    testWidgets('no tablet o menu vira gaveta', (tester) async {
-      await abrirPainel(tester, papel: 'administrador', largura: 800, altura: 900);
-      expect(_tem('disputas'), isFalse);
-      await tester.tap(find.byTooltip('Open navigation menu'));
-      await tester.pumpAndSettle();
+    testWidgets('a partir de 1024 o menu lateral é fixo, agrupado e com rodapé', (tester) async {
+      await abrirPainel(tester, papel: 'administrador', largura: 1280, altura: 900);
+      for (final grupo in ['OPERAÇÃO', 'FINANCEIRO', 'CRESCIMENTO', 'ADMINISTRAÇÃO']) {
+        expect(find.text(grupo), findsOneWidget, reason: grupo);
+      }
+      expect(find.text('Risco e antifraude'), findsOneWidget);
+      expect(find.text('Notificações push'), findsOneWidget);
+      expect(find.text('Sair'), findsOneWidget);
+      expect(find.text('Administrador'), findsWidgets); // papel no rodapé
+    });
+
+    testWidgets('de 768 a 1023 o menu fica recolhido, só com ícones', (tester) async {
+      await abrirPainel(tester, papel: 'administrador', largura: 900, altura: 900);
       expect(_tem('disputas'), isTrue);
+      expect(find.text('OPERAÇÃO'), findsNothing);
       await irPara(tester, 'disputas');
       expect(find.text('Disputas'), findsWidgets);
+    });
+
+    testWidgets('abaixo de 768 vira barra inferior com cinco módulos e "Mais"', (tester) async {
+      await abrirPainel(tester, papel: 'administrador', largura: 400, altura: 900);
+      for (final id in ['verificacao', 'disputas', 'busca', 'risco', 'dashboard', 'mais']) {
+        expect(_tem(id), isTrue, reason: id);
+      }
+      expect(_tem('equipe'), isFalse);
+      await tester.tap(find.byKey(const ValueKey('menu-mais')));
+      await tester.pumpAndSettle();
+      expect(_tem('equipe'), isTrue);
+      expect(find.text('Sair'), findsOneWidget);
+    });
+
+    testWidgets('ambiente de teste mostra a faixa fixa', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(PainelApp(api: ApiFake(), ambienteTeste: true));
+      await entrar(tester, 'administrador');
+      expect(find.textContaining('AMBIENTE DE TESTE'), findsOneWidget);
     });
   });
 }

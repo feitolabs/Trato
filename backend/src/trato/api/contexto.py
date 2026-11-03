@@ -179,7 +179,8 @@ def usuario_atual(
     credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Usuario:
-    token = credenciais.credentials if credenciais else request.query_params.get("token")
+    # Só o cabeçalho Authorization vale: token na URL vaza em histórico, log e referer.
+    token = credenciais.credentials if credenciais else None
     usuario = contexto.auth.autenticar(token) if token else None
     if usuario is None:
         raise HTTPException(

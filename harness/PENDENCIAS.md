@@ -57,3 +57,35 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 - **iOS:** build e simulador só em macOS com Xcode. Definir um Mac (ou CI na nuvem, ex.: Codemagic) antes da Fase 9.
 - Supabase CLI e GitHub CLI (`gh`) não estão instalados (opcionais).
 - Repositório GitHub "Trato" ainda não está ligado como `origin`.
+
+## Painel admin v2 (03/11/2026)
+
+**Decisões suas (travam requisitos obrigatórios do documento, seção 10):**
+1. **Tabela de taxas:** hoje há só a taxa única de 7,50% (`taxa_progressiva_ativa = 0`). Faixas e como aparecem em Configurações.
+2. **Quem custeia o cupom** (Trato ou profissional): muda a Receita Trato e o extrato fiscal. O painel não calcula desconto concedido.
+3. **Tetos de alçada por papel.** Valores **provisórios** na tabela `papeis_alcada` (Administrador R$ 5.000, Financeiro e Líder R$ 2.000,
+   Mediador e Atendente N2 R$ 500, Atendente N1 R$ 300, demais R$ 0). A alçada efetiva de cada pessoa agora é limitada a esse teto:
+   **os administradores existentes (gravados com R$ 100.000.000,00) passaram a valer R$ 5.000,00** e decisões de disputa acima disso
+   esperam uma segunda pessoa. Para mudar: `update papeis_alcada set teto_centavos = … where papel = '…'`.
+4. **Níveis de verificação:** o painel mostra o nível pedido e as categorias separados, mas quais níveis existem e o que liberam não está definido.
+5–9. Visibilidade por cidade/raio (RN-01), ajuda das categorias, mobile como app separado, papel Analista de risco, arquivo de design (Figma).
+
+**Aguardando o fluxo normal (não fiz por regra de dupla aprovação):**
+- Propor em Configurações o **teto de valor do pedido** (documento: R$ 1.000,00) e o **limite de valor atípico** (R$ 800,00). Sem
+  isso o backend não barra pedido caro e o Risco não gera alerta de valor atípico.
+- Existem duas contas "João Vitor Cardoso" na equipe (`cardosojoaovitor47@` e `cardosojoavitor47@`; a segunda nunca entrou). Revogar
+  a que não é sua pelo painel.
+- Dados de teste ainda no banco (`teste_admin`, `teste_financeiro`, `teste_Pintura`, versão 1 de configuração com motivo "teste_…", pedidos
+  de teste). Versões de configuração aprovadas são imutáveis e a auditoria é imutável: limpar exige decisão sua (RNF-07).
+
+**Não feito (precisa de OK ou de dependência externa):**
+- Convite por e-mail e 2FA obrigatório no primeiro acesso (RF-EQP-01, RNF-03): precisa da API de admin do Supabase e envio de e-mail
+  (efeito real). Hoje a pessoa precisa já ter conta no Trato.
+- Fila de suporte (RF-BUS-05): não existe tabela nem rota de chamados; a aba mostra o estado vazio com orientação. Atribuir, responder e
+  encerrar dependem disso. Idem "desativar categoria" com contagem de pedidos em andamento.
+- Geração de relatório em segundo plano com aviso (RF-REL-02): hoje gera na hora e baixa; o código de download fica na memória do processo
+  (serve com 1 instância; com várias, trocar por tabela).
+- Preferência de marketing no app: o painel respeita `preferencias.marketing.push = false`, mas o app ainda não grava essa preferência.
+- Tema escuro do design system (valores não vieram nas capturas); Analista de risco; detalhe de cupom com pedidos e total de desconto
+  (RF-CUP-04); agendamento de push; revisão de acessos a cada 90 dias; regras combinadas de risco; filtros do painel por cidade e categoria.
+- Cobertura de testes de integração contra o Supabase real para as consultas novas (validei as principais com `SELECT` no banco real).

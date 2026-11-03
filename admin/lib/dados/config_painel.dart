@@ -15,10 +15,18 @@ import 'api_http.dart';
 ///   --dart-define=ADMIN_SUPABASE_ANON_KEY=<chave pública (anon)>
 /// ```
 ///
+/// `ADMIN_AMBIENTE=producao` só no ambiente real; sem isso o painel mostra a faixa de teste.
+///
 /// Sem `ADMIN_MODO=api` (ou com algum valor faltando) o painel usa os dados de exemplo.
 /// Nunca ponha a chave de serviço (service role) aqui: o painel só usa a chave pública.
 class ConfigPainel {
-  const ConfigPainel({this.modo = '', this.urlApi = '', this.urlSupabase = '', this.chaveAnon = ''});
+  const ConfigPainel({
+    this.modo = '',
+    this.urlApi = '',
+    this.urlSupabase = '',
+    this.chaveAnon = '',
+    this.ambiente = '',
+  });
 
   /// Lê os `--dart-define` pela lista permitida (M14): em debug, segredo para o painel; em release é ignorado.
   factory ConfigPainel.doAmbiente() => ConfigPainel.deValores(filtrarDefines(lerDefinesDoAmbiente()));
@@ -28,12 +36,19 @@ class ConfigPainel {
         urlApi: v['ADMIN_API_URL'] ?? '',
         urlSupabase: v['ADMIN_SUPABASE_URL'] ?? '',
         chaveAnon: v['ADMIN_SUPABASE_ANON_KEY'] ?? '',
+        ambiente: v['ADMIN_AMBIENTE'] ?? '',
       );
 
   final String modo;
   final String urlApi;
   final String urlSupabase;
   final String chaveAnon;
+
+  /// `producao` esconde a faixa de ambiente. Qualquer outro valor (ou vazio) mostra a faixa fixa
+  /// "Ambiente de teste" (RNF-07): na dúvida, a pessoa vê que não é produção.
+  final String ambiente;
+
+  bool get ehProducao => ambiente.trim().toLowerCase() == 'producao';
 
   bool get usaApi =>
       modo.trim().toLowerCase() == 'api' && urlApi.isNotEmpty && urlSupabase.isNotEmpty && chaveAnon.isNotEmpty;

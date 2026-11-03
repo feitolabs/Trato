@@ -34,15 +34,23 @@ class ApiFake implements ApiAdmin {
     return vazio ? vazioValor : dados();
   }
 
-  void _registrar(String acao, String entidade, String? motivo) {
+  int? _ultimoRegistro;
+
+  @override
+  int? get ultimoRegistroAuditoria => _ultimoRegistro;
+
+  void _registrar(String acao, String entidade, String? motivo, {Map<String, dynamic> detalhes = const {}}) {
     final id = _auditoria.length + 1;
+    _ultimoRegistro = id;
     _auditoria.add(EntradaAuditoria(
       id: id,
       ocorridaEm: _base.add(Duration(minutes: 30 + id)),
       ator: _eu?.email ?? 'sistema',
+      atorNome: _eu?.nome,
       acao: acao,
       entidade: entidade,
       motivo: motivo,
+      detalhes: detalhes,
       hash: 'a${(id * 7919).toRadixString(16).padLeft(7, '0')}',
     ));
   }
@@ -161,14 +169,19 @@ class ApiFake implements ApiAdmin {
   }
 
   // ---------- F7.3 ----------
+  final _conciliados = <String>{};
+
   @override
-  Future<ResumoConciliacao> resumoConciliacao() => _ler(
+  Future<ResumoConciliacao> resumoConciliacao({int? dias}) => _ler(
         () => ResumoConciliacao(
           confirmadoCentavos: 1284500,
           estornadoCentavos: 12000,
           emAndamentoCentavos: 96000,
-          divergencias: 1,
+          divergencias: _conciliados.contains('l-4') ? 0 : 1,
           atualizadoEm: _base,
+          cobrancas: 412,
+          reembolsos: 9,
+          valorDivergenteCentavos: _conciliados.contains('l-4') ? 0 : 15000,
         ),
         ResumoConciliacao(
           confirmadoCentavos: 0,
@@ -180,7 +193,14 @@ class ApiFake implements ApiAdmin {
       );
 
   @override
-  Future<List<LancamentoEspelho>> extrato() => _ler(
+  Future<void> conciliarDivergencia(String lancamentoId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _conciliados.add(lancamentoId);
+    _registrar('pagamento.divergencia_conciliada', 'lancamento:$lancamentoId', motivo);
+  }
+
+  @override
+  Future<List<LancamentoEspelho>> extrato({int? dias}) => _ler(
         () => [
           LancamentoEspelho(
             id: 'l-1',
@@ -188,8 +208,10 @@ class ApiFake implements ApiAdmin {
             descricao: 'Sinal do orçamento',
             valorCentavos: 36000,
             status: StatusProvedor.confirmado,
-            pedido: 'PED-1042',
-            refProvedor: 'pi_exemplo_001',
+            pedido: 'PED-10490',
+            refProvedor: 'pay_8f21...c3a',
+            taxaCentavos: 2700,
+            liquidoCentavos: 33300,
           ),
           LancamentoEspelho(
             id: 'l-2',
@@ -197,8 +219,8 @@ class ApiFake implements ApiAdmin {
             descricao: 'Pagamento final',
             valorCentavos: 84000,
             status: StatusProvedor.aguardandoConfirmacao,
-            pedido: 'PED-1042',
-            refProvedor: 'pi_exemplo_002',
+            pedido: 'PED-10482',
+            refProvedor: 'pay_3e9f...b77',
           ),
           LancamentoEspelho(
             id: 'l-3',
@@ -206,8 +228,9 @@ class ApiFake implements ApiAdmin {
             descricao: 'Reembolso decidido em disputa',
             valorCentavos: -12000,
             status: StatusProvedor.reembolsado,
-            pedido: 'PED-0987',
-            refProvedor: 're_exemplo_003',
+            pedido: 'PED-10455',
+            refProvedor: 'rf_19bd...a40',
+            tipo: 'Reembolso',
           ),
           LancamentoEspelho(
             id: 'l-4',
@@ -215,46 +238,102 @@ class ApiFake implements ApiAdmin {
             descricao: 'Pagamento recusado pelo cartão',
             valorCentavos: 15000,
             status: StatusProvedor.falhou,
-            pedido: 'PED-1010',
-            refProvedor: 'pi_exemplo_004',
-            divergente: true,
+            pedido: 'PED-10471',
+            refProvedor: 'pay_77c0...d12',
+            divergente: !_conciliados.contains('l-4'),
+            conciliado: _conciliados.contains('l-4'),
           ),
         ],
         const [],
       );
 
   // ---------- F7.4 ----------
+  List<UsuarioBusca> get _usuarios => [
+        const UsuarioBusca(
+          id: 'u-1',
+          nome: 'Marina Souza',
+          tipo: 'Cliente',
+          status: 'ativo',
+          idPublico: 'CLI-1042',
+          cidade: 'Belo Horizonte',
+          emailMascarado: 'm•••••@exemplo.com',
+          telefoneMascarado: '(31) •••••-1190',
+        ),
+        UsuarioBusca(
+          id: 'u-2',
+          nome: 'Carlos Pereira',
+          tipo: 'Profissional',
+          status: 'ativo',
+          idPublico: 'PRO-2281',
+          cidade: 'Belo Horizonte',
+          emailMascarado: 'c•••••@exemplo.com',
+          telefoneMascarado: '(31) •••••-4821',
+          categorias: const [
+            CategoriaProfissional(nome: 'Pintor', ativaNoPerfil: true, ativaNaPlataforma: true),
+            CategoriaProfissional(nome: 'Eletricista', ativaNoPerfil: false, ativaNaPlataforma: true),
+          ],
+          historico: [
+            EventoUsuario(_base.subtract(const Duration(days: 4)), 'Categoria Eletricista desativada pelo profissional'),
+            EventoUsuario(_base.subtract(const Duration(days: 5)), 'Pedido PED-10482 concluído'),
+            EventoUsuario(_base.subtract(const Duration(days: 14)), 'Verificação aprovada por Emanuel Cabral'),
+          ],
+        ),
+        const UsuarioBusca(
+          id: 'u-3',
+          nome: 'Paulo Lima',
+          tipo: 'Profissional',
+          status: 'restrito',
+          idPublico: 'PRO-3307',
+          cidade: 'Contagem',
+          emailMascarado: 'p•••••@exemplo.com',
+          telefoneMascarado: '(31) •••••-7734',
+        ),
+      ];
+
   @override
   Future<List<UsuarioBusca>> buscarUsuarios(String termo) => _ler(() {
-        const todos = [
-          UsuarioBusca(
-            id: 'u-1',
-            nome: 'Marina Souza',
-            tipo: 'Cliente',
-            status: 'ativo',
-            emailMascarado: 'm*****@exemplo.com',
-            cpfMascarado: '***.***.***-12',
-          ),
-          UsuarioBusca(
-            id: 'u-2',
-            nome: 'Carlos Pereira',
-            tipo: 'Profissional',
-            status: 'ativo',
-            emailMascarado: 'c*****@exemplo.com',
-            cpfMascarado: '***.***.***-45',
-          ),
-          UsuarioBusca(
-            id: 'u-3',
-            nome: 'Paulo Lima',
-            tipo: 'Profissional',
-            status: 'suspenso',
-            emailMascarado: 'p****@exemplo.com',
-            cpfMascarado: '***.***.***-78',
-          ),
-        ];
         final t = termo.trim().toLowerCase();
-        return [for (final u in todos) if (t.isEmpty || u.nome.toLowerCase().contains(t)) u];
+        return [
+          for (final u in _usuarios)
+            if (t.isEmpty ||
+                u.nome.toLowerCase().contains(t) ||
+                u.idPublico.toLowerCase().contains(t) ||
+                (u.emailMascarado ?? '').toLowerCase().contains(t))
+              u,
+        ];
       }, const []);
+
+  @override
+  Future<UsuarioBusca> detalheUsuario(String usuarioId) async {
+    await Future<void>.delayed(atraso);
+    return _usuarios.firstWhere((u) => u.id == usuarioId);
+  }
+
+  @override
+  Future<DiagnosticoPedido> diagnosticarPedido(String usuarioId, String pedido) async {
+    await Future<void>.delayed(atraso);
+    if (pedido.trim().isEmpty) throw const ErroApi('Pedido não encontrado.');
+    return const DiagnosticoPedido(
+      pedido: 'PED-10482',
+      titulo: 'Troca de fiação do quarto',
+      categoria: 'Eletricista',
+      aparece: false,
+      itens: [
+        ItemDiagnostico(
+          ok: false,
+          titulo: 'Não tem a categoria ativa.',
+          detalhe: 'O pedido é de Eletricista, e essa categoria está inativa no perfil dele.',
+        ),
+        ItemDiagnostico(
+          ok: true,
+          titulo: 'Categoria ativa na plataforma.',
+          detalhe: 'Eletricista não foi desativada em Categorias.',
+        ),
+        ItemDiagnostico(ok: true, titulo: 'Profissional verificado.', detalhe: 'Aprovado em 20/10/2026.'),
+        ItemDiagnostico(ok: true, titulo: 'Sem bloqueio na conta.', detalhe: 'Nenhum bloqueio preventivo ativo.'),
+      ],
+    );
+  }
 
   @override
   Future<DadosPessoais> revelarDadosPessoais(String usuarioId, String motivo) async {
@@ -267,24 +346,32 @@ class ApiFake implements ApiAdmin {
   Future<List<PedidoBusca>> buscarPedidos(String termo) => _ler(() {
         const todos = [
           PedidoBusca(
-            id: 'PED-1042',
+            id: 'p-1',
+            codigo: 'PED-10482',
             titulo: 'Troca de chuveiro',
             cliente: 'Marina Souza',
-            status: 'em execução',
+            profissional: 'Carlos Pereira',
+            categoria: 'Eletricista',
+            cidade: 'Belo Horizonte',
+            status: 'Em andamento',
             valorCentavos: 120000,
           ),
           PedidoBusca(
-            id: 'PED-0987',
+            id: 'p-2',
+            codigo: 'PED-10455',
             titulo: 'Pintura de sala',
             cliente: 'Marina Souza',
-            status: 'disputa aberta',
+            profissional: 'Paulo Lima',
+            categoria: 'Pintor',
+            cidade: 'Belo Horizonte',
+            status: 'Em disputa',
             valorCentavos: 240000,
           ),
         ];
         final t = termo.trim().toLowerCase();
         return [
           for (final p in todos)
-            if (t.isEmpty || p.id.toLowerCase().contains(t) || p.titulo.toLowerCase().contains(t)) p,
+            if (t.isEmpty || p.codigo.toLowerCase().contains(t) || p.titulo.toLowerCase().contains(t)) p,
         ];
       }, const []);
 
@@ -297,6 +384,8 @@ class ApiFake implements ApiAdmin {
             solicitante: 'Paulo Lima',
             status: 'aberto',
             aberto: _base.subtract(const Duration(hours: 3)),
+            prioridade: 'alta',
+            prazo: _base.add(const Duration(hours: 5)),
           ),
           Chamado(
             id: 'CH-30',
@@ -304,6 +393,8 @@ class ApiFake implements ApiAdmin {
             solicitante: 'Marina Souza',
             status: 'em atendimento',
             aberto: _base.subtract(const Duration(days: 1)),
+            responsavel: 'Bruna Teixeira',
+            prazo: _base.add(const Duration(hours: 20)),
           ),
         ],
         const [],
@@ -443,93 +534,77 @@ class ApiFake implements ApiAdmin {
   }
 
   // ---------- F7.5 ----------
-  static const _definicoes = [
-    ConfigDefinicao(
-      chave: 'taxa_base_bps',
-      descricao: 'Taxa do Trato (base)',
-      unidade: UnidadeConfig.bps,
-      minimo: 100,
-      maximo: 2000,
-      exigeDuplaAprovacao: true,
-    ),
-    ConfigDefinicao(
-      chave: 'taxa_minima_bps',
-      descricao: 'Taxa mínima do Trato',
-      unidade: UnidadeConfig.bps,
-      minimo: 0,
-      maximo: 1500,
-      exigeDuplaAprovacao: true,
-    ),
-    ConfigDefinicao(
-      chave: 'sinal_bps',
-      descricao: 'Sinal pago ao aceitar o orçamento',
-      unidade: UnidadeConfig.bps,
-      minimo: 1000,
-      maximo: 5000,
-      exigeDuplaAprovacao: true,
-    ),
-    ConfigDefinicao(
-      chave: 'prazo_confirmacao_horas',
-      descricao: 'Prazo para o cliente confirmar o serviço',
-      unidade: UnidadeConfig.horas,
-      minimo: 24,
-      maximo: 96,
-      exigeDuplaAprovacao: true,
-    ),
-    ConfigDefinicao(
-      chave: 'prazo_contestacao_dias',
-      descricao: 'Prazo do cliente para reclamar',
-      unidade: UnidadeConfig.dias,
-      minimo: 3,
-      maximo: 30,
-      exigeDuplaAprovacao: true,
-    ),
-    ConfigDefinicao(
-      chave: 'prazo_resposta_disputa_horas',
-      descricao: 'Prazo de resposta do profissional na disputa',
-      unidade: UnidadeConfig.horas,
-      minimo: 12,
-      maximo: 120,
-      exigeDuplaAprovacao: false,
-    ),
-    ConfigDefinicao(
-      chave: 'alcada_disputa_centavos',
-      descricao: 'Alçada de decisão sem segunda pessoa',
-      unidade: UnidadeConfig.centavos,
-      minimo: 0,
-      maximo: 1000000,
-      exigeDuplaAprovacao: true,
-    ),
-    ConfigDefinicao(
-      chave: 'garantia_dias_padrao',
-      descricao: 'Prazo de garantia padrão do serviço',
-      unidade: UnidadeConfig.dias,
-      minimo: 0,
-      maximo: 180,
-      exigeDuplaAprovacao: false,
-    ),
+  static ConfigDefinicao _def(
+    String chave,
+    String descricao,
+    UnidadeConfig unidade,
+    int minimo,
+    int maximo, {
+    bool dupla = false,
+  }) =>
+      ConfigDefinicao(
+        chave: chave,
+        descricao: descricao,
+        unidade: unidade,
+        minimo: minimo,
+        maximo: maximo,
+        exigeDuplaAprovacao: dupla,
+      );
+
+  static final _definicoes = [
+    _def('taxa_bps', 'Taxa do Trato por serviço', UnidadeConfig.bps, 0, 2000, dupla: true),
+    _def('taxa_minima_centavos', 'Taxa mínima por pedido', UnidadeConfig.centavos, 0, 5000, dupla: true),
+    _def('taxa_progressiva_ativa', 'Tabela progressiva de taxa', UnidadeConfig.quantidade, 0, 1, dupla: true),
+    _def('adiantamento_bps', 'Adiantamento ao iniciar o serviço', UnidadeConfig.bps, 0, 10000),
+    _def('prazo_liberacao_dias', 'Prazo para liberar o repasse ao profissional', UnidadeConfig.dias, 0, 30, dupla: true),
+    _def('janela_chargeback_dias', 'Janela de reclamação do cliente', UnidadeConfig.dias, 1, 30, dupla: true),
+    _def('prazo_confirmacao_cliente_horas', 'Prazo para o cliente confirmar o serviço', UnidadeConfig.horas, 1, 720),
+    _def('prazo_pagamento_pendente_horas', 'Prazo do pagamento pendente', UnidadeConfig.horas, 1, 72),
+    _def('garantia_retrabalho_dias_padrao', 'Garantia de retrabalho (padrão)', UnidadeConfig.dias, 0, 365),
+    _def('prazo_retrabalho_atendimento_dias', 'Prazo para atender o retrabalho', UnidadeConfig.dias, 1, 60),
+    _def('prazo_resposta_disputa_horas', 'Prazo de resposta da disputa', UnidadeConfig.horas, 1, 720),
+    _def('prazo_congelar_disputa_horas', 'Prazo para congelar o repasse na disputa', UnidadeConfig.horas, 1, 720),
+    _def('prazo_decisao_disputa_dias_uteis', 'Prazo de decisão da disputa', UnidadeConfig.diasUteis, 1, 30),
+    _def('limite_orcamentos_por_pedido', 'Máximo de orçamentos por pedido', UnidadeConfig.quantidade, 1, 20),
+    _def('validade_pedido_horas', 'Validade do pedido aberto', UnidadeConfig.horas, 1, 720),
+    _def('tolerancia_comparecimento_horas', 'Tolerância de comparecimento', UnidadeConfig.horas, 0, 24),
+    _def('valor_minimo_servico_centavos', 'Valor mínimo do pedido', UnidadeConfig.centavos, 1000, 100000),
+    _def('valor_maximo_servico_centavos', 'Teto de valor do pedido', UnidadeConfig.centavos, 10000, 1000000, dupla: true),
+    _def('limite_valor_atipico_centavos', 'Limite de valor atípico', UnidadeConfig.centavos, 10000, 1000000, dupla: true),
   ];
 
   List<ConfigVersao> _versoesIniciais() {
     const vigente = {
-      'taxa_base_bps': 750,
-      'taxa_minima_bps': 300,
-      'sinal_bps': 3000,
-      'prazo_confirmacao_horas': 48,
-      'prazo_contestacao_dias': 7,
+      'taxa_bps': 750,
+      'taxa_minima_centavos': 300,
+      'taxa_progressiva_ativa': 0,
+      'adiantamento_bps': 0,
+      'prazo_liberacao_dias': 0,
+      'janela_chargeback_dias': 7,
+      'prazo_confirmacao_cliente_horas': 48,
+      'prazo_pagamento_pendente_horas': 2,
+      'garantia_retrabalho_dias_padrao': 30,
+      'prazo_retrabalho_atendimento_dias': 7,
       'prazo_resposta_disputa_horas': 48,
-      'alcada_disputa_centavos': 50000,
-      'garantia_dias_padrao': 30,
+      'prazo_congelar_disputa_horas': 72,
+      'prazo_decisao_disputa_dias_uteis': 5,
+      'limite_orcamentos_por_pedido': 5,
+      'validade_pedido_horas': 48,
+      'tolerancia_comparecimento_horas': 1,
+      'valor_minimo_servico_centavos': 3000,
+      'valor_maximo_servico_centavos': 100000,
+      'limite_valor_atipico_centavos': 100000,
     };
     return [
       ConfigVersao(
         id: 'v3',
         numero: 3,
         status: StatusVersao.aguardandoAprovacao,
-        motivo: 'Ajuste do prazo de confirmação depois da revisão jurídica',
+        motivo: 'volume alto de feriado',
         criadaPor: 'eq-financeiro',
+        criadaPorNome: 'João Vitor Cardoso',
         criadaEm: _base.subtract(const Duration(hours: 2)),
-        valores: {...vigente, 'prazo_confirmacao_horas': 72},
+        valores: {...vigente, 'prazo_resposta_disputa_horas': 72},
       ),
       ConfigVersao(
         id: 'v2',
@@ -537,7 +612,9 @@ class ApiFake implements ApiAdmin {
         status: StatusVersao.vigente,
         motivo: 'Valores do piloto',
         criadaPor: 'eq-financeiro',
+        criadaPorNome: 'Emanuel Cabral',
         aprovadaPor: 'eq-administrador',
+        aprovadaPorNome: 'João Vitor Cardoso',
         criadaEm: _base.subtract(const Duration(days: 3)),
         valores: vigente,
       ),
@@ -547,9 +624,11 @@ class ApiFake implements ApiAdmin {
         status: StatusVersao.substituida,
         motivo: 'Valores iniciais',
         criadaPor: 'eq-financeiro',
+        criadaPorNome: 'João Vitor Cardoso',
         aprovadaPor: 'eq-administrador',
+        aprovadaPorNome: 'Emanuel Cabral',
         criadaEm: _base.subtract(const Duration(days: 20)),
-        valores: {...vigente, 'taxa_base_bps': 800},
+        valores: {...vigente, 'taxa_bps': 800, 'valor_minimo_servico_centavos': 2000},
       ),
     ];
   }
@@ -563,7 +642,8 @@ class ApiFake implements ApiAdmin {
   void _exigirFaixa(Map<String, int> valores) {
     for (final d in _definicoes) {
       final v = valores[d.chave];
-      if (v == null || v < d.minimo || v > d.maximo) {
+      if (v == null) continue;
+      if (v < d.minimo || v > d.maximo) {
         throw ErroApi('${d.descricao}: o valor precisa ficar entre ${d.minimo} e ${d.maximo}.');
       }
     }
@@ -573,6 +653,7 @@ class ApiFake implements ApiAdmin {
   Future<void> proporConfig(Map<String, int> valores, String motivo) async {
     await Future<void>.delayed(atraso);
     _exigirFaixa(valores);
+    final vigente = _versoes.firstWhere((v) => v.status == StatusVersao.vigente);
     final numero = _versoes.first.numero + 1;
     _versoes = [
       ConfigVersao(
@@ -581,8 +662,9 @@ class ApiFake implements ApiAdmin {
         status: StatusVersao.aguardandoAprovacao,
         motivo: motivo,
         criadaPor: _eu?.id ?? '',
+        criadaPorNome: _eu?.nome,
         criadaEm: _base.add(Duration(hours: numero)),
-        valores: valores,
+        valores: {...vigente.valores, ...valores},
       ),
       ..._versoes,
     ];
@@ -599,7 +681,7 @@ class ApiFake implements ApiAdmin {
     _versoes = [
       for (final v in _versoes)
         if (v.id == versaoId)
-          v.comStatus(StatusVersao.vigente, aprovadaPor: _eu?.id)
+          v.comStatus(StatusVersao.vigente, aprovadaPor: _eu?.id, aprovadaPorNome: _eu?.nome)
         else if (v.status == StatusVersao.vigente)
           v.comStatus(StatusVersao.substituida)
         else
@@ -612,6 +694,13 @@ class ApiFake implements ApiAdmin {
   Future<void> publicarConfig(String versaoId, String motivo) => aprovarConfig(versaoId, motivo);
 
   @override
+  Future<void> recusarConfig(String versaoId, String motivo) async {
+    await Future<void>.delayed(atraso);
+    _versoes = [for (final v in _versoes) if (v.id != versaoId) v];
+    _registrar('config.rascunho_descartado', 'config_versoes:$versaoId', motivo);
+  }
+
+  @override
   Future<void> reverterConfig(String versaoId, String motivo) async {
     await Future<void>.delayed(atraso);
     final antiga = _versoes.firstWhere((v) => v.id == versaoId);
@@ -621,14 +710,28 @@ class ApiFake implements ApiAdmin {
 
   // ---------- F7.6 ----------
   @override
-  Future<List<EntradaAuditoria>> listarAuditoria({String? acao, String? ator}) => _ler(() {
+  Future<PaginaAuditoria> listarAuditoria({
+    String? acao,
+    String? ator,
+    String? entidade,
+    DateTime? desde,
+    DateTime? ate,
+    int limite = 25,
+    int deslocamento = 0,
+  }) =>
+      _ler(() {
         final a = acao?.trim().toLowerCase() ?? '';
         final p = ator?.trim().toLowerCase() ?? '';
-        return [
+        final todos = [
           for (final e in _auditoria.reversed)
-            if ((a.isEmpty || e.acao.toLowerCase().contains(a)) && (p.isEmpty || e.ator.toLowerCase().contains(p))) e,
+            if ((a.isEmpty || e.acao.toLowerCase().contains(a)) &&
+                (p.isEmpty || e.ator.toLowerCase().contains(p) || (e.atorNome ?? '').toLowerCase().contains(p)) &&
+                (entidade == null || e.entidade.startsWith(entidade)))
+              e,
         ];
-      }, const []);
+        final fim = (deslocamento + limite).clamp(0, todos.length);
+        return PaginaAuditoria(itens: todos.sublist(deslocamento.clamp(0, todos.length), fim), total: todos.length);
+      }, const PaginaAuditoria(itens: [], total: 0));
 
   @override
   Future<ResultadoCadeia> verificarCadeia() async {
@@ -645,8 +748,10 @@ class ApiFake implements ApiAdmin {
           id: 1,
           ocorridaEm: _base.subtract(const Duration(days: 1)),
           ator: 'eq-administrador',
+          atorNome: 'Emanuel Cabral',
           acao: 'config.publicada',
-          entidade: 'config:v2',
+          entidade: 'config_versoes:v2',
+          entidadeNome: 'Versão 2',
           motivo: 'Valores do piloto',
           hash: 'a0001f3',
         ),
@@ -654,8 +759,10 @@ class ApiFake implements ApiAdmin {
           id: 2,
           ocorridaEm: _base.subtract(const Duration(hours: 20)),
           ator: 'mediador@teste.local',
-          acao: 'disputa.decidida',
-          entidade: 'disputa:d-0',
+          atorNome: 'Mediador',
+          acao: 'financeiro.disputa_decidida',
+          entidade: 'pedidos:d-0',
+          entidadeNome: 'PED-10455 · Pintura de sala',
           motivo: 'Cliente não comprovou o problema',
           hash: 'a0002b9',
         ),
@@ -664,29 +771,56 @@ class ApiFake implements ApiAdmin {
   List<Verificacao> _verificacoesIniciais() => [
         Verificacao(
           id: 'ver-1',
+          profissionalId: 'pro-1',
           profissional: 'Carlos Pereira',
-          categoria: 'Elétrica',
+          idPublico: 'PRO-2281',
+          nivel: 'Verificado',
+          categorias: const ['Eletricista', 'Pintor'],
           cidade: 'Belo Horizonte',
           enviadaEm: _base.subtract(const Duration(hours: 6)),
           cpfMascarado: '***.***.***-45',
-          documentos: const ['Documento (frente)', 'Documento (verso)', 'Selfie'],
+          documentos: const ['Frente do documento', 'Verso do documento', 'Selfie'],
+          enviosAnteriores: [
+            EnvioVerificacao(
+              enviadoEm: _base.subtract(const Duration(days: 9)),
+              aprovado: false,
+              motivo: 'Selfie não confere',
+            ),
+          ],
         ),
         Verificacao(
           id: 'ver-2',
+          profissionalId: 'pro-2',
           profissional: 'Ana Ribeiro',
-          categoria: 'Pintura',
+          idPublico: 'PRO-3307',
+          nivel: 'Verificado',
+          categorias: const ['Pintor'],
           cidade: 'Belo Horizonte',
           enviadaEm: _base.subtract(const Duration(days: 1)),
-          cpfMascarado: '***.***.***-90',
-          documentos: const ['Documento (frente)', 'Selfie'],
+          documentos: const ['Frente do documento', 'Selfie'],
           status: StatusVerificacao.emAnalise,
+        ),
+        Verificacao(
+          id: 'ver-3',
+          profissionalId: 'pro-3',
+          profissional: 'José Roberto Alves',
+          idPublico: 'PRO-4410',
+          nivel: 'Verificado',
+          categorias: const ['Encanador'],
+          cidade: 'Contagem',
+          enviadaEm: _base.subtract(const Duration(days: 3)),
+          cpfMascarado: '***.***.***-77',
+          documentos: const ['Frente do documento', 'Verso do documento', 'Selfie'],
+          status: StatusVerificacao.aprovada,
         ),
       ];
 
   List<Disputa> _disputasIniciais() => [
         Disputa(
           id: 'd-1',
-          pedido: 'PED-0987',
+          pedido: 'PED-10482',
+          titulo: 'Pintura de sala e cozinha',
+          respostaAte: _base.add(const Duration(hours: 20)),
           cliente: 'Marina Souza',
           profissional: 'Carlos Pereira',
           motivo: 'Serviço mal feito',
@@ -717,7 +851,9 @@ class ApiFake implements ApiAdmin {
         ),
         Disputa(
           id: 'd-2',
-          pedido: 'PED-1021',
+          pedido: 'PED-10471',
+          titulo: 'Limpeza pós-obra',
+          respostaAte: _base.add(const Duration(hours: 31)),
           cliente: 'Paulo Lima',
           profissional: 'Ana Ribeiro',
           motivo: 'Não compareceu',
@@ -745,7 +881,7 @@ class ApiFake implements ApiAdmin {
   // ===========================================================================
 
   @override
-  Future<MetricasDashboard> metricasDashboard() => _ler(
+  Future<MetricasDashboard> metricasDashboard({int dias = 30, DateTime? inicio, DateTime? fim}) => _ler(
         () => const MetricasDashboard(
           gmvCentavos: 12540000,
           receitaTaxaCentavos: 1504800,
@@ -759,6 +895,14 @@ class ApiFake implements ApiAdmin {
           profissionaisPendentes: 3,
           cidadesAtivas: 2,
           categoriasAtivas: 12,
+          gmvAnteriorCentavos: 11160000,
+          receitaTaxaAnteriorCentavos: 1370000,
+          pedidosAtivos: 214,
+          pedidosAtivosAnterior: 221,
+          baseUsuarios: 3902,
+          baseUsuariosAnterior: 3695,
+          disputasAbertas: 2,
+          alertasRiscoAbertos: 2,
         ),
         const MetricasDashboard(
           gmvCentavos: 0,
@@ -777,7 +921,7 @@ class ApiFake implements ApiAdmin {
       );
 
   @override
-  Future<SeriesDashboard> seriesDashboard({int dias = 7}) => _ler(
+  Future<SeriesDashboard> seriesDashboard({int dias = 30, DateTime? inicio, DateTime? fim}) => _ler(
         () => const SeriesDashboard(
           historicoDias: [
             PontoSerieDashboard(data: '2026-10-27', pedidos: 8, gmvCentavos: 96000),
@@ -789,10 +933,10 @@ class ApiFake implements ApiAdmin {
             PontoSerieDashboard(data: '2026-11-02', pedidos: 14, gmvCentavos: 185000),
           ],
           funil: [
-            EtapaFunilDashboard(etapa: '1. Pedidos Criados', quantidade: 142, taxaConversaoPct: 100.0),
-            EtapaFunilDashboard(etapa: '2. Propostas Recebidas', quantidade: 128, taxaConversaoPct: 90.1),
-            EtapaFunilDashboard(etapa: '3. Pedidos Fechados', quantidade: 105, taxaConversaoPct: 73.9),
-            EtapaFunilDashboard(etapa: '4. Serviços Concluídos', quantidade: 98, taxaConversaoPct: 69.0),
+            EtapaFunilDashboard(etapa: 'Pedidos criados', quantidade: 142, taxaConversaoPct: 100.0),
+            EtapaFunilDashboard(etapa: 'Propostas recebidas', quantidade: 128, taxaConversaoPct: 90.1),
+            EtapaFunilDashboard(etapa: 'Pedidos fechados', quantidade: 105, taxaConversaoPct: 73.9),
+            EtapaFunilDashboard(etapa: 'Serviços concluídos', quantidade: 98, taxaConversaoPct: 69.0),
           ],
         ),
         const SeriesDashboard(historicoDias: [], funil: []),
@@ -900,69 +1044,140 @@ class ApiFake implements ApiAdmin {
     }
   }
 
-  final List<AlertaRisco> _alertasRisco = [
+  List<AlertaRisco> _alertasRisco = [
     const AlertaRisco(
       id: 'r-1',
       usuarioId: 'u-101',
-      usuarioNome: 'Lucas Santos',
-      tipo: 'taxa_cancelamento',
-      severidade: 'alta',
-      detalhes: 'Profissional cancelou 4 dos últimos 10 pedidos aceitos.',
-      resolvido: false,
-      criadoEm: '2026-11-01T14:30:00Z',
+      usuarioNome: 'Paulo R.',
+      usuarioTipo: 'cliente',
+      usuarioStatus: 'ativo',
+      pedido: 'PED-10498',
+      tipo: 'valor_atipico',
+      severidade: 'critica',
+      detalhes: 'Pedido criado com valor de R\$ 3.000,00. O limite de atipicidade é R\$ 800,00 e o teto do pedido '
+          'é R\$ 1.000,00, então a criação deveria ter sido barrada.',
+      criadoEm: '2026-11-02T13:40:00Z',
     ),
     const AlertaRisco(
       id: 'r-2',
-      usuarioId: 'u-204',
-      usuarioNome: 'Mariana Lima',
-      tipo: 'disputas_frequentes',
-      severidade: 'media',
-      detalhes: 'Cliente abriu disputa em 2 pedidos consecutivos.',
-      resolvido: false,
+      usuarioId: 'u-102',
+      usuarioNome: 'Marcos V.',
+      usuarioTipo: 'profissional',
+      usuarioStatus: 'ativo',
+      pedido: 'PED-10482',
+      tipo: 'varios_pedidos_em_pouco_tempo',
+      severidade: 'alta',
+      detalhes: '3 pedidos de valor alto em 2 horas.',
+      status: 'em_analise',
+      responsavel: 'Emanuel Cabral',
       criadoEm: '2026-11-02T10:15:00Z',
+    ),
+    const AlertaRisco(
+      id: 'r-3',
+      usuarioId: 'u-103',
+      usuarioNome: 'Carla M.',
+      usuarioTipo: 'profissional',
+      usuarioStatus: 'ativo',
+      tipo: 'troca_de_chave_pix',
+      severidade: 'media',
+      detalhes: 'Chave alterada 2 vezes em 24 horas.',
+      criadoEm: '2026-11-01T14:30:00Z',
     ),
   ];
 
   @override
   Future<List<AlertaRisco>> listarAlertasRisco() => _ler(() => List.of(_alertasRisco), []);
 
+  void _statusDoUsuario(String usuarioId, String status) {
+    _alertasRisco = [for (final a in _alertasRisco) a.usuarioId == usuarioId ? a.comUsuarioStatus(status) : a];
+  }
+
   @override
   Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _statusDoUsuario(usuarioId, 'bloqueado');
     _registrar('risco.bloqueio_preventivo', 'usuarios', motivo);
   }
 
   @override
+  Future<void> desbloquearConta(String usuarioId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _statusDoUsuario(usuarioId, 'ativo');
+    _registrar('risco.desbloqueio', 'usuarios', motivo);
+  }
+
+  @override
   Future<void> travarSaque(String usuarioId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _statusDoUsuario(usuarioId, 'restrito');
     _registrar('risco.saque_travado', 'perfis_profissional', motivo);
   }
 
   @override
-  Future<void> resolverAlertaRisco(String alertaId, {required String motivo}) async {
-    final idx = _alertasRisco.indexWhere((a) => a.id == alertaId);
-    if (idx >= 0) {
-      final a = _alertasRisco[idx];
-      _alertasRisco[idx] = AlertaRisco(
-        id: a.id,
-        usuarioId: a.usuarioId,
-        usuarioNome: a.usuarioNome,
-        tipo: a.tipo,
-        severidade: a.severidade,
-        detalhes: a.detalhes,
-        resolvido: true,
-        criadoEm: a.criadoEm,
-      );
-      _registrar('risco.alerta_resolvido', 'alertas_risco', motivo);
-    }
+  Future<void> destravarSaque(String usuarioId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _statusDoUsuario(usuarioId, 'ativo');
+    _registrar('risco.saque_destravado', 'perfis_profissional', motivo);
+  }
+
+  @override
+  Future<void> assumirAlertaRisco(String alertaId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _alertasRisco = [
+      for (final a in _alertasRisco)
+        if (a.id == alertaId)
+          AlertaRisco(
+            id: a.id,
+            usuarioId: a.usuarioId,
+            usuarioNome: a.usuarioNome,
+            usuarioTipo: a.usuarioTipo,
+            usuarioStatus: a.usuarioStatus,
+            pedido: a.pedido,
+            tipo: a.tipo,
+            severidade: a.severidade,
+            detalhes: a.detalhes,
+            status: 'em_analise',
+            responsavel: _eu?.nome,
+            criadoEm: a.criadoEm,
+          )
+        else
+          a,
+    ];
+    _registrar('risco.alerta_assumido', 'alertas_risco', motivo);
+  }
+
+  @override
+  Future<void> resolverAlertaRisco(String alertaId, {required String resultado, required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _alertasRisco = [for (final a in _alertasRisco) a.id == alertaId ? a.comResolucao(resultado) : a];
+    _registrar('risco.alerta_resolvido', 'alertas_risco', motivo);
   }
 
   final List<CampanhaNotificacao> _campanhas = [
     const CampanhaNotificacao(
       id: 'cmp-1',
-      titulo: 'Alta demanda em Campinas!',
-      mensagem: 'Muitos clientes buscando eletricistas e pintores agora.',
+      titulo: 'Bem-vindo ao Trato',
+      mensagem: 'Peça orçamentos de profissionais verificados na sua região.',
+      segmento: 'clientes',
+      totalDestinatarios: 2410,
+      criadoEm: '2026-10-28T16:00:00Z',
+      autor: 'Emanuel Cabral',
+      enviados: 2410,
+      entregues: 2356,
+      abertos: 612,
+    ),
+    const CampanhaNotificacao(
+      id: 'cmp-2',
+      titulo: 'Atualize seus documentos',
+      mensagem: 'Documentos vencidos impedem novos pedidos.',
       segmento: 'profissionais',
-      totalDestinatarios: 85,
-      criadoEm: '2026-11-01T16:00:00Z',
+      tipo: 'operacional',
+      totalDestinatarios: 1040,
+      criadoEm: '2026-10-21T16:00:00Z',
+      autor: 'Emanuel Cabral',
+      enviados: 1040,
+      entregues: 1028,
+      abertos: 497,
     ),
   ];
 
@@ -970,23 +1185,46 @@ class ApiFake implements ApiAdmin {
   Future<List<CampanhaNotificacao>> listarCampanhasNotificacao() => _ler(() => List.of(_campanhas), []);
 
   @override
+  Future<EstimativaCampanha> estimarCampanhaNotificacao({
+    required String segmento,
+    required String tipo,
+    String? categoriaId,
+    String? cidadeId,
+  }) async {
+    await Future<void>.delayed(atraso);
+    final base = switch (segmento) {
+      'clientes' => 3000,
+      'profissionais' => 902,
+      'todos' => 3902,
+      _ => 640,
+    };
+    final fora = tipo == 'marketing' ? 412 : 0;
+    return EstimativaCampanha(destinatarios: base - fora, desativaram: fora);
+  }
+
+  @override
   Future<CampanhaNotificacao> dispararCampanhaNotificacao({
     required String titulo,
     required String mensagem,
     required String segmento,
+    String tipo = 'marketing',
     String? categoriaId,
     String? cidadeId,
     required String motivo,
   }) async {
+    await Future<void>.delayed(atraso);
     final c = CampanhaNotificacao(
       id: 'cmp-${_campanhas.length + 1}',
       titulo: titulo,
       mensagem: mensagem,
       segmento: segmento,
+      tipo: tipo,
       categoriaId: categoriaId,
       cidadeId: cidadeId,
       totalDestinatarios: 120,
       criadoEm: DateTime.now().toIso8601String(),
+      autor: _eu?.nome,
+      enviados: 120,
     );
     _campanhas.insert(0, c);
     _registrar('notificacao.campanha_disparada', 'campanhas_notificacao', motivo);
@@ -996,25 +1234,41 @@ class ApiFake implements ApiAdmin {
   final List<CupomAdmin> _cupons = [
     const CupomAdmin(
       id: 'cup-1',
-      codigo: 'PRIMEIRACOMPRA',
+      codigo: 'BEMVINDO10',
       tipo: 'percentual',
       valor: 10,
-      valorMinimoCentavos: 0,
+      valorMinimoCentavos: 5000,
       limiteUsos: 100,
+      limitePorUsuario: 1,
       usosAtuais: 14,
+      validoAte: '2026-12-31',
+      campanha: 'Boas-vindas',
       ativo: true,
       criadoEm: '2026-10-29T10:00:00Z',
     ),
     const CupomAdmin(
       id: 'cup-2',
-      codigo: 'BEMVINDO20',
+      codigo: 'PINTURA20',
       tipo: 'fixo',
       valor: 2000,
-      valorMinimoCentavos: 5000,
-      limiteUsos: 200,
-      usosAtuais: 35,
+      valorMinimoCentavos: 15000,
+      limiteUsos: 150,
+      usosAtuais: 37,
+      validoAte: '2026-11-30',
+      campanha: 'Lançamento Pintor',
       ativo: true,
       criadoEm: '2026-10-30T10:00:00Z',
+    ),
+    const CupomAdmin(
+      id: 'cup-3',
+      codigo: 'TESTEJUNHO',
+      tipo: 'percentual',
+      valor: 5,
+      valorMinimoCentavos: 0,
+      limiteUsos: 50,
+      usosAtuais: 0,
+      ativo: false,
+      criadoEm: '2026-10-31T10:00:00Z',
     ),
   ];
 
@@ -1028,9 +1282,16 @@ class ApiFake implements ApiAdmin {
     required int valor,
     int valorMinimoCentavos = 0,
     int? limiteUsos,
+    int? limitePorUsuario,
+    String? validoDesde,
     String? validoAte,
+    String? campanha,
     required String motivo,
   }) async {
+    await Future<void>.delayed(atraso);
+    if (_cupons.any((c) => c.codigo == codigo.toUpperCase())) {
+      throw ErroApi("O cupom '${codigo.toUpperCase()}' já está cadastrado.");
+    }
     final c = CupomAdmin(
       id: 'cup-${_cupons.length + 1}',
       codigo: codigo.toUpperCase(),
@@ -1038,8 +1299,11 @@ class ApiFake implements ApiAdmin {
       valor: valor,
       valorMinimoCentavos: valorMinimoCentavos,
       limiteUsos: limiteUsos,
+      limitePorUsuario: limitePorUsuario,
       usosAtuais: 0,
+      validoDesde: validoDesde,
       validoAte: validoAte,
+      campanha: campanha,
       ativo: true,
       criadoEm: DateTime.now().toIso8601String(),
     );
@@ -1050,24 +1314,12 @@ class ApiFake implements ApiAdmin {
 
   @override
   Future<CupomAdmin> alterarStatusCupom(String cupomId, {required bool ativo, required String motivo}) async {
+    await Future<void>.delayed(atraso);
     final idx = _cupons.indexWhere((c) => c.id == cupomId);
     if (idx < 0) throw const ErroApi('Cupom não encontrado.');
-    final c = _cupons[idx];
-    final novo = CupomAdmin(
-      id: c.id,
-      codigo: c.codigo,
-      tipo: c.tipo,
-      valor: c.valor,
-      valorMinimoCentavos: c.valorMinimoCentavos,
-      limiteUsos: c.limiteUsos,
-      usosAtuais: c.usosAtuais,
-      validoAte: c.validoAte,
-      ativo: ativo,
-      criadoEm: c.criadoEm,
-    );
-    _cupons[idx] = novo;
+    _cupons[idx] = _cupons[idx].comAtivo(ativo);
     _registrar(ativo ? 'cupom.ativado' : 'cupom.desativado', 'cupons', motivo);
-    return novo;
+    return _cupons[idx];
   }
 
   @override
@@ -1076,38 +1328,75 @@ class ApiFake implements ApiAdmin {
     _registrar('cupom.excluido', 'cupons', motivo);
   }
 
-  final List<MembroEquipeAdmin> _equipe = [
+  static const _tetos = {
+    'administrador': 500000,
+    'financeiro': 200000,
+    'lider_suporte': 200000,
+    'mediador': 50000,
+    'atendente_n2': 50000,
+    'atendente_n1': 30000,
+  };
+
+  List<MembroEquipeAdmin> _equipe = [
     const MembroEquipeAdmin(
       usuarioId: 'eq-1',
-      nome: 'João Vitor Cardoso',
-      email: 'cardosojoaovitor47@gmail.com',
+      nome: 'Emanuel Cabral',
+      email: 'emanuel@feitolabs.com.br',
       papel: 'administrador',
       ativo: true,
-      alcadaCentavos: 10000000000,
+      alcadaCentavos: 500000,
       criadoEm: '2026-10-29T09:00:00Z',
+      ultimoAcesso: '2026-11-02T14:20:00Z',
+      tetoPapelCentavos: 500000,
     ),
     const MembroEquipeAdmin(
       usuarioId: 'eq-2',
-      nome: 'Emanoel Cabral',
-      email: 'emanoel.cabral@trato.feitolabs.com.br',
-      papel: 'administrador',
+      nome: 'João Vitor Cardoso',
+      email: 'joao.cardoso@feitolabs.com.br',
+      papel: 'financeiro',
       ativo: true,
-      alcadaCentavos: 10000000000,
+      alcadaCentavos: 200000,
       criadoEm: '2026-10-29T09:00:00Z',
+      ultimoAcesso: '2026-11-01T18:02:00Z',
+      tetoPapelCentavos: 200000,
     ),
     const MembroEquipeAdmin(
       usuarioId: 'eq-3',
-      nome: 'Gabriel Victor',
-      email: 'gabriel.victor@trato.feitolabs.com.br',
-      papel: 'administrador',
+      nome: 'Bruna Teixeira',
+      email: 'bruna.teixeira@feitolabs.com.br',
+      papel: 'atendente_n1',
       ativo: true,
-      alcadaCentavos: 10000000000,
-      criadoEm: '2026-10-29T09:00:00Z',
+      alcadaCentavos: 30000,
+      criadoEm: '2026-10-30T09:00:00Z',
+      ultimoAcesso: '2026-11-01T09:00:00Z',
+      tetoPapelCentavos: 30000,
+    ),
+    const MembroEquipeAdmin(
+      usuarioId: 'eq-4',
+      nome: 'Larissa Prado',
+      email: 'larissa.prado@feitolabs.com.br',
+      papel: 'atendente_n1',
+      ativo: true,
+      alcadaCentavos: 0,
+      criadoEm: '2026-10-31T09:00:00Z',
+      status: 'convite_enviado',
+      tetoPapelCentavos: 30000,
     ),
   ];
 
   @override
   Future<List<MembroEquipeAdmin>> listarEquipe() => _ler(() => List.of(_equipe), []);
+
+  @override
+  Future<Map<String, int>> tetosDosPapeis() async => Map.of(_tetos);
+
+  void _validarConcessao(String papel, int alcada) {
+    final teto = _tetos[papel] ?? 0;
+    if (alcada > teto) throw const ErroApi('A alçada passa do teto do papel. Ajuste o valor.');
+  }
+
+  int _administradoresAtivos([String? exceto]) =>
+      _equipe.where((m) => m.papel == 'administrador' && m.ativo && m.usuarioId != exceto).length;
 
   @override
   Future<MembroEquipeAdmin> adicionarMembroEquipe({
@@ -1117,6 +1406,11 @@ class ApiFake implements ApiAdmin {
     int alcadaCentavos = 0,
     required String motivo,
   }) async {
+    await Future<void>.delayed(atraso);
+    _validarConcessao(papel, alcadaCentavos);
+    if (_equipe.any((m) => m.email.toLowerCase() == email.trim().toLowerCase() && m.ativo)) {
+      throw const ErroApi('Este e-mail já tem acesso. Edite o colaborador existente.');
+    }
     final m = MembroEquipeAdmin(
       usuarioId: 'eq-${_equipe.length + 1}',
       nome: nome,
@@ -1125,11 +1419,26 @@ class ApiFake implements ApiAdmin {
       ativo: true,
       alcadaCentavos: alcadaCentavos,
       criadoEm: DateTime.now().toIso8601String(),
+      status: 'convite_enviado',
+      tetoPapelCentavos: _tetos[papel] ?? 0,
     );
-    _equipe.add(m);
+    _equipe = [..._equipe, m];
     _registrar('equipe.membro_adicionado', 'equipe', motivo);
     return m;
   }
+
+  MembroEquipeAdmin _copia(MembroEquipeAdmin m, {String? papel, int? alcada, bool? ativo}) => MembroEquipeAdmin(
+        usuarioId: m.usuarioId,
+        nome: m.nome,
+        email: m.email,
+        papel: papel ?? m.papel,
+        ativo: ativo ?? m.ativo,
+        alcadaCentavos: alcada ?? m.alcadaCentavos,
+        criadoEm: m.criadoEm,
+        status: (ativo ?? m.ativo) ? (m.status == 'revogado' ? 'ativo' : m.status) : 'revogado',
+        ultimoAcesso: m.ultimoAcesso,
+        tetoPapelCentavos: _tetos[papel ?? m.papel] ?? m.tetoPapelCentavos,
+      );
 
   @override
   Future<MembroEquipeAdmin> editarMembroEquipe(
@@ -1139,47 +1448,62 @@ class ApiFake implements ApiAdmin {
     bool? ativo,
     required String motivo,
   }) async {
+    await Future<void>.delayed(atraso);
     final idx = _equipe.indexWhere((m) => m.usuarioId == usuarioId);
     if (idx < 0) throw const ErroApi('Membro da equipe não encontrado.');
     final ant = _equipe[idx];
-    final atualizado = MembroEquipeAdmin(
-      usuarioId: ant.usuarioId,
-      nome: ant.nome,
-      email: ant.email,
-      papel: papel ?? ant.papel,
-      ativo: ativo ?? ant.ativo,
-      alcadaCentavos: alcadaCentavos ?? ant.alcadaCentavos,
-      criadoEm: ant.criadoEm,
-    );
-    _equipe[idx] = atualizado;
+    final novoPapel = papel ?? ant.papel;
+    _validarConcessao(novoPapel, alcadaCentavos ?? ant.alcadaCentavos);
+    final deixaDeSerAdmin = ant.papel == 'administrador' && ant.ativo && (novoPapel != 'administrador' || ativo == false);
+    if (deixaDeSerAdmin && _administradoresAtivos(usuarioId) == 0) {
+      throw const ErroApi('Este é o único Administrador ativo: não pode ser revogado nem rebaixado.');
+    }
+    final atualizado = _copia(ant, papel: papel, alcada: alcadaCentavos, ativo: ativo);
+    _equipe = [for (var i = 0; i < _equipe.length; i++) i == idx ? atualizado : _equipe[i]];
     _registrar('equipe.membro_atualizado', 'equipe', motivo);
     return atualizado;
   }
 
   @override
   Future<void> revogarMembroEquipe(String usuarioId, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
     final idx = _equipe.indexWhere((m) => m.usuarioId == usuarioId);
-    if (idx >= 0) {
-      final ant = _equipe[idx];
-      _equipe[idx] = MembroEquipeAdmin(
-        usuarioId: ant.usuarioId,
-        nome: ant.nome,
-        email: ant.email,
-        papel: ant.papel,
-        ativo: false,
-        alcadaCentavos: ant.alcadaCentavos,
-        criadoEm: ant.criadoEm,
-      );
-      _registrar('equipe.acesso_revogado', 'equipe', motivo);
+    if (idx < 0) return;
+    final ant = _equipe[idx];
+    if (ant.papel == 'administrador' && ant.ativo && _administradoresAtivos(usuarioId) == 0) {
+      throw const ErroApi('Este é o único Administrador ativo: não pode ser revogado nem rebaixado.');
     }
+    _equipe = [for (var i = 0; i < _equipe.length; i++) i == idx ? _copia(ant, ativo: false) : _equipe[i]];
+    _registrar('equipe.acesso_revogado', 'equipe', motivo);
   }
 
   @override
-  String urlRelatorioFinanceiroCsv() => 'https://api.trato.local/v1/admin/relatorios/financeiro';
-
-  @override
-  String urlRelatorioPedidosCsv() => 'https://api.trato.local/v1/admin/relatorios/pedidos';
-
-  @override
-  String urlRelatorioRepassesCsv() => 'https://api.trato.local/v1/admin/relatorios/repasses';
+  Future<RelatorioPronto> solicitarRelatorio(
+    String tipo, {
+    DateTime? inicio,
+    DateTime? fim,
+    String? cidadeId,
+    String formato = 'excel_br',
+    required String motivo,
+  }) async {
+    await Future<void>.delayed(atraso);
+    _registrar(
+      'relatorio.exportado',
+      'relatorios',
+      motivo,
+      detalhes: {
+        'relatorio': tipo,
+        'inicio': inicio?.toIso8601String().substring(0, 10),
+        'fim': fim?.toIso8601String().substring(0, 10),
+        'formato': formato,
+      },
+    );
+    return RelatorioPronto(
+      url: 'https://api.trato.local/v1/admin/relatorios/baixar/exemplo',
+      nomeArquivo: 'trato_${tipo}_exemplo.csv',
+      linhas: 128,
+      colunas: tipo == 'financeiro' ? 15 : (tipo == 'pedidos' ? 10 : 11),
+      comDadosPessoais: tipo == 'financeiro',
+    );
+  }
 }

@@ -45,11 +45,12 @@ Future<void> irPara(WidgetTester tester, String id) async {
   await tester.pumpAndSettle();
 }
 
-/// Preenche o diálogo de motivo e confirma.
+/// Preenche o modal de ação sensível e confirma. O botão só habilita com motivo de 10+ caracteres.
 Future<void> confirmarMotivo(WidgetTester tester, String botao, {String motivo = 'Motivo de teste válido'}) async {
-  await tester.enterText(find.widgetWithText(TextField, 'Motivo (obrigatório)'), motivo);
+  await tester.enterText(find.widgetWithText(TextField, 'Motivo'), motivo);
   await tester.pump();
-  await tester.tap(find.widgetWithText(FilledButton, botao));
+  final modal = find.byType(Dialog).evaluate().isNotEmpty ? find.byType(Dialog) : find.byType(BottomSheet);
+  await tester.tap(find.descendant(of: modal, matching: find.text(botao)));
   await tester.pumpAndSettle();
 }
 
