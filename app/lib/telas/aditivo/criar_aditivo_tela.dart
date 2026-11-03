@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
@@ -58,14 +59,20 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
   String? get _erroMotivo => _motivo.text.trim().length < 5
       ? 'Motivo muito curto. Explique o motivo do aditivo com pelo menos 5 caracteres.'
       : null;
-  String? get _erroValor => _centavos == null
-      ? 'Valor não informado. Digite um valor em reais maior que zero (ex.: 45,00).'
-      : null;
+  String? get _erroValor {
+    if (_centavos == null) {
+      return 'Valor não informado. Digite um valor em reais maior que zero (ex.: 45,00).';
+    }
+    if (_centavos! > Dinheiro.limiteAditivoMaximoCentavos) {
+      return 'Valor do aditivo excede o teto permitido de ${Dinheiro.formatar(Dinheiro.limiteAditivoMaximoCentavos)}.';
+    }
+    return null;
+  }
 
   Future<void> _atualizarResumo() async {
     final c = _centavos;
     final minha = ++_versao;
-    if (c == null) {
+    if (c == null || c > Dinheiro.limiteAditivoMaximoCentavos) {
       setState(() {
         _resumo = null;
         _resumoFalhou = false;
@@ -177,6 +184,10 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
           controlador: _valor,
           prefixo: 'R\$ ',
           teclado: const TextInputType.numberWithOptions(decimal: true),
+          formatadores: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+            LengthLimitingTextInputFormatter(9),
+          ],
           erro: _tentou ? _erroValor : null,
           aoMudar: (_) {
             setState(() {});

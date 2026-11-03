@@ -409,7 +409,8 @@ abstract final class RotasTrato {
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static Future<void> irParaProfissional(BuildContext context) async {
-    final tem = await repos.perfilPublico?.temPerfilProfissional() ?? false;
+    final tem = (ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true) ||
+        (await repos.perfilPublico?.temPerfilProfissional() ?? false);
     if (tem && context.mounted) {
       _entrarNaCascaProfissional(context);
       return;
@@ -445,7 +446,13 @@ abstract final class RotasTrato {
                 servico: repos.verificacao ?? ServicoVerificacaoFake(),
                 aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
                 aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
-                aoConcluir: () => _entrarNaCascaProfissional(context),
+                aoConcluir: () {
+                  final pub = repos.perfilPublico;
+                  if (pub is ServicoPerfilPublicoFake) {
+                    pub.definirTemPerfil(true);
+                  }
+                  _entrarNaCascaProfissional(context);
+                },
               ),
             ),
           ),
@@ -483,6 +490,7 @@ abstract final class RotasTrato {
           carregarPedidos: repos.profissional.pedidosAbertos,
           carregarCategorias: repos.catalogo.categorias,
           aoAbrirNotificacoes: () => abrirNotificacoes(context, profissional: true),
+          aoUsarComoCliente: () => irParaCliente(context),
           aoFazerCheckIn: () => _acoesPedidoProfissional(
             context,
             pedidoId: inicio.proximo?.pedidoId ?? _idDemo,

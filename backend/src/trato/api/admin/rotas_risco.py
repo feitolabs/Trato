@@ -81,16 +81,17 @@ def listar_alertas(
             # Detecta disputas ativas
             disputas = con.execute(
                 """
-                SELECT d.id, d.pedido_id, p.titulo, p.cliente_id, u.nome as cliente_nome, p.valor_centavos
+                SELECT d.id, d.pedido_id, p.titulo, p.cliente_id, u.nome as cliente_nome, d.valor_congelado_centavos
                 FROM public.disputas d
                 JOIN public.pedidos p ON p.id = d.pedido_id
                 JOIN public.usuarios u ON u.id = p.cliente_id
-                WHERE d.status in ('aberta', 'em_analise', 'aguardando_segunda_pessoa')
+                WHERE d.status in ('aberta', 'aguardando_profissional', 'em_analise')
                 LIMIT 5
                 """
             ).fetchall()
 
             for d in disputas:
+                val = d["valor_congelado_centavos"] or 0
                 alertas.append(
                     AlertaRiscoOut(
                         id=f"disp-{d['id']}",
@@ -98,7 +99,7 @@ def listar_alertas(
                         usuario_nome=d["cliente_nome"],
                         tipo="disputa_financeira",
                         severidade="alta",
-                        detalhes=f"Disputa em aberto no pedido '{d['titulo']}' (R$ {d['valor_centavos'] / 100:.2f}). Reter liquidação.",
+                        detalhes=f"Disputa em aberto no pedido '{d['titulo']}' (R$ {val / 100:.2f}). Reter liquidação.",
                         resolvido=False,
                         criado_em=datetime.now(timezone.utc).isoformat(),
                     )
@@ -107,15 +108,19 @@ def listar_alertas(
             # Detecta pedidos de alto valor (anomalia)
             altos = con.execute(
                 """
-                SELECT p.id, p.titulo, p.cliente_id, u.nome as cliente_nome, p.valor_centavos
+                SELECT p.id, p.titulo, p.cliente_id, u.nome as cliente_nome,
+                       coalesce(c.valor_total_centavos, p.faixa_preco_max_centavos, 0) as valor_centavos
                 FROM public.pedidos p
                 JOIN public.usuarios u ON u.id = p.cliente_id
-                WHERE p.valor_centavos >= 500000 and p.status in ('criado', 'aberto', 'em_execucao')
+                LEFT JOIN public.contratos c ON c.pedido_id = p.id
+                WHERE (coalesce(c.valor_total_centavos, p.faixa_preco_max_centavos, 0) >= 500000)
+                  AND p.status in ('aberto', 'orcamento_aceito', 'pago_retido', 'em_andamento')
                 LIMIT 5
                 """
             ).fetchall()
 
             for p in altos:
+                val = p["valor_centavos"] or 0
                 alertas.append(
                     AlertaRiscoOut(
                         id=f"val-{p['id']}",
@@ -123,7 +128,7 @@ def listar_alertas(
                         usuario_nome=p["cliente_nome"],
                         tipo="valor_atípico",
                         severidade="media",
-                        detalhes=f"Pedido com valor elevado: R$ {p['valor_centavos'] / 100:.2f} ('{p['titulo']}'). Verificar consistência.",
+                        detalhes=f"Pedido com valor elevado: R$ {val / 100:.2f} ('{p['titulo']}'). Verificar consistência.",
                         resolvido=False,
                         criado_em=datetime.now(timezone.utc).isoformat(),
                     )
@@ -227,3 +232,4 @@ def resolver_alerta(
                 motivo=corpo.motivo,
             )
     return {"mensagem": "Alerta resolvido com sucesso."}
+

@@ -9,7 +9,7 @@ from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, papel_das_regras
 from trato.api.modelos import JanelaOut, PedidoOut
-from trato.pedidos.estados import Ator, Pedido, acoes_permitidas
+from trato.pedidos.estados import Ator, Papel, Pedido, acoes_permitidas
 
 
 def eh_participante(pedido: Pedido, usuario: Usuario) -> bool:
@@ -48,12 +48,26 @@ def carregar_pedido(
     return pedido
 
 
-def ator_de(usuario: Usuario) -> Ator:
+def ator_de(usuario: Usuario, pedido: Pedido | None = None) -> Ator:
+    if pedido is not None:
+        if pedido.cliente_id == usuario.id:
+            return Ator(Papel.CLIENTE, usuario.id)
+        if pedido.profissional_id == usuario.id:
+            return Ator(Papel.PROFISSIONAL, usuario.id)
     return Ator(papel_das_regras(usuario), usuario.id)
 
 
 def pedido_out(pedido: Pedido, usuario: Usuario) -> PedidoOut:
-    eh_cliente = usuario.papel is PapelUsuario.CLIENTE
+    eh_cliente = pedido.cliente_id == usuario.id
+    papel_no_pedido = (
+        Papel.CLIENTE
+        if eh_cliente
+        else (
+            Papel.PROFISSIONAL
+            if pedido.profissional_id == usuario.id
+            else papel_das_regras(usuario)
+        )
+    )
     return PedidoOut(
         id=pedido.id,
         estado=pedido.estado.value,
@@ -66,7 +80,7 @@ def pedido_out(pedido: Pedido, usuario: Usuario) -> PedidoOut:
         else None,
         concluido_em=pedido.concluido_em,
         acoes_permitidas=sorted(
-            a.value for a in acoes_permitidas(pedido, papel_das_regras(usuario))
+            a.value for a in acoes_permitidas(pedido, papel_no_pedido)
         ),
         pagamento_confirmado=pedido.referencia_pagamento is not None,
         codigo_inicio=pedido.codigo_inicio if eh_cliente else None,

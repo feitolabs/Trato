@@ -46,7 +46,11 @@ class CascaProfissionalTela extends StatefulWidget {
     this.carregarPedidos,
     this.carregarCategorias,
     this.aoAbrirNotificacoes,
+    this.aoUsarComoCliente,
   });
+
+  /// Permite trocar para a casca do cliente.
+  final VoidCallback? aoUsarComoCliente;
 
   /// Carrega o detalhe do pedido tocado (API). Sem isso, mostra [detalhe].
   final Future<DetalhePedido> Function(PedidoAberto pedido)? carregarDetalhe;
@@ -188,6 +192,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         aoAbrirFiltros: _filtros,
         aoAbrirPedido: _abrirDetalhe,
         aoAbrirNotificacoes: widget.aoAbrirNotificacoes,
+        aoUsarComoCliente: widget.aoUsarComoCliente,
       ),
       PedidosProfissionalTela(
         pedidos: _inicio.pedidos,

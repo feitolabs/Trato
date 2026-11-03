@@ -165,15 +165,49 @@ class _CorpoState extends State<_Corpo> {
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),
         if (_podeEnviar) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          CartaoTrato(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.badge_outlined, color: CoresTrato.petroleo, size: 20),
+                    const SizedBox(width: EspacosTrato.x2),
+                    Expanded(
+                      child: Text('Documentos e orientações', style: TipografiaTrato.corpoForte),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: EspacosTrato.x3),
+                Text(
+                  '• Documentos aceitos: CNH ou RG original (físico ou digital emitido pelo gov.br), legível e dentro da validade.',
+                  style: TipografiaTrato.corpoPequeno,
+                ),
+                const SizedBox(height: EspacosTrato.x2),
+                Text(
+                  '• Como mandar o documento: Retire do plástico protetor. Posicione sobre uma superfície plana, em ambiente bem iluminado. Enquadre a CNH aberta ou frente e verso do RG sem cortar bordas e sem reflexos.',
+                  style: TipografiaTrato.corpoPequeno,
+                ),
+                const SizedBox(height: EspacosTrato.x2),
+                Text(
+                  '• Como tirar a selfie: Segure o mesmo documento ao lado do seu rosto, olhando para a câmera em local iluminado. Não cubra o rosto nem os dados do documento. Não use óculos escuros, boné ou máscara.',
+                  style: TipografiaTrato.corpoPequeno,
+                ),
+              ],
+            ),
+          ),
           const TituloSecao('Envie duas fotos'),
           CampoFoto(
             rotulo: 'Foto do documento',
+            dica: 'CNH aberta ou RG (frente e verso), fora do plástico e legível',
             referencia: _documento,
             aoTocar: () => _capturar(widget.aoCapturarDocumento, (r) => _documento = r),
           ),
           const SizedBox(height: EspacosTrato.x3),
           CampoFoto(
-            rotulo: 'Selfie segurando o rosto',
+            rotulo: 'Selfie segurando o documento',
+            dica: 'Segure o documento ao lado do rosto, bem iluminado e nítido',
             referencia: _selfie,
             aoTocar: () => _capturar(widget.aoCapturarSelfie, (r) => _selfie = r),
           ),

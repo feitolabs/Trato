@@ -184,7 +184,7 @@ void main() {
       FilledButton botao() => t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Enviar para análise'));
       expect(botao().onPressed, isNull);
       await _tocar(t, find.text('Foto do documento'));
-      await _tocar(t, find.text('Selfie segurando o rosto'));
+      await _tocar(t, find.text('Selfie segurando o documento'));
       expect(botao().onPressed, isNull);
       await _tocar(t, find.byKey(const Key('ciente_lgpd')));
       expect(botao().onPressed, isNotNull);
@@ -253,7 +253,8 @@ void main() {
       expect(find.text('Descrição vazia. Digite o que é o item.'), findsOneWidget);
 
       await t.enterText(find.byType(TextField).at(0), '2 tomadas');
-      await t.enterText(find.byType(TextField).at(1), '46,50');
+      await t.enterText(find.byType(TextField).at(1), '1');
+      await t.enterText(find.byType(TextField).at(2), '46,50');
       await _tocar(t, find.text('Adicionar item'));
       expect(find.text('R\$ 46,50'), findsWidgets);
       await _tocar(t, find.text('Foto da nota'));

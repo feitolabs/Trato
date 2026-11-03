@@ -68,9 +68,8 @@ def obter_metricas(
         lin_pag = con.execute(
             """
             select
-              coalesce(sum(case when status in ('pago', 'concluido', 'liquidado') then valor_centavos else 0 end), 0) as gmv,
-              coalesce(sum(case when status in ('pago', 'concluido', 'liquidado') then taxa_plataforma_centavos else 0 end), 0) as receita
-            from public.pagamentos;
+              (select coalesce(sum(valor_centavos), 0) from public.pagamentos where status = 'confirmado') as gmv,
+              (select coalesce(sum(taxa_trato_centavos), 0) from public.contratos where status not in ('cancelado', 'aguardando_pagamento')) as receita;
             """
         ).fetchone() or {"gmv": 0, "receita": 0}
         gmv = int(lin_pag["gmv"] or 0)
@@ -83,10 +82,10 @@ def obter_metricas(
             """
             select
               count(*) as total,
-              count(*) filter (where status in ('concluido', 'finalizado')) as concluidos,
-              count(*) filter (where status in ('em_execucao', 'aguardando_aprovacao', 'contratado')) as em_andamento,
-              count(*) filter (where status in ('criado', 'aberto', 'propostas')) as abertos,
-              count(*) filter (where status in ('em_disputa', 'disputa')) as disputa
+              count(*) filter (where status in ('concluido')) as concluidos,
+              count(*) filter (where status in ('orcamento_aceito', 'pago_retido', 'agendado', 'em_andamento', 'em_confirmacao', 'retrabalho')) as em_andamento,
+              count(*) filter (where status in ('aberto')) as abertos,
+              count(*) filter (where status in ('em_disputa')) as disputa
             from public.pedidos;
             """
         ).fetchone() or {"total": 0, "concluidos": 0, "em_andamento": 0, "abertos": 0, "disputa": 0}
@@ -98,7 +97,7 @@ def obter_metricas(
         tot_prof = (con.execute("select count(*) as total from public.perfis_profissional;").fetchone() or {"total": 0})["total"]
 
         # Verificações pendentes
-        tot_pend = (con.execute("select count(*) as total from public.verificacoes where status = 'pendente';").fetchone() or {"total": 0})["total"]
+        tot_pend = (con.execute("select count(*) as total from public.verificacoes where status in ('enviada', 'em_analise');").fetchone() or {"total": 0})["total"]
 
         # Cidades ativas
         tot_cid = (con.execute("select count(*) as total from public.cidades where ativa = true;").fetchone() or {"total": 0})["total"]
@@ -145,11 +144,12 @@ def obter_series(
         dados_linhas = con.execute(
             """
             select
-              to_char(date_trunc('day', criado_em), 'YYYY-MM-DD') as dia,
-              count(*) as qtd,
-              coalesce(sum(valor_centavos), 0) as gmv
-            from public.pedidos
-            where criado_em >= now() - make_interval(days => %s)
+              to_char(date_trunc('day', p.criado_em), 'YYYY-MM-DD') as dia,
+              count(distinct p.id) as qtd,
+              coalesce(sum(c.valor_total_centavos), 0) as gmv
+            from public.pedidos p
+            left join public.contratos c on c.pedido_id = p.id and c.status not in ('cancelado')
+            where p.criado_em >= now() - make_interval(days => %s)
             group by 1
             order by 1;
             """,
@@ -167,8 +167,8 @@ def obter_series(
             select
               count(*) as criados,
               count(*) filter (where exists (select 1 from public.orcamentos o where o.pedido_id = pedidos.id)) as com_propostas,
-              count(*) filter (where status in ('em_execucao', 'aguardando_aprovacao', 'concluido', 'finalizado')) as fechados,
-              count(*) filter (where status in ('concluido', 'finalizado')) as concluidos
+              count(*) filter (where status in ('orcamento_aceito', 'pago_retido', 'agendado', 'em_andamento', 'em_confirmacao', 'concluido', 'retrabalho')) as fechados,
+              count(*) filter (where status = 'concluido') as concluidos
             from public.pedidos;
             """
         ).fetchone() or {"criados": 0, "com_propostas": 0, "fechados": 0, "concluidos": 0}

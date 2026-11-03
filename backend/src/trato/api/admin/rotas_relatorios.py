@@ -45,15 +45,17 @@ def exportar_financeiro(
         linhas = con.execute(
             """
             SELECT
-              id,
-              criado_em,
-              pedido_id,
-              metodo,
-              valor_centavos,
-              coalesce(taxa_plataforma_centavos, 0) as taxa,
-              status
-            FROM public.pagamentos
-            ORDER BY criado_em DESC
+              p.id,
+              p.criado_em,
+              coalesce(c.pedido_id, p.contrato_id) as pedido_id,
+              p.meio as metodo,
+              p.valor_centavos,
+              coalesce(c.taxa_trato_centavos, 0) as taxa,
+              coalesce(c.liquido_profissional_centavos, p.valor_centavos) as liquido,
+              p.status
+            FROM public.pagamentos p
+            LEFT JOIN public.contratos c ON c.id = p.contrato_id
+            ORDER BY p.criado_em DESC
             """
         ).fetchall()
 
@@ -117,12 +119,13 @@ def exportar_pedidos(
               c.nome as categoria,
               u.nome as cliente,
               cid.nome as cidade,
-              coalesce(p.valor_centavos, 0) as valor_centavos,
+              coalesce(ct.valor_total_centavos, p.faixa_preco_max_centavos, 0) as valor_centavos,
               p.status
             FROM public.pedidos p
             LEFT JOIN public.categorias c ON c.id = p.categoria_id
             LEFT JOIN public.usuarios u ON u.id = p.cliente_id
             LEFT JOIN public.cidades cid ON cid.id = p.cidade_id
+            LEFT JOIN public.contratos ct ON ct.pedido_id = p.id
             ORDER BY p.criado_em DESC
             """
         ).fetchall()
@@ -177,7 +180,7 @@ def exportar_repasses(
               r.id,
               r.criado_em,
               u.nome as profissional,
-              coalesce(r.valor_centavos, 0) as valor_centavos,
+              coalesce(r.valor_liquido_centavos, r.valor_bruto_centavos, 0) as valor_centavos,
               r.status
             FROM public.repasses r
             LEFT JOIN public.usuarios u ON u.id = r.profissional_id
@@ -204,3 +207,4 @@ def exportar_repasses(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
     )
+

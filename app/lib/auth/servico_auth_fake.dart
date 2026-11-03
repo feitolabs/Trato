@@ -209,6 +209,7 @@ class ServicoAuthFake implements ServicoAuth {
       email: atual?.email ?? '',
       nome: atual?.nome,
       celularConfirmado: true,
+      perfil: atual?.perfil,
     ));
   }
 }

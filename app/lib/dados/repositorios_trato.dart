@@ -4,6 +4,7 @@ import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
+import '../telas/lgpd/servico_fake.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
@@ -66,6 +67,10 @@ class RepositoriosTrato {
         agenda: RepositorioAgendaFake(),
         disputaProfissional:
             ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
+        perfilPublico: ServicoPerfilPublicoFake(),
+        cadastroProfissional: ServicoCadastroProfissionalFake(),
+        verificacao: ServicoVerificacaoFake(),
+        privacidade: ServicoPrivacidadeFake(),
       );
 
   /// Modo API. Cada área usa a API quando o backend já tem a rota; o que não tem rota segue em

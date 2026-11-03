@@ -144,7 +144,8 @@ void main() {
       expect(find.byType(VerificacaoTela), findsOneWidget);
 
       await _tocar(tester, 'Foto do documento');
-      await _tocar(tester, 'Selfie segurando o rosto');
+      await _tocar(tester, 'Selfie segurando o documento');
+      await tester.ensureVisible(find.byKey(const Key('ciente_lgpd')));
       await tester.tap(find.byKey(const Key('ciente_lgpd')));
       await tester.pumpAndSettle();
       await _tocar(tester, 'Enviar para análise');

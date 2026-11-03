@@ -34,6 +34,8 @@ from trato.seguranca.texto_livre import limpar_etiquetas, limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["app"])
 
+TETO_ORCAMENTO_CENTAVOS = 50_000_000  # R$ 500.000,00
+
 
 class _Entrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -64,7 +66,9 @@ class ItemOrcamentoIn(BaseModel):
     tipo: str = Field(description="deslocamento | horas | material | outro")
     descricao: str = Field(min_length=1, max_length=200)
     quantidade: Decimal = Field(gt=0, description="Ex.: 1, 2.5")
-    valor_unitario_centavos: int = Field(ge=0, description="Em centavos")
+    valor_unitario_centavos: int = Field(
+        ge=0, le=TETO_ORCAMENTO_CENTAVOS, description="Em centavos"
+    )
 
 
 class EtapaPropostaIn(BaseModel):
@@ -229,7 +233,7 @@ class EnviarMensagemIn(_Entrada):
 
 class ResumoOrcamentoIn(_Entrada):
     valor_centavos: StrictInt = Field(
-        gt=0, le=10**10, description="Total do orçamento, em centavos."
+        gt=0, le=TETO_ORCAMENTO_CENTAVOS, description="Total do orçamento, em centavos."
     )
 
 
@@ -374,6 +378,12 @@ def enviar_orcamento(
         raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
 
     agora = contexto.agora()
+    total_estimado = sum(int(i.quantidade * i.valor_unitario_centavos) for i in dados.itens)
+    if total_estimado > TETO_ORCAMENTO_CENTAVOS:
+        raise HTTPException(
+            422,
+            f"O valor total do orçamento não pode passar de R$ 500.000,00.",
+        )
     itens = [
         ItemOrcamento(
             tipo=i.tipo.strip().lower(),

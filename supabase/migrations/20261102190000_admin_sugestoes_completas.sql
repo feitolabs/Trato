@@ -55,3 +55,4 @@ create table if not exists public.alertas_risco (
 );
 
 alter table public.alertas_risco enable row level security;
+

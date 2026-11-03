@@ -31,6 +31,7 @@ class EnviarNotaTela extends StatefulWidget {
 
 class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   final _descricao = TextEditingController();
+  final _quantidade = TextEditingController(text: '1');
   final _valor = TextEditingController();
   final _itens = <ItemNota>[];
   String? _foto;
@@ -42,23 +43,34 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   @override
   void dispose() {
     _descricao.dispose();
+    _quantidade.dispose();
     _valor.dispose();
     super.dispose();
   }
 
   void _adicionarItem() {
     final desc = _descricao.text.trim();
+    final qtdTexto = _quantidade.text.trim();
+    final qtd = int.tryParse(qtdTexto);
     final centavos = Dinheiro.lerCentavos(_valor.text);
     if (desc.isEmpty) {
       return setState(() => _erroItem = 'Descrição vazia. Digite o que é o item.');
+    }
+    if (qtd == null || qtd <= 0) {
+      return setState(() => _erroItem = 'Quantidade inválida. Digite um número inteiro maior que zero.');
     }
     if (centavos == null || centavos <= 0) {
       return setState(() => _erroItem =
           'Valor não informado. Digite um valor em reais maior que zero (ex.: 46,50).');
     }
     setState(() {
-      _itens.add(ItemNota(descricao: desc, centavos: centavos));
+      _itens.add(ItemNota(
+        descricao: desc,
+        quantidade: qtd,
+        valorUnitarioCentavos: centavos,
+      ));
       _descricao.clear();
+      _quantidade.text = '1';
       _valor.clear();
       _erroItem = null;
     });
@@ -149,7 +161,12 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
                     padding: EdgeInsets.only(bottom: i == _itens.length - 1 ? 0 : EspacosTrato.x2),
                     child: Row(
                       children: [
-                        Expanded(child: Text(_itens[i].descricao, style: TipografiaTrato.corpo)),
+                        Expanded(
+                          child: Text(
+                            _rotuloItem(_itens[i]),
+                            style: TipografiaTrato.corpo,
+                          ),
+                        ),
                         const SizedBox(width: EspacosTrato.x2),
                         Text(formatarReais(_itens[i].centavos), style: TipografiaTrato.corpoForte),
                         IconButton(
@@ -166,18 +183,50 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
             ),
           ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(rotulo: 'Item', controlador: _descricao, dica: 'Ex.: 2 tomadas 20 A'),
+        CampoTrato(rotulo: 'Item', controlador: _descricao, dica: 'Ex.: Tomada 20 A'),
         const SizedBox(height: EspacosTrato.x3),
-        CampoTrato(
-          rotulo: 'Valor',
-          controlador: _valor,
-          prefixo: 'R\$ ',
-          teclado: const TextInputType.numberWithOptions(decimal: true),
-          erro: _erroItem,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: CampoTrato(
+                rotulo: 'Quantidade',
+                controlador: _quantidade,
+                dica: '1',
+                teclado: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: EspacosTrato.x3),
+            Expanded(
+              flex: 3,
+              child: CampoTrato(
+                rotulo: 'Valor',
+                controlador: _valor,
+                prefixo: 'R\$ ',
+                teclado: const TextInputType.numberWithOptions(decimal: true),
+                dica: '0,00',
+              ),
+            ),
+          ],
         ),
+        if (_erroItem != null) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          Text(
+            _erroItem!,
+            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x3),
         BotaoSecundario(texto: 'Adicionar item', icone: Icons.add, aoTocar: _adicionarItem),
       ],
     );
+  }
+
+  String _rotuloItem(ItemNota item) {
+    if (item.quantidade <= 1) return item.descricao;
+    final regex = RegExp(r'^\d+\s*x?\s+', caseSensitive: false);
+    if (regex.hasMatch(item.descricao)) return item.descricao;
+    return '${item.quantidade}x ${item.descricao}';
   }
 }

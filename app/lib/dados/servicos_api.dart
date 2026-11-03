@@ -107,7 +107,13 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
       enviadaEm: DateTime.parse(n['enviada_em'] as String).toLocal(),
       itens: [
         for (final i in (n['itens'] as List).cast<Map<String, dynamic>>())
-          ItemNota(descricao: i['descricao'] as String, centavos: i['total_centavos'] as int),
+          ItemNota(
+            descricao: i['descricao'] as String,
+            quantidade: (i['quantidade'] is num) ? (i['quantidade'] as num).toInt() : 1,
+            valorUnitarioCentavos: (i['valor_unitario_centavos'] is num)
+                ? (i['valor_unitario_centavos'] as num).toInt()
+                : (i['total_centavos'] as int? ?? 0),
+          ),
       ],
     );
   }
@@ -154,7 +160,11 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
         'foto_storage_path': fotoPath.replaceAll(RegExp(r'^/+'), ''),
       'itens': [
         for (final i in envio.itens)
-          {'descricao': i.descricao, 'quantidade': 1, 'valor_unitario_centavos': i.centavos},
+          {
+            'descricao': i.descricao,
+            'quantidade': i.quantidade,
+            'valor_unitario_centavos': i.valorUnitarioCentavos,
+          },
       ],
     };
 

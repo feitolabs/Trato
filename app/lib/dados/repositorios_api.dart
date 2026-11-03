@@ -104,7 +104,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<PedidosDoCliente> listar() async {
-    final pedidos = [for (final j in _lista(await _api.get('/v1/pedidos'))) PedidoApi.deJson(j)];
+    final pedidos = [
+      for (final j in _lista(await _api.get('/v1/pedidos', consulta: const {'como': 'cliente'})))
+        PedidoApi.deJson(j)
+    ];
     return PedidosDoCliente(
       emAndamento: [
         for (final p in pedidos)
@@ -758,7 +761,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     } catch (_) {}
     ProximoAtendimento? proximo;
     try {
-      final itensBrutos = _lista(await _api.get('/v1/pedidos'));
+      final itensBrutos =
+          _lista(await _api.get('/v1/pedidos', consulta: const {'como': 'profissional'}));
       final meus = <PedidoApi>[];
       for (final j in itensBrutos) {
         try {

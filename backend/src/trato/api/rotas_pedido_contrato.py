@@ -167,9 +167,12 @@ class CobrarContratoIn(_Entrada):
     )
 
 
+TETO_ADITIVO_CENTAVOS = 10_000_000  # R$ 100.000,00
+
+
 class AditivoNovoIn(_Entrada):
     descricao: str = Field(min_length=1, max_length=1000)
-    valor_centavos: StrictInt = Field(gt=0, le=TETO_CENTAVOS)
+    valor_centavos: StrictInt = Field(gt=0, le=TETO_ADITIVO_CENTAVOS)
 
 
 class AprovarAditivoContratoIn(_Entrada):
@@ -298,11 +301,13 @@ def criar_cobranca(
     contrato_id: str,
     corpo: CobrarContratoIn,
     request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> CobrancaContratoOut:
     servico = _servico(request)
     pedido, contrato = _contrato_do_usuario(contexto, contrato_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do contrato pode pagar.")
     if pedido.estado not in ESTADOS_COBRAVEIS or pedido.referencia_pagamento is not None:
         raise HTTPException(409, "O pedido não está esperando pagamento.")
     cobranca = servico.cobrar(
@@ -550,7 +555,7 @@ def aprovar_aditivo(
     aditivo_id: str,
     request: Request,
     corpo: AprovarAditivoContratoIn | None = None,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AditivoDecididoOut:
     meio = corpo.meio if corpo else MeioPagamento.PIX
@@ -566,7 +571,7 @@ def recusar_aditivo(
     contrato_id: str,
     aditivo_id: str,
     request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AditivoDecididoOut:
     return _decidir_aditivo(

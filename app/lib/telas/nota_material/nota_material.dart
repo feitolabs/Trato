@@ -3,10 +3,19 @@
 library;
 
 class ItemNota {
-  const ItemNota({required this.descricao, required this.centavos});
+  const ItemNota({
+    required this.descricao,
+    this.quantidade = 1,
+    int? valorUnitarioCentavos,
+    int? centavos,
+  }) : valorUnitarioCentavos = valorUnitarioCentavos ?? centavos ?? 0;
 
   final String descricao;
-  final int centavos;
+  final int quantidade;
+  final int valorUnitarioCentavos;
+
+  int get centavos => quantidade * valorUnitarioCentavos;
+  int get totalCentavos => centavos;
 }
 
 /// Envio do profissional: foto da notinha + itens com valor.

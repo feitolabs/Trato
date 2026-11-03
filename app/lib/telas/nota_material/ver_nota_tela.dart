@@ -48,7 +48,12 @@ class VerNotaTela extends StatelessWidget {
                   for (final i in n.itens)
                     Padding(
                       padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
-                      child: LinhaValor(rotulo: i.descricao, valor: formatarReais(i.centavos)),
+                      child: LinhaValor(
+                        rotulo: i.quantidade > 1 && !RegExp(r'^\d+\s*x?\s+', caseSensitive: false).hasMatch(i.descricao)
+                            ? '${i.quantidade}x ${i.descricao}'
+                            : i.descricao,
+                        valor: formatarReais(i.centavos),
+                      ),
                     ),
                   const Divider(),
                   const SizedBox(height: EspacosTrato.x1),

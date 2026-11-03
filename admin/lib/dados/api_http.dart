@@ -1121,13 +1121,16 @@ class ApiAdminHttp implements ApiAdmin {
   // ---------- Módulo 7: Exportação de Relatórios CSV ----------
 
   @override
-  String urlRelatorioFinanceiroCsv() => '$_api/v1/admin/relatorios/financeiro';
+  String urlRelatorioFinanceiroCsv() =>
+      '$_api/v1/admin/relatorios/financeiro${_token != null ? '?token=$_token' : ''}';
 
   @override
-  String urlRelatorioPedidosCsv() => '$_api/v1/admin/relatorios/pedidos';
+  String urlRelatorioPedidosCsv() =>
+      '$_api/v1/admin/relatorios/pedidos${_token != null ? '?token=$_token' : ''}';
 
   @override
-  String urlRelatorioRepassesCsv() => '$_api/v1/admin/relatorios/repasses';
+  String urlRelatorioRepassesCsv() =>
+      '$_api/v1/admin/relatorios/repasses${_token != null ? '?token=$_token' : ''}';
 }
 
 class _Resposta {

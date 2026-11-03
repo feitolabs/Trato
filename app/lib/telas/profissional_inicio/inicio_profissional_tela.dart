@@ -19,10 +19,14 @@ class InicioProfissionalTela extends StatefulWidget {
     this.aoAbrirFiltros,
     this.aoAbrirPedido,
     this.aoAbrirNotificacoes,
+    this.aoUsarComoCliente,
   });
 
   /// Abre as notificações. Sem isso, o sino não aparece.
   final VoidCallback? aoAbrirNotificacoes;
+
+  /// Alterna para a visão de cliente.
+  final VoidCallback? aoUsarComoCliente;
 
   final InicioProfissional dados;
   final ValueChanged<bool>? aoAlterarDisponivel;
@@ -66,8 +70,27 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                         ],
                       ),
                     ),
+                    if (widget.aoUsarComoCliente != null) ...[
+                      const SizedBox(width: EspacosTrato.x2),
+                      Semantics(
+                        button: true,
+                        label: 'Trocar para modo cliente',
+                        child: Material(
+                          color: CoresTrato.superficie,
+                          shape: const CircleBorder(side: BorderSide(color: CoresTrato.borda)),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: widget.aoUsarComoCliente,
+                            child: const SizedBox.square(
+                              dimension: 48,
+                              child: Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     if (widget.aoAbrirNotificacoes != null) ...[
-                      const SizedBox(width: EspacosTrato.x3),
+                      const SizedBox(width: EspacosTrato.x2),
                       Semantics(
                         button: true,
                         label: 'Notificações',

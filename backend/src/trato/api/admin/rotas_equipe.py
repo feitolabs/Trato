@@ -65,14 +65,14 @@ def listar_equipe(
             SELECT
               e.usuario_id,
               coalesce(u.nome, 'Membro da Equipe') as nome,
-              coalesce(up.email, 'equipe@trato.local') as email,
+              coalesce(au.email, 'equipe@trato.local') as email,
               e.papel,
               e.ativo,
               coalesce(e.alcada_centavos, 0) as alcada_centavos,
               e.criado_em
             FROM public.equipe e
             LEFT JOIN public.usuarios u ON u.id = e.usuario_id
-            LEFT JOIN public.usuarios_privados up ON up.usuario_id = e.usuario_id
+            LEFT JOIN auth.users au ON au.id = e.usuario_id
             ORDER BY e.ativo DESC, e.criado_em ASC
             """
         ).fetchall()
@@ -105,49 +105,40 @@ def adicionar_membro(
     email_norm = corpo.email.strip().lower()
 
     with banco.transacao() as con:
-        # Verifica se já tem usuário com esse e-mail
-        usr_priv = con.execute("SELECT usuario_id FROM public.usuarios_privados WHERE email = %s", (email_norm,)).fetchone()
+        # Verifica se já tem usuário registrado no Auth com esse e-mail
+        usr = con.execute("SELECT id, email FROM auth.users WHERE lower(email) = %s", (email_norm,)).fetchone()
 
-        if usr_priv:
-            usuario_id = usr_priv["usuario_id"]
-        else:
-            # Cria conta base para o colaborador
-            novo_u = con.execute(
-                """
-                INSERT INTO public.usuarios (tipo, status, nome)
-                VALUES ('cliente', 'ativo', %s)
-                RETURNING id
-                """,
-                (corpo.nome,),
-            ).fetchone()
-            usuario_id = novo_u["id"]
-            con.execute(
-                """
-                INSERT INTO public.usuarios_privados (usuario_id, email, telefone)
-                VALUES (%s, %s, '(00) 00000-0000')
-                """,
-                (usuario_id, email_norm),
+        if usr is None:
+            raise HTTPException(
+                404,
+                f"Nenhuma conta encontrada com o e-mail '{email_norm}'. O colaborador precisa se cadastrar na plataforma antes de ser adicionado à equipe.",
             )
+
+        usuario_id = usr["id"]
+
+        # Garante perfil público na tabela usuarios
+        con.execute(
+            """
+            INSERT INTO public.usuarios (id, nome, status)
+            VALUES (%s, %s, 'ativo')
+            ON CONFLICT (id) DO UPDATE SET nome = coalesce(nullif(EXCLUDED.nome, ''), public.usuarios.nome)
+            """,
+            (usuario_id, corpo.nome),
+        )
 
         # Insere ou atualiza na equipe
-        existente = con.execute("SELECT usuario_id FROM public.equipe WHERE usuario_id = %s", (usuario_id,)).fetchone()
-        if existente:
-            con.execute(
-                """
-                UPDATE public.equipe
-                SET papel = %s, alcada_centavos = %s, ativo = true, revogado_em = null
-                WHERE usuario_id = %s
-                """,
-                (corpo.papel, corpo.alcada_centavos, usuario_id),
-            )
-        else:
-            con.execute(
-                """
-                INSERT INTO public.equipe (usuario_id, papel, alcada_centavos, ativo)
-                VALUES (%s, %s, %s, true)
-                """,
-                (usuario_id, corpo.papel, corpo.alcada_centavos),
-            )
+        con.execute(
+            """
+            INSERT INTO public.equipe (usuario_id, papel, alcada_centavos, ativo)
+            VALUES (%s, %s, %s, true)
+            ON CONFLICT (usuario_id) DO UPDATE
+            SET papel = EXCLUDED.papel,
+                alcada_centavos = EXCLUDED.alcada_centavos,
+                ativo = true,
+                revogado_em = null
+            """,
+            (usuario_id, corpo.papel, corpo.alcada_centavos),
+        )
 
         admin.auditoria.registrar(
             ator_id=operador.id,
@@ -187,10 +178,10 @@ def editar_membro(
     with banco.transacao() as con:
         m = con.execute(
             """
-            SELECT e.usuario_id, coalesce(u.nome, 'Membro') as nome, coalesce(up.email, 'email') as email, e.papel, e.ativo, e.alcada_centavos, e.criado_em
+            SELECT e.usuario_id, coalesce(u.nome, 'Membro') as nome, coalesce(au.email, 'email') as email, e.papel, e.ativo, e.alcada_centavos, e.criado_em
             FROM public.equipe e
             LEFT JOIN public.usuarios u ON u.id = e.usuario_id
-            LEFT JOIN public.usuarios_privados up ON up.usuario_id = e.usuario_id
+            LEFT JOIN auth.users au ON au.id = e.usuario_id
             WHERE e.usuario_id = %s
             """,
             (uid,),
@@ -258,3 +249,4 @@ def revogar_membro(
             motivo=motivo,
         )
         return {"mensagem": "Acesso revogado com sucesso."}
+

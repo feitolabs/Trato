@@ -337,11 +337,13 @@ class CampoFoto extends StatelessWidget {
     required this.rotulo,
     required this.aoTocar,
     this.referencia,
+    this.dica,
     this.altura = 120,
   });
 
   final String rotulo;
   final String? referencia;
+  final String? dica;
   final VoidCallback aoTocar;
   final double altura;
 
@@ -434,6 +436,16 @@ class CampoFoto extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (dica != null && !tem) ...[
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    dica!,
+                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 Text(
                   tem ? 'Toque na foto para ampliar ou aqui para trocar' : 'Toque para tirar a foto',
                   style: TipografiaTrato.legenda.copyWith(color: CoresTrato.petroleo),

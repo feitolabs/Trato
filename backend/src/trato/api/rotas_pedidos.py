@@ -159,10 +159,11 @@ def abrir_pedido(
 
 @router.get("", response_model=list[PedidoOut], summary="Meus pedidos")
 def listar_pedidos(
+    como: str | None = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[PedidoOut]:
-    como_cliente = usuario.papel is PapelUsuario.CLIENTE
+    como_cliente = (como == "cliente") if como else (usuario.papel is PapelUsuario.CLIENTE)
     achados = contexto.pedidos.listar_do_usuario(usuario.id, como_cliente)
     return [pedido_out(p, usuario) for p in achados]
 
@@ -255,7 +256,7 @@ def mudar_estado(
             ) from None
     try:
         transicao = estados.transicionar(
-            pedido, acao, ator_de(usuario), contexto.agora(), prova, cfg.prazos_pedido
+            pedido, acao, ator_de(usuario, pedido), contexto.agora(), prova, cfg.prazos_pedido
         )
     except CodigoNaoConfere:
         contexto.limite_codigo.errou(
@@ -322,13 +323,15 @@ def _disputa_out(pedido_id: str, d: disputas.Disputa) -> DisputaOut:
 def abrir_disputa(
     pedido_id: str,
     corpo: AbrirDisputaIn,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaOut:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido pode abrir disputa.")
     agora = contexto.agora()
     prova = ProvaDisputa(corpo.motivo, corpo.descricao, tuple(f.para_regra() for f in corpo.fotos))
-    transicao = estados.transicionar(pedido, Acao.ABRIR_DISPUTA, ator_de(usuario), agora, prova)
+    transicao = estados.transicionar(pedido, Acao.ABRIR_DISPUTA, ator_de(usuario, pedido), agora, prova)
 
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
     congelado = saldo.retido + saldo.a_liberar
@@ -402,10 +405,12 @@ def responder_disputa(
 def pedir_retrabalho(
     pedido_id: str,
     corpo: PedirRetrabalhoIn,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> RetrabalhoOut:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido pode pedir retrabalho.")
     agora = contexto.agora()
     cfg = contexto.config.carregar()
 
@@ -420,7 +425,7 @@ def pedir_retrabalho(
 
     prova = ProvaRetrabalho(corpo.descricao, tuple(f.para_regra() for f in corpo.fotos))
     transicao = estados.transicionar(
-        pedido, Acao.PEDIR_RETRABALHO, ator_de(usuario), agora, prova, prazos
+        pedido, Acao.PEDIR_RETRABALHO, ator_de(usuario, pedido), agora, prova, prazos
     )
     if garantia is None:  # transicionar já recusa pedido sem conclusão; defesa extra
         raise HTTPException(409, "Este pedido ainda não tem garantia.")

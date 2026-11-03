@@ -76,4 +76,5 @@ def traduzir(erro: psycopg.Error) -> ErroPersistencia:
         return ErroPersistencia("O backend não tem permissão para essa operação no banco.")
     if isinstance(erro, psycopg.OperationalError | psycopg.InterfaceError):
         return BancoIndisponivel("Banco de dados indisponível.")
-    return ErroPersistencia("Erro ao gravar no banco.")
+    _log.error("Erro no Postgres não tratado especificamente (%s): %s", type(erro).__name__, erro, exc_info=True)
+    return ErroPersistencia("Erro ao acessar o banco de dados.")

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../auth/estrutura_auth.dart';
+import '../profissional_apoio/apoio.dart';
 import 'dinheiro.dart';
 import 'servico_orcamento.dart';
 
@@ -63,7 +64,18 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   ResumoOrcamento? _resumo;
   int _ultimoPedido = -1;
 
-  static final _somenteNumero = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))];
+  static final _formatadoresDeslocamento = [
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+    LengthLimitingTextInputFormatter(8),
+  ];
+  static final _formatadoresHoras = [
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+    LengthLimitingTextInputFormatter(5),
+  ];
+  static final _formatadoresValorHora = [
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+    LengthLimitingTextInputFormatter(8),
+  ];
 
   @override
   void initState() {
@@ -97,7 +109,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
 
   Future<void> _atualizarResumo() async {
     final total = _total;
-    if (total <= 0) {
+    if (total <= 0 || total > Dinheiro.limiteOrcamentoMaximoCentavos) {
       _ultimoPedido = -1;
       if (_resumo != null) setState(() => _resumo = null);
       return;
@@ -112,23 +124,43 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   String? _erroDeslocamento() {
     final texto = _deslocamento.text.trim();
     if (texto.isEmpty) return null;
-    return Dinheiro.lerCentavos(texto) == null
-        ? 'Valor de deslocamento inválido. Use só números, como 30 ou 30,50.'
-        : null;
+    final centavos = Dinheiro.lerCentavos(texto);
+    if (centavos == null) {
+      return 'Valor de deslocamento inválido. Use só números, como 30 ou 30,50.';
+    }
+    if (centavos > Dinheiro.limiteDeslocamentoMaximoCentavos) {
+      return 'Deslocamento máximo permitido é ${Dinheiro.formatar(Dinheiro.limiteDeslocamentoMaximoCentavos)}.';
+    }
+    return null;
   }
 
   String? _erroHoras() {
     final decimos = Dinheiro.lerDecimosDeHora(_horas.text);
-    return (decimos == null || decimos <= 0)
-        ? 'Quantidade de horas não informada. Digite as horas, como 3 ou 2,5.'
-        : null;
+    if (decimos == null || decimos <= 0) {
+      return 'Quantidade de horas não informada. Digite as horas, como 3 ou 2,5.';
+    }
+    if (decimos > Dinheiro.limiteDecimosHorasMaximo) {
+      return 'O limite máximo é de ${Dinheiro.limiteDecimosHorasMaximo ~/ 10} horas.';
+    }
+    return null;
   }
 
   String? _erroValorHora() {
     final valor = Dinheiro.lerCentavos(_valorHora.text);
-    return (valor == null || valor <= 0)
-        ? 'Valor da hora não informado. Digite o valor por hora de trabalho (ex.: 80,00).'
-        : null;
+    if (valor == null || valor <= 0) {
+      return 'Valor da hora não informado. Digite o valor por hora de trabalho (ex.: 80,00).';
+    }
+    if (valor > Dinheiro.limiteValorHoraMaximoCentavos) {
+      return 'Valor da hora máximo é ${Dinheiro.formatar(Dinheiro.limiteValorHoraMaximoCentavos)}.';
+    }
+    return null;
+  }
+
+  String? _erroTotal() {
+    if (_total > Dinheiro.limiteOrcamentoMaximoCentavos) {
+      return 'O total (${Dinheiro.formatar(_total)}) excede o teto permitido de ${Dinheiro.formatar(Dinheiro.limiteOrcamentoMaximoCentavos)}.';
+    }
+    return null;
   }
 
   Future<void> _adicionarItem() async {
@@ -146,7 +178,10 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   Future<void> _enviar() async {
     if (_enviando) return;
     setState(() => _mostrarErros = true);
-    if (_erroDeslocamento() != null || _erroHoras() != null || _erroValorHora() != null) {
+    if (_erroDeslocamento() != null ||
+        _erroHoras() != null ||
+        _erroValorHora() != null ||
+        _erroTotal() != null) {
       return;
     }
     final desloc =
@@ -178,10 +213,18 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_erroTotal() != null) ...[
+            AvisoFaixa(
+              texto: _erroTotal()!,
+              tipo: TipoStatus.perigo,
+              icone: Icons.error_outline,
+            ),
+            const SizedBox(height: EspacosTrato.x3),
+          ],
           BotaoPrimario(
             texto: 'Enviar orçamento',
             carregando: _enviando,
-            aoTocar: _enviando ? null : _enviar,
+            aoTocar: (_enviando || _erroTotal() != null) ? null : _enviar,
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
@@ -203,7 +246,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                 controlador: _deslocamento,
                 prefixo: 'R\$ ',
                 teclado: TextInputType.number,
-                formatadores: _somenteNumero,
+                formatadores: _formatadoresDeslocamento,
                 aoMudar: (_) => _mudou(),
                 erro: _mostrarErros ? _erroDeslocamento() : null,
               ),
@@ -215,7 +258,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                 controlador: _horas,
                 sufixo: 'h',
                 teclado: TextInputType.number,
-                formatadores: _somenteNumero,
+                formatadores: _formatadoresHoras,
                 aoMudar: (_) => _mudou(),
                 erro: _mostrarErros ? _erroHoras() : null,
               ),
@@ -232,7 +275,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                 controlador: _valorHora,
                 prefixo: 'R\$ ',
                 teclado: TextInputType.number,
-                formatadores: _somenteNumero,
+                formatadores: _formatadoresValorHora,
                 aoMudar: (_) => _mudou(),
                 erro: _mostrarErros ? _erroValorHora() : null,
               ),
@@ -528,13 +571,28 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
   void _confirmar() {
     setState(() => _tentou = true);
     final centavos = Dinheiro.lerCentavos(_valor.text);
-    if (_nome.text.trim().isEmpty || centavos == null || centavos <= 0) return;
+    if (_nome.text.trim().isEmpty ||
+        centavos == null ||
+        centavos <= 0 ||
+        centavos > Dinheiro.limiteOrcamentoMaximoCentavos) {
+      return;
+    }
     Navigator.of(context).pop(ItemMaterial(nome: _nome.text.trim(), centavos: centavos));
   }
 
   @override
   Widget build(BuildContext context) {
     final centavos = Dinheiro.lerCentavos(_valor.text);
+    final erroValor = () {
+      if (!_tentou) return null;
+      if (centavos == null || centavos <= 0) {
+        return 'Valor do material não informado. Digite um valor em reais maior que zero.';
+      }
+      if (centavos > Dinheiro.limiteOrcamentoMaximoCentavos) {
+        return 'Valor máximo permitido é ${Dinheiro.formatar(Dinheiro.limiteOrcamentoMaximoCentavos)}.';
+      }
+      return null;
+    }();
     return Padding(
       padding: EdgeInsets.only(
         left: EspacosTrato.x5,
@@ -563,10 +621,11 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               controlador: _valor,
               prefixo: 'R\$ ',
               teclado: TextInputType.number,
-              formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-              erro: _tentou && (centavos == null || centavos <= 0)
-                  ? 'Valor do material não informado. Digite um valor em reais maior que zero.'
-                  : null,
+              formatadores: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                LengthLimitingTextInputFormatter(9),
+              ],
+              erro: erroValor,
             ),
             const SizedBox(height: EspacosTrato.x5),
             BotaoPrimario(texto: 'Adicionar', aoTocar: _confirmar),

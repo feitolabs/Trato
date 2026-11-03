@@ -139,10 +139,12 @@ def criar_cobranca(
     pedido_id: str,
     corpo: CobrarIn,
     servico: Servico,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> CobrancaOut:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido pode pagar.")
     if pedido.estado is not Estado.ORCAMENTO_ACEITO:
         raise ErroFluxo("O pedido não está esperando pagamento.")
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
@@ -206,10 +208,12 @@ def aprovar_aditivo(
     aditivo_id: str,
     corpo: AprovarAditivoIn,
     servico: Servico,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AditivoAprovadoOut:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido pode aprovar aditivo.")
     aditivo, cobranca = servico.aprovar_aditivo(contexto, pedido, aditivo_id, corpo.meio)
     return AditivoAprovadoOut(aditivo=_aditivo_out(aditivo), cobranca=_cobranca_out(cobranca))
 

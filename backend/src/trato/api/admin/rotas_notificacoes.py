@@ -153,3 +153,4 @@ def disparar_campanha(
             total_destinatarios=total,
             criado_em=camp["criado_em"].isoformat() if hasattr(camp["criado_em"], "isoformat") else str(camp["criado_em"]),
         )
+

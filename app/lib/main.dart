@@ -43,13 +43,33 @@ void abrirLoginPorSessaoExpirada() {
       .whenComplete(() => _loginDeSessaoAberto = false);
 }
 
+const _defaultApiUrl = 'https://trato-wald.onrender.com';
+const _defaultSupabaseUrl = 'https://ornaoshsvuszquntkqsk.supabase.co';
+const _defaultSupabaseAnonKey = 'sb_publishable_GwIISqsEKuOu6iK4IBlRvQ__TVCCgj8';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // `--dart-define=TRATO_MODO=demo|api` (padrão demo) e `--dart-define=TRATO_API_URL=...`.
-  final config = ConfigTrato.doAmbiente();
-  // Sem chaves do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY por --dart-define), o login fica no
-  // serviço de teste. Ver docs/login-configuracao.md. O token do login vai para a [sessaoTrato].
-  final configAuth = ConfigAuth.doAmbiente();
+  var config = ConfigTrato.doAmbiente();
+  var configAuth = ConfigAuth.doAmbiente();
+
+  // Garante que o app execute conectado à API e Supabase reais por padrão,
+  // impedindo que caia acidentalmente em modo mock/demo.
+  final forcouDemo = const String.fromEnvironment('TRATO_MODO').trim().toLowerCase() == 'demo';
+  if (!forcouDemo && !config.usaApi) {
+    config = ConfigTrato(
+      modo: ModoTrato.api,
+      apiUrl: config.apiUrl.isNotEmpty ? config.apiUrl : _defaultApiUrl,
+    );
+  }
+  if (!forcouDemo && !configAuth.supabaseConfigurado) {
+    configAuth = ConfigAuth(
+      supabaseUrl: configAuth.supabaseUrl.isNotEmpty ? configAuth.supabaseUrl : _defaultSupabaseUrl,
+      supabaseAnonKey:
+          configAuth.supabaseAnonKey.isNotEmpty ? configAuth.supabaseAnonKey : _defaultSupabaseAnonKey,
+      googleWebClientId: configAuth.googleWebClientId,
+      googleIosClientId: configAuth.googleIosClientId,
+    );
+  }
   if (configAuth.supabaseConfigurado) {
     ServicoAuthPadrao.atual = await ServicoAuthSupabase.inicializar(
       configAuth,

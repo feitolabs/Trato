@@ -2,6 +2,7 @@
 /// PROVISÓRIO: formato real vem do backend.
 library;
 
+import '../../auth/servico_auth.dart';
 import '../cliente/modelos.dart' show Avaliacao;
 
 export '../cliente/modelos.dart' show Avaliacao;
@@ -54,15 +55,45 @@ class ServicoPerfilPublicoFake implements ServicoPerfilPublico {
     this.perfil = perfilPublicoExemplo,
     this.avaliacoes = avaliacoesRecebidasExemplo,
     this.falharAoCarregar = false,
-  });
+    bool? temPerfil,
+  }) : _temPerfil = temPerfil;
 
   final PerfilPublico perfil;
   final List<Avaliacao> avaliacoes;
   final bool falharAoCarregar;
+  bool? _temPerfil;
+
+  void definirTemPerfil(bool tem) => _temPerfil = tem;
 
   @override
   Future<PerfilPublico> carregarPerfil() async {
     if (falharAoCarregar) throw Exception('falha de teste');
+    final sessao = ServicoAuthPadrao.atual.sessaoAtual;
+    if (sessao != null && sessao.nome != null && sessao.nome!.trim().isNotEmpty) {
+      final nome = sessao.nome!.trim();
+      final partes = nome.split(RegExp(r'\s+'));
+      final iniciais = partes.length > 1
+          ? '${partes.first[0]}${partes.last[0]}'.toUpperCase()
+          : (partes.isNotEmpty && partes.first.isNotEmpty
+              ? partes.first[0].toUpperCase()
+              : perfil.iniciais);
+      return PerfilPublico(
+        nome: nome,
+        iniciais: iniciais,
+        categoria: perfil.categoria,
+        verificacao: perfil.verificacao,
+        noTratoDesde: perfil.noTratoDesde,
+        nota: perfil.nota,
+        totalAvaliacoes: perfil.totalAvaliacoes,
+        servicosConcluidos: perfil.servicosConcluidos,
+        sobre: perfil.sobre,
+        cidade: perfil.cidade,
+        fotosPortfolio: perfil.fotosPortfolio,
+        ultimasAvaliacoes: perfil.ultimasAvaliacoes,
+        listaFotosPortfolio: perfil.listaFotosPortfolio,
+        fotoReferencia: perfil.fotoReferencia,
+      );
+    }
     return perfil;
   }
 
@@ -73,7 +104,8 @@ class ServicoPerfilPublicoFake implements ServicoPerfilPublico {
   }
 
   @override
-  Future<bool> temPerfilProfissional() async => true;
+  Future<bool> temPerfilProfissional() async =>
+      _temPerfil ?? (ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional ?? false);
 }
 
 const avaliacoesRecebidasExemplo = [

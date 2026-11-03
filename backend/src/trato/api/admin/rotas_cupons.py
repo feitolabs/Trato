@@ -220,3 +220,4 @@ def excluir_cupom(
         )
 
         return {"mensagem": f"Cupom '{cup['codigo']}' removido/desativado com sucesso."}
+

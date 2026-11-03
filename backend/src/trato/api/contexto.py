@@ -175,10 +175,12 @@ _bearer = HTTPBearer(auto_error=False, description="Token do usuário (provedor 
 
 
 def usuario_atual(
+    request: Request,
     credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Usuario:
-    usuario = contexto.auth.autenticar(credenciais.credentials) if credenciais else None
+    token = credenciais.credentials if credenciais else request.query_params.get("token")
+    usuario = contexto.auth.autenticar(token) if token else None
     if usuario is None:
         raise HTTPException(
             401, "Faça login para continuar.", headers={"WWW-Authenticate": "Bearer"}

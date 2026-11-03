@@ -1,3 +1,4 @@
+import '../auth/servico_auth.dart';
 import '../telas/carteira/dados_exemplo.dart';
 import '../telas/carteira/modelos.dart';
 import '../telas/conclusao/dados_exemplo.dart';
@@ -363,10 +364,33 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
 
 class RepositorioPerfilFake implements RepositorioPerfil {
   @override
-  Future<PerfilCliente> carregar() async => per.DadosExemplo.perfil;
+  Future<PerfilCliente> carregar() async {
+    final sessao = ServicoAuthPadrao.atual.sessaoAtual;
+    final base = per.DadosExemplo.perfil;
+    final nomeUsuario = (sessao?.nome?.trim().isNotEmpty == true)
+        ? sessao!.nome!.trim()
+        : (sessao?.email.isNotEmpty == true
+            ? sessao!.email.split('@').first
+            : base.nome);
+    if (sessao == null) return base;
+    return PerfilCliente(
+      nome: nomeUsuario,
+      iniciais: _iniciais(nomeUsuario),
+      resumo: base.resumo,
+      grupos: base.grupos,
+      fotoReferencia: base.fotoReferencia,
+    );
+  }
+
+  static String _iniciais(String nome) {
+    final partes = nome.trim().split(RegExp(r'\s+'));
+    if (partes.isEmpty || partes.first.isEmpty) return 'CL';
+    if (partes.length == 1) return partes.first.substring(0, 1).toUpperCase();
+    return '${partes.first[0]}${partes.last[0]}'.toUpperCase();
+  }
 
   @override
-  String? get nomeSalvo => per.DadosExemplo.perfil.nome;
+  String? get nomeSalvo => ServicoAuthPadrao.atual.sessaoAtual?.nome ?? per.DadosExemplo.perfil.nome;
 }
 
 class RepositorioProfissionalFake implements RepositorioProfissional {
@@ -380,7 +404,20 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
       inicioProfissionalExemplo.pedidos;
 
   @override
-  Future<InicioProfissional> inicio() async => inicioProfissionalExemplo;
+  Future<InicioProfissional> inicio() async {
+    final sessao = ServicoAuthPadrao.atual.sessaoAtual;
+    if (sessao != null && sessao.nome != null && sessao.nome!.trim().isNotEmpty) {
+      final primeiroNome = sessao.nome!.trim().split(' ').first;
+      return InicioProfissional(
+        nome: primeiroNome,
+        pedidos: inicioProfissionalExemplo.pedidos,
+        proximo: inicioProfissionalExemplo.proximo,
+        carteira: inicioProfissionalExemplo.carteira,
+        disponivelAgora: inicioProfissionalExemplo.disponivelAgora,
+      );
+    }
+    return inicioProfissionalExemplo;
+  }
 
   @override
   Future<DetalhePedido> detalhe(String pedidoId) async => detalhePedidoExemplo;
