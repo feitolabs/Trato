@@ -5,14 +5,10 @@ import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/repositorios.dart' show FiltroPedidosAbertos;
 import '../agenda/agenda_tela.dart';
-import '../carteira/carteira_tela.dart';
 import '../cliente/modelos.dart' show CategoriaServico;
 import '../mensagens/mensagens_tela.dart';
-import '../mensagens/servico_fake.dart';
-import '../perfil_publico/perfil_publico.dart';
-import '../perfil_publico/perfil_publico_tela.dart';
+import '../mensagens/modelos.dart';
 import 'detalhe_pedido_tela.dart';
-import 'dados_exemplo.dart';
 import 'filtros_pedidos_tela.dart';
 import 'inicio_profissional_tela.dart';
 import 'modelos.dart';
@@ -29,8 +25,8 @@ class CascaProfissionalTela extends StatefulWidget {
   const CascaProfissionalTela({
     super.key,
     this.abaInicial = 0,
-    this.inicio = inicioProfissionalExemplo,
-    this.detalhe = detalhePedidoExemplo,
+    required this.inicio,
+    this.detalhe,
     this.aoFazerCheckIn,
     this.aoFazerOrcamento,
     this.aoFazerOrcamentoDoPedido,
@@ -83,7 +79,7 @@ class CascaProfissionalTela extends StatefulWidget {
   final InicioProfissional inicio;
 
   /// Detalhe mostrado ao tocar num pedido aberto (provisório: o backend entrega o do pedido tocado).
-  final DetalhePedido detalhe;
+  final DetalhePedido? detalhe;
   final VoidCallback? aoFazerCheckIn;
   final VoidCallback? aoFazerOrcamento;
 
@@ -133,7 +129,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => carregar == null
-            ? tela(widget.detalhe)
+            ? tela(widget.detalhe!)
             : Carregador<DetalhePedido>(
                 carregar: () => carregar(pedido),
                 construir: (_, dados) => tela(dados),
@@ -202,7 +198,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         aoAbrirPedido: _abrirDetalhe,
         conversas: widget.abaConversas ??
             const ListaConversas(
-              servico: ServicoMensagensFake(),
+              servico: _SemConversas(),
               textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
             ),
       ),
@@ -211,8 +207,8 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
             carregar: () async => const [],
             aoFazerCheckIn: (_) => widget.aoFazerCheckIn?.call(),
           ),
-      widget.abaCarteira ?? const CarteiraTela(soExtrato: true),
-      widget.abaPerfil ?? PerfilPublicoTela(servico: ServicoPerfilPublicoFake()),
+      widget.abaCarteira ?? const SizedBox.shrink(),
+      widget.abaPerfil ?? const SizedBox.shrink(),
     ];
     return Scaffold(
       body: IndexedStack(index: _aba, children: paginas),
@@ -223,4 +219,12 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       ),
     );
   }
+}
+
+/// Aba de conversas sem origem de dados: lista vazia (o `rotas.dart` sempre entrega a real).
+class _SemConversas implements ServicoMensagens {
+  const _SemConversas();
+
+  @override
+  Future<List<ConversaResumo>> listar() async => const [];
 }

@@ -1,5 +1,5 @@
 import '../telas/carteira/modelos.dart';
-import '../telas/conclusao/dados_exemplo.dart';
+import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
 import '../telas/pagamento/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';

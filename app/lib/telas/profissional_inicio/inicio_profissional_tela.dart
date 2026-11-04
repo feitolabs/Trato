@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_profissional.dart';
 
@@ -12,7 +11,7 @@ import 'pecas_profissional.dart';
 class InicioProfissionalTela extends StatefulWidget {
   const InicioProfissionalTela({
     super.key,
-    this.dados = inicioProfissionalExemplo,
+    required this.dados,
     this.aoAlterarDisponivel,
     this.aoFazerCheckIn,
     this.aoAbrirCarteira,

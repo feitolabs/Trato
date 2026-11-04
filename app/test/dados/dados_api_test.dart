@@ -13,11 +13,12 @@ import 'package:trato/dados/repositorios_catalogo_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/carteira/modelos.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/disputa_profissional/disputa.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
 import 'package:trato/telas/profissional/servico_orcamento.dart';
+import 'package:trato/telas/conclusao/modelos.dart';
 
 const _pedidoJson = {
   'id': 'abcd1234',
@@ -78,15 +79,12 @@ class _Chamada {
 
 void main() {
   group('ConfigTrato', () {
-    test('modo padrão é demonstração e não usa a rede', () {
-      final c = ConfigTrato.doAmbiente();
-      expect(c.modo, ModoTrato.demo);
-      expect(c.usaApi, isFalse);
+    test('sem TRATO_API_URL não usa a API', () {
+      expect(ConfigTrato.doAmbiente().usaApi, isFalse);
     });
 
-    test('modo api sem URL cai em demonstração', () {
-      expect(const ConfigTrato(modo: ModoTrato.api).usaApi, isFalse);
-      expect(const ConfigTrato(modo: ModoTrato.api, apiUrl: 'https://x').usaApi, isTrue);
+    test('com a URL usa a API', () {
+      expect(const ConfigTrato(apiUrl: 'https://x').usaApi, isTrue);
     });
   });
 

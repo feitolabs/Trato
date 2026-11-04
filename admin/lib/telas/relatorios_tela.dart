@@ -119,12 +119,9 @@ class _RelatoriosTelaState extends State<RelatoriosTela> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CartaoSecao(
-                child: Wrap(
-                  spacing: EspacosTrato.x4,
-                  runSpacing: EspacosTrato.x3,
-                  crossAxisAlignment: WrapCrossAlignment.start,
-                  children: [
-                    Column(
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final periodo = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -132,32 +129,49 @@ class _RelatoriosTelaState extends State<RelatoriosTela> {
                         const SizedBox(height: EspacosTrato.x2),
                         FiltroPeriodo(selecionado: _periodo, aoMudar: (p) => setState(() => _periodo = p)),
                       ],
-                    ),
-                    SizedBox(
-                      width: 240,
-                      child: SeletorTrato<String?>(
-                        rotulo: 'Cidade',
-                        valor: _cidadeId,
-                        opcoes: [
-                          (null, 'Todas as cidades'),
-                          for (final c in _cidades) (c.id, '${c.nome} - ${c.uf}'),
+                    );
+                    final cidade = SeletorTrato<String?>(
+                      rotulo: 'Cidade',
+                      valor: _cidadeId,
+                      opcoes: [
+                        (null, 'Todas as cidades'),
+                        for (final c in _cidades) (c.id, '${c.nome} - ${c.uf}'),
+                      ],
+                      aoMudar: (v) => setState(() => _cidadeId = v),
+                    );
+                    final formato = SeletorTrato<String>(
+                      rotulo: 'Formato',
+                      valor: _formato,
+                      opcoes: const [
+                        ('excel_br', 'Excel em português (; e vírgula decimal)'),
+                        ('padrao', 'Padrão (, e ponto decimal)'),
+                      ],
+                      aoMudar: (v) => setState(() => _formato = v),
+                    );
+                    if (c.maxWidth < 900) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          periodo,
+                          const SizedBox(height: EspacosTrato.x4),
+                          cidade,
+                          const SizedBox(height: EspacosTrato.x3),
+                          formato,
                         ],
-                        aoMudar: (v) => setState(() => _cidadeId = v),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 400,
-                      child: SeletorTrato<String>(
-                        rotulo: 'Formato',
-                        valor: _formato,
-                        opcoes: const [
-                          ('excel_br', 'Excel em português (; e vírgula decimal)'),
-                          ('padrao', 'Padrão (, e ponto decimal)'),
-                        ],
-                        aoMudar: (v) => setState(() => _formato = v),
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+                    // Período à esquerda; cidade e formato dividem o resto, alinhados pelo topo dos campos.
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        periodo,
+                        const SizedBox(width: EspacosTrato.x4),
+                        Expanded(child: cidade),
+                        const SizedBox(width: EspacosTrato.x3),
+                        Expanded(child: formato),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: EspacosTrato.intervaloCartoes),

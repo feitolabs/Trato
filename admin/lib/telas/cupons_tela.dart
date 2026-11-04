@@ -247,6 +247,7 @@ class _CuponsTelaState extends State<CuponsTela> {
   Widget build(BuildContext context) {
     final podeGerenciar = context.pode(Permissao.cuponsGerenciar);
     return CarregaDados<List<CupomAdmin>>(
+      esqueleto: const EsqueletoPagina(),
       key: ValueKey('cupons-$_versao'),
       carregar: context.api.listarCupons,
       construir: (context, lista, _) => Column(

@@ -140,11 +140,24 @@ class _Indicadores extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, c) {
         final colunas = c.maxWidth >= 1000 ? 4 : (c.maxWidth >= 560 ? 2 : 1);
-        final largura = (c.maxWidth - (colunas - 1) * EspacosTrato.intervaloCartoes) / colunas;
-        return Wrap(
-          spacing: EspacosTrato.intervaloCartoes,
-          runSpacing: EspacosTrato.intervaloCartoes,
-          children: [for (final k in cartoes) SizedBox(width: largura, child: k)],
+        // Linhas de mesma altura: cada cartão estica até o mais alto da linha.
+        return Column(
+          children: [
+            for (var i = 0; i < cartoes.length; i += colunas) ...[
+              if (i > 0) const SizedBox(height: EspacosTrato.intervaloCartoes),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var j = i; j < i + colunas; j++) ...[
+                      if (j > i) const SizedBox(width: EspacosTrato.intervaloCartoes),
+                      Expanded(child: j < cartoes.length ? cartoes[j] : const SizedBox.shrink()),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         );
       },
     );

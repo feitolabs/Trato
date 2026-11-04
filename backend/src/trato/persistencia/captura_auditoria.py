@@ -21,3 +21,28 @@ def anotar_id_gravado(registro_id: int) -> None:
     ids = _IDS_DA_REQUISICAO.get()
     if ids is not None:
         ids.append(registro_id)
+
+
+class CabecalhoAuditoria:
+    """Middleware ASGI puro: devolve o número do registro de auditoria da ação em `X-Auditoria-Id`.
+
+    Não usa `BaseHTTPMiddleware` de propósito: ele relê o corpo da requisição e quebra o limite de
+    tamanho para corpos enviados em pedaços."""
+
+    def __init__(self, app):  # type: ignore[no-untyped-def]
+        self.app = app
+
+    async def __call__(self, scope, receive, send):  # type: ignore[no-untyped-def]
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        ids = iniciar_captura_de_ids()
+
+        async def enviar(mensagem):  # type: ignore[no-untyped-def]
+            if mensagem["type"] == "http.response.start" and ids:
+                cabecalhos = list(mensagem.get("headers", []))
+                cabecalhos.append((b"x-auditoria-id", str(ids[-1]).encode("ascii")))
+                mensagem = {**mensagem, "headers": cabecalhos}
+            await send(mensagem)
+
+        await self.app(scope, receive, enviar)

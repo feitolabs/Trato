@@ -200,7 +200,7 @@ def test_papel_errado_e_403_com_jwt_real(amb):
     for metodo, caminho, quem in rotas:
         r = getattr(amb.cliente, metodo)(BASE + caminho, headers=amb.h(quem))
         assert r.status_code == 403, (caminho, quem, r.status_code)
-    assert amb.cliente.get(BASE + "/usuarios", headers=amb.h("cadastro")).status_code == 200
+    _r = amb.cliente.get(BASE + "/usuarios", headers=amb.h("cadastro")); assert _r.status_code == 200, _r.text
 
 
 def test_cliente_e_conta_bloqueada_ou_sem_token_nao_entram(amb):
@@ -256,9 +256,17 @@ def test_fila_detalhe_url_assinada_e_decisao(amb):
 
     url = f"{BASE}/verificacoes/{amb.ids['v1']}/documentos/{amb.ids['doc']}/url"
     assert amb.cliente.post(url, json={}, headers=cad).status_code == 422
+    # motivo curto (menos de 10 caracteres) é recusado; o Administrador tem todas as permissões
+    assert amb.cliente.post(url, json={"motivo": "Conferir"}, headers=cad).status_code == 422
     assert (
         amb.cliente.post(
-            url, json={"motivo": "Conferir"}, headers=amb.h("administrador")
+            url, json={"motivo": "Conferir o documento"}, headers=amb.h("administrador")
+        ).status_code
+        == 200
+    )
+    assert (
+        amb.cliente.post(
+            url, json={"motivo": "Conferir o documento"}, headers=amb.h("financeiro")
         ).status_code
         == 403
     )
@@ -266,7 +274,7 @@ def test_fila_detalhe_url_assinada_e_decisao(amb):
     assert r.status_code == 200 and r.json()["expira_em_segundos"] == 60
     assert amb.assinador.chamadas[-1] == ("privado/pro1/frente.jpg", 60)
     linha = amb.sql(
-        "select ator_tipo, motivo, depois::text from public.auditoria where acao = 'dado_pessoal.documento_revelado'"
+        "select ator_tipo, motivo, depois::text from public.auditoria where acao = 'dado_pessoal.documento_revelado' and motivo = 'Conferir frente do RG'"
     )
     assert linha[0][0] == "equipe" and linha[0][1] == "Conferir frente do RG"
     assert "privado/pro1" not in linha[0][2]
@@ -416,7 +424,7 @@ def criar(amb, quem="financeiro", **corpo):
 def test_config_ciclo_completo_e_regras_do_banco(amb):
     fin = amb.h("financeiro")
     assert amb.cliente.get(BASE + "/config/vigente", headers=fin).status_code == 404
-    assert len(amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()) == 5
+    assert len(amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()) == 7
 
     # Valores fora dos limites do catálogo e faixas sobrepostas são recusados, sem deixar lixo.
     assert (
@@ -561,7 +569,7 @@ def test_auditoria_filtros_e_cadeia_no_banco(amb):
     por_entidade = amb.cliente.get(
         f"{BASE}/auditoria?entidade=verificacoes&entidade_id={amb.ids['v1']}", headers=seg
     )
-    assert por_entidade.json()["total"] == 2  # url do documento + aprovação
+    assert por_entidade.json()["total"] == 3  # 2 urls do documento (cadastro e administrador) + aprovação
     futuro = (datetime.now(UTC) + timedelta(days=1)).isoformat().replace("+00:00", "Z")
     assert (
         amb.cliente.get(BASE + "/auditoria", params={"desde": futuro}, headers=seg).json()["total"]

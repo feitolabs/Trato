@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato_admin/app.dart';
-import 'package:trato_admin/dados/api_fake.dart';
+import 'apoio/api_fake.dart';
 
 /// Abre o painel numa janela [largura] x [altura] e entra com o papel [papel].
 Future<void> abrirPainel(

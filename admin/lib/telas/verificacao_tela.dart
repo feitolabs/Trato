@@ -24,6 +24,7 @@ class VerificacaoTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CarregaDados<List<Verificacao>>(
+      esqueleto: const EsqueletoPagina(),
       carregar: context.api.listarVerificacoes,
       estaVazio: (l) => l.isEmpty,
       mensagemVazia: 'Nenhum cadastro esperando análise.',

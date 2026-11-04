@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas.dart';
 import 'recursos_mvp.dart';
@@ -12,7 +11,7 @@ import 'recursos_mvp.dart';
 class PedidoExecucaoTela extends StatefulWidget {
   const PedidoExecucaoTela({
     super.key,
-    this.pedido = DadosExemplo.pedidoEmExecucao,
+    required this.pedido,
     this.aoAprovarAditivo,
     this.aoRecusarAditivo,
     this.aoTocarSos,

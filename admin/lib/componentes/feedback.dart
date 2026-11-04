@@ -329,9 +329,12 @@ class _Bloco extends StatelessWidget {
 
 /// Esqueleto de lista e de card enquanto os dados carregam.
 class EsqueletoLista extends StatelessWidget {
-  const EsqueletoLista({super.key, this.linhas = 5});
+  const EsqueletoLista({super.key, this.linhas = 5, this.padding = EdgeInsets.zero});
 
   final int linhas;
+
+  /// Zero por padrão: quem usa já está dentro da margem da página.
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +342,7 @@ class EsqueletoLista extends StatelessWidget {
       label: 'Carregando',
       child: ListView.separated(
         physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(EspacosTrato.x6),
+        padding: padding,
         itemCount: linhas,
         separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
         itemBuilder: (_, _) => Container(
@@ -366,6 +369,32 @@ class EsqueletoLista extends StatelessWidget {
 }
 
 /// Esqueleto de uma fileira de cards de métrica.
+/// Esqueleto de uma página inteira: mantém a margem e o lugar do título, para a tela não "pular"
+/// quando os dados chegam (a API real demora mais que um dado de exemplo).
+class EsqueletoPagina extends StatelessWidget {
+  const EsqueletoPagina({super.key, this.linhas = 5});
+
+  final int linhas;
+
+  @override
+  Widget build(BuildContext context) {
+    final margem = Responsivo.margemLateral(FaixaPainel.de(context));
+    return Padding(
+      padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x6, margem, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Bloco(largura: 220, altura: 24),
+          const SizedBox(height: EspacosTrato.x2),
+          const _Bloco(largura: 340, altura: 12),
+          const SizedBox(height: EspacosTrato.x5),
+          Expanded(child: EsqueletoLista(linhas: linhas)),
+        ],
+      ),
+    );
+  }
+}
+
 class EsqueletoCartoes extends StatelessWidget {
   const EsqueletoCartoes({super.key, this.quantidade = 4});
 
@@ -506,13 +535,11 @@ class CabecalhoPagina extends StatelessWidget {
               children: [
                 Expanded(child: textos),
                 const SizedBox(width: EspacosTrato.x4),
-                Flexible(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: EspacosTrato.x3,
-                    runSpacing: EspacosTrato.x2,
-                    children: acoes,
-                  ),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: EspacosTrato.x3,
+                  runSpacing: EspacosTrato.x2,
+                  children: acoes,
                 ),
               ],
             ),

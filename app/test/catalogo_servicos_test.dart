@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/dados/repositorios.dart';
 import 'package:trato/dados/repositorios_catalogo.dart';
-import 'package:trato/dados/repositorios_catalogo_fake.dart';
+import 'apoio/exemplos/dados/repositorios_catalogo_fake.dart';
 import 'package:trato/telas/agenda/agenda_tela.dart';
 import 'package:trato/telas/agenda/modelos.dart';
 import 'package:trato/telas/catalogo/categoria_tela.dart';

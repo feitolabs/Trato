@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/conclusao/avaliacao_tela.dart';
 import 'package:trato/telas/conclusao/conclusao_tela.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/conclusao/garantia_tela.dart';
 import 'package:trato/telas/conclusao/relatar_problema_tela.dart';
 import 'package:trato/tema/tema.dart';
@@ -20,9 +20,9 @@ void main() {
     'tablet': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'conclusao': const ConclusaoTela(),
-    'avaliacao': const AvaliacaoTela(notasIniciais: [5, 5, 4, 5, 0]),
-    'relatar_problema': const RelatarProblemaTela(
+    'conclusao': const ConclusaoTela(resumo: resumoConclusaoExemplo, ),
+    'avaliacao': const AvaliacaoTela(dados: dadosAvaliacaoExemplo, notasIniciais: [5, 5, 4, 5, 0]),
+    'relatar_problema': const RelatarProblemaTela(dados: dadosRelatoExemplo, 
       motivoInicial: 'O problema voltou ou não foi resolvido',
       descricaoInicial: 'A pia voltou a vazar dois dias depois do conserto.',
     ),

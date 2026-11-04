@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/carteira/carteira_tela.dart';
-import 'package:trato/telas/carteira/dados_exemplo.dart';
+import 'apoio/exemplos/telas/carteira/dados_exemplo.dart';
 import 'package:trato/telas/carteira/modelos.dart';
 import 'package:trato/tema/tema.dart';
 
@@ -25,7 +25,7 @@ Future<void> _abrir(
 void main() {
   testWidgets('mostra saldos e extrato exatamente como vieram do dado',
       (tester) async {
-    await _abrir(tester, const CarteiraTela());
+    await _abrir(tester, const CarteiraTela(dados: DadosExemploCarteira.completo, ));
 
     expect(find.text('R\$ 712,50'), findsOneWidget);
     expect(find.text('R\$ 425,00'), findsOneWidget);
@@ -75,7 +75,7 @@ void main() {
 
   testWidgets('Sacar via Pix chama o callback', (tester) async {
     var sacou = 0;
-    await _abrir(tester, CarteiraTela(aoSacarPix: () => sacou++));
+    await _abrir(tester, CarteiraTela(dados: DadosExemploCarteira.completo, aoSacarPix: () => sacou++));
     await tester.tap(find.text('Sacar via Pix'));
     expect(sacou, 1);
   });
@@ -93,7 +93,7 @@ void main() {
 
   testWidgets('Ver tudo chama o callback', (tester) async {
     var abriu = 0;
-    await _abrir(tester, CarteiraTela(aoVerTudo: () => abriu++));
+    await _abrir(tester, CarteiraTela(dados: DadosExemploCarteira.completo, aoVerTudo: () => abriu++));
     await tester.tap(find.text('Ver tudo'));
     expect(abriu, 1);
   });

@@ -4,7 +4,7 @@ import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
-import '../telas/lgpd/servico_fake.dart';
+import '../telas/mensagens/modelos.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
@@ -14,9 +14,7 @@ import 'config.dart';
 import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
 import 'repositorios_catalogo_api.dart';
-import 'repositorios_catalogo_fake.dart';
 import 'repositorios_api.dart';
-import 'repositorios_fake.dart';
 import 'servico_upload.dart';
 import 'servicos_api.dart';
 import 'sessao.dart';
@@ -40,38 +38,22 @@ class RepositoriosTrato {
     this.cadastroProfissional,
     this.perfilPublico,
     this.privacidade,
-    RepositorioCatalogo? catalogo,
-    RepositorioServicosCliente? servicos,
-    RepositorioAgenda? agenda,
+    this.mensagens,
+    this.mensagensProfissional,
+    required this.catalogo,
+    required this.servicos,
+    required this.agenda,
     this.modoApi = false,
-  })  : _catalogo = catalogo,
-        _servicos = servicos,
-        _agenda = agenda;
+  });
 
   final ServicoDisputaProfissional? disputaProfissional;
   final ServicoCadastroProfissional? cadastroProfissional;
   final ServicoPerfilPublico? perfilPublico;
   final ServicoPrivacidade? privacidade;
 
-  /// Modo demonstração: só dados de exemplo, sem rede.
-  factory RepositoriosTrato.demo() => RepositoriosTrato(
-        pedidos: RepositorioPedidosFake(),
-        orcamentos: RepositorioOrcamentosFake(),
-        pagamento: RepositorioPagamentoFake(),
-        chat: RepositorioChatFake(),
-        notificacoes: RepositorioNotificacoesFake(),
-        perfil: RepositorioPerfilFake(),
-        profissional: RepositorioProfissionalFake(),
-        catalogo: RepositorioCatalogoFake(),
-        servicos: RepositorioServicosClienteFake(),
-        agenda: RepositorioAgendaFake(),
-        disputaProfissional:
-            ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
-        perfilPublico: ServicoPerfilPublicoFake(),
-        cadastroProfissional: ServicoCadastroProfissionalFake(),
-        verificacao: ServicoVerificacaoFake(),
-        privacidade: ServicoPrivacidadeFake(),
-      );
+  /// Listas de conversas. Nulo = montadas a partir dos pedidos (o normal); testes injetam as suas.
+  final ServicoMensagens? mensagens;
+  final ServicoMensagens? mensagensProfissional;
 
   /// Modo API. Cada área usa a API quando o backend já tem a rota; o que não tem rota segue em
   /// demonstração (lista em `docs/app-ligacao.md` e `docs/app-divergencias.md`).
@@ -123,7 +105,9 @@ class RepositoriosTrato {
     ServicoCamera? camera,
     ServicoLocalizacao? localizacao,
   }) {
-    if (!config.usaApi) return RepositoriosTrato.demo();
+    if (!config.usaApi) {
+      throw StateError('App sem API configurada: passe TRATO_MODO=api e TRATO_API_URL.');
+    }
     final api = ClienteApi(urlBase: config.apiUrl, sessao: sessao);
     final upload = criarUpload?.call(api);
     return RepositoriosTrato.api(
@@ -160,12 +144,7 @@ class RepositoriosTrato {
   final RepositorioPerfil perfil;
   final RepositorioProfissional profissional;
 
-  /// Catálogo, serviços do cliente e agenda: sem eles (testes antigos), usa a demonstração.
-  final RepositorioCatalogo? _catalogo;
-  final RepositorioServicosCliente? _servicos;
-  final RepositorioAgenda? _agenda;
-
-  late final RepositorioCatalogo catalogo = _catalogo ?? RepositorioCatalogoFake();
-  late final RepositorioServicosCliente servicos = _servicos ?? RepositorioServicosClienteFake();
-  late final RepositorioAgenda agenda = _agenda ?? RepositorioAgendaFake();
+  final RepositorioCatalogo catalogo;
+  final RepositorioServicosCliente servicos;
+  final RepositorioAgenda agenda;
 }

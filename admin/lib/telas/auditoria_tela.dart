@@ -146,14 +146,12 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
           ),
         Padding(
           padding: EdgeInsets.fromLTRB(margem, 0, margem, EspacosTrato.x3),
-          child: Wrap(
-            spacing: EspacosTrato.x3,
-            runSpacing: EspacosTrato.x3,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                width: 220,
-                child: DropdownButtonFormField<String?>(
+              BarraFiltros(
+                filtros: [
+                DropdownButtonFormField<String?>(
                   key: ValueKey('acao-$_acao'),
                   initialValue: _acao,
                   isExpanded: true,
@@ -167,10 +165,7 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
                     _pagina = 0;
                   }),
                 ),
-              ),
-              SizedBox(
-                width: 220,
-                child: TextField(
+                TextField(
                   controller: _ator,
                   onSubmitted: (v) => setState(() {
                     _atorBusca = v;
@@ -189,7 +184,9 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
                     ),
                   ),
                 ),
+                ],
               ),
+              const SizedBox(height: EspacosTrato.x3),
               FiltroPeriodo(
                 selecionado: _periodo,
                 aoMudar: (p) => setState(() {

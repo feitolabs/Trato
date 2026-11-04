@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/exemplos/demo.dart';
 
 /// Percorre os caminhos de toque do app e falha se alguma tela mostrar o texto do placeholder
 /// "Esta tela chega nas próximas etapas". É um explorador: em cada tela, toca em cada alvo
@@ -41,7 +42,7 @@ class _Explorador {
   }
 
   Future<void> _montar() async {
-    RotasTrato.repos = RepositoriosTrato.demo();
+    RotasTrato.repos = repositoriosDemo();
     ServicoAuthPadrao.atual = ServicoAuthFake();
     // Solta a árvore anterior antes de montar a nova (a memória cresce com muitas montagens).
     await tester.pumpWidget(const SizedBox());

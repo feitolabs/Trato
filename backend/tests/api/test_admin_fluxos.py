@@ -163,6 +163,10 @@ def test_nao_existe_escrita_nem_saque_nem_saldo_proprio(adm):
     for metodo, caminho in rotas:
         if any(p in caminho for p in ("pagamentos", "lancamentos", "webhooks", "contratos")):
             assert metodo == "GET", (metodo, caminho)
+        # Travar/destravar saque só bloqueia (RF de Risco) e o relatório de repasses só lê (GET):
+        # nenhuma rota do painel move dinheiro.
+        if caminho.endswith(("/travar-saque", "/destravar-saque", "/relatorios/repasses")):
+            continue
         assert not any(p in caminho for p in ("saque", "saldo", "pix", "repasse"))
     assert (
         adm.cliente.post(f"{BASE}/pagamentos", json={}, headers=cab("t-financeiro")).status_code

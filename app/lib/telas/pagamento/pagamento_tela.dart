@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 
 /// Tela 14 — Pagamento. Sem regra de dinheiro: mostra o valor que vem em [dados] e,
@@ -11,7 +10,7 @@ import 'modelos.dart';
 class PagamentoTela extends StatefulWidget {
   const PagamentoTela({
     super.key,
-    this.dados = DadosExemplo.pagamento,
+    required this.dados,
     this.aoPagar,
     this.aoVoltar,
   });

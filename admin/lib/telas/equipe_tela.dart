@@ -218,6 +218,7 @@ class _EquipeTelaState extends State<EquipeTela> {
     final podeGerenciar = context.pode(Permissao.equipeGerenciar);
     final margem = Responsivo.margemLateral(FaixaPainel.de(context));
     return CarregaDados<List<MembroEquipeAdmin>>(
+      esqueleto: const EsqueletoPagina(),
       key: ValueKey('equipe-$_versao'),
       carregar: context.api.listarEquipe,
       construir: (context, lista, _) {

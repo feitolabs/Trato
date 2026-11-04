@@ -107,53 +107,42 @@ class _UsuariosListaState extends State<_UsuariosLista> {
       mensagemSemItens: 'Nenhum usuário encontrado.',
       tituloDetalhe: (u) => u.nome,
       topo: Padding(
-        padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x3, EspacosTrato.x3, EspacosTrato.x2),
-        child: Wrap(
-          spacing: EspacosTrato.x3,
-          runSpacing: EspacosTrato.x3,
-          children: [
-            SizedBox(
-              width: 360,
-              child: TextField(
-                onChanged: (v) => setState(() => _busca = v),
-                decoration: const InputDecoration(
-                  labelText: 'Buscar usuário por nome',
-                  helperText: 'Nome, ID ou e-mail',
-                  prefixIcon: Icon(IconesTrato.buscar, size: 20),
-                ),
-              ),
+        padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x3, margem, EspacosTrato.x2),
+        child: BarraFiltros(
+          busca: TextField(
+            onChanged: (v) => setState(() => _busca = v),
+            decoration: const InputDecoration(
+              labelText: 'Buscar usuário por nome',
+              helperText: 'Nome, ID ou e-mail',
+              prefixIcon: Icon(IconesTrato.buscar, size: 20),
             ),
-            SizedBox(
-              width: 170,
-              child: DropdownButtonFormField<String?>(
-                key: ValueKey('tipo-$_tipo'),
-                initialValue: _tipo,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('Todos')),
-                  DropdownMenuItem(value: 'Cliente', child: Text('Cliente')),
-                  DropdownMenuItem(value: 'Profissional', child: Text('Profissional')),
-                  DropdownMenuItem(value: 'Equipe', child: Text('Equipe')),
-                ],
-                onChanged: (v) => setState(() => _tipo = v),
-              ),
+          ),
+          filtros: [
+            DropdownButtonFormField<String?>(
+              key: ValueKey('tipo-$_tipo'),
+              initialValue: _tipo,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Tipo'),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Todos')),
+                DropdownMenuItem(value: 'Cliente', child: Text('Cliente')),
+                DropdownMenuItem(value: 'Profissional', child: Text('Profissional')),
+                DropdownMenuItem(value: 'Equipe', child: Text('Equipe')),
+              ],
+              onChanged: (v) => setState(() => _tipo = v),
             ),
-            SizedBox(
-              width: 170,
-              child: DropdownButtonFormField<String?>(
-                key: ValueKey('status-$_status'),
-                initialValue: _status,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('Todos')),
-                  DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
-                  DropdownMenuItem(value: 'restrito', child: Text('Restrito')),
-                  DropdownMenuItem(value: 'bloqueado', child: Text('Bloqueado')),
-                ],
-                onChanged: (v) => setState(() => _status = v),
-              ),
+            DropdownButtonFormField<String?>(
+              key: ValueKey('status-$_status'),
+              initialValue: _status,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Status'),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Todos')),
+                DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
+                DropdownMenuItem(value: 'restrito', child: Text('Restrito')),
+                DropdownMenuItem(value: 'bloqueado', child: Text('Bloqueado')),
+              ],
+              onChanged: (v) => setState(() => _status = v),
             ),
           ],
         ),

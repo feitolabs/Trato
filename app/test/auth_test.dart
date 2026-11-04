@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/telas/auth/confirmar_celular_tela.dart';
 import 'package:trato/telas/auth/confirmar_email_tela.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';

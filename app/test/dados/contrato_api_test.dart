@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/auth/ligacao_sessao.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import '../apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
@@ -12,11 +12,12 @@ import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/nota_material/nota_material.dart';
 import 'package:trato/telas/pagamento/modelos.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';
 import 'package:trato/telas/verificacao/verificacao.dart';
+import 'package:trato/telas/conclusao/modelos.dart';
 
 // TESTES DE CONTRATO. Cada repositório fala com um HTTP simulado e confere método, caminho,
 // corpo e a leitura da resposta. Os exemplos de resposta são copiados de `docs/api-rotas.md`

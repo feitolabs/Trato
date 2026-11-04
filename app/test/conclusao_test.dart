@@ -3,10 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/conclusao/apoio_conclusao.dart';
 import 'package:trato/telas/conclusao/avaliacao_tela.dart';
 import 'package:trato/telas/conclusao/conclusao_tela.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import 'apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/conclusao/garantia_tela.dart';
 import 'package:trato/telas/conclusao/relatar_problema_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'package:trato/telas/conclusao/modelos.dart';
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -46,7 +47,7 @@ void main() {
     var relatou = false;
     await _abrir(
       tester,
-      ConclusaoTela(aoConfirmar: () => confirmou = true, aoRelatarProblema: () => relatou = true),
+      ConclusaoTela(resumo: resumoConclusaoExemplo, aoConfirmar: () => confirmou = true, aoRelatarProblema: () => relatou = true),
     );
     expect(find.text('R\$ 425,00'), findsOneWidget);
     for (final d in '7305'.split('')) {
@@ -77,7 +78,7 @@ void main() {
   group('Avaliação', () {
     testWidgets('estrelas: tocar marca a nota e troca a nota', (tester) async {
       EnvioAvaliacao? envio;
-      await _abrir(tester, AvaliacaoTela(aoEnviar: (e) => envio = e));
+      await _abrir(tester, AvaliacaoTela(dados: dadosAvaliacaoExemplo, aoEnviar: (e) => envio = e));
       await tester.tap(find.byKey(const Key('estrela_Limpeza_3')));
       await tester.pump();
       await tester.tap(find.text('Enviar avaliação'));
@@ -89,14 +90,14 @@ void main() {
     });
 
     testWidgets('notas iniciais aparecem com estrelas cheias', (tester) async {
-      await _abrir(tester, const AvaliacaoTela(notasIniciais: [5, 5, 4, 5, 0]));
+      await _abrir(tester, const AvaliacaoTela(dados: dadosAvaliacaoExemplo, notasIniciais: [5, 5, 4, 5, 0]));
       expect(find.byIcon(Icons.star), findsNWidgets(19));
       expect(find.byIcon(Icons.star_border), findsNWidgets(6));
     });
 
     testWidgets('gorjeta: Não por padrão, R\$ 20, Outro com valor digitado', (tester) async {
       EnvioAvaliacao? envio;
-      await _abrir(tester, AvaliacaoTela(aoEnviar: (e) => envio = e));
+      await _abrir(tester, AvaliacaoTela(dados: dadosAvaliacaoExemplo, aoEnviar: (e) => envio = e));
       expect(find.text('Vai inteira para o profissional, sem taxa.'), findsOneWidget);
       await tester.tap(find.text('Enviar avaliação'));
       expect(envio!.gorjetaCentavos, 0);
@@ -124,7 +125,7 @@ void main() {
       EnvioRelato? envio;
       await _abrir(
         tester,
-        RelatarProblemaTela(aoEnviar: (e) => envio = e),
+        RelatarProblemaTela(dados: dadosRelatoExemplo, aoEnviar: (e) => envio = e),
         tamanho: const Size(390, 2400),
       );
       expect(find.byIcon(Icons.radio_button_checked), findsNothing);
@@ -150,7 +151,7 @@ void main() {
     });
 
     testWidgets('mostra valor congelado e prazo recebidos', (tester) async {
-      await _abrir(tester, const RelatarProblemaTela(), tamanho: const Size(390, 2400));
+      await _abrir(tester, const RelatarProblemaTela(dados: dadosRelatoExemplo, ), tamanho: const Size(390, 2400));
       expect(find.textContaining('R\$ 220,00'), findsOneWidget);
       expect(find.textContaining('48 horas para responder'), findsOneWidget);
     });
@@ -195,9 +196,9 @@ void main() {
     'tablet 768x1024': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'conclusão': const ConclusaoTela(),
-    'avaliação': const AvaliacaoTela(notasIniciais: [5, 5, 4, 5, 0]),
-    'relatar problema': const RelatarProblemaTela(motivoInicial: 'Dano no local'),
+    'conclusão': const ConclusaoTela(resumo: resumoConclusaoExemplo, ),
+    'avaliação': const AvaliacaoTela(dados: dadosAvaliacaoExemplo, notasIniciais: [5, 5, 4, 5, 0]),
+    'relatar problema': const RelatarProblemaTela(dados: dadosRelatoExemplo, motivoInicial: 'Dano no local'),
     'garantia': GarantiaTela(dados: dadosGarantiaExemplo),
   };
   for (final MapEntry(key: nomeTela, value: tela) in telas.entries) {

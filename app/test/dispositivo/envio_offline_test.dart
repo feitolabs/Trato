@@ -15,6 +15,9 @@ import 'package:trato/dispositivo/captura_check_in_dispositivo.dart';
 import 'package:trato/dispositivo/servico_camera.dart';
 import 'package:trato/dispositivo/servico_localizacao.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
+import '../apoio/exemplos/dispositivo/servico_camera_fake.dart';
+import '../apoio/exemplos/dados/servico_upload_fake.dart';
+import '../apoio/exemplos/dispositivo/servico_localizacao_fake.dart';
 
 class _Req {
   _Req(this.metodo, this.url, this.corpo, this.cabecalhos);

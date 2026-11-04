@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas.dart';
 
@@ -13,7 +12,7 @@ import 'pecas.dart';
 class ChatPedidoTela extends StatefulWidget {
   const ChatPedidoTela({
     super.key,
-    this.conversa = DadosExemplo.conversa,
+    required this.conversa,
     this.aoEnviar,
     this.aoTocarCamera,
     this.aoCapturarFoto,

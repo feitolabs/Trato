@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dados/repositorios.dart';
-import 'package:trato/dados/repositorios_fake.dart';
+import '../apoio/exemplos/dados/repositorios_fake.dart';
 import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/conclusao/avaliacao_tela.dart';
 import 'package:trato/telas/conclusao/conclusao_tela.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
-import 'package:trato/telas/orcamentos/dados_exemplo.dart';
+import '../apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
 import 'package:trato/telas/pagamento/aguardando_pagamento_tela.dart';
 import 'package:trato/telas/pagamento/pagamento_tela.dart';
@@ -18,6 +18,8 @@ import 'package:trato/telas/pagamento/modelos.dart';
 import 'package:trato/telas/pedidos/modelos.dart';
 import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'package:trato/telas/conclusao/modelos.dart';
+import '../apoio/exemplos/demo.dart';
 
 
 /// Backend simulado em memória: guarda o estado do pedido e é o ÚNICO que diz quando está pago.
@@ -116,7 +118,7 @@ void main() {
       final b = _Backend();
       final antes = RotasTrato.repos;
       addTearDown(() => RotasTrato.repos = antes);
-      final base = RepositoriosTrato.demo();
+      final base = repositoriosDemo();
       RotasTrato.repos = RepositoriosTrato(
         pedidos: _Pedidos(b),
         orcamentos: _Orcamentos(b),
@@ -125,6 +127,9 @@ void main() {
         notificacoes: base.notificacoes,
         perfil: base.perfil,
         profissional: base.profissional,
+        catalogo: base.catalogo,
+        servicos: base.servicos,
+        agenda: base.agenda,
       );
 
       await tester.pumpWidget(MaterialApp(theme: TemaTrato.claro, home: const CascaClienteTela()));

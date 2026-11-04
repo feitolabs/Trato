@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'apoio_conclusao.dart';
-import 'dados_exemplo.dart';
+import 'modelos.dart';
 
 /// Tela 21: dias restantes da garantia, o que cobre e o que não cobre.
 /// Prazos e a data final vêm do backend; o app não calcula garantia.

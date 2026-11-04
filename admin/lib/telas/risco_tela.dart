@@ -45,6 +45,7 @@ class _RiscoTelaState extends State<RiscoTela> {
   @override
   Widget build(BuildContext context) {
     return CarregaDados<List<AlertaRisco>>(
+      esqueleto: const EsqueletoPagina(),
       key: ValueKey('risco-$_versao'),
       carregar: context.api.listarAlertasRisco,
       estaVazio: (l) => l.isEmpty,
@@ -105,12 +106,10 @@ class _FilaRiscoState extends State<_FilaRisco> {
                   padding: EdgeInsets.fromLTRB(
                     Responsivo.margemLateral(FaixaPainel.de(context)),
                     0,
-                    EspacosTrato.x3,
+                    Responsivo.margemLateral(FaixaPainel.de(context)),
                     EspacosTrato.x2,
                   ),
-                  child: SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<String?>(
+                  child: DropdownButtonFormField<String?>(
                       key: ValueKey('sev-$_severidade'),
                       initialValue: _severidade,
                       isExpanded: true,
@@ -124,7 +123,6 @@ class _FilaRiscoState extends State<_FilaRisco> {
                       ],
                       onChanged: (v) => setState(() => _severidade = v),
                     ),
-                  ),
                 ),
               ],
             ),

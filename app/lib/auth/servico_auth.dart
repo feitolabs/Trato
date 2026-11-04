@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'servico_auth_fake.dart';
 
 /// Provedores de login social.
 enum ProvedorAuth { google, apple }
@@ -186,8 +185,16 @@ abstract class ServicoAuth {
   Future<SessaoAuth> confirmarCelular({required String celular, required String codigo});
 }
 
-/// Serviço usado pelas telas quando ninguém passa um. Começa no fake (roda sem chaves);
-/// o `main` troca por `ServicoAuthSupabase` quando houver configuração.
+/// Serviço usado pelas telas quando ninguém passa um. O `main` coloca aqui o
+/// `ServicoAuthSupabase`; sem ele (sem configuração) o login falha com erro claro.
 abstract final class ServicoAuthPadrao {
-  static ServicoAuth atual = ServicoAuthFake();
+  static ServicoAuth atual = const _AuthNaoConfigurado();
+}
+
+class _AuthNaoConfigurado implements ServicoAuth {
+  const _AuthNaoConfigurado();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Login não configurado: faltam SUPABASE_URL e SUPABASE_ANON_KEY.');
 }

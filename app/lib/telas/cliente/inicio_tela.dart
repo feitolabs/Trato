@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../servicos/servicos_recentes_tela.dart';
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 
 /// Tela 8 do protótipo: Início do cliente. [aoBuscar] leva à aba Buscar.
@@ -36,9 +35,9 @@ class InicioTela extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nome = dados?.nome ?? nomeDoCliente;
-    final andamento = dados == null ? pedidoEmAndamento : dados!.emAndamento;
-    final recentesBrutos = dados?.recentes ?? servicosRecentes;
+    final nome = dados?.nome ?? '';
+    final andamento = dados?.emAndamento;
+    final recentesBrutos = dados?.recentes ?? const <ServicoRecente>[];
     final recentes = [
       for (final r in recentesBrutos)
         if ((andamento?.pedidoId == null || r.pedidoId != andamento?.pedidoId) &&
@@ -46,7 +45,7 @@ class InicioTela extends StatelessWidget {
           r,
     ];
     final grade = dados == null
-        ? categorias
+        ? const <CategoriaServico>[]
         : [
             ...dados!.categorias.take(7),
             if (dados!.categorias.isNotEmpty) const CategoriaServico('Ver todas', Icons.grid_view),

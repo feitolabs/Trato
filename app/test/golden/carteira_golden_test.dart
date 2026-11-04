@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/carteira/carteira_tela.dart';
-import 'package:trato/telas/carteira/dados_exemplo.dart';
+import '../apoio/exemplos/telas/carteira/dados_exemplo.dart';
 import 'package:trato/telas/carteira/modelos.dart';
 import 'package:trato/tema/tema.dart';
 

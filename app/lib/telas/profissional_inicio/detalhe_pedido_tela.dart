@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_profissional.dart';
 import 'recusar_pedido_folha.dart';
@@ -13,7 +12,7 @@ import 'recusar_pedido_folha.dart';
 class DetalhePedidoTela extends StatelessWidget {
   const DetalhePedidoTela({
     super.key,
-    this.dados = detalhePedidoExemplo,
+    required this.dados,
     this.aoFazerOrcamento,
     this.aoPerguntar,
     this.aoRecusar,

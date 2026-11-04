@@ -52,16 +52,11 @@ Future<void> main() async {
   var config = ConfigTrato.doAmbiente();
   var configAuth = ConfigAuth.doAmbiente();
 
-  // Garante que o app execute conectado à API e Supabase reais por padrão,
-  // impedindo que caia acidentalmente em modo mock/demo.
-  final forcouDemo = const String.fromEnvironment('TRATO_MODO').trim().toLowerCase() == 'demo';
-  if (!forcouDemo && !config.usaApi) {
-    config = ConfigTrato(
-      modo: ModoTrato.api,
-      apiUrl: config.apiUrl.isNotEmpty ? config.apiUrl : _defaultApiUrl,
-    );
+  // O app sempre usa a API e o Supabase reais; sem --dart-define cai nos endereços padrão.
+  if (!config.usaApi) {
+    config = const ConfigTrato(apiUrl: _defaultApiUrl);
   }
-  if (!forcouDemo && !configAuth.supabaseConfigurado) {
+  if (!configAuth.supabaseConfigurado) {
     configAuth = ConfigAuth(
       supabaseUrl: configAuth.supabaseUrl.isNotEmpty ? configAuth.supabaseUrl : _defaultSupabaseUrl,
       supabaseAnonKey:

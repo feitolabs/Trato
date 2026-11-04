@@ -7,6 +7,7 @@ import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/telas/pedidos/recursos_mvp.dart';
 import 'package:trato/telas/pedidos/seus_pedidos_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/exemplos/telas/pedidos/dados_exemplo.dart' as exped;
 
 const _telas = {
   'pequeno 320x568': Size(320, 568),
@@ -43,7 +44,7 @@ void main() {
 
   group('Seus pedidos', () {
     testWidgets('mostra os pedidos em andamento e troca de aba', (tester) async {
-      await _abrir(tester, const SeusPedidosTela());
+      await _abrir(tester, const SeusPedidosTela(emAndamento: exped.DadosExemplo.pedidosEmAndamento, finalizados: exped.DadosExemplo.pedidosFinalizados, ));
       expect(find.text('Troca de tomadas e chuveiro'), findsOneWidget);
       expect(find.text('Disputa aberta · em análise'), findsOneWidget);
       expect(find.text('Finalizado'), findsNothing);
@@ -60,7 +61,7 @@ void main() {
 
     testWidgets('tocar no cartão abre o pedido', (tester) async {
       PedidoResumo? aberto;
-      await _abrir(tester, SeusPedidosTela(aoAbrirPedido: (p) => aberto = p));
+      await _abrir(tester, SeusPedidosTela(emAndamento: exped.DadosExemplo.pedidosEmAndamento, finalizados: exped.DadosExemplo.pedidosFinalizados, aoAbrirPedido: (p) => aberto = p));
       await tester.tap(find.text('Vazamento na pia'));
       expect(aberto?.titulo, 'Vazamento na pia');
     });
@@ -69,7 +70,7 @@ void main() {
   group('Pedido em execução', () {
     testWidgets('aprovar o aditivo troca os botões pelo resultado', (tester) async {
       var aprovou = false;
-      await _abrir(tester, PedidoExecucaoTela(aoAprovarAditivo: () => aprovou = true));
+      await _abrir(tester, PedidoExecucaoTela(pedido: exped.DadosExemplo.pedidoEmExecucao, aoAprovarAditivo: () => aprovou = true));
       expect(find.text('Aditivo aguardando sua resposta'), findsOneWidget);
       expect(find.textContaining('R\$ 45,00'), findsOneWidget);
       expect(find.text('Pagamento acompanhado no app'), findsOneWidget);
@@ -83,7 +84,7 @@ void main() {
 
     testWidgets('recusar o aditivo', (tester) async {
       var recusou = false;
-      await _abrir(tester, PedidoExecucaoTela(aoRecusarAditivo: () => recusou = true));
+      await _abrir(tester, PedidoExecucaoTela(pedido: exped.DadosExemplo.pedidoEmExecucao, aoRecusarAditivo: () => recusou = true));
       await tester.tap(find.text('Recusar'));
       await tester.pumpAndSettle();
       expect(recusou, isTrue);
@@ -96,7 +97,7 @@ void main() {
     });
 
     testWidgets('botão SOS não aparece na execução com kSosHabilitado = false', (tester) async {
-      await _abrir(tester, PedidoExecucaoTela(aoTocarSos: () {}));
+      await _abrir(tester, PedidoExecucaoTela(pedido: exped.DadosExemplo.pedidoEmExecucao, aoTocarSos: () {}));
       expect(find.text('SOS'), findsNothing);
       expect(find.byType(BotaoSos), findsNothing);
     });
@@ -105,7 +106,7 @@ void main() {
       final toques = <String>[];
       await _abrir(
         tester,
-        PedidoExecucaoTela(
+        PedidoExecucaoTela(pedido: exped.DadosExemplo.pedidoEmExecucao, 
           aoTocarSos: () => toques.add('sos'),
           aoConversar: () => toques.add('conversar'),
           aoVerConclusao: () => toques.add('conclusao'),
@@ -120,7 +121,7 @@ void main() {
 
   group('Chat do pedido', () {
     testWidgets('mostra o aviso, a mensagem de sistema e as bolhas', (tester) async {
-      await _abrir(tester, const ChatPedidoTela());
+      await _abrir(tester, const ChatPedidoTela(conversa: exped.DadosExemplo.conversa, ));
       expect(find.textContaining('Telefones e e-mails são ocultados'), findsOneWidget);
       expect(find.text('Serviço iniciado com o seu código às 14h10.', skipOffstage: false),
           findsOneWidget);
@@ -130,7 +131,7 @@ void main() {
 
     testWidgets('envia mensagem digitada e resposta rápida', (tester) async {
       final enviadas = <String>[];
-      await _abrir(tester, ChatPedidoTela(aoEnviar: enviadas.add, horaAgora: () => '16h00'));
+      await _abrir(tester, ChatPedidoTela(conversa: exped.DadosExemplo.conversa, aoEnviar: enviadas.add, horaAgora: () => '16h00'));
       await tester.enterText(find.byType(TextField), 'Obrigada!');
       await tester.tap(find.byTooltip('Enviar'));
       await tester.pumpAndSettle();
@@ -144,7 +145,7 @@ void main() {
 
     testWidgets('mensagem vazia não é enviada', (tester) async {
       final enviadas = <String>[];
-      await _abrir(tester, ChatPedidoTela(aoEnviar: enviadas.add));
+      await _abrir(tester, ChatPedidoTela(conversa: exped.DadosExemplo.conversa, aoEnviar: enviadas.add));
       await tester.enterText(find.byType(TextField), '   ');
       await tester.tap(find.byTooltip('Enviar'));
       expect(enviadas, isEmpty);
@@ -153,9 +154,9 @@ void main() {
 
   group('sem estouro de layout', () {
     final telas = <String, Widget>{
-      'seus pedidos': const SeusPedidosTela(),
-      'pedido em execução': const PedidoExecucaoTela(),
-      'chat': const ChatPedidoTela(),
+      'seus pedidos': const SeusPedidosTela(emAndamento: exped.DadosExemplo.pedidosEmAndamento, finalizados: exped.DadosExemplo.pedidosFinalizados, ),
+      'pedido em execução': const PedidoExecucaoTela(pedido: exped.DadosExemplo.pedidoEmExecucao, ),
+      'chat': const ChatPedidoTela(conversa: exped.DadosExemplo.conversa, ),
     };
     for (final MapEntry(key: nome, value: tela) in telas.entries) {
       for (final MapEntry(key: nomeTela, value: tamanho) in _telas.entries) {

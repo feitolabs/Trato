@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:trato_admin/dados/api_fake.dart';
 import 'package:trato_admin/dados/api_http.dart';
 import 'package:trato_admin/dados/config_painel.dart';
 import 'package:trato_admin/dados/modelos.dart';
@@ -47,9 +46,9 @@ Servidor servidorLogavel({String papel = 'mediador'}) {
 
 void main() {
   group('escolha da API', () {
-    test('sem configuração usa os dados de exemplo', () {
-      expect(criarApi(const ConfigPainel()), isA<ApiFake>());
-      expect(criarApi(const ConfigPainel(modo: 'api')), isA<ApiFake>()); // faltam as URLs
+    test('sem configuração completa não abre (não há dados de exemplo)', () {
+      expect(() => criarApi(const ConfigPainel()), throwsStateError);
+      expect(() => criarApi(const ConfigPainel(modo: 'api')), throwsStateError); // faltam as URLs
     });
 
     test('com modo api e todos os valores usa HTTP', () {

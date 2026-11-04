@@ -509,15 +509,10 @@ class _ListaPaginadaState<T> extends State<ListaPaginada<T>> {
     final fim = (ini + widget.porPagina).clamp(0, todos.length);
     final visiveis = todos.sublist(ini, fim);
 
-    final barra = Wrap(
-      spacing: EspacosTrato.x3,
-      runSpacing: EspacosTrato.x3,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        if (widget.textoBusca != null)
-          SizedBox(
-            width: 320,
-            child: TextField(
+    final barra = BarraFiltros(
+      busca: widget.textoBusca == null
+          ? null
+          : TextField(
               controller: _busca,
               onChanged: (_) => setState(() => _pagina = 0),
               decoration: InputDecoration(
@@ -525,11 +520,10 @@ class _ListaPaginadaState<T> extends State<ListaPaginada<T>> {
                 prefixIcon: const Icon(IconesTrato.buscar, size: 20),
               ),
             ),
-          ),
+      acoes: widget.acoesTopo,
+      filtros: [
         for (var f = 0; f < widget.filtros.length; f++)
-          SizedBox(
-            width: 200,
-            child: DropdownButtonFormField<String?>(
+            DropdownButtonFormField<String?>(
               key: ValueKey('filtro-$f-${_valores[f]}'),
               initialValue: _valores[f],
               isExpanded: true,
@@ -543,22 +537,17 @@ class _ListaPaginadaState<T> extends State<ListaPaginada<T>> {
                 _pagina = 0;
               }),
             ),
-          ),
         if (widget.ordens.length > 1)
-          SizedBox(
-            width: 220,
-            child: DropdownButtonFormField<int>(
-              initialValue: _ordem,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Ordenar'),
-              items: [
-                for (var i = 0; i < widget.ordens.length; i++)
-                  DropdownMenuItem(value: i, child: Text(widget.ordens[i].rotulo)),
-              ],
-              onChanged: (v) => setState(() => _ordem = v ?? 0),
-            ),
+          DropdownButtonFormField<int>(
+            initialValue: _ordem,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Ordenar'),
+            items: [
+              for (var i = 0; i < widget.ordens.length; i++)
+                DropdownMenuItem(value: i, child: Text(widget.ordens[i].rotulo)),
+            ],
+            onChanged: (v) => setState(() => _ordem = v ?? 0),
           ),
-        ...widget.acoesTopo,
       ],
     );
 
@@ -863,6 +852,44 @@ class FiltroPeriodo extends StatelessWidget {
           () => _personalizado(context),
         ),
       ],
+    );
+  }
+}
+
+/// Linha de busca + filtros: a busca e os filtros dividem a largura toda (sem espaço sobrando) e,
+/// em tela estreita, cada campo ocupa uma linha inteira.
+class BarraFiltros extends StatelessWidget {
+  const BarraFiltros({super.key, this.busca, this.filtros = const [], this.acoes = const []});
+
+  final Widget? busca;
+  final List<Widget> filtros;
+  final List<Widget> acoes;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final campos = [?busca, ...filtros];
+        if (c.maxWidth < 680) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final w in campos) ...[w, const SizedBox(height: EspacosTrato.x3)],
+              if (acoes.isNotEmpty) Wrap(spacing: EspacosTrato.x3, runSpacing: EspacosTrato.x2, children: acoes),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < campos.length; i++) ...[
+              if (i > 0) const SizedBox(width: EspacosTrato.x3),
+              Expanded(flex: busca != null && i == 0 ? 2 : 1, child: campos[i]),
+            ],
+            for (final a in acoes) ...[const SizedBox(width: EspacosTrato.x3), a],
+          ],
+        );
+      },
     );
   }
 }

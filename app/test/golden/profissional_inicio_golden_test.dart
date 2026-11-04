@@ -5,6 +5,7 @@ import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 import '../apoio/fontes.dart';
+import '../apoio/exemplos/telas/profissional_inicio/dados_exemplo.dart';
 
 /// Telas 23 (início, dentro da casca com a barra) e 24 (detalhe do pedido) do protótipo
 /// em celular pequeno, protótipo e tablet. Atualizar: flutter test --update-goldens
@@ -17,8 +18,8 @@ void main() {
     'tablet': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'inicio': const CascaProfissionalTela(),
-    'detalhe_pedido': const DetalhePedidoTela(),
+    'inicio': const CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, ),
+    'detalhe_pedido': const DetalhePedidoTela(dados: detalhePedidoExemplo, ),
   };
 
   for (final MapEntry(key: tela, value: widget) in telas.entries) {

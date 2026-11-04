@@ -176,13 +176,9 @@ class _ConteudoState extends State<_Conteudo> {
           ],
         ),
         const SizedBox(height: EspacosTrato.x3),
-        Wrap(
-          spacing: EspacosTrato.x3,
-          runSpacing: EspacosTrato.x3,
-          children: [
-            SizedBox(
-              width: 200,
-              child: DropdownButtonFormField<String?>(
+        BarraFiltros(
+          filtros: [
+            DropdownButtonFormField<String?>(
                 key: ValueKey('tipo-$_tipo'),
                 initialValue: _tipo,
                 isExpanded: true,
@@ -196,10 +192,7 @@ class _ConteudoState extends State<_Conteudo> {
                 ],
                 onChanged: (v) => setState(() => _tipo = v),
               ),
-            ),
-            SizedBox(
-              width: 200,
-              child: DropdownButtonFormField<String?>(
+            DropdownButtonFormField<String?>(
                 key: ValueKey('status-$_status'),
                 initialValue: _status,
                 isExpanded: true,
@@ -213,33 +206,42 @@ class _ConteudoState extends State<_Conteudo> {
                 ],
                 onChanged: (v) => setState(() => _status = v),
               ),
-            ),
           ],
         ),
         const SizedBox(height: EspacosTrato.x3),
         if (linhas.isEmpty)
           const Padding(padding: EdgeInsets.all(EspacosTrato.x6), child: EstadoVazio('Nada com esses filtros.'))
-        else if (celular)
-          for (final l in linhas)
-            Padding(
-              padding: const EdgeInsets.only(bottom: EspacosTrato.intervaloCartoes),
-              child: _CartaoLancamento(l, podeConciliar: podeConciliar, aoConciliar: () => _conciliar(l)),
-            )
         else
-          CartaoSecao(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _CabecalhoTabela(temTaxa: temTaxa),
-                for (final l in linhas)
-                  _LinhaTabela(
-                    l,
-                    temTaxa: temTaxa,
-                    podeConciliar: podeConciliar,
-                    aoConciliar: () => _conciliar(l),
-                  ),
-              ],
-            ),
+          // A tabela precisa de ~960 px; abaixo disso (celular, tablet, janela estreita) vira cartões.
+          LayoutBuilder(
+            builder: (context, c) {
+              if (celular || c.maxWidth < 960) {
+                return Column(
+                  children: [
+                    for (final l in linhas)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: EspacosTrato.intervaloCartoes),
+                        child: _CartaoLancamento(l, podeConciliar: podeConciliar, aoConciliar: () => _conciliar(l)),
+                      ),
+                  ],
+                );
+              }
+              return CartaoSecao(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _CabecalhoTabela(temTaxa: temTaxa),
+                    for (final l in linhas)
+                      _LinhaTabela(
+                        l,
+                        temTaxa: temTaxa,
+                        podeConciliar: podeConciliar,
+                        aoConciliar: () => _conciliar(l),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
         const SizedBox(height: EspacosTrato.x3),
         Text(
@@ -261,7 +263,7 @@ abstract final class PagamentosStatus {
       };
 }
 
-const _flex = [14, 10, 12, 16, 15, 12, 13, 17, 10];
+const _flex = [13, 11, 13, 15, 14, 12, 11, 14, 10];
 
 class _CabecalhoTabela extends StatelessWidget {
   const _CabecalhoTabela({required this.temTaxa});

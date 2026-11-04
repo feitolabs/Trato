@@ -14,12 +14,18 @@ import 'package:trato/telas/nota_material/ver_nota_tela.dart';
 import 'package:trato/telas/perfil_publico/avaliacoes_recebidas_tela.dart';
 import 'package:trato/telas/perfil_publico/perfil_publico.dart';
 import 'package:trato/telas/perfil_publico/perfil_publico_tela.dart';
-import 'package:trato/telas/profissional/servico_orcamento_fake.dart';
+import 'apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro_profissional_tela.dart';
 import 'package:trato/telas/verificacao/verificacao.dart';
 import 'package:trato/telas/verificacao/verificacao_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/exemplos/telas/nota_material/nota_material_fake.dart';
+import 'apoio/exemplos/telas/disputa_profissional/disputa_fake.dart';
+import 'apoio/exemplos/telas/aditivo/aditivo_fake.dart';
+import 'apoio/exemplos/telas/profissional_cadastro/cadastro_fake.dart';
+import 'apoio/exemplos/telas/perfil_publico/perfil_publico_fake.dart';
+import 'apoio/exemplos/telas/verificacao/verificacao_fake.dart';
 
 Future<void> _abrir(
   WidgetTester tester,

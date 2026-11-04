@@ -56,6 +56,7 @@ class DisputasTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CarregaDados<(List<Disputa>, String?)>(
+      esqueleto: const EsqueletoPagina(),
       carregar: () async {
         final api = context.api;
         final lista = await api.listarDisputas();

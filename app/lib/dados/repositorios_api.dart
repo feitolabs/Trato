@@ -5,7 +5,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../componentes/componentes.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/carteira/modelos.dart' hide ResumoCarteira;
-import '../telas/conclusao/dados_exemplo.dart';
+import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
 import '../telas/pagamento/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
