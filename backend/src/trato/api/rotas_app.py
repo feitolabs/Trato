@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
@@ -63,7 +63,9 @@ class OrcamentoOut(BaseModel):
 
 
 class ItemOrcamentoIn(BaseModel):
-    tipo: str = Field(description="deslocamento | horas | material | outro")
+    tipo: Literal["deslocamento", "horas", "material", "outro"] = Field(
+        description="Os mesmos valores aceitos pelo banco (`orcamento_itens_tipo_check`)."
+    )
     descricao: str = Field(min_length=1, max_length=200)
     quantidade: Decimal = Field(gt=0, description="Ex.: 1, 2.5")
     valor_unitario_centavos: int = Field(
@@ -331,7 +333,8 @@ def listar_orcamentos(
         consulta="orcamentos",
     )
     itens = contexto.orcamentos.do_pedido(pedido.id)
-    if usuario.papel is PapelUsuario.PROFISSIONAL:
+    # Vale a relação com o pedido: profissional aprovado também pode ser o cliente dele.
+    if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.cliente_id != usuario.id:
         itens = [o for o in itens if o.profissional_id == usuario.id]
     detalhes = {i: contexto.usuarios.detalhe(i) for i in {o.profissional_id for o in itens}}
     return [
@@ -376,6 +379,8 @@ def enviar_orcamento(
         raise HTTPException(404, "Pedido não encontrado.")
     if pedido.estado is not Estado.ABERTO:
         raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
+    if pedido.cliente_id == usuario.id:
+        raise HTTPException(403, "Você não pode orçar o seu próprio pedido.")
 
     agora = contexto.agora()
     total_estimado = sum(int(i.quantidade * i.valor_unitario_centavos) for i in dados.itens)
@@ -452,7 +457,9 @@ def enviar_orcamento(
 def valores_do_pagamento(
     pedido_id: str,
     request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.EQUIPE)),
+    usuario: Usuario = Depends(
+        exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL, PapelUsuario.EQUIPE)
+    ),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PagamentoValoresOut:
     pedido = carregar_pedido(
@@ -463,6 +470,8 @@ def valores_do_pagamento(
         equipe=(Permissao.PAGAMENTOS_VER,),
         consulta="pagamento",
     )
+    if usuario.papel is not PapelUsuario.EQUIPE and pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido vê os valores do pagamento.")
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
     servico = getattr(request.app.state, "servico_pagamento", None)
@@ -534,7 +543,7 @@ def _conversa_do_pedido(
     contexto: Contexto, pedido: Pedido, usuario: Usuario, profissional_id: str | None
 ) -> str:
     """Abre (ou acha) a conversa do pedido com UM profissional."""
-    if usuario.papel is PapelUsuario.PROFISSIONAL:
+    if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.cliente_id != usuario.id:
         alvo = usuario.id
     else:
         alvo = profissional_id or pedido.profissional_id
@@ -604,9 +613,7 @@ def enviar_mensagem(
     contexto: Contexto = Depends(obter_contexto),
 ) -> MensagemOut:
     pedido = _pedido_visivel(contexto, pedido_id, usuario)
-    if usuario.papel is PapelUsuario.PROFISSIONAL and (
-        pedido.profissional_id not in (None, usuario.id)
-    ):
+    if pedido.cliente_id != usuario.id and pedido.profissional_id not in (None, usuario.id):
         raise HTTPException(404, "Pedido não encontrado.")
     conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
     nova = contexto.conversas.enviar(conversa, usuario.id, corpo.texto)
@@ -776,7 +783,7 @@ def avaliar(
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.estado is not Estado.CONCLUIDO:
         raise HTTPException(409, "Só dá para avaliar depois que o serviço for concluído.")
-    if usuario.papel is PapelUsuario.CLIENTE:
+    if pedido.cliente_id == usuario.id:
         direcao, avaliado = "cliente_para_profissional", pedido.profissional_id
     else:
         direcao, avaliado = "profissional_para_cliente", pedido.cliente_id

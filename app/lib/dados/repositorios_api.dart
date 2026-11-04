@@ -146,9 +146,14 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<String> criar(RascunhoPedido rascunho) async {
+    final categoriaId = rascunho.categoriaId;
+    final cidadeId = rascunho.cidadeId;
+    if (categoriaId == null || cidadeId == null) {
+      throw const ErroTrato(TipoErro.recusado, 'Escolha a categoria e a cidade do serviço.');
+    }
     final corpo = <String, dynamic>{
-      'categoria_id': rascunho.categoriaId ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8',
-      'cidade_id': rascunho.cidadeId ?? 'de470309-afb7-49ac-9471-54e8387d4a88',
+      'categoria_id': categoriaId,
+      'cidade_id': cidadeId,
       if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
       if (rascunho.prazoDesejado != null)
         'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
@@ -573,18 +578,26 @@ class RepositorioChatApi implements RepositorioChat {
 
   @override
   Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId}) async {
-    final pedido = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
     final mensagens = _lista(
       await _api.get(
         '/v1/pedidos/$pedidoId/mensagens',
         consulta: _consulta(profissionalId),
       ),
     );
+    // Antes de ser contratado, o profissional conversa mas não é parte do pedido: o backend
+    // responde 404 em `GET /v1/pedidos/{id}`. O chat segue, só sem a situação do pedido.
+    final numero = PedidoApi.numeroDe(pedidoId);
+    var situacao = 'Pedido aberto';
+    try {
+      situacao = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId'))).estadoNome;
+    } on ErroTrato catch (erro) {
+      if (erro.tipo != TipoErro.naoEncontrado) rethrow;
+    }
     return ConversaPedido(
-      nome: 'Pedido ${pedido.numero}',
+      nome: 'Pedido $numero',
       iniciais: '#',
-      numeroPedido: pedido.numero,
-      situacao: pedido.estadoNome,
+      numeroPedido: numero,
+      situacao: situacao,
       mensagens: [
         for (final m in mensagens)
           MensagemChat(
@@ -792,6 +805,23 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     );
   }
 
+  /// `POST /v1/pedidos/{id}/acoes/confirmar_agenda`: tira o pedido pago de `pago_e_retido` e
+  /// libera o check-in. O backend confere a janela e gera o código de início do cliente.
+  @override
+  Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/acoes/confirmar_agenda',
+      corpo: {
+        'prova': {
+          'janela': {
+            'inicio': inicio.toUtc().toIso8601String(),
+            'fim': fim.toUtc().toIso8601String(),
+          },
+        },
+      },
+    );
+  }
+
   /// Não há rota de detalhe do pedido aberto: o detalhe sai da própria lista.
   @override
   Future<DetalhePedido> detalhe(String pedidoId) async {
@@ -892,34 +922,38 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     final valorHoras = Dinheiro.valorDasHoras(pronto.valorHoraCentavos, pronto.decimosDeHora);
     if (valorHoras > 0) {
       itens.add({
+        'tipo': 'horas',
         'descricao': 'Mão de obra',
         'quantidade': 1,
-        'preco_unitario_centavos': valorHoras,
+        'valor_unitario_centavos': valorHoras,
       });
     }
     if (pronto.deslocamentoCentavos > 0) {
       itens.add({
+        'tipo': 'deslocamento',
         'descricao': 'Deslocamento',
         'quantidade': 1,
-        'preco_unitario_centavos': pronto.deslocamentoCentavos,
+        'valor_unitario_centavos': pronto.deslocamentoCentavos,
       });
     }
     if (pronto.materialPorMim) {
       for (final item in pronto.itens) {
         if (item.centavos > 0) {
           itens.add({
+            'tipo': 'material',
             'descricao': item.nome,
             'quantidade': 1,
-            'preco_unitario_centavos': item.centavos,
+            'valor_unitario_centavos': item.centavos,
           });
         }
       }
     }
     if (itens.isEmpty && pronto.totalCentavos > 0) {
       itens.add({
+        'tipo': 'outro',
         'descricao': 'Serviço',
         'quantidade': 1,
-        'preco_unitario_centavos': pronto.totalCentavos,
+        'valor_unitario_centavos': pronto.totalCentavos,
       });
     }
 
@@ -932,8 +966,8 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
       '/v1/pedidos/$id/orcamentos',
       corpo: {
         'itens': itens,
-        'prazo_dias': 3,
-        'validade_dias': 3,
+        'prazo_execucao_dias': 3,
+        'validade_ate': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
         'sinal_material_centavos': sinal,
         'garantia_dias': pronto.garantiaDias,
       },

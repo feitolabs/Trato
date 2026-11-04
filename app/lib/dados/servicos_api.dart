@@ -109,7 +109,8 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
         for (final i in (n['itens'] as List).cast<Map<String, dynamic>>())
           ItemNota(
             descricao: i['descricao'] as String,
-            quantidade: (i['quantidade'] is num) ? (i['quantidade'] as num).toInt() : 1,
+            // O backend manda a quantidade como texto decimal ("2.00").
+            quantidade: num.tryParse('${i['quantidade']}')?.toInt() ?? 1,
             valorUnitarioCentavos: (i['valor_unitario_centavos'] is num)
                 ? (i['valor_unitario_centavos'] as num).toInt()
                 : (i['total_centavos'] as int? ?? 0),
@@ -150,7 +151,12 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
             midiaId = res.arquivoId;
           }
         }
+      } on ErroTrato {
+        rethrow; // sem foto enviada a nota não vale; o caminho do aparelho não serve ao backend
       } catch (_) {}
+      if (midiaId == null) {
+        throw const ErroTrato(TipoErro.recusado, 'Não conseguimos ler a foto da nota. Tire outra.');
+      }
     }
 
     final corpo = <String, dynamic>{
@@ -306,59 +312,60 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     'Noite': ('18:00', '22:00'),
   };
 
+  /// Categorias e cidades vêm do banco. Sem elas, o erro vai para a tela: nunca lista de exemplo.
+  /// Raio, dias e períodos são as opções fixas do formulário.
   @override
   Future<OpcoesCadastro> carregarOpcoes() async {
-    try {
-      final cats = _lista(await _api.get('/v1/catalogo/categorias'));
-      _idPorNomeCategoria = {
-        for (final c in cats)
-          if (c['nome'] is String && c['id'] is String)
-            (c['nome'] as String): (c['id'] as String),
-      };
-      try {
-        final cids = _lista(await _api.get('/v1/catalogo/cidades'));
-        _idPorNomeCidade = {
-          for (final c in cids)
-            if (c['nome'] is String && c['id'] is String)
-              (c['nome'] as String).toLowerCase(): (c['id'] as String),
-        };
-      } on Object {
-        // Segue com mapeamento padrão de cidade se a rota falhar.
-      }
-      final nomes = _idPorNomeCategoria.keys.toList();
-      if (nomes.isNotEmpty) {
-        return OpcoesCadastro(
-          categorias: nomes,
-          raiosKm: opcoesCadastroExemplo.raiosKm,
-          dias: opcoesCadastroExemplo.dias,
-          periodos: opcoesCadastroExemplo.periodos,
-        );
-      }
-    } on Object {
-      // Sem rede ou módulo ainda não inicializado: usa opções padrão.
-    }
-    return opcoesCadastroExemplo;
+    final cats = _lista(await _api.get('/v1/catalogo/categorias'));
+    final cids = _lista(await _api.get('/v1/catalogo/cidades'));
+    _idPorNomeCategoria = {for (final c in cats) c['nome'] as String: c['id'] as String};
+    _idPorNomeCidade = {for (final c in cids) c['nome'] as String: c['id'] as String};
+    return OpcoesCadastro(
+      categorias: _idPorNomeCategoria.keys.toList(),
+      raiosKm: opcoesCadastroExemplo.raiosKm,
+      dias: opcoesCadastroExemplo.dias,
+      periodos: opcoesCadastroExemplo.periodos,
+    );
   }
 
   String _resolverCategoriaId(String nome) {
-    final direto = _idPorNomeCategoria[nome];
-    if (direto != null) return direto;
-    final limpo = nome.toLowerCase();
-    for (final entry in _idPorNomeCategoria.entries) {
-      final k = entry.key.toLowerCase();
-      if (limpo.contains(k) || k.contains(limpo)) return entry.value;
+    final id = _idPorNomeCategoria[nome];
+    if (id == null) {
+      throw ErroTrato(TipoErro.recusado, 'A categoria "$nome" não está mais disponível.');
     }
-    return _idPorNomeCategoria.values.firstOrNull ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8';
+    return id;
   }
 
+  /// Compara sem acento: "Divinópolis" digitado tem de achar "Divinopolis" do catálogo.
+  static String _semAcento(String texto) {
+    const de = 'áàâãäéèêëíìîïóòôõöúùûüç';
+    const para = 'aaaaaeeeeiiiiooooouuuuc';
+    final minusculo = texto.trim().toLowerCase();
+    return [
+      for (final letra in minusculo.split(''))
+        de.contains(letra) ? para[de.indexOf(letra)] : letra,
+    ].join();
+  }
+
+  /// O id da cidade digitada. Sem cidade conhecida, recusa: gravar outra cidade esconderia
+  /// do profissional todos os pedidos da região dele, sem nenhum aviso.
   String _resolverCidadeId(String cidade) {
-    final limpo = cidade.trim().toLowerCase();
-    final direto = _idPorNomeCidade[limpo];
-    if (direto != null) return direto;
+    final limpo = _semAcento(cidade);
     for (final entry in _idPorNomeCidade.entries) {
-      if (limpo.contains(entry.key) || entry.key.contains(limpo)) return entry.value;
+      if (_semAcento(entry.key) == limpo) return entry.value;
     }
-    return _idPorNomeCidade.values.firstOrNull ?? 'de470309-afb7-49ac-9471-54e8387d4a88';
+    if (limpo.isNotEmpty) {
+      for (final entry in _idPorNomeCidade.entries) {
+        final nome = _semAcento(entry.key);
+        if (limpo.contains(nome) || nome.contains(limpo)) return entry.value;
+      }
+    }
+    throw ErroTrato(
+      TipoErro.recusado,
+      _idPorNomeCidade.isEmpty
+          ? 'Não conseguimos carregar as cidades. Tente de novo.'
+          : 'Ainda não atendemos essa cidade. Atendemos: ${_idPorNomeCidade.keys.join(', ')}.',
+    );
   }
 
   @override
@@ -371,12 +378,10 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       for (final c in dados.categorias) _resolverCategoriaId(c),
     ];
     final cidadeId = _resolverCidadeId(dados.cidade);
-    final bairroNome = dados.cidade.trim();
+    // A tela pede só a cidade: sem `bairro`, o profissional atende a cidade inteira. O nome da
+    // cidade não pode ir como bairro, porque o filtro de pedidos abertos compara bairro exato.
     final regioes = [
-      {
-        'cidade_id': cidadeId,
-        if (bairroNome.isNotEmpty) 'bairro': bairroNome,
-      },
+      {'cidade_id': cidadeId},
     ];
     final disponibilidade = <Map<String, Object>>[
       for (final d in dados.dias)
@@ -396,9 +401,8 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
           'descricao': dados.portfolio[i],
         },
     ];
-    final padraoCat = _idPorNomeCategoria.values.firstOrNull ?? '3ea59447-e7f7-43fe-aff2-78e86cb5fcb8';
     final corpo = <String, Object?>{
-      'categorias': categoriasIds.isEmpty ? [padraoCat] : categoriasIds,
+      'categorias': categoriasIds,
       'regioes': regioes,
       'disponibilidade': disponibilidade,
       'bio': dados.sobre.trim(),
@@ -504,7 +508,7 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
       totalAvaliacoes: avaliacoes.length,
       servicosConcluidos: concluidos,
       sobre: (prof?['bio'] as String?) ?? 'Perfil profissional cadastrado no Trato.',
-      cidade: cidades.isNotEmpty ? cidades.first : 'Belo Horizonte',
+      cidade: cidades.isNotEmpty ? cidades.first : '',
       fotosPortfolio: fotosPortfolio.length,
       ultimasAvaliacoes: avaliacoes,
       listaFotosPortfolio: fotosPortfolio,
@@ -623,8 +627,8 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
 
   @override
   Future<List<Consentimento>> consentimentos() async {
-    try {
-      final res = await _api.get('/v1/me/consentimentos');
+    final res = await _api.get('/v1/me/consentimentos');
+    {
       final mapa = (res is Map<String, dynamic>) ? res : <String, dynamic>{};
       final ativosPorFinalidade = <String, bool>{};
       final vigentes = mapa['vigentes'];
@@ -655,8 +659,6 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
             obrigatorio: item.obrigatorio,
           ),
       ];
-    } catch (_) {
-      return ServicoPrivacidadeFake.exemplo;
     }
   }
 

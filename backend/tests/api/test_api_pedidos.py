@@ -28,10 +28,6 @@ def test_cliente_abre_pedido(amb):
     assert amb.contexto.pedidos.obter(corpo["id"]) is not None
 
 
-def test_profissional_nao_abre_pedido(amb):
-    assert amb.cliente.post("/v1/pedidos", headers=cab("t-prof")).status_code == 403
-
-
 def test_sem_login_da_401(amb):
     assert amb.cliente.post("/v1/pedidos").status_code == 401
     assert amb.cliente.get("/v1/pedidos", headers=cab("token-desconhecido")).status_code == 401

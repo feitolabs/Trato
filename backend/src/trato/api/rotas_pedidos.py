@@ -50,6 +50,7 @@ from trato.garantias.retrabalho import EM_CURSO
 from trato.pedidos import estados
 from trato.pedidos.estados import (
     Acao,
+    Ator,
     CodigoNaoConfere,
     Estado,
     Papel,
@@ -133,10 +134,13 @@ def _concluir_efeitos(contexto: Contexto, pedido: Pedido) -> None:
 @router.post("", response_model=PedidoOut, status_code=201, summary="Abrir pedido")
 def abrir_pedido(
     corpo: AbrirPedidoIn | None = None,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
-    pedido = estados.abrir_pedido(uuid.uuid4().hex, ator_de(usuario), contexto.agora())
+    # Quem abre o pedido é o cliente dele, mesmo que também seja profissional aprovado.
+    pedido = estados.abrir_pedido(
+        uuid.uuid4().hex, Ator(Papel.CLIENTE, usuario.id), contexto.agora()
+    )
     dados = corpo.para_dados() if corpo else None
     if dados is not None:  # M9: limite e mascaramento de contato no texto livre
         cfg = obter_config_seguranca()

@@ -566,6 +566,38 @@ abstract final class RotasTrato {
       );
 
   /// Ações do pedido de hoje: check-in, nota de materiais e aditivo.
+  /// Escolhe dia e hora da visita de um pedido pago. Quem aceita ou recusa é o backend.
+  static Future<void> _marcarVisita(BuildContext context, String pedidoId) async {
+    final hoje = DateTime.now();
+    final dia = await showDatePicker(
+      context: context,
+      firstDate: hoje,
+      lastDate: hoje.add(const Duration(days: 90)),
+      helpText: 'Dia da visita',
+    );
+    if (dia == null || !context.mounted) return;
+    final hora = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+      helpText: 'Hora da chegada',
+    );
+    if (hora == null || !context.mounted) return;
+    final inicio = DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute);
+    final ok = await _tentar(
+      context,
+      () => repos.profissional.confirmarAgenda(
+        pedidoId,
+        inicio,
+        inicio.add(const Duration(hours: 2)),
+      ),
+    );
+    if (ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Visita marcada. O cliente já pode ver o código de início.')),
+      );
+    }
+  }
+
   static void _acoesPedidoProfissional(
     BuildContext context, {
     required String pedidoId,
@@ -579,6 +611,14 @@ abstract final class RotasTrato {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+            ListTile(
+              leading: const Icon(Icons.event_available_outlined),
+              title: const Text('Marcar data da visita'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                _marcarVisita(context, pedidoId);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.place_outlined),
               title: const Text('Fazer check-in'),

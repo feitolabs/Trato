@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'auth/config_auth.dart';
 import 'auth/ligacao_sessao.dart';
@@ -49,6 +50,8 @@ const _defaultSupabaseAnonKey = 'sb_publishable_GwIISqsEKuOu6iK4IBlRvQ__TVCCgj8'
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // O app é só vertical. Android e iOS também travam isso no manifesto e no Info.plist.
+  await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
   var config = ConfigTrato.doAmbiente();
   var configAuth = ConfigAuth.doAmbiente();
 

@@ -271,8 +271,8 @@ def detalhe_do_orcamento(
     pedido = contexto.pedidos.obter(orc.pedido_id) if orc else None
     if orc is None or pedido is None:
         raise HTTPException(404, "Orçamento não encontrado.")
-    dono = usuario.papel is PapelUsuario.CLIENTE and pedido.cliente_id == usuario.id
-    autor = usuario.papel is PapelUsuario.PROFISSIONAL and orc.profissional_id == usuario.id
+    dono = pedido.cliente_id == usuario.id
+    autor = orc.profissional_id == usuario.id
     if not (dono or autor):
         raise HTTPException(404, "Orçamento não encontrado.")
     campos = {k: v for k, v in vars(orc).items() if k != "itens"}

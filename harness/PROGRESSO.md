@@ -536,3 +536,12 @@ consulta pública só devolve `disponivel`; a unique do banco fecha a corrida en
 
 
 
+
+## 2026-11-04 — Contrato Cliente x Profissional, tela vertical e limpeza de exemplos
+
+- App só na vertical (Flutter, AndroidManifest, Info.plist).
+- 252 SQLs do backend validados com PREPARE no banco real; 9 são fragmentos de SQL dinâmico.
+- Corrigido: orçamento (campos), profissional aprovado agindo como cliente, marcar visita (`confirmar_agenda`), chat antes da contratação, cidade/bairro no cadastro, quantidade da nota, nomes de categoria.
+- Modo real sem exemplos: catálogo, formulário do pedido, cadastro e consentimentos.
+- Testes: 4 do admin já falhavam antes (`test_so_o_papel_cadastro_abre_documento`, `test_nao_existe_escrita_nem_saque_nem_saldo_proprio`, `test_so_o_cadastro_recebe_url_com_motivo_e_fica_registrado`, `test_fila_detalhe_url_assinada_e_decisao`); 12 goldens com diferença de pixels em telas não alteradas.
+- Pendente com OK do João: commit, push/deploy e limpeza dos dados de teste no banco.

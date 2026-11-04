@@ -304,10 +304,10 @@ def test_listagem_por_papel_e_privacidade(cenario):
     assert c.cliente.get(f"/v1/pedidos/{pedido_id}", headers=c.token("cliente2")).status_code == 404
     # id que não é uuid também é 404, não erro 500
     assert c.cliente.get("/v1/pedidos/abc", headers=c.token("cliente")).status_code == 404
-    # profissional não abre pedido
-    assert (
-        c.cliente.post("/v1/pedidos", json=corpo_pedido(c), headers=c.token("profissional"))
-    ).status_code == 403
+    # profissional aprovado também contrata: o pedido sai no nome dele, como cliente
+    r = c.cliente.post("/v1/pedidos", json=corpo_pedido(c), headers=c.token("profissional"))
+    assert r.status_code == 201
+    assert r.json()["cliente_id"] != meus[0]["cliente_id"]
 
 
 def test_pedido_sem_dados_e_pergunta_invalida_sao_recusados(cenario):

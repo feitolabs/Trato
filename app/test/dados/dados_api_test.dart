@@ -16,6 +16,7 @@ import 'package:trato/telas/carteira/modelos.dart';
 import 'package:trato/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/disputa_profissional/disputa.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
+import 'package:trato/telas/profissional_cadastro/cadastro.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
 import 'package:trato/telas/profissional/servico_orcamento.dart';
 
@@ -157,6 +158,107 @@ void main() {
     });
   });
 
+  group('contrato Cliente x Profissional', () {
+    test('confirmar agenda manda a janela no formato do backend', () async {
+      final (api, chamadas) = _cliente((_) => _json(_pedidoJson));
+
+      await RepositorioProfissionalApi(api).confirmarAgenda(
+        'ped-1',
+        DateTime.utc(2030, 1, 2, 9),
+        DateTime.utc(2030, 1, 2, 11),
+      );
+
+      expect(chamadas.single.caminho, '/v1/pedidos/ped-1/acoes/confirmar_agenda');
+      expect(chamadas.single.corpo, {
+        'prova': {
+          'janela': {'inicio': '2030-01-02T09:00:00.000Z', 'fim': '2030-01-02T11:00:00.000Z'},
+        },
+      });
+    });
+
+    test('profissional ainda não contratado abre o chat mesmo com 404 no pedido', () async {
+      final (api, _) = _cliente(
+        (r) => r.url.path.endsWith('/mensagens')
+            ? _json(<Object>[])
+            : _json({'detail': 'Pedido não encontrado.'}, 404),
+      );
+
+      final conversa = await RepositorioChatApi(api).conversa('abcd1234');
+
+      expect(conversa.numeroPedido, '#ABCD');
+      expect(conversa.mensagens, isEmpty);
+    });
+
+    test('quantidade da nota vem como texto decimal', () async {
+      final (api, _) = _cliente(
+        (_) => _json([
+          {
+            'id': 'n1',
+            'contrato_id': 'ped-1',
+            'total_centavos': 3000,
+            'enviada_em': '2026-10-27T12:00:00Z',
+            'itens': [
+              {
+                'descricao': 'Tomada',
+                'quantidade': '3.00',
+                'valor_unitario_centavos': 1000,
+                'total_centavos': 3000,
+              },
+            ],
+          },
+        ]),
+      );
+
+      final nota = await ServicoNotaMaterialApi(api).carregar('ped-1');
+
+      expect(nota!.itens.single.quantidade, 3);
+    });
+
+    http.Response catalogo(http.Request r) => switch (r.url.path) {
+          '/v1/catalogo/categorias' => _json([
+              {'id': 'cat-1', 'nome': 'Eletricista', 'slug': 'eletricista'},
+            ]),
+          '/v1/catalogo/cidades' => _json([
+              {'id': 'cid-bh', 'nome': 'Belo Horizonte', 'uf': 'MG'},
+              {'id': 'cid-div', 'nome': 'Divinopolis', 'uf': 'MG'},
+            ]),
+          _ => _json(<String, Object>{}, 201),
+        };
+
+    DadosCadastroProfissional dadosCadastro(String cidade) => DadosCadastroProfissional(
+          nome: 'Ana Souza',
+          categorias: const {'Eletricista'},
+          cidade: cidade,
+          raioKm: 10,
+          dias: const {'Seg'},
+          periodos: const {'Manhã'},
+          sobre: 'Elétrica residencial',
+          portfolio: const [],
+        );
+
+    test('cadastro acha a cidade sem acento e não usa a cidade como bairro', () async {
+      final (api, chamadas) = _cliente(catalogo);
+      final servico = ServicoCadastroProfissionalApi(api);
+      await servico.carregarOpcoes();
+
+      await servico.salvar(dadosCadastro('Divinópolis'));
+
+      final corpo = chamadas.singleWhere((c) => c.caminho == '/v1/profissional/cadastro').corpo!;
+      expect(corpo['regioes'], [
+        {'cidade_id': 'cid-div'},
+      ]);
+    });
+
+    test('cadastro recusa cidade não atendida em vez de gravar outra', () async {
+      final (api, chamadas) = _cliente(catalogo);
+      final servico = ServicoCadastroProfissionalApi(api);
+      await servico.carregarOpcoes();
+
+      await expectLater(servico.salvar(dadosCadastro('Recife')), throwsA(isA<ErroTrato>()));
+      expect(chamadas.where((c) => c.caminho == '/v1/profissional/cadastro'), isEmpty);
+    });
+  });
+
   group('RepositorioPedidosApi', () {
     test('lista separa em andamento de finalizados e guarda o id', () async {
       final (api, chamadas) = _cliente(
@@ -168,7 +270,7 @@ void main() {
 
       final lista = await RepositorioPedidosApi(api).listar();
 
-      expect(chamadas.single.caminho, '/v1/pedidos');
+      expect(chamadas.single.caminho, '/v1/pedidos?como=cliente');
       expect(lista.emAndamento.single.id, 'abcd1234');
       expect(lista.emAndamento.single.estadoApi, 'em_andamento');
       expect(lista.emAndamento.single.statusTexto, startsWith('Em execução'));
@@ -180,6 +282,8 @@ void main() {
 
       final id = await RepositorioPedidosApi(api).criar(
         const RascunhoPedido(
+          categoriaId: 'cat-1',
+          cidadeId: 'cid-1',
           servicos: ['Tomadas'],
           quantidade: 2,
           voltagem: '127 V',
@@ -423,17 +527,24 @@ void main() {
       expect(chamadas.single.caminho, '/v1/pedidos/ped-123/orcamentos');
       final corpo = chamadas.single.corpo!;
       expect(corpo['garantia_dias'], 90);
-      expect(corpo['prazo_dias'], 3);
-      expect(corpo['validade_dias'], 3);
+      expect(corpo['prazo_execucao_dias'], 3);
+      expect(DateTime.tryParse(corpo['validade_ate'] as String), isNotNull);
       expect(corpo['sinal_material_centavos'], 4500);
       final itens = corpo['itens'] as List;
       expect(itens.length, 3);
+      // Contrato do backend (CriarOrcamentoIn/ItemOrcamentoIn): tipo e valor_unitario_centavos.
+      for (final i in itens) {
+        expect((i as Map).keys.toSet(),
+            {'tipo', 'descricao', 'quantidade', 'valor_unitario_centavos'});
+      }
+      expect(itens[0]['tipo'], 'horas');
       expect(itens[0]['descricao'], 'Mão de obra');
-      expect(itens[0]['preco_unitario_centavos'], 20000); // 8000 * 25 / 10
-      expect(itens[1]['descricao'], 'Deslocamento');
-      expect(itens[1]['preco_unitario_centavos'], 3000);
+      expect(itens[0]['valor_unitario_centavos'], 20000); // 8000 * 25 / 10
+      expect(itens[1]['tipo'], 'deslocamento');
+      expect(itens[1]['valor_unitario_centavos'], 3000);
+      expect(itens[2]['tipo'], 'material');
       expect(itens[2]['descricao'], 'Tomadas');
-      expect(itens[2]['preco_unitario_centavos'], 4500);
+      expect(itens[2]['valor_unitario_centavos'], 4500);
     });
 
     test('enviar sem pedidoId lança ErroTrato', () async {
@@ -466,6 +577,7 @@ void main() {
       final id = await repo.criar(
         const RascunhoPedido(
           categoriaId: 'hidraulica',
+          cidadeId: 'cid-1',
           servicos: ['Torneira', 'Válvula'],
           quantidade: 2,
           voltagem: '',
@@ -479,7 +591,7 @@ void main() {
       expect(chamadas.single.caminho, '/v1/pedidos');
       final corpo = chamadas.single.corpo!;
       expect(corpo['categoria_id'], 'hidraulica');
-      expect(corpo['cidade_id'], 'de470309-afb7-49ac-9471-54e8387d4a88');
+      expect(corpo['cidade_id'], 'cid-1');
       expect(corpo['titulo'], 'Torneira, Válvula');
       expect(corpo['descricao'], 'Troca de torneira com vazamento');
       expect(corpo['faixa_preco_min_centavos'], 10000);
@@ -567,7 +679,7 @@ void main() {
       final repo = RepositorioCatalogoApi(api);
       final resultados = await repo.buscar('eletricista');
 
-      expect(chamadas.single.caminho, '/v1/profissionais?servico=eletricista');
+      expect(chamadas.first.caminho, '/v1/profissionais?servico=eletricista');
       expect(resultados.length, 1);
       expect(resultados.single.id, 'prof-123');
       expect(resultados.single.nome, 'Carlos Silva');
@@ -598,7 +710,7 @@ void main() {
         const FiltroProfissionais(bairro: 'Centro'),
       );
 
-      expect(chamadas.single.caminho, '/v1/profissionais?categoria_id=pintura&bairro=Centro');
+      expect(chamadas.first.caminho, '/v1/profissionais?categoria_id=pintura&bairro=Centro');
       expect(lista.single.id, 'prof-456');
       expect(lista.single.nome, 'Ana Souza');
     });

@@ -66,7 +66,11 @@ class PedidosEmMemoria:
     def listar_abertos(
         self, profissional_id: str, limite: int = 100, offset: int = 0
     ) -> Sequence[PedidoAberto]:
-        abertos = [p for p in self._pedidos.values() if p.estado is Estado.ABERTO]
+        abertos = [
+            p
+            for p in self._pedidos.values()
+            if p.estado is Estado.ABERTO and p.cliente_id != profissional_id
+        ]
         abertos.sort(key=lambda p: p.aberto_em, reverse=True)
         saida = []
         for p in abertos[offset : offset + limite]:

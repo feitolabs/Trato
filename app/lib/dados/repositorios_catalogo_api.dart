@@ -1,15 +1,15 @@
+import 'package:flutter/material.dart';
+
 import '../componentes/componentes.dart';
 import '../telas/agenda/modelos.dart';
 import '../telas/cliente/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
 import '../telas/servicos/modelos.dart';
 import 'cliente_api.dart';
-import 'catalogo_exemplo.dart';
 import 'erros.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
-import 'repositorios_catalogo_fake.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`) do catálogo, dos serviços e da agenda.
 // Só o que o backend já tem sai da API; o resto segue em demonstração e está listado em
@@ -30,41 +30,79 @@ String _iniciais(String nome) {
 /// Catálogo ligado à API real (`GET /v1/catalogo/categorias`, `GET /v1/profissionais` e
 /// `GET /v1/profissionais/{id}`).
 class RepositorioCatalogoApi implements RepositorioCatalogo {
-  RepositorioCatalogoApi(this._api, {RepositorioCatalogo? demo})
-      : _demo = demo ?? RepositorioCatalogoFake();
+  RepositorioCatalogoApi(this._api);
 
   final ClienteApi _api;
-  final RepositorioCatalogo _demo;
 
+  /// Ícone de cada categoria do banco, pelo `slug`. É só apresentação.
+  static const _icones = <String, IconData>{
+    'limpeza-residencial': Icons.auto_awesome_outlined,
+    'montagem-de-moveis': Icons.inventory_2_outlined,
+    'pintura-interna': Icons.format_paint_outlined,
+    'eletricista': Icons.bolt,
+    'encanador': Icons.water_drop_outlined,
+    'reparos-gerais': Icons.handyman_outlined,
+    'ar-condicionado': Icons.ac_unit,
+    'eletrodomesticos': Icons.kitchen_outlined,
+    'chaveiro': Icons.vpn_key_outlined,
+    'jardinagem': Icons.grass_outlined,
+    'diarista': Icons.cleaning_services_outlined,
+    'marcenaria': Icons.carpenter_outlined,
+    'vidraceiro': Icons.window_outlined,
+    'serralheria': Icons.fence_outlined,
+    'gesso-drywall': Icons.layers_outlined,
+    'pisos-revestimentos': Icons.grid_on_outlined,
+    'impermeabilizacao': Icons.umbrella_outlined,
+    'cameras-seguranca': Icons.videocam_outlined,
+    'informatica-redes': Icons.wifi,
+    'mudanca-frete': Icons.local_shipping_outlined,
+    'cortinas-persianas': Icons.blinds_outlined,
+    'limpeza-especial': Icons.chair_outlined,
+  };
+
+  /// Só o que está no banco. Sem rede, o erro vai para a tela ("Tentar de novo").
   @override
   Future<List<CategoriaServico>> categorias() async {
-    final baseDemo = await _demo.categorias();
+    final resposta = await _api.get('/v1/catalogo/categorias');
+    return [
+      for (final item in (resposta as List? ?? const []).cast<Map<String, dynamic>>())
+        CategoriaServico(
+          item['nome'] as String,
+          _icones[item['slug']] ?? Icons.home_repair_service_outlined,
+          id: item['id'] as String,
+        ),
+    ];
+  }
+
+  Map<String, String>? _nomesCategorias;
+
+  /// A API devolve as categorias do profissional como id; a tela mostra o nome.
+  Future<void> _carregarNomesCategorias() async {
+    if (_nomesCategorias != null) return;
     try {
       final resposta = await _api.get('/v1/catalogo/categorias');
-      if (resposta is List && resposta.isNotEmpty) {
-        final iconesPorId = {for (final c in baseDemo) c.id: c.icone};
-        return [
-          for (final item in resposta.cast<Map<String, dynamic>>())
-            CategoriaServico(
-              (item['nome'] as String?) ?? 'Serviço',
-              iconesPorId[item['id'] as String?] ??
-                  iconesPorId[item['slug'] as String?] ??
-                  baseDemo.first.icone,
-              id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
-            ),
-        ];
+      if (resposta is List) {
+        _nomesCategorias = {
+          for (final c in resposta)
+            if (c is Map && c['id'] is String && c['nome'] is String)
+              c['id'] as String: c['nome'] as String,
+        };
       }
-    } on Object {
-      // Sem rede ou rota offline: usa as categorias padrão.
+    } on ErroTrato {
+      // Sem os nomes, a especialidade só fica em branco; a lista continua.
     }
-    return baseDemo;
   }
+
+  String _especialidade(List<Object?> ids) => [
+        for (final c in ids)
+          if (_nomesCategorias?[c] != null) _nomesCategorias![c]!,
+      ].join(', ');
 
   Profissional _converterBusca(Map<String, dynamic> j) {
     final id = (j['id'] as String?) ?? '';
     final nome = (j['nome'] as String?) ?? 'Profissional';
     final nivel = (j['nivel_verificacao'] as String?) ?? '';
-    final categorias = [for (final c in (j['categorias'] as List? ?? const [])) '$c'];
+    final categorias = (j['categorias'] as List?) ?? const <Object?>[];
     final notaPublica = (j['nota_publica'] as num?)?.toDouble() ?? 0.0;
     final servicosConcluidos = (j['servicos_concluidos'] as int?) ?? 0;
     return Profissional(
@@ -72,11 +110,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       nome: nome,
       iniciais: _iniciais(nome),
       verificacao: nivel.contains('plus') ? 'Verificado Plus' : 'Verificado',
-      especialidade: categorias.join(', '),
+      especialidade: _especialidade(categorias),
       servicosConcluidos: servicosConcluidos,
       nota: notaPublica,
       distanciaKm: 0,
-      regiao: 'Belo Horizonte',
+      regiao: '',
     );
   }
 
@@ -87,6 +125,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
     };
     final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
+    await _carregarNomesCategorias();
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
         _converterBusca(item as Map<String, dynamic>),
@@ -102,6 +141,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final resposta = _mapa(
       await _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
     );
+    await _carregarNomesCategorias();
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
         _converterBusca(item as Map<String, dynamic>),
@@ -137,46 +177,40 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   Future<FormularioPedido> _formularioBase(String categoriaId) async {
-    try {
-      final cats = await categorias();
-      final c = cats.where((x) => x.id == categoriaId).firstOrNull;
-      if (c != null) return formularioDaCategoria(c);
-    } catch (_) {
-      // Falha ao obter da API: segue para demo ou genérico.
+    final c = (await categorias()).where((x) => x.id == categoriaId).firstOrNull;
+    if (c == null) {
+      throw const ErroTrato(TipoErro.naoEncontrado, 'Esta categoria não está mais disponível.');
     }
-    try {
-      return await _demo.formulario(categoriaId);
-    } catch (_) {
-      return FormularioPedido(
-        categoriaId: categoriaId,
-        categoria: 'Serviço solicitado',
-        servicos: const ['Orçamento geral'],
-        servicosIniciais: const {'Orçamento geral'},
-        perguntaQuantidade: 'Quantos itens ou ambientes?',
-        dicaQuantidade: 'Uma estimativa já ajuda',
-        quantidadeInicial: 1,
-        perguntaVoltagem: 'Voltagem',
-        voltagens: const [],
-        voltagemInicial: '',
-        descricaoInicial: '',
-        fotos: const [],
-        prazos: const ['Esta semana', 'Sem pressa'],
-        faixas: const [
-          FaixaPreco(minimoCentavos: 10000, maximoCentavos: 30000),
-          FaixaPreco(minimoCentavos: 30000, maximoCentavos: 80000),
-        ],
-        endereco: 'Seu endereço atual',
-        avisoEndereco: 'O endereço completo só aparece para o profissional contratado.',
-        avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
-      );
-    }
+    return FormularioPedido(
+      categoriaId: c.id,
+      icone: c.icone,
+      categoria: c.nome,
+      servicos: const ['Orçamento geral'],
+      servicosIniciais: const {},
+      perguntaQuantidade: 'Quantos itens ou ambientes?',
+      dicaQuantidade: 'Uma estimativa já ajuda',
+      quantidadeInicial: 1,
+      perguntaVoltagem: '',
+      voltagens: const [],
+      voltagemInicial: '',
+      descricaoInicial: '',
+      fotos: const [],
+      prazos: const ['Esta semana', 'Sem pressa'],
+      faixas: const [
+        FaixaPreco(minimoCentavos: 20000, maximoCentavos: 50000),
+        FaixaPreco(minimoCentavos: 0, maximoCentavos: 20000),
+        FaixaPreco(minimoCentavos: 50000, maximoCentavos: 100000),
+      ],
+      endereco: 'Combine o endereço depois da contratação',
+      avisoEndereco: 'O endereço completo só aparece para o profissional que você contratar.',
+      avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas. Avisamos quando o prazo terminar.',
+    );
   }
 
   @override
   Future<Profissional> perfil(String profissionalId) async {
-    // Os profissionais de demonstração têm id "prof-...": não existem no backend.
-    if (profissionalId.startsWith('prof-')) return _demo.perfil(profissionalId);
     final j = _mapa(await _api.get('/v1/profissionais/$profissionalId'));
+    await _carregarNomesCategorias();
     final nome = (j['nome'] as String?) ?? 'Profissional';
     final nivel = (j['nivel_verificacao'] as String?) ?? '';
     final avaliacoes = [
@@ -202,7 +236,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       nome: nome,
       iniciais: _iniciais(nome),
       verificacao: nivel.contains('plus') ? 'Verificado Plus' : 'Verificado',
-      especialidade: [for (final c in (j['categorias'] as List? ?? const [])) '$c'].join(', '),
+      especialidade: _especialidade((j['categorias'] as List?) ?? const <Object?>[]),
       servicosConcluidos: (j['servicos_concluidos'] as int?) ?? 0,
       nota: notaPublica ?? 0,
       distanciaKm: 0,

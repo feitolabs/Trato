@@ -164,6 +164,9 @@ abstract interface class RepositorioProfissional {
   Future<DetalhePedido> detalhe(String pedidoId);
   Future<void> recusar(String pedidoId, MotivoRecusa motivo);
 
+  /// Marca a visita de um pedido já pago. Sem isso o check-in não é liberado.
+  Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim);
+
   /// Carteira como EXTRATO (D15): sem saldo próprio, sem saque.
   Future<List<ItemExtrato>> extrato();
 
