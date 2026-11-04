@@ -540,6 +540,26 @@ void main() {
       expect(p.distanciaKm, isNull, reason: 'a API não devolve distância');
     });
 
+    test('início mostra a carteira real (GET /profissionais/me/saldo)', () async {
+      final (api, _) = _api({
+        'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos Mendes', 'papel': 'profissional'}),
+        'GET /v1/profissional/pedidos-abertos': (200, abertos),
+        'GET /v1/profissionais/me/saldo': (200, {'a_liberar_centavos': 12345, 'liberado_centavos': 6789}),
+        'GET /v1/pedidos': (200, <Map<String, dynamic>>[]),
+      });
+
+      final i = await RepositorioProfissionalApi(api).inicio();
+
+      expect(i.carteira.retidoCentavos, 12345);
+      expect(i.carteira.paraSacarCentavos, 6789);
+    });
+
+    test('início: se tudo falhar o erro sobe (a tela mostra "tentar de novo")', () async {
+      final (api, _) = _api({});
+
+      await expectLater(RepositorioProfissionalApi(api).inicio(), throwsA(isA<Object>()));
+    });
+
     test('início junta /me, pedidos abertos e o próximo atendimento', () async {
       final (api, _) = _api({
         'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos Mendes', 'papel': 'profissional'}),
@@ -554,12 +574,16 @@ void main() {
       expect(i.proximo!.pedidoId, 'ab12cd34');
     });
 
-    test('detalhe sai da lista; pedido que sumiu dá aviso', () async {
-      final (api, _) = _api({'GET /v1/profissional/pedidos-abertos': (200, abertos)});
+    test('detalhe vem de GET /pedidos-abertos/{id}; pedido que sumiu dá aviso', () async {
+      final (api, chamadas) = _api({
+        'GET /v1/profissional/pedidos-abertos/pa1': (200, abertos.first),
+        'GET /v1/profissional/pedidos-abertos/nao-existe': (404, {'detail': 'Pedido não encontrado.'}),
+      });
       final repo = RepositorioProfissionalApi(api);
 
       final d = await repo.detalhe('pa1');
       expect(d.descricao, 'Sala, teto alto');
+      expect(chamadas.first.caminho, '/v1/profissional/pedidos-abertos/pa1');
 
       await expectLater(
         repo.detalhe('nao-existe'),

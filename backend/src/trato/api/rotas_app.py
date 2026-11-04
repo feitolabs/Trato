@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
 
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
@@ -25,6 +25,7 @@ from trato.api.repositorios_app import (
     DocumentoVerificacao,
 )
 from trato.api.servicos import carregar_pedido, eh_participante
+from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
 from trato.profissional.config import ORDEM_NIVEIS, obter_config_profissional
@@ -230,6 +231,13 @@ class AvaliacaoOut(BaseModel):
 class EnviarMensagemIn(_Entrada):
     texto: str = Field(min_length=1, max_length=2000)
 
+    @field_validator("texto")
+    @classmethod
+    def _texto_nao_so_espacos(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("A mensagem não pode ser só espaços.")
+        return v
+
 
 class ResumoOrcamentoIn(_Entrada):
     valor_centavos: StrictInt = Field(
@@ -376,14 +384,16 @@ def enviar_orcamento(
         raise HTTPException(404, "Pedido não encontrado.")
     if pedido.estado is not Estado.ABERTO:
         raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
+    # Só orça quem atua na categoria e na região do pedido (mesma regra da lista de abertos).
+    if pedido_visivel_ao_profissional(contexto, pedido.id, usuario.id) is None:
+        raise HTTPException(404, "Pedido não encontrado.")
 
     agora = contexto.agora()
     total_estimado = sum(int(i.quantidade * i.valor_unitario_centavos) for i in dados.itens)
+    if total_estimado <= 0:
+        raise HTTPException(422, "O valor total do orçamento precisa ser maior que zero.")
     if total_estimado > TETO_ORCAMENTO_CENTAVOS:
-        raise HTTPException(
-            422,
-            f"O valor total do orçamento não pode passar de R$ 500.000,00.",
-        )
+        raise HTTPException(422, "O valor total do orçamento não pode passar de R$ 500.000,00.")
     itens = [
         ItemOrcamento(
             tipo=i.tipo.strip().lower(),
@@ -530,6 +540,20 @@ def resumo_do_orcamento(
 # --- Mensagens --------------------------------------------------------------------------
 
 
+def _exigir_profissional_do_pedido(contexto: Contexto, pedido, usuario: Usuario) -> None:
+    """Profissional só conversa num pedido que ele pode ver (categoria e região) ou que o contratou.
+
+    Sem isso, qualquer profissional abriria conversa em qualquer pedido aberto."""
+    if usuario.papel is not PapelUsuario.PROFISSIONAL:
+        return
+    if pedido.profissional_id == usuario.id:
+        return
+    if pedido.profissional_id is not None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido_visivel_ao_profissional(contexto, pedido.id, usuario.id) is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+
+
 def _conversa_do_pedido(
     contexto: Contexto, pedido: Pedido, usuario: Usuario, profissional_id: str | None
 ) -> str:
@@ -586,6 +610,7 @@ def listar_mensagens(
         consulta="chat",
         com_disputa=True,
     )
+    _exigir_profissional_do_pedido(contexto, pedido, usuario)
     conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
     return _mensagens_out(contexto, conversa, usuario)
 
@@ -604,10 +629,7 @@ def enviar_mensagem(
     contexto: Contexto = Depends(obter_contexto),
 ) -> MensagemOut:
     pedido = _pedido_visivel(contexto, pedido_id, usuario)
-    if usuario.papel is PapelUsuario.PROFISSIONAL and (
-        pedido.profissional_id not in (None, usuario.id)
-    ):
-        raise HTTPException(404, "Pedido não encontrado.")
+    _exigir_profissional_do_pedido(contexto, pedido, usuario)
     conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
     nova = contexto.conversas.enviar(conversa, usuario.id, corpo.texto)
     return next(m for m in _mensagens_out(contexto, conversa, usuario) if m.id == nova)

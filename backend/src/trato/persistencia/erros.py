@@ -74,6 +74,10 @@ def traduzir(erro: psycopg.Error) -> ErroPersistencia:
         return DadosInvalidos("Dado em formato inválido.")
     if isinstance(erro, pg.InsufficientPrivilege):
         return ErroPersistencia("O backend não tem permissão para essa operação no banco.")
+    if isinstance(erro, pg.SerializationFailure | pg.DeadlockDetected | pg.LockNotAvailable):
+        # Duas requisições disputaram o mesmo registro (ex.: duplo toque em "aceitar"): é um
+        # conflito de estado (409), não banco fora do ar (503).
+        return ConflitoDeEstado("Outra ação mexeu nisso ao mesmo tempo. Tente de novo.")
     if isinstance(erro, psycopg.OperationalError | psycopg.InterfaceError):
         return BancoIndisponivel("Banco de dados indisponível.")
     _log.error("Erro no Postgres não tratado especificamente (%s): %s", type(erro).__name__, erro, exc_info=True)
