@@ -28,6 +28,7 @@ from trato.api.servicos import carregar_pedido, eh_participante
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
+from trato.persistencia.erros import RegraDoBanco
 from trato.profissional.config import ORDEM_NIVEIS, obter_config_profissional
 from trato.profissional.repositorio import slugs
 from trato.seguranca.config import obter_config_seguranca
@@ -410,25 +411,34 @@ def enviar_orcamento(
         )
         for e in dados.etapas
     ]
-    orcamento_id = contexto.orcamentos.enviar(
-        pedido_id=pedido.id,
-        profissional_id=usuario.id,
-        itens=itens,
-        agora=agora,
-        etapas=etapas,
-        prazo_execucao_dias=dados.prazo_execucao_dias,
-        validade_ate=dados.validade_ate,
-        garantia_dias=dados.garantia_dias,
-        fora_do_escopo=(
-            limpar_texto(dados.fora_do_escopo, "fora_do_escopo", 1000)
-            if dados.fora_do_escopo
-            else None
-        ),
-        sinal_material_centavos=dados.sinal_material_centavos,
-        observacoes=(
-            limpar_texto(dados.observacoes, "observacoes", 1000) if dados.observacoes else None
-        ),
-    )
+    try:
+        orcamento_id = contexto.orcamentos.enviar(
+            pedido_id=pedido.id,
+            profissional_id=usuario.id,
+            itens=itens,
+            agora=agora,
+            etapas=etapas,
+            prazo_execucao_dias=dados.prazo_execucao_dias,
+            validade_ate=dados.validade_ate,
+            garantia_dias=dados.garantia_dias,
+            fora_do_escopo=(
+                limpar_texto(dados.fora_do_escopo, "fora_do_escopo", 1000)
+                if dados.fora_do_escopo
+                else None
+            ),
+            sinal_material_centavos=dados.sinal_material_centavos,
+            observacoes=(
+                limpar_texto(dados.observacoes, "observacoes", 1000) if dados.observacoes else None
+            ),
+        )
+    except RegraDoBanco as erro:
+        if "aprovado e verificado" in str(erro):
+            raise HTTPException(
+                403,
+                "Seu cadastro ainda está em análise. Você poderá enviar orçamentos assim que "
+                "for aprovado e verificado.",
+            ) from erro
+        raise
     detalhe = contexto.orcamentos.detalhe(orcamento_id)
     if detalhe is None:
         orc = contexto.orcamentos.obter(orcamento_id)

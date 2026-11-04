@@ -421,17 +421,18 @@ void main() {
       expect(chamadas.single.caminho, '/v1/pedidos/ped-123/orcamentos');
       final corpo = chamadas.single.corpo!;
       expect(corpo['garantia_dias'], 90);
-      expect(corpo['prazo_dias'], 3);
-      expect(corpo['validade_dias'], 3);
+      expect(corpo['prazo_execucao_dias'], 3);
+      expect(DateTime.parse(corpo['validade_ate'] as String).isAfter(DateTime.now().toUtc()), isTrue);
       expect(corpo['sinal_material_centavos'], 4500);
       final itens = corpo['itens'] as List;
       expect(itens.length, 3);
       expect(itens[0]['descricao'], 'Mão de obra');
-      expect(itens[0]['preco_unitario_centavos'], 20000); // 8000 * 25 / 10
+      expect(itens.every((i) => const {'horas', 'deslocamento', 'material', 'outro'}.contains(i['tipo'])), isTrue);
+      expect(itens[0]['valor_unitario_centavos'], 20000); // 8000 * 25 / 10
       expect(itens[1]['descricao'], 'Deslocamento');
-      expect(itens[1]['preco_unitario_centavos'], 3000);
+      expect(itens[1]['valor_unitario_centavos'], 3000);
       expect(itens[2]['descricao'], 'Tomadas');
-      expect(itens[2]['preco_unitario_centavos'], 4500);
+      expect(itens[2]['valor_unitario_centavos'], 4500);
     });
 
     test('enviar sem pedidoId lança ErroTrato', () async {

@@ -6,6 +6,8 @@ Nunca toca no Supabase real.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from .test_fluxo_postgres import abrir_pedido, acao, enviar_orcamento
@@ -305,3 +307,69 @@ def test_aceites_simultaneos_geram_um_unico_contrato(atuacao):  # noqa: F811
     assert codigos.count(200) >= 1, codigos
     assert contratos_do_pedido(c, pedido_id) == 1, codigos
     assert all(codigo in (200, 409, 422) for codigo in codigos), codigos
+
+
+def test_orcamento_no_formato_do_app_e_aceito(atuacao):  # noqa: F811
+    """Contrato app <-> backend: o app monta o orçamento assim (ver ServicoOrcamentoApi.enviar)."""
+    c = atuacao
+    pedido_id = abrir_pedido(c)
+    corpo = {
+        "itens": [
+            {
+                "tipo": "horas",
+                "descricao": "Mão de obra",
+                "quantidade": 1,
+                "valor_unitario_centavos": 12_000,
+            },
+            {
+                "tipo": "deslocamento",
+                "descricao": "Deslocamento",
+                "quantidade": 1,
+                "valor_unitario_centavos": 3_000,
+            },
+        ],
+        "prazo_execucao_dias": 3,
+        "validade_ate": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
+        "sinal_material_centavos": 0,
+        "garantia_dias": 30,
+    }
+    r = post(c, f"/v1/pedidos/{pedido_id}/orcamentos", "profissional", corpo)
+    assert r.status_code == 201, r.text
+    assert r.json()["valor_total_centavos"] == 15_000
+
+
+def test_orcamento_no_formato_antigo_do_app_e_recusado_com_motivo(atuacao):  # noqa: F811
+    """O formato que o app mandava antes (sem `tipo`, preço com outro nome) é 422."""
+    c = atuacao
+    pedido_id = abrir_pedido(c)
+    antigo = {
+        "itens": [{"descricao": "Serviço", "quantidade": 1, "preco_unitario_centavos": 10_000}],
+        "prazo_dias": 3,
+        "validade_dias": 3,
+    }
+    r = post(c, f"/v1/pedidos/{pedido_id}/orcamentos", "profissional", antigo)
+    assert r.status_code == 422, r.text
+
+
+def test_cadastro_em_analise_nao_envia_orcamento_e_recebe_motivo_claro(atuacao):  # noqa: F811
+    c = atuacao
+    pedido_id = abrir_pedido(c)
+    with c.local.admin() as con:
+        antes = con.execute(
+            "select status::text from public.perfis_profissional where usuario_id = %s",
+            (c.ids["profissional"],),
+        ).fetchone()[0]
+        con.execute(
+            "update public.perfis_profissional set status = 'em_analise' where usuario_id = %s",
+            (c.ids["profissional"],),
+        )
+    try:
+        r = post(c, f"/v1/pedidos/{pedido_id}/orcamentos", "profissional", corpo_orcamento())
+    finally:
+        with c.local.admin() as con:
+            con.execute(
+                "update public.perfis_profissional set status = %s where usuario_id = %s",
+                (antes, c.ids["profissional"]),
+            )
+    assert r.status_code == 403, r.text
+    assert "em análise" in r.json()["detail"]

@@ -777,6 +777,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       abertos = await pedidosAbertos(const FiltroPedidosAbertos(limite: 20));
       deuCerto = true;
     } catch (e) {
+      // 403: cadastro ainda em análise. A tela mostra o motivo, não uma lista vazia.
+      if (e is ErroTrato && e.codigoHttp == 403) rethrow;
       primeiroErro ??= e;
     }
     try {
@@ -927,34 +929,38 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     final valorHoras = Dinheiro.valorDasHoras(pronto.valorHoraCentavos, pronto.decimosDeHora);
     if (valorHoras > 0) {
       itens.add({
+        'tipo': 'horas',
         'descricao': 'Mão de obra',
         'quantidade': 1,
-        'preco_unitario_centavos': valorHoras,
+        'valor_unitario_centavos': valorHoras,
       });
     }
     if (pronto.deslocamentoCentavos > 0) {
       itens.add({
+        'tipo': 'deslocamento',
         'descricao': 'Deslocamento',
         'quantidade': 1,
-        'preco_unitario_centavos': pronto.deslocamentoCentavos,
+        'valor_unitario_centavos': pronto.deslocamentoCentavos,
       });
     }
     if (pronto.materialPorMim) {
       for (final item in pronto.itens) {
         if (item.centavos > 0) {
           itens.add({
+            'tipo': 'material',
             'descricao': item.nome,
             'quantidade': 1,
-            'preco_unitario_centavos': item.centavos,
+            'valor_unitario_centavos': item.centavos,
           });
         }
       }
     }
     if (itens.isEmpty && pronto.totalCentavos > 0) {
       itens.add({
+        'tipo': 'outro',
         'descricao': 'Serviço',
         'quantidade': 1,
-        'preco_unitario_centavos': pronto.totalCentavos,
+        'valor_unitario_centavos': pronto.totalCentavos,
       });
     }
 
@@ -967,8 +973,8 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
       '/v1/pedidos/$id/orcamentos',
       corpo: {
         'itens': itens,
-        'prazo_dias': 3,
-        'validade_dias': 3,
+        'prazo_execucao_dias': 3,
+        'validade_ate': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
         'sinal_material_centavos': sinal,
         'garantia_dias': pronto.garantiaDias,
       },

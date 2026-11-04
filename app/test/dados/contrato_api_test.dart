@@ -554,6 +554,21 @@ void main() {
       expect(i.carteira.paraSacarCentavos, 6789);
     });
 
+    test('início: cadastro em análise (403) mostra o motivo, não lista vazia', () async {
+      final (api, _) = _api({
+        'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos', 'papel': 'cliente'}),
+        'GET /v1/profissional/pedidos-abertos': (
+          403,
+          {'detail': 'Seu cadastro de profissional ainda está em análise.'},
+        ),
+      });
+
+      await expectLater(
+        RepositorioProfissionalApi(api).inicio(),
+        throwsA(isA<ErroTrato>().having((e) => e.mensagem, 'mensagem', contains('em análise'))),
+      );
+    });
+
     test('início: se tudo falhar o erro sobe (a tela mostra "tentar de novo")', () async {
       final (api, _) = _api({});
 
