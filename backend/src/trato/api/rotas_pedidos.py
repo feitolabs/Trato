@@ -160,6 +160,8 @@ def abrir_pedido(
                 for r in dados.respostas
             ),
         )
+    if dados is not None and not dados.bairro and dados.endereco and dados.endereco.bairro:
+        dados = replace(dados, bairro=dados.endereco.bairro)  # o profissional vê o bairro
     gravado = contexto.pedidos.salvar(pedido, None, dados)
     return pedido_out(gravado, usuario)
 

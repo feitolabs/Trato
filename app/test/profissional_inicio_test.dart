@@ -37,6 +37,15 @@ void main() {
     expect(reaisCurto(150000), 'R\$ 1.500');
     expect(textoFaixa(pedidoTomadasExemplo), 'R\$ 200 a R\$ 500');
     expect(textoFaixa(inicioProfissionalExemplo.pedidos[1]), 'Sem faixa');
+    // Só o teto (cliente informou "até quanto") ou só o piso também aparecem.
+    const soTeto = PedidoAberto(
+      id: 'x', titulo: 't', bairro: '', prazo: 'sem data', faixaMaxCentavos: 80000,
+    );
+    const soPiso = PedidoAberto(
+      id: 'x', titulo: 't', bairro: '', prazo: 'sem data', faixaMinCentavos: 10000,
+    );
+    expect(textoFaixa(soTeto), 'Até R\$ 800');
+    expect(textoFaixa(soPiso), 'A partir de R\$ 100');
     expect(textoDistancia(2.1), '2,1 km');
     expect(textoOrcamentos(pedidoTomadasExemplo), '3 de 5 orçaram');
     expect(textoOrcamentos(inicioProfissionalExemplo.pedidos[1]), '1 de 5 orçou');
