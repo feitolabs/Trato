@@ -95,17 +95,19 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
         Align(
           alignment: Alignment.centerLeft,
           child: ChipStatus(
-            texto: 'Aguardando confirmação do pagamento · ${formatarReais(dados.valorLiberadoCentavos)}',
+            // O pagamento já foi confirmado pelo parceiro antes do serviço; aqui o que acabou
+            // de acontecer é a confirmação do serviço pelo cliente.
+            texto: 'Serviço confirmado · ${formatarReais(dados.valorLiberadoCentavos)}',
             tipo: TipoStatus.sucesso,
             icone: Icons.check,
           ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        Text('Como foi o serviço do ${dados.nomeProfissional}?',
+        Text('Como foi o serviço com ${dados.nomeProfissional}?',
             style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
         Text(
-          'Sua nota ajuda outros clientes. O ${dados.nomeProfissional} também avalia você.',
+          'Sua nota ajuda outros clientes. ${primeiraMaiuscula(dados.nomeProfissional)} também avalia você.',
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x5),

@@ -13,9 +13,13 @@ class AgendaTela extends StatelessWidget {
     required this.carregar,
     this.aoFazerCheckIn,
     this.hoje,
+    this.atualizarQuando,
   });
 
   final Future<List<Agendamento>> Function() carregar;
+
+  /// Recarrega a agenda quando dispara (ex.: depois de marcar a visita).
+  final Listenable? atualizarQuando;
   final ValueChanged<Agendamento>? aoFazerCheckIn;
 
   /// Dia de "hoje" (para os testes). Padrão: o dia do aparelho.
@@ -28,6 +32,7 @@ class AgendaTela extends StatelessWidget {
       comVoltar: false,
       child: CarregadorTela<List<Agendamento>>(
         carregar: carregar,
+        atualizarQuando: atualizarQuando,
         construir: (context, itens, _) => itens.isEmpty
             ? const EstadoVazio(
                 icone: Icons.calendar_today_outlined,
@@ -129,14 +134,15 @@ class _CartaoAgendamento extends StatelessWidget {
             ],
           ),
           const SizedBox(height: EspacosTrato.x1),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.place_outlined, size: 18, color: CoresTrato.petroleo),
-              const SizedBox(width: EspacosTrato.x2),
-              Expanded(child: Text(a.local, style: secundario)),
-            ],
-          ),
+          if (a.local.trim().isNotEmpty)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.place_outlined, size: 18, color: CoresTrato.petroleo),
+                const SizedBox(width: EspacosTrato.x2),
+                Expanded(child: Text(a.local, style: secundario)),
+              ],
+            ),
           if (a.cliente != null) ...[
             const SizedBox(height: EspacosTrato.x1),
             Text('Cliente: ${a.cliente}', style: secundario),
@@ -144,7 +150,7 @@ class _CartaoAgendamento extends StatelessWidget {
           if (a.podeFazerCheckIn && aoFazerCheckIn != null) ...[
             const SizedBox(height: EspacosTrato.x3),
             BotaoSecundario(
-              texto: 'Fazer check-in',
+              texto: a.estado == EstadoAgendamento.emAndamento ? 'Concluir serviço' : 'Fazer check-in',
               icone: Icons.place_outlined,
               aoTocar: aoFazerCheckIn,
             ),

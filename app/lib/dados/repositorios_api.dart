@@ -16,6 +16,7 @@ import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
+import '../telas/comuns/formato_aparelho.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
 import 'fila_offline.dart';
@@ -29,7 +30,7 @@ import 'servico_upload.dart';
 
 String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
-String _hora(DateTime d) => '${d.hour}h${_doisDigitos(d.minute)}';
+String _hora(DateTime d) => horaDoAparelho(d);
 
 Map<String, dynamic> _mapa(Object? json) =>
     json is Map<String, dynamic> ? json : (json is Map ? Map<String, dynamic>.from(json) : const <String, dynamic>{});
@@ -101,6 +102,38 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   Future<SaldoPedidoApi> _saldo(String id) async =>
       SaldoPedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$id/saldo')));
+
+  /// `GET /v1/pedidos/{id}/fotos`: URLs assinadas e curtas das fotos do serviço. "antes" é a foto
+  /// de chegada (ou "antes"), "depois" a foto final (ou "depois"). Falha de rede = sem fotos.
+  Future<Map<String, String>> _fotosDoServico(String pedidoId) async {
+    final porFinalidade = <String, String>{};
+    try {
+      for (final f in _lista(await _api.get('/v1/pedidos/$pedidoId/fotos'))) {
+        final url = f['url'];
+        if (url is! String) continue;
+        switch (f['finalidade']) {
+          case 'checkin' || 'antes':
+            porFinalidade.putIfAbsent('antes', () => url);
+          case 'checkout' || 'depois':
+            porFinalidade['depois'] = url;
+        }
+      }
+    } catch (_) {}
+    return porFinalidade;
+  }
+
+  /// Nome do profissional do pedido (`GET /v1/profissionais/{id}`). Sem nome, "o profissional":
+  /// as frases das telas funcionam com os dois (início de frase ganha maiúscula).
+  Future<String> _nomeDoProfissional(PedidoApi pedido) async {
+    final id = pedido.profissionalId;
+    if (id == null) return 'o profissional';
+    try {
+      final nome = (_mapa(await _api.get('/v1/profissionais/$id'))['nome'] as String?)?.trim();
+      return (nome == null || nome.isEmpty) ? 'o profissional' : nome;
+    } catch (_) {
+      return 'o profissional';
+    }
+  }
 
   @override
   Future<PedidosDoCliente> listar() async {
@@ -174,8 +207,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
           {'pergunta_id': 'prazo', 'resposta': rascunho.prazo},
       ],
     };
+    // Só ASCII: a chave vai num cabeçalho HTTP e o nome do serviço tem acento ("Orçamento geral").
     final chaveIdemp =
-        'pedido-${DateTime.now().millisecondsSinceEpoch}-${rascunho.servicos.join('_')}-${rascunho.descricao.hashCode}';
+        'pedido-${DateTime.now().millisecondsSinceEpoch}-${rascunho.servicos.join('|').hashCode.abs()}-${rascunho.descricao.hashCode.abs()}';
     final criado = PedidoApi.deJson(
       _mapa(await _api.post('/v1/pedidos', corpo: corpo, chaveIdempotencia: chaveIdemp)),
     );
@@ -220,28 +254,36 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final eventos = [
       for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j),
     ];
+    // Etapas da linha do tempo (índice = posição). O check-in cobre "Chegou" e "Em execução".
     const etapaDaAcao = {
       'aceitar_orcamento': 0,
       'confirmar_agenda': 1,
       'fazer_check_in': 3,
-      'confirmar_conclusao': 4,
+      'fazer_check_out': 4,
+      'confirmar_conclusao': 5,
     };
     const etapaDoEstado = {
       'orcamento_aceito': 0,
       'pago_e_retido': 0,
       'agendado': 1,
       'em_andamento': 3,
-      'em_confirmacao': 3,
-      'concluido': 5,
+      'em_confirmacao': 4,
+      'concluido': 6,
     };
-    const titulos = ['Contratado', 'A caminho', 'Chegou', 'Em execução', 'Finalizado'];
+    const titulos = [
+      'Contratado',
+      'Visita marcada',
+      'Chegou',
+      'Em execução',
+      'Aguardando sua confirmação',
+      'Finalizado',
+    ];
     final atual = etapaDoEstado[pedido.estado] ?? 0;
     final quando = <int, DateTime>{};
     for (final e in eventos) {
       final etapa = etapaDaAcao[e.acao];
       if (etapa != null) quando[etapa] = e.em.toLocal();
     }
-    // O check-in cobre "Chegou" e "Em execução" no backend (uma ação só).
     final checkIn = quando[3];
     if (checkIn != null) quando[2] = checkIn;
     final etapas = [
@@ -261,7 +303,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       titulo: 'Serviço em execução',
       etapas: etapas,
       fotos: const [],
-      codigoInicio: pedido.codigoInicio,
+      // O código de início só serve até o profissional chegar.
+      codigoInicio: const {'em_andamento', 'em_confirmacao', 'concluido'}.contains(pedido.estado)
+          ? null
+          : pedido.codigoInicio,
     );
   }
 
@@ -269,9 +314,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<ResumoConclusao> conclusao(String pedidoId) async {
     final pedido = await _pedido(pedidoId);
     final saldo = await _saldo(pedidoId);
+    final fotos = await _fotosDoServico(pedidoId);
     return ResumoConclusao(
       numeroPedido: pedido.numero,
-      nomeProfissional: 'O profissional',
+      nomeProfissional: await _nomeDoProfissional(pedido),
+      fotoAntes: fotos['antes'],
+      fotoDepois: fotos['depois'],
+      fotosCarregadas: true,
       legendaFotoAntes: 'Antes',
       legendaFotoDepois: 'Depois',
       orcamentoCentavos: saldo.clientePagouCentavos,
@@ -296,7 +345,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       motivos: textos.motivos,
       solucoes: textos.solucoes,
       prazoRespostaHoras: textos.prazoRespostaHoras,
-      nomeProfissional: 'O profissional',
+      nomeProfissional: await _nomeDoProfissional(pedido),
     );
   }
 
@@ -338,8 +387,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async {
     final saldo = await _saldo(pedidoId);
+    final pedido = await _pedido(pedidoId);
     return DadosAvaliacao(
-      nomeProfissional: 'O profissional',
+      nomeProfissional: await _nomeDoProfissional(pedido),
       valorLiberadoCentavos: saldo.clientePagouCentavos,
       criterios: textos.criterios,
       gorjetasCentavos: textos.gorjetas,
@@ -722,6 +772,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     this._api, {
     this.captura = const CapturaIndisponivel(),
     this.capturaDoPedido,
+    this.capturaFinalDoPedido,
     this.upload,
     this.fila,
   });
@@ -731,6 +782,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
   /// Câmera e GPS ligados ao pedido (a foto sobe com o `pedido_id`). Sem ele vale [captura].
   final CapturaCheckIn Function(String pedidoId)? capturaDoPedido;
+
+  /// Igual à de cima, mas a foto sobe com a finalidade `checkout` (foto final do serviço).
+  final CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido;
   final ServicoUpload? upload;
   final FilaOffline? fila;
 
@@ -786,9 +840,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
           proximo = ProximoAtendimento(
             pedidoId: p.id,
-            quando: p.estadoNome,
+            // Data e hora combinadas; antes de marcar a visita, diz isso em vez do nome do estado.
+            quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
             titulo: 'Pedido ${p.numero}',
             endereco: '',
+            janelaInicio: p.janelaInicio?.toLocal(),
+            emAndamento: p.estado == 'em_andamento',
           );
           break;
         }
@@ -884,6 +941,19 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         upload: upload,
         fila: fila,
       );
+
+  @override
+  ServicoCheckOut servicoCheckOut(String pedidoId) {
+    final captura = capturaFinalDoPedido?.call(pedidoId) ?? this.captura;
+    final checkIn = ServicoCheckInApi(
+      _api,
+      pedidoId: pedidoId,
+      captura: captura,
+      upload: upload,
+      fila: fila,
+    );
+    return ServicoCheckOutApi(checkIn, captura);
+  }
 }
 
 /// `POST /v1/orcamentos/resumo` `{valor_centavos}` e `POST /v1/pedidos/{pedido_id}/orcamentos`.
@@ -1052,7 +1122,8 @@ class ServicoCheckInApi implements ServicoCheckIn {
   @override
   Future<int?> localizar() async {
     final posicao = _posicao = await captura.posicao();
-    return posicao?.distanciaMetros;
+    if (posicao == null) return null;
+    return posicao.distanciaMetros ?? distanciaDesconhecidaMetros;
   }
 
   // Sem rota no backend: mensagens rápidas e aviso de cliente ausente.

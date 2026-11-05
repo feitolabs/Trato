@@ -11,11 +11,15 @@ class CarregadorTela<T> extends StatefulWidget {
     required this.carregar,
     required this.construir,
     this.esqueleto,
+    this.atualizarQuando,
   });
 
   final Future<T> Function() carregar;
   final Widget Function(BuildContext context, T dados, VoidCallback recarregar) construir;
   final Widget Function(BuildContext context)? esqueleto;
+
+  /// Quando este aviso dispara, recarrega do servidor.
+  final Listenable? atualizarQuando;
 
   @override
   State<CarregadorTela<T>> createState() => _CarregadorTelaState<T>();
@@ -24,7 +28,25 @@ class CarregadorTela<T> extends StatefulWidget {
 class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   late Future<T> _futuro = widget.carregar();
 
-  void _recarregar() => setState(() => _futuro = widget.carregar());
+  @override
+  void initState() {
+    super.initState();
+    widget.atualizarQuando?.addListener(_recarregar);
+  }
+
+  @override
+  void dispose() {
+    widget.atualizarQuando?.removeListener(_recarregar);
+    super.dispose();
+  }
+
+  void _recarregar() {
+    if (!mounted) return;
+    // Bloco, não seta: o setState do Flutter recusa callback que devolve Future (lança no debug).
+    setState(() {
+      _futuro = widget.carregar();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -203,8 +203,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         faixa: _faixa,
         fotos: List.of(_fotosNovas),
         categoriaId: widget.formulario.categoriaId,
-        cidadeId: _cidade?.id ?? (widget.formulario.cidades.isNotEmpty ? widget.formulario.cidades.first.id : 'de470309-afb7-49ac-9471-54e8387d4a88'),
-        bairro: _cidade?.nome ?? (widget.formulario.cidades.isNotEmpty ? widget.formulario.cidades.first.nome : 'Belo Horizonte'),
+        // Sem cidade carregada o pedido não abre (o repositório avisa); nada de cidade inventada.
+        cidadeId: _cidade?.id ?? widget.formulario.cidades.firstOrNull?.id,
       );
       setState(() => _enviando = true);
       try {

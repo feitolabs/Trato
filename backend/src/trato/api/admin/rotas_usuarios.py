@@ -88,7 +88,7 @@ class AlterarStatusUsuarioIn(BaseModel):
 def alterar_status_usuario(
     usuario_id: str,
     corpo: AlterarStatusUsuarioIn,
-    operador: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
+    operador: Operador = Depends(exigir(Permissao.USUARIOS_STATUS)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
 ) -> UsuarioOut:

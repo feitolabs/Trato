@@ -255,6 +255,51 @@ void main() {
       expect(aceito, isNull);
     });
 
+    testWidgets('aceitar sem marcar a leitura também avisa por mensagem visível na tela', (tester) async {
+      // O aviso da caixa fica abaixo da dobra: sem a mensagem o botão parece não responder.
+      await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos, aoAceitar: (o) {}));
+
+      await _tocar(tester, find.textContaining('Aceitar orçamento'));
+      await tester.pump();
+
+      expect(find.textContaining('Marque "Li o escopo'), findsOneWidget);
+    });
+
+    testWidgets('bloco sem texto (fora do escopo, cancelamento) não aparece', (tester) async {
+      final d = carlos.detalhe!;
+      final semRegras = Orcamento(
+        id: carlos.id,
+        profissional: carlos.profissional,
+        iniciais: carlos.iniciais,
+        verificacao: carlos.verificacao,
+        totalCentavos: carlos.totalCentavos,
+        nota: carlos.nota,
+        notaResumo: carlos.notaResumo,
+        servicosResumo: carlos.servicosResumo,
+        servicosConcluidos: carlos.servicosConcluidos,
+        quando: carlos.quando,
+        inicio: carlos.inicio,
+        garantia: carlos.garantia,
+        observacao: carlos.observacao,
+        detalhe: DetalheOrcamento(
+          validoAte: d.validoAte,
+          itens: d.itens,
+          notaMaterial: d.notaMaterial,
+          agendaTitulo: d.agendaTitulo,
+          agendaDetalhe: d.agendaDetalhe,
+          garantiaTitulo: d.garantiaTitulo,
+          garantiaDetalhe: d.garantiaDetalhe,
+          foraDoEscopo: '',
+          cancelamento: '   ',
+        ),
+      );
+      await _abrir(tester, DetalheOrcamentoTela(orcamento: semRegras));
+
+      expect(find.text('Fora do escopo'), findsNothing);
+      expect(find.text('Cancelamento'), findsNothing);
+      expect(find.text(d.garantiaTitulo), findsOneWidget);
+    });
+
     testWidgets('com a leitura marcada, aceitar chama o callback', (tester) async {
       Orcamento? aceito;
       await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos, aoAceitar: (o) => aceito = o));

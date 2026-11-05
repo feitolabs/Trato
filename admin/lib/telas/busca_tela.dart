@@ -205,11 +205,12 @@ class _CartaoUsuarioState extends State<_CartaoUsuario> {
                 if (d == null && context.pode(Permissao.dadosPessoaisRevelar))
                   TextButton(onPressed: _revelar, child: const Text('Revelar dados pessoais')),
                 const Spacer(),
-                TextButton.icon(
-                  onPressed: _alterarStatus,
-                  icon: const Icon(Icons.manage_accounts_outlined, size: 16),
-                  label: const Text('Alterar status'),
-                ),
+                if (context.pode(Permissao.usuariosStatus))
+                  TextButton.icon(
+                    onPressed: _alterarStatus,
+                    icon: const Icon(Icons.manage_accounts_outlined, size: 16),
+                    label: const Text('Alterar status'),
+                  ),
               ],
             ),
           ],

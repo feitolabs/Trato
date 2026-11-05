@@ -114,6 +114,7 @@ class RepositorioUploads(Protocol):
     def solicitacao(self, solicitacao_id: str) -> Solicitacao | None: ...
     def salvar_midia(self, m: Midia) -> None: ...
     def midia(self, midia_id: str) -> Midia | None: ...
+    def midias_do_pedido(self, pedido_id: str, finalidades: tuple[str, ...]) -> list[Midia]: ...
     def salvar_documento(self, d: DocumentoGuardado) -> None: ...
     def documento_por_caminho(self, caminho: str) -> DocumentoGuardado | None: ...
 
@@ -137,6 +138,14 @@ class UploadsEmMemoria:
 
     def midia(self, midia_id: str) -> Midia | None:
         return self.midias.get(midia_id)
+
+    def midias_do_pedido(self, pedido_id: str, finalidades: tuple[str, ...]) -> list[Midia]:
+        achadas = [
+            m
+            for m in self.midias.values()
+            if m.pedido_id == pedido_id and m.finalidade in finalidades
+        ]
+        return sorted(achadas, key=lambda m: m.criada_em)
 
     def salvar_documento(self, d: DocumentoGuardado) -> None:
         self.documentos[d.id] = d

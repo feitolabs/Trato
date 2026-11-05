@@ -118,7 +118,9 @@ def test_papel_revogado_na_hora_perde_o_acesso(adm):
 def test_so_o_papel_cadastro_abre_documento(adm):
     caminho = "/v1/admin/verificacoes/ver-1/documentos/doc-1/url"
     corpo = {"motivo": "Conferir documento"}
-    for papel in ("administrador", "seguranca", "financeiro", "mediador"):
+    for papel in ("seguranca", "financeiro", "mediador"):
         r = adm.cliente.post(caminho, json=corpo, headers=cab(token_de(papel)))
         assert r.status_code == 403
     assert adm.cliente.post(caminho, json=corpo, headers=cab("t-cadastro")).status_code == 200
+    # Decisão do João: administrador tem alçada total (continua exigindo motivo e gerando auditoria).
+    assert adm.cliente.post(caminho, json=corpo, headers=cab("t-administrador")).status_code == 200

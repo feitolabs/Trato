@@ -317,12 +317,14 @@ void main() {
 
       final p = await RepositorioPedidosApi(api).acompanhar('abcd1234');
 
-      expect(p.codigoInicio, '4821');
+      // Em andamento = o profissional já chegou: o código de início não serve mais.
+      expect(p.codigoInicio, isNull);
       expect(p.etapas.map((e) => e.titulo), [
         'Contratado',
-        'A caminho',
+        'Visita marcada',
         'Chegou',
         'Em execução',
+        'Aguardando sua confirmação',
         'Finalizado',
       ]);
       expect(p.etapas[0].detalhe, isNotEmpty);

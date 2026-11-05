@@ -39,6 +39,7 @@ enum Permissao {
   disputasSegundaPessoa,
   pagamentosVer,
   usuariosBuscar,
+  usuariosStatus,
   dadosPessoaisRevelar,
   pedidosBuscar,
   suporteVer,

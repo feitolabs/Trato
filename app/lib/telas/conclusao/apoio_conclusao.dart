@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../../componentes/imagem_trato.dart';
 import '../../tema/tema.dart';
 
+/// Início de frase: "o profissional" vira "O profissional"; "Maria" continua "Maria".
+String primeiraMaiuscula(String texto) =>
+    texto.isEmpty ? texto : '${texto[0].toUpperCase()}${texto.substring(1)}';
+
 /// "R$ 1.234,56" a partir de centavos inteiros. Só formata: o cálculo é do backend.
 String formatarReais(int centavos) {
   final negativo = centavos < 0;

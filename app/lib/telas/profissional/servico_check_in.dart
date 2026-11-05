@@ -1,3 +1,6 @@
+/// Posição registrada, mas o app não conhece o endereço (só o backend confere a distância).
+const int distanciaDesconhecidaMetros = -1;
+
 /// Foto de chegada já tirada. [hora] pronta para exibir ("14h06") e [referencia] opcional.
 class FotoChegada {
   const FotoChegada({required this.hora, this.referencia});
@@ -23,6 +26,8 @@ abstract interface class ServicoCheckIn {
   Future<FotoChegada?> tirarFoto();
 
   /// Distância até o endereço, em metros. Null se não conseguiu localizar.
+  /// [distanciaDesconhecidaMetros] quando a posição foi registrada mas o app ainda não sabe
+  /// onde fica o endereço (quem confere a distância é o backend).
   Future<int?> localizar();
 
   Future<void> enviarMensagemRapida(String mensagem);

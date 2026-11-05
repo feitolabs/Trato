@@ -92,7 +92,8 @@ class DetalhePedidoTela extends StatelessWidget {
                         const SizedBox(width: EspacosTrato.x2),
                         Expanded(
                           child: Text(
-                            '${pedido.bairro}, a ${textoDistancia(pedido.distanciaKm)}. '
+                            '${pedido.bairro.isEmpty ? 'Distância' : '${pedido.bairro}, a'} '
+                            '${textoDistancia(pedido.distanciaKm)}. '
                             'O endereço completo aparece depois da contratação.',
                             style: TipografiaTrato.corpoPequeno
                                 .copyWith(color: CoresTrato.textoSecundario),
@@ -199,7 +200,7 @@ class _Mapa extends StatelessWidget {
             Align(
               alignment: Alignment.bottomLeft,
               child: Text(
-                '[Mapa]',
+                'Área aproximada',
                 style: TipografiaTrato.corpoPequeno.copyWith(
                   color: CoresTrato.petroleo,
                   fontWeight: FontWeight.w700,

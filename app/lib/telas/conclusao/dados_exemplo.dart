@@ -17,10 +17,21 @@ class ResumoConclusao {
     required this.aditivoCentavos,
     required this.codigo,
     required this.avisoLiberacao,
+    this.fotoAntes,
+    this.fotoDepois,
+    this.fotosCarregadas = false,
   });
 
   final String numeroPedido;
   final String nomeProfissional;
+
+  /// URL assinada da foto de chegada e da foto final que o profissional enviou (da API).
+  final String? fotoAntes;
+  final String? fotoDepois;
+
+  /// Verdadeiro quando as fotos vieram da API: sem foto, a tela diz "Sem foto" em vez do
+  /// marcador "[Foto antes]" do protótipo.
+  final bool fotosCarregadas;
 
   /// Ex.: "Antes · 14h08".
   final String legendaFotoAntes;

@@ -6,6 +6,7 @@ import '../telas/pedido_novo/modelos.dart';
 import '../telas/pedidos/modelos.dart';
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/servico_check_in.dart';
+import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
 
@@ -173,6 +174,9 @@ abstract interface class RepositorioProfissional {
   /// Calculadora: taxa e líquido vêm do backend.
   ServicoOrcamento servicoOrcamento(String pedidoId);
 
-  /// Check-in/out do pedido.
+  /// Check-in do pedido.
   ServicoCheckIn servicoCheckIn(String pedidoId);
+
+  /// Check-out do pedido: foto final e código de conclusão que o cliente informa.
+  ServicoCheckOut servicoCheckOut(String pedidoId);
 }

@@ -376,15 +376,17 @@ class RepositorioAgendaApi implements RepositorioAgenda {
     final inicio = await _profissional.inicio();
     final proximo = inicio.proximo;
     if (proximo == null) return const [];
-    final agora = DateTime.now();
+    // O dia vem da visita marcada; sem visita marcada, fica em "hoje" com o aviso no horário.
+    final base = proximo.janelaInicio ?? DateTime.now();
     return [
       Agendamento(
         id: proximo.pedidoId ?? 'proximo',
         pedidoId: proximo.pedidoId ?? 'demo',
-        dia: DateTime(agora.year, agora.month, agora.day),
+        dia: DateTime(base.year, base.month, base.day),
         horario: proximo.quando,
         titulo: proximo.titulo,
         local: proximo.endereco,
+        estado: proximo.emAndamento ? EstadoAgendamento.emAndamento : EstadoAgendamento.agendado,
       ),
     ];
   }

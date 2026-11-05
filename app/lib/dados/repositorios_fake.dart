@@ -12,6 +12,7 @@ import '../telas/perfil_cliente/dados_exemplo.dart' as per;
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_in_fake.dart';
+import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional/servico_orcamento_fake.dart';
 import '../telas/profissional_inicio/dados_exemplo.dart';
@@ -437,4 +438,7 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId) => ServicoCheckInFake();
+
+  @override
+  ServicoCheckOut servicoCheckOut(String pedidoId) => ServicoCheckOutFake();
 }

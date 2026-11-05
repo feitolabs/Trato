@@ -461,3 +461,39 @@ def test_perfil_publico_so_de_aprovado_sem_dado_sensivel_e_com_avaliacoes(e2, am
     for proibido in ("cpf", "telefone", "email", "endereco", "avaliador", "cli-1", "usuario_id"):
         assert proibido not in r.text
     assert e2.amb.cliente.get("/v1/profissionais/pro-1").status_code == 401
+
+
+# --- fotos do serviço: o cliente vê o que o profissional enviou -----------------------------
+
+
+def test_cliente_e_profissional_veem_as_fotos_do_servico_com_url_assinada(e2, amb):
+    # Regressão (04/11/2026): a tela de conclusão mostrava "[Foto antes] [Foto depois]" porque
+    # o backend não tinha rota para o cliente abrir as fotos que o profissional enviou.
+    amb.semear_pedido(Estado.AGENDADO, codigo_inicio="1234")
+    e2.enviar("t-prof", "checkin", JPEG_COM_EXIF, pedido_id="ped-1")
+    e2.enviar("t-prof", "checkout", JPEG_COM_EXIF, pedido_id="ped-1")
+    e2.enviar("t-cliente", "pedido", JPEG_COM_EXIF, pedido_id="ped-1")  # foto do pedido: não entra
+
+    for quem in ("t-cliente", "t-prof"):
+        r = e2.get("/v1/pedidos/ped-1/fotos", quem)
+        assert r.status_code == 200, quem
+        fotos = r.json()
+        assert [f["finalidade"] for f in fotos] == ["checkin", "checkout"]
+        for f in fotos:
+            assert f["url"].startswith("https://") and f["expira_em_segundos"] == 300
+            assert set(f) == {"id", "finalidade", "url", "expira_em_segundos", "criada_em"}
+
+
+def test_quem_nao_e_parte_do_pedido_nao_ve_as_fotos(e2, amb):
+    amb.semear_pedido(Estado.AGENDADO, codigo_inicio="1234")
+    e2.enviar("t-prof", "checkin", JPEG_COM_EXIF, pedido_id="ped-1")
+    for quem in ("t-outro-cliente", "t-outro-prof"):
+        assert e2.get("/v1/pedidos/ped-1/fotos", quem).status_code == 404, quem
+    assert e2.get("/v1/pedidos/ped-1/fotos", "t-equipe").status_code == 403
+    assert amb.cliente.get("/v1/pedidos/ped-1/fotos").status_code == 401
+    assert e2.get("/v1/pedidos/nao-existe/fotos", "t-cliente").status_code == 404
+
+
+def test_pedido_sem_fotos_devolve_lista_vazia(e2, amb):
+    amb.semear_pedido(Estado.AGENDADO)
+    assert e2.get("/v1/pedidos/ped-1/fotos", "t-cliente").json() == []

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 
 import 'auth/config_auth.dart';
@@ -57,7 +59,9 @@ Future<void> main() async {
 
   // Garante que o app execute conectado à API e Supabase reais por padrão,
   // impedindo que caia acidentalmente em modo mock/demo.
-  final forcouDemo = const String.fromEnvironment('TRATO_MODO').trim().toLowerCase() == 'demo';
+  // Demo só existe em debug: um build de produção nunca abre com dados de exemplo.
+  final forcouDemo = !kReleaseMode &&
+      const String.fromEnvironment('TRATO_MODO').trim().toLowerCase() == 'demo';
   if (!forcouDemo && !config.usaApi) {
     config = ConfigTrato(
       modo: ModoTrato.api,
@@ -109,6 +113,10 @@ class TratoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Trato',
+      // Português do Brasil também nos componentes do sistema (calendário, relógio, botões).
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       navigatorKey: navegadorTrato,
       debugShowCheckedModeBanner: false,
       theme: TemaTrato.claro,

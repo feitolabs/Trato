@@ -205,8 +205,12 @@ void main() {
       expect(find.text('HOJE'), findsOneWidget);
       expect(find.text('AMANHÃ'), findsOneWidget);
       expect(find.text('Concluído'), findsOneWidget);
-      expect(find.text('Fazer check-in'), findsNWidgets(4));
+      // O atendimento já em andamento oferece "Concluir serviço"; os outros, o check-in.
+      expect(find.text('Fazer check-in'), findsNWidgets(3));
+      expect(find.text('Concluir serviço'), findsOneWidget);
       await tester.tap(find.text('Fazer check-in').first);
+      expect(checkIn?.id, 'ag-2');
+      await tester.tap(find.text('Concluir serviço'));
       expect(checkIn?.id, 'ag-1');
     });
 

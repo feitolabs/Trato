@@ -1,3 +1,4 @@
+import '../telas/comuns/formato_aparelho.dart';
 import '../telas/profissional/servico_check_in.dart';
 import 'dispositivo.dart';
 
@@ -19,18 +20,18 @@ class ServicoCheckInDispositivo implements ServicoCheckIn {
     if (ref == null) return null;
     ultimaFoto = ref;
     final agora = DateTime.now();
-    final hora = '${agora.hour}h${agora.minute.toString().padLeft(2, '0')}';
+    final hora = horaDoAparelho(agora);
     return FotoChegada(hora: hora, referencia: ref);
   }
 
-  /// A distância até o endereço é do backend (o app não tem o endereço antes da contratação).
-  /// Com a posição capturada devolve 0 só para liberar o passo; o backend decide a validade.
+  /// A distância até o endereço é do backend. Com a posição capturada devolve "desconhecida"
+  /// (nunca um 0 m inventado); o backend decide a validade.
   @override
   Future<int?> localizar() async {
     final posicao = await dispositivo.localizador.posicaoAtual();
     if (posicao == null) return null;
     ultimaPosicao = posicao;
-    return 0;
+    return distanciaDesconhecidaMetros;
   }
 
   @override

@@ -176,12 +176,18 @@ class _CheckInTelaState extends State<CheckInTela> {
             child: Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
           ),
           titulo: 'Localização',
-          detalhe: distancia == null ? 'Confirme que você chegou' : 'A $distancia m do endereço',
+          detalhe: distancia == null
+              ? 'Confirme que você chegou'
+              : distancia == distanciaDesconhecidaMetros
+                  ? 'Localização registrada'
+                  : 'A $distancia m do endereço',
           feito: distancia != null,
           textoAcao: 'Localizar',
           aoTocarAcao: _localizar,
         ),
-        if (distancia != null && distancia > widget.avisoDistanciaMetros) ...[
+        if (distancia != null &&
+            distancia != distanciaDesconhecidaMetros &&
+            distancia > widget.avisoDistanciaMetros) ...[
           const SizedBox(height: EspacosTrato.x3),
           const AvisoFaixa(
             texto: 'Você parece estar longe do endereço. Confira se está no lugar certo; '

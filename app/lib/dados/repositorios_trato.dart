@@ -81,6 +81,7 @@ class RepositoriosTrato {
     ClienteApi api, {
     CapturaCheckIn captura = const CapturaIndisponivel(),
     CapturaCheckIn Function(String pedidoId)? capturaDoPedido,
+    CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido,
     ServicoUpload? upload,
     ServicoCamera? camera,
   }) {
@@ -89,6 +90,7 @@ class RepositoriosTrato {
       api,
       captura: captura,
       capturaDoPedido: capturaDoPedido,
+      capturaFinalDoPedido: capturaFinalDoPedido,
       upload: upload,
     );
     return RepositoriosTrato(
@@ -135,6 +137,15 @@ class RepositoriosTrato {
                 localizacao: localizacao,
                 upload: upload,
                 pedidoId: pedidoId,
+              )
+          : null,
+      capturaFinalDoPedido: camera != null && localizacao != null && upload != null
+          ? (pedidoId) => CapturaCheckInDispositivo(
+                camera: camera,
+                localizacao: localizacao,
+                upload: upload,
+                pedidoId: pedidoId,
+                finalidadeFoto: FinalidadeArquivo.checkOut,
               )
           : null,
       upload: upload,
