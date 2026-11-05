@@ -133,6 +133,9 @@ void main() {
       // 1. Pedido aberto → orçamentos recebidos.
       await _tocar(tester, 'Pedidos');
       await _tocar(tester, 'Instalar ventilador');
+      // Pedido aberto: primeiro a tela "Seu pedido" (editável), depois os orçamentos.
+      expect(find.text('Seu pedido'), findsOneWidget);
+      await _tocar(tester, 'Ver orçamentos');
       expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
 
       // 2. Detalhe do orçamento e aceite (o app só pede; o estado muda no backend).

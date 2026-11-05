@@ -19,7 +19,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from trato.api.repositorios import DadosPedido
+from trato.api.repositorios import DadosPedido, EnderecoPedido
 from trato.api.repositorios_app import PedidoAberto
 from trato.pedidos.estados import (
     Acao,
@@ -233,6 +233,106 @@ class PedidosPostgres:
         return salvo
 
     # --- internos ----------------------------------------------------------------------
+    # --- dados descritos pelo cliente (editáveis enquanto o pedido aguarda orçamentos) --------
+    def dados_do_pedido(self, pedido_id: str) -> DadosPedido | None:
+        achado = como_uuid(pedido_id)
+        if achado is None:
+            return None
+        with self._banco.transacao() as con:
+            return self._ler_dados(con, achado)
+
+    def _ler_dados(self, con: psycopg.Connection[Any], pid: str) -> DadosPedido | None:
+        p = con.execute(
+            "select categoria_id, cidade_id, titulo, descricao, bairro, local_aprox_lat, "
+            "local_aprox_lng, prazo_desejado, faixa_preco_min_centavos, "
+            "faixa_preco_max_centavos, urgente from public.pedidos where id = %s",
+            (pid,),
+        ).fetchone()
+        if p is None:
+            return None
+        e = con.execute(
+            "select cep, logradouro, numero, complemento, bairro, referencia, lat, lng "
+            "from public.pedidos_endereco where pedido_id = %s",
+            (pid,),
+        ).fetchone()
+        return DadosPedido(
+            categoria_id=str(p["categoria_id"]),
+            cidade_id=str(p["cidade_id"]),
+            titulo=p["titulo"],
+            descricao=p["descricao"],
+            bairro=p["bairro"],
+            local_aprox_lat=p["local_aprox_lat"],
+            local_aprox_lng=p["local_aprox_lng"],
+            prazo_desejado=p["prazo_desejado"],
+            faixa_preco_min_centavos=p["faixa_preco_min_centavos"],
+            faixa_preco_max_centavos=p["faixa_preco_max_centavos"],
+            urgente=p["urgente"],
+            endereco=None
+            if e is None
+            else EnderecoPedido(
+                logradouro=e["logradouro"],
+                numero=e["numero"],
+                complemento=e["complemento"],
+                bairro=e["bairro"],
+                cep=e["cep"],
+                referencia=e["referencia"],
+                lat=e["lat"],
+                lng=e["lng"],
+            ),
+        )
+
+    def atualizar_dados(self, pedido_id: str, ator_id: str, novos: DadosPedido) -> DadosPedido:
+        """Troca descrição, faixa de preço, prazo, urgência e endereço, com auditoria."""
+        pid = exigir_uuid(pedido_id, "pedido")
+        with self._banco.transacao() as con:
+            antes = self._ler_dados(con, pid)
+            if antes is None:
+                raise DadosInvalidos("Pedido não encontrado.")
+            con.execute(
+                "update public.pedidos set titulo = %s, descricao = %s, bairro = %s, "
+                "prazo_desejado = %s, faixa_preco_min_centavos = %s, "
+                "faixa_preco_max_centavos = %s, urgente = %s where id = %s",
+                (
+                    novos.titulo,
+                    novos.descricao,
+                    novos.bairro,
+                    novos.prazo_desejado,
+                    novos.faixa_preco_min_centavos,
+                    novos.faixa_preco_max_centavos,
+                    novos.urgente,
+                    pid,
+                ),
+            )
+            e = novos.endereco
+            if e is not None:
+                # Sem DELETE (o papel do backend não tem): atualiza e, se não havia, insere.
+                feito = con.execute(
+                    "update public.pedidos_endereco set cep = %s, logradouro = %s, numero = %s, "
+                    "complemento = %s, bairro = %s, referencia = %s, lat = %s, lng = %s "
+                    "where pedido_id = %s",
+                    (e.cep, e.logradouro, e.numero, e.complemento, e.bairro, e.referencia,
+                     e.lat, e.lng, pid),
+                )  # fmt: skip
+                if feito.rowcount == 0:
+                    con.execute(
+                        "insert into public.pedidos_endereco (pedido_id, cep, logradouro, "
+                        "numero, complemento, bairro, referencia, lat, lng) "
+                        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (pid, e.cep, e.logradouro, e.numero, e.complemento, e.bairro,
+                         e.referencia, e.lat, e.lng),
+                    )  # fmt: skip
+            registrar_na_transacao(
+                con,
+                ator_id=ator_id,
+                ator_tipo="cliente",
+                acao="pedido.editado",
+                entidade="pedido",
+                entidade_id=pid,
+                antes={"faixa_max": antes.faixa_preco_max_centavos},
+                depois={"faixa_max": novos.faixa_preco_max_centavos},
+            )
+            return self._ler_dados(con, pid) or novos
+
     def _carregar(self, con: psycopg.Connection[Any], pedido_id: str) -> Pedido | None:
         linha = con.execute(
             f"{_SELECT_PEDIDO} where p.id = %s",  # noqa: S608

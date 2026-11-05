@@ -112,6 +112,21 @@ abstract final class TemaTrato {
         ),
       ),
       dividerTheme: const DividerThemeData(color: CoresTrato.borda, thickness: 1),
+      // Avisos (toasts): cartão flutuante arredondado, longe da borda e com texto legível.
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: CoresTrato.petroleo,
+        contentTextStyle: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
+        shape: RoundedRectangleBorder(borderRadius: raio),
+        insetPadding: const EdgeInsets.fromLTRB(
+          EspacosTrato.x4,
+          0,
+          EspacosTrato.x4,
+          EspacosTrato.x6,
+        ),
+        showCloseIcon: true,
+        closeIconColor: CoresTrato.creme,
+      ),
     );
   }
 }

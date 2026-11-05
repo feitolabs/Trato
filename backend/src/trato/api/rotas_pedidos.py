@@ -7,7 +7,7 @@ identifica quem pede, monta a prova, chama a regra e grava o resultado.
 from __future__ import annotations
 
 import uuid
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import timedelta
 from typing import Any
 
@@ -30,13 +30,16 @@ from trato.api.modelos import (
     CheckInIn,
     CheckOutIn,
     ConfirmarAgendaIn,
+    DadosPedidoOut,
     DisputaOut,
+    EditarPedidoIn,
+    EnderecoIn,
     EventoOut,
     PedidoOut,
     PedirRetrabalhoIn,
     RetrabalhoOut,
 )
-from trato.api.repositorios import Contrato
+from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.garantias import (
     ErroRetrabalho,
@@ -183,6 +186,78 @@ def ver_pedido(
         contexto, pedido_id, usuario, request=request, equipe=(Permissao.PEDIDOS_BUSCAR,)
     )
     return pedido_out(pedido, usuario)
+
+
+def _dados_out(d: DadosPedido) -> DadosPedidoOut:
+    return DadosPedidoOut(
+        titulo=d.titulo,
+        descricao=d.descricao,
+        bairro=d.bairro,
+        prazo_desejado=d.prazo_desejado,
+        faixa_preco_min_centavos=d.faixa_preco_min_centavos,
+        faixa_preco_max_centavos=d.faixa_preco_max_centavos,
+        urgente=d.urgente,
+        endereco=EnderecoIn(**asdict(d.endereco)) if d.endereco else None,
+    )
+
+
+@router.get(
+    "/{pedido_id}/dados", response_model=DadosPedidoOut, summary="O que o cliente descreveu"
+)
+def ver_dados_do_pedido(
+    pedido_id: str,
+    request: Request,
+    usuario: Usuario = Depends(usuario_atual),
+    contexto: Contexto = Depends(obter_contexto),
+) -> DadosPedidoOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario, request=request)
+    dados = contexto.pedidos.dados_do_pedido(pedido.id)
+    if dados is None:
+        raise HTTPException(404, "Este pedido não tem descrição gravada.")
+    return _dados_out(dados)
+
+
+@router.patch(
+    "/{pedido_id}", response_model=DadosPedidoOut, summary="Editar o pedido (cliente, antes do aceite)"
+)
+def editar_pedido(
+    pedido_id: str,
+    corpo: EditarPedidoIn,
+    request: Request,
+    usuario: Usuario = Depends(usuario_atual),
+    contexto: Contexto = Depends(obter_contexto),
+) -> DadosPedidoOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario, request=request)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só quem abriu o pedido pode editá-lo.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Depois de aceitar um orçamento o pedido não pode mais mudar.")
+    atual = contexto.pedidos.dados_do_pedido(pedido.id)
+    if atual is None:
+        raise HTTPException(404, "Este pedido não tem descrição gravada.")
+    cfg = obter_config_seguranca()
+    mudancas: dict[str, Any] = {}
+    if corpo.descricao is not None:
+        mudancas["descricao"] = limpar_texto(
+            corpo.descricao, "descrição", cfg.descricao_max_chars, cfg
+        )
+    # 0 = "sem limite": limpa a faixa. Ausente = mantém.
+    for campo in ("faixa_preco_min_centavos", "faixa_preco_max_centavos"):
+        valor = getattr(corpo, campo)
+        if valor is not None:
+            mudancas[campo] = valor or None
+    if corpo.prazo_desejado is not None:
+        mudancas["prazo_desejado"] = corpo.prazo_desejado
+    if corpo.urgente is not None:
+        mudancas["urgente"] = corpo.urgente
+    if corpo.endereco is not None:
+        mudancas["endereco"] = EnderecoPedido(**corpo.endereco.model_dump())
+        mudancas["bairro"] = corpo.endereco.bairro or atual.bairro
+    novos = replace(atual, **mudancas)
+    minimo, maximo = novos.faixa_preco_min_centavos, novos.faixa_preco_max_centavos
+    if minimo is not None and maximo is not None and minimo > maximo:
+        raise HTTPException(422, "O valor mínimo não pode passar do máximo.")
+    return _dados_out(contexto.pedidos.atualizar_dados(pedido.id, usuario.id, novos))
 
 
 @router.get("/{pedido_id}/eventos", response_model=list[EventoOut], summary="Histórico do pedido")

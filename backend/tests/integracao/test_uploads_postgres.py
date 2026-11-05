@@ -123,3 +123,29 @@ def test_midias_do_pedido_filtra_por_finalidade_e_ordena_no_postgres(cenario):
     assert [m.finalidade for m in achadas] == ["checkin", "checkout"]
     assert {m.id for m in achadas} == {chegada.id, saida.id}
     assert repo.midias_do_pedido(pedido_id, ("depois",)) == []
+
+
+def test_cliente_edita_pedido_no_postgres(cenario):
+    pedido_id = abrir_pedido(cenario)
+    cab = cenario.token("cliente")
+    r = cenario.cliente.patch(
+        f"/v1/pedidos/{pedido_id}",
+        json={
+            "descricao": "Agora são 3 cômodos",
+            "faixa_preco_max_centavos": 120000,
+            "endereco": {"logradouro": "Rua Nova", "numero": "5", "bairro": "Savassi"},
+        },
+        headers=cab,
+    )
+    assert r.status_code == 200, r.text
+    # segunda edição: o endereço já existe, então é atualizado (sem DELETE)
+    r = cenario.cliente.patch(
+        f"/v1/pedidos/{pedido_id}",
+        json={"endereco": {"logradouro": "Rua Outra", "numero": "9"}},
+        headers=cab,
+    )
+    assert r.status_code == 200, r.text
+    lido = cenario.cliente.get(f"/v1/pedidos/{pedido_id}/dados", headers=cab).json()
+    assert lido["faixa_preco_max_centavos"] == 120000
+    assert "3 cômodos" in lido["descricao"]
+    assert lido["endereco"]["logradouro"] == "Rua Outra"

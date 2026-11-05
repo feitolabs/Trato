@@ -74,6 +74,7 @@ import '../perfil_cliente/modelos.dart';
 import '../perfil_cliente/perfil_cliente_tela.dart';
 import '../pedidos/chat_pedido_tela.dart';
 import '../pedidos/modelos.dart';
+import '../pedidos/pedido_aberto_tela.dart';
 import '../pedidos/pedido_execucao_tela.dart';
 import '../pedidos/seus_pedidos_tela.dart';
 import '../profissional/calculadora_orcamento_tela.dart';
@@ -1035,7 +1036,7 @@ abstract final class RotasTrato {
     if (estado != null) {
       switch (estado) {
         case 'aberto':
-          _abrir<void>(context, _orcamentosRecebidos(id));
+          _abrir<void>(context, _pedidoAberto(id));
         case 'orcamento_aceito':
           _abrir<void>(context, _pagamento(id));
         case 'concluido':
@@ -1060,6 +1061,42 @@ abstract final class RotasTrato {
       abrirServico(context, pedido.id ?? ServicosExemplo.vazamento);
     }
   }
+
+  /// Pedido aguardando orçamentos: o que foi descrito (editável) e a porta para os orçamentos.
+  static Widget _pedidoAberto(String pedidoId) => Carregador<DadosDoPedido>(
+        carregar: () => repos.pedidos.dados(pedidoId),
+        construir: (context, dados) => PedidoAbertoTela(
+          numero: pedidoId.substring(0, pedidoId.length < 4 ? pedidoId.length : 4).toUpperCase(),
+          dados: dados,
+          aoVerOrcamentos: () =>
+              _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
+          aoSalvar: ({
+            required String descricao,
+            required int faixaMaxCentavos,
+            required String logradouro,
+            required String numero,
+            required String bairro,
+          }) async {
+            try {
+              final novos = await repos.pedidos.editar(
+                pedidoId,
+                descricao: descricao,
+                faixaMaxCentavos: faixaMaxCentavos,
+                logradouro: logradouro,
+                numero: numero,
+                bairro: bairro,
+              );
+              if (context.mounted) {
+                _avisoSimples(context, 'Pedido atualizado. Os profissionais já veem a mudança.');
+              }
+              return novos;
+            } on Object catch (erro) {
+              if (context.mounted) _aviso(context, erro);
+              return null;
+            }
+          },
+        ),
+      );
 
   static Widget _orcamentosRecebidos(String pedidoId) =>
       Carregador<OrcamentosDoPedido>(

@@ -100,6 +100,48 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<PedidoApi> _pedido(String id) async =>
       PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$id')));
 
+  static DadosDoPedido _dadosDeJson(Map<String, dynamic> j) {
+    final e = j['endereco'] as Map<String, dynamic>?;
+    return DadosDoPedido(
+      titulo: j['titulo'] as String,
+      descricao: j['descricao'] as String,
+      faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
+      logradouro: e?['logradouro'] as String?,
+      numero: e?['numero'] as String?,
+      bairro: e?['bairro'] as String?,
+      complemento: e?['complemento'] as String?,
+    );
+  }
+
+  @override
+  Future<DadosDoPedido> dados(String pedidoId) async =>
+      _dadosDeJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/dados')));
+
+  @override
+  Future<DadosDoPedido> editar(
+    String pedidoId, {
+    String? descricao,
+    int? faixaMaxCentavos,
+    String? logradouro,
+    String? numero,
+    String? bairro,
+    String? complemento,
+  }) async {
+    final corpo = <String, Object?>{
+      if (descricao != null) 'descricao': descricao,
+      if (faixaMaxCentavos != null) 'faixa_preco_max_centavos': faixaMaxCentavos,
+      if (logradouro != null && logradouro.trim().isNotEmpty)
+        'endereco': {
+          'logradouro': logradouro.trim(),
+          if (numero != null && numero.trim().isNotEmpty) 'numero': numero.trim(),
+          if (bairro != null && bairro.trim().isNotEmpty) 'bairro': bairro.trim(),
+          if (complemento != null && complemento.trim().isNotEmpty)
+            'complemento': complemento.trim(),
+        },
+    };
+    return _dadosDeJson(_mapa(await _api.patch('/v1/pedidos/$pedidoId', corpo: corpo)));
+  }
+
   Future<SaldoPedidoApi> _saldo(String id) async =>
       SaldoPedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$id/saldo')));
 
