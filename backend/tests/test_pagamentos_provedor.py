@@ -141,3 +141,46 @@ def test_stripe_valida_webhook_no_formato_do_stripe():
         stripe.validar_webhook(
             corpo, fake.assinar(corpo, 1_793_275_200, "outro"), agora=1_793_275_200
         )
+
+
+def test_stripe_cartao_acha_ou_cria_cliente_e_gera_chave_efemera():
+    chamadas = []
+    existe = {"sim": False}
+
+    def transporte(metodo, caminho, campos, cabecalhos):
+        chamadas.append((metodo, caminho, dict(campos), dict(cabecalhos)))
+        if caminho == "/v1/customers/search":
+            return 200, {"data": [{"id": "cus_1"}] if existe["sim"] else []}
+        if caminho == "/v1/customers":
+            return 200, {"id": "cus_novo"}
+        if caminho == "/v1/ephemeral_keys":
+            return 200, {"secret": "ek_test_abc"}
+        if caminho == "/v1/payment_intents":
+            return 200, {"id": "pi_9", "amount": 100, "status": "requires_payment_method",
+                         "client_secret": "pi_9_secret"}
+        return 404, {}
+
+    stripe = ProvedorStripeTeste(CHAVE_TESTE, "segredo-do-webhook", transporte)
+    novo = stripe.preparar_cartao("u-1")
+    assert (novo.cliente_id, novo.chave_efemera) == ("cus_novo", "ek_test_abc")
+    criar = next(c for c in chamadas if c[1] == "/v1/customers")
+    assert criar[2] == {"metadata[trato_usuario_id]": "u-1"} and criar[3] == {
+        "Idempotency-Key": "cliente/u-1"
+    }
+    efemera = next(c for c in chamadas if c[1] == "/v1/ephemeral_keys")
+    assert efemera[2] == {"customer": "cus_novo"} and "Stripe-Version" in efemera[3]
+
+    existe["sim"] = True  # segunda vez: reaproveita o cliente, não cria outro
+    chamadas.clear()
+    assert stripe.preparar_cartao("u-1").cliente_id == "cus_1"
+    assert not any(c[1] == "/v1/customers" for c in chamadas)
+
+    stripe.criar_cobranca(
+        valor_centavos=100,
+        meio=MeioPagamento.CARTAO,
+        chave_idempotencia="c",
+        metadados={},
+        cliente_externo="cus_1",
+    )
+    campos = next(c for c in chamadas if c[1] == "/v1/payment_intents")[2]
+    assert campos["customer"] == "cus_1" and campos["setup_future_usage"] == "on_session"

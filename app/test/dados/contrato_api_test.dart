@@ -417,6 +417,10 @@ void main() {
             },
           ],
         ),
+        'GET /v1/pedidos/ab12cd34/interlocutor': (
+          200,
+          {'id': 'p1', 'nome': 'Carlos S.', 'papel': 'profissional'},
+        ),
         'POST /v1/pedidos/ab12cd34/mensagens': (201, {'id': 3}),
       });
       final repo = RepositorioChatApi(api);
@@ -424,6 +428,8 @@ void main() {
       final c = await repo.conversa('ab12cd34');
       await repo.enviar('ab12cd34', 'Oi');
 
+      expect(c.nome, 'Carlos S.');
+      expect(c.iniciais, 'CS');
       expect(c.mensagens.map((m) => m.texto), ['Chego às 14h', 'Combinado']);
       expect(c.mensagens.map((m) => m.minha), [false, true]);
       expect(c.mensagens.last.lida, isTrue);

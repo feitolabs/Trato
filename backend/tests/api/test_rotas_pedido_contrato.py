@@ -474,3 +474,31 @@ def test_recusar_exige_profissional_motivo_e_pedido_visivel(abertos):
         ).status_code
         == 404
     )
+
+
+def test_cartao_devolve_cliente_e_chave_da_folha_e_pix_nao(fluxo: Fluxo):  # noqa: F811
+    pid = fluxo.aceitar()
+    cartao = fluxo.chamar("POST", f"/v1/contratos/{pid}/cobranca", "t-cliente", {"meio": "cartao"})
+    assert cartao.status_code == 201, cartao.text
+    corpo = cartao.json()
+    assert corpo["tipo_instrucao"] == "cartao_segredo_do_cliente"
+    assert corpo["cliente_externo_id"].startswith("cus_")
+    assert corpo["chave_efemera"].startswith("ek_test_")
+    assert ("preparar_cartao", "") not in fluxo.fake.chamadas  # sempre com o id do usuário
+
+    pix = fluxo.chamar("POST", f"/v1/contratos/{pid}/cobranca", "t-cliente", {"meio": "pix"})
+    assert pix.json()["cliente_externo_id"] is None and pix.json()["chave_efemera"] is None
+
+
+def test_chat_mostra_quem_esta_do_outro_lado_e_nao_o_numero_do_pedido(fluxo: Fluxo):  # noqa: F811
+    pid = fluxo.aceitar()
+    do_cliente = fluxo.chamar("GET", f"/v1/pedidos/{pid}/interlocutor", "t-cliente")
+    assert do_cliente.status_code == 200, do_cliente.text
+    assert do_cliente.json()["papel"] == "profissional" and do_cliente.json()["nome"]
+    assert not do_cliente.json()["nome"].startswith("Pedido")
+    do_prof = fluxo.chamar("GET", f"/v1/pedidos/{pid}/interlocutor", "t-prof")
+    assert do_prof.status_code == 200, do_prof.text
+    assert do_prof.json()["papel"] == "cliente"
+    assert do_prof.json()["id"] != do_cliente.json()["id"]
+    # quem não é parte do pedido não descobre nomes
+    assert fluxo.chamar("GET", f"/v1/pedidos/{pid}/interlocutor", "t-outro-prof").status_code == 404

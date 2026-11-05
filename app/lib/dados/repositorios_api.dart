@@ -677,6 +677,13 @@ class RepositorioChatApi implements RepositorioChat {
         temArquivoImagem(t);
   }
 
+  static String _iniciaisDe(String nome) {
+    final partes = nome.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (partes.isEmpty) return '#';
+    final primeira = partes.first[0].toUpperCase();
+    return partes.length == 1 ? primeira : '$primeira${partes.last[0].toUpperCase()}';
+  }
+
   Map<String, String>? _consulta(String? profissionalId) =>
       profissionalId == null || profissionalId.isEmpty
           ? null
@@ -699,9 +706,25 @@ class RepositorioChatApi implements RepositorioChat {
     } on ErroTrato catch (erro) {
       if (erro.tipo != TipoErro.naoEncontrado) rethrow;
     }
+    // Quem está do outro lado (nome curto). Se falhar, o chat segue com o número do pedido.
+    var nome = 'Pedido $numero';
+    var iniciais = '#';
+    try {
+      final o = _mapa(await _api.get(
+        '/v1/pedidos/$pedidoId/interlocutor',
+        consulta: _consulta(profissionalId),
+      ));
+      final n = ((o['nome'] as String?) ?? '').trim();
+      if (n.isNotEmpty) {
+        nome = n;
+        iniciais = _iniciaisDe(n);
+      }
+    } on ErroTrato {
+      // mantém o título pelo número do pedido
+    }
     return ConversaPedido(
-      nome: 'Pedido $numero',
-      iniciais: '#',
+      nome: nome,
+      iniciais: iniciais,
       numeroPedido: numero,
       situacao: situacao,
       mensagens: [

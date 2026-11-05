@@ -46,6 +46,19 @@ class CobrancaProvedor:
 
 
 @dataclass(frozen=True)
+class PreparoCartao:
+    """O que o app precisa para abrir a folha de cartão do provedor (cartões salvos e novo).
+
+    Nenhum dado de cartão passa pelo Trato: o provedor guarda (D15). O `cliente_id` é o cliente
+    DO PROVEDOR; `chave_efemera` é um segredo de vida curta que só deixa o app daquele cliente
+    listar e cadastrar os próprios cartões.
+    """
+
+    cliente_id: str
+    chave_efemera: str
+
+
+@dataclass(frozen=True)
 class EstornoProvedor:
     id: str
     cobranca_id: str
@@ -78,8 +91,12 @@ class ProvedorPagamento(Protocol):
         chave_idempotencia: str,
         metadados: Mapping[str, str],
         parcelas: int = 1,
+        cliente_externo: str | None = None,
     ) -> CobrancaProvedor:
         """Cria a cobrança. A mesma `chave_idempotencia` devolve a mesma cobrança."""
+
+    def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
+        """Cliente do provedor (uma vez por usuário) + chave efêmera da folha de cartão."""
 
     def consultar_cobranca(self, cobranca_id: str) -> CobrancaProvedor: ...
 

@@ -177,6 +177,7 @@ class ServicoPagamento:
         meio: MeioPagamento,
         aditivo_id: str | None = None,
         parcelas: int = 1,
+        cliente_externo: str | None = None,
     ) -> CobrancaLocal:
         """Cria (ou devolve a pendente) a cobrança do pedido ou de um aditivo.
 
@@ -206,6 +207,7 @@ class ServicoPagamento:
             chave_idempotencia=chave,
             metadados=metadados,
             parcelas=parcelas,
+            cliente_externo=cliente_externo,
         )
         local = CobrancaLocal(
             criada.id,

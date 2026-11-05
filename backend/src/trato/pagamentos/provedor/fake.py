@@ -20,6 +20,7 @@ from trato.pagamentos.provedor.base import (
     ErroProvedor,
     EstornoProvedor,
     EventoProvedor,
+    PreparoCartao,
     StatusCobranca,
     TipoEvento,
 )
@@ -50,6 +51,7 @@ class ProvedorFake:
         self._por_chave: dict[str, str] = {}
         self._estornos: dict[str, EstornoProvedor] = {}
         self._estornado: dict[str, int] = {}
+        self.clientes_das_cobrancas: dict[str, str] = {}
         self.chamadas: list[tuple[str, str]] = []  # (operação, chave) para os testes olharem
 
     # --- interface ---------------------------------------------------------------------
@@ -62,8 +64,11 @@ class ProvedorFake:
         chave_idempotencia: str,
         metadados: Mapping[str, str],
         parcelas: int = 1,
+        cliente_externo: str | None = None,
     ) -> CobrancaProvedor:
         self.chamadas.append(("criar_cobranca", chave_idempotencia))
+        if cliente_externo:
+            self.clientes_das_cobrancas[chave_idempotencia] = cliente_externo
         if chave_idempotencia in self._por_chave:
             return self._cobrancas[self._por_chave[chave_idempotencia]]
         if isinstance(valor_centavos, bool) or not isinstance(valor_centavos, int):
@@ -106,6 +111,10 @@ class ProvedorFake:
         estorno = EstornoProvedor(f"re_fake_{_curto(chave_idempotencia)}", cobranca_id, valor, True)
         self._estornos[chave_idempotencia] = estorno
         return estorno
+
+    def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
+        self.chamadas.append(("preparar_cartao", usuario_id))
+        return PreparoCartao(f"cus_fake_{_curto(usuario_id)}", f"ek_test_fake_{_curto(usuario_id)}")
 
     def segredo_webhook(self) -> str:
         return self._segredo

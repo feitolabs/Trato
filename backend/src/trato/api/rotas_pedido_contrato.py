@@ -26,6 +26,7 @@ from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.servicos import carregar_pedido
 from trato.pagamentos.custo import MeioPagamento
+from trato.pagamentos.provedor.base import ErroProvedor
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
 from trato.pedidos.estados import Estado, Pedido
@@ -85,6 +86,12 @@ class CobrancaContratoOut(BaseModel):
     parcelas: int = 1
     tipo_instrucao: str = Field(description="`pix_copia_e_cola` ou `cartao_segredo_do_cliente`.")
     instrucao: str | None = Field(None, description="O que o app usa para pagar.")
+    cliente_externo_id: str | None = Field(
+        None, description="Cartão: cliente do provedor, para a folha listar e salvar cartões."
+    )
+    chave_efemera: str | None = Field(
+        None, description="Cartão: chave de vida curta da folha de cartão do provedor."
+    )
     criada_em: datetime
 
 
@@ -311,10 +318,25 @@ def criar_cobranca(
         raise HTTPException(403, "Só o cliente do contrato pode pagar.")
     if pedido.estado not in ESTADOS_COBRAVEIS or pedido.referencia_pagamento is not None:
         raise HTTPException(409, "O pedido não está esperando pagamento.")
+    preparo = None
+    if corpo.meio is MeioPagamento.CARTAO and hasattr(servico.provedor, "preparar_cartao"):
+        try:
+            preparo = servico.provedor.preparar_cartao(usuario.id)
+        except ErroProvedor as erro:
+            raise HTTPException(502, "O parceiro de pagamento não respondeu. Tente de novo.") from erro
     cobranca = servico.cobrar(
-        contexto, pedido, contrato.valor_centavos, corpo.meio, parcelas=corpo.parcelas
+        contexto,
+        pedido,
+        contrato.valor_centavos,
+        corpo.meio,
+        parcelas=corpo.parcelas,
+        cliente_externo=preparo.cliente_id if preparo else None,
     )
-    return _cobranca_out(pedido.id, cobranca)
+    saida = _cobranca_out(pedido.id, cobranca)
+    if preparo is not None:
+        saida.cliente_externo_id = preparo.cliente_id
+        saida.chave_efemera = preparo.chave_efemera
+    return saida
 
 
 @router.get(
