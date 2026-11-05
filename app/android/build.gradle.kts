@@ -22,3 +22,11 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+// O plugin do Stripe puxa uma dependência de lint que não existe no Maven público
+// (play-services-tapandpay). Só a checagem "lintVital" desse plugin é desligada; o app não muda.
+subprojects {
+    if (project.name == "stripe_android") {
+        tasks.matching { it.name.startsWith("lintVital") }.configureEach { enabled = false }
+    }
+}
