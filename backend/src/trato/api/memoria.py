@@ -96,6 +96,8 @@ class PedidosEmMemoria:
                     urgente=d.urgente if d else False,
                     prazo_desejado=d.prazo_desejado if d else None,
                     aberto_em=p.aberto_em,
+                    local_aprox_lat=d.local_aprox_lat if d else None,
+                    local_aprox_lng=d.local_aprox_lng if d else None,
                 )
             )
         return tuple(saida)

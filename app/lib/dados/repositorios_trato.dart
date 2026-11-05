@@ -84,14 +84,16 @@ class RepositoriosTrato {
     CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido,
     ServicoUpload? upload,
     ServicoCamera? camera,
+    Future<PosicaoAtual?> Function()? posicao,
   }) {
-    final pedidos = RepositorioPedidosApi(api, upload: upload);
+    final pedidos = RepositorioPedidosApi(api, upload: upload, posicao: posicao);
     final profissional = RepositorioProfissionalApi(
       api,
       captura: captura,
       capturaDoPedido: capturaDoPedido,
       capturaFinalDoPedido: capturaFinalDoPedido,
       upload: upload,
+      posicao: posicao,
     );
     return RepositoriosTrato(
         modoApi: true,
@@ -150,6 +152,15 @@ class RepositoriosTrato {
           : null,
       upload: upload,
       camera: camera,
+      posicao: localizacao == null
+          ? null
+          : () async {
+              try {
+                return await localizacao.posicaoAtual();
+              } on ErroLocalizacao {
+                return null;
+              }
+            },
     );
   }
 

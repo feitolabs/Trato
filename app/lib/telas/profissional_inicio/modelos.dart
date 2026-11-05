@@ -51,12 +51,18 @@ class PedidoAberto {
     this.faixaMinCentavos,
     this.faixaMaxCentavos,
     this.urgente = false,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
   final String titulo;
   final String bairro;
   final double? distanciaKm;
+
+  /// Ponto aproximado do pedido (nunca o endereço exato); ausente = sem mapa.
+  final double? latitude;
+  final double? longitude;
 
   /// Texto pronto. Ex.: "até sexta, 30/10", "hoje", "próxima semana".
   final String prazo;

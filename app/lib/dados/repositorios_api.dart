@@ -1,3 +1,4 @@
+import '../dispositivo/servico_localizacao.dart';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
@@ -91,7 +92,16 @@ String _iniciais(String nome) {
 }
 
 class RepositorioPedidosApi implements RepositorioPedidos {
-  RepositorioPedidosApi(this._api, {this.textos = const TextosPadraoTelas(), this.upload});
+  RepositorioPedidosApi(
+    this._api, {
+    this.textos = const TextosPadraoTelas(),
+    this.upload,
+    this.posicao,
+  });
+
+  /// Posição aproximada do aparelho (nula se o cliente negou o GPS). Vai no pedido para o
+  /// profissional ver a distância.
+  final Future<PosicaoAtual?> Function()? posicao;
 
   final ClienteApi _api;
   final TextosPadraoTelas textos;
@@ -226,9 +236,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     if (categoriaId == null || cidadeId == null) {
       throw const ErroTrato(TipoErro.recusado, 'Escolha a categoria e a cidade do serviço.');
     }
+    final onde = await posicao?.call();
     final corpo = <String, dynamic>{
       'categoria_id': categoriaId,
       'cidade_id': cidadeId,
+      // Arredondado a ~1 km: o profissional vê a região, nunca o ponto exato.
+      if (onde != null) 'local_aprox_lat': double.parse(onde.latitude.toStringAsFixed(2)),
+      if (onde != null) 'local_aprox_lng': double.parse(onde.longitude.toStringAsFixed(2)),
       if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
       if (rascunho.prazoDesejado != null)
         'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
@@ -817,7 +831,11 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     this.capturaFinalDoPedido,
     this.upload,
     this.fila,
+    this.posicao,
   });
+
+  /// Onde o profissional está agora (para calcular a distância dos pedidos). Pode ser nula.
+  final Future<PosicaoAtual?> Function()? posicao;
 
   final ClienteApi _api;
   final CapturaCheckIn captura;
@@ -834,7 +852,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// faixa de preço e recusas; não vêm distância, nem quantos já orçaram.
   @override
   Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro) async {
-    final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos', consulta: filtro.consulta));
+    final onde = await posicao?.call();
+    final consulta = {
+      ...filtro.consulta,
+      if (onde != null) 'lat': '${onde.latitude}',
+      if (onde != null) 'lng': '${onde.longitude}',
+    };
+    final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos', consulta: consulta));
     return [for (final j in itens) _pedidoAberto(j)];
   }
 
@@ -853,6 +877,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       faixaMinCentavos: j['faixa_preco_min_centavos'] as int?,
       faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
       urgente: urgente,
+      distanciaKm: (j['distancia_km'] as num?)?.toDouble(),
+      latitude: (j['local_aprox_lat'] as num?)?.toDouble(),
+      longitude: (j['local_aprox_lng'] as num?)?.toDouble(),
     );
   }
 
@@ -924,7 +951,14 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// Não há rota de detalhe do pedido aberto: o detalhe sai da própria lista.
   @override
   Future<DetalhePedido> detalhe(String pedidoId) async {
-    final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos'));
+    final onde = await posicao?.call();
+    final itens = _lista(await _api.get(
+      '/v1/profissional/pedidos-abertos',
+      consulta: {
+        if (onde != null) 'lat': '${onde.latitude}',
+        if (onde != null) 'lng': '${onde.longitude}',
+      },
+    ));
     final achado = itens.where((j) => j['id'] == pedidoId).toList();
     if (achado.isEmpty) {
       throw const ErroTrato(TipoErro.naoEncontrado, 'Este pedido não está mais disponível.');

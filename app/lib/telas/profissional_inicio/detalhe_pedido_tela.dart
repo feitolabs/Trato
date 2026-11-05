@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../../dispositivo/abrir_mapa.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import 'dados_exemplo.dart';
 import 'modelos.dart';
@@ -42,14 +43,17 @@ class DetalhePedidoTela extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          [dados.fechaEm, textoOrcamentos(pedido)].where((t) => t.isNotEmpty).join(' · '),
+          [dados.fechaEm, textoOrcamentos(pedido)]
+              .where((t) => t.isNotEmpty)
+              .join(' · '),
         ),
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
+              padding: const EdgeInsets.only(
+                  top: EspacosTrato.x2, bottom: EspacosTrato.x6),
               child: ConteudoResponsivo(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,14 +62,19 @@ class DetalhePedidoTela extends StatelessWidget {
                     const SizedBox(height: EspacosTrato.x2),
                     Text(
                       dados.clienteResumo,
-                      style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.corpo
+                          .copyWith(color: CoresTrato.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x5),
                     Row(
                       children: [
-                        for (var i = 0; i < dados.legendasFotos.length; i++) ...[
+                        for (var i = 0;
+                            i < dados.legendasFotos.length;
+                            i++) ...[
                           if (i > 0) const SizedBox(width: EspacosTrato.x2),
-                          Expanded(child: EspacoFoto(legenda: dados.legendasFotos[i])),
+                          Expanded(
+                              child:
+                                  EspacoFoto(legenda: dados.legendasFotos[i])),
                         ],
                       ],
                     ),
@@ -83,7 +92,18 @@ class DetalhePedidoTela extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: EspacosTrato.x4),
-                    const _Mapa(),
+                    _Mapa(
+                      aoTocar:
+                          pedido.latitude == null || pedido.longitude == null
+                              ? null
+                              : () => abrirNoMapa(
+                                    pedido.latitude!,
+                                    pedido.longitude!,
+                                    pedido.bairro.isEmpty
+                                        ? 'Região do pedido'
+                                        : pedido.bairro,
+                                  ),
+                    ),
                     const SizedBox(height: EspacosTrato.x2),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,9 +143,15 @@ class DetalhePedidoTela extends StatelessWidget {
                 child: ConteudoResponsivo(
                   child: Row(
                     children: [
-                      Expanded(child: BotaoSecundario(texto: 'Perguntar', aoTocar: aoPerguntar ?? () {})),
+                      Expanded(
+                          child: BotaoSecundario(
+                              texto: 'Perguntar',
+                              aoTocar: aoPerguntar ?? () {})),
                       const SizedBox(width: EspacosTrato.x3),
-                      Expanded(child: BotaoPrimario(texto: 'Fazer orçamento', aoTocar: aoFazerOrcamento ?? () {})),
+                      Expanded(
+                          child: BotaoPrimario(
+                              texto: 'Fazer orçamento',
+                              aoTocar: aoFazerOrcamento ?? () {})),
                     ],
                   ),
                 ),
@@ -137,7 +163,8 @@ class DetalhePedidoTela extends StatelessWidget {
     );
   }
 
-  static String _capitalizar(String t) => t.isEmpty ? t : t[0].toUpperCase() + t.substring(1);
+  static String _capitalizar(String t) =>
+      t.isEmpty ? t : t[0].toUpperCase() + t.substring(1);
 }
 
 class _LinhaDoCartao extends StatelessWidget {
@@ -154,13 +181,15 @@ class _LinhaDoCartao extends StatelessWidget {
           flex: 2,
           child: Text(
             linha.rotulo,
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo
+                .copyWith(color: CoresTrato.textoSecundario),
           ),
         ),
         const SizedBox(width: EspacosTrato.x3),
         Expanded(
           flex: 3,
-          child: Text(linha.valor, textAlign: TextAlign.end, style: TipografiaTrato.corpoForte),
+          child: Text(linha.valor,
+              textAlign: TextAlign.end, style: TipografiaTrato.corpoForte),
         ),
       ],
     );
@@ -169,45 +198,57 @@ class _LinhaDoCartao extends StatelessWidget {
 
 /// Espaço do mapa do protótipo (área aproximada, sem endereço exato).
 class _Mapa extends StatelessWidget {
-  const _Mapa();
+  const _Mapa({this.aoTocar});
+
+  /// Abre o app de mapas no ponto aproximado. Sem ponto, o cartão só ilustra a área.
+  final VoidCallback? aoTocar;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Mapa da região aproximada',
-      child: Container(
-        height: 160,
-        width: double.infinity,
-        padding: const EdgeInsets.all(EspacosTrato.x3),
-        decoration: BoxDecoration(
-          color: CoresTrato.azulSuave,
-          borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-          border: Border.all(color: CoresTrato.borda),
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  color: CoresTrato.azulClaro,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: CoresTrato.azulTexto, width: 1.5),
+      label: aoTocar == null
+          ? 'Mapa da região aproximada'
+          : 'Abrir região aproximada no mapa',
+      button: aoTocar != null,
+      child: GestureDetector(
+        onTap: aoTocar,
+        child: Container(
+          height: 160,
+          width: double.infinity,
+          padding: const EdgeInsets.all(EspacosTrato.x3),
+          decoration: BoxDecoration(
+            color: CoresTrato.azulSuave,
+            borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+            border: Border.all(color: CoresTrato.borda),
+          ),
+          child: Stack(
+            children: [
+              Align(
+                alignment: const Alignment(0, -0.45),
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: CoresTrato.azulClaro,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: CoresTrato.azulTexto, width: 1.5),
+                  ),
                 ),
               ),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                'Área aproximada',
-                style: TipografiaTrato.corpoPequeno.copyWith(
-                  color: CoresTrato.petroleo,
-                  fontWeight: FontWeight.w700,
+              Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  aoTocar == null
+                      ? 'Área aproximada'
+                      : 'Área aproximada · toque para ver no mapa',
+                  style: TipografiaTrato.corpoPequeno.copyWith(
+                    color: CoresTrato.petroleo,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

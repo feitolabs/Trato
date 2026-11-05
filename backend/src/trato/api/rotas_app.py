@@ -174,6 +174,13 @@ class PedidoAbertoOut(BaseModel):
     urgente: bool
     prazo_desejado: date | None
     aberto_em: datetime
+    local_aprox_lat: float | None = None
+    local_aprox_lng: float | None = None
+    distancia_km: float | None = Field(
+        default=None,
+        description="Distância em linha reta até o ponto aproximado do pedido. Só vem quando o "
+        "profissional manda `lat` e `lng`.",
+    )
 
 
 class ResumoOrcamentoOut(BaseModel):

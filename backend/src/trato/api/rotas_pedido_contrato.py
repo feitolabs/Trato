@@ -9,6 +9,7 @@ Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
@@ -715,6 +716,29 @@ class OrdemPedidos(StrEnum):
     URGENTES = "urgentes"
     MAIOR_VALOR = "maior_valor"
     MENOR_VALOR = "menor_valor"
+    PROXIMOS = "proximos"
+
+
+def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Distância em linha reta (haversine), em km."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = (
+        math.sin((p2 - p1) / 2) ** 2
+        + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lng2 - lng1) / 2) ** 2
+    )
+    return 2 * 6371.0 * math.asin(math.sqrt(a))
+
+
+def _saida_aberto(p: PedidoAberto, lat: float | None, lng: float | None) -> PedidoAbertoOut:
+    km = None
+    if (
+        lat is not None
+        and lng is not None
+        and p.local_aprox_lat is not None
+        and p.local_aprox_lng is not None
+    ):
+        km = round(_distancia_km(lat, lng, p.local_aprox_lat, p.local_aprox_lng), 1)
+    return PedidoAbertoOut(**vars(p), distancia_km=km)
 
 
 def _teto_da_faixa(p: PedidoAberto) -> int:
@@ -739,6 +763,8 @@ def pedidos_abertos(
     preco_max_centavos: Annotated[int | None, Query(ge=0, le=TETO_CENTAVOS)] = None,
     ordenar: OrdemPedidos = OrdemPedidos.RECENTES,
     limite: Annotated[int, Query(ge=1, le=100)] = 50,
+    lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    lng: Annotated[float | None, Query(ge=-180, le=180)] = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[PedidoAbertoOut]:
@@ -782,9 +808,13 @@ def pedidos_abertos(
                 -p.aberto_em.timestamp(),
             )
         )
+    elif ordenar is OrdemPedidos.PROXIMOS and lat is not None and lng is not None:
+        saida = [_saida_aberto(p, lat, lng) for p in itens]
+        saida.sort(key=lambda o: (o.distancia_km is None, o.distancia_km or 0.0))
+        return saida[:limite]
     else:
         itens.sort(key=lambda p: p.aberto_em, reverse=True)
-    return [PedidoAbertoOut(**vars(p)) for p in itens[:limite]]
+    return [_saida_aberto(p, lat, lng) for p in itens[:limite]]
 
 
 class PedidoAbertoDetalheOut(PedidoAbertoOut):
@@ -801,6 +831,8 @@ class PedidoAbertoDetalheOut(PedidoAbertoOut):
 )
 def pedido_aberto(
     pedido_id: str,
+    lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    lng: Annotated[float | None, Query(ge=-180, le=180)] = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoAbertoDetalheOut:
@@ -817,7 +849,7 @@ def pedido_aberto(
         raise HTTPException(404, "Pedido não encontrado.")
     orcamentos = contexto.orcamentos.do_pedido(achado.id)
     return PedidoAbertoDetalheOut(
-        **vars(achado),
+        **_saida_aberto(achado, lat, lng).model_dump(),
         orcamentos_recebidos=len(orcamentos),
         ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
     )
