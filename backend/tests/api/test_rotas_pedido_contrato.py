@@ -356,7 +356,7 @@ def test_me_do_profissional_mostra_verificacao(amb):
 # --- pedidos abertos e recusa -------------------------------------------------------------
 
 
-def _abrir(amb, pid, bairro, categoria, faixa, urgente=False, dias=1):
+def _abrir(amb, pid, bairro, categoria, faixa, urgente=False, dias=1, local=(None, None)):
     from trato.api.repositorios import DadosPedido
     from trato.pedidos.estados import Pedido
 
@@ -367,7 +367,7 @@ def _abrir(amb, pid, bairro, categoria, faixa, urgente=False, dias=1):
         dados=DadosPedido(
             categoria_id=categoria, cidade_id="c", titulo=f"Pedido {pid}", descricao="d",
             bairro=bairro, faixa_preco_min_centavos=faixa[0], faixa_preco_max_centavos=faixa[1],
-            urgente=urgente,
+            urgente=urgente, local_aprox_lat=local[0], local_aprox_lng=local[1],
         ),
     )  # fmt: skip
 
@@ -405,6 +405,27 @@ def test_pedidos_abertos_filtros_e_ordem(abertos):
         == 422
     )
     assert chamar(abertos, "GET", url, "t-cliente").status_code == 403
+
+
+def test_distancia_ate_o_pedido_so_com_a_posicao_do_profissional(amb):
+    # Praça Sete (BH) e um ponto a ~4 km; "c" não tem ponto.
+    _abrir(amb, "perto", "Centro", "pintura", (None, None), dias=1, local=(-19.92, -43.94))
+    _abrir(amb, "longe", "Pampulha", "pintura", (None, None), dias=2, local=(-19.86, -43.97))
+    _abrir(amb, "sem", "Centro", "pintura", (None, None), dias=3)
+    url = "/v1/profissional/pedidos-abertos"
+    sem_pos = chamar(amb, "GET", url, "t-prof").json()
+    assert all(p["distancia_km"] is None for p in sem_pos)
+    com_pos = chamar(amb, "GET", url + "?lat=-19.9167&lng=-43.9345&ordenar=proximos", "t-prof")
+    achados = {p["id"]: p for p in com_pos.json()}
+    assert [p["id"] for p in com_pos.json()] == ["perto", "longe", "sem"]
+    assert achados["perto"]["distancia_km"] < 1.0
+    assert 5.0 < achados["longe"]["distancia_km"] < 12.0
+    assert achados["sem"]["distancia_km"] is None
+    det = chamar(
+        amb, "GET", "/v1/profissional/pedidos-abertos/longe?lat=-19.9167&lng=-43.9345", "t-prof"
+    )
+    assert det.json()["distancia_km"] == achados["longe"]["distancia_km"]
+    assert chamar(amb, "GET", url + "?lat=95&lng=0", "t-prof").status_code == 422
 
 
 def test_detalhe_do_pedido_aberto_com_quantos_orcaram(abertos):
@@ -453,3 +474,31 @@ def test_recusar_exige_profissional_motivo_e_pedido_visivel(abertos):
         ).status_code
         == 404
     )
+
+
+def test_cartao_devolve_cliente_e_chave_da_folha_e_pix_nao(fluxo: Fluxo):  # noqa: F811
+    pid = fluxo.aceitar()
+    cartao = fluxo.chamar("POST", f"/v1/contratos/{pid}/cobranca", "t-cliente", {"meio": "cartao"})
+    assert cartao.status_code == 201, cartao.text
+    corpo = cartao.json()
+    assert corpo["tipo_instrucao"] == "cartao_segredo_do_cliente"
+    assert corpo["cliente_externo_id"].startswith("cus_")
+    assert corpo["chave_efemera"].startswith("ek_test_")
+    assert ("preparar_cartao", "") not in fluxo.fake.chamadas  # sempre com o id do usuário
+
+    pix = fluxo.chamar("POST", f"/v1/contratos/{pid}/cobranca", "t-cliente", {"meio": "pix"})
+    assert pix.json()["cliente_externo_id"] is None and pix.json()["chave_efemera"] is None
+
+
+def test_chat_mostra_quem_esta_do_outro_lado_e_nao_o_numero_do_pedido(fluxo: Fluxo):  # noqa: F811
+    pid = fluxo.aceitar()
+    do_cliente = fluxo.chamar("GET", f"/v1/pedidos/{pid}/interlocutor", "t-cliente")
+    assert do_cliente.status_code == 200, do_cliente.text
+    assert do_cliente.json()["papel"] == "profissional" and do_cliente.json()["nome"]
+    assert not do_cliente.json()["nome"].startswith("Pedido")
+    do_prof = fluxo.chamar("GET", f"/v1/pedidos/{pid}/interlocutor", "t-prof")
+    assert do_prof.status_code == 200, do_prof.text
+    assert do_prof.json()["papel"] == "cliente"
+    assert do_prof.json()["id"] != do_cliente.json()["id"]
+    # quem não é parte do pedido não descobre nomes
+    assert fluxo.chamar("GET", f"/v1/pedidos/{pid}/interlocutor", "t-outro-prof").status_code == 404

@@ -1,3 +1,4 @@
+import '../dispositivo/servico_localizacao.dart';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
@@ -16,6 +17,7 @@ import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
+import '../telas/comuns/formato_aparelho.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
 import 'fila_offline.dart';
@@ -29,7 +31,7 @@ import 'servico_upload.dart';
 
 String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
-String _hora(DateTime d) => '${d.hour}h${_doisDigitos(d.minute)}';
+String _hora(DateTime d) => horaDoAparelho(d);
 
 Map<String, dynamic> _mapa(Object? json) =>
     json is Map<String, dynamic> ? json : (json is Map ? Map<String, dynamic>.from(json) : const <String, dynamic>{});
@@ -90,7 +92,16 @@ String _iniciais(String nome) {
 }
 
 class RepositorioPedidosApi implements RepositorioPedidos {
-  RepositorioPedidosApi(this._api, {this.textos = const TextosPadraoTelas(), this.upload});
+  RepositorioPedidosApi(
+    this._api, {
+    this.textos = const TextosPadraoTelas(),
+    this.upload,
+    this.posicao,
+  });
+
+  /// Posição aproximada do aparelho (nula se o cliente negou o GPS). Vai no pedido para o
+  /// profissional ver a distância.
+  final Future<PosicaoAtual?> Function()? posicao;
 
   final ClienteApi _api;
   final TextosPadraoTelas textos;
@@ -99,8 +110,82 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<PedidoApi> _pedido(String id) async =>
       PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$id')));
 
+  static DadosDoPedido _dadosDeJson(Map<String, dynamic> j) {
+    final e = j['endereco'] as Map<String, dynamic>?;
+    return DadosDoPedido(
+      titulo: j['titulo'] as String,
+      descricao: j['descricao'] as String,
+      faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
+      logradouro: e?['logradouro'] as String?,
+      numero: e?['numero'] as String?,
+      bairro: e?['bairro'] as String?,
+      complemento: e?['complemento'] as String?,
+    );
+  }
+
+  @override
+  Future<DadosDoPedido> dados(String pedidoId) async =>
+      _dadosDeJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/dados')));
+
+  @override
+  Future<DadosDoPedido> editar(
+    String pedidoId, {
+    String? descricao,
+    int? faixaMaxCentavos,
+    String? logradouro,
+    String? numero,
+    String? bairro,
+    String? complemento,
+  }) async {
+    final corpo = <String, Object?>{
+      if (descricao != null) 'descricao': descricao,
+      if (faixaMaxCentavos != null) 'faixa_preco_max_centavos': faixaMaxCentavos,
+      if (logradouro != null && logradouro.trim().isNotEmpty)
+        'endereco': {
+          'logradouro': logradouro.trim(),
+          if (numero != null && numero.trim().isNotEmpty) 'numero': numero.trim(),
+          if (bairro != null && bairro.trim().isNotEmpty) 'bairro': bairro.trim(),
+          if (complemento != null && complemento.trim().isNotEmpty)
+            'complemento': complemento.trim(),
+        },
+    };
+    return _dadosDeJson(_mapa(await _api.patch('/v1/pedidos/$pedidoId', corpo: corpo)));
+  }
+
   Future<SaldoPedidoApi> _saldo(String id) async =>
       SaldoPedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$id/saldo')));
+
+  /// `GET /v1/pedidos/{id}/fotos`: URLs assinadas e curtas das fotos do serviço. "antes" é a foto
+  /// de chegada (ou "antes"), "depois" a foto final (ou "depois"). Falha de rede = sem fotos.
+  Future<Map<String, String>> _fotosDoServico(String pedidoId) async {
+    final porFinalidade = <String, String>{};
+    try {
+      for (final f in _lista(await _api.get('/v1/pedidos/$pedidoId/fotos'))) {
+        final url = f['url'];
+        if (url is! String) continue;
+        switch (f['finalidade']) {
+          case 'checkin' || 'antes':
+            porFinalidade.putIfAbsent('antes', () => url);
+          case 'checkout' || 'depois':
+            porFinalidade['depois'] = url;
+        }
+      }
+    } catch (_) {}
+    return porFinalidade;
+  }
+
+  /// Nome do profissional do pedido (`GET /v1/profissionais/{id}`). Sem nome, "o profissional":
+  /// as frases das telas funcionam com os dois (início de frase ganha maiúscula).
+  Future<String> _nomeDoProfissional(PedidoApi pedido) async {
+    final id = pedido.profissionalId;
+    if (id == null) return 'o profissional';
+    try {
+      final nome = (_mapa(await _api.get('/v1/profissionais/$id'))['nome'] as String?)?.trim();
+      return (nome == null || nome.isEmpty) ? 'o profissional' : nome;
+    } catch (_) {
+      return 'o profissional';
+    }
+  }
 
   @override
   Future<PedidosDoCliente> listar() async {
@@ -151,9 +236,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     if (categoriaId == null || cidadeId == null) {
       throw const ErroTrato(TipoErro.recusado, 'Escolha a categoria e a cidade do serviço.');
     }
+    final onde = await posicao?.call();
     final corpo = <String, dynamic>{
       'categoria_id': categoriaId,
       'cidade_id': cidadeId,
+      // Arredondado a ~1 km: o profissional vê a região, nunca o ponto exato.
+      if (onde != null) 'local_aprox_lat': double.parse(onde.latitude.toStringAsFixed(2)),
+      if (onde != null) 'local_aprox_lng': double.parse(onde.longitude.toStringAsFixed(2)),
       if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
       if (rascunho.prazoDesejado != null)
         'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
@@ -174,8 +263,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
           {'pergunta_id': 'prazo', 'resposta': rascunho.prazo},
       ],
     };
+    // Só ASCII: a chave vai num cabeçalho HTTP e o nome do serviço tem acento ("Orçamento geral").
     final chaveIdemp =
-        'pedido-${DateTime.now().millisecondsSinceEpoch}-${rascunho.servicos.join('_')}-${rascunho.descricao.hashCode}';
+        'pedido-${DateTime.now().millisecondsSinceEpoch}-${rascunho.servicos.join('|').hashCode.abs()}-${rascunho.descricao.hashCode.abs()}';
     final criado = PedidoApi.deJson(
       _mapa(await _api.post('/v1/pedidos', corpo: corpo, chaveIdempotencia: chaveIdemp)),
     );
@@ -220,28 +310,36 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final eventos = [
       for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j),
     ];
+    // Etapas da linha do tempo (índice = posição). O check-in cobre "Chegou" e "Em execução".
     const etapaDaAcao = {
       'aceitar_orcamento': 0,
       'confirmar_agenda': 1,
       'fazer_check_in': 3,
-      'confirmar_conclusao': 4,
+      'fazer_check_out': 4,
+      'confirmar_conclusao': 5,
     };
     const etapaDoEstado = {
       'orcamento_aceito': 0,
       'pago_e_retido': 0,
       'agendado': 1,
       'em_andamento': 3,
-      'em_confirmacao': 3,
-      'concluido': 5,
+      'em_confirmacao': 4,
+      'concluido': 6,
     };
-    const titulos = ['Contratado', 'A caminho', 'Chegou', 'Em execução', 'Finalizado'];
+    const titulos = [
+      'Contratado',
+      'Visita marcada',
+      'Chegou',
+      'Em execução',
+      'Aguardando sua confirmação',
+      'Finalizado',
+    ];
     final atual = etapaDoEstado[pedido.estado] ?? 0;
     final quando = <int, DateTime>{};
     for (final e in eventos) {
       final etapa = etapaDaAcao[e.acao];
       if (etapa != null) quando[etapa] = e.em.toLocal();
     }
-    // O check-in cobre "Chegou" e "Em execução" no backend (uma ação só).
     final checkIn = quando[3];
     if (checkIn != null) quando[2] = checkIn;
     final etapas = [
@@ -261,7 +359,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       titulo: 'Serviço em execução',
       etapas: etapas,
       fotos: const [],
-      codigoInicio: pedido.codigoInicio,
+      // O código de início só serve até o profissional chegar.
+      codigoInicio: const {'em_andamento', 'em_confirmacao', 'concluido'}.contains(pedido.estado)
+          ? null
+          : pedido.codigoInicio,
     );
   }
 
@@ -269,9 +370,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<ResumoConclusao> conclusao(String pedidoId) async {
     final pedido = await _pedido(pedidoId);
     final saldo = await _saldo(pedidoId);
+    final fotos = await _fotosDoServico(pedidoId);
     return ResumoConclusao(
       numeroPedido: pedido.numero,
-      nomeProfissional: 'O profissional',
+      nomeProfissional: await _nomeDoProfissional(pedido),
+      fotoAntes: fotos['antes'],
+      fotoDepois: fotos['depois'],
+      fotosCarregadas: true,
       legendaFotoAntes: 'Antes',
       legendaFotoDepois: 'Depois',
       orcamentoCentavos: saldo.clientePagouCentavos,
@@ -296,7 +401,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       motivos: textos.motivos,
       solucoes: textos.solucoes,
       prazoRespostaHoras: textos.prazoRespostaHoras,
-      nomeProfissional: 'O profissional',
+      nomeProfissional: await _nomeDoProfissional(pedido),
     );
   }
 
@@ -338,8 +443,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async {
     final saldo = await _saldo(pedidoId);
+    final pedido = await _pedido(pedidoId);
     return DadosAvaliacao(
-      nomeProfissional: 'O profissional',
+      nomeProfissional: await _nomeDoProfissional(pedido),
       valorLiberadoCentavos: saldo.clientePagouCentavos,
       criterios: textos.criterios,
       gorjetasCentavos: textos.gorjetas,
@@ -540,6 +646,10 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     return Cobranca(
       id: j['cobranca_id'] as String,
       pixCopiaECola: j['tipo_instrucao'] == 'pix_copia_e_cola' ? j['instrucao'] as String? : null,
+      segredoCartao:
+          j['tipo_instrucao'] == 'cartao_segredo_do_cliente' ? j['instrucao'] as String? : null,
+      clienteCartaoId: j['cliente_externo_id'] as String?,
+      chaveEfemera: j['chave_efemera'] as String?,
     );
   }
 
@@ -571,6 +681,13 @@ class RepositorioChatApi implements RepositorioChat {
         temArquivoImagem(t);
   }
 
+  static String _iniciaisDe(String nome) {
+    final partes = nome.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (partes.isEmpty) return '#';
+    final primeira = partes.first[0].toUpperCase();
+    return partes.length == 1 ? primeira : '$primeira${partes.last[0].toUpperCase()}';
+  }
+
   Map<String, String>? _consulta(String? profissionalId) =>
       profissionalId == null || profissionalId.isEmpty
           ? null
@@ -593,9 +710,25 @@ class RepositorioChatApi implements RepositorioChat {
     } on ErroTrato catch (erro) {
       if (erro.tipo != TipoErro.naoEncontrado) rethrow;
     }
+    // Quem está do outro lado (nome curto). Se falhar, o chat segue com o número do pedido.
+    var nome = 'Pedido $numero';
+    var iniciais = '#';
+    try {
+      final o = _mapa(await _api.get(
+        '/v1/pedidos/$pedidoId/interlocutor',
+        consulta: _consulta(profissionalId),
+      ));
+      final n = ((o['nome'] as String?) ?? '').trim();
+      if (n.isNotEmpty) {
+        nome = n;
+        iniciais = _iniciaisDe(n);
+      }
+    } on ErroTrato {
+      // mantém o título pelo número do pedido
+    }
     return ConversaPedido(
-      nome: 'Pedido $numero',
-      iniciais: '#',
+      nome: nome,
+      iniciais: iniciais,
       numeroPedido: numero,
       situacao: situacao,
       mensagens: [
@@ -722,15 +855,23 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     this._api, {
     this.captura = const CapturaIndisponivel(),
     this.capturaDoPedido,
+    this.capturaFinalDoPedido,
     this.upload,
     this.fila,
+    this.posicao,
   });
+
+  /// Onde o profissional está agora (para calcular a distância dos pedidos). Pode ser nula.
+  final Future<PosicaoAtual?> Function()? posicao;
 
   final ClienteApi _api;
   final CapturaCheckIn captura;
 
   /// Câmera e GPS ligados ao pedido (a foto sobe com o `pedido_id`). Sem ele vale [captura].
   final CapturaCheckIn Function(String pedidoId)? capturaDoPedido;
+
+  /// Igual à de cima, mas a foto sobe com a finalidade `checkout` (foto final do serviço).
+  final CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido;
   final ServicoUpload? upload;
   final FilaOffline? fila;
 
@@ -738,7 +879,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// faixa de preço e recusas; não vêm distância, nem quantos já orçaram.
   @override
   Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro) async {
-    final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos', consulta: filtro.consulta));
+    final onde = await posicao?.call();
+    final consulta = {
+      ...filtro.consulta,
+      if (onde != null) 'lat': '${onde.latitude}',
+      if (onde != null) 'lng': '${onde.longitude}',
+    };
+    final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos', consulta: consulta));
     return [for (final j in itens) _pedidoAberto(j)];
   }
 
@@ -757,6 +904,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       faixaMinCentavos: j['faixa_preco_min_centavos'] as int?,
       faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
       urgente: urgente,
+      distanciaKm: (j['distancia_km'] as num?)?.toDouble(),
+      latitude: (j['local_aprox_lat'] as num?)?.toDouble(),
+      longitude: (j['local_aprox_lng'] as num?)?.toDouble(),
     );
   }
 
@@ -786,9 +936,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
           proximo = ProximoAtendimento(
             pedidoId: p.id,
-            quando: p.estadoNome,
+            // Data e hora combinadas; antes de marcar a visita, diz isso em vez do nome do estado.
+            quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
             titulo: 'Pedido ${p.numero}',
             endereco: '',
+            janelaInicio: p.janelaInicio?.toLocal(),
+            emAndamento: p.estado == 'em_andamento',
           );
           break;
         }
@@ -825,7 +978,14 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// Não há rota de detalhe do pedido aberto: o detalhe sai da própria lista.
   @override
   Future<DetalhePedido> detalhe(String pedidoId) async {
-    final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos'));
+    final onde = await posicao?.call();
+    final itens = _lista(await _api.get(
+      '/v1/profissional/pedidos-abertos',
+      consulta: {
+        if (onde != null) 'lat': '${onde.latitude}',
+        if (onde != null) 'lng': '${onde.longitude}',
+      },
+    ));
     final achado = itens.where((j) => j['id'] == pedidoId).toList();
     if (achado.isEmpty) {
       throw const ErroTrato(TipoErro.naoEncontrado, 'Este pedido não está mais disponível.');
@@ -884,6 +1044,19 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         upload: upload,
         fila: fila,
       );
+
+  @override
+  ServicoCheckOut servicoCheckOut(String pedidoId) {
+    final captura = capturaFinalDoPedido?.call(pedidoId) ?? this.captura;
+    final checkIn = ServicoCheckInApi(
+      _api,
+      pedidoId: pedidoId,
+      captura: captura,
+      upload: upload,
+      fila: fila,
+    );
+    return ServicoCheckOutApi(checkIn, captura);
+  }
 }
 
 /// `POST /v1/orcamentos/resumo` `{valor_centavos}` e `POST /v1/pedidos/{pedido_id}/orcamentos`.
@@ -1052,7 +1225,8 @@ class ServicoCheckInApi implements ServicoCheckIn {
   @override
   Future<int?> localizar() async {
     final posicao = _posicao = await captura.posicao();
-    return posicao?.distanciaMetros;
+    if (posicao == null) return null;
+    return posicao.distanciaMetros ?? distanciaDesconhecidaMetros;
   }
 
   // Sem rota no backend: mensagens rápidas e aviso de cliente ausente.

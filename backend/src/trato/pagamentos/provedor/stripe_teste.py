@@ -22,12 +22,15 @@ from trato.pagamentos.provedor.base import (
     ErroProvedor,
     EstornoProvedor,
     EventoProvedor,
+    PreparoCartao,
     StatusCobranca,
 )
 from trato.pagamentos.provedor.stripe_formato import interpretar_evento_stripe
 from trato.pagamentos.webhook import verificar_assinatura
 
 URL_BASE = "https://api.stripe.com"
+# Versão da API exigida pela chave efêmera: tem de ser a do SDK do app (flutter_stripe).
+VERSAO_API_CHAVE_EFEMERA = "2024-06-20"
 Resposta = tuple[int, Mapping[str, Any]]
 # (método, caminho, campos do formulário, cabeçalhos extras) -> (status HTTP, JSON)
 Transporte = Callable[[str, str, Mapping[str, str], Mapping[str, str]], Resposta]
@@ -93,6 +96,7 @@ class ProvedorStripeTeste:
         chave_idempotencia: str,
         metadados: Mapping[str, str],
         parcelas: int = 1,
+        cliente_externo: str | None = None,
     ) -> CobrancaProvedor:
         if parcelas != 1:
             raise ErroProvedor("Parcelamento ainda não está ligado nesta integração.")
@@ -114,9 +118,41 @@ class ProvedorStripeTeste:
                 "capture_method": "automatic",
                 "payment_method_options[card][request_three_d_secure]": "automatic",
             }
+            if cliente_externo:
+                # Com o cliente, a folha de cartão lista os cartões salvos e guarda o novo.
+                campos |= {
+                    "customer": cliente_externo,
+                    "setup_future_usage": "on_session",
+                }
         campos |= {f"metadata[{k}]": v for k, v in metadados.items()}
         corpo = self._chamar("POST", "/v1/payment_intents", campos, chave_idempotencia)
         return self._cobranca(corpo, meio)
+
+    def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
+        """Acha (ou cria) o cliente deste usuário no Stripe e gera a chave efêmera dele."""
+        achados = self._chamar(
+            "GET",
+            "/v1/customers/search",
+            {"query": f"metadata['trato_usuario_id']:'{usuario_id}'", "limit": "1"},
+        ).get("data") or []
+        if achados:
+            cliente_id = str(achados[0]["id"])
+        else:
+            criado = self._chamar(
+                "POST",
+                "/v1/customers",
+                {"metadata[trato_usuario_id]": usuario_id},
+                f"cliente/{usuario_id}",
+            )
+            cliente_id = str(criado["id"])
+        chave = self._chamar(
+            "POST",
+            "/v1/ephemeral_keys",
+            {"customer": cliente_id},
+            None,
+            {"Stripe-Version": VERSAO_API_CHAVE_EFEMERA},
+        )
+        return PreparoCartao(cliente_id, str(chave["secret"]))
 
     def consultar_cobranca(self, cobranca_id: str) -> CobrancaProvedor:
         corpo = self._chamar("GET", f"/v1/payment_intents/{cobranca_id}", {})
@@ -155,9 +191,14 @@ class ProvedorStripeTeste:
     # --- detalhes ----------------------------------------------------------------------
 
     def _chamar(
-        self, metodo: str, caminho: str, campos: Mapping[str, str], chave: str | None = None
+        self,
+        metodo: str,
+        caminho: str,
+        campos: Mapping[str, str],
+        chave: str | None = None,
+        extras: Mapping[str, str] | None = None,
     ) -> Mapping[str, Any]:
-        cabecalhos = {"Idempotency-Key": chave} if chave else {}
+        cabecalhos = {**(extras or {}), **({"Idempotency-Key": chave} if chave else {})}
         status, corpo = self._transporte(metodo, caminho, campos, cabecalhos)
         if status >= 400:
             erro = corpo.get("error", {}) if isinstance(corpo, Mapping) else {}

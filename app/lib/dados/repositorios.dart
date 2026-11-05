@@ -6,6 +6,7 @@ import '../telas/pedido_novo/modelos.dart';
 import '../telas/pedidos/modelos.dart';
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/servico_check_in.dart';
+import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
 
@@ -21,8 +22,53 @@ class PedidosDoCliente {
   bool get vazio => emAndamento.isEmpty && finalizados.isEmpty;
 }
 
+/// O que o cliente descreveu no pedido e ainda pode mudar antes de aceitar um orçamento.
+class DadosDoPedido {
+  const DadosDoPedido({
+    required this.titulo,
+    required this.descricao,
+    this.faixaMaxCentavos,
+    this.logradouro,
+    this.numero,
+    this.bairro,
+    this.complemento,
+  });
+
+  final String titulo;
+  final String descricao;
+  final int? faixaMaxCentavos;
+  final String? logradouro;
+  final String? numero;
+  final String? bairro;
+  final String? complemento;
+
+  /// "Rua das Flores, 10 · Centro", ou nulo se não há endereço.
+  String? get enderecoResumo {
+    final rua = logradouro;
+    if (rua == null || rua.isEmpty) return null;
+    final n = (numero == null || numero!.isEmpty) ? '' : ', $numero';
+    final b = (bairro == null || bairro!.isEmpty) ? '' : ' · $bairro';
+    return '$rua$n$b';
+  }
+}
+
 abstract interface class RepositorioPedidos {
   Future<PedidosDoCliente> listar();
+
+  /// Descrição, valor pretendido e endereço do pedido.
+  Future<DadosDoPedido> dados(String pedidoId);
+
+  /// Troca esses dados. Só o cliente e só enquanto o pedido aguarda orçamentos (o backend decide).
+  /// [faixaMaxCentavos] 0 = sem limite. Campos nulos ficam como estão.
+  Future<DadosDoPedido> editar(
+    String pedidoId, {
+    String? descricao,
+    int? faixaMaxCentavos,
+    String? logradouro,
+    String? numero,
+    String? bairro,
+    String? complemento,
+  });
 
   /// Abre o pedido e devolve o id.
   Future<String> criar(RascunhoPedido rascunho);
@@ -66,7 +112,22 @@ abstract interface class RepositorioOrcamentos {
 enum StatusPagamento { aguardando, pago, falhou }
 
 class Cobranca {
-  const Cobranca({required this.id, this.pixCopiaECola, this.urlCheckout});
+  const Cobranca({
+    required this.id,
+    this.pixCopiaECola,
+    this.urlCheckout,
+    this.segredoCartao,
+    this.clienteCartaoId,
+    this.chaveEfemera,
+  });
+
+  /// Cartão: o que a folha do provedor precisa (nunca aparece na tela).
+  final String? segredoCartao;
+  final String? clienteCartaoId;
+  final String? chaveEfemera;
+
+  bool get precisaDaFolhaDeCartao =>
+      segredoCartao != null && clienteCartaoId != null && chaveEfemera != null;
 
   final String id;
 
@@ -173,6 +234,9 @@ abstract interface class RepositorioProfissional {
   /// Calculadora: taxa e líquido vêm do backend.
   ServicoOrcamento servicoOrcamento(String pedidoId);
 
-  /// Check-in/out do pedido.
+  /// Check-in do pedido.
   ServicoCheckIn servicoCheckIn(String pedidoId);
+
+  /// Check-out do pedido: foto final e código de conclusão que o cliente informa.
+  ServicoCheckOut servicoCheckOut(String pedidoId);
 }

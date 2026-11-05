@@ -104,6 +104,9 @@ class PedidoAberto:
     urgente: bool
     prazo_desejado: date | None
     aberto_em: datetime
+    # Ponto aproximado (o app arredonda), nunca o endereço exato.
+    local_aprox_lat: float | None = None
+    local_aprox_lng: float | None = None
 
 
 @dataclass(frozen=True)

@@ -68,6 +68,12 @@ class BancoLocal:
                         "revoke execute on functions from public"
                     )
             self._grants_do_service_role_da_f32(con)
+            # Migrations de grants posteriores à F3.8b: precisam rodar depois do trecho acima,
+            # que faz `revoke all` nessas tabelas (em produção a ordem cronológica já garante isso).
+            for arquivo in sorted(
+                (RAIZ / "supabase" / "migrations").glob("*admin_catalogo_delete.sql")
+            ):
+                con.execute(arquivo.read_text(encoding="utf-8"))
 
     def _grants_do_service_role_da_f32(self, con: psycopg.Connection[Any]) -> None:
         """Os privilégios do `service_role` nas tabelas da F3.2 vêm da F3.8b, que depende das

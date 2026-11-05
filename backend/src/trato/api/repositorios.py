@@ -167,6 +167,12 @@ class RepositorioPedidos(Protocol):
 
     def eventos(self, pedido_id: str) -> Sequence[Evento]: ...
 
+    def dados_do_pedido(self, pedido_id: str) -> DadosPedido | None:
+        """O que o cliente descreveu ao abrir (descrição, faixa de preço, endereço)."""
+
+    def atualizar_dados(self, pedido_id: str, ator_id: str, novos: DadosPedido) -> DadosPedido:
+        """Troca esses dados (só o cliente, só enquanto aguarda orçamentos)."""
+
     def listar_do_usuario(
         self, usuario_id: str, como_cliente: bool, limite: int = 100, offset: int = 0
     ) -> Sequence[Pedido]: ...

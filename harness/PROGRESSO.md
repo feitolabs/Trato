@@ -545,3 +545,35 @@ consulta pública só devolve `disponivel`; a unique do banco fecha a corrida en
 - Modo real sem exemplos: catálogo, formulário do pedido, cadastro e consentimentos.
 - Testes: 4 do admin já falhavam antes (`test_so_o_papel_cadastro_abre_documento`, `test_nao_existe_escrita_nem_saque_nem_saldo_proprio`, `test_so_o_cadastro_recebe_url_com_motivo_e_fica_registrado`, `test_fila_detalhe_url_assinada_e_decisao`); 12 goldens com diferença de pixels em telas não alteradas.
 - Pendente com OK do João: commit, push/deploy e limpeza dos dados de teste no banco.
+
+## 2026-11-04 — Roteiro de aceitação e limpeza de mocks
+
+- Backend: 4 testes velhos atualizados à decisão "administrador com alçada total" (1.299 passed).
+- App: demo só em debug (`kReleaseMode` em `main.dart`); 12 goldens regenerados (telas mudaram de propósito); `flutter analyze` limpo.
+- Novo `docs/roteiro-aceitacao.md`: cada fluxo, a prova automática e o que falta provar no ambiente real.
+- Banco: levantamento só de leitura. Limpeza e testes reais aguardam OK do João.
+
+## 2026-11-04 (tarde) — Limpeza do banco
+- Apagado (com OK do João): 22 pedidos e dependentes (3 contratos, 3 orçamentos, pagamento, lançamento, 2 partidas, 15 mídias), categoria teste_Pintura, config nº 1 de teste, evento de webhook de teste, 2 contas de teste (cliente e profissional) e 15 arquivos órfãos do Storage.
+- Mantido: config nº 2 (vigente, 17 parâmetros), 22 categorias e 2 cidades reais, 13 contas Auth, 6 da equipe, auditoria (cadeia de hash, 37 linhas) e 9 arquivos do bucket verificacao.
+- Pendente: 2 contas @example.test (administrador e financeiro) autoras/aprovadoras da config nº 2. Apagá-las exige reatribuir a autoria. `docs/teste-real-banco-limpeza.sql` está perigoso (apaga tudo): não usar.
+
+## 2026-11-04 (noite) — Rodada de testes executados
+- Stripe teste real 11/11; app no emulador até o login; painel admin no navegador (aprovar/recusar/auditoria).
+- Backend 1.307 testes; painel 78 testes. 8 testes novos de categorias, cidades e status de usuário (antes: nenhum).
+- Bug: excluir categoria dava 500 (sem DELETE no banco). Migration criada, **não aplicada**: PRECISO DO OK.
+- Segurança: bloquear usuário passou a exigir `usuarios_status` (administrador).
+- PENDENCIAS.md atualizado com a D16.
+
+## 2026-11-04 (madrugada) — App no emulador: cliente e profissional
+- Novo `harness/subir-pilha-local.py`: Postgres descartável + backend de produção + login local. Debug manifest libera HTTP só em debug.
+- Fluxo percorrido de verdade: pedido, orçamento, aceite, pagamento, webhook, "Serviço em execução".
+- 5 defeitos corrigidos (chave de idempotência com acento, lista não atualizava, aceite "morto", blocos vazios, sobras de mock).
+- Migration `admin_catalogo_delete` aplicada no Supabase real (com OK do João); `DELETE` só em categorias e perguntas.
+- Pendente: ver `docs/roteiro-aceitacao.md` (rodada 2).
+
+## 2026-11-05 — Serviço de ponta a ponta no emulador (rodada 3)
+- Fluxo inteiro percorrido no app: visita, check-in, check-out, confirmação, avaliação, chat. Dinheiro fecha ao centavo.
+- Corrigidos: check-in impossível, check-out sem tela ligada, CarregadorTela no debug, Agenda, idioma pt-BR, menu estourando.
+- `harness/subir-pilha-local.py` agora sobe Storage local; app em debug libera HTTP só no manifest de debug.
+- Pendências visuais e de texto listadas em `docs/roteiro-aceitacao.md` (rodada 3).

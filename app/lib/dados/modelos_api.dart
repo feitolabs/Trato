@@ -2,6 +2,8 @@
 /// Dinheiro sempre em centavos inteiros. Só leitura de JSON; nenhuma regra aqui.
 library;
 
+import '../telas/comuns/formato_aparelho.dart';
+
 DateTime _data(Object? valor) => DateTime.parse(valor! as String);
 DateTime? _dataOuNulo(Object? valor) => valor == null ? null : DateTime.parse(valor as String);
 
@@ -17,9 +19,13 @@ class PedidoApi {
     required this.acoesPermitidas,
     required this.codigoInicio,
     required this.codigoConclusao,
+    this.janelaInicio,
+    this.janelaFim,
   });
 
   factory PedidoApi.deJson(Map<String, dynamic> j) => PedidoApi(
+        janelaInicio: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['inicio']),
+        janelaFim: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['fim']),
         id: j['id'] as String,
         estado: j['estado'] as String,
         estadoNome: j['estado_nome'] as String,
@@ -42,6 +48,20 @@ class PedidoApi {
   final List<String> acoesPermitidas;
   final String? codigoInicio;
   final String? codigoConclusao;
+
+  /// Janela da visita combinada (só existe depois de `confirmar_agenda`).
+  final DateTime? janelaInicio;
+  final DateTime? janelaFim;
+
+  /// "06/11 · 9:00 AM às 11:00 AM" (ou 24 h), no horário e no formato do aparelho; nulo se a
+  /// visita não foi marcada.
+  String? get janelaRotulo {
+    final i = janelaInicio;
+    final f = janelaFim;
+    if (i == null) return null;
+    final inicio = '${diaMesDoAparelho(i)} · ${horaDoAparelho(i)}';
+    return f == null ? inicio : '$inicio às ${horaDoAparelho(f)}';
+  }
 
   /// Número curto para exibir ("#4F2A"): só os 4 primeiros caracteres do id.
   String get numero => numeroDe(id);

@@ -121,7 +121,7 @@ void main() {
   group('Chat do pedido', () {
     testWidgets('mostra o aviso, a mensagem de sistema e as bolhas', (tester) async {
       await _abrir(tester, const ChatPedidoTela());
-      expect(find.textContaining('Telefones e e-mails são ocultados'), findsOneWidget);
+      expect(find.textContaining('telefones e e-mails ficam ocultos'), findsOneWidget);
       expect(find.text('Serviço iniciado com o seu código às 14h10.', skipOffstage: false),
           findsOneWidget);
       expect(find.text('Vi aqui, vou olhar agora.'), findsOneWidget);

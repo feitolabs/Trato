@@ -81,15 +81,19 @@ class RepositoriosTrato {
     ClienteApi api, {
     CapturaCheckIn captura = const CapturaIndisponivel(),
     CapturaCheckIn Function(String pedidoId)? capturaDoPedido,
+    CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido,
     ServicoUpload? upload,
     ServicoCamera? camera,
+    Future<PosicaoAtual?> Function()? posicao,
   }) {
-    final pedidos = RepositorioPedidosApi(api, upload: upload);
+    final pedidos = RepositorioPedidosApi(api, upload: upload, posicao: posicao);
     final profissional = RepositorioProfissionalApi(
       api,
       captura: captura,
       capturaDoPedido: capturaDoPedido,
+      capturaFinalDoPedido: capturaFinalDoPedido,
       upload: upload,
+      posicao: posicao,
     );
     return RepositoriosTrato(
         modoApi: true,
@@ -137,8 +141,26 @@ class RepositoriosTrato {
                 pedidoId: pedidoId,
               )
           : null,
+      capturaFinalDoPedido: camera != null && localizacao != null && upload != null
+          ? (pedidoId) => CapturaCheckInDispositivo(
+                camera: camera,
+                localizacao: localizacao,
+                upload: upload,
+                pedidoId: pedidoId,
+                finalidadeFoto: FinalidadeArquivo.checkOut,
+              )
+          : null,
       upload: upload,
       camera: camera,
+      posicao: localizacao == null
+          ? null
+          : () async {
+              try {
+                return await localizacao.posicaoAtual();
+              } on ErroLocalizacao {
+                return null;
+              }
+            },
     );
   }
 

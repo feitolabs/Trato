@@ -15,6 +15,14 @@ class ServicoLocalizacaoReal implements ServicoLocalizacao {
       throw const ErroLocalizacao(FalhaLocalizacao.gpsDesligado);
     }
     try {
+      var permissao = await Geolocator.checkPermission();
+      if (permissao == LocationPermission.denied) {
+        permissao = await Geolocator.requestPermission();
+      }
+      if (permissao == LocationPermission.denied ||
+          permissao == LocationPermission.deniedForever) {
+        throw const ErroLocalizacao(FalhaLocalizacao.semPermissao);
+      }
       final p = await Geolocator.getCurrentPosition(
         locationSettings: LocationSettings(accuracy: LocationAccuracy.high, timeLimit: tempoLimite),
       );

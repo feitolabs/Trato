@@ -12,6 +12,7 @@ import '../telas/perfil_cliente/dados_exemplo.dart' as per;
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_in_fake.dart';
+import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional/servico_orcamento_fake.dart';
 import '../telas/profissional_inicio/dados_exemplo.dart';
@@ -28,6 +29,39 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   final List<EnvioRelato> relatos = [];
   final List<String> retrabalhos = [];
   bool conclusaoConfirmada = false;
+
+  DadosDoPedido _dadosDemo = const DadosDoPedido(
+    titulo: 'Pedido de exemplo',
+    descricao: 'Descrição de exemplo',
+    faixaMaxCentavos: 50000,
+  );
+
+  @override
+  Future<DadosDoPedido> dados(String pedidoId) async => _dadosDemo;
+
+  @override
+  Future<DadosDoPedido> editar(
+    String pedidoId, {
+    String? descricao,
+    int? faixaMaxCentavos,
+    String? logradouro,
+    String? numero,
+    String? bairro,
+    String? complemento,
+  }) async {
+    _dadosDemo = DadosDoPedido(
+      titulo: _dadosDemo.titulo,
+      descricao: descricao ?? _dadosDemo.descricao,
+      faixaMaxCentavos: faixaMaxCentavos == 0
+          ? null
+          : (faixaMaxCentavos ?? _dadosDemo.faixaMaxCentavos),
+      logradouro: logradouro ?? _dadosDemo.logradouro,
+      numero: numero ?? _dadosDemo.numero,
+      bairro: bairro ?? _dadosDemo.bairro,
+      complemento: complemento ?? _dadosDemo.complemento,
+    );
+    return _dadosDemo;
+  }
 
   @override
   Future<PedidosDoCliente> listar() async => const PedidosDoCliente(
@@ -437,4 +471,7 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId) => ServicoCheckInFake();
+
+  @override
+  ServicoCheckOut servicoCheckOut(String pedidoId) => ServicoCheckOutFake();
 }

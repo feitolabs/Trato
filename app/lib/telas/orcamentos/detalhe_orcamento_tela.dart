@@ -42,7 +42,15 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   Future<void> _aceitar() async {
     if (_aceitando) return;
     setState(() => _tentou = true);
-    if (!_leu) return;
+    if (!_leu) {
+      // O aviso da caixa fica abaixo da dobra: sem isto o botão parece não responder.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Marque "Li o escopo, a garantia e as regras" para aceitar.')),
+        );
+      return;
+    }
     setState(() => _aceitando = true);
     try {
       await widget.aoAceitar?.call(widget.orcamento);
@@ -152,18 +160,23 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                 titulo: d.garantiaTitulo,
                 texto: d.garantiaDetalhe,
               ),
-              const Divider(height: 1),
-              _BlocoRegra(
-                icone: Icons.warning_amber_rounded,
-                titulo: 'Fora do escopo',
-                texto: d.foraDoEscopo,
-              ),
-              const Divider(height: 1),
-              _BlocoRegra(
-                icone: Icons.schedule,
-                titulo: 'Cancelamento',
-                texto: d.cancelamento,
-              ),
+              // Bloco sem texto não aparece: o profissional pode não ter preenchido.
+              if (d.foraDoEscopo.trim().isNotEmpty) ...[
+                const Divider(height: 1),
+                _BlocoRegra(
+                  icone: Icons.warning_amber_rounded,
+                  titulo: 'Fora do escopo',
+                  texto: d.foraDoEscopo,
+                ),
+              ],
+              if (d.cancelamento.trim().isNotEmpty) ...[
+                const Divider(height: 1),
+                _BlocoRegra(
+                  icone: Icons.schedule,
+                  titulo: 'Cancelamento',
+                  texto: d.cancelamento,
+                ),
+              ],
             ],
           ),
         ),

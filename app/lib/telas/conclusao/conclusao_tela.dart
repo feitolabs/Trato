@@ -31,7 +31,10 @@ class ConclusaoTela extends StatelessWidget {
         ],
       ),
       children: [
-        Text('${resumo.nomeProfissional} terminou o serviço', style: TipografiaTrato.tituloGrande),
+        Text(
+          '${primeiraMaiuscula(resumo.nomeProfissional)} terminou o serviço',
+          style: TipografiaTrato.tituloGrande,
+        ),
         const SizedBox(height: EspacosTrato.x2),
         Text(
           'Confira as fotos e o resultado antes de confirmar.',
@@ -41,9 +44,21 @@ class ConclusaoTela extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _FotoComHora(foto: '[Foto antes]', hora: resumo.legendaFotoAntes)),
+            Expanded(
+              child: _FotoComHora(
+                foto: resumo.fotoAntes ?? (resumo.fotosCarregadas ? 'Sem foto' : '[Foto antes]'),
+                referencia: resumo.fotoAntes,
+                hora: resumo.legendaFotoAntes,
+              ),
+            ),
             const SizedBox(width: EspacosTrato.x2),
-            Expanded(child: _FotoComHora(foto: '[Foto depois]', hora: resumo.legendaFotoDepois)),
+            Expanded(
+              child: _FotoComHora(
+                foto: resumo.fotoDepois ?? (resumo.fotosCarregadas ? 'Sem foto' : '[Foto depois]'),
+                referencia: resumo.fotoDepois,
+                hora: resumo.legendaFotoDepois,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),
@@ -88,17 +103,20 @@ class ConclusaoTela extends StatelessWidget {
 }
 
 class _FotoComHora extends StatelessWidget {
-  const _FotoComHora({required this.foto, required this.hora});
+  const _FotoComHora({required this.foto, required this.hora, this.referencia});
 
   final String foto;
   final String hora;
+
+  /// URL da foto real; sem ela a caixa mostra só a legenda.
+  final String? referencia;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        EspacoFoto(legenda: foto),
+        EspacoFoto(legenda: foto, referencia: referencia),
         const SizedBox(height: EspacosTrato.x2),
         Text(
           hora,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
+import '../comuns/formato_aparelho.dart';
 import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas.dart';
@@ -35,8 +36,7 @@ class ChatPedidoTela extends StatefulWidget {
   final String Function() horaAgora;
 
   static String _horaPadrao() {
-    final agora = DateTime.now();
-    return '${agora.hour}h${agora.minute.toString().padLeft(2, '0')}';
+    return horaDoAparelho(DateTime.now());
   }
 
   @override
@@ -221,7 +221,7 @@ class _AvisoPrivacidade extends StatelessWidget {
             Expanded(
               child: Text(
                 'As mensagens ficam guardadas e servem de prova. '
-                'Telefones e e-mails são ocultados.',
+                'Antes de contratar, telefones e e-mails ficam ocultos.',
                 style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
               ),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/componentes/componentes.dart';
+import 'package:trato/dispositivo/abrir_mapa.dart';
 import 'package:trato/telas/profissional_inicio/casca_profissional_tela.dart';
 import 'package:trato/telas/profissional_inicio/dados_exemplo.dart';
 import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
@@ -22,7 +23,8 @@ Future<void> _abrir(
     MaterialApp(
       theme: TemaTrato.claro,
       builder: (context, filho) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(fonte)),
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(fonte)),
         child: EscalaFonteLimitada(child: filho!),
       ),
       home: tela,
@@ -37,14 +39,34 @@ void main() {
     expect(reaisCurto(150000), 'R\$ 1.500');
     expect(textoFaixa(pedidoTomadasExemplo), 'R\$ 200 a R\$ 500');
     expect(textoFaixa(inicioProfissionalExemplo.pedidos[1]), 'Sem faixa');
+    // Só o teto (cliente informou "até quanto") ou só o piso também aparecem.
+    const soTeto = PedidoAberto(
+      id: 'x',
+      titulo: 't',
+      bairro: '',
+      prazo: 'sem data',
+      faixaMaxCentavos: 80000,
+    );
+    const soPiso = PedidoAberto(
+      id: 'x',
+      titulo: 't',
+      bairro: '',
+      prazo: 'sem data',
+      faixaMinCentavos: 10000,
+    );
+    expect(textoFaixa(soTeto), 'Até R\$ 800');
+    expect(textoFaixa(soPiso), 'A partir de R\$ 100');
     expect(textoDistancia(2.1), '2,1 km');
     expect(textoOrcamentos(pedidoTomadasExemplo), '3 de 5 orçaram');
-    expect(textoOrcamentos(inicioProfissionalExemplo.pedidos[1]), '1 de 5 orçou');
-    expect(textoOrcamentos(inicioProfissionalExemplo.pedidos[2]), 'Ninguém orçou');
+    expect(
+        textoOrcamentos(inicioProfissionalExemplo.pedidos[1]), '1 de 5 orçou');
+    expect(
+        textoOrcamentos(inicioProfissionalExemplo.pedidos[2]), 'Ninguém orçou');
   });
 
   group('Início do profissional', () {
-    testWidgets('mostra disponibilidade, atendimento, carteira e pedidos', (tester) async {
+    testWidgets('mostra disponibilidade, atendimento, carteira e pedidos',
+        (tester) async {
       await _abrir(tester, const InicioProfissionalTela());
       expect(find.text('Pedidos perto de você'), findsOneWidget);
       expect(find.text('HOJE · 14H'), findsOneWidget);
@@ -62,7 +84,8 @@ void main() {
       expect(find.textContaining('Rua '), findsOneWidget);
     });
 
-    testWidgets('chave disponível e botões chamam os callbacks', (tester) async {
+    testWidgets('chave disponível e botões chamam os callbacks',
+        (tester) async {
       bool? disponivel;
       var checkIn = false;
       var filtros = false;
@@ -103,22 +126,66 @@ void main() {
   });
 
   group('Detalhe do pedido', () {
-    testWidgets('mostra só bairro e distância, com aviso do endereço', (tester) async {
-      await _abrir(tester, const DetalhePedidoTela(), tamanho: const Size(390, 2000));
+    testWidgets('mostra só bairro e distância, com aviso do endereço',
+        (tester) async {
+      await _abrir(tester, const DetalhePedidoTela(),
+          tamanho: const Size(390, 2000));
       expect(find.text('Fecha em 31 horas · 3 de 5 orçaram'), findsOneWidget);
       expect(find.textContaining('Savassi, a 2,1 km'), findsOneWidget);
-      expect(find.textContaining('endereço completo aparece depois da contratação'), findsOneWidget);
+      expect(
+          find.textContaining(
+              'endereço completo aparece depois da contratação'),
+          findsOneWidget);
       expect(find.text('Até sexta, 30/10'), findsOneWidget);
       expect(find.text('R\$ 200 a R\$ 500'), findsOneWidget);
       expect(find.text('Trocar tomada, trocar chuveiro'), findsOneWidget);
     });
 
-    testWidgets('Perguntar e Fazer orçamento chamam os callbacks', (tester) async {
+    testWidgets('tocar a área aproximada abre o mapa só quando há ponto',
+        (tester) async {
+      final abertos = <(double, double)>[];
+      final antes = abrirNoMapa;
+      abrirNoMapa = (lat, lng, _) async {
+        abertos.add((lat, lng));
+        return true;
+      };
+      addTearDown(() => abrirNoMapa = antes);
+      const comPonto = DetalhePedido(
+        pedido: PedidoAberto(
+          id: 'x',
+          titulo: 't',
+          bairro: 'Savassi',
+          prazo: 'hoje',
+          distanciaKm: 0.4,
+          latitude: -19.92,
+          longitude: -43.94,
+        ),
+        fechaEm: 'Aberto agora',
+        clienteResumo: '',
+        legendasFotos: [],
+        descricao: 'd',
+        linhas: [],
+      );
+      await _abrir(tester, const DetalhePedidoTela(dados: comPonto),
+          tamanho: const Size(390, 2000));
+      expect(find.textContaining('Savassi, a 0,4 km'), findsOneWidget);
+      await tester.tap(find.textContaining('toque para ver no mapa'));
+      expect(abertos, [(-19.92, -43.94)]);
+
+      await _abrir(tester, const DetalhePedidoTela(),
+          tamanho: const Size(390, 2000));
+      expect(find.textContaining('toque para ver no mapa'), findsNothing);
+    });
+
+    testWidgets('Perguntar e Fazer orçamento chamam os callbacks',
+        (tester) async {
       var perguntou = false;
       var orcou = false;
       await _abrir(
         tester,
-        DetalhePedidoTela(aoPerguntar: () => perguntou = true, aoFazerOrcamento: () => orcou = true),
+        DetalhePedidoTela(
+            aoPerguntar: () => perguntou = true,
+            aoFazerOrcamento: () => orcou = true),
         tamanho: const Size(390, 2000),
       );
       await tester.tap(find.text('Perguntar'));
@@ -126,7 +193,8 @@ void main() {
       expect(perguntou && orcou, isTrue);
     });
 
-    testWidgets('recusar pede motivo e só confirma com um escolhido', (tester) async {
+    testWidgets('recusar pede motivo e só confirma com um escolhido',
+        (tester) async {
       MotivoRecusa? recusado;
       await _abrir(
         tester,
@@ -172,8 +240,10 @@ void main() {
   });
 
   group('Casca do profissional', () {
-    testWidgets('tem as 5 abas e nenhuma mostra tela provisória', (tester) async {
-      await _abrir(tester, const CascaProfissionalTela(), tamanho: const Size(390, 844));
+    testWidgets('tem as 5 abas e nenhuma mostra tela provisória',
+        (tester) async {
+      await _abrir(tester, const CascaProfissionalTela(),
+          tamanho: const Size(390, 844));
       expect(find.byType(BarraAbasTrato), findsOneWidget);
       for (final aba in abasProfissional) {
         expect(find.text(aba.rotulo), findsWidgets);
@@ -189,14 +259,16 @@ void main() {
     });
 
     testWidgets('tocar a carteira leva à aba Carteira', (tester) async {
-      await _abrir(tester, const CascaProfissionalTela(), tamanho: const Size(390, 1200));
+      await _abrir(tester, const CascaProfissionalTela(),
+          tamanho: const Size(390, 1200));
       await tester.tap(find.text('Em andamento'));
       await tester.pumpAndSettle();
       final barra = tester.widget<BarraAbasTrato>(find.byType(BarraAbasTrato));
       expect(barra.indiceAtual, 3);
     });
 
-    testWidgets('tocar um pedido abre o detalhe e recusar volta à lista', (tester) async {
+    testWidgets('tocar um pedido abre o detalhe e recusar volta à lista',
+        (tester) async {
       MotivoRecusa? recusado;
       await _abrir(
         tester,
@@ -230,7 +302,8 @@ void main() {
   for (final MapEntry(key: nomeTela, value: tela) in telas.entries) {
     for (final MapEntry(key: nomeTam, value: tam) in tamanhos.entries) {
       for (final fonte in [1.0, 1.3]) {
-        testWidgets('sem estouro — $nomeTela, $nomeTam, fonte x$fonte', (tester) async {
+        testWidgets('sem estouro — $nomeTela, $nomeTam, fonte x$fonte',
+            (tester) async {
           await _abrir(tester, tela, tamanho: tam, fonte: fonte);
           expect(tester.takeException(), isNull);
         });

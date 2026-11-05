@@ -130,7 +130,7 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
         ),
         const SizedBox(height: EspacosTrato.x4),
         Text(
-          '${dados.nomeProfissional} tem ${dados.prazoRespostaHoras} horas para responder. '
+          '${primeiraMaiuscula(dados.nomeProfissional)} tem ${dados.prazoRespostaHoras} horas para responder. '
           'Sem acordo, nosso suporte analisa o caso e decide com base no chat, nas fotos e no orçamento.',
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),

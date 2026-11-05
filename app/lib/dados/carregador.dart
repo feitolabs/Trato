@@ -15,9 +15,13 @@ class Carregador<T> extends StatefulWidget {
     this.vazio,
     this.tituloVazio = 'Nada por aqui ainda',
     this.textoVazio = '',
+    this.atualizarQuando,
   });
 
   final Future<T> Function() carregar;
+
+  /// Quando este aviso dispara, recarrega do servidor (ex.: depois de criar um pedido).
+  final Listenable? atualizarQuando;
   final Widget Function(BuildContext context, T dado) construir;
 
   /// Esqueleto opcional para loading (Skeleton loading).
@@ -35,7 +39,29 @@ class Carregador<T> extends StatefulWidget {
 class _CarregadorState<T> extends State<Carregador<T>> {
   late Future<T> _futuro = widget.carregar();
 
+  @override
+  void initState() {
+    super.initState();
+    widget.atualizarQuando?.addListener(_recarregar);
+  }
+
+  @override
+  void didUpdateWidget(covariant Carregador<T> antigo) {
+    super.didUpdateWidget(antigo);
+    if (antigo.atualizarQuando != widget.atualizarQuando) {
+      antigo.atualizarQuando?.removeListener(_recarregar);
+      widget.atualizarQuando?.addListener(_recarregar);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.atualizarQuando?.removeListener(_recarregar);
+    super.dispose();
+  }
+
   void _recarregar() {
+    if (!mounted) return;
     setState(() {
       _futuro = widget.carregar();
     });

@@ -257,9 +257,7 @@ def test_fila_detalhe_url_assinada_e_decisao(amb):
     url = f"{BASE}/verificacoes/{amb.ids['v1']}/documentos/{amb.ids['doc']}/url"
     assert amb.cliente.post(url, json={}, headers=cad).status_code == 422
     assert (
-        amb.cliente.post(
-            url, json={"motivo": "Conferir"}, headers=amb.h("administrador")
-        ).status_code
+        amb.cliente.post(url, json={"motivo": "Conferir"}, headers=amb.h("seguranca")).status_code
         == 403
     )
     r = amb.cliente.post(url, json={"motivo": "Conferir frente do RG"}, headers=cad)

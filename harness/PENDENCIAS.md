@@ -3,6 +3,19 @@
 Itens que precisam de resposta do João (ou de advogado/contador) antes de virar código.
 Não inventar regra: enquanto estiver aqui, não implementar.
 
+## Respondidas (decisão D16, 30/10/2026, em `DECISOES.md`)
+
+Atualizado em 04/11/2026. A tabela abaixo mantém o histórico das dúvidas; estas já têm resposta:
+
+- **P1:** 48 h para o cliente confirmar + 7 dias de janela de reclamação, como prazos separados.
+- **P3, P4, P5, P8, P9:** como na V2 (sem taxa surpresa ao cliente; sem os 30% adiantados; taxa real nas telas; sem garantia financiada; painel web).
+- **P6 e P15 (cidade):** Belo Horizonte/MG; categorias Limpeza residencial, Montagem de móveis e Pintura de interiores.
+- **P7:** Stripe, caminho A (ledger espelho).
+- **P11:** sem SMS no piloto (login por e-mail, Google e Apple).
+- **P12 a P14:** seguem as recomendações de `docs/fidelidade-visual.md`.
+- **P2:** regra única e transparente no piloto; **o valor ainda estava a fechar** (aberto até o João informar o número).
+- **Ainda abertas:** P10 (fornecedor de verificação), P16 a P19 (sem resposta registrada nos arquivos).
+
 ## Para o João decidir
 
 | # | Dúvida | Onde aparece | Impacto |

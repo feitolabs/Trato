@@ -174,6 +174,13 @@ class PedidoAbertoOut(BaseModel):
     urgente: bool
     prazo_desejado: date | None
     aberto_em: datetime
+    local_aprox_lat: float | None = None
+    local_aprox_lng: float | None = None
+    distancia_km: float | None = Field(
+        default=None,
+        description="Distância em linha reta até o ponto aproximado do pedido. Só vem quando o "
+        "profissional manda `lat` e `lng`.",
+    )
 
 
 class ResumoOrcamentoOut(BaseModel):
@@ -597,6 +604,42 @@ def listar_mensagens(
     )
     conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
     return _mensagens_out(contexto, conversa, usuario)
+
+
+class InterlocutorOut(BaseModel):
+    id: str
+    nome: str
+    papel: str = Field(description="`cliente` ou `profissional`: quem está do outro lado.")
+
+
+@router.get(
+    "/pedidos/{pedido_id}/interlocutor",
+    response_model=InterlocutorOut,
+    summary="Quem está do outro lado da conversa do pedido",
+    description=(
+        "Só o primeiro nome e a inicial do sobrenome (o app mostra no topo do chat). Para o "
+        "cliente, `profissional_id` escolhe a conversa, como em `/mensagens`."
+    ),
+)
+def interlocutor(
+    pedido_id: str,
+    request: Request,
+    profissional_id: Annotated[str | None, Query()] = None,
+    usuario: Usuario = Depends(usuario_atual),
+    contexto: Contexto = Depends(obter_contexto),
+) -> InterlocutorOut:
+    pedido = _pedido_visivel(contexto, pedido_id, usuario, request, consulta="chat")
+    # Valida o mesmo acesso da conversa (e 404/422 iguais).
+    _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
+    if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.cliente_id != usuario.id:
+        outro, papel = pedido.cliente_id, "cliente"
+    else:
+        outro, papel = profissional_id or pedido.profissional_id, "profissional"
+    detalhe = contexto.usuarios.detalhe(outro) if outro else None
+    nome = (detalhe.nome if detalhe else None) or papel.capitalize()
+    partes = nome.split()
+    curto = partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
+    return InterlocutorOut(id=outro or "", nome=curto, papel=papel)
 
 
 @router.post(

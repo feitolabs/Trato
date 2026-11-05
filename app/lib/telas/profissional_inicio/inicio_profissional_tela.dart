@@ -313,7 +313,11 @@ class CartaoPedidoAberto extends StatelessWidget {
               ),
               const SizedBox(height: EspacosTrato.x2),
               Text(
-                '${pedido.bairro} · ${textoDistancia(pedido.distanciaKm)} · ${pedido.prazo}',
+                [
+                  if (pedido.bairro.isNotEmpty) pedido.bairro,
+                  textoDistancia(pedido.distanciaKm),
+                  pedido.prazo,
+                ].join(' · '),
                 style: secundario,
               ),
               const SizedBox(height: EspacosTrato.x2),

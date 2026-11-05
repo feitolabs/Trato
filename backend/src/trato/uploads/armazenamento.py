@@ -17,6 +17,9 @@ class ArmazenamentoArquivos(Protocol):
     def url_envio(self, bucket: str, caminho: str, content_type: str, segundos: int) -> str:
         """URL assinada para o app enviar o arquivo direto ao bucket privado."""
 
+    def url_leitura(self, bucket: str, caminho: str, segundos: int) -> str:
+        """URL assinada e curta para QUEM PODE VER o arquivo (o backend decide quem) abri-lo."""
+
     def ler(self, bucket: str, caminho: str) -> bytes:
         """Bytes do arquivo enviado. Levanta `ArquivoNaoEncontrado`."""
 
@@ -38,6 +41,9 @@ class ArmazenamentoFake:
     def simular_envio(self, bucket: str, caminho: str, dados: bytes) -> None:
         """O que o app faria com a URL assinada."""
         self.arquivos[(bucket, caminho)] = dados
+
+    def url_leitura(self, bucket: str, caminho: str, segundos: int) -> str:
+        return f"https://storage.invalid/leitura/{bucket}/{caminho}?expira={segundos}"
 
     def ler(self, bucket: str, caminho: str) -> bytes:
         try:
@@ -70,6 +76,17 @@ class ArmazenamentoSupabase:
         resp = self._http.post(f"{self._base}/object/upload/sign/{bucket}/{caminho}")
         resp.raise_for_status()
         return self._base + resp.json()["url"]
+
+    def url_leitura(self, bucket: str, caminho: str, segundos: int) -> str:
+        resp = self._http.post(
+            f"{self._base}/object/sign/{bucket}/{caminho}", json={"expiresIn": segundos}
+        )
+        resp.raise_for_status()
+        dados = resp.json()
+        assinada = str(dados.get("signedURL") or dados.get("signedUrl") or "")
+        if assinada.startswith(("http://", "https://")):
+            return assinada
+        return self._base + (assinada if assinada.startswith("/") else "/" + assinada)
 
     def ler(self, bucket: str, caminho: str) -> bytes:
         resp = self._http.get(f"{self._base}/object/{bucket}/{caminho}")

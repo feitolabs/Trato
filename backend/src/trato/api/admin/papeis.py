@@ -32,6 +32,7 @@ class Permissao(StrEnum):
     DISPUTAS_SEGUNDA_PESSOA = "disputas_segunda_pessoa"
     PAGAMENTOS_VER = "pagamentos_ver"
     USUARIOS_BUSCAR = "usuarios_buscar"
+    USUARIOS_STATUS = "usuarios_status"  # bloquear, restringir e reativar contas (só administrador)
     DADOS_PESSOAIS_REVELAR = "dados_pessoais_revelar"
     PEDIDOS_BUSCAR = "pedidos_buscar"
     CONFIG_VER = "config_ver"

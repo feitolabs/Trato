@@ -7,6 +7,8 @@ registra em `midias` ou `verificacao_documentos`. Documento de verificação nã
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
@@ -75,6 +77,58 @@ def obter_servico(request: Request) -> ServicoUploads:
     if servico is None:
         raise HTTPException(503, "O envio de arquivos ainda não foi ligado.")
     return servico
+
+
+router_fotos = APIRouter(prefix="/v1/pedidos", tags=["uploads"])
+
+# Fotos que mostram o serviço (chegada, saída e as de antes/durante/depois). Foto de disputa,
+# nota de material e anexo de chat têm regras próprias e não entram aqui.
+FINALIDADES_DA_FOTO_DO_SERVICO = ("checkin", "antes", "durante", "depois", "checkout")
+URL_LEITURA_SEGUNDOS = 300
+
+
+class FotoDoPedidoOut(BaseModel):
+    id: str
+    finalidade: str
+    url: str = Field(description="URL assinada e curta para abrir a foto. Não guarde.")
+    expira_em_segundos: int
+    criada_em: datetime
+
+
+@router_fotos.get(
+    "/{pedido_id}/fotos",
+    response_model=list[FotoDoPedidoOut],
+    summary="Fotos do serviço (chegada, saída, antes e depois) com URL assinada curta",
+    description=(
+        "Só o cliente e o profissional do pedido veem; quem não é parte recebe 404. O arquivo "
+        "fica em bucket privado: a URL expira em poucos minutos e nunca expõe o caminho."
+    ),
+)
+def fotos_do_pedido(
+    pedido_id: str,
+    usuario: Usuario = Depends(_usuario),
+    contexto: Contexto = Depends(obter_contexto),
+    servico: ServicoUploads = Depends(obter_servico),
+) -> list[FotoDoPedidoOut]:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None or usuario.id not in (pedido.cliente_id, pedido.profissional_id):
+        raise HTTPException(404, "Pedido não encontrado.")
+    fotos: list[FotoDoPedidoOut] = []
+    for m in servico.repo.midias_do_pedido(pedido.id, FINALIDADES_DA_FOTO_DO_SERVICO):
+        try:
+            url = servico.armazenamento.url_leitura(m.bucket, m.storage_path, URL_LEITURA_SEGUNDOS)
+        except Exception:  # noqa: BLE001,S112 - storage fora do ar não derruba a tela do pedido
+            continue
+        fotos.append(
+            FotoDoPedidoOut(
+                id=m.id,
+                finalidade=m.finalidade,
+                url=url,
+                expira_em_segundos=URL_LEITURA_SEGUNDOS,
+                criada_em=m.criada_em,
+            )
+        )
+    return fotos
 
 
 def _pedido_do_envio(contexto: Contexto, corpo: PedirUploadIn, usuario: Usuario) -> Pedido:
@@ -188,6 +242,7 @@ def registrar_rotas(
     from trato.api.contexto import agora_utc
 
     app.include_router(router)
+    app.include_router(router_fotos)
     armazenamento = armazenamento or armazenamento_da_config()
     if armazenamento is None:
         return

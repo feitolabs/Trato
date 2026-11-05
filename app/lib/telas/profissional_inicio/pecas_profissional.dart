@@ -16,11 +16,13 @@ String reaisCurto(int centavos) {
 
 /// "R$ 200 a R$ 500", "R$ 350" ou "Sem faixa".
 String textoFaixa(PedidoAberto p) {
-  if (!p.temFaixa) return 'Sem faixa';
-  if (p.faixaMinCentavos == p.faixaMaxCentavos) {
-    return reaisCurto(p.faixaMinCentavos!);
-  }
-  return '${reaisCurto(p.faixaMinCentavos!)} a ${reaisCurto(p.faixaMaxCentavos!)}';
+  final min = p.faixaMinCentavos;
+  final max = p.faixaMaxCentavos;
+  if (max != null && (min == null || min == 0)) return 'Até ${reaisCurto(max)}';
+  if (min != null && max == null) return 'A partir de ${reaisCurto(min)}';
+  if (min == null || max == null) return 'Sem faixa';
+  if (min == max) return reaisCurto(min);
+  return '${reaisCurto(min)} a ${reaisCurto(max)}';
 }
 
 /// "2,1 km".

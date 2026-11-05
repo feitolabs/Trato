@@ -67,7 +67,10 @@ class ClienteApi {
         pedido.headers['Authorization'] = 'Bearer $efetivo';
       }
       if (chaveIdempotencia != null) {
-        pedido.headers['Idempotency-Key'] = chaveIdempotencia;
+        // Cabeçalho HTTP só aceita ASCII visível: acento ou espaço na chave derrubaria a chamada
+        // antes de sair do aparelho.
+        pedido.headers['Idempotency-Key'] =
+            chaveIdempotencia.replaceAll(RegExp(r'[^\x21-\x7E]'), '_');
       }
       if (corpo != null) {
         pedido.headers['Content-Type'] = 'application/json; charset=utf-8';

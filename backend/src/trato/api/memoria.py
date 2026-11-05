@@ -55,6 +55,15 @@ class PedidosEmMemoria:
     def eventos(self, pedido_id: str) -> Sequence[Evento]:
         return tuple(self._eventos.get(pedido_id, ()))
 
+    def dados_do_pedido(self, pedido_id: str) -> DadosPedido | None:
+        return self._dados.get(pedido_id)
+
+    def atualizar_dados(self, pedido_id: str, ator_id: str, novos: DadosPedido) -> DadosPedido:
+        if pedido_id not in self._pedidos:
+            raise DadosInvalidos("Pedido não encontrado.")
+        self._dados[pedido_id] = novos
+        return novos
+
     def listar_do_usuario(
         self, usuario_id: str, como_cliente: bool, limite: int = 100, offset: int = 0
     ) -> Sequence[Pedido]:
@@ -87,6 +96,8 @@ class PedidosEmMemoria:
                     urgente=d.urgente if d else False,
                     prazo_desejado=d.prazo_desejado if d else None,
                     aberto_em=p.aberto_em,
+                    local_aprox_lat=d.local_aprox_lat if d else None,
+                    local_aprox_lng=d.local_aprox_lng if d else None,
                 )
             )
         return tuple(saida)

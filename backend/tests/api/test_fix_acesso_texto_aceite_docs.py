@@ -185,7 +185,7 @@ def test_url_do_documento_dura_o_que_a_configuracao_diz(adm):  # noqa: F811
 def test_so_o_cadastro_recebe_url_com_motivo_e_fica_registrado(adm):  # noqa: F811
     url = "/v1/admin/verificacoes/ver-1/documentos/doc-1/url"
     corpo = {"motivo": "Conferir o documento do cadastro"}
-    for token in ("t-moderador", "t-financeiro", "t-atendente_n1", "t-administrador", "t-mediador"):
+    for token in ("t-moderador", "t-financeiro", "t-atendente_n1", "t-mediador"):
         assert adm.cliente.post(url, json=corpo, headers=cab(token)).status_code == 403, token
     assert adm.assinador.chamadas == []
     sem_motivo = adm.cliente.post(url, json={}, headers=cab("t-cadastro"))

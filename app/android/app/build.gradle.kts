@@ -70,3 +70,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Tema AppCompat da folha de cartão (Stripe PaymentSheet).
+    implementation("androidx.appcompat:appcompat:1.7.0")
+}

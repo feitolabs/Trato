@@ -191,6 +191,44 @@ class UploadsPostgres:
 
         return self._memoria.midia(midia_id)
 
+    def midias_do_pedido(self, pedido_id: str, finalidades: tuple[str, ...]) -> list[Midia]:
+        p_id = como_uuid(pedido_id)
+        if not p_id:
+            return self._memoria.midias_do_pedido(pedido_id, finalidades)
+        try:
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    """
+                    select id, pedido_id, enviada_por, finalidade, bucket,
+                           storage_path, mime, tamanho_bytes, sha256,
+                           criado_em, lat, lng
+                    from public.midias
+                    where pedido_id = %s and finalidade = any(%s)
+                    order by criado_em
+                    """,
+                    (p_id, list(finalidades)),
+                ).fetchall()
+            return [
+                Midia(
+                    id=_para_hex(row["id"]),
+                    pedido_id=str(row["pedido_id"]),
+                    enviada_por=str(row["enviada_por"]),
+                    finalidade=row["finalidade"],
+                    bucket=row["bucket"],
+                    storage_path=row["storage_path"],
+                    mime=row["mime"] or "application/octet-stream",
+                    tamanho_bytes=row["tamanho_bytes"] or 0,
+                    sha256=row["sha256"] or "",
+                    criada_em=row["criado_em"],
+                    lat=row["lat"],
+                    lng=row["lng"],
+                )
+                for row in linhas
+            ]
+        except Exception as err:
+            logger.warning("Falha ao listar midias do pedido no banco: %s", err)
+            return self._memoria.midias_do_pedido(pedido_id, finalidades)
+
     @property
     def documentos(self) -> dict[str, DocumentoGuardado]:
         return self._memoria.documentos

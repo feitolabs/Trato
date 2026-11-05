@@ -97,6 +97,29 @@ class AbrirPedidoIn(_Entrada):
         )
 
 
+class EditarPedidoIn(_Entrada):
+    """Campos que o cliente pode trocar enquanto o pedido aguarda orçamentos (todos opcionais).
+    Para limpar a faixa de preço, mande `0`. Endereço vem inteiro (substitui o anterior)."""
+
+    descricao: str | None = Field(default=None, min_length=1)
+    faixa_preco_min_centavos: int | None = Field(default=None, ge=0)
+    faixa_preco_max_centavos: int | None = Field(default=None, ge=0)
+    prazo_desejado: date | None = None
+    urgente: bool | None = None
+    endereco: EnderecoIn | None = None
+
+
+class DadosPedidoOut(BaseModel):
+    titulo: str
+    descricao: str
+    bairro: str | None = None
+    prazo_desejado: date | None = None
+    faixa_preco_min_centavos: int | None = None
+    faixa_preco_max_centavos: int | None = None
+    urgente: bool = False
+    endereco: EnderecoIn | None = None
+
+
 class AceitarOrcamentoIn(_Entrada):
     orcamento_id: str
 

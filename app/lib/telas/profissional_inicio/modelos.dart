@@ -10,10 +10,18 @@ class ProximoAtendimento {
     required this.titulo,
     required this.endereco,
     this.pedidoId,
+    this.janelaInicio,
+    this.emAndamento = false,
   });
+
+  /// O serviço já começou (check-in feito).
+  final bool emAndamento;
 
   /// Id do pedido na API (nulo nos dados de exemplo).
   final String? pedidoId;
+
+  /// Início da visita combinada; nulo enquanto a data não foi marcada.
+  final DateTime? janelaInicio;
 
   /// Ex.: "Hoje · 14h".
   final String quando;
@@ -43,12 +51,18 @@ class PedidoAberto {
     this.faixaMinCentavos,
     this.faixaMaxCentavos,
     this.urgente = false,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
   final String titulo;
   final String bairro;
   final double? distanciaKm;
+
+  /// Ponto aproximado do pedido (nunca o endereço exato); ausente = sem mapa.
+  final double? latitude;
+  final double? longitude;
 
   /// Texto pronto. Ex.: "até sexta, 30/10", "hoje", "próxima semana".
   final String prazo;

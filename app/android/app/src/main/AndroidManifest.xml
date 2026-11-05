@@ -9,6 +9,10 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
     <uses-feature android:name="android.hardware.location" android:required="false"/>
+    <queries>
+        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="geo"/></intent>
+        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>
+    </queries>
     <application
         android:label="Trato"
         android:name="${applicationName}"
