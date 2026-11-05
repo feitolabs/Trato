@@ -646,6 +646,10 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     return Cobranca(
       id: j['cobranca_id'] as String,
       pixCopiaECola: j['tipo_instrucao'] == 'pix_copia_e_cola' ? j['instrucao'] as String? : null,
+      segredoCartao:
+          j['tipo_instrucao'] == 'cartao_segredo_do_cliente' ? j['instrucao'] as String? : null,
+      clienteCartaoId: j['cliente_externo_id'] as String?,
+      chaveEfemera: j['chave_efemera'] as String?,
     );
   }
 

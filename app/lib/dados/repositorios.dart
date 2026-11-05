@@ -112,7 +112,22 @@ abstract interface class RepositorioOrcamentos {
 enum StatusPagamento { aguardando, pago, falhou }
 
 class Cobranca {
-  const Cobranca({required this.id, this.pixCopiaECola, this.urlCheckout});
+  const Cobranca({
+    required this.id,
+    this.pixCopiaECola,
+    this.urlCheckout,
+    this.segredoCartao,
+    this.clienteCartaoId,
+    this.chaveEfemera,
+  });
+
+  /// Cartão: o que a folha do provedor precisa (nunca aparece na tela).
+  final String? segredoCartao;
+  final String? clienteCartaoId;
+  final String? chaveEfemera;
+
+  bool get precisaDaFolhaDeCartao =>
+      segredoCartao != null && clienteCartaoId != null && chaveEfemera != null;
 
   final String id;
 

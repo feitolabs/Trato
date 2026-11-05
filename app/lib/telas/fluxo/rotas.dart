@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
+import '../../dispositivo/folha_cartao.dart';
 import '../../auth/servico_auth.dart';
 import '../../dados/repositorios_trato.dart';
 import '../../dados/sessao.dart';
@@ -91,6 +92,9 @@ abstract final class RotasTrato {
   /// Padrão: demonstração (dados de exemplo, sem rede). O `main.dart` troca conforme o modo.
   static RepositoriosTrato repos = RepositoriosTrato.demo();
 
+  /// Folha de cartão do provedor. O `main` liga a real; nos testes e na demonstração não abre nada.
+  static FolhaCartao folhaCartao = FolhaCartaoFake();
+
   /// Câmera, GPS e envio de arquivos. Padrão: fake (testes); o `main.dart` troca pelo real.
   static DispositivoTrato dispositivo = DispositivoTrato.fake();
 
@@ -140,8 +144,11 @@ abstract final class RotasTrato {
       Navigator.of(context).popUntil((rota) => rota.isFirst);
 
   static void _aviso(BuildContext context, Object erro) {
-    final texto =
-        erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo.';
+    final texto = erro is ErroTrato
+        ? erro.mensagem
+        : erro is ErroFolhaCartao
+            ? erro.mensagem
+            : 'Algo deu errado. Tente de novo.';
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(texto)));
@@ -1155,6 +1162,27 @@ abstract final class RotasTrato {
                   await repos.pagamento.criarCobranca(pedidoId, metodo),
             );
             if (!ok || !context.mounted) return;
+            // Cartão: a folha do provedor lista os cartões salvos e cadastra um novo. O app só
+            // abre a folha; quem diz "pago" continua sendo o backend.
+            final c = cobranca;
+            if (metodo == MetodoPagamento.cartao && c != null && c.precisaDaFolhaDeCartao) {
+              ResultadoCartao? resultado;
+              final aberto = await _tentar(
+                context,
+                () async => resultado = await folhaCartao.pagar(
+                  PreparoFolhaCartao(
+                    segredoDoPagamento: c.segredoCartao!,
+                    clienteId: c.clienteCartaoId!,
+                    chaveEfemera: c.chaveEfemera!,
+                  ),
+                ),
+              );
+              if (!aberto || !context.mounted) return;
+              if (resultado == ResultadoCartao.cancelado) {
+                _avisoSimples(context, 'Pagamento cancelado. Você pode escolher outro cartão.');
+                return;
+              }
+            }
             // O app fica esperando; quem diz "pago" é o backend.
             _abrir<void>(
               context,

@@ -14,6 +14,7 @@ import 'dados/repositorios_trato.dart';
 import 'dados/sessao.dart';
 import 'dados/servico_upload.dart';
 import 'dispositivo/dispositivo_real.dart';
+import 'dispositivo/folha_cartao.dart';
 import 'dispositivo/servico_camera_real.dart';
 import 'dispositivo/servico_localizacao_real.dart';
 import 'galeria/galeria_componentes.dart';
@@ -103,6 +104,7 @@ Future<void> main() async {
     camera: ServicoCameraReal(),
     localizacao: const ServicoLocalizacaoReal(),
   );
+  RotasTrato.folhaCartao = FolhaCartaoStripe();
   runApp(const TratoApp());
 }
 
