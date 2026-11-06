@@ -9,6 +9,7 @@ registra em `midias` ou `verificacao_documentos`. O app nunca registra nada por 
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import uuid
 from collections.abc import Callable
@@ -117,6 +118,8 @@ class RepositorioUploads(Protocol):
     def midias_do_pedido(self, pedido_id: str, finalidades: tuple[str, ...]) -> list[Midia]: ...
     def salvar_documento(self, d: DocumentoGuardado) -> None: ...
     def documento_por_caminho(self, caminho: str) -> DocumentoGuardado | None: ...
+    def definir_foto_perfil(self, usuario_id: str, caminho: str) -> None: ...
+    def foto_perfil(self, usuario_id: str) -> str | None: ...
 
 
 class UploadsEmMemoria:
@@ -126,6 +129,7 @@ class UploadsEmMemoria:
         self.solicitacoes: dict[str, Solicitacao] = {}
         self.midias: dict[str, Midia] = {}
         self.documentos: dict[str, DocumentoGuardado] = {}
+        self.fotos_de_perfil: dict[str, str] = {}
 
     def salvar_solicitacao(self, s: Solicitacao) -> None:
         self.solicitacoes[s.id] = s
@@ -152,6 +156,12 @@ class UploadsEmMemoria:
 
     def documento_por_caminho(self, caminho: str) -> DocumentoGuardado | None:
         return next((d for d in self.documentos.values() if d.storage_path == caminho), None)
+
+    def definir_foto_perfil(self, usuario_id: str, caminho: str) -> None:
+        self.fotos_de_perfil[str(usuario_id).replace('-', '')] = caminho
+
+    def foto_perfil(self, usuario_id: str) -> str | None:
+        return self.fotos_de_perfil.get(str(usuario_id).replace('-', ''))
 
 
 def distancia_metros(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -286,6 +296,15 @@ class ServicoUploads:
                     agora,
                 )  # fmt: skip
             )
+        elif regra.registro == "avatar":
+            # A foto de perfil passa a ser esta; a anterior sai do bucket (sem sobra de rosto).
+            anterior = self.repo.foto_perfil(dono_id)
+            self.repo.definir_foto_perfil(dono_id, sol.caminho)
+            if anterior and anterior != sol.caminho:
+                try:
+                    self.armazenamento.remover(sol.bucket, anterior)
+                except Exception:  # noqa: BLE001 - "melhor esforço": a troca já valeu
+                    logging.getLogger(__name__).warning("Não removi a foto de perfil antiga.")
         feita = replace(sol, status="concluida", registro_id=registro_id)
         self.repo.salvar_solicitacao(feita)
         return feita

@@ -498,7 +498,18 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
       verificacao = null;
     }
 
+    // Foto de perfil (se o profissional já enviou). Sem foto ou sem rede, ficam as iniciais.
+    String? fotoUrl;
+    if (usuarioId.isNotEmpty) {
+      try {
+        fotoUrl = (_mapa(await _api.get('/v1/usuarios/$usuarioId/foto')))['url'] as String?;
+      } on ErroTrato {
+        fotoUrl = null;
+      }
+    }
+
     return PerfilPublico(
+      fotoReferencia: fotoUrl,
       nome: nomeExibicao,
       iniciais: _iniciaisNome(nomeExibicao),
       categoria: categoriasNomes.isEmpty ? 'Profissional' : categoriasNomes.join(' · '),

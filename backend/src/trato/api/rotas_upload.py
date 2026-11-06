@@ -80,6 +80,7 @@ def obter_servico(request: Request) -> ServicoUploads:
 
 
 router_fotos = APIRouter(prefix="/v1/pedidos", tags=["uploads"])
+router_usuarios = APIRouter(prefix="/v1/usuarios", tags=["uploads"])
 
 # Fotos que mostram o serviço (chegada, saída e as de antes/durante/depois). Foto de disputa,
 # nota de material e anexo de chat têm regras próprias e não entram aqui.
@@ -129,6 +130,36 @@ def fotos_do_pedido(
             )
         )
     return fotos
+
+
+class FotoDePerfilOut(BaseModel):
+    url: str | None = Field(description="URL assinada e curta da foto; `null` se não tem foto.")
+    expira_em_segundos: int = URL_LEITURA_SEGUNDOS
+
+
+@router_usuarios.get(
+    "/{usuario_id}/foto",
+    response_model=FotoDePerfilOut,
+    summary="Foto de perfil de um usuário (URL assinada curta)",
+    description=(
+        "Qualquer usuário logado pode pedir: a foto de perfil aparece para quem conversa, orça "
+        "ou contrata com a pessoa. O id é um UUID que só aparece nessas telas. Sem foto, `url` "
+        "vem `null` e o app mostra as iniciais."
+    ),
+)
+def foto_de_perfil(
+    usuario_id: str,
+    usuario: Usuario = Depends(_usuario),
+    servico: ServicoUploads = Depends(obter_servico),
+) -> FotoDePerfilOut:
+    caminho = servico.repo.foto_perfil(usuario_id)
+    if not caminho:
+        return FotoDePerfilOut(url=None)
+    try:
+        url = servico.armazenamento.url_leitura("avatar", caminho, URL_LEITURA_SEGUNDOS)
+    except Exception:  # noqa: BLE001 - storage fora do ar: o app mostra as iniciais
+        return FotoDePerfilOut(url=None)
+    return FotoDePerfilOut(url=url)
 
 
 def _pedido_do_envio(contexto: Contexto, corpo: PedirUploadIn, usuario: Usuario) -> Pedido:
@@ -243,6 +274,7 @@ def registrar_rotas(
 
     app.include_router(router)
     app.include_router(router_fotos)
+    app.include_router(router_usuarios)
     armazenamento = armazenamento or armazenamento_da_config()
     if armazenamento is None:
         return

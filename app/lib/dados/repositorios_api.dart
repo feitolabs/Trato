@@ -713,6 +713,7 @@ class RepositorioChatApi implements RepositorioChat {
     // Quem está do outro lado (nome curto). Se falhar, o chat segue com o número do pedido.
     var nome = 'Pedido $numero';
     var iniciais = '#';
+    String? outroId;
     try {
       final o = _mapa(await _api.get(
         '/v1/pedidos/$pedidoId/interlocutor',
@@ -722,11 +723,13 @@ class RepositorioChatApi implements RepositorioChat {
       if (n.isNotEmpty) {
         nome = n;
         iniciais = _iniciaisDe(n);
+        outroId = o['id'] as String?;
       }
     } on ErroTrato {
       // mantém o título pelo número do pedido
     }
     return ConversaPedido(
+      usuarioId: outroId,
       nome: nome,
       iniciais: iniciais,
       numeroPedido: numero,
@@ -799,10 +802,50 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
 
 /// `GET` e `PATCH /v1/me`. O primeiro `GET /v1/me` depois do login cria o usuário no backend.
 class RepositorioPerfilApi implements RepositorioPerfil {
-  RepositorioPerfilApi(this._api);
+  RepositorioPerfilApi(this._api, {this.upload});
 
   final ClienteApi _api;
+  final ServicoUpload? upload;
   String? _ultimoNome;
+  String? _meuId;
+
+  /// URL curta da foto por usuário; vale ~4 min (a URL do backend expira em 5).
+  final Map<String, (DateTime, Future<String?>)> _fotos = {};
+
+  @override
+  Future<String?> fotoDe(String usuarioId) {
+    final guardada = _fotos[usuarioId];
+    if (guardada != null && DateTime.now().difference(guardada.$1).inMinutes < 4) {
+      return guardada.$2;
+    }
+    final busca = () async {
+      try {
+        final j = _mapa(await _api.get('/v1/usuarios/$usuarioId/foto'));
+        return j['url'] as String?;
+      } on Object {
+        return null; // sem foto, sem rede ou erro: as iniciais bastam (nunca derruba a tela)
+      }
+    }();
+    _fotos[usuarioId] = (DateTime.now(), busca);
+    return busca;
+  }
+
+  @override
+  Future<void> enviarFoto(String caminhoLocal) async {
+    final servico = upload;
+    if (servico == null) return;
+    final bytes = await File(caminhoLocal).readAsBytes();
+    await servico.enviar(
+      ArquivoCapturado(
+        bytes: bytes,
+        sha256: crypto.sha256.convert(bytes).toString(),
+        capturadaEm: DateTime.now().toUtc(),
+      ),
+      FinalidadeArquivo.avatar,
+    );
+    final id = _meuId;
+    if (id != null) _fotos.remove(id);
+  }
 
   @override
   String? get nomeSalvo => _ultimoNome;
@@ -814,6 +857,8 @@ class RepositorioPerfilApi implements RepositorioPerfil {
     if (nome != null && nome.isNotEmpty && nome != 'Sua conta') {
       _ultimoNome = nome;
     }
+    _meuId = j['id'] as String?;
+    final foto = _meuId == null ? null : await fotoDe(_meuId!);
     final nota = j['nota_publica'] as num?;
     final concluidos = j['servicos_concluidos'] as int?;
     final partes = [
@@ -824,6 +869,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),
+      fotoReferencia: foto,
       grupos: const [
         GrupoPerfil(
           titulo: 'SEGURANÇA E AVISOS',

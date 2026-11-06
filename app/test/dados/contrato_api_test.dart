@@ -479,11 +479,16 @@ void main() {
     };
 
     test('GET /v1/me vira o perfil do cliente', () async {
-      final (api, chamadas) = _api({'GET /v1/me': (200, me)});
+      final (api, chamadas) = _api({
+        'GET /v1/me': (200, me),
+        'GET /v1/usuarios/c1/foto': (200, {'url': 'https://fotos.teste/c1.jpg'}),
+      });
 
       final p = await RepositorioPerfilApi(api).carregar();
 
-      expect(chamadas.single.autorizacao, 'Bearer valor-de-teste');
+      expect(chamadas.first.autorizacao, 'Bearer valor-de-teste');
+      expect(chamadas.map((c) => c.caminho), ['/v1/me', '/v1/usuarios/c1/foto']);
+      expect(p.fotoReferencia, 'https://fotos.teste/c1.jpg');
       expect(p.nome, 'Mariana Alves');
       expect(p.iniciais, 'MA');
       expect(p.resumo, 'Nota 4,8 · 6 serviços');
@@ -811,8 +816,21 @@ void main() {
       await auth.entrarComEmail(email: 'a@b.com', senha: 'x');
       await Future<void>.delayed(Duration.zero);
 
-      expect(chamadas.single.caminho, '/v1/me');
-      expect(chamadas.single.autorizacao, startsWith('Bearer '));
+      // O primeiro pedido é o /v1/me (cria o usuário); depois vem a busca da foto de perfil.
+      expect(chamadas.first.caminho, '/v1/me');
+      expect(chamadas.first.autorizacao, startsWith('Bearer '));
+    });
+
+    test('foto de perfil que falha nunca derruba o perfil', () async {
+      final (api, _) = _api({
+        'GET /v1/me': (200, {'id': 'c1', 'nome': 'Ana', 'papel': 'cliente'}),
+        'GET /v1/usuarios/c1/foto': (500, {'detail': 'erro'}),
+      });
+
+      final p = await RepositorioPerfilApi(api).carregar();
+
+      expect(p.nome, 'Ana');
+      expect(p.fotoReferencia, isNull);
     });
 
     test('sem rede: mensagem de "sem internet"', () async {

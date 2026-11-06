@@ -398,6 +398,12 @@ class RepositorioNotificacoesFake implements RepositorioNotificacoes {
 
 class RepositorioPerfilFake implements RepositorioPerfil {
   @override
+  Future<String?> fotoDe(String usuarioId) async => null;
+
+  @override
+  Future<void> enviarFoto(String caminhoLocal) async {}
+
+  @override
   Future<PerfilCliente> carregar() async {
     final sessao = ServicoAuthPadrao.atual.sessaoAtual;
     final base = per.DadosExemplo.perfil;

@@ -1,3 +1,4 @@
+import '../cliente/avatar_de_usuario.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -162,12 +163,10 @@ class _Cabecalho extends StatelessWidget {
               onPressed: () => Navigator.maybePop(context),
               icon: const Icon(Icons.arrow_back_ios_new, size: 18),
             ),
-            Container(
-              width: 48,
-              height: 48,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: CoresTrato.azulClaro, shape: BoxShape.circle),
-              child: Text(conversa.iniciais, style: TipografiaTrato.corpoForte),
+            AvatarDeUsuario(
+              iniciais: conversa.iniciais,
+              usuarioId: conversa.usuarioId,
+              tamanho: 48,
             ),
             const SizedBox(width: EspacosTrato.x3),
             Expanded(

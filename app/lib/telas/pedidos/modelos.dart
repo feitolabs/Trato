@@ -106,8 +106,11 @@ class ConversaPedido {
     required this.situacao,
     required this.mensagens,
     required this.respostasRapidas,
+    this.usuarioId,
   });
 
+  /// Quem está do outro lado (para buscar a foto de perfil).
+  final String? usuarioId;
   final String nome;
   final String iniciais;
   final String numeroPedido;

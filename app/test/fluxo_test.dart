@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/telas/aditivo/criar_aditivo_tela.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
@@ -247,19 +246,18 @@ void main() {
     expect(find.byType(PerfilProfissionalTela), findsOneWidget);
   });
 
-  testWidgets('profissional: pedido de hoje oferece nota de materiais e aditivo', (tester) async {
+  testWidgets('profissional: pedido agendado oferece nota de materiais, sem aditivo nem disputa',
+      (tester) async {
     await _abrir(tester, RotasTrato.cascaProfissionalParaTeste());
     await _tocar(tester, 'Fazer check-in');
     expect(find.text('Enviar nota de materiais'), findsOneWidget);
-    expect(find.text('Criar aditivo'), findsOneWidget);
+    // Aditivo só com o serviço em andamento; disputa e retrabalho vêm das notificações.
+    expect(find.text('Criar aditivo'), findsNothing);
+    expect(find.text('Responder disputa'), findsNothing);
+    expect(find.text('Atender retrabalho'), findsNothing);
 
     await _tocar(tester, 'Enviar nota de materiais');
     expect(find.byType(EnviarNotaTela), findsOneWidget);
-    await _voltar(tester);
-
-    await _tocar(tester, 'Fazer check-in');
-    await _tocar(tester, 'Criar aditivo');
-    expect(find.byType(CriarAditivoTela), findsOneWidget);
   });
 
   testWidgets('garantia: Pedir retrabalho envia e fecha diálogo sem erro de _dependents',

@@ -1,3 +1,4 @@
+import '../cliente/avatar_de_usuario.dart';
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -98,7 +99,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            AvatarIniciais(iniciais: o.iniciais, tamanho: 64),
+            AvatarDeUsuario(iniciais: o.iniciais, usuarioId: o.profissionalId, tamanho: 64),
             const SizedBox(width: EspacosTrato.x4),
             Expanded(
               child: Column(

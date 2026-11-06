@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../agenda/modelos.dart' show EstadoAgendamento;
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
@@ -459,6 +460,18 @@ abstract final class RotasTrato {
 
   /// Foto pela câmera; devolve só a referência (o upload é do backend, por URL assinada).
   static Future<String?> _fotografar() => dispositivo.fotografarEEnviar();
+
+  /// Foto de PERFIL: tira, mostra na hora e envia ao backend (outros usuários passam a ver).
+  static Future<String?> _fotografarPerfil() async {
+    final local = await dispositivo.camera.fotografar();
+    if (local == null) return null;
+    try {
+      await repos.perfil.enviarFoto(local);
+    } on Object catch (_) {
+      // sem rede: a foto aparece só neste aparelho até enviar de novo
+    }
+    return local;
+  }
   static Future<List<String>> _selecionarFotos() =>
       dispositivo.fotografarMultiplasEEnviar();
 
@@ -545,6 +558,7 @@ abstract final class RotasTrato {
             aoCheckIn: () => _abrir<void>(
               context,
               CheckInTela(
+                aoIniciar: () => _aoIniciarServico(context),
                 servico: _servicoCheckIn(inicio.proximo?.pedidoId ?? _idDemo),
                 tituloBarra: inicio.proximo == null
                     ? 'Check-in'
@@ -611,9 +625,11 @@ abstract final class RotasTrato {
             context,
             pedidoId: a.pedidoId,
             titulo: a.titulo,
+            estado: a.estado,
             aoCheckIn: () => _abrir<void>(
               context,
               CheckInTela(
+                aoIniciar: () => _aoIniciarServico(context),
                 servico: _servicoCheckIn(a.pedidoId),
                 tituloBarra: '${a.titulo} · ${a.horario}',
               ),
@@ -638,6 +654,7 @@ abstract final class RotasTrato {
       context: context,
       initialTime: const TimeOfDay(hour: 9, minute: 0),
       helpText: 'Hora da chegada',
+      // Relógio no formato brasileiro (24 h), como o Flutter faz em português do Brasil.
     );
     if (hora == null || !context.mounted) return;
     final inicio =
@@ -658,6 +675,16 @@ abstract final class RotasTrato {
                 'Visita marcada. O cliente já pode ver o código de início.')),
       );
     }
+  }
+
+  /// Depois do início aceito pelo backend: fecha o check-in, atualiza a agenda e avisa.
+  static void _aoIniciarServico(BuildContext context) {
+    pedidosMudaram.value++;
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Serviço iniciado. O cliente foi avisado.')),
+    );
   }
 
   /// Check-out: foto final e o código de conclusão que o cliente informa. Quem confere o código
@@ -688,7 +715,11 @@ abstract final class RotasTrato {
     required String pedidoId,
     required String titulo,
     required VoidCallback aoCheckIn,
+    EstadoAgendamento estado = EstadoAgendamento.agendado,
   }) {
+    // Só o que o momento do pedido permite (disputa e retrabalho vêm das notificações).
+    final agendado = estado == EstadoAgendamento.agendado;
+    final emAndamento = estado == EstadoAgendamento.emAndamento;
     showModalBottomSheet<void>(
       context: context,
       // Rolável: com 8 ações a lista passa da altura de um celular menor e estourava embaixo.
@@ -698,6 +729,7 @@ abstract final class RotasTrato {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+              if (agendado)
               ListTile(
                 leading: const Icon(Icons.event_available_outlined),
                 title: const Text('Marcar data da visita'),
@@ -706,6 +738,7 @@ abstract final class RotasTrato {
                   _marcarVisita(context, pedidoId);
                 },
               ),
+              if (agendado)
               ListTile(
                 leading: const Icon(Icons.place_outlined),
                 title: const Text('Fazer check-in'),
@@ -714,6 +747,7 @@ abstract final class RotasTrato {
                   aoCheckIn();
                 },
               ),
+              if (emAndamento)
               ListTile(
                 leading: const Icon(Icons.task_alt_outlined),
                 title: const Text('Concluir serviço (check-out)'),
@@ -730,6 +764,7 @@ abstract final class RotasTrato {
                   _abrir<void>(context, _chat(pedidoId));
                 },
               ),
+              if (agendado || emAndamento)
               ListTile(
                 leading: const Icon(Icons.receipt_long_outlined),
                 title: const Text('Enviar nota de materiais'),
@@ -738,29 +773,13 @@ abstract final class RotasTrato {
                   _abrir<void>(context, _enviarNota(pedidoId, titulo));
                 },
               ),
+              if (emAndamento)
               ListTile(
                 leading: const Icon(Icons.add_task_outlined),
                 title: const Text('Criar aditivo'),
                 onTap: () {
                   Navigator.of(folha).pop();
                   _abrir<void>(context, _criarAditivo(pedidoId, titulo));
-                },
-              ),
-              // Sem lista de disputas na API, o id do pedido faz de id da disputa (demonstração).
-              ListTile(
-                leading: const Icon(Icons.gavel_outlined),
-                title: const Text('Responder disputa'),
-                onTap: () {
-                  Navigator.of(folha).pop();
-                  abrirDisputa(context, pedidoId);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.build_outlined),
-                title: const Text('Atender retrabalho'),
-                onTap: () {
-                  Navigator.of(folha).pop();
-                  abrirRetrabalho(context, pedidoId);
                 },
               ),
             ],
@@ -832,7 +851,7 @@ abstract final class RotasTrato {
           final servico = repos.perfilPublico ?? ServicoPerfilPublicoFake();
           return PerfilPublicoTela(
             servico: servico,
-            aoCapturarFotoPerfil: _fotografar,
+            aoCapturarFotoPerfil: _fotografarPerfil,
             aoVerAvaliacoes: () => _abrir<void>(
               context,
               AvaliacoesRecebidasTela(servico: servico),
@@ -851,7 +870,7 @@ abstract final class RotasTrato {
         carregar: repos.perfil.carregar,
         construir: (context, perfil) => PerfilClienteTela(
           perfil: _soComDestino(perfil),
-          aoCapturarFotoPerfil: _fotografar,
+          aoCapturarFotoPerfil: _fotografarPerfil,
           aoSair: () => sair(context),
           aoTocarItem: (acao) {
             switch (acao) {
@@ -905,6 +924,7 @@ abstract final class RotasTrato {
         nome: p.nome,
         iniciais: p.iniciais,
         resumo: p.resumo,
+        fotoReferencia: p.fotoReferencia,
         grupos: [
           for (final g in p.grupos)
             if (g.itens.any((i) => _acoesComTela.contains(i.acao)))
@@ -1309,7 +1329,10 @@ abstract final class RotasTrato {
           aoEnviar: (envio) async {
             final ok = await _tentar(
                 context, () => repos.pedidos.avaliar(pedidoId, envio));
-            if (ok && context.mounted) _voltarAoInicio(context);
+            if (ok && context.mounted) {
+              _voltarAoInicio(context);
+              _avisoSimples(context, 'Avaliação enviada. Obrigado!');
+            }
           },
           aoAvaliarDepois: () => _voltarAoInicio(context),
         ),

@@ -105,7 +105,7 @@ class RepositoriosTrato {
         pagamento: RepositorioPagamentoApi(api),
         chat: RepositorioChatApi(api),
         notificacoes: RepositorioNotificacoesApi(api),
-        perfil: RepositorioPerfilApi(api),
+        perfil: RepositorioPerfilApi(api, upload: upload),
         profissional: profissional,
         aditivo: ServicoAditivoApi(api),
         notaMaterial: ServicoNotaMaterialApi(api, upload: upload),

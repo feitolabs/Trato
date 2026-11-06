@@ -1,3 +1,4 @@
+import '../cliente/avatar_de_usuario.dart';
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -122,7 +123,7 @@ class _CartaoOrcamento extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AvatarIniciais(iniciais: o.iniciais),
+              AvatarDeUsuario(iniciais: o.iniciais, usuarioId: o.profissionalId),
               const SizedBox(width: EspacosTrato.x3),
               Expanded(
                 flex: 3,

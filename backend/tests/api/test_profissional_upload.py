@@ -497,3 +497,39 @@ def test_quem_nao_e_parte_do_pedido_nao_ve_as_fotos(e2, amb):
 def test_pedido_sem_fotos_devolve_lista_vazia(e2, amb):
     amb.semear_pedido(Estado.AGENDADO)
     assert e2.get("/v1/pedidos/ped-1/fotos", "t-cliente").json() == []
+
+
+def test_foto_de_perfil_fica_salva_e_qualquer_usuario_logado_recebe_url_curta(e2):
+    # Sem foto: url nula, o app mostra as iniciais.
+    sem = e2.get("/v1/usuarios/pro-1/foto", "t-cliente")
+    assert sem.status_code == 200 and sem.json()["url"] is None
+
+    _, concluir = e2.enviar("t-prof", "avatar", JPEG_COM_EXIF)
+    assert concluir.status_code == 200, concluir.text
+
+    com = e2.get("/v1/usuarios/pro-1/foto", "t-cliente")  # o cliente vê a foto do profissional
+    assert com.status_code == 200
+    corpo = com.json()
+    assert corpo["url"] and corpo["expira_em_segundos"] > 0
+    assert "pro-1" in corpo["url"]  # vem da pasta do dono, no bucket de avatar
+    # A foto do outro lado continua sem foto.
+    assert e2.get("/v1/usuarios/cli-1/foto", "t-prof").json()["url"] is None
+    # Sem login não vê.
+    assert e2.amb.cliente.get("/v1/usuarios/pro-1/foto").status_code in (401, 403)
+
+
+def test_trocar_a_foto_de_perfil_apaga_a_anterior(e2):
+    _, primeira = e2.enviar("t-prof", "avatar", JPEG_COM_EXIF)
+    assert primeira.status_code == 200
+    antes = e2.repo.foto_perfil("pro-1")
+    assert antes and e2.armazenamento.ler("avatar", antes)
+
+    _, segunda = e2.enviar("t-prof", "avatar", JPEG_COM_EXIF, nome="b.jpg")
+    assert segunda.status_code == 200
+    depois = e2.repo.foto_perfil("pro-1")
+    assert depois and depois != antes
+    from trato.uploads.armazenamento import ArquivoNaoEncontrado
+
+    with pytest.raises(ArquivoNaoEncontrado):
+        e2.armazenamento.ler("avatar", antes)  # a antiga saiu do bucket
+    assert e2.armazenamento.ler("avatar", depois)

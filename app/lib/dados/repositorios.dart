@@ -185,6 +185,12 @@ abstract interface class RepositorioNotificacoes {
 abstract interface class RepositorioPerfil {
   Future<PerfilCliente> carregar();
   String? get nomeSalvo;
+
+  /// Foto de perfil de qualquer usuário (URL curta do backend) ou `null` se não tiver.
+  Future<String?> fotoDe(String usuarioId);
+
+  /// Envia a foto de perfil de quem está logado (a que o cliente e o profissional veem).
+  Future<void> enviarFoto(String caminhoLocal);
 }
 
 /// Filtros de `GET /v1/profissional/pedidos-abertos`. O backend aplica; o app só pede.

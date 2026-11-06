@@ -229,6 +229,24 @@ class UploadsPostgres:
             logger.warning("Falha ao listar midias do pedido no banco: %s", err)
             return self._memoria.midias_do_pedido(pedido_id, finalidades)
 
+    def definir_foto_perfil(self, usuario_id: str, caminho: str) -> None:
+        uid = como_uuid(usuario_id)
+        if not uid:
+            self._memoria.definir_foto_perfil(usuario_id, caminho)
+            return
+        with self._banco.transacao() as con:
+            con.execute("update public.usuarios set foto_path = %s where id = %s", (caminho, uid))
+
+    def foto_perfil(self, usuario_id: str) -> str | None:
+        uid = como_uuid(usuario_id)
+        if not uid:
+            return self._memoria.foto_perfil(usuario_id)
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select foto_path from public.usuarios where id = %s", (uid,)
+            ).fetchone()
+        return linha["foto_path"] if linha else None
+
     @property
     def documentos(self) -> dict[str, DocumentoGuardado]:
         return self._memoria.documentos

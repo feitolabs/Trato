@@ -216,7 +216,7 @@ void main() {
 
     testWidgets('agenda vazia explica', (tester) async {
       await _abrir(tester, AgendaTela(carregar: () async => const []));
-      expect(find.text('Agenda livre'), findsOneWidget);
+      expect(find.text('Nada agendado'), findsOneWidget);
     });
 
     test('rótulos do dia', () {

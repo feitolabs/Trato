@@ -36,8 +36,8 @@ class AgendaTela extends StatelessWidget {
         construir: (context, itens, _) => itens.isEmpty
             ? const EstadoVazio(
                 icone: Icons.calendar_today_outlined,
-                titulo: 'Agenda livre',
-                texto: 'Quando um cliente aceitar o seu orçamento, o atendimento aparece aqui.',
+                titulo: 'Nada agendado',
+                texto: 'Os atendimentos contratados e em andamento aparecem aqui.',
               )
             : _Dias(itens: itens, aoFazerCheckIn: aoFazerCheckIn, hoje: hoje),
       ),
