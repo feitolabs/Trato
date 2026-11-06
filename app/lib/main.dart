@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +7,7 @@ import 'auth/ligacao_sessao.dart';
 import 'auth/servico_auth.dart';
 import 'auth/servico_auth_supabase.dart';
 import 'telas/auth/login_tela.dart';
+import 'telas/auth/nova_senha_tela.dart';
 import 'dados/cliente_api.dart';
 import 'dados/config.dart';
 import 'dados/repositorios_trato.dart';
@@ -58,18 +58,11 @@ Future<void> main() async {
   var config = ConfigTrato.doAmbiente();
   var configAuth = ConfigAuth.doAmbiente();
 
-  // Garante que o app execute conectado à API e Supabase reais por padrão,
-  // impedindo que caia acidentalmente em modo mock/demo.
-  // Demo só existe em debug: um build de produção nunca abre com dados de exemplo.
-  final forcouDemo = !kReleaseMode &&
-      const String.fromEnvironment('TRATO_MODO').trim().toLowerCase() == 'demo';
-  if (!forcouDemo && !config.usaApi) {
-    config = ConfigTrato(
-      modo: ModoTrato.api,
-      apiUrl: config.apiUrl.isNotEmpty ? config.apiUrl : _defaultApiUrl,
-    );
+  // O app sempre usa a API e o Supabase reais; sem --dart-define cai nos endereços padrão.
+  if (!config.usaApi) {
+    config = const ConfigTrato(apiUrl: _defaultApiUrl);
   }
-  if (!forcouDemo && !configAuth.supabaseConfigurado) {
+  if (!configAuth.supabaseConfigurado) {
     configAuth = ConfigAuth(
       supabaseUrl: configAuth.supabaseUrl.isNotEmpty ? configAuth.supabaseUrl : _defaultSupabaseUrl,
       supabaseAnonKey:
@@ -94,6 +87,10 @@ Future<void> main() async {
       if (config.usaApi) await RotasTrato.repos.perfil.carregar();
     },
   );
+  // Link do e-mail de recuperação: o app abre direto na tela de senha nova.
+  if (configAuth.supabaseConfigurado) {
+    ServicoAuthPadrao.atual.recuperacaoDeSenha.listen((_) => _abrirNovaSenha());
+  }
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
@@ -106,6 +103,22 @@ Future<void> main() async {
   );
   RotasTrato.folhaCartao = FolhaCartaoStripe();
   runApp(const TratoApp());
+}
+
+/// Abre a tela de senha nova por cima de tudo. Se o link abriu o app agora (partida a frio), o
+/// navegador ainda não existe: tenta de novo no próximo quadro.
+void _abrirNovaSenha([int tentativa = 0]) {
+  final navegador = navegadorTrato.currentState;
+  if (navegador == null) {
+    if (tentativa < 50) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _abrirNovaSenha(tentativa + 1));
+    }
+    return;
+  }
+  navegador.pushAndRemoveUntil(
+    MaterialPageRoute<void>(builder: (_) => const NovaSenhaTela()),
+    (_) => false,
+  );
 }
 
 class TratoApp extends StatelessWidget {

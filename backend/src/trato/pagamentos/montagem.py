@@ -19,6 +19,9 @@ def escolher_provedor(config: Config | None = None) -> ProvedorPagamento:
     config = config or obter_config()
     nome = config.trato_provedor_pagamento.strip().lower()
     if nome == "fake":
+        if config.trato_ambiente.strip().lower() == "producao":
+            # Provedor falso em produção simularia pagamentos sem dinheiro de verdade.
+            raise ErroProvedor("Provedor de pagamento 'fake' não é permitido em produção.")
         return ProvedorFake()
     if nome == "stripe":
         chave = config.stripe_secret_key.get_secret_value()

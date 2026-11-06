@@ -39,36 +39,7 @@ abstract interface class ServicoVerificacao {
   Future<void> enviar(EnvioVerificacao envio);
 }
 
-/// PROVISÓRIO — só para teste e demonstração.
-class ServicoVerificacaoFake implements ServicoVerificacao {
-  ServicoVerificacaoFake({
-    this.situacao = const SituacaoVerificacao(status: StatusVerificacao.naoEnviada),
-    this.falharAoCarregar = false,
-    this.falharAoEnviar = false,
-  });
-
-  final SituacaoVerificacao situacao;
-  final bool falharAoCarregar;
-  final bool falharAoEnviar;
-  final List<EnvioVerificacao> enviados = [];
-
-  @override
-  Future<SituacaoVerificacao> carregarSituacao() async {
-    if (falharAoCarregar) throw Exception('falha de teste');
-    return situacao;
-  }
-
-  @override
-  Future<TextoLgpd> carregarTextoLgpd() async => textoLgpdExemplo;
-
-  @override
-  Future<void> enviar(EnvioVerificacao envio) async {
-    if (falharAoEnviar) throw Exception('falha de teste');
-    enviados.add(envio);
-  }
-}
-
-const textoLgpdExemplo = TextoLgpd(
+const textoLgpdPadrao = TextoLgpd(
   finalidade: 'Conferir se o documento e o rosto são da mesma pessoa que fez o cadastro.',
   retencao: 'Guardamos enquanto você mantiver sua conta ativa. '
       'Se a análise for recusada ou substituída, apagamos em até 90 dias.',

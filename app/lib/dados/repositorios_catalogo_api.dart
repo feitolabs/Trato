@@ -20,6 +20,20 @@ String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
 
 Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
 
+/// Ícone de cada categoria pelo id/slug (o backend não manda ícone). Categoria nova usa o genérico.
+IconData iconeDaCategoria(String? id) => switch (id) {
+      'eletrica' => Icons.bolt,
+      'hidraulica' => Icons.water_drop_outlined,
+      'pintura' => Icons.format_paint_outlined,
+      'montagem' => Icons.inventory_2_outlined,
+      'limpeza' => Icons.auto_awesome_outlined,
+      'ar-condicionado' => Icons.ac_unit,
+      'chaveiro' => Icons.vpn_key_outlined,
+      'jardinagem' => Icons.yard_outlined,
+      'reformas' => Icons.construction_outlined,
+      _ => Icons.handyman_outlined,
+    };
+
 String _iniciais(String nome) {
   final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
   if (partes.isEmpty) return '?';
@@ -34,32 +48,6 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   final ClienteApi _api;
 
-  /// Ícone de cada categoria do banco, pelo `slug`. É só apresentação.
-  static const _icones = <String, IconData>{
-    'limpeza-residencial': Icons.auto_awesome_outlined,
-    'montagem-de-moveis': Icons.inventory_2_outlined,
-    'pintura-interna': Icons.format_paint_outlined,
-    'eletricista': Icons.bolt,
-    'encanador': Icons.water_drop_outlined,
-    'reparos-gerais': Icons.handyman_outlined,
-    'ar-condicionado': Icons.ac_unit,
-    'eletrodomesticos': Icons.kitchen_outlined,
-    'chaveiro': Icons.vpn_key_outlined,
-    'jardinagem': Icons.grass_outlined,
-    'diarista': Icons.cleaning_services_outlined,
-    'marcenaria': Icons.carpenter_outlined,
-    'vidraceiro': Icons.window_outlined,
-    'serralheria': Icons.fence_outlined,
-    'gesso-drywall': Icons.layers_outlined,
-    'pisos-revestimentos': Icons.grid_on_outlined,
-    'impermeabilizacao': Icons.umbrella_outlined,
-    'cameras-seguranca': Icons.videocam_outlined,
-    'informatica-redes': Icons.wifi,
-    'mudanca-frete': Icons.local_shipping_outlined,
-    'cortinas-persianas': Icons.blinds_outlined,
-    'limpeza-especial': Icons.chair_outlined,
-  };
-
   /// Só o que está no banco. Sem rede, o erro vai para a tela ("Tentar de novo").
   @override
   Future<List<CategoriaServico>> categorias() async {
@@ -67,9 +55,9 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     return [
       for (final item in (resposta as List? ?? const []).cast<Map<String, dynamic>>())
         CategoriaServico(
-          item['nome'] as String,
-          _icones[item['slug']] ?? Icons.home_repair_service_outlined,
-          id: item['id'] as String,
+          (item['nome'] as String?) ?? 'Serviço',
+          iconeDaCategoria((item['id'] as String?) ?? (item['slug'] as String?)),
+          id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
         ),
     ];
   }
@@ -177,33 +165,30 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   Future<FormularioPedido> _formularioBase(String categoriaId) async {
-    final c = (await categorias()).where((x) => x.id == categoriaId).firstOrNull;
-    if (c == null) {
-      throw const ErroTrato(TipoErro.naoEncontrado, 'Esta categoria não está mais disponível.');
-    }
+    final cats = await categorias();
+    final c = cats.where((x) => x.id == categoriaId).firstOrNull;
     return FormularioPedido(
-      categoriaId: c.id,
-      icone: c.icone,
-      categoria: c.nome,
-      servicos: const ['Orçamento geral'],
-      servicosIniciais: const {},
+      categoriaId: categoriaId,
+      icone: c?.icone ?? Icons.handyman_outlined,
+      categoria: c?.nome ?? 'Serviço solicitado',
+      servicos: (c?.servicos.isEmpty ?? true) ? const ['Orçamento geral'] : c!.servicos,
+      servicosIniciais: {(c?.servicos.isEmpty ?? true) ? 'Orçamento geral' : c!.servicos.first},
       perguntaQuantidade: 'Quantos itens ou ambientes?',
       dicaQuantidade: 'Uma estimativa já ajuda',
       quantidadeInicial: 1,
-      perguntaVoltagem: '',
+      perguntaVoltagem: 'Voltagem',
       voltagens: const [],
       voltagemInicial: '',
       descricaoInicial: '',
       fotos: const [],
       prazos: const ['Esta semana', 'Sem pressa'],
       faixas: const [
-        FaixaPreco(minimoCentavos: 20000, maximoCentavos: 50000),
-        FaixaPreco(minimoCentavos: 0, maximoCentavos: 20000),
-        FaixaPreco(minimoCentavos: 50000, maximoCentavos: 100000),
+        FaixaPreco(minimoCentavos: 10000, maximoCentavos: 30000),
+        FaixaPreco(minimoCentavos: 30000, maximoCentavos: 80000),
       ],
-      endereco: 'Combine o endereço depois da contratação',
-      avisoEndereco: 'O endereço completo só aparece para o profissional que você contratar.',
-      avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas. Avisamos quando o prazo terminar.',
+      endereco: 'Seu endereço atual',
+      avisoEndereco: 'O endereço completo só aparece para o profissional contratado.',
+      avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
     );
   }
 
@@ -381,7 +366,7 @@ class RepositorioAgendaApi implements RepositorioAgenda {
     return [
       Agendamento(
         id: proximo.pedidoId ?? 'proximo',
-        pedidoId: proximo.pedidoId ?? 'demo',
+        pedidoId: proximo.pedidoId ?? '',
         dia: DateTime(base.year, base.month, base.day),
         horario: proximo.quando,
         titulo: proximo.titulo,

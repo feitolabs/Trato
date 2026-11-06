@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 
 /// Tela 15 — Seus pedidos, com abas "Em andamento" e "Finalizados".
@@ -10,8 +9,8 @@ import 'modelos.dart';
 class SeusPedidosTela extends StatefulWidget {
   const SeusPedidosTela({
     super.key,
-    this.emAndamento = DadosExemplo.pedidosEmAndamento,
-    this.finalizados = DadosExemplo.pedidosFinalizados,
+    required this.emAndamento,
+    required this.finalizados,
     this.aoAbrirPedido,
   });
 

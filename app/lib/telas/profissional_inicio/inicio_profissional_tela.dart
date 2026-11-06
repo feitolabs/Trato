@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_profissional.dart';
 
@@ -12,7 +11,7 @@ import 'pecas_profissional.dart';
 class InicioProfissionalTela extends StatefulWidget {
   const InicioProfissionalTela({
     super.key,
-    this.dados = inicioProfissionalExemplo,
+    required this.dados,
     this.aoAlterarDisponivel,
     this.aoFazerCheckIn,
     this.aoAbrirCarteira,
@@ -110,14 +109,18 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                     ],
                   ],
                 ),
-                const SizedBox(height: EspacosTrato.x4),
-                _CartaoDisponivel(
-                  ligado: _disponivel,
-                  aoMudar: (v) {
-                    setState(() => _disponivel = v);
-                    widget.aoAlterarDisponivel?.call(v);
-                  },
-                ),
+                // Só aparece quando alguém grava a escolha: o backend ainda não tem "disponível agora",
+                // e um interruptor que não grava em lugar nenhum engana o profissional.
+                if (widget.aoAlterarDisponivel != null) ...[
+                  const SizedBox(height: EspacosTrato.x4),
+                  _CartaoDisponivel(
+                    ligado: _disponivel,
+                    aoMudar: (v) {
+                      setState(() => _disponivel = v);
+                      widget.aoAlterarDisponivel?.call(v);
+                    },
+                  ),
+                ],
                 if (dados.proximo != null) ...[
                   const SizedBox(height: EspacosTrato.x4),
                   _CartaoProximo(proximo: dados.proximo!, aoFazerCheckIn: widget.aoFazerCheckIn),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
-import '../cliente/dados_exemplo.dart';
 import '../cliente/modelos.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
@@ -17,7 +16,7 @@ class BuscaProfissionaisTela extends StatefulWidget {
     required this.servico,
     this.aoAbrirProfissional,
     this.termoInicial = '',
-    this.sugestoes = categorias,
+    this.sugestoes = const [],
     this.aoEscolherCategoria,
     this.aoVerTodas,
   });

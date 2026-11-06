@@ -299,3 +299,15 @@ def test_falha_no_meio_e_refeita_sem_duplicar_o_ledger(adm, monkeypatch):
     assert r.status_code == 200, r.text
     assert list(adm.lancamentos()) == depois_da_falha
     assert adm.pedido().estado is Estado.CONCLUIDO
+
+
+def test_acao_sensivel_devolve_o_numero_do_registro_de_auditoria(adm):
+    """O painel mostra "Registro de auditoria nº N" no aviso de sucesso (cabeçalho X-Auditoria-Id)."""
+    adm.semear_disputa()
+    r = decidir(adm, "liberar_tudo")
+    assert r.status_code == 200
+    numero = int(r.headers["x-auditoria-id"])
+    ultimo, _ = adm.admin.auditoria.listar(FiltroAuditoria(), 1, 0)
+    assert numero == ultimo[0].id
+    # leitura não gera registro: sem cabeçalho
+    assert "x-auditoria-id" not in adm.cliente.get(URL, headers=cab("t-mediador")).headers

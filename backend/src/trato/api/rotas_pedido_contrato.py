@@ -25,6 +25,7 @@ from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.servicos import carregar_pedido
+from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
@@ -1028,13 +1029,10 @@ def pedido_aberto(
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoAbertoDetalheOut:
     recusados = {r.pedido_id for r in contexto.recusas.do_profissional(usuario.id)}
-    achado = next(
-        (
-            p
-            for p in contexto.pedidos.listar_abertos(usuario.id)
-            if p.id == pedido_id and p.id not in recusados
-        ),
-        None,
+    achado = (
+        None
+        if pedido_id in recusados
+        else pedido_visivel_ao_profissional(contexto, pedido_id, usuario.id)
     )
     if achado is None:
         raise HTTPException(404, "Pedido não encontrado.")
@@ -1059,7 +1057,7 @@ def recusar_pedido(
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> RecusaOut:
-    visivel = any(p.id == pedido_id for p in contexto.pedidos.listar_abertos(usuario.id))
+    visivel = pedido_visivel_ao_profissional(contexto, pedido_id, usuario.id) is not None
     ja_recusou = any(r.pedido_id == pedido_id for r in contexto.recusas.do_profissional(usuario.id))
     if not (visivel or ja_recusou):
         raise HTTPException(404, "Pedido não encontrado.")

@@ -6,7 +6,6 @@ import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../profissional/dinheiro.dart' show Dinheiro;
 import '../profissional_apoio/apoio.dart' show CapturarFoto;
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_pedido.dart';
 
@@ -19,7 +18,7 @@ const _maxFotos = 4;
 class NovoPedidoTela extends StatefulWidget {
   const NovoPedidoTela({
     super.key,
-    this.formulario = formularioExemplo,
+    required this.formulario,
     this.aoEnviar,
     this.aoTrocarCategoria,
     this.aoMudarEndereco,

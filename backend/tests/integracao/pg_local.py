@@ -24,6 +24,10 @@ MIGRATIONS = (
     "f37_chat",
     "profissional_disponibilidade_portfolio_uploads",
     "lgpd_exclusao_consentimentos",
+    "admin_sugestoes_completas",
+    "painel_admin_ds_v2",
+    "alertas_risco_fluxo",
+    "campanhas_tipo",
 )
 
 
@@ -54,6 +58,9 @@ class BancoLocal:
         self.uri: str = self.servidor.get_uri()
         with self.admin() as con:
             con.execute(ref["STUBS"])
+            # O auth.users do Supabase tem e-mail; o stub só tem id e a busca do painel lê o e-mail.
+            con.execute("alter table auth.users add column if not exists email text")
+            con.execute("grant select on auth.users to service_role")
             con.execute(ref["PADROES"]["real"])
             for arquivo in sorted((RAIZ / "supabase" / "migrations").glob("*.sql")):
                 if not any(chave in arquivo.name for chave in MIGRATIONS):
@@ -74,6 +81,13 @@ class BancoLocal:
                 (RAIZ / "supabase" / "migrations").glob("*admin_catalogo_delete.sql")
             ):
                 con.execute(arquivo.read_text(encoding="utf-8"))
+            # Tabelas do painel (admin_sugestoes_*, painel_admin_*): no Supabase o service_role as
+            # recebe por privilégio padrão; no banco local precisamos conceder.
+            con.execute(
+                "grant select, insert, update, delete on public.cupons, "
+                "public.campanhas_notificacao, public.alertas_risco, public.papeis_alcada "
+                "to service_role"
+            )
 
     def _grants_do_service_role_da_f32(self, con: psycopg.Connection[Any]) -> None:
         """Os privilégios do `service_role` nas tabelas da F3.2 vêm da F3.8b, que depende das

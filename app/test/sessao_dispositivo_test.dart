@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/ligacao_sessao.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/dispositivo/check_in_dispositivo.dart';
 import 'package:trato/dispositivo/dispositivo.dart';
-import 'package:trato/telas/profissional/servico_check_in_fake.dart';
+import 'apoio/exemplos/telas/profissional/servico_check_in_fake.dart';
+import 'apoio/exemplos/dispositivo/dispositivo_fake.dart';
+import 'apoio/exemplos/demo.dart';
 
 const _credencialDeTeste = 'abc12345';
 
@@ -50,7 +52,7 @@ void main() {
     });
 
     test('check-in usa câmera e GPS; sem posição não libera o passo', () async {
-      final disp = DispositivoTrato.fake();
+      final disp = dispositivoDemo();
       final servico = ServicoCheckInDispositivo(base: ServicoCheckInFake(), dispositivo: disp);
       expect(await servico.tirarFoto(), isNotNull);
       expect(servico.ultimaFoto, startsWith('fake://'));

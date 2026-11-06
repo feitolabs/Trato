@@ -12,6 +12,11 @@ import 'package:trato/telas/profissional/check_out_tela.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
 import 'package:trato/telas/profissional/servico_check_out.dart';
 import 'package:trato/tema/tema.dart';
+import '../apoio/exemplos/telas/pedido_novo/dados_exemplo.dart';
+import '../apoio/exemplos/telas/profissional/servico_check_out_fake.dart';
+import '../apoio/exemplos/dispositivo/servico_camera_fake.dart';
+import '../apoio/exemplos/dados/servico_upload_fake.dart';
+import '../apoio/exemplos/dispositivo/permissao_fake.dart';
 
 Future<void> _abrir(WidgetTester tester, Widget tela) async {
   tester.view.physicalSize = const Size(390, 2400);
@@ -411,7 +416,7 @@ void main() {
   group('Novo pedido', () {
     testWidgets('foto capturada aparece como anexo', (tester) async {
       var chamadas = 0;
-      await _abrir(tester, NovoPedidoTela(aoCapturarFoto: () async => 'arq-${++chamadas}'));
+      await _abrir(tester, NovoPedidoTela(formulario: formularioExemplo, aoCapturarFoto: () async => 'arq-${++chamadas}'));
 
       await tester.ensureVisible(find.text('Adicionar'));
       await tester.tap(find.text('Adicionar'));

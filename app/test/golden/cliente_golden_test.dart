@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
-import 'package:trato/telas/cliente/dados_exemplo.dart';
+import '../apoio/exemplos/telas/cliente/dados_exemplo.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
 import 'package:trato/tema/tema.dart';
 

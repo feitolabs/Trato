@@ -9,6 +9,7 @@ const definesPublicos = <String>{
   'ADMIN_API_URL',
   'ADMIN_SUPABASE_URL',
   'ADMIN_SUPABASE_ANON_KEY',
+  'ADMIN_AMBIENTE',
 };
 
 /// Nomes que nunca podem estar no app, mesmo vazios no código: se vierem preenchidos, é erro.
@@ -83,6 +84,7 @@ Map<String, String> lerDefinesDoAmbiente() => const {
       'ADMIN_API_URL': String.fromEnvironment('ADMIN_API_URL'),
       'ADMIN_SUPABASE_URL': String.fromEnvironment('ADMIN_SUPABASE_URL'),
       'ADMIN_SUPABASE_ANON_KEY': String.fromEnvironment('ADMIN_SUPABASE_ANON_KEY'),
+      'ADMIN_AMBIENTE': String.fromEnvironment('ADMIN_AMBIENTE'),
       'SUPABASE_SERVICE_ROLE_KEY': String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY'),
       'ADMIN_SERVICE_ROLE_KEY': String.fromEnvironment('ADMIN_SERVICE_ROLE_KEY'),
       'DATABASE_URL': String.fromEnvironment('DATABASE_URL'),

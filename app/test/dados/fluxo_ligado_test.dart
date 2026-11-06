@@ -4,7 +4,7 @@ import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dados/carregador.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
-import 'package:trato/dados/repositorios_fake.dart';
+import '../apoio/exemplos/dados/repositorios_fake.dart';
 import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/telas/carteira/carteira_tela.dart';
 import 'package:trato/telas/carteira/modelos.dart';
@@ -19,6 +19,8 @@ import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 import '../apoio/fontes.dart';
+import '../apoio/exemplos/demo.dart';
+import '../apoio/exemplos/dados/repositorios_catalogo_fake.dart';
 
 Future<void> _abrir(WidgetTester tester, Widget tela, {bool esperar = true}) async {
   tester.view.physicalSize = const Size(390, 1600);
@@ -75,11 +77,14 @@ RepositoriosTrato _repos({
       notificacoes: notificacoes ?? RepositorioNotificacoesFake(),
       perfil: RepositorioPerfilFake(),
       profissional: RepositorioProfissionalFake(),
+      catalogo: RepositorioCatalogoFake(),
+      servicos: RepositorioServicosClienteFake(),
+      agenda: RepositorioAgendaFake(),
     );
 
 void main() {
   setUpAll(carregarFontesTrato);
-  tearDown(() => RotasTrato.repos = RepositoriosTrato.demo());
+  tearDown(() => RotasTrato.repos = repositoriosDemo());
 
   group('Carregador', () {
     testWidgets('mostra carregando e depois o conteúdo', (tester) async {

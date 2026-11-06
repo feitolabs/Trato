@@ -22,6 +22,7 @@ from trato.api.admin import criar_router_admin
 from trato.api.contexto import Contexto
 from trato.api.erros import instalar_tratadores
 from trato.config import obter_config
+from trato.persistencia.captura_auditoria import CabecalhoAuditoria
 from trato.seguranca.config import obter_config_seguranca, parametros_docs
 
 
@@ -60,11 +61,14 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
         rotas_profissional_cadastro.registrar_rotas(app)
     instalar_tratadores(app)
     cfg_seg = obter_config_seguranca()
+
+    app.add_middleware(CabecalhoAuditoria)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cfg_seg.cors_origens or [],
         allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_credentials=True,
+        expose_headers=["X-Auditoria-Id"],
         allow_methods=cfg_seg.cors_metodos or ["*"],
         allow_headers=cfg_seg.cors_cabecalhos or ["*"],
     )

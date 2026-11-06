@@ -7,17 +7,22 @@ from pydantic import BaseModel, Field
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
+    CategoriaProfissionalOut,
     ComMotivo,
     DadosPessoaisOut,
+    DiagnosticoOut,
     EuOut,
     EventoPedidoOut,
+    EventoUsuarioOut,
+    ItemDiagnosticoOut,
     Pagina,
     PedidoDetalheOut,
     PedidoResumoOut,
     PessoaOut,
+    UsuarioDetalheOut,
     UsuarioOut,
 )
-from trato.api.admin.papeis import PapelEquipe, Permissao
+from trato.api.admin.papeis import Permissao
 from trato.api.contexto import Contexto, obter_contexto
 from trato.persistencia.comum import como_uuid
 
@@ -30,17 +35,25 @@ def eu(
     admin: AdminContexto = Depends(obter_admin),
 ) -> EuOut:
     conhecido = admin.usuarios.obter(operador.id)
-    alcada = operador.membro.alcada_centavos
-    if operador.membro.papel == PapelEquipe.ADMINISTRADOR:
-        alcada = alcada or 100_000_000_00
-    else:
-        alcada = alcada or 0
+    # Já vem limitada ao teto do papel (RP-02). Quem não tem alçada mostra "Sem alçada financeira".
+    alcada = operador.membro.alcada_centavos or 0
     return EuOut(
         id=operador.id,
         papel=operador.membro.papel.value,
         nome=conhecido.nome if conhecido else None,
         alcada_centavos=alcada,
     )
+
+
+def _usuario_out(u: object, extras: dict) -> UsuarioOut:
+    saida = UsuarioOut.model_validate(u)
+    c = extras.get(saida.id)
+    if c is not None:
+        saida.publico_id = c.publico_id
+        saida.email_mascarado = c.email_mascarado
+        saida.telefone_mascarado = c.telefone_mascarado
+        saida.cidade = c.cidade
+    return saida
 
 
 @router.get("/usuarios", response_model=Pagina[UsuarioOut], summary="Buscar usuários")
@@ -53,8 +66,9 @@ def buscar_usuarios(
     admin: AdminContexto = Depends(obter_admin),
 ) -> Pagina[UsuarioOut]:
     itens, total = admin.usuarios.buscar(q, status, limite, deslocamento)
+    extras = admin.usuarios.complementos(itens)
     return Pagina(
-        itens=[UsuarioOut.model_validate(u) for u in itens],
+        itens=[_usuario_out(u, extras) for u in itens],
         total=total,
         limite=limite,
         deslocamento=deslocamento,
@@ -62,22 +76,66 @@ def buscar_usuarios(
 
 
 @router.get(
-    "/usuarios/{usuario_id}", response_model=UsuarioOut, summary="Detalhe (sem dados pessoais)"
+    "/usuarios/{usuario_id}",
+    response_model=UsuarioDetalheOut,
+    summary="Detalhe (contato mascarado, categorias e histórico)",
 )
 def detalhe_usuario(
     usuario_id: str,
     _: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
     admin: AdminContexto = Depends(obter_admin),
-) -> UsuarioOut:
+) -> UsuarioDetalheOut:
     achado = admin.usuarios.obter(usuario_id)
     if achado is None:
         raise HTTPException(404, "Usuário não encontrado.")
-    return UsuarioOut.model_validate(achado)
+    base = _usuario_out(achado, admin.usuarios.complementos([achado]))
+    return UsuarioDetalheOut(
+        **base.model_dump(),
+        categorias=[
+            CategoriaProfissionalOut(
+                categoria_id=c.categoria_id,
+                nome=c.nome,
+                ativa_no_perfil=c.ativa_no_perfil,
+                ativa_na_plataforma=c.ativa_na_plataforma,
+            )
+            for c in admin.usuarios.categorias(usuario_id)
+        ],
+        historico=[
+            EventoUsuarioOut(em=e.em, texto=e.texto)
+            for e in admin.usuarios.historico(usuario_id, 20)
+        ],
+    )
+
+
+@router.get(
+    "/usuarios/{usuario_id}/diagnostico-pedido",
+    response_model=DiagnosticoOut,
+    summary="Por que este pedido não aparece para este profissional? (RN-01)",
+)
+def diagnostico_pedido(
+    usuario_id: str,
+    pedido: str = Query(..., min_length=2, max_length=60, description="Código PED-10482 ou id."),
+    _: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
+    admin: AdminContexto = Depends(obter_admin),
+) -> DiagnosticoOut:
+    if admin.usuarios.obter(usuario_id) is None:
+        raise HTTPException(404, "Usuário não encontrado.")
+    d = admin.usuarios.diagnosticar(usuario_id, pedido)
+    if d is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    return DiagnosticoOut(
+        pedido_id=d.pedido_id,
+        pedido_numero=d.pedido_numero,
+        pedido_titulo=d.pedido_titulo,
+        categoria=d.categoria,
+        aparece=d.aparece,
+        itens=[ItemDiagnosticoOut(ok=i.ok, titulo=i.titulo, detalhe=i.detalhe) for i in d.itens],
+    )
 
 
 class AlterarStatusUsuarioIn(BaseModel):
     status: str = Field(pattern="^(ativo|restrito|bloqueado)$")
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 @router.post(
@@ -99,10 +157,15 @@ def alterar_status_usuario(
     if uid is None:
         raise HTTPException(404, "Usuário não encontrado.")
     with banco.transacao() as con:
-        usuario = con.execute("SELECT id, nome, status FROM public.usuarios WHERE id = %s", (uid,)).fetchone()
+        usuario = con.execute(
+            "SELECT id, nome, status FROM public.usuarios WHERE id = %s", (uid,)
+        ).fetchone()
         if usuario is None:
             raise HTTPException(404, "Usuário não encontrado.")
-        con.execute("UPDATE public.usuarios SET status = %s, atualizado_em = now() WHERE id = %s", (corpo.status, uid))
+        con.execute(
+            "UPDATE public.usuarios SET status = %s, atualizado_em = now() WHERE id = %s",
+            (corpo.status, uid),
+        )
         admin.auditoria.registrar(
             ator_id=operador.id,
             acao="usuario.status_alterado",

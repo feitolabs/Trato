@@ -13,12 +13,13 @@ import 'package:trato/dados/repositorios_catalogo_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/carteira/modelos.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/disputa_profissional/disputa.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
 import 'package:trato/telas/profissional/servico_orcamento.dart';
+import 'package:trato/telas/conclusao/modelos.dart';
 
 const _pedidoJson = {
   'id': 'abcd1234',
@@ -79,15 +80,12 @@ class _Chamada {
 
 void main() {
   group('ConfigTrato', () {
-    test('modo padrão é demonstração e não usa a rede', () {
-      final c = ConfigTrato.doAmbiente();
-      expect(c.modo, ModoTrato.demo);
-      expect(c.usaApi, isFalse);
+    test('sem TRATO_API_URL não usa a API', () {
+      expect(ConfigTrato.doAmbiente().usaApi, isFalse);
     });
 
-    test('modo api sem URL cai em demonstração', () {
-      expect(const ConfigTrato(modo: ModoTrato.api).usaApi, isFalse);
-      expect(const ConfigTrato(modo: ModoTrato.api, apiUrl: 'https://x').usaApi, isTrue);
+    test('com a URL usa a API', () {
+      expect(const ConfigTrato(apiUrl: 'https://x').usaApi, isTrue);
     });
   });
 
@@ -235,6 +233,33 @@ void main() {
           sobre: 'Elétrica residencial',
           portfolio: const [],
         );
+
+    test('o formulário oferece as cidades do banco, com a grafia do catálogo', () async {
+      final (api, _) = _cliente(catalogo);
+      final opcoes = await ServicoCadastroProfissionalApi(api).carregarOpcoes();
+      expect(opcoes.cidades, ['Belo Horizonte', 'Divinopolis']);
+      expect(opcoes.categorias, ['Eletricista']);
+      expect(opcoes.vazio, isFalse);
+    });
+
+    test('cidade escolhida na lista vira o cidade_id exato', () async {
+      final (api, chamadas) = _cliente(catalogo);
+      final servico = ServicoCadastroProfissionalApi(api);
+      final opcoes = await servico.carregarOpcoes();
+      await servico.salvar(dadosCadastro(opcoes.cidades.first));
+      final corpo = chamadas.singleWhere((c) => c.caminho == '/v1/profissional/cadastro').corpo!;
+      expect(corpo['regioes'], [
+        {'cidade_id': 'cid-bh'},
+      ]);
+    });
+
+    test('catálogo fora do ar: o erro sobe para a tela, sem lista de exemplo', () async {
+      final (api, _) = _cliente((r) => _json({'detail': 'fora do ar'}, 503));
+      await expectLater(
+        ServicoCadastroProfissionalApi(api).carregarOpcoes(),
+        throwsA(isA<ErroTrato>()),
+      );
+    });
 
     test('cadastro acha a cidade sem acento e não usa a cidade como bairro', () async {
       final (api, chamadas) = _cliente(catalogo);
@@ -530,7 +555,7 @@ void main() {
       final corpo = chamadas.single.corpo!;
       expect(corpo['garantia_dias'], 90);
       expect(corpo['prazo_execucao_dias'], 3);
-      expect(DateTime.tryParse(corpo['validade_ate'] as String), isNotNull);
+      expect(DateTime.parse(corpo['validade_ate'] as String).isAfter(DateTime.now().toUtc()), isTrue);
       expect(corpo['sinal_material_centavos'], 4500);
       final itens = corpo['itens'] as List;
       expect(itens.length, 3);
@@ -541,10 +566,10 @@ void main() {
       }
       expect(itens[0]['tipo'], 'horas');
       expect(itens[0]['descricao'], 'Mão de obra');
+      expect(itens.every((i) => const {'horas', 'deslocamento', 'material', 'outro'}.contains(i['tipo'])), isTrue);
       expect(itens[0]['valor_unitario_centavos'], 20000); // 8000 * 25 / 10
-      expect(itens[1]['tipo'], 'deslocamento');
+      expect(itens[1]['descricao'], 'Deslocamento');
       expect(itens[1]['valor_unitario_centavos'], 3000);
-      expect(itens[2]['tipo'], 'material');
       expect(itens[2]['descricao'], 'Tomadas');
       expect(itens[2]['valor_unitario_centavos'], 4500);
     });

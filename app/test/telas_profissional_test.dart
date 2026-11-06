@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato/dados/erros.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
 import 'package:trato/telas/aditivo/criar_aditivo_tela.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
@@ -14,12 +15,18 @@ import 'package:trato/telas/nota_material/ver_nota_tela.dart';
 import 'package:trato/telas/perfil_publico/avaliacoes_recebidas_tela.dart';
 import 'package:trato/telas/perfil_publico/perfil_publico.dart';
 import 'package:trato/telas/perfil_publico/perfil_publico_tela.dart';
-import 'package:trato/telas/profissional/servico_orcamento_fake.dart';
+import 'apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro_profissional_tela.dart';
 import 'package:trato/telas/verificacao/verificacao.dart';
 import 'package:trato/telas/verificacao/verificacao_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/exemplos/telas/nota_material/nota_material_fake.dart';
+import 'apoio/exemplos/telas/disputa_profissional/disputa_fake.dart';
+import 'apoio/exemplos/telas/aditivo/aditivo_fake.dart';
+import 'apoio/exemplos/telas/profissional_cadastro/cadastro_fake.dart';
+import 'apoio/exemplos/telas/perfil_publico/perfil_publico_fake.dart';
+import 'apoio/exemplos/telas/verificacao/verificacao_fake.dart';
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -57,6 +64,15 @@ Future<void> _tocar(WidgetTester t, Finder f) async {
 /// Serviço que nunca responde: segura a tela em "carregando".
 class _Pendente {
   static Future<T> _nunca<T>() => Completer<T>().future;
+}
+
+/// A API recusa com um motivo (cidade que ainda não atendemos, por exemplo).
+class _CadastroRecusado extends ServicoCadastroProfissionalFake {
+  @override
+  Future<void> salvar(DadosCadastroProfissional dados) async => throw const ErroTrato(
+        TipoErro.recusado,
+        'Ainda não atendemos essa cidade. Atendemos: Belo Horizonte, Divinopolis.',
+      );
 }
 
 class _CadastroPendente extends ServicoCadastroProfissionalFake {
@@ -104,6 +120,33 @@ void main() {
   });
 
   group('Cadastro do profissional', () {
+    testWidgets('sem escolher a cidade pede a cidade e não envia', (t) async {
+      final fake = ServicoCadastroProfissionalFake();
+      await _abrir(t, CadastroProfissionalTela(servico: fake));
+      await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
+      await _tocar(t, find.text('Eletricista'));
+      await _tocar(t, find.text('Seg'));
+      await _tocar(t, find.text('Manhã'));
+      await _tocar(t, find.text('Salvar e continuar'));
+      expect(find.textContaining('Cidade não escolhida'), findsOneWidget);
+      expect(fake.salvos, isEmpty);
+      // A cidade é escolhida na lista (as do banco), nunca digitada.
+      expect(find.text('Belo Horizonte'), findsOneWidget);
+      expect(find.text('Divinopolis'), findsOneWidget);
+    });
+
+    testWidgets('recusa com motivo mostra o motivo, não "confira sua conexão"', (t) async {
+      await _abrir(t, CadastroProfissionalTela(servico: _CadastroRecusado()));
+      await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
+      await _tocar(t, find.text('Belo Horizonte'));
+      await _tocar(t, find.text('Eletricista'));
+      await _tocar(t, find.text('Seg'));
+      await _tocar(t, find.text('Manhã'));
+      await _tocar(t, find.text('Salvar e continuar'));
+      expect(find.textContaining('Ainda não atendemos essa cidade'), findsOneWidget);
+      expect(find.textContaining('Confira sua conexão'), findsNothing);
+    });
+
     testWidgets('valida, salva e chama aoConcluir', (t) async {
       final fake = ServicoCadastroProfissionalFake();
       var concluiu = false;
@@ -127,11 +170,11 @@ void main() {
       expect(fake.salvos, isEmpty);
 
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await t.enterText(find.widgetWithText(TextField, '').at(1), 'x'); // sobre (ignorado)
+      await t.enterText(find.widgetWithText(TextField, '').first, 'x'); // sobre (ignorado)
       await _tocar(t, find.text('Eletricista'));
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));
-      await t.enterText(find.byType(TextField).at(2), 'Belo Horizonte');
+      await _tocar(t, find.text('Belo Horizonte'));
       await _tocar(t, find.text('20 km'));
       await _tocar(t, find.text('Adicionar foto'));
       await _tocar(t, find.text('Salvar e continuar'));
@@ -148,7 +191,7 @@ void main() {
       final fake = ServicoCadastroProfissionalFake(falharAoSalvar: true);
       await _abrir(t, CadastroProfissionalTela(servico: fake));
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await t.enterText(find.byType(TextField).at(2), 'BH');
+      await _tocar(t, find.text('Belo Horizonte'));
       await _tocar(t, find.text('Eletricista'));
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));

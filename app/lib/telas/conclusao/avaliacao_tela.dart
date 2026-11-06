@@ -5,14 +5,14 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'apoio_conclusao.dart';
 import 'campo_longo.dart';
-import 'dados_exemplo.dart';
+import 'modelos.dart';
 import 'estrelas_nota.dart';
 
 /// Tela 19: avaliação em 5 critérios, comentário e gorjeta opcional.
 class AvaliacaoTela extends StatefulWidget {
   const AvaliacaoTela({
     super.key,
-    this.dados = dadosAvaliacaoExemplo,
+    required this.dados,
     this.notasIniciais,
     this.aoEnviar,
     this.aoAvaliarDepois,

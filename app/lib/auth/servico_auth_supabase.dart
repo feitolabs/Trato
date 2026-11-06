@@ -31,7 +31,9 @@ class ServicoAuthSupabase implements ServicoAuth {
     ClienteApi? api,
   })  : _cliente = cliente ?? sb.Supabase.instance.client,
         _codigo = codigo ?? ControleCodigoCelular(),
-        _api = api;
+        _api = api {
+    _vigiarRecuperacao();
+  }
 
   /// Inicializa o Supabase. Chame no `main` antes de `runApp`, só se
   /// `config.supabaseConfigurado`. [api] é a API do Trato, que guarda o CPF (fora do login).
@@ -53,7 +55,37 @@ class ServicoAuthSupabase implements ServicoAuth {
   final ClienteApi? _api;
   String? _cpfPendente;
 
+  // Link de recuperação: o evento pode chegar antes de a tela escutar (app fechado, aberto pelo
+  // e-mail). Guardamos o aviso até o primeiro ouvinte.
+  final _recuperacao = StreamController<void>.broadcast();
+  var _recuperacaoPendente = false;
+  StreamSubscription<sb.AuthState>? _escutaRecuperacao;
+
   sb.GoTrueClient get _auth => _cliente.auth;
+
+  void _vigiarRecuperacao() {
+    _escutaRecuperacao ??= _auth.onAuthStateChange.listen((e) {
+      if (e.event != sb.AuthChangeEvent.passwordRecovery) return;
+      if (_recuperacao.hasListener) {
+        _recuperacao.add(null);
+      } else {
+        _recuperacaoPendente = true;
+      }
+    });
+  }
+
+  @override
+  Stream<void> get recuperacaoDeSenha async* {
+    if (_recuperacaoPendente) {
+      _recuperacaoPendente = false;
+      yield null;
+    }
+    yield* _recuperacao.stream;
+  }
+
+  @override
+  Future<void> definirNovaSenha(String senha) =>
+      _proteger(() => _auth.updateUser(sb.UserAttributes(password: senha)));
 
   @override
   bool provedorHabilitado(ProvedorAuth provedor) => switch (provedor) {
@@ -382,7 +414,7 @@ class ServicoAuthSupabase implements ServicoAuth {
 
   @override
   Future<void> recuperarSenha(String email) =>
-      _proteger(() => _auth.resetPasswordForEmail(email.trim()));
+      _proteger(() => _auth.resetPasswordForEmail(email.trim(), redirectTo: kUrlRetornoEmail));
 
   @override
   Future<void> reenviarCodigoCelular(String celular) => _proteger(() async {

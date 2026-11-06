@@ -2,11 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/telas/auth/confirmar_celular_tela.dart';
 import 'package:trato/telas/auth/confirmar_email_tela.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
+import 'package:trato/telas/auth/nova_senha_tela.dart';
 import 'package:trato/telas/auth/recuperar_senha_tela.dart';
 import 'package:trato/telas/auth/validacao.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
@@ -566,14 +567,14 @@ void main() {
       await _abrir(tester, const RecuperarSenhaTela());
 
       await _digitar(tester, 'E-mail', 'mariana');
-      await _tocar(tester, 'Enviar código');
+      await _tocar(tester, 'Enviar link');
       expect(
         find.text('E-mail incompleto ou sem arroba. Digite no formato nome@exemplo.com.'),
         findsOneWidget,
       );
 
       await _digitar(tester, 'E-mail', 'mariana@email.com');
-      await _tocar(tester, 'Enviar código');
+      await _tocar(tester, 'Enviar link');
       expect(find.textContaining('você vai receber as instruções'), findsOneWidget);
       expect(
         find.text('E-mail incompleto ou sem arroba. Digite no formato nome@exemplo.com.'),
@@ -586,7 +587,7 @@ void main() {
       await _abrir(tester, RecuperarSenhaTela(servico: servico));
       await _digitar(tester, 'E-mail', 'mariana@email.com');
 
-      await _tocar(tester, 'Enviar código');
+      await _tocar(tester, 'Enviar link');
 
       expect(find.text('Sem internet. Confira sua conexão e tente de novo.'), findsOneWidget);
       expect(find.textContaining('você vai receber as instruções'), findsNothing);
@@ -622,4 +623,89 @@ void main() {
       }
     }
   }
+
+  group('nova senha (link do e-mail de recuperação)', () {
+    testWidgets('pedir a recuperação registra o e-mail no serviço', (tester) async {
+      final servico = ServicoAuthFake();
+      await _abrir(tester, RecuperarSenhaTela(servico: servico));
+      await _digitar(tester, 'E-mail', 'mariana@email.com');
+      await _tocar(tester, 'Enviar link');
+      expect(servico.recuperacoesPedidas, ['mariana@email.com']);
+    });
+
+    testWidgets('senha fraca ou diferente mostra erro e não troca nada', (tester) async {
+      final servico = ServicoAuthFake();
+      await _abrir(tester, NovaSenhaTela(servico: servico));
+
+      await _digitar(tester, 'Senha nova', 'curta');
+      await _digitar(tester, 'Repita a senha nova', 'curta');
+      await _tocar(tester, 'Salvar senha');
+      expect(find.textContaining('Senha fraca'), findsOneWidget);
+
+      await _digitar(tester, 'Senha nova', 'SenhaBoa123');
+      await _digitar(tester, 'Repita a senha nova', 'SenhaBoa124');
+      await _tocar(tester, 'Salvar senha');
+      expect(find.textContaining('As senhas não são iguais'), findsOneWidget);
+      expect(servico.senhasDefinidas, isEmpty);
+      expect(find.byType(NovaSenhaTela), findsOneWidget);
+    });
+
+    testWidgets('senha boa: troca, encerra a sessão do link e vai para o login', (tester) async {
+      final servico = ServicoAuthFake(contas: {'mariana@email.com': _senha}, aceitaQualquerLogin: false);
+      await servico.entrarComEmail(email: 'mariana@email.com', senha: _senha);
+      servico.simularLinkDeRecuperacao('mariana@email.com');
+      await _abrir(tester, NovaSenhaTela(servico: servico));
+
+      await _digitar(tester, 'Senha nova', 'SenhaBoa123');
+      await _digitar(tester, 'Repita a senha nova', 'SenhaBoa123');
+      await _tocar(tester, 'Salvar senha');
+
+      expect(servico.senhasDefinidas, ['SenhaBoa123']);
+      expect(servico.sessaoAtual, isNull);
+      expect(find.byType(LoginTela), findsOneWidget);
+      expect(find.textContaining('Senha alterada'), findsOneWidget);
+      // A senha antiga deixa de valer e a nova entra.
+      await expectLater(
+        servico.entrarComEmail(email: 'mariana@email.com', senha: _senha),
+        throwsA(isA<ErroAuth>()),
+      );
+      final sessao = await servico.entrarComEmail(email: 'mariana@email.com', senha: 'SenhaBoa123');
+      expect(sessao.email, 'mariana@email.com');
+    });
+
+    testWidgets('erro do serviço fica na tela e a pessoa pode tentar de novo', (tester) async {
+      final servico = ServicoAuthFake();
+      await _abrir(tester, NovaSenhaTela(servico: servico));
+      await _digitar(tester, 'Senha nova', 'SenhaBoa123');
+      await _digitar(tester, 'Repita a senha nova', 'SenhaBoa123');
+      servico.falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
+      await _tocar(tester, 'Salvar senha');
+      expect(find.text('Sem internet. Confira sua conexão e tente de novo.'), findsOneWidget);
+      expect(find.byType(NovaSenhaTela), findsOneWidget);
+
+      await _tocar(tester, 'Salvar senha');
+      expect(servico.senhasDefinidas, ['SenhaBoa123']);
+      expect(find.byType(LoginTela), findsOneWidget);
+    });
+
+    testWidgets('Cancelar encerra a sessão do link sem trocar a senha', (tester) async {
+      final servico = ServicoAuthFake();
+      await servico.entrarComEmail(email: 'mariana@email.com', senha: _senha);
+      await _abrir(tester, NovaSenhaTela(servico: servico));
+      await _tocar(tester, 'Cancelar');
+      expect(servico.senhasDefinidas, isEmpty);
+      expect(servico.sessaoAtual, isNull);
+      expect(find.byType(LoginTela), findsOneWidget);
+    });
+
+    test('o fake avisa quando o link de recuperação abre o app', () async {
+      final servico = ServicoAuthFake();
+      final recebidos = <void>[];
+      final sub = servico.recuperacaoDeSenha.listen(recebidos.add);
+      servico.simularLinkDeRecuperacao('mariana@email.com');
+      await Future<void>.delayed(Duration.zero);
+      expect(recebidos, hasLength(1));
+      await sub.cancel();
+    });
+  });
 }

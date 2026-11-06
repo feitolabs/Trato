@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dispositivo/abrir_mapa.dart';
 import 'package:trato/telas/profissional_inicio/casca_profissional_tela.dart';
-import 'package:trato/telas/profissional_inicio/dados_exemplo.dart';
+import 'apoio/exemplos/telas/profissional_inicio/dados_exemplo.dart';
 import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
 import 'package:trato/telas/profissional_inicio/inicio_profissional_tela.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';
@@ -65,9 +65,8 @@ void main() {
   });
 
   group('Início do profissional', () {
-    testWidgets('mostra disponibilidade, atendimento, carteira e pedidos',
-        (tester) async {
-      await _abrir(tester, const InicioProfissionalTela());
+    testWidgets('mostra disponibilidade, atendimento, carteira e pedidos', (tester) async {
+      await _abrir(tester, const InicioProfissionalTela(dados: inicioProfissionalExemplo, ));
       expect(find.text('Pedidos perto de você'), findsOneWidget);
       expect(find.text('HOJE · 14H'), findsOneWidget);
       expect(find.text('R\$ 425,00'), findsOneWidget);
@@ -79,7 +78,7 @@ void main() {
     });
 
     testWidgets('pedido aberto não mostra endereço completo', (tester) async {
-      await _abrir(tester, const InicioProfissionalTela());
+      await _abrir(tester, const InicioProfissionalTela(dados: inicioProfissionalExemplo, ));
       // O endereço aparece uma vez só: no atendimento já contratado.
       expect(find.textContaining('Rua '), findsOneWidget);
     });
@@ -93,7 +92,7 @@ void main() {
       PedidoAberto? aberto;
       await _abrir(
         tester,
-        InicioProfissionalTela(
+        InicioProfissionalTela(dados: inicioProfissionalExemplo, 
           aoAlterarDisponivel: (v) => disponivel = v,
           aoFazerCheckIn: () => checkIn = true,
           aoAbrirFiltros: () => filtros = true,
@@ -126,10 +125,8 @@ void main() {
   });
 
   group('Detalhe do pedido', () {
-    testWidgets('mostra só bairro e distância, com aviso do endereço',
-        (tester) async {
-      await _abrir(tester, const DetalhePedidoTela(),
-          tamanho: const Size(390, 2000));
+    testWidgets('mostra só bairro e distância, com aviso do endereço', (tester) async {
+      await _abrir(tester, const DetalhePedidoTela(dados: detalhePedidoExemplo, ), tamanho: const Size(390, 2000));
       expect(find.text('Fecha em 31 horas · 3 de 5 orçaram'), findsOneWidget);
       expect(find.textContaining('Savassi, a 2,1 km'), findsOneWidget);
       expect(
@@ -172,7 +169,7 @@ void main() {
       await tester.tap(find.textContaining('toque para ver no mapa'));
       expect(abertos, [(-19.92, -43.94)]);
 
-      await _abrir(tester, const DetalhePedidoTela(),
+      await _abrir(tester, const DetalhePedidoTela(dados: detalhePedidoExemplo),
           tamanho: const Size(390, 2000));
       expect(find.textContaining('toque para ver no mapa'), findsNothing);
     });
@@ -183,9 +180,7 @@ void main() {
       var orcou = false;
       await _abrir(
         tester,
-        DetalhePedidoTela(
-            aoPerguntar: () => perguntou = true,
-            aoFazerOrcamento: () => orcou = true),
+        DetalhePedidoTela(dados: detalhePedidoExemplo, aoPerguntar: () => perguntou = true, aoFazerOrcamento: () => orcou = true),
         tamanho: const Size(390, 2000),
       );
       await tester.tap(find.text('Perguntar'));
@@ -198,7 +193,7 @@ void main() {
       MotivoRecusa? recusado;
       await _abrir(
         tester,
-        DetalhePedidoTela(aoRecusar: (m) => recusado = m),
+        DetalhePedidoTela(dados: detalhePedidoExemplo, aoRecusar: (m) => recusado = m),
         tamanho: const Size(390, 2000),
       );
       await tester.tap(find.text('Recusar pedido'));
@@ -228,7 +223,7 @@ void main() {
       MotivoRecusa? recusado;
       await _abrir(
         tester,
-        DetalhePedidoTela(aoRecusar: (m) => recusado = m),
+        DetalhePedidoTela(dados: detalhePedidoExemplo, aoRecusar: (m) => recusado = m),
         tamanho: const Size(390, 2000),
       );
       await tester.tap(find.text('Recusar pedido'));
@@ -240,10 +235,8 @@ void main() {
   });
 
   group('Casca do profissional', () {
-    testWidgets('tem as 5 abas e nenhuma mostra tela provisória',
-        (tester) async {
-      await _abrir(tester, const CascaProfissionalTela(),
-          tamanho: const Size(390, 844));
+    testWidgets('tem as 5 abas e nenhuma mostra tela provisória', (tester) async {
+      await _abrir(tester, const CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, ), tamanho: const Size(390, 844));
       expect(find.byType(BarraAbasTrato), findsOneWidget);
       for (final aba in abasProfissional) {
         expect(find.text(aba.rotulo), findsWidgets);
@@ -259,8 +252,7 @@ void main() {
     });
 
     testWidgets('tocar a carteira leva à aba Carteira', (tester) async {
-      await _abrir(tester, const CascaProfissionalTela(),
-          tamanho: const Size(390, 1200));
+      await _abrir(tester, const CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, ), tamanho: const Size(390, 1200));
       await tester.tap(find.text('Em andamento'));
       await tester.pumpAndSettle();
       final barra = tester.widget<BarraAbasTrato>(find.byType(BarraAbasTrato));
@@ -272,7 +264,7 @@ void main() {
       MotivoRecusa? recusado;
       await _abrir(
         tester,
-        CascaProfissionalTela(aoRecusar: (m) => recusado = m),
+        CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, aoRecusar: (m) => recusado = m),
         tamanho: const Size(390, 2000),
       );
       await tester.tap(find.text('Instalar 4 luminárias'));
@@ -296,8 +288,8 @@ void main() {
     'tablet 768x1024': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'casca/início': const CascaProfissionalTela(),
-    'detalhe': const DetalhePedidoTela(),
+    'casca/início': const CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, ),
+    'detalhe': const DetalhePedidoTela(dados: detalhePedidoExemplo, ),
   };
   for (final MapEntry(key: nomeTela, value: tela) in telas.entries) {
     for (final MapEntry(key: nomeTam, value: tam) in tamanhos.entries) {

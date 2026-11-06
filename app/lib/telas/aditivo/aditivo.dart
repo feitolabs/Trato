@@ -43,39 +43,3 @@ abstract interface class ServicoAditivo {
   Future<void> responder(String aditivoId, {required bool aprovar});
 }
 
-/// PROVISÓRIO — só para teste e demonstração.
-class ServicoAditivoFake implements ServicoAditivo {
-  ServicoAditivoFake({this.detalhe, this.falharAoCarregar = false, this.falharAoEnviar = false});
-
-  final DetalheAditivo? detalhe;
-  final bool falharAoCarregar;
-  final bool falharAoEnviar;
-  final List<NovoAditivo> criados = [];
-  final List<(String, bool)> respostas = [];
-
-  @override
-  Future<void> criar(NovoAditivo aditivo) async {
-    if (falharAoEnviar) throw Exception('falha de teste');
-    criados.add(aditivo);
-  }
-
-  @override
-  Future<DetalheAditivo?> carregar(String aditivoId) async {
-    if (falharAoCarregar) throw Exception('falha de teste');
-    return detalhe;
-  }
-
-  @override
-  Future<void> responder(String aditivoId, {required bool aprovar}) async {
-    if (falharAoEnviar) throw Exception('falha de teste');
-    respostas.add((aditivoId, aprovar));
-  }
-}
-
-const aditivoExemplo = DetalheAditivo(
-  id: 'ad-1',
-  pedidoTitulo: 'Troca de tomadas e chuveiro',
-  profissional: 'Carlos',
-  motivo: 'A fiação do chuveiro estava ressecada. Precisei trocar 6 m de cabo 6 mm.',
-  valorCentavos: 4500,
-);
