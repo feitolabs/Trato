@@ -105,6 +105,26 @@ class RepositorioPedidosFake implements RepositorioPedidos {
 }
 
 class RepositorioOrcamentosFake implements RepositorioOrcamentos {
+  /// (pedido, orçamento, valor) de cada contraproposta feita — para os testes.
+  final List<(String, String, int)> contrapropostas = [];
+  final List<(String, String, int)> aceitesDeContraproposta = [];
+
+  @override
+  Future<void> contraproporValor(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    String? mensagem,
+  }) async {
+    contrapropostas.add((pedidoId, orcamentoId, valorCentavos));
+  }
+
+  @override
+  Future<void> aceitarContraproposta(
+      String pedidoId, String orcamentoId, int valorCentavos) async {
+    aceitesDeContraproposta.add((pedidoId, orcamentoId, valorCentavos));
+  }
+
   final List<String> aceitos = [];
 
   @override

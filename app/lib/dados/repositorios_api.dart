@@ -490,6 +490,33 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
 
   final ClienteApi _api;
 
+  /// `POST /v1/pedidos/{id}/orcamentos/{orc}/contraproposta` `{valor_centavos, mensagem?}`.
+  @override
+  Future<void> contraproporValor(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    String? mensagem,
+  }) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/orcamentos/$orcamentoId/contraproposta',
+      corpo: {
+        'valor_centavos': valorCentavos,
+        if (mensagem != null && mensagem.trim().isNotEmpty) 'mensagem': mensagem.trim(),
+      },
+    );
+  }
+
+  /// `POST .../contraproposta/aceitar` `{valor_centavos}`: nova versão do orçamento.
+  @override
+  Future<void> aceitarContraproposta(
+      String pedidoId, String orcamentoId, int valorCentavos) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/orcamentos/$orcamentoId/contraproposta/aceitar',
+      corpo: {'valor_centavos': valorCentavos},
+    );
+  }
+
   /// `GET /v1/pedidos/{id}/orcamentos` (do mais barato ao mais caro) e, para cada um,
   /// `GET /v1/orcamentos/{id}` (itens, validade, fora do escopo). Falha no detalhe de um
   /// orçamento não derruba a lista: ele só aparece sem detalhe.
@@ -681,6 +708,19 @@ class RepositorioChatApi implements RepositorioChat {
         temArquivoImagem(t);
   }
 
+  static MensagemChat _mensagem(Map<String, dynamic> m) {
+    final bruto = (m['texto'] as String?) ?? '';
+    final (contra, texto) = ContrapropostaChat.ler(bruto);
+    return MensagemChat(
+      tipo: contra == null && _ehMensagemFoto(bruto) ? TipoMensagem.foto : TipoMensagem.texto,
+      hora: _hora(DateTime.parse(m['enviada_em'] as String).toLocal()),
+      texto: texto,
+      minha: m['minha'] == true,
+      lida: m['lida_em'] != null,
+      contraproposta: contra,
+    );
+  }
+
   static String _iniciaisDe(String nome) {
     final partes = nome.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (partes.isEmpty) return '#';
@@ -735,16 +775,7 @@ class RepositorioChatApi implements RepositorioChat {
       numeroPedido: numero,
       situacao: situacao,
       mensagens: [
-        for (final m in mensagens)
-          MensagemChat(
-            tipo: _ehMensagemFoto((m['texto'] as String?) ?? '')
-                ? TipoMensagem.foto
-                : TipoMensagem.texto,
-            hora: _hora(DateTime.parse(m['enviada_em'] as String).toLocal()),
-            texto: m['texto'] as String,
-            minha: m['minha'] == true,
-            lida: m['lida_em'] != null,
-          ),
+        for (final m in mensagens) _mensagem(m),
       ],
       respostasRapidas: textos.respostasRapidas,
     );
@@ -953,6 +984,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       distanciaKm: (j['distancia_km'] as num?)?.toDouble(),
       latitude: (j['local_aprox_lat'] as num?)?.toDouble(),
       longitude: (j['local_aprox_lng'] as num?)?.toDouble(),
+      clienteId: j['cliente_id'] as String?,
+      clienteNome: j['cliente_nome'] as String?,
     );
   }
 

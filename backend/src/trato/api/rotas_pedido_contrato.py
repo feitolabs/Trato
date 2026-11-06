@@ -21,14 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
-from trato.api.repositorios import Contrato
+from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.servicos import carregar_pedido
 from trato.pagamentos.custo import MeioPagamento
-from trato.pagamentos.provedor.base import ErroProvedor
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
+from trato.pagamentos.provedor.base import ErroProvedor
 from trato.pedidos.estados import Estado, Pedido
 from trato.persistencia.erros import NaoEncontrado
 from trato.persistencia.usuarios import nome_de_exibicao
@@ -323,7 +323,9 @@ def criar_cobranca(
         try:
             preparo = servico.provedor.preparar_cartao(usuario.id)
         except ErroProvedor as erro:
-            raise HTTPException(502, "O parceiro de pagamento não respondeu. Tente de novo.") from erro
+            raise HTTPException(
+                502, "O parceiro de pagamento não respondeu. Tente de novo."
+            ) from erro
     cobranca = servico.cobrar(
         contexto,
         pedido,
@@ -729,6 +731,165 @@ def avaliar_contrato(
     return rotas_app.avaliar(contrato_id, corpo, usuario, contexto)
 
 
+# --- Contraproposta de valor -------------------------------------------------------------
+#
+# O cliente propõe um valor menor para um orçamento; o profissional aceita (vira uma nova versão
+# do orçamento, com um item só, no valor combinado) ou responde pelo chat. Nada muda no banco:
+# a proposta fica no chat, com uma marca no começo do texto que o app esconde.
+
+MARCA_CONTRAPROPOSTA = "[contraproposta:"
+
+
+def _reais(centavos: int) -> str:
+    inteiro = f"{centavos // 100:,}".replace(",", ".")
+    return f"R$ {inteiro},{centavos % 100:02d}"
+
+
+class ContrapropostaIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    valor_centavos: StrictInt = Field(
+        gt=0, le=TETO_CENTAVOS, description="O valor que o cliente propõe."
+    )
+    mensagem: str | None = Field(default=None, max_length=500)
+
+
+class ContrapropostaOut(BaseModel):
+    mensagem_id: int
+    valor_centavos: int
+    orcamento_id: str
+
+
+class AceiteContrapropostaIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    valor_centavos: StrictInt = Field(gt=0, le=TETO_CENTAVOS)
+
+
+class AceiteContrapropostaOut(BaseModel):
+    orcamento_id: str
+    valor_centavos: int
+    versao: int | None = None
+
+
+def _orcamento_do_pedido(contexto: Contexto, pedido: Pedido, orcamento_id: str):  # type: ignore[no-untyped-def]
+    detalhe = contexto.orcamentos.detalhe(orcamento_id)
+    if detalhe is None or detalhe.pedido_id != pedido.id:
+        raise HTTPException(404, "Orçamento não encontrado.")
+    if detalhe.status != "enviado":
+        raise HTTPException(409, "Este orçamento foi substituído por uma versão mais nova.")
+    return detalhe
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta",
+    response_model=ContrapropostaOut,
+    status_code=201,
+    summary="Cliente propõe um valor menor para o orçamento",
+    description=(
+        "Só o cliente dono do pedido, enquanto o pedido ainda recebe orçamentos. O valor precisa "
+        "ser menor que o do orçamento. A proposta vai para a conversa com aquele profissional."
+    ),
+)
+def contraproposta(
+    pedido_id: str,
+    orcamento_id: str,
+    corpo: ContrapropostaIn,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> ContrapropostaOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None or pedido.cliente_id != usuario.id:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido já não aceita contraproposta.")
+    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
+    if corpo.valor_centavos >= detalhe.valor_centavos:
+        raise HTTPException(
+            422, f"A contraproposta precisa ser menor que {_reais(detalhe.valor_centavos)}."
+        )
+    extra = ""
+    if corpo.mensagem:
+        extra = " " + limpar_texto(corpo.mensagem, "mensagem", 500, obter_config_seguranca())
+    texto = (
+        f"{MARCA_CONTRAPROPOSTA}{orcamento_id}:{corpo.valor_centavos}] "
+        f"Contraproposta de {_reais(corpo.valor_centavos)} "
+        f"(o orçamento atual é {_reais(detalhe.valor_centavos)}).{extra}"
+    )
+    conversa = contexto.conversas.abrir(pedido.id, detalhe.profissional_id)
+    mensagem_id = contexto.conversas.enviar(conversa, usuario.id, texto)
+    return ContrapropostaOut(
+        mensagem_id=mensagem_id, valor_centavos=corpo.valor_centavos, orcamento_id=orcamento_id
+    )
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta/aceitar",
+    response_model=AceiteContrapropostaOut,
+    status_code=201,
+    summary="Profissional aceita a contraproposta e atualiza o orçamento",
+    description=(
+        "Só o autor do orçamento. O valor tem de ser o de uma contraproposta que o cliente "
+        "mandou na conversa. Cria uma nova versão do orçamento com um item só, no valor "
+        "combinado, mantendo prazo e garantia."
+    ),
+)
+def aceitar_contraproposta(
+    pedido_id: str,
+    orcamento_id: str,
+    corpo: AceiteContrapropostaIn,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> AceiteContrapropostaOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido já não recebe mudança no orçamento.")
+    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
+    if detalhe.profissional_id != usuario.id:
+        raise HTTPException(404, "Orçamento não encontrado.")
+    conversa = contexto.conversas.abrir(pedido.id, usuario.id)
+    marca = f"{MARCA_CONTRAPROPOSTA}{orcamento_id}:{corpo.valor_centavos}]"
+    houve = any(
+        m.autor_id == pedido.cliente_id and m.texto.startswith(marca)
+        for m in contexto.conversas.listar(conversa)
+    )
+    if not houve:
+        raise HTTPException(422, "O cliente não fez essa contraproposta.")
+    if corpo.valor_centavos >= detalhe.valor_centavos:
+        raise HTTPException(409, "O orçamento já está nesse valor ou abaixo.")
+    novo_id = contexto.orcamentos.enviar(
+        pedido_id=pedido.id,
+        profissional_id=usuario.id,
+        itens=[
+            ItemOrcamento(
+                tipo="outro",
+                descricao="Valor combinado na contraproposta",
+                quantidade=Decimal(1),
+                valor_unitario_centavos=corpo.valor_centavos,
+            )
+        ],
+        agora=contexto.agora(),
+        prazo_execucao_dias=detalhe.prazo_execucao_dias,
+        validade_ate=detalhe.validade_ate,
+        garantia_dias=detalhe.garantia_dias,
+        fora_do_escopo=detalhe.fora_do_escopo,
+        observacoes=detalhe.observacoes,
+    )
+    contexto.conversas.enviar(
+        conversa,
+        usuario.id,
+        f"Contraproposta aceita. Novo orçamento de {_reais(corpo.valor_centavos)}.",
+    )
+    novo = contexto.orcamentos.detalhe(novo_id)
+    return AceiteContrapropostaOut(
+        orcamento_id=novo_id,
+        valor_centavos=corpo.valor_centavos,
+        versao=novo.versao if novo else None,
+    )
+
+
 # --- Pedidos abertos e recusa -----------------------------------------------------------
 
 
@@ -751,7 +912,9 @@ def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * 6371.0 * math.asin(math.sqrt(a))
 
 
-def _saida_aberto(p: PedidoAberto, lat: float | None, lng: float | None) -> PedidoAbertoOut:
+def _saida_aberto(
+    p: PedidoAberto, lat: float | None, lng: float | None, contexto: Contexto | None = None
+) -> PedidoAbertoOut:
     km = None
     if (
         lat is not None
@@ -760,7 +923,13 @@ def _saida_aberto(p: PedidoAberto, lat: float | None, lng: float | None) -> Pedi
         and p.local_aprox_lng is not None
     ):
         km = round(_distancia_km(lat, lng, p.local_aprox_lat, p.local_aprox_lng), 1)
-    return PedidoAbertoOut(**vars(p), distancia_km=km)
+    nome = None
+    if contexto is not None and p.cliente_id:
+        detalhe = contexto.usuarios.detalhe(p.cliente_id)
+        partes = (detalhe.nome or "").split() if detalhe else []
+        if partes:
+            nome = partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
+    return PedidoAbertoOut(**vars(p), distancia_km=km, cliente_nome=nome)
 
 
 def _teto_da_faixa(p: PedidoAberto) -> int:
@@ -831,12 +1000,12 @@ def pedidos_abertos(
             )
         )
     elif ordenar is OrdemPedidos.PROXIMOS and lat is not None and lng is not None:
-        saida = [_saida_aberto(p, lat, lng) for p in itens]
+        saida = [_saida_aberto(p, lat, lng, contexto) for p in itens]
         saida.sort(key=lambda o: (o.distancia_km is None, o.distancia_km or 0.0))
         return saida[:limite]
     else:
         itens.sort(key=lambda p: p.aberto_em, reverse=True)
-    return [_saida_aberto(p, lat, lng) for p in itens[:limite]]
+    return [_saida_aberto(p, lat, lng, contexto) for p in itens[:limite]]
 
 
 class PedidoAbertoDetalheOut(PedidoAbertoOut):
@@ -871,7 +1040,7 @@ def pedido_aberto(
         raise HTTPException(404, "Pedido não encontrado.")
     orcamentos = contexto.orcamentos.do_pedido(achado.id)
     return PedidoAbertoDetalheOut(
-        **_saida_aberto(achado, lat, lng).model_dump(),
+        **_saida_aberto(achado, lat, lng, contexto).model_dump(),
         orcamentos_recebidos=len(orcamentos),
         ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
     )

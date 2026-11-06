@@ -3,11 +3,19 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../../dispositivo/abrir_mapa.dart';
+import '../cliente/avatar_de_usuario.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_profissional.dart';
 import 'recusar_pedido_folha.dart';
+
+String _iniciais(String nome) {
+  final partes = nome.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (partes.isEmpty) return 'C';
+  final a = partes.first[0].toUpperCase();
+  return partes.length == 1 ? a : '$a${partes.last[0].toUpperCase()}';
+}
 
 /// Tela 24 do protótipo: detalhe de um pedido aberto, visto pelo profissional.
 /// Mostra só bairro e distância: o endereço completo aparece depois da contratação.
@@ -58,6 +66,25 @@ class DetalhePedidoTela extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (pedido.clienteId != null) ...[
+                      Row(
+                        children: [
+                          AvatarDeUsuario(
+                            iniciais: _iniciais(pedido.clienteNome ?? ''),
+                            usuarioId: pedido.clienteId,
+                            tamanho: 40,
+                          ),
+                          const SizedBox(width: EspacosTrato.x3),
+                          Expanded(
+                            child: Text(
+                              pedido.clienteNome ?? 'Cliente',
+                              style: TipografiaTrato.corpoForte,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: EspacosTrato.x3),
+                    ],
                     Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
                     const SizedBox(height: EspacosTrato.x2),
                     Text(

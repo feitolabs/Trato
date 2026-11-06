@@ -154,8 +154,8 @@ class PedidosPostgres:
             linhas = con.execute(
                 "select p.id, p.titulo, p.descricao, p.bairro, p.categoria_id, "
                 "p.faixa_preco_min_centavos, p.faixa_preco_max_centavos, p.urgente, "
-                "p.prazo_desejado, p.criado_em, p.local_aprox_lat, p.local_aprox_lng "
-                "from public.pedidos p "
+                "p.prazo_desejado, p.criado_em, p.local_aprox_lat, p.local_aprox_lng, "
+                "p.cliente_id from public.pedidos p "
                 "where p.status = 'aberto' and p.cliente_id <> %s "
                 "and exists (select 1 from public.profissional_categorias pc "
                 "            where pc.profissional_id = %s and pc.categoria_id = p.categoria_id "
@@ -180,6 +180,7 @@ class PedidosPostgres:
                 l["criado_em"],
                 l["local_aprox_lat"],
                 l["local_aprox_lng"],
+                str(l["cliente_id"]),
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )

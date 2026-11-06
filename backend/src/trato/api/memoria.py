@@ -98,6 +98,7 @@ class PedidosEmMemoria:
                     aberto_em=p.aberto_em,
                     local_aprox_lat=d.local_aprox_lat if d else None,
                     local_aprox_lng=d.local_aprox_lng if d else None,
+                    cliente_id=p.cliente_id,
                 )
             )
         return tuple(saida)

@@ -107,6 +107,17 @@ abstract interface class RepositorioOrcamentos {
 
   /// Só pede ao backend. Taxa e líquido nunca são calculados no app.
   Future<void> aceitar(String pedidoId, String orcamentoId);
+
+  /// Cliente propõe um valor menor (vai para a conversa do profissional). O backend valida.
+  Future<void> contraproporValor(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    String? mensagem,
+  });
+
+  /// Profissional aceita a contraproposta: o orçamento ganha uma nova versão no valor combinado.
+  Future<void> aceitarContraproposta(String pedidoId, String orcamentoId, int valorCentavos);
 }
 
 enum StatusPagamento { aguardando, pago, falhou }

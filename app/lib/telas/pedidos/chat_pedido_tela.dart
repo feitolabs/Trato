@@ -21,6 +21,7 @@ class ChatPedidoTela extends StatefulWidget {
     this.aoCapturarFoto,
     this.aoEnviarFoto,
     this.aoRecarregar,
+    this.aoAceitarContraproposta,
     this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
@@ -31,6 +32,9 @@ class ChatPedidoTela extends StatefulWidget {
   final Future<String?> Function()? aoCapturarFoto;
   final ValueChanged<String>? aoEnviarFoto;
   final Future<ConversaPedido> Function()? aoRecarregar;
+
+  /// Profissional aceita a contraproposta do cliente (só aparece nas mensagens que ele recebe).
+  final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
   final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
@@ -127,7 +131,16 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
                   padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
                   children: [
                     // reverse: a lista começa colada embaixo, perto do campo de envio.
-                    for (final m in _mensagens.reversed) _LinhaMensagem(mensagem: m),
+                    for (final m in _mensagens.reversed)
+                      _LinhaMensagem(
+                        mensagem: m,
+                        aoAceitarContraproposta: widget.aoAceitarContraproposta == null
+                            ? null
+                            : (c) async {
+                                await widget.aoAceitarContraproposta!(c);
+                                await _sincronizar();
+                              },
+                      ),
                   ],
                 ),
               ),
@@ -232,9 +245,10 @@ class _AvisoPrivacidade extends StatelessWidget {
 }
 
 class _LinhaMensagem extends StatelessWidget {
-  const _LinhaMensagem({required this.mensagem});
+  const _LinhaMensagem({required this.mensagem, this.aoAceitarContraproposta});
 
   final MensagemChat mensagem;
+  final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
 
   @override
   Widget build(BuildContext context) {
@@ -270,11 +284,35 @@ class _LinhaMensagem extends StatelessWidget {
               borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
               border: minha ? null : Border.all(color: CoresTrato.borda),
             ),
-            child: Text(
-              mensagem.texto ?? '',
-              style: TipografiaTrato.corpo.copyWith(
-                color: minha ? CoresTrato.creme : CoresTrato.petroleo,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (mensagem.contraproposta != null) ...[
+                  Text(
+                    'Contraproposta',
+                    style: TipografiaTrato.sobretitulo.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                    ),
+                  ),
+                  const SizedBox(height: EspacosTrato.x1),
+                ],
+                Text(
+                  mensagem.texto ?? '',
+                  style: TipografiaTrato.corpo.copyWith(
+                    color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                  ),
+                ),
+                if (mensagem.contraproposta != null &&
+                    !minha &&
+                    aoAceitarContraproposta != null) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  FilledButton(
+                    onPressed: () => aoAceitarContraproposta!(mensagem.contraproposta!),
+                    child: const Text('Aceitar e atualizar orçamento'),
+                  ),
+                ],
+              ],
             ),
           );
 

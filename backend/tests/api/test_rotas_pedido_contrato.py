@@ -428,6 +428,15 @@ def test_distancia_ate_o_pedido_so_com_a_posicao_do_profissional(amb):
     assert chamar(amb, "GET", url + "?lat=95&lng=0", "t-prof").status_code == 422
 
 
+def test_pedido_aberto_traz_quem_pediu_so_com_nome_curto(abertos):
+    r = chamar(abertos, "GET", "/v1/profissional/pedidos-abertos", "t-prof").json()
+    assert all(p["cliente_id"] for p in r)
+    assert all("cpf" not in p and "telefone" not in p and "email" not in p for p in r)
+    assert all(p["cliente_nome"] is None or len(p["cliente_nome"].split()) <= 2 for p in r)
+    det = chamar(abertos, "GET", "/v1/profissional/pedidos-abertos/a", "t-prof").json()
+    assert det["cliente_id"] == r[0]["cliente_id"] or det["cliente_id"]
+
+
 def test_detalhe_do_pedido_aberto_com_quantos_orcaram(abertos):
     base = "/v1/profissional/pedidos-abertos"
     r = chamar(abertos, "GET", base + "/a", "t-prof")
@@ -435,7 +444,9 @@ def test_detalhe_do_pedido_aberto_com_quantos_orcaram(abertos):
     corpo = r.json()
     assert corpo["id"] == "a" and corpo["titulo"] == "Pedido a" and corpo["bairro"] == "Centro"
     assert corpo["orcamentos_recebidos"] == 0 and corpo["ja_orcou"] is False
-    assert "endereco" not in corpo and "cliente_id" not in corpo
+    # Decisão de produto: o profissional vê quem pediu (id + nome curto, para a foto), mas nunca
+    # o endereço nem dado de contato antes da contratação.
+    assert "endereco" not in corpo and "cpf" not in corpo and "telefone" not in corpo
     assert chamar(abertos, "GET", base + "/nao-existe", "t-prof").status_code == 404
     assert chamar(abertos, "GET", base + "/a", "t-cliente").status_code == 403
     assert abertos.cliente.get(base + "/a").status_code == 401

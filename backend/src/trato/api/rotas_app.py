@@ -181,6 +181,12 @@ class PedidoAbertoOut(BaseModel):
         description="Distância em linha reta até o ponto aproximado do pedido. Só vem quando o "
         "profissional manda `lat` e `lng`.",
     )
+    cliente_id: str | None = Field(
+        default=None, description="Quem pediu, para o app buscar a foto de perfil."
+    )
+    cliente_nome: str | None = Field(
+        default=None, description="Primeiro nome e inicial do sobrenome (nunca dado de contato)."
+    )
 
 
 class ResumoOrcamentoOut(BaseModel):

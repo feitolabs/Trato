@@ -5,6 +5,7 @@ import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
 import '../../dispositivo/folha_cartao.dart';
+import '../orcamentos/folha_contraproposta.dart';
 import '../../auth/servico_auth.dart';
 import '../../dados/repositorios_trato.dart';
 import '../../dados/sessao.dart';
@@ -1146,10 +1147,26 @@ abstract final class RotasTrato {
                       context,
                       _chat(pedidoId, profissionalId: o.profissionalId),
                     ),
-                    aoFazerContraproposta: (o) => _abrir<void>(
-                      context,
-                      _chat(pedidoId, profissionalId: o.profissionalId),
-                    ),
+                    aoFazerContraproposta: (o) async {
+                      final proposta = await pedirContraproposta(context, o.totalCentavos);
+                      if (proposta == null || !context.mounted) return;
+                      final ok = await _tentar(
+                        context,
+                        () => repos.orcamentos.contraproporValor(
+                          pedidoId,
+                          o.id,
+                          proposta.$1,
+                          mensagem: proposta.$2,
+                        ),
+                      );
+                      if (ok && context.mounted) {
+                        _avisoSimples(context, 'Contraproposta enviada ao profissional.');
+                        _abrir<void>(
+                          context,
+                          _chat(pedidoId, profissionalId: o.profissionalId),
+                        );
+                      }
+                    },
                     aoAceitar: (o) async {
                       // Só pede ao backend; taxa e líquido são dele.
                       final ok = await _tentar(
@@ -1293,6 +1310,16 @@ abstract final class RotasTrato {
               ? () =>
                   repos.chat.conversa(pedidoId, profissionalId: profissionalId)
               : null,
+          aoAceitarContraproposta: (c) async {
+            final ok = await _tentar(
+              context,
+              () => repos.orcamentos
+                  .aceitarContraproposta(pedidoId, c.orcamentoId, c.valorCentavos),
+            );
+            if (ok && context.mounted) {
+              _avisoSimples(context, 'Orçamento atualizado para o valor combinado.');
+            }
+          },
           aoEnviar: (texto) => _tentar(
             context,
             () => repos.chat

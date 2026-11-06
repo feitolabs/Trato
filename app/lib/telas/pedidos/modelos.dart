@@ -80,6 +80,24 @@ class PedidoEmExecucao {
 
 enum TipoMensagem { texto, foto, sistema }
 
+/// Proposta de valor menor feita pelo cliente, vinda na conversa (o backend marca o texto).
+class ContrapropostaChat {
+  const ContrapropostaChat({required this.orcamentoId, required this.valorCentavos});
+
+  final String orcamentoId;
+  final int valorCentavos;
+
+  /// Lê `[contraproposta:<orcamento>:<centavos>] texto`. Devolve a proposta e o texto limpo.
+  static (ContrapropostaChat?, String) ler(String texto) {
+    final m = RegExp(r'^\[contraproposta:([^:\]]+):(\d+)\]\s*').firstMatch(texto);
+    if (m == null) return (null, texto);
+    return (
+      ContrapropostaChat(orcamentoId: m.group(1)!, valorCentavos: int.parse(m.group(2)!)),
+      texto.substring(m.end),
+    );
+  }
+}
+
 class MensagemChat {
   const MensagemChat({
     required this.tipo,
@@ -87,7 +105,11 @@ class MensagemChat {
     this.texto,
     this.minha = false,
     this.lida = false,
+    this.contraproposta,
   });
+
+  /// Preenchida quando a mensagem é uma contraproposta de valor.
+  final ContrapropostaChat? contraproposta;
 
   final TipoMensagem tipo;
   final String hora;

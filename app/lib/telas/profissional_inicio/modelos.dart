@@ -53,7 +53,13 @@ class PedidoAberto {
     this.urgente = false,
     this.latitude,
     this.longitude,
+    this.clienteId,
+    this.clienteNome,
   });
+
+  /// Quem pediu (foto de perfil e primeiro nome). Nunca contato.
+  final String? clienteId;
+  final String? clienteNome;
 
   final String id;
   final String titulo;
