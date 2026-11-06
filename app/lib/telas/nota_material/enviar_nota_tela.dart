@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
 import '../profissional/dinheiro.dart';
@@ -97,11 +98,16 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
         _enviada = true;
       });
       widget.aoEnviada?.call();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // Recusa do backend (ex.: serviço ainda não iniciado): mostra o motivo, não "conexão".
+      final motivo = e is ErroTrato && e.tipo != TipoErro.semInternet && e.mensagem.isNotEmpty
+          ? e.mensagem
+          : null;
       setState(() {
         _enviando = false;
-        _erroEnvio = 'Não foi possível enviar a nota. Confira sua conexão e tente de novo.';
+        _erroEnvio =
+            motivo ?? 'Não foi possível enviar a nota. Confira sua conexão e tente de novo.';
       });
     }
   }

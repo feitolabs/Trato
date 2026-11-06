@@ -296,6 +296,33 @@ def _em_andamento(c) -> str:
     return pedido_id
 
 
+def test_nota_com_foto_ja_enviada_reaproveita_a_midia(cenario):
+    """Pelo app a foto sobe antes (linha em `midias`) e a nota aponta para ela. Antes, a nota
+    inseria o mesmo caminho de novo e o app via 409 'Esse registro já existe'."""
+    c = cenario
+    pedido_id = _em_andamento(c)
+    caminho = f"{pedido_id}/nota-{uuid.uuid4().hex}.jpg"
+    with c.local.admin() as con:
+        con.execute(
+            "insert into public.midias (pedido_id, enviada_por, finalidade, storage_path) "
+            "values (%s, %s, 'nota_material', %s)",
+            (pedido_id, c.ids["profissional"], caminho),
+        )
+    corpo = {
+        "foto_storage_path": caminho,
+        "itens": [{"descricao": "Tomada", "quantidade": 1, "valor_unitario_centavos": 4_500}],
+    }
+    url = f"/v1/contratos/{pedido_id}/notas-material"
+    r = post(c, url, "profissional", corpo)
+    assert r.status_code == 201, r.text
+    assert r.json()["total_centavos"] == 4_500
+    with c.local.admin() as con:
+        linhas = con.execute(
+            "select count(*) from public.midias where storage_path = %s", (caminho,)
+        ).fetchone()[0]
+    assert linhas == 1
+
+
 def test_garantia_aditivo_e_nota_de_material(cenario):
     c = cenario
     pedido_id = _em_andamento(c)

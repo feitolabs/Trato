@@ -173,11 +173,19 @@ class ExecucaoPostgres:
             ).fetchone()
             if contrato is None:
                 raise NaoEncontrado("Este pedido ainda não tem contrato.")
+            # A foto costuma já ter sido enviada pelo serviço de upload (`midia_id`): reaproveita
+            # a linha em vez de inserir de novo o mesmo caminho (violaria a unicidade).
             midia = con.execute(
-                "insert into public.midias (pedido_id, enviada_por, finalidade, storage_path) "
-                "values (%s, %s, 'nota_material', %s) returning id",
+                "select id from public.midias where pedido_id = %s and enviada_por = %s "
+                "and finalidade = 'nota_material' and storage_path = %s limit 1",
                 (pedido, profissional, foto_storage_path),
             ).fetchone()
+            if midia is None:
+                midia = con.execute(
+                    "insert into public.midias (pedido_id, enviada_por, finalidade, storage_path) "
+                    "values (%s, %s, 'nota_material', %s) returning id",
+                    (pedido, profissional, foto_storage_path),
+                ).fetchone()
             nota = con.execute(
                 "insert into public.notas_material (contrato_id, aditivo_id, enviada_por, "
                 "midia_id, total_centavos) values (%s, %s, %s, %s, %s) returning id",
