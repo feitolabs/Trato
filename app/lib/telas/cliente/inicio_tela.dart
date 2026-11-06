@@ -40,7 +40,8 @@ class InicioTela extends StatelessWidget {
     final recentesBrutos = dados?.recentes ?? const <ServicoRecente>[];
     final recentes = [
       for (final r in recentesBrutos)
-        if ((andamento?.pedidoId == null || r.pedidoId != andamento?.pedidoId) &&
+        if ((andamento?.pedidoId == null ||
+                r.pedidoId != andamento?.pedidoId) &&
             (andamento == null || r.titulo != andamento.titulo))
           r,
     ];
@@ -48,7 +49,8 @@ class InicioTela extends StatelessWidget {
         ? const <CategoriaServico>[]
         : [
             ...dados!.categorias.take(7),
-            if (dados!.categorias.isNotEmpty) const CategoriaServico('Ver todas', Icons.grid_view),
+            if (dados!.categorias.isNotEmpty)
+              const CategoriaServico('Ver todas', Icons.grid_view),
           ];
     return Scaffold(
       body: SafeArea(
@@ -71,7 +73,8 @@ class InicioTela extends StatelessWidget {
                                 .copyWith(color: CoresTrato.textoSecundario),
                           ),
                           const SizedBox(height: EspacosTrato.x1),
-                          Text('O que você precisa hoje?', style: TipografiaTrato.tituloGrande),
+                          Text('O que você precisa hoje?',
+                              style: TipografiaTrato.tituloGrande),
                         ],
                       ),
                     ),
@@ -99,13 +102,15 @@ class InicioTela extends StatelessWidget {
                     children: [
                       Text(
                         'Descreva o problema',
-                        style: TipografiaTrato.titulo.copyWith(color: CoresTrato.creme),
+                        style: TipografiaTrato.titulo
+                            .copyWith(color: CoresTrato.creme),
                       ),
                       const SizedBox(height: EspacosTrato.x3),
                       Text(
                         'Receba até 5 orçamentos de profissionais com identidade verificada. '
                         'O pagamento é processado por parceiro e acompanhado no app.',
-                        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
+                        style: TipografiaTrato.corpo
+                            .copyWith(color: CoresTrato.creme),
                       ),
                       const SizedBox(height: EspacosTrato.x5),
                       BotaoSecundario(
@@ -124,18 +129,21 @@ class InicioTela extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(andamento.titulo, style: TipografiaTrato.tituloCartao),
+                        Text(andamento.titulo,
+                            style: TipografiaTrato.tituloCartao),
                         const SizedBox(height: EspacosTrato.x2),
                         Text(
                           andamento.situacao,
-                          style:
-                              TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                          style: TipografiaTrato.corpo
+                              .copyWith(color: CoresTrato.textoSecundario),
                         ),
                         if (andamento.aviso.isNotEmpty) ...[
                           const SizedBox(height: EspacosTrato.x2),
                           Align(
                             alignment: Alignment.centerLeft,
-                            child: ChipStatus(texto: andamento.aviso, tipo: TipoStatus.destaque),
+                            child: ChipStatus(
+                                texto: andamento.aviso,
+                                tipo: TipoStatus.destaque),
                           ),
                         ],
                       ],
@@ -158,7 +166,9 @@ class InicioTela extends StatelessWidget {
                   const SizedBox(height: EspacosTrato.x6),
                   Row(
                     children: [
-                      Expanded(child: Text('Serviços recentes', style: TipografiaTrato.titulo)),
+                      Expanded(
+                          child: Text('Serviços recentes',
+                              style: TipografiaTrato.titulo)),
                       if (aoVerServicos != null)
                         BotaoLink(texto: 'Ver todos', aoTocar: aoVerServicos),
                     ],
@@ -222,17 +232,21 @@ class _GradeCategorias extends StatelessWidget {
       children: [
         for (var inicio = 0; inicio < itens.length; inicio += _porLinha) ...[
           if (inicio > 0) const SizedBox(height: EspacosTrato.x2),
-          Row(
-            children: [
-              for (var i = inicio; i < inicio + _porLinha; i++) ...[
-                if (i > inicio) const SizedBox(width: EspacosTrato.x2),
-                Expanded(
-                  child: i < itens.length
-                      ? _Categoria(categoria: itens[i], aoTocar: aoTocar)
-                      : const SizedBox.shrink(),
-                ),
+          // Cartões da mesma linha com a mesma altura, tenha o nome 1 ou 2 linhas.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = inicio; i < inicio + _porLinha; i++) ...[
+                  if (i > inicio) const SizedBox(width: EspacosTrato.x2),
+                  Expanded(
+                    child: i < itens.length
+                        ? _Categoria(categoria: itens[i], aoTocar: aoTocar)
+                        : const SizedBox.shrink(),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ],
       ],
@@ -267,15 +281,20 @@ class _Categoria extends StatelessWidget {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(categoria.icone, color: CoresTrato.petroleo),
                 const SizedBox(height: EspacosTrato.x2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    categoria.nome,
-                    maxLines: 1,
-                    style: TipografiaTrato.corpoPequeno.copyWith(fontWeight: FontWeight.w500),
+                // Mesmo tamanho em todas: nome longo quebra em 2 linhas em vez de encolher a fonte.
+                Text(
+                  categoria.nome,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TipografiaTrato.corpoPequeno.copyWith(
+                    fontSize: 12,
+                    height: 1.25,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],

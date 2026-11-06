@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../tema/tema.dart';
 
-/// Animação de pulso suave (shimmer) para elementos de esqueleto.
+/// Brilho que atravessa os blocos cinza (shimmer), em loop, enquanto a tela carrega.
+///
+/// Só os [BlocoEsqueleto] de dentro brilham; o cartão em volta fica parado. Com "remover
+/// animações" ligado no aparelho, os blocos ficam parados (acessibilidade).
 class PulsoEsqueleto extends StatefulWidget {
   const PulsoEsqueleto({super.key, required this.child});
 
@@ -16,13 +19,19 @@ class _PulsoEsqueletoState extends State<PulsoEsqueleto>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controlador = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat(reverse: true);
+    duration: const Duration(milliseconds: 1400),
+  );
 
-  late final Animation<double> _opacidade = Tween<double>(
-    begin: 0.45,
-    end: 0.90,
-  ).animate(CurvedAnimation(parent: _controlador, curve: Curves.easeInOut));
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final semAnimacao = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (semAnimacao) {
+      _controlador.stop();
+    } else if (!_controlador.isAnimating) {
+      _controlador.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -31,12 +40,26 @@ class _PulsoEsqueletoState extends State<PulsoEsqueleto>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return FadeTransition(opacity: _opacidade, child: widget.child);
-  }
+  Widget build(BuildContext context) =>
+      _AnimacaoEsqueleto(animacao: _controlador, child: widget.child);
+}
+
+class _AnimacaoEsqueleto extends InheritedWidget {
+  const _AnimacaoEsqueleto({required this.animacao, required super.child});
+
+  final Animation<double> animacao;
+
+  static Animation<double>? de(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_AnimacaoEsqueleto>()
+      ?.animacao;
+
+  @override
+  bool updateShouldNotify(_AnimacaoEsqueleto antigo) =>
+      antigo.animacao != animacao;
 }
 
 /// Bloco base de esqueleto com cantos arredondados e cor dos tokens do Trato.
+/// Dentro de um [PulsoEsqueleto], uma faixa clara passa por ele da esquerda para a direita.
 class BlocoEsqueleto extends StatelessWidget {
   const BlocoEsqueleto({
     super.key,
@@ -53,12 +76,37 @@ class BlocoEsqueleto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: largura,
-      height: altura,
-      decoration: BoxDecoration(
-        color: cor ?? CoresTrato.borda.withValues(alpha: 0.6),
+    final base = cor ?? CoresTrato.borda;
+    final brilho = Color.lerp(base, CoresTrato.superficie, 0.75)!;
+    final animacao = _AnimacaoEsqueleto.de(context);
+    BoxDecoration decoracao(double t) {
+      // t vai de 0 a 1: a faixa clara entra pela esquerda e sai pela direita.
+      final centro = -1.0 + 3.0 * t;
+      return BoxDecoration(
         borderRadius: BorderRadius.circular(raio),
+        gradient: LinearGradient(
+          begin: Alignment(centro - 1.2, 0),
+          end: Alignment(centro + 1.2, 0),
+          colors: [base, brilho, base],
+          stops: const [0.25, 0.5, 0.75],
+        ),
+      );
+    }
+
+    if (animacao == null) {
+      return Container(
+        width: largura,
+        height: altura,
+        decoration: BoxDecoration(
+            color: base, borderRadius: BorderRadius.circular(raio)),
+      );
+    }
+    return AnimatedBuilder(
+      animation: animacao,
+      builder: (_, __) => Container(
+        width: largura,
+        height: altura,
+        decoration: decoracao(animacao.value),
       ),
     );
   }
@@ -107,7 +155,8 @@ class CartaoEsqueleto extends StatelessWidget {
       decoration: BoxDecoration(
         color: CoresTrato.superficie,
         borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-        border: Border.all(color: CoresTrato.borda, width: EspacosTrato.bordaFina),
+        border:
+            Border.all(color: CoresTrato.borda, width: EspacosTrato.bordaFina),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +253,8 @@ class EsqueletoPagina extends StatelessWidget {
       body: SafeArea(
         child: PulsoEsqueleto(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
+            padding:
+                const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -216,7 +266,8 @@ class EsqueletoPagina extends StatelessWidget {
                 Expanded(
                   child: ListView.separated(
                     itemCount: cartoes,
-                    separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: EspacosTrato.x3),
                     itemBuilder: (_, __) => const CartaoEsqueleto(),
                   ),
                 ),
@@ -234,4 +285,3 @@ class EsqueletoPagina extends StatelessWidget {
     );
   }
 }
-
