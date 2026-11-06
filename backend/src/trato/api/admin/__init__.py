@@ -45,6 +45,7 @@ def criar_router_admin() -> APIRouter:
         rotas_relatorios,
     ):
         roteador.include_router(modulo.router)
+    roteador.include_router(rotas_pagamentos.router_divergencias)
     return roteador
 
 

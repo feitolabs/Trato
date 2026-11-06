@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'apoio/exemplos/demo.dart';
+
 /// Configuração comum de todos os testes do app.
 ///
 /// `TRATO_GOLDEN=ignorar` (só no CI) faz o teste golden NÃO falhar por diferença de pixel:
@@ -17,6 +19,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
       goldenFileComparator = _ComparadorSoAviso(atual.basedir.resolve('_.dart'));
     }
   }
+  ligarDemoNosTestes();
   await testMain();
 }
 

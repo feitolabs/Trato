@@ -72,11 +72,10 @@ class EstadoCarregando extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (esqueleto != null) return esqueleto!;
-    return Center(
-      child: Semantics(
-        label: 'Carregando',
-        child: const CircularProgressIndicator(color: CoresTrato.petroleo),
-      ),
+    // Esqueleto em vez de spinner: a tela parece pronta mais cedo (cartões no lugar).
+    return Semantics(
+      label: 'Carregando',
+      child: const Align(alignment: Alignment.topCenter, child: EsqueletoLista()),
     );
   }
 }

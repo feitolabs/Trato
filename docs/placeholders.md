@@ -15,7 +15,7 @@ profissional) e falha se o texto aparecer.
 | `cliente/inicio_tela.dart` (categoria, "Ver todas") | Início → grade | Categoria / Todas as categorias |
 | `cliente/inicio_tela.dart` (serviço recente) | Início → "Pintura da sala" | Detalhe do serviço (+ "Ver todos" → lista) |
 | `cliente/buscar_tela.dart` (tela 9, só protótipo) | perfil sem detalhe | aviso "Perfil indisponível" (tela não é usada no fluxo do app) |
-| `cliente/perfil_profissional_tela.dart` (favoritar) | perfil → coração | **Removido**: favoritos estão fora do MVP (sem rota) |
+| `cliente/perfil_profissional_tela.dart` (favoritar) | perfil → coração | Coração liga em `PUT/DELETE /v1/me/favoritos/{id}` |
 | idem ("Pedir orçamento ao X") | perfil | Novo pedido na categoria do profissional |
 | idem ("Ver as N" avaliações) | perfil | Lista de avaliações do profissional |
 | `orcamentos/detalhe_orcamento_tela.dart` ("Conversar") | detalhe do orçamento | Chat do pedido (só na demonstração; no modo `api` o botão some: sem rota de conversa antes de contratar) |
@@ -51,7 +51,7 @@ Nenhum uso de `EmBreveTela` resta em `app/lib/`; a classe foi apagada.
 | `profissional_inicio/inicio_profissional_tela.dart` | "Filtros" sem tela | `FiltrosPedidosAbertosTela` + `FiltroPedidosAbertos` |
 | `profissional/area_profissional_provisoria.dart` | sem uso | continua sem uso (candidata a apagar) |
 | `cliente/buscar_tela.dart` (tela 9) | só no protótipo e nos goldens | continua assim; a aba Buscar usa `BuscaProfissionaisTela` |
-| `perfil_cliente/` | itens sem tela eram escondidos | "Termos e políticas" agora abre os textos; restam escondidos: dados pessoais, endereços, formas de pagamento, favoritos, contatos de confiança |
+| `perfil_cliente/` | itens sem tela eram escondidos | "Termos e políticas" agora abre os textos; dados pessoais, endereços salvos, favoritos e contatos de confiança abrem telas reais (`/v1/me/...`); resta escondido só: formas de pagamento (cartão é guardado pelo Stripe, sem rota no Trato) |
 
 ## 4. Fora do MVP (item removido da tela, não é placeholder)
 

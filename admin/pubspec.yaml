@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   http: ^1.2.2
   url_launcher: ^6.3.0
 
@@ -59,12 +61,13 @@ flutter:
   uses-material-design: true
 
   fonts:
-    - family: Archivo
+    # Fontes do design system do painel (DS v2, seção 3.2). Licença OFL junto dos arquivos.
+    - family: Bricolage
       fonts:
-        - asset: assets/fontes/Archivo.ttf
-    - family: Figtree
+        - asset: assets/fontes/Bricolage.ttf
+    - family: Hanken
       fonts:
-        - asset: assets/fontes/Figtree.ttf
+        - asset: assets/fontes/Hanken.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -7,7 +7,6 @@ import '../dispositivo/servico_camera.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
-import '../telas/lgpd/servico_fake.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
@@ -15,6 +14,7 @@ import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
 import 'servico_upload.dart';
+import 'paralelo.dart';
 
 // Serviços das telas de aditivo, nota de materiais, disputa e verificação, falando com a API.
 // Só pedem e mostram: o total da nota, o estado do aditivo e a cobrança são do backend.
@@ -216,13 +216,13 @@ class ServicoVerificacaoApi implements ServicoVerificacao {
   @override
   Future<TextoLgpd> carregarTextoLgpd() async {
     final todas = _cache ?? await _todas();
-    if (todas.isEmpty) return textoLgpdExemplo;
+    if (todas.isEmpty) return textoLgpdPadrao;
     final v = todas.last;
     return TextoLgpd(
       finalidade: v['finalidade'] as String,
       retencao: 'Guardamos enquanto você mantiver sua conta ativa. '
           'Se a análise for recusada ou substituída, apagamos em até ${v['retencao_dias'] ?? 90} dias.',
-      quemVe: textoLgpdExemplo.quemVe,
+      quemVe: textoLgpdPadrao.quemVe,
     );
   }
 
@@ -312,19 +312,30 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     'Noite': ('18:00', '22:00'),
   };
 
-  /// Categorias e cidades vêm do banco. Sem elas, o erro vai para a tela: nunca lista de exemplo.
-  /// Raio, dias e períodos são as opções fixas do formulário.
+  /// Categorias e cidades vêm do banco. Se qualquer chamada falhar, o erro vai para a tela
+  /// ("Tentar de novo"): nunca lista de exemplo. Raio, dias e períodos são opções fixas.
   @override
   Future<OpcoesCadastro> carregarOpcoes() async {
-    final cats = _lista(await _api.get('/v1/catalogo/categorias'));
-    final cids = _lista(await _api.get('/v1/catalogo/cidades'));
-    _idPorNomeCategoria = {for (final c in cats) c['nome'] as String: c['id'] as String};
-    _idPorNomeCidade = {for (final c in cids) c['nome'] as String: c['id'] as String};
+    final (catsBrutas, cidsBrutas) = await emParalelo2(
+      _api.get('/v1/catalogo/categorias'),
+      _api.get('/v1/catalogo/cidades'),
+    );
+    final cats = _lista(catsBrutas);
+    final cids = _lista(cidsBrutas);
+    _idPorNomeCategoria = {
+      for (final c in cats)
+        if (c['nome'] is String && c['id'] is String) (c['nome'] as String): (c['id'] as String),
+    };
+    _idPorNomeCidade = {
+      for (final c in cids)
+        if (c['nome'] is String && c['id'] is String) (c['nome'] as String): (c['id'] as String),
+    };
     return OpcoesCadastro(
       categorias: _idPorNomeCategoria.keys.toList(),
-      raiosKm: opcoesCadastroExemplo.raiosKm,
-      dias: opcoesCadastroExemplo.dias,
-      periodos: opcoesCadastroExemplo.periodos,
+      cidades: _idPorNomeCidade.keys.toList(),
+      raiosKm: opcoesCadastroPadrao.raiosKm,
+      dias: opcoesCadastroPadrao.dias,
+      periodos: opcoesCadastroPadrao.periodos,
     );
   }
 
@@ -661,7 +672,7 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
         }
       }
       return [
-        for (final item in ServicoPrivacidadeFake.exemplo)
+        for (final item in consentimentosPadrao)
           Consentimento(
             id: item.id,
             titulo: item.titulo,

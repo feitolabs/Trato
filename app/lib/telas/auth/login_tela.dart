@@ -17,7 +17,7 @@ import 'validacao.dart';
 class LoginTela extends StatefulWidget {
   const LoginTela({super.key, this.servico, this.sessaoExpirada = false});
 
-  /// Se nulo, usa [ServicoAuthPadrao.atual] (fake até haver chaves).
+  /// Se nulo, usa [ServicoAuthPadrao.atual] (Supabase, ligado pelo main).
   final ServicoAuth? servico;
 
   /// Aberta por cima da tela em uso depois de um 401: avisa, e ao entrar só volta para a tela

@@ -16,18 +16,29 @@ class PerfilProfissionalTela extends StatelessWidget {
     required this.profissional,
     this.aoPedirOrcamento,
     this.aoVerAvaliacoes,
+    this.favoritoAtual,
+    this.aoMudarFavorito,
   }) : assert(profissional.detalhe != null);
 
   final Profissional profissional;
   final ValueChanged<Profissional>? aoPedirOrcamento;
   final ValueChanged<Profissional>? aoVerAvaliacoes;
 
+  /// Coração de favorito: só aparece com os dois ligados (precisa de rota no backend).
+  final Future<bool> Function()? favoritoAtual;
+  final Future<void> Function(bool favorito)? aoMudarFavorito;
+
   @override
   Widget build(BuildContext context) {
     final p = profissional;
     final d = p.detalhe!;
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          if (favoritoAtual != null && aoMudarFavorito != null)
+            _BotaoFavorito(atual: favoritoAtual!, aoMudar: aoMudarFavorito!),
+        ],
+      ),
       body: SafeArea(
         child: ConteudoResponsivo(
           child: SingleChildScrollView(
@@ -193,6 +204,60 @@ class PerfilProfissionalTela extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BotaoFavorito extends StatefulWidget {
+  const _BotaoFavorito({required this.atual, required this.aoMudar});
+
+  final Future<bool> Function() atual;
+  final Future<void> Function(bool favorito) aoMudar;
+
+  @override
+  State<_BotaoFavorito> createState() => _BotaoFavoritoState();
+}
+
+class _BotaoFavoritoState extends State<_BotaoFavorito> {
+  bool? _favorito;
+  var _salvando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.atual().then((v) {
+      if (mounted) setState(() => _favorito = v);
+    }).catchError((Object _) {}); // sem rede: o coração só não aparece
+  }
+
+  Future<void> _alternar() async {
+    final novo = !(_favorito ?? false);
+    if (_salvando) return;
+    setState(() => _salvando = true);
+    try {
+      await widget.aoMudar(novo);
+      if (mounted) setState(() => _favorito = novo);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Não foi possível salvar. Tente de novo.')));
+      }
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_favorito == null) return const SizedBox.shrink();
+    return IconButton(
+      tooltip: _favorito! ? 'Tirar dos favoritos' : 'Favoritar',
+      onPressed: _alternar,
+      icon: Icon(
+        _favorito! ? Icons.favorite : Icons.favorite_border,
+        color: CoresTrato.petroleo,
       ),
     );
   }

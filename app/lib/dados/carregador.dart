@@ -136,7 +136,10 @@ class EstadoTela extends StatelessWidget {
                       ? esqueleto ??
                           Semantics(
                             label: 'Carregando',
-                            child: const CircularProgressIndicator(color: CoresTrato.petroleo),
+                            child: const Align(
+                              alignment: Alignment.topCenter,
+                              child: EsqueletoLista(),
+                            ),
                           )
                       : Column(
                           mainAxisSize: MainAxisSize.min,

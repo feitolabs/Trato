@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'apoio/exemplos/telas/cliente/dados_exemplo.dart' as excli;
 import 'package:trato/telas/ajuda/ajuda_tela.dart';
-import 'package:trato/telas/ajuda/servico_fake.dart';
+import 'apoio/exemplos/telas/ajuda/servico_fake.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
-import 'package:trato/telas/busca/servico_fake.dart';
+import 'apoio/exemplos/telas/busca/servico_fake.dart';
 import 'package:trato/telas/cliente/modelos.dart';
 import 'package:trato/telas/lgpd/central_privacidade_tela.dart';
 import 'package:trato/telas/lgpd/excluir_conta_tela.dart';
-import 'package:trato/telas/lgpd/servico_fake.dart';
+import 'apoio/exemplos/telas/lgpd/servico_fake.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
 import 'package:trato/telas/mensagens/modelos.dart';
-import 'package:trato/telas/mensagens/servico_fake.dart';
+import 'apoio/exemplos/telas/mensagens/servico_fake.dart';
 import 'package:trato/telas/notificacoes/modelos.dart';
 import 'package:trato/telas/notificacoes/notificacoes_tela.dart';
-import 'package:trato/telas/notificacoes/servico_fake.dart';
+import 'apoio/exemplos/telas/notificacoes/servico_fake.dart';
 import 'package:trato/tema/tema.dart';
+import 'package:trato/componentes/componentes.dart';
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -64,7 +66,7 @@ void main() {
       await _abrir(tester, NotificacoesTela(servico: ServicoNotificacoesFake(itens: const [])));
       expect(find.text('Nada por aqui'), findsOneWidget);
       await _abrir(tester, NotificacoesTela(servico: ServicoNotificacoesFake(travar: true)));
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(EsqueletoLista), findsOneWidget);
       await _abrir(tester, NotificacoesTela(servico: ServicoNotificacoesFake(falhar: true)));
       expect(find.text('Tentar de novo'), findsOneWidget);
     });
@@ -227,6 +229,7 @@ void main() {
         tester,
         BuscaProfissionaisTela(
           servico: const ServicoBuscaFake(),
+          sugestoes: excli.categorias,
           aoAbrirProfissional: (p) => aberto = p,
         ),
       );
@@ -256,7 +259,7 @@ void main() {
         tester,
         const BuscaProfissionaisTela(servico: ServicoBuscaFake(travar: true), termoInicial: 'a'),
       );
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(EsqueletoLista), findsOneWidget);
     });
   });
 }

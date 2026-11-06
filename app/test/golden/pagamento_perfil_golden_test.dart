@@ -5,6 +5,8 @@ import 'package:trato/telas/perfil_cliente/perfil_cliente_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 import '../apoio/fontes.dart';
+import '../apoio/exemplos/telas/pagamento/dados_exemplo.dart' as expag;
+import '../apoio/exemplos/telas/perfil_cliente/dados_exemplo.dart' as expcl;
 
 /// Telas 14 (pagamento) e 22 (perfil do cliente) em 3 tamanhos.
 /// Atualizar: flutter test --update-goldens
@@ -17,8 +19,8 @@ void main() {
     'tablet': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'pagamento': const PagamentoTela(),
-    'perfil_cliente': const PerfilClienteTela(),
+    'pagamento': const PagamentoTela(dados: expag.DadosExemplo.pagamento, ),
+    'perfil_cliente': const PerfilClienteTela(perfil: expcl.DadosExemplo.perfil, ),
   };
 
   for (final MapEntry(key: tela, value: widget) in telas.entries) {

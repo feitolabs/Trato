@@ -577,3 +577,76 @@ consulta pública só devolve `disponivel`; a unique do banco fecha a corrida en
 - Corrigidos: check-in impossível, check-out sem tela ligada, CarregadorTela no debug, Agenda, idioma pt-BR, menu estourando.
 - `harness/subir-pilha-local.py` agora sobe Storage local; app em debug libera HTTP só no manifest de debug.
 - Pendências visuais e de texto listadas em `docs/roteiro-aceitacao.md` (rodada 3).
+
+## 2026-11-05 — Perfil do cliente: itens com dados reais
+- Causa: o app escondia (`_acoesComTela`) os itens sem tela/rota, e o `RepositorioPerfilApi` só montava 2 grupos.
+- Backend: `api/conta.py` + `persistencia/conta.py`: `/v1/me/dados-pessoais` (telefone, nascimento), `/v1/me/enderecos` (até 10, 1 principal), `/v1/me/favoritos`, `/v1/me/contatos-confianca` (até 5). `/v1/me/dados` continua sendo a exportação LGPD.
+- App: telas em `telas/conta/`, `ServicoContaApi`, coração de favorito no perfil do profissional. "Formas de pagamento" segue escondido (cartão fica no Stripe).
+- Migration `20261105120000_conta_enderecos_favoritos_contatos.sql` **aplicada** no Supabase com o OK do João.
+- Testes: backend 1212 ok (11 novos); app todos ok (8 novos em `conta_test.dart`).
+
+## 03/11/2026 — Painel admin no design system v2
+
+**Pedido (João):** deixar o painel igual aos dois PDFs de 02/11/2026 ("Design System e Requisitos do Painel
+Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
+
+**Feito — design system (admin/lib/tema e admin/lib/componentes)**
+- Tokens do PDF: cores, status (cor + ícone + palavra), Bricolage Grotesque 800 e Hanken Grotesk (baixadas do
+  `google/fonts`, OFL, com a licença junto; Archivo e Figtree saíram do painel), escala de 4 px, raios 12/24,
+  botões de 44 px com anel de foco de 2 px. `tema/LEIA-ME.md` explica que o painel não é mais cópia do app.
+- Componentes: botão (primário, secundário, destrutivo, link, ícone), chip de status e de papel, banner,
+  card de lista e de métrica, abas, lista com busca/filtros/paginação de 25, seletor com busca (>7 opções),
+  modal de ação sensível (motivo de 10+ caracteres, contador, aviso de auditoria, botão com o nome da ação,
+  sobe da base no celular), aviso temporário com **nº do registro de auditoria**, esqueleto, estado vazio com
+  orientação, erro com código `ERR-xxxx`.
+- Shell: menu agrupado (Operação, Financeiro, Crescimento, Administração) com rodapé fixo, 3 faixas
+  (≥1024 fixo, 768–1023 só ícones, <768 barra inferior com 5 + "Mais"), conteúdo até 1200 px, faixa fixa de
+  ambiente de teste (`ADMIN_AMBIENTE=producao` esconde), sessão que expira em 30 min sem uso.
+- As 12 telas refeitas conforme as capturas (Verificação, Disputas, Pagamentos, Painel, Busca e suporte,
+  Risco, Notificações push, Cupons, Equipe, Relatórios, Configurações, Auditoria) + login.
+
+**Feito — backend**
+- Cabeçalho `X-Auditoria-Id` em toda ação que grava auditoria (aparece no aviso de sucesso).
+- Verificação: lista traz CPF mascarado, documentos, categorias, cidade e envios anteriores (a lista vinha sem
+  CPF e sem documentos: era a "área vazia" das capturas).
+- Pedido com número curto `PED-xxxxx`; disputas, pagamentos, busca e risco mostram título/código, não UUID.
+- Pagamentos: período, taxa Trato e líquido do profissional por pedido, conciliar divergência com motivo.
+- Painel executivo: período (7/30/90/personalizado) com comparação ao período anterior; **removido o 12% fixo**
+  que inflava a receita (agora é a soma das taxas dos contratos concluídos).
+- Usuários: contato mascarado, categorias do profissional e diagnóstico "por que este pedido não aparece" (RN-01).
+- Risco: alertas com pedido, status, responsável e resultado; travar/destravar saques e bloquear/desbloquear
+  conta (a consulta antiga tinha `ORDER BY` duplicado e inventava alertas); detecção de valor atípico lê o limite
+  das Configurações (sem limite aprovado, não detecta).
+- Push: tipo operacional/marketing, estimativa de destinatários, segmento por cidade/categoria de verdade,
+  histórico com entregues e abertos.
+- Cupons: campanha, limite por usuário, início/fim, validações (sem espaço, 1–100%, fim > início); excluir só
+  cupom nunca usado.
+- Equipe: e-mail duplicado barrado, alçada limitada ao teto do papel, último Administrador protegido, status
+  "convite enviado", último acesso.
+- Relatórios: filtros de período e cidade, formato Excel-BR ou padrão, auditoria da exportação, CPF só para
+  quem pode revelar dados pessoais. **O token de login saiu da URL** (download por código de uso único).
+- Auditoria: nome do ator, nome da entidade, filtro por "quem" e período, exportação CSV.
+- Motivo mínimo de 10 caracteres em todas as ações sensíveis (era 3 a 5).
+- Teto de valor do pedido (RN-07) aplicado na criação **quando aprovado em Configurações**.
+
+**Feito — banco (autorizado pelo João; migrations em `supabase/migrations/`)**
+- `20261103120000_painel_admin_ds_v2`: nomes legíveis e faixas dos parâmetros (some o "teste_"), duas
+  definições novas (teto de valor do pedido e limite de valor atípico), colunas de cupom, `pedidos.numero`,
+  tabela `papeis_alcada`.
+- `20261103130000_alertas_risco_fluxo` e `20261103140000_campanhas_tipo`: colunas novas, nada apagado.
+
+**Verificação**
+- Painel: `flutter analyze` sem problemas; 92 testes passam (reescritos para os textos do design system).
+- Backend: ruff limpo nos arquivos tocados; testes novos em `tests/api/test_painel_v2_regras.py`.
+- Visual conferido no navegador (desktop 1360 e celular 390) contra as capturas.
+
+**Limites conhecidos** — ver "Painel admin v2" em `PENDENCIAS.md`.
+
+## 2026-11-06 — Performance de consultas e telas de carregamento
+- Causa principal: backend no Render em Virginia (EUA) e banco em São Paulo: ~120 ms por consulta.
+- Banco: 45 índices nas chaves estrangeiras sem índice (`20261106120000_indices_chaves_estrangeiras.sql`), **aplicada** no Supabase com o OK do João. Rollback em `supabase/rollback/`.
+- Backend: papel `service_role` fixado na conexão (porta 5432) em vez de `set local role` por transação (1 ida ao banco a menos por transação; na 6543 segue por transação); pool com 2 conexões abertas; respostas gzip acima de 1 KB; medidor `TRATO_MEDIR_CONSULTAS=1` (cabeçalho `Server-Timing` + log `trato.medicao`).
+- App: chamadas independentes em paralelo (`dados/paralelo.dart`, repassa o erro original): início do cliente (4 chamadas, e `/v1/pedidos` uma vez só), acompanhar, conclusão, relato, avaliação, orçamentos, busca e perfil de profissional, formulário do pedido, opções do cadastro. Carregamento com esqueleto em vez de spinner. Fotos com cache em disco (chave = URL sem o token) e decodificadas no tamanho da tela (`cached_network_image`).
+- Hospedagem: segue no Render (Virginia), decisão do João. Sem região na América do Sul; o ganho vem de menos idas ao banco.
+- Golden `novo_pedido` dependia da data de hoje: a tela aceita `agora` e o teste fixa 05/11/2026.
+- Testes: backend 1377 ok; conferido no Supabase real que o papel continua `service_role` com 1 consulta por transação.

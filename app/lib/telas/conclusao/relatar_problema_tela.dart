@@ -4,13 +4,13 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'apoio_conclusao.dart';
 import 'campo_longo.dart';
-import 'dados_exemplo.dart';
+import 'modelos.dart';
 
 /// Tela 20: relatar problema (abre a disputa). O valor fica congelado; o app só avisa.
 class RelatarProblemaTela extends StatefulWidget {
   const RelatarProblemaTela({
     super.key,
-    this.dados = dadosRelatoExemplo,
+    required this.dados,
     this.motivoInicial,
     this.descricaoInicial,
     this.aoEnviar,

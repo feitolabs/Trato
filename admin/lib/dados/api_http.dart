@@ -32,6 +32,11 @@ class ApiAdminHttp implements ApiAdmin {
   final Duration tempoLimite;
 
   String? _token;
+  int? _ultimoRegistro;
+
+  @override
+  int? get ultimoRegistroAuditoria => _ultimoRegistro;
+
   final _idsDocumentos = <String, String>{};
 
   static String _semBarraFinal(String u) => u.endsWith('/') ? u.substring(0, u.length - 1) : u;
@@ -48,6 +53,7 @@ class ApiAdminHttp implements ApiAdmin {
     int maxTentativas = 3,
   }) async {
     final ehIdempotente = metodo == 'GET' || metodo == 'HEAD';
+    if (!ehIdempotente) _ultimoRegistro = null; // o número vale só para a ação em andamento
     final limiteTentativas = ehIdempotente ? maxTentativas : 1;
 
     for (var tentativa = 1; tentativa <= limiteTentativas; tentativa++) {
@@ -66,6 +72,8 @@ class ApiAdminHttp implements ApiAdmin {
           await Future<void>.delayed(Duration(milliseconds: 250 * tentativa));
           continue;
         }
+        final registro = int.tryParse(r.headers['x-auditoria-id'] ?? '');
+        if (registro != null) _ultimoRegistro = registro;
         final texto = utf8.decode(r.bodyBytes);
         Object? json;
         if (texto.isNotEmpty) {
@@ -197,9 +205,17 @@ class ApiAdminHttp implements ApiAdmin {
 
   @override
   Future<List<Verificacao>> listarVerificacoes() async {
-    final corpo = await _chamar('GET', '/v1/admin/verificacoes', consulta: {'limite': '100'});
+    // A fila (enviada e em análise) e os já decididos, para os contadores e filtros da tela.
+    final uri = Uri.parse('$_api/v1/admin/verificacoes').replace(queryParameters: {
+      'status': const ['enviada', 'em_analise', 'aprovada', 'recusada'],
+      'limite': const ['100'],
+    });
+    final token = _token;
+    if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
+    final r = await _enviar('GET', uri, cabecalhos: {'Authorization': 'Bearer $token'});
+    if (!r.ok) throw _erro(r);
     return [
-      for (final v in _itens(corpo))
+      for (final v in _itens(r.json))
         () {
           final rotulos = <String>[];
           for (final d in (v['documentos'] as List? ?? const [])) {
@@ -211,12 +227,23 @@ class ApiAdminHttp implements ApiAdmin {
           }
           return Verificacao(
             id: v['id'] as String,
+            profissionalId: (v['profissional_id'] as String?) ?? '',
             profissional: (v['profissional_nome'] as String?) ?? 'Profissional',
-            categoria: 'Nível ${v['nivel_solicitado'] ?? '-'}',
-            cidade: '',
+            idPublico: (v['publico_id'] as String?) ?? '',
+            nivel: _capitalizar((v['nivel_solicitado'] as String?) ?? ''),
+            categorias: [for (final c in (v['categorias'] as List? ?? const [])) '$c'],
+            cidade: (v['cidade'] as String?) ?? '',
             enviadaEm: _data(v['enviada_em']),
-            cpfMascarado: (v['cpf_mascarado'] as String?) ?? '—',
+            cpfMascarado: v['cpf_mascarado'] as String?,
             documentos: rotulos,
+            enviosAnteriores: [
+              for (final e in (v['envios_anteriores'] as List? ?? const []))
+                EnvioVerificacao(
+                  enviadoEm: _data(_mapa(e)['enviado_em']),
+                  aprovado: _mapa(e)['status'] == 'aprovada',
+                  motivo: _mapa(e)['motivo'] as String?,
+                ),
+            ],
             status: _statusVerificacao[v['status']] ?? StatusVerificacao.enviada,
             motivoDecisao: v['motivo_recusa'] as String?,
           );
@@ -224,10 +251,17 @@ class ApiAdminHttp implements ApiAdmin {
     ];
   }
 
-  static String _rotuloDocumento(String tipo) {
-    final t = tipo.replaceAll('_', ' ');
-    return t.isEmpty ? 'Documento' : '${t[0].toUpperCase()}${t.substring(1)}';
+  static String _capitalizar(String t) {
+    final limpo = t.replaceAll('_', ' ').trim();
+    return limpo.isEmpty ? '' : '${limpo[0].toUpperCase()}${limpo.substring(1)}';
   }
+
+  static String _rotuloDocumento(String tipo) => switch (tipo) {
+        'documento_frente' => 'Frente do documento',
+        'documento_verso' => 'Verso do documento',
+        'selfie' => 'Selfie',
+        _ => tipo.isEmpty ? 'Documento' : _capitalizar(tipo),
+      };
 
   @override
   Future<String?> revelarDocumento(String verificacaoId, String documento, String motivo) async {
@@ -268,16 +302,22 @@ class ApiAdminHttp implements ApiAdmin {
   Disputa _disputa(Map<String, dynamic> d) {
     final decisao = DecisaoDisputa.values.where((x) => x.codigo == d['decisao']).firstOrNull;
     final divisao = d['divisao'] is Map ? _mapa(d['divisao']) : null;
-    final motivo = (d['motivo'] as String?) ?? '';
+    final motivo = _rotuloMotivo((d['motivo'] as String?) ?? '');
+    final pedidoId = d['pedido_id'] as String;
+    final numero = d['pedido_numero'];
     return Disputa(
-      id: d['pedido_id'] as String,
-      pedido: d['pedido_id'] as String,
+      id: pedidoId,
+      pedido: numero == null ? 'PED-${pedidoId.replaceAll('-', '').substring(0, 4).toUpperCase()}' : 'PED-$numero',
+      titulo: (d['pedido_titulo'] as String?) ?? '',
       cliente: (d['cliente'] is Map ? _mapa(d['cliente'])['nome'] as String? : null) ?? 'Cliente',
       profissional: (d['profissional'] is Map ? _mapa(d['profissional'])['nome'] as String? : null) ?? 'Profissional',
       motivo: motivo,
       descricao: motivo,
       valorEmAnaliseCentavos: _int(d['valor_congelado_centavos']),
       decisaoAte: _data(d['decisao_ate']),
+      respostaAte: d['resposta_ate'] == null ? null : _data(d['resposta_ate']),
+      atrasada: d['atrasada'] == true,
+      semResposta: d['sem_resposta'] == true,
       status: _estadoDisputa[d['estado']] ?? StatusDisputa.emAnalise,
       decisao: decisao,
       valorReembolsoCentavos: divisao == null ? null : _int(divisao['para_cliente_centavos']),
@@ -285,8 +325,8 @@ class ApiAdminHttp implements ApiAdmin {
       evidencias: [
         for (final e in (d['evidencias'] as List? ?? const []))
           EvidenciaDisputa(
-            autor: (_mapa(e)['ator_papel'] as String?) ?? '—',
-            tipo: (_mapa(e)['origem'] as String?) ?? 'prova',
+            autor: _rotuloPapel(_mapa(e)['ator_papel'] as String?),
+            tipo: _rotuloAcao((_mapa(e)['origem'] as String?) ?? 'prova'),
             texto: _texto(_mapa(e)['dados']),
           ),
       ],
@@ -294,12 +334,38 @@ class ApiAdminHttp implements ApiAdmin {
         for (final e in (d['linha_do_tempo'] as List? ?? const []))
           EventoDisputa(
             _data(_mapa(e)['em']),
-            (_mapa(e)['ator_papel'] as String?) ?? 'sistema',
-            '${_mapa(e)['acao']}${_mapa(e)['de'] != null ? ': ${_mapa(e)['de']} → ${_mapa(e)['para']}' : ''}',
+            _rotuloPapel(_mapa(e)['ator_papel'] as String?),
+            _rotuloAcao('${_mapa(e)['acao']}'),
           ),
       ],
     );
   }
+
+  static String _rotuloPapel(String? papel) => switch (papel) {
+        'cliente' => 'Cliente',
+        'profissional' => 'Profissional',
+        'mediador' || 'equipe' => 'Equipe Trato',
+        'sistema' || null => 'Sistema',
+        final outro => _capitalizar(outro),
+      };
+
+  static String _rotuloMotivo(String motivo) => switch (motivo) {
+        '' => 'Problema no serviço',
+        final m => _capitalizar(m),
+      };
+
+  /// Ação técnica (`disputa_aberta`) em frase legível. Código desconhecido vira texto simples.
+  static String _rotuloAcao(String acao) => switch (acao) {
+        'disputa_aberta' => 'Disputa aberta pelo cliente',
+        'disputa_respondida' => 'Profissional respondeu à disputa',
+        'decisao_registrada' => 'Decisão registrada',
+        'decisao_aprovada' => 'Decisão aprovada por uma segunda pessoa',
+        'concluir' => 'Serviço marcado como concluído',
+        'abrir_disputa' => 'Cliente relatou um problema',
+        'responder_disputa' => 'Profissional respondeu',
+        'decidir_disputa' => 'Disputa decidida pela equipe',
+        final outro => _capitalizar(outro),
+      };
 
   static String _texto(Object? dados) {
     if (dados is Map) {
@@ -340,14 +406,17 @@ class ApiAdminHttp implements ApiAdmin {
   // ---------- F7.3 pagamentos ----------
 
   @override
-  Future<ResumoConciliacao> resumoConciliacao() async {
-    final r = _mapa(await _chamar('GET', '/v1/admin/pagamentos/resumo'));
+  Future<ResumoConciliacao> resumoConciliacao({int? dias}) async {
+    final r = _mapa(await _chamar('GET', '/v1/admin/pagamentos/resumo', consulta: {'dias': dias?.toString()}));
     return ResumoConciliacao(
       confirmadoCentavos: _int(r['confirmado_centavos']),
       estornadoCentavos: _int(r['estornado_centavos']),
       emAndamentoCentavos: _int(r['retido_centavos']),
       divergencias: _int(r['divergencias']),
       atualizadoEm: _data(r['atualizado_em']),
+      cobrancas: _int(r['cobrancas']),
+      reembolsos: _int(r['reembolsos']),
+      valorDivergenteCentavos: _int(r['valor_divergente_centavos']),
     );
   }
 
@@ -358,42 +427,102 @@ class ApiAdminHttp implements ApiAdmin {
   };
 
   @override
-  Future<List<LancamentoEspelho>> extrato() async {
-    final corpo = await _chamar('GET', '/v1/admin/pagamentos', consulta: {'limite': '100'});
+  Future<List<LancamentoEspelho>> extrato({int? dias}) async {
+    final corpo = await _chamar('GET', '/v1/admin/pagamentos', consulta: {'limite': '100', 'dias': dias?.toString()});
     return [
       for (final p in _itens(corpo))
         LancamentoEspelho(
           id: p['lancamento_id'].toString(),
           data: _data(p['data']),
           descricao: 'Cobrança do pedido',
+          tipo: p['status'] == 'estornado' ? 'Reembolso' : 'Cobrança',
           valorCentavos: _int(p['valor_centavos']),
           status: _statusPagamento[p['status']] ?? StatusProvedor.aguardandoConfirmacao,
-          pedido: (p['pedido_id'] as String?) ?? '—',
+          pedido: _codigoPedido(p['pedido_id'] as String?, p['pedido_numero']),
           refProvedor: (p['referencia_provedor'] as String?) ?? '—',
           divergente: p['divergente'] == true,
+          taxaCentavos: (p['taxa_trato_centavos'] as num?)?.toInt(),
+          liquidoCentavos: (p['liquido_profissional_centavos'] as num?)?.toInt(),
         ),
     ];
   }
 
+  /// "PED-10482". Sem número curto, usa o começo do id para a pessoa ainda poder citar o pedido.
+  static String _codigoPedido(String? id, Object? numero) {
+    if (numero != null) return 'PED-$numero';
+    if (id == null || id.isEmpty) return '—';
+    return 'PED-${id.replaceAll('-', '').substring(0, 4).toUpperCase()}';
+  }
+
+  @override
+  Future<void> conciliarDivergencia(String lancamentoId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/divergencias/$lancamentoId/conciliar', corpo: {'motivo': motivo});
+  }
+
   // ---------- F7.4 busca ----------
+
+  static String _tipoUsuario(Object? t) => switch (t) {
+        'cliente' => 'Cliente',
+        'profissional' => 'Profissional',
+        'equipe' => 'Equipe',
+        final outro => '$outro',
+      };
+
+  UsuarioBusca _usuario(Map<String, dynamic> u) => UsuarioBusca(
+        id: u['id'] as String,
+        nome: (u['nome'] as String?) ?? '—',
+        tipo: _tipoUsuario(u['tipo']),
+        status: (u['status'] as String?) ?? '—',
+        idPublico: (u['publico_id'] as String?) ?? '',
+        emailMascarado: u['email_mascarado'] as String?,
+        telefoneMascarado: u['telefone_mascarado'] as String?,
+        cidade: u['cidade'] as String?,
+        categorias: [
+          for (final c in (u['categorias'] as List? ?? const []))
+            CategoriaProfissional(
+              nome: _mapa(c)['nome'] as String,
+              ativaNoPerfil: _mapa(c)['ativa_no_perfil'] == true,
+              ativaNaPlataforma: _mapa(c)['ativa_na_plataforma'] == true,
+            ),
+        ],
+        historico: [
+          for (final e in (u['historico'] as List? ?? const []))
+            EventoUsuario(_data(_mapa(e)['em']), _mapa(e)['texto'] as String),
+        ],
+      );
 
   @override
   Future<List<UsuarioBusca>> buscarUsuarios(String termo) async {
     final corpo = await _chamar('GET', '/v1/admin/usuarios', consulta: {'q': termo.trim(), 'limite': '100'});
-    return [
-      for (final u in _itens(corpo))
-        UsuarioBusca(
-          id: u['id'] as String,
-          nome: (u['nome'] as String?) ?? '—',
-          tipo: switch (u['tipo']) {
-            'cliente' => 'Cliente',
-            'profissional' => 'Profissional',
-            'equipe' => 'Equipe',
-            final outro => '$outro',
-          },
-          status: (u['status'] as String?) ?? '—',
-        ),
-    ];
+    return [for (final u in _itens(corpo)) _usuario(u)];
+  }
+
+  @override
+  Future<UsuarioBusca> detalheUsuario(String usuarioId) async =>
+      _usuario(_mapa(await _chamar('GET', '/v1/admin/usuarios/$usuarioId')));
+
+  @override
+  Future<DiagnosticoPedido> diagnosticarPedido(String usuarioId, String pedido) async {
+    final d = _mapa(await _chamar(
+      'GET',
+      '/v1/admin/usuarios/$usuarioId/diagnostico-pedido',
+      consulta: {'pedido': pedido.trim()},
+    ));
+    final numero = d['pedido_numero'];
+    return DiagnosticoPedido(
+      pedido: numero == null ? pedido.trim() : 'PED-$numero',
+      titulo: (d['pedido_titulo'] as String?) ?? '',
+      categoria: (d['categoria'] as String?) ?? '',
+      aparece: d['aparece'] == true,
+      itens: [
+        for (final i in (d['itens'] as List? ?? const []))
+          ItemDiagnostico(
+            ok: _mapa(i)['ok'] == true,
+            titulo: _mapa(i)['titulo'] as String,
+            detalhe: _mapa(i)['detalhe'] as String,
+          ),
+      ],
+    );
   }
 
   @override
@@ -422,13 +551,32 @@ class ApiAdminHttp implements ApiAdmin {
       for (final p in _itens(corpo))
         PedidoBusca(
           id: p['id'] as String,
+          codigo: _codigoPedido(p['id'] as String?, p['numero']),
           titulo: (p['titulo'] as String?) ?? 'Pedido',
           cliente: (p['cliente_nome'] as String?) ?? '—',
-          status: ((p['estado'] as String?) ?? '').replaceAll('_', ' '),
+          profissional: p['profissional_nome'] as String?,
+          categoria: p['categoria'] as String?,
+          cidade: p['cidade'] as String?,
+          status: _rotuloEstadoPedido((p['estado'] as String?) ?? ''),
           valorCentavos: _int(p['valor_centavos']),
         ),
     ];
   }
+
+  static String _rotuloEstadoPedido(String estado) => switch (estado) {
+        'aberto' => 'Aberto',
+        'orcamento_aceito' => 'Orçamento aceito',
+        'pago_retido' => 'Pago e retido',
+        'agendado' => 'Agendado',
+        'em_andamento' => 'Em andamento',
+        'em_confirmacao' => 'Em confirmação',
+        'concluido' => 'Concluído',
+        'retrabalho' => 'Retrabalho',
+        'em_disputa' => 'Em disputa',
+        'cancelado' => 'Cancelado',
+        'expirado' => 'Expirado',
+        final outro => _capitalizar(outro),
+      };
 
   @override
   Future<List<Chamado>> listarChamados() async {
@@ -442,6 +590,9 @@ class ApiAdminHttp implements ApiAdmin {
           solicitante: c['solicitante'] as String,
           status: c['status'] as String,
           aberto: _data(c['aberto_em'] ?? c['aberto']),
+          prioridade: (c['prioridade'] as String?) ?? 'normal',
+          responsavel: c['responsavel'] as String?,
+          prazo: c['prazo'] == null ? null : _data(c['prazo']),
         ),
     ];
   }
@@ -637,7 +788,7 @@ class ApiAdminHttp implements ApiAdmin {
             chave: d['chave'] as String,
             descricao: (d['descricao'] as String?) ?? d['chave'] as String,
             unidade: UnidadeConfig.values.where((u) => u.codigo == d['unidade']).firstOrNull ??
-                (d['unidade'] == 'dias_uteis' ? UnidadeConfig.dias : UnidadeConfig.quantidade),
+                UnidadeConfig.quantidade,
             minimo: _int(d['minimo']),
             maximo: _int(d['maximo']),
             exigeDuplaAprovacao: d['exige_dupla_aprovacao'] == true,
@@ -662,6 +813,8 @@ class ApiAdminHttp implements ApiAdmin {
       criadaPor: (v['criada_por'] as String?) ?? '',
       criadaEm: _data(v['criado_em']),
       aprovadaPor: v['aprovada_por'] as String?,
+      criadaPorNome: v['criada_por_nome'] as String?,
+      aprovadaPorNome: v['aprovada_por_nome'] as String?,
       valores: valores,
     );
   }
@@ -688,6 +841,11 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
+  Future<void> recusarConfig(String versaoId, String motivo) async {
+    await _chamar('DELETE', '/v1/admin/config/versoes/$versaoId', corpo: {'motivo': motivo});
+  }
+
+  @override
   Future<void> reverterConfig(String versaoId, String motivo) async {
     await _chamar('POST', '/v1/admin/config/versoes/$versaoId/reverter', corpo: {'motivo': motivo});
   }
@@ -695,23 +853,41 @@ class ApiAdminHttp implements ApiAdmin {
   // ---------- F7.6 auditoria ----------
 
   @override
-  Future<List<EntradaAuditoria>> listarAuditoria({String? acao, String? ator}) async {
+  Future<PaginaAuditoria> listarAuditoria({
+    String? acao,
+    String? ator,
+    String? entidade,
+    DateTime? desde,
+    DateTime? ate,
+    int limite = 25,
+    int deslocamento = 0,
+  }) async {
     final corpo = await _chamar('GET', '/v1/admin/auditoria', consulta: {
       'acao': acao?.trim(),
-      'ator_id': ator?.trim(),
-      'limite': '100',
+      'ator': ator?.trim(),
+      'entidade': entidade?.trim(),
+      'desde': desde?.toUtc().toIso8601String(),
+      'ate': ate?.toUtc().toIso8601String(),
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
     });
-    return [
-      for (final e in _itens(corpo))
-        EntradaAuditoria(
-          id: _int(e['id']),
-          ocorridaEm: _data(e['ocorrida_em']),
-          ator: (e['ator_id'] as String?) ?? (e['ator_tipo'] as String?) ?? 'sistema',
-          acao: (e['acao'] as String?) ?? '—',
-          entidade: [e['entidade'], e['entidade_id']].where((x) => x != null).join(':'),
-          motivo: e['motivo'] as String?,
-        ),
-    ];
+    return PaginaAuditoria(
+      total: corpo is Map ? _int(corpo['total']) : 0,
+      itens: [
+        for (final e in _itens(corpo))
+          EntradaAuditoria(
+            id: _int(e['id']),
+            ocorridaEm: _data(e['ocorrida_em']),
+            ator: (e['ator_id'] as String?) ?? (e['ator_tipo'] as String?) ?? 'sistema',
+            atorNome: e['ator_nome'] as String?,
+            acao: (e['acao'] as String?) ?? '—',
+            entidade: [e['entidade'], e['entidade_id']].where((x) => x != null).join(':'),
+            entidadeNome: e['entidade_nome'] as String?,
+            motivo: e['motivo'] as String?,
+            detalhes: e['depois'] is Map ? _mapa(e['depois']) : const {},
+          ),
+      ],
+    );
   }
 
   @override
@@ -723,8 +899,8 @@ class ApiAdminHttp implements ApiAdmin {
   // ---------- Módulo 1: Dashboard ----------
 
   @override
-  Future<MetricasDashboard> metricasDashboard() async {
-    final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/metricas'));
+  Future<MetricasDashboard> metricasDashboard({int dias = 30, DateTime? inicio, DateTime? fim}) async {
+    final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/metricas', consulta: _periodo(dias, inicio, fim)));
     return MetricasDashboard(
       gmvCentavos: _int(m['gmv_centavos']),
       receitaTaxaCentavos: _int(m['receita_taxa_centavos']),
@@ -738,12 +914,27 @@ class ApiAdminHttp implements ApiAdmin {
       profissionaisPendentes: _int(m['profissionais_pendentes']),
       cidadesAtivas: _int(m['cidades_ativas']),
       categoriasAtivas: _int(m['categorias_ativas']),
+      gmvAnteriorCentavos: _int(m['gmv_anterior_centavos']),
+      receitaTaxaAnteriorCentavos: _int(m['receita_taxa_anterior_centavos']),
+      pedidosAtivos: _int(m['pedidos_ativos']),
+      pedidosAtivosAnterior: _int(m['pedidos_ativos_anterior']),
+      baseUsuarios: _int(m['base_usuarios']),
+      baseUsuariosAnterior: _int(m['base_usuarios_anterior']),
+      disputasAbertas: _int(m['disputas_abertas']),
+      alertasRiscoAbertos: _int(m['alertas_risco_abertos']),
     );
   }
 
+  static Map<String, String?> _periodo(int dias, DateTime? inicio, DateTime? fim) {
+    String dia(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    if (inicio != null && fim != null) return {'inicio': dia(inicio), 'fim': dia(fim)};
+    return {'dias': '$dias'};
+  }
+
   @override
-  Future<SeriesDashboard> seriesDashboard({int dias = 7}) async {
-    final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/series', consulta: {'dias': '$dias'}));
+  Future<SeriesDashboard> seriesDashboard({int dias = 30, DateTime? inicio, DateTime? fim}) async {
+    final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/series', consulta: _periodo(dias, inicio, fim)));
     final hist = (m['historico_dias'] as List<dynamic>? ?? []);
     final funil = (m['funil'] as List<dynamic>? ?? []);
     return SeriesDashboard(
@@ -873,9 +1064,17 @@ class ApiAdminHttp implements ApiAdmin {
           id: a['id'] as String,
           usuarioId: a['usuario_id'] as String?,
           usuarioNome: a['usuario_nome'] as String?,
+          usuarioTipo: a['usuario_tipo'] as String?,
+          usuarioStatus: a['usuario_status'] as String?,
+          pedido: a['pedido_numero'] != null
+              ? 'PED-${a['pedido_numero']}'
+              : (a['pedido_id'] == null ? null : _codigoPedido(a['pedido_id'] as String, null)),
           tipo: a['tipo'] as String,
           severidade: a['severidade'] as String,
           detalhes: a['detalhes'] as String,
+          status: (a['status'] as String?) ?? 'em_aberto',
+          resultado: a['resultado'] as String?,
+          responsavel: a['responsavel'] as String?,
           resolvido: a['resolvido'] as bool? ?? false,
           criadoEm: a['criado_em'] as String? ?? '',
         ),
@@ -888,33 +1087,72 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
+  Future<void> desbloquearConta(String usuarioId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/risco/desbloqueio', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
+  }
+
+  @override
   Future<void> travarSaque(String usuarioId, {required String motivo}) async {
     await _chamar('POST', '/v1/admin/risco/travar-saque', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
   }
 
   @override
-  Future<void> resolverAlertaRisco(String alertaId, {required String motivo}) async {
-    await _chamar('POST', '/v1/admin/risco/alertas/$alertaId/resolver', corpo: {'motivo': motivo});
+  Future<void> destravarSaque(String usuarioId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/risco/destravar-saque', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
+  }
+
+  @override
+  Future<void> assumirAlertaRisco(String alertaId, {required String motivo}) async {
+    await _chamar('POST', '/v1/admin/risco/alertas/$alertaId/assumir', corpo: {'motivo': motivo});
+  }
+
+  @override
+  Future<void> resolverAlertaRisco(String alertaId, {required String resultado, required String motivo}) async {
+    await _chamar(
+      'POST',
+      '/v1/admin/risco/alertas/$alertaId/resolver',
+      corpo: {'motivo': motivo, 'resultado': resultado},
+    );
   }
 
   // ---------- Módulo 4: Notificações em Massa & Campanhas ----------
 
+  static CampanhaNotificacao _campanha(Map<String, dynamic> c) => CampanhaNotificacao(
+        id: c['id'] as String,
+        titulo: c['titulo'] as String,
+        mensagem: c['mensagem'] as String,
+        segmento: c['segmento'] as String,
+        tipo: (c['tipo'] as String?) ?? 'marketing',
+        categoriaId: c['categoria_id'] as String?,
+        cidadeId: c['cidade_id'] as String?,
+        totalDestinatarios: _int(c['total_destinatarios']),
+        criadoEm: c['criado_em'] as String? ?? '',
+        autor: c['autor'] as String?,
+        enviados: _int(c['enviados']),
+        entregues: _int(c['entregues']),
+        abertos: _int(c['abertos']),
+      );
+
   @override
   Future<List<CampanhaNotificacao>> listarCampanhasNotificacao() async {
     final itens = _itens(await _chamar('GET', '/v1/admin/notificacoes/campanhas'));
-    return [
-      for (final c in itens)
-        CampanhaNotificacao(
-          id: c['id'] as String,
-          titulo: c['titulo'] as String,
-          mensagem: c['mensagem'] as String,
-          segmento: c['segmento'] as String,
-          categoriaId: c['categoria_id'] as String?,
-          cidadeId: c['cidade_id'] as String?,
-          totalDestinatarios: _int(c['total_destinatarios']),
-          criadoEm: c['criado_em'] as String? ?? '',
-        ),
-    ];
+    return [for (final c in itens) _campanha(c)];
+  }
+
+  @override
+  Future<EstimativaCampanha> estimarCampanhaNotificacao({
+    required String segmento,
+    required String tipo,
+    String? categoriaId,
+    String? cidadeId,
+  }) async {
+    final r = _mapa(await _chamar('GET', '/v1/admin/notificacoes/estimativa', consulta: {
+      'segmento': segmento,
+      'tipo': tipo,
+      'categoria_id': categoriaId,
+      'cidade_id': cidadeId,
+    }));
+    return EstimativaCampanha(destinatarios: _int(r['destinatarios']), desativaram: _int(r['desativaram']));
   }
 
   @override
@@ -922,6 +1160,7 @@ class ApiAdminHttp implements ApiAdmin {
     required String titulo,
     required String mensagem,
     required String segmento,
+    String tipo = 'marketing',
     String? categoriaId,
     String? cidadeId,
     required String motivo,
@@ -933,43 +1172,37 @@ class ApiAdminHttp implements ApiAdmin {
         'titulo': titulo,
         'mensagem': mensagem,
         'segmento': segmento,
+        'tipo': tipo,
         if (categoriaId != null) 'categoria_id': categoriaId,
         if (cidadeId != null) 'cidade_id': cidadeId,
         'motivo': motivo,
       },
     ));
-    return CampanhaNotificacao(
-      id: c['id'] as String,
-      titulo: c['titulo'] as String,
-      mensagem: c['mensagem'] as String,
-      segmento: c['segmento'] as String,
-      categoriaId: c['categoria_id'] as String?,
-      cidadeId: c['cidade_id'] as String?,
-      totalDestinatarios: _int(c['total_destinatarios']),
-      criadoEm: c['criado_em'] as String? ?? '',
-    );
+    return _campanha(c);
   }
 
   // ---------- Módulo 5: Gestão de Cupons ----------
 
+  static CupomAdmin _cupom(Map<String, dynamic> c) => CupomAdmin(
+        id: c['id'] as String,
+        codigo: c['codigo'] as String,
+        tipo: c['tipo'] as String,
+        valor: _int(c['valor']),
+        valorMinimoCentavos: _int(c['valor_minimo_centavos']),
+        limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
+        usosAtuais: _int(c['usos_atuais']),
+        validoAte: c['valido_ate'] as String?,
+        validoDesde: c['valido_desde'] as String?,
+        campanha: c['campanha'] as String?,
+        limitePorUsuario: c['limite_por_usuario'] != null ? _int(c['limite_por_usuario']) : null,
+        ativo: c['ativo'] as bool? ?? true,
+        criadoEm: c['criado_em'] as String? ?? '',
+      );
+
   @override
   Future<List<CupomAdmin>> listarCupons() async {
     final itens = _itens(await _chamar('GET', '/v1/admin/cupons'));
-    return [
-      for (final c in itens)
-        CupomAdmin(
-          id: c['id'] as String,
-          codigo: c['codigo'] as String,
-          tipo: c['tipo'] as String,
-          valor: _int(c['valor']),
-          valorMinimoCentavos: _int(c['valor_minimo_centavos']),
-          limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
-          usosAtuais: _int(c['usos_atuais']),
-          validoAte: c['valido_ate'] as String?,
-          ativo: c['ativo'] as bool? ?? true,
-          criadoEm: c['criado_em'] as String? ?? '',
-        ),
-    ];
+    return [for (final c in itens) _cupom(c)];
   }
 
   @override
@@ -979,7 +1212,10 @@ class ApiAdminHttp implements ApiAdmin {
     required int valor,
     int valorMinimoCentavos = 0,
     int? limiteUsos,
+    int? limitePorUsuario,
+    String? validoDesde,
     String? validoAte,
+    String? campanha,
     required String motivo,
   }) async {
     final c = _mapa(await _chamar(
@@ -991,22 +1227,14 @@ class ApiAdminHttp implements ApiAdmin {
         'valor': valor,
         'valor_minimo_centavos': valorMinimoCentavos,
         if (limiteUsos != null) 'limite_usos': limiteUsos,
+        if (limitePorUsuario != null) 'limite_por_usuario': limitePorUsuario,
+        if (validoDesde != null) 'valido_desde': validoDesde,
         if (validoAte != null) 'valido_ate': validoAte,
+        if (campanha != null && campanha.isNotEmpty) 'campanha': campanha,
         'motivo': motivo,
       },
     ));
-    return CupomAdmin(
-      id: c['id'] as String,
-      codigo: c['codigo'] as String,
-      tipo: c['tipo'] as String,
-      valor: _int(c['valor']),
-      valorMinimoCentavos: _int(c['valor_minimo_centavos']),
-      limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
-      usosAtuais: _int(c['usos_atuais']),
-      validoAte: c['valido_ate'] as String?,
-      ativo: c['ativo'] as bool? ?? true,
-      criadoEm: c['criado_em'] as String? ?? '',
-    );
+    return _cupom(c);
   }
 
   @override
@@ -1016,18 +1244,7 @@ class ApiAdminHttp implements ApiAdmin {
       '/v1/admin/cupons/$cupomId/status',
       corpo: {'ativo': ativo, 'motivo': motivo},
     ));
-    return CupomAdmin(
-      id: c['id'] as String,
-      codigo: c['codigo'] as String,
-      tipo: c['tipo'] as String,
-      valor: _int(c['valor']),
-      valorMinimoCentavos: _int(c['valor_minimo_centavos']),
-      limiteUsos: c['limite_usos'] != null ? _int(c['limite_usos']) : null,
-      usosAtuais: _int(c['usos_atuais']),
-      validoAte: c['valido_ate'] as String?,
-      ativo: c['ativo'] as bool? ?? true,
-      criadoEm: c['criado_em'] as String? ?? '',
-    );
+    return _cupom(c);
   }
 
   @override
@@ -1037,21 +1254,29 @@ class ApiAdminHttp implements ApiAdmin {
 
   // ---------- Módulo 6: Equipe Interna ----------
 
+  static MembroEquipeAdmin _membro(Map<String, dynamic> m) => MembroEquipeAdmin(
+        usuarioId: m['usuario_id'] as String,
+        nome: m['nome'] as String,
+        email: m['email'] as String,
+        papel: m['papel'] as String,
+        ativo: m['ativo'] as bool? ?? true,
+        alcadaCentavos: _int(m['alcada_centavos']),
+        criadoEm: m['criado_em'] as String? ?? '',
+        status: (m['status'] as String?) ?? 'ativo',
+        ultimoAcesso: m['ultimo_acesso'] as String?,
+        tetoPapelCentavos: _int(m['teto_papel_centavos']),
+      );
+
   @override
   Future<List<MembroEquipeAdmin>> listarEquipe() async {
     final itens = _itens(await _chamar('GET', '/v1/admin/equipe'));
-    return [
-      for (final m in itens)
-        MembroEquipeAdmin(
-          usuarioId: m['usuario_id'] as String,
-          nome: m['nome'] as String,
-          email: m['email'] as String,
-          papel: m['papel'] as String,
-          ativo: m['ativo'] as bool? ?? true,
-          alcadaCentavos: _int(m['alcada_centavos']),
-          criadoEm: m['criado_em'] as String? ?? '',
-        ),
-    ];
+    return [for (final m in itens) _membro(m)];
+  }
+
+  @override
+  Future<Map<String, int>> tetosDosPapeis() async {
+    final itens = _itens(await _chamar('GET', '/v1/admin/equipe/tetos'));
+    return {for (final t in itens) t['papel'] as String: _int(t['teto_centavos'])};
   }
 
   @override
@@ -1073,15 +1298,7 @@ class ApiAdminHttp implements ApiAdmin {
         'motivo': motivo,
       },
     ));
-    return MembroEquipeAdmin(
-      usuarioId: m['usuario_id'] as String,
-      nome: m['nome'] as String,
-      email: m['email'] as String,
-      papel: m['papel'] as String,
-      ativo: m['ativo'] as bool? ?? true,
-      alcadaCentavos: _int(m['alcada_centavos']),
-      criadoEm: m['criado_em'] as String? ?? '',
-    );
+    return _membro(m);
   }
 
   @override
@@ -1102,15 +1319,7 @@ class ApiAdminHttp implements ApiAdmin {
         'motivo': motivo,
       },
     ));
-    return MembroEquipeAdmin(
-      usuarioId: m['usuario_id'] as String,
-      nome: m['nome'] as String,
-      email: m['email'] as String,
-      papel: m['papel'] as String,
-      ativo: m['ativo'] as bool? ?? true,
-      alcadaCentavos: _int(m['alcada_centavos']),
-      criadoEm: m['criado_em'] as String? ?? '',
-    );
+    return _membro(m);
   }
 
   @override
@@ -1121,16 +1330,32 @@ class ApiAdminHttp implements ApiAdmin {
   // ---------- Módulo 7: Exportação de Relatórios CSV ----------
 
   @override
-  String urlRelatorioFinanceiroCsv() =>
-      '$_api/v1/admin/relatorios/financeiro${_token != null ? '?token=$_token' : ''}';
-
-  @override
-  String urlRelatorioPedidosCsv() =>
-      '$_api/v1/admin/relatorios/pedidos${_token != null ? '?token=$_token' : ''}';
-
-  @override
-  String urlRelatorioRepassesCsv() =>
-      '$_api/v1/admin/relatorios/repasses${_token != null ? '?token=$_token' : ''}';
+  Future<RelatorioPronto> solicitarRelatorio(
+    String tipo, {
+    DateTime? inicio,
+    DateTime? fim,
+    String? cidadeId,
+    String formato = 'excel_br',
+    required String motivo,
+  }) async {
+    String dia(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final r = _mapa(await _chamar('POST', '/v1/admin/relatorios/$tipo', corpo: {
+      if (inicio != null) 'inicio': dia(inicio),
+      if (fim != null) 'fim': dia(fim),
+      if (cidadeId != null) 'cidade_id': cidadeId,
+      'formato': formato,
+      'motivo': motivo,
+    }));
+    // O token de login nunca vai na URL: o link vale só uma vez e por poucos minutos.
+    return RelatorioPronto(
+      url: '$_api/v1/admin/relatorios/baixar/${r['codigo']}',
+      nomeArquivo: r['nome_arquivo'] as String,
+      linhas: _int(r['linhas']),
+      colunas: _int(r['colunas']),
+      comDadosPessoais: r['com_dados_pessoais'] == true,
+    );
+  }
 }
 
 class _Resposta {

@@ -10,6 +10,7 @@ import 'erros.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
+import 'paralelo.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`) do catálogo, dos serviços e da agenda.
 // Só o que o backend já tem sai da API; o resto segue em demonstração e está listado em
@@ -19,6 +20,20 @@ String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
 
 Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
+
+/// Ícone de cada categoria pelo id/slug (o backend não manda ícone). Categoria nova usa o genérico.
+IconData iconeDaCategoria(String? id) => switch (id) {
+      'eletrica' => Icons.bolt,
+      'hidraulica' => Icons.water_drop_outlined,
+      'pintura' => Icons.format_paint_outlined,
+      'montagem' => Icons.inventory_2_outlined,
+      'limpeza' => Icons.auto_awesome_outlined,
+      'ar-condicionado' => Icons.ac_unit,
+      'chaveiro' => Icons.vpn_key_outlined,
+      'jardinagem' => Icons.yard_outlined,
+      'reformas' => Icons.construction_outlined,
+      _ => Icons.handyman_outlined,
+    };
 
 String _iniciais(String nome) {
   final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
@@ -34,32 +49,6 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   final ClienteApi _api;
 
-  /// Ícone de cada categoria do banco, pelo `slug`. É só apresentação.
-  static const _icones = <String, IconData>{
-    'limpeza-residencial': Icons.auto_awesome_outlined,
-    'montagem-de-moveis': Icons.inventory_2_outlined,
-    'pintura-interna': Icons.format_paint_outlined,
-    'eletricista': Icons.bolt,
-    'encanador': Icons.water_drop_outlined,
-    'reparos-gerais': Icons.handyman_outlined,
-    'ar-condicionado': Icons.ac_unit,
-    'eletrodomesticos': Icons.kitchen_outlined,
-    'chaveiro': Icons.vpn_key_outlined,
-    'jardinagem': Icons.grass_outlined,
-    'diarista': Icons.cleaning_services_outlined,
-    'marcenaria': Icons.carpenter_outlined,
-    'vidraceiro': Icons.window_outlined,
-    'serralheria': Icons.fence_outlined,
-    'gesso-drywall': Icons.layers_outlined,
-    'pisos-revestimentos': Icons.grid_on_outlined,
-    'impermeabilizacao': Icons.umbrella_outlined,
-    'cameras-seguranca': Icons.videocam_outlined,
-    'informatica-redes': Icons.wifi,
-    'mudanca-frete': Icons.local_shipping_outlined,
-    'cortinas-persianas': Icons.blinds_outlined,
-    'limpeza-especial': Icons.chair_outlined,
-  };
-
   /// Só o que está no banco. Sem rede, o erro vai para a tela ("Tentar de novo").
   @override
   Future<List<CategoriaServico>> categorias() async {
@@ -67,9 +56,9 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     return [
       for (final item in (resposta as List? ?? const []).cast<Map<String, dynamic>>())
         CategoriaServico(
-          item['nome'] as String,
-          _icones[item['slug']] ?? Icons.home_repair_service_outlined,
-          id: item['id'] as String,
+          (item['nome'] as String?) ?? 'Serviço',
+          iconeDaCategoria((item['id'] as String?) ?? (item['slug'] as String?)),
+          id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
         ),
     ];
   }
@@ -124,8 +113,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       'categoria_id': categoriaId,
       if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
     };
-    final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
-    await _carregarNomesCategorias();
+    final (bruto, _) = await emParalelo2(
+      _api.get('/v1/profissionais', consulta: consulta),
+      _carregarNomesCategorias(),
+    );
+    final resposta = _mapa(bruto);
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
         _converterBusca(item as Map<String, dynamic>),
@@ -138,10 +130,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final consulta = <String, String>{
       if (limpo.length >= 2) 'servico': limpo,
     };
-    final resposta = _mapa(
-      await _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
+    final (bruto, _) = await emParalelo2(
+      _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
+      _carregarNomesCategorias(),
     );
-    await _carregarNomesCategorias();
+    final resposta = _mapa(bruto);
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
         _converterBusca(item as Map<String, dynamic>),
@@ -164,9 +157,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   @override
   Future<FormularioPedido> formulario(String categoriaId) async {
-    final base = await _formularioBase(categoriaId);
-    // Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
-    final cidades = await _cidades();
+    // Em paralelo. Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
+    final (base, cidades) = await emParalelo2(_formularioBase(categoriaId), _cidades());
     if (cidades.isEmpty) {
       throw const ErroTrato(
         TipoErro.indisponivel,
@@ -177,40 +169,40 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   Future<FormularioPedido> _formularioBase(String categoriaId) async {
-    final c = (await categorias()).where((x) => x.id == categoriaId).firstOrNull;
-    if (c == null) {
-      throw const ErroTrato(TipoErro.naoEncontrado, 'Esta categoria não está mais disponível.');
-    }
+    final cats = await categorias();
+    final c = cats.where((x) => x.id == categoriaId).firstOrNull;
     return FormularioPedido(
-      categoriaId: c.id,
-      icone: c.icone,
-      categoria: c.nome,
-      servicos: const ['Orçamento geral'],
-      servicosIniciais: const {},
+      categoriaId: categoriaId,
+      icone: c?.icone ?? Icons.handyman_outlined,
+      categoria: c?.nome ?? 'Serviço solicitado',
+      servicos: (c?.servicos.isEmpty ?? true) ? const ['Orçamento geral'] : c!.servicos,
+      servicosIniciais: {(c?.servicos.isEmpty ?? true) ? 'Orçamento geral' : c!.servicos.first},
       perguntaQuantidade: 'Quantos itens ou ambientes?',
       dicaQuantidade: 'Uma estimativa já ajuda',
       quantidadeInicial: 1,
-      perguntaVoltagem: '',
+      perguntaVoltagem: 'Voltagem',
       voltagens: const [],
       voltagemInicial: '',
       descricaoInicial: '',
       fotos: const [],
       prazos: const ['Esta semana', 'Sem pressa'],
       faixas: const [
-        FaixaPreco(minimoCentavos: 20000, maximoCentavos: 50000),
-        FaixaPreco(minimoCentavos: 0, maximoCentavos: 20000),
-        FaixaPreco(minimoCentavos: 50000, maximoCentavos: 100000),
+        FaixaPreco(minimoCentavos: 10000, maximoCentavos: 30000),
+        FaixaPreco(minimoCentavos: 30000, maximoCentavos: 80000),
       ],
-      endereco: 'Combine o endereço depois da contratação',
-      avisoEndereco: 'O endereço completo só aparece para o profissional que você contratar.',
-      avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas. Avisamos quando o prazo terminar.',
+      endereco: 'Seu endereço atual',
+      avisoEndereco: 'O endereço completo só aparece para o profissional contratado.',
+      avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
     );
   }
 
   @override
   Future<Profissional> perfil(String profissionalId) async {
-    final j = _mapa(await _api.get('/v1/profissionais/$profissionalId'));
-    await _carregarNomesCategorias();
+    final (bruto, _) = await emParalelo2(
+      _api.get('/v1/profissionais/$profissionalId'),
+      _carregarNomesCategorias(),
+    );
+    final j = _mapa(bruto);
     final nome = (j['nome'] as String?) ?? 'Profissional';
     final nivel = (j['nivel_verificacao'] as String?) ?? '';
     final avaliacoes = [
@@ -264,9 +256,25 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
   final ClienteApi _api;
   final RepositorioPedidos _pedidos;
 
+  /// `recentes()` e `emAndamento()` saem da mesma lista. Chamados juntos (tela inicial),
+  /// dividem UM `GET /v1/pedidos` em voo em vez de fazer dois. Não guarda resultado:
+  /// terminada a chamada, a próxima busca de novo (dados sempre atuais).
+  Future<PedidosDoCliente>? _listaEmVoo;
+
+  Future<PedidosDoCliente> _listar() {
+    final emVoo = _listaEmVoo;
+    if (emVoo != null) return emVoo;
+    final nova = _pedidos.listar();
+    _listaEmVoo = nova;
+    nova.whenComplete(() {
+      if (identical(_listaEmVoo, nova)) _listaEmVoo = null;
+    }).ignore();
+    return nova;
+  }
+
   @override
   Future<List<ServicoRecente>> recentes() async {
-    final todos = await _pedidos.listar();
+    final todos = await _listar();
     return [
       for (final p in [...todos.finalizados, ...todos.emAndamento])
         if (p.id != null)
@@ -282,7 +290,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
 
   @override
   Future<PedidoEmAndamento?> emAndamento() async {
-    final todos = await _pedidos.listar();
+    final todos = await _listar();
     final p = todos.emAndamento.where((x) => x.id != null).firstOrNull;
     if (p == null) return null;
     return PedidoEmAndamento(
@@ -381,7 +389,7 @@ class RepositorioAgendaApi implements RepositorioAgenda {
     return [
       Agendamento(
         id: proximo.pedidoId ?? 'proximo',
-        pedidoId: proximo.pedidoId ?? 'demo',
+        pedidoId: proximo.pedidoId ?? '',
         dia: DateTime(base.year, base.month, base.day),
         horario: proximo.quando,
         titulo: proximo.titulo,

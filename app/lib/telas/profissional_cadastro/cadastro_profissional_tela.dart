@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../profissional_apoio/apoio.dart';
 import 'cadastro.dart';
@@ -70,7 +71,7 @@ class _Formulario extends StatefulWidget {
 class _FormularioState extends State<_Formulario> {
   late final _nome = TextEditingController(text: widget.nomeInicial);
   final _sobre = TextEditingController();
-  final _cidade = TextEditingController();
+  String? _cidade;
   final _scrollController = ScrollController();
   final _categorias = <String>{};
   final _dias = <String>{};
@@ -85,7 +86,6 @@ class _FormularioState extends State<_Formulario> {
   void dispose() {
     _nome.dispose();
     _sobre.dispose();
-    _cidade.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -103,9 +103,8 @@ class _FormularioState extends State<_Formulario> {
   String? get _erroNome => _nome.text.trim().length < 3
       ? 'Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'
       : null;
-  String? get _erroCidade => _cidade.text.trim().isEmpty
-      ? 'Região não informada. Digite a cidade ou o bairro onde você atende.'
-      : null;
+  String? get _erroCidade =>
+      _cidade == null ? 'Cidade não escolhida. Escolha a cidade onde você atende.' : null;
 
   bool get _valido =>
       _erroNome == null &&
@@ -146,7 +145,7 @@ class _FormularioState extends State<_Formulario> {
         nome: _nome.text.trim(),
         sobre: _sobre.text.trim(),
         categorias: {..._categorias},
-        cidade: _cidade.text.trim(),
+        cidade: _cidade!,
         raioKm: _raio,
         dias: {..._dias},
         periodos: {..._periodos},
@@ -155,11 +154,17 @@ class _FormularioState extends State<_Formulario> {
       if (!mounted) return;
       setState(() => _enviando = false);
       widget.aoConcluir?.call();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // Recusa com motivo (cidade que ainda não atendemos, categoria fora do ar...): mostra o
+      // motivo. "Confira sua conexão" só vale quando a falha foi de rede mesmo.
+      final motivo = e is ErroTrato && e.tipo != TipoErro.semInternet && e.mensagem.isNotEmpty
+          ? e.mensagem
+          : null;
       setState(() {
         _enviando = false;
-        _erroEnvio = 'Não foi possível salvar os dados. Confira sua conexão e tente novamente.';
+        _erroEnvio =
+            motivo ?? 'Não foi possível salvar os dados. Confira sua conexão e tente novamente.';
       });
       _rolarParaTopo();
     }
@@ -224,12 +229,14 @@ class _FormularioState extends State<_Formulario> {
         if (_tentou && _categorias.isEmpty)
           _erro('Nenhuma categoria selecionada. Escolha pelo menos uma área de atuação.'),
         const TituloSecao('Área atendida'),
-        CampoTrato(
-          rotulo: 'Cidade ou bairro base',
-          controlador: _cidade,
-          erro: _tentou ? _erroCidade : null,
-          aoMudar: (_) => setState(() {}),
+        Text('Cidade', style: TipografiaTrato.corpoForte),
+        const SizedBox(height: EspacosTrato.x2),
+        OpcoesPilula(
+          opcoes: o.cidades,
+          selecionadas: {if (_cidade != null) _cidade!},
+          aoAlternar: (v) => setState(() => _cidade = v),
         ),
+        if (_tentou && _erroCidade != null) _erro(_erroCidade!),
         const SizedBox(height: EspacosTrato.x3),
         Text('Até onde você vai', style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x2),

@@ -6,11 +6,13 @@ Tudo sai do ledger-espelho e dos eventos de webhook já gravados. Não há rota 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from trato.api.admin.contexto import Operador, exigir
+from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
+    ComMotivo,
     ContaAdminOut,
     EventoWebhookOut,
     ExtratoContratoOut,
@@ -21,10 +23,21 @@ from trato.api.admin.modelos import (
     SaldoContratoOut,
 )
 from trato.api.admin.papeis import Permissao
+from trato.api.admin.repositorios import FiltroAuditoria
 from trato.api.contexto import Contexto, obter_contexto
 from trato.financeiro.ledger import CUSTODIA, TAXA_TRATO, Lancamento, TipoLancamento
 
 router = APIRouter(prefix="/v1/admin", tags=["admin: pagamentos (leitura)"])
+
+# Conciliar só anota na auditoria (nenhum dinheiro se move); por isso mora fora de /pagamentos.
+router_divergencias = APIRouter(prefix="/v1/admin/divergencias", tags=["admin: conciliação"])
+ACAO_CONCILIADA = "pagamento.divergencia_conciliada"
+
+
+def _conciliadas(admin: AdminContexto) -> set[str]:
+    """Ids dos lançamentos já conciliados. A fonte é a própria auditoria (imutável)."""
+    itens, _ = admin.auditoria.listar(FiltroAuditoria(acao=ACAO_CONCILIADA), 100, 0)
+    return {i.entidade_id for i in itens if i.entidade_id}
 
 
 def lancamento_admin_out(item: Lancamento) -> LancamentoAdminOut:
@@ -48,7 +61,18 @@ def _estornado(lancamentos: Sequence[Lancamento]) -> dict[str, int]:
     return soma
 
 
-def _pagamentos(contexto: Contexto, pedido_id: str | None = None) -> list[PagamentoOut]:
+def _taxa_do_pedido(contexto: Contexto, pedido_id: str, pedido: object | None) -> int | None:
+    """Taxa que o Trato reteve neste pedido (do ledger-espelho). Sem dado, nada se inventa."""
+    try:
+        profissional = getattr(pedido, "profissional_id", None)
+        return int(contexto.ledger.saldos_pedido(pedido_id, profissional).taxa_trato)
+    except Exception:  # noqa: BLE001 - o espelho pode não ter o pedido; a coluna fica vazia
+        return None
+
+
+def _pagamentos(
+    contexto: Contexto, pedido_id: str | None = None, conciliadas: set[str] | None = None
+) -> list[PagamentoOut]:
     todos = contexto.ledger.lancamentos(pedido_id)
     estornos = _estornado(contexto.ledger.lancamentos())
     saida = []
@@ -61,13 +85,16 @@ def _pagamentos(contexto: Contexto, pedido_id: str | None = None) -> list[Pagame
         if estornado:
             status = "estornado" if estornado >= item.valor else "estornado_parcial"
         # Conciliação: cobrança sem pedido, sem contrato ou sem referência do provedor.
-        divergente = (
+        divergente = item.id not in (conciliadas or set()) and (
             pedido is None
             or pedido.referencia_pagamento is None
             or contexto.contratos.obter_do_pedido(item.pedido_id) is None
         )
+        taxa = _taxa_do_pedido(contexto, item.pedido_id, pedido)
         saida.append(
             PagamentoOut(
+                taxa_trato_centavos=taxa,
+                liquido_profissional_centavos=None if taxa is None else max(item.valor - taxa, 0),
                 lancamento_id=item.id,
                 pedido_id=item.pedido_id,
                 valor_centavos=item.valor,
@@ -82,6 +109,10 @@ def _pagamentos(contexto: Contexto, pedido_id: str | None = None) -> list[Pagame
     return saida
 
 
+def _no_periodo(p: PagamentoOut, dias: int | None, contexto: Contexto) -> bool:
+    return dias is None or p.data >= contexto.agora() - timedelta(days=dias)
+
+
 @router.get("/pagamentos", response_model=Pagina[PagamentoOut], summary="Pagamentos (espelho)")
 def listar_pagamentos(
     pedido_id: str | None = None,
@@ -89,16 +120,24 @@ def listar_pagamentos(
     apenas_divergentes: bool = False,
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
+    dias: int | None = Query(None, ge=1, le=3650, description="Só os dos últimos N dias."),
     _: Operador = Depends(exigir(Permissao.PAGAMENTOS_VER)),
     contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
 ) -> Pagina[PagamentoOut]:
     itens = [
         p
-        for p in _pagamentos(contexto, pedido_id)
-        if (status is None or p.status == status) and (not apenas_divergentes or p.divergente)
+        for p in _pagamentos(contexto, pedido_id, _conciliadas(admin))
+        if (status is None or p.status == status)
+        and (not apenas_divergentes or p.divergente)
+        and _no_periodo(p, dias, contexto)
     ]
+    pagina = itens[deslocamento : deslocamento + limite]
+    rotulos = admin.pedidos.rotulos([p.pedido_id for p in pagina])
+    for p in pagina:
+        p.pedido_numero = rotulos.get(p.pedido_id, (None, ""))[0]
     return Pagina(
-        itens=itens[deslocamento : deslocamento + limite],
+        itens=pagina,
         total=len(itens),
         limite=limite,
         deslocamento=deslocamento,
@@ -109,11 +148,20 @@ def listar_pagamentos(
     "/pagamentos/resumo", response_model=ResumoConciliacaoOut, summary="Resumo da conciliação"
 )
 def resumo(
+    dias: int | None = Query(None, ge=1, le=3650, description="Só os dos últimos N dias."),
     _: Operador = Depends(exigir(Permissao.PAGAMENTOS_VER)),
     contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
 ) -> ResumoConciliacaoOut:
-    pagamentos = _pagamentos(contexto)
+    pagamentos = [
+        p
+        for p in _pagamentos(contexto, None, _conciliadas(admin))
+        if _no_periodo(p, dias, contexto)
+    ]
     return ResumoConciliacaoOut(
+        cobrancas=len(pagamentos),
+        reembolsos=sum(1 for p in pagamentos if p.estornado_centavos > 0),
+        valor_divergente_centavos=sum(p.valor_centavos for p in pagamentos if p.divergente),
         confirmado_centavos=sum(p.valor_centavos for p in pagamentos),
         estornado_centavos=sum(p.estornado_centavos for p in pagamentos),
         retido_centavos=contexto.ledger.saldo_da_conta(CUSTODIA),
@@ -207,4 +255,36 @@ def extrato_do_contrato(
             taxa_trato_centavos=saldo.taxa_trato,
         ),
         lancamentos=[lancamento_admin_out(i) for i in itens],
+    )
+
+
+@router_divergencias.post(
+    "/{lancamento_id}/conciliar",
+    status_code=204,
+    summary="Marcar uma divergência como conciliada (só anota; não mexe em dinheiro)",
+)
+def conciliar(
+    lancamento_id: str,
+    corpo: ComMotivo,
+    operador: Operador = Depends(exigir(Permissao.PAGAMENTOS_CONCILIAR)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> None:
+    ja = _conciliadas(admin)
+    alvo = next(
+        (p for p in _pagamentos(contexto, None, ja) if p.lancamento_id == lancamento_id), None
+    )
+    if alvo is None:
+        if lancamento_id in ja:
+            raise HTTPException(409, "Essa divergência já foi conciliada.")
+        raise HTTPException(404, "Lançamento não encontrado.")
+    if not alvo.divergente:
+        raise HTTPException(409, "Esse lançamento não tem divergência.")
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao=ACAO_CONCILIADA,
+        entidade="lancamentos",
+        entidade_id=lancamento_id,
+        depois={"pedido_id": alvo.pedido_id, "valor_centavos": alvo.valor_centavos},
+        motivo=corpo.motivo,
     )

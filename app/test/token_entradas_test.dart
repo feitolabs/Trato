@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/auth/ligacao_sessao.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/erros.dart';

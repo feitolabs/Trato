@@ -38,6 +38,7 @@ from trato.persistencia.app_extras import TaxaPostgres, VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
+from trato.persistencia.conta import ContaPostgres
 from trato.persistencia.contratos import ContratosPostgres
 from trato.persistencia.conversas import ConversasPostgres, NotificacoesPostgres
 from trato.persistencia.dinheiro import (
@@ -135,6 +136,7 @@ def criar_contexto_postgres(
         repasses=RepassesPostgres(banco),
         recusas=RecusasPostgres(banco),
         notas_material=NotasMaterialPostgres(banco, execucao),
+        conta=ContaPostgres(banco),
         transacao_banco=banco.transacao,
         extras={
             "usuarios": usuarios,

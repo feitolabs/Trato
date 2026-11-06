@@ -346,4 +346,50 @@ void main() {
       await m.cliente.dispose();
     });
   });
+
+  group('recuperação de senha', () {
+    http.Response sessao(http.Request _) => _json(200, {
+          'access_token': 'a.b.c',
+          'token_type': 'bearer',
+          'expires_in': 3600,
+          'refresh_token': 'r',
+          'user': _usuario(),
+        });
+
+    test('o e-mail de recuperação volta para o app (redirect_to)', () async {
+      final m = _montar((_) => _json(200, <String, dynamic>{}));
+      await m.servico.recuperarSenha(' mariana@email.com ');
+      final p = m.pedidos.single;
+      expect(p.url.path, '/auth/v1/recover');
+      expect(p.url.queryParameters['redirect_to'], kUrlRetornoEmail);
+      expect((jsonDecode(p.body) as Map<String, dynamic>)['email'], 'mariana@email.com');
+      await m.cliente.dispose();
+    });
+
+    test('definirNovaSenha troca a senha da sessão do link', () async {
+      final m = _montar((r) => r.url.path == '/auth/v1/user' ? _json(200, _usuario()) : sessao(r));
+      await m.servico.entrarComEmail(email: 'mariana@email.com', senha: _senha);
+      await m.servico.definirNovaSenha('NovaSenha123');
+      final p = m.pedidos.lastWhere((r) => r.url.path == '/auth/v1/user');
+      expect(p.method, 'PUT');
+      expect((jsonDecode(p.body) as Map<String, dynamic>)['password'], 'NovaSenha123');
+      await m.cliente.dispose();
+    });
+
+    test('senha fraca recusada pelo Supabase vira senhaFraca', () async {
+      final m = _montar((r) => r.url.path == '/auth/v1/user' ? _erro(422, 'weak_password') : sessao(r));
+      await m.servico.entrarComEmail(email: 'mariana@email.com', senha: _senha);
+      await expectLater(
+        m.servico.definirNovaSenha('123'),
+        throwsA(_erroAuth(TipoErroAuth.senhaFraca)),
+      );
+      await m.cliente.dispose();
+    });
+
+    test('sem sessão (link vencido) a troca falha com erro tratado', () async {
+      final m = _montar((_) => _json(200, <String, dynamic>{}));
+      await expectLater(m.servico.definirNovaSenha('NovaSenha123'), throwsA(isA<ErroAuth>()));
+      await m.cliente.dispose();
+    });
+  });
 }

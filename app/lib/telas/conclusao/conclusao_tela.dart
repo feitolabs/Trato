@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'apoio_conclusao.dart';
-import 'dados_exemplo.dart';
+import 'modelos.dart';
 
 /// Tela 18: o profissional terminou; o cliente confere fotos, valor retido e o código.
 class ConclusaoTela extends StatelessWidget {
   const ConclusaoTela({
     super.key,
-    this.resumo = resumoConclusaoExemplo,
+    required this.resumo,
     this.aoConfirmar,
     this.aoRelatarProblema,
   });

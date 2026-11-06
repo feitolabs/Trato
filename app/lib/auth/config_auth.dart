@@ -27,7 +27,7 @@ class ConfigAuth {
   final String googleWebClientId;
   final String googleIosClientId;
 
-  /// Sem URL e chave, o app roda com o serviço fake.
+  /// Sem URL e chave, o login falha com erro claro.
   bool get supabaseConfigurado => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   bool get googleConfigurado => googleWebClientId.isNotEmpty;

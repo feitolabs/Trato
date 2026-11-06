@@ -144,7 +144,9 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     assert r.status_code == 201 and r.json()["minha"] is True
     historia = get(c, url_msg, "profissional").json()
     assert [m["minha"] for m in historia] == [True, False]
-    assert get(c, url_msg, "profissional2").json() == []  # conversas separadas
+    # conversas separadas: quem não atua na categoria/região do pedido nem entra nele
+    outro = get(c, url_msg, "profissional2")
+    assert outro.status_code == 404 or outro.json() == []
     assert get(c, url_msg, "cliente2").status_code == 404
 
     # aceite: o orçamento aceito vem marcado; valores do pagamento vêm do contrato

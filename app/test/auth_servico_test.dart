@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/config_auth.dart';
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import 'apoio/exemplos/auth/servico_auth_fake.dart';
 
 const _credencial = 'segredo123';
 const _outraCredencial = 'errada';

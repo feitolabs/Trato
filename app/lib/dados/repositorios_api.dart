@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../componentes/componentes.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/carteira/modelos.dart' hide ResumoCarteira;
-import '../telas/conclusao/dados_exemplo.dart';
+import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
 import '../telas/pagamento/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
@@ -24,6 +24,7 @@ import 'fila_offline.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'servico_upload.dart';
+import 'paralelo.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`). Só pedem e mostram; o backend decide.
 // Onde a rota ainda não existe no backend, a classe lança [ErroTrato.indisponivel] e o
@@ -306,9 +307,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<PedidoEmExecucao> acompanhar(String pedidoId) async {
-    final pedido = await _pedido(pedidoId);
+    // Em paralelo: pedido e histórico não dependem um do outro.
+    final (pedido, eventosBrutos) =
+        await emParalelo2(_pedido(pedidoId), _api.get('/v1/pedidos/$pedidoId/eventos'));
     final eventos = [
-      for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j),
+      for (final j in _lista(eventosBrutos)) EventoApi.deJson(j),
     ];
     // Etapas da linha do tempo (índice = posição). O check-in cobre "Chegou" e "Em execução".
     const etapaDaAcao = {
@@ -368,9 +371,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<ResumoConclusao> conclusao(String pedidoId) async {
-    final pedido = await _pedido(pedidoId);
-    final saldo = await _saldo(pedidoId);
-    final fotos = await _fotosDoServico(pedidoId);
+    final (pedido, saldo, fotos) =
+        await emParalelo3(_pedido(pedidoId), _saldo(pedidoId), _fotosDoServico(pedidoId));
     return ResumoConclusao(
       numeroPedido: pedido.numero,
       nomeProfissional: await _nomeDoProfissional(pedido),
@@ -393,8 +395,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<DadosRelatoProblema> dadosRelato(String pedidoId) async {
-    final pedido = await _pedido(pedidoId);
-    final saldo = await _saldo(pedidoId);
+    final (pedido, saldo) = await emParalelo2(_pedido(pedidoId), _saldo(pedidoId));
     return DadosRelatoProblema(
       titulo: 'Pedido ${pedido.numero}',
       valorCongeladoCentavos: saldo.retidoCentavos + saldo.aLiberarCentavos,
@@ -442,8 +443,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async {
-    final saldo = await _saldo(pedidoId);
-    final pedido = await _pedido(pedidoId);
+    final (saldo, pedido) = await emParalelo2(_saldo(pedidoId), _pedido(pedidoId));
     return DadosAvaliacao(
       nomeProfissional: await _nomeDoProfissional(pedido),
       valorLiberadoCentavos: saldo.clientePagouCentavos,
@@ -522,8 +522,12 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
   /// orçamento não derruba a lista: ele só aparece sem detalhe.
   @override
   Future<OrcamentosDoPedido> listar(String pedidoId) async {
-    final pedido = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
-    final brutos = _lista(await _api.get('/v1/pedidos/$pedidoId/orcamentos'));
+    final (pedidoBruto, orcamentosBrutos) = await emParalelo2(
+      _api.get('/v1/pedidos/$pedidoId'),
+      _api.get('/v1/pedidos/$pedidoId/orcamentos'),
+    );
+    final pedido = PedidoApi.deJson(_mapa(pedidoBruto));
+    final brutos = _lista(orcamentosBrutos);
     final detalhes = await Future.wait([
       for (final j in brutos) _detalhe(j['id'] as String),
     ]);
@@ -903,8 +907,17 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       fotoReferencia: foto,
       grupos: const [
         GrupoPerfil(
+          titulo: 'CONTA',
+          itens: [
+            ItemPerfil(acao: AcaoPerfil.dadosPessoais, titulo: 'Dados pessoais'),
+            ItemPerfil(acao: AcaoPerfil.enderecos, titulo: 'Endereços salvos'),
+            ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais favoritos'),
+          ],
+        ),
+        GrupoPerfil(
           titulo: 'SEGURANÇA E AVISOS',
           itens: [
+            ItemPerfil(acao: AcaoPerfil.contatosConfianca, titulo: 'Contatos de confiança'),
             ItemPerfil(acao: AcaoPerfil.notificacoes, titulo: 'Notificações'),
             ItemPerfil(acao: AcaoPerfil.usarComoProfissional, titulo: 'Usar como profissional'),
           ],
@@ -914,6 +927,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
           itens: [
             ItemPerfil(acao: AcaoPerfil.meusDados, titulo: 'Meus dados (LGPD)'),
             ItemPerfil(acao: AcaoPerfil.centralAjuda, titulo: 'Central de ajuda'),
+            ItemPerfil(acao: AcaoPerfil.termos, titulo: 'Termos e políticas'),
           ],
         ),
       ],
@@ -989,27 +1003,57 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     );
   }
 
-  /// Início = nome (`/v1/me`) + pedidos abertos + próximo atendimento (`/v1/pedidos`). A
-  /// carteira da Início não tem rota (D15: só extrato): fica zerada.
+  /// Início = nome (`/v1/me`) + pedidos abertos + próximo atendimento (`/v1/pedidos`) + carteira
+  /// (`/v1/profissionais/me/saldo`). Se TUDO falhar, o erro sobe para a tela mostrar "tentar de
+  /// novo"; falha parcial mostra o que deu certo.
   @override
   Future<InicioProfissional> inicio() async {
+    Object? primeiroErro;
+    T? tentar<T>(T? Function() ler) {
+      try {
+        return ler();
+      } catch (e) {
+        primeiroErro ??= e;
+        return null;
+      }
+    }
+
     Map<String, dynamic> me = const {};
+    var abertos = <PedidoAberto>[];
+    ProximoAtendimento? proximo;
+    var carteira = const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0);
+    var deuCerto = false;
     try {
       me = _mapa(await _api.get('/v1/me'));
-    } catch (_) {}
-    var abertos = <PedidoAberto>[];
+      deuCerto = true;
+    } catch (e) {
+      primeiroErro ??= e;
+    }
     try {
       abertos = await pedidosAbertos(const FiltroPedidosAbertos(limite: 20));
-    } catch (_) {}
-    ProximoAtendimento? proximo;
+      deuCerto = true;
+    } catch (e) {
+      // 403: cadastro ainda em análise. A tela mostra o motivo, não uma lista vazia.
+      if (e is ErroTrato && e.codigoHttp == 403) rethrow;
+      primeiroErro ??= e;
+    }
+    try {
+      final saldo = _mapa(await _api.get('/v1/profissionais/me/saldo'));
+      carteira = ResumoCarteira(
+        retidoCentavos: (saldo['a_liberar_centavos'] as num?)?.toInt() ?? 0,
+        paraSacarCentavos: (saldo['liberado_centavos'] as num?)?.toInt() ?? 0,
+      );
+      deuCerto = true;
+    } catch (e) {
+      primeiroErro ??= e;
+    }
     try {
       final itensBrutos =
           _lista(await _api.get('/v1/pedidos', consulta: const {'como': 'profissional'}));
       final meus = <PedidoApi>[];
       for (final j in itensBrutos) {
-        try {
-          meus.add(PedidoApi.deJson(j));
-        } catch (_) {}
+        final p = tentar(() => PedidoApi.deJson(j));
+        if (p != null) meus.add(p);
       }
       for (final p in meus) {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
@@ -1025,13 +1069,17 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
           break;
         }
       }
-    } catch (_) {}
+      deuCerto = true;
+    } catch (e) {
+      primeiroErro ??= e;
+    }
+    if (!deuCerto && primeiroErro != null) throw primeiroErro!;
     final nomeMe = ((me['nome'] as String?) ?? '').trim();
     final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
     return InicioProfissional(
       nome: primeiroNome.isEmpty ? 'Profissional' : primeiroNome,
       disponivelAgora: true,
-      carteira: const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0),
+      carteira: carteira,
       pedidos: abertos,
       proximo: proximo,
     );
@@ -1054,22 +1102,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     );
   }
 
-  /// Não há rota de detalhe do pedido aberto: o detalhe sai da própria lista.
+  /// `GET /v1/profissional/pedidos-abertos/{id}`: pedido que não está mais disponível responde 404.
   @override
   Future<DetalhePedido> detalhe(String pedidoId) async {
-    final onde = await posicao?.call();
-    final itens = _lista(await _api.get(
-      '/v1/profissional/pedidos-abertos',
-      consulta: {
-        if (onde != null) 'lat': '${onde.latitude}',
-        if (onde != null) 'lng': '${onde.longitude}',
-      },
-    ));
-    final achado = itens.where((j) => j['id'] == pedidoId).toList();
-    if (achado.isEmpty) {
-      throw const ErroTrato(TipoErro.naoEncontrado, 'Este pedido não está mais disponível.');
+    final Map<String, dynamic> j;
+    try {
+      j = _mapa(await _api.get('/v1/profissional/pedidos-abertos/$pedidoId'));
+    } on ErroTrato catch (e) {
+      if (e.tipo == TipoErro.naoEncontrado) {
+        throw const ErroTrato(TipoErro.naoEncontrado, 'Este pedido não está mais disponível.');
+      }
+      rethrow;
     }
-    final j = achado.first;
     final aberto = _pedidoAberto(j);
     return DetalhePedido(
       pedido: aberto,

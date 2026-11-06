@@ -5,6 +5,8 @@ import 'package:trato/telas/pagamento/pagamento_tela.dart';
 import 'package:trato/telas/perfil_cliente/modelos.dart';
 import 'package:trato/telas/perfil_cliente/perfil_cliente_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/exemplos/telas/pagamento/dados_exemplo.dart' as expag;
+import 'apoio/exemplos/telas/perfil_cliente/dados_exemplo.dart' as expcl;
 
 const _telas = {
   'pequeno 320x568': Size(320, 568),
@@ -45,7 +47,7 @@ const _adiantamento = DadosPagamento(
 void main() {
   group('Pagamento', () {
     testWidgets('mostra valor, passos de proteção e aviso de CPF', (tester) async {
-      await _abrir(tester, const PagamentoTela());
+      await _abrir(tester, const PagamentoTela(dados: expag.DadosExemplo.pagamento, ));
       expect(find.text('R\$ 380,00'), findsOneWidget);
       expect(find.text('Como funciona o pagamento', skipOffstage: false), findsOneWidget);
       expect(find.textContaining('só no nome do seu CPF', skipOffstage: false), findsOneWidget);
@@ -54,7 +56,7 @@ void main() {
 
     testWidgets('trocar para cartão muda o botão e o método enviado', (tester) async {
       MetodoPagamento? pago;
-      await _abrir(tester, PagamentoTela(aoPagar: (m) => pago = m));
+      await _abrir(tester, PagamentoTela(dados: expag.DadosExemplo.pagamento, aoPagar: (m) => pago = m));
       await tester.tap(find.text('Cartão de crédito à vista'));
       await tester.pumpAndSettle();
       expect(find.text('Pagar R\$ 380,00 com cartão'), findsOneWidget);
@@ -65,7 +67,7 @@ void main() {
 
     testWidgets('Pix é o padrão e o botão chama o callback', (tester) async {
       MetodoPagamento? pago;
-      await _abrir(tester, PagamentoTela(aoPagar: (m) => pago = m));
+      await _abrir(tester, PagamentoTela(dados: expag.DadosExemplo.pagamento, aoPagar: (m) => pago = m));
       await tester.tap(find.textContaining('Pagar R\$'));
       expect(pago, MetodoPagamento.pix);
     });
@@ -78,14 +80,14 @@ void main() {
     });
 
     testWidgets('sem rótulo, nada extra aparece', (tester) async {
-      await _abrir(tester, const PagamentoTela());
+      await _abrir(tester, const PagamentoTela(dados: expag.DadosExemplo.pagamento, ));
       expect(find.textContaining('Adiantamento'), findsNothing);
     });
   });
 
   group('Perfil do cliente', () {
     testWidgets('mostra nome, nota e os três grupos', (tester) async {
-      await _abrir(tester, const PerfilClienteTela());
+      await _abrir(tester, const PerfilClienteTela(perfil: expcl.DadosExemplo.perfil, ));
       expect(find.text('Mariana Alves'), findsOneWidget);
       expect(find.text('Nota 4,8 como cliente · 6 serviços'), findsOneWidget);
       expect(find.text('CONTA'), findsOneWidget);
@@ -99,7 +101,7 @@ void main() {
       var saiu = false;
       await _abrir(
         tester,
-        PerfilClienteTela(aoTocarItem: toques.add, aoSair: () => saiu = true),
+        PerfilClienteTela(perfil: expcl.DadosExemplo.perfil, aoTocarItem: toques.add, aoSair: () => saiu = true),
       );
       await tester.tap(find.text('Usar como profissional'));
       await tester.tap(find.text('Meus dados (LGPD)'));
@@ -112,7 +114,7 @@ void main() {
   group('sem estouro de layout', () {
     final telas = <String, Widget>{
       'pagamento': const PagamentoTela(dados: _adiantamento),
-      'perfil': const PerfilClienteTela(),
+      'perfil': const PerfilClienteTela(perfil: expcl.DadosExemplo.perfil, ),
     };
     for (final MapEntry(key: nome, value: tela) in telas.entries) {
       for (final MapEntry(key: nomeTela, value: tamanho) in _telas.entries) {

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/telas/orcamentos/dados_exemplo.dart';
+import '../apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 import '../apoio/fontes.dart';
+import '../apoio/exemplos/telas/pedido_novo/dados_exemplo.dart';
 
 /// Telas 11 (Novo pedido), 12 (Orçamentos recebidos) e 13 (Detalhe do orçamento) do PDF
 /// em celular pequeno, protótipo e tablet. Altura grande para a tela inteira caber.
@@ -20,12 +21,14 @@ void main() {
     'tablet': Size(768, 1700),
   };
   final telas = <String, Widget>{
-    'novo_pedido': NovoPedidoTela(
+    'novo_pedido': NovoPedidoTela(formulario: formularioExemplo, 
       aoTrocarCategoria: () {},
       aoMudarEndereco: () {},
       aoAdicionarFoto: () {},
+      // Data fixa: o prazo padrão (hoje + 7) não muda o golden a cada dia.
+      agora: () => DateTime(2026, 11, 5),
     ),
-    'orcamentos': OrcamentosRecebidosTela(),
+    'orcamentos': OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ),
     'detalhe_orcamento': DetalheOrcamentoTela(
       orcamento: orcamentosExemplo[1],
       aoConversar: (_) {},

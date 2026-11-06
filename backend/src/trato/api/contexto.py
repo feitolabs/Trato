@@ -76,6 +76,12 @@ _APOS_COMMIT: ContextVar[list[Callable[[], None]] | None] = ContextVar(
 )
 
 
+def _conta_em_memoria() -> Any:
+    from trato.api.conta import ContaEmMemoria
+
+    return ContaEmMemoria()
+
+
 def _repasses_em_memoria() -> RepositorioRepasses:
     from trato.api.memoria import RepassesEmMemoria
 
@@ -107,6 +113,8 @@ class Contexto:
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
     notas_material: RepositorioNotasMaterial = field(default_factory=NotasMaterialEmMemoria)
+    # Dados pessoais, endereços, favoritos e contatos de confiança (`api/conta.py`).
+    conta: Any = field(default_factory=lambda: _conta_em_memoria())
     # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
     taxa: ProvedorTaxa | None = None
     repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)
@@ -179,7 +187,8 @@ def usuario_atual(
     credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Usuario:
-    token = credenciais.credentials if credenciais else request.query_params.get("token")
+    # Só o cabeçalho Authorization vale: token na URL vaza em histórico, log e referer.
+    token = credenciais.credentials if credenciais else None
     usuario = contexto.auth.autenticar(token) if token else None
     if usuario is None:
         raise HTTPException(
@@ -189,8 +198,22 @@ def usuario_atual(
 
 
 def exigir_papel(*papeis: PapelUsuario) -> Callable[[Usuario], Usuario]:
-    def dependencia(usuario: Usuario = Depends(usuario_atual)) -> Usuario:
+    def dependencia(
+        usuario: Usuario = Depends(usuario_atual),
+        contexto: Contexto = Depends(obter_contexto),
+    ) -> Usuario:
         if usuario.papel not in papeis:
+            # Cadastro de profissional ainda não aprovado: o sistema o trata como cliente até lá.
+            if (
+                PapelUsuario.PROFISSIONAL in papeis
+                and usuario.papel is PapelUsuario.CLIENTE
+                and contexto.usuarios.tem_perfil_profissional(usuario.id)
+            ):
+                raise HTTPException(
+                    403,
+                    "Seu cadastro de profissional ainda está em análise. Você verá os pedidos e "
+                    "poderá enviar orçamentos assim que for aprovado.",
+                )
             raise HTTPException(403, "Seu perfil não pode fazer isso.")
         return usuario
 

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/ajuda/ajuda_tela.dart';
-import 'package:trato/telas/ajuda/servico_fake.dart';
+import '../apoio/exemplos/telas/ajuda/servico_fake.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
-import 'package:trato/telas/busca/servico_fake.dart';
+import '../apoio/exemplos/telas/busca/servico_fake.dart';
 import 'package:trato/telas/lgpd/central_privacidade_tela.dart';
 import 'package:trato/telas/lgpd/excluir_conta_tela.dart';
-import 'package:trato/telas/lgpd/servico_fake.dart';
+import '../apoio/exemplos/telas/lgpd/servico_fake.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
-import 'package:trato/telas/mensagens/servico_fake.dart';
+import '../apoio/exemplos/telas/mensagens/servico_fake.dart';
 import 'package:trato/telas/notificacoes/notificacoes_tela.dart';
-import 'package:trato/telas/notificacoes/servico_fake.dart';
+import '../apoio/exemplos/telas/notificacoes/servico_fake.dart';
 import 'package:trato/tema/tema.dart';
+import '../apoio/exemplos/telas/cliente/dados_exemplo.dart' as excli;
 
 import '../apoio/fontes.dart';
 
@@ -36,7 +37,8 @@ void main() {
     'privacidade': () => CentralPrivacidadeTela(servico: ServicoPrivacidadeFake()),
     'excluir_conta': () => ExcluirContaTela(servico: ServicoPrivacidadeFake()),
     'ajuda': () => const AjudaTela(servico: ServicoAjudaFake()),
-    'busca': () => const BuscaProfissionaisTela(servico: ServicoBuscaFake()),
+    'busca': () =>
+        BuscaProfissionaisTela(servico: const ServicoBuscaFake(), sugestoes: excli.categorias),
     'busca_resultados': () =>
         const BuscaProfissionaisTela(servico: ServicoBuscaFake(), termoInicial: 'elétrica'),
     'busca_vazio': () =>

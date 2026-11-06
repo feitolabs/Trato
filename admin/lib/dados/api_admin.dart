@@ -4,6 +4,10 @@ import 'modelos.dart';
 /// os endpoints esperados estão em docs/painel-admin.md. Nenhuma regra de dinheiro mora aqui:
 /// o painel pede, o backend decide.
 abstract interface class ApiAdmin {
+  /// Número do registro de auditoria gerado pela última ação (o backend manda em `X-Auditoria-Id`).
+  /// O aviso de sucesso mostra esse número.
+  int? get ultimoRegistroAuditoria;
+
   Future<UsuarioEquipe> entrar(String email, String senha);
   Future<void> sair();
 
@@ -26,11 +30,21 @@ abstract interface class ApiAdmin {
   Future<ResultadoDecisao> aprovarDisputa(String id, {required String justificativa});
 
   // F7.3 pagamentos (somente leitura)
-  Future<ResumoConciliacao> resumoConciliacao();
-  Future<List<LancamentoEspelho>> extrato();
+  /// [dias] limita ao período (7, 30, 90…); nulo = tudo.
+  Future<ResumoConciliacao> resumoConciliacao({int? dias});
+  Future<List<LancamentoEspelho>> extrato({int? dias});
+
+  /// Marca uma divergência como conciliada. Só anota: não mexe em dinheiro (RF-PAG-04).
+  Future<void> conciliarDivergencia(String lancamentoId, {required String motivo});
 
   // F7.4 busca, suporte, categorias, cidades e usuários
   Future<List<UsuarioBusca>> buscarUsuarios(String termo);
+
+  /// Detalhe com categorias cadastradas e histórico (contato continua mascarado).
+  Future<UsuarioBusca> detalheUsuario(String usuarioId);
+
+  /// RN-01: por que este pedido aparece (ou não) para este profissional.
+  Future<DiagnosticoPedido> diagnosticarPedido(String usuarioId, String pedido);
   Future<DadosPessoais> revelarDadosPessoais(String usuarioId, String motivo);
   Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo});
   Future<List<PedidoBusca>> buscarPedidos(String termo);
@@ -77,13 +91,25 @@ abstract interface class ApiAdmin {
   Future<void> publicarConfig(String versaoId, String motivo);
   Future<void> reverterConfig(String versaoId, String motivo);
 
+  /// Recusa uma proposta que ainda espera aprovação (ela é descartada; o histórico fica na auditoria).
+  Future<void> recusarConfig(String versaoId, String motivo);
+
   // F7.6 auditoria
-  Future<List<EntradaAuditoria>> listarAuditoria({String? acao, String? ator});
+  Future<PaginaAuditoria> listarAuditoria({
+    String? acao,
+    String? ator,
+    String? entidade,
+    DateTime? desde,
+    DateTime? ate,
+    int limite = 25,
+    int deslocamento = 0,
+  });
   Future<ResultadoCadeia> verificarCadeia();
 
   // Módulo 1: Dashboard
-  Future<MetricasDashboard> metricasDashboard();
-  Future<SeriesDashboard> seriesDashboard({int dias = 7});
+  /// Período: os últimos [dias] ou o intervalo [inicio]–[fim] (personalizado).
+  Future<MetricasDashboard> metricasDashboard({int dias = 30, DateTime? inicio, DateTime? fim});
+  Future<SeriesDashboard> seriesDashboard({int dias = 30, DateTime? inicio, DateTime? fim});
 
   // Módulo 2: Perguntas Dinâmicas da Categoria
   Future<List<PerguntaCategoriaAdmin>> listarPerguntasCategoria(String categoriaId);
@@ -112,15 +138,29 @@ abstract interface class ApiAdmin {
   // Módulo 3: Central Antifraude e Risco
   Future<List<AlertaRisco>> listarAlertasRisco();
   Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo});
+  Future<void> desbloquearConta(String usuarioId, {required String motivo});
   Future<void> travarSaque(String usuarioId, {required String motivo});
-  Future<void> resolverAlertaRisco(String alertaId, {required String motivo});
+  Future<void> destravarSaque(String usuarioId, {required String motivo});
+
+  /// Assume o alerta: ele vai para "Em análise" com a pessoa como responsável.
+  Future<void> assumirAlertaRisco(String alertaId, {required String motivo});
+
+  /// [resultado]: "procedente" ou "improcedente".
+  Future<void> resolverAlertaRisco(String alertaId, {required String resultado, required String motivo});
 
   // Módulo 4: Notificações em Massa & Campanhas
   Future<List<CampanhaNotificacao>> listarCampanhasNotificacao();
+  Future<EstimativaCampanha> estimarCampanhaNotificacao({
+    required String segmento,
+    required String tipo,
+    String? categoriaId,
+    String? cidadeId,
+  });
   Future<CampanhaNotificacao> dispararCampanhaNotificacao({
     required String titulo,
     required String mensagem,
     required String segmento,
+    String tipo = 'marketing',
     String? categoriaId,
     String? cidadeId,
     required String motivo,
@@ -134,7 +174,10 @@ abstract interface class ApiAdmin {
     required int valor,
     int valorMinimoCentavos = 0,
     int? limiteUsos,
+    int? limitePorUsuario,
+    String? validoDesde,
     String? validoAte,
+    String? campanha,
     required String motivo,
   });
   Future<CupomAdmin> alterarStatusCupom(String cupomId, {required bool ativo, required String motivo});
@@ -142,6 +185,9 @@ abstract interface class ApiAdmin {
 
   // Módulo 6: Equipe Interna
   Future<List<MembroEquipeAdmin>> listarEquipe();
+
+  /// Teto de alçada de cada papel, em centavos (RP-02).
+  Future<Map<String, int>> tetosDosPapeis();
   Future<MembroEquipeAdmin> adicionarMembroEquipe({
     required String nome,
     required String email,
@@ -159,7 +205,15 @@ abstract interface class ApiAdmin {
   Future<void> revogarMembroEquipe(String usuarioId, {required String motivo});
 
   // Módulo 7: Exportação de Relatórios CSV
-  String urlRelatorioFinanceiroCsv();
-  String urlRelatorioPedidosCsv();
-  String urlRelatorioRepassesCsv();
+
+  /// Gera o relatório ([tipo]: `financeiro`, `pedidos` ou `repasses`) e devolve o link de uso único.
+  /// Toda exportação grava na auditoria quem exportou, os filtros e a data (RF-REL-03).
+  Future<RelatorioPronto> solicitarRelatorio(
+    String tipo, {
+    DateTime? inicio,
+    DateTime? fim,
+    String? cidadeId,
+    String formato = 'excel_br',
+    required String motivo,
+  });
 }

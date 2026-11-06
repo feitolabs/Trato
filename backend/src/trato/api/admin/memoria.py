@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from trato.api.admin import config_regras as regras
 from trato.api.admin.repositorios import (
+    ComplementoUsuarioAdmin,
     DadosPessoaisAdmin,
     DefinicaoConfig,
     EntradaAuditoria,
@@ -22,6 +23,7 @@ from trato.api.admin.repositorios import (
     VerificacaoAdmin,
     VersaoConfig,
 )
+from trato.persistencia.captura_auditoria import anotar_id_gravado
 from trato.persistencia.comum import para_json
 from trato.persistencia.erros import NaoEncontrado, RegraDoBanco
 
@@ -89,6 +91,7 @@ class AuditoriaEmMemoria:
             }
             linha["hash"] = self._hash(linha, anterior)
             self._linhas.append(linha)
+            anotar_id_gravado(int(linha["id"]))
             return int(linha["id"])
 
     def listar(
@@ -222,6 +225,18 @@ class UsuariosAdminEmMemoria:
     def nomes(self, ids: Sequence[str]) -> dict[str, str]:
         return {i: self._itens[i].nome for i in ids if i in self._itens}
 
+    def complementos(self, usuarios):
+        return {u.id: ComplementoUsuarioAdmin(publico_id=u.id[:8].upper()) for u in usuarios}
+
+    def categorias(self, usuario_id):
+        return ()
+
+    def historico(self, usuario_id, limite):
+        return ()
+
+    def diagnosticar(self, usuario_id, pedido):
+        return None
+
     def dados_pessoais(
         self, usuario_id: str, ator_id: str, motivo: str
     ) -> DadosPessoaisAdmin | None:
@@ -284,6 +299,10 @@ class PedidosAdminEmMemoria:
             )
         saida.sort(key=lambda r: r.criado_em or _agora(), reverse=True)
         return tuple(saida[deslocamento : deslocamento + limite]), len(saida)
+
+    def rotulos(self, pedido_ids: Sequence[str]) -> dict[str, tuple[int | None, str]]:
+        dados = getattr(self._contexto.pedidos, "_dados", {})
+        return {i: (None, dados[i].titulo if i in dados else "Pedido") for i in pedido_ids}
 
 
 class ConfigAdminEmMemoria:

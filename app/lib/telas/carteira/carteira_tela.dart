@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 
 /// Tela 27 — Carteira do profissional. Só exibe o que o backend devolveu em [dados]:
@@ -11,7 +10,7 @@ import 'modelos.dart';
 class CarteiraTela extends StatelessWidget {
   const CarteiraTela({
     super.key,
-    this.dados = DadosExemploCarteira.completo,
+    required this.dados,
     this.aoSacarPix,
     this.aoVerTudo,
     this.aoTentarNovamente,
