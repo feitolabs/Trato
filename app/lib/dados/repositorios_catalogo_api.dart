@@ -21,25 +21,43 @@ String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
 
 Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
 
-/// Ícone de cada categoria pelo id/slug (o backend não manda ícone). Categoria nova usa o genérico.
-IconData iconeDaCategoria(String? id) => switch (id) {
-      'eletrica' => Icons.bolt,
-      'hidraulica' => Icons.water_drop_outlined,
-      'pintura' => Icons.format_paint_outlined,
-      'montagem' => Icons.inventory_2_outlined,
-      'limpeza' => Icons.auto_awesome_outlined,
+/// Ícone de cada categoria pelo slug (o backend não manda ícone). Categoria nova usa o genérico.
+/// Os slugs são os de `public.categorias`; os curtos antigos ficam para não quebrar dados velhos.
+IconData iconeDaCategoria(String? slug) => switch (slug) {
+      'eletricista' || 'eletrica' => Icons.bolt,
+      'encanador' || 'hidraulica' => Icons.water_drop_outlined,
+      'pintura-interna' || 'pintura' => Icons.format_paint_outlined,
+      'montagem-de-moveis' || 'montagem' => Icons.chair_outlined,
+      'limpeza-residencial' || 'limpeza' => Icons.cleaning_services_outlined,
+      'diarista' => Icons.home_outlined,
+      'limpeza-especial' => Icons.weekend_outlined,
       'ar-condicionado' => Icons.ac_unit,
       'chaveiro' => Icons.vpn_key_outlined,
       'jardinagem' => Icons.yard_outlined,
+      'reparos-gerais' => Icons.handyman_outlined,
       'reformas' => Icons.construction_outlined,
-      _ => Icons.handyman_outlined,
+      'cameras-seguranca' => Icons.videocam_outlined,
+      'cortinas-persianas' => Icons.blinds_outlined,
+      'gesso-drywall' => Icons.view_quilt_outlined,
+      'impermeabilizacao' => Icons.umbrella_outlined,
+      'informatica-redes' => Icons.router_outlined,
+      'eletrodomesticos' => Icons.kitchen_outlined,
+      'marcenaria' => Icons.carpenter_outlined,
+      'mudanca-frete' => Icons.local_shipping_outlined,
+      'pisos-revestimentos' => Icons.grid_on_outlined,
+      'serralheria' => Icons.hardware_outlined,
+      'vidraceiro' => Icons.window_outlined,
+      _ => Icons.home_repair_service_outlined,
     };
 
 String _iniciais(String nome) {
-  final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  final partes =
+      nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
   if (partes.isEmpty) return '?';
   final primeira = partes.first[0].toUpperCase();
-  return partes.length == 1 ? primeira : primeira + partes.last[0].toUpperCase();
+  return partes.length == 1
+      ? primeira
+      : primeira + partes.last[0].toUpperCase();
 }
 
 /// Catálogo ligado à API real (`GET /v1/catalogo/categorias`, `GET /v1/profissionais` e
@@ -54,10 +72,12 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   Future<List<CategoriaServico>> categorias() async {
     final resposta = await _api.get('/v1/catalogo/categorias');
     return [
-      for (final item in (resposta as List? ?? const []).cast<Map<String, dynamic>>())
+      for (final item
+          in (resposta as List? ?? const []).cast<Map<String, dynamic>>())
         CategoriaServico(
           (item['nome'] as String?) ?? 'Serviço',
-          iconeDaCategoria((item['id'] as String?) ?? (item['slug'] as String?)),
+          iconeDaCategoria(
+              (item['slug'] as String?) ?? (item['id'] as String?)),
           id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
         ),
     ];
@@ -108,10 +128,12 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   @override
-  Future<List<Profissional>> profissionais(String categoriaId, FiltroProfissionais filtro) async {
+  Future<List<Profissional>> profissionais(
+      String categoriaId, FiltroProfissionais filtro) async {
     final consulta = <String, String>{
       'categoria_id': categoriaId,
-      if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
+      if (filtro.bairro != null && filtro.bairro!.isNotEmpty)
+        'bairro': filtro.bairro!,
     };
     final (bruto, _) = await emParalelo2(
       _api.get('/v1/profissionais', consulta: consulta),
@@ -131,7 +153,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       if (limpo.length >= 2) 'servico': limpo,
     };
     final (bruto, _) = await emParalelo2(
-      _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
+      _api.get('/v1/profissionais',
+          consulta: consulta.isEmpty ? null : consulta),
       _carregarNomesCategorias(),
     );
     final resposta = _mapa(bruto);
@@ -158,7 +181,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   @override
   Future<FormularioPedido> formulario(String categoriaId) async {
     // Em paralelo. Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
-    final (base, cidades) = await emParalelo2(_formularioBase(categoriaId), _cidades());
+    final (base, cidades) =
+        await emParalelo2(_formularioBase(categoriaId), _cidades());
     if (cidades.isEmpty) {
       throw const ErroTrato(
         TipoErro.indisponivel,
@@ -175,8 +199,12 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       categoriaId: categoriaId,
       icone: c?.icone ?? Icons.handyman_outlined,
       categoria: c?.nome ?? 'Serviço solicitado',
-      servicos: (c?.servicos.isEmpty ?? true) ? const ['Orçamento geral'] : c!.servicos,
-      servicosIniciais: {(c?.servicos.isEmpty ?? true) ? 'Orçamento geral' : c!.servicos.first},
+      servicos: (c?.servicos.isEmpty ?? true)
+          ? const ['Orçamento geral']
+          : c!.servicos,
+      servicosIniciais: {
+        (c?.servicos.isEmpty ?? true) ? 'Orçamento geral' : c!.servicos.first
+      },
       perguntaQuantidade: 'Quantos itens ou ambientes?',
       dicaQuantidade: 'Uma estimativa já ajuda',
       quantidadeInicial: 1,
@@ -191,7 +219,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
         FaixaPreco(minimoCentavos: 30000, maximoCentavos: 80000),
       ],
       endereco: 'Seu endereço atual',
-      avisoEndereco: 'O endereço completo só aparece para o profissional contratado.',
+      avisoEndereco:
+          'O endereço completo só aparece para o profissional contratado.',
       avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
     );
   }
@@ -212,11 +241,14 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           servico: 'serviço',
           nota: ((a as Map)['nota_geral'] as num).toDouble(),
           comentario: (a['comentario'] as String?) ?? '',
-          detalhes: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'].join(' · '),
+          detalhes: [
+            for (final e in (a['etiquetas'] as List? ?? const [])) '$e'
+          ].join(' · '),
         ),
     ];
     final portfolio = [
-      for (final p in (j['portfolio'] as List? ?? const [])) (p as Map)['titulo'] as String,
+      for (final p in (j['portfolio'] as List? ?? const []))
+        (p as Map)['titulo'] as String,
     ];
     final regioes = [
       for (final r in (j['regioes'] as List? ?? const []))
@@ -228,7 +260,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       nome: nome,
       iniciais: _iniciais(nome),
       verificacao: nivel.contains('plus') ? 'Verificado Plus' : 'Verificado',
-      especialidade: _especialidade((j['categorias'] as List?) ?? const <Object?>[]),
+      especialidade:
+          _especialidade((j['categorias'] as List?) ?? const <Object?>[]),
       servicosConcluidos: (j['servicos_concluidos'] as int?) ?? 0,
       nota: notaPublica ?? 0,
       distanciaKm: 0,
@@ -303,7 +336,8 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
 
   @override
   Future<DetalheServico> detalhe(String pedidoId) async {
-    final pedido = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
+    final pedido =
+        PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
     final antesDaContratacao = pedido.estado == 'aberto';
     final etapas = antesDaContratacao
         ? const [
@@ -327,10 +361,13 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
     var valores = <LinhaValor>[];
     if (!antesDaContratacao && pedido.estado != 'cancelado') {
       try {
-        final s = SaldoPedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/saldo')));
+        final s = SaldoPedidoApi.deJson(
+            _mapa(await _api.get('/v1/pedidos/$pedidoId/saldo')));
         valores = [
-          if (s.clientePagouCentavos > 0) LinhaValor('Total pago', s.clientePagouCentavos, destaque: true),
-          if (s.liberadoCentavos > 0) LinhaValor('Já liberado ao profissional', s.liberadoCentavos),
+          if (s.clientePagouCentavos > 0)
+            LinhaValor('Total pago', s.clientePagouCentavos, destaque: true),
+          if (s.liberadoCentavos > 0)
+            LinhaValor('Já liberado ao profissional', s.liberadoCentavos),
         ];
       } on ErroTrato {
         // Sem saldo (ainda sem pagamento): mostra o pedido sem valores.
@@ -342,7 +379,10 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
       'pago_e_retido' => ('Pagamento confirmado · a agendar', TipoStatus.info),
       'agendado' => ('Agendado', TipoStatus.info),
       'em_andamento' => ('Em execução', TipoStatus.info),
-      'em_confirmacao' => ('Em execução · aguardando sua confirmação', TipoStatus.info),
+      'em_confirmacao' => (
+          'Em execução · aguardando sua confirmação',
+          TipoStatus.info
+        ),
       'concluido' => ('Finalizado', TipoStatus.sucesso),
       'cancelado' => ('Cancelado', TipoStatus.alerta),
       'em_disputa' => ('Disputa aberta · em análise', TipoStatus.alerta),
@@ -394,7 +434,9 @@ class RepositorioAgendaApi implements RepositorioAgenda {
         horario: proximo.quando,
         titulo: proximo.titulo,
         local: proximo.endereco,
-        estado: proximo.emAndamento ? EstadoAgendamento.emAndamento : EstadoAgendamento.agendado,
+        estado: proximo.emAndamento
+            ? EstadoAgendamento.emAndamento
+            : EstadoAgendamento.agendado,
       ),
     ];
   }
