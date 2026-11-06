@@ -7,6 +7,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from trato import __version__
 from trato.api import (
+    conta,
     rotas_app,
     rotas_cadastro,
     rotas_financeiro,
@@ -31,6 +32,7 @@ def criar_router() -> APIRouter:
     roteador.include_router(rotas_pedidos.router)
     roteador.include_router(rotas_app.router)
     roteador.include_router(rotas_pedido_contrato.router)
+    roteador.include_router(conta.router)
     roteador.include_router(rotas_financeiro.router)
     roteador.include_router(rotas_webhook.router)
     roteador.include_router(criar_router_admin())

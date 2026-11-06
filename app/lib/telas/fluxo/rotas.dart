@@ -45,6 +45,11 @@ import '../nota_material/nota_material.dart';
 import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_fake.dart';
+import '../conta/dados_pessoais_tela.dart';
+import '../conta/enderecos_tela.dart';
+import '../conta/favoritos_contatos_telas.dart';
+import '../conta/modelos.dart' show ServicoConta;
+import '../conta/servico_fake.dart';
 import '../lgpd/central_privacidade_tela.dart';
 import '../lgpd/servico_fake.dart';
 import '../mensagens/mensagens_tela.dart';
@@ -272,6 +277,15 @@ abstract final class RotasTrato {
               context,
               AvaliacoesProfissionalTela(profissional: x),
             ),
+            favoritoAtual: perfil.id == null
+                ? null
+                : () async => (await _conta.favoritos())
+                    .any((f) => f.profissionalId == perfil.id),
+            aoMudarFavorito: perfil.id == null
+                ? null
+                : (v) => v
+                    ? _conta.favoritar(perfil.id!)
+                    : _conta.desfavoritar(perfil.id!),
           ),
         ),
       );
@@ -903,6 +917,32 @@ abstract final class RotasTrato {
               case AcaoPerfil.centralAjuda:
                 _abrir<void>(
                     context, const AjudaTela(servico: ServicoAjudaFake()));
+              case AcaoPerfil.dadosPessoais:
+                _abrir<void>(context, DadosPessoaisTela(servico: _conta));
+              case AcaoPerfil.enderecos:
+                _abrir<void>(context, EnderecosTela(servico: _conta));
+              case AcaoPerfil.favoritos:
+                _abrir<void>(
+                  context,
+                  FavoritosTela(
+                    servico: _conta,
+                    aoAbrir: (f) => abrirPerfil(
+                      context,
+                      Profissional(
+                        id: f.profissionalId,
+                        nome: f.nome ?? 'Profissional',
+                        iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
+                        verificacao: '',
+                        especialidade: '',
+                        servicosConcluidos: f.servicos ?? 0,
+                        nota: f.nota ?? 0,
+                        distanciaKm: 0,
+                      ),
+                    ),
+                  ),
+                );
+              case AcaoPerfil.contatosConfianca:
+                _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
               default:
                 break;
             }
@@ -910,10 +950,16 @@ abstract final class RotasTrato {
         ),
       );
 
-  /// Itens do Perfil sem tela ainda (dados pessoais, endereços, pagamento, favoritos, contatos)
-  /// saem da lista em vez de abrir uma tela vazia. Voltam quando a tela existir
-  /// (`docs/placeholders.md`).
+  static final ServicoConta _contaDemo = ServicoContaFake();
+  static ServicoConta get _conta => repos.conta ?? _contaDemo;
+
+  /// Itens do Perfil sem tela ainda (hoje só "Formas de pagamento") saem da lista em vez de
+  /// abrir uma tela vazia. Voltam quando a tela existir (`docs/placeholders.md`).
   static const _acoesComTela = {
+    AcaoPerfil.dadosPessoais,
+    AcaoPerfil.enderecos,
+    AcaoPerfil.favoritos,
+    AcaoPerfil.contatosConfianca,
     AcaoPerfil.usarComoProfissional,
     AcaoPerfil.notificacoes,
     AcaoPerfil.meusDados,
