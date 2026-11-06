@@ -24,6 +24,7 @@ class NovoPedidoTela extends StatefulWidget {
     this.aoMudarEndereco,
     this.aoAdicionarFoto,
     this.aoCapturarFoto,
+    this.agora,
   });
 
   final FormularioPedido formulario;
@@ -38,6 +39,9 @@ class NovoPedidoTela extends StatefulWidget {
   /// vale no lugar de [aoAdicionarFoto] e as fotos entram no [RascunhoPedido].
   final CapturarFoto? aoCapturarFoto;
 
+  /// Relógio da tela (prazo padrão e calendário). Nulo = hora do aparelho; testes fixam a data.
+  final DateTime Function()? agora;
+
   @override
   State<NovoPedidoTela> createState() => _NovoPedidoTelaState();
 }
@@ -48,7 +52,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late String _voltagem = widget.formulario.voltagemInicial;
   /// `false` = sem pressa (padrão); `true` = com pressa.
   bool _comPressa = false;
-  late DateTime _dataPrazo = DateTime.now().add(const Duration(days: 7));
+  late DateTime _dataPrazo = _agora().add(const Duration(days: 7));
   late FaixaPreco _faixa = widget.formulario.faixas.first;
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
   final _controladorValorProprio = TextEditingController();
@@ -58,6 +62,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   var _enviando = false;
   final _fotosNovas = <String>[];
   CidadeOpcao? _cidade;
+
+  DateTime _agora() => widget.agora?.call() ?? DateTime.now();
 
   @override
   void initState() {
@@ -70,7 +76,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   void _selecionarPressa(bool comPressa) {
     setState(() {
       _comPressa = comPressa;
-      final hoje = DateTime.now();
+      final hoje = _agora();
       _dataPrazo = hoje.add(Duration(days: comPressa ? 2 : 7));
     });
   }
@@ -81,7 +87,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   String? get _erroPrazo => null;
 
   Future<void> _escolherDataPrazo() async {
-    final hoje = DateTime.now();
+    final hoje = _agora();
     final inicio = DateTime(hoje.year, hoje.month, hoje.day);
     final data = await showDatePicker(
       context: context,

@@ -16,6 +16,7 @@ import 'package:trato/telas/notificacoes/modelos.dart';
 import 'package:trato/telas/notificacoes/notificacoes_tela.dart';
 import 'apoio/exemplos/telas/notificacoes/servico_fake.dart';
 import 'package:trato/tema/tema.dart';
+import 'package:trato/componentes/componentes.dart';
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -65,7 +66,7 @@ void main() {
       await _abrir(tester, NotificacoesTela(servico: ServicoNotificacoesFake(itens: const [])));
       expect(find.text('Nada por aqui'), findsOneWidget);
       await _abrir(tester, NotificacoesTela(servico: ServicoNotificacoesFake(travar: true)));
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(EsqueletoLista), findsOneWidget);
       await _abrir(tester, NotificacoesTela(servico: ServicoNotificacoesFake(falhar: true)));
       expect(find.text('Tentar de novo'), findsOneWidget);
     });
@@ -258,7 +259,7 @@ void main() {
         tester,
         const BuscaProfissionaisTela(servico: ServicoBuscaFake(travar: true), termoInicial: 'a'),
       );
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(EsqueletoLista), findsOneWidget);
     });
   });
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from trato import __version__
 from trato.api import (
@@ -21,6 +22,7 @@ from trato.api import (
 from trato.api.admin import criar_router_admin
 from trato.api.contexto import Contexto
 from trato.api.erros import instalar_tratadores
+from trato.api.medicao import MedidorConsultas, medicao_ligada
 from trato.config import obter_config
 from trato.persistencia.captura_auditoria import CabecalhoAuditoria
 from trato.seguranca.config import obter_config_seguranca, parametros_docs
@@ -63,6 +65,10 @@ def instalar(app: FastAPI, contexto: Contexto | None = None) -> FastAPI:
     cfg_seg = obter_config_seguranca()
 
     app.add_middleware(CabecalhoAuditoria)
+    # Respostas JSON acima de 1 KB vão compactadas (listas no 4G).
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    if medicao_ligada():
+        app.add_middleware(MedidorConsultas)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cfg_seg.cors_origens or [],

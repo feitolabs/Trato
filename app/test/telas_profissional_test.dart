@@ -27,6 +27,7 @@ import 'apoio/exemplos/telas/aditivo/aditivo_fake.dart';
 import 'apoio/exemplos/telas/profissional_cadastro/cadastro_fake.dart';
 import 'apoio/exemplos/telas/perfil_publico/perfil_publico_fake.dart';
 import 'apoio/exemplos/telas/verificacao/verificacao_fake.dart';
+import 'package:trato/componentes/componentes.dart';
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -84,7 +85,7 @@ void main() {
   group('Estados comuns (carregando / erro / vazio)', () {
     testWidgets('carregando mostra o indicador', (t) async {
       await _abrir(t, CadastroProfissionalTela(servico: _CadastroPendente()), assentar: false);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(EsqueletoLista), findsOneWidget);
     });
 
     testWidgets('erro mostra mensagem simples e "Tentar de novo" recarrega', (t) async {

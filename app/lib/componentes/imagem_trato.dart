@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../tema/tema.dart';
@@ -78,13 +79,7 @@ Widget? construirImagemReal(String? referencia, {BoxFit fit = BoxFit.cover}) {
     if (img != null) return img;
   }
   if (ehUrlImagem(referencia)) {
-    return Image.network(
-      referencia,
-      fit: fit,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-    );
+    return _ImagemDaRede(url: referencia, fit: fit);
   }
   if (temArquivoImagem(referencia)) {
     return Image.file(
@@ -96,6 +91,45 @@ Widget? construirImagemReal(String? referencia, {BoxFit fit = BoxFit.cover}) {
     );
   }
   return null;
+}
+
+/// Chave do cache de uma foto do Storage: a URL sem a query. A URL assinada muda o token a
+/// cada consulta, mas o arquivo (caminho) é o mesmo; sem isso o app baixaria tudo de novo.
+String chaveCacheImagem(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return url;
+  return uri.replace(query: '').toString().replaceFirst(RegExp(r'\?$'), '');
+}
+
+/// Foto da rede com cache em disco (entre aberturas do app) e decodificada no tamanho em que
+/// aparece: miniatura de lista não ocupa memória de foto inteira.
+class _ImagemDaRede extends StatelessWidget {
+  const _ImagemDaRede({required this.url, required this.fit});
+
+  final String url;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, limites) {
+        final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+        final largura =
+            limites.hasBoundedWidth ? (limites.maxWidth * dpr).round().clamp(64, 2048) : null;
+        return CachedNetworkImage(
+          imageUrl: url,
+          cacheKey: chaveCacheImagem(url),
+          fit: fit,
+          width: double.infinity,
+          height: double.infinity,
+          memCacheWidth: largura,
+          fadeInDuration: const Duration(milliseconds: 150),
+          placeholder: (_, __) => const ColoredBox(color: CoresTrato.azulClaro),
+          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
 }
 
 /// Legenda amigável para exibição (evita mostrar caminhos completos de arquivos locais).
