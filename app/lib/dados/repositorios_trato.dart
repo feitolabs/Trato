@@ -1,3 +1,6 @@
+import '../telas/conta/modelos.dart';
+import '../telas/conta/servico_fake.dart';
+import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';
 import '../dispositivo/servico_localizacao.dart';
@@ -40,6 +43,7 @@ class RepositoriosTrato {
     this.cadastroProfissional,
     this.perfilPublico,
     this.privacidade,
+    this.conta,
     RepositorioCatalogo? catalogo,
     RepositorioServicosCliente? servicos,
     RepositorioAgenda? agenda,
@@ -52,6 +56,9 @@ class RepositoriosTrato {
   final ServicoCadastroProfissional? cadastroProfissional;
   final ServicoPerfilPublico? perfilPublico;
   final ServicoPrivacidade? privacidade;
+
+  /// Dados pessoais, endereços, favoritos e contatos de confiança (`/v1/me/...`).
+  final ServicoConta? conta;
 
   /// Modo demonstração: só dados de exemplo, sem rede.
   factory RepositoriosTrato.demo() => RepositoriosTrato(
@@ -68,6 +75,7 @@ class RepositoriosTrato {
         disputaProfissional:
             ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
         perfilPublico: ServicoPerfilPublicoFake(),
+        conta: ServicoContaFake(),
         cadastroProfissional: ServicoCadastroProfissionalFake(),
         verificacao: ServicoVerificacaoFake(),
         privacidade: ServicoPrivacidadeFake(),
@@ -114,6 +122,7 @@ class RepositoriosTrato {
         cadastroProfissional: ServicoCadastroProfissionalApi(api),
         perfilPublico: ServicoPerfilPublicoApi(api),
         privacidade: ServicoPrivacidadeApi(api),
+        conta: ServicoContaApi(api),
         capturaVerificacao:
             camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
     );

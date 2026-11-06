@@ -577,3 +577,10 @@ consulta pública só devolve `disponivel`; a unique do banco fecha a corrida en
 - Corrigidos: check-in impossível, check-out sem tela ligada, CarregadorTela no debug, Agenda, idioma pt-BR, menu estourando.
 - `harness/subir-pilha-local.py` agora sobe Storage local; app em debug libera HTTP só no manifest de debug.
 - Pendências visuais e de texto listadas em `docs/roteiro-aceitacao.md` (rodada 3).
+
+## 2026-11-05 — Perfil do cliente: itens com dados reais
+- Causa: o app escondia (`_acoesComTela`) os itens sem tela/rota, e o `RepositorioPerfilApi` só montava 2 grupos.
+- Backend: `api/conta.py` + `persistencia/conta.py`: `/v1/me/dados-pessoais` (telefone, nascimento), `/v1/me/enderecos` (até 10, 1 principal), `/v1/me/favoritos`, `/v1/me/contatos-confianca` (até 5). `/v1/me/dados` continua sendo a exportação LGPD.
+- App: telas em `telas/conta/`, `ServicoContaApi`, coração de favorito no perfil do profissional. "Formas de pagamento" segue escondido (cartão fica no Stripe).
+- Migration `20261105120000_conta_enderecos_favoritos_contatos.sql` **aplicada** no Supabase com o OK do João.
+- Testes: backend 1212 ok (11 novos); app todos ok (8 novos em `conta_test.dart`).

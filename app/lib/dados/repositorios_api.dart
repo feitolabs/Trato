@@ -903,8 +903,17 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       fotoReferencia: foto,
       grupos: const [
         GrupoPerfil(
+          titulo: 'CONTA',
+          itens: [
+            ItemPerfil(acao: AcaoPerfil.dadosPessoais, titulo: 'Dados pessoais'),
+            ItemPerfil(acao: AcaoPerfil.enderecos, titulo: 'Endereços salvos'),
+            ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais favoritos'),
+          ],
+        ),
+        GrupoPerfil(
           titulo: 'SEGURANÇA E AVISOS',
           itens: [
+            ItemPerfil(acao: AcaoPerfil.contatosConfianca, titulo: 'Contatos de confiança'),
             ItemPerfil(acao: AcaoPerfil.notificacoes, titulo: 'Notificações'),
             ItemPerfil(acao: AcaoPerfil.usarComoProfissional, titulo: 'Usar como profissional'),
           ],
@@ -914,6 +923,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
           itens: [
             ItemPerfil(acao: AcaoPerfil.meusDados, titulo: 'Meus dados (LGPD)'),
             ItemPerfil(acao: AcaoPerfil.centralAjuda, titulo: 'Central de ajuda'),
+            ItemPerfil(acao: AcaoPerfil.termos, titulo: 'Termos e políticas'),
           ],
         ),
       ],
