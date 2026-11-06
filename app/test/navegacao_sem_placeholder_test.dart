@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+@Tags(['lento'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/auth/servico_auth_fake.dart';
 import 'package:trato/dados/repositorios_trato.dart';

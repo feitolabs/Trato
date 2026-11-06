@@ -80,7 +80,11 @@ class _OrcamentosRecebidosTelaState extends State<OrcamentosRecebidosTela> {
                 text: '${p.recebidos} de ${p.limite}',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              TextSpan(text: ' orçamentos. Recebendo por mais ${p.tempoRestante}.'),
+              TextSpan(
+                text: p.tempoRestante.isEmpty
+                    ? ' orçamentos recebidos.'
+                    : ' orçamentos. Recebendo por mais ${p.tempoRestante}.',
+              ),
             ],
           ),
         ),
