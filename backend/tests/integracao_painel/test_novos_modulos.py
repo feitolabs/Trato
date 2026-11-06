@@ -58,19 +58,22 @@ def test_notificacoes_campanhas(painel):
 
 
 def test_relatorios_csv(painel):
-    assert painel.chamar(None, "GET", "/v1/admin/relatorios/financeiro").status_code == 401
-    r_fin = painel.chamar("administrador", "GET", "/v1/admin/relatorios/financeiro")
-    assert r_fin.status_code in (200, 503)
-    if r_fin.status_code == 200:
-        assert "ID_Pagamento;Data_Criacao;" in r_fin.text
+    corpo = {"formato": "excel_br", "motivo": "Fechamento contábil do mês"}
+    assert painel.chamar(None, "POST", "/v1/admin/relatorios/financeiro", json=corpo).status_code == 401
+    r = painel.chamar("administrador", "POST", "/v1/admin/relatorios/financeiro", json=corpo)
+    assert r.status_code in (201, 503)
+    if r.status_code == 201:
+        pronto = r.json()
+        baixado = painel.http.get(f"/v1/admin/relatorios/baixar/{pronto['codigo']}")
+        assert baixado.status_code == 200
+        assert baixado.text.startswith("﻿ID_Pagamento;Data;")
+        assert "attachment; filename=" in baixado.headers.get("Content-Disposition", "")
+        # o código vale uma vez só
+        assert painel.http.get(f"/v1/admin/relatorios/baixar/{pronto['codigo']}").status_code == 404
 
 
-def test_relatorios_download_via_query_token(painel):
+def test_token_na_url_nao_autentica(painel):
     token = painel.entrar("administrador")
-    # Autenticação via query param ?token=... (como o navegador faz ao clicar no botão de download)
-    r_fin = painel.http.get(f"/v1/admin/relatorios/financeiro?token={token}")
-    assert r_fin.status_code in (200, 503)
-    assert r_fin.status_code != 401
-    if r_fin.status_code == 200:
-        assert "ID_Pagamento;Data_Criacao;" in r_fin.text
-        assert "attachment; filename=" in r_fin.headers.get("Content-Disposition", "")
+    corpo = {"motivo": "Fechamento contábil do mês"}
+    r = painel.http.post(f"/v1/admin/relatorios/financeiro?token={token}", json=corpo)
+    assert r.status_code == 401

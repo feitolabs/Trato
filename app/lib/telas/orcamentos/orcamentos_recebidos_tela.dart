@@ -6,7 +6,6 @@ import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
-import 'dados_exemplo.dart';
 import 'detalhe_orcamento_tela.dart';
 import 'modelos.dart';
 
@@ -14,15 +13,13 @@ import 'modelos.dart';
 ///
 /// [aoVerOrcamento] abre o detalhe. Sem ele, abre [DetalheOrcamentoTela] quando o orçamento
 /// tem detalhe e não faz nada quando não tem.
-final _padrao = orcamentosExemplo;
-
 class OrcamentosRecebidosTela extends StatefulWidget {
-  OrcamentosRecebidosTela({
+  const OrcamentosRecebidosTela({
     super.key,
-    this.pedido = resumoPedidoExemplo,
-    List<Orcamento>? orcamentos,
+    required this.pedido,
+    required this.orcamentos,
     this.aoVerOrcamento,
-  }) : orcamentos = orcamentos ?? _padrao;
+  });
 
   final ResumoPedido pedido;
   final List<Orcamento> orcamentos;

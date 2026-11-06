@@ -126,8 +126,8 @@ void main() {
   test('auditoria: lista e cadeia íntegra; papel sem acesso é barrado', () async {
     final seg = await _entrar('seguranca');
     final itens = await seg.listarAuditoria(acao: 'config.');
-    expect(itens, isNotEmpty);
-    expect(itens.every((e) => e.acao.startsWith('config.')), isTrue);
+    expect(itens.itens, isNotEmpty);
+    expect(itens.itens.every((e) => e.acao.startsWith('config.')), isTrue);
     final cadeia = await seg.verificarCadeia();
     expect(cadeia.ok, isTrue);
     final fin = await _entrar('financeiro');

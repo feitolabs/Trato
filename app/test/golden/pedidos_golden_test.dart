@@ -6,6 +6,7 @@ import 'package:trato/telas/pedidos/seus_pedidos_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 import '../apoio/fontes.dart';
+import '../apoio/exemplos/telas/pedidos/dados_exemplo.dart' as exped;
 
 /// Telas 15 a 17 do protótipo em celular pequeno, protótipo e tablet.
 /// Atualizar: flutter test --update-goldens
@@ -18,9 +19,9 @@ void main() {
     'tablet': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'seus_pedidos': const SeusPedidosTela(),
-    'pedido_execucao': const PedidoExecucaoTela(),
-    'chat': const ChatPedidoTela(),
+    'seus_pedidos': const SeusPedidosTela(emAndamento: exped.DadosExemplo.pedidosEmAndamento, finalizados: exped.DadosExemplo.pedidosFinalizados, ),
+    'pedido_execucao': const PedidoExecucaoTela(pedido: exped.DadosExemplo.pedidoEmExecucao, ),
+    'chat': const ChatPedidoTela(conversa: exped.DadosExemplo.conversa, ),
   };
 
   for (final MapEntry(key: tela, value: widget) in telas.entries) {

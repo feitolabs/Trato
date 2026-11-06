@@ -9,6 +9,7 @@ from trato.api.admin.modelos import (
     ComMotivo,
     DecisaoVerificacaoIn,
     DocumentoOut,
+    EnvioAnteriorOut,
     Pagina,
     UrlDocumentoOut,
     VerificacaoOut,
@@ -35,6 +36,13 @@ def _saida(v: VerificacaoAdmin) -> VerificacaoOut:
         cpf_mascarado=v.cpf_mascarado,
         documentos=[
             DocumentoOut(id=d.id, tipo=d.tipo, validade_em=d.validade_em) for d in v.documentos
+        ],
+        publico_id=v.publico_id,
+        categorias=list(v.categorias),
+        cidade=v.cidade,
+        envios_anteriores=[
+            EnvioAnteriorOut(enviado_em=e.enviado_em, status=e.status, motivo=e.motivo)
+            for e in v.envios_anteriores
         ],
     )
 

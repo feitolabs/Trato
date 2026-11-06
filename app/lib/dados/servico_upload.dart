@@ -54,26 +54,6 @@ abstract interface class ServicoUpload {
   });
 }
 
-/// Para teste e demonstração: guarda o que "enviou" e devolve ids sequenciais.
-class ServicoUploadFake implements ServicoUpload {
-  ServicoUploadFake({this.falha});
-
-  /// Se preenchido, todo envio lança este erro (ex.: [ErroTrato.semInternet]).
-  ErroTrato? falha;
-  final List<(ArquivoCapturado, FinalidadeArquivo, String?)> enviados = [];
-
-  @override
-  Future<ArquivoEnviado> enviar(
-    ArquivoCapturado arquivo,
-    FinalidadeArquivo finalidade, {
-    String? pedidoId,
-  }) async {
-    if (falha != null) throw falha!;
-    enviados.add((arquivo, finalidade, pedidoId));
-    return ArquivoEnviado(arquivoId: 'arq-${enviados.length}');
-  }
-}
-
 /// Envio real em três passos (`backend/src/trato/api/rotas_upload.py`).
 ///
 /// 1. `POST /v1/uploads` `{destino, nome_arquivo, content_type, tamanho_bytes, pedido_id?,

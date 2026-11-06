@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:trato_admin/dados/api_fake.dart';
 import 'package:trato_admin/dados/api_http.dart';
 import 'package:trato_admin/dados/config_painel.dart';
 import 'package:trato_admin/dados/modelos.dart';
@@ -47,9 +46,9 @@ Servidor servidorLogavel({String papel = 'mediador'}) {
 
 void main() {
   group('escolha da API', () {
-    test('sem configuração usa os dados de exemplo', () {
-      expect(criarApi(const ConfigPainel()), isA<ApiFake>());
-      expect(criarApi(const ConfigPainel(modo: 'api')), isA<ApiFake>()); // faltam as URLs
+    test('sem configuração completa não abre (não há dados de exemplo)', () {
+      expect(() => criarApi(const ConfigPainel()), throwsStateError);
+      expect(() => criarApi(const ConfigPainel(modo: 'api')), throwsStateError); // faltam as URLs
     });
 
     test('com modo api e todos os valores usa HTTP', () {
@@ -155,7 +154,7 @@ void main() {
       final lista = await api.listarVerificacoes();
       expect(lista.single.profissional, 'Carlos');
       expect(lista.single.status, StatusVerificacao.emAnalise);
-      expect(lista.single.documentos, ['Documento frente', 'Selfie']);
+      expect(lista.single.documentos, ['Frente do documento', 'Selfie']);
 
       final url = await api.revelarDocumento('v-1', 'Selfie', 'Conferir a foto do cadastro');
       expect(url, contains('storage.teste'));
@@ -297,7 +296,7 @@ void main() {
       expect(d.cpf, '000.000.000-00');
       expect(d.email, isNull);
       expect(d.nascimento, '1990-01-01');
-      expect((await api.buscarPedidos('')).single.status, 'em execucao');
+      expect((await api.buscarPedidos('')).single.status, 'Em execucao');
       expect(s.chamada('GET', '/v1/admin/pedidos').url.queryParameters.containsKey('q'), isFalse);
     });
 
@@ -350,7 +349,7 @@ void main() {
         },
       );
       final c = await api.carregarConfig();
-      expect(c.definicoes.last.unidade, UnidadeConfig.dias);
+      expect(c.definicoes.last.unidade, UnidadeConfig.diasUteis);
       expect(c.versoes.single.status, StatusVersao.aguardandoAprovacao);
       expect(c.versoes.single.valores, {'taxa_base_bps': 750});
       expect(c.versoes.single.criadaPor, 'u-3');
@@ -408,8 +407,8 @@ void main() {
       );
       s.respostas['POST /v1/admin/auditoria/verificar-cadeia'] = (200, {'integra': false, 'primeira_falha_id': 3});
       final lista = await api.listarAuditoria(acao: 'config.', ator: '');
-      expect(lista.single.acao, 'config.publicada');
-      expect(lista.single.hash, isNull);
+      expect(lista.itens.single.acao, 'config.publicada');
+      expect(lista.itens.single.hash, isNull);
       final q = s.chamada('GET', '/v1/admin/auditoria').url.queryParameters;
       expect(q['acao'], 'config.');
       expect(q.containsKey('ator_id'), isFalse);

@@ -147,6 +147,8 @@ class ConfigApi:
     prazos_pedido: PrazosPedido
     disputas: ConfigDisputa
     garantias: ConfigGarantia
+    # Teto de valor do pedido (RN-07). Vazio = ainda não aprovado em Configurações: sem teto.
+    valor_maximo_servico_centavos: int | None = None
 
 
 class ProvedorConfig(Protocol):

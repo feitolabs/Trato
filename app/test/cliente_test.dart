@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
-import 'package:trato/telas/cliente/buscar_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
-import 'package:trato/telas/cliente/dados_exemplo.dart';
+import 'apoio/exemplos/telas/cliente/dados_exemplo.dart';
 import 'package:trato/telas/cliente/inicio_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
 import 'package:trato/telas/catalogo/categoria_tela.dart';
@@ -124,63 +123,6 @@ void main() {
     });
   });
 
-  group('buscar', () {
-    testWidgets('lista os 3 profissionais do protótipo', (tester) async {
-      await _abrir(tester, const BuscarTela());
-
-      expect(find.text('Carlos Mendes'), findsOneWidget);
-      expect(find.text('André Lopes'), findsOneWidget);
-      expect(find.text('Joana Ribeiro'), findsOneWidget);
-      expect(find.text('4,9'), findsOneWidget);
-      expect(find.text('2,1 km'), findsOneWidget);
-      expect(find.text('Elétrica · 71 serviços · resp. em 1 h'), findsOneWidget);
-    });
-
-    testWidgets('filtros reduzem a lista e atualizam a contagem', (tester) async {
-      await _abrir(tester, const BuscarTela());
-
-      await tester.tap(find.text('Atende hoje'));
-      await tester.pump();
-
-      expect(find.text('1 profissional perto de Savassi'), findsOneWidget);
-      expect(find.text('André Lopes'), findsNothing);
-
-      await tester.tap(find.text('Atende hoje'));
-      await tester.pump();
-      expect(find.text('3 profissionais perto de Savassi'), findsOneWidget);
-    });
-
-    testWidgets('Mapa troca a lista por um espaço reservado', (tester) async {
-      await _abrir(tester, const BuscarTela());
-
-      await tester.tap(find.text('Mapa'));
-      await tester.pump();
-
-      expect(find.text('Mapa em breve'), findsOneWidget);
-      expect(find.text('Carlos Mendes'), findsNothing);
-
-      await tester.tap(find.text('Lista'));
-      await tester.pump();
-      expect(find.text('Carlos Mendes'), findsOneWidget);
-    });
-
-    testWidgets('Carlos abre o perfil', (tester) async {
-      await _abrir(tester, const BuscarTela());
-
-      await _tocar(tester, find.text('Carlos Mendes'));
-
-      expect(find.byType(PerfilProfissionalTela), findsOneWidget);
-    });
-
-    testWidgets('quem ainda não tem perfil no protótipo avisa que está indisponível',
-        (tester) async {
-      await _abrir(tester, const BuscarTela());
-
-      await _tocar(tester, find.text('André Lopes'));
-
-      expect(find.text('Perfil indisponível por enquanto.'), findsOneWidget);
-    });
-  });
 
   group('perfil do profissional', () {
     testWidgets('mostra nota, serviços, verificações, trabalhos e avaliações', (tester) async {

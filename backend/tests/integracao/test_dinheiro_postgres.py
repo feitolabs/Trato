@@ -346,6 +346,8 @@ def _mediador(c) -> None:
             "values (%s, 'mediador', 100000000)",
             (novo,),
         )
+        # a alçada efetiva é limitada pelo teto do papel (papeis_alcada); o teste decide R$ 900
+        con.execute("update public.papeis_alcada set teto_centavos = 100000000 where papel = 'mediador'")
 
 
 def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):

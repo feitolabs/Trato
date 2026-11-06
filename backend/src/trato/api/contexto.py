@@ -179,7 +179,8 @@ def usuario_atual(
     credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Usuario:
-    token = credenciais.credentials if credenciais else request.query_params.get("token")
+    # Só o cabeçalho Authorization vale: token na URL vaza em histórico, log e referer.
+    token = credenciais.credentials if credenciais else None
     usuario = contexto.auth.autenticar(token) if token else None
     if usuario is None:
         raise HTTPException(
@@ -189,8 +190,22 @@ def usuario_atual(
 
 
 def exigir_papel(*papeis: PapelUsuario) -> Callable[[Usuario], Usuario]:
-    def dependencia(usuario: Usuario = Depends(usuario_atual)) -> Usuario:
+    def dependencia(
+        usuario: Usuario = Depends(usuario_atual),
+        contexto: Contexto = Depends(obter_contexto),
+    ) -> Usuario:
         if usuario.papel not in papeis:
+            # Cadastro de profissional ainda não aprovado: o sistema o trata como cliente até lá.
+            if (
+                PapelUsuario.PROFISSIONAL in papeis
+                and usuario.papel is PapelUsuario.CLIENTE
+                and contexto.usuarios.tem_perfil_profissional(usuario.id)
+            ):
+                raise HTTPException(
+                    403,
+                    "Seu cadastro de profissional ainda está em análise. Você verá os pedidos e "
+                    "poderá enviar orçamentos assim que for aprovado.",
+                )
             raise HTTPException(403, "Seu perfil não pode fazer isso.")
         return usuario
 

@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/auth/ligacao_sessao.dart';
-import 'package:trato/auth/servico_auth_fake.dart';
+import '../apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
@@ -12,11 +12,12 @@ import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
-import 'package:trato/telas/conclusao/dados_exemplo.dart';
+import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/nota_material/nota_material.dart';
 import 'package:trato/telas/pagamento/modelos.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';
 import 'package:trato/telas/verificacao/verificacao.dart';
+import 'package:trato/telas/conclusao/modelos.dart';
 
 // TESTES DE CONTRATO. Cada repositório fala com um HTTP simulado e confere método, caminho,
 // corpo e a leitura da resposta. Os exemplos de resposta são copiados de `docs/api-rotas.md`
@@ -550,6 +551,41 @@ void main() {
       expect(p.distanciaKm, isNull, reason: 'a API não devolve distância');
     });
 
+    test('início mostra a carteira real (GET /profissionais/me/saldo)', () async {
+      final (api, _) = _api({
+        'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos Mendes', 'papel': 'profissional'}),
+        'GET /v1/profissional/pedidos-abertos': (200, abertos),
+        'GET /v1/profissionais/me/saldo': (200, {'a_liberar_centavos': 12345, 'liberado_centavos': 6789}),
+        'GET /v1/pedidos': (200, <Map<String, dynamic>>[]),
+      });
+
+      final i = await RepositorioProfissionalApi(api).inicio();
+
+      expect(i.carteira.retidoCentavos, 12345);
+      expect(i.carteira.paraSacarCentavos, 6789);
+    });
+
+    test('início: cadastro em análise (403) mostra o motivo, não lista vazia', () async {
+      final (api, _) = _api({
+        'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos', 'papel': 'cliente'}),
+        'GET /v1/profissional/pedidos-abertos': (
+          403,
+          {'detail': 'Seu cadastro de profissional ainda está em análise.'},
+        ),
+      });
+
+      await expectLater(
+        RepositorioProfissionalApi(api).inicio(),
+        throwsA(isA<ErroTrato>().having((e) => e.mensagem, 'mensagem', contains('em análise'))),
+      );
+    });
+
+    test('início: se tudo falhar o erro sobe (a tela mostra "tentar de novo")', () async {
+      final (api, _) = _api({});
+
+      await expectLater(RepositorioProfissionalApi(api).inicio(), throwsA(isA<Object>()));
+    });
+
     test('início junta /me, pedidos abertos e o próximo atendimento', () async {
       final (api, _) = _api({
         'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos Mendes', 'papel': 'profissional'}),
@@ -564,12 +600,16 @@ void main() {
       expect(i.proximo!.pedidoId, 'ab12cd34');
     });
 
-    test('detalhe sai da lista; pedido que sumiu dá aviso', () async {
-      final (api, _) = _api({'GET /v1/profissional/pedidos-abertos': (200, abertos)});
+    test('detalhe vem de GET /pedidos-abertos/{id}; pedido que sumiu dá aviso', () async {
+      final (api, chamadas) = _api({
+        'GET /v1/profissional/pedidos-abertos/pa1': (200, abertos.first),
+        'GET /v1/profissional/pedidos-abertos/nao-existe': (404, {'detail': 'Pedido não encontrado.'}),
+      });
       final repo = RepositorioProfissionalApi(api);
 
       final d = await repo.detalhe('pa1');
       expect(d.descricao, 'Sala, teto alto');
+      expect(chamadas.first.caminho, '/v1/profissional/pedidos-abertos/pa1');
 
       await expectLater(
         repo.detalhe('nao-existe'),

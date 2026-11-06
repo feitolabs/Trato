@@ -42,7 +42,7 @@ def test_categoria_ciclo_completo_criar_editar_desativar_excluir(amb):  # noqa: 
 
     r = amb.cliente.put(
         f"{BASE}/categorias/{cid}",
-        json={"nome": "Limpeza geral", "garantia_retrabalho_dias": 30, "motivo": "Renomear"},
+        json={"nome": "Limpeza geral", "garantia_retrabalho_dias": 30, "motivo": "Renomear a categoria"},
         headers=adm,
     )
     assert r.status_code == 200 and r.json()["nome"] == "Limpeza geral"
@@ -51,7 +51,7 @@ def test_categoria_ciclo_completo_criar_editar_desativar_excluir(amb):  # noqa: 
     ) == [("Limpeza geral", 30)]
 
     r = amb.cliente.patch(
-        f"{BASE}/categorias/{cid}", json={"ativa": False, "motivo": "Pausa"}, headers=adm
+        f"{BASE}/categorias/{cid}", json={"ativa": False, "motivo": "Pausa temporária"}, headers=adm
     )
     assert r.status_code == 200 and r.json()["ativa"] is False
     assert amb.sql("select ativa from public.categorias where id = %s", cid) == [(False,)]
@@ -64,19 +64,19 @@ def test_categoria_ciclo_completo_criar_editar_desativar_excluir(amb):  # noqa: 
 
     trilha = _auditoria(amb, "categoria.")
     assert trilha["categoria.criada"] == "Categoria do piloto"
-    assert trilha["categoria.editada"] == "Renomear"
-    assert trilha["categoria.desativada"] == "Pausa"
+    assert trilha["categoria.editada"] == "Renomear a categoria"
+    assert trilha["categoria.desativada"] == "Pausa temporária"
     assert trilha["categoria.excluida"] == "Limpeza do teste"
 
 
 def test_categoria_duplicada_motivo_obrigatorio_e_id_ruim(amb):  # noqa: F811
     adm = amb.h("administrador")
     ok = amb.cliente.post(
-        f"{BASE}/categorias", json={"nome": "Montagem de móveis", "motivo": "Piloto"}, headers=adm
+        f"{BASE}/categorias", json={"nome": "Montagem de móveis", "motivo": "Categoria do piloto"}, headers=adm
     )
     assert ok.status_code == 201
     repetida = amb.cliente.post(
-        f"{BASE}/categorias", json={"nome": "Montagem de móveis", "motivo": "Piloto"}, headers=adm
+        f"{BASE}/categorias", json={"nome": "Montagem de móveis", "motivo": "Categoria do piloto"}, headers=adm
     )
     assert repetida.status_code == 409
     sem_motivo = amb.cliente.post(f"{BASE}/categorias", json={"nome": "Sem motivo"}, headers=adm)
@@ -87,7 +87,7 @@ def test_categoria_duplicada_motivo_obrigatorio_e_id_ruim(amb):  # noqa: F811
     assert curto.status_code == 422
     assert (
         amb.cliente.patch(
-            f"{BASE}/categorias/nao-e-uuid", json={"ativa": False, "motivo": "teste"}, headers=adm
+            f"{BASE}/categorias/nao-e-uuid", json={"ativa": False, "motivo": "teste de id inválido"}, headers=adm
         ).status_code
         == 404
     )
@@ -149,7 +149,7 @@ def test_cidade_criar_duplicada_e_desativar(amb):  # noqa: F811
     assert amb.sql("select ativa from public.cidades where id = %s", cidade["id"]) == [(False,)]
     assert (
         amb.cliente.patch(
-            f"{BASE}/cidades/nao-e-uuid", json={"ativa": True, "motivo": "teste"}, headers=adm
+            f"{BASE}/cidades/nao-e-uuid", json={"ativa": True, "motivo": "teste de id inválido"}, headers=adm
         ).status_code
         == 404
     )

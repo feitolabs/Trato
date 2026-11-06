@@ -9,7 +9,7 @@ from typing import Annotated, Any, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 # Toda ação sensível pede um motivo escrito (vai para a auditoria).
-Motivo = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]
+Motivo = Annotated[str, StringConstraints(strip_whitespace=True, min_length=10, max_length=1000)]
 
 
 class Entrada(BaseModel):
@@ -53,6 +53,12 @@ class DocumentoOut(Saida):
     mascarado: bool = True  # o arquivo só abre pela URL assinada, com motivo, e só para o cadastro
 
 
+class EnvioAnteriorOut(Saida):
+    enviado_em: datetime
+    status: str
+    motivo: str | None = None
+
+
 class VerificacaoOut(Saida):
     id: str
     profissional_id: str
@@ -64,6 +70,10 @@ class VerificacaoOut(Saida):
     motivo_recusa: str | None = None
     cpf_mascarado: str | None = None
     documentos: list[DocumentoOut] = []
+    publico_id: str = ""
+    categorias: list[str] = []
+    cidade: str | None = None
+    envios_anteriores: list[EnvioAnteriorOut] = []
 
 
 class DecisaoVerificacaoIn(Entrada):
@@ -100,6 +110,8 @@ class AprovarDisputaIn(Entrada):
 
 class DisputaResumoOut(BaseModel):
     pedido_id: str
+    pedido_numero: int | None = None
+    pedido_titulo: str | None = None
     estado: str
     motivo: str
     valor_congelado_centavos: int
@@ -185,6 +197,10 @@ class PagamentoOut(BaseModel):
     data: datetime
     referencia_provedor: str | None = None
     divergente: bool = False
+    pedido_numero: int | None = None
+    # Taxa retida pelo Trato e líquido do profissional neste pedido (RF-PAG-05).
+    taxa_trato_centavos: int | None = None
+    liquido_profissional_centavos: int | None = None
 
 
 class ResumoConciliacaoOut(BaseModel):
@@ -194,6 +210,9 @@ class ResumoConciliacaoOut(BaseModel):
     taxa_trato_centavos: int
     divergencias: int
     atualizado_em: datetime
+    cobrancas: int = 0
+    reembolsos: int = 0
+    valor_divergente_centavos: int = 0
 
 
 class EventoWebhookOut(BaseModel):
@@ -233,6 +252,42 @@ class UsuarioOut(Saida):
     criado_em: datetime | None = None
     nivel_verificacao: str | None = None
     status_profissional: str | None = None
+    publico_id: str = ""
+    email_mascarado: str | None = None
+    telefone_mascarado: str | None = None
+    cidade: str | None = None
+
+
+class CategoriaProfissionalOut(BaseModel):
+    categoria_id: str
+    nome: str
+    ativa_no_perfil: bool
+    ativa_na_plataforma: bool
+
+
+class EventoUsuarioOut(BaseModel):
+    em: datetime
+    texto: str
+
+
+class UsuarioDetalheOut(UsuarioOut):
+    categorias: list[CategoriaProfissionalOut] = []
+    historico: list[EventoUsuarioOut] = []
+
+
+class ItemDiagnosticoOut(BaseModel):
+    ok: bool
+    titulo: str
+    detalhe: str
+
+
+class DiagnosticoOut(BaseModel):
+    pedido_id: str
+    pedido_numero: int | None = None
+    pedido_titulo: str
+    categoria: str
+    aparece: bool
+    itens: list[ItemDiagnosticoOut]
 
 
 class DadosPessoaisOut(Saida):
@@ -252,6 +307,10 @@ class PedidoResumoOut(Saida):
     profissional_id: str | None
     valor_centavos: int | None
     criado_em: datetime | None
+    numero: int | None = None
+    categoria: str | None = None
+    cidade: str | None = None
+    profissional_nome: str | None = None
 
 
 class EventoPedidoOut(BaseModel):
@@ -312,7 +371,9 @@ class VersaoConfigOut(BaseModel):
     status: str
     motivo: str
     criada_por: str
+    criada_por_nome: str | None = None
     aprovada_por: str | None = None
+    aprovada_por_nome: str | None = None
     vigente_desde: datetime | None = None
     revertida_de: str | None = None
     criado_em: datetime | None = None
@@ -344,6 +405,8 @@ class EntradaAuditoriaOut(Saida):
     motivo: str | None
     antes: Any = None
     depois: Any = None
+    ator_nome: str | None = None
+    entidade_nome: str | None = None
 
 
 class CadeiaOut(BaseModel):

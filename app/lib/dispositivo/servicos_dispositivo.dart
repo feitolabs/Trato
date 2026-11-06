@@ -24,14 +24,6 @@ class ServicosDispositivo {
         upload: ServicoUploadApi(api),
       );
 
-  /// Demonstração e testes: nada toca no aparelho nem na rede.
-  factory ServicosDispositivo.fake() => ServicosDispositivo(
-        camera: ServicoCameraFake(),
-        localizacao: ServicoLocalizacaoFake(),
-        permissao: ServicoPermissaoFake(),
-        upload: ServicoUploadFake(),
-      );
-
   final ServicoCamera camera;
   final ServicoLocalizacao localizacao;
   final ServicoPermissao permissao;

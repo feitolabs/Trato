@@ -135,7 +135,8 @@ void main() {
       expect(find.byType(CadastroProfissionalTela), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await tester.enterText(find.byType(TextField).at(2), 'Belo Horizonte');
+      await tester.tap(find.text('Belo Horizonte'));
+      await tester.pump();
       await _tocar(tester, 'Eletricista');
       await _tocar(tester, 'Seg');
       await _tocar(tester, 'Manhã');

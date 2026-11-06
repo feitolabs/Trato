@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/profissional/calculadora_orcamento_tela.dart';
 import 'package:trato/telas/profissional/check_in_tela.dart';
 import 'package:trato/telas/profissional/servico_check_in.dart';
-import 'package:trato/telas/profissional/servico_check_in_fake.dart';
-import 'package:trato/telas/profissional/servico_orcamento_fake.dart';
+import '../apoio/exemplos/telas/profissional/servico_check_in_fake.dart';
+import '../apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'package:trato/tema/tema.dart';
 
 import '../apoio/fontes.dart';

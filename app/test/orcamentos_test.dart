@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/telas/orcamentos/dados_exemplo.dart';
+import 'apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/modelos.dart';
 import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/exemplos/telas/pedido_novo/dados_exemplo.dart';
 
 /// Novo pedido com todos os atalhos ligados (como no protótipo e no app).
-Widget _novoPedidoCompleto() => NovoPedidoTela(
+Widget _novoPedidoCompleto() => NovoPedidoTela(formulario: formularioExemplo, 
       aoTrocarCategoria: () {},
       aoMudarEndereco: () {},
       aoAdicionarFoto: () {},
@@ -70,7 +71,7 @@ void main() {
     });
 
     testWidgets('contador respeita o mínimo de 1', (tester) async {
-      await _abrir(tester, const NovoPedidoTela());
+      await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
 
       await tester.tap(find.byTooltip('Diminuir'));
       await tester.pump();
@@ -87,7 +88,7 @@ void main() {
 
     testWidgets('sem serviço escolhido mostra erro e não envia', (tester) async {
       RascunhoPedido? recebido;
-      await _abrir(tester, NovoPedidoTela(aoEnviar: (r) => recebido = r));
+      await _abrir(tester, NovoPedidoTela(formulario: formularioExemplo, aoEnviar: (r) => recebido = r));
 
       await tester.tap(find.text('Trocar tomada'));
       await tester.tap(find.text('Trocar chuveiro'));
@@ -102,7 +103,7 @@ void main() {
     });
 
     testWidgets('descrição vazia mostra erro', (tester) async {
-      await _abrir(tester, const NovoPedidoTela());
+      await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
 
       await tester.enterText(find.byType(TextField), '   ');
       await _tocar(tester, find.text('Próximo'));
@@ -115,7 +116,7 @@ void main() {
 
     testWidgets('Próximo devolve o que foi preenchido', (tester) async {
       RascunhoPedido? recebido;
-      await _abrir(tester, NovoPedidoTela(aoEnviar: (r) => recebido = r));
+      await _abrir(tester, NovoPedidoTela(formulario: formularioExemplo, aoEnviar: (r) => recebido = r));
 
       await tester.tap(find.text('127 V'));
       await tester.tap(find.byTooltip('Aumentar'));
@@ -133,7 +134,7 @@ void main() {
 
     testWidgets('informar meu valor preenche faixa exata com centavos informados', (tester) async {
       RascunhoPedido? recebido;
-      await _abrir(tester, NovoPedidoTela(aoEnviar: (r) => recebido = r));
+      await _abrir(tester, NovoPedidoTela(formulario: formularioExemplo, aoEnviar: (r) => recebido = r));
 
       await _tocar(tester, find.text('Informar meu valor'));
       expect(find.text('Valor que pretende gastar'), findsOneWidget);
@@ -149,13 +150,13 @@ void main() {
 
     for (final texto in ['Trocar', 'Mudar', 'Adicionar']) {
       testWidgets('sem callback, $texto não aparece', (tester) async {
-        await _abrir(tester, const NovoPedidoTela());
+        await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
         expect(find.text(texto), findsNothing);
       });
     }
 
     testWidgets('sem callback, Próximo não abre outra tela', (tester) async {
-      await _abrir(tester, const NovoPedidoTela());
+      await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
       await _tocar(tester, find.text('Próximo'));
       expect(find.byType(NovoPedidoTela), findsOneWidget);
     });
@@ -163,7 +164,7 @@ void main() {
 
   group('orçamentos recebidos', () {
     testWidgets('mostra o cabeçalho e os 3 orçamentos do protótipo', (tester) async {
-      await _abrir(tester, OrcamentosRecebidosTela());
+      await _abrir(tester, OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ));
 
       expect(find.text('Pedido #4821'), findsOneWidget);
       expect(find.text('Orçamentos recebidos'), findsOneWidget);
@@ -176,7 +177,7 @@ void main() {
     });
 
     testWidgets('ordenação: menor valor, maior nota e mais cedo', (tester) async {
-      await _abrir(tester, OrcamentosRecebidosTela());
+      await _abrir(tester, OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ));
       expect(_ordemNaTela(tester), ['Joana Ribeiro', 'Carlos Mendes', 'André Lopes']);
 
       await tester.tap(find.text('Maior nota'));
@@ -193,7 +194,7 @@ void main() {
     });
 
     testWidgets('Ver orçamento do Carlos abre o detalhe', (tester) async {
-      await _abrir(tester, OrcamentosRecebidosTela());
+      await _abrir(tester, OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ));
 
       await _tocar(tester, find.text('Ver orçamento').at(1));
 
@@ -201,7 +202,7 @@ void main() {
     });
 
     testWidgets('orçamento sem detalhe não abre tela nenhuma', (tester) async {
-      await _abrir(tester, OrcamentosRecebidosTela());
+      await _abrir(tester, OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ));
 
       await _tocar(tester, find.text('Ver orçamento').first);
 
@@ -211,7 +212,7 @@ void main() {
 
     testWidgets('aoVerOrcamento recebe o orçamento tocado', (tester) async {
       Orcamento? visto;
-      await _abrir(tester, OrcamentosRecebidosTela(aoVerOrcamento: (o) => visto = o));
+      await _abrir(tester, OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, aoVerOrcamento: (o) => visto = o));
 
       await _tocar(tester, find.text('Ver orçamento').last);
 
@@ -340,7 +341,7 @@ void main() {
   // Qualquer estouro de layout faz o teste falhar.
   final telas = <String, Widget Function()>{
     'novo pedido': _novoPedidoCompleto,
-    'orçamentos': () => OrcamentosRecebidosTela(),
+    'orçamentos': () => OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ),
     'detalhe': () => DetalheOrcamentoTela(orcamento: orcamentosExemplo[1]),
   };
   const tamanhos = [Size(320, 568), Size(390, 844), Size(768, 1024)];

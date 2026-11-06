@@ -49,51 +49,47 @@ class _LoginTelaState extends State<LoginTela> {
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(EspacosTrato.x6),
+          padding: const EdgeInsets.all(EspacosTrato.x4),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(EspacosTrato.x8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('Trato', style: TipografiaTrato.marcaPequena),
-                    const SizedBox(height: EspacosTrato.x1),
-                    Text('Painel da equipe', style: TipografiaTrato.legenda),
-                    const SizedBox(height: EspacosTrato.x6),
-                    TextField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.username],
-                      decoration: const InputDecoration(labelText: 'E-mail da equipe'),
-                    ),
+            child: CartaoSecao(
+              padding: const EdgeInsets.all(EspacosTrato.x8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Trato', style: TipografiaTrato.marca),
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text('PAINEL ADMIN', style: TipografiaTrato.sobretitulo),
+                  const SizedBox(height: EspacosTrato.x6),
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.username],
+                    decoration: const InputDecoration(labelText: 'E-mail da equipe'),
+                  ),
+                  const SizedBox(height: EspacosTrato.x3),
+                  TextField(
+                    controller: _senha,
+                    obscureText: true,
+                    autofillHints: const [AutofillHints.password],
+                    onSubmitted: (_) => _entrar(),
+                    decoration: const InputDecoration(labelText: 'Senha'),
+                  ),
+                  if (_erro != null) ...[
                     const SizedBox(height: EspacosTrato.x3),
-                    TextField(
-                      controller: _senha,
-                      obscureText: true,
-                      autofillHints: const [AutofillHints.password],
-                      onSubmitted: (_) => _entrar(),
-                      decoration: const InputDecoration(labelText: 'Senha'),
-                    ),
-                    if (_erro != null) ...[
-                      const SizedBox(height: EspacosTrato.x3),
-                      BannerInfo(_erro!, tom: Tom.erro, icone: Icons.error_outline),
-                    ],
-                    const SizedBox(height: EspacosTrato.x5),
-                    FilledButton(
-                      onPressed: _enviando ? null : _entrar,
-                      child: _enviando
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Entrar'),
-                    ),
-                    const SizedBox(height: EspacosTrato.x4),
-                    const AvisoAuditoria(),
-                    const SizedBox(height: EspacosTrato.x1),
-                    Text('Cada acesso e cada ação ficam registrados com o seu nome.', style: TipografiaTrato.legenda),
+                    BannerInfo(_erro!, tom: Tom.erro),
                   ],
-                ),
+                  const SizedBox(height: EspacosTrato.x5),
+                  BotaoTrato.primario(
+                    'Entrar',
+                    aoPressionar: _enviando ? null : _entrar,
+                    carregando: _enviando,
+                    rotuloCarregando: 'Entrando',
+                  ),
+                  const SizedBox(height: EspacosTrato.x4),
+                  const AvisoAuditoria(texto: 'Cada acesso e cada ação ficam registrados com o seu nome.'),
+                ],
               ),
             ),
           ),

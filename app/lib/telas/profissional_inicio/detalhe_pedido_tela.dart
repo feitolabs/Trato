@@ -5,7 +5,6 @@ import '../../tema/tema.dart';
 import '../../dispositivo/abrir_mapa.dart';
 import '../cliente/avatar_de_usuario.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
-import 'dados_exemplo.dart';
 import 'modelos.dart';
 import 'pecas_profissional.dart';
 import 'recusar_pedido_folha.dart';
@@ -22,7 +21,7 @@ String _iniciais(String nome) {
 class DetalhePedidoTela extends StatelessWidget {
   const DetalhePedidoTela({
     super.key,
-    this.dados = detalhePedidoExemplo,
+    required this.dados,
     this.aoFazerOrcamento,
     this.aoPerguntar,
     this.aoRecusar,

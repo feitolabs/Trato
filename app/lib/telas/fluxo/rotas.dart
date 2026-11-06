@@ -20,7 +20,6 @@ import '../aditivo/responder_aditivo_tela.dart';
 import '../busca/busca_profissionais_tela.dart';
 import '../busca/modelos.dart';
 import '../../dados/repositorios_catalogo.dart';
-import '../../dados/repositorios_catalogo_fake.dart' show ServicosExemplo;
 import '../agenda/agenda_tela.dart';
 import '../catalogo/avaliacoes_profissional_tela.dart';
 import '../catalogo/categoria_tela.dart';
@@ -44,24 +43,19 @@ import '../nota_material/enviar_nota_tela.dart';
 import '../nota_material/nota_material.dart';
 import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
-import '../ajuda/servico_fake.dart';
+import '../ajuda/servico_ajuda_local.dart';
 import '../lgpd/central_privacidade_tela.dart';
-import '../lgpd/servico_fake.dart';
 import '../mensagens/mensagens_tela.dart';
-import '../mensagens/servico_fake.dart';
 import '../perfil_publico/avaliacoes_recebidas_tela.dart';
-import '../perfil_publico/perfil_publico.dart';
 import '../perfil_publico/perfil_publico_tela.dart';
-import '../profissional_cadastro/cadastro.dart';
 import '../profissional_cadastro/cadastro_profissional_tela.dart';
-import '../verificacao/verificacao.dart';
 import '../verificacao/verificacao_tela.dart';
 import '../carteira/carteira_tela.dart';
 import '../carteira/modelos.dart';
 import '../cliente/casca_cliente_tela.dart';
 import '../conclusao/avaliacao_tela.dart';
 import '../conclusao/conclusao_tela.dart';
-import '../conclusao/dados_exemplo.dart';
+import '../conclusao/modelos.dart';
 import '../conclusao/garantia_tela.dart';
 import '../conclusao/relatar_problema_tela.dart';
 import '../notificacoes/modelos.dart';
@@ -91,39 +85,27 @@ import '../profissional_inicio/modelos.dart';
 /// sabe para onde cada botão vai, e de onde vêm os dados, é este arquivo. Os repositórios
 /// (API ou demonstração) vêm de [repos], configurado no `main.dart`.
 abstract final class RotasTrato {
-  /// Padrão: demonstração (dados de exemplo, sem rede). O `main.dart` troca conforme o modo.
-  static RepositoriosTrato repos = RepositoriosTrato.demo();
+  /// Repositórios da API. O `main.dart` liga na abertura do app.
+  static late RepositoriosTrato repos;
 
-  /// Folha de cartão do provedor. O `main` liga a real; nos testes e na demonstração não abre nada.
+  /// Folha de cartão do provedor. O `main` liga a real; nos testes não abre nada.
   static FolhaCartao folhaCartao = FolhaCartaoFake();
 
-  /// Câmera, GPS e envio de arquivos. Padrão: fake (testes); o `main.dart` troca pelo real.
-  static DispositivoTrato dispositivo = DispositivoTrato.fake();
+  /// Câmera, GPS e envio de arquivos. O `main.dart` liga o real.
+  static late DispositivoTrato dispositivo;
 
-  /// Serviços de nota, aditivo, disputa e busca. Ainda sem rota na API: seguem em demonstração
-  /// (docs/app-ligacao.md). Trocar aqui quando o backend tiver as rotas.
-  static final ServicoNotaMaterial _notaDemo =
-      ServicoNotaMaterialFake(nota: notaMaterialExemplo);
-  static final ServicoAditivo _aditivoDemo =
-      ServicoAditivoFake(detalhe: aditivoExemplo);
-
-  /// Modo `api`: nota, aditivo e disputa vêm de `repos`; fora dele, a demonstração.
-  static ServicoNotaMaterial get servicoNota => repos.notaMaterial ?? _notaDemo;
-  static ServicoAditivo get servicoAditivo => repos.aditivo ?? _aditivoDemo;
-  static final ServicoDisputaProfissional _disputaDemo =
-      ServicoDisputaProfissionalFake(
-          disputa: disputaExemplo, retrabalho: retrabalhoExemplo);
-  static ServicoDisputaProfissional get servicoDisputa =>
-      repos.disputaProfissional ?? _disputaDemo;
+  /// Nota de materiais, aditivo e disputa vêm sempre da API (`repos`).
+  static ServicoNotaMaterial get servicoNota => repos.notaMaterial!;
+  static ServicoAditivo get servicoAditivo => repos.aditivo!;
+  static ServicoDisputaProfissional get servicoDisputa => repos.disputaProfissional!;
 
   /// Busca por texto: pede ao catálogo (modo `api`: demonstração até a rota de busca existir).
   static ServicoBusca get servicoBusca => _ServicoBuscaCatalogo(repos.catalogo);
 
   /// Lista de conversas da aba Mensagens. No modo `api` vem dos pedidos (uma conversa por
   /// pedido contratado); na demonstração, dados de exemplo.
-  static ServicoMensagens get _servicoMensagens => repos.modoApi
-      ? ServicoMensagensDosPedidos(repos.pedidos, chat: repos.chat)
-      : const ServicoMensagensFake();
+  static ServicoMensagens get _servicoMensagens =>
+      repos.mensagens ?? ServicoMensagensDosPedidos(repos.pedidos, chat: repos.chat);
 
   /// Sessão do cliente HTTP, para o "Sair" limpar o token. O `main.dart` liga.
   static SessaoTrato? sessao;
@@ -131,8 +113,8 @@ abstract final class RotasTrato {
   /// Há login guardado (a splash pula o onboarding)?
   static bool get temSessao => ServicoAuthPadrao.atual.sessaoAtual != null;
 
-  /// Id usado nos dados de exemplo, que não têm pedido real por trás.
-  static const _idDemo = 'demo';
+  /// Sem id de pedido (não deveria acontecer com dado da API): a chamada falha com erro claro.
+  static const _semId = '';
 
   /// Avisa a lista de pedidos que ela precisa recarregar (criou pedido, mexeu num pedido).
   static final ValueNotifier<int> pedidosMudaram = ValueNotifier<int>(0);
@@ -337,7 +319,7 @@ abstract final class RotasTrato {
         Builder(
           builder: (context) => ServicosRecentesTela(
             carregar: repos.servicos.recentes,
-            aoAbrir: (s) => abrirServico(context, s.pedidoId ?? _idDemo),
+            aoAbrir: (s) => abrirServico(context, s.pedidoId ?? _semId),
           ),
         ),
       );
@@ -415,11 +397,10 @@ abstract final class RotasTrato {
           dados: dados,
           aoAbrirNotificacoes: () => abrirNotificacoes(context),
           aoNovoPedido: () => abrirNovoPedido(context),
-          aoAbrirPedidoEmAndamento: (p) =>
-              abrirServico(context, p.pedidoId ?? _idDemo),
+          aoAbrirPedidoEmAndamento: (p) => abrirServico(context, p.pedidoId ?? _semId),
           aoAbrirCategoria: (c) => abrirCategoria(context, c),
           aoVerTodasCategorias: () => abrirTodasCategorias(context),
-          aoAbrirServico: (s) => abrirServico(context, s.pedidoId ?? _idDemo),
+          aoAbrirServico: (s) => abrirServico(context, s.pedidoId ?? _semId),
           aoVerServicos: () => abrirServicos(context),
         ),
       );
@@ -488,26 +469,17 @@ abstract final class RotasTrato {
         context,
         Builder(
           builder: (context) => CadastroProfissionalTela(
-            nomeInicial: repos.perfil.nomeSalvo ??
-                ServicoAuthPadrao.atual.sessaoAtual?.nome ??
-                '',
-            servico:
-                repos.cadastroProfissional ?? ServicoCadastroProfissionalFake(),
+            nomeInicial: repos.perfil.nomeSalvo ?? ServicoAuthPadrao.atual.sessaoAtual?.nome ?? '',
+            servico: repos.cadastroProfissional!,
             aoAdicionarFoto: _fotografar,
             aoAdicionarFotos: _selecionarFotos,
             aoConcluir: () => _abrir<void>(
               context,
               VerificacaoTela(
-                servico: repos.verificacao ?? ServicoVerificacaoFake(),
-                aoCapturarDocumento:
-                    repos.capturaVerificacao?.documento ?? _fotografar,
-                aoCapturarSelfie:
-                    repos.capturaVerificacao?.selfie ?? _fotografar,
+                servico: repos.verificacao!,
+                aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
+                aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
                 aoConcluir: () {
-                  final pub = repos.perfilPublico;
-                  if (pub is ServicoPerfilPublicoFake) {
-                    pub.definirTemPerfil(true);
-                  }
                   _entrarNaCascaProfissional(context);
                 },
               ),
@@ -538,12 +510,9 @@ abstract final class RotasTrato {
           abaAgenda: _abaAgenda(),
           abaConversas: Builder(
             builder: (context) => ListaConversas(
-              servico: repos.modoApi
-                  ? ServicoMensagensDoProfissional(repos.profissional,
-                      chat: repos.chat)
-                  : const ServicoMensagensFake(),
-              textoVazio:
-                  'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
+              servico: repos.mensagensProfissional ??
+                  ServicoMensagensDoProfissional(repos.profissional, chat: repos.chat),
+              textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
               aoAbrirConversa: (c) => _abrir<void>(context, _chat(c.pedidoId)),
             ),
           ),
@@ -554,13 +523,13 @@ abstract final class RotasTrato {
           aoUsarComoCliente: () => irParaCliente(context),
           aoFazerCheckIn: () => _acoesPedidoProfissional(
             context,
-            pedidoId: inicio.proximo?.pedidoId ?? _idDemo,
+            pedidoId: inicio.proximo?.pedidoId ?? _semId,
             titulo: inicio.proximo?.titulo ?? 'Pedido de hoje',
             aoCheckIn: () => _abrir<void>(
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
-                servico: _servicoCheckIn(inicio.proximo?.pedidoId ?? _idDemo),
+                servico: _servicoCheckIn(inicio.proximo?.pedidoId ?? _semId),
                 tituloBarra: inicio.proximo == null
                     ? 'Check-in'
                     : '${inicio.proximo!.titulo} · ${inicio.proximo!.quando}',
@@ -568,18 +537,16 @@ abstract final class RotasTrato {
             ),
           ),
           aoFazerOrcamento: () {
-            final pedido =
-                inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
-            final id = pedido?.id ?? _idDemo;
+            final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
+            final id = pedido?.id ?? _semId;
             final titulo = pedido?.titulo ?? 'Orçamento';
             _abrirOrcamento(context, id, titulo);
           },
           aoFazerOrcamentoDoPedido: (pedido) =>
               _abrirOrcamento(context, pedido.id, pedido.titulo),
           aoPerguntar: () {
-            final pedido =
-                inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
-            _abrir<void>(context, _chat(pedido?.id ?? _idDemo));
+            final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
+            _abrir<void>(context, _chat(pedido?.id ?? _semId));
           },
           aoPerguntarDoPedido: (pedido) =>
               _abrir<void>(context, _chat(pedido.id)),
@@ -849,7 +816,7 @@ abstract final class RotasTrato {
   /// Aba "Perfil" da casca do profissional: perfil público e avaliações recebidas.
   static Widget _abaPerfilProfissional() => Builder(
         builder: (context) {
-          final servico = repos.perfilPublico ?? ServicoPerfilPublicoFake();
+          final servico = repos.perfilPublico!;
           return PerfilPublicoTela(
             servico: servico,
             aoCapturarFotoPerfil: _fotografarPerfil,
@@ -885,7 +852,7 @@ abstract final class RotasTrato {
                 _abrir<void>(
                   context,
                   CentralPrivacidadeTela(
-                    servico: repos.privacidade ?? ServicoPrivacidadeFake(),
+                    servico: repos.privacidade!,
                     aoAbrirTermos: () => abrirTermos(context),
                     aoContaExcluida: () async {
                       await sair(context);
@@ -901,8 +868,7 @@ abstract final class RotasTrato {
                   ),
                 );
               case AcaoPerfil.centralAjuda:
-                _abrir<void>(
-                    context, const AjudaTela(servico: ServicoAjudaFake()));
+                _abrir<void>(context, const AjudaTela(servico: ServicoAjudaLocal()));
               default:
                 break;
             }
@@ -978,8 +944,8 @@ abstract final class RotasTrato {
 
   /// Aba "Buscar" do cliente: busca por serviço e abertura do perfil do profissional.
   static Widget abaBuscar() => Carregador<List<CategoriaServico>>(
-        // Se o catálogo falhar, mostra o erro com "Tentar de novo". Nada de categoria inventada.
-        carregar: repos.catalogo.categorias,
+        // Se o catálogo falhar, a busca por texto continua sem as sugestões de categoria.
+        carregar: () => repos.catalogo.categorias().catchError((Object _) => <CategoriaServico>[]),
         construir: (context, cats) => BuscaProfissionaisTela(
           servico: servicoBusca,
           sugestoes: [
@@ -1059,7 +1025,7 @@ abstract final class RotasTrato {
   }
 
   static void abrirPedido(BuildContext context, PedidoResumo pedido) {
-    final id = pedido.id ?? _idDemo;
+    final id = pedido.id ?? _semId;
     final estado = pedido.estadoApi;
     if (estado != null) {
       switch (estado) {
@@ -1086,7 +1052,7 @@ abstract final class RotasTrato {
     } else if (pedido.statusTexto.contains('orçamentos recebidos')) {
       _abrir<void>(context, _orcamentosRecebidos(id));
     } else {
-      abrirServico(context, pedido.id ?? ServicosExemplo.vazamento);
+      abrirServico(context, pedido.id ?? _semId);
     }
   }
 
@@ -1242,9 +1208,7 @@ abstract final class RotasTrato {
     );
   }
 
-  static void abrirGarantia(BuildContext context,
-          {String pedidoId = _idDemo}) =>
-      _abrir<void>(
+  static void abrirGarantia(BuildContext context, {String pedidoId = _semId}) => _abrir<void>(
         context,
         Carregador<DadosGarantia>(
           carregar: () => repos.pedidos.garantia(pedidoId),

@@ -4,7 +4,7 @@ import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../ajuda/ajuda_tela.dart';
-import '../ajuda/servico_fake.dart';
+import '../ajuda/servico_ajuda_local.dart';
 import 'estrutura_auth.dart';
 import 'validacao.dart';
 
@@ -35,7 +35,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
   }
 
   void _abrirAjuda() => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const AjudaTela(servico: ServicoAjudaFake())),
+        MaterialPageRoute<void>(builder: (_) => const AjudaTela(servico: ServicoAjudaLocal())),
       );
 
   Future<void> _enviar() async {
@@ -80,7 +80,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
         Text('Recuperar senha', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x3),
         Text(
-          'Informe o e-mail da sua conta. Enviamos um código para criar uma senha nova.',
+          'Informe o e-mail da sua conta. Enviamos um link para criar uma senha nova. Abra o e-mail neste aparelho.',
           style: TipografiaTrato.corpo,
         ),
         const SizedBox(height: EspacosTrato.x6),
@@ -101,7 +101,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
               style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto),
             ),
           ),
-        BotaoPrimario(texto: 'Enviar código', aoTocar: _enviar, carregando: _carregando),
+        BotaoPrimario(texto: 'Enviar link', aoTocar: _enviar, carregando: _carregando),
       ],
     );
   }

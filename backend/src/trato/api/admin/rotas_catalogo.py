@@ -48,7 +48,7 @@ class CriarCategoriaIn(BaseModel):
     garantia_retrabalho_dias: int | None = Field(default=None, ge=1, le=365)
     ordem: int = 0
     ativa: bool = True
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 class EditarCategoriaIn(BaseModel):
@@ -58,16 +58,16 @@ class EditarCategoriaIn(BaseModel):
     garantia_retrabalho_dias: int | None = Field(default=None, ge=1, le=365)
     ordem: int | None = None
     ativa: bool | None = None
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 class AlterarStatusIn(BaseModel):
     ativa: bool
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 class ExcluirComMotivoIn(BaseModel):
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 # =============================================================================
@@ -89,7 +89,7 @@ class CriarCidadeIn(BaseModel):
     ativa: bool = True
     centro_lat: float | None = None
     centro_lng: float | None = None
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 # =============================================================================
@@ -292,7 +292,7 @@ def alterar_status_categoria(
 @router.delete("/categorias/{categoria_id}", status_code=204, summary="Excluir categoria sem dependências")
 def excluir_categoria(
     categoria_id: str,
-    motivo: str = Query(..., min_length=3, max_length=500),
+    motivo: str = Query(..., min_length=10, max_length=500),
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
@@ -460,7 +460,7 @@ class CriarPerguntaIn(BaseModel):
     opcoes: list[str] | None = None
     obrigatoria: bool = False
     ordem: int = 0
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 class EditarPerguntaIn(BaseModel):
@@ -470,7 +470,7 @@ class EditarPerguntaIn(BaseModel):
     obrigatoria: bool | None = None
     ordem: int | None = None
     ativa: bool | None = None
-    motivo: str = Field(min_length=3, max_length=500)
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 # =============================================================================
@@ -637,7 +637,7 @@ def editar_pergunta_categoria(
 def desativar_pergunta_categoria(
     categoria_id: str,
     pergunta_id: str,
-    motivo: str = Query(..., min_length=3),
+    motivo: str = Query(..., min_length=10),
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
