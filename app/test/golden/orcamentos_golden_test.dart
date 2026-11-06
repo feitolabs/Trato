@@ -25,6 +25,8 @@ void main() {
       aoTrocarCategoria: () {},
       aoMudarEndereco: () {},
       aoAdicionarFoto: () {},
+      // Data fixa: o prazo padrão (hoje + 7) não muda o golden a cada dia.
+      agora: () => DateTime(2026, 11, 5),
     ),
     'orcamentos': OrcamentosRecebidosTela(orcamentos: orcamentosExemplo, pedido: resumoPedidoExemplo, ),
     'detalhe_orcamento': DetalheOrcamentoTela(

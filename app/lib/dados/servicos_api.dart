@@ -14,6 +14,7 @@ import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'erros.dart';
 import 'servico_upload.dart';
+import 'paralelo.dart';
 
 // Serviços das telas de aditivo, nota de materiais, disputa e verificação, falando com a API.
 // Só pedem e mostram: o total da nota, o estado do aditivo e a cobrança são do backend.
@@ -315,8 +316,12 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
   /// ("Tentar de novo"): nunca lista de exemplo. Raio, dias e períodos são opções fixas.
   @override
   Future<OpcoesCadastro> carregarOpcoes() async {
-    final cats = _lista(await _api.get('/v1/catalogo/categorias'));
-    final cids = _lista(await _api.get('/v1/catalogo/cidades'));
+    final (catsBrutas, cidsBrutas) = await emParalelo2(
+      _api.get('/v1/catalogo/categorias'),
+      _api.get('/v1/catalogo/cidades'),
+    );
+    final cats = _lista(catsBrutas);
+    final cids = _lista(cidsBrutas);
     _idPorNomeCategoria = {
       for (final c in cats)
         if (c['nome'] is String && c['id'] is String) (c['nome'] as String): (c['id'] as String),

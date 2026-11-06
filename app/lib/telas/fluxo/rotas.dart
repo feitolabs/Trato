@@ -85,6 +85,7 @@ import '../profissional/check_out_tela.dart';
 import '../profissional/servico_check_in.dart';
 import '../profissional_inicio/casca_profissional_tela.dart';
 import '../profissional_inicio/modelos.dart';
+import '../../dados/paralelo.dart';
 
 /// Liga as telas entre si e aos dados. As telas não se conhecem e não conhecem a rede: quem
 /// sabe para onde cada botão vai, e de onde vêm os dados, é este arquivo. Os repositórios
@@ -420,10 +421,11 @@ abstract final class RotasTrato {
       );
 
   static Future<DadosInicio> _carregarInicio() async {
-    final perfil = await repos.perfil.carregar();
-    final categorias = await repos.catalogo.categorias();
-    final andamento = await repos.servicos.emAndamento();
-    final recentes = await repos.servicos.recentes();
+    // As quatro em paralelo: a tela espera a mais lenta, não a soma das quatro.
+    final ((perfil, categorias), (andamento, recentes)) = await emParalelo2(
+      emParalelo2(repos.perfil.carregar(), repos.catalogo.categorias()),
+      emParalelo2(repos.servicos.emAndamento(), repos.servicos.recentes()),
+    );
     final recentesFiltrados = [
       for (final r in recentes)
         if ((andamento?.pedidoId == null ||

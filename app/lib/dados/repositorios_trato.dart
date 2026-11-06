@@ -1,5 +1,4 @@
 import '../telas/conta/modelos.dart';
-import '../telas/conta/servico_fake.dart';
 import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';

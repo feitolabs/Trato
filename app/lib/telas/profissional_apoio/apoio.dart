@@ -116,11 +116,9 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
         future: _futuro,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: CoresTrato.azulTexto,
-                semanticsLabel: 'Carregando',
-              ),
+            return Semantics(
+              label: 'Carregando',
+              child: const Align(alignment: Alignment.topCenter, child: EsqueletoLista()),
             );
           }
           if (snap.hasError) {

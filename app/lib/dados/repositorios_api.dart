@@ -24,6 +24,7 @@ import 'fila_offline.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'servico_upload.dart';
+import 'paralelo.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`). Só pedem e mostram; o backend decide.
 // Onde a rota ainda não existe no backend, a classe lança [ErroTrato.indisponivel] e o
@@ -306,9 +307,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<PedidoEmExecucao> acompanhar(String pedidoId) async {
-    final pedido = await _pedido(pedidoId);
+    // Em paralelo: pedido e histórico não dependem um do outro.
+    final (pedido, eventosBrutos) =
+        await emParalelo2(_pedido(pedidoId), _api.get('/v1/pedidos/$pedidoId/eventos'));
     final eventos = [
-      for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j),
+      for (final j in _lista(eventosBrutos)) EventoApi.deJson(j),
     ];
     // Etapas da linha do tempo (índice = posição). O check-in cobre "Chegou" e "Em execução".
     const etapaDaAcao = {
@@ -368,9 +371,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<ResumoConclusao> conclusao(String pedidoId) async {
-    final pedido = await _pedido(pedidoId);
-    final saldo = await _saldo(pedidoId);
-    final fotos = await _fotosDoServico(pedidoId);
+    final (pedido, saldo, fotos) =
+        await emParalelo3(_pedido(pedidoId), _saldo(pedidoId), _fotosDoServico(pedidoId));
     return ResumoConclusao(
       numeroPedido: pedido.numero,
       nomeProfissional: await _nomeDoProfissional(pedido),
@@ -393,8 +395,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<DadosRelatoProblema> dadosRelato(String pedidoId) async {
-    final pedido = await _pedido(pedidoId);
-    final saldo = await _saldo(pedidoId);
+    final (pedido, saldo) = await emParalelo2(_pedido(pedidoId), _saldo(pedidoId));
     return DadosRelatoProblema(
       titulo: 'Pedido ${pedido.numero}',
       valorCongeladoCentavos: saldo.retidoCentavos + saldo.aLiberarCentavos,
@@ -442,8 +443,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async {
-    final saldo = await _saldo(pedidoId);
-    final pedido = await _pedido(pedidoId);
+    final (saldo, pedido) = await emParalelo2(_saldo(pedidoId), _pedido(pedidoId));
     return DadosAvaliacao(
       nomeProfissional: await _nomeDoProfissional(pedido),
       valorLiberadoCentavos: saldo.clientePagouCentavos,
@@ -522,8 +522,12 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
   /// orçamento não derruba a lista: ele só aparece sem detalhe.
   @override
   Future<OrcamentosDoPedido> listar(String pedidoId) async {
-    final pedido = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
-    final brutos = _lista(await _api.get('/v1/pedidos/$pedidoId/orcamentos'));
+    final (pedidoBruto, orcamentosBrutos) = await emParalelo2(
+      _api.get('/v1/pedidos/$pedidoId'),
+      _api.get('/v1/pedidos/$pedidoId/orcamentos'),
+    );
+    final pedido = PedidoApi.deJson(_mapa(pedidoBruto));
+    final brutos = _lista(orcamentosBrutos);
     final detalhes = await Future.wait([
       for (final j in brutos) _detalhe(j['id'] as String),
     ]);

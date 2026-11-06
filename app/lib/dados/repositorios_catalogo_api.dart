@@ -10,6 +10,7 @@ import 'erros.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
+import 'paralelo.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`) do catálogo, dos serviços e da agenda.
 // Só o que o backend já tem sai da API; o resto segue em demonstração e está listado em
@@ -112,8 +113,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       'categoria_id': categoriaId,
       if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
     };
-    final resposta = _mapa(await _api.get('/v1/profissionais', consulta: consulta));
-    await _carregarNomesCategorias();
+    final (bruto, _) = await emParalelo2(
+      _api.get('/v1/profissionais', consulta: consulta),
+      _carregarNomesCategorias(),
+    );
+    final resposta = _mapa(bruto);
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
         _converterBusca(item as Map<String, dynamic>),
@@ -126,10 +130,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final consulta = <String, String>{
       if (limpo.length >= 2) 'servico': limpo,
     };
-    final resposta = _mapa(
-      await _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
+    final (bruto, _) = await emParalelo2(
+      _api.get('/v1/profissionais', consulta: consulta.isEmpty ? null : consulta),
+      _carregarNomesCategorias(),
     );
-    await _carregarNomesCategorias();
+    final resposta = _mapa(bruto);
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
         _converterBusca(item as Map<String, dynamic>),
@@ -152,9 +157,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   @override
   Future<FormularioPedido> formulario(String categoriaId) async {
-    final base = await _formularioBase(categoriaId);
-    // Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
-    final cidades = await _cidades();
+    // Em paralelo. Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
+    final (base, cidades) = await emParalelo2(_formularioBase(categoriaId), _cidades());
     if (cidades.isEmpty) {
       throw const ErroTrato(
         TipoErro.indisponivel,
@@ -194,8 +198,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   @override
   Future<Profissional> perfil(String profissionalId) async {
-    final j = _mapa(await _api.get('/v1/profissionais/$profissionalId'));
-    await _carregarNomesCategorias();
+    final (bruto, _) = await emParalelo2(
+      _api.get('/v1/profissionais/$profissionalId'),
+      _carregarNomesCategorias(),
+    );
+    final j = _mapa(bruto);
     final nome = (j['nome'] as String?) ?? 'Profissional';
     final nivel = (j['nivel_verificacao'] as String?) ?? '';
     final avaliacoes = [
@@ -249,9 +256,25 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
   final ClienteApi _api;
   final RepositorioPedidos _pedidos;
 
+  /// `recentes()` e `emAndamento()` saem da mesma lista. Chamados juntos (tela inicial),
+  /// dividem UM `GET /v1/pedidos` em voo em vez de fazer dois. Não guarda resultado:
+  /// terminada a chamada, a próxima busca de novo (dados sempre atuais).
+  Future<PedidosDoCliente>? _listaEmVoo;
+
+  Future<PedidosDoCliente> _listar() {
+    final emVoo = _listaEmVoo;
+    if (emVoo != null) return emVoo;
+    final nova = _pedidos.listar();
+    _listaEmVoo = nova;
+    nova.whenComplete(() {
+      if (identical(_listaEmVoo, nova)) _listaEmVoo = null;
+    }).ignore();
+    return nova;
+  }
+
   @override
   Future<List<ServicoRecente>> recentes() async {
-    final todos = await _pedidos.listar();
+    final todos = await _listar();
     return [
       for (final p in [...todos.finalizados, ...todos.emAndamento])
         if (p.id != null)
@@ -267,7 +290,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
 
   @override
   Future<PedidoEmAndamento?> emAndamento() async {
-    final todos = await _pedidos.listar();
+    final todos = await _listar();
     final p = todos.emAndamento.where((x) => x.id != null).firstOrNull;
     if (p == null) return null;
     return PedidoEmAndamento(

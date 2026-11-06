@@ -641,3 +641,12 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Visual conferido no navegador (desktop 1360 e celular 390) contra as capturas.
 
 **Limites conhecidos** — ver "Painel admin v2" em `PENDENCIAS.md`.
+
+## 2026-11-06 — Performance de consultas e telas de carregamento
+- Causa principal: backend no Render em Virginia (EUA) e banco em São Paulo: ~120 ms por consulta.
+- Banco: 45 índices nas chaves estrangeiras sem índice (`20261106120000_indices_chaves_estrangeiras.sql`), **aplicada** no Supabase com o OK do João. Rollback em `supabase/rollback/`.
+- Backend: papel `service_role` fixado na conexão (porta 5432) em vez de `set local role` por transação (1 ida ao banco a menos por transação; na 6543 segue por transação); pool com 2 conexões abertas; respostas gzip acima de 1 KB; medidor `TRATO_MEDIR_CONSULTAS=1` (cabeçalho `Server-Timing` + log `trato.medicao`).
+- App: chamadas independentes em paralelo (`dados/paralelo.dart`, repassa o erro original): início do cliente (4 chamadas, e `/v1/pedidos` uma vez só), acompanhar, conclusão, relato, avaliação, orçamentos, busca e perfil de profissional, formulário do pedido, opções do cadastro. Carregamento com esqueleto em vez de spinner. Fotos com cache em disco (chave = URL sem o token) e decodificadas no tamanho da tela (`cached_network_image`).
+- Hospedagem: segue no Render (Virginia), decisão do João. Sem região na América do Sul; o ganho vem de menos idas ao banco.
+- Golden `novo_pedido` dependia da data de hoje: a tela aceita `agora` e o teste fixa 05/11/2026.
+- Testes: backend 1377 ok; conferido no Supabase real que o papel continua `service_role` com 1 consulta por transação.
