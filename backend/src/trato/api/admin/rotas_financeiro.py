@@ -6,16 +6,21 @@ mostram o que o provedor avisou e o que travou, para o financeiro agir.
 
 from __future__ import annotations
 
+import csv
+import io
+from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
+from trato.api.admin.modelos import ComMotivo
 from trato.api.admin.papeis import Permissao
+from trato.api.admin.rotas_relatorios import guardar_para_baixar
 from trato.api.contexto import Contexto, obter_contexto
-from trato.financeiro import periodo
+from trato.financeiro import extrato_profissional, fechamento, periodo
 from trato.financeiro.conciliacao import conciliar
 from trato.financeiro.contestacoes import Contestacao, StatusContestacao
 from trato.pedidos.estados import Estado
@@ -104,6 +109,39 @@ class ConciliacaoOut(BaseModel):
     movimentos_ignorados: int
     divergencias: list[LinhaConciliacaoOut]
     linhas: list[LinhaConciliacaoOut]
+
+
+class FechamentoOut(BaseModel):
+    mes: str
+    fechado: bool
+    pode_fechar: bool  # o mês já terminou e ainda não foi fechado
+    totais: dict[str, Any]  # recalculados agora, do ledger
+    gravado: dict[str, Any] | None = None  # o retrato do dia do fechamento
+    confere: bool | None = None  # recalculado == gravado (só para mês fechado)
+    hash: str | None = None
+    fechado_por: str | None = None
+    fechado_por_nome: str | None = None
+    fechado_em: datetime | None = None
+    motivo: str | None = None
+
+
+class MesResumoOut(BaseModel):
+    mes: str
+    fechado: bool
+    pode_fechar: bool
+    fechado_em: datetime | None = None
+
+
+class ArquivoProntoOut(BaseModel):
+    codigo: str
+    nome_arquivo: str
+    expira_em_segundos: int = 180
+
+
+class PedirExtratoIn(BaseModel):
+    inicio: date
+    fim: date
+    motivo: str = Field(min_length=10, max_length=500)
 
 
 class ConsultaCobrancaOut(BaseModel):
@@ -361,6 +399,217 @@ def conciliacao(
         divergencias=[saida(lin) for lin in resultado.divergencias],
         linhas=[saida(lin) for lin in resultado.linhas],
     )
+
+
+# --- Fechamento mensal e trava (itens 7 e 8) ---------------------------------------------------
+
+
+def _mes_ou_422(mes: str) -> tuple[int, int]:
+    try:
+        return periodo.ler_mes(mes)
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+
+
+def _fechamento_out(mes: str, contexto: Contexto, admin: AdminContexto) -> FechamentoOut:
+    ano, numero = _mes_ou_422(mes)
+    atuais = asdict(
+        fechamento.calcular(
+            contexto.ledger.lancamentos(), contexto.contestacoes.listar(), ano, numero
+        )
+    )
+    gravado = contexto.fechamentos.obter(f"{ano:04d}-{numero:02d}")
+    if gravado is None:
+        return FechamentoOut(
+            mes=atuais["mes"],
+            fechado=False,
+            pode_fechar=fechamento.pode_fechar(ano, numero, contexto.agora()),
+            totais=atuais,
+        )
+    nome = None
+    if admin.usuarios is not None:
+        nome = admin.usuarios.nomes([gravado.fechado_por]).get(gravado.fechado_por)
+    return FechamentoOut(
+        mes=gravado.mes,
+        fechado=True,
+        pode_fechar=False,
+        totais=atuais,
+        gravado=gravado.totais,
+        confere=fechamento.hash_dos_totais(atuais) == gravado.hash,
+        hash=gravado.hash,
+        fechado_por=gravado.fechado_por,
+        fechado_por_nome=nome,
+        fechado_em=gravado.fechado_em,
+        motivo=gravado.motivo,
+    )
+
+
+@router.get("/fechamentos", response_model=list[MesResumoOut], summary="Meses e se estão fechados")
+def listar_fechamentos(
+    ultimos: int = Query(12, ge=1, le=36),
+    _: Operador = Depends(exigir(Permissao.PAGAMENTOS_VER)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> list[MesResumoOut]:
+    agora = contexto.agora()
+    ano, numero = periodo.mes_de(agora)
+    gravados = {f.mes: f for f in contexto.fechamentos.listar()}
+    saida = []
+    for _passo in range(ultimos):
+        chave = f"{ano:04d}-{numero:02d}"
+        f = gravados.get(chave)
+        saida.append(
+            MesResumoOut(
+                mes=chave,
+                fechado=f is not None,
+                pode_fechar=f is None and fechamento.pode_fechar(ano, numero, agora),
+                fechado_em=f.fechado_em if f else None,
+            )
+        )
+        ano, numero = (ano - 1, 12) if numero == 1 else (ano, numero - 1)
+    return saida
+
+
+@router.get("/fechamentos/{mes}", response_model=FechamentoOut, summary="Totais do mês")
+def ver_fechamento(
+    mes: str,
+    _: Operador = Depends(exigir(Permissao.PAGAMENTOS_VER)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> FechamentoOut:
+    return _fechamento_out(mes, contexto, admin)
+
+
+@router.post(
+    "/fechamentos/{mes}/fechar",
+    response_model=FechamentoOut,
+    summary="Fecha o mês: grava o retrato (imutável) e trava novos lançamentos nele",
+)
+def fechar_mes(
+    mes: str,
+    corpo: ComMotivo,
+    operador: Operador = Depends(exigir(Permissao.PAGAMENTOS_CONCILIAR)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> FechamentoOut:
+    ano, numero = _mes_ou_422(mes)
+    if not fechamento.pode_fechar(ano, numero, contexto.agora()):
+        raise HTTPException(422, "Só dá para fechar um mês que já terminou.")
+    totais = fechamento.calcular(
+        contexto.ledger.lancamentos(), contexto.contestacoes.listar(), ano, numero
+    )
+    novo = fechamento.montar(totais, operador.id, contexto.agora(), corpo.motivo)
+    try:
+        contexto.fechamentos.gravar(novo)
+    except fechamento.MesJaFechado as erro:
+        raise HTTPException(409, "Esse mês já foi fechado.") from erro
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao="financeiro.mes_fechado",
+        entidade="fechamentos_mensais",
+        depois={"mes": novo.mes, "hash": novo.hash, **novo.totais},
+        motivo=corpo.motivo,
+    )
+    return _fechamento_out(novo.mes, contexto, admin)
+
+
+_ROTULOS_FECHAMENTO = (
+    ("cobrancas", "Cobranças recebidas (quantidade)", False),
+    ("cobrado_centavos", "Recebido de clientes (bruto)", True),
+    ("devolvido_centavos", "Devolvido a clientes (estornos e contestações)", True),
+    ("entrada_liquida_centavos", "Entrada líquida de clientes", True),
+    ("receita_taxas_centavos", "Receita do Trato (taxas)", True),
+    ("liberado_profissionais_centavos", "Liberado aos profissionais", True),
+    ("pago_profissionais_centavos", "Pago aos profissionais", True),
+    ("retido_fim_centavos", "Retido ao fim do mês", True),
+    ("a_liberar_fim_centavos", "A liberar ao fim do mês", True),
+    ("liberado_fim_centavos", "Liberado e não pago ao fim do mês", True),
+    ("contestacoes_perdidas", "Contestações perdidas (quantidade)", False),
+    ("contestacoes_perdidas_centavos", "Contestações perdidas (valor)", True),
+    ("lancamentos", "Lançamentos no ledger (quantidade)", False),
+)
+
+
+@router.post(
+    "/fechamentos/{mes}/exportar",
+    response_model=ArquivoProntoOut,
+    status_code=201,
+    summary="CSV do mês para o contador (código de uso único para baixar)",
+)
+def exportar_fechamento(
+    mes: str,
+    operador: Operador = Depends(exigir(Permissao.RELATORIOS_EXPORTAR)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> ArquivoProntoOut:
+    dados = _fechamento_out(mes, contexto, admin)
+    totais = dados.gravado or dados.totais
+    saida = io.StringIO()
+    escritor = csv.writer(saida, delimiter=";")
+    situacao = "Fechado" if dados.fechado else "Prévia (mês ainda não fechado)"
+    escritor.writerow(["Trato - fechamento do mês", dados.mes, situacao])
+    if dados.hash:
+        escritor.writerow(["Hash do fechamento", dados.hash, ""])
+    escritor.writerow(["Indicador", "Valor", ""])
+    for chave, rotulo, dinheiro in _ROTULOS_FECHAMENTO:
+        valor = int(totais.get(chave, 0))
+        texto = f"{valor / 100:.2f}".replace(".", ",") if dinheiro else str(valor)
+        escritor.writerow([rotulo, texto, ""])
+    conteudo = ("﻿" + saida.getvalue()).encode("utf-8")
+    nome = f"trato_fechamento_{dados.mes}.csv"
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao="relatorio.exportado",
+        entidade="relatorios",
+        depois={"relatorio": "fechamento", "mes": dados.mes, "fechado": dados.fechado},
+    )
+    codigo = guardar_para_baixar(conteudo, nome, operador.id, "text/csv; charset=utf-8")
+    return ArquivoProntoOut(codigo=codigo, nome_arquivo=nome)
+
+
+# --- Extrato do profissional em PDF (item 9) ---------------------------------------------------
+
+
+@router.post(
+    "/profissionais/{usuario_id}/extrato",
+    response_model=ArquivoProntoOut,
+    status_code=201,
+    summary="Extrato de recebimentos do profissional em PDF (código de uso único)",
+)
+def extrato_do_profissional(
+    usuario_id: str,
+    corpo: PedirExtratoIn,
+    operador: Operador = Depends(exigir(Permissao.RELATORIOS_EXPORTAR)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> ArquivoProntoOut:
+    if corpo.fim < corpo.inicio:
+        raise HTTPException(422, "O fim precisa ser depois do início.")
+    if (corpo.fim - corpo.inicio).days > 366:
+        raise HTTPException(422, "Use um período de até um ano.")
+    usuario = admin.usuarios.obter(usuario_id) if admin.usuarios is not None else None
+    if usuario is None or usuario.tipo != "profissional":
+        raise HTTPException(404, "Profissional não encontrado.")
+    desde = periodo.dia(corpo.inicio)[0]
+    ate = periodo.dia(corpo.fim)[1]
+    extrato = extrato_profissional.montar(contexto.ledger.lancamentos(), usuario_id, desde, ate)
+    rotulos = admin.pedidos.rotulos(list({lin.pedido_id for lin in extrato.linhas}))
+    conteudo = extrato_profissional.pdf(extrato, usuario.nome, rotulos, contexto.agora())
+    nome = f"trato_extrato_{corpo.inicio:%Y%m%d}_{corpo.fim:%Y%m%d}.pdf"
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao="relatorio.exportado",
+        entidade="usuarios",
+        entidade_id=usuario_id,
+        depois={
+            "relatorio": "extrato_profissional",
+            "inicio": corpo.inicio.isoformat(),
+            "fim": corpo.fim.isoformat(),
+            "recebido_centavos": extrato.recebido_centavos,
+        },
+        motivo=corpo.motivo,
+    )
+    codigo = guardar_para_baixar(conteudo, nome, operador.id, "application/pdf")
+    return ArquivoProntoOut(codigo=codigo, nome_arquivo=nome)
 
 
 __all__ = ["StatusContestacao", "router", "servico_pagamento"]

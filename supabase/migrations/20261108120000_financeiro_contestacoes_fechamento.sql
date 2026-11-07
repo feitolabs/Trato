@@ -55,7 +55,8 @@ alter table public.fechamentos_mensais enable row level security;
 grant select, insert on table public.fechamentos_mensais to service_role;
 
 -- 3. Trava do mês fechado ------------------------------------------------------------------------
--- O mês é o do horário de Brasília (o mesmo do relatório do contador).
+-- O mês é o do horário de Brasília, UTC-3 fixo (sem horário de verão desde 2019), o mesmo do
+-- relatório do contador e de `trato/financeiro/periodo.py`. Não depende da base de fusos do servidor.
 create or replace function public.recusar_lancamento_em_mes_fechado()
 returns trigger
 language plpgsql
@@ -64,10 +65,10 @@ as $$
 begin
   if exists (
     select 1 from public.fechamentos_mensais f
-     where f.mes = date_trunc('month', new.ocorrido_em at time zone 'America/Sao_Paulo')::date
+     where f.mes = date_trunc('month', new.ocorrido_em at time zone interval '-03:00')::date
   ) then
     raise exception 'O mês de % já foi fechado: corrija com um estorno no mês corrente.',
-      to_char(new.ocorrido_em at time zone 'America/Sao_Paulo', 'MM/YYYY')
+      to_char(new.ocorrido_em at time zone interval '-03:00', 'MM/YYYY')
       using errcode = 'restrict_violation';
   end if;
   return new;
@@ -80,7 +81,7 @@ create trigger lancamentos_mes_fechado before insert on public.lancamentos
 
 -- 4. Prazo do alerta de pagamento parado ---------------------------------------------------------
 insert into public.config_definicoes (chave, descricao, unidade, minimo, maximo, escopos_permitidos, exige_dupla_aprovacao)
-values ('alerta_pagamento_parado_minutos', 'Alerta de pagamento sem confirmação', 'minutos', 5, 1440, array['global'], true)
+values ('alerta_pagamento_parado_minutos', 'Alerta de pagamento sem confirmação (minutos)', 'quantidade', 5, 1440, array['global'], true)
 on conflict (chave) do nothing;
 
 commit;

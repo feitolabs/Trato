@@ -50,6 +50,7 @@ from trato.persistencia.dinheiro import (
     RepassesPostgres,
 )
 from trato.persistencia.execucao import ExecucaoPostgres
+from trato.persistencia.fechamentos import FechamentosPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
@@ -136,6 +137,7 @@ def criar_contexto_postgres(
         avaliacoes=AvaliacoesPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),
+        fechamentos=FechamentosPostgres(banco),
         recusas=RecusasPostgres(banco),
         notas_material=NotasMaterialPostgres(banco, execucao),
         conta=ContaPostgres(banco),

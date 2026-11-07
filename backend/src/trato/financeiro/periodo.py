@@ -2,7 +2,7 @@
 
 O Brasil não tem horário de verão desde 2019, então o fuso é fixo em UTC-3. Usar um deslocamento
 fixo evita depender da base de fusos do sistema (no Windows ela nem vem instalada). O gatilho do
-banco que trava o mês fechado usa 'America/Sao_Paulo', que hoje é o mesmo UTC-3.
+banco que trava o mês fechado usa o mesmo deslocamento fixo (`interval '-03:00'`).
 """
 
 from __future__ import annotations

@@ -78,3 +78,51 @@ def test_ledger_inteiro_numa_consulta_igual_ao_lido_por_pedido(cenario):
         do_pedido = cenario.contexto.ledger.lancamentos(pedido_id)
         assert do_pedido
         assert [i for i in todos if i.pedido_id == pedido_id] == list(do_pedido)
+
+
+def test_contestacao_e_fechamento_no_banco_e_a_trava_do_mes(cenario):
+    from datetime import timedelta
+
+    from trato.financeiro import fechamento
+    from trato.financeiro.contestacoes import Contestacao, StatusContestacao
+    from trato.persistencia.contestacoes import ContestacoesPostgres
+    from trato.persistencia.erros import RegraDoBanco
+    from trato.persistencia.fechamentos import FechamentosPostgres
+
+    pedido_id = contratar(cenario)
+    agora = datetime.now(UTC)
+    contestacoes = ContestacoesPostgres(cenario.banco)
+    c = Contestacao(
+        "dp_pg_1", 9_000, StatusContestacao.ABERTA, agora, agora, "pi_x", pedido_id, "fraudulent"
+    )
+    contestacoes.salvar(c)
+    assert contestacoes.abertas_do_pedido(pedido_id) == (c,)
+    encerrada = Contestacao(
+        "dp_pg_1", 9_000, StatusContestacao.GANHA, agora, agora, "pi_x", pedido_id, "fraudulent",
+        encerrada_em=agora,
+    )  # fmt: skip
+    contestacoes.salvar(encerrada)
+    assert contestacoes.obter("dp_pg_1").status is StatusContestacao.GANHA
+    assert contestacoes.abertas_do_pedido(pedido_id) == ()
+
+    # Fecha um mês antigo (sem lançamentos de teste nele) e tenta lançar dentro dele.
+    totais = fechamento.calcular((), (), 2020, 1)
+    f = fechamento.montar(totais, cenario.ids["equipe2"], agora, "Fechamento de teste no banco")
+    repo = FechamentosPostgres(cenario.banco)
+    repo.gravar(f)
+    assert repo.obter("2020-01").hash == f.hash
+    with pytest.raises(fechamento.MesJaFechado):
+        repo.gravar(f)
+    livro = Livro()
+    janeiro = datetime(2020, 1, 15, 12, 0, tzinfo=UTC)
+    registrar_cobranca(livro, pedido_id, 1_000, f"teste-trava/{pedido_id}", janeiro)
+    with pytest.raises(RegraDoBanco, match="já foi fechado"):
+        cenario.contexto.ledger.lancar_varios(livro.lancamentos)
+    # Fora do mês fechado, o mesmo lançamento entra.
+    livro = Livro()
+    registrar_cobranca(livro, pedido_id, 1_000, f"teste-trava2/{pedido_id}", agora)
+    cenario.contexto.ledger.lancar_varios(livro.lancamentos)
+    with cenario.banco.transacao() as con, pytest.raises(Exception):  # noqa: B017
+        con.execute("delete from public.fechamentos_mensais")
+    assert repo.obter("2020-01") is not None
+    assert agora - timedelta(days=1) < agora
