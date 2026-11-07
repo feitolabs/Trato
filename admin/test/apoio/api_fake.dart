@@ -110,7 +110,7 @@ class ApiFake implements ApiAdmin {
   Future<String?> revelarDocumento(String verificacaoId, String documento, String motivo) async {
     await Future<void>.delayed(atraso);
     _registrar('dado_pessoal.documento_revelado', 'verificacao:$verificacaoId', motivo);
-    return null;
+    return 'https://storage.teste/assinado/doc.jpg';
   }
 
   @override
