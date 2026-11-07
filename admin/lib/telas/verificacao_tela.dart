@@ -198,9 +198,15 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
     });
     if (!ok || !mounted) return;
     setState(() => _reveladas.add(documento));
-    // A URL assinada vale poucos segundos e abre em outra aba; nunca é mostrada nem guardada.
+    // A URL assinada vale poucos segundos: abre num modal aqui mesmo, nunca é mostrada nem guardada.
+    // (Nova aba depois de um await cai no bloqueador de pop-up do navegador.)
     final aberta = url;
-    if (aberta != null) await launchUrl(Uri.parse(aberta), webOnlyWindowName: '_blank');
+    if (aberta == null) return;
+    await mostrarModal<void>(
+      context,
+      largura: 860,
+      construir: (_) => VisualizadorDocumento(titulo: documento, url: aberta, profissional: widget.verificacao.profissional),
+    );
   }
 
   Future<void> _decidir(bool aprovar) async {
@@ -403,9 +409,74 @@ class _ArquivoMascarado extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           Text(rotulo, style: TipografiaTrato.corpoForte),
           Text(revelado ? 'Aberto nesta sessão' : 'Escondido', style: TipografiaTrato.legenda),
-          if (!revelado && aoRevelar != null) BotaoTrato.link('Revelar', aoPressionar: aoRevelar),
+          // O link assinado expira em segundos: ver de novo pede outro motivo e gera outro registro.
+          if (aoRevelar != null) BotaoTrato.link(revelado ? 'Ver de novo' : 'Revelar', aoPressionar: aoRevelar),
         ],
       ),
+    );
+  }
+}
+
+/// Modal que mostra o documento revelado sem sair do painel. Dá zoom (pinça/roda) e arrasto.
+/// Se a imagem não carregar (PDF, link expirado), oferece abrir em nova aba — com clique da
+/// pessoa, para o navegador não bloquear.
+class VisualizadorDocumento extends StatelessWidget {
+  const VisualizadorDocumento({super.key, required this.titulo, required this.url, required this.profissional});
+
+  final String titulo;
+  final String url;
+  final String profissional;
+
+  @override
+  Widget build(BuildContext context) {
+    final altura = MediaQuery.sizeOf(context).height * 0.62;
+    return CorpoModal(
+      titulo: '$titulo · $profissional',
+      consequencia: 'Use a roda do mouse ou a pinça para dar zoom. A visualização foi gravada na auditoria.',
+      filhos: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
+          child: Container(
+            height: altura,
+            color: CoresTrato.fundoSelecionado,
+            child: InteractiveViewer(
+              maxScale: 5,
+              child: Center(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  semanticLabel: titulo,
+                  webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+                  loadingBuilder: (context, filho, progresso) => progresso == null
+                      ? filho
+                      : const Center(child: CircularProgressIndicator(semanticsLabel: 'Carregando documento')),
+                  errorBuilder: (context, _, _) => Padding(
+                    padding: const EdgeInsets.all(EspacosTrato.x6),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.broken_image_outlined, size: 36, color: CoresTrato.textoMudo),
+                        const SizedBox(height: EspacosTrato.x2),
+                        Text(
+                          'Não deu para mostrar o arquivo aqui.',
+                          style: TipografiaTrato.corpo,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: EspacosTrato.x2),
+                        BotaoTrato.link(
+                          'Abrir em nova aba',
+                          aoPressionar: () => launchUrl(Uri.parse(url), webOnlyWindowName: '_blank'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+      acoes: [BotaoTrato.secundario('Fechar', aoPressionar: () => Navigator.of(context).pop())],
     );
   }
 }

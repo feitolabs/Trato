@@ -670,3 +670,9 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Verificação aprovada ou em análise dentro de um fluxo: botão "Continuar" (antes, nada).
 - Limite conhecido: o raio ("Até onde você vai") nunca foi enviado ao backend; na edição volta para a primeira opção. Fica em PENDENCIAS.
 - Publicado (OK do João): merge em `main` (136cad4) e push. APK de release novo em `builds/trato-release.apk` (73,7 MB, modo `api`, assinado com a chave da Feito Labs, mesma do APK anterior: instala por cima). O anterior ficou em `builds/trato-release-2026-11-05.apk`.
+
+## 2026-11-07 — Painel: documento da verificação abre num modal
+- Problema: "Revelar" chamava `launchUrl` em nova aba depois do `await` da API; o navegador perdia o gesto do clique e bloqueava o pop-up. Nada abria.
+- Agora: `VisualizadorDocumento` (em `verificacao_tela.dart`) mostra a imagem num modal do DS, com zoom e arrasto (`InteractiveViewer`), `WebHtmlElementStrategy.fallback` contra CORS. Se não carregar (PDF, link expirado), oferece "Abrir em nova aba" com clique da pessoa.
+- Cartão revelado ganha "Ver de novo": o link assinado expira em segundos, então pede outro motivo e gera outro registro na auditoria.
+- Teste: `verificacao_test.dart` confere que o modal abre e fecha (o fake agora devolve uma URL de teste). `flutter test` do painel: 152 OK.

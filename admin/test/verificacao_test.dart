@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato_admin/app.dart';
+import 'package:trato_admin/telas/verificacao_tela.dart';
 import 'apoio/api_fake.dart';
 
 import 'ajuda.dart';
@@ -46,7 +47,14 @@ void main() {
     final botao = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Revelar'));
     expect(botao.onPressed, isNull);
     await confirmarMotivo(tester, 'Revelar');
+    // o documento abre num modal no próprio painel, sem nova aba
+    expect(find.byType(VisualizadorDocumento), findsOneWidget);
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Fechar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(VisualizadorDocumento), findsNothing);
     expect(find.text('Aberto nesta sessão'), findsOneWidget);
+    expect(find.text('Ver de novo'), findsOneWidget);
   });
 
   testWidgets('recusar usa motivo da lista padronizada e atualiza o status', (tester) async {
