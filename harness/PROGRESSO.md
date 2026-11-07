@@ -682,3 +682,43 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Agora: `BrilhoEsqueleto` (em `componentes/feedback.dart`) dá um relógio de 1,4 s aos `BlocoEsqueleto` de baixo; a faixa clara passa só nos blocos (fundo e borda dos cartões não mudam), todos no mesmo passo. Esqueletos aninhados usam o relógio de cima. Com "reduzir movimento" do sistema, fica parado.
 - Barras trocadas por blocos: categorias e diagnóstico na Busca, estimativa de destinatários em Notificações, imagem do documento na Verificação.
 - Painel: 153 testes OK. Não conferi a animação no navegador.
+## 2026-11-08 — Financeiro do painel: 2 correções, 3 lacunas e 5 itens novos
+**Pedido (João):** resolver a lista do módulo financeiro (itens 1 a 10).
+
+**Correções**
+- (1) Conciliação: só as 100 últimas da auditoria contavam; agora lê todas. Achado junto: no Postgres a auditoria
+  devolve o uuid com hífens e o ledger sem, então a conciliação no banco real nunca valia. Ids normalizados.
+- (10) Tela de Pagamentos: o ledger era lido uma consulta por contrato, e cada cobrança fazia mais 5 idas ao banco.
+  Agora são uma consulta para o ledger e uma para os pedidos (`dados_de_pagamento`), com o período filtrado antes.
+
+**Lacunas**
+- (2) Contestação de cartão: `charge.dispute.*` grava em `contestacoes` (status, valor, prazo de provas). Perdida
+  vira estorno do serviço no ledger (a taxa não volta), uma vez só; sem saldo (já liberado), fica em revisão.
+  Liquidação com contestação aberta avisa o financeiro.
+- (4) Pagamento parado: `GET /v1/admin/financeiro/alertas` lista cobrança sem confirmação há mais de
+  `alerta_pagamento_parado_minutos` (30 até ser aprovada); "Consultar no provedor" só pergunta e orienta, nunca marca
+  pago (D13). Estornos não enviados ao provedor entram no mesmo lugar.
+- (5) Repasse que falhou: `transfer.reversed` e `payout.failed` ficam em revisão com o motivo do provedor e o repasse.
+
+**Novos**
+- (3) Conciliação do dia (V2.5): `financeiro/conciliacao.py` compara o extrato do provedor (`/v1/balance_transactions`,
+  paginado) com o ledger: cobrança, estorno e contestação, folga de 2 h. Testado com extrato simulado, não com o Stripe.
+- (6) Aba "Avisos do provedor" (eventos do webhook com o motivo de revisão).
+- (7, 8) Fechamento do mês: totais só do ledger, retrato com hash, CSV para o contador; `fechamentos_mensais`
+  imutável e gatilho que recusa lançamento em mês fechado (UTC-3 fixo). Sem custo de cupom (o pedido não guarda desconto).
+- (9) Extrato do profissional em PDF (gerador próprio, sem dependência nova), pelo painel, com motivo e auditoria.
+  Conta só o que ele de fato recebeu (um estorno parcial não aparece inflado).
+- Painel: Pagamentos virou abas (Extrato, Alertas, Contestações, Conciliação do dia, Avisos do provedor, Fechamento do
+  mês); botão "Extrato em PDF" no profissional, em Busca e suporte.
+
+**Banco:** migration `20261108120000_financeiro_contestacoes_fechamento.sql` escrita e testada no Postgres local,
+**não aplicada no Supabase** (precisa do OK). Ela precisa entrar antes de publicar este backend (ver PENDENCIAS).
+
+**Verificação** (`harness/verificar.py`, 08/11): testes TODOS passaram — backend 1420, app 830, painel 165 (8 pulados,
+já existiam). O resultado geral saiu "VERIFICAÇÃO FALHOU" por itens que já existiam antes desta tarefa, conferidos
+contra a develop de antes: lint/formatação do ruff em arquivos antigos (`admin/postgres.py`, `test_admin_postgres.py`
+e outros), `flutter analyze` com avisos antigos no app e no painel, e a varredura de segredos acusando os APKs em
+`builds/` e `app/test/auth_test.dart`. Nenhum desses vem dos arquivos novos.
+
+**Git:** os 5 commits ficaram na `develop` local (outra sessão trocou a pasta para a develop no meio do trabalho),
+não na `feature/f7-financeiro-correcoes`. Nada foi enviado ao GitHub.

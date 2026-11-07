@@ -116,6 +116,28 @@ Regras (todas já existem em `disputas/`, `pedidos/estados.py` e `financeiro/led
 contrato ou sem referência do provedor. O saldo é **por pedido** (espelho); não há saldo próprio do Trato
 nem rota de saque, chave Pix ou repasse.
 
+### 3.1 Financeiro: contestações, alertas, conciliação, fechamento (08/11/2026)
+
+Prefixo `/v1/admin/financeiro`. Nada aqui move dinheiro nem marca "pago" (D13). Código em
+`backend/src/trato/api/admin/rotas_financeiro.py`.
+
+| Método e caminho | Papel | O que faz |
+|---|---|---|
+| `GET /contestacoes?status=em_aberto\|aberta\|em_analise\|ganha\|perdida\|encerrada` | pagamentos_ver | Contestações de cartão (chargeback), da mais urgente (prazo de provas) para a mais antiga. `{id, pedido_id, pedido_numero, valor_centavos, motivo_legivel, status, prazo_provas, horas_para_prazo, repasse_liberado, …}` |
+| `GET /alertas` | pagamentos_ver | `{pagamentos_parados[], repasses_com_falha[], estornos_pendentes[], eventos_em_revisao[], contestacoes_em_aberto, minutos_pagamento_parado, provedor_ligado}`. Parado = cobrança sem confirmação há mais de `alerta_pagamento_parado_minutos` (Configurações; 30 até ser aprovada). |
+| `POST /cobrancas/{id}/consultar` | pagamentos_conciliar | Pergunta ao provedor o status da cobrança e devolve uma orientação. Auditado. **Não** marca pago: se o provedor já recebeu, a orientação é reenviar o aviso assinado. |
+| `GET /conciliacao?dia=AAAA-MM-DD` | pagamentos_ver | Extrato do provedor × ledger espelho no dia (Brasília): cobrança por id do provedor, estorno e contestação por pedido, folga de 2 h para o aviso atrasado. `{confere, divergencias[], linhas[], cobrado_provedor_centavos, cobrado_trato_centavos, taxas_provedor_centavos}`. Auditado. |
+| `GET /fechamentos?ultimos=12` | pagamentos_ver | Meses e se estão fechados / podem fechar. |
+| `GET /fechamentos/{AAAA-MM}` | pagamentos_ver | Totais recalculados do ledger; se fechado, o retrato gravado, o hash e `confere` (recalculado == gravado). |
+| `POST /fechamentos/{AAAA-MM}/fechar` `{motivo}` | pagamentos_conciliar | Só mês já terminado. Grava o retrato (imutável) e, no banco, trava lançamentos com data nesse mês. 409 se já fechado. Auditado. |
+| `POST /fechamentos/{AAAA-MM}/exportar` | relatorios_exportar | CSV (Excel-BR) do mês por código de uso único (`/v1/admin/relatorios/baixar/{codigo}`). |
+| `POST /profissionais/{usuario_id}/extrato` `{inicio, fim, motivo}` | relatorios_exportar | Extrato de recebimentos do profissional em PDF, por código de uso único. Auditado com motivo. |
+
+Webhooks novos tratados (`TIPOS_STRIPE`): `charge.dispute.created|updated|closed` (contestação; perdida vira
+estorno do serviço no ledger, a taxa não volta; sem saldo, fica em revisão) e `transfer.reversed` /
+`payout.failed` (repasse que falhou: fica em revisão com o motivo do provedor). `GET /v1/admin/webhooks/eventos`
+passou a trazer `revisao` (o motivo, quando o evento está para revisar).
+
 ## 4. Usuários e pedidos
 
 | Método e caminho | Papel | Corpo | Resposta |
