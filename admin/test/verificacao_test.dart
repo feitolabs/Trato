@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato_admin/app.dart';
@@ -6,7 +8,17 @@ import 'apoio/api_fake.dart';
 
 import 'ajuda.dart';
 
+/// PNG 1x1 transparente: nos testes não há rede, então o "link" vira esta imagem.
+final _png = Uint8List.fromList(const [
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, //
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+  0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+  0x42, 0x60, 0x82,
+]);
+
 void main() {
+  setUp(() => imagemDoLink = (_) => MemoryImage(_png));
   testWidgets('lista a fila e mostra o detalhe com CPF e arquivos mascarados', (tester) async {
     await abrirPainel(tester, papel: 'cadastro');
     await tester.tap(find.text('Carlos Pereira').first);
@@ -53,8 +65,35 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, 'Fechar'));
     await tester.pumpAndSettle();
     expect(find.byType(VisualizadorDocumento), findsNothing);
-    expect(find.text('Aberto nesta sessão'), findsOneWidget);
+    expect(find.textContaining('Liberado até'), findsOneWidget);
     expect(find.text('Ver de novo'), findsOneWidget);
+  });
+
+  testWidgets('ver de novo em até 10 minutos não pede motivo; depois pede', (tester) async {
+    await abrirPainel(tester, papel: 'cadastro');
+    await tester.tap(find.text('Carlos Pereira').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Revelar').first);
+    await tester.pumpAndSettle();
+    await confirmarMotivo(tester, 'Revelar');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Fechar'));
+    await tester.pumpAndSettle();
+
+    // dentro do prazo: abre direto, sem o campo Motivo
+    await tester.tap(find.text('Ver de novo'));
+    await tester.pumpAndSettle();
+    expect(find.byType(VisualizadorDocumento), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Motivo'), findsNothing);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Fechar'));
+    await tester.pumpAndSettle();
+
+    // passou o prazo: volta a pedir motivo
+    await tester.pump(kDocumentoLiberadoPor + const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Aberto nesta sessão'), findsOneWidget);
+    await tester.tap(find.text('Ver de novo'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Motivo'), findsOneWidget);
   });
 
   testWidgets('recusar usa motivo da lista padronizada e atualiza o status', (tester) async {
