@@ -149,8 +149,33 @@ class DetalheVerificacao extends StatefulWidget {
   State<DetalheVerificacao> createState() => _DetalheVerificacaoState();
 }
 
+/// Quanto tempo um documento revelado fica liberado para reabrir sem novo motivo.
+const kDocumentoLiberadoPor = Duration(minutes: 10);
+
+/// Imagem de um link assinado. Trocável nos testes (lá não há rede).
+ImageProvider Function(String url) imagemDoLink =
+    (url) => NetworkImage(url, webHtmlElementStrategy: WebHtmlElementStrategy.fallback);
+
+/// Documento já revelado: a imagem fica presa na memória (não o link, que expira em segundos)
+/// até [ate]. Reabrir nesse prazo não pede motivo nem chama o backend.
+class _DocumentoLiberado {
+  _DocumentoLiberado(this.imagem, this.ate, this.manter, this.fim);
+
+  final ImageProvider imagem;
+  final DateTime ate;
+  final ImageStreamCompleterHandle? manter;
+  final Timer fim;
+
+  void descartar() {
+    fim.cancel();
+    manter?.dispose();
+    imagem.evict();
+  }
+}
+
 class _DetalheVerificacaoState extends State<DetalheVerificacao> {
   final _reveladas = <String>{};
+  final _liberados = <String, _DocumentoLiberado>{};
   String? _cpfRevelado;
   Timer? _escondeCpf;
   bool _decidindo = false;
@@ -158,7 +183,52 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
   @override
   void dispose() {
     _escondeCpf?.cancel();
+    // Trocou de cadastro ou saiu da tela: a imagem some da memória.
+    for (final d in _liberados.values) {
+      d.descartar();
+    }
+    _liberados.clear();
     super.dispose();
+  }
+
+  void _soltar(String documento) {
+    final d = _liberados.remove(documento);
+    if (d == null) return;
+    d.descartar();
+    if (mounted) setState(() {});
+  }
+
+  /// Carrega e prende a imagem por [kDocumentoLiberadoPor]. Se não carregar, não guarda nada:
+  /// o próximo "Ver de novo" pede motivo e um link novo.
+  ImageProvider _liberar(String documento, String url) {
+    _soltar(documento);
+    final imagem = imagemDoLink(url);
+    final fluxo = imagem.resolve(ImageConfiguration.empty);
+    fluxo.addListener(ImageStreamListener((_, _) {}, onError: (_, _) => _soltar(documento)));
+    _liberados[documento] = _DocumentoLiberado(
+      imagem,
+      DateTime.now().add(kDocumentoLiberadoPor),
+      fluxo.completer?.keepAlive(),
+      Timer(kDocumentoLiberadoPor, () => _soltar(documento)),
+    );
+    return imagem;
+  }
+
+  Future<void> _mostrar(String documento, ImageProvider imagem, {String? url}) => mostrarModal<void>(
+        context,
+        largura: 860,
+        construir: (_) => VisualizadorDocumento(
+          titulo: documento,
+          imagem: imagem,
+          url: url,
+          profissional: widget.verificacao.profissional,
+        ),
+      );
+
+  Future<void> _verDeNovo(String documento) async {
+    final liberado = _liberados[documento];
+    if (liberado == null) return _revelar(documento);
+    await _mostrar(documento, liberado.imagem);
   }
 
   Future<void> _revelarCpf() async {
@@ -188,7 +258,8 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
     final motivo = await pedirMotivo(
       context,
       titulo: 'Ver $documento',
-      descricao: 'O arquivo fica escondido por padrão. Ao abrir, a visualização é gravada.',
+      descricao: 'O arquivo fica escondido por padrão. Ao abrir, a visualização é gravada. '
+          'Depois, fica liberado por ${kDocumentoLiberadoPor.inMinutes} minutos enquanto este cadastro estiver aberto.',
       rotuloConfirmar: 'Revelar',
     );
     if (motivo == null || !mounted) return;
@@ -197,16 +268,16 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
       url = await api.revelarDocumento(widget.verificacao.id, documento, motivo);
     });
     if (!ok || !mounted) return;
-    setState(() => _reveladas.add(documento));
     // A URL assinada vale poucos segundos: abre num modal aqui mesmo, nunca é mostrada nem guardada.
     // (Nova aba depois de um await cai no bloqueador de pop-up do navegador.)
     final aberta = url;
-    if (aberta == null) return;
-    await mostrarModal<void>(
-      context,
-      largura: 860,
-      construir: (_) => VisualizadorDocumento(titulo: documento, url: aberta, profissional: widget.verificacao.profissional),
-    );
+    if (aberta == null) {
+      setState(() => _reveladas.add(documento));
+      return;
+    }
+    final imagem = _liberar(documento, aberta);
+    setState(() => _reveladas.add(documento));
+    await _mostrar(documento, imagem, url: aberta);
   }
 
   Future<void> _decidir(bool aprovar) async {
@@ -315,7 +386,8 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
                 _ArquivoMascarado(
                   rotulo: doc,
                   revelado: _reveladas.contains(doc),
-                  aoRevelar: podeRevelar ? () => _revelar(doc) : null,
+                  liberadoAte: _liberados[doc]?.ate,
+                  aoRevelar: podeRevelar ? () => _verDeNovo(doc) : null,
                 ),
             ],
           ),
@@ -375,11 +447,26 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
 }
 
 class _ArquivoMascarado extends StatelessWidget {
-  const _ArquivoMascarado({required this.rotulo, required this.revelado, required this.aoRevelar});
+  const _ArquivoMascarado({
+    required this.rotulo,
+    required this.revelado,
+    required this.liberadoAte,
+    required this.aoRevelar,
+  });
 
   final String rotulo;
   final bool revelado;
+  final DateTime? liberadoAte;
   final VoidCallback? aoRevelar;
+
+  String get _legenda {
+    final ate = liberadoAte;
+    if (ate != null) {
+      String dois(int n) => n.toString().padLeft(2, '0');
+      return 'Liberado até ${dois(ate.hour)}:${dois(ate.minute)}';
+    }
+    return revelado ? 'Aberto nesta sessão' : 'Escondido';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -408,8 +495,8 @@ class _ArquivoMascarado extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x2),
           Text(rotulo, style: TipografiaTrato.corpoForte),
-          Text(revelado ? 'Aberto nesta sessão' : 'Escondido', style: TipografiaTrato.legenda),
-          // O link assinado expira em segundos: ver de novo pede outro motivo e gera outro registro.
+          Text(_legenda, style: TipografiaTrato.legenda),
+          // Dentro do prazo reabre direto; depois dele, pede motivo e gera outro registro.
           if (aoRevelar != null) BotaoTrato.link(revelado ? 'Ver de novo' : 'Revelar', aoPressionar: aoRevelar),
         ],
       ),
@@ -421,11 +508,20 @@ class _ArquivoMascarado extends StatelessWidget {
 /// Se a imagem não carregar (PDF, link expirado), oferece abrir em nova aba — com clique da
 /// pessoa, para o navegador não bloquear.
 class VisualizadorDocumento extends StatelessWidget {
-  const VisualizadorDocumento({super.key, required this.titulo, required this.url, required this.profissional});
+  const VisualizadorDocumento({
+    super.key,
+    required this.titulo,
+    required this.imagem,
+    required this.profissional,
+    this.url,
+  });
 
   final String titulo;
-  final String url;
+  final ImageProvider imagem;
   final String profissional;
+
+  /// Link assinado recém-gerado, para o "Abrir em nova aba". Nulo ao reabrir (já expirou).
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
@@ -442,11 +538,10 @@ class VisualizadorDocumento extends StatelessWidget {
             child: InteractiveViewer(
               maxScale: 5,
               child: Center(
-                child: Image.network(
-                  url,
+                child: Image(
+                  image: imagem,
                   fit: BoxFit.contain,
                   semanticLabel: titulo,
-                  webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                   loadingBuilder: (context, filho, progresso) => progresso == null
                       ? filho
                       : const Center(child: CircularProgressIndicator(semanticsLabel: 'Carregando documento')),
@@ -463,10 +558,13 @@ class VisualizadorDocumento extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: EspacosTrato.x2),
-                        BotaoTrato.link(
-                          'Abrir em nova aba',
-                          aoPressionar: () => launchUrl(Uri.parse(url), webOnlyWindowName: '_blank'),
-                        ),
+                        if (url case final link?)
+                          BotaoTrato.link(
+                            'Abrir em nova aba',
+                            aoPressionar: () => launchUrl(Uri.parse(link), webOnlyWindowName: '_blank'),
+                          )
+                        else
+                          Text('Feche e use "Ver de novo" para gerar outro link.', style: TipografiaTrato.legenda),
                       ],
                     ),
                   ),
