@@ -315,7 +315,20 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
               Text('Categorias cadastradas', style: TipografiaTrato.secao),
               const SizedBox(height: EspacosTrato.x2),
               if (snap.connectionState != ConnectionState.done)
-                const LinearProgressIndicator()
+                Semantics(
+                  label: 'Carregando',
+                  child: const BrilhoEsqueleto(
+                    child: Wrap(
+                      spacing: EspacosTrato.x2,
+                      runSpacing: EspacosTrato.x2,
+                      children: [
+                        BlocoEsqueleto(largura: 180, altura: 24),
+                        BlocoEsqueleto(largura: 140, altura: 24),
+                        BlocoEsqueleto(largura: 160, altura: 24),
+                      ],
+                    ),
+                  ),
+                )
               else if (d.categorias.isEmpty)
                 Text('Nenhuma categoria cadastrada.', style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoMudo))
               else
@@ -397,7 +410,24 @@ class _Diagnostico extends StatelessWidget {
               future: diagnostico,
               builder: (context, snap) {
                 if (snap.connectionState != ConnectionState.done) {
-                  return const Padding(padding: EdgeInsets.only(top: EspacosTrato.x3), child: LinearProgressIndicator());
+                  return Padding(
+                    padding: const EdgeInsets.only(top: EspacosTrato.x3),
+                    child: Semantics(
+                      label: 'Carregando',
+                      child: const BrilhoEsqueleto(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            BlocoEsqueleto(largura: 240, altura: 16),
+                            SizedBox(height: EspacosTrato.x2),
+                            BlocoEsqueleto(largura: 320, altura: 12),
+                            SizedBox(height: EspacosTrato.x2),
+                            BlocoEsqueleto(largura: 280, altura: 12),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
                 }
                 if (snap.hasError) {
                   return Padding(

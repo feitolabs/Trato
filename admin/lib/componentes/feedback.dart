@@ -10,29 +10,29 @@ enum Tom { neutro, ok, alerta, erro, info }
 
 extension TomVisual on Tom {
   Color get texto => switch (this) {
-        Tom.ok => CoresTrato.sucessoTexto,
-        Tom.alerta => CoresTrato.avisoTexto,
-        Tom.erro => CoresTrato.perigoTexto,
-        Tom.info => CoresTrato.infoTexto,
-        Tom.neutro => CoresTrato.neutroTexto,
-      };
+    Tom.ok => CoresTrato.sucessoTexto,
+    Tom.alerta => CoresTrato.avisoTexto,
+    Tom.erro => CoresTrato.perigoTexto,
+    Tom.info => CoresTrato.infoTexto,
+    Tom.neutro => CoresTrato.neutroTexto,
+  };
 
   Color get fundo => switch (this) {
-        Tom.ok => CoresTrato.sucessoFundo,
-        Tom.alerta => CoresTrato.avisoFundo,
-        Tom.erro => CoresTrato.perigoFundo,
-        Tom.info => CoresTrato.infoFundo,
-        Tom.neutro => CoresTrato.neutroFundo,
-      };
+    Tom.ok => CoresTrato.sucessoFundo,
+    Tom.alerta => CoresTrato.avisoFundo,
+    Tom.erro => CoresTrato.perigoFundo,
+    Tom.info => CoresTrato.infoFundo,
+    Tom.neutro => CoresTrato.neutroFundo,
+  };
 
   /// Status é sempre cor, ícone e palavra: o ícone repete o que a cor diz.
   IconData get icone => switch (this) {
-        Tom.ok => Icons.check_circle_outline,
-        Tom.alerta => Icons.schedule,
-        Tom.erro => Icons.block,
-        Tom.info => Icons.info_outline,
-        Tom.neutro => Icons.remove_circle_outline,
-      };
+    Tom.ok => Icons.check_circle_outline,
+    Tom.alerta => Icons.schedule,
+    Tom.erro => Icons.block,
+    Tom.info => Icons.info_outline,
+    Tom.neutro => Icons.remove_circle_outline,
+  };
 }
 
 /// Etiqueta de status: cor + ícone + palavra, totalmente arredondada.
@@ -101,10 +101,7 @@ class BannerInfo extends StatelessWidget {
       container: true,
       child: Container(
         padding: const EdgeInsets.all(EspacosTrato.x3),
-        decoration: BoxDecoration(
-          color: tom.fundo,
-          borderRadius: BorderRadius.circular(EspacosTrato.raio),
-        ),
+        decoration: BoxDecoration(color: tom.fundo, borderRadius: BorderRadius.circular(EspacosTrato.raio)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -114,10 +111,15 @@ class BannerInfo extends StatelessWidget {
               child: titulo == null
                   ? Text(texto, style: TipografiaTrato.corpo.copyWith(color: cor))
                   : Text.rich(
-                      TextSpan(children: [
-                        TextSpan(text: '$titulo ', style: TipografiaTrato.corpoForte.copyWith(color: cor)),
-                        TextSpan(text: texto),
-                      ]),
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '$titulo ',
+                            style: TipografiaTrato.corpoForte.copyWith(color: cor),
+                          ),
+                          TextSpan(text: texto),
+                        ],
+                      ),
                       style: TipografiaTrato.corpo.copyWith(color: cor),
                     ),
             ),
@@ -293,11 +295,7 @@ class EstadoErro extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoMudo),
               ),
-              Text(
-                'Código ${codigoDeErro(mensagem)}',
-                textAlign: TextAlign.center,
-                style: TipografiaTrato.legenda,
-              ),
+              Text('Código ${codigoDeErro(mensagem)}', textAlign: TextAlign.center, style: TipografiaTrato.legenda),
               const SizedBox(height: EspacosTrato.x4),
               BotaoTrato.secundario('Tentar de novo', aoPressionar: aoTentar),
             ],
@@ -308,24 +306,83 @@ class EstadoErro extends StatelessWidget {
   }
 }
 
-/// Bloco cinza do esqueleto de carregamento.
-class _Bloco extends StatelessWidget {
-  const _Bloco({this.largura, required this.altura});
+/// Faixa de brilho que passa sobre os blocos do esqueleto (1,4 s por volta).
+/// Um só por árvore: esqueletos aninhados reaproveitam o de cima. Sem animação quando o
+/// sistema pede menos movimento.
+class BrilhoEsqueleto extends StatefulWidget {
+  const BrilhoEsqueleto({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<BrilhoEsqueleto> createState() => _BrilhoEsqueletoState();
+}
+
+/// Entrega o relógio do brilho aos blocos de baixo; todos andam juntos.
+class _BrilhoAtivo extends InheritedNotifier<Animation<double>> {
+  const _BrilhoAtivo({required Animation<double> super.notifier, required super.child});
+
+  static Animation<double>? de(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_BrilhoAtivo>()?.notifier;
+}
+
+class _BrilhoEsqueletoState extends State<BrilhoEsqueleto> with SingleTickerProviderStateMixin {
+  late final _controle = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final parado = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (parado) {
+      _controle.stop();
+    } else if (!_controle.isAnimating) {
+      _controle.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Já existe um brilho acima: usa o relógio dele, para os blocos não ficarem fora de passo.
+    if (_BrilhoAtivo.de(context) != null) return widget.child;
+    return _BrilhoAtivo(notifier: _controle, child: widget.child);
+  }
+}
+
+/// Bloco do esqueleto de carregamento. Dentro de um esqueleto usa o brilho dele; sozinho,
+/// traz o próprio.
+class BlocoEsqueleto extends StatelessWidget {
+  const BlocoEsqueleto({super.key, this.largura, required this.altura});
   final double? largura;
   final double altura;
 
   @override
   Widget build(BuildContext context) {
+    final relogio = _BrilhoAtivo.de(context);
+    if (relogio == null) return BrilhoEsqueleto(child: this);
+    // A faixa clara atravessa o bloco da esquerda para a direita.
+    final x = relogio.value * 4 - 2;
     return Container(
       width: largura,
       height: altura,
       decoration: BoxDecoration(
-        color: CoresTrato.neutroFundo,
         borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
+        gradient: LinearGradient(
+          begin: Alignment(x - 1, 0),
+          end: Alignment(x + 1, 0),
+          colors: const [CoresTrato.neutroFundo, CoresTrato.fundoSuperficie, CoresTrato.neutroFundo],
+        ),
       ),
     );
   }
 }
+
+typedef _Bloco = BlocoEsqueleto;
 
 /// Esqueleto de lista e de card enquanto os dados carregam.
 class EsqueletoLista extends StatelessWidget {
@@ -340,27 +397,29 @@ class EsqueletoLista extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Carregando',
-      child: ListView.separated(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: padding,
-        itemCount: linhas,
-        separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
-        itemBuilder: (_, _) => Container(
-          padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
-          decoration: BoxDecoration(
-            color: CoresTrato.fundoSuperficie,
-            borderRadius: BorderRadius.circular(EspacosTrato.raio),
-            border: Border.all(color: CoresTrato.bordaSuave),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Bloco(largura: 180, altura: 16),
-              SizedBox(height: EspacosTrato.x2),
-              _Bloco(largura: 280, altura: 12),
-              SizedBox(height: EspacosTrato.x2),
-              _Bloco(largura: 96, altura: 20),
-            ],
+      child: BrilhoEsqueleto(
+        child: ListView.separated(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: padding,
+          itemCount: linhas,
+          separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
+          itemBuilder: (_, _) => Container(
+            padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
+            decoration: BoxDecoration(
+              color: CoresTrato.fundoSuperficie,
+              borderRadius: BorderRadius.circular(EspacosTrato.raio),
+              border: Border.all(color: CoresTrato.bordaSuave),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Bloco(largura: 180, altura: 16),
+                SizedBox(height: EspacosTrato.x2),
+                _Bloco(largura: 280, altura: 12),
+                SizedBox(height: EspacosTrato.x2),
+                _Bloco(largura: 96, altura: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -379,17 +438,19 @@ class EsqueletoPagina extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final margem = Responsivo.margemLateral(FaixaPainel.de(context));
-    return Padding(
-      padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x6, margem, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _Bloco(largura: 220, altura: 24),
-          const SizedBox(height: EspacosTrato.x2),
-          const _Bloco(largura: 340, altura: 12),
-          const SizedBox(height: EspacosTrato.x5),
-          Expanded(child: EsqueletoLista(linhas: linhas)),
-        ],
+    return BrilhoEsqueleto(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x6, margem, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Bloco(largura: 220, altura: 24),
+            const SizedBox(height: EspacosTrato.x2),
+            const _Bloco(largura: 340, altura: 12),
+            const SizedBox(height: EspacosTrato.x5),
+            Expanded(child: EsqueletoLista(linhas: linhas)),
+          ],
+        ),
       ),
     );
   }
@@ -404,31 +465,33 @@ class EsqueletoCartoes extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Carregando',
-      child: Wrap(
-        spacing: EspacosTrato.intervaloCartoes,
-        runSpacing: EspacosTrato.intervaloCartoes,
-        children: [
-          for (var i = 0; i < quantidade; i++)
-            Container(
-              width: 240,
-              padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
-              decoration: BoxDecoration(
-                color: CoresTrato.fundoSuperficie,
-                borderRadius: BorderRadius.circular(EspacosTrato.raio),
-                border: Border.all(color: CoresTrato.bordaSuave),
+      child: BrilhoEsqueleto(
+        child: Wrap(
+          spacing: EspacosTrato.intervaloCartoes,
+          runSpacing: EspacosTrato.intervaloCartoes,
+          children: [
+            for (var i = 0; i < quantidade; i++)
+              Container(
+                width: 240,
+                padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
+                decoration: BoxDecoration(
+                  color: CoresTrato.fundoSuperficie,
+                  borderRadius: BorderRadius.circular(EspacosTrato.raio),
+                  border: Border.all(color: CoresTrato.bordaSuave),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Bloco(largura: 100, altura: 12),
+                    SizedBox(height: EspacosTrato.x3),
+                    _Bloco(largura: 140, altura: 28),
+                    SizedBox(height: EspacosTrato.x2),
+                    _Bloco(largura: 180, altura: 12),
+                  ],
+                ),
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Bloco(largura: 100, altura: 12),
-                  SizedBox(height: EspacosTrato.x3),
-                  _Bloco(largura: 140, altura: 28),
-                  SizedBox(height: EspacosTrato.x2),
-                  _Bloco(largura: 180, altura: 12),
-                ],
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -594,7 +657,9 @@ class CampoLeitura extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline, size: 14, color: CoresTrato.avisoTexto),
               const SizedBox(width: EspacosTrato.x1),
-              Flexible(child: Text(alerta!, style: TipografiaTrato.legenda.copyWith(color: CoresTrato.avisoTexto))),
+              Flexible(
+                child: Text(alerta!, style: TipografiaTrato.legenda.copyWith(color: CoresTrato.avisoTexto)),
+              ),
             ],
           ),
         ],
