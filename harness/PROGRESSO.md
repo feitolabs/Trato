@@ -722,3 +722,6 @@ e outros), `flutter analyze` com avisos antigos no app e no painel, e a varredur
 
 **Git:** os 5 commits ficaram na `develop` local (outra sessão trocou a pasta para a develop no meio do trabalho),
 não na `feature/f7-financeiro-correcoes`. Nada foi enviado ao GitHub.
+- Depois (OK do João, 08/11): migration aplicada no Supabase e conferida (tabelas, 3 gatilhos, definição, grants do
+  service_role sem DELETE em fechamentos, anon sem leitura, RLS ligada). `develop` enviada ao GitHub. Publicar no Render
+  e cadastrar os eventos no Stripe ficaram com o João (passo a passo na conversa).

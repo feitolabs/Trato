@@ -1,5 +1,6 @@
 -- Financeiro do painel (07/11/2026): contestação de cartão, fechamento mensal e trava do mês.
--- AINDA NÃO APLICADA no Supabase: precisa do OK do João. Idempotente. Não apaga nem altera dado.
+-- Aplicada no Supabase em 08/11/2026 com o OK do João (versão registrada pelo Supabase: o nome
+-- financeiro_contestacoes_fechamento). Idempotente. Não apaga nem altera dado.
 --
 --   1. contestacoes: chargeback avisado pelo provedor (charge.dispute.*). Status, valor, prazo para
 --      mandar provas e resultado. O histórico completo fica em eventos_webhook.
