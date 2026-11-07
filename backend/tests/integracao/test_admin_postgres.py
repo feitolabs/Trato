@@ -617,3 +617,44 @@ def test_perfis_de_equipe_so_veem_o_que_o_papel_permite_nos_pagamentos_em_modo_p
     )
     assert amb.cliente.get(BASE + "/disputas", headers=amb.h("mediador")).json()["total"] == 0
     assert amb.cliente.get(BASE + "/webhooks/eventos", headers=fin).json()["total"] == 0
+
+
+def test_painel_le_email_do_auth_sem_select_em_auth_users(amb):
+    """Como no Supabase: o service_role não lê auth.users; e-mail e último acesso vêm das
+    funções privado.contas_auth / conta_auth_por_email. E o /eu lê papeis_alcada."""
+    amb.sql(
+        "update auth.users set email = 'maria@exemplo.test' where id = %s", amb.ids["Maria Cliente"]
+    )
+    amb.sql(
+        "update auth.users set email = 'admin@exemplo.test', last_sign_in_at = now() where id = %s",
+        amb.ids["administrador"],
+    )
+    convidado = str(uuid.uuid4())
+    amb.sql("insert into auth.users (id, email) values (%s, 'convidado@exemplo.test')", convidado)
+    amb.sql("insert into public.usuarios (id, nome) values (%s, 'Convidado')", convidado)
+    adm = amb.h("administrador")
+
+    eu = amb.cliente.get(BASE + "/eu", headers=adm)
+    assert eu.status_code == 200, eu.text
+
+    maria = amb.cliente.get(BASE + "/usuarios?q=maria", headers=amb.h("atendente_n1")).json()
+    mascarado = maria["itens"][0]["email_mascarado"]
+    assert mascarado and mascarado != "maria@exemplo.test"
+
+    equipe = amb.cliente.get(BASE + "/equipe", headers=adm)
+    assert equipe.status_code == 200, equipe.text
+    admin = next(m for m in equipe.json() if m["usuario_id"] == amb.ids["administrador"])
+    assert admin["email"] == "admin@exemplo.test" and admin["ultimo_acesso"]
+
+    novo = amb.cliente.post(
+        BASE + "/equipe",
+        headers=adm,
+        json={
+            "nome": "Convidado",
+            "email": "  CONVIDADO@exemplo.test ",
+            "papel": "atendente_n1",
+            "motivo": "Entrou no time de suporte",
+        },
+    )
+    assert novo.status_code in (200, 201), novo.text
+    assert novo.json()["usuario_id"] == convidado

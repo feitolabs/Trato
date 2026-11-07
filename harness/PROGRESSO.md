@@ -650,3 +650,15 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Hospedagem: segue no Render (Virginia), decisão do João. Sem região na América do Sul; o ganho vem de menos idas ao banco.
 - Golden `novo_pedido` dependia da data de hoje: a tela aceita `agora` e o teste fixa 05/11/2026.
 - Testes: backend 1377 ok; conferido no Supabase real que o papel continua `service_role` com 1 consulta por transação.
+
+## 2026-11-07 — Login do painel admin: "O backend não tem permissão para essa operação no banco"
+- Causa: `GET /v1/admin/eu` (chamado logo após o login no Supabase Auth) faz join com `public.papeis_alcada`, criada na migration do painel v2 **sem grant**. O `service_role` não tinha SELECT: log do Postgres `permission denied for table papeis_alcada`.
+- Mesmo problema nos logs em `upload_solicitacoes`: o backend apaga a tentativa pendente anterior antes de gravar a nova, sem DELETE. A transação falhava e a solicitação ficava só na memória do processo.
+- Migration `20261107120000_grants_alcada_uploads.sql` (SELECT em `papeis_alcada`, DELETE em `upload_solicitacoes`), **aplicada** no Supabase com o OK do João. Rollback em `supabase/rollback/grants_alcada_uploads_rollback.sql`.
+- Conferido no banco: única tabela de `public` sem SELECT para o `service_role` era `papeis_alcada`; `pedidos` segue sem DELETE.
+- Lição: toda tabela nova precisa de `grant` explícito ao `service_role` na mesma migration.
+
+**Mesma sessão — Busca > Usuários, Gestão da equipe e foto da verificação**
+- Usuários e Equipe: o backend lia `auth.users` direto (e-mail, último acesso, adicionar membro por e-mail) e o `service_role` não tem SELECT lá. Em vez de abrir a tabela do Auth, migration `20261107130000_contas_auth_para_backend.sql` com `privado.contas_auth(uuid[])` e `privado.conta_auth_por_email(text)` (security definer, EXECUTE só para o `service_role`, mesmo padrão de `confirmar_email_do_usuario`). Trocados os 4 usos: `admin/postgres.py` (complementos da busca), `rotas_equipe.py` (listar e adicionar), `persistencia/conta.py` (e-mail do perfil, que sumia em silêncio).
+- Por que os testes não pegaram: o banco local (`tests/integracao/pg_local.py`) dava `grant select on auth.users` e grant manual em `papeis_alcada`, coisas que o Supabase não tem. Removidos; o stub agora aplica as duas migrations novas, como em produção. Teste novo em `test_admin_postgres.py`.
+- Foto da verificação ("requested path is invalid"): `AssinadorSupabaseStorage.assinar` montava o link sem `/storage/v1`. Corrigido igual ao `url_leitura`; teste em `tests/test_armazenamento_urls.py`.

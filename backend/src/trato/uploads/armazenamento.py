@@ -131,7 +131,6 @@ class AssinadorSupabaseStorage:
         import httpx
 
         self._base = url.rstrip("/") + "/storage/v1"
-        self._url_base = url.rstrip("/")
         self._bucket = bucket
         self._http = cliente or httpx.Client(
             headers={"Authorization": f"Bearer {chave_servico}", "apikey": chave_servico},
@@ -146,11 +145,11 @@ class AssinadorSupabaseStorage:
         resp.raise_for_status()
         dados = resp.json()
         signed_url = str(dados.get("signedURL") or dados.get("signedUrl") or "")
-        if signed_url.startswith("http://") or signed_url.startswith("https://"):
+        if signed_url.startswith(("http://", "https://")):
             return signed_url
-        if signed_url.startswith("/"):
-            return f"{self._url_base}{signed_url}"
-        return f"{self._base}/{signed_url}"
+        # O Supabase devolve o caminho relativo à API de Storage ("/object/sign/..."): sem o
+        # "/storage/v1" o link responde "requested path is invalid".
+        return self._base + (signed_url if signed_url.startswith("/") else "/" + signed_url)
 
 
 def assinador_da_config(bucket: str = "verificacao") -> AssinadorSupabaseStorage | None:

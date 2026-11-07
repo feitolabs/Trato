@@ -84,10 +84,11 @@ _SELECT = """
     SELECT e.usuario_id, coalesce(u.nome, 'Membro da equipe') AS nome,
            coalesce(au.email, '') AS email, e.papel, e.ativo,
            coalesce(e.alcada_centavos, 0) AS alcada_centavos, e.criado_em,
-           au.last_sign_in_at AS ultimo_acesso
+           au.ultimo_acesso
     FROM public.equipe e
     LEFT JOIN public.usuarios u ON u.id = e.usuario_id
-    LEFT JOIN auth.users au ON au.id = e.usuario_id
+    LEFT JOIN privado.contas_auth(array(SELECT usuario_id FROM public.equipe)) au
+           ON au.id = e.usuario_id
 """
 
 
@@ -172,7 +173,7 @@ def adicionar_membro(
         tetos = _tetos(con)
         _validar_concessao(operador, corpo.papel, corpo.alcada_centavos, tetos)
         usr = con.execute(
-            "SELECT id, email FROM auth.users WHERE lower(email) = %s", (email_norm,)
+            "SELECT id, email FROM privado.conta_auth_por_email(%s)", (email_norm,)
         ).fetchone()
         if usr is None:
             raise HTTPException(
