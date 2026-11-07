@@ -86,6 +86,7 @@ class BancoLocal:
                 "*admin_catalogo_delete.sql",
                 "*grants_alcada_uploads.sql",
                 "*contas_auth_para_backend.sql",
+                "*financeiro_contestacoes_fechamento.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     con.execute(arquivo.read_text(encoding="utf-8"))

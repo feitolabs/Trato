@@ -907,3 +907,199 @@ class RelatorioPronto {
   final int colunas;
   final bool comDadosPessoais;
 }
+
+// ---------- Financeiro: contestações, alertas, conciliação, fechamento ----------
+
+/// Contestação de cartão (chargeback) avisada pelo provedor.
+class ContestacaoCartao {
+  const ContestacaoCartao({
+    required this.id,
+    required this.pedido,
+    required this.valorCentavos,
+    required this.motivo,
+    required this.status,
+    required this.abertaEm,
+    this.prazoProvas,
+    this.horasParaPrazo,
+    this.encerradaEm,
+    this.repasseLiberado = false,
+    this.cobrancaId,
+  });
+  final String id;
+  final String pedido; // "PED-10482 · Pintura" ou o começo do id
+  final int valorCentavos;
+  final String motivo; // texto legível
+  final String status; // aberta | em_analise | ganha | perdida | encerrada
+  final DateTime abertaEm;
+  final DateTime? prazoProvas;
+  final int? horasParaPrazo;
+  final DateTime? encerradaEm;
+  final bool repasseLiberado;
+  final String? cobrancaId;
+
+  bool get emAberto => status == 'aberta' || status == 'em_analise';
+}
+
+class PagamentoParado {
+  const PagamentoParado({
+    required this.cobrancaId,
+    required this.pedido,
+    required this.valorCentavos,
+    required this.meio,
+    required this.criadaEm,
+    required this.minutosParado,
+    required this.clienteAvisou,
+  });
+  final String cobrancaId;
+  final String pedido;
+  final int valorCentavos;
+  final String meio;
+  final DateTime criadaEm;
+  final int minutosParado;
+  final bool clienteAvisou;
+}
+
+class EventoEmRevisao {
+  const EventoEmRevisao({required this.eventoId, required this.tipo, required this.recebidoEm, required this.motivo});
+  final String eventoId;
+  final String tipo;
+  final DateTime recebidoEm;
+  final String motivo;
+}
+
+class EstornoPendente {
+  const EstornoPendente({required this.pedido, required this.cobrancaId, required this.valorCentavos, required this.criadaEm});
+  final String pedido;
+  final String cobrancaId;
+  final int valorCentavos;
+  final DateTime criadaEm;
+}
+
+class AlertasFinanceiros {
+  const AlertasFinanceiros({
+    required this.minutosPagamentoParado,
+    required this.provedorLigado,
+    required this.pagamentosParados,
+    required this.repassesComFalha,
+    required this.estornosPendentes,
+    required this.eventosEmRevisao,
+    required this.contestacoesEmAberto,
+  });
+  final int minutosPagamentoParado;
+  final bool provedorLigado;
+  final List<PagamentoParado> pagamentosParados;
+  final List<EventoEmRevisao> repassesComFalha;
+  final List<EstornoPendente> estornosPendentes;
+  final List<EventoEmRevisao> eventosEmRevisao;
+  final int contestacoesEmAberto;
+
+  int get total => pagamentosParados.length + repassesComFalha.length + estornosPendentes.length + eventosEmRevisao.length;
+}
+
+class ConsultaCobranca {
+  const ConsultaCobranca({required this.statusNoProvedor, required this.statusNoTrato, required this.orientacao});
+  final String statusNoProvedor;
+  final String? statusNoTrato;
+  final String orientacao;
+}
+
+/// Um evento recebido do provedor (webhook), sem o conteúdo bruto.
+class EventoProvedor {
+  const EventoProvedor({
+    required this.eventoId,
+    required this.tipo,
+    required this.recebidoEm,
+    this.pedidoId,
+    this.referencia,
+    this.valorCentavos,
+    this.revisao,
+  });
+  final String eventoId;
+  final String tipo;
+  final DateTime recebidoEm;
+  final String? pedidoId;
+  final String? referencia;
+  final int? valorCentavos;
+  final String? revisao;
+}
+
+class LinhaConciliacao {
+  const LinhaConciliacao({
+    required this.tipo,
+    required this.referencia,
+    required this.pedido,
+    required this.valorProvedorCentavos,
+    required this.valorTratoCentavos,
+    required this.situacao,
+  });
+  final String tipo; // cobranca | estorno | contestacao
+  final String referencia;
+  final String? pedido;
+  final int valorProvedorCentavos;
+  final int valorTratoCentavos;
+  final String situacao; // confere | so_no_provedor | so_no_trato | valor_diferente
+
+  int get diferencaCentavos => valorProvedorCentavos - valorTratoCentavos;
+}
+
+class ConciliacaoDia {
+  const ConciliacaoDia({
+    required this.dia,
+    required this.confere,
+    required this.cobradoProvedorCentavos,
+    required this.cobradoTratoCentavos,
+    required this.taxasProvedorCentavos,
+    required this.divergencias,
+    required this.linhas,
+  });
+  final DateTime dia;
+  final bool confere;
+  final int cobradoProvedorCentavos;
+  final int cobradoTratoCentavos;
+  final int taxasProvedorCentavos;
+  final List<LinhaConciliacao> divergencias;
+  final List<LinhaConciliacao> linhas;
+}
+
+class MesFinanceiro {
+  const MesFinanceiro({required this.mes, required this.fechado, required this.podeFechar, this.fechadoEm});
+  final String mes; // AAAA-MM
+  final bool fechado;
+  final bool podeFechar;
+  final DateTime? fechadoEm;
+}
+
+class FechamentoMes {
+  const FechamentoMes({
+    required this.mes,
+    required this.fechado,
+    required this.podeFechar,
+    required this.totais,
+    this.gravado,
+    this.confere,
+    this.hash,
+    this.fechadoPorNome,
+    this.fechadoEm,
+    this.motivo,
+  });
+  final String mes;
+  final bool fechado;
+  final bool podeFechar;
+  final Map<String, int> totais;
+  final Map<String, int>? gravado;
+  final bool? confere;
+  final String? hash;
+  final String? fechadoPorNome;
+  final DateTime? fechadoEm;
+  final String? motivo;
+
+  /// O que vale para mostrar: o retrato gravado (mês fechado) ou a prévia.
+  Map<String, int> get valores => gravado ?? totais;
+}
+
+/// Arquivo pronto para baixar por link de uso único (o token nunca vai na URL).
+class ArquivoPronto {
+  const ArquivoPronto({required this.url, required this.nomeArquivo});
+  final String url;
+  final String nomeArquivo;
+}

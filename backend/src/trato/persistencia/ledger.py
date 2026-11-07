@@ -195,9 +195,7 @@ class LedgerPostgres:
     def lancamentos(self, pedido_id: str | None = None) -> Sequence[Lancamento]:
         with self._banco.transacao() as con:
             if pedido_id is None:
-                contratos = con.execute(
-                    "select id, pedido_id from public.contratos order by criado_em, id"
-                ).fetchall()
+                return self._todos(con)
             else:
                 pid = como_uuid(pedido_id)
                 contratos = (
@@ -210,6 +208,27 @@ class LedgerPostgres:
             saida: list[Lancamento] = []
             for contrato in contratos:
                 saida += self._carregar(con, str(contrato["id"]), str(contrato["pedido_id"]))
+        return tuple(saida)
+
+    def _todos(self, con: psycopg.Connection[Any]) -> tuple[Lancamento, ...]:
+        """O ledger inteiro numa consulta só (antes era uma por contrato: lento com volume)."""
+        linhas = con.execute(
+            "select k.pedido_id, l.id, l.tipo, l.estorna_id, l.chave_idempotencia, "
+            "l.ocorrido_em, e.evento_id as evento, c.codigo, c.usuario_id, p.sentido, "
+            "p.valor_centavos "
+            "from public.lancamentos l "
+            "join public.contratos k on k.id = l.contrato_id "
+            "join public.partidas p on p.lancamento_id = l.id "
+            "join public.contas_ledger c on c.id = p.conta_id "
+            "left join public.eventos_webhook e on e.id = l.evento_webhook_id "
+            "order by k.criado_em, k.id, p.id"
+        ).fetchall()
+        por_pedido: dict[str, list[dict[str, Any]]] = {}
+        for linha in linhas:  # a ordem dos contratos e das partidas é a de antes
+            por_pedido.setdefault(str(linha["pedido_id"]), []).append(linha)
+        saida: list[Lancamento] = []
+        for pedido, grupo in por_pedido.items():
+            saida += self._montar(grupo, pedido)
         return tuple(saida)
 
     def saldo_da_conta(self, conta: Conta, pedido_id: str | None = None) -> int:

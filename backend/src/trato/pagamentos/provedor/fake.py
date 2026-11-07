@@ -10,8 +10,9 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from datetime import datetime
 from typing import Any
 
 from trato.pagamentos.custo import MeioPagamento
@@ -20,6 +21,7 @@ from trato.pagamentos.provedor.base import (
     ErroProvedor,
     EstornoProvedor,
     EventoProvedor,
+    MovimentoProvedor,
     PreparoCartao,
     StatusCobranca,
     TipoEvento,
@@ -35,6 +37,8 @@ _TIPO_STRIPE = {
     TipoEvento.PAGAMENTO_FALHOU: "payment_intent.payment_failed",
     TipoEvento.ESTORNO_CONFIRMADO: "charge.refunded",
     TipoEvento.LIQUIDACAO: "payout.paid",
+    TipoEvento.CONTESTACAO: "charge.dispute.created",
+    TipoEvento.REPASSE_FALHOU: "payout.failed",
 }
 
 
@@ -53,6 +57,7 @@ class ProvedorFake:
         self._estornado: dict[str, int] = {}
         self.clientes_das_cobrancas: dict[str, str] = {}
         self.chamadas: list[tuple[str, str]] = []  # (operação, chave) para os testes olharem
+        self._movimentos: list[MovimentoProvedor] = []
 
     # --- interface ---------------------------------------------------------------------
 
@@ -131,7 +136,14 @@ class ProvedorFake:
     def interpretar_evento(self, payload: Mapping[str, Any]) -> EventoProvedor | None:
         return interpretar_evento_stripe(payload)
 
+    def movimentos(self, desde: datetime, ate: datetime) -> Sequence[MovimentoProvedor]:
+        return tuple(m for m in self._movimentos if desde <= m.criado_em < ate)
+
     # --- simulação (só existe no fake) --------------------------------------------------
+
+    def registrar_movimento(self, movimento: MovimentoProvedor) -> None:
+        """Põe uma linha no extrato falso (o fake não inventa extrato sozinho)."""
+        self._movimentos.append(movimento)
 
     def evento_assinado(
         self,
@@ -145,6 +157,9 @@ class ProvedorFake:
         segredo: str | None = None,
         repasse_id: str | None = None,
         objeto_id: str | None = None,
+        tipo_stripe: str | None = None,
+        status_contestacao: str = "needs_response",
+        motivo_falha: str = "Conta bancária recusou o pagamento.",
     ) -> tuple[bytes, dict[str, str]]:
         """Corpo e cabeçalhos de um webhook, como o provedor mandaria. Não muda o estado."""
         cobranca = self.consultar_cobranca(cobranca_id)
@@ -166,6 +181,29 @@ class ProvedorFake:
                 "currency": "brl",
                 "metadata": metadados,
             }
+        elif tipo is TipoEvento.CONTESTACAO:
+            objeto = {
+                "id": objeto_id or f"dp_fake_{_curto(cobranca_id)}",
+                "object": "dispute",
+                "payment_intent": cobranca_id,
+                "amount": valor,
+                "currency": "brl",
+                "reason": "fraudulent",
+                "status": status_contestacao,
+                "created": instante,
+                "evidence_details": {"due_by": instante + 7 * 86_400},
+                "metadata": {},
+            }
+        elif tipo is TipoEvento.REPASSE_FALHOU:
+            metadados["cobranca_id"] = cobranca_id
+            if repasse_id is not None:
+                metadados["repasse_id"] = repasse_id
+            objeto = {
+                "id": objeto_id or f"po_fake_{_curto(cobranca_id)}",
+                "amount": valor,
+                "failure_message": motivo_falha,
+                "metadata": metadados,
+            }
         elif tipo is TipoEvento.LIQUIDACAO:
             metadados["cobranca_id"] = cobranca_id
             if repasse_id is not None:
@@ -175,11 +213,12 @@ class ProvedorFake:
                 "amount": valor,
                 "metadata": metadados,
             }
-        evento_id = evento_id or f"evt_fake_{_TIPO_STRIPE[tipo]}_{_curto(cobranca_id)}"
+        nome = tipo_stripe or _TIPO_STRIPE[tipo]
+        evento_id = evento_id or f"evt_fake_{nome}_{_curto(cobranca_id)}"
         corpo = json.dumps(
             {
                 "id": evento_id,
-                "type": _TIPO_STRIPE[tipo],
+                "type": nome,
                 "created": instante,
                 "data": {"object": objeto},
             },

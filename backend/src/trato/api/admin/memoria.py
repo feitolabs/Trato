@@ -304,6 +304,15 @@ class PedidosAdminEmMemoria:
         dados = getattr(self._contexto.pedidos, "_dados", {})
         return {i: (None, dados[i].titulo if i in dados else "Pedido") for i in pedido_ids}
 
+    def dados_de_pagamento(self, pedido_ids: Sequence[str]) -> dict[str, tuple[str | None, bool]]:
+        saida: dict[str, tuple[str | None, bool]] = {}
+        for i in set(pedido_ids):
+            pedido = self._contexto.pedidos.obter(i)
+            if pedido is not None:
+                tem_contrato = self._contexto.contratos.obter_do_pedido(i) is not None
+                saida[i] = (pedido.referencia_pagamento, tem_contrato)
+        return saida
+
 
 class ConfigAdminEmMemoria:
     def __init__(

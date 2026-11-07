@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
@@ -249,6 +250,50 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
     if (ok) await widget.aoMudar();
   }
 
+  /// Extrato de recebimentos em PDF (comprovante de renda do profissional). Pede período e motivo.
+  Future<void> _extrato() async {
+    final u = widget.usuario;
+    final hoje = DateTime.now();
+    final periodos = <String, (DateTime, DateTime)>{
+      'mes_passado': (DateTime(hoje.year, hoje.month - 1, 1), DateTime(hoje.year, hoje.month, 0)),
+      'este_mes': (DateTime(hoje.year, hoje.month, 1), hoje),
+      'tres_meses': (DateTime(hoje.year, hoje.month - 3, 1), DateTime(hoje.year, hoje.month, 0)),
+      'doze_meses': (DateTime(hoje.year, hoje.month - 12, 1), DateTime(hoje.year, hoje.month, 0)),
+    };
+    var escolhido = 'mes_passado';
+    final r = await pedirFormulario<(String, String)>(
+      context,
+      titulo: 'Extrato de recebimentos de ${u.nome}',
+      consequencia: 'Sai em PDF com o que o parceiro de pagamento já liberou no período. Serve de comprovante de renda.',
+      rotuloConfirmar: 'Gerar PDF',
+      campos: (ctx, rebuild) => SeletorTrato<String>(
+        rotulo: 'Período',
+        valor: escolhido,
+        opcoes: const [
+          ('mes_passado', 'Mês passado'),
+          ('este_mes', 'Este mês até hoje'),
+          ('tres_meses', 'Últimos 3 meses fechados'),
+          ('doze_meses', 'Últimos 12 meses fechados'),
+        ],
+        aoMudar: (v) {
+          escolhido = v;
+          rebuild();
+        },
+      ),
+      camposValidos: () => true,
+      resultado: (motivo) => (escolhido, motivo),
+    );
+    if (r == null || !mounted) return;
+    final (inicio, fim) = periodos[r.$1]!;
+    final api = context.api;
+    ArquivoPronto? arquivo;
+    final ok = await executar(context, () async {
+      arquivo = await api.extratoProfissional(u.id, inicio: inicio, fim: fim, motivo: r.$2);
+    }, sucesso: 'Extrato pronto. O download começa agora.');
+    if (!ok || arquivo == null) return;
+    await launchUrl(Uri.parse(arquivo!.url), webOnlyWindowName: '_blank');
+  }
+
   void _diagnosticar() {
     if (_pedido.text.trim().length < 2) return;
     final futuro = context.api.diagnosticarPedido(widget.usuario.id, _pedido.text);
@@ -297,6 +342,8 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
                   BotaoTrato.secundario('Revelar dados pessoais', aoPressionar: _revelar, icone: IconesTrato.revelar),
                 if (context.pode(Permissao.usuariosStatus))
                   BotaoTrato.secundario('Alterar status', aoPressionar: _alterarStatus),
+                if (d.tipo == 'Profissional' && context.pode(Permissao.relatoriosExportar))
+                  BotaoTrato.secundario('Extrato em PDF', aoPressionar: _extrato, icone: Icons.picture_as_pdf_outlined),
               ],
             ),
             const SizedBox(height: EspacosTrato.x4),

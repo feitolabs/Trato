@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -123,6 +124,15 @@ class CobrancasPostgres:
                 _SELECT_COBRANCA + "where c.pedido_id = %s and p.stripe_payment_intent_id "
                 "is not null order by p.criado_em, p.id",
                 (pedido,),
+            ).fetchall()
+        return [_cobranca(linha) for linha in linhas]
+
+    def aguardando_desde_antes(self, limite: datetime) -> Sequence[CobrancaLocal]:
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                _SELECT_COBRANCA + "where p.status = 'pendente' and p.stripe_payment_intent_id "
+                "is not null and p.criado_em <= %s order by p.criado_em, p.id",
+                (limite,),
             ).fetchall()
         return [_cobranca(linha) for linha in linhas]
 

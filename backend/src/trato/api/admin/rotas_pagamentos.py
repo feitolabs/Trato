@@ -5,6 +5,7 @@ Tudo sai do ledger-espelho e dos eventos de webhook já gravados. Não há rota 
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from datetime import timedelta
 
@@ -34,10 +35,32 @@ router_divergencias = APIRouter(prefix="/v1/admin/divergencias", tags=["admin: c
 ACAO_CONCILIADA = "pagamento.divergencia_conciliada"
 
 
+_PAGINA_AUDITORIA = 500
+
+
+def _id_normal(valor: str) -> str:
+    """O mesmo id em uma forma só: a auditoria do banco devolve uuid com hífens, o ledger sem."""
+    try:
+        return uuid.UUID(valor).hex
+    except ValueError:
+        return valor
+
+
 def _conciliadas(admin: AdminContexto) -> set[str]:
-    """Ids dos lançamentos já conciliados. A fonte é a própria auditoria (imutável)."""
-    itens, _ = admin.auditoria.listar(FiltroAuditoria(acao=ACAO_CONCILIADA), 100, 0)
-    return {i.entidade_id for i in itens if i.entidade_id}
+    """Ids (normalizados) dos lançamentos já conciliados. A fonte é a auditoria (imutável).
+
+    Lê TODAS as páginas: antes só as 100 últimas contavam e as mais antigas voltavam a aparecer
+    como divergência."""
+    ids: set[str] = set()
+    lidos = 0
+    while True:
+        itens, total = admin.auditoria.listar(
+            FiltroAuditoria(acao=ACAO_CONCILIADA), _PAGINA_AUDITORIA, lidos
+        )
+        ids.update(_id_normal(i.entidade_id) for i in itens if i.entidade_id)
+        lidos += len(itens)
+        if not itens or lidos >= total:
+            return ids
 
 
 def lancamento_admin_out(item: Lancamento) -> LancamentoAdminOut:
@@ -61,36 +84,53 @@ def _estornado(lancamentos: Sequence[Lancamento]) -> dict[str, int]:
     return soma
 
 
-def _taxa_do_pedido(contexto: Contexto, pedido_id: str, pedido: object | None) -> int | None:
-    """Taxa que o Trato reteve neste pedido (do ledger-espelho). Sem dado, nada se inventa."""
-    try:
-        profissional = getattr(pedido, "profissional_id", None)
-        return int(contexto.ledger.saldos_pedido(pedido_id, profissional).taxa_trato)
-    except Exception:  # noqa: BLE001 - o espelho pode não ter o pedido; a coluna fica vazia
-        return None
+def _taxas_por_pedido(lancamentos: Sequence[Lancamento]) -> dict[str, int]:
+    """Saldo da conta de taxa do Trato por pedido, somado do que já foi lido (sem ir ao banco)."""
+    taxa: dict[str, int] = {}
+    for item in lancamentos:
+        if item.credito == TAXA_TRATO:
+            taxa[item.pedido_id] = taxa.get(item.pedido_id, 0) + item.valor
+        if item.debito == TAXA_TRATO:
+            taxa[item.pedido_id] = taxa.get(item.pedido_id, 0) - item.valor
+    return taxa
 
 
 def _pagamentos(
-    contexto: Contexto, pedido_id: str | None = None, conciliadas: set[str] | None = None
+    contexto: Contexto,
+    admin: AdminContexto,
+    pedido_id: str | None = None,
+    conciliadas: set[str] | None = None,
+    dias: int | None = None,
 ) -> list[PagamentoOut]:
-    todos = contexto.ledger.lancamentos(pedido_id)
-    estornos = _estornado(contexto.ledger.lancamentos())
+    """As cobranças do espelho com o status de estorno e de conciliação.
+
+    O ledger é lido UMA vez e os pedidos numa consulta só (antes eram várias idas ao banco por
+    cobrança: com o banco longe do servidor, algumas centenas já travavam a tela)."""
+    todos = contexto.ledger.lancamentos()
+    if pedido_id is not None:
+        todos = tuple(i for i in todos if i.pedido_id == pedido_id)
+    estornos = _estornado(todos)
+    taxas = _taxas_por_pedido(todos)
+    limite = contexto.agora() - timedelta(days=dias) if dias is not None else None
+    cobrancas = [
+        i
+        for i in todos
+        if i.tipo is TipoLancamento.COBRANCA and (limite is None or i.data >= limite)
+    ]
+    pedidos = admin.pedidos.dados_de_pagamento([i.pedido_id for i in cobrancas])
+    ja = conciliadas or set()
     saida = []
-    for item in todos:
-        if item.tipo is not TipoLancamento.COBRANCA:
-            continue
-        pedido = contexto.pedidos.obter(item.pedido_id)
+    for item in cobrancas:
+        referencia, tem_contrato = pedidos.get(item.pedido_id, (None, False))
         estornado = estornos.get(item.id, 0)
         status = "confirmado"
         if estornado:
             status = "estornado" if estornado >= item.valor else "estornado_parcial"
         # Conciliação: cobrança sem pedido, sem contrato ou sem referência do provedor.
-        divergente = item.id not in (conciliadas or set()) and (
-            pedido is None
-            or pedido.referencia_pagamento is None
-            or contexto.contratos.obter_do_pedido(item.pedido_id) is None
+        divergente = _id_normal(item.id) not in ja and (
+            item.pedido_id not in pedidos or referencia is None or not tem_contrato
         )
-        taxa = _taxa_do_pedido(contexto, item.pedido_id, pedido)
+        taxa = taxas.get(item.pedido_id, 0) if item.pedido_id in pedidos else None
         saida.append(
             PagamentoOut(
                 taxa_trato_centavos=taxa,
@@ -101,16 +141,12 @@ def _pagamentos(
                 estornado_centavos=estornado,
                 status=status,
                 data=item.data,
-                referencia_provedor=pedido.referencia_pagamento if pedido else None,
+                referencia_provedor=referencia,
                 divergente=divergente,
             )
         )
     saida.sort(key=lambda p: p.data, reverse=True)
     return saida
-
-
-def _no_periodo(p: PagamentoOut, dias: int | None, contexto: Contexto) -> bool:
-    return dias is None or p.data >= contexto.agora() - timedelta(days=dias)
 
 
 @router.get("/pagamentos", response_model=Pagina[PagamentoOut], summary="Pagamentos (espelho)")
@@ -127,10 +163,8 @@ def listar_pagamentos(
 ) -> Pagina[PagamentoOut]:
     itens = [
         p
-        for p in _pagamentos(contexto, pedido_id, _conciliadas(admin))
-        if (status is None or p.status == status)
-        and (not apenas_divergentes or p.divergente)
-        and _no_periodo(p, dias, contexto)
+        for p in _pagamentos(contexto, admin, pedido_id, _conciliadas(admin), dias)
+        if (status is None or p.status == status) and (not apenas_divergentes or p.divergente)
     ]
     pagina = itens[deslocamento : deslocamento + limite]
     rotulos = admin.pedidos.rotulos([p.pedido_id for p in pagina])
@@ -153,11 +187,7 @@ def resumo(
     contexto: Contexto = Depends(obter_contexto),
     admin: AdminContexto = Depends(obter_admin),
 ) -> ResumoConciliacaoOut:
-    pagamentos = [
-        p
-        for p in _pagamentos(contexto, None, _conciliadas(admin))
-        if _no_periodo(p, dias, contexto)
-    ]
+    pagamentos = _pagamentos(contexto, admin, None, _conciliadas(admin), dias)
     return ResumoConciliacaoOut(
         cobrancas=len(pagamentos),
         reembolsos=sum(1 for p in pagamentos if p.estornado_centavos > 0),
@@ -183,6 +213,10 @@ def eventos_webhook(
     contexto: Contexto = Depends(obter_contexto),
 ) -> Pagina[EventoWebhookOut]:
     todos = sorted(contexto.eventos_webhook.listar(), key=lambda e: e.recebido_em, reverse=True)
+    revisao = {
+        (e.provedor, e.evento_id): m.removeprefix("revisar: ")
+        for e, m in contexto.eventos_webhook.em_revisao()
+    }
     itens = []
     for e in todos[deslocamento : deslocamento + limite]:
         dados = e.payload.get("data")
@@ -201,6 +235,7 @@ def eventos_webhook(
                 valor_centavos=valor
                 if isinstance(valor, int) and not isinstance(valor, bool)
                 else None,
+                revisao=revisao.get((e.provedor, e.evento_id)),
             )
         )
     return Pagina(itens=itens, total=len(todos), limite=limite, deslocamento=deslocamento)
@@ -272,10 +307,11 @@ def conciliar(
 ) -> None:
     ja = _conciliadas(admin)
     alvo = next(
-        (p for p in _pagamentos(contexto, None, ja) if p.lancamento_id == lancamento_id), None
+        (p for p in _pagamentos(contexto, admin, None, ja) if p.lancamento_id == lancamento_id),
+        None,
     )
     if alvo is None:
-        if lancamento_id in ja:
+        if _id_normal(lancamento_id) in ja:
             raise HTTPException(409, "Essa divergência já foi conciliada.")
         raise HTTPException(404, "Lançamento não encontrado.")
     if not alvo.divergente:

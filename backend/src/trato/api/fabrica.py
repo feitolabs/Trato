@@ -39,6 +39,7 @@ from trato.persistencia.auditoria import AuditoriaPostgres
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
 from trato.persistencia.conta import ContaPostgres
+from trato.persistencia.contestacoes import ContestacoesPostgres
 from trato.persistencia.contratos import ContratosPostgres
 from trato.persistencia.conversas import ConversasPostgres, NotificacoesPostgres
 from trato.persistencia.dinheiro import (
@@ -49,6 +50,7 @@ from trato.persistencia.dinheiro import (
     RepassesPostgres,
 )
 from trato.persistencia.execucao import ExecucaoPostgres
+from trato.persistencia.fechamentos import FechamentosPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
@@ -134,6 +136,8 @@ def criar_contexto_postgres(
         taxa=TaxaPostgres(banco),
         avaliacoes=AvaliacoesPostgres(banco),
         repasses=RepassesPostgres(banco),
+        contestacoes=ContestacoesPostgres(banco),
+        fechamentos=FechamentosPostgres(banco),
         recusas=RecusasPostgres(banco),
         notas_material=NotasMaterialPostgres(banco, execucao),
         conta=ContaPostgres(banco),
