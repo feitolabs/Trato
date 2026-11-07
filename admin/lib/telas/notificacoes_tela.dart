@@ -324,7 +324,9 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
           FutureBuilder<EstimativaCampanha>(
             future: _estimativa,
             builder: (context, snap) {
-              if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator();
+              if (snap.connectionState != ConnectionState.done) {
+                return Semantics(label: 'Carregando', child: const BlocoEsqueleto(largura: 140, altura: 24));
+              }
               if (snap.hasError) return Text(snap.error.toString(), style: TipografiaTrato.legenda);
               final e = snap.data!;
               return Column(

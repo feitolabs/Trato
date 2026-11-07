@@ -544,7 +544,10 @@ class VisualizadorDocumento extends StatelessWidget {
                   semanticLabel: titulo,
                   loadingBuilder: (context, filho, progresso) => progresso == null
                       ? filho
-                      : const Center(child: CircularProgressIndicator(semanticsLabel: 'Carregando documento')),
+                      : Semantics(
+                          label: 'Carregando documento',
+                          child: const BlocoEsqueleto(largura: double.infinity, altura: double.infinity),
+                        ),
                   errorBuilder: (context, _, _) => Padding(
                     padding: const EdgeInsets.all(EspacosTrato.x6),
                     child: Column(
