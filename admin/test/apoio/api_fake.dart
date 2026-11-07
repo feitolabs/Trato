@@ -1530,7 +1530,7 @@ class ApiFake implements ApiAdmin {
               eventoId: 'evt_falha',
               tipo: 'payout.failed',
               recebidoEm: _base,
-              motivo: 'repasse falhou (payout.failed): Conta encerrada no banco.; repasse r-1 do pedido p-1',
+              motivo: 'repasse falhou (payout.failed): Conta encerrada no banco; repasse r-1 do pedido p-1',
             ),
           ],
           estornosPendentes: const [],

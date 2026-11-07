@@ -39,7 +39,7 @@ void main() {
     expect(find.text('Pagamentos sem confirmação'), findsOneWidget);
     expect(find.text('Cliente avisou que pagou'), findsOneWidget);
     expect(find.text('Repasses que falharam'), findsOneWidget);
-    expect(find.textContaining('Conta encerrada no banco.'), findsOneWidget);
+    expect(find.textContaining('Conta encerrada no banco; repasse'), findsOneWidget);
     expect(find.textContaining('1 contestação de cartão em aberto'), findsOneWidget);
 
     await tester.tap(find.text('Consultar no provedor'));
@@ -92,7 +92,9 @@ void main() {
     expect(find.textContaining('Não dá para desfazer'), findsOneWidget);
     await confirmarMotivo(tester, 'Fechar o mês');
 
-    expect(find.textContaining('Mês fechado.', findRichText: true), findsOneWidget);
+    // Continua em setembro, agora fechado (o aviso "Mês fechado." do canto não basta).
+    expect(find.text('Totais de setembro de 2026'), findsOneWidget);
+    expect(find.textContaining('Nada mais entra neste mês', findRichText: true), findsOneWidget);
     expect(find.text('Fechar o mês'), findsNothing);
     expect(find.text('Baixar CSV para o contador'), findsOneWidget);
   });

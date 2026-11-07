@@ -725,3 +725,9 @@ não na `feature/f7-financeiro-correcoes`. Nada foi enviado ao GitHub.
 - Depois (OK do João, 08/11): migration aplicada no Supabase e conferida (tabelas, 3 gatilhos, definição, grants do
   service_role sem DELETE em fechamentos, anon sem leitura, RLS ligada). `develop` enviada ao GitHub. Publicar no Render
   e cadastrar os eventos no Stripe ficaram com o João (passo a passo na conversa).
+- Verificação no navegador (08/11), painel com dados de exemplo (`test/apoio/main_qa.dart`, o backend publicado ainda é o
+  antigo), em 1360 px e em celular (375 px): as 6 abas abrem e mostram o esperado. Achados e corrigidos: depois de fechar
+  um mês a tela pulava para outro mês (agora fica no mês fechado; o teste antigo passava por engano, porque o aviso
+  "Mês fechado." do canto tem o mesmo texto do quadro); totais do fechamento com nome quebrado e valor colado (agora
+  nome à esquerda e valor alinhado à direita); motivo do repasse com falha mostrava ".;" duplicado. Painel: 12 testes do
+  financeiro OK; backend: testes de contestação e repasse OK.
