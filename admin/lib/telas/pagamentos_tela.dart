@@ -6,6 +6,7 @@ import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
+import 'financeiro_abas.dart';
 
 /// F7.3 — pagamentos e conciliação. SOMENTE LEITURA (D15, RN-06): sem saldo próprio e sem saque.
 /// Mostra o espelho do que o provedor de pagamento confirmou.
@@ -30,17 +31,46 @@ class _PagamentosTelaState extends State<PagamentosTela> {
 
   @override
   Widget build(BuildContext context) {
-    final api = context.api;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CabecalhoPagina(
-          'Pagamentos e conciliação',
-          subtitulo: 'Extrato espelho do provedor de pagamento',
-          acoes: [FiltroPeriodo(selecionado: _periodo, aoMudar: (p) => setState(() => _periodo = p))],
+        const CabecalhoPagina('Pagamentos e conciliação', subtitulo: 'Extrato espelho do provedor de pagamento'),
+        Expanded(
+          child: AbasTrato(
+            abas: [
+              AbaTrato('Extrato', conteudo: _extrato(context)),
+              const AbaTrato('Alertas', conteudo: AbaAlertasFinanceiros()),
+              const AbaTrato('Contestações', conteudo: AbaContestacoes()),
+              const AbaTrato('Conciliação do dia', conteudo: AbaConciliacaoDia()),
+              const AbaTrato('Avisos do provedor', conteudo: AbaEventosProvedor()),
+              const AbaTrato('Fechamento do mês', conteudo: AbaFechamentoMes()),
+            ],
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _extrato(BuildContext context) {
+    final api = context.api;
+    final margem = Responsivo.margemLateral(FaixaPainel.de(context));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: Responsivo.margemLateral(FaixaPainel.de(context))),
+          padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x4, margem, 0),
+          child: Wrap(
+            spacing: EspacosTrato.x3,
+            runSpacing: EspacosTrato.x3,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FiltroPeriodo(selecionado: _periodo, aoMudar: (p) => setState(() => _periodo = p)),
+            ],
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: margem),
           child: const BannerInfo(
             'O Trato não guarda saldo nem faz saque. Esta tela mostra o que o provedor confirmou; '
             'cobranças e repasses são criados lá.',

@@ -1327,6 +1327,199 @@ class ApiAdminHttp implements ApiAdmin {
     await _chamar('DELETE', '/v1/admin/equipe/$usuarioId', consulta: {'motivo': motivo});
   }
 
+  // ---------- Financeiro: contestações, alertas, conciliação, fechamento ----------
+
+  static String _dia(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static DateTime? _dataOuNada(Object? o) => o == null ? null : _data(o);
+
+  static String _pedidoComTitulo(Map<String, dynamic> m) {
+    final codigo = _codigoPedido(m['pedido_id'] as String?, m['pedido_numero']);
+    final titulo = m['pedido_titulo'] as String?;
+    return titulo == null || titulo.isEmpty ? codigo : '$codigo · $titulo';
+  }
+
+  static EventoEmRevisao _revisao(Map<String, dynamic> e) => EventoEmRevisao(
+        eventoId: e['evento_id'] as String,
+        tipo: e['tipo'] as String,
+        recebidoEm: _data(e['recebido_em']),
+        motivo: e['motivo'] as String,
+      );
+
+  @override
+  Future<List<ContestacaoCartao>> listarContestacoes({String? status}) async {
+    final corpo = await _chamar('GET', '/v1/admin/financeiro/contestacoes', consulta: {'status': status});
+    return [
+      for (final c in _itens(corpo))
+        ContestacaoCartao(
+          id: c['id'] as String,
+          pedido: _pedidoComTitulo(c),
+          valorCentavos: _int(c['valor_centavos']),
+          motivo: c['motivo_legivel'] as String,
+          status: c['status'] as String,
+          abertaEm: _data(c['aberta_em']),
+          prazoProvas: _dataOuNada(c['prazo_provas']),
+          horasParaPrazo: (c['horas_para_prazo'] as num?)?.toInt(),
+          encerradaEm: _dataOuNada(c['encerrada_em']),
+          repasseLiberado: c['repasse_liberado'] == true,
+          cobrancaId: c['cobranca_id'] as String?,
+        ),
+    ];
+  }
+
+  @override
+  Future<AlertasFinanceiros> alertasFinanceiros() async {
+    final r = _mapa(await _chamar('GET', '/v1/admin/financeiro/alertas'));
+    return AlertasFinanceiros(
+      minutosPagamentoParado: _int(r['minutos_pagamento_parado']),
+      provedorLigado: r['provedor_ligado'] == true,
+      pagamentosParados: [
+        for (final p in _itens(r['pagamentos_parados']))
+          PagamentoParado(
+            cobrancaId: p['cobranca_id'] as String,
+            pedido: _codigoPedido(p['pedido_id'] as String?, p['pedido_numero']),
+            valorCentavos: _int(p['valor_centavos']),
+            meio: p['meio'] as String,
+            criadaEm: _data(p['criada_em']),
+            minutosParado: _int(p['minutos_parado']),
+            clienteAvisou: p['cliente_avisou'] == true,
+          ),
+      ],
+      repassesComFalha: [for (final e in _itens(r['repasses_com_falha'])) _revisao(e)],
+      estornosPendentes: [
+        for (final o in _itens(r['estornos_pendentes']))
+          EstornoPendente(
+            pedido: _codigoPedido(o['pedido_id'] as String?, null),
+            cobrancaId: o['cobranca_id'] as String,
+            valorCentavos: _int(o['valor_centavos']),
+            criadaEm: _data(o['criada_em']),
+          ),
+      ],
+      eventosEmRevisao: [for (final e in _itens(r['eventos_em_revisao'])) _revisao(e)],
+      contestacoesEmAberto: _int(r['contestacoes_em_aberto']),
+    );
+  }
+
+  @override
+  Future<ConsultaCobranca> consultarCobranca(String cobrancaId) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/financeiro/cobrancas/$cobrancaId/consultar'));
+    return ConsultaCobranca(
+      statusNoProvedor: r['status_no_provedor'] as String,
+      statusNoTrato: r['status_no_trato'] as String?,
+      orientacao: r['orientacao'] as String,
+    );
+  }
+
+  @override
+  Future<ConciliacaoDia> conciliacaoDoDia(DateTime dia) async {
+    final r = _mapa(await _chamar('GET', '/v1/admin/financeiro/conciliacao', consulta: {'dia': _dia(dia)}));
+    List<LinhaConciliacao> linhas(Object? lista) => [
+          for (final l in _itens(lista))
+            LinhaConciliacao(
+              tipo: l['tipo'] as String,
+              referencia: l['referencia'] as String,
+              pedido: l['pedido_id'] == null ? null : _codigoPedido(l['pedido_id'] as String?, l['pedido_numero']),
+              valorProvedorCentavos: _int(l['valor_provedor_centavos']),
+              valorTratoCentavos: _int(l['valor_trato_centavos']),
+              situacao: l['situacao'] as String,
+            ),
+        ];
+    return ConciliacaoDia(
+      dia: DateTime.parse(r['dia'] as String),
+      confere: r['confere'] == true,
+      cobradoProvedorCentavos: _int(r['cobrado_provedor_centavos']),
+      cobradoTratoCentavos: _int(r['cobrado_trato_centavos']),
+      taxasProvedorCentavos: _int(r['taxas_provedor_centavos']),
+      divergencias: linhas(r['divergencias']),
+      linhas: linhas(r['linhas']),
+    );
+  }
+
+  @override
+  Future<List<EventoProvedor>> listarEventosProvedor({int limite = 50}) async {
+    final corpo = await _chamar('GET', '/v1/admin/webhooks/eventos', consulta: {'limite': '$limite'});
+    return [
+      for (final e in _itens(corpo))
+        EventoProvedor(
+          eventoId: e['evento_id'] as String,
+          tipo: e['tipo'] as String,
+          recebidoEm: _data(e['recebido_em']),
+          pedidoId: e['pedido_id'] as String?,
+          referencia: e['referencia'] as String?,
+          valorCentavos: (e['valor_centavos'] as num?)?.toInt(),
+          revisao: e['revisao'] as String?,
+        ),
+    ];
+  }
+
+  @override
+  Future<List<MesFinanceiro>> listarMeses({int ultimos = 12}) async {
+    final corpo = await _chamar('GET', '/v1/admin/financeiro/fechamentos', consulta: {'ultimos': '$ultimos'});
+    return [
+      for (final m in _itens(corpo))
+        MesFinanceiro(
+          mes: m['mes'] as String,
+          fechado: m['fechado'] == true,
+          podeFechar: m['pode_fechar'] == true,
+          fechadoEm: _dataOuNada(m['fechado_em']),
+        ),
+    ];
+  }
+
+  static Map<String, int> _totais(Object? o) => {
+        for (final e in (o as Map? ?? const {}).entries)
+          if (e.value is num) e.key as String: (e.value as num).toInt(),
+      };
+
+  FechamentoMes _fechamento(Map<String, dynamic> r) => FechamentoMes(
+        mes: r['mes'] as String,
+        fechado: r['fechado'] == true,
+        podeFechar: r['pode_fechar'] == true,
+        totais: _totais(r['totais']),
+        gravado: r['gravado'] == null ? null : _totais(r['gravado']),
+        confere: r['confere'] as bool?,
+        hash: r['hash'] as String?,
+        fechadoPorNome: r['fechado_por_nome'] as String?,
+        fechadoEm: _dataOuNada(r['fechado_em']),
+        motivo: r['motivo'] as String?,
+      );
+
+  @override
+  Future<FechamentoMes> verFechamento(String mes) async =>
+      _fechamento(_mapa(await _chamar('GET', '/v1/admin/financeiro/fechamentos/$mes')));
+
+  @override
+  Future<FechamentoMes> fecharMes(String mes, {required String motivo}) async => _fechamento(
+        _mapa(await _chamar('POST', '/v1/admin/financeiro/fechamentos/$mes/fechar', corpo: {'motivo': motivo})),
+      );
+
+  ArquivoPronto _arquivo(Object? corpo) {
+    final r = _mapa(corpo);
+    // O token de login nunca vai na URL: o link vale só uma vez e por poucos minutos.
+    return ArquivoPronto(
+      url: '$_api/v1/admin/relatorios/baixar/${r['codigo']}',
+      nomeArquivo: r['nome_arquivo'] as String,
+    );
+  }
+
+  @override
+  Future<ArquivoPronto> exportarFechamento(String mes) async =>
+      _arquivo(await _chamar('POST', '/v1/admin/financeiro/fechamentos/$mes/exportar'));
+
+  @override
+  Future<ArquivoPronto> extratoProfissional(
+    String usuarioId, {
+    required DateTime inicio,
+    required DateTime fim,
+    required String motivo,
+  }) async =>
+      _arquivo(await _chamar(
+        'POST',
+        '/v1/admin/financeiro/profissionais/$usuarioId/extrato',
+        corpo: {'inicio': _dia(inicio), 'fim': _dia(fim), 'motivo': motivo},
+      ));
+
   // ---------- Módulo 7: Exportação de Relatórios CSV ----------
 
   @override

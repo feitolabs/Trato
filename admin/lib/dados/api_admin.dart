@@ -204,6 +204,30 @@ abstract interface class ApiAdmin {
   });
   Future<void> revogarMembroEquipe(String usuarioId, {required String motivo});
 
+  // Financeiro: contestações, alertas, conciliação com o provedor e fechamento do mês.
+  // Tudo leitura ou registro: nada aqui move dinheiro nem marca "pago" (D13).
+
+  /// [status]: `em_aberto`, `aberta`, `em_analise`, `ganha`, `perdida` ou `encerrada`; nulo = todas.
+  Future<List<ContestacaoCartao>> listarContestacoes({String? status});
+  Future<AlertasFinanceiros> alertasFinanceiros();
+
+  /// Pergunta ao provedor como está a cobrança. Não muda nada no Trato.
+  Future<ConsultaCobranca> consultarCobranca(String cobrancaId);
+  Future<ConciliacaoDia> conciliacaoDoDia(DateTime dia);
+  Future<List<EventoProvedor>> listarEventosProvedor({int limite = 50});
+  Future<List<MesFinanceiro>> listarMeses({int ultimos = 12});
+  Future<FechamentoMes> verFechamento(String mes);
+  Future<FechamentoMes> fecharMes(String mes, {required String motivo});
+  Future<ArquivoPronto> exportarFechamento(String mes);
+
+  /// Extrato de recebimentos do profissional em PDF (comprovante de renda).
+  Future<ArquivoPronto> extratoProfissional(
+    String usuarioId, {
+    required DateTime inicio,
+    required DateTime fim,
+    required String motivo,
+  });
+
   // Módulo 7: Exportação de Relatórios CSV
 
   /// Gera o relatório ([tipo]: `financeiro`, `pedidos` ou `repasses`) e devolve o link de uso único.

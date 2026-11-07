@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 
-from trato.pagamentos.modelos import Aditivo, CobrancaLocal, OrdemEstorno, TermosContrato
+from trato.pagamentos.modelos import (
+    Aditivo,
+    CobrancaLocal,
+    EstadoCobranca,
+    OrdemEstorno,
+    TermosContrato,
+)
 
 
 class CobrancasEmMemoria:
@@ -19,6 +26,14 @@ class CobrancasEmMemoria:
 
     def do_pedido(self, pedido_id: str) -> Sequence[CobrancaLocal]:
         achadas = [c for c in self._itens.values() if c.pedido_id == pedido_id]
+        return sorted(achadas, key=lambda c: c.criada_em)
+
+    def aguardando_desde_antes(self, limite: datetime) -> Sequence[CobrancaLocal]:
+        achadas = [
+            c
+            for c in self._itens.values()
+            if c.status is EstadoCobranca.AGUARDANDO and c.criada_em <= limite
+        ]
         return sorted(achadas, key=lambda c: c.criada_em)
 
 

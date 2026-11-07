@@ -56,20 +56,29 @@ class _Pronto:
     nome: str
     operador_id: str
     expira: float
+    midia: str = "text/csv; charset=utf-8"
 
 
 _prontos: dict[str, _Pronto] = {}
 _trava = threading.Lock()
 
 
-def _guardar(conteudo: bytes, nome: str, operador_id: str) -> str:
+def _guardar(
+    conteudo: bytes, nome: str, operador_id: str, midia: str = "text/csv; charset=utf-8"
+) -> str:
     agora = time.monotonic()
     codigo = secrets.token_urlsafe(32)
     with _trava:
         for k in [k for k, v in _prontos.items() if v.expira < agora]:
             del _prontos[k]
-        _prontos[codigo] = _Pronto(conteudo, nome, operador_id, agora + _SEGUNDOS_DO_CODIGO)
+        _prontos[codigo] = _Pronto(conteudo, nome, operador_id, agora + _SEGUNDOS_DO_CODIGO, midia)
     return codigo
+
+
+def guardar_para_baixar(conteudo: bytes, nome: str, operador_id: str, midia: str) -> str:
+    """Outro módulo do painel (fechamento, extrato) entrega arquivo pelo mesmo código de uso
+    único: o token nunca vai na URL e o link morre em poucos minutos."""
+    return _guardar(conteudo, nome, operador_id, midia)
 
 
 def _banco(contexto: Contexto) -> Any:
@@ -318,7 +327,7 @@ def baixar(codigo: str) -> Response:
         raise HTTPException(404, "Este link já foi usado ou expirou. Gere o relatório de novo.")
     return Response(
         content=pronto.conteudo,
-        media_type="text/csv; charset=utf-8",
+        media_type=pronto.midia,
         headers={
             "Content-Disposition": f'attachment; filename="{pronto.nome}"',
             "Cache-Control": "no-store",

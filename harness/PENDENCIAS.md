@@ -117,3 +117,18 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 
 ## App do profissional (07/11/2026)
 - Raio de atendimento ("Até onde você vai"): a tela coleta, mas o app não envia e o backend não guarda (`CadastroIn` não tem o campo). Decidir: gravar o raio (coluna + filtro de pedidos por distância, RN-01) ou tirar a pergunta da tela.
+
+## Financeiro do painel (08/11/2026)
+- Migration `20261108120000_financeiro_contestacoes_fechamento.sql` **aplicada no Supabase em 08/11/2026** (OK do João).
+  Falta publicar o backend novo no Render (passo a passo enviado ao João). Antes da aplicação valia:
+  Sem ela, em produção: contestações não são gravadas (o webhook de contestação falha e o Stripe reenvia),
+  "Fechamento do mês" responde erro e a trava do mês não existe. Rollback em `supabase/rollback/`.
+  **Ordem obrigatória: aplicar a migration ANTES de publicar este backend.** O aviso de liquidação
+  (`payout.paid`) passou a consultar `contestacoes`; sem a tabela, ele falha e o repasse não é espelhado.
+- Assinar no Stripe os eventos novos do webhook: `charge.dispute.created`, `charge.dispute.updated`,
+  `charge.dispute.closed`, `transfer.reversed`, `payout.failed`. Sem isso eles nunca chegam.
+- Conciliação do dia testada só com extrato simulado; falta rodar contra o Stripe de teste e agendar a conferência
+  diária (hoje é sob demanda, na aba).
+- Fechamento sem o custo de cupom: o pedido não guarda o desconto (quem paga já foi decidido: o Trato).
+- Extrato em PDF só pelo painel; o app do profissional ainda não tem o botão.
+- Prazo do alerta de pagamento parado: 30 min até alguém propor e aprovar `alerta_pagamento_parado_minutos`.

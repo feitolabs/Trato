@@ -17,6 +17,7 @@ from trato.api.admin import (
     rotas_dashboard,
     rotas_disputas,
     rotas_equipe,
+    rotas_financeiro,
     rotas_notificacoes,
     rotas_pagamentos,
     rotas_relatorios,
@@ -43,6 +44,7 @@ def criar_router_admin() -> APIRouter:
         rotas_cupons,
         rotas_equipe,
         rotas_relatorios,
+        rotas_financeiro,
     ):
         roteador.include_router(modulo.router)
     roteador.include_router(rotas_pagamentos.router_divergencias)

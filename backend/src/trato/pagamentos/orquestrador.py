@@ -26,6 +26,12 @@ from dataclasses import replace
 from trato.api.contexto import Contexto
 from trato.api.repositorios import EventoWebhook
 from trato.api.webhook_pagamento import EventoForaDeOrdem  # a rota do webhook responde 409
+from trato.financeiro.contestacoes import (
+    Contestacao,
+    StatusContestacao,
+    ler_disputa_stripe,
+    mesclar,
+)
 from trato.financeiro.ledger import (
     CUSTODIA,
     LedgerErro,
@@ -110,6 +116,8 @@ class ServicoPagamento:
             TipoEvento.PAGAMENTO_FALHOU: self._pagamento_falhou,
             TipoEvento.ESTORNO_CONFIRMADO: self._estorno_confirmado,
             TipoEvento.LIQUIDACAO: self._liquidacao,
+            TipoEvento.CONTESTACAO: self._contestacao,
+            TipoEvento.REPASSE_FALHOU: self._repasse_falhou,
         }
         for tipo_stripe, tipo in TIPOS_STRIPE.items():
             contexto.manipuladores_webhook[tipo_stripe] = self._manipulador(manipuladores[tipo])
@@ -436,6 +444,12 @@ class ServicoPagamento:
             return
         if pedido.estado is not Estado.CONCLUIDO:
             raise EventoForaDeOrdem("Liquidação antes de o pedido concluir ou durante disputa.")
+        if contexto.contestacoes.abertas_do_pedido(pedido.id):
+            # O provedor já pagou (o espelho registra), mas o financeiro precisa saber: se a
+            # contestação for perdida, o valor sai do Trato e não do profissional.
+            contexto.eventos_webhook.marcar_revisao(
+                bruto, f"repasse liberado com contestação de cartão aberta no pedido {pedido.id}"
+            )
         agora = contexto.agora()
         novos = self._planejar(
             contexto,
@@ -455,6 +469,103 @@ class ServicoPagamento:
             repasses.vincular_transferencia(repasse.id, evento.objeto_id)
         if gravados:
             repasses.marcar_liberado(repasse.id, gravados[0].id, agora)
+
+    def _contestacao(
+        self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
+    ) -> None:
+        """`charge.dispute.*`: registra a contestação e, quando PERDIDA, espelha no ledger.
+
+        Perdida = o banco do cliente devolveu o valor a ele: o mesmo efeito de um reembolso feito
+        por fora (estorno do pedido, a taxa não volta). Sem como lançar (ex.: o valor já foi
+        liberado ao profissional), fica o alerta para o financeiro. Aberta, em análise, ganha ou
+        encerrada só atualizam o registro: o dinheiro não muda no espelho.
+        """
+        dados = bruto.payload.get("data")
+        objeto = dados.get("object") if isinstance(dados, dict) else None
+        nova = ler_disputa_stripe(objeto if isinstance(objeto, dict) else {}, contexto.agora())
+        if nova is None:
+            contexto.eventos_webhook.marcar_revisao(bruto, "contestação sem id, valor ou status")
+            return
+        cobranca = self.cobrancas.obter(nova.cobranca_id or "")
+        if cobranca is not None:
+            nova = replace(nova, pedido_id=cobranca.pedido_id)
+        antiga = contexto.contestacoes.obter(nova.provedor_contestacao_id)
+        atual = mesclar(antiga, nova)
+        contexto.contestacoes.salvar(atual)
+        if cobranca is None:
+            contexto.eventos_webhook.marcar_revisao(bruto, "contestação de cobrança desconhecida")
+            return
+        ja_perdida = antiga is not None and antiga.status is StatusContestacao.PERDIDA
+        if atual.status is StatusContestacao.PERDIDA and not ja_perdida:
+            self._contestacao_perdida(atual, cobranca, contexto, bruto)
+
+    def _contestacao_perdida(
+        self,
+        contestacao: Contestacao,
+        cobranca: CobrancaLocal,
+        contexto: Contexto,
+        bruto: EventoWebhook,
+    ) -> None:
+        valor = contestacao.valor_centavos
+        resta = cobranca.valor_centavos - cobranca.estornado_centavos
+        motivo = (
+            f"contestação {contestacao.provedor_contestacao_id} perdida: {valor} centavos "
+            f"voltaram ao cliente ({cobranca.id})"
+        )
+        if valor > resta:
+            contexto.eventos_webhook.marcar_revisao(
+                bruto, f"{motivo}; não foi lançado: só restavam {resta} centavos na cobrança"
+            )
+            return
+        try:
+            novos = self._planejar(
+                contexto,
+                cobranca.pedido_id,
+                lambda livro: estornar_pedido(
+                    livro,
+                    cobranca.pedido_id,
+                    valor,
+                    f"contest/{contestacao.provedor_contestacao_id}",
+                    contexto.agora(),
+                    bruto.evento_id,
+                ),
+            )
+            if novos:
+                contexto.ledger.lancar_varios(novos)
+        except LedgerErro as erro:
+            contexto.eventos_webhook.marcar_revisao(bruto, f"{motivo}; não foi lançado: {erro}")
+            return
+        devolvido = cobranca.estornado_centavos + valor
+        situacao = (
+            EstadoCobranca.DEVOLVIDA if devolvido >= cobranca.valor_centavos else cobranca.status
+        )
+        self.cobrancas.salvar(replace(cobranca, estornado_centavos=devolvido, status=situacao))
+
+    def _repasse_falhou(
+        self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
+    ) -> None:
+        """`transfer.reversed` / `payout.failed`: o dinheiro não chegou ao profissional.
+
+        O espelho não muda sozinho (o que já foi liberado continua liberado até o financeiro
+        decidir): o evento fica em revisão, com o motivo do provedor e o repasse achado.
+        """
+        repasses = contexto.repasses
+        repasse = repasses.por_transferencia(evento.objeto_id) if evento.objeto_id else None
+        if repasse is None:
+            repasse = repasses.obter(evento.metadados.get("repasse_id", ""))
+        dados = bruto.payload.get("data")
+        objeto = dados.get("object") if isinstance(dados, dict) else {}
+        objeto = objeto if isinstance(objeto, dict) else {}
+        causa = str(objeto.get("failure_message") or objeto.get("failure_code") or "sem motivo")
+        causa = causa.rstrip(". ")
+        onde = (
+            f"repasse {repasse.id} do pedido {repasse.pedido_id}"
+            if repasse is not None
+            else "sem repasse correspondente"
+        )
+        contexto.eventos_webhook.marcar_revisao(
+            bruto, f"repasse falhou ({bruto.tipo}): {causa}; {onde}"
+        )
 
     def _devolver_pagamento_orfao(self, cobranca: CobrancaLocal) -> None:
         """Pagou depois de o pedido cancelar/expirar: o dinheiro volta, sem passar pelo ledger."""

@@ -15,6 +15,13 @@ TIPOS_STRIPE: dict[str, TipoEvento] = {
     # `transfer.paid` NÃO existe no Stripe (o CLI recusa); os de transferência são
     # `transfer.created`/`.updated`/`.reversed`; a liquidação no banco é `payout.paid`.
     "payout.paid": TipoEvento.LIQUIDACAO,
+    # Contestação de cartão (chargeback): o mesmo manipulador lê o status do objeto `dispute`.
+    "charge.dispute.created": TipoEvento.CONTESTACAO,
+    "charge.dispute.updated": TipoEvento.CONTESTACAO,
+    "charge.dispute.closed": TipoEvento.CONTESTACAO,
+    # Repasse que não chegou ao profissional: transferência desfeita ou banco recusou o payout.
+    "transfer.reversed": TipoEvento.REPASSE_FALHOU,
+    "payout.failed": TipoEvento.REPASSE_FALHOU,
 }
 
 
@@ -36,6 +43,12 @@ def interpretar_evento_stripe(payload: Mapping[str, Any]) -> EventoProvedor | No
     elif tipo is TipoEvento.LIQUIDACAO:
         cobranca_id = metadados.get("cobranca_id")
         valor = _inteiro(objeto.get("amount"))
+    elif tipo is TipoEvento.CONTESTACAO:
+        cobranca_id = objeto.get("payment_intent")
+        valor = _inteiro(objeto.get("amount"))
+    elif tipo is TipoEvento.REPASSE_FALHOU:
+        cobranca_id = metadados.get("cobranca_id")
+        valor = _inteiro(objeto.get("amount_reversed", objeto.get("amount")))
     else:
         cobranca_id = objeto.get("id")
         # Pago é o valor RECEBIDO (pode ser menor que o pedido); sem ele, o valor da cobrança.

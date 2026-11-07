@@ -223,6 +223,8 @@ class EventoWebhookOut(BaseModel):
     pedido_id: str | None = None
     referencia: str | None = None
     valor_centavos: int | None = None
+    # Motivo quando o evento ficou para o financeiro revisar (valor diferente, repasse falhou…).
+    revisao: str | None = None
 
 
 class SaldoContratoOut(BaseModel):
