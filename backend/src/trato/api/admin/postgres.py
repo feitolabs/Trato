@@ -789,6 +789,24 @@ class PedidosAdminPostgres:
             ).fetchall()
         return {str(l["id"]): (l["numero"], l["titulo"]) for l in linhas}  # noqa: E741
 
+    def dados_de_pagamento(self, pedido_ids: Sequence[str]) -> dict[str, tuple[str | None, bool]]:
+        ids = list({i for i in (como_uuid(p) for p in pedido_ids) if i is not None})
+        if not ids:
+            return {}
+        # A referência é a mesma que `PedidosPostgres` lê: a prova da transição para pago_retido.
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select p.id, "
+                "(select h.prova -> 'dados' ->> 'referencia_pagamento' "
+                "   from public.pedido_historico h "
+                "  where h.pedido_id = p.id and h.para_status = 'pago_retido' "
+                "  order by h.id desc limit 1) as referencia, "
+                "exists (select 1 from public.contratos c where c.pedido_id = p.id) as contrato "
+                "from public.pedidos p where p.id = any(%s)",
+                (ids,),
+            ).fetchall()
+        return {str(l["id"]): (l["referencia"], bool(l["contrato"])) for l in linhas}  # noqa: E741
+
 
 _COLUNAS_VERSAO = (
     "id, numero, status, motivo, criada_por, aprovada_por, vigente_desde, revertida_de, criado_em"

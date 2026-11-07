@@ -260,6 +260,12 @@ class RepositorioPedidosAdmin(Protocol):
     def rotulos(self, pedido_ids: Sequence[str]) -> dict[str, tuple[int | None, str]]:
         """(número curto, título) dos pedidos, para as telas que só têm o id."""
 
+    def dados_de_pagamento(self, pedido_ids: Sequence[str]) -> dict[str, tuple[str | None, bool]]:
+        """(referência do pagamento no provedor, tem contrato) de vários pedidos numa ida só.
+
+        Serve à conciliação: a tela de pagamentos não pode fazer uma consulta por pedido.
+        Pedido que não existe fica de fora do dicionário."""
+
 
 # --- Configuração versionada -------------------------------------------------------------------
 
