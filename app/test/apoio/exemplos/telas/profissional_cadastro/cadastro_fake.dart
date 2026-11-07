@@ -6,12 +6,16 @@ class ServicoCadastroProfissionalFake implements ServicoCadastroProfissional {
     this.opcoes = opcoesCadastroPadrao,
     this.falharAoCarregar = false,
     this.falharAoSalvar = false,
+    this.atual,
   });
 
   final OpcoesCadastro opcoes;
   final bool falharAoCarregar;
   final bool falharAoSalvar;
   final List<DadosCadastroProfissional> salvos = [];
+
+  /// O cadastro já salvo (edição). `null` = primeiro cadastro.
+  DadosCadastroProfissional? atual;
 
   @override
   Future<OpcoesCadastro> carregarOpcoes() async {
@@ -20,8 +24,15 @@ class ServicoCadastroProfissionalFake implements ServicoCadastroProfissional {
   }
 
   @override
+  Future<DadosCadastroProfissional?> carregarAtual() async {
+    if (falharAoCarregar) throw Exception('falha de teste');
+    return atual;
+  }
+
+  @override
   Future<void> salvar(DadosCadastroProfissional dados) async {
     if (falharAoSalvar) throw Exception('falha de teste');
     salvos.add(dados);
+    atual = dados;
   }
 }

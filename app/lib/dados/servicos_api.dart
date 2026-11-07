@@ -314,8 +314,72 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
 
   /// Categorias e cidades vêm do banco. Se qualquer chamada falhar, o erro vai para a tela
   /// ("Tentar de novo"): nunca lista de exemplo. Raio, dias e períodos são opções fixas.
+  /// Carga das opções em curso: [carregarAtual] reaproveita em vez de buscar de novo
+  /// (a tela pede as duas coisas ao mesmo tempo).
+  Future<OpcoesCadastro>? _opcoesEmCurso;
+
   @override
-  Future<OpcoesCadastro> carregarOpcoes() async {
+  Future<OpcoesCadastro> carregarOpcoes() => _opcoesEmCurso = _buscarOpcoes();
+
+  /// `GET /v1/profissional/perfil` em linguagem da tela: ids viram nomes e janelas viram
+  /// dias e períodos. Sem cadastro (404), `null`. O raio não é guardado no backend: vem 0.
+  @override
+  Future<DadosCadastroProfissional?> carregarAtual() async {
+    final Object? bruto;
+    try {
+      bruto = (await emParalelo2(
+        _api.get('/v1/profissional/perfil'),
+        _opcoesEmCurso ?? carregarOpcoes(),
+      ))
+          .$1;
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404) return null;
+      rethrow;
+    }
+    final p = _mapa(bruto);
+    final nomePorIdCategoria = {for (final e in _idPorNomeCategoria.entries) e.value: e.key};
+    final nomePorIdCidade = {for (final e in _idPorNomeCidade.entries) e.value: e.key};
+    final diaPorIndice = {for (final e in _diaParaIndice.entries) e.value: e.key};
+    final dias = <String>{};
+    final periodos = <String>{};
+    for (final j in _lista(p['disponibilidade'] ?? const [])) {
+      final dia = diaPorIndice[j['dia_semana']];
+      final periodo = _periodoDaJanela(j['inicio'] as String?, j['fim'] as String?);
+      if (dia != null) dias.add(dia);
+      if (periodo != null) periodos.add(periodo);
+    }
+    final regioes = _lista(p['regioes'] ?? const []);
+    return DadosCadastroProfissional(
+      nome: '',
+      sobre: (p['bio'] as String?) ?? '',
+      categorias: {
+        for (final id in (p['categorias'] as List? ?? const []))
+          if (nomePorIdCategoria[id] case final String nome) nome,
+      },
+      cidade: regioes.isEmpty ? '' : (nomePorIdCidade[regioes.first['cidade_id']] ?? ''),
+      raioKm: 0,
+      dias: dias,
+      periodos: periodos,
+      portfolio: [
+        for (final item in _lista(p['portfolio'] ?? const []))
+          if (item['descricao'] case final String ref when ref.isNotEmpty) ref,
+      ],
+    );
+  }
+
+  /// Manhã/Tarde/Noite da janela salva: a exata de [_periodoParaJanela] ou, se o horário foi
+  /// gravado de outro jeito, pela hora de início.
+  static String? _periodoDaJanela(String? inicio, String? fim) {
+    if (inicio == null) return null;
+    for (final e in _periodoParaJanela.entries) {
+      if (e.value.$1 == inicio && e.value.$2 == fim) return e.key;
+    }
+    final hora = int.tryParse(inicio.split(':').first);
+    if (hora == null) return null;
+    return hora < 12 ? 'Manhã' : (hora < 18 ? 'Tarde' : 'Noite');
+  }
+
+  Future<OpcoesCadastro> _buscarOpcoes() async {
     final (catsBrutas, cidsBrutas) = await emParalelo2(
       _api.get('/v1/catalogo/categorias'),
       _api.get('/v1/catalogo/cidades'),

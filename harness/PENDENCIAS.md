@@ -114,3 +114,6 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 - Tema escuro do design system (valores não vieram nas capturas); Analista de risco; detalhe de cupom com pedidos e total de desconto
   (RF-CUP-04); agendamento de push; revisão de acessos a cada 90 dias; regras combinadas de risco; filtros do painel por cidade e categoria.
 - Cobertura de testes de integração contra o Supabase real para as consultas novas (validei as principais com `SELECT` no banco real).
+
+## App do profissional (07/11/2026)
+- Raio de atendimento ("Até onde você vai"): a tela coleta, mas o app não envia e o backend não guarda (`CadastroIn` não tem o campo). Decidir: gravar o raio (coluna + filtro de pedidos por distância, RN-01) ou tirar a pergunta da tela.

@@ -206,7 +206,81 @@ void main() {
     });
   });
 
+  group('Editar cadastro', () {
+    testWidgets('começa com o que está salvo; salvar sem mexer mantém tudo', (t) async {
+      final fake = ServicoCadastroProfissionalFake(
+        atual: const DadosCadastroProfissional(
+          nome: '',
+          sobre: 'Faço instalação elétrica há 10 anos.',
+          categorias: {'Eletricista', 'Categoria que saiu do ar'},
+          cidade: 'Divinopolis',
+          raioKm: 0,
+          dias: {'Seg', 'Sáb'},
+          periodos: {'Tarde'},
+          portfolio: ['foto-antiga'],
+        ),
+      );
+      var concluiu = false;
+      await _abrir(
+        t,
+        CadastroProfissionalTela(
+          servico: fake,
+          edicao: true,
+          nomeInicial: 'Carlos Almeida',
+          aoConcluir: () => concluiu = true,
+        ),
+      );
+      expect(find.text('Salvar e continuar'), findsNothing);
+      expect(find.text('Faço instalação elétrica há 10 anos.'), findsOneWidget);
+
+      await _tocar(t, find.text('Salvar alterações'));
+
+      final d = fake.salvos.single;
+      expect(d.nome, 'Carlos Almeida');
+      expect(d.sobre, 'Faço instalação elétrica há 10 anos.');
+      expect(d.categorias, {'Eletricista'}); // a que saiu do catálogo não volta marcada
+      expect(d.cidade, 'Divinopolis');
+      expect(d.raioKm, 5); // o backend não guarda o raio: fica a primeira opção
+      expect(d.dias, {'Seg', 'Sáb'});
+      expect(d.periodos, {'Tarde'});
+      expect(d.portfolio, ['foto-antiga']);
+      expect(concluiu, isTrue);
+    });
+
+    testWidgets('primeiro cadastro continua vazio e com "Salvar e continuar"', (t) async {
+      await _abrir(t, CadastroProfissionalTela(servico: ServicoCadastroProfissionalFake()));
+      expect(find.text('Salvar e continuar'), findsOneWidget);
+      expect(find.text('Salvar alterações'), findsNothing);
+    });
+  });
+
   group('Verificação', () {
+    testWidgets('aprovada ou em análise dentro do fluxo: "Continuar" segue em frente', (t) async {
+      for (final status in [StatusVerificacao.aprovada, StatusVerificacao.emAnalise]) {
+        var concluiu = false;
+        await _abrir(
+          t,
+          VerificacaoTela(
+            servico: ServicoVerificacaoFake(situacao: SituacaoVerificacao(status: status)),
+            aoConcluir: () => concluiu = true,
+          ),
+        );
+        expect(find.text('Enviar para análise'), findsNothing);
+        await _tocar(t, find.text('Continuar'));
+        expect(concluiu, isTrue, reason: '$status');
+      }
+      // Fora de um fluxo (sem aoConcluir), não há o que continuar.
+      await _abrir(
+        t,
+        VerificacaoTela(
+          servico: ServicoVerificacaoFake(
+            situacao: const SituacaoVerificacao(status: StatusVerificacao.aprovada),
+          ),
+        ),
+      );
+      expect(find.text('Continuar'), findsNothing);
+    });
+
     testWidgets('mostra finalidade e retenção; só envia com 2 fotos e ciência', (t) async {
       final fake = ServicoVerificacaoFake();
       var concluiu = false;

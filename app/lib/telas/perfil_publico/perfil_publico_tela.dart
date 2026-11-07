@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -23,7 +25,8 @@ class PerfilPublicoTela extends StatefulWidget {
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
-  final VoidCallback? aoEditarCadastro;
+  /// Abre a edição; quando ela termina, o perfil é carregado de novo.
+  final FutureOr<void> Function()? aoEditarCadastro;
   final VoidCallback? aoUsarComoCliente;
 
   /// Sai da conta (limpa a sessão). Sem ele, o botão não aparece.
@@ -37,6 +40,14 @@ class PerfilPublicoTela extends StatefulWidget {
 class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
   static String? _fotoSalvaSessao;
   String? _fotoAtual;
+
+  /// Muda depois de editar o cadastro: a página carrega o perfil de novo.
+  int _versao = 0;
+
+  Future<void> _editarCadastro() async {
+    await widget.aoEditarCadastro?.call();
+    if (mounted) setState(() => _versao++);
+  }
 
   Future<void> _tocarAvatar(String nome) async {
     final capturar = widget.aoCapturarFotoPerfil;
@@ -85,6 +96,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
   @override
   Widget build(BuildContext context) {
     return PaginaCarregavel<PerfilPublico>(
+      key: ValueKey(_versao),
       titulo: 'Seu perfil público',
       carregar: widget.servico.carregarPerfil,
       construir: (context, p) {
@@ -92,7 +104,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
         return CorpoRolavel(
           rodape: widget.aoEditarCadastro == null
               ? null
-              : BotaoSecundario(texto: 'Editar cadastro', aoTocar: widget.aoEditarCadastro),
+              : BotaoSecundario(texto: 'Editar cadastro', aoTocar: _editarCadastro),
           children: [
             Row(
               children: [
