@@ -1477,6 +1477,223 @@ class ApiFake implements ApiAdmin {
     _registrar('equipe.acesso_revogado', 'equipe', motivo);
   }
 
+  // ---------- Financeiro: contestações, alertas, conciliação, fechamento ----------
+
+  final Set<String> _mesesFechados = {};
+
+  @override
+  Future<List<ContestacaoCartao>> listarContestacoes({String? status}) => _ler(
+        () => [
+          ContestacaoCartao(
+            id: 'dp_1',
+            pedido: 'PED-10482 · Pintura da sala',
+            valorCentavos: 107500,
+            motivo: 'Cliente diz que não fez a compra',
+            status: 'aberta',
+            abertaEm: _base.subtract(const Duration(days: 1)),
+            prazoProvas: _base.add(const Duration(days: 6)),
+            horasParaPrazo: 144,
+            cobrancaId: 'pi_1',
+          ),
+          ContestacaoCartao(
+            id: 'dp_2',
+            pedido: 'PED-10390 · Instalação de chuveiro',
+            valorCentavos: 18000,
+            motivo: 'Cliente diz que o serviço ficou ruim',
+            status: 'perdida',
+            abertaEm: _base.subtract(const Duration(days: 30)),
+            encerradaEm: _base.subtract(const Duration(days: 2)),
+            repasseLiberado: true,
+          ),
+        ].where((c) => status == null || (status == 'em_aberto' ? c.emAberto : c.status == status)).toList(),
+        const <ContestacaoCartao>[],
+      );
+
+  @override
+  Future<AlertasFinanceiros> alertasFinanceiros() => _ler(
+        () => AlertasFinanceiros(
+          minutosPagamentoParado: 30,
+          provedorLigado: true,
+          pagamentosParados: [
+            PagamentoParado(
+              cobrancaId: 'pi_parado',
+              pedido: 'PED-10501',
+              valorCentavos: 32250,
+              meio: 'pix',
+              criadaEm: _base.subtract(const Duration(minutes: 52)),
+              minutosParado: 52,
+              clienteAvisou: true,
+            ),
+          ],
+          repassesComFalha: [
+            EventoEmRevisao(
+              eventoId: 'evt_falha',
+              tipo: 'payout.failed',
+              recebidoEm: _base,
+              motivo: 'repasse falhou (payout.failed): Conta encerrada no banco.; repasse r-1 do pedido p-1',
+            ),
+          ],
+          estornosPendentes: const [],
+          eventosEmRevisao: const [],
+          contestacoesEmAberto: 1,
+        ),
+        const AlertasFinanceiros(
+          minutosPagamentoParado: 30,
+          provedorLigado: true,
+          pagamentosParados: [],
+          repassesComFalha: [],
+          estornosPendentes: [],
+          eventosEmRevisao: [],
+          contestacoesEmAberto: 0,
+        ),
+      );
+
+  @override
+  Future<ConsultaCobranca> consultarCobranca(String cobrancaId) async {
+    await Future<void>.delayed(atraso);
+    _registrar('pagamento.consultado_no_provedor', 'pagamentos:$cobrancaId', null);
+    return const ConsultaCobranca(
+      statusNoProvedor: 'paga',
+      statusNoTrato: 'aguardando',
+      orientacao: 'O provedor já confirmou o pagamento, mas o aviso não chegou ao Trato. Reenvie o evento '
+          'payment_intent.succeeded pelo painel do provedor: o Trato só marca pago pelo aviso assinado.',
+    );
+  }
+
+  @override
+  Future<ConciliacaoDia> conciliacaoDoDia(DateTime dia) => _ler(
+        () {
+          const linhas = [
+            LinhaConciliacao(
+              tipo: 'cobranca',
+              referencia: 'pi_1',
+              pedido: 'PED-10482',
+              valorProvedorCentavos: 107500,
+              valorTratoCentavos: 107500,
+              situacao: 'confere',
+            ),
+            LinhaConciliacao(
+              tipo: 'cobranca',
+              referencia: 'pi_9',
+              pedido: null,
+              valorProvedorCentavos: 5000,
+              valorTratoCentavos: 0,
+              situacao: 'so_no_provedor',
+            ),
+          ];
+          return ConciliacaoDia(
+            dia: dia,
+            confere: false,
+            cobradoProvedorCentavos: 112500,
+            cobradoTratoCentavos: 107500,
+            taxasProvedorCentavos: 4300,
+            divergencias: [linhas[1]],
+            linhas: linhas,
+          );
+        },
+        ConciliacaoDia(
+          dia: dia,
+          confere: true,
+          cobradoProvedorCentavos: 0,
+          cobradoTratoCentavos: 0,
+          taxasProvedorCentavos: 0,
+          divergencias: const [],
+          linhas: const [],
+        ),
+      );
+
+  @override
+  Future<List<EventoProvedor>> listarEventosProvedor({int limite = 50}) => _ler(
+        () => [
+          EventoProvedor(
+            eventoId: 'evt_falha',
+            tipo: 'payout.failed',
+            recebidoEm: _base,
+            revisao: 'repasse falhou (payout.failed): Conta encerrada no banco.',
+          ),
+          EventoProvedor(
+            eventoId: 'evt_1',
+            tipo: 'payment_intent.succeeded',
+            recebidoEm: _base.subtract(const Duration(hours: 2)),
+            pedidoId: 'p-1',
+            referencia: 'pi_1',
+            valorCentavos: 107500,
+          ),
+        ],
+        const <EventoProvedor>[],
+      );
+
+  @override
+  Future<List<MesFinanceiro>> listarMeses({int ultimos = 12}) => _ler(
+        () => [
+          const MesFinanceiro(mes: '2026-10', fechado: false, podeFechar: false),
+          MesFinanceiro(mes: '2026-09', fechado: _mesesFechados.contains('2026-09'), podeFechar: !_mesesFechados.contains('2026-09')),
+        ],
+        const <MesFinanceiro>[],
+      );
+
+  static const _totaisSetembro = {
+    'cobrancas': 38,
+    'cobrado_centavos': 1284500,
+    'devolvido_centavos': 12000,
+    'entrada_liquida_centavos': 1272500,
+    'receita_taxas_centavos': 89300,
+    'liberado_profissionais_centavos': 1080000,
+    'pago_profissionais_centavos': 0,
+    'retido_fim_centavos': 103200,
+    'a_liberar_fim_centavos': 0,
+    'liberado_fim_centavos': 1080000,
+    'contestacoes_perdidas': 1,
+    'contestacoes_perdidas_centavos': 18000,
+    'lancamentos': 131,
+  };
+
+  @override
+  Future<FechamentoMes> verFechamento(String mes) => _ler(
+        () {
+          final fechado = _mesesFechados.contains(mes);
+          return FechamentoMes(
+            mes: mes,
+            fechado: fechado,
+            podeFechar: !fechado && mes != '2026-10',
+            totais: _totaisSetembro,
+            gravado: fechado ? _totaisSetembro : null,
+            confere: fechado ? true : null,
+            hash: fechado ? 'a' * 64 : null,
+            fechadoPorNome: fechado ? 'Financeiro de teste' : null,
+            fechadoEm: fechado ? _base : null,
+          );
+        },
+        FechamentoMes(mes: mes, fechado: false, podeFechar: false, totais: const {}),
+      );
+
+  @override
+  Future<FechamentoMes> fecharMes(String mes, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _mesesFechados.add(mes);
+    _registrar('financeiro.mes_fechado', 'fechamentos_mensais:$mes', motivo);
+    return verFechamento(mes);
+  }
+
+  @override
+  Future<ArquivoPronto> exportarFechamento(String mes) async {
+    await Future<void>.delayed(atraso);
+    _registrar('relatorio.exportado', 'relatorios', null);
+    return ArquivoPronto(url: 'https://exemplo.test/baixar/fechamento-$mes', nomeArquivo: 'trato_fechamento_$mes.csv');
+  }
+
+  @override
+  Future<ArquivoPronto> extratoProfissional(
+    String usuarioId, {
+    required DateTime inicio,
+    required DateTime fim,
+    required String motivo,
+  }) async {
+    await Future<void>.delayed(atraso);
+    _registrar('relatorio.exportado', 'usuarios:$usuarioId', motivo);
+    return const ArquivoPronto(url: 'https://exemplo.test/baixar/extrato', nomeArquivo: 'trato_extrato.pdf');
+  }
+
   @override
   Future<RelatorioPronto> solicitarRelatorio(
     String tipo, {

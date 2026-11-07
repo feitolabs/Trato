@@ -424,7 +424,8 @@ def criar(amb, quem="financeiro", **corpo):
 def test_config_ciclo_completo_e_regras_do_banco(amb):
     fin = amb.h("financeiro")
     assert amb.cliente.get(BASE + "/config/vigente", headers=fin).status_code == 404
-    assert len(amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()) == 7
+    # 5 do teste + 2 do painel v2 + o prazo do alerta de pagamento parado (financeiro, 08/11).
+    assert len(amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()) == 8
 
     # Valores fora dos limites do catálogo e faixas sobrepostas são recusados, sem deixar lixo.
     assert (
