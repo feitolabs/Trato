@@ -556,7 +556,8 @@ class ServicoPagamento:
         dados = bruto.payload.get("data")
         objeto = dados.get("object") if isinstance(dados, dict) else {}
         objeto = objeto if isinstance(objeto, dict) else {}
-        causa = objeto.get("failure_message") or objeto.get("failure_code") or "sem motivo"
+        causa = str(objeto.get("failure_message") or objeto.get("failure_code") or "sem motivo")
+        causa = causa.rstrip(". ")
         onde = (
             f"repasse {repasse.id} do pedido {repasse.pedido_id}"
             if repasse is not None

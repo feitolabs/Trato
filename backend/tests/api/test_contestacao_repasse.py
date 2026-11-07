@@ -116,7 +116,7 @@ def test_payout_que_falhou_fica_em_revisao_com_o_motivo_do_provedor(fluxo: Fluxo
     assert r.status_code == 200
     (alerta,) = fluxo.ctx.eventos_webhook.em_revisao()
     assert alerta[0].tipo == "payout.failed"
-    assert "Conta encerrada no banco." in alerta[1] and repasse.id in alerta[1]
+    assert "Conta encerrada no banco; repasse" in alerta[1] and repasse.id in alerta[1]
 
 
 # --- Painel: contestações, alertas e consulta ao provedor --------------------------------------

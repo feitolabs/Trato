@@ -28,24 +28,28 @@ Widget _secao(String titulo, List<Widget> itens, {String? vazio}) {
         if (itens.isEmpty && vazio != null)
           Text(vazio, style: TipografiaTrato.legenda)
         else
-          for (final w in itens) Padding(padding: const EdgeInsets.only(bottom: EspacosTrato.intervaloCartoes), child: w),
+          for (final w in itens)
+            Padding(
+              padding: const EdgeInsets.only(bottom: EspacosTrato.intervaloCartoes),
+              child: w,
+            ),
       ],
     ),
   );
 }
 
 String tipoEventoLegivel(String tipo) => switch (tipo) {
-      'payment_intent.succeeded' => 'Pagamento confirmado',
-      'payment_intent.payment_failed' => 'Pagamento recusado',
-      'charge.refunded' => 'Reembolso',
-      'payout.paid' => 'Repasse pago',
-      'payout.failed' => 'Repasse recusado pelo banco',
-      'transfer.reversed' => 'Transferência desfeita',
-      'charge.dispute.created' => 'Contestação aberta',
-      'charge.dispute.updated' => 'Contestação atualizada',
-      'charge.dispute.closed' => 'Contestação encerrada',
-      _ => tipo,
-    };
+  'payment_intent.succeeded' => 'Pagamento confirmado',
+  'payment_intent.payment_failed' => 'Pagamento recusado',
+  'charge.refunded' => 'Reembolso',
+  'payout.paid' => 'Repasse pago',
+  'payout.failed' => 'Repasse recusado pelo banco',
+  'transfer.reversed' => 'Transferência desfeita',
+  'charge.dispute.created' => 'Contestação aberta',
+  'charge.dispute.updated' => 'Contestação atualizada',
+  'charge.dispute.closed' => 'Contestação encerrada',
+  _ => tipo,
+};
 
 // ---------------------------------------------------------------------------------------------
 // Alertas
@@ -74,7 +78,8 @@ class _AbaAlertasFinanceirosState extends State<AbaAlertasFinanceiros> {
       carregar: context.api.alertasFinanceiros,
       estaVazio: (a) => a.total == 0 && a.contestacoesEmAberto == 0 && a.provedorLigado,
       mensagemVazia: 'Nada travado no dinheiro.',
-      detalheVazio: 'Pagamento sem confirmação, repasse que falhou, estorno não enviado e aviso '
+      detalheVazio:
+          'Pagamento sem confirmação, repasse que falhou, estorno não enviado e aviso '
           'para revisar aparecem aqui.',
       construir: (context, a, recarregar) => RefreshIndicator(
         onRefresh: recarregar,
@@ -101,50 +106,37 @@ class _AbaAlertasFinanceirosState extends State<AbaAlertasFinanceiros> {
                   icone: Icons.gavel_outlined,
                 ),
               ),
-            _secao(
-              'Pagamentos sem confirmação',
-              [
-                for (final p in a.pagamentosParados)
-                  CartaoLista(
-                    titulo: '${p.pedido} · ${formatarReais(p.valorCentavos)}',
-                    linhas: [
-                      '${p.meio == 'pix' ? 'Pix' : 'Cartão'} · sem confirmação há ${formatarMilhar(p.minutosParado)} min',
-                      'Cobrança ${p.cobrancaId}',
-                    ],
-                    chips: [
-                      p.clienteAvisou
-                          ? const ChipEstado('Cliente avisou que pagou', tom: Tom.alerta)
-                          : const ChipEstado('Sem aviso do cliente'),
-                      // Na linha dos chips (e não à direita) para caber no celular.
-                      if (podeConsultar)
-                        BotaoTrato.link('Consultar no provedor', aoPressionar: () => _consultar(p)),
-                    ],
-                  ),
-              ],
-              vazio: 'Nenhum pagamento parado há mais de ${a.minutosPagamentoParado} min.',
-            ),
-            _secao(
-              'Repasses que falharam',
-              [for (final e in a.repassesComFalha) _CartaoRevisao(e, tom: Tom.erro)],
-              vazio: 'Nenhum repasse com falha.',
-            ),
-            _secao(
-              'Estornos não enviados ao provedor',
-              [
-                for (final o in a.estornosPendentes)
-                  CartaoLista(
-                    titulo: '${o.pedido} · ${formatarReais(o.valorCentavos)}',
-                    linhas: ['Pedido de estorno de ${formatarData(o.criadaEm)}', 'Cobrança ${o.cobrancaId}'],
-                    chips: const [ChipEstado('O sistema tenta de novo sozinho', tom: Tom.info)],
-                  ),
-              ],
-              vazio: 'Nenhum estorno esperando o provedor.',
-            ),
-            _secao(
-              'Avisos do provedor para revisar',
-              [for (final e in a.eventosEmRevisao) _CartaoRevisao(e, tom: Tom.alerta)],
-              vazio: 'Nenhum aviso para revisar.',
-            ),
+            _secao('Pagamentos sem confirmação', [
+              for (final p in a.pagamentosParados)
+                CartaoLista(
+                  titulo: '${p.pedido} · ${formatarReais(p.valorCentavos)}',
+                  linhas: [
+                    '${p.meio == 'pix' ? 'Pix' : 'Cartão'} · sem confirmação há ${formatarMilhar(p.minutosParado)} min',
+                    'Cobrança ${p.cobrancaId}',
+                  ],
+                  chips: [
+                    p.clienteAvisou
+                        ? const ChipEstado('Cliente avisou que pagou', tom: Tom.alerta)
+                        : const ChipEstado('Sem aviso do cliente'),
+                    // Na linha dos chips (e não à direita) para caber no celular.
+                    if (podeConsultar) BotaoTrato.link('Consultar no provedor', aoPressionar: () => _consultar(p)),
+                  ],
+                ),
+            ], vazio: 'Nenhum pagamento parado há mais de ${a.minutosPagamentoParado} min.'),
+            _secao('Repasses que falharam', [
+              for (final e in a.repassesComFalha) _CartaoRevisao(e, tom: Tom.erro),
+            ], vazio: 'Nenhum repasse com falha.'),
+            _secao('Estornos não enviados ao provedor', [
+              for (final o in a.estornosPendentes)
+                CartaoLista(
+                  titulo: '${o.pedido} · ${formatarReais(o.valorCentavos)}',
+                  linhas: ['Pedido de estorno de ${formatarData(o.criadaEm)}', 'Cobrança ${o.cobrancaId}'],
+                  chips: const [ChipEstado('O sistema tenta de novo sozinho', tom: Tom.info)],
+                ),
+            ], vazio: 'Nenhum estorno esperando o provedor.'),
+            _secao('Avisos do provedor para revisar', [
+              for (final e in a.eventosEmRevisao) _CartaoRevisao(e, tom: Tom.alerta),
+            ], vazio: 'Nenhum aviso para revisar.'),
           ],
         ),
       ),
@@ -171,12 +163,12 @@ class _CartaoRevisao extends StatelessWidget {
 // Contestações
 
 (String, Tom) chipContestacao(String status) => switch (status) {
-      'aberta' => ('Mandar provas', Tom.erro),
-      'em_analise' => ('Em análise no banco', Tom.alerta),
-      'ganha' => ('Ganha', Tom.ok),
-      'perdida' => ('Perdida', Tom.erro),
-      _ => ('Encerrada', Tom.neutro),
-    };
+  'aberta' => ('Mandar provas', Tom.erro),
+  'em_analise' => ('Em análise no banco', Tom.alerta),
+  'ganha' => ('Ganha', Tom.ok),
+  'perdida' => ('Perdida', Tom.erro),
+  _ => ('Encerrada', Tom.neutro),
+};
 
 class AbaContestacoes extends StatefulWidget {
   const AbaContestacoes({super.key});
@@ -251,18 +243,24 @@ class _CartaoContestacao extends StatelessWidget {
         c.motivo,
         if (c.emAberto && prazo != null)
           'Prazo para provas: ${formatarData(prazo)}'
-              '${horas == null ? '' : horas < 0 ? ' (vencido)' : ' (faltam ${formatarMilhar(horas)} h)'}',
+              '${horas == null
+                  ? ''
+                  : horas < 0
+                  ? ' (vencido)'
+                  : ' (faltam ${formatarMilhar(horas)} h)'}',
         if (!c.emAberto && c.encerradaEm != null) 'Encerrada em ${formatarData(c.encerradaEm!)}',
         'Aberta em ${formatarData(c.abertaEm)} · ${c.id}',
       ],
       chips: [
         ChipEstado(texto, tom: tom),
-        if (c.emAberto && horas != null && horas <= 48 && horas >= 0)
-          const ChipEstado('Prazo perto', tom: Tom.erro),
+        if (c.emAberto && horas != null && horas <= 48 && horas >= 0) const ChipEstado('Prazo perto', tom: Tom.erro),
         if (c.repasseLiberado) const ChipEstado('Repasse já liberado', tom: Tom.alerta),
       ],
       acoes: [
-        Text(formatarReais(c.valorCentavos), style: TipografiaTrato.numeroTabular.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          formatarReais(c.valorCentavos),
+          style: TipografiaTrato.numeroTabular.copyWith(fontWeight: FontWeight.w700),
+        ),
       ],
     );
   }
@@ -272,18 +270,18 @@ class _CartaoContestacao extends StatelessWidget {
 // Conciliação do dia
 
 (String, Tom) chipSituacao(String situacao) => switch (situacao) {
-      'confere' => ('Confere', Tom.ok),
-      'so_no_provedor' => ('Só no provedor', Tom.erro),
-      'so_no_trato' => ('Só no Trato', Tom.erro),
-      _ => ('Valor diferente', Tom.alerta),
-    };
+  'confere' => ('Confere', Tom.ok),
+  'so_no_provedor' => ('Só no provedor', Tom.erro),
+  'so_no_trato' => ('Só no Trato', Tom.erro),
+  _ => ('Valor diferente', Tom.alerta),
+};
 
 String _tipoConciliacao(String tipo) => switch (tipo) {
-      'cobranca' => 'Cobrança',
-      'estorno' => 'Estorno',
-      'contestacao' => 'Contestação',
-      _ => tipo,
-    };
+  'cobranca' => 'Cobrança',
+  'estorno' => 'Estorno',
+  'contestacao' => 'Contestação',
+  _ => tipo,
+};
 
 class AbaConciliacaoDia extends StatefulWidget {
   const AbaConciliacaoDia({super.key, this.hoje});
@@ -336,7 +334,11 @@ class _AbaConciliacaoDiaState extends State<AbaConciliacaoDia> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 r.confere
-                    ? const BannerInfo('O extrato do provedor bate com o que o Trato registrou.', titulo: 'Confere.', tom: Tom.ok)
+                    ? const BannerInfo(
+                        'O extrato do provedor bate com o que o Trato registrou.',
+                        titulo: 'Confere.',
+                        tom: Tom.ok,
+                      )
                     : BannerInfo(
                         '${r.divergencias.length} ${r.divergencias.length == 1 ? 'diferença' : 'diferenças'} entre o '
                         'provedor e o Trato. Contestação em aberto aparece aqui até ser encerrada.',
@@ -344,32 +346,40 @@ class _AbaConciliacaoDiaState extends State<AbaConciliacaoDia> {
                         tom: Tom.erro,
                       ),
                 const SizedBox(height: EspacosTrato.x4),
-                LayoutBuilder(builder: (context, c) {
-                  final colunas = c.maxWidth >= 720 ? 3 : 1;
-                  final largura = (c.maxWidth - (colunas - 1) * EspacosTrato.intervaloCartoes) / colunas;
-                  return Wrap(
-                    spacing: EspacosTrato.intervaloCartoes,
-                    runSpacing: EspacosTrato.intervaloCartoes,
-                    children: [
-                      SizedBox(
-                        width: largura,
-                        child: CartaoMetrica(titulo: 'O provedor recebeu', valor: formatarReais(r.cobradoProvedorCentavos)),
-                      ),
-                      SizedBox(
-                        width: largura,
-                        child: CartaoMetrica(titulo: 'O Trato registrou', valor: formatarReais(r.cobradoTratoCentavos)),
-                      ),
-                      SizedBox(
-                        width: largura,
-                        child: CartaoMetrica(
-                          titulo: 'Custo do provedor',
-                          valor: formatarReais(r.taxasProvedorCentavos),
-                          subtitulo: 'Taxas cobradas no dia',
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final colunas = c.maxWidth >= 720 ? 3 : 1;
+                    final largura = (c.maxWidth - (colunas - 1) * EspacosTrato.intervaloCartoes) / colunas;
+                    return Wrap(
+                      spacing: EspacosTrato.intervaloCartoes,
+                      runSpacing: EspacosTrato.intervaloCartoes,
+                      children: [
+                        SizedBox(
+                          width: largura,
+                          child: CartaoMetrica(
+                            titulo: 'O provedor recebeu',
+                            valor: formatarReais(r.cobradoProvedorCentavos),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                }),
+                        SizedBox(
+                          width: largura,
+                          child: CartaoMetrica(
+                            titulo: 'O Trato registrou',
+                            valor: formatarReais(r.cobradoTratoCentavos),
+                          ),
+                        ),
+                        SizedBox(
+                          width: largura,
+                          child: CartaoMetrica(
+                            titulo: 'Custo do provedor',
+                            valor: formatarReais(r.taxasProvedorCentavos),
+                            subtitulo: 'Taxas cobradas no dia',
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: EspacosTrato.x5),
                 Row(
                   children: [
@@ -431,7 +441,8 @@ class AbaEventosProvedor extends StatelessWidget {
                     'Recebido em ${formatarData(e.recebidoEm)}',
                     [
                       if (e.referencia != null) e.referencia!,
-                      if (e.pedidoId != null) 'pedido ${e.pedidoId!.length > 8 ? e.pedidoId!.substring(0, 8) : e.pedidoId}',
+                      if (e.pedidoId != null)
+                        'pedido ${e.pedidoId!.length > 8 ? e.pedidoId!.substring(0, 8) : e.pedidoId}',
                       e.eventoId,
                     ].join(' · '),
                     if (e.revisao != null) e.revisao!,
@@ -472,8 +483,18 @@ const rotulosFechamento = [
 
 String nomeDoMes(String mes) {
   const nomes = [
-    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+    'janeiro',
+    'fevereiro',
+    'março',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro',
   ];
   final partes = mes.split('-');
   final n = int.tryParse(partes.length == 2 ? partes[1] : '') ?? 0;
@@ -497,14 +518,20 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
     final motivo = await pedirMotivo(
       context,
       titulo: 'Fechar ${nomeDoMes(f.mes)}?',
-      descricao: 'Os totais ficam gravados e nada mais entra neste mês: correções viram estorno no mês '
+      descricao:
+          'Os totais ficam gravados e nada mais entra neste mês: correções viram estorno no mês '
           'corrente. Não dá para desfazer.',
       rotuloConfirmar: 'Fechar o mês',
       destrutivo: true,
     );
     if (motivo == null || !mounted) return;
     final ok = await executar(context, () => api.fecharMes(f.mes, motivo: motivo), sucesso: 'Mês fechado.');
-    if (ok) setState(() => _versao++);
+    // Fica no mês que acabou de fechar (sem isso, a escolha automática pularia para outro).
+    if (ok)
+      setState(() {
+        _mes = f.mes;
+        _versao++;
+      });
   }
 
   Future<void> _exportar(String mes) async {
@@ -530,21 +557,24 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
         return ListView(
           padding: _margens(context),
           children: [
-            SizedBox(
-              width: 320,
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('mes-$mes'),
-                initialValue: mes,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Mês'),
-                items: [
-                  for (final m in meses)
-                    DropdownMenuItem(
-                      value: m.mes,
-                      child: Text('${nomeDoMes(m.mes)}${m.fechado ? ' · fechado' : ''}'),
-                    ),
-                ],
-                onChanged: (v) => setState(() => _mes = v),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('mes-$mes'),
+                  initialValue: mes,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Mês'),
+                  items: [
+                    for (final m in meses)
+                      DropdownMenuItem(
+                        value: m.mes,
+                        child: Text('${nomeDoMes(m.mes)}${m.fechado ? ' · fechado' : ''}'),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _mes = v),
+                ),
               ),
             ),
             const SizedBox(height: EspacosTrato.x4),
@@ -583,7 +613,7 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
                     child: Column(
                       children: [
                         for (final (chave, rotulo, dinheiro) in rotulosFechamento)
-                          Linha(
+                          _LinhaTotal(
                             rotulo,
                             dinheiro ? formatarReais(f.valores[chave] ?? 0) : formatarMilhar(f.valores[chave] ?? 0),
                           ),
@@ -620,6 +650,30 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Uma linha dos totais: o nome à esquerda e o valor alinhado à direita, para comparar de olho.
+class _LinhaTotal extends StatelessWidget {
+  const _LinhaTotal(this.rotulo, this.valor);
+  final String rotulo;
+  final String valor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x2),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: CoresTrato.bordaSuave)),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(rotulo, style: TipografiaTrato.corpo)),
+          const SizedBox(width: EspacosTrato.x3),
+          Text(valor, style: TipografiaTrato.numeroTabular),
+        ],
+      ),
     );
   }
 }
