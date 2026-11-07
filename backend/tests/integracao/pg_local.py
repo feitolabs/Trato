@@ -58,9 +58,12 @@ class BancoLocal:
         self.uri: str = self.servidor.get_uri()
         with self.admin() as con:
             con.execute(ref["STUBS"])
-            # O auth.users do Supabase tem e-mail; o stub só tem id e a busca do painel lê o e-mail.
+            # O auth.users do Supabase tem e-mail e último acesso; o stub só tem id. Como no
+            # Supabase, o service_role NÃO lê auth.users: o backend passa por privado.contas_auth.
             con.execute("alter table auth.users add column if not exists email text")
-            con.execute("grant select on auth.users to service_role")
+            con.execute(
+                "alter table auth.users add column if not exists last_sign_in_at timestamptz"
+            )
             con.execute(ref["PADROES"]["real"])
             for arquivo in sorted((RAIZ / "supabase" / "migrations").glob("*.sql")):
                 if not any(chave in arquivo.name for chave in MIGRATIONS):
@@ -77,16 +80,22 @@ class BancoLocal:
             self._grants_do_service_role_da_f32(con)
             # Migrations de grants posteriores à F3.8b: precisam rodar depois do trecho acima,
             # que faz `revoke all` nessas tabelas (em produção a ordem cronológica já garante isso).
-            for arquivo in sorted(
-                (RAIZ / "supabase" / "migrations").glob("*admin_catalogo_delete.sql")
+            # Mesmo grant da F3.8a (que não roda aqui) para o schema das funções internas.
+            con.execute("grant usage on schema privado to service_role")
+            for padrao in (
+                "*admin_catalogo_delete.sql",
+                "*grants_alcada_uploads.sql",
+                "*contas_auth_para_backend.sql",
             ):
-                con.execute(arquivo.read_text(encoding="utf-8"))
+                for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
+                    con.execute(arquivo.read_text(encoding="utf-8"))
             # Tabelas do painel (admin_sugestoes_*, painel_admin_*): no Supabase o service_role as
             # recebe por privilégio padrão; no banco local precisamos conceder.
+            # papeis_alcada NÃO entra aqui: em produção ela ficou sem grant e o login do painel
+            # quebrou; o grant dela vem da migration grants_alcada_uploads, como no Supabase.
             con.execute(
                 "grant select, insert, update, delete on public.cupons, "
-                "public.campanhas_notificacao, public.alertas_risco, public.papeis_alcada "
-                "to service_role"
+                "public.campanhas_notificacao, public.alertas_risco to service_role"
             )
 
     def _grants_do_service_role_da_f32(self, con: psycopg.Connection[Any]) -> None:

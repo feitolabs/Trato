@@ -66,9 +66,11 @@ class ContaPostgres:
         )
 
     def _email(self, uid: str) -> str | None:
-        try:  # o papel do backend pode não ler auth.users: sem e-mail, a tela esconde a linha
+        try:  # sem a função no banco (migration não aplicada), a tela esconde a linha do e-mail
             with self._banco.transacao() as con:
-                linha = con.execute("select email from auth.users where id = %s", (uid,)).fetchone()
+                linha = con.execute(
+                    "select email from privado.contas_auth(array[%s::uuid])", (uid,)
+                ).fetchone()
             return linha["email"] if linha and linha["email"] else None
         except ErroPersistencia:
             return None
