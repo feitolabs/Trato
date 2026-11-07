@@ -677,3 +677,8 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Cartão revelado ganha "Ver de novo": o link assinado expira em segundos, então pede outro motivo e gera outro registro na auditoria.
 - Teste: `verificacao_test.dart` confere que o modal abre e fecha (o fake agora devolve uma URL de teste). `flutter test` do painel: 152 OK.
 - Depois (pedido do João): documento revelado fica liberado por 10 minutos (`kDocumentoLiberadoPor`) enquanto o cadastro está aberto. Guarda a imagem já carregada (`keepAlive` do cache de imagens), não o link, que expira em segundos. "Ver de novo" nesse prazo reabre sem motivo e sem chamar o backend; o cartão mostra "Liberado até HH:mm". Passou o prazo, trocou de cadastro ou saiu da tela: a imagem sai da memória e volta a pedir motivo. A auditoria registra a revelação, não cada reabertura. Teste novo em `verificacao_test.dart`; painel 153 OK.
+## 2026-11-07 — Painel: esqueleto de carregamento com brilho
+- Problema: os esqueletos (`EsqueletoPagina`, `EsqueletoLista`, `EsqueletoCartoes`) eram blocos parados; alguns detalhes ainda usavam barra de progresso.
+- Agora: `BrilhoEsqueleto` (em `componentes/feedback.dart`) dá um relógio de 1,4 s aos `BlocoEsqueleto` de baixo; a faixa clara passa só nos blocos (fundo e borda dos cartões não mudam), todos no mesmo passo. Esqueletos aninhados usam o relógio de cima. Com "reduzir movimento" do sistema, fica parado.
+- Barras trocadas por blocos: categorias e diagnóstico na Busca, estimativa de destinatários em Notificações, imagem do documento na Verificação.
+- Painel: 153 testes OK. Não conferi a animação no navegador.
