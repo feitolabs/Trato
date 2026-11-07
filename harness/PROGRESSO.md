@@ -669,3 +669,4 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Edição (`edicao: true`): botão "Salvar alterações"; salvou, volta ao perfil com "Cadastro atualizado." e o perfil recarrega. Não passa pela Verificação.
 - Verificação aprovada ou em análise dentro de um fluxo: botão "Continuar" (antes, nada).
 - Limite conhecido: o raio ("Até onde você vai") nunca foi enviado ao backend; na edição volta para a primeira opção. Fica em PENDENCIAS.
+- Publicado (OK do João): merge em `main` (136cad4) e push. APK de release novo em `builds/trato-release.apk` (73,7 MB, modo `api`, assinado com a chave da Feito Labs, mesma do APK anterior: instala por cima). O anterior ficou em `builds/trato-release-2026-11-05.apk`.
