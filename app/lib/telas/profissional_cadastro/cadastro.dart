@@ -51,6 +51,10 @@ class DadosCadastroProfissional {
 abstract interface class ServicoCadastroProfissional {
   Future<OpcoesCadastro> carregarOpcoes();
 
+  /// O cadastro já salvo, para a edição começar preenchida. `null` quando ainda não existe.
+  /// [DadosCadastroProfissional.raioKm] vem 0 quando o backend não guarda o raio.
+  Future<DadosCadastroProfissional?> carregarAtual();
+
   /// Lança exceção se não conseguir salvar; a tela mostra mensagem simples e deixa tentar de novo.
   Future<void> salvar(DadosCadastroProfissional dados);
 }

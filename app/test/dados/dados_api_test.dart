@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/config.dart';
 import 'package:trato/dados/erros.dart';
+import 'package:trato/dados/paralelo.dart';
 import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/repositorios_catalogo.dart';
 import 'package:trato/dados/repositorios_catalogo_api.dart';
@@ -281,6 +282,52 @@ void main() {
 
       await expectLater(servico.salvar(dadosCadastro('Recife')), throwsA(isA<ErroTrato>()));
       expect(chamadas.where((c) => c.caminho == '/v1/profissional/cadastro'), isEmpty);
+    });
+
+    test('cadastro salvo volta em linguagem da tela, sem buscar o catálogo duas vezes', () async {
+      final (api, chamadas) = _cliente(
+        (r) => r.url.path == '/v1/profissional/perfil'
+            ? _json({
+                'bio': 'Elétrica residencial',
+                'categorias': ['cat-1', 'cat-desativada'],
+                'regioes': [
+                  {'cidade_id': 'cid-div', 'bairro': null},
+                ],
+                'disponibilidade': [
+                  {'dia_semana': 0, 'inicio': '08:00', 'fim': '12:00'},
+                  {'dia_semana': 5, 'inicio': '19:00', 'fim': '21:00'}, // gravado de outro jeito
+                ],
+                'portfolio': [
+                  {'titulo': 'Trabalho 1', 'descricao': 'foto-ref-1'},
+                  {'titulo': 'Sem foto', 'descricao': null},
+                ],
+              })
+            : catalogo(r),
+      );
+      final servico = ServicoCadastroProfissionalApi(api);
+
+      final (opcoes, atual) = await emParalelo2(servico.carregarOpcoes(), servico.carregarAtual());
+
+      expect(opcoes.categorias, ['Eletricista']);
+      expect(atual!.categorias, {'Eletricista'});
+      expect(atual.cidade, 'Divinopolis');
+      expect(atual.dias, {'Seg', 'Sáb'});
+      expect(atual.periodos, {'Manhã', 'Noite'});
+      expect(atual.sobre, 'Elétrica residencial');
+      expect(atual.portfolio, ['foto-ref-1']);
+      expect(atual.raioKm, 0);
+      expect(chamadas.where((c) => c.caminho == '/v1/catalogo/categorias'), hasLength(1));
+    });
+
+    test('sem cadastro ainda (404): nada a preencher', () async {
+      final (api, _) = _cliente(
+        (r) => r.url.path == '/v1/profissional/perfil'
+            ? _json({'detail': 'Você ainda não tem cadastro de profissional.'}, 404)
+            : catalogo(r),
+      );
+      final servico = ServicoCadastroProfissionalApi(api);
+      final (_, atual) = await emParalelo2(servico.carregarOpcoes(), servico.carregarAtual());
+      expect(atual, isNull);
     });
   });
 

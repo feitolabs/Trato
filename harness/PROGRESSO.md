@@ -662,3 +662,10 @@ Admin (v2)" e "Design system do painel admin"). Banco liberado para alterar.
 - Usuários e Equipe: o backend lia `auth.users` direto (e-mail, último acesso, adicionar membro por e-mail) e o `service_role` não tem SELECT lá. Em vez de abrir a tabela do Auth, migration `20261107130000_contas_auth_para_backend.sql` com `privado.contas_auth(uuid[])` e `privado.conta_auth_por_email(text)` (security definer, EXECUTE só para o `service_role`, mesmo padrão de `confirmar_email_do_usuario`). Trocados os 4 usos: `admin/postgres.py` (complementos da busca), `rotas_equipe.py` (listar e adicionar), `persistencia/conta.py` (e-mail do perfil, que sumia em silêncio).
 - Por que os testes não pegaram: o banco local (`tests/integracao/pg_local.py`) dava `grant select on auth.users` e grant manual em `papeis_alcada`, coisas que o Supabase não tem. Removidos; o stub agora aplica as duas migrations novas, como em produção. Teste novo em `test_admin_postgres.py`.
 - Foto da verificação ("requested path is invalid"): `AssinadorSupabaseStorage.assinar` montava o link sem `/storage/v1`. Corrigido igual ao `url_leitura`; teste em `tests/test_armazenamento_urls.py`.
+
+## 2026-11-07 — App: "Editar cadastro" do profissional
+- Problema: "Editar cadastro" (perfil do profissional) reaproveitava o fluxo do primeiro cadastro. O formulário começava vazio (só o nome) e, depois de salvar, abria a Verificação; já aprovada, a tela não tinha botão nenhum (beco sem saída).
+- Agora: `ServicoCadastroProfissional.carregarAtual()` lê `GET /v1/profissional/perfil` (em paralelo com as opções, sem buscar o catálogo duas vezes) e traduz ids → nomes, janelas → dias e períodos. O formulário começa preenchido; categoria ou cidade que saiu do catálogo não volta marcada.
+- Edição (`edicao: true`): botão "Salvar alterações"; salvou, volta ao perfil com "Cadastro atualizado." e o perfil recarrega. Não passa pela Verificação.
+- Verificação aprovada ou em análise dentro de um fluxo: botão "Continuar" (antes, nada).
+- Limite conhecido: o raio ("Até onde você vai") nunca foi enviado ao backend; na edição volta para a primeira opção. Fica em PENDENCIAS.
