@@ -487,10 +487,10 @@ class UsuariosAdminPostgres:
                 " join public.cidades ci on ci.id = r.cidade_id where r.profissional_id = u.id) "
                 "as cidade "
                 "from public.usuarios u "
-                "left join auth.users au on au.id = u.id "
+                "left join privado.contas_auth(%s) au on au.id = u.id "
                 "left join public.usuarios_privados p on p.usuario_id = u.id "
                 "where u.id = any(%s)",
-                (ids,),
+                (ids, ids),
             ).fetchall()
         por_id = {str(l["id"]): l for l in linhas}  # noqa: E741
         prefixo = {"profissional": "PRO", "cliente": "CLI", "equipe": "EQP"}
