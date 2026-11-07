@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
+import '../../dados/paralelo.dart';
 import '../../tema/tema.dart';
 import '../profissional_apoio/apoio.dart';
 import 'cadastro.dart';
@@ -17,6 +18,7 @@ class CadastroProfissionalTela extends StatelessWidget {
     this.aoAdicionarFotos,
     this.aoConcluir,
     this.nomeInicial = '',
+    this.edicao = false,
   });
 
   final ServicoCadastroProfissional servico;
@@ -27,21 +29,27 @@ class CadastroProfissionalTela extends StatelessWidget {
   final VoidCallback? aoConcluir;
   final String nomeInicial;
 
+  /// Profissional já cadastrado mudando os dados: o botão diz "Salvar alterações".
+  final bool edicao;
+
   @override
   Widget build(BuildContext context) {
-    return PaginaCarregavel<OpcoesCadastro>(
+    return PaginaCarregavel<(OpcoesCadastro, DadosCadastroProfissional?)>(
       titulo: 'Seu cadastro',
-      carregar: servico.carregarOpcoes,
-      estaVazio: (o) => o.vazio,
+      // Opções primeiro: o serviço real reaproveita essa carga para traduzir o cadastro salvo.
+      carregar: () => emParalelo2(servico.carregarOpcoes(), servico.carregarAtual()),
+      estaVazio: (d) => d.$1.vazio,
       tituloVazio: 'Cadastro indisponível agora',
       textoVazio: 'Ainda não há categorias para escolher. Volte daqui a pouco.',
-      construir: (context, opcoes) => _Formulario(
-        opcoes: opcoes,
+      construir: (context, d) => _Formulario(
+        opcoes: d.$1,
+        atual: d.$2,
         servico: servico,
         aoAdicionarFoto: aoAdicionarFoto,
         aoAdicionarFotos: aoAdicionarFotos,
         aoConcluir: aoConcluir,
         nomeInicial: nomeInicial,
+        edicao: edicao,
       ),
     );
   }
@@ -50,34 +58,47 @@ class CadastroProfissionalTela extends StatelessWidget {
 class _Formulario extends StatefulWidget {
   const _Formulario({
     required this.opcoes,
+    required this.atual,
     required this.servico,
     required this.aoAdicionarFoto,
     required this.aoAdicionarFotos,
     required this.aoConcluir,
     required this.nomeInicial,
+    required this.edicao,
   });
 
   final OpcoesCadastro opcoes;
+  final DadosCadastroProfissional? atual;
   final ServicoCadastroProfissional servico;
   final CapturarFoto? aoAdicionarFoto;
   final Future<List<String>> Function()? aoAdicionarFotos;
   final VoidCallback? aoConcluir;
   final String nomeInicial;
+  final bool edicao;
 
   @override
   State<_Formulario> createState() => _FormularioState();
 }
 
 class _FormularioState extends State<_Formulario> {
-  late final _nome = TextEditingController(text: widget.nomeInicial);
-  final _sobre = TextEditingController();
-  String? _cidade;
+  // O cadastro salvo preenche o formulário; só entra o que ainda está entre as opções
+  // (categoria ou cidade desativada não volta marcada).
+  late final DadosCadastroProfissional? _atual = widget.atual;
+  late final _nome = TextEditingController(
+    text: (_atual?.nome.trim().isNotEmpty ?? false) ? _atual!.nome : widget.nomeInicial,
+  );
+  late final _sobre = TextEditingController(text: _atual?.sobre ?? '');
+  late String? _cidade = widget.opcoes.cidades.contains(_atual?.cidade) ? _atual!.cidade : null;
   final _scrollController = ScrollController();
-  final _categorias = <String>{};
-  final _dias = <String>{};
-  final _periodos = <String>{};
-  final _portfolio = <String>[];
-  late int _raio = widget.opcoes.raiosKm.isEmpty ? 0 : widget.opcoes.raiosKm.first;
+  late final _categorias = <String>{
+    ...?_atual?.categorias.where(widget.opcoes.categorias.contains),
+  };
+  late final _dias = <String>{...?_atual?.dias.where(widget.opcoes.dias.contains)};
+  late final _periodos = <String>{...?_atual?.periodos.where(widget.opcoes.periodos.contains)};
+  late final _portfolio = <String>[...?_atual?.portfolio];
+  late int _raio = widget.opcoes.raiosKm.contains(_atual?.raioKm)
+      ? _atual!.raioKm
+      : (widget.opcoes.raiosKm.isEmpty ? 0 : widget.opcoes.raiosKm.first);
   bool _tentou = false;
   bool _enviando = false;
   String? _erroEnvio;
@@ -188,7 +209,7 @@ class _FormularioState extends State<_Formulario> {
             const SizedBox(height: EspacosTrato.x3),
           ],
           BotaoPrimario(
-            texto: 'Salvar e continuar',
+            texto: widget.edicao ? 'Salvar alterações' : 'Salvar e continuar',
             carregando: _enviando,
             aoTocar: _salvar,
           ),

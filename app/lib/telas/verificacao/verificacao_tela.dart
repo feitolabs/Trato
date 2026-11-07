@@ -21,7 +21,8 @@ class VerificacaoTela extends StatelessWidget {
   final CapturarFoto? aoCapturarDocumento;
   final CapturarFoto? aoCapturarSelfie;
 
-  /// Depois que o envio foi aceito pelo serviço.
+  /// Depois que o envio foi aceito pelo serviço. Com a verificação já aprovada ou em análise,
+  /// é o botão "Continuar".
   final VoidCallback? aoConcluir;
 
   @override
@@ -153,7 +154,11 @@ class _CorpoState extends State<_Corpo> {
                 ),
               ],
             )
-          : null,
+          // Já aprovada ou em análise dentro de um fluxo (ex.: depois do cadastro): nada a
+          // enviar, mas a pessoa precisa de um caminho para seguir em frente.
+          : (widget.aoConcluir != null && !_enviado)
+              ? BotaoPrimario(texto: 'Continuar', aoTocar: widget.aoConcluir)
+              : null,
       children: [
         Text('Confirme sua identidade', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x3),

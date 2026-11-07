@@ -504,6 +504,25 @@ abstract final class RotasTrato {
         ),
       );
 
+  /// "Editar cadastro" de quem já é profissional: formulário preenchido com o que está salvo;
+  /// salvou, volta ao perfil. A verificação de identidade não se repete por mudar os dados.
+  static Future<void> _editarCadastroProfissional(BuildContext context) => _abrir<void>(
+        context,
+        Builder(
+          builder: (tela) => CadastroProfissionalTela(
+            edicao: true,
+            nomeInicial: repos.perfil.nomeSalvo ?? ServicoAuthPadrao.atual.sessaoAtual?.nome ?? '',
+            servico: repos.cadastroProfissional!,
+            aoAdicionarFoto: _fotografar,
+            aoAdicionarFotos: _selecionarFotos,
+            aoConcluir: () {
+              Navigator.of(tela).pop();
+              _avisoSimples(context, 'Cadastro atualizado.');
+            },
+          ),
+        ),
+      );
+
   // --- Profissional ------------------------------------------------------------------
 
   @visibleForTesting
@@ -840,7 +859,7 @@ abstract final class RotasTrato {
               context,
               AvaliacoesRecebidasTela(servico: servico),
             ),
-            aoEditarCadastro: () => _abrirCadastroProfissional(context),
+            aoEditarCadastro: () => _editarCadastroProfissional(context),
             aoUsarComoCliente: () => irParaCliente(context),
             aoSair: () => sair(context),
           );
