@@ -108,6 +108,9 @@ class RepositorioCobrancas(Protocol):
 
     def do_pedido(self, pedido_id: str) -> Sequence[CobrancaLocal]: ...
 
+    def aguardando_desde_antes(self, limite: datetime) -> Sequence[CobrancaLocal]:
+        """Cobranças ainda sem confirmação do provedor, criadas até `limite` (mais antiga antes)."""
+
 
 class RepositorioAditivos(Protocol):
     def obter(self, aditivo_id: str) -> Aditivo | None: ...

@@ -8,14 +8,14 @@ BASE = "/v1/admin"
 FIN = cab("t-financeiro")
 
 
-def test_conciliacoes_alem_de_100_nao_voltam_a_aparecer(adm):
+def test_conciliacoes_alem_de_100_nao_voltam_a_aparecer(adm):  # noqa: F811
     # Antes só as 100 últimas conciliações da auditoria contavam: a 101ª voltava como divergência.
     for n in range(105):
         registrar_cobranca(adm.contexto.ledger.livro, f"ped-fantasma-{n}", 1_000, f"c-{n}", AGORA)
     itens = adm.cliente.get(f"{BASE}/pagamentos?limite=100", headers=FIN).json()["itens"]
-    itens += adm.cliente.get(
-        f"{BASE}/pagamentos?limite=100&deslocamento=100", headers=FIN
-    ).json()["itens"]
+    itens += adm.cliente.get(f"{BASE}/pagamentos?limite=100&deslocamento=100", headers=FIN).json()[
+        "itens"
+    ]
     assert len(itens) == 105
 
     for item in itens:
@@ -31,7 +31,7 @@ def test_conciliacoes_alem_de_100_nao_voltam_a_aparecer(adm):
     assert resumo["valor_divergente_centavos"] == 0
 
 
-def test_filtro_de_periodo_vale_antes_de_montar_a_lista(adm):
+def test_filtro_de_periodo_vale_antes_de_montar_a_lista(adm):  # noqa: F811
     registrar_cobranca(adm.contexto.ledger.livro, "ped-velho", 1_000, "c-velho", AGORA)
     adm.relogio.avancar(days=40)
     registrar_cobranca(adm.contexto.ledger.livro, "ped-novo", 2_000, "c-novo", adm.relogio())

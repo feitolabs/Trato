@@ -82,6 +82,12 @@ def _conta_em_memoria() -> Any:
     return ContaEmMemoria()
 
 
+def _contestacoes_em_memoria() -> Any:
+    from trato.financeiro.contestacoes import ContestacoesEmMemoria
+
+    return ContestacoesEmMemoria()
+
+
 def _repasses_em_memoria() -> RepositorioRepasses:
     from trato.api.memoria import RepassesEmMemoria
 
@@ -118,6 +124,8 @@ class Contexto:
     # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
     taxa: ProvedorTaxa | None = None
     repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)
+    # Contestações de cartão (chargeback) avisadas pelo provedor (`financeiro/contestacoes.py`).
+    contestacoes: Any = field(default_factory=lambda: _contestacoes_em_memoria())
     # Transação do armazenamento (reentrante). Em memória não faz nada; no Postgres é
     # `Banco.transacao`. Use `contexto.transacao()`, que também roda os `depois_do_commit`.
     transacao_banco: Callable[[], AbstractContextManager[object]] = nullcontext

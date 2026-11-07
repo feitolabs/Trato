@@ -5,8 +5,8 @@ Tudo sai do ledger-espelho e dos eventos de webhook já gravados. Não há rota 
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 import uuid
+from collections.abc import Sequence
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -213,6 +213,10 @@ def eventos_webhook(
     contexto: Contexto = Depends(obter_contexto),
 ) -> Pagina[EventoWebhookOut]:
     todos = sorted(contexto.eventos_webhook.listar(), key=lambda e: e.recebido_em, reverse=True)
+    revisao = {
+        (e.provedor, e.evento_id): m.removeprefix("revisar: ")
+        for e, m in contexto.eventos_webhook.em_revisao()
+    }
     itens = []
     for e in todos[deslocamento : deslocamento + limite]:
         dados = e.payload.get("data")
@@ -231,6 +235,7 @@ def eventos_webhook(
                 valor_centavos=valor
                 if isinstance(valor, int) and not isinstance(valor, bool)
                 else None,
+                revisao=revisao.get((e.provedor, e.evento_id)),
             )
         )
     return Pagina(itens=itens, total=len(todos), limite=limite, deslocamento=deslocamento)

@@ -9,6 +9,11 @@ EVENTOS_REAIS = {
     "payment_intent.payment_failed",
     "charge.refunded",
     "payout.paid",
+    "charge.dispute.created",
+    "charge.dispute.updated",
+    "charge.dispute.closed",
+    "transfer.reversed",
+    "payout.failed",
 }
 
 

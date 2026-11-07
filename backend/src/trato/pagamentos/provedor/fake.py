@@ -35,6 +35,8 @@ _TIPO_STRIPE = {
     TipoEvento.PAGAMENTO_FALHOU: "payment_intent.payment_failed",
     TipoEvento.ESTORNO_CONFIRMADO: "charge.refunded",
     TipoEvento.LIQUIDACAO: "payout.paid",
+    TipoEvento.CONTESTACAO: "charge.dispute.created",
+    TipoEvento.REPASSE_FALHOU: "payout.failed",
 }
 
 
@@ -145,6 +147,9 @@ class ProvedorFake:
         segredo: str | None = None,
         repasse_id: str | None = None,
         objeto_id: str | None = None,
+        tipo_stripe: str | None = None,
+        status_contestacao: str = "needs_response",
+        motivo_falha: str = "Conta bancária recusou o pagamento.",
     ) -> tuple[bytes, dict[str, str]]:
         """Corpo e cabeçalhos de um webhook, como o provedor mandaria. Não muda o estado."""
         cobranca = self.consultar_cobranca(cobranca_id)
@@ -166,6 +171,29 @@ class ProvedorFake:
                 "currency": "brl",
                 "metadata": metadados,
             }
+        elif tipo is TipoEvento.CONTESTACAO:
+            objeto = {
+                "id": objeto_id or f"dp_fake_{_curto(cobranca_id)}",
+                "object": "dispute",
+                "payment_intent": cobranca_id,
+                "amount": valor,
+                "currency": "brl",
+                "reason": "fraudulent",
+                "status": status_contestacao,
+                "created": instante,
+                "evidence_details": {"due_by": instante + 7 * 86_400},
+                "metadata": {},
+            }
+        elif tipo is TipoEvento.REPASSE_FALHOU:
+            metadados["cobranca_id"] = cobranca_id
+            if repasse_id is not None:
+                metadados["repasse_id"] = repasse_id
+            objeto = {
+                "id": objeto_id or f"po_fake_{_curto(cobranca_id)}",
+                "amount": valor,
+                "failure_message": motivo_falha,
+                "metadata": metadados,
+            }
         elif tipo is TipoEvento.LIQUIDACAO:
             metadados["cobranca_id"] = cobranca_id
             if repasse_id is not None:
@@ -175,11 +203,12 @@ class ProvedorFake:
                 "amount": valor,
                 "metadata": metadados,
             }
-        evento_id = evento_id or f"evt_fake_{_TIPO_STRIPE[tipo]}_{_curto(cobranca_id)}"
+        nome = tipo_stripe or _TIPO_STRIPE[tipo]
+        evento_id = evento_id or f"evt_fake_{nome}_{_curto(cobranca_id)}"
         corpo = json.dumps(
             {
                 "id": evento_id,
-                "type": _TIPO_STRIPE[tipo],
+                "type": nome,
                 "created": instante,
                 "data": {"object": objeto},
             },

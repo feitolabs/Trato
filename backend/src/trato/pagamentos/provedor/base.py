@@ -32,6 +32,8 @@ class TipoEvento(StrEnum):
     PAGAMENTO_FALHOU = "pagamento_falhou"
     ESTORNO_CONFIRMADO = "estorno_confirmado"
     LIQUIDACAO = "liquidacao"  # o provedor liquidou o valor ao profissional (caminho A)
+    CONTESTACAO = "contestacao"  # chargeback: aberta, atualizada ou encerrada no banco do cliente
+    REPASSE_FALHOU = "repasse_falhou"  # transferência revertida ou pagamento ao banco recusado
 
 
 @dataclass(frozen=True)
