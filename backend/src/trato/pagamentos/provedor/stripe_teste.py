@@ -12,7 +12,8 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from trato.config import obter_config
@@ -22,13 +23,50 @@ from trato.pagamentos.provedor.base import (
     ErroProvedor,
     EstornoProvedor,
     EventoProvedor,
+    MovimentoProvedor,
     PreparoCartao,
     StatusCobranca,
+    TipoMovimento,
 )
 from trato.pagamentos.provedor.stripe_formato import interpretar_evento_stripe
 from trato.pagamentos.webhook import verificar_assinatura
 
 URL_BASE = "https://api.stripe.com"
+_PAGINAS_MAXIMAS = 50  # 5.000 linhas por consulta; um dia do piloto fica muito abaixo disso
+_TIPOS_MOVIMENTO = {
+    "charge": TipoMovimento.COBRANCA,
+    "payment": TipoMovimento.COBRANCA,
+    "refund": TipoMovimento.ESTORNO,
+    "payment_refund": TipoMovimento.ESTORNO,
+    "adjustment": TipoMovimento.CONTESTACAO,  # no Stripe, o chargeback entra como ajuste
+    "dispute": TipoMovimento.CONTESTACAO,
+    "transfer": TipoMovimento.REPASSE,
+    "payout": TipoMovimento.SAQUE,
+    "stripe_fee": TipoMovimento.TAXA_PROVEDOR,
+}
+
+
+def movimento_stripe(linha: Mapping[str, Any]) -> MovimentoProvedor | None:
+    """Uma `balance_transaction` (com `source` expandido) como movimento do Trato."""
+    valor, taxa, criado = linha.get("amount"), linha.get("fee", 0), linha.get("created")
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in (valor, taxa, criado)):
+        return None
+    fonte = linha.get("source")
+    cobranca = None
+    if isinstance(fonte, Mapping):
+        cobranca = fonte.get("payment_intent")
+        if not isinstance(cobranca, str) and isinstance(fonte.get("charge"), Mapping):
+            cobranca = fonte["charge"].get("payment_intent")
+    return MovimentoProvedor(
+        id=str(linha.get("id")),
+        tipo=_TIPOS_MOVIMENTO.get(str(linha.get("type")), TipoMovimento.OUTRO),
+        valor_centavos=valor,
+        taxa_provedor_centavos=taxa,
+        criado_em=datetime.fromtimestamp(criado, UTC),
+        cobranca_id=cobranca if isinstance(cobranca, str) and cobranca else None,
+    )
+
+
 # Versão da API exigida pela chave efêmera: tem de ser a do SDK do app (flutter_stripe).
 VERSAO_API_CHAVE_EFEMERA = "2024-06-20"
 Resposta = tuple[int, Mapping[str, Any]]
@@ -130,11 +168,14 @@ class ProvedorStripeTeste:
 
     def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
         """Acha (ou cria) o cliente deste usuário no Stripe e gera a chave efêmera dele."""
-        achados = self._chamar(
-            "GET",
-            "/v1/customers/search",
-            {"query": f"metadata['trato_usuario_id']:'{usuario_id}'", "limit": "1"},
-        ).get("data") or []
+        achados = (
+            self._chamar(
+                "GET",
+                "/v1/customers/search",
+                {"query": f"metadata['trato_usuario_id']:'{usuario_id}'", "limit": "1"},
+            ).get("data")
+            or []
+        )
         if achados:
             cliente_id = str(achados[0]["id"])
         else:
@@ -187,6 +228,24 @@ class ProvedorStripeTeste:
 
     def interpretar_evento(self, payload: Mapping[str, Any]) -> EventoProvedor | None:
         return interpretar_evento_stripe(payload)
+
+    def movimentos(self, desde: datetime, ate: datetime) -> Sequence[MovimentoProvedor]:
+        """`GET /v1/balance_transactions` do intervalo, página por página (100 por vez)."""
+        campos = {
+            "created[gte]": str(int(desde.timestamp())),
+            "created[lt]": str(int(ate.timestamp())),
+            "limit": "100",
+            "expand[]": "data.source",
+        }
+        saida: list[MovimentoProvedor] = []
+        for _ in range(_PAGINAS_MAXIMAS):
+            corpo = self._chamar("GET", "/v1/balance_transactions", campos)
+            linhas = corpo.get("data") or []
+            saida += [m for m in (movimento_stripe(linha) for linha in linhas) if m is not None]
+            if not corpo.get("has_more") or not linhas:
+                return saida
+            campos = {**campos, "starting_after": str(linhas[-1]["id"])}
+        raise ErroProvedor("Extrato do Stripe grande demais para um dia: use um intervalo menor.")
 
     # --- detalhes ----------------------------------------------------------------------
 

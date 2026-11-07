@@ -6,8 +6,9 @@ dele; quem decide o que o pedido faz com isso é o orquestrador (`pagamentos/orq
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -82,6 +83,31 @@ class EventoProvedor:
     objeto_id: str | None = None
 
 
+class TipoMovimento(StrEnum):
+    """O que cada linha do extrato do provedor é, do ponto de vista do Trato."""
+
+    COBRANCA = "cobranca"  # entrou dinheiro de um cliente
+    ESTORNO = "estorno"  # devolução ao cliente
+    CONTESTACAO = "contestacao"  # chargeback (sai, e volta se for ganha)
+    REPASSE = "repasse"  # transferência ao profissional
+    SAQUE = "saque"  # payout para conta bancária
+    TAXA_PROVEDOR = "taxa_provedor"  # cobrança avulsa do provedor
+    OUTRO = "outro"
+
+
+@dataclass(frozen=True)
+class MovimentoProvedor:
+    """Uma linha do extrato do provedor (no Stripe, `balance_transaction`). Centavos com sinal:
+    entrada positiva, saída negativa. `taxa_provedor_centavos` é o que o provedor cobrou."""
+
+    id: str
+    tipo: TipoMovimento
+    valor_centavos: int
+    taxa_provedor_centavos: int
+    criado_em: datetime
+    cobranca_id: str | None = None  # a cobrança (PaymentIntent) a que a linha se refere
+
+
 class ProvedorPagamento(Protocol):
     nome: str
 
@@ -117,3 +143,6 @@ class ProvedorPagamento(Protocol):
 
     def interpretar_evento(self, payload: Mapping[str, Any]) -> EventoProvedor | None:
         """Traduz o JSON de um evento já autenticado. `None` para tipos que não interessam."""
+
+    def movimentos(self, desde: datetime, ate: datetime) -> Sequence[MovimentoProvedor]:
+        """Extrato do provedor no intervalo [desde, ate). Só leitura: serve à conciliação."""

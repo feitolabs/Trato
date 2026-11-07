@@ -6,7 +6,7 @@ mostram o que o provedor avisou e o que travou, para o financeiro agir.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.papeis import Permissao
 from trato.api.contexto import Contexto, obter_contexto
+from trato.financeiro import periodo
+from trato.financeiro.conciliacao import conciliar
 from trato.financeiro.contestacoes import Contestacao, StatusContestacao
 from trato.pedidos.estados import Estado
 
@@ -80,6 +82,28 @@ class AlertasFinanceirosOut(BaseModel):
     estornos_pendentes: list[EstornoPendenteOut]
     eventos_em_revisao: list[EventoRevisaoOut]
     contestacoes_em_aberto: int
+
+
+class LinhaConciliacaoOut(BaseModel):
+    tipo: str
+    referencia: str
+    pedido_id: str | None
+    pedido_numero: int | None = None
+    valor_provedor_centavos: int
+    valor_trato_centavos: int
+    diferenca_centavos: int
+    situacao: str
+
+
+class ConciliacaoOut(BaseModel):
+    dia: date
+    confere: bool
+    cobrado_provedor_centavos: int
+    cobrado_trato_centavos: int
+    taxas_provedor_centavos: int
+    movimentos_ignorados: int
+    divergencias: list[LinhaConciliacaoOut]
+    linhas: list[LinhaConciliacaoOut]
 
 
 class ConsultaCobrancaOut(BaseModel):
@@ -281,6 +305,61 @@ def consultar_cobranca(
         status_no_trato=local.status.value,
         valor_centavos=remota.valor_centavos,
         orientacao=orientacao,
+    )
+
+
+@router.get(
+    "/conciliacao",
+    response_model=ConciliacaoOut,
+    summary="Compara o extrato do provedor com o ledger espelho em um dia (horário de Brasília)",
+)
+def conciliacao(
+    request: Request,
+    dia: date = Query(..., description="AAAA-MM-DD"),
+    operador: Operador = Depends(exigir(Permissao.PAGAMENTOS_VER)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> ConciliacaoOut:
+    servico = servico_pagamento(request)
+    if servico is None:
+        raise HTTPException(503, "Provedor de pagamento não configurado.")
+    desde, ate = periodo.dia(dia)
+    if desde > contexto.agora():
+        raise HTTPException(422, "Esse dia ainda não começou.")
+    try:
+        movimentos = servico.provedor.movimentos(desde, ate)
+    except Exception as erro:  # noqa: BLE001 - falha do provedor vira 502 sem detalhe
+        raise HTTPException(502, "O provedor não respondeu. Tente de novo em instantes.") from erro
+    resultado = conciliar(movimentos, contexto.ledger.lancamentos(), desde, ate)
+    rotulos = admin.pedidos.rotulos([lin.pedido_id for lin in resultado.linhas if lin.pedido_id])
+
+    def saida(lin) -> LinhaConciliacaoOut:
+        return LinhaConciliacaoOut(
+            tipo=lin.tipo,
+            referencia=lin.referencia,
+            pedido_id=lin.pedido_id,
+            pedido_numero=rotulos.get(lin.pedido_id or "", (None, ""))[0],
+            valor_provedor_centavos=lin.valor_provedor_centavos,
+            valor_trato_centavos=lin.valor_trato_centavos,
+            diferenca_centavos=lin.diferenca_centavos,
+            situacao=lin.situacao,
+        )
+
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao="pagamento.conciliacao_executada",
+        entidade="pagamentos",
+        depois={"dia": dia.isoformat(), "divergencias": len(resultado.divergencias)},
+    )
+    return ConciliacaoOut(
+        dia=dia,
+        confere=resultado.confere,
+        cobrado_provedor_centavos=resultado.cobrado_provedor_centavos,
+        cobrado_trato_centavos=resultado.cobrado_trato_centavos,
+        taxas_provedor_centavos=resultado.taxas_provedor_centavos,
+        movimentos_ignorados=resultado.movimentos_ignorados,
+        divergencias=[saida(lin) for lin in resultado.divergencias],
+        linhas=[saida(lin) for lin in resultado.linhas],
     )
 
 

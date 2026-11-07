@@ -197,3 +197,31 @@ def test_consultar_no_provedor_orienta_reenviar_o_aviso_e_nao_marca_pago(fluxo: 
     assert fluxo.pedido(pid)["estado"] == "orcamento_aceito"  # nada virou pago (D13)
     (registro,), _ = admin.auditoria.listar(FiltroAuditoria(acao="pagamento.consultado"), 10, 0)
     assert registro.ator_id == "eq-fin"
+
+
+def test_conciliacao_do_dia_pelo_painel_acusa_pagamento_que_o_trato_nao_viu(fluxo: Fluxo):  # noqa: F811
+    from datetime import timedelta
+
+    from trato.pagamentos.provedor import MovimentoProvedor, TipoMovimento
+
+    _painel(fluxo)
+    pid = fluxo.aceitar()
+    cobranca = fluxo.pagar(pid)
+    agora = fluxo.amb.relogio()
+    fluxo.fake.registrar_movimento(
+        MovimentoProvedor("txn_1", TipoMovimento.COBRANCA, VALOR + TAXA, 400, agora, cobranca["id"])
+    )
+    fluxo.fake.registrar_movimento(
+        MovimentoProvedor("txn_2", TipoMovimento.COBRANCA, 5_000, 200, agora, "pi_desconhecido")
+    )
+    dia = (agora - timedelta(hours=3)).date().isoformat()  # o dia em Brasília
+
+    r = fluxo.chamar("GET", f"/v1/admin/financeiro/conciliacao?dia={dia}", "t-financeiro")
+
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert corpo["confere"] is False and corpo["taxas_provedor_centavos"] == 600
+    (div,) = corpo["divergencias"]
+    assert div["referencia"] == "pi_desconhecido" and div["situacao"] == "so_no_provedor"
+    ok = next(lin for lin in corpo["linhas"] if lin["referencia"] == cobranca["id"])
+    assert ok["situacao"] == "confere" and ok["pedido_id"] == pid

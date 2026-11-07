@@ -10,8 +10,9 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from datetime import datetime
 from typing import Any
 
 from trato.pagamentos.custo import MeioPagamento
@@ -20,6 +21,7 @@ from trato.pagamentos.provedor.base import (
     ErroProvedor,
     EstornoProvedor,
     EventoProvedor,
+    MovimentoProvedor,
     PreparoCartao,
     StatusCobranca,
     TipoEvento,
@@ -55,6 +57,7 @@ class ProvedorFake:
         self._estornado: dict[str, int] = {}
         self.clientes_das_cobrancas: dict[str, str] = {}
         self.chamadas: list[tuple[str, str]] = []  # (operação, chave) para os testes olharem
+        self._movimentos: list[MovimentoProvedor] = []
 
     # --- interface ---------------------------------------------------------------------
 
@@ -133,7 +136,14 @@ class ProvedorFake:
     def interpretar_evento(self, payload: Mapping[str, Any]) -> EventoProvedor | None:
         return interpretar_evento_stripe(payload)
 
+    def movimentos(self, desde: datetime, ate: datetime) -> Sequence[MovimentoProvedor]:
+        return tuple(m for m in self._movimentos if desde <= m.criado_em < ate)
+
     # --- simulação (só existe no fake) --------------------------------------------------
+
+    def registrar_movimento(self, movimento: MovimentoProvedor) -> None:
+        """Põe uma linha no extrato falso (o fake não inventa extrato sozinho)."""
+        self._movimentos.append(movimento)
 
     def evento_assinado(
         self,
