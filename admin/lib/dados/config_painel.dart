@@ -25,6 +25,7 @@ class ConfigPainel {
     this.urlSupabase = '',
     this.chaveAnon = '',
     this.ambiente = '',
+    this.atualizarSegundos = '',
   });
 
   /// Lê os `--dart-define` pela lista permitida (M14): em debug, segredo para o painel; em release é ignorado.
@@ -36,6 +37,7 @@ class ConfigPainel {
         urlSupabase: v['ADMIN_SUPABASE_URL'] ?? '',
         chaveAnon: v['ADMIN_SUPABASE_ANON_KEY'] ?? '',
         ambiente: v['ADMIN_AMBIENTE'] ?? '',
+        atualizarSegundos: v['ADMIN_ATUALIZAR_SEGUNDOS'] ?? '',
       );
 
   final String modo;
@@ -46,6 +48,17 @@ class ConfigPainel {
   /// `producao` esconde a faixa de ambiente. Qualquer outro valor (ou vazio) mostra a faixa fixa
   /// "Ambiente de teste" (RNF-07): na dúvida, a pessoa vê que não é produção.
   final String ambiente;
+
+  /// `ADMIN_ATUALIZAR_SEGUNDOS`: de quanto em quanto tempo as filas da Operação se atualizam
+  /// sozinhas. Vazio ou inválido = 60 s; `0` desliga (continua atualizando ao voltar para a aba).
+  final String atualizarSegundos;
+
+  Duration get intervaloAtualizacao {
+    final n = int.tryParse(atualizarSegundos.trim());
+    if (n == null || n < 0) return const Duration(seconds: 60);
+    // Abaixo de 15 s a fila martela o backend sem ganho para quem analisa.
+    return n == 0 ? Duration.zero : Duration(seconds: n < 15 ? 15 : n);
+  }
 
   bool get ehProducao => ambiente.trim().toLowerCase() == 'producao';
 

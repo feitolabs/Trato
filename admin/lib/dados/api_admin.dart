@@ -12,18 +12,52 @@ abstract interface class ApiAdmin {
   Future<void> sair();
 
   // F7.1 verificação
-  Future<List<Verificacao>> listarVerificacoes();
+  /// Uma página da fila, filtrada no servidor. [status] vazio = todos; [busca] casa o nome ou o
+  /// id curto (PRO-XXXX). Ordem: envio mais antigo primeiro.
+  Future<PaginaRemota<Verificacao>> listarVerificacoes({
+    List<StatusVerificacao> status = const [],
+    String busca = '',
+    int deslocamento = 0,
+    int limite = 50,
+  });
+
+  /// Quantas verificações há em cada status (para os contadores dos filtros).
+  Future<Map<StatusVerificacao, int>> contarVerificacoes();
+
+  /// Assume a análise. Se outra pessoa já assumiu, o backend recusa (409), a menos que
+  /// [substituir] seja true.
+  Future<void> assumirVerificacao(String id, {required String motivo, bool substituir = false});
+
   /// Devolve a URL assinada de curta duração (ou null, no exemplo).
   Future<String?> revelarDocumento(String verificacaoId, String documento, String motivo);
   Future<void> decidirVerificacao(String id, {required bool aprovar, required String motivo});
 
   // F7.2 disputas
-  Future<List<Disputa>> listarDisputas();
+  /// Uma página da fila, leve: sem evidências nem linha do tempo (vêm em [obterDisputa]).
+  /// [situacao]: `abertas`, `decididas` ou `todas`. Ordem: prazo de decisão mais curto primeiro.
+  Future<PaginaRemota<Disputa>> listarDisputas({
+    String situacao = 'abertas',
+    int deslocamento = 0,
+    int limite = 50,
+  });
+
+  /// O caso completo, com evidências e linha do tempo.
+  Future<Disputa> obterDisputa(String id);
+
+  Future<({int abertas, int decididas})> contarDisputas();
+
+  /// Assume a análise da disputa. Se outra pessoa já assumiu, o backend recusa (409), a menos que
+  /// [substituir] seja true.
+  Future<void> assumirDisputa(String id, {required String motivo, bool substituir = false});
+
+  /// [estadoEsperado]: o estado que a pessoa viu. Se a disputa mudou desde então, o backend
+  /// recusa (409) e nada se move.
   Future<ResultadoDecisao> decidirDisputa(
     String id, {
     required DecisaoDisputa decisao,
     int? valorReembolsoCentavos,
     required String justificativa,
+    StatusDisputa? estadoEsperado,
   });
 
   /// Segunda pessoa (outra, não quem decidiu) aprova uma decisão acima da alçada.

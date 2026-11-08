@@ -103,8 +103,53 @@ class ApiFake implements ApiAdmin {
   }
 
   // ---------- F7.1 ----------
+  /// Quantas chamadas de lista a fila fez (os testes conferem que não há uma por item).
+  int chamadasListaDisputas = 0;
+  int chamadasDetalheDisputa = 0;
+
+  static PaginaRemota<T> _pagina<T>(List<T> todos, int deslocamento, int limite) {
+    final fim = deslocamento + limite > todos.length ? todos.length : deslocamento + limite;
+    return PaginaRemota(deslocamento >= todos.length ? <T>[] : todos.sublist(deslocamento, fim), todos.length);
+  }
+
+  /// Troca a fila inteira (para testar paginação com muitos itens).
+  set verificacoes(List<Verificacao> v) => _verificacoes = v;
+
   @override
-  Future<List<Verificacao>> listarVerificacoes() => _ler(() => _verificacoes, const []);
+  Future<PaginaRemota<Verificacao>> listarVerificacoes({
+    List<StatusVerificacao> status = const [],
+    String busca = '',
+    int deslocamento = 0,
+    int limite = 50,
+  }) {
+    final termo = busca.trim().toLowerCase();
+    final achadas = [
+      for (final v in _verificacoes)
+        if ((status.isEmpty || status.contains(v.status)) &&
+            (termo.isEmpty || v.profissional.toLowerCase().contains(termo) || v.idPublico.toLowerCase().contains(termo)))
+          v,
+    ]..sort((a, b) => a.enviadaEm.compareTo(b.enviadaEm));
+    return _ler(() => _pagina(achadas, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<Map<StatusVerificacao, int>> contarVerificacoes() => _ler(
+        () => {for (final s in StatusVerificacao.values) s: _verificacoes.where((v) => v.status == s).length},
+        {for (final s in StatusVerificacao.values) s: 0},
+      );
+
+  @override
+  Future<void> assumirVerificacao(String id, {required String motivo, bool substituir = false}) async {
+    await Future<void>.delayed(atraso);
+    final v = _verificacoes.firstWhere((x) => x.id == id);
+    if (v.status == StatusVerificacao.aprovada || v.status == StatusVerificacao.recusada) {
+      throw const ErroApi('Essa verificação já foi decidida.');
+    }
+    final outro = v.status == StatusVerificacao.emAnalise && v.analistaId != null && v.analistaId != _eu?.id;
+    if (outro && !substituir) throw ErroApi('${v.analistaNome ?? 'Outra pessoa'} já está analisando este cadastro.');
+    _verificacoes = [for (final x in _verificacoes) x.id == id ? x.assumidaPor(_eu?.id ?? '', _eu?.nome ?? '') : x];
+    _registrar('verificacao.assumida', 'verificacao:$id', motivo);
+  }
 
   @override
   Future<String?> revelarDocumento(String verificacaoId, String documento, String motivo) async {
@@ -116,6 +161,10 @@ class ApiFake implements ApiAdmin {
   @override
   Future<void> decidirVerificacao(String id, {required bool aprovar, required String motivo}) async {
     await Future<void>.delayed(atraso);
+    final atual = _verificacoes.firstWhere((x) => x.id == id);
+    if (atual.status == StatusVerificacao.emAnalise && atual.analistaId != null && atual.analistaId != _eu?.id) {
+      throw ErroApi('${atual.analistaNome ?? 'Outra pessoa'} está analisando este cadastro. Assuma a análise antes de decidir.');
+    }
     _verificacoes = [
       for (final v in _verificacoes)
         if (v.id == id)
@@ -128,7 +177,48 @@ class ApiFake implements ApiAdmin {
 
   // ---------- F7.2 ----------
   @override
-  Future<List<Disputa>> listarDisputas() => _ler(() => _disputas, const []);
+  Future<PaginaRemota<Disputa>> listarDisputas({String situacao = 'abertas', int deslocamento = 0, int limite = 50}) {
+    chamadasListaDisputas++;
+    final achadas = [
+      for (final d in _disputas)
+        if (situacao == 'todas' || (situacao == 'decididas') == (d.status == StatusDisputa.decidida)) d,
+    ]..sort((a, b) => a.decisaoAte.compareTo(b.decisaoAte));
+    return _ler(() => _pagina(achadas, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<Disputa> obterDisputa(String id) {
+    chamadasDetalheDisputa++;
+    return _ler(() => _disputas.firstWhere((d) => d.id == id), _disputas.firstWhere((d) => d.id == id));
+  }
+
+  @override
+  Future<({int abertas, int decididas})> contarDisputas() => _ler(() {
+        final decididas = _disputas.where((d) => d.status == StatusDisputa.decidida).length;
+        return (abertas: _disputas.length - decididas, decididas: decididas);
+      }, (abertas: 0, decididas: 0));
+
+  @override
+  Future<void> assumirDisputa(String id, {required String motivo, bool substituir = false}) async {
+    await Future<void>.delayed(atraso);
+    final d = _disputas.firstWhere((x) => x.id == id);
+    if (d.status == StatusDisputa.decidida) throw const ErroApi('Essa disputa já foi decidida.');
+    if (d.responsavelId != null && d.responsavelId != _eu?.id && !substituir) {
+      throw ErroApi('${d.responsavelNome ?? 'Outra pessoa'} já está analisando esta disputa.');
+    }
+    _disputas = [for (final x in _disputas) x.id == id ? x.assumidaPor(_eu?.id ?? '', _eu?.nome ?? '') : x];
+    _registrar('disputa.assumida', 'disputa:$id', motivo);
+  }
+
+  /// Simula outra pessoa assumindo a disputa.
+  void assumirDisputaComo(String id, String membroId, String nome) {
+    _disputas = [for (final x in _disputas) x.id == id ? x.assumidaPor(membroId, nome) : x];
+  }
+
+  /// Simula outra pessoa mexendo na disputa enquanto a tela está aberta.
+  void mudarEstadoDisputa(String id, StatusDisputa novo) {
+    _disputas = [for (final d in _disputas) d.id == id ? d.comDecisao(novo, d.decisao ?? DecisaoDisputa.liberarTudo, d.valorReembolsoCentavos) : d];
+  }
 
   @override
   Future<ResultadoDecisao> decidirDisputa(
@@ -136,9 +226,17 @@ class ApiFake implements ApiAdmin {
     required DecisaoDisputa decisao,
     int? valorReembolsoCentavos,
     required String justificativa,
+    StatusDisputa? estadoEsperado,
   }) async {
     await Future<void>.delayed(atraso);
     final d = _disputas.firstWhere((x) => x.id == id);
+    if (d.responsavelId != null && d.responsavelId != _eu?.id) {
+      throw ErroApi('${d.responsavelNome ?? 'Outra pessoa'} está analisando esta disputa. Assuma a análise antes de decidir.');
+    }
+    if (estadoEsperado != null && estadoEsperado != d.status) {
+      throw const ErroApi('A disputa mudou desde que você abriu (nova resposta ou decisão de outra pessoa). '
+          'Atualize e confira antes de decidir.');
+    }
     final valor = switch (decisao) {
       DecisaoDisputa.reembolsoTotal => d.valorEmAnaliseCentavos,
       DecisaoDisputa.reembolsoParcial => valorReembolsoCentavos,

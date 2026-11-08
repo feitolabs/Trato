@@ -19,6 +19,13 @@ class UsuarioEquipe {
 
 enum StatusVerificacao { enviada, emAnalise, aprovada, recusada }
 
+/// Uma página de uma lista do servidor: os itens e quantos existem ao todo com o mesmo filtro.
+class PaginaRemota<T> {
+  const PaginaRemota(this.itens, this.total);
+  final List<T> itens;
+  final int total;
+}
+
 /// Um envio anterior do mesmo profissional (RF-VER-02).
 class EnvioVerificacao {
   const EnvioVerificacao({required this.enviadoEm, required this.aprovado, this.motivo});
@@ -42,7 +49,13 @@ class Verificacao {
     this.enviosAnteriores = const [],
     this.status = StatusVerificacao.enviada,
     this.motivoDecisao,
+    this.analistaId,
+    this.analistaNome,
   });
+
+  /// Quem assumiu a análise. Outra pessoa só decide depois de assumir no lugar dela.
+  final String? analistaId;
+  final String? analistaNome;
 
   final String id;
 
@@ -84,6 +97,26 @@ class Verificacao {
         enviosAnteriores: enviosAnteriores,
         status: novo,
         motivoDecisao: motivo,
+        analistaId: analistaId,
+        analistaNome: analistaNome,
+      );
+
+  Verificacao assumidaPor(String id, String nome) => Verificacao(
+        id: this.id,
+        profissionalId: profissionalId,
+        profissional: profissional,
+        idPublico: idPublico,
+        nivel: nivel,
+        categorias: categorias,
+        cidade: cidade,
+        enviadaEm: enviadaEm,
+        cpfMascarado: cpfMascarado,
+        documentos: documentos,
+        enviosAnteriores: enviosAnteriores,
+        status: StatusVerificacao.emAnalise,
+        motivoDecisao: motivoDecisao,
+        analistaId: id,
+        analistaNome: nome,
       );
 }
 
@@ -144,9 +177,15 @@ class Disputa {
     this.respostaAte,
     this.atrasada = false,
     this.semResposta = false,
+    this.responsavelId,
+    this.responsavelNome,
   });
 
   final String id;
+
+  /// Quem assumiu a análise. Só essa pessoa decide (o backend confere).
+  final String? responsavelId;
+  final String? responsavelNome;
 
   /// Título legível do pedido (ex.: "Pintura de sala e cozinha"). Vazio = só o motivo.
   final String titulo;
@@ -192,6 +231,31 @@ class Disputa {
         respostaAte: respostaAte,
         atrasada: atrasada,
         semResposta: semResposta,
+        responsavelId: novo == StatusDisputa.decidida ? null : responsavelId,
+        responsavelNome: novo == StatusDisputa.decidida ? null : responsavelNome,
+      );
+
+  Disputa assumidaPor(String id, String nome) => Disputa(
+        id: this.id,
+        pedido: pedido,
+        cliente: cliente,
+        profissional: profissional,
+        motivo: motivo,
+        descricao: descricao,
+        valorEmAnaliseCentavos: valorEmAnaliseCentavos,
+        decisaoAte: decisaoAte,
+        evidencias: evidencias,
+        linhaDoTempo: linhaDoTempo,
+        status: status,
+        decisao: decisao,
+        valorReembolsoCentavos: valorReembolsoCentavos,
+        decididoPor: decididoPor,
+        titulo: titulo,
+        respostaAte: respostaAte,
+        atrasada: atrasada,
+        semResposta: semResposta,
+        responsavelId: id,
+        responsavelNome: nome,
       );
 }
 

@@ -48,7 +48,8 @@ void main() {
 
   test('verificação: lista, documento por URL assinada curta, recusa e aprovação com motivo', () async {
     final api = await _entrar('cadastro');
-    final lista = await api.listarVerificacoes();
+    const pendentes = [StatusVerificacao.enviada, StatusVerificacao.emAnalise];
+    final lista = (await api.listarVerificacoes(status: pendentes)).itens;
     expect(lista.length, greaterThanOrEqualTo(2));
     final v = lista.first;
     expect(v.cpfMascarado, startsWith('***.'));
@@ -63,13 +64,13 @@ void main() {
         throwsA(isA<ErroApi>().having((e) => e.proibido, 'proibido', true)));
     await api.decidirVerificacao(v.id, aprovar: false, motivo: 'Documento ilegível');
     await api.decidirVerificacao(lista[1].id, aprovar: true, motivo: 'Tudo conferido');
-    final depois = await api.listarVerificacoes();
+    final depois = (await api.listarVerificacoes(status: pendentes)).itens;
     expect(depois.where((x) => x.id == v.id), isEmpty); // saiu da fila de pendentes
   }, skip: pular);
 
   test('disputa: dentro da alçada decide; acima pede segunda pessoa, que não é quem decidiu', () async {
     final med = await _entrar('mediador');
-    final lista = await med.listarDisputas();
+    final lista = (await med.listarDisputas()).itens;
     final ped1 = lista.firstWhere((d) => d.id == 'ped-1');
     final ped2 = lista.firstWhere((d) => d.id == 'ped-2');
     expect(ped1.valorEmAnaliseCentavos, 100000);
@@ -84,7 +85,7 @@ void main() {
     final r3 = await lider.aprovarDisputa(ped2.id, justificativa: 'Confere com as provas');
     expect(r3.status, StatusDisputa.decidida);
     // a fila do painel só traz o que está aberto: decidida sai da lista
-    expect((await lider.listarDisputas()).where((d) => d.id == 'ped-2'), isEmpty);
+    expect((await lider.listarDisputas()).itens.where((d) => d.id == 'ped-2'), isEmpty);
   }, skip: pular);
 
   test('pagamentos em leitura: resumo e extrato com divergência', () async {
