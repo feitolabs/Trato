@@ -74,11 +74,19 @@ class VerificacaoOut(Saida):
     categorias: list[str] = []
     cidade: str | None = None
     envios_anteriores: list[EnvioAnteriorOut] = []
+    analista_id: str | None = None
+    analista_nome: str | None = None
 
 
 class DecisaoVerificacaoIn(Entrada):
     aprovar: bool
     motivo: Motivo
+
+
+class AssumirIn(Entrada):
+    motivo: Motivo
+    # True = tira a análise de outra pessoa (fica na auditoria).
+    substituir: bool = False
 
 
 class UrlDocumentoOut(BaseModel):
@@ -102,6 +110,9 @@ class DecidirDisputaIn(Entrada):
     # Só em reembolso parcial: exatamente um dos dois.
     percentual_cliente_bps: int | None = Field(default=None, ge=1, le=9999)
     valor_cliente_centavos: int | None = Field(default=None, ge=1)
+    # Estado que a pessoa viu na tela. Se a disputa mudou desde então (o profissional respondeu,
+    # outra pessoa decidiu), responde 409 em vez de decidir sobre dado velho.
+    estado_esperado: str | None = None
 
 
 class AprovarDisputaIn(Entrada):
@@ -120,6 +131,12 @@ class DisputaResumoOut(BaseModel):
     decisao_ate: datetime
     atrasada: bool
     sem_resposta: bool
+    # Para a lista leve não precisar abrir o detalhe de cada disputa.
+    cliente_nome: str | None = None
+    profissional_nome: str | None = None
+    # Quem assumiu a análise (só disputa aberta). Só essa pessoa decide.
+    responsavel_id: str | None = None
+    responsavel_nome: str | None = None
 
 
 class PessoaOut(BaseModel):

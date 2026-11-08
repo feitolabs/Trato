@@ -9,7 +9,7 @@ import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
 
 /// F7.2 — fila de disputas (RF-DIS-01 a RF-DIS-04).
-class DisputasTela extends StatelessWidget {
+class DisputasTela extends StatefulWidget {
   const DisputasTela({super.key});
 
   static (String, Tom) chip(Disputa d) {
@@ -54,76 +54,107 @@ class DisputasTela extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return CarregaDados<(List<Disputa>, String?)>(
-      esqueleto: const EsqueletoPagina(),
-      carregar: () async {
-        final api = context.api;
-        final lista = await api.listarDisputas();
-        final prazos = await _prazosVigentes(api);
-        return (lista, prazos);
-      },
-      estaVazio: (d) => d.$1.isEmpty,
-      mensagemVazia: 'Nenhuma disputa aberta.',
-      detalheVazio: 'Quando um cliente relatar problema, ele aparece aqui com o prazo de resposta.',
-      construir: (context, dados, recarregar) => _FilaDisputas(lista: dados.$1, prazos: dados.$2, aoMudar: recarregar),
-    );
-  }
+  State<DisputasTela> createState() => _DisputasTelaState();
 }
 
-class _FilaDisputas extends StatefulWidget {
-  const _FilaDisputas({required this.lista, required this.prazos, required this.aoMudar});
-  final List<Disputa> lista;
-  final String? prazos;
-  final Future<void> Function() aoMudar;
-
-  @override
-  State<_FilaDisputas> createState() => _FilaDisputasState();
-}
-
-class _FilaDisputasState extends State<_FilaDisputas> {
+/// A fila vem do servidor em páginas leves (uma chamada por página). O caso completo, com
+/// evidências e linha do tempo, é carregado só quando a disputa é aberta.
+class _DisputasTelaState extends State<DisputasTela> {
   String _filtro = 'abertas';
+  ({int abertas, int decididas})? _contagem;
+  String? _prazos;
+
+  bool _iniciou = false;
+
+  /// A primeira carga sai daqui, não do initState: quem carrega lê `context.api`.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_iniciou) return;
+    _iniciou = true;
+    _contar();
+    DisputasTela._prazosVigentes(context.api).then((p) {
+      if (mounted) setState(() => _prazos = p);
+    });
+  }
+
+  Future<void> _contar() async {
+    try {
+      final n = await context.api.contarDisputas();
+      if (mounted) setState(() => _contagem = n);
+    } catch (_) {
+      // Sem contagem, os filtros só não mostram o número.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final abertas = widget.lista.where((d) => d.status != StatusDisputa.decidida).length;
-    final itens = [
-      for (final d in widget.lista)
-        if (_filtro == 'todas' || (_filtro == 'abertas') == (d.status != StatusDisputa.decidida)) d,
-    ]..sort((a, b) => a.decisaoAte.compareTo(b.decisaoAte)); // o prazo mais curto primeiro
-
+    final c = _contagem;
+    if (c != null && c.abertas + c.decididas == 0) {
+      return const EstadoVazio(
+        'Nenhuma disputa aberta.',
+        detalhe: 'Quando um cliente relatar problema, ele aparece aqui com o prazo de resposta.',
+      );
+    }
+    final abertas = c?.abertas ?? 0;
+    final decididas = c?.decididas ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CabecalhoPagina('Disputas', subtitulo: widget.prazos ?? 'Problemas relatados em serviços'),
+        CabecalhoPagina('Disputas', subtitulo: _prazos ?? 'Problemas relatados em serviços'),
         Expanded(
-          child: MestreDetalhe<Disputa>(
-            itens: itens,
-            mensagemSemItens: 'Nenhuma disputa com esse filtro.',
-            tituloDetalhe: DisputasTela.tituloDe,
-            topo: FiltroStatus(
-              opcoes: [
-                ('abertas', 'Abertas', abertas),
-                ('decididas', 'Decididas', widget.lista.length - abertas),
-                ('todas', 'Todas', widget.lista.length),
-              ],
-              selecionado: _filtro,
-              aoMudar: (v) => setState(() => _filtro = v),
-            ),
-            itemBuilder: (context, d, sel) {
-              final (texto, tom) = DisputasTela.chip(d);
-              return CartaoLista(
-                titulo: DisputasTela.tituloDe(d),
-                linhas: [
-                  '${d.pedido} · ${d.cliente} × ${d.profissional}',
-                  DisputasTela.prazo(d),
-                  'Retido ${formatarReais(d.valorEmAnaliseCentavos)}',
+          child: FilaRemota<Disputa>(
+            filtro: _filtro,
+            esqueleto: const EsqueletoPagina(),
+            chave: (d) => d.id,
+            aoAtualizar: _contar,
+            carregar: (deslocamento, limite) =>
+                context.api.listarDisputas(situacao: _filtro, deslocamento: deslocamento, limite: limite),
+            construir: (context, fila) => MestreDetalhe<Disputa>(
+              itens: fila.itens,
+              chave: (d) => d.id,
+              mensagemSemItens: 'Nenhuma disputa com esse filtro.',
+              tituloDetalhe: DisputasTela.tituloDe,
+              rodape: fila.itens.isEmpty ? null : RodapeFila(fila, rotuloItens: 'disputas'),
+              topo: FiltroStatus(
+                opcoes: [
+                  ('abertas', 'Abertas', abertas),
+                  ('decididas', 'Decididas', decididas),
+                  ('todas', 'Todas', abertas + decididas),
                 ],
-                chips: [ChipEstado(texto, tom: tom)],
-                selecionado: sel,
-              );
-            },
-            detalheBuilder: (context, d) => DetalheDisputa(key: ValueKey(d.id), disputa: d, aoMudar: widget.aoMudar),
+                selecionado: _filtro,
+                aoMudar: (v) => setState(() => _filtro = v),
+              ),
+              itemBuilder: (context, d, sel) {
+                final (texto, tom) = DisputasTela.chip(d);
+                return CartaoLista(
+                  titulo: DisputasTela.tituloDe(d),
+                  linhas: [
+                    '${d.pedido} · ${d.cliente} × ${d.profissional}',
+                    DisputasTela.prazo(d),
+                    'Retido ${formatarReais(d.valorEmAnaliseCentavos)}',
+                    if (d.responsavelNome != null) 'Com ${d.responsavelNome}',
+                  ],
+                  chips: [ChipEstado(texto, tom: tom)],
+                  selecionado: sel,
+                );
+              },
+              detalheBuilder: (context, d) => CarregaDados<Disputa>(
+                // O caso se atualiza sozinho e depois de cada ação, sem perder o que foi digitado.
+                key: ValueKey('disputa-${d.id}'),
+                esqueleto: const EsqueletoPagina(),
+                atualizarSozinho: true,
+                carregar: () => context.api.obterDisputa(d.id),
+                construir: (context, completa, recarregar) => DetalheDisputa(
+                  key: ValueKey(d.id),
+                  disputa: completa,
+                  aoMudar: () async {
+                    await recarregar();
+                    await fila.recarregar();
+                  },
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -185,6 +216,27 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
     };
   }
 
+  Future<void> _assumir({required bool substituir}) async {
+    final api = context.api;
+    final d = widget.disputa;
+    final quem = d.responsavelNome ?? 'outra pessoa';
+    final motivo = await pedirMotivo(
+      context,
+      titulo: substituir ? 'Assumir no lugar de $quem?' : 'Assumir esta disputa?',
+      descricao: substituir
+          ? 'A análise passa para você e $quem deixa de poder decidir. A troca fica na auditoria.'
+          : 'Você fica como responsável pelo caso. Outra pessoa só decide se assumir no seu lugar.',
+      rotuloConfirmar: substituir ? 'Assumir no lugar' : 'Assumir disputa',
+    );
+    if (motivo == null || !mounted) return;
+    final ok = await executar(
+      context,
+      () => api.assumirDisputa(d.id, motivo: motivo, substituir: substituir),
+      sucesso: 'Disputa assumida.',
+    );
+    if (ok) await widget.aoMudar();
+  }
+
   Future<void> _registrar() async {
     setState(() => _tentou = true);
     final semJustificativa = _justificativa.text.trim().length < kMotivoMinimo;
@@ -197,6 +249,8 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
         decisao: _decisao!,
         valorReembolsoCentavos: _decisao == DecisaoDisputa.reembolsoParcial ? lerReaisEmCentavos(_valor.text) : null,
         justificativa: _justificativa.text.trim(),
+        // O que a pessoa está vendo. Se mudou no servidor, ele recusa e nada se move.
+        estadoEsperado: widget.disputa.status,
       );
       if (mounted) {
         final n = api.ultimoRegistroAuditoria;
@@ -209,6 +263,8 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
       await widget.aoMudar();
     } catch (e) {
       if (mounted) mostrarErro(context, e);
+      // A recusa costuma ser "a disputa mudou": traz o caso atualizado (o texto digitado fica).
+      await widget.aoMudar();
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
@@ -218,9 +274,13 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
   Widget build(BuildContext context) {
     final d = widget.disputa;
     final (textoChip, tomChip) = DisputasTela.chip(d);
-    final podeDecidir = context.pode(Permissao.disputasDecidir) &&
-        d.status != StatusDisputa.decidida &&
-        d.status != StatusDisputa.aguardandoSegundaPessoa;
+    final eu = context.eu?.id;
+    final aberta = d.status != StatusDisputa.decidida && d.status != StatusDisputa.aguardandoSegundaPessoa;
+    final comOutro = aberta && d.responsavelId != null && d.responsavelId != eu;
+    final comigo = aberta && d.responsavelId != null && d.responsavelId == eu;
+    final podeAgir = context.pode(Permissao.disputasDecidir) && aberta;
+    // Assumida por outra pessoa: só decide depois de assumir no lugar dela (o backend também barra).
+    final podeDecidir = podeAgir && !comOutro;
     return ListView(
       padding: const EdgeInsets.all(EspacosTrato.x6),
       children: [
@@ -245,6 +305,31 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
             tom: Tom.alerta,
             icone: IconesTrato.travar,
           ),
+        if (comOutro) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          BannerInfo(
+            'Para não decidirem o mesmo caso ao mesmo tempo, só quem assumiu decide.',
+            titulo: '${d.responsavelNome ?? 'Outra pessoa'} está analisando esta disputa.',
+            tom: Tom.alerta,
+            icone: Icons.person_outline,
+          ),
+          if (podeAgir) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BotaoTrato.secundario('Assumir no lugar', aoPressionar: () => _assumir(substituir: true)),
+            ),
+          ],
+        ] else if (comigo) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          const BannerInfo('Você está analisando esta disputa.', icone: Icons.person_outline),
+        ] else if (podeAgir) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: BotaoTrato.secundario('Assumir disputa', aoPressionar: () => _assumir(substituir: false)),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x4),
         Linha('Motivo', d.motivo),
         Linha('Retido', formatarReais(d.valorEmAnaliseCentavos)),
@@ -298,6 +383,8 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
             padding: const EdgeInsets.only(top: EspacosTrato.x4),
             child: _AprovacaoSegundaPessoa(disputa: d, aoMudar: widget.aoMudar),
           )
+        else if (comOutro)
+          const SizedBox.shrink()
         else if (!context.pode(Permissao.disputasDecidir))
           const Padding(
             padding: EdgeInsets.only(top: EspacosTrato.x4),

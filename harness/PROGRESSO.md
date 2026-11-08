@@ -731,3 +731,58 @@ não na `feature/f7-financeiro-correcoes`. Nada foi enviado ao GitHub.
   "Mês fechado." do canto tem o mesmo texto do quadro); totais do fechamento com nome quebrado e valor colado (agora
   nome à esquerda e valor alinhado à direita); motivo do repasse com falha mostrava ".;" duplicado. Painel: 12 testes do
   financeiro OK; backend: testes de contestação e repasse OK.
+
+## 2026-11-07 — Operação do painel: 5 correções (filas, disputas, assumir, Risco, atualização)
+
+Branch `feature/f7-correcoes-operacao` (a partir da `develop`). Nada commitado, nada enviado.
+
+1. **Fila cortada em 100.** Verificação e Disputas pediam `limite=100` e filtravam no app. Agora o servidor filtra
+   (status/situação e busca por nome ou PRO-XXXX), devolve o `total` e o painel traz 50 por vez com "Carregar mais"
+   ("Mostrando 50 de 130"). Contadores vêm de `GET /verificacoes/contagem` e `GET /disputas/contagem`. O selo de
+   pendentes do menu também (antes contava uma lista cortada).
+2. **Disputas com N+1.** A lista fazia 1 + N chamadas (detalhe de cada disputa). Agora é 1 chamada por página, com
+   nomes de cliente e profissional no resumo; o caso completo (`GET /disputas/{id}`) só ao abrir.
+3. **Duas pessoas no mesmo item.**
+   - Verificação: `POST /verificacoes/{id}/assumir` (usa a coluna `analista_id` que já existia; sem migration).
+     Decidir ou assumir cadastro que outra pessoa assumiu dá 409 com o nome dela; `substituir=true` troca, com motivo
+     na auditoria (`verificacao.assumida`). Tela: "Assumir análise", "X está analisando", "Assumir no lugar".
+   - Disputas: `estado_esperado` na decisão; se a disputa mudou desde que a pessoa abriu, 409 e nada se move.
+     **"Assumir disputa" ficou de fora:** precisa de coluna nova em `disputas` (migration, precisa de OK).
+4. **Risco recriava a tela.** Usava `key` com versão. Agora recarrega no lugar. Achado no caminho: o `CarregaDados`
+   (usado em todo o painel) trocava a tela pelo esqueleto ao recarregar e perdia filtro e seleção em **todas** as
+   telas. Agora mantém os dados antigos até os novos chegarem. `MestreDetalhe` ganhou `chave`: a seleção segue o
+   mesmo item quando a lista muda de ordem (antes era pela posição e podia mostrar outro item).
+5. **Atualização automática.** Verificação, Disputas (lista e caso aberto) e Risco se atualizam a cada
+   `ADMIN_ATUALIZAR_SEGUNDOS` (padrão 60; mínimo 15; 0 desliga) e ao voltar para a aba. Aba escondida não chama o
+   backend. Novo define na lista permitida (painel e `verificar_defines.py`) e no `.env.example`.
+
+Testes novos: backend `tests/api/test_admin_operacao.py` (11) e 1 em `tests/integracao/test_admin_postgres.py`
+(SQL real no Postgres local: busca com `%` literal, contagem, assumir, 409, auditoria); painel `test/operacao_test.dart` (8).
+
+**Verificação** (`harness/verificar.py`, 07/11): testes TODOS passaram — backend 1431, app 830, painel 173 (8 pulados,
+já existiam); Postgres local do painel 16. "VERIFICAÇÃO FALHOU" só por itens antigos, nenhum nos arquivos desta tarefa:
+ruff em `rotas_catalogo.py` e outros, formatação de `admin/postgres.py:133` (bug antigo: `escape '\'` vira `escape ''`
+na busca de ator da auditoria; fora desta tarefa), avisos antigos do `flutter analyze` e a varredura acusando os APKs em
+`builds/` e `app/test/auth_test.dart`.
+Navegador (build `main_qa`, 1360 px): fila de Verificação com contadores, "Todos os 2 cadastros", Assumir análise →
+"Você está analisando", "Com Cadastro" no card e seleção mantida.
+
+### 2026-11-07 — Assumir disputa (OK do João para criar a migration)
+
+- Migration `supabase/migrations/20261109120000_disputas_responsavel.sql` (+ rollback em `supabase/rollback/`):
+  `disputas.responsavel_id` e `assumida_em`, check de par, índice. **Criada, NÃO aplicada no Supabase.** O app
+  (authenticated) não recebe leitura das colunas novas. Testada no Postgres local (`pg_local.py` passou a aplicá-la).
+- Backend: repositório próprio `ResponsaveisDisputa` (memória e Postgres), sem mexer na máquina de estados da disputa.
+  `POST /disputas/{id}/assumir` (motivo; `substituir` troca; auditoria `disputa.assumida`). Decidir disputa assumida por
+  outra pessoa dá 409 antes de qualquer lançamento. Lista e detalhe trazem `responsavel_id`/`responsavel_nome`.
+- Painel: "Assumir disputa", "Você está analisando", "X está analisando" com "Assumir no lugar"; card mostra "Com X".
+- Testes: API 4 novos (`test_admin_operacao.py`), Postgres local 1 (`test_dinheiro_postgres.py`, com o papel
+  service_role e conferindo que authenticated não lê a coluna), painel 2 (`operacao_test.dart`).
+- **Ordem para publicar:** aplicar a migration no Supabase (precisa de OK) → depois publicar o backend.
+- Verificação (07/11, depois do Assumir disputa): testes TODOS passaram — backend 1436, app 830, painel 175 (8 pulados).
+  "VERIFICAÇÃO FALHOU" pelos mesmos itens antigos de antes (lint/formatação antigos, incluindo `admin/postgres.py:133`,
+  avisos antigos do analyze, APKs em `builds/`). Nenhum nos arquivos desta tarefa.
+- Depois (OK do João, 08/11): migration `disputas_responsavel` aplicada no Supabase e conferida: 2 colunas anuláveis, check e
+  chave estrangeira, índice, RLS ligada, service_role lê e grava, authenticated e anon sem leitura, nenhuma linha preenchida.
+  Advisor de segurança: só o aviso que já existia (proteção contra senhas vazadas desligada no Auth). Commit e merge na
+  `develop` local; nada enviado ao GitHub nem publicado.

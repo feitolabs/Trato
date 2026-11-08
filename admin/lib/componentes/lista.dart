@@ -331,6 +331,8 @@ class MestreDetalhe<T> extends StatefulWidget {
     required this.tituloDetalhe,
     this.topo,
     this.mensagemSemItens = 'Nada por aqui.',
+    this.chave,
+    this.rodape,
   });
 
   final List<T> itens;
@@ -342,12 +344,29 @@ class MestreDetalhe<T> extends StatefulWidget {
   final Widget? topo;
   final String mensagemSemItens;
 
+  /// Identidade do item (o id). Com ela, a seleção segue o MESMO item quando a lista é atualizada
+  /// e muda de ordem; sem ela, a seleção é pela posição.
+  final Object Function(T item)? chave;
+
+  /// Fica depois do último item, dentro da rolagem (ex.: "Carregar mais").
+  final Widget? rodape;
+
   @override
   State<MestreDetalhe<T>> createState() => _MestreDetalheState<T>();
 }
 
 class _MestreDetalheState<T> extends State<MestreDetalhe<T>> {
   int _selecionado = 0;
+  Object? _chaveSelecionada;
+
+  int _indiceAtual() {
+    final chave = widget.chave;
+    if (chave != null && _chaveSelecionada != null) {
+      final i = widget.itens.indexWhere((x) => chave(x) == _chaveSelecionada);
+      if (i >= 0) return i;
+    }
+    return _selecionado < widget.itens.length ? _selecionado : 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -355,20 +374,25 @@ class _MestreDetalheState<T> extends State<MestreDetalhe<T>> {
       builder: (context, c) {
         final largo = c.maxWidth >= kLarguraMestreDetalhe;
         final margem = Responsivo.margemLateral(FaixaPainel.de(context));
-        final atual = _selecionado < widget.itens.length ? _selecionado : 0;
+        final atual = _indiceAtual();
+        final rodape = widget.rodape;
         final Widget lista = widget.itens.isEmpty
             ? EstadoVazio(widget.mensagemSemItens)
             : ListView.separated(
                 padding: EdgeInsets.fromLTRB(largo ? margem : margem, EspacosTrato.x2, largo ? EspacosTrato.x3 : margem, EspacosTrato.x6),
-                itemCount: widget.itens.length,
+                itemCount: widget.itens.length + (rodape == null ? 0 : 1),
                 separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
                 itemBuilder: (context, i) {
+                  if (i == widget.itens.length) return rodape!;
                   final item = widget.itens[i];
                   return InkWell(
                     borderRadius: BorderRadius.circular(EspacosTrato.raio),
                     onTap: () {
                       if (largo) {
-                        setState(() => _selecionado = i);
+                        setState(() {
+                          _selecionado = i;
+                          _chaveSelecionada = widget.chave?.call(item);
+                        });
                       } else {
                         Navigator.of(context).push(MaterialPageRoute<void>(
                           builder: (ctx) => Scaffold(

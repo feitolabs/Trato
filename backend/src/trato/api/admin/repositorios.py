@@ -116,12 +116,23 @@ class VerificacaoAdmin:
     categorias: tuple[str, ...] = ()
     cidade: str | None = None
     envios_anteriores: tuple[EnvioAnteriorAdmin, ...] = ()
+    # Quem assumiu a análise (status em_analise). Outra pessoa só decide depois de assumir.
+    analista_id: str | None = None
+    analista_nome: str | None = None
 
 
 class RepositorioVerificacoesAdmin(Protocol):
     def listar(
-        self, status: Sequence[str], limite: int, deslocamento: int
-    ) -> tuple[Sequence[VerificacaoAdmin], int]: ...
+        self,
+        status: Sequence[str],
+        limite: int,
+        deslocamento: int,
+        busca: str | None = None,
+    ) -> tuple[Sequence[VerificacaoAdmin], int]:
+        """`busca` casa o nome do profissional ou o id curto (PRO-XXXX), sem diferenciar caixa."""
+
+    def contar(self) -> dict[str, int]:
+        """Quantas verificações há em cada status (todos os status aparecem, mesmo com 0)."""
 
     def obter(self, verificacao_id: str) -> VerificacaoAdmin | None: ...
 
@@ -129,7 +140,16 @@ class RepositorioVerificacoesAdmin(Protocol):
         """O caminho no storage (nunca sai da API). Só para gerar a URL assinada."""
 
     def decidir(self, verificacao_id: str, analista_id: str, aprovar: bool, motivo: str) -> None:
-        """Aprova ou recusa. Grava a decisão, atualiza o perfil e a auditoria na MESMA operação."""
+        """Aprova ou recusa. Grava a decisão, atualiza o perfil e a auditoria na MESMA operação.
+
+        Recusa (`RegraDoBanco`, 409) se já foi decidida ou se OUTRA pessoa assumiu a análise.
+        """
+
+    def assumir(
+        self, verificacao_id: str, analista_id: str, motivo: str, substituir: bool = False
+    ) -> None:
+        """Passa para em_analise com a pessoa como responsável. Se outra pessoa já assumiu, só
+        troca com `substituir=True` (fica na auditoria quem saiu e quem entrou)."""
 
 
 class AssinadorUrl(Protocol):
@@ -349,3 +369,26 @@ class RepositorioConfigAdmin(Protocol):
         """Cria NOVA versão (aguardando aprovação) copiando a alvo. Histórico não é editado."""
 
     def descartar_rascunho(self, versao_id: str, autor_id: str, motivo: str) -> None: ...
+
+
+@dataclass(frozen=True)
+class ResponsavelDisputa:
+    """Quem da equipe assumiu a análise de uma disputa aberta."""
+
+    usuario_id: str
+    nome: str | None
+    assumida_em: datetime
+
+
+class RepositorioResponsaveisDisputa(Protocol):
+    def de_varios(self, pedido_ids: Sequence[str]) -> dict[str, ResponsavelDisputa]:
+        """Responsável da disputa ATIVA de cada pedido (pedidos sem responsável ficam de fora)."""
+
+    def assumir(
+        self, pedido_id: str, membro_id: str, motivo: str, substituir: bool = False
+    ) -> ResponsavelDisputa:
+        """Passa a análise para `membro_id` e audita (`disputa.assumida`).
+
+        `RegraDoBanco` (409) se a disputa não está mais aberta ou se OUTRA pessoa já assumiu e
+        `substituir` é falso. `NaoEncontrado` (404) se o pedido não tem disputa.
+        """

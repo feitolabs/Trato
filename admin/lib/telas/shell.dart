@@ -132,8 +132,9 @@ class _ShellPainelState extends State<ShellPainel> {
 
   Future<int> _contarPendentes() async {
     try {
-      final lista = await context.api.listarVerificacoes();
-      return lista.where((v) => v.status == StatusVerificacao.enviada || v.status == StatusVerificacao.emAnalise).length;
+      // Contagem do servidor: antes vinha de uma lista cortada em 100.
+      final n = await context.api.contarVerificacoes();
+      return (n[StatusVerificacao.enviada] ?? 0) + (n[StatusVerificacao.emAnalise] ?? 0);
     } catch (_) {
       return 0;
     }

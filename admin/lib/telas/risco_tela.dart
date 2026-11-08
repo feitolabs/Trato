@@ -16,8 +16,6 @@ class RiscoTela extends StatefulWidget {
 }
 
 class _RiscoTelaState extends State<RiscoTela> {
-  int _versao = 0;
-
   static (String, Tom) severidade(String s) => switch (s) {
         'critica' => ('Crítica', Tom.erro),
         'alta' => ('Alta', Tom.erro),
@@ -44,14 +42,15 @@ class _RiscoTelaState extends State<RiscoTela> {
 
   @override
   Widget build(BuildContext context) {
+    // Recarregar mantém filtro e alerta selecionado (antes a tela inteira era recriada).
     return CarregaDados<List<AlertaRisco>>(
       esqueleto: const EsqueletoPagina(),
-      key: ValueKey('risco-$_versao'),
+      atualizarSozinho: true,
       carregar: context.api.listarAlertasRisco,
       estaVazio: (l) => l.isEmpty,
       mensagemVazia: 'Nenhum alerta de risco',
       detalheVazio: 'Quando o sistema detectar algo fora do normal, o alerta aparece aqui.',
-      construir: (context, lista, _) => _FilaRisco(lista: lista, aoMudar: () => setState(() => _versao++)),
+      construir: (context, lista, recarregar) => _FilaRisco(lista: lista, aoMudar: recarregar),
     );
   }
 }
@@ -88,6 +87,7 @@ class _FilaRiscoState extends State<_FilaRisco> {
         Expanded(
           child: MestreDetalhe<AlertaRisco>(
             itens: itens,
+            chave: (a) => a.id,
             mensagemSemItens: 'Nenhum alerta com esse filtro.',
             tituloDetalhe: (a) => _RiscoTelaState.nomeDoTipo(a.tipo),
             topo: Column(

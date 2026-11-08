@@ -347,7 +347,9 @@ def _mediador(c) -> None:
             (novo,),
         )
         # a alçada efetiva é limitada pelo teto do papel (papeis_alcada); o teste decide R$ 900
-        con.execute("update public.papeis_alcada set teto_centavos = 100000000 where papel = 'mediador'")
+        con.execute(
+            "update public.papeis_alcada set teto_centavos = 100000000 where papel = 'mediador'"
+        )
 
 
 def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):
@@ -557,3 +559,66 @@ def test_migration_ordens_estorno_aplica_protege_e_desfaz(cenario):
             "where table_name = 'pagamentos' and column_name = 'estornado_centavos'"
         ).fetchone()[0]
         assert colunas == 0
+
+
+def test_assumir_disputa_grava_o_responsavel_e_barra_outro_decisor(cenario):
+    """Migration disputas_responsavel + SQL do painel, com o papel service_role do backend."""
+    c = cenario
+    _mediador(c)
+    segundo = str(uuid.uuid4())
+    c.ids["mediador_b"] = segundo
+    with c.local.admin() as con:
+        con.execute("insert into auth.users (id) values (%s)", (segundo,))
+        con.execute("insert into public.usuarios (id, nome) values (%s, 'Mediadora B')", (segundo,))
+        con.execute(
+            "insert into public.equipe (usuario_id, papel, alcada_centavos) "
+            "values (%s, 'mediador', 100000000)",
+            (segundo,),
+        )
+    pedido_id = ate_em_confirmacao(c)
+    disputa = {
+        "motivo": "mal_feito",
+        "descricao": "Pia vazando.",
+        "fotos": [{"arquivo_id": "f3", "tirada_em": agora().isoformat()}],
+    }
+    r = c.cliente.post(f"/v1/pedidos/{pedido_id}/disputa", json=disputa, headers=c.token("cliente"))
+    assert r.status_code == 201, r.text
+    base = f"/v1/admin/disputas/{pedido_id}"
+    corpo = {"motivo": "Vou analisar o caso"}
+
+    r = c.cliente.post(f"{base}/assumir", json=corpo, headers=c.token("mediador"))
+    assert r.status_code == 200, r.text
+    assert r.json()["responsavel_id"] == c.ids["mediador"]
+    assert r.json()["responsavel_nome"] == "Mediador"
+    fila = c.cliente.get("/v1/admin/disputas", headers=c.token("mediador")).json()
+    assert next(i for i in fila["itens"] if i["pedido_id"] == pedido_id)["responsavel_nome"] == (
+        "Mediador"
+    )
+
+    decisao = {"resultado": "liberar_tudo", "justificativa": "Fotos mostram o serviço feito."}
+    barrada = c.cliente.post(f"{base}/decisao", json=decisao, headers=c.token("mediador_b"))
+    assert barrada.status_code == 409 and "Mediador" in barrada.json()["detail"]
+    outra = c.cliente.post(f"{base}/assumir", json=corpo, headers=c.token("mediador_b"))
+    assert outra.status_code == 409
+
+    troca = {"motivo": "Mediador saiu de folga", "substituir": True}
+    r = c.cliente.post(f"{base}/assumir", json=troca, headers=c.token("mediador_b"))
+    assert r.status_code == 200 and r.json()["responsavel_nome"] == "Mediadora B"
+    with c.local.admin() as con:
+        linha = con.execute(
+            "select responsavel_id::text, assumida_em is not null from public.disputas "
+            "where pedido_id = %s",
+            (pedido_id,),
+        ).fetchone()
+        assert linha == (segundo, True)
+        assumidas = con.execute(
+            "select motivo from public.auditoria where acao = 'disputa.assumida' "
+            "and entidade_id = %s order by ocorrida_em, id",
+            (pedido_id,),
+        ).fetchall()
+        assert [a[0] for a in assumidas] == ["Vou analisar o caso", "Mediador saiu de folga"]
+        # A coluna nova não foi liberada para o app (papel authenticated).
+        assert not con.execute(
+            "select has_column_privilege('authenticated', 'public.disputas', 'responsavel_id', "
+            "'select')"
+        ).fetchone()[0]

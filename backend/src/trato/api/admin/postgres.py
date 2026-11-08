@@ -34,6 +34,7 @@ from trato.api.admin.repositorios import (
     MembroEquipe,
     ParametroConfig,
     PedidoResumoAdmin,
+    ResponsavelDisputa,
     UsuarioAdmin,
     VerificacaoAdmin,
     VersaoConfig,
@@ -243,21 +244,47 @@ class VerificacoesAdminPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
+    # O id curto mostrado no painel (PRO-XXXX) sai dos 4 primeiros dígitos do id do profissional.
+    _SELECT = (
+        "select v.id, v.profissional_id, u.nome, v.nivel_solicitado, v.status, "
+        "v.enviada_em, v.decidida_em, v.motivo_recusa, p.cpf, v.analista_id, "
+        "a.nome as analista_nome "
+        "from public.verificacoes v join public.usuarios u on u.id = v.profissional_id "
+        "left join public.usuarios_privados p on p.usuario_id = v.profissional_id "
+        "left join public.usuarios a on a.id = v.analista_id "
+    )
+    _ONDE = (
+        "where v.status = any(%(status)s) "
+        "and (%(termo)s::text is null or u.nome ilike %(like)s escape '\\' "
+        "     or ('PRO-' || upper(left(replace(v.profissional_id::text, '-', ''), 4))) "
+        "        ilike %(like)s escape '\\') "
+    )
+
     def listar(
-        self, status: Sequence[str], limite: int, deslocamento: int
+        self,
+        status: Sequence[str],
+        limite: int,
+        deslocamento: int,
+        busca: str | None = None,
     ) -> tuple[Sequence[VerificacaoAdmin], int]:
+        termo = (busca or "").strip() or None
+        params = {
+            "status": list(status),
+            "termo": termo,
+            "like": _like(termo) if termo else None,
+            "limite": limite,
+            "deslocamento": deslocamento,
+        }
         with self._banco.transacao() as con:
             total = con.execute(
-                "select count(*) as n from public.verificacoes where status = any(%s)",
-                (list(status),),
+                "select count(*) as n from public.verificacoes v "
+                "join public.usuarios u on u.id = v.profissional_id " + self._ONDE,
+                params,
             ).fetchone()["n"]
             linhas = con.execute(
-                "select v.id, v.profissional_id, u.nome, v.nivel_solicitado, v.status, "
-                "v.enviada_em, v.decidida_em, v.motivo_recusa, p.cpf "
-                "from public.verificacoes v join public.usuarios u on u.id = v.profissional_id "
-                "left join public.usuarios_privados p on p.usuario_id = v.profissional_id "
-                "where v.status = any(%s) order by v.enviada_em limit %s offset %s",
-                (list(status), limite, deslocamento),
+                self._SELECT + self._ONDE + "order by v.enviada_em, v.id "
+                "limit %(limite)s offset %(deslocamento)s",
+                params,
             ).fetchall()
             complementos = self._complementos(con, linhas)
         return (
@@ -332,22 +359,26 @@ class VerificacoesAdminPostgres:
             enviada_em=l["enviada_em"],
             decidida_em=l["decidida_em"],
             motivo_recusa=l["motivo_recusa"],
+            analista_id=None if l.get("analista_id") is None else str(l["analista_id"]),
+            analista_nome=l.get("analista_nome"),
             **extra,
         )
+
+    def contar(self) -> dict[str, int]:
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select status, count(*) as n from public.verificacoes group by status"
+            ).fetchall()
+        saida = dict.fromkeys(("enviada", "em_analise", "aprovada", "recusada"), 0)
+        saida.update({l["status"]: int(l["n"]) for l in linhas})  # noqa: E741
+        return saida
 
     def obter(self, verificacao_id: str) -> VerificacaoAdmin | None:
         achado = como_uuid(verificacao_id)
         if achado is None:
             return None
         with self._banco.transacao() as con:
-            linha = con.execute(
-                "select v.id, v.profissional_id, u.nome, v.nivel_solicitado, v.status, "
-                "v.enviada_em, v.decidida_em, v.motivo_recusa, p.cpf "
-                "from public.verificacoes v join public.usuarios u on u.id = v.profissional_id "
-                "left join public.usuarios_privados p on p.usuario_id = v.profissional_id "
-                "where v.id = %s",
-                (achado,),
-            ).fetchone()
+            linha = con.execute(self._SELECT + "where v.id = %s", (achado,)).fetchone()
             if linha is None:
                 return None
             complemento = self._complementos(con, [linha])[str(linha["id"])]
@@ -370,14 +401,22 @@ class VerificacoesAdminPostgres:
         novo = "aprovada" if aprovar else "recusada"
         with self._banco.transacao() as con:
             linha = con.execute(
-                "select status, profissional_id, nivel_solicitado from public.verificacoes "
-                "where id = %s for update",
+                "select v.status, v.profissional_id, v.nivel_solicitado, v.analista_id, "
+                "a.nome as analista_nome from public.verificacoes v "
+                "left join public.usuarios a on a.id = v.analista_id "
+                "where v.id = %s for update of v",
                 (achado,),
             ).fetchone()
             if linha is None:
                 raise NaoEncontrado("Verificação não encontrada.")
             if linha["status"] not in ("enviada", "em_analise"):
                 raise RegraDoBanco("Essa verificação já foi decidida.")
+            dono = linha["analista_id"]
+            if linha["status"] == "em_analise" and dono is not None and str(dono) != analista_id:
+                raise RegraDoBanco(
+                    f"{linha['analista_nome'] or 'Outra pessoa'} está analisando este cadastro. "
+                    "Assuma a análise antes de decidir."
+                )
             con.execute(
                 "update public.verificacoes set status = %s, analista_id = %s, "
                 "motivo_recusa = %s, decidida_em = now() where id = %s",
@@ -405,6 +444,109 @@ class VerificacoesAdminPostgres:
                 depois={"status": novo, "nivel": linha["nivel_solicitado"]},
                 motivo=motivo,
             )
+
+    def assumir(
+        self, verificacao_id: str, analista_id: str, motivo: str, substituir: bool = False
+    ) -> None:
+        achado = exigir_uuid(verificacao_id, "id da verificação")
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select v.status, v.analista_id, a.nome as analista_nome "
+                "from public.verificacoes v left join public.usuarios a on a.id = v.analista_id "
+                "where v.id = %s for update of v",
+                (achado,),
+            ).fetchone()
+            if linha is None:
+                raise NaoEncontrado("Verificação não encontrada.")
+            if linha["status"] not in ("enviada", "em_analise"):
+                raise RegraDoBanco("Essa verificação já foi decidida.")
+            dono = None if linha["analista_id"] is None else str(linha["analista_id"])
+            outro = linha["status"] == "em_analise" and dono not in (None, analista_id)
+            if outro and not substituir:
+                raise RegraDoBanco(
+                    f"{linha['analista_nome'] or 'Outra pessoa'} já está analisando este cadastro."
+                )
+            con.execute(
+                "update public.verificacoes set status = 'em_analise', analista_id = %s "
+                "where id = %s",
+                (analista_id, achado),
+            )
+            _auditar(
+                con,
+                analista_id,
+                "verificacao.assumida",
+                entidade="verificacoes",
+                entidade_id=achado,
+                antes={"status": linha["status"], "analista_id": dono},
+                depois={"status": "em_analise", "analista_id": analista_id},
+                motivo=motivo,
+            )
+
+
+class ResponsaveisDisputaPostgres:
+    """Quem assumiu a disputa ATIVA de cada pedido (`disputas.responsavel_id`)."""
+
+    _ATIVAS = "('aberta', 'aguardando_profissional', 'em_analise')"
+
+    def __init__(self, banco: Banco) -> None:
+        self._banco = banco
+
+    def de_varios(self, pedido_ids: Sequence[str]) -> dict[str, ResponsavelDisputa]:
+        validos = [u for u in (como_uuid(p) for p in pedido_ids) if u is not None]
+        if not validos:
+            return {}
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select d.pedido_id, d.responsavel_id, d.assumida_em, u.nome "
+                "from public.disputas d join public.usuarios u on u.id = d.responsavel_id "
+                f"where d.pedido_id = any(%s::uuid[]) and d.status in {self._ATIVAS}",
+                (validos,),
+            ).fetchall()
+        return {
+            str(l["pedido_id"]): ResponsavelDisputa(  # noqa: E741
+                str(l["responsavel_id"]), l["nome"], l["assumida_em"]
+            )
+            for l in linhas  # noqa: E741
+        }
+
+    def assumir(
+        self, pedido_id: str, membro_id: str, motivo: str, substituir: bool = False
+    ) -> ResponsavelDisputa:
+        pid = exigir_uuid(pedido_id, "pedido")
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select d.id, d.status, d.responsavel_id, u.nome as responsavel_nome "
+                "from public.disputas d left join public.usuarios u on u.id = d.responsavel_id "
+                "where d.pedido_id = %s order by d.aberta_em desc limit 1 for update of d",
+                (pid,),
+            ).fetchone()
+            if linha is None:
+                raise NaoEncontrado("Este pedido não tem disputa.")
+            if linha["status"] not in ("aberta", "aguardando_profissional", "em_analise"):
+                raise RegraDoBanco("Essa disputa já foi decidida.")
+            dono = None if linha["responsavel_id"] is None else str(linha["responsavel_id"])
+            if dono not in (None, membro_id) and not substituir:
+                quem = linha["responsavel_nome"] or "Outra pessoa"
+                raise RegraDoBanco(f"{quem} já está analisando esta disputa.")
+            novo = con.execute(
+                "update public.disputas set responsavel_id = %s, assumida_em = now() "
+                "where id = %s returning assumida_em",
+                (membro_id, linha["id"]),
+            ).fetchone()
+            nome = con.execute(
+                "select nome from public.usuarios where id = %s", (membro_id,)
+            ).fetchone()
+            _auditar(
+                con,
+                membro_id,
+                "disputa.assumida",
+                entidade="pedidos",
+                entidade_id=pid,
+                antes={"responsavel_id": dono},
+                depois={"responsavel_id": membro_id},
+                motivo=motivo,
+            )
+        return ResponsavelDisputa(membro_id, nome["nome"] if nome else None, novo["assumida_em"])
 
 
 class UsuariosAdminPostgres:
@@ -1108,5 +1250,6 @@ def criar_admin_postgres(banco: Banco, assinador=None) -> AdminContexto:
         pedidos=PedidosAdminPostgres(banco),
         config=ConfigAdminPostgres(banco),
         auditoria=AuditoriaAdminPostgres(banco),
+        responsaveis_disputa=ResponsaveisDisputaPostgres(banco),
         assinador=assinador,
     )

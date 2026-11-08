@@ -24,6 +24,7 @@ PERMITIDAS = {
     "TRATO_MODO", "TRATO_API_URL", "SUPABASE_URL", "SUPABASE_ANON_KEY",
     "GOOGLE_WEB_CLIENT_ID", "GOOGLE_IOS_CLIENT_ID", "GALERIA",
     "ADMIN_MODO", "ADMIN_API_URL", "ADMIN_SUPABASE_URL", "ADMIN_SUPABASE_ANON_KEY", "ADMIN_AMBIENTE",
+    "ADMIN_ATUALIZAR_SEGUNDOS",
 }
 NOME_SEGREDO = re.compile(r"(?i)service_role|secret|database_url|db_url|^sk_|private_key|jwt_secret")
 VALOR_SEGREDO = re.compile(r"\b(sk|rk)_(live|test)_[0-9A-Za-z]{6,}|\bwhsec_[0-9A-Za-z]{6,}")

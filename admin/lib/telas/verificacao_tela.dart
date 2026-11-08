@@ -11,7 +11,7 @@ import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
 
 /// F7.1 — fila de verificação de profissionais (RF-VER-01 a RF-VER-04).
-class VerificacaoTela extends StatelessWidget {
+class VerificacaoTela extends StatefulWidget {
   const VerificacaoTela({super.key});
 
   static (String, Tom) chip(StatusVerificacao s) => switch (s) {
@@ -22,51 +22,69 @@ class VerificacaoTela extends StatelessWidget {
       };
 
   @override
-  Widget build(BuildContext context) {
-    return CarregaDados<List<Verificacao>>(
-      esqueleto: const EsqueletoPagina(),
-      carregar: context.api.listarVerificacoes,
-      estaVazio: (l) => l.isEmpty,
-      mensagemVazia: 'Nenhum cadastro esperando análise.',
-      detalheVazio: 'Quando um profissional enviar os documentos, o cadastro aparece aqui.',
-      construir: (context, lista, recarregar) => _FilaVerificacao(lista: lista, aoMudar: recarregar),
-    );
-  }
+  State<VerificacaoTela> createState() => _VerificacaoTelaState();
 }
 
-class _FilaVerificacao extends StatefulWidget {
-  const _FilaVerificacao({required this.lista, required this.aoMudar});
-
-  final List<Verificacao> lista;
-  final Future<void> Function() aoMudar;
-
-  @override
-  State<_FilaVerificacao> createState() => _FilaVerificacaoState();
-}
-
-class _FilaVerificacaoState extends State<_FilaVerificacao> {
+/// A fila vem do servidor em páginas (filtro e busca também rodam lá). Os contadores vêm de
+/// `/verificacoes/contagem`, então não dependem de quantos itens foram trazidos.
+class _VerificacaoTelaState extends State<VerificacaoTela> {
   /// `pendentes` (enviada + em análise) ou o nome de um status.
   String _filtro = 'pendentes';
   String _busca = '';
+  Timer? _esperaBusca;
+  Map<StatusVerificacao, int>? _contagem;
 
-  int _contar(StatusVerificacao s) => widget.lista.where((v) => v.status == s).length;
+  bool _iniciou = false;
 
-  bool _casa(Verificacao v) {
-    final ok = switch (_filtro) {
-      'pendentes' => v.status == StatusVerificacao.enviada || v.status == StatusVerificacao.emAnalise,
-      final nome => v.status.name == nome,
-    };
-    if (!ok) return false;
-    final t = _busca.trim().toLowerCase();
-    return t.isEmpty || v.profissional.toLowerCase().contains(t) || v.idPublico.toLowerCase().contains(t);
+  /// A primeira carga sai daqui, não do initState: quem carrega lê `context.api`.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_iniciou) return;
+    _iniciou = true;
+    _contar();
+  }
+
+  @override
+  void dispose() {
+    _esperaBusca?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _contar() async {
+    try {
+      final n = await context.api.contarVerificacoes();
+      if (mounted) setState(() => _contagem = n);
+    } catch (_) {
+      // Sem contagem, os filtros só não mostram o número.
+    }
+  }
+
+  int _n(StatusVerificacao s) => _contagem?[s] ?? 0;
+
+  List<StatusVerificacao> get _status => switch (_filtro) {
+        'pendentes' => const [StatusVerificacao.enviada, StatusVerificacao.emAnalise],
+        final nome => [StatusVerificacao.values.byName(nome)],
+      };
+
+  void _aoDigitar(String v) {
+    _esperaBusca?.cancel();
+    _esperaBusca = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _busca = v.trim());
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final pendentes = _contar(StatusVerificacao.enviada) + _contar(StatusVerificacao.emAnalise);
-    // Fila ordenada pelo envio mais antigo.
-    final itens = widget.lista.where(_casa).toList()..sort((a, b) => a.enviadaEm.compareTo(b.enviadaEm));
+    final contagem = _contagem;
+    final pendentes = _n(StatusVerificacao.enviada) + _n(StatusVerificacao.emAnalise);
     final margem = Responsivo.margemLateral(FaixaPainel.de(context));
+    if (contagem != null && contagem.values.every((n) => n == 0)) {
+      return const EstadoVazio(
+        'Nenhum cadastro esperando análise.',
+        detalhe: 'Quando um profissional enviar os documentos, o cadastro aparece aqui.',
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -79,50 +97,66 @@ class _FilaVerificacaoState extends State<_FilaVerificacao> {
                   'Fila pelo envio mais antigo. Aprovar libera pedidos só das categorias aprovadas.',
         ),
         Expanded(
-          child: MestreDetalhe<Verificacao>(
-            itens: itens,
-            mensagemSemItens: 'Nenhum cadastro com esse filtro.',
-            tituloDetalhe: (v) => v.profissional,
-            topo: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FiltroStatus(
-                  opcoes: [
-                    ('pendentes', 'Pendentes', pendentes),
-                    ('enviada', 'Enviada', _contar(StatusVerificacao.enviada)),
-                    ('emAnalise', 'Em análise', _contar(StatusVerificacao.emAnalise)),
-                    ('aprovada', 'Aprovada', _contar(StatusVerificacao.aprovada)),
-                    ('recusada', 'Recusada', _contar(StatusVerificacao.recusada)),
-                  ],
-                  selecionado: _filtro,
-                  aoMudar: (v) => setState(() => _filtro = v),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(margem, 0, EspacosTrato.x3, EspacosTrato.x2),
-                  child: TextField(
-                    onChanged: (v) => setState(() => _busca = v),
-                    decoration: const InputDecoration(
-                      labelText: 'Buscar cadastro',
-                      prefixIcon: Icon(IconesTrato.buscar, size: 20),
+          child: FilaRemota<Verificacao>(
+            filtro: (_filtro, _busca),
+            esqueleto: const EsqueletoPagina(),
+            chave: (v) => v.id,
+            aoAtualizar: _contar,
+            carregar: (deslocamento, limite) => context.api.listarVerificacoes(
+              status: _status,
+              busca: _busca,
+              deslocamento: deslocamento,
+              limite: limite,
+            ),
+            construir: (context, fila) => MestreDetalhe<Verificacao>(
+              itens: fila.itens,
+              chave: (v) => v.id,
+              mensagemSemItens: 'Nenhum cadastro com esse filtro.',
+              tituloDetalhe: (v) => v.profissional,
+              rodape: fila.itens.isEmpty ? null : RodapeFila(fila, rotuloItens: 'cadastros'),
+              topo: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FiltroStatus(
+                    opcoes: [
+                      ('pendentes', 'Pendentes', pendentes),
+                      ('enviada', 'Enviada', _n(StatusVerificacao.enviada)),
+                      ('emAnalise', 'Em análise', _n(StatusVerificacao.emAnalise)),
+                      ('aprovada', 'Aprovada', _n(StatusVerificacao.aprovada)),
+                      ('recusada', 'Recusada', _n(StatusVerificacao.recusada)),
+                    ],
+                    selecionado: _filtro,
+                    aoMudar: (v) => setState(() => _filtro = v),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(margem, 0, EspacosTrato.x3, EspacosTrato.x2),
+                    child: TextField(
+                      onChanged: _aoDigitar,
+                      decoration: const InputDecoration(
+                        labelText: 'Buscar cadastro',
+                        prefixIcon: Icon(IconesTrato.buscar, size: 20),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            itemBuilder: (context, v, sel) {
-              final (texto, tom) = VerificacaoTela.chip(v.status);
-              return CartaoLista(
-                titulo: v.profissional,
-                linhas: [
-                  if (v.categorias.isNotEmpty) v.categorias.join(', '),
-                  'Enviado em ${formatarData(v.enviadaEm)}',
                 ],
-                chips: [ChipEstado(texto, tom: tom)],
-                selecionado: sel,
-              );
-            },
-            detalheBuilder: (context, v) =>
-                DetalheVerificacao(key: ValueKey(v.id), verificacao: v, aoMudar: widget.aoMudar),
+              ),
+              itemBuilder: (context, v, sel) {
+                final (texto, tom) = VerificacaoTela.chip(v.status);
+                return CartaoLista(
+                  titulo: v.profissional,
+                  linhas: [
+                    if (v.categorias.isNotEmpty) v.categorias.join(', '),
+                    'Enviado em ${formatarData(v.enviadaEm)}',
+                    if (v.status == StatusVerificacao.emAnalise && v.analistaNome != null)
+                      'Com ${v.analistaNome}',
+                  ],
+                  chips: [ChipEstado(texto, tom: tom)],
+                  selecionado: sel,
+                );
+              },
+              detalheBuilder: (context, v) =>
+                  DetalheVerificacao(key: ValueKey(v.id), verificacao: v, aoMudar: fila.recarregar),
+            ),
           ),
         ),
       ],
@@ -280,6 +314,28 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
     await _mostrar(documento, imagem, url: aberta);
   }
 
+  Future<void> _assumir({required bool substituir}) async {
+    final api = context.api;
+    final v = widget.verificacao;
+    final quem = v.analistaNome ?? 'outra pessoa';
+    final motivo = await pedirMotivo(
+      context,
+      titulo: substituir ? 'Assumir no lugar de $quem?' : 'Assumir a análise?',
+      descricao: substituir
+          ? 'A análise passa para você e $quem deixa de poder decidir. A troca fica na auditoria.'
+          : 'O cadastro vai para Em análise com você como responsável. '
+              'Outra pessoa só decide se assumir no seu lugar.',
+      rotuloConfirmar: substituir ? 'Assumir no lugar' : 'Assumir análise',
+    );
+    if (motivo == null || !mounted) return;
+    final ok = await executar(
+      context,
+      () => api.assumirVerificacao(v.id, motivo: motivo, substituir: substituir),
+      sucesso: 'Análise assumida.',
+    );
+    if (ok) await widget.aoMudar();
+  }
+
   Future<void> _decidir(bool aprovar) async {
     final api = context.api;
     final v = widget.verificacao;
@@ -312,7 +368,13 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
     final decidida = v.status == StatusVerificacao.aprovada || v.status == StatusVerificacao.recusada;
     final podeRevelar = context.pode(Permissao.documentosRevelar);
     final podeRevelarPessoais = context.pode(Permissao.dadosPessoaisRevelar);
-    final podeDecidir = context.pode(Permissao.verificacoesDecidir) && !decidida;
+    final eu = context.eu?.id;
+    final assumida = v.status == StatusVerificacao.emAnalise && v.analistaId != null;
+    final comOutro = assumida && v.analistaId != eu;
+    final comigo = assumida && v.analistaId == eu;
+    final podeAgir = context.pode(Permissao.verificacoesDecidir) && !decidida;
+    // Assumido por outra pessoa: só decide depois de assumir no lugar dela (o backend também barra).
+    final podeDecidir = podeAgir && !comOutro;
     final semCpf = v.cpfMascarado == null || v.cpfMascarado!.isEmpty;
 
     return ListView(
@@ -341,6 +403,25 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
             ChipEstado(textoStatus, tom: tomStatus),
           ],
         ),
+        if (comOutro) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          BannerInfo(
+            'Para não decidirem o mesmo cadastro ao mesmo tempo, só quem assumiu aprova ou recusa.',
+            titulo: '${v.analistaNome ?? 'Outra pessoa'} está analisando este cadastro.',
+            tom: Tom.alerta,
+            icone: Icons.person_outline,
+          ),
+          if (podeAgir) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BotaoTrato.secundario('Assumir no lugar', aoPressionar: () => _assumir(substituir: true)),
+            ),
+          ],
+        ] else if (comigo) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          const BannerInfo('Você está analisando este cadastro.', icone: Icons.person_outline),
+        ],
         const SizedBox(height: EspacosTrato.x4),
         Wrap(
           spacing: EspacosTrato.x8,
@@ -431,6 +512,11 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
             spacing: EspacosTrato.x3,
             runSpacing: EspacosTrato.x3,
             children: [
+              if (!assumida)
+                BotaoTrato.secundario(
+                  'Assumir análise',
+                  aoPressionar: _decidindo ? null : () => _assumir(substituir: false),
+                ),
               BotaoTrato.secundario('Recusar cadastro', aoPressionar: _decidindo ? null : () => _decidir(false)),
               BotaoTrato.primario(
                 'Aprovar profissional',
