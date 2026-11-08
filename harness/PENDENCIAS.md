@@ -104,6 +104,8 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
   de teste). Versões de configuração aprovadas são imutáveis e a auditoria é imutável: limpar exige decisão sua (RNF-07).
 
 **Não feito (precisa de OK ou de dependência externa):**
+- **Publicar o backend e o painel da Operação** (filas paginadas, assumir, atualização automática). A migration
+  `disputas_responsavel` já está no Supabase (08/11). Precisa de OK ou de o João publicar no Render.
 - Convite por e-mail e 2FA obrigatório no primeiro acesso (RF-EQP-01, RNF-03): precisa da API de admin do Supabase e envio de e-mail
   (efeito real). Hoje a pessoa precisa já ter conta no Trato.
 - Fila de suporte (RF-BUS-05): não existe tabela nem rota de chamados; a aba mostra o estado vazio com orientação. Atribuir, responder e
