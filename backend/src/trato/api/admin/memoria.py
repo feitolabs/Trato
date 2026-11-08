@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -19,6 +19,7 @@ from trato.api.admin.repositorios import (
     FiltroAuditoria,
     MembroEquipe,
     PedidoResumoAdmin,
+    ResponsavelDisputa,
     UsuarioAdmin,
     VerificacaoAdmin,
     VersaoConfig,
@@ -150,18 +151,73 @@ class VerificacoesAdminEmMemoria:
         self._auditoria = auditoria
         self._agora = agora
         self._itens: dict[str, _Verificacao] = {}
+        # Nome de quem assume (os testes preenchem; em produção vem do banco).
+        self._nomes: dict[str, str] = {}
+
+    def nomear(self, usuario_id: str, nome: str) -> None:
+        self._nomes[usuario_id] = nome
 
     def adicionar(self, verificacao: VerificacaoAdmin, caminhos: dict[str, str] | None = None):
         self._itens[verificacao.id] = _Verificacao(verificacao, caminhos or {})
 
     def listar(
-        self, status: Sequence[str], limite: int, deslocamento: int
+        self,
+        status: Sequence[str],
+        limite: int,
+        deslocamento: int,
+        busca: str | None = None,
     ) -> tuple[Sequence[VerificacaoAdmin], int]:
+        termo = (busca or "").strip().lower()
         achadas = sorted(
-            (i.dados for i in self._itens.values() if i.dados.status in status),
+            (
+                i.dados
+                for i in self._itens.values()
+                if i.dados.status in status
+                and (
+                    not termo
+                    or termo in i.dados.profissional_nome.lower()
+                    or termo in i.dados.publico_id.lower()
+                )
+            ),
             key=lambda v: v.enviada_em,
         )
         return tuple(achadas[deslocamento : deslocamento + limite]), len(achadas)
+
+    def contar(self) -> dict[str, int]:
+        saida = dict.fromkeys(("enviada", "em_analise", "aprovada", "recusada"), 0)
+        for i in self._itens.values():
+            saida[i.dados.status] = saida.get(i.dados.status, 0) + 1
+        return saida
+
+    def assumir(
+        self, verificacao_id: str, analista_id: str, motivo: str, substituir: bool = False
+    ) -> None:
+        item = self._itens.get(verificacao_id)
+        if item is None:
+            raise NaoEncontrado("Verificação não encontrada.")
+        antes = item.dados
+        if antes.status not in ("enviada", "em_analise"):
+            raise RegraDoBanco("Essa verificação já foi decidida.")
+        outro = antes.analista_id not in (None, analista_id) and antes.status == "em_analise"
+        if outro and not substituir:
+            raise RegraDoBanco(
+                f"{antes.analista_nome or 'Outra pessoa'} já está analisando este cadastro."
+            )
+        item.dados = replace(
+            antes,
+            status="em_analise",
+            analista_id=analista_id,
+            analista_nome=self._nomes.get(analista_id),
+        )
+        self._auditoria.registrar(
+            ator_id=analista_id,
+            acao="verificacao.assumida",
+            entidade="verificacoes",
+            entidade_id=verificacao_id,
+            antes={"status": antes.status, "analista_id": antes.analista_id},
+            depois={"status": "em_analise", "analista_id": analista_id},
+            motivo=motivo,
+        )
 
     def obter(self, verificacao_id: str) -> VerificacaoAdmin | None:
         item = self._itens.get(verificacao_id)
@@ -178,6 +234,12 @@ class VerificacoesAdminEmMemoria:
         antes = item.dados.status
         if antes not in ("enviada", "em_analise"):
             raise RegraDoBanco("Essa verificação já foi decidida.")
+        dono = item.dados.analista_id
+        if antes == "em_analise" and dono is not None and dono != analista_id:
+            raise RegraDoBanco(
+                f"{item.dados.analista_nome or 'Outra pessoa'} está analisando este cadastro. "
+                "Assuma a análise antes de decidir."
+            )
         novo = "aprovada" if aprovar else "recusada"
         item.dados = replace(
             item.dados,
@@ -194,6 +256,56 @@ class VerificacoesAdminEmMemoria:
             depois={"status": novo},
             motivo=motivo,
         )
+
+
+class ResponsaveisDisputaEmMemoria:
+    """Quem assumiu cada disputa. `estado_de(pedido_id)` diz o estado da disputa (None = não há)."""
+
+    def __init__(
+        self,
+        auditoria: AuditoriaEmMemoria,
+        estado_de: Callable[[str], str | None],
+        agora=_agora,
+    ) -> None:
+        self._auditoria = auditoria
+        self._estado_de = estado_de
+        self._agora = agora
+        self._itens: dict[str, ResponsavelDisputa] = {}
+        self._nomes: dict[str, str] = {}
+
+    def nomear(self, usuario_id: str, nome: str) -> None:
+        self._nomes[usuario_id] = nome
+
+    def de_varios(self, pedido_ids: Sequence[str]) -> dict[str, ResponsavelDisputa]:
+        return {
+            p: self._itens[p]
+            for p in pedido_ids
+            if p in self._itens and self._estado_de(p) not in (None, "decidida")
+        }
+
+    def assumir(
+        self, pedido_id: str, membro_id: str, motivo: str, substituir: bool = False
+    ) -> ResponsavelDisputa:
+        estado = self._estado_de(pedido_id)
+        if estado is None:
+            raise NaoEncontrado("Este pedido não tem disputa.")
+        if estado == "decidida":
+            raise RegraDoBanco("Essa disputa já foi decidida.")
+        atual = self._itens.get(pedido_id)
+        if atual is not None and atual.usuario_id != membro_id and not substituir:
+            raise RegraDoBanco(f"{atual.nome or 'Outra pessoa'} já está analisando esta disputa.")
+        novo = ResponsavelDisputa(membro_id, self._nomes.get(membro_id), self._agora())
+        self._itens[pedido_id] = novo
+        self._auditoria.registrar(
+            ator_id=membro_id,
+            acao="disputa.assumida",
+            entidade="pedidos",
+            entidade_id=pedido_id,
+            antes={"responsavel_id": atual.usuario_id if atual else None},
+            depois={"responsavel_id": membro_id},
+            motivo=motivo,
+        )
+        return novo
 
 
 class UsuariosAdminEmMemoria:

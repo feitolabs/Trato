@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
+    AssumirIn,
     ComMotivo,
     DecisaoVerificacaoIn,
     DocumentoOut,
@@ -44,12 +45,15 @@ def _saida(v: VerificacaoAdmin) -> VerificacaoOut:
             EnvioAnteriorOut(enviado_em=e.enviado_em, status=e.status, motivo=e.motivo)
             for e in v.envios_anteriores
         ],
+        analista_id=v.analista_id,
+        analista_nome=v.analista_nome,
     )
 
 
 @router.get("", response_model=Pagina[VerificacaoOut], summary="Fila de verificações")
 def listar(
     status: list[str] | None = Query(None, description="Padrão: enviada e em_analise."),
+    busca: str | None = Query(None, max_length=80, description="Nome ou id curto (PRO-XXXX)."),
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
     _: Operador = Depends(exigir(Permissao.VERIFICACOES_VER)),
@@ -58,10 +62,18 @@ def listar(
     escolhidos = tuple(status) if status else STATUS_DA_FILA
     if any(s not in STATUS_VALIDOS for s in escolhidos):
         raise HTTPException(422, f"status deve ser um de: {', '.join(STATUS_VALIDOS)}.")
-    itens, total = admin.verificacoes.listar(escolhidos, limite, deslocamento)
+    itens, total = admin.verificacoes.listar(escolhidos, limite, deslocamento, busca)
     return Pagina(
         itens=[_saida(v) for v in itens], total=total, limite=limite, deslocamento=deslocamento
     )
+
+
+@router.get("/contagem", summary="Quantas verificações há em cada status")
+def contagem(
+    _: Operador = Depends(exigir(Permissao.VERIFICACOES_VER)),
+    admin: AdminContexto = Depends(obter_admin),
+) -> dict[str, int]:
+    return admin.verificacoes.contar()
 
 
 @router.get("/{verificacao_id}", response_model=VerificacaoOut, summary="Detalhe (sem arquivos)")
@@ -107,6 +119,27 @@ def url_do_documento(
     )
     url = admin.assinador.assinar(caminho, admin.segundos_url)
     return UrlDocumentoOut(url=url, expira_em_segundos=admin.segundos_url)
+
+
+@router.post(
+    "/{verificacao_id}/assumir",
+    response_model=VerificacaoOut,
+    summary="Assumir a análise (vai para em_analise com você como responsável)",
+    description=(
+        "Se outra pessoa já assumiu, responde 409; com `substituir=true` a análise passa para "
+        "você e a troca fica na auditoria. Cadastro já decidido responde 409."
+    ),
+)
+def assumir(
+    verificacao_id: str,
+    corpo: AssumirIn,
+    operador: Operador = Depends(exigir(Permissao.VERIFICACOES_DECIDIR)),
+    admin: AdminContexto = Depends(obter_admin),
+) -> VerificacaoOut:
+    if admin.verificacoes.obter(verificacao_id) is None:
+        raise HTTPException(404, "Verificação não encontrada.")
+    admin.verificacoes.assumir(verificacao_id, operador.id, corpo.motivo, corpo.substituir)
+    return _saida(admin.verificacoes.obter(verificacao_id))  # type: ignore[arg-type]
 
 
 @router.post(

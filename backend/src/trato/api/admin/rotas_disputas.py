@@ -17,6 +17,7 @@ from trato import disputas
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
     AprovarDisputaIn,
+    AssumirIn,
     DecidirDisputaIn,
     DisputaDetalheOut,
     DisputaResumoOut,
@@ -27,6 +28,7 @@ from trato.api.admin.modelos import (
     PessoaOut,
 )
 from trato.api.admin.papeis import PapelEquipe, Permissao
+from trato.api.admin.repositorios import ResponsavelDisputa
 from trato.api.admin.rotas_pagamentos import lancamento_admin_out
 from trato.api.contexto import Contexto, obter_contexto
 from trato.disputas import Ator, Decisao, Disputa, Estado, Resultado
@@ -56,9 +58,15 @@ def _resumo(
     d: Disputa,
     contexto: Contexto,
     rotulos: dict[str, tuple[int | None, str]] | None = None,
+    partes: tuple[str | None, str | None] = (None, None),
+    responsavel: ResponsavelDisputa | None = None,
 ) -> DisputaResumoOut:
     numero, titulo = (rotulos or {}).get(pedido_id, (None, None))
     return DisputaResumoOut(
+        cliente_nome=partes[0],
+        profissional_nome=partes[1],
+        responsavel_id=responsavel.usuario_id if responsavel else None,
+        responsavel_nome=responsavel.nome if responsavel else None,
         pedido_id=pedido_id,
         pedido_numero=numero,
         pedido_titulo=titulo,
@@ -71,6 +79,11 @@ def _resumo(
         atrasada=d.atrasada(contexto.agora()),
         sem_resposta=d.sem_resposta,
     )
+
+
+def _responsaveis(admin: AdminContexto, pedido_ids: list[str]) -> dict[str, ResponsavelDisputa]:
+    repo = admin.responsaveis_disputa
+    return repo.de_varios(pedido_ids) if repo is not None and pedido_ids else {}
 
 
 def _sem_codigos(valor: Any) -> Any:
@@ -128,7 +141,19 @@ def _detalhe(
         for e in eventos
         if e.prova is not None
     ]
-    resumo = _resumo(pedido_id, d, contexto, admin.pedidos.rotulos([pedido_id]))
+    partes = (
+        (nomes.get(pedido.cliente_id), nomes.get(pedido.profissional_id or ""))
+        if pedido
+        else (None, None)
+    )
+    resumo = _resumo(
+        pedido_id,
+        d,
+        contexto,
+        admin.pedidos.rotulos([pedido_id]),
+        partes,
+        _responsaveis(admin, [pedido_id]).get(pedido_id),
+    )
     return DisputaDetalheOut(
         **resumo.model_dump(),
         estado_pedido=pedido.estado.value if pedido else None,
@@ -168,29 +193,88 @@ def _obter(contexto: Contexto, pedido_id: str) -> Disputa:
     return disputa
 
 
+def _na_situacao(d: Disputa, estado: Estado | None, situacao: str) -> bool:
+    if estado is not None:
+        return d.estado is estado
+    if situacao == "todas":
+        return True
+    decidida = d.estado is Estado.DECIDIDA
+    return decidida if situacao == "decididas" else not decidida
+
+
 @router.get("", response_model=Pagina[DisputaResumoOut], summary="Fila de disputas")
 def fila(
-    estado: Estado | None = Query(None, description="Padrão: tudo que não está decidido."),
+    estado: Estado | None = Query(
+        None, description="Um estado só. Tem prioridade sobre `situacao`."
+    ),
+    situacao: str = Query(
+        "abertas", pattern="^(abertas|decididas|todas)$", description="Padrão: não decididas."
+    ),
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
     _: Operador = Depends(exigir(Permissao.DISPUTAS_VER)),
     contexto: Contexto = Depends(obter_contexto),
     admin: AdminContexto = Depends(obter_admin),
 ) -> Pagina[DisputaResumoOut]:
-    achadas = [
-        (pid, d)
-        for pid, d in _todas(contexto)
-        if (d.estado is estado if estado else d.estado is not Estado.DECIDIDA)
-    ]
-    achadas.sort(key=lambda par: par[1].prazos.decisao_ate)  # o prazo mais curto primeiro
+    achadas = [(pid, d) for pid, d in _todas(contexto) if _na_situacao(d, estado, situacao)]
+    # O prazo mais curto primeiro; empate pelo pedido, para a paginação não pular nem repetir.
+    achadas.sort(key=lambda par: (par[1].prazos.decisao_ate, par[0]))
     pagina = achadas[deslocamento : deslocamento + limite]
     rotulos = admin.pedidos.rotulos([pid for pid, _ in pagina])
+    pedidos = {pid: contexto.pedidos.obter(pid) for pid, _ in pagina}
+    ids = {i for p in pedidos.values() if p for i in (p.cliente_id, p.profissional_id) if i}
+    nomes = admin.usuarios.nomes(list(ids))
+    donos = _responsaveis(admin, [pid for pid, _ in pagina])
+
+    def partes(pid: str) -> tuple[str | None, str | None]:
+        p = pedidos.get(pid)
+        if p is None:
+            return (None, None)
+        return (nomes.get(p.cliente_id), nomes.get(p.profissional_id or ""))
+
     return Pagina(
-        itens=[_resumo(pid, d, contexto, rotulos) for pid, d in pagina],
+        itens=[
+            _resumo(pid, d, contexto, rotulos, partes(pid), donos.get(pid)) for pid, d in pagina
+        ],
         total=len(achadas),
         limite=limite,
         deslocamento=deslocamento,
     )
+
+
+@router.get("/contagem", summary="Quantas disputas estão abertas e quantas já foram decididas")
+def contagem(
+    _: Operador = Depends(exigir(Permissao.DISPUTAS_VER)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> dict[str, int]:
+    todas = _todas(contexto)
+    decididas = sum(1 for _, d in todas if d.estado is Estado.DECIDIDA)
+    return {"abertas": len(todas) - decididas, "decididas": decididas, "todas": len(todas)}
+
+
+@router.post(
+    "/{pedido_id}/assumir",
+    response_model=DisputaDetalheOut,
+    summary="Assumir a análise da disputa",
+    description=(
+        "Só quem assumiu decide. Se outra pessoa já assumiu, responde 409; com "
+        "`substituir=true` a análise passa para você e a troca fica na auditoria."
+    ),
+)
+def assumir(
+    pedido_id: str,
+    corpo: AssumirIn,
+    operador: Operador = Depends(exigir(Permissao.DISPUTAS_DECIDIR)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> DisputaDetalheOut:
+    disputa = _obter(contexto, pedido_id)
+    if disputa.estado is Estado.DECIDIDA:
+        raise HTTPException(409, "Essa disputa já foi decidida.")
+    if admin.responsaveis_disputa is None:
+        raise HTTPException(503, "Assumir disputa ainda não está configurado neste ambiente.")
+    admin.responsaveis_disputa.assumir(pedido_id, operador.id, corpo.motivo, corpo.substituir)
+    return _detalhe(contexto, admin, pedido_id, disputa)
 
 
 @router.get("/{pedido_id}", response_model=DisputaDetalheOut, summary="Detalhe da disputa")
@@ -333,6 +417,19 @@ def decidir(
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaDetalheOut:
     disputa = _obter(contexto, pedido_id)
+    if corpo.estado_esperado is not None and corpo.estado_esperado != disputa.estado.value:
+        raise HTTPException(
+            409,
+            "A disputa mudou desde que você abriu (nova resposta ou decisão de outra pessoa). "
+            "Atualize e confira antes de decidir.",
+        )
+    dono = _responsaveis(admin, [pedido_id]).get(pedido_id)
+    if dono is not None and dono.usuario_id != operador.id:
+        raise HTTPException(
+            409,
+            f"{dono.nome or 'Outra pessoa'} está analisando esta disputa. "
+            "Assuma a análise antes de decidir.",
+        )
     agora = contexto.agora()
     if disputa.estado is Estado.ABERTA and agora > disputa.prazos.resposta_ate:
         disputa = disputa.encerrar_sem_resposta(Ator.SISTEMA, agora)  # profissional não respondeu
