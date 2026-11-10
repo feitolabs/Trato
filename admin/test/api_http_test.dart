@@ -151,10 +151,22 @@ void main() {
         200,
         {'url': 'https://storage.teste/arquivo?assinatura=1', 'expira_em_segundos': 60},
       );
-      final lista = await api.listarVerificacoes();
+      final pagina = await api.listarVerificacoes(
+        status: const [StatusVerificacao.enviada, StatusVerificacao.emAnalise],
+        busca: ' Carl ',
+        deslocamento: 50,
+        limite: 50,
+      );
+      final lista = pagina.itens;
+      expect(pagina.total, 1);
       expect(lista.single.profissional, 'Carlos');
       expect(lista.single.status, StatusVerificacao.emAnalise);
       expect(lista.single.documentos, ['Frente do documento', 'Selfie']);
+      final consulta = s.chamada('GET', '/v1/admin/verificacoes').url.queryParametersAll;
+      expect(consulta['status'], ['enviada', 'em_analise']);
+      expect(consulta['busca'], ['Carl']);
+      expect(consulta['limite'], ['50']);
+      expect(consulta['deslocamento'], ['50']);
 
       final url = await api.revelarDocumento('v-1', 'Selfie', 'Conferir a foto do cadastro');
       expect(url, contains('storage.teste'));
@@ -170,13 +182,23 @@ void main() {
       });
     });
 
-    test('disputas: mapeia detalhe, decide e aprova', () async {
+    test('disputas: lista leve numa chamada só, detalhe à parte, decide e aprova', () async {
       s.respostas['GET /v1/admin/disputas'] = (
         200,
         {
           'itens': [
-            {'pedido_id': 'ped-1'},
+            {
+              'pedido_id': 'ped-1',
+              'pedido_numero': 10482,
+              'estado': 'em_analise',
+              'motivo': 'mal_feito',
+              'valor_congelado_centavos': 240000,
+              'decisao_ate': '2026-11-02T12:00:00Z',
+              'cliente_nome': 'Marina',
+              'profissional_nome': 'Carlos',
+            },
           ],
+          'total': 7,
         },
       );
       s.respostas['GET /v1/admin/disputas/ped-1'] = (
@@ -200,7 +222,18 @@ void main() {
           ],
         },
       );
-      final d = (await api.listarDisputas()).single;
+      final pagina = await api.listarDisputas(situacao: 'todas', deslocamento: 0, limite: 50);
+      expect(pagina.total, 7);
+      final leve = pagina.itens.single;
+      expect(leve.cliente, 'Marina');
+      expect(leve.profissional, 'Carlos');
+      expect(leve.pedido, 'PED-10482');
+      expect(leve.status, StatusDisputa.emAnalise);
+      expect(s.chamada('GET', '/v1/admin/disputas').url.queryParameters['situacao'], 'todas');
+      // A lista não abre o detalhe de cada disputa (antes era uma chamada por item).
+      expect(s.chamadas.where((c) => c.url.path == '/v1/admin/disputas/ped-1'), isEmpty);
+
+      final d = await api.obterDisputa('ped-1');
       expect(d.cliente, 'Marina');
       expect(d.status, StatusDisputa.aguardandoSegundaPessoa);
       expect(d.decisao, DecisaoDisputa.reembolsoTotal);
@@ -214,11 +247,13 @@ void main() {
         decisao: DecisaoDisputa.reembolsoParcial,
         valorReembolsoCentavos: 5000,
         justificativa: 'Parte do serviço foi feita',
+        estadoEsperado: StatusDisputa.emAnalise,
       );
       expect(r.status, StatusDisputa.aguardandoSegundaPessoa);
       expect(jsonDecode(s.chamada('POST', '/v1/admin/disputas/ped-1/decisao').body), {
         'resultado': 'reembolso_parcial',
         'justificativa': 'Parte do serviço foi feita',
+        'estado_esperado': 'em_analise',
         'valor_cliente_centavos': 5000,
       });
 

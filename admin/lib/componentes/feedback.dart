@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../nucleo/escopo.dart';
 import '../tema/tema.dart';
+import 'atualizacao.dart';
 import 'botoes.dart';
 import 'icones.dart';
 
@@ -507,6 +508,7 @@ class CarregaDados<T> extends StatefulWidget {
     this.mensagemVazia = 'Nada por aqui.',
     this.detalheVazio,
     this.esqueleto,
+    this.atualizarSozinho = false,
   });
 
   final Future<T> Function() carregar;
@@ -516,41 +518,70 @@ class CarregaDados<T> extends StatefulWidget {
   final String? detalheVazio;
   final Widget? esqueleto;
 
+  /// Liga a atualização automática (intervalo configurado e volta para a aba). Ver [AtualizaSozinho].
+  final bool atualizarSozinho;
+
   @override
   State<CarregaDados<T>> createState() => _CarregaDadosState<T>();
 }
 
-class _CarregaDadosState<T> extends State<CarregaDados<T>> {
-  late Future<T> _futuro = widget.carregar();
+/// Recarregar não troca a tela pelo esqueleto: os dados antigos ficam até os novos chegarem.
+/// Assim filtro, seleção e o que a pessoa digitou no detalhe sobrevivem à atualização.
+class _CarregaDadosState<T> extends State<CarregaDados<T>> with AtualizaSozinho {
+  late T _dados;
+  bool _temDados = false;
+  Object? _erro;
+  int _geracao = 0;
 
-  Future<void> _recarregar() async {
-    final novo = widget.carregar();
-    setState(() {
-      _futuro = novo;
-    });
+  @override
+  bool get atualizacaoLigada => widget.atualizarSozinho;
+
+  bool _iniciou = false;
+
+  /// A primeira carga sai daqui, não do initState: quem carrega lê `context.api`.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_iniciou) return;
+    _iniciou = true;
+    _buscar();
+  }
+
+  /// Só a resposta do pedido mais recente vale (uma resposta lenta não pisa numa nova).
+  Future<void> _buscar() async {
+    final geracao = ++_geracao;
     try {
-      await novo;
-    } catch (_) {}
+      final dados = await widget.carregar();
+      if (!mounted || geracao != _geracao) return;
+      setState(() {
+        _dados = dados;
+        _temDados = true;
+        _erro = null;
+      });
+    } catch (e) {
+      if (!mounted || geracao != _geracao) return;
+      // Já tinha dados: mantém o que estava na tela (o erro de uma ação aparece na própria ação).
+      if (!_temDados) setState(() => _erro = e);
+    }
+  }
+
+  Future<void> _tentarDeNovo() async {
+    setState(() => _erro = null);
+    await _buscar();
   }
 
   @override
+  Future<void> atualizarEmSilencio() => _buscar();
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<T>(
-      future: _futuro,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return widget.esqueleto ?? const EsqueletoLista();
-        }
-        if (snap.hasError) {
-          return EstadoErro(snap.error.toString(), aoTentar: _recarregar);
-        }
-        final dados = snap.data as T;
-        if (widget.estaVazio?.call(dados) ?? false) {
-          return EstadoVazio(widget.mensagemVazia, detalhe: widget.detalheVazio);
-        }
-        return widget.construir(context, dados, _recarregar);
-      },
-    );
+    if (_erro case final erro?) return EstadoErro(erro.toString(), aoTentar: _tentarDeNovo);
+    if (!_temDados) return widget.esqueleto ?? const EsqueletoLista();
+    final dados = _dados;
+    if (widget.estaVazio?.call(dados) ?? false) {
+      return EstadoVazio(widget.mensagemVazia, detalhe: widget.detalheVazio);
+    }
+    return widget.construir(context, dados, _buscar);
   }
 }
 

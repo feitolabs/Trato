@@ -1,0 +1,35 @@
+# Fly.io — backend do Trato. Rode `fly ...` dentro de backend/.
+# O nome do app é único no Fly inteiro: se "trato-backend" já existir, troque aqui.
+# SEGREDOS NÃO FICAM AQUI. Use `fly secrets set` (ver docs/hospedagem-fly-io.md).
+app = "trato-backend"
+primary_region = "gru" # São Paulo, mesma região do Supabase (sa-east-1)
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Só valores que NÃO são segredo.
+[env]
+  TRATO_AMBIENTE = "producao"
+  TRATO_PERSISTENCIA = "postgres"
+  # Atrás do proxy do Fly o IP real vem em X-Forwarded-For. Sem isto o limite de taxa por IP
+  # enxerga um IP só (o do proxy) e bloqueia todo mundo junto.
+  TRATO_SEG_CONFIAR_X_FORWARDED_FOR = "true"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Sempre ligada: sem "dormir" e sem esperar acordar.
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/saude"
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

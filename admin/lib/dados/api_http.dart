@@ -203,18 +203,28 @@ class ApiAdminHttp implements ApiAdmin {
     'recusada': StatusVerificacao.recusada,
   };
 
+  static String _codigoVerificacao(StatusVerificacao s) =>
+      _statusVerificacao.entries.firstWhere((e) => e.value == s).key;
+
   @override
-  Future<List<Verificacao>> listarVerificacoes() async {
-    // A fila (enviada e em análise) e os já decididos, para os contadores e filtros da tela.
+  Future<PaginaRemota<Verificacao>> listarVerificacoes({
+    List<StatusVerificacao> status = const [],
+    String busca = '',
+    int deslocamento = 0,
+    int limite = 50,
+  }) async {
+    final codigos = status.isEmpty ? _statusVerificacao.keys.toList() : status.map(_codigoVerificacao).toList();
     final uri = Uri.parse('$_api/v1/admin/verificacoes').replace(queryParameters: {
-      'status': const ['enviada', 'em_analise', 'aprovada', 'recusada'],
-      'limite': const ['100'],
+      'status': codigos,
+      if (busca.trim().isNotEmpty) 'busca': [busca.trim()],
+      'limite': ['$limite'],
+      'deslocamento': ['$deslocamento'],
     });
     final token = _token;
     if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
     final r = await _enviar('GET', uri, cabecalhos: {'Authorization': 'Bearer $token'});
     if (!r.ok) throw _erro(r);
-    return [
+    final itens = [
       for (final v in _itens(r.json))
         () {
           final rotulos = <String>[];
@@ -246,9 +256,24 @@ class ApiAdminHttp implements ApiAdmin {
             ],
             status: _statusVerificacao[v['status']] ?? StatusVerificacao.enviada,
             motivoDecisao: v['motivo_recusa'] as String?,
+            analistaId: v['analista_id'] as String?,
+            analistaNome: v['analista_nome'] as String?,
           );
         }(),
     ];
+    final total = r.json is Map ? _int((r.json as Map)['total']) : itens.length;
+    return PaginaRemota(itens, total);
+  }
+
+  @override
+  Future<Map<StatusVerificacao, int>> contarVerificacoes() async {
+    final corpo = _mapa(await _chamar('GET', '/v1/admin/verificacoes/contagem'));
+    return {for (final e in _statusVerificacao.entries) e.value: _int(corpo[e.key])};
+  }
+
+  @override
+  Future<void> assumirVerificacao(String id, {required String motivo, bool substituir = false}) async {
+    await _chamar('POST', '/v1/admin/verificacoes/$id/assumir', corpo: {'motivo': motivo, 'substituir': substituir});
   }
 
   static String _capitalizar(String t) {
@@ -289,15 +314,42 @@ class ApiAdminHttp implements ApiAdmin {
     'decidida': StatusDisputa.decidida,
   };
 
+  static String _codigoEstadoDisputa(StatusDisputa s) => switch (s) {
+        StatusDisputa.aberta || StatusDisputa.aguardandoProfissional => 'aberta',
+        StatusDisputa.emAnalise => 'em_analise',
+        StatusDisputa.aguardandoSegundaPessoa => 'aguardando_aprovacao',
+        StatusDisputa.decidida => 'decidida',
+      };
+
+  /// Uma chamada por página (antes era uma por disputa): o detalhe vem só ao abrir o caso.
   @override
-  Future<List<Disputa>> listarDisputas() async {
-    final corpo = await _chamar('GET', '/v1/admin/disputas', consulta: {'limite': '100'});
-    final ids = [for (final d in _itens(corpo)) d['pedido_id'] as String];
-    return Future.wait([for (final id in ids) _detalheDisputa(id)]);
+  Future<PaginaRemota<Disputa>> listarDisputas({
+    String situacao = 'abertas',
+    int deslocamento = 0,
+    int limite = 50,
+  }) async {
+    final corpo = await _chamar('GET', '/v1/admin/disputas', consulta: {
+      'situacao': situacao,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    });
+    final itens = [for (final d in _itens(corpo)) _disputa(d)];
+    return PaginaRemota(itens, corpo is Map ? _int(corpo['total']) : itens.length);
   }
 
-  Future<Disputa> _detalheDisputa(String pedidoId) async =>
-      _disputa(_mapa(await _chamar('GET', '/v1/admin/disputas/$pedidoId')));
+  @override
+  Future<Disputa> obterDisputa(String id) async => _disputa(_mapa(await _chamar('GET', '/v1/admin/disputas/$id')));
+
+  @override
+  Future<void> assumirDisputa(String id, {required String motivo, bool substituir = false}) async {
+    await _chamar('POST', '/v1/admin/disputas/$id/assumir', corpo: {'motivo': motivo, 'substituir': substituir});
+  }
+
+  @override
+  Future<({int abertas, int decididas})> contarDisputas() async {
+    final c = _mapa(await _chamar('GET', '/v1/admin/disputas/contagem'));
+    return (abertas: _int(c['abertas']), decididas: _int(c['decididas']));
+  }
 
   Disputa _disputa(Map<String, dynamic> d) {
     final decisao = DecisaoDisputa.values.where((x) => x.codigo == d['decisao']).firstOrNull;
@@ -309,8 +361,12 @@ class ApiAdminHttp implements ApiAdmin {
       id: pedidoId,
       pedido: numero == null ? 'PED-${pedidoId.replaceAll('-', '').substring(0, 4).toUpperCase()}' : 'PED-$numero',
       titulo: (d['pedido_titulo'] as String?) ?? '',
-      cliente: (d['cliente'] is Map ? _mapa(d['cliente'])['nome'] as String? : null) ?? 'Cliente',
-      profissional: (d['profissional'] is Map ? _mapa(d['profissional'])['nome'] as String? : null) ?? 'Profissional',
+      cliente: (d['cliente'] is Map ? _mapa(d['cliente'])['nome'] as String? : null) ??
+          d['cliente_nome'] as String? ??
+          'Cliente',
+      profissional: (d['profissional'] is Map ? _mapa(d['profissional'])['nome'] as String? : null) ??
+          d['profissional_nome'] as String? ??
+          'Profissional',
       motivo: motivo,
       descricao: motivo,
       valorEmAnaliseCentavos: _int(d['valor_congelado_centavos']),
@@ -322,6 +378,8 @@ class ApiAdminHttp implements ApiAdmin {
       decisao: decisao,
       valorReembolsoCentavos: divisao == null ? null : _int(divisao['para_cliente_centavos']),
       decididoPor: d['decidido_por'] as String?,
+      responsavelId: d['responsavel_id'] as String?,
+      responsavelNome: d['responsavel_nome'] as String?,
       evidencias: [
         for (final e in (d['evidencias'] as List? ?? const []))
           EvidenciaDisputa(
@@ -380,10 +438,12 @@ class ApiAdminHttp implements ApiAdmin {
     required DecisaoDisputa decisao,
     int? valorReembolsoCentavos,
     required String justificativa,
+    StatusDisputa? estadoEsperado,
   }) async {
     final corpo = await _chamar('POST', '/v1/admin/disputas/$id/decisao', corpo: {
       'resultado': decisao.codigo,
       'justificativa': justificativa,
+      if (estadoEsperado != null) 'estado_esperado': _codigoEstadoDisputa(estadoEsperado),
       if (decisao == DecisaoDisputa.reembolsoParcial) 'valor_cliente_centavos': valorReembolsoCentavos,
     });
     return _resultado(corpo);

@@ -19,6 +19,7 @@ from trato.api.admin.memoria import (
     ConfigAdminEmMemoria,
     EquipeEmMemoria,
     PedidosAdminEmMemoria,
+    ResponsaveisDisputaEmMemoria,
     UsuariosAdminEmMemoria,
     VerificacoesAdminEmMemoria,
 )
@@ -252,6 +253,11 @@ def adm() -> AmbienteAdmin:
         config=config_admin,
         auditoria=auditoria,
         assinador=assinador,
+        responsaveis_disputa=ResponsaveisDisputaEmMemoria(
+            auditoria,
+            lambda pid: d.estado.value if (d := contexto.disputas.obter(pid)) else None,
+            relogio,
+        ),
     )
     app = criar_app(contexto)
     instalar_admin(app, admin)

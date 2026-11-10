@@ -200,7 +200,8 @@ def test_papel_errado_e_403_com_jwt_real(amb):
     for metodo, caminho, quem in rotas:
         r = getattr(amb.cliente, metodo)(BASE + caminho, headers=amb.h(quem))
         assert r.status_code == 403, (caminho, quem, r.status_code)
-    _r = amb.cliente.get(BASE + "/usuarios", headers=amb.h("cadastro")); assert _r.status_code == 200, _r.text
+    _r = amb.cliente.get(BASE + "/usuarios", headers=amb.h("cadastro"))
+    assert _r.status_code == 200, _r.text
 
 
 def test_cliente_e_conta_bloqueada_ou_sem_token_nao_entram(amb):
@@ -570,7 +571,9 @@ def test_auditoria_filtros_e_cadeia_no_banco(amb):
     por_entidade = amb.cliente.get(
         f"{BASE}/auditoria?entidade=verificacoes&entidade_id={amb.ids['v1']}", headers=seg
     )
-    assert por_entidade.json()["total"] == 3  # 2 urls do documento (cadastro e administrador) + aprovação
+    assert (
+        por_entidade.json()["total"] == 3
+    )  # 2 urls do documento (cadastro e administrador) + aprovação
     futuro = (datetime.now(UTC) + timedelta(days=1)).isoformat().replace("+00:00", "Z")
     assert (
         amb.cliente.get(BASE + "/auditoria", params={"desde": futuro}, headers=seg).json()["total"]
@@ -659,3 +662,58 @@ def test_painel_le_email_do_auth_sem_select_em_auth_users(amb):
     )
     assert novo.status_code in (200, 201), novo.text
     assert novo.json()["usuario_id"] == convidado
+
+
+def test_operacao_busca_contagem_assumir_e_decisao_barrada_no_postgres(amb):
+    """Correções da Operação contra o SQL de verdade: busca, contagem, assumir e o 409."""
+    with amb.local.admin() as con:
+        pro = _novo_usuario(con, amb.ids, "Zeca Encanador")
+        con.execute("insert into public.perfis_profissional (usuario_id) values (%s)", (pro,))
+        v = str(
+            con.execute(
+                "insert into public.verificacoes (profissional_id, nivel_solicitado, "
+                "consentimento_lgpd_em) values (%s, 'verificado', now()) returning id",
+                (pro,),
+            ).fetchone()[0]
+        )
+    cad, adm = amb.h("cadastro"), amb.h("administrador")
+
+    achou = amb.cliente.get(BASE + "/verificacoes?busca=zeca%25", headers=cad).json()
+    assert achou["total"] == 0  # o % da busca é literal, não curinga
+    achou = amb.cliente.get(BASE + "/verificacoes?busca=zeca enc", headers=cad).json()
+    assert [i["id"] for i in achou["itens"]] == [v] and achou["total"] == 1
+    curto = "PRO-" + pro.replace("-", "")[:4].upper()
+    por_id = amb.cliente.get(f"{BASE}/verificacoes?busca={curto.lower()}", headers=cad).json()
+    assert v in [i["id"] for i in por_id["itens"]]
+
+    contagem = amb.cliente.get(BASE + "/verificacoes/contagem", headers=cad).json()
+    assert set(contagem) == {"enviada", "em_analise", "aprovada", "recusada"}
+    assert contagem["enviada"] >= 1
+
+    corpo = {"motivo": "Vou analisar agora"}
+    r = amb.cliente.post(f"{BASE}/verificacoes/{v}/assumir", json=corpo, headers=cad)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "em_analise" and r.json()["analista_nome"] == "cadastro"
+
+    decisao = {"aprovar": True, "motivo": "Documentos conferem"}
+    barrada = amb.cliente.post(f"{BASE}/verificacoes/{v}/decisao", json=decisao, headers=adm)
+    assert barrada.status_code == 409 and "cadastro" in barrada.json()["detail"]
+    assert (
+        amb.cliente.post(f"{BASE}/verificacoes/{v}/assumir", json=corpo, headers=adm).status_code
+        == 409
+    )
+
+    troca = {"motivo": "Cadastro saiu de férias", "substituir": True}
+    r = amb.cliente.post(f"{BASE}/verificacoes/{v}/assumir", json=troca, headers=adm)
+    assert r.status_code == 200 and r.json()["analista_id"] == amb.ids["administrador"]
+    r = amb.cliente.post(f"{BASE}/verificacoes/{v}/decisao", json=decisao, headers=adm)
+    assert r.status_code == 200 and r.json()["status"] == "aprovada"
+    aud = amb.sql(
+        "select acao, motivo from public.auditoria where entidade_id = %s order by ocorrida_em, id",
+        v,
+    )
+    assert aud == [
+        ("verificacao.assumida", "Vou analisar agora"),
+        ("verificacao.assumida", "Cadastro saiu de férias"),
+        ("verificacao.aprovada", "Documentos conferem"),
+    ]

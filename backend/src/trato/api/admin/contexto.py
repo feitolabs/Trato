@@ -19,6 +19,7 @@ from trato.api.admin.repositorios import (
     RepositorioConfigAdmin,
     RepositorioEquipe,
     RepositorioPedidosAdmin,
+    RepositorioResponsaveisDisputa,
     RepositorioUsuariosAdmin,
     RepositorioVerificacoesAdmin,
 )
@@ -35,6 +36,8 @@ class AdminContexto:
     pedidos: RepositorioPedidosAdmin
     config: RepositorioConfigAdmin
     auditoria: RepositorioAuditoriaAdmin
+    # Quem assumiu cada disputa. Sem ele, "assumir" responde 503 e a decisão não confere dono.
+    responsaveis_disputa: RepositorioResponsaveisDisputa | None = None
     # Sem assinador, a URL do documento responde 503 (o bucket privado não é aberto às cegas).
     assinador: AssinadorUrl | None = None
     # Vem de `TRATO_SEG_URL_DOCUMENTO_SEGUNDOS` (padrão 60): URL assinada curta.
