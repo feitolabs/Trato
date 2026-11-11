@@ -11,9 +11,9 @@ Regras que valem para todas:
   (a API não revela que o pedido existe).
 - Valores em **centavos inteiros** (`1.5` ou texto é recusado com `422`). O app **só pede e mostra**:
   taxa, líquido, custo do provedor e "pago" são decididos pelo backend.
-- **Taxa SOMADA (31/10/2026):** `valor_centavos` de orçamento/contrato é o SERVIÇO. O cliente paga
-  serviço + taxa (`total_a_pagar_centavos`); o profissional recebe o serviço inteiro. Ver
-  `docs/taxa-somada-parcelado.md`.
+- **Taxa DESCONTADA (10/11/2026):** `valor_centavos` de orçamento/contrato é o SERVIÇO. O cliente paga
+  o serviço (`total_a_pagar_centavos`); o profissional recebe o serviço menos a taxa. Ver
+  `docs/taxa-descontada-profissional.md`.
 - Corpo com campo desconhecido: `422`.
 - `{contrato_id}` é o **id do pedido** (o contrato é um por pedido e não tem outro id).
 - O app **nunca** mostra "pago" antes de `pago: true` em `GET /v1/contratos/{id}/pagamento` (D13).
@@ -25,7 +25,7 @@ Regras que valem para todas:
 | `GET /v1/pedidos/{id}/orcamentos` | cliente dono (vê todos), profissional (só o dele), equipe com permissão | — | lista de `{id, profissional_id, profissional_nome, versao, valor_centavos, prazo_execucao_dias, garantia_dias, observacoes, enviado_em, aceito}`; do mais barato ao mais caro; **sem rascunhos** |
 | `POST /v1/pedidos/{id}/orcamentos` | profissional | `{itens: [{tipo, descricao, quantidade, valor_unitario_centavos}], etapas?: [{descricao, valor_centavos}], prazo_execucao_dias?, validade_ate?, garantia_dias?, fora_do_escopo?, sinal_material_centavos?, observacoes?}` | `201` `{id, pedido_id, profissional_id, versao, status, valor_total_centavos, enviado_em}`. Cria nova versão do orçamento e envia para o pedido aberto. Versão anterior 'enviada' vira 'substituido'. `404` se o pedido não existir; `409` se o pedido não estiver aberto |
 | `GET /v1/orcamentos/{id}` | cliente dono do pedido e o profissional autor | — | os campos acima mais `status`, `validade_ate`, `fora_do_escopo`, `sinal_material_centavos`, `itens[] {tipo, descricao, quantidade (texto), valor_unitario_centavos, total_centavos}`. Rascunho: `404` |
-| `POST /v1/orcamentos/resumo` | profissional | `{valor_centavos}` | `{valor_centavos (o orçamento), taxa_centavos, total_cliente_centavos (orçamento + taxa), receita_trato_centavos (= taxa), liquido_centavos (= orçamento: o profissional recebe tudo), taxa_bps, taxa_percentual, custo_provedor_estimado_centavos, custo_provedor_estimativa: true}`. Taxa da configuração vigente, SOMADA ao orçamento; o custo do provedor é **estimativa** (maior entre Pix e cartão) e o Trato o absorve (sai da taxa), não do líquido. Sem taxa configurada: `503`. Nada é gravado |
+| `POST /v1/orcamentos/resumo` | profissional | `{valor_centavos}` | `{valor_centavos (o orçamento), taxa_centavos, total_cliente_centavos (= orçamento), receita_trato_centavos (= taxa), liquido_centavos (= orçamento − taxa), taxa_bps, taxa_percentual, custo_provedor_estimado_centavos, custo_provedor_estimativa: true}`. Taxa da configuração vigente, descontada do profissional; o custo do provedor é **estimativa** (maior entre Pix e cartão) e o Trato o absorve (sai da taxa), não do líquido. Sem taxa configurada: `503`. Nada é gravado |
 
 O aceite continua em `POST /v1/pedidos/{id}/acoes/aceitar_orcamento`.
 
@@ -33,8 +33,8 @@ O aceite continua em `POST /v1/pedidos/{id}/acoes/aceitar_orcamento`.
 
 | Método e caminho | Quem pode | Corpo | Resposta |
 |---|---|---|---|
-| `POST /v1/contratos/{id}/cobranca` | cliente do contrato | `{meio: "pix" \| "cartao", parcelas?: 1..12}` (`parcelas > 1` só no cartão e só se o custo do provedor estiver configurado; hoje `422`) | `201` `{contrato_id, cobranca_id, estado_pagamento: "aguardando_confirmacao", meio, parcelas, valor_centavos (= serviço + taxa + custo do parcelado), tipo_instrucao, instrucao, criada_em}`. Pix: `tipo_instrucao = "pix_copia_e_cola"` e `instrucao` é o código. Cartão: `"cartao_segredo_do_cliente"` e `instrucao` é o segredo para o SDK do app. Repetir com o mesmo meio devolve a **mesma** cobrança pendente (idempotente); trocar o meio cancela a anterior |
-| `GET /v1/contratos/{id}/pagamento` | cliente e profissional do contrato | — | `{contrato_id, estado_pagamento, pago, valor_centavos (serviço), total_a_pagar_centavos (serviço + taxa), pago_centavos (o que o ledger recebeu), cobranca_id, meio, estado_pedido}` |
+| `POST /v1/contratos/{id}/cobranca` | cliente do contrato | `{meio: "pix" \| "cartao", parcelas?: 1..12}` (`parcelas > 1` só no cartão e só se o custo do provedor estiver configurado; hoje `422`) | `201` `{contrato_id, cobranca_id, estado_pagamento: "aguardando_confirmacao", meio, parcelas, valor_centavos (= serviço + custo do parcelado), tipo_instrucao, instrucao, criada_em}`. Pix: `tipo_instrucao = "pix_copia_e_cola"` e `instrucao` é o código. Cartão: `"cartao_segredo_do_cliente"` e `instrucao` é o segredo para o SDK do app. Repetir com o mesmo meio devolve a **mesma** cobrança pendente (idempotente); trocar o meio cancela a anterior |
+| `GET /v1/contratos/{id}/pagamento` | cliente e profissional do contrato | — | `{contrato_id, estado_pagamento, pago, valor_centavos (serviço), total_a_pagar_centavos (= serviço), pago_centavos (o que o ledger recebeu), cobranca_id, meio, estado_pedido}` |
 
 `estado_pagamento`: `sem_cobranca`, `aguardando_confirmacao`, `pago`, `falhou`, `cancelada`.
 `pago` só vira `true` depois do **webhook assinado** do provedor (`POST /v1/webhooks/stripe`): a
@@ -119,7 +119,7 @@ pedido que ele não podia ver responde `404`.
 
 | Rota | Para que serve | Resposta |
 |---|---|---|
-| `GET /v1/pedidos/{id}/pagamento` | **Antes de cobrar**: o que mostrar na tela de pagar (valor e meios). Cliente do pedido ou equipe com permissão | `{pedido_id, estado, valor_centavos (serviço), taxa_centavos, total_a_pagar_centavos (Pix e cartão à vista), opcoes_parcelamento: [{parcelas, custo_centavos, total_centavos, valor_parcela_centavos}] (vazia = parcelado desligado), pago_centavos, pagamento_confirmado, meios_disponiveis: ["pix","cartao"], cobranca_pendente_id}` |
+| `GET /v1/pedidos/{id}/pagamento` | **Antes de cobrar**: o que mostrar na tela de pagar (valor e meios). Cliente do pedido ou equipe com permissão | `{pedido_id, estado, valor_centavos (serviço), total_a_pagar_centavos (Pix e cartão à vista), opcoes_parcelamento: [{parcelas, custo_centavos, total_centavos, valor_parcela_centavos}] (vazia = parcelado desligado), pago_centavos, pagamento_confirmado, meios_disponiveis: ["pix","cartao"], cobranca_pendente_id}` |
 | `GET /v1/contratos/{id}/pagamento` | **Depois de cobrar**: o estado do pagamento (consultar até `pago: true`). Cliente e profissional | `{contrato_id, estado_pagamento, pago, valor_centavos, pago_centavos, cobranca_id, meio, estado_pedido}` |
 
 O app lê **valor e meios** da primeira e **só acredita em "pago"** na segunda (`pago: true`, que vem

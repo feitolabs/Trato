@@ -786,3 +786,36 @@ Navegador (build `main_qa`, 1360 px): fila de Verificação com contadores, "Tod
   chave estrangeira, índice, RLS ligada, service_role lê e grava, authenticated e anon sem leitura, nenhuma linha preenchida.
   Advisor de segurança: só o aviso que já existia (proteção contra senhas vazadas desligada no Auth). Commit e merge na
   `develop` local; nada enviado ao GitHub nem publicado.
+
+## 2026-11-08 — Backend preparado para o Fly.io (gru, São Paulo)
+
+Decisão do sócio e do João: começar no Fly.io, banco segue no Supabase (sa-east-1). Branch `feature/hospedagem-fly-io`.
+
+- Novos: `backend/Dockerfile` (python 3.11-slim, usuário sem root, porta 8080), `backend/.dockerignore`,
+  `backend/fly.toml` (região `gru`, 1 máquina `shared-cpu-1x` 512 MB, sempre ligada, healthcheck em `/saude`),
+  `docs/hospedagem-fly-io.md` (passo a passo para o João) e 2 linhas comentadas no `.env.example`. Sem segredo em nada.
+- Comando de partida: `trato.main:app`. **O `render.yaml` usa `trato.api.fabrica:criar_app_da_config --factory`, que não liga
+  `registrar_rotas` (limite de taxa, HSTS, LGPD) nem tem `/saude`.** Na produção do Render a camada de segurança provavelmente
+  não está ativa. No Fly passa a estar: por isso `TRATO_SEG_CONFIAR_X_FORWARDED_FOR=true` no `fly.toml` (senão o limite por IP
+  trataria todos os usuários como um IP só). Pendente de decisão: conferir se 300 req/min por IP basta para o app.
+- Admin é Flutter web estático: não vai no Fly. Hospedagem estática grátis (Cloudflare Pages/Netlify); depois incluir o endereço
+  em `TRATO_SEG_CORS_ORIGENS`.
+- Agendador (`python -m trato.agendador`) continua fora, como no Render. Vira segundo processo quando for ligado.
+- **Nada implantado.** Sem conta, cartão, `fly deploy` nem segredos. O Docker não existe nesta máquina: a imagem não foi
+  montada. Simulei o `Dockerfile` (python 3.11, `pip install .` sem modo editável, `trato.main:app`): `/saude` 200, `/docs`
+  404 em produção, HSTS presente.
+- Verificação (`harness/verificar.py`, 08/11): testes TODOS passaram — backend 1436, painel 175 (8 pulados), app sem falha.
+  "VERIFICAÇÃO FALHOU" pelos mesmos itens antigos (ruff lint/formatação, `flutter analyze`, APKs em `builds/` e
+  `app/test/auth_test.dart` na varredura de segredos). Nenhum nos arquivos desta tarefa.
+
+## 2026-11-10 — Taxa descontada do profissional (`feature/taxa-descontada-profissional`)
+
+Decisão do João (D17), substitui a taxa somada de 31/10/2026. Detalhe: `docs/taxa-descontada-profissional.md`.
+
+- Cliente paga o orçamento. A taxa é calculada sobre o orçamento, congelada no aceite e descontada na conclusão, antes de creditar a carteira.
+- Reembolso devolve 100%, inclusive a taxa já descontada (retrabalho que vira disputa). Só o custo do parcelado não volta.
+- Backend: `taxa.py`, `orquestrador.py`, `ledger.py`, `repasses.py`, `contratos.py`, `rotas_app.py`, `rotas_pedidos.py`, `rotas_disputas.py`, termos (`rotas_legal.py`). Saiu `cancelamento_devolve_taxa` e `taxa_reembolsavel`.
+- App: calculadora e aditivo mostram a taxa descontada; a tela de pagamento do cliente não mostra taxa. 4 goldens refeitos. Painel sem mudança.
+- Sem migration, sem escrita no banco, nada publicado. Banco real sem contratos nem pagamentos (só leitura).
+- Assumido, a confirmar: em reembolso parcial a taxa incide sobre o que ficou para o profissional. Termos atualizados: validar com o Emanoel.
+- Verificação (`harness/verificar.py`, 10/11): testes TODOS passaram — backend 1437 (com Postgres), app 830, painel 175 (8 pulados). "VERIFICAÇÃO FALHOU" pelos mesmos itens antigos (ruff lint/formatação, `flutter analyze`, APKs em `builds/` e `app/test/auth_test.dart` na varredura de segredos).

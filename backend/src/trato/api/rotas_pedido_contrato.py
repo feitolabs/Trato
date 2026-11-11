@@ -82,7 +82,7 @@ class CobrancaContratoOut(BaseModel):
     estado_pagamento: str = Field(description="Sempre `aguardando_confirmacao` aqui; nunca `pago`.")
     meio: str
     valor_centavos: int = Field(
-        description="O que o cliente paga: serviço + taxa do Trato (+ custo do parcelado)."
+        description="O que o cliente paga: o serviço (+ custo do parcelado)."
     )
     parcelas: int = 1
     tipo_instrucao: str = Field(description="`pix_copia_e_cola` ou `cartao_segredo_do_cliente`.")
@@ -104,7 +104,7 @@ class PagamentoContratoOut(BaseModel):
     pago: bool = Field(description="Verdadeiro só depois do webhook assinado do provedor.")
     valor_centavos: int | None = Field(description="O valor do SERVIÇO (o orçamento).")
     total_a_pagar_centavos: int | None = Field(
-        None, description="Serviço + taxa do Trato (à vista). Sem custo de parcelamento."
+        None, description="O valor do serviço (à vista). Sem custo de parcelamento."
     )
     pago_centavos: int
     cobranca_id: str | None = None

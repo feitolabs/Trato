@@ -198,7 +198,7 @@ Faça uma fase por vez. **Só avance quando a fase atual passar na verificação
 **Regra de ouro do escopo:** nenhuma regra de dinheiro roda no app. O app só pede e mostra.
 
 1. **Máquina de estados do pedido** (10 estados): Aberto → Orçamento aceito → Pago e retido → Agendado → Em andamento → Em confirmação → Concluído. Saídas: Cancelado, Em disputa, Retrabalho. Cada mudança valida **quem pode, quando e com qual prova**.
-2. **Cálculo da taxa:** tabela progressiva, base 7,5%, mínima configurável (R$ 3,00 decidido). **A taxa é SOMADA ao pedido** (decisão do João, 31/10/2026): o cliente paga serviço + taxa; o profissional recebe o valor inteiro do orçamento; a taxa é a receita do Trato. Mostrar ao cliente serviço, taxa e total; ao profissional, o total do cliente, a taxa e o que ele recebe. O custo do Stripe no Pix e no cartão à vista sai da taxa (o Trato absorve). No cartão **parcelado** o cliente paga o custo de parcelamento REAL do provedor, repassado (tabela configurável por nº de parcelas, vazia = parcelado desligado). A taxa e esse custo **não são reembolsados** (reembolso devolve só o serviço). Detalhes e perguntas em aberto: `docs/taxa-somada-parcelado.md`.
+2. **Cálculo da taxa:** tabela progressiva, base 7,5%, mínima configurável (R$ 3,00 decidido). **A taxa é DESCONTADA do profissional** (decisão do João, 10/11/2026, substitui a de 31/10/2026): o cliente paga o valor do orçamento; a taxa é calculada sobre o orçamento, congelada no aceite e descontada na conclusão, antes de creditar a carteira; o profissional recebe orçamento − taxa; a taxa é a receita do Trato. Mostrar ao profissional o que o cliente paga, a taxa e o que ele recebe; o cliente não vê taxa. O custo do Stripe no Pix e no cartão à vista sai da taxa (o Trato absorve). No cartão **parcelado** o cliente paga o custo de parcelamento REAL do provedor, repassado (tabela configurável por nº de parcelas, vazia = parcelado desligado). Reembolso devolve 100% do serviço, inclusive a taxa já descontada; só o custo do parcelado não volta. Detalhes: `docs/taxa-descontada-profissional.md`.
 3. **Cálculo do Stripe** (decisão 3): custo no Pix e no cartão, e quanto sobra para o Trato.
 4. **Pagamento (Stripe):** 30% adiantado, resto no fim, valor retido, liberação só ao encerrar ou após 7 dias sem problema, pagamento por etapas, aditivo com pagamento próprio.
 5. **Idempotência e webhooks assinados:** reenvio não cobra duas vezes.
@@ -232,7 +232,7 @@ Seção 6 do escopo.
 
 1. Cadastro, **verificação** (documento e selfie), status em análise/aprovado/recusado.
 2. Pedidos abertos com filtros, alertas por categoria e região, recusar com motivo.
-3. **Calculadora de orçamento:** deslocamento, horas, material, total, **taxa** (paga pelo cliente, somada), o que o cliente paga e o que o profissional recebe (= o total do orçamento). Etapas, sinal de material, validade e garantia.
+3. **Calculadora de orçamento:** deslocamento, horas, material, total, **taxa** (descontada do profissional), o que o cliente paga (= o total do orçamento) e o que o profissional recebe (= orçamento − taxa). Etapas, sinal de material, validade e garantia.
 4. Agenda, navegação até o cliente, **check-in** (foto, local, código) e **check-out** (foto final, código).
 5. **Enviar a notinha dos materiais** ao cliente e criar **aditivo com preço**.
 6. Carteira: retido, a liberar, liberado, extrato, saque por Pix só para chave do mesmo CPF/CNPJ.

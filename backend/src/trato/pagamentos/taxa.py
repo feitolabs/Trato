@@ -1,9 +1,9 @@
 """Regra única da taxa do Trato (piloto, D13): taxa fixa em bps com mínimo em centavos.
 
-Decisão do João (31/10/2026): a taxa é SOMADA ao pedido. O cliente paga serviço + taxa (+ o custo de
-parcelamento, se parcelar); o profissional recebe o valor INTEIRO do orçamento; a taxa é a receita
-do Trato (e dela sai o custo do provedor no Pix e no cartão à vista). `calcular_taxa` recebe o
-valor do SERVIÇO; `montar_total` devolve a conta completa.
+Decisão do João (10/11/2026, substitui a de 31/10/2026): a taxa é DESCONTADA do profissional. O
+cliente paga o valor do orçamento (+ o custo de parcelamento, se parcelar); o profissional recebe o
+orçamento menos a taxa; a taxa é a receita do Trato (e dela sai o custo do provedor no Pix e no
+cartão à vista). `calcular_taxa` recebe o valor do SERVIÇO; `montar_total` devolve a conta completa.
 
 Os dois números vêm da configuração, nunca do código. A tabela progressiva (D2) está em
 espera até P2; ligá-la sem a implementação é erro, para ninguém cobrar achando que vale.
@@ -65,20 +65,20 @@ def calcular_taxa(valor_centavos: int, config: ConfigTaxa) -> int:
 
 @dataclass(frozen=True)
 class TotalPedido:
-    """A conta de um valor de serviço. Centavos; `cobrado = servico + taxa + parcelamento`."""
+    """A conta de um valor de serviço. Centavos; `cobrado = servico + parcelamento`."""
 
     servico_centavos: int
     taxa_centavos: int
     custo_parcelamento_centavos: int
     cobrado_centavos: int
-    liquido_profissional_centavos: int  # = servico: o profissional recebe o orçamento inteiro
+    liquido_profissional_centavos: int  # = servico - taxa: o que entra na carteira do profissional
     receita_trato_centavos: int  # = taxa (o custo do parcelamento é do provedor, não do Trato)
 
 
 def montar_total(
     servico_centavos: int, config: ConfigTaxa, custo_parcelamento_centavos: int = 0
 ) -> TotalPedido:
-    """Taxa SOMADA ao serviço; o custo de parcelamento (já calculado) é repassado por cima."""
+    """Taxa DESCONTADA do profissional; o custo de parcelamento (já calculado) vai por cima."""
     if isinstance(custo_parcelamento_centavos, bool) or not isinstance(
         custo_parcelamento_centavos, int
     ):
@@ -90,7 +90,7 @@ def montar_total(
         servico_centavos=servico_centavos,
         taxa_centavos=taxa,
         custo_parcelamento_centavos=custo_parcelamento_centavos,
-        cobrado_centavos=servico_centavos + taxa + custo_parcelamento_centavos,
-        liquido_profissional_centavos=servico_centavos,
+        cobrado_centavos=servico_centavos + custo_parcelamento_centavos,
+        liquido_profissional_centavos=servico_centavos - taxa,
         receita_trato_centavos=taxa,
     )

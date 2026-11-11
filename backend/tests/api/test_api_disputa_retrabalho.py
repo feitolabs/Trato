@@ -26,12 +26,12 @@ def test_cliente_abre_disputa_com_valor_do_ledger(amb):
     assert amb.cliente.get("/v1/pedidos/ped-1/disputa", headers=cab("t-prof")).status_code == 200
 
 
-def test_valor_congelado_e_retido_mais_a_liberar_sem_a_taxa(amb):
-    # Dúvida de regra registrada no relatório: a taxa já repartida não entra no congelado.
+def test_valor_congelado_inclui_a_taxa_ja_descontada(amb):
+    # Reembolso devolve 100% (João, 10/11/2026): a taxa já repartida também pode voltar.
     amb.semear_pedido(Estado.EM_CONFIRMACAO)
     amb.semear_dinheiro(100_000, taxa=7_500)
 
-    assert abrir(amb).json()["valor_congelado_centavos"] == 92_500
+    assert abrir(amb).json()["valor_congelado_centavos"] == 100_000
 
 
 def test_disputa_sem_dinheiro_retido_da_409(amb):

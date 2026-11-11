@@ -57,7 +57,7 @@ def test_contestacao_perdida_devolve_o_servico_no_ledger_uma_vez_so(fluxo: Fluxo
     assert c.status is StatusContestacao.PERDIDA and c.encerrada_em is not None
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == 0
-    assert saldo["taxa_trato_centavos"] == TAXA  # a taxa não volta, como no reembolso
+    assert saldo["taxa_trato_centavos"] == 0  # nenhuma taxa foi descontada antes de concluir
     assert fluxo.servico.cobrancas.obter(cobranca["id"]).estornado_centavos == VALOR
     fluxo.ctx.ledger.livro.verificar_partidas()
 
@@ -209,7 +209,7 @@ def test_conciliacao_do_dia_pelo_painel_acusa_pagamento_que_o_trato_nao_viu(flux
     cobranca = fluxo.pagar(pid)
     agora = fluxo.amb.relogio()
     fluxo.fake.registrar_movimento(
-        MovimentoProvedor("txn_1", TipoMovimento.COBRANCA, VALOR + TAXA, 400, agora, cobranca["id"])
+        MovimentoProvedor("txn_1", TipoMovimento.COBRANCA, VALOR, 400, agora, cobranca["id"])
     )
     fluxo.fake.registrar_movimento(
         MovimentoProvedor("txn_2", TipoMovimento.COBRANCA, 5_000, 200, agora, "pi_desconhecido")

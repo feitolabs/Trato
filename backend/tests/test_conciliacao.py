@@ -15,7 +15,12 @@ from trato.financeiro.conciliacao import (
     conciliar,
     referencia_da_cobranca,
 )
-from trato.financeiro.ledger import Livro, estornar_pedido, registrar_cobranca, separar_taxa
+from trato.financeiro.ledger import (
+    Livro,
+    estornar_pedido,
+    registrar_cobranca,
+    separar_custo_parcelamento,
+)
 from trato.pagamentos.provedor import ErroProvedor, MovimentoProvedor, TipoMovimento
 from trato.pagamentos.provedor.stripe_teste import ProvedorStripeTeste
 
@@ -31,7 +36,7 @@ def mov(tipo, valor, ref, quando=MEIO_DIA, taxa=0, mid=None):
 def livro_com_cobranca(pedido="ped-1", ref="pi_1", valor=10_750, quando=MEIO_DIA) -> Livro:
     livro = Livro()
     registrar_cobranca(livro, pedido, valor, f"cob/{ref}", quando)
-    separar_taxa(livro, pedido, 750, f"cob/{ref}/taxa", quando)
+    separar_custo_parcelamento(livro, pedido, 750, f"cob/{ref}", quando)
     return livro
 
 

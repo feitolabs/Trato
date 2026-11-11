@@ -47,7 +47,7 @@ class CobrancaOut(BaseModel):
     pedido_id: str
     aditivo_id: str | None
     valor_centavos: int = Field(
-        description="O que o cliente paga: serviço + taxa (+ custo do parcelado)."
+        description="O que o cliente paga: o serviço (+ custo do parcelado)."
     )
     parcelas: int = 1
     meio: str

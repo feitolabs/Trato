@@ -71,9 +71,9 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
         "valor_centavos": 90_000,
         "taxa_centavos": 6_750,
-        "liquido_centavos": 90_000,  # taxa SOMADA: o profissional recebe o orçamento inteiro
+        "liquido_centavos": 83_250,  # a taxa é descontada do profissional
     }
-    assert corpo["total_cliente_centavos"] == 96_750
+    assert corpo["total_cliente_centavos"] == 90_000
     assert corpo["custo_provedor_estimado_centavos"] > 0
     r = post(c, "/v1/orcamentos/resumo", "profissional", {"valor_centavos": 200_000})
     assert r.json()["taxa_centavos"] == 12_000  # faixa de 600 bps acima de 100.000

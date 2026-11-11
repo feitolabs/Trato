@@ -1,5 +1,7 @@
 # Taxa somada ao pedido e parcelado (decisão do João, 31/10/2026)
 
+> **SUBSTITUÍDO em 10/11/2026 quanto a quem paga a taxa e ao reembolso.** A taxa agora é descontada do profissional: ver `docs/taxa-descontada-profissional.md`. O que segue valendo daqui: o parcelado (custo real do provedor, tabela configurável, vazia = desligado), agora com base no valor do serviço.
+
 Fonte das decisões: `docs/teste-real-banco.md` (seções "Decisão do João" e "CORREÇÃO"; a correção vale sobre o resto).
 Dinheiro só no backend, centavos inteiros, ledger imutável, idempotência.
 

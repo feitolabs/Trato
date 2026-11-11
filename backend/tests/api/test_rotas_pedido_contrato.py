@@ -46,8 +46,8 @@ def test_resumo_traz_taxa_liquido_e_custo_estimado_do_provedor(amb):
     r = chamar(amb, "POST", "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 100_000})
     assert r.status_code == 200, r.text
     corpo = r.json()
-    assert corpo["taxa_centavos"] == 7_500 and corpo["liquido_centavos"] == 100_000
-    assert corpo["total_cliente_centavos"] == 107_500
+    assert corpo["taxa_centavos"] == 7_500 and corpo["liquido_centavos"] == 92_500
+    assert corpo["total_cliente_centavos"] == 100_000
     assert corpo["taxa_bps"] == 750 and corpo["taxa_percentual"] == 7.5
     # mínimo configurável: 7,5% de R$ 10,00 = 75 centavos, mas o mínimo é 500 (50%)
     pequeno = chamar(amb, "POST", "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
@@ -77,7 +77,7 @@ def test_cobranca_nunca_devolve_pago_antes_do_webhook(fluxo: Fluxo):  # noqa: F8
     cobranca = r.json()
     assert cobranca["estado_pagamento"] == "aguardando_confirmacao"
     assert cobranca["tipo_instrucao"] == "pix_copia_e_cola" and cobranca["instrucao"]
-    assert cobranca["valor_centavos"] == 107_500  # serviço + taxa (7,5%) SOMADA
+    assert cobranca["valor_centavos"] == 100_000  # só o orçamento: a taxa sai do profissional
 
     # repetir devolve a mesma cobrança pendente (idempotente)
     outra = fluxo.chamar(
@@ -103,8 +103,8 @@ def test_cobranca_nunca_devolve_pago_antes_do_webhook(fluxo: Fluxo):  # noqa: F8
     )
     depois = fluxo.chamar("GET", f"/v1/contratos/{pid}/pagamento", "t-prof").json()
     assert depois["estado_pagamento"] == "pago" and depois["pago"] is True
-    assert depois["pago_centavos"] == 107_500 and depois["valor_centavos"] == 100_000
-    assert depois["total_a_pagar_centavos"] == 107_500
+    assert depois["pago_centavos"] == 100_000 and depois["valor_centavos"] == 100_000
+    assert depois["total_a_pagar_centavos"] == 100_000
     # pago: não cobra de novo
     assert (
         fluxo.chamar(
