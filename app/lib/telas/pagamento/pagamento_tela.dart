@@ -85,16 +85,6 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         ),
                       ),
                     ],
-                    if (dados.servicoCentavos != null && dados.taxaCentavos != null) ...[
-                      const SizedBox(height: EspacosTrato.x3),
-                      Text(
-                        'Serviço ${Dinheiro.formatar(dados.servicoCentavos!)} + '
-                        'taxa do Trato ${Dinheiro.formatar(dados.taxaCentavos!)}',
-                        style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.textoSecundario,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Como você quer pagar?', style: TipografiaTrato.corpoForte),
                     const SizedBox(height: EspacosTrato.x3),

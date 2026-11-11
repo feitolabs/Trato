@@ -104,7 +104,7 @@ class CriarOrcamentoOut(BaseModel):
 class OpcaoParcelamentoOut(BaseModel):
     parcelas: int
     custo_centavos: int = Field(description="Custo do provedor repassado ao cliente.")
-    total_centavos: int = Field(description="Serviço + taxa + custo, em centavos.")
+    total_centavos: int = Field(description="Serviço + custo, em centavos.")
     valor_parcela_centavos: int
 
 
@@ -114,10 +114,9 @@ class PagamentoValoresOut(BaseModel):
     valor_centavos: int | None = Field(
         None, description="Valor do SERVIÇO (o orçamento), em centavos."
     )
-    taxa_centavos: int | None = Field(None, description="Taxa do Trato, SOMADA ao serviço.")
     total_a_pagar_centavos: int | None = Field(
         None,
-        description="Pix e cartão à vista: serviço + taxa. O Trato absorve o custo do provedor.",
+        description="Pix e cartão à vista: o serviço. O Trato absorve o custo do provedor.",
     )
     opcoes_parcelamento: list[OpcaoParcelamentoOut] = Field(
         default_factory=list,
@@ -193,13 +192,13 @@ class PedidoAbertoOut(BaseModel):
 
 class ResumoOrcamentoOut(BaseModel):
     valor_centavos: int = Field(
-        description="O valor do orçamento (serviço). O profissional recebe tudo."
+        description="O valor do orçamento (serviço). É o que o cliente paga."
     )
     taxa_centavos: int = Field(
-        description="Taxa do Trato (configuração vigente), SOMADA ao orçamento: o cliente paga."
+        description="Taxa do Trato (configuração vigente), descontada do profissional."
     )
     total_cliente_centavos: int = Field(
-        description="O que o cliente paga à vista: orçamento + taxa."
+        description="O que o cliente paga à vista: o valor do orçamento."
     )
     receita_trato_centavos: int = Field(description="A taxa é a receita do Trato.")
     taxa_bps: int = Field(
@@ -209,7 +208,7 @@ class ResumoOrcamentoOut(BaseModel):
         description="A mesma taxa efetiva em %, com 2 casas (ex.: 7.5). Para o app só mostrar."
     )
     liquido_centavos: int = Field(
-        description="O que o profissional recebe: o valor do orçamento inteiro, sem desconto."
+        description="O que o profissional recebe: o orçamento menos a taxa."
     )
     custo_provedor_estimado_centavos: int = Field(
         description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
@@ -518,11 +517,11 @@ def valores_do_pagamento(
             ),
             None,
         )
-    taxa = total = None
+    total = None
     opcoes: list[OpcaoParcelamentoOut] = []
     if contrato is not None and servico is not None:
         conta = servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos)
-        taxa, total = conta.taxa_centavos, conta.cobrado_centavos
+        total = conta.cobrado_centavos
         opcoes = [
             OpcaoParcelamentoOut(**vars(o)) for o in servico.config().parcelamento.opcoes(total)
         ]
@@ -530,7 +529,6 @@ def valores_do_pagamento(
         pedido_id=pedido.id,
         estado=pedido.estado.value,
         valor_centavos=contrato.valor_centavos if contrato else None,
-        taxa_centavos=taxa,
         total_a_pagar_centavos=total,
         opcoes_parcelamento=opcoes,
         pago_centavos=saldo.cliente_pagou,
@@ -560,8 +558,8 @@ def resumo_do_orcamento(
         taxa_centavos=taxa,
         taxa_bps=(taxa * 10_000 + corpo.valor_centavos // 2) // corpo.valor_centavos,
         taxa_percentual=round(taxa * 100 / corpo.valor_centavos, 2),
-        liquido_centavos=corpo.valor_centavos,
-        total_cliente_centavos=corpo.valor_centavos + taxa,
+        liquido_centavos=corpo.valor_centavos - taxa,
+        total_cliente_centavos=corpo.valor_centavos,
         receita_trato_centavos=taxa,
         custo_provedor_estimado_centavos=max(
             calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento

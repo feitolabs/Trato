@@ -1,5 +1,5 @@
 // Modelos da tela de pagamento. O app só exibe o que vier daqui:
-// quanto pagar agora, em que condição e a taxa são decididos pelo backend.
+// quanto pagar agora e em que condição são decididos pelo backend.
 
 enum MetodoPagamento { pix, cartao }
 
@@ -33,14 +33,8 @@ class DadosPagamento {
     required this.valorAgoraCentavos,
     required this.opcoes,
     this.rotuloValor,
-    this.servicoCentavos,
-    this.taxaCentavos,
     this.parcelamento = const [],
   });
-
-  /// Valor do serviço e taxa do Trato (somada), para mostrar a conta antes de pagar. Null = não mostra.
-  final int? servicoCentavos;
-  final int? taxaCentavos;
 
   /// Total por número de parcelas no cartão. Vazio enquanto o parcelado estiver desligado.
   final List<OpcaoParcelamento> parcelamento;

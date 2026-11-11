@@ -142,7 +142,7 @@ class ContratosPostgres:
                     pedido, orcamento, ped["cliente_id"], orc["profissional_id"],
                     f"{ped['titulo']}\n\n{ped['descricao']}", orc["fora_do_escopo"],
                     Jsonb(itens_json), orc["prazo_execucao_dias"], orc["garantia_dias"], valor,
-                    taxa_bps, taxa, valor, adiantamento, versao, Jsonb(regras),
+                    taxa_bps, taxa, valor - taxa, adiantamento, versao, Jsonb(regras),
                     hash_documento, aceito_em, contrato.aceite_ip, contrato.aceite_dispositivo,
                 ),
             ).fetchone()  # fmt: skip

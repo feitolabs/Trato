@@ -25,6 +25,8 @@ from trato.financeiro.ledger import (
     registrar_repasse,
     repartir_custodia,
     repartir_proporcional,
+    separar_custo_parcelamento,
+    taxa_descontada,
 )
 
 T0 = datetime(2026, 11, 2, 9, 0, tzinfo=UTC)
@@ -275,38 +277,41 @@ def test_estorno_de_outro_pedido_e_recusado():
         livro.lancar(torto)
 
 
-def test_estorno_total_devolve_so_o_servico_e_a_taxa_fica():
-    # Cobrado 10.000 = serviço 9.250 + taxa 750: a taxa do Trato não é reembolsada.
+def test_estorno_total_devolve_tudo_e_o_trato_nao_fica_com_taxa():
+    # Cobrado 10.000; na conclusão, 9.250 ao profissional e 750 de taxa. Reembolso devolve 100%.
     livro = concluido(10_000, 750)
-    estornar_pedido(livro, PED, 9_250, "est", T0)
-    s = livro.saldos_pedido(PED, PROF)
-    assert (s.cliente_pagou, s.retido, s.a_liberar, s.taxa_trato) == (750, 0, 0, 750)
-    livro.verificar_partidas()
-
-
-def test_estorno_acima_do_servico_e_recusado_sem_taxa_reembolsavel():
-    livro = concluido(10_000, 750)
-    with pytest.raises(EstornoInvalido, match="a taxa não volta"):
-        estornar_pedido(livro, PED, 9_251, "est", T0)
-
-
-def test_taxa_reembolsavel_e_regra_explicita_e_configuravel():
-    """Exceção pendente de validação jurídica (arrependimento): só devolve a taxa se pedida."""
-    livro = concluido(10_000, 750)
-    estornar_pedido(livro, PED, 10_000, "est", T0, taxa_reembolsavel=750)
+    assert taxa_descontada(livro.lancamentos, PED) == 750
+    estornar_pedido(livro, PED, 10_000, "est", T0)
     s = livro.saldos_pedido(PED, PROF)
     assert (s.cliente_pagou, s.retido, s.a_liberar, s.taxa_trato) == (0, 0, 0, 0)
+    assert taxa_descontada(livro.lancamentos, PED) == 0
     livro.verificar_partidas()
-    with pytest.raises(EstornoInvalido, match="reembolsável"):
-        estornar_pedido(concluido(10_000, 750), PED, 100, "est", T0, taxa_reembolsavel=751)
 
 
-def test_estorno_parcial_nao_toca_na_taxa():
+def test_estorno_acima_do_cobrado_e_recusado():
+    livro = concluido(10_000, 750)
+    with pytest.raises(EstornoInvalido, match="parcelamento não volta"):
+        estornar_pedido(livro, PED, 10_001, "est", T0)
+
+
+def test_custo_de_parcelamento_nao_volta_no_estorno():
+    livro = cobrado(10_215)
+    separar_custo_parcelamento(livro, PED, 215, "cob1", T0)
+    assert taxa_descontada(livro.lancamentos, PED) == 0  # custo não é taxa do Trato
+    with pytest.raises(EstornoInvalido, match="parcelamento não volta"):
+        estornar_pedido(livro, PED, 10_001, "est-demais", T0)
+    estornar_pedido(livro, PED, 10_000, "est", T0)
+    s = livro.saldos_pedido(PED, PROF)
+    assert (s.cliente_pagou, s.retido, s.taxa_trato) == (215, 0, 215)
+    livro.verificar_partidas()
+
+
+def test_estorno_parcial_depois_de_concluir_e_proporcional_na_taxa():
     livro = concluido(10_000, 750)
     estornar_pedido(livro, PED, 4_000, "est", T0)
     s = livro.saldos_pedido(PED, PROF)
-    assert s.taxa_trato == 750  # a taxa não é proporcional: fica inteira
-    assert s.a_liberar == 5_250  # 9.250 - 4.000
+    assert s.taxa_trato == 450  # 750 - 300 (40% do valor voltou)
+    assert s.a_liberar == 5_550  # 9.250 - 3.700
     assert s.cliente_pagou == 6_000
     assert s.taxa_trato + s.a_liberar == s.cliente_pagou
     livro.verificar_partidas()
@@ -329,7 +334,7 @@ def test_estorno_do_pedido_e_idempotente_e_atomico():
 
 def test_estorno_do_pedido_acima_do_cobrado_e_recusado():
     livro = concluido()
-    for valor in (0, 9_251, -5):
+    for valor in (0, 10_001, -5):
         with pytest.raises(EstornoInvalido):
             estornar_pedido(livro, PED, valor, "est", T0)
     assert len(livro.lancamentos) == 3
@@ -347,11 +352,11 @@ def test_estorno_do_que_ja_foi_sacado_e_recusado_sem_gravar_nada():
 
 def test_estornos_parciais_sucessivos_ate_zerar():
     livro = concluido(10_001, 751)
-    for i, valor in enumerate([3_333, 3_333, 2_584]):  # 10.001 - 751 de taxa = 9.250 de serviço
+    for i, valor in enumerate([3_333, 3_333, 3_335]):  # devolve os 10.001 inteiros
         estornar_pedido(livro, PED, valor, f"est{i}", T0)
         livro.verificar_partidas()
     s = livro.saldos_pedido(PED, PROF)
-    assert (s.cliente_pagou, s.a_liberar, s.taxa_trato, s.retido) == (751, 0, 751, 0)
+    assert (s.cliente_pagou, s.a_liberar, s.taxa_trato, s.retido) == (0, 0, 0, 0)
 
 
 # --- Sem perder centavo (varredura de valores) ----------------------------------------
@@ -381,11 +386,11 @@ def test_repartir_proporcional_nunca_perde_centavo():
 def test_varredura_estorno_parcial_nao_cria_nem_perde_centavo():
     for valor, taxa in [(1, 0), (3, 1), (999, 75), (10_001, 751), (123_457, 9_259)]:
         passo = max(1, valor // 11)
-        for devolver in range(1, valor - taxa + 1, passo):
+        for devolver in range(1, valor + 1, passo):
             livro = concluido(valor, taxa)
             estornar_pedido(livro, PED, devolver, "est", T0)
             s = livro.saldos_pedido(PED, PROF)
             assert s.cliente_pagou == valor - devolver
             assert s.taxa_trato + s.a_liberar + s.retido == valor - devolver
-            assert s.taxa_trato == taxa  # a taxa nunca volta
+            assert s.taxa_trato <= taxa  # a taxa volta em proporção ao que foi devolvido
             livro.verificar_partidas()

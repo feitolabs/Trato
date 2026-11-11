@@ -14,7 +14,7 @@ from trato.financeiro.ledger import (
     liberar,
     registrar_cobranca,
     repartir_custodia,
-    separar_taxa,
+    separar_custo_parcelamento,
 )
 from trato.financeiro.pdf import PdfSimples
 
@@ -22,11 +22,10 @@ OUTUBRO = datetime(2026, 10, 15, 15, 0, tzinfo=UTC)
 
 
 def _pedido_concluido(
-    livro: Livro, pedido: str, quando: datetime, valor=10_000, taxa=750, profissional="pro-1"
+    livro: Livro, pedido: str, quando: datetime, valor=10_750, taxa=750, profissional="pro-1"
 ):
-    registrar_cobranca(livro, pedido, valor + taxa, f"cob/pi_{pedido}", quando)
-    separar_taxa(livro, pedido, taxa, f"cob/pi_{pedido}/taxa", quando)
-    repartir_custodia(livro, pedido, profissional, 0, f"din/{pedido}/rep", quando)
+    registrar_cobranca(livro, pedido, valor, f"cob/pi_{pedido}", quando)
+    repartir_custodia(livro, pedido, profissional, taxa, f"din/{pedido}/rep", quando)
 
 
 def test_totais_do_mes_fecham_entre_si():
@@ -34,7 +33,7 @@ def test_totais_do_mes_fecham_entre_si():
     _pedido_concluido(livro, "p1", OUTUBRO)
     liberar(livro, "p1", "pro-1", "liq/p1", OUTUBRO + timedelta(days=2))
     registrar_cobranca(livro, "p2", 5_750, "cob/pi_p2", OUTUBRO)
-    separar_taxa(livro, "p2", 750, "cob/pi_p2/taxa", OUTUBRO)
+    separar_custo_parcelamento(livro, "p2", 750, "cob/pi_p2", OUTUBRO)
     estornar_pedido(livro, "p2", 2_000, "din/p2/disputa/est", OUTUBRO + timedelta(days=1))
     # Um pedido de novembro não entra em outubro.
     _pedido_concluido(livro, "p3", datetime(2026, 11, 2, 12, 0, tzinfo=UTC))
@@ -45,7 +44,7 @@ def test_totais_do_mes_fecham_entre_si():
     assert t.cobrado_centavos == 10_750 + 5_750
     assert t.devolvido_centavos == 2_000
     assert t.entrada_liquida_centavos == t.cobrado_centavos - t.devolvido_centavos
-    assert t.receita_taxas_centavos == 1_500  # a taxa não volta no estorno
+    assert t.receita_taxas_centavos == 1_500  # taxa de p1 + custo de parcelamento de p2
     assert t.liberado_profissionais_centavos == 10_000
     assert t.retido_fim_centavos == 5_000 - 2_000  # p2 segue retido, menos o que voltou
     assert t.a_liberar_fim_centavos == 0 and t.liberado_fim_centavos == 10_000
@@ -92,7 +91,8 @@ def test_extrato_do_profissional_soma_recebido_e_estorno():
     livro = Livro()
     _pedido_concluido(livro, "p1", OUTUBRO)
     liberar(livro, "p1", "pro-1", "liq/p1", OUTUBRO + timedelta(days=1))
-    _pedido_concluido(livro, "p2", OUTUBRO + timedelta(days=3))  # ainda a liberar
+    # ainda a liberar; sem taxa, para o estorno sair todo do "a liberar"
+    _pedido_concluido(livro, "p2", OUTUBRO + timedelta(days=3), valor=10_000, taxa=0)
     estornar_pedido(livro, "p2", 3_000, "din/p2/disputa/est", OUTUBRO + timedelta(days=4))
     _pedido_concluido(livro, "p3", OUTUBRO, profissional="pro-2")
     liberar(livro, "p3", "pro-2", "liq/p3", OUTUBRO)  # de outro profissional: não entra

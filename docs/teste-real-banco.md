@@ -126,6 +126,8 @@ Para aplicar na config real: o mínimo de `prazo_liberacao_dias` em `supabase/se
 exige que 0 seja rejeitado). Falta baixar o mínimo para 0 e ajustar esse teste junto, e só então rodar o seed 2. A config de teste já no banco
 (`teste_`) **não** tem `prazo_liberacao_dias`. Pendente do João: taxa mínima em centavos (0 se não houver) e confirmar `taxa_bps = 750`.
 
+> **Substituído em 10/11/2026:** a taxa passou a ser descontada do profissional e o reembolso devolve 100%. Ver `docs/taxa-descontada-profissional.md`. As decisões de 31/10/2026 abaixo ficam como histórico.
+
 ## Decisão do João: quem paga a taxa (31/10/2026)
 
 A taxa do Trato é **7,5% sobre o total do pedido e é SOMADA ao pedido** (o cliente paga serviço + taxa). **Não é subtraída do profissional**:

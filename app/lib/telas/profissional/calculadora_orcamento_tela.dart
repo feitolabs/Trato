@@ -468,8 +468,8 @@ class _ResumoEscuro extends StatelessWidget {
     final r = resumo;
     // O rótulo com a porcentagem vem do dado do backend, nunca de um texto fixo.
     final rotuloTaxa = r == null || r.taxaBps == null
-        ? 'Taxa Trato (paga pelo cliente)'
-        : 'Taxa Trato ${Dinheiro.formatarBps(r.taxaBps!)} (paga pelo cliente)';
+        ? 'Taxa Trato'
+        : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps!)})';
     return CartaoTrato(
       escuro: true,
       child: Column(
@@ -484,7 +484,7 @@ class _ResumoEscuro extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           _LinhaResumo(
             rotulo: rotuloTaxa,
-            valor: r == null ? '—' : Dinheiro.formatar(r.taxaCentavos),
+            valor: r == null ? '—' : '– ${Dinheiro.formatar(r.taxaCentavos)}',
             estiloRotulo: claro,
             estiloValor: claro,
           ),
@@ -514,8 +514,8 @@ class _ResumoEscuro extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
-            'A taxa do Trato é somada ao seu orçamento e paga pelo cliente: você recebe o valor '
-            'inteiro do orçamento.',
+            'A taxa do Trato é descontada do seu orçamento quando o serviço é concluído. '
+            'Pedido cancelado não paga taxa.',
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
           ),
         ],

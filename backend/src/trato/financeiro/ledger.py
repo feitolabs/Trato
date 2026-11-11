@@ -14,20 +14,20 @@
 Os tipos são os do CHECK de `lancamentos.tipo` do banco (F3.5); o banco ainda aceita
 `custo_stripe` e `reembolso`, que o Python não lança. O que muda entre dois lançamentos do mesmo
 tipo é o par de contas (tipo: débito -> crédito):
-    COBRANCA    cliente (externo) -> custódia          cliente pagou serviço + taxa (+ parcelamento)
-    TAXA        custódia -> taxa do Trato              na confirmação do pagamento: taxa + custo
-                                                       de parcelamento saem da custódia, que fica
-                                                       só com o valor do SERVIÇO (taxa SOMADA ao
-                                                       pedido, decisão do João de 31/10/2026)
+    COBRANCA    cliente (externo) -> custódia          cliente pagou o serviço (+ parcelamento)
+    TAXA        custódia -> taxa do Trato              na conclusão: a taxa é descontada do
+                                                       profissional antes de creditar a carteira
+                                                       (decisão do João de 10/11/2026). Na
+                                                       confirmação do pagamento, só o custo de
+                                                       parcelamento sai (chave `.../parcelamento`)
     COBRANCA    cliente (externo) -> liberado          gorjeta: 100% do profissional, sem taxa
-    RETENCAO    custódia -> a liberar (profissional)   o serviço do profissional, ao concluir
+    RETENCAO    custódia -> a liberar (profissional)   serviço menos a taxa, ao concluir
     REPASSE     a liberar -> liberado (profissional)   liberação: passou o prazo / cliente confirmou
     REPASSE     liberado -> profissional (externo)     o provedor pagou o profissional
     ESTORNO     inverte EXATAMENTE as partidas de um lançamento (o banco confere isso)
 
-A taxa e o custo de parcelamento NÃO são reembolsados: o estorno parcial devolve só o valor do
-serviço (custódia e parte do profissional). Exceção configurável e pendente de validação jurídica:
-`taxa_reembolsavel` em `estornar_pedido`.
+O reembolso devolve o serviço inteiro, inclusive a taxa já descontada, proporcionalmente ao valor
+devolvido. Só o custo de parcelamento NÃO volta (o provedor não devolve).
 
 O banco só aceita estorno do lançamento INTEIRO, e um único estorno por original. Por isso o
 estorno parcial do pedido (`estornar_pedido`) estorna os originais por inteiro e lança de novo,
@@ -55,6 +55,8 @@ class TipoConta(StrEnum):
     LIBERADO = "liberado"  # do profissional, disponível para saque
     TAXA_TRATO = "taxa_trato"
 
+
+SUFIXO_PARCELAMENTO = "/parcelamento"  # chave do lançamento TAXA que é custo de parcelamento
 
 _EXTERNAS = frozenset({TipoConta.CLIENTE_EXTERNO, TipoConta.PROFISSIONAL_EXTERNO})
 _COM_TITULAR = frozenset({TipoConta.A_LIBERAR, TipoConta.LIBERADO})
@@ -199,6 +201,23 @@ def _ja_estornado(itens: Iterable[Lancamento], original_id: str) -> int:
     return sum(i.valor for i in itens if i.estorno_de == original_id)
 
 
+def eh_custo_parcelamento(item: Lancamento) -> bool:
+    """Lançamento TAXA que é o custo do parcelado (do cliente), e não a taxa do Trato."""
+    return item.tipo is TipoLancamento.TAXA and item.chave.endswith(SUFIXO_PARCELAMENTO)
+
+
+def taxa_descontada(lancamentos: Sequence[Lancamento], pedido_id: str) -> int:
+    """Taxa do Trato já descontada do profissional neste pedido e ainda não devolvida."""
+    return sum(
+        i.valor
+        for i in lancamentos
+        if i.pedido_id == pedido_id
+        and i.tipo is TipoLancamento.TAXA
+        and not eh_custo_parcelamento(i)
+        and not _ja_estornado(lancamentos, i.id)
+    )
+
+
 def _validar(itens: Sequence[Lancamento], novo: Lancamento) -> None:
     if novo.tipo is TipoLancamento.ESTORNO:
         original = next((i for i in itens if i.id == novo.estorno_de), None)
@@ -332,7 +351,7 @@ def registrar_gorjeta(
     )
 
 
-def separar_taxa(
+def separar_custo_parcelamento(
     livro: Livro,
     pedido_id: str,
     valor: int,
@@ -340,13 +359,14 @@ def separar_taxa(
     data: datetime,
     evento_webhook_id: str | None = None,
 ) -> Lancamento:
-    """Tira da custódia a parte do Trato (taxa + custo de parcelamento repassado ao provedor).
+    """Tira da custódia o custo de parcelamento repassado ao provedor.
 
-    Roda logo depois do `registrar_cobranca`: o que fica retido é só o valor do serviço.
+    Roda logo depois do `registrar_cobranca`: o que fica retido é só o valor do serviço. `chave` é
+    a base da operação; o sufixo marca o lançamento como custo, que não volta no reembolso.
     """
     return livro.lancar(
         Lancamento(
-            chave,
+            f"{chave}{SUFIXO_PARCELAMENTO}",
             pedido_id,
             TipoLancamento.TAXA,
             CUSTODIA,
@@ -507,14 +527,12 @@ def estornar_pedido(
     chave: str,
     data: datetime,
     evento_webhook_id: str | None = None,
-    taxa_reembolsavel: int = 0,
 ) -> tuple[Lancamento, ...]:
     """Devolve `valor` ao cliente (parcial ou total) a partir do valor do SERVIÇO.
 
-    A taxa do Trato (e o custo de parcelamento) não voltam: `valor` pode ir até o que cobrado menos
-    a taxa. `taxa_reembolsavel` (padrão 0; regra pendente de validação jurídica) é a parte da taxa
-    que PODE voltar junto, somada ao limite. A divisão do `valor` é proporcional entre custódia,
-    parte do profissional e essa parte da taxa.
+    `valor` pode ir até o que foi cobrado menos o custo de parcelamento, que não volta. A divisão é
+    proporcional entre custódia, parte do profissional e taxa já descontada: se o cliente recebe
+    tudo de volta, o Trato não fica com taxa.
 
     Estorna por INTEIRO os lançamentos em aberto de TAXA, RETENCAO e COBRANCA (a que foi para a
     custódia; a gorjeta não entra) e, se o valor for parcial, lança de novo (COBRANCA, RETENCAO e
@@ -529,18 +547,18 @@ def estornar_pedido(
     retencoes = _em_aberto(livro, pedido_id, TipoLancamento.RETENCAO, None)
     taxas = _em_aberto(livro, pedido_id, TipoLancamento.TAXA, None)
     cobrado = sum(i.valor for i in cobrancas)
-    taxa_total = sum(i.valor for i in taxas)
-    if not 0 <= taxa_reembolsavel <= taxa_total:
-        raise EstornoInvalido("A parte reembolsável da taxa deve ficar entre 0 e a taxa cobrada.")
-    maximo = cobrado - taxa_total + taxa_reembolsavel
+    custo_parcelamento = sum(i.valor for i in taxas if eh_custo_parcelamento(i))
+    taxa_servico = sum(i.valor for i in taxas) - custo_parcelamento
+    maximo = cobrado - custo_parcelamento
     if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= maximo:
         raise EstornoInvalido(
-            f"O valor do estorno deve ficar entre 1 e {maximo} centavos (a taxa não volta)."
+            f"O valor do estorno deve ficar entre 1 e {maximo} centavos "
+            "(o custo do parcelamento não volta)."
         )
     pesos = [
         livro.saldo(CUSTODIA, pedido_id),
         sum(i.valor for i in retencoes),
-        taxa_reembolsavel,
+        taxa_servico,
     ]
     devolvidos = repartir_proporcional(valor, pesos)
     mantido = cobrado - valor
@@ -553,20 +571,28 @@ def estornar_pedido(
     if mantido:
         profissional = retencoes[0].credito.titular if retencoes else None
         mantidos = (
-            (TipoLancamento.COBRANCA, CLIENTE, CUSTODIA, mantido),
+            ("cobranca", TipoLancamento.COBRANCA, CLIENTE, CUSTODIA, mantido),
             (
+                "retencao",
                 TipoLancamento.RETENCAO,
                 CUSTODIA,
                 a_liberar(profissional) if profissional else None,
                 pesos[1] - devolvidos[1],
             ),
-            (TipoLancamento.TAXA, CUSTODIA, TAXA_TRATO, taxa_total - devolvidos[2]),
+            ("taxa", TipoLancamento.TAXA, CUSTODIA, TAXA_TRATO, taxa_servico - devolvidos[2]),
+            (
+                SUFIXO_PARCELAMENTO.removeprefix("/"),
+                TipoLancamento.TAXA,
+                CUSTODIA,
+                TAXA_TRATO,
+                custo_parcelamento,
+            ),
         )
-        for tipo, conta_debito, conta_credito, quanto in mantidos:
+        for nome, tipo, conta_debito, conta_credito, quanto in mantidos:
             if quanto > 0 and conta_credito is not None:
                 novos.append(
                     Lancamento(
-                        f"{chave}/mantida/{tipo.value}",
+                        f"{chave}/mantida/{nome}",
                         pedido_id,
                         tipo,
                         conta_debito,
