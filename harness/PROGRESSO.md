@@ -825,3 +825,17 @@ Decisão do João (D17), substitui a taxa somada de 31/10/2026. Detalhe: `docs/t
 - `app/lib/main.dart`: `_defaultApiUrl` passa de `https://trato-wald.onrender.com` (Render) para `https://trato.fly.dev`. Era a única referência ao Render no código. Builds com `TRATO_API_URL` (dart-define / `vars.TRATO_API_URL` no GitHub Actions) continuam mandando por cima do padrão.
 - `flutter analyze lib/main.dart`: sem problemas. Nenhum teste referencia o endereço. Backend, banco e testes não mudaram.
 - Pendente fora do código: `vars.TRATO_API_URL` no GitHub, Site URL e Redirect URLs do Supabase Auth, `TRATO_SEG_CORS_ORIGENS` no Fly, publicação no Vercel, agendador e desligar o Render.
+
+## 2026-11-10 — Painel admin pronto para o Vercel
+
+- `admin/web/vercel.json` (novo): reescreve qualquer rota para `index.html` (recarregar página interna não dá 404) e define `X-Content-Type-Options`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`. O `flutter build web` copia o arquivo para `build/web`.
+- Build gerado a partir da `develop` (v0.1.7) com `ADMIN_MODO=api`, `ADMIN_API_URL=https://trato.fly.dev` e a chave pública do Supabase "Trato" (sa-east-1, mesma região do Fly `gru`). `flutter build web --release`: OK, 42 MB. Sem `ADMIN_AMBIENTE=producao`: o painel mostra a faixa de teste enquanto o Stripe estiver em modo teste.
+- Bundle conferido: sem `sk_`, sem JWT, sem `sb_secret_`; as únicas ocorrências de `service_role`, `whsec_` e `DATABASE_URL` são os nomes da lista de bloqueio do próprio painel. Nenhuma referência ao Render.
+- Publicação no Vercel e `TRATO_SEG_CORS_ORIGENS` no Fly: com o João.
+
+## 2026-11-10 — Log de acesso do uvicorn quebrado pelo filtro de LGPD
+
+- Sintoma (logs do Fly): a cada requisição, `--- Logging error ---` com `ValueError: not enough values to unpack (expected 5, got 0)`. As requisições respondiam normal; só o log de acesso saía quebrado.
+- Causa: `trato/seguranca/logs.py` trocava `registro.msg` pela mensagem redigida e zerava `registro.args`, mas o `AccessFormatter` do uvicorn desempacota 5 argumentos de `args`.
+- Correção: para o logger `uvicorn.access`, mantém a estrutura de `args` e redige cada texto (o caminho leva a query com dado pessoal). Os demais loggers seguem como antes. Teste novo em `tests/seguranca/test_http.py` (reproduzia o erro antes do ajuste).
+- Verificação: backend 1438 testes passaram; `ruff` limpo nos dois arquivos. Sem migration. Precisa de novo `fly deploy` para valer em produção.
