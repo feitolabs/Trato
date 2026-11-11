@@ -819,3 +819,9 @@ Decisão do João (D17), substitui a taxa somada de 31/10/2026. Detalhe: `docs/t
 - Sem migration, sem escrita no banco, nada publicado. Banco real sem contratos nem pagamentos (só leitura).
 - Assumido, a confirmar: em reembolso parcial a taxa incide sobre o que ficou para o profissional. Termos atualizados: validar com o Emanoel.
 - Verificação (`harness/verificar.py`, 10/11): testes TODOS passaram — backend 1437 (com Postgres), app 830, painel 175 (8 pulados). "VERIFICAÇÃO FALHOU" pelos mesmos itens antigos (ruff lint/formatação, `flutter analyze`, APKs em `builds/` e `app/test/auth_test.dart` na varredura de segredos).
+
+## 2026-11-10 — App aponta para a API no Fly.io
+
+- `app/lib/main.dart`: `_defaultApiUrl` passa de `https://trato-wald.onrender.com` (Render) para `https://trato.fly.dev`. Era a única referência ao Render no código. Builds com `TRATO_API_URL` (dart-define / `vars.TRATO_API_URL` no GitHub Actions) continuam mandando por cima do padrão.
+- `flutter analyze lib/main.dart`: sem problemas. Nenhum teste referencia o endereço. Backend, banco e testes não mudaram.
+- Pendente fora do código: `vars.TRATO_API_URL` no GitHub, Site URL e Redirect URLs do Supabase Auth, `TRATO_SEG_CORS_ORIGENS` no Fly, publicação no Vercel, agendador e desligar o Render.

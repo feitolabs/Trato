@@ -47,7 +47,7 @@ void abrirLoginPorSessaoExpirada() {
       .whenComplete(() => _loginDeSessaoAberto = false);
 }
 
-const _defaultApiUrl = 'https://trato-wald.onrender.com';
+const _defaultApiUrl = 'https://trato.fly.dev';
 const _defaultSupabaseUrl = 'https://ornaoshsvuszquntkqsk.supabase.co';
 const _defaultSupabaseAnonKey = 'sb_publishable_GwIISqsEKuOu6iK4IBlRvQ__TVCCgj8';
 
