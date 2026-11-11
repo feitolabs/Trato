@@ -258,6 +258,27 @@ def test_filtro_global_de_logs(caplog: pytest.LogCaptureFixture):
     assert "[email]" in caplog.text
 
 
+def test_filtro_global_nao_quebra_o_log_de_acesso_do_uvicorn():
+    """O formatador de acesso do uvicorn desempacota 5 argumentos: o filtro não pode zerá-los."""
+    from uvicorn.logging import AccessFormatter
+
+    instalar_filtro_logs()
+    registro = logging.getLogger("uvicorn.access").makeRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1234", "GET", "/v1/x?email=ana@x.com&token=abc", "1.1", 200),
+        None,
+    )
+    texto = AccessFormatter(
+        fmt='%(client_addr)s - "%(request_line)s" %(status_code)s', use_colors=False
+    ).format(registro)
+    assert "ana@x.com" not in texto and "token=abc" not in texto
+    assert '"GET /v1/x?email=[oculto]&token=[oculto] HTTP/1.1"' in texto and "200" in texto
+
+
 def test_idempotencia_em_metodos_mutantes():
     amb = montar()
     headers = {**cab("t-cli"), "Idempotency-Key": "teste-idemp-123"}

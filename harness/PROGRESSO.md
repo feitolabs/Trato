@@ -825,3 +825,10 @@ Decisão do João (D17), substitui a taxa somada de 31/10/2026. Detalhe: `docs/t
 - `app/lib/main.dart`: `_defaultApiUrl` passa de `https://trato-wald.onrender.com` (Render) para `https://trato.fly.dev`. Era a única referência ao Render no código. Builds com `TRATO_API_URL` (dart-define / `vars.TRATO_API_URL` no GitHub Actions) continuam mandando por cima do padrão.
 - `flutter analyze lib/main.dart`: sem problemas. Nenhum teste referencia o endereço. Backend, banco e testes não mudaram.
 - Pendente fora do código: `vars.TRATO_API_URL` no GitHub, Site URL e Redirect URLs do Supabase Auth, `TRATO_SEG_CORS_ORIGENS` no Fly, publicação no Vercel, agendador e desligar o Render.
+
+## 2026-11-10 — Log de acesso do uvicorn quebrado pelo filtro de LGPD
+
+- Sintoma (logs do Fly): a cada requisição, `--- Logging error ---` com `ValueError: not enough values to unpack (expected 5, got 0)`. As requisições respondiam normal; só o log de acesso saía quebrado.
+- Causa: `trato/seguranca/logs.py` trocava `registro.msg` pela mensagem redigida e zerava `registro.args`, mas o `AccessFormatter` do uvicorn desempacota 5 argumentos de `args`.
+- Correção: para o logger `uvicorn.access`, mantém a estrutura de `args` e redige cada texto (o caminho leva a query com dado pessoal). Os demais loggers seguem como antes. Teste novo em `tests/seguranca/test_http.py` (reproduzia o erro antes do ajuste).
+- Verificação: backend 1438 testes passaram; `ruff` limpo nos dois arquivos. Sem migration. Precisa de novo `fly deploy` para valer em produção.
