@@ -48,8 +48,16 @@ def instalar_filtro_logs() -> None:
     def nova_fabrica(*args, **kwargs) -> logging.LogRecord:  # type: ignore[no-untyped-def]
         registro = fabrica(*args, **kwargs)
         try:
-            registro.msg = redigir(registro.getMessage())
-            registro.args = ()
+            if registro.name == "uvicorn.access" and isinstance(registro.args, tuple):
+                # O formatador de acesso do uvicorn desempacota 5 argumentos (cliente, método,
+                # caminho, versão, status): zerar `args` o quebra a cada requisição. Mantém a
+                # estrutura e redige cada texto (o caminho leva a query com dado pessoal).
+                registro.args = tuple(
+                    redigir(a) if isinstance(a, str) else a for a in registro.args
+                )
+            else:
+                registro.msg = redigir(registro.getMessage())
+                registro.args = ()
         except Exception:  # noqa: BLE001, S110 - log nunca derruba o programa
             pass
         return registro
