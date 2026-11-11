@@ -35,6 +35,7 @@ from trato.disputas import Ator, Decisao, Disputa, Estado, Resultado
 from trato.financeiro.ledger import CUSTODIA, Lancamento, Livro, estornar_pedido, repartir_custodia
 from trato.financeiro.repasses import repasse_dos_lancamentos
 from trato.garantias import abrir_garantia
+from trato.pagamentos.taxa import TaxaNaoCongelada, calcular_taxa, taxa_congelada
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Pedido
 from trato.pedidos.estados import Ator as AtorPedido
@@ -291,8 +292,8 @@ def _planejar_dinheiro(contexto: Contexto, pedido: Pedido, d: Disputa) -> list[L
     """Lançamentos do espelho para a decisão, com as funções que o ledger já tem.
 
     Chaves determinísticas (`disputa/<pedido>/...`): refazer a chamada depois de uma falha no
-    meio não duplica nada (se já estão no ledger, não planeja de novo). A taxa do Trato já saiu da
-    custódia na confirmação do pagamento: a divisão mexe só no valor do serviço.
+    meio não duplica nada (se já estão no ledger, não planeja de novo). A taxa é a que o contrato
+    congelou no aceite, nunca a da configuração de hoje (A3).
     """
     prefixo = f"disputa/{pedido.id}/"
     existentes = contexto.ledger.lancamentos(pedido.id)
@@ -307,9 +308,14 @@ def _planejar_dinheiro(contexto: Contexto, pedido: Pedido, d: Disputa) -> list[L
         estornar_pedido(livro, pedido.id, d.divisao.para_cliente, f"{prefixo}est", agora)
     restante = livro.saldo(CUSTODIA, pedido.id)
     if d.divisao.para_profissional > 0 and restante > 0:
-        # A taxa do Trato já saiu da custódia na confirmação do pagamento (taxa SOMADA): o
-        # profissional recebe o que sobrou do serviço, sem desconto.
-        repartir_custodia(livro, pedido.id, pedido.profissional_id or "", 0, f"{prefixo}rep", agora)
+        try:
+            contrato = contexto.contratos.obter_do_pedido(pedido.id)
+            taxa = calcular_taxa(restante, taxa_congelada(contrato))
+        except TaxaNaoCongelada as erro:
+            raise HTTPException(503, str(erro)) from erro
+        repartir_custodia(
+            livro, pedido.id, pedido.profissional_id or "", taxa, f"{prefixo}rep", agora
+        )
     return list(livro.lancamentos[antes:])
 
 

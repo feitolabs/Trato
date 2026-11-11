@@ -96,9 +96,6 @@ class ConfigPagamento:
     alcada_disputa_centavos: int  # acima disso a decisão da disputa pede segunda pessoa
     # Custo do parcelado repassado ao cliente. Vazio = parcelado desligado (João, 31/10/2026).
     parcelamento: ConfigParcelamento = field(default_factory=ConfigParcelamento)
-    # PENDENTE de validação jurídica (art. 49 do CDC): cancelar antes de o serviço começar devolve
-    # também a taxa do Trato? Padrão False = a taxa nunca volta (decisão do João). Não decidido.
-    cancelamento_devolve_taxa: bool = False
 
 
 class RepositorioCobrancas(Protocol):

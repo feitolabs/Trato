@@ -99,10 +99,10 @@ void main() {
       // 30 + 3 x 80 + 46 + 64 = R$ 380,00
       expect(servico.pedidos, [38000]);
       expect(find.text('R\$ 380,00'), findsWidgets);
-      // Taxa SOMADA: o cliente paga 380 + 28,50; o profissional recebe os 380 inteiros.
-      expect(find.text('Taxa Trato 7,5% (paga pelo cliente)'), findsOneWidget);
-      expect(find.text('R\$ 28,50'), findsOneWidget);
-      expect(find.text('R\$ 408,50'), findsOneWidget);
+      // Taxa descontada: o cliente paga 380; o profissional recebe 380 menos 28,50.
+      expect(find.text('Taxa Trato (7,5%)'), findsOneWidget);
+      expect(find.text('– R\$ 28,50'), findsOneWidget);
+      expect(find.text('R\$ 351,50'), findsOneWidget);
       expect(find.text('Serviços parecidos na região: R\$ 300,00 a R\$ 450,00.'), findsOneWidget);
     });
 
@@ -110,9 +110,9 @@ void main() {
       final servico = ServicoOrcamentoFake(taxaBps: 500);
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
-      expect(find.text('Taxa Trato 5% (paga pelo cliente)'), findsOneWidget);
-      expect(find.text('R\$ 19,00'), findsOneWidget);
-      expect(find.text('R\$ 399,00'), findsOneWidget);
+      expect(find.text('Taxa Trato (5%)'), findsOneWidget);
+      expect(find.text('– R\$ 19,00'), findsOneWidget);
+      expect(find.text('R\$ 361,00'), findsOneWidget);
     });
 
     testWidgets('mudar um campo refaz o pedido com o novo total', (tester) async {

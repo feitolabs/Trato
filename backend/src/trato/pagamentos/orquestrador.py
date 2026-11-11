@@ -40,7 +40,7 @@ from trato.financeiro.ledger import (
     liberar,
     registrar_cobranca,
     repartir_custodia,
-    separar_taxa,
+    separar_custo_parcelamento,
 )
 from trato.financeiro.repasses import repasse_dos_lancamentos
 from trato.pagamentos.custo import MeioPagamento
@@ -141,11 +141,11 @@ class ServicoPagamento:
         aditivo_id: str | None = None,
         parcelas: int = 1,
     ) -> TotalPedido:
-        """Quanto cobrar do cliente por `servico_centavos`: serviço + taxa (+ custo do parcelado).
+        """Quanto cobrar do cliente por `servico_centavos`: o serviço (+ custo do parcelado).
 
-        Pedido principal: a taxa é a do contrato (congelada no aceite). Aditivo: a taxa é só o que
-        a taxa total cresce por causa dele (taxa sobre serviço + aditivos pagos, menos a já
-        cobrada), para o mínimo não ser cobrado duas vezes.
+        A taxa não entra na cobrança: é descontada do profissional na conclusão. Pedido principal:
+        a taxa é a do contrato (congelada no aceite). Aditivo: a taxa é só o que a taxa total
+        cresce por causa dele, para o mínimo não contar duas vezes.
         """
         taxa_cfg = self._taxa_congelada(contexto, pedido.id)
         if aditivo_id is None:
@@ -161,14 +161,12 @@ class ServicoPagamento:
                 calcular_taxa(antes, taxa_cfg) if antes > 0 else 0
             )
             total = TotalPedido(
-                servico_centavos, taxa, 0, servico_centavos + taxa, servico_centavos, taxa
+                servico_centavos, taxa, 0, servico_centavos, servico_centavos - taxa, taxa
             )
         if parcelas == 1:
             return total
         try:
-            custo = self.config().parcelamento.custo_centavos(
-                total.servico_centavos + total.taxa_centavos, parcelas
-            )
+            custo = self.config().parcelamento.custo_centavos(total.servico_centavos, parcelas)
         except ParcelamentoIndisponivel as erro:
             raise ErroFluxo(str(erro), 422) from erro
         return replace(
@@ -189,8 +187,8 @@ class ServicoPagamento:
     ) -> CobrancaLocal:
         """Cria (ou devolve a pendente) a cobrança do pedido ou de um aditivo.
 
-        `servico_centavos` é o valor do serviço; a cobrança sai por esse valor + a taxa do Trato
-        (+ o custo repassado do parcelado). Parcelado só no cartão e só com o custo na tabela.
+        `servico_centavos` é o valor do serviço; a cobrança sai por esse valor (+ o custo repassado
+        do parcelado). Parcelado só no cartão e só com o custo na tabela.
         """
         if isinstance(parcelas, bool) or not isinstance(parcelas, int) or parcelas < 1:
             raise ErroFluxo("Número de parcelas inválido.", 422)
@@ -325,10 +323,10 @@ class ServicoPagamento:
                 )
                 contexto.pedidos.salvar(transicao.pedido, transicao.evento)
 
-        # A parte do Trato (taxa + custo do parcelado) sai da custódia já na confirmação: o que
-        # fica retido é só o serviço, e é o que reembolso, disputa e repasse movem (taxa SOMADA).
+        # O custo do parcelado sai da custódia já na confirmação. O serviço fica retido inteiro: a
+        # taxa só é descontada do profissional na conclusão, e reembolso devolve o valor todo.
         servico = self._servico_da_cobranca(contexto, cobranca)
-        parte_trato = cobranca.valor_centavos - servico
+        custo_parcelamento = cobranca.valor_centavos - servico
 
         def lancar(livro: Livro) -> None:
             registrar_cobranca(
@@ -339,12 +337,12 @@ class ServicoPagamento:
                 agora,
                 bruto.evento_id,
             )
-            if parte_trato > 0:
-                separar_taxa(
+            if custo_parcelamento > 0:
+                separar_custo_parcelamento(
                     livro,
                     cobranca.pedido_id,
-                    parte_trato,
-                    f"cob/{cobranca.id}/taxa",
+                    custo_parcelamento,
+                    f"cob/{cobranca.id}",
                     agora,
                     bruto.evento_id,
                 )
@@ -597,13 +595,11 @@ class ServicoPagamento:
                     self.cobrancas.salvar(replace(c, status=EstadoCobranca.CANCELADA))
             retido = contexto.ledger.saldo_da_conta(CUSTODIA, depois.id)
             if retido > 0:
-                taxa_volta = self._taxa_reembolsavel_no_cancelamento(contexto, depois)
                 self.aplicar_dinheiro(
                     contexto,
                     depois,
                     operacao="cancelamento",
-                    devolver_ao_cliente=retido + taxa_volta,
-                    taxa_reembolsavel=taxa_volta,
+                    devolver_ao_cliente=retido,
                     repartir=False,
                     gatilho="confirmacao_cliente",
                 )
@@ -634,22 +630,6 @@ class ServicoPagamento:
             servico = contrato.valor_centavos if contrato else cobranca.valor_centavos
         return min(servico, cobranca.valor_centavos)
 
-    def _taxa_reembolsavel_no_cancelamento(self, contexto: Contexto, pedido: Pedido) -> int:
-        """Quanto da taxa volta ao cliente no cancelamento. Padrão 0 (a taxa não volta).
-
-        Só vira positivo se a regra `cancelamento_devolve_taxa` for LIGADA na configuração: ponto
-        pendente de validação jurídica (art. 49 do CDC, arrependimento em 7 dias). O custo do
-        parcelamento nunca volta (o provedor não devolve)."""
-        if not self.config().cancelamento_devolve_taxa:
-            return 0
-        taxa_cfg = self._taxa_congelada(contexto, pedido.id)
-        volta = 0
-        for c in self.cobrancas.do_pedido(pedido.id):
-            if c.status is EstadoCobranca.PAGA:
-                servico = self._servico_da_cobranca(contexto, c)
-                volta += min(calcular_taxa(servico, taxa_cfg), c.valor_centavos - servico)
-        return volta
-
     def aplicar_dinheiro(
         self,
         contexto: Contexto,
@@ -659,7 +639,6 @@ class ServicoPagamento:
         devolver_ao_cliente: int,
         repartir: bool,
         gatilho: str = "decisao_disputa",
-        taxa_reembolsavel: int = 0,
     ) -> None:
         """Devolve `devolver_ao_cliente` ao cliente e/ou reparte o que resta na custódia.
 
@@ -677,7 +656,7 @@ class ServicoPagamento:
         )
         if not ja_feito:
             self._registrar_intencao(
-                contexto, pedido, chave, devolver_ao_cliente, repartir, gatilho, taxa_reembolsavel
+                contexto, pedido, chave, devolver_ao_cliente, repartir, gatilho
             )
         contexto.depois_do_commit(lambda: self.reenviar_estornos(pedido.id))
 
@@ -689,26 +668,19 @@ class ServicoPagamento:
         devolver_ao_cliente: int,
         repartir: bool,
         gatilho: str,
-        taxa_reembolsavel: int = 0,
     ) -> None:
         agora = contexto.agora()
         profissional = pedido.profissional_id or ""
 
         def operacao(livro: Livro) -> None:
             if devolver_ao_cliente > 0:
-                estornar_pedido(
-                    livro,
-                    pedido.id,
-                    devolver_ao_cliente,
-                    f"{chave}/est",
-                    agora,
-                    taxa_reembolsavel=taxa_reembolsavel,
-                )
+                estornar_pedido(livro, pedido.id, devolver_ao_cliente, f"{chave}/est", agora)
             restante = livro.saldo(CUSTODIA, pedido.id)
             if repartir and restante > 0:
-                # A taxa já saiu da custódia na confirmação do pagamento: o profissional recebe
-                # o que sobrou do serviço (o orçamento inteiro, menos o que voltou ao cliente).
-                repartir_custodia(livro, pedido.id, profissional, 0, f"{chave}/rep", agora)
+                # A taxa (a congelada no aceite) incide sobre o que fica para o profissional e é
+                # descontada aqui, antes de o valor chegar à carteira dele.
+                taxa = calcular_taxa(restante, self._taxa_congelada(contexto, pedido.id))
+                repartir_custodia(livro, pedido.id, profissional, taxa, f"{chave}/rep", agora)
 
         novos = self._planejar(contexto, pedido.id, operacao)
         ordens = self._ordens_de_estorno(pedido.id, devolver_ao_cliente, chave, agora)

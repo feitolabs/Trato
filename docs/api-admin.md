@@ -134,7 +134,7 @@ Prefixo `/v1/admin/financeiro`. Nada aqui move dinheiro nem marca "pago" (D13). 
 | `POST /profissionais/{usuario_id}/extrato` `{inicio, fim, motivo}` | relatorios_exportar | Extrato de recebimentos do profissional em PDF, por código de uso único. Auditado com motivo. |
 
 Webhooks novos tratados (`TIPOS_STRIPE`): `charge.dispute.created|updated|closed` (contestação; perdida vira
-estorno do serviço no ledger, a taxa não volta; sem saldo, fica em revisão) e `transfer.reversed` /
+estorno do serviço no ledger; sem saldo, fica em revisão) e `transfer.reversed` /
 `payout.failed` (repasse que falhou: fica em revisão com o motivo do provedor). `GET /v1/admin/webhooks/eventos`
 passou a trazer `revisao` (o motivo, quando o evento está para revisar).
 

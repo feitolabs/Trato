@@ -634,8 +634,6 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     return DadosPagamento(
       subtitulo: 'Pedido ${PedidoApi.numeroDe(pedidoId)}',
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
-      servicoCentavos: valor,
-      taxaCentavos: j['taxa_centavos'] as int?,
       parcelamento: [
         for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
           OpcaoParcelamento(

@@ -277,7 +277,7 @@ HTML_TERMOS = f"""<!DOCTYPE html>
     <h2>4. Preços, taxa da plataforma e materiais</h2>
     <ul>
       <li><strong>Quem define o preço do serviço é o profissional</strong>, no orçamento.</li>
-      <li><strong>Taxa de serviço do Trato:</strong> calculada sobre o valor do orçamento (taxa base de <strong>7,5%</strong>, respeitado o mínimo de <strong>R$ 3,00</strong>, conforme a tabela progressiva vigente no momento do aceite). A taxa e o valor líquido aparecem de forma clara antes de o profissional enviar o orçamento e antes de o cliente pagar.</li>
+      <li><strong>Taxa de serviço do Trato:</strong> calculada sobre o valor do orçamento (taxa base de <strong>7,5%</strong>, respeitado o mínimo de <strong>R$ 3,00</strong>, conforme a tabela progressiva vigente no momento do aceite). A taxa é descontada do valor recebido pelo profissional, e o cliente paga o valor do orçamento, sem acréscimo de taxa. A taxa e o valor líquido aparecem de forma clara antes de o profissional enviar o orçamento.</li>
       <li><strong>Aditivos:</strong> qualquer trabalho extra deve ser registrado como aditivo no aplicativo e aprovado pelo cliente antes da execução.</li>
       <li><strong>Materiais:</strong> quando o orçamento prevê compra de materiais pelo profissional, ele deve anexar a nota fiscal ou comprovante no aplicativo.</li>
     </ul>

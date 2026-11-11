@@ -423,7 +423,7 @@ void main() {
       await t.enterText(find.byType(TextField).at(1), '100');
       await t.pumpAndSettle();
       expect(liquido.pedidos, contains(10000));
-      expect(find.text('R\$ 107,50'), findsOneWidget); // cliente paga 100 + 7,50
+      expect(find.text('R\$ 92,50'), findsOneWidget); // o profissional recebe 100 menos 7,50
 
       await _tocar(t, find.text('Enviar aditivo ao cliente'));
       expect(fake.criados.single.valorCentavos, 10000);

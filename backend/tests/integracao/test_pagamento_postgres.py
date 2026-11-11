@@ -33,9 +33,7 @@ from .test_fluxo_postgres import abrir_pedido, enviar_orcamento
 pytestmark = pytest.mark.integracao
 
 VALOR_ORCAMENTO = 80_000 + 10_000  # 8 x 10.000 + 2,5 x 4.000, como em `enviar_orcamento`
-# A taxa é SOMADA ao orçamento (João, 31/10/2026): 7,5% (750 bps, faixa até 100.000) de 90.000.
-TAXA_ORCAMENTO = 6_750
-COBRADO = VALOR_ORCAMENTO + TAXA_ORCAMENTO
+COBRADO = VALOR_ORCAMENTO  # a taxa é descontada do profissional (João, 10/11/2026)
 
 
 def _aplicar(con, subir: str, descer: str, pronto: str) -> list[str]:
@@ -226,9 +224,9 @@ def test_cobranca_webhook_ledger_e_idempotencia(pg):
     )
     assert soma[0] == 0
     antes = (len(lanc), len(contexto.ledger.lancamentos(pedido_id)))
-    # a taxa sai da custódia na confirmação: fica retido só o serviço
+    # o valor fica retido inteiro: a taxa só sai na conclusão
     assert contexto.ledger.saldo_da_conta(CUSTODIA, pedido_id) == VALOR_ORCAMENTO
-    assert contexto.ledger.saldos_pedido(pedido_id, None).taxa_trato == TAXA_ORCAMENTO
+    assert contexto.ledger.saldos_pedido(pedido_id, None).taxa_trato == 0
 
     # o MESMO evento de novo: 200, duplicado, nada novo no ledger nem no pedido
     r = webhook(c, TipoEvento.PAGAMENTO_CONFIRMADO, cob["id"], evento_id=evento)

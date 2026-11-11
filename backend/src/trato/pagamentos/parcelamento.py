@@ -6,7 +6,7 @@ valor padrão: a tabela `parcelas -> bps` vem da configuração e, ENQUANTO ESTI
 fica desligado (só cartão à vista e Pix). Os números só entram quando o João trouxer a proposta do
 provedor (ver `docs/provedores-pagamento.md`).
 
-Base de cálculo (a confirmar com o provedor): o bps incide sobre `serviço + taxa do Trato`, uma vez,
+Base de cálculo (a confirmar com o provedor): o bps incide sobre o valor do serviço, uma vez,
 arredondado meio para cima. Se o provedor cobrar sobre o total já com o custo (gross-up), a conta
 muda aqui, num lugar só.
 """

@@ -20,8 +20,9 @@ from trato.pagamentos.taxa import ConfigTaxa
 VALOR = 100_000
 TAXA_BPS = 750  # só nos testes; no sistema vem da configuração
 TAXA_MINIMA = 500
-TAXA_ESPERADA = 7_500  # SOMADA ao serviço (João, 31/10/2026): o cliente paga serviço + taxa
-COBRADO = VALOR + TAXA_ESPERADA
+TAXA_ESPERADA = 7_500  # descontada do profissional na conclusão (João, 10/11/2026)
+COBRADO = VALOR  # o cliente paga só o orçamento
+LIQUIDO = VALOR - TAXA_ESPERADA
 
 
 @dataclass
@@ -160,11 +161,11 @@ def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     assert primeiro.json() == {"recebido": True, "duplicado": False, "tratado": True}
     assert reenvio.json()["duplicado"] is True
     assert fluxo.pedido(pid)["estado"] == "pago_e_retido"
-    # reenvio não duplicou; a taxa sai da custódia na confirmação: fica retido só o serviço
-    assert fluxo.tipos(pid) == [TipoLancamento.COBRANCA, TipoLancamento.TAXA]
+    # reenvio não duplicou; o valor fica retido inteiro, a taxa só sai na conclusão
+    assert fluxo.tipos(pid) == [TipoLancamento.COBRANCA]
     assert fluxo.saldo(pid)["retido_centavos"] == VALOR
     assert fluxo.saldo(pid)["cliente_pagou_centavos"] == COBRADO
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert fluxo.saldo(pid)["taxa_trato_centavos"] == 0
 
     fluxo.agendar(pid)
     assert fluxo.pedido(pid)["estado"] == "agendado"
@@ -176,14 +177,14 @@ def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == 0
     assert saldo["taxa_trato_centavos"] == TAXA_ESPERADA
-    assert saldo["a_liberar_centavos"] == VALOR  # o profissional recebe o orçamento inteiro
+    assert saldo["a_liberar_centavos"] == LIQUIDO  # a taxa sai antes de chegar à carteira
     assert fluxo.ctx.garantias.obter_garantia(pid) is not None
 
     # O provedor liquida; o ledger só espelha (caminho A). O aviso aponta o repasse (M5).
     r = fluxo.liquidar(pid, cobranca["id"])
     assert r.status_code == 200
     saldo = fluxo.saldo(pid)
-    assert saldo["a_liberar_centavos"] == 0 and saldo["liberado_centavos"] == VALOR
+    assert saldo["a_liberar_centavos"] == 0 and saldo["liberado_centavos"] == LIQUIDO
     fluxo.ctx.ledger.livro.verificar_partidas()
     assert fluxo.pedido(pid)["estado"] == "concluido"
     assert [
@@ -276,7 +277,7 @@ def test_assinatura_invalida_nao_muda_nada(fluxo: Fluxo):
     falso = {"Stripe-Signature": fluxo.fake.assinar(corpo, instante, "segredo-errado")}
     assert fluxo.http.post("/v1/webhooks/stripe", content=corpo, headers=falso).status_code == 400
     assert fluxo.http.post("/v1/webhooks/stripe", content=corpo).status_code == 400
-    adulterado = corpo.replace(b'"amount":107500', b'"amount":1')
+    adulterado = corpo.replace(b'"amount":100000', b'"amount":1')
     _, certo = fluxo.fake.evento_assinado(
         TipoEvento.PAGAMENTO_CONFIRMADO, cobranca["id"], instante=instante
     )
@@ -331,7 +332,8 @@ def test_liquidacao_com_valor_ou_repasse_errado_nao_libera(fluxo: Fluxo):
     cobranca = fluxo.servico.cobrancas.do_pedido(pid)[0]
     fluxo.concluir(pid)
     repasse = fluxo.repasse(pid)
-    assert repasse.valor_liquido_centavos == VALOR and repasse.taxa_centavos == 0
+    assert repasse.valor_liquido_centavos == LIQUIDO and repasse.taxa_centavos == TAXA_ESPERADA
+    assert repasse.valor_bruto_centavos == VALOR
 
     errado = fluxo.liquidar(pid, cobranca.id, valor_centavos=repasse.valor_liquido_centavos + 1)
     outro = fluxo.liquidar(pid, cobranca.id, repasse_id="nao-e-nosso", evento_id="evt_outro")
@@ -430,36 +432,20 @@ def test_cancelamento_antes_de_pagar_cancela_a_cobranca(fluxo: Fluxo):
     assert fluxo.tipos(pid) == []
 
 
-def test_cancelamento_depois_de_pagar_devolve_o_servico_e_a_taxa_fica(fluxo: Fluxo):
+def test_cancelamento_depois_de_pagar_devolve_tudo_ao_cliente(fluxo: Fluxo):
     pid = fluxo.aceitar()
     cobranca = fluxo.pagar(pid)
     fluxo.agendar(pid)
     r = fluxo.acao(pid, "cancelar", "t-cliente", {"motivo": "mudei de ideia"})
     assert r.json()["estado"] == "cancelado"
     saldo = fluxo.saldo(pid)
-    # A taxa do Trato não volta (decisão do João): o cliente recebe de volta só o serviço.
-    assert saldo["retido_centavos"] == 0 and saldo["cliente_pagou_centavos"] == TAXA_ESPERADA
-    assert saldo["taxa_trato_centavos"] == TAXA_ESPERADA
+    # Nenhuma taxa foi descontada ainda: o cliente recebe 100% de volta.
+    assert saldo["retido_centavos"] == 0 and saldo["cliente_pagou_centavos"] == 0
+    assert saldo["taxa_trato_centavos"] == 0
     assert [c for c in fluxo.fake.chamadas if c[0] == "estornar"] == [
         ("estornar", f"din/{pid}/cancelamento/{cobranca['id']}")
     ]
     assert fluxo.servico.cobrancas.obter(cobranca["id"]).estornado_centavos == VALOR
-    fluxo.ctx.ledger.livro.verificar_partidas()
-
-
-def test_cancelamento_com_regra_juridica_ligada_devolve_tambem_a_taxa(fluxo: Fluxo):
-    """Regra PENDENTE de validação jurídica (art. 49 do CDC): desligada por padrão, ligável."""
-    fluxo.servico.config = lambda: ConfigPagamento(
-        ConfigTaxa(TAXA_BPS, TAXA_MINIMA), 10**9, cancelamento_devolve_taxa=True
-    )
-    pid = fluxo.aceitar()
-    fluxo.pagar(pid)
-    fluxo.agendar(pid)
-    assert fluxo.acao(pid, "cancelar", "t-cliente", {"motivo": "arrependi"}).status_code == 200
-    saldo = fluxo.saldo(pid)
-    assert saldo["cliente_pagou_centavos"] == 0 and saldo["taxa_trato_centavos"] == 0
-    cobranca = fluxo.servico.cobrancas.do_pedido(pid)[0]
-    assert cobranca.estornado_centavos == COBRADO
     fluxo.ctx.ledger.livro.verificar_partidas()
 
 
@@ -488,17 +474,17 @@ def test_parcelado_repassa_o_custo_do_provedor_e_ele_nao_volta(fluxo: Fluxo):
     r = fluxo.chamar(
         "POST", f"/v1/pedidos/{pid}/cobranca", "t-cliente", {"meio": "cartao", "parcelas": 3}
     )
-    # 2% (teste) de serviço + taxa = 2% de 107.500 = 2.150
-    assert r.status_code == 201 and r.json()["valor_centavos"] == COBRADO + 2_150
+    # 2% (teste) do serviço = 2% de 100.000 = 2.000
+    assert r.status_code == 201 and r.json()["valor_centavos"] == COBRADO + 2_000
     fluxo.fake.marcar_paga(r.json()["id"])
     assert fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, r.json()["id"]).status_code == 200
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == VALOR
-    assert saldo["taxa_trato_centavos"] == TAXA_ESPERADA + 2_150  # taxa + custo repassado
+    assert saldo["taxa_trato_centavos"] == 2_000  # só o custo repassado; a taxa sai na conclusão
     fluxo.agendar(pid)
     assert fluxo.acao(pid, "cancelar", "t-cliente", {"motivo": "x"}).status_code == 200
     saldo = fluxo.saldo(pid)
-    assert saldo["cliente_pagou_centavos"] == TAXA_ESPERADA + 2_150  # só o serviço voltou
+    assert saldo["cliente_pagou_centavos"] == 2_000  # o serviço voltou; o custo do parcelado não
 
 
 # --- disputa -----------------------------------------------------------------------------------
@@ -539,8 +525,8 @@ def test_disputa_congela_e_reembolso_parcial_divide_o_valor(fluxo: Fluxo):
     assert fluxo.pedido(pid)["estado"] == "concluido"
 
     saldo = fluxo.saldo(pid)
-    assert saldo["taxa_trato_centavos"] == TAXA_ESPERADA  # a taxa não é proporcional nem volta
-    assert saldo["a_liberar_centavos"] == 75_000  # o profissional recebe o que o mediador deu
+    assert saldo["taxa_trato_centavos"] == 5_625  # 7,5% do que ficou para o profissional
+    assert saldo["a_liberar_centavos"] == 69_375  # 75.000 menos a taxa
     assert saldo["retido_centavos"] == 0
     assert [c[0] for c in fluxo.fake.chamadas].count("estornar") == 1
     fluxo.ctx.ledger.livro.verificar_partidas()
@@ -553,11 +539,70 @@ def test_disputa_reembolso_total_cancela_e_devolve(fluxo: Fluxo):
     r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     assert r.status_code == 200 and r.json()["estado_pedido"] == "cancelado"
     saldo = fluxo.saldo(pid)
-    # Reembolso total devolve o serviço; a taxa do Trato fica (não é reembolsada).
-    assert saldo["retido_centavos"] == 0 and saldo["taxa_trato_centavos"] == TAXA_ESPERADA
+    # Reembolso total devolve 100%: o Trato não fica com taxa.
+    assert saldo["retido_centavos"] == 0 and saldo["taxa_trato_centavos"] == 0
     assert fluxo.ctx.ledger.saldo_da_conta(CUSTODIA, pid) == 0
-    assert fluxo.ctx.ledger.saldo_da_conta(TAXA_TRATO, pid) == TAXA_ESPERADA
-    assert saldo["cliente_pagou_centavos"] == TAXA_ESPERADA
+    assert fluxo.ctx.ledger.saldo_da_conta(TAXA_TRATO, pid) == 0
+    assert saldo["cliente_pagou_centavos"] == 0
+
+
+def test_disputa_depois_de_concluir_devolve_tambem_a_taxa_descontada(fluxo: Fluxo):
+    pid = fluxo.ate_em_confirmacao()
+    fluxo.concluir(pid)
+    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    r = fluxo.chamar(
+        "POST",
+        f"/v1/pedidos/{pid}/retrabalho",
+        "t-cliente",
+        {
+            "descricao": "Rodapé solto.",
+            "fotos": [{"arquivo_id": "f3", "tirada_em": AGORA.isoformat()}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    _abrir_e_responder_disputa(fluxo, pid)  # congela o orçamento inteiro, com a taxa
+
+    decisao = {"resultado": "reembolso_total", "justificativa": "Serviço não resolvido."}
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
+    assert r.status_code == 200, r.text
+    assert r.json()["para_cliente_centavos"] == VALOR
+    saldo = fluxo.saldo(pid)
+    assert saldo["cliente_pagou_centavos"] == 0 and saldo["taxa_trato_centavos"] == 0
+    assert saldo["a_liberar_centavos"] == 0
+    fluxo.ctx.ledger.livro.verificar_partidas()
+
+
+def test_parcelado_com_reembolso_parcial_nao_mistura_o_custo_no_repasse(fluxo: Fluxo):
+    from trato.pagamentos.parcelamento import ConfigParcelamento
+
+    fluxo.servico.config = lambda: ConfigPagamento(
+        ConfigTaxa(TAXA_BPS, TAXA_MINIMA), 10**9, parcelamento=ConfigParcelamento({3: 200})
+    )
+    pid = fluxo.aceitar()
+    r = fluxo.chamar(
+        "POST", f"/v1/pedidos/{pid}/cobranca", "t-cliente", {"meio": "cartao", "parcelas": 3}
+    )
+    fluxo.fake.marcar_paga(r.json()["id"])
+    assert fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, r.json()["id"]).status_code == 200
+    fluxo.agendar(pid)
+    fluxo.iniciar(pid)
+    fluxo.encerrar_execucao(pid)
+    _abrir_e_responder_disputa(fluxo, pid)
+
+    decisao = {
+        "resultado": "reembolso_parcial",
+        "justificativa": "Parte do serviço foi feita.",
+        "percentual_cliente_bps": 2_500,
+    }
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
+    assert r.status_code == 200, r.text
+    saldo = fluxo.saldo(pid)
+    assert saldo["a_liberar_centavos"] == 69_375
+    assert saldo["taxa_trato_centavos"] == 5_625 + 2_000  # taxa + custo do parcelado
+    repasse = fluxo.repasse(pid)
+    assert (repasse.valor_bruto_centavos, repasse.taxa_centavos) == (75_000, 5_625)
+    assert repasse.valor_liquido_centavos == 69_375
+    fluxo.ctx.ledger.livro.verificar_partidas()
 
 
 def test_disputa_liberar_tudo_conclui_com_taxa_cheia(fluxo: Fluxo):
@@ -633,14 +678,14 @@ def test_aditivo_so_cobra_depois_da_aprovacao_do_cliente(fluxo: Fluxo):
     assert r.status_code == 200, r.text
     assert r.json()["aditivo"]["estado"] == "aprovado"
     cobranca = r.json()["cobranca"]
-    # aditivo de 20.000: a taxa cresce de 7.500 para 9.000 (7,5% de 120.000), então +1.500
-    assert cobranca["valor_centavos"] == 21_500 and cobranca["status"] == "aguardando"
+    # aditivo de 20.000: o cliente paga o valor do aditivo, sem taxa por cima
+    assert cobranca["valor_centavos"] == 20_000 and cobranca["status"] == "aguardando"
     assert fluxo.chamar("POST", url, "t-cliente", {"meio": "pix"}).status_code == 409  # já aprovado
 
     fluxo.fake.marcar_paga(cobranca["id"])
     assert fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, cobranca["id"]).status_code == 200
     assert fluxo.pedido(pid)["estado"] == "em_andamento"
-    assert fluxo.saldo(pid)["retido_centavos"] == VALOR + 20_000  # a taxa já saiu da custódia
+    assert fluxo.saldo(pid)["retido_centavos"] == VALOR + 20_000  # retido inteiro até concluir
     assert fluxo.servico.aditivos.obter(aid).estado.value == "pago"
 
     fluxo.encerrar_execucao(pid)
@@ -648,7 +693,7 @@ def test_aditivo_so_cobra_depois_da_aprovacao_do_cliente(fluxo: Fluxo):
     taxa = 9_000  # 7,5% de 120.000
     saldo = fluxo.saldo(pid)
     assert saldo["taxa_trato_centavos"] == taxa
-    assert saldo["a_liberar_centavos"] == 120_000
+    assert saldo["a_liberar_centavos"] == 111_000  # 120.000 menos a taxa
 
 
 def test_aditivo_so_com_servico_em_andamento(fluxo: Fluxo):

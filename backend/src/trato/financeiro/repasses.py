@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from trato.api.repositorios import Repasse
-from trato.financeiro.ledger import Lancamento, TipoLancamento
+from trato.financeiro.ledger import Lancamento, TipoLancamento, eh_custo_parcelamento
 
 
 def repasse_dos_lancamentos(
@@ -23,7 +23,10 @@ def repasse_dos_lancamentos(
     """`None` se a divisão não deixou nada para o profissional (tudo voltou ao cliente)."""
     itens = list(lancamentos)
     liquido = sum(i.valor for i in itens if i.tipo is TipoLancamento.RETENCAO)
-    taxa = sum(i.valor for i in itens if i.tipo is TipoLancamento.TAXA)
+    # O custo do parcelado é do cliente: não sai do profissional, então não entra no repasse.
+    taxa = sum(
+        i.valor for i in itens if i.tipo is TipoLancamento.TAXA and not eh_custo_parcelamento(i)
+    )
     if liquido <= 0 or not profissional_id:
         return None
     return Repasse(

@@ -398,7 +398,6 @@ class ConfigPagamentoPostgres:
             taxa,
             parametros.get("alcada_disputa_centavos", 0),
             parcelamento=ConfigParcelamento(custos),
-            cancelamento_devolve_taxa=bool(parametros.get("cancelamento_devolve_taxa", 0)),
         )
 
 

@@ -41,6 +41,7 @@ from trato.api.modelos import (
 )
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
+from trato.financeiro.ledger import taxa_descontada
 from trato.garantias import (
     ErroRetrabalho,
     EstadoRetrabalho,
@@ -432,6 +433,8 @@ def abrir_disputa(
 
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
     congelado = saldo.retido + saldo.a_liberar
+    if saldo.a_liberar > 0:  # já concluído (retrabalho): a taxa descontada também pode voltar
+        congelado += taxa_descontada(contexto.ledger.lancamentos(pedido.id), pedido.id)
     if congelado <= 0:
         raise HTTPException(409, "Não há valor retido neste pedido para congelar.")
     disputa = disputas.abrir(
