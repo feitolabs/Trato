@@ -668,6 +668,7 @@ class ApiAdminHttp implements ApiAdmin {
           nome: c['nome'] as String,
           ativa: c['ativa'] as bool? ?? true,
           profissionais: _int(c['profissionais']),
+          aceitaRemoto: c['aceita_remoto'] as bool? ?? false,
         ),
     ];
   }
@@ -689,6 +690,7 @@ class ApiAdminHttp implements ApiAdmin {
     int? garantiaDias,
     int ordem = 0,
     bool ativa = true,
+    bool aceitaRemoto = false,
     required String motivo,
   }) async {
     final r = _mapa(await _chamar(
@@ -701,6 +703,7 @@ class ApiAdminHttp implements ApiAdmin {
         'garantia_retrabalho_dias': garantiaDias,
         'ordem': ordem,
         'ativa': ativa,
+        'aceita_remoto': aceitaRemoto,
         'motivo': motivo,
       },
     ));
@@ -713,6 +716,7 @@ class ApiAdminHttp implements ApiAdmin {
       ordem: _int(r['ordem']),
       ativa: r['ativa'] as bool? ?? true,
       profissionais: _int(r['profissionais']),
+      aceitaRemoto: r['aceita_remoto'] as bool? ?? false,
     );
   }
 
@@ -725,6 +729,7 @@ class ApiAdminHttp implements ApiAdmin {
     int? garantiaDias,
     int? ordem,
     bool? ativa,
+    bool? aceitaRemoto,
     required String motivo,
   }) async {
     final r = _mapa(await _chamar(
@@ -737,6 +742,7 @@ class ApiAdminHttp implements ApiAdmin {
         if (garantiaDias != null) 'garantia_retrabalho_dias': garantiaDias,
         if (ordem != null) 'ordem': ordem,
         if (ativa != null) 'ativa': ativa,
+        if (aceitaRemoto != null) 'aceita_remoto': aceitaRemoto,
         'motivo': motivo,
       },
     ));
@@ -749,6 +755,7 @@ class ApiAdminHttp implements ApiAdmin {
       ordem: _int(r['ordem']),
       ativa: r['ativa'] as bool? ?? true,
       profissionais: _int(r['profissionais']),
+      aceitaRemoto: r['aceita_remoto'] as bool? ?? false,
     );
   }
 

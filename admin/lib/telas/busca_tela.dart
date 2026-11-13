@@ -631,7 +631,12 @@ class _AbaCategorias extends StatelessWidget {
     if (dados == null || !context.mounted) return;
     final ok = await executar(
       context,
-      () => context.api.criarCategoria(nome: dados.nome, garantiaDias: dados.garantiaDias, motivo: dados.motivo),
+      () => context.api.criarCategoria(
+        nome: dados.nome,
+        garantiaDias: dados.garantiaDias,
+        aceitaRemoto: dados.aceitaRemoto,
+        motivo: dados.motivo,
+      ),
       sucesso: 'Categoria "${dados.nome}" criada.',
     );
     if (ok) await recarregar();
@@ -647,7 +652,13 @@ class _AbaCategorias extends StatelessWidget {
     if (dados == null || !context.mounted) return;
     final ok = await executar(
       context,
-      () => context.api.editarCategoria(c.id, nome: dados.nome, garantiaDias: dados.garantiaDias, motivo: dados.motivo),
+      () => context.api.editarCategoria(
+        c.id,
+        nome: dados.nome,
+        garantiaDias: dados.garantiaDias,
+        aceitaRemoto: dados.aceitaRemoto,
+        motivo: dados.motivo,
+      ),
       sucesso: 'Categoria atualizada.',
     );
     if (ok) await recarregar();
@@ -717,6 +728,11 @@ class _AbaCategorias extends StatelessWidget {
               Flexible(child: Text(c.nome, style: TipografiaTrato.corpoForte)),
               const SizedBox(width: EspacosTrato.x2),
               ChipEstado(c.ativa ? 'Ativa' : 'Inativa', tom: c.ativa ? Tom.ok : Tom.neutro),
+              const SizedBox(width: EspacosTrato.x2),
+              ChipEstado(
+                c.aceitaRemoto ? 'Presencial e remoto' : 'Só presencial',
+                tom: c.aceitaRemoto ? Tom.info : Tom.neutro,
+              ),
             ],
           ),
           titulo: c.nome,
@@ -749,9 +765,10 @@ class _AbaCategorias extends StatelessWidget {
 }
 
 class _DadosCategoria {
-  const _DadosCategoria(this.nome, this.garantiaDias, this.motivo);
+  const _DadosCategoria(this.nome, this.garantiaDias, this.aceitaRemoto, this.motivo);
   final String nome;
   final int? garantiaDias;
+  final bool aceitaRemoto;
   final String motivo;
 }
 
@@ -762,6 +779,7 @@ Future<_DadosCategoria?> _formCategoria(
 }) {
   final nome = TextEditingController(text: existente?.nome ?? '');
   final garantia = TextEditingController(text: existente?.garantiaDias?.toString() ?? '');
+  var aceitaRemoto = existente?.aceitaRemoto ?? false;
 
   /// RN-02: nome único, sem diferenciar maiúsculas e acentos.
   String? erroNome() {
@@ -800,10 +818,31 @@ Future<_DadosCategoria?> _formCategoria(
             helperText: 'Vazio = padrão do sistema',
           ),
         ),
+        const SizedBox(height: EspacosTrato.x3),
+        SwitchListTile(
+          key: const ValueKey('aceita-remoto'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Aceita atendimento remoto'),
+          subtitle: const Text(
+            'Desligado: só presencial, com endereço obrigatório (padrão). Ligado: o cliente '
+            'escolhe entre presencial e remoto, e o remoto não pede endereço. Use em serviços '
+            'como design, desenvolvimento e arquitetura.',
+          ),
+          value: aceitaRemoto,
+          onChanged: (v) {
+            aceitaRemoto = v;
+            rebuild();
+          },
+        ),
       ],
     ),
     camposValidos: () => nome.text.trim().length >= 2 && erroNome() == null,
-    resultado: (motivo) => _DadosCategoria(nome.text.trim(), int.tryParse(garantia.text.trim()), motivo),
+    resultado: (motivo) => _DadosCategoria(
+      nome.text.trim(),
+      int.tryParse(garantia.text.trim()),
+      aceitaRemoto,
+      motivo,
+    ),
   );
 }
 
