@@ -40,6 +40,8 @@ class Mensagem:
     mascarada: bool
     enviada_em: datetime
     lida_em: datetime | None
+    # Quando chegou ao aparelho de quem recebeu (✓✓ cinza). A leitura também conta como entrega.
+    entregue_em: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -118,7 +120,7 @@ class ConversasPostgres:
             return ()
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select id, autor_id, corpo_exibido, mascarada, enviada_em, lida_em "
+                "select id, autor_id, corpo_exibido, mascarada, enviada_em, lida_em, entregue_em "
                 "from public.mensagens where conversa_id = %s order by id",
                 (achado,),
             ).fetchall()
@@ -130,6 +132,7 @@ class ConversasPostgres:
                 l["mascarada"],
                 l["enviada_em"],
                 l["lida_em"],
+                l["entregue_em"],
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )

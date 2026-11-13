@@ -22,6 +22,7 @@ MIGRATIONS = (
     "f35_dinheiro",
     "f36_disputas",
     "f37_chat",
+    "mensagens_entregue_em",
     "profissional_disponibilidade_portfolio_uploads",
     "lgpd_exclusao_consentimentos",
     "admin_sugestoes_completas",

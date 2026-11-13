@@ -100,3 +100,26 @@ def test_cliente_com_dois_profissionais_precisa_dizer_qual(amb):
     _post(amb, "/v1/pedidos/ped-1/mensagens", "t-outro-prof", {"texto": "Oi"})
     r = _get(amb, "/v1/pedidos/ped-1/mensagens")
     assert r.status_code == 200 and [m["texto"] for m in r.json()] == ["Oi"]
+
+
+def test_recebido_quando_o_aparelho_busca_a_lista_e_lido_quando_abre_a_conversa(amb):
+    servico_do(amb)
+    _pedido_aberto(amb)
+    _post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", ORCAMENTO)
+    _post(amb, "/v1/pedidos/ped-1/mensagens", "t-prof", {"texto": "Oi"})
+    # quem mandou vê: enviada (nem recebida nem lida)
+    [m] = _get(amb, "/v1/pedidos/ped-1/mensagens", "t-prof").json()
+    assert m["entregue_em"] is None and m["lida_em"] is None
+    # o aparelho do cliente busca a lista de conversas: a mensagem "chegou"
+    _get(amb, "/v1/conversas")
+    [m] = _get(amb, "/v1/pedidos/ped-1/mensagens", "t-prof").json()
+    assert m["entregue_em"] is not None and m["lida_em"] is None
+    # o cliente abre a conversa: lida (e continua recebida)
+    _get(amb, "/v1/pedidos/ped-1/mensagens")
+    [m] = _get(amb, "/v1/pedidos/ped-1/mensagens", "t-prof").json()
+    assert m["lida_em"] is not None and m["entregue_em"] is not None
+    # quem escreve não "recebe" a própria mensagem só por listar as conversas
+    _post(amb, "/v1/pedidos/ped-1/mensagens", "t-prof", {"texto": "Mais uma"})
+    _get(amb, "/v1/conversas", "t-prof")
+    novo = _get(amb, "/v1/pedidos/ped-1/mensagens", "t-prof").json()[-1]
+    assert novo["entregue_em"] is None

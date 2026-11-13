@@ -52,6 +52,10 @@ class RepositorioConversasApp(Protocol):
     def marcar_conversa_lida(self, conversa_id: str, usuario_id: str, agora: datetime) -> int:
         """Marca tudo que a outra parte mandou. Devolve quantas foram marcadas agora."""
 
+    def marcar_entregues(self, usuario_id: str, agora: datetime) -> int:
+        """O aparelho da pessoa buscou as conversas: tudo que a outra parte mandou e ainda não
+        tinha chegado passa a "recebido". Devolve quantas foram marcadas agora."""
+
 
 class ServicoMensagens:
     def __init__(self, repo: RepositorioConversasApp, mascarador: Mascarador | None = None) -> None:
@@ -128,9 +132,21 @@ class ConversasAppEmMemoria:
         if m.autor_id == usuario_id:
             raise DadosInvalidos("Você não precisa marcar a sua própria mensagem como lida.")
         if m.lida_em is None:
-            m = replace(m, lida_em=agora)
+            m = replace(m, lida_em=agora, entregue_em=m.entregue_em or agora)
             self._base._mensagens[conversa][i] = m
         return m.lida_em
+
+    def marcar_entregues(self, usuario_id: str, agora: datetime) -> int:
+        marcadas = 0
+        for conversa, lista in self._base._mensagens.items():
+            partes = self._partes(conversa)
+            if partes is None or usuario_id not in partes[:2]:
+                continue
+            for i, m in enumerate(lista):
+                if m.autor_id != usuario_id and m.entregue_em is None:
+                    lista[i] = replace(m, entregue_em=agora)
+                    marcadas += 1
+        return marcadas
 
     def marcar_conversa_lida(self, conversa_id: str, usuario_id: str, agora: datetime) -> int:
         partes = self._partes(conversa_id)
@@ -140,7 +156,7 @@ class ConversasAppEmMemoria:
         lista = self._base._mensagens[conversa_id]
         for i, m in enumerate(lista):
             if m.autor_id != usuario_id and m.lida_em is None:
-                lista[i] = replace(m, lida_em=agora)
+                lista[i] = replace(m, lida_em=agora, entregue_em=m.entregue_em or agora)
                 marcadas += 1
         return marcadas
 
@@ -186,6 +202,20 @@ class ConversasAppPostgres:
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )
+
+    def marcar_entregues(self, usuario_id: str, agora: datetime) -> int:
+        usuario = como_uuid(usuario_id)
+        if usuario is None:
+            return 0
+        with self._banco.transacao() as con:
+            marcadas = con.execute(
+                "update public.mensagens m set entregue_em = %(agora)s "
+                "from public.conversas cv where cv.id = m.conversa_id "
+                "and (cv.cliente_id = %(u)s or cv.profissional_id = %(u)s) "
+                "and m.autor_id <> %(u)s and m.entregue_em is null returning m.id",
+                {"agora": agora, "u": usuario},
+            ).fetchall()
+        return len(marcadas)
 
     def marcar_lida(self, mensagem_id: int, usuario_id: str, agora: datetime) -> datetime:
         usuario = como_uuid(usuario_id)
