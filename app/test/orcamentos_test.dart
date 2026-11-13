@@ -266,6 +266,49 @@ void main() {
       expect(find.textContaining('Marque "Li o escopo'), findsOneWidget);
     });
 
+    testWidgets('orçamento por hora mostra o total de horas ao cliente', (tester) async {
+      final d = carlos.detalhe!;
+      final porHora = Orcamento(
+        id: carlos.id,
+        profissional: carlos.profissional,
+        iniciais: carlos.iniciais,
+        verificacao: carlos.verificacao,
+        totalCentavos: carlos.totalCentavos,
+        nota: carlos.nota,
+        notaResumo: carlos.notaResumo,
+        servicosResumo: carlos.servicosResumo,
+        servicosConcluidos: carlos.servicosConcluidos,
+        quando: carlos.quando,
+        inicio: carlos.inicio,
+        garantia: carlos.garantia,
+        observacao: carlos.observacao,
+        detalhe: DetalheOrcamento(
+          validoAte: d.validoAte,
+          itens: d.itens,
+          notaMaterial: d.notaMaterial,
+          agendaTitulo: d.agendaTitulo,
+          agendaDetalhe: d.agendaDetalhe,
+          garantiaTitulo: d.garantiaTitulo,
+          garantiaDetalhe: d.garantiaDetalhe,
+          foraDoEscopo: d.foraDoEscopo,
+          cancelamento: d.cancelamento,
+          totalHoras: '5 h',
+          horasDeslocamento: '1,5 h',
+          horasTrabalhadas: '3,5 h',
+        ),
+      );
+      await _abrir(tester, DetalheOrcamentoTela(orcamento: porHora));
+
+      expect(find.text('Total de horas'), findsOneWidget);
+      expect(find.text('5 h'), findsOneWidget);
+      expect(find.text('3,5 h trabalhadas + 1,5 h de deslocamento'), findsOneWidget);
+    });
+
+    testWidgets('orçamento que não é por hora não mostra total de horas', (tester) async {
+      await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos));
+      expect(find.text('Total de horas'), findsNothing);
+    });
+
     testWidgets('bloco sem texto (fora do escopo, cancelamento) não aparece', (tester) async {
       final d = carlos.detalhe!;
       final semRegras = Orcamento(

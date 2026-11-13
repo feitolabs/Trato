@@ -585,7 +585,7 @@ void main() {
       final servico = ServicoOrcamentoApi(api, pedidoId: 'ped-123');
       await servico.enviar(
         const OrcamentoPronto(
-          deslocamentoCentavos: 3000,
+          decimosDeslocamento: 10,
           decimosDeHora: 25,
           valorHoraCentavos: 8000,
           garantiaDias: 90,
@@ -611,12 +611,16 @@ void main() {
         expect((i as Map).keys.toSet(),
             {'tipo', 'descricao', 'quantidade', 'valor_unitario_centavos'});
       }
-      expect(itens[0]['tipo'], 'horas');
-      expect(itens[0]['descricao'], 'Mão de obra');
       expect(itens.every((i) => const {'horas', 'deslocamento', 'material', 'outro'}.contains(i['tipo'])), isTrue);
-      expect(itens[0]['valor_unitario_centavos'], 20000); // 8000 * 25 / 10
-      expect(itens[1]['descricao'], 'Deslocamento');
-      expect(itens[1]['valor_unitario_centavos'], 3000);
+      // Por hora: quantidade = horas, valor unitário = valor da hora (o backend soma).
+      expect(itens[0]['tipo'], 'deslocamento');
+      expect(itens[0]['descricao'], 'Horas de deslocamento');
+      expect(itens[0]['quantidade'], 1.0);
+      expect(itens[0]['valor_unitario_centavos'], 8000);
+      expect(itens[1]['tipo'], 'horas');
+      expect(itens[1]['descricao'], 'Horas trabalhadas');
+      expect(itens[1]['quantidade'], 2.5);
+      expect(itens[1]['valor_unitario_centavos'], 8000);
       expect(itens[2]['descricao'], 'Tomadas');
       expect(itens[2]['valor_unitario_centavos'], 4500);
     });
@@ -628,7 +632,7 @@ void main() {
       expect(
         () => servico.enviar(
           const OrcamentoPronto(
-            deslocamentoCentavos: 0,
+            decimosDeslocamento: 0,
             decimosDeHora: 10,
             valorHoraCentavos: 5000,
             garantiaDias: 30,

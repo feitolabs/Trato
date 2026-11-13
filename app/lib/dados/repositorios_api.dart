@@ -550,10 +550,13 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
       final j = _mapa(await _api.get('/v1/orcamentos/$id'));
       final itens = [
         for (final i in (j['itens'] as List? ?? const []).cast<Map<String, dynamic>>())
-          ItemOrcamento(
-            descricao: i['descricao'] as String,
-            centavos: i['total_centavos'] as int,
-          ),
+          // Item de hora com valor zero é só a informação das horas (numa contraproposta aceita,
+          // o preço já está no valor combinado): vai no bloco de horas, não numa linha de R$ 0,00.
+          if (!(const {'horas', 'deslocamento'}.contains(i['tipo']) && i['total_centavos'] == 0))
+            ItemOrcamento(
+              descricao: i['descricao'] as String,
+              centavos: i['total_centavos'] as int,
+            ),
       ];
       final validade = j['validade_ate'] as String?;
       final garantia = j['garantia_dias'] as int?;
@@ -562,6 +565,9 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
         validoAte: validade == null ? '' : _dia(DateTime.parse(validade).toLocal()),
         itens: itens,
         notaMaterial: _sinalMaterial(j['sinal_material_centavos'] as int?),
+        totalHoras: _horasTexto(j['total_horas']),
+        horasDeslocamento: _horasTexto(j['horas_deslocamento']),
+        horasTrabalhadas: _horasTexto(j['horas_trabalhadas']),
         agendaTitulo: prazo == null ? '' : 'Prazo de execução',
         agendaDetalhe: prazo == null ? '' : '$prazo ${prazo == 1 ? 'dia' : 'dias'}',
         garantiaTitulo: garantia == null ? '' : 'Garantia',
@@ -573,6 +579,13 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
       if (erro.tipo == TipoErro.sessaoExpirada) rethrow;
       return null;
     }
+  }
+
+  /// "5.5" -> "5,5 h"; "3" -> "3 h"; nulo -> "".
+  static String _horasTexto(Object? bruto) {
+    final horas = double.tryParse('${bruto ?? ''}');
+    if (horas == null || horas <= 0) return '';
+    return Dinheiro.formatarHoras((horas * 10).round());
   }
 
   String _sinalMaterial(int? centavos) => centavos == null || centavos == 0
@@ -695,12 +708,36 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
 
 /// `GET/POST /v1/pedidos/{id}/mensagens`. Telefone e e-mail já saem mascarados do backend.
 class RepositorioChatApi implements RepositorioChat {
-  RepositorioChatApi(this._api, {this.textos = const TextosPadraoTelas()});
+  RepositorioChatApi(this._api, {this.textos = const TextosPadraoTelas(), this.upload});
 
   final ClienteApi _api;
   final TextosPadraoTelas textos;
 
-  static bool _ehMensagemFoto(String texto) {
+  /// Sobe a foto do chat. Sem ele (testes, demonstração), a referência segue como veio.
+  final ServicoUpload? upload;
+
+  /// A mensagem de foto leva `[Foto:<id da mídia>]`; a imagem abre por URL assinada curta.
+  static final _marcadorFoto = RegExp(r'^\[Foto:([0-9a-fA-F-]{16,40})\]$');
+
+  /// URL curta da foto por mídia (vale 4 min; a do backend expira em 5).
+  final Map<String, (DateTime, String?)> _urlsDeFotos = {};
+
+  Future<String?> _urlDaFoto(String pedidoId, String midiaId) async {
+    final guardada = _urlsDeFotos[midiaId];
+    if (guardada != null && DateTime.now().difference(guardada.$1).inMinutes < 4) {
+      return guardada.$2;
+    }
+    String? url;
+    try {
+      url = _mapa(await _api.get('/v1/pedidos/$pedidoId/anexos-chat/$midiaId'))['url'] as String?;
+    } on Object {
+      url = null; // sem rede ou sem a foto: a conversa abre, a imagem fica como "Foto"
+    }
+    if (url != null) _urlsDeFotos[midiaId] = (DateTime.now(), url);
+    return url;
+  }
+
+  static bool ehMensagemFoto(String texto) {
     final t = texto.trim();
     return t.startsWith('[Foto') ||
         t.startsWith('midia://') ||
@@ -714,7 +751,7 @@ class RepositorioChatApi implements RepositorioChat {
     final bruto = (m['texto'] as String?) ?? '';
     final (contra, texto) = ContrapropostaChat.ler(bruto);
     return MensagemChat(
-      tipo: contra == null && _ehMensagemFoto(bruto) ? TipoMensagem.foto : TipoMensagem.texto,
+      tipo: contra == null && ehMensagemFoto(bruto) ? TipoMensagem.foto : TipoMensagem.texto,
       hora: _hora(DateTime.parse(m['enviada_em'] as String).toLocal()),
       texto: texto,
       minha: m['minha'] == true,
@@ -777,10 +814,27 @@ class RepositorioChatApi implements RepositorioChat {
       numeroPedido: numero,
       situacao: situacao,
       mensagens: [
-        for (final m in mensagens) _mensagem(m),
+        for (final m in await _comFotos(pedidoId, mensagens)) _mensagem(m),
       ],
       respostasRapidas: textos.respostasRapidas,
     );
+  }
+
+  /// Troca `[Foto:<id>]` pela URL da imagem (em paralelo). Sem URL, vira o texto "Foto".
+  Future<List<Map<String, dynamic>>> _comFotos(
+    String pedidoId,
+    List<Map<String, dynamic>> brutas,
+  ) async {
+    return Future.wait([
+      for (final m in brutas)
+        () async {
+          final texto = ((m['texto'] as String?) ?? '').trim();
+          final achou = _marcadorFoto.firstMatch(texto);
+          if (achou == null) return m;
+          final url = await _urlDaFoto(pedidoId, achou.group(1)!);
+          return {...m, 'texto': url ?? '[Foto indisponível]'};
+        }(),
+    ]);
   }
 
   @override
@@ -794,11 +848,37 @@ class RepositorioChatApi implements RepositorioChat {
 
   @override
   Future<void> enviarFoto(String pedidoId, String referencia, {String? profissionalId}) async {
+    var texto = referencia;
+    final servico = upload;
+    // Foto tirada agora: sobe como anexo de chat e a mensagem leva só o id. Antes, o app mandava
+    // o CAMINHO do arquivo no celular de quem enviou, que não abre em outro aparelho.
+    if (servico != null && _ehArquivoLocal(referencia)) {
+      final bytes = await File(referencia).readAsBytes();
+      final enviado = await servico.enviar(
+        ArquivoCapturado(
+          bytes: bytes,
+          sha256: crypto.sha256.convert(bytes).toString(),
+          capturadaEm: DateTime.now().toUtc(),
+        ),
+        FinalidadeArquivo.chat,
+        pedidoId: pedidoId,
+      );
+      texto = '[Foto:${enviado.arquivoId}]';
+    }
     await _api.post(
       '/v1/pedidos/$pedidoId/mensagens',
       consulta: _consulta(profissionalId),
-      corpo: {'texto': referencia},
+      corpo: {'texto': texto},
     );
+  }
+
+  static bool _ehArquivoLocal(String referencia) {
+    if (referencia.startsWith('[') || referencia.startsWith('http')) return false;
+    try {
+      return File(referencia).existsSync();
+    } on Object {
+      return false;
+    }
   }
 }
 
@@ -842,13 +922,14 @@ class RepositorioPerfilApi implements RepositorioPerfil {
   String? _ultimoNome;
   String? _meuId;
 
-  /// URL curta da foto por usuário; vale ~4 min (a URL do backend expira em 5).
+  /// URL curta da foto por usuário; vale 45 s (a URL do backend expira em 5). Curto de propósito:
+  /// quem troca a foto aparece com a nova na lista de mensagens e no perfil quase na hora.
   final Map<String, (DateTime, Future<String?>)> _fotos = {};
 
   @override
   Future<String?> fotoDe(String usuarioId) {
     final guardada = _fotos[usuarioId];
-    if (guardada != null && DateTime.now().difference(guardada.$1).inMinutes < 4) {
+    if (guardada != null && DateTime.now().difference(guardada.$1).inSeconds < 45) {
       return guardada.$2;
     }
     final busca = () async {
@@ -1019,6 +1100,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     Map<String, dynamic> me = const {};
     var abertos = <PedidoAberto>[];
     ProximoAtendimento? proximo;
+    var contratados = <PedidoContratado>[];
     var carteira = const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0);
     var deuCerto = false;
     try {
@@ -1053,6 +1135,10 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         final p = tentar(() => PedidoApi.deJson(j));
         if (p != null) meus.add(p);
       }
+      contratados = [
+        for (final p in meus)
+          if (_estadosDoProfissional.contains(p.estado)) _contratado(p),
+      ];
       for (final p in meus) {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
           proximo = ProximoAtendimento(
@@ -1080,6 +1166,42 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       carteira: carteira,
       pedidos: abertos,
       proximo: proximo,
+      contratados: contratados,
+    );
+  }
+
+  /// Estados em que o pedido já é do profissional e ainda pede atenção dele. `concluido`,
+  /// `cancelado` e o resto saem: o histórico fica na carteira e no perfil.
+  static const _estadosDoProfissional = {
+    'orcamento_aceito',
+    'aguardando_confirmacao',
+    'pago_e_retido',
+    'agendado',
+    'em_andamento',
+    'em_confirmacao',
+    'em_disputa',
+    'retrabalho',
+  };
+
+  PedidoContratado _contratado(PedidoApi p) {
+    final situacao = switch (p.estado) {
+      'orcamento_aceito' => 'Orçamento aceito · aguardando o pagamento do cliente',
+      'aguardando_confirmacao' => 'Pagamento sendo confirmado pelo parceiro',
+      'pago_e_retido' => 'Pago · marque a data da visita',
+      'agendado' => 'Agendado',
+      'em_andamento' => 'Em execução',
+      'em_confirmacao' => 'Aguardando a confirmação do cliente',
+      'em_disputa' => 'Em análise (reclamação aberta)',
+      'retrabalho' => 'Retrabalho em andamento',
+      _ => p.estadoNome,
+    };
+    return PedidoContratado(
+      pedidoId: p.id,
+      titulo: 'Pedido ${p.numero}',
+      situacao: situacao,
+      estadoApi: p.estado,
+      quando: p.janelaRotulo,
+      janelaInicio: p.janelaInicio?.toLocal(),
     );
   }
 
@@ -1213,21 +1335,22 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     }
 
     final itens = <Map<String, dynamic>>[];
-    final valorHoras = Dinheiro.valorDasHoras(pronto.valorHoraCentavos, pronto.decimosDeHora);
-    if (valorHoras > 0) {
-      itens.add({
-        'tipo': 'horas',
-        'descricao': 'Mão de obra',
-        'quantidade': 1,
-        'valor_unitario_centavos': valorHoras,
-      });
-    }
-    if (pronto.deslocamentoCentavos > 0) {
+    // Por hora: a quantidade é o número de horas e o valor unitário é o valor da hora. Assim o
+    // cliente vê as horas (deslocamento e trabalhadas) e o backend soma o total.
+    if (pronto.decimosDeslocamento > 0 && pronto.valorHoraCentavos > 0) {
       itens.add({
         'tipo': 'deslocamento',
-        'descricao': 'Deslocamento',
-        'quantidade': 1,
-        'valor_unitario_centavos': pronto.deslocamentoCentavos,
+        'descricao': 'Horas de deslocamento',
+        'quantidade': pronto.decimosDeslocamento / 10,
+        'valor_unitario_centavos': pronto.valorHoraCentavos,
+      });
+    }
+    if (pronto.decimosDeHora > 0 && pronto.valorHoraCentavos > 0) {
+      itens.add({
+        'tipo': 'horas',
+        'descricao': 'Horas trabalhadas',
+        'quantidade': pronto.decimosDeHora / 10,
+        'valor_unitario_centavos': pronto.valorHoraCentavos,
       });
     }
     if (pronto.materialPorMim) {

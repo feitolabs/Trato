@@ -36,9 +36,9 @@ CalculadoraOrcamentoTela _calculadora(
   ServicoOrcamentoFake servico, {
   ValueChanged<OrcamentoPronto>? aoEnviar,
   List<ItemMaterial> itens = _itens,
-  String desloc = '30',
-  String horas = '3',
-  String valorHora = '80',
+  String desloc = '0,5',
+  String horas = '2,5',
+  String valorHora = '90',
 }) =>
     CalculadoraOrcamentoTela(
       servico: servico,
@@ -83,6 +83,12 @@ void main() {
       expect(Dinheiro.valorDasHoras(3333, 5), 1667); // meio centavo sobe
     });
 
+    test('formatarHoras', () {
+      expect(Dinheiro.formatarHoras(30), '3 h');
+      expect(Dinheiro.formatarHoras(25), '2,5 h');
+      expect(Dinheiro.formatarHoras(0), '0 h');
+    });
+
     test('percentual vem de pontos-base', () {
       expect(Dinheiro.formatarBps(500), '5%');
       expect(Dinheiro.formatarBps(750), '7,5%');
@@ -96,7 +102,7 @@ void main() {
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
 
-      // 30 + 3 x 80 + 46 + 64 = R$ 380,00
+      // (0,5 h de deslocamento + 2,5 h trabalhadas) x 90 + 46 + 64 = R$ 380,00
       expect(servico.pedidos, [38000]);
       expect(find.text('R\$ 380,00'), findsWidgets);
       // Taxa descontada: o cliente paga 380; o profissional recebe 380 menos 28,50.
@@ -104,6 +110,16 @@ void main() {
       expect(find.text('– R\$ 28,50'), findsOneWidget);
       expect(find.text('R\$ 351,50'), findsOneWidget);
       expect(find.text('Serviços parecidos na região: R\$ 300,00 a R\$ 450,00.'), findsOneWidget);
+    });
+
+    testWidgets('mostra o total de horas (deslocamento + trabalhadas) ao profissional', (tester) async {
+      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      await _abrir(tester, _calculadora(servico));
+      await tester.pump();
+      expect(find.textContaining('Total de horas: 3 h'), findsOneWidget);
+      await tester.enterText(_campo('Horas de deslocamento'), '1,5');
+      await tester.pump();
+      expect(find.textContaining('Total de horas: 4 h'), findsOneWidget);
     });
 
     testWidgets('rótulo da taxa acompanha o percentual devolvido', (tester) async {
@@ -120,12 +136,12 @@ void main() {
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
 
-      await tester.enterText(_campo('Horas'), '4');
+      await tester.enterText(_campo('Horas trabalhadas'), '4');
       await tester.pump();
       await tester.pump();
 
-      expect(servico.pedidos.last, 46000); // 30 + 4 x 80 + 110
-      expect(find.text('R\$ 460,00'), findsOneWidget);
+      expect(servico.pedidos.last, 51500); // (0,5 + 4) x 90 + 110
+      expect(find.text('R\$ 515,00'), findsOneWidget);
     });
 
     testWidgets('Cliente fornece tira o material do total', (tester) async {
@@ -162,7 +178,7 @@ void main() {
 
       expect(enviado, isNull);
       expect(
-        find.text('Quantidade de horas não informada. Digite as horas, como 3 ou 2,5.'),
+        find.text('Horas trabalhadas não informadas. Digite as horas, como 3 ou 2,5.'),
         findsOneWidget,
       );
       expect(
@@ -181,7 +197,7 @@ void main() {
       await tester.pump();
       expect(enviado, isNull);
       expect(
-        find.text('Valor de deslocamento inválido. Use só números, como 30 ou 30,50.'),
+        find.text('Horas de deslocamento inválidas. Use só números, como 1 ou 1,5.'),
         findsOneWidget,
       );
     });
@@ -198,9 +214,10 @@ void main() {
 
       expect(enviado, isNotNull);
       expect(enviado!.totalCentavos, 38000);
-      expect(enviado!.deslocamentoCentavos, 3000);
-      expect(enviado!.decimosDeHora, 30);
-      expect(enviado!.valorHoraCentavos, 8000);
+      expect(enviado!.decimosDeslocamento, 5);
+      expect(enviado!.decimosDeHora, 25);
+      expect(enviado!.totalDecimosDeHora, 30);
+      expect(enviado!.valorHoraCentavos, 9000);
       expect(enviado!.garantiaDias, 90);
       expect(enviado!.itens.length, 2);
       expect(enviado!.pedirSinalMaterial, isTrue);

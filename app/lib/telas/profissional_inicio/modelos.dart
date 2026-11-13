@@ -31,6 +31,42 @@ class ProximoAtendimento {
   final String endereco;
 }
 
+/// Pedido que o cliente já aceitou (do orçamento do profissional): do aceite até o fim. É o que o
+/// profissional acompanha na aba Pedidos. Antes do pagamento ele NÃO está mais "aberto" e, sem esta
+/// lista, sumia da tela do profissional.
+class PedidoContratado {
+  const PedidoContratado({
+    required this.pedidoId,
+    required this.titulo,
+    required this.situacao,
+    required this.estadoApi,
+    this.quando,
+    this.janelaInicio,
+  });
+
+  final String pedidoId;
+
+  /// Ex.: "Pedido #4F2A".
+  final String titulo;
+
+  /// Texto pronto da situação, ex.: "Aguardando o pagamento do cliente".
+  final String situacao;
+
+  /// Estado na API (`orcamento_aceito`, `pago_e_retido`, `agendado`...).
+  final String estadoApi;
+
+  /// Data combinada da visita, quando já existe.
+  final String? quando;
+  final DateTime? janelaInicio;
+
+  bool get aguardandoPagamento =>
+      estadoApi == 'orcamento_aceito' || estadoApi == 'aguardando_confirmacao';
+
+  /// Entra na agenda (já pago, para agendar, agendado ou em execução).
+  bool get naAgenda => const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(estadoApi);
+  bool get emAndamento => estadoApi == 'em_andamento';
+}
+
 class ResumoCarteira {
   const ResumoCarteira({required this.retidoCentavos, required this.paraSacarCentavos});
 
@@ -90,7 +126,11 @@ class InicioProfissional {
     required this.carteira,
     required this.pedidos,
     this.proximo,
+    this.contratados = const [],
   });
+
+  /// Pedidos aceitos pelo cliente, do aceite ao fim (inclui "aguardando pagamento").
+  final List<PedidoContratado> contratados;
 
   final String nome;
   final bool disponivelAgora;
@@ -105,6 +145,7 @@ class InicioProfissional {
         proximo: proximo,
         carteira: carteira,
         pedidos: novos,
+        contratados: contratados,
       );
 }
 

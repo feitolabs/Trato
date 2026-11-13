@@ -24,9 +24,9 @@ void main() {
     'calculadora': CalculadoraOrcamentoTela(
       servico: ServicoOrcamentoFake(taxaBps: 500),
       tituloPedido: 'Troca de tomadas e chuveiro',
-      deslocamentoInicial: '30',
-      horasInicial: '3',
-      valorHoraInicial: '80',
+      deslocamentoInicial: '0,5',
+      horasInicial: '2,5',
+      valorHoraInicial: '90',
       itensIniciais: const [
         ItemMaterial(nome: '2 tomadas 20 A', centavos: 4600),
         ItemMaterial(nome: 'Resistência 220 V', centavos: 6400),

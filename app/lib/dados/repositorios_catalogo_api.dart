@@ -422,22 +422,24 @@ class RepositorioAgendaApi implements RepositorioAgenda {
   @override
   Future<List<Agendamento>> listar() async {
     final inicio = await _profissional.inicio();
-    final proximo = inicio.proximo;
-    if (proximo == null) return const [];
-    // O dia vem da visita marcada; sem visita marcada, fica em "hoje" com o aviso no horário.
-    final base = proximo.janelaInicio ?? DateTime.now();
+    // Todos os atendimentos pagos, não só o primeiro. O dia vem da visita marcada; sem visita
+    // marcada, fica em "hoje" com o aviso no horário.
     return [
-      Agendamento(
-        id: proximo.pedidoId ?? 'proximo',
-        pedidoId: proximo.pedidoId ?? '',
-        dia: DateTime(base.year, base.month, base.day),
-        horario: proximo.quando,
-        titulo: proximo.titulo,
-        local: proximo.endereco,
-        estado: proximo.emAndamento
-            ? EstadoAgendamento.emAndamento
-            : EstadoAgendamento.agendado,
-      ),
+      for (final c in inicio.contratados)
+        if (c.naAgenda)
+          Agendamento(
+            id: c.pedidoId,
+            pedidoId: c.pedidoId,
+            dia: DateTime(
+              (c.janelaInicio ?? DateTime.now()).year,
+              (c.janelaInicio ?? DateTime.now()).month,
+              (c.janelaInicio ?? DateTime.now()).day,
+            ),
+            horario: c.quando ?? 'Data da visita ainda não marcada',
+            titulo: c.titulo,
+            local: '',
+            estado: c.emAndamento ? EstadoAgendamento.emAndamento : EstadoAgendamento.agendado,
+          ),
     ];
   }
 }

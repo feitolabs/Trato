@@ -138,6 +138,22 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                 LinhaValor(rotulo: item.descricao, valor: formatarReais(item.centavos)),
                 const SizedBox(height: EspacosTrato.x3),
               ],
+              if (d.totalHoras.isNotEmpty) ...[
+                LinhaValor(
+                  key: const ValueKey('total-horas-orcamento'),
+                  rotulo: 'Total de horas',
+                  valor: d.totalHoras,
+                ),
+                if (d.horasDeslocamento.isNotEmpty && d.horasTrabalhadas.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: EspacosTrato.x1),
+                    child: Text(
+                      '${d.horasTrabalhadas} trabalhadas + ${d.horasDeslocamento} de deslocamento',
+                      style: secundario,
+                    ),
+                  ),
+                const SizedBox(height: EspacosTrato.x3),
+              ],
               const Divider(),
               const SizedBox(height: EspacosTrato.x3),
               LinhaValor(rotulo: 'Total', valor: formatarReais(o.totalCentavos), destaque: true),

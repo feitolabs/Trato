@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
-import '../cliente/avatar_iniciais.dart';
+import '../cliente/avatar_de_usuario.dart';
 import '../cliente/modelos.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
@@ -208,7 +208,7 @@ class _CartaoResultado extends StatelessWidget {
             padding: const EdgeInsets.all(EspacosTrato.x4),
             child: Row(
               children: [
-                AvatarIniciais(iniciais: p.iniciais),
+                AvatarDeUsuario(iniciais: p.iniciais, usuarioId: p.id),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
                   child: Column(

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../cliente/avatar_iniciais.dart';
+import '../cliente/avatar_de_usuario.dart';
+import '../cliente/avatar_iniciais.dart' show SeloVerificacao;
 import '../cliente/modelos.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 
@@ -73,7 +74,7 @@ class CartaoProfissional extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AvatarIniciais(iniciais: p.iniciais),
+                    AvatarDeUsuario(iniciais: p.iniciais, usuarioId: p.id),
                     const SizedBox(width: EspacosTrato.x3),
                     Expanded(
                       child: Column(

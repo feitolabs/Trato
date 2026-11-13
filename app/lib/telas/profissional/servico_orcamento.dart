@@ -9,7 +9,7 @@ class ItemMaterial {
 /// quem confere e grava é o backend.
 class OrcamentoPronto {
   const OrcamentoPronto({
-    required this.deslocamentoCentavos,
+    required this.decimosDeslocamento,
     required this.decimosDeHora,
     required this.valorHoraCentavos,
     required this.garantiaDias,
@@ -19,7 +19,10 @@ class OrcamentoPronto {
     required this.totalCentavos,
   });
 
-  final int deslocamentoCentavos;
+  /// Horas de deslocamento, em décimos de hora (15 = 1,5 h). Cobradas pelo mesmo valor da hora.
+  final int decimosDeslocamento;
+
+  /// Horas trabalhadas, em décimos de hora.
   final int decimosDeHora;
   final int valorHoraCentavos;
   final int garantiaDias;
@@ -27,6 +30,9 @@ class OrcamentoPronto {
   final bool materialPorMim;
   final bool pedirSinalMaterial;
   final int totalCentavos;
+
+  /// Total de horas que o cliente vai ver: deslocamento + trabalhadas, em décimos de hora.
+  int get totalDecimosDeHora => decimosDeslocamento + decimosDeHora;
 }
 
 /// O que o backend devolve para um total. Tudo já calculado lá (escopo 11.1).

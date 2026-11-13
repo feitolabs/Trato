@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
-import '../cliente/avatar_iniciais.dart';
+import '../cliente/avatar_de_usuario.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
 
@@ -13,10 +13,14 @@ class MensagensTela extends StatelessWidget {
     required this.servico,
     this.aoAbrirConversa,
     this.comVoltar = false,
+    this.atualizarACada,
   });
 
   final ServicoMensagens servico;
   final ValueChanged<ConversaResumo>? aoAbrirConversa;
+
+  /// Atualiza a lista sozinha neste intervalo (mensagem nova aparece sem fechar o app).
+  final Duration? atualizarACada;
 
   /// Falso por padrão: a tela é uma aba da casca do cliente.
   final bool comVoltar;
@@ -26,7 +30,11 @@ class MensagensTela extends StatelessWidget {
     return MolduraTelaComum(
       titulo: 'Mensagens',
       comVoltar: comVoltar,
-      child: ListaConversas(servico: servico, aoAbrirConversa: aoAbrirConversa),
+      child: ListaConversas(
+        servico: servico,
+        aoAbrirConversa: aoAbrirConversa,
+        atualizarACada: atualizarACada,
+      ),
     );
   }
 }
@@ -38,16 +46,19 @@ class ListaConversas extends StatelessWidget {
     required this.servico,
     this.aoAbrirConversa,
     this.textoVazio = 'Ao pedir um serviço, a conversa com o profissional aparece aqui.',
+    this.atualizarACada,
   });
 
   final ServicoMensagens servico;
   final ValueChanged<ConversaResumo>? aoAbrirConversa;
+  final Duration? atualizarACada;
   final String textoVazio;
 
   @override
   Widget build(BuildContext context) {
     return CarregadorTela<List<ConversaResumo>>(
       carregar: servico.listar,
+      atualizarACada: atualizarACada,
       construir: (context, itens, _) => itens.isEmpty
           ? EstadoVazio(
               icone: Icons.chat_bubble_outline,
@@ -92,7 +103,7 @@ class _LinhaConversa extends StatelessWidget {
             padding: const EdgeInsets.all(EspacosTrato.x4),
             child: Row(
               children: [
-                AvatarIniciais(iniciais: item.iniciais),
+                AvatarDeUsuario(iniciais: item.iniciais, usuarioId: item.outraParteId),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
                   child: Column(
