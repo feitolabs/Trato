@@ -342,11 +342,13 @@ class _LinhaMensagem extends StatelessWidget {
           if (!minha)
             Text(mensagem.hora, style: legendaHora)
           else
-            // Pinzinho de quem mandou: um = enviada; dois azuis = a outra pessoa já leu.
+            // Pinzinho de quem mandou: ✓ enviada · ✓✓ cinza recebida · ✓✓ azul visualizada.
             Semantics(
               label: mensagem.lida
                   ? 'Enviada às ${mensagem.hora}, visualizada'
-                  : 'Enviada às ${mensagem.hora}',
+                  : mensagem.recebida
+                      ? 'Enviada às ${mensagem.hora}, recebida'
+                      : 'Enviada às ${mensagem.hora}',
               excludeSemantics: true,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -354,9 +356,14 @@ class _LinhaMensagem extends StatelessWidget {
                   Text(mensagem.hora, style: legendaHora),
                   const SizedBox(width: EspacosTrato.x1),
                   Icon(
-                    mensagem.lida ? Icons.done_all : Icons.done,
+                    mensagem.lida || mensagem.recebida ? Icons.done_all : Icons.done,
                     key: ValueKey(
-                        mensagem.lida ? 'pino-visualizada' : 'pino-enviada'),
+                      mensagem.lida
+                          ? 'pino-visualizada'
+                          : mensagem.recebida
+                              ? 'pino-recebida'
+                              : 'pino-enviada',
+                    ),
                     size: 16,
                     color: mensagem.lida
                         ? CoresTrato.azulTexto

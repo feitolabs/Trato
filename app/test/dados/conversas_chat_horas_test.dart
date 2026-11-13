@@ -160,6 +160,32 @@ void main() {
       expect(buscas.single.caminho, '/v1/pedidos/ped-1/anexos-chat/$_midia');
     });
 
+    test('entregue_em e lida_em viram recebida e lida (a leitura também conta como recebida)',
+        () async {
+      Map<String, Object?> msg(int id, String? entregue, String? lida) => {
+            'id': id,
+            'autor_id': 'eu',
+            'minha': true,
+            'texto': 'm$id',
+            'mascarada': false,
+            'enviada_em': '2026-10-29T10:00:00Z',
+            'entregue_em': entregue,
+            'lida_em': lida,
+          };
+      final (api, _) = _cliente((r) {
+        if (r.url.path.endsWith('/mensagens')) {
+          return _json([
+            msg(1, null, null),
+            msg(2, '2026-10-29T10:01:00Z', null),
+            msg(3, null, '2026-10-29T10:02:00Z'),
+          ]);
+        }
+        return _json({'detail': 'não'}, 404);
+      });
+      final m = (await RepositorioChatApi(api).conversa('ped-1')).mensagens;
+      expect([for (final x in m) (x.recebida, x.lida)], [(false, false), (true, false), (true, true)]);
+    });
+
     test('foto que não abre não derruba a conversa', () async {
       final (api, _) = _cliente((r) {
         if (r.url.path.endsWith('/mensagens')) {

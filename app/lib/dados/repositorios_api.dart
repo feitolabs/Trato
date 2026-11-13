@@ -756,6 +756,7 @@ class RepositorioChatApi implements RepositorioChat {
       texto: texto,
       minha: m['minha'] == true,
       lida: m['lida_em'] != null,
+      recebida: m['entregue_em'] != null || m['lida_em'] != null,
       contraproposta: contra,
     );
   }

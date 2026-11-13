@@ -144,6 +144,9 @@ class MensagemOut(BaseModel):
     mascarada: bool
     enviada_em: datetime
     lida_em: datetime | None
+    entregue_em: datetime | None = Field(
+        None, description="Quando chegou ao aparelho de quem recebeu (a leitura também conta)."
+    )
 
 
 class NotificacaoOut(BaseModel):
@@ -729,6 +732,7 @@ def _mensagens_out(contexto: Contexto, conversa: str, usuario: Usuario) -> list[
             mascarada=m.mascarada,
             enviada_em=m.enviada_em,
             lida_em=m.lida_em,
+            entregue_em=m.entregue_em or m.lida_em,
         )
         for m in contexto.conversas.listar(conversa)
     ]
