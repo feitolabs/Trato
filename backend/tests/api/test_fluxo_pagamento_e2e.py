@@ -714,3 +714,55 @@ def test_cancelar_devolve_principal_e_aditivo(fluxo: Fluxo):
     # com o serviço em andamento o cancelamento não é permitido; o aditivo segue o pedido
     r = fluxo.acao(pid, "cancelar", "t-cliente", {"motivo": "x"})
     assert r.status_code == 409
+
+
+# --- chave de idempotência do provedor --------------------------------------------------------
+
+
+def _provedor_estrito(fake: ProvedorFake) -> dict[str, tuple]:
+    """Faz o provedor falso recusar como o Stripe: mesma chave com parâmetros diferentes dá erro."""
+    from trato.pagamentos.provedor import ErroProvedor
+
+    vistos: dict[str, tuple] = {}
+    original = fake.criar_cobranca
+
+    def estrito(*, valor_centavos, meio, chave_idempotencia, metadados, **resto):
+        params = (valor_centavos, meio, resto.get("parcelas", 1), resto.get("cliente_externo"))
+        if chave_idempotencia in vistos and vistos[chave_idempotencia] != params:
+            raise ErroProvedor(
+                "Stripe recusou (400): Keys for idempotent requests can only be used with the "
+                "same parameters they were first used with."
+            )
+        vistos[chave_idempotencia] = params
+        return original(
+            valor_centavos=valor_centavos,
+            meio=meio,
+            chave_idempotencia=chave_idempotencia,
+            metadados=metadados,
+            **resto,
+        )
+
+    fake.criar_cobranca = estrito  # type: ignore[method-assign]
+    return vistos
+
+
+def test_trocar_pix_por_cartao_nao_colide_a_chave_do_provedor(fluxo: Fluxo):
+    _provedor_estrito(fluxo.fake)
+    pid = fluxo.aceitar()
+    pix = fluxo.cobrar(pid, "pix")
+    # A tentativa anterior chegou ao provedor mas não ficou registrada aqui (falha entre os dois):
+    # a próxima não pode reaproveitar a mesma chave com outro meio.
+    fluxo.servico.cobrancas._itens.clear()
+    cartao = fluxo.cobrar(pid, "cartao")
+    assert cartao["id"] != pix["id"] and cartao["meio"] == "cartao"
+
+
+def test_repetir_o_mesmo_pedido_de_cobranca_continua_idempotente(fluxo: Fluxo):
+    _provedor_estrito(fluxo.fake)
+    pid = fluxo.aceitar()
+    primeira = fluxo.cobrar(pid, "cartao")
+    de_novo = fluxo.cobrar(pid, "cartao")
+    assert de_novo["id"] == primeira["id"]
+    # mesmo sem o registro local, mesmos parâmetros = mesma chave = mesma cobrança no provedor
+    fluxo.servico.cobrancas._itens.clear()
+    assert fluxo.cobrar(pid, "cartao")["id"] == primeira["id"]
