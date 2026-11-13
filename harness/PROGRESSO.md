@@ -875,3 +875,11 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - Testes: backend `test_orcamentos_do_profissional_e_papel.py`; app novos casos em `atualizacao_automatica_test.dart`, `conversas_chat_horas_test.dart`; 3 goldens do chat refeitos. Backend 1453, app 852.
 - **Pendente:** `fly deploy` (as rotas novas só existem depois) e migration do "recebido".
 
+## 2026-11-12 — "Recebido" no chat e nome do app no Fly (v0.1.11)
+
+- Migration `mensagens_entregue_em` (arquivo `supabase/migrations/20261112220000_mensagens_entregue_em.sql`, rollback em `supabase/rollback/mensagens_entregue_em_rollback.sql`): coluna `entregue_em` e gatilho `mensagens_proteger` que deixa `entregue_em` e `lida_em` serem preenchidas uma vez cada (ler implica receber). Testada num Postgres local (7 testes, incluindo o rollback) e **aplicada no Supabase "Trato" com o OK do João** (versão registrada pelo Supabase na hora da aplicação; antes: sem a coluna, 23 mensagens, nenhuma lida; depois: coluna criada, gatilho ativo, mensagens intactas). `service_role` já escreve na coluna.
+- Backend: `GET /v1/conversas` marca como recebido o que a outra parte mandou (`marcar_entregues`); `MensagemOut.entregue_em`.
+- App: pinzinho em três estados (✓ enviada, ✓✓ cinza recebida, ✓✓ azul visualizada).
+- `backend/fly.toml`: `app = "trato"` (era `trato-backend`, nome que não existe; o deploy anterior falhou por isso). Deploy: `fly deploy` dentro de `backend/`.
+- Verificação: backend 1461, app todos passaram (4 testes de navegação falharam uma vez por a pasta temporária do Flutter ser apagada; passam em nova execução).
+
