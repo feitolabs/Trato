@@ -910,3 +910,12 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - Testes: 2 casos novos em `conversas_chat_horas_test.dart`; `pedidos_test.dart` passa.
 - Para o pedido andar: o profissional marca a visita, faz o check-in com o código de início e o check-out com a foto final; só então o cliente confirma.
 
+
+## 2026-11-13 — Endereço obrigatório e atendimento remoto (v0.1.16)
+
+- **Endereço no presencial:** pedido presencial exige rua, número, bairro e CEP (422 sem isso). O profissional contratado vê o endereço (cartão "Em andamento", agenda, próximo atendimento) e abre no mapa; o cliente vê o "Local do serviço" no detalhe. Antes o profissional só via a cidade.
+- **Modalidade:** `categorias.aceita_remoto` (admin liga por categoria; padrão só presencial), `pedidos.modalidade` (padrão presencial, imutável depois de criado), `perfis_profissional.atende_presencial/atende_remoto` (pelo menos um). Remoto: mesmo pagamento e retenção; check-in e check-out só com o código do cliente (sem foto/GPS); aparece para profissionais de qualquer cidade que atendem remoto. Presencial segue por cidade.
+- **Migration:** `20261113120000_modalidade_remoto.sql` (só colunas com padrão; rollback em `supabase/rollback/modalidade_remoto_rollback.sql`).
+- **Admin:** chave "Atende remoto" no formulário da categoria; chip na lista; 409 se desligar com pedido remoto em andamento.
+- **Correções do mesmo release:** mensagens rápidas do check-in ("Cheguei"...) davam erro silencioso — agora saem no chat do pedido; aprovar aditivo falhava (o app mandava o id do aditivo onde o servidor espera o do pedido) e cobrava Pix, que o Stripe da conta não tem — agora cartão; cabeçalho do aditivo mostra o nome de quem pediu.
+- Testes: backend 138+24+127 (separados por pasta), admin 30, app `modalidade_test.dart` (21) e suíte inteira. O teste `navegacao_sem_placeholder_test.dart` derruba a VM do Dart nesta máquina (também no código sem estas mudanças), então não conta como regressão.

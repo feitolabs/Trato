@@ -457,6 +457,7 @@ class CategoriaAdmin {
     this.icone,
     this.garantiaDias,
     this.ordem = 0,
+    this.aceitaRemoto = false,
   });
   final String id;
   final String nome;
@@ -467,6 +468,10 @@ class CategoriaAdmin {
   final int? garantiaDias;
   final int ordem;
 
+  /// O serviço desta categoria também pode ser feito de forma remota (o cliente escolhe entre
+  /// presencial e remoto). Padrão: só presencial, com endereço obrigatório.
+  final bool aceitaRemoto;
+
   CategoriaAdmin comAtiva(bool valor) => CategoriaAdmin(
         id: id,
         nome: nome,
@@ -476,6 +481,7 @@ class CategoriaAdmin {
         icone: icone,
         garantiaDias: garantiaDias,
         ordem: ordem,
+        aceitaRemoto: aceitaRemoto,
       );
 }
 

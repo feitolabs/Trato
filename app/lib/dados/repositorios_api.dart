@@ -111,6 +111,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<PedidoApi> _pedido(String id) async =>
       PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$id')));
 
+  static DadosDoPedido dadosDeJson(Map<String, dynamic> j) => _dadosDeJson(j);
+
   static DadosDoPedido _dadosDeJson(Map<String, dynamic> j) {
     final e = j['endereco'] as Map<String, dynamic>?;
     return DadosDoPedido(
@@ -121,6 +123,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       numero: e?['numero'] as String?,
       bairro: e?['bairro'] as String?,
       complemento: e?['complemento'] as String?,
+      cep: e?['cep'] as String?,
+      referencia: e?['referencia'] as String?,
+      modalidade: (j['modalidade'] as String?) ?? 'presencial',
     );
   }
 
@@ -244,7 +249,14 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       // Arredondado a ~1 km: o profissional vê a região, nunca o ponto exato.
       if (onde != null) 'local_aprox_lat': double.parse(onde.latitude.toStringAsFixed(2)),
       if (onde != null) 'local_aprox_lng': double.parse(onde.longitude.toStringAsFixed(2)),
-      if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty) 'bairro': rascunho.bairro,
+      if (rascunho.endereco != null && rascunho.modalidade == Modalidade.presencial)
+        'bairro': rascunho.endereco!.bairro.trim()
+      else if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty)
+        'bairro': rascunho.bairro,
+      'modalidade': rascunho.modalidade.codigo,
+      // Presencial leva o endereço completo (o profissional só o vê depois de contratado).
+      if (rascunho.modalidade == Modalidade.presencial && rascunho.endereco != null)
+        'endereco': rascunho.endereco!.paraJson(),
       if (rascunho.prazoDesejado != null)
         'prazo_desejado': rascunho.prazoDesejado!.toIso8601String().substring(0, 10),
       'titulo': rascunho.servicos.isNotEmpty ? rascunho.servicos.join(', ') : 'Pedido de serviço',
@@ -1112,6 +1124,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       longitude: (j['local_aprox_lng'] as num?)?.toDouble(),
       clienteId: j['cliente_id'] as String?,
       clienteNome: j['cliente_nome'] as String?,
+      modalidade: (j['modalidade'] as String?) ?? 'presencial',
     );
   }
 
@@ -1169,9 +1182,14 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         final p = tentar(() => PedidoApi.deJson(j));
         if (p != null) meus.add(p);
       }
+      // O endereço completo só existe depois da contratação: busca o de cada pedido presencial.
+      final enderecos = await _enderecosDosContratados([
+        for (final p in meus)
+          if (_estadosDoProfissional.contains(p.estado) && !p.remoto) p.id,
+      ]);
       contratados = [
         for (final p in meus)
-          if (_estadosDoProfissional.contains(p.estado)) _contratado(p),
+          if (_estadosDoProfissional.contains(p.estado)) _contratado(p, enderecos[p.id]),
       ];
       for (final p in meus) {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
@@ -1180,9 +1198,10 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
             // Data e hora combinadas; antes de marcar a visita, diz isso em vez do nome do estado.
             quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
             titulo: 'Pedido ${p.numero}',
-            endereco: '',
+            endereco: p.remoto ? 'Atendimento remoto' : (enderecos[p.id]?.enderecoCompleto ?? ''),
             janelaInicio: p.janelaInicio?.toLocal(),
             emAndamento: p.estado == 'em_andamento',
+            remoto: p.remoto,
           );
           break;
         }
@@ -1240,7 +1259,26 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     'retrabalho',
   };
 
-  PedidoContratado _contratado(PedidoApi p) {
+  /// `GET /v1/pedidos/{id}/dados` de cada pedido, em paralelo. Falha em um não derruba o Início:
+  /// aquele pedido só fica sem o endereço na tela.
+  Future<Map<String, DadosDoPedido>> _enderecosDosContratados(List<String> ids) async {
+    final achados = await Future.wait([
+      for (final id in ids)
+        () async {
+          try {
+            return MapEntry(
+              id,
+              RepositorioPedidosApi.dadosDeJson(_mapa(await _api.get('/v1/pedidos/$id/dados'))),
+            );
+          } on Object {
+            return null;
+          }
+        }(),
+    ]);
+    return {for (final e in achados) if (e != null) e.key: e.value};
+  }
+
+  PedidoContratado _contratado(PedidoApi p, [DadosDoPedido? dados]) {
     final situacao = switch (p.estado) {
       'orcamento_aceito' => 'Orçamento aceito · aguardando o pagamento do cliente',
       'aguardando_confirmacao' => 'Pagamento sendo confirmado pelo parceiro',
@@ -1259,6 +1297,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       estadoApi: p.estado,
       quando: p.janelaRotulo,
       janelaInicio: p.janelaInicio?.toLocal(),
+      remoto: p.remoto,
+      endereco: dados?.enderecoCompleto,
+      consultaMapa: dados?.consultaDoMapa,
     );
   }
 
@@ -1298,7 +1339,10 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       clienteResumo: '',
       legendasFotos: const [],
       descricao: (j['descricao'] as String?) ?? '',
-      linhas: [if (aberto.bairro.isNotEmpty) LinhaDetalhe('Bairro', aberto.bairro)],
+      linhas: [
+        LinhaDetalhe('Modalidade', aberto.remoto ? 'Remoto' : 'Presencial'),
+        if (!aberto.remoto && aberto.bairro.isNotEmpty) LinhaDetalhe('Bairro', aberto.bairro),
+      ],
     );
   }
 
@@ -1336,17 +1380,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       ServicoOrcamentoApi(_api, pedidoId: pedidoId);
 
   @override
-  ServicoCheckIn servicoCheckIn(String pedidoId) =>
+  ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) =>
       ServicoCheckInApi(
         _api,
         pedidoId: pedidoId,
         captura: capturaDoPedido?.call(pedidoId) ?? captura,
         upload: upload,
         fila: fila,
+        remoto: remoto,
       );
 
   @override
-  ServicoCheckOut servicoCheckOut(String pedidoId) {
+  ServicoCheckOut servicoCheckOut(String pedidoId, {bool remoto = false}) {
     final captura = capturaFinalDoPedido?.call(pedidoId) ?? this.captura;
     final checkIn = ServicoCheckInApi(
       _api,
@@ -1354,6 +1399,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       captura: captura,
       upload: upload,
       fila: fila,
+      remoto: remoto,
     );
     return ServicoCheckOutApi(checkIn, captura);
   }
@@ -1497,7 +1543,12 @@ class ServicoCheckInApi implements ServicoCheckIn {
     required this.captura,
     this.upload,
     this.fila,
+    this.remoto = false,
   });
+
+  /// Serviço remoto: início e fim só com o código do cliente (sem foto, localização nem fila
+  /// offline).
+  final bool remoto;
 
   final ClienteApi _api;
   final String pedidoId;
@@ -1530,12 +1581,17 @@ class ServicoCheckInApi implements ServicoCheckIn {
     return posicao.distanciaMetros ?? distanciaDesconhecidaMetros;
   }
 
-  // Sem rota no backend: mensagens rápidas e aviso de cliente ausente.
+  /// Mensagem rápida e aviso de cliente ausente saem como mensagem normal no chat do pedido: o
+  /// cliente vê na conversa (e na notificação de mensagem nova), e fica guardada como prova.
   @override
-  Future<void> enviarMensagemRapida(String mensagem) async => throw ErroTrato.indisponivel;
+  Future<void> enviarMensagemRapida(String mensagem) async {
+    await _api.post('/v1/pedidos/$pedidoId/mensagens', corpo: {'texto': mensagem});
+  }
 
   @override
-  Future<void> avisarClienteAusente() async => throw ErroTrato.indisponivel;
+  Future<void> avisarClienteAusente() => enviarMensagemRapida(
+        'Cheguei ao local, mas não encontrei você. Pode me responder por aqui?',
+      );
 
   Map<String, Object?> _fotoJson(FotoCapturada f) =>
       {'arquivo_id': f.arquivoId, 'tirada_em': f.tiradaEm.toUtc().toIso8601String()};
@@ -1578,8 +1634,25 @@ class ServicoCheckInApi implements ServicoCheckIn {
     return true;
   }
 
+  /// Serviço remoto: a prova é só o código. Código errado = recusado pelo backend.
+  Future<bool> _postarSoComCodigo(String acao, String chave, String codigo) async {
+    await _api.post('/v1/pedidos/$pedidoId/acoes/$acao', corpo: {
+      'prova': {chave: codigo},
+    });
+    return true;
+  }
+
   @override
   Future<ResultadoInicio> iniciarServico(String codigo) async {
+    if (remoto) {
+      try {
+        await _postarSoComCodigo('fazer_check_in', 'codigo_inicio', codigo);
+        return ResultadoInicio.iniciado;
+      } on ErroTrato catch (erro) {
+        if (erro.tipo == TipoErro.recusado) return ResultadoInicio.codigoIncorreto;
+        rethrow;
+      }
+    }
     final foto = _foto;
     final posicao = _posicao;
     if (foto == null || posicao == null) {
@@ -1612,6 +1685,10 @@ class ServicoCheckInApi implements ServicoCheckIn {
 
   /// Check-out: foto final e código de conclusão que o cliente informa. Devolve `false` se
   /// ficou guardado para enviar quando a internet voltar.
+  /// Check-out remoto: só o código de conclusão. Devolve sempre `true` (sem fila offline).
+  Future<bool> fazerCheckOutRemoto(String codigo) =>
+      _postarSoComCodigo('fazer_check_out', 'codigo_conclusao', codigo);
+
   Future<bool> fazerCheckOut({required FotoCapturada fotoFinal, required String codigo}) async {
     final acao = AcaoOffline(
       pedidoId: pedidoId,
@@ -1670,6 +1747,15 @@ class ServicoCheckOutApi implements ServicoCheckOut {
 
   @override
   Future<ResultadoFim> finalizar(String codigo) async {
+    if (_checkIn.remoto) {
+      try {
+        await _checkIn.fazerCheckOutRemoto(codigo);
+        return ResultadoFim.concluido;
+      } on ErroTrato catch (erro) {
+        if (erro.tipo == TipoErro.recusado) return ResultadoFim.codigoIncorreto;
+        rethrow;
+      }
+    }
     final foto = _foto;
     if (foto == null) {
       throw const ErroTrato(TipoErro.recusado, 'Tire a foto final antes de concluir.');

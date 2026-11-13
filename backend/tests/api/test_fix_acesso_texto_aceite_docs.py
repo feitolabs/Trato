@@ -68,6 +68,12 @@ def test_titulo_e_descricao_do_pedido_sao_limitados_e_mascarados(amb):
         "cidade_id": "x",
         "titulo": "Pintar sala",
         "descricao": "Me ligue no zap 31 97777-6666 para combinar",
+        "endereco": {
+            "logradouro": "Rua das Flores",
+            "numero": "10",
+            "bairro": "Centro",
+            "cep": "35500-000",
+        },
     }
     r = amb.cliente.post("/v1/pedidos", json=corpo, headers=cab("t-cliente"))
     assert r.status_code == 201, r.text

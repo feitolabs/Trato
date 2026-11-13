@@ -19,11 +19,19 @@ class CheckInTela extends StatefulWidget {
     required this.tituloBarra,
     this.fotoInicial,
     this.distanciaInicialMetros,
-    this.mensagensRapidas = const ['Cheguei', 'Estou na portaria', 'Preciso de 15 minutos'],
+    this.mensagensRapidas = const [
+      'Cheguei',
+      'Estou na portaria',
+      'Preciso de 15 minutos'
+    ],
     this.aoIniciar,
     this.permissao,
     this.avisoDistanciaMetros = 300,
+    this.remoto = false,
   });
+
+  /// Serviço remoto: sem foto de chegada nem localização; só o código que o cliente informa.
+  final bool remoto;
 
   final ServicoCheckIn servico;
 
@@ -63,7 +71,9 @@ class _CheckInTelaState extends State<CheckInTela> {
     super.dispose();
   }
 
-  bool get _podeIniciar => _foto != null && _distancia != null && _codigo.text.length == 4;
+  bool get _podeIniciar =>
+      _codigo.text.length == 4 &&
+      (widget.remoto || (_foto != null && _distancia != null));
 
   Future<bool> _permitido(TipoPermissao tipo, TextoPermissao texto) async {
     final p = widget.permissao;
@@ -72,7 +82,9 @@ class _CheckInTelaState extends State<CheckInTela> {
 
   Future<void> _tirarFoto() async {
     setState(() => _erroPasso = null);
-    if (!await _permitido(TipoPermissao.camera, TextoPermissao.cameraCheckIn)) return;
+    if (!await _permitido(TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {
+      return;
+    }
     try {
       final foto = await widget.servico.tirarFoto();
       if (mounted && foto != null) setState(() => _foto = foto);
@@ -83,7 +95,9 @@ class _CheckInTelaState extends State<CheckInTela> {
 
   Future<void> _localizar() async {
     setState(() => _erroPasso = null);
-    if (!await _permitido(TipoPermissao.localizacao, TextoPermissao.localizacao)) return;
+    if (!await _permitido(TipoPermissao.localizacao, TextoPermissao.localizacao)) {
+      return;
+    }
     try {
       final metros = await widget.servico.localizar();
       if (mounted && metros != null) setState(() => _distancia = metros);
@@ -99,7 +113,7 @@ class _CheckInTelaState extends State<CheckInTela> {
 
   Future<void> _clienteAusente() async {
     await widget.servico.avisarClienteAusente();
-    if (mounted) setState(() => _aviso = 'Avisamos o cliente e a central.');
+    if (mounted) setState(() => _aviso = 'Avisamos o cliente pelo chat.');
   }
 
   Future<void> _iniciar() async {
@@ -126,7 +140,8 @@ class _CheckInTelaState extends State<CheckInTela> {
         _erroCodigo = 'Código incorreto. Peça de novo ao cliente.';
       }
       if (resultado == ResultadoInicio.guardadoOffline) {
-        _aviso = 'Sem internet. Guardamos sua chegada e enviamos assim que o sinal voltar. '
+        _aviso =
+            'Sem internet. Guardamos sua chegada e enviamos assim que o sinal voltar. '
             'O serviço só começa quando o Trato confirmar.';
       }
     });
@@ -145,52 +160,68 @@ class _CheckInTelaState extends State<CheckInTela> {
         aoTocar: _podeIniciar ? _iniciar : null,
       ),
       children: [
-        Text('Check-in', style: TipografiaTrato.tituloGrande),
+        Text(widget.remoto ? 'Iniciar atendimento' : 'Check-in',
+            style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
-        Text('Três passos para começar o serviço.', style: TipografiaTrato.corpo),
+        Text(
+          widget.remoto
+              ? 'Atendimento remoto: peça ao cliente o código de início e digite abaixo. '
+                  'Não precisa de foto nem de localização.'
+              : 'Três passos para começar o serviço.',
+          style: TipografiaTrato.corpo,
+        ),
         const SizedBox(height: EspacosTrato.x5),
-        _CartaoPasso(
-          miniatura: foto == null
-              ? const ColoredBox(color: CoresTrato.azulClaro)
-              : ToquePreviewImagem(
-                  referencia: foto.referencia ?? 'Foto de chegada · ${foto.hora}',
-                  legenda: 'Foto de chegada · ${foto.hora}',
-                  child: construirImagemReal(foto.referencia) ??
-                      const ColoredBox(
-                        color: CoresTrato.azulClaro,
-                        child: Center(
-                          child: Icon(Icons.zoom_in, size: 20, color: CoresTrato.petroleo),
+        if (!widget.remoto) ...[
+          _CartaoPasso(
+            miniatura: foto == null
+                ? const ColoredBox(color: CoresTrato.azulClaro)
+                : ToquePreviewImagem(
+                    referencia:
+                        foto.referencia ?? 'Foto de chegada · ${foto.hora}',
+                    legenda: 'Foto de chegada · ${foto.hora}',
+                    child: construirImagemReal(foto.referencia) ??
+                        const ColoredBox(
+                          color: CoresTrato.azulClaro,
+                          child: Center(
+                            child: Icon(Icons.zoom_in,
+                                size: 20, color: CoresTrato.petroleo),
+                          ),
                         ),
-                      ),
-                ),
-          titulo: 'Foto de chegada',
-          detalhe: foto == null ? 'Tire uma foto do local' : '${foto.hora} · toque na foto para ver',
-          feito: foto != null,
-          textoAcao: 'Tirar foto',
-          aoTocarAcao: _tirarFoto,
-        ),
-        const SizedBox(height: EspacosTrato.x3),
-        _CartaoPasso(
-          miniatura: const ColoredBox(
-            color: CoresTrato.azulSuave,
-            child: Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
+                  ),
+            titulo: 'Foto de chegada',
+            detalhe: foto == null
+                ? 'Tire uma foto do local'
+                : '${foto.hora} · toque na foto para ver',
+            feito: foto != null,
+            textoAcao: 'Tirar foto',
+            aoTocarAcao: _tirarFoto,
           ),
-          titulo: 'Localização',
-          detalhe: distancia == null
-              ? 'Confirme que você chegou'
-              : distancia == distanciaDesconhecidaMetros
-                  ? 'Localização registrada'
-                  : 'A $distancia m do endereço',
-          feito: distancia != null,
-          textoAcao: 'Localizar',
-          aoTocarAcao: _localizar,
-        ),
-        if (distancia != null &&
+          const SizedBox(height: EspacosTrato.x3),
+          _CartaoPasso(
+            miniatura: const ColoredBox(
+              color: CoresTrato.azulSuave,
+              child:
+                  Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
+            ),
+            titulo: 'Localização',
+            detalhe: distancia == null
+                ? 'Confirme que você chegou'
+                : distancia == distanciaDesconhecidaMetros
+                    ? 'Localização registrada'
+                    : 'A $distancia m do endereço',
+            feito: distancia != null,
+            textoAcao: 'Localizar',
+            aoTocarAcao: _localizar,
+          ),
+        ],
+        if (!widget.remoto &&
+            distancia != null &&
             distancia != distanciaDesconhecidaMetros &&
             distancia > widget.avisoDistanciaMetros) ...[
           const SizedBox(height: EspacosTrato.x3),
           const AvisoFaixa(
-            texto: 'Você parece estar longe do endereço. Confira se está no lugar certo; '
+            texto:
+                'Você parece estar longe do endereço. Confira se está no lugar certo; '
                 'o Trato confere de novo ao iniciar.',
             tipo: TipoStatus.alerta,
             icone: Icons.location_off_outlined,
@@ -198,7 +229,10 @@ class _CheckInTelaState extends State<CheckInTela> {
         ],
         if (_erroPasso != null) ...[
           const SizedBox(height: EspacosTrato.x3),
-          AvisoFaixa(texto: _erroPasso!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
+          AvisoFaixa(
+              texto: _erroPasso!,
+              tipo: TipoStatus.perigo,
+              icone: Icons.error_outline),
         ],
         const SizedBox(height: EspacosTrato.x3),
         _CartaoCodigo(
@@ -214,7 +248,8 @@ class _CheckInTelaState extends State<CheckInTela> {
           runSpacing: EspacosTrato.x2,
           children: [
             for (final mensagem in widget.mensagensRapidas)
-              _ChipMensagem(texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
+              _ChipMensagem(
+                  texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
           ],
         ),
         if (_aviso != null) ...[
@@ -222,7 +257,9 @@ class _CheckInTelaState extends State<CheckInTela> {
           Text(_aviso!, style: TipografiaTrato.legenda),
         ],
         const SizedBox(height: EspacosTrato.x5),
-        Center(child: BotaoLink(texto: 'Cliente não está no local', aoTocar: _clienteAusente)),
+        Center(
+            child: BotaoLink(
+                texto: 'Cliente não está no local', aoTocar: _clienteAusente)),
       ],
     );
   }
@@ -252,7 +289,9 @@ class _CartaoPasso extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
-            child: SizedBox.square(dimension: EspacosTrato.x12 + EspacosTrato.x2, child: miniatura),
+            child: SizedBox.square(
+                dimension: EspacosTrato.x12 + EspacosTrato.x2,
+                child: miniatura),
           ),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
@@ -271,7 +310,10 @@ class _CartaoPasso extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: feito
-                  ? const ChipStatus(texto: 'Feito', tipo: TipoStatus.sucesso, icone: Icons.check)
+                  ? const ChipStatus(
+                      texto: 'Feito',
+                      tipo: TipoStatus.sucesso,
+                      icone: Icons.check)
                   : BotaoLink(texto: textoAcao, aoTocar: aoTocarAcao),
             ),
           ),
@@ -283,7 +325,8 @@ class _CartaoPasso extends StatelessWidget {
 
 /// Cartão com contorno petróleo: é o passo em destaque do protótipo.
 class _CartaoCodigo extends StatelessWidget {
-  const _CartaoCodigo({required this.controlador, required this.aoMudar, this.erro});
+  const _CartaoCodigo(
+      {required this.controlador, required this.aoMudar, this.erro});
 
   final TextEditingController controlador;
   final VoidCallback aoMudar;
@@ -304,7 +347,8 @@ class _CartaoCodigo extends StatelessWidget {
           children: [
             Text('Código de início', style: TipografiaTrato.tituloCartao),
             const SizedBox(height: EspacosTrato.x1),
-            Text('Peça os 4 números para a cliente.', style: TipografiaTrato.legenda),
+            Text('Peça os 4 números para a cliente.',
+                style: TipografiaTrato.legenda),
             const SizedBox(height: EspacosTrato.x4),
             TextField(
               controller: controlador,
@@ -314,7 +358,8 @@ class _CartaoCodigo extends StatelessWidget {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (_) => aoMudar(),
               style: TipografiaTrato.tituloGrande.copyWith(letterSpacing: 12),
-              decoration: InputDecoration(counterText: '', errorText: erro, hintText: '— — — —'),
+              decoration: InputDecoration(
+                  counterText: '', errorText: erro, hintText: '— — — —'),
             ),
           ],
         ),

@@ -23,6 +23,7 @@ MIGRATIONS = (
     "f36_disputas",
     "f37_chat",
     "mensagens_entregue_em",
+    "modalidade_remoto",
     "profissional_disponibilidade_portfolio_uploads",
     "lgpd_exclusao_consentimentos",
     "admin_sugestoes_completas",

@@ -135,12 +135,12 @@ void main() {
       expect(find.byType(CadastroProfissionalTela), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await tester.tap(find.text('Belo Horizonte'));
-      await tester.pump();
-      await _tocar(tester, 'Eletricista');
-      await _tocar(tester, 'Seg');
-      await _tocar(tester, 'Manhã');
-      await _tocar(tester, 'Salvar e continuar');
+      for (final texto in ['Belo Horizonte', 'Eletricista', 'Seg', 'Manhã', 'Salvar e continuar']) {
+        // a tela de cadastro rola: traz o item para a área visível antes de tocar
+        await tester.ensureVisible(find.text(texto).last);
+        await tester.pumpAndSettle();
+        await _tocar(tester, texto);
+      }
       expect(find.byType(VerificacaoTela), findsOneWidget);
 
       await _tocar(tester, 'Foto do documento');

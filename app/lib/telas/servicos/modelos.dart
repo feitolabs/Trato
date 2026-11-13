@@ -54,7 +54,15 @@ class DetalheServico {
     this.valores = const [],
     this.avisoValores,
     this.descricao,
+    this.remoto = false,
+    this.local,
   });
+
+  /// Serviço remoto (sem endereço). Presencial é o padrão.
+  final bool remoto;
+
+  /// Endereço do serviço por extenso (presencial), ou nulo se não há.
+  final String? local;
 
   final String pedidoId;
   final String numero;

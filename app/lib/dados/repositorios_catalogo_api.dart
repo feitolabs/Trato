@@ -9,6 +9,7 @@ import 'cliente_api.dart';
 import 'erros.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
+import 'repositorios_api.dart' show RepositorioPedidosApi;
 import 'repositorios_catalogo.dart';
 import 'paralelo.dart';
 
@@ -79,6 +80,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           iconeDaCategoria(
               (item['slug'] as String?) ?? (item['id'] as String?)),
           id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
+          aceitaRemoto: item['aceita_remoto'] == true,
         ),
     ];
   }
@@ -222,6 +224,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       avisoEndereco:
           'O endereço completo só aparece para o profissional contratado.',
       avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
+      aceitaRemoto: c?.aceitaRemoto ?? false,
     );
   }
 
@@ -400,7 +403,20 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
         nomeProfissional = null;
       }
     }
+    // Local do serviço (o cliente vê o próprio endereço). Sem rede: o pedido abre sem o local.
+    String? local;
+    if (!pedido.remoto) {
+      try {
+        local = RepositorioPedidosApi.dadosDeJson(
+          _mapa(await _api.get('/v1/pedidos/${pedido.id}/dados')),
+        ).enderecoCompleto;
+      } on Object {
+        local = null;
+      }
+    }
     return DetalheServico(
+      remoto: pedido.remoto,
+      local: local,
       pedidoId: pedido.id,
       numero: pedido.numero,
       titulo: 'Pedido ${pedido.numero}',
@@ -456,7 +472,9 @@ class RepositorioAgendaApi implements RepositorioAgenda {
             ),
             horario: c.quando ?? 'Data da visita ainda não marcada',
             titulo: c.titulo,
-            local: '',
+            local: c.remoto ? 'Atendimento remoto' : (c.endereco ?? ''),
+            remoto: c.remoto,
+            consultaMapa: c.consultaMapa,
             estado: c.emAndamento ? EstadoAgendamento.emAndamento : EstadoAgendamento.agendado,
           ),
     ];

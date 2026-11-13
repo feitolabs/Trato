@@ -45,6 +45,9 @@ class PerfilProfissional:
     portfolio: tuple[ItemPortfolio, ...]
     criado_em: datetime
     nivel_verificacao: str = "basico"
+    # O que o profissional atende. Padrão = só presencial (como os cadastros anteriores).
+    atende_presencial: bool = True
+    atende_remoto: bool = False
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,7 @@ class CategoriaPublica:
     slug: str
     icone: str | None = None
     pai_id: str | None = None
+    aceita_remoto: bool = False  # o admin liga por categoria; padrão: só presencial
 
 
 @dataclass(frozen=True)

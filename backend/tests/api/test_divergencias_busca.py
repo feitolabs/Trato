@@ -55,7 +55,7 @@ def test_catalogo_exige_login_e_lista_so_o_ativo(amb, busca):
     assert amb.cliente.get("/v1/catalogo/cidades").status_code == 401
     cats = ver(amb, "/v1/catalogo/categorias").json()
     assert [c["nome"] for c in cats] == ["Elétrica", "Encanador", "Pintura"]
-    assert {"id", "nome", "slug", "icone", "pai_id"} == set(cats[0])
+    assert {"id", "nome", "slug", "icone", "pai_id", "aceita_remoto"} == set(cats[0])
     cidades = ver(amb, "/v1/catalogo/cidades", "t-prof").json()
     assert [(c["nome"], c["uf"]) for c in cidades] == [
         ("Belo Horizonte", "MG"),

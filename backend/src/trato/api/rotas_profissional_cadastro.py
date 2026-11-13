@@ -61,6 +61,10 @@ class PortfolioIO(_Entrada):
 
 
 class CadastroIn(_Entrada):
+    atende_presencial: bool = Field(True, description="Atende no local do cliente.")
+    atende_remoto: bool = Field(
+        False, description="Atende à distância (só nas categorias que aceitam)."
+    )
     categorias: list[str] = Field(min_length=1, max_length=100)
     regioes: list[RegiaoIO] = Field(min_length=1, max_length=200)
     disponibilidade: list[JanelaIO] = Field(default_factory=list, max_length=100)
@@ -69,6 +73,8 @@ class CadastroIn(_Entrada):
 
 
 class PerfilEditarIn(_Entrada):
+    atende_presencial: bool | None = None
+    atende_remoto: bool | None = None
     categorias: list[str] | None = Field(None, min_length=1, max_length=100)
     regioes: list[RegiaoIO] | None = Field(None, min_length=1, max_length=200)
     disponibilidade: list[JanelaIO] | None = Field(None, max_length=100)
@@ -81,6 +87,8 @@ class PerfilProfissionalOut(BaseModel):
     status: str
     nivel_verificacao: str
     nivel_verificacao_exigido: str = Field(description="Mínimo para as suas categorias.")
+    atende_presencial: bool = True
+    atende_remoto: bool = False
     bio: str | None
     categorias: list[str]
     regioes: list[RegiaoIO]
@@ -102,6 +110,8 @@ class PerfilPublicoOut(BaseModel):
     nivel_verificacao: str
     nota_publica: float | None
     servicos_concluidos: int | None
+    atende_presencial: bool = True
+    atende_remoto: bool = False
     categorias: list[str]
     regioes: list[RegiaoIO]
     disponibilidade: list[JanelaIO]
@@ -214,6 +224,8 @@ def _perfil_out(modulo: Modulo, p: PerfilProfissional) -> PerfilProfissionalOut:
         nivel_verificacao=p.nivel_verificacao,
         nivel_verificacao_exigido=modulo.config.nivel_exigido(slugs(modulo.catalogo, p.categorias)),
         bio=p.bio,
+        atende_presencial=p.atende_presencial,
+        atende_remoto=p.atende_remoto,
         categorias=list(p.categorias),
         regioes=[RegiaoIO(cidade_id=r.cidade_id, bairro=r.bairro) for r in p.regioes],
         disponibilidade=[JanelaIO(**vars(j)) for j in p.disponibilidade],
@@ -251,9 +263,17 @@ def cadastrar(
         disponibilidade=_disponibilidade(modulo, corpo.disponibilidade),
         portfolio=_portfolio(modulo, corpo.portfolio),
         criado_em=contexto.agora(),
+        atende_presencial=corpo.atende_presencial,
+        atende_remoto=corpo.atende_remoto,
     )
+    _exigir_alguma_modalidade(perfil)
     modulo.repo.salvar(perfil)
     return _perfil_out(modulo, perfil)
+
+
+def _exigir_alguma_modalidade(perfil: PerfilProfissional) -> None:
+    if not (perfil.atende_presencial or perfil.atende_remoto):
+        raise HTTPException(422, "Escolha atender presencial, remoto ou os dois.")
 
 
 def _perfil_do_usuario(modulo: Modulo, usuario: Usuario) -> PerfilProfissional:
@@ -299,7 +319,12 @@ def editar_perfil(
         portfolio=_portfolio(modulo, corpo.portfolio)
         if corpo.portfolio is not None
         else atual.portfolio,
+        atende_presencial=atual.atende_presencial
+        if corpo.atende_presencial is None
+        else corpo.atende_presencial,
+        atende_remoto=atual.atende_remoto if corpo.atende_remoto is None else corpo.atende_remoto,
     )
+    _exigir_alguma_modalidade(novo)
     modulo.repo.salvar(novo)
     return _perfil_out(modulo, novo)
 
@@ -320,6 +345,9 @@ class CategoriaOut(BaseModel):
     slug: str
     icone: str | None
     pai_id: str | None
+    aceita_remoto: bool = Field(
+        False, description="O serviço desta categoria pode ser feito de forma remota."
+    )
 
 
 class CidadeOut(BaseModel):
@@ -479,6 +507,8 @@ def perfil_publico(
         nivel_verificacao=perfil.nivel_verificacao,
         nota_publica=detalhe.nota_publica,
         servicos_concluidos=detalhe.servicos_concluidos,
+        atende_presencial=perfil.atende_presencial,
+        atende_remoto=perfil.atende_remoto,
         categorias=base.categorias,
         regioes=base.regioes,
         disponibilidade=base.disponibilidade,

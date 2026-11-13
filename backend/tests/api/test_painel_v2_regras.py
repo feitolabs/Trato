@@ -10,6 +10,12 @@ CORPO_PEDIDO = {
     "cidade_id": "cid-1",
     "titulo": "Pintar a sala",
     "descricao": "Duas demãos, parede inteira.",
+    "endereco": {
+        "logradouro": "Rua das Flores",
+        "numero": "10",
+        "bairro": "Centro",
+        "cep": "35500-000",
+    },
 }
 
 

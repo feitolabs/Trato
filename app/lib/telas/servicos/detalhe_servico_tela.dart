@@ -47,6 +47,39 @@ class DetalheServicoTela extends StatelessWidget {
                   const SizedBox(height: EspacosTrato.x3),
                   Text(dados.descricao!, style: TipografiaTrato.corpo),
                 ],
+                const SizedBox(height: EspacosTrato.x5),
+                Text('Local do serviço', style: TipografiaTrato.titulo),
+                const SizedBox(height: EspacosTrato.x3),
+                CartaoTrato(
+                  key: const ValueKey('local-do-servico'),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        dados.remoto ? Icons.videocam_outlined : Icons.location_on_outlined,
+                        color: CoresTrato.petroleo,
+                      ),
+                      const SizedBox(width: EspacosTrato.x3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              dados.remoto ? 'Atendimento remoto' : 'Atendimento presencial',
+                              style: TipografiaTrato.corpoForte,
+                            ),
+                            Text(
+                              dados.remoto
+                                  ? 'Sem endereço: você combina tudo com o profissional pelo chat.'
+                                  : dados.local ?? 'Endereço não informado neste pedido.',
+                              style: secundario,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 if (pro != null) ...[
                   const SizedBox(height: EspacosTrato.x5),
                   Text('Profissional', style: TipografiaTrato.titulo),
