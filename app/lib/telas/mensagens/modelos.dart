@@ -11,7 +11,11 @@ class ConversaResumo {
     this.naoLidas = 0,
     this.outraParteId,
     this.profissionalId,
+    this.conversaId,
   });
+
+  /// Id da conversa no backend (para marcar como lida ao sair do chat).
+  final String? conversaId;
 
   final String pedidoId;
   final String tituloPedido;

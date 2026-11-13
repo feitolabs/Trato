@@ -6,7 +6,12 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from trato.api.repositorios import EtapaProposta, ItemOrcamento, Orcamento
-from trato.api.repositorios_app import ItemDoOrcamento, OrcamentoDetalhe, OrcamentoDoPedido
+from trato.api.repositorios_app import (
+    ItemDoOrcamento,
+    OrcamentoDetalhe,
+    OrcamentoDoPedido,
+    OrcamentoDoProfissional,
+)
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import DadosInvalidos, RegraDoBanco
@@ -38,6 +43,32 @@ class OrcamentosPostgres:
             profissional_id=str(linha["profissional_id"]),
             valor_centavos=int(linha["valor_total_centavos"]),
             categoria_id=str(linha["categoria_id"]),
+        )
+
+    def do_profissional(self, profissional_id: str) -> Sequence[OrcamentoDoProfissional]:
+        """Última versão de cada orçamento que o profissional enviou (rascunho e versões antigas
+        ficam de fora), o mais novo primeiro."""
+        achado = como_uuid(profissional_id)
+        if achado is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select o.id, o.pedido_id, o.versao, o.valor_total_centavos, o.status, "
+                "o.enviado_em from public.orcamentos o "
+                "where o.profissional_id = %s and o.status in ('enviado', 'aceito', 'recusado') "
+                "order by o.enviado_em desc nulls last, o.id limit 200",
+                (achado,),
+            ).fetchall()
+        return tuple(
+            OrcamentoDoProfissional(
+                str(l["id"]),
+                str(l["pedido_id"]),
+                int(l["versao"]),
+                int(l["valor_total_centavos"]),
+                l["status"],
+                l["enviado_em"],
+            )  # fmt: skip
+            for l in linhas  # noqa: E741
         )
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:

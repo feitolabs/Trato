@@ -39,6 +39,8 @@ class ResumoConversa:
     ultima_texto: str | None
     ultima_em: datetime | None
     ultima_minha: bool | None
+    # Quem vê é o CLIENTE do pedido (falso: é o profissional). A mesma conta pode ser os dois.
+    sou_cliente: bool = True
 
 
 class RepositorioConversasApp(Protocol):
@@ -102,6 +104,7 @@ class ConversasAppEmMemoria:
                     ultima.texto if ultima else None,
                     ultima.enviada_em if ultima else None,
                     ultima.autor_id == usuario_id if ultima else None,
+                    usuario_id == cliente,
                 )  # fmt: skip
             )
         return sorted(
@@ -179,6 +182,7 @@ class ConversasAppPostgres:
                 l["ultima_texto"],
                 l["ultima_em"],
                 l["ultima_minha"],
+                str(l["cliente_id"]) == usuario,
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )

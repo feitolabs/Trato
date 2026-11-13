@@ -15,7 +15,12 @@ from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Protocol
 
-from trato.api.repositorios_app import OrcamentoDetalhe, OrcamentoDoPedido, PedidoAberto
+from trato.api.repositorios_app import (
+    OrcamentoDetalhe,
+    OrcamentoDoPedido,
+    OrcamentoDoProfissional,
+    PedidoAberto,
+)
 from trato.disputas import ConfigDisputa, Disputa
 from trato.financeiro.ledger import Conta, Lancamento, SaldoPedido
 from trato.garantias import ConfigGarantia, Garantia, Retrabalho
@@ -193,6 +198,9 @@ class RepositorioOrcamentos(Protocol):
 
     def detalhe(self, orcamento_id: str) -> OrcamentoDetalhe | None:
         """Orçamento com itens, validade e fora do escopo; rascunho nunca é devolvido."""
+
+    def do_profissional(self, profissional_id: str) -> Sequence[OrcamentoDoProfissional]:
+        """Última versão de cada orçamento que o profissional enviou, o mais novo primeiro."""
 
     def enviar(
         self,

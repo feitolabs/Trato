@@ -83,6 +83,9 @@ class ConversaOut(BaseModel):
     ultima_mensagem: str | None
     ultima_em: datetime | None
     ultima_minha: bool | None
+    sou_cliente: bool = Field(
+        True, description="Quem vê é o cliente do pedido (falso: o profissional)."
+    )
 
 
 class LeituraOut(BaseModel):
@@ -262,6 +265,14 @@ def _titulo_do_pedido(contexto: Contexto, pedido_id: str) -> str | None:
 
 @router.get("/conversas", response_model=list[ConversaOut], summary="Minhas conversas")
 def listar_conversas(
+    como: Annotated[
+        str | None,
+        Query(
+            pattern="^(cliente|profissional)$",
+            description="Só as conversas em que a pessoa é cliente ou profissional do pedido. "
+            "A mesma conta pode ser os dois: sem isso, as duas listas se misturam.",
+        ),
+    ] = None,
     usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
     mensagens: ServicoMensagens = Depends(_mensagens),
     contexto: Contexto = Depends(obter_contexto),
@@ -279,8 +290,10 @@ def listar_conversas(
             ultima_mensagem=c.ultima_texto,
             ultima_em=c.ultima_em,
             ultima_minha=c.ultima_minha,
+            sou_cliente=c.sou_cliente,
         )  # fmt: skip
         for c in mensagens.conversas(usuario.id)
+        if como is None or (c.sou_cliente == (como == "cliente"))
     ]
 
 

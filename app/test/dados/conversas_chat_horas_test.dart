@@ -96,7 +96,8 @@ void main() {
       final (api, chamadas) = _cliente((_) => _json(corpo));
       final lista = await ServicoConversasApi(api, comoProfissional: false).listar();
 
-      expect(chamadas.single.caminho, '/v1/conversas');
+      // Só as conversas em que a pessoa é cliente (a mesma conta pode ser profissional também).
+      expect(chamadas.single.caminho, '/v1/conversas?como=cliente');
       expect(lista, hasLength(3));
       expect(lista[0].interlocutor, 'Ana S.');
       expect(lista[0].tituloPedido, 'Trocar chuveiro');
@@ -115,8 +116,10 @@ void main() {
 
     test('para o profissional, o outro lado é o cliente e não manda profissional_id', () async {
       final (api, _) = _cliente((_) => _json(corpo));
-      final lista = await ServicoConversasApi(api, comoProfissional: true).listar();
+      final (api2, chamadas2) = _cliente((_) => _json(corpo));
+      final lista = await ServicoConversasApi(api2, comoProfissional: true).listar();
 
+      expect(chamadas2.single.caminho, '/v1/conversas?como=profissional');
       expect(lista[1].interlocutor, 'Cliente');
       expect(lista.every((c) => c.profissionalId == null), isTrue);
       expect(lista[0].outraParteId, 'pro-1'); // quem está do outro lado (foto de perfil)
@@ -178,6 +181,38 @@ void main() {
       final conversa = await RepositorioChatApi(api).conversa('ped-1');
       expect(conversa.mensagens, hasLength(1));
       expect(conversa.mensagens.single.texto, '[Foto indisponível]');
+    });
+
+    test('foto antiga (caminho do arquivo do outro celular) vira "Foto indisponível"', () async {
+      final (api, _) = _cliente((r) {
+        if (r.url.path.endsWith('/mensagens')) {
+          return _json([
+            {
+              'id': 1,
+              'autor_id': 'u1',
+              'minha': false,
+              'texto': '/data/user/0/br.com.feitolabs.trato/cache/scaled_70ea8cbc.jpg',
+              'mascarada': false,
+              'enviada_em': '2026-10-29T10:00:00Z',
+              'lida_em': null,
+            },
+            {
+              'id': 2,
+              'autor_id': 'eu',
+              'minha': true,
+              'texto': '/data/user/0/br.com.feitolabs.trato/cache/scaled_minha.jpg',
+              'mascarada': false,
+              'enviada_em': '2026-10-29T10:01:00Z',
+              'lida_em': null,
+            },
+          ]);
+        }
+        return _json({'detail': 'não'}, 404);
+      });
+      final conversa = await RepositorioChatApi(api).conversa('ped-1');
+      // Recebida: nunca mostra o caminho. Enviada por mim: o arquivo existe no meu aparelho.
+      expect(conversa.mensagens[0].texto, '[Foto indisponível]');
+      expect(conversa.mensagens[1].texto, contains('scaled_minha.jpg'));
     });
 
     test('foto tirada agora sobe como anexo de chat e a mensagem leva só o id', () async {
@@ -312,6 +347,27 @@ void main() {
             return _json(<Object>[]);
           case '/v1/profissionais/me/saldo':
             return _json({'a_liberar_centavos': 0, 'liberado_centavos': 0});
+          case '/v1/profissional/orcamentos':
+            return _json([
+              {
+                'orcamento_id': 'o1',
+                'pedido_id': 'ped-1111',
+                'titulo_pedido': 'Trocar chuveiro',
+                'versao': 2,
+                'valor_centavos': 25000,
+                'enviado_em': '2026-11-12T10:00:00Z',
+                'situacao': 'aguardando',
+              },
+              {
+                'orcamento_id': 'o2',
+                'pedido_id': 'ffff2222',
+                'titulo_pedido': null,
+                'versao': 1,
+                'valor_centavos': 9000,
+                'enviado_em': null,
+                'situacao': 'aceito',
+              },
+            ]);
           case '/v1/pedidos':
             return _json([
               pedido('aaaa1111', 'orcamento_aceito', 'Orçamento aceito'),
@@ -326,6 +382,12 @@ void main() {
 
       final inicio = await RepositorioProfissionalApi(api).inicio();
 
+      expect(inicio.orcamentosEnviados, hasLength(2));
+      expect(inicio.orcamentosEnviados.first.titulo, 'Trocar chuveiro');
+      expect(inicio.orcamentosEnviados.first.aguardando, isTrue);
+      expect(inicio.orcamentosEnviados.first.valorCentavos, 25000);
+      expect(inicio.orcamentosEnviados.last.titulo, 'Pedido #FFFF');
+      expect(inicio.orcamentosEnviados.last.aceito, isTrue);
       expect(
         inicio.contratados.map((c) => c.estadoApi),
         ['orcamento_aceito', 'aguardando_confirmacao', 'agendado'],
