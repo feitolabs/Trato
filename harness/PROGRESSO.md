@@ -897,3 +897,9 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - Verificação: app 855 testes passaram; backend 1462 passaram + 1 intermitente (esta contraproposta), corrigida; 12 testes de contraproposta/horas/chat passaram 3x. Suíte completa do backend não repetida depois da correção, por decisão do João (demora ~17 min).
 - Stripe: o sandbox já tem webhook para `https://trato.fly.dev/v1/webhooks/stripe`; o CLI está logado. Para simular um pagamento: `stripe payment_intents confirm pi_... --payment-method pm_card_visa`.
 
+## 2026-11-13 — Nome do profissional no pedido e chave pública do Stripe (v0.1.14)
+
+- **"Profissional contratado" / "PC" no detalhe do pedido.** Texto fixo em `RepositorioServicosClienteApi.detalhe`. Agora busca o nome curto em `GET /v1/pedidos/{id}/interlocutor` ("Gabriel L.", iniciais "GL"); sem rede, volta ao texto genérico. A foto já era buscada pelo id; o profissional do pedido de teste não tem `foto_path`, então aparece com iniciais (correto).
+- **"Pagamento com cartão indisponível no momento".** O APK foi compilado sem `STRIPE_PUBLISHABLE_KEY` (`folha_cartao.dart` recusa abrir sem ela). A cobrança no backend já dava 201 depois do conserto da idempotência (v0.1.13). O build de teste de pagamento inclui a `pk_test_` do `.env` num arquivo de defines fora do git; `docs/BUILD.md` lista a variável como permitida (chave pública; nunca a `sk_`).
+- Testes: 2 casos novos em `conversas_chat_horas_test.dart` (nome real e queda para o rótulo genérico); arquivo inteiro passa (12).
+

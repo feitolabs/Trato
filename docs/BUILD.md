@@ -44,7 +44,7 @@ flutter run --dart-define-from-file=dart-defines.json
 
 ### Lista permitida (M14)
 
-Só estas variáveis podem entrar no app: `TRATO_MODO`, `TRATO_API_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID` (e `GALERIA`, só desenvolvimento). No painel: `ADMIN_MODO`, `ADMIN_API_URL`, `ADMIN_SUPABASE_URL`, `ADMIN_SUPABASE_ANON_KEY`.
+Só estas variáveis podem entrar no app: `TRATO_MODO`, `TRATO_API_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`, `STRIPE_PUBLISHABLE_KEY` (e `GALERIA`, só desenvolvimento). A `STRIPE_PUBLISHABLE_KEY` (`pk_test_...`/`pk_live_...`) é **pública** e é o que abre a tela de cartão: sem ela o app avisa "Pagamento com cartão indisponível no momento". Nunca a `sk_` (chave secreta). No painel: `ADMIN_MODO`, `ADMIN_API_URL`, `ADMIN_SUPABASE_URL`, `ADMIN_SUPABASE_ANON_KEY`.
 
 - **Nunca** aponte `--dart-define-from-file` para o `.env` da raiz (tem `service_role`, `DATABASE_URL`, Stripe).
 - No código (`app/lib/dados/defines_publicos.dart`): em **debug** o app para com erro se achar variável com cara de segredo (`service_role`, `secret`, `sk_`, `JWT_SECRET`, `DATABASE_URL`, ou uma chave anon que na verdade é `service_role`); em **release** ela é ignorada.

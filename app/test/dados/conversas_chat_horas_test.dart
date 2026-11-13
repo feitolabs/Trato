@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/repositorios_api.dart';
+import 'package:trato/dados/repositorios_catalogo_api.dart' show RepositorioServicosClienteApi;
 import 'package:trato/dados/repositorios.dart' show FiltroPedidosAbertos;
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/dispositivo/servico_localizacao.dart' show PosicaoAtual;
@@ -349,6 +350,54 @@ void main() {
       expect(detalhe.horasTrabalhadas, '3,5 h');
       expect(detalhe.itens.map((i) => i.descricao), ['Valor combinado na contraproposta']);
       expect(dados.orcamentos.single.totalCentavos, 30000);
+    });
+  });
+
+  group('Detalhe do pedido do cliente', () {
+    Map<String, Object?> pedidoJson() => {
+          'id': 'aaaa1111',
+          'estado': 'orcamento_aceito',
+          'estado_nome': 'Orçamento aceito',
+          'cliente_id': 'c1',
+          'profissional_id': 'pro-1',
+          'aberto_em': '2026-11-07T12:00:00Z',
+          'janela': null,
+          'concluido_em': null,
+          'acoes_permitidas': <String>[],
+          'codigo_inicio': null,
+          'codigo_conclusao': null,
+        };
+
+    test('mostra o nome e as iniciais reais do profissional contratado', () async {
+      final (api, _) = _cliente((r) {
+        if (r.url.path.endsWith('/interlocutor')) {
+          return _json({'id': 'pro-1', 'nome': 'Gabriel L.', 'papel': 'profissional'});
+        }
+        if (r.url.path == '/v1/pedidos/aaaa1111') return _json(pedidoJson());
+        if (r.url.path.endsWith('/eventos') || r.url.path.endsWith('/fotos')) {
+          return _json(<Object>[]);
+        }
+        return _json({'detail': 'não'}, 404);
+      });
+      final repo = RepositorioServicosClienteApi(api, RepositorioPedidosApi(api));
+      final detalhe = await repo.detalhe('aaaa1111');
+      expect(detalhe.profissional?.nome, 'Gabriel L.');
+      expect(detalhe.profissional?.iniciais, 'GL');
+      expect(detalhe.profissional?.id, 'pro-1'); // com o id, a foto de perfil é buscada
+    });
+
+    test('se o nome não vier, cai no rótulo genérico e o pedido abre igual', () async {
+      final (api, _) = _cliente((r) {
+        if (r.url.path == '/v1/pedidos/aaaa1111') return _json(pedidoJson());
+        if (r.url.path.endsWith('/eventos') || r.url.path.endsWith('/fotos')) {
+          return _json(<Object>[]);
+        }
+        return _json({'detail': 'fora'}, 503);
+      });
+      final repo = RepositorioServicosClienteApi(api, RepositorioPedidosApi(api));
+      final detalhe = await repo.detalhe('aaaa1111');
+      expect(detalhe.profissional?.nome, 'Profissional contratado');
+      expect(detalhe.profissional?.iniciais, 'PC');
     });
   });
 
