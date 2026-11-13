@@ -883,3 +883,9 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - `backend/fly.toml`: `app = "trato"` (era `trato-backend`, nome que não existe; o deploy anterior falhou por isso). Deploy: `fly deploy` dentro de `backend/`.
 - Verificação: backend 1461, app todos passaram (4 testes de navegação falharam uma vez por a pasta temporária do Flutter ser apagada; passam em nova execução).
 
+## 2026-11-13 — Logo cortada no perfil (v0.1.12)
+
+- Sintoma (João): a logo "um app Feito Labs" aparecia cortada no rodapé do perfil. Causa: as peças da logo são creme (feitas para a splash escura) e somem no fundo creme. `LogoFeitoLabs(sobreFundoClaro: true)` pinta essas peças de petróleo; só o perfil do cliente usa. Goldens `perfil_cliente_celular` e `perfil_cliente_tablet` refeitos.
+- Verificação: app 854 testes passaram. Backend sem mudança.
+- Aviso de processo: não rodar duas execuções de `flutter test` ao mesmo tempo nem usar `timeout` curto: uma execução interrompida deixa `flutter_tester.exe` órfãos que travam a seguinte e apagam a pasta temporária ("did not complete").
+
