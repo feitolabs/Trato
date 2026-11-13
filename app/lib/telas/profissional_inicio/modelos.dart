@@ -12,7 +12,11 @@ class ProximoAtendimento {
     this.pedidoId,
     this.janelaInicio,
     this.emAndamento = false,
+    this.remoto = false,
   });
+
+  /// Serviço remoto: sem endereço, sem foto e sem localização no check-in.
+  final bool remoto;
 
   /// O serviço já começou (check-in feito).
   final bool emAndamento;
@@ -42,7 +46,19 @@ class PedidoContratado {
     required this.estadoApi,
     this.quando,
     this.janelaInicio,
+    this.remoto = false,
+    this.endereco,
+    this.consultaMapa,
   });
+
+  /// Serviço remoto (sem endereço).
+  final bool remoto;
+
+  /// Endereço por extenso (presencial, já contratado). Nulo se o cliente não informou.
+  final String? endereco;
+
+  /// Texto para abrir no mapa.
+  final String? consultaMapa;
 
   final String pedidoId;
 
@@ -117,7 +133,12 @@ class PedidoAberto {
     this.longitude,
     this.clienteId,
     this.clienteNome,
+    this.modalidade = 'presencial',
   });
+
+  /// `presencial` ou `remoto`.
+  final String modalidade;
+  bool get remoto => modalidade == 'remoto';
 
   /// Quem pediu (foto de perfil e primeiro nome). Nunca contato.
   final String? clienteId;

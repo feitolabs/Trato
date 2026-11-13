@@ -43,7 +43,11 @@ class FormularioPedido {
     this.categoriaId,
     this.icone = Icons.bolt,
     this.cidades = const [],
+    this.aceitaRemoto = false,
   });
+
+  /// A categoria aceita atendimento remoto: o cliente escolhe presencial ou remoto.
+  final bool aceitaRemoto;
 
   /// Cidades para escolher. Vazio = formulário de exemplo, sem seleção de cidade.
   final List<CidadeOpcao> cidades;
@@ -74,6 +78,30 @@ class FormularioPedido {
   /// Ícone da categoria, mostrado ao lado do nome.
   final IconData icone;
 
+  /// Cópia deste formulário com o atendimento remoto liberado (ou não) para a categoria.
+  FormularioPedido comAceitaRemoto(bool valor) => FormularioPedido(
+        categoria: categoria,
+        servicos: servicos,
+        servicosIniciais: servicosIniciais,
+        perguntaQuantidade: perguntaQuantidade,
+        dicaQuantidade: dicaQuantidade,
+        quantidadeInicial: quantidadeInicial,
+        perguntaVoltagem: perguntaVoltagem,
+        voltagens: voltagens,
+        voltagemInicial: voltagemInicial,
+        descricaoInicial: descricaoInicial,
+        fotos: fotos,
+        prazos: prazos,
+        faixas: faixas,
+        endereco: endereco,
+        avisoEndereco: avisoEndereco,
+        avisoPrazo: avisoPrazo,
+        categoriaId: categoriaId,
+        icone: icone,
+        cidades: cidades,
+        aceitaRemoto: valor,
+      );
+
   /// Cópia deste formulário com a lista de cidades para escolher.
   FormularioPedido comCidades(List<CidadeOpcao> novas) => FormularioPedido(
         categoria: categoria,
@@ -95,7 +123,49 @@ class FormularioPedido {
         categoriaId: categoriaId,
         icone: icone,
         cidades: novas,
+        aceitaRemoto: aceitaRemoto,
       );
+}
+
+/// Como o serviço será feito.
+enum Modalidade {
+  presencial('presencial', 'Presencial'),
+  remoto('remoto', 'Remoto');
+
+  const Modalidade(this.codigo, this.rotulo);
+
+  /// O valor que o backend usa.
+  final String codigo;
+  final String rotulo;
+}
+
+/// Endereço do serviço presencial. Rua, número, bairro e CEP são obrigatórios (o profissional
+/// contratado precisa saber aonde ir); complemento e referência ajudam a achar o lugar.
+class EnderecoRascunho {
+  const EnderecoRascunho({
+    required this.logradouro,
+    required this.numero,
+    required this.bairro,
+    required this.cep,
+    this.complemento = '',
+    this.referencia = '',
+  });
+
+  final String logradouro;
+  final String numero;
+  final String bairro;
+  final String cep;
+  final String complemento;
+  final String referencia;
+
+  Map<String, String> paraJson() => {
+        'logradouro': logradouro.trim(),
+        'numero': numero.trim(),
+        'bairro': bairro.trim(),
+        'cep': cep.trim(),
+        if (complemento.trim().isNotEmpty) 'complemento': complemento.trim(),
+        if (referencia.trim().isNotEmpty) 'referencia': referencia.trim(),
+      };
 }
 
 /// O que o cliente preencheu, devolvido em `aoEnviar`.
@@ -112,7 +182,13 @@ class RascunhoPedido {
     this.cidadeId,
     this.bairro,
     this.prazoDesejado,
+    this.modalidade = Modalidade.presencial,
+    this.endereco,
   });
+
+  /// Presencial (padrão, com [endereco]) ou remoto (sem endereço).
+  final Modalidade modalidade;
+  final EnderecoRascunho? endereco;
 
   /// Data que o cliente informou em "Sem pressa" / "Com pressa".
   final DateTime? prazoDesejado;

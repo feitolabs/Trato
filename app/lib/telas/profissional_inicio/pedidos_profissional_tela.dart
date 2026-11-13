@@ -22,7 +22,11 @@ class PedidosProfissionalTela extends StatefulWidget {
     this.aoAbrirContratado,
     this.orcamentosEnviados = const [],
     this.aoAbrirOrcamentoEnviado,
+    this.aoAbrirMapa,
   });
+
+  /// Abre o endereço no mapa do aparelho (recebe o texto do endereço).
+  final ValueChanged<String>? aoAbrirMapa;
 
   /// Os orçamentos que o profissional enviou e a resposta do cliente (aguardando, aceito...).
   final List<OrcamentoEnviado> orcamentosEnviados;
@@ -185,6 +189,44 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                   style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
                 ),
               ],
+              const SizedBox(height: EspacosTrato.x2),
+              if (c.remoto)
+                Row(
+                  key: const ValueKey('modalidade-remoto'),
+                  children: [
+                    const Icon(Icons.videocam_outlined, size: 18, color: CoresTrato.petroleo),
+                    const SizedBox(width: EspacosTrato.x2),
+                    Text('Atendimento remoto', style: TipografiaTrato.corpoPequeno),
+                  ],
+                )
+              else if (c.endereco != null) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 18, color: CoresTrato.petroleo),
+                    const SizedBox(width: EspacosTrato.x2),
+                    Expanded(
+                      child: Text(
+                        c.endereco!,
+                        key: const ValueKey('endereco-do-pedido'),
+                        style: TipografiaTrato.corpoPequeno,
+                      ),
+                    ),
+                  ],
+                ),
+                if (c.consultaMapa != null && widget.aoAbrirMapa != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: BotaoLink(
+                      texto: 'Abrir no mapa',
+                      aoTocar: () => widget.aoAbrirMapa!(c.consultaMapa!),
+                    ),
+                  ),
+              ] else
+                Text(
+                  'O cliente ainda não informou o endereço: combine pelo chat.',
+                  style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                ),
             ],
           ),
         );

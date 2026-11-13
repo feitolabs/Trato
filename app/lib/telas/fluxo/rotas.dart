@@ -4,6 +4,7 @@ import '../agenda/modelos.dart' show EstadoAgendamento;
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/relogio_de_atualizacao.dart';
+import '../../dispositivo/mapa.dart';
 import '../../dados/repositorios.dart';
 import '../../dispositivo/folha_cartao.dart';
 import '../orcamentos/folha_contraproposta.dart';
@@ -583,10 +584,13 @@ abstract final class RotasTrato {
           recarregarInicio: repos.profissional.inicio,
           aoAbrirOrcamentoEnviado: (o) => _abrir<void>(context, _chat(o.pedidoId)),
           atualizarACada: _intervalo,
+          aoAbrirMapa: abrirNoMapa,
           aoAbrirContratado: (c) => _acoesPedidoProfissional(
             context,
             pedidoId: c.pedidoId,
             titulo: c.titulo,
+            remoto: c.remoto,
+            consultaMapa: c.consultaMapa,
             // Antes do pagamento só há a conversa; `concluido` aqui só esconde check-in e check-out.
             estado: c.emAndamento
                 ? EstadoAgendamento.emAndamento
@@ -597,7 +601,8 @@ abstract final class RotasTrato {
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
-                servico: _servicoCheckIn(c.pedidoId),
+                servico: _servicoCheckIn(c.pedidoId, remoto: c.remoto),
+                remoto: c.remoto,
                 tituloBarra: c.titulo,
               ),
             ),
@@ -610,11 +615,16 @@ abstract final class RotasTrato {
             context,
             pedidoId: inicio.proximo?.pedidoId ?? _semId,
             titulo: inicio.proximo?.titulo ?? 'Pedido de hoje',
+            remoto: inicio.proximo?.remoto ?? false,
             aoCheckIn: () => _abrir<void>(
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
-                servico: _servicoCheckIn(inicio.proximo?.pedidoId ?? _semId),
+                remoto: inicio.proximo?.remoto ?? false,
+                servico: _servicoCheckIn(
+                  inicio.proximo?.pedidoId ?? _semId,
+                  remoto: inicio.proximo?.remoto ?? false,
+                ),
                 tituloBarra: inicio.proximo == null
                     ? 'Check-in'
                     : '${inicio.proximo!.titulo} · ${inicio.proximo!.quando}',
@@ -643,8 +653,8 @@ abstract final class RotasTrato {
   /// Check-in do pedido. No modo API o serviço já recebe a captura real (câmera, upload e GPS) e
   /// é ele quem guarda foto e posição para enviar; embrulhá-lo no serviço do aparelho fazia a
   /// tela marcar "Feito" sem o envio ter foto nem posição. O embrulho só vale na demonstração.
-  static ServicoCheckIn _servicoCheckIn(String pedidoId) {
-    final base = repos.profissional.servicoCheckIn(pedidoId);
+  static ServicoCheckIn _servicoCheckIn(String pedidoId, {bool remoto = false}) {
+    final base = repos.profissional.servicoCheckIn(pedidoId, remoto: remoto);
     return repos.modoApi
         ? base
         : ServicoCheckInDispositivo(base: base, dispositivo: dispositivo);
@@ -682,11 +692,14 @@ abstract final class RotasTrato {
             pedidoId: a.pedidoId,
             titulo: a.titulo,
             estado: a.estado,
+            remoto: a.remoto,
+            consultaMapa: a.consultaMapa,
             aoCheckIn: () => _abrir<void>(
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
-                servico: _servicoCheckIn(a.pedidoId),
+                remoto: a.remoto,
+                servico: _servicoCheckIn(a.pedidoId, remoto: a.remoto),
                 tituloBarra: '${a.titulo} · ${a.horario}',
               ),
             ),
@@ -746,11 +759,13 @@ abstract final class RotasTrato {
   /// Check-out: foto final e o código de conclusão que o cliente informa. Quem confere o código
   /// é o backend; ao ser aceito o serviço vai para "em confirmação" e o cliente é avisado.
   static void _abrirCheckOut(
-      BuildContext context, String pedidoId, String titulo) {
+      BuildContext context, String pedidoId, String titulo,
+      {bool remoto = false}) {
     _abrir<void>(
       context,
       CheckOutTela(
-        servico: repos.profissional.servicoCheckOut(pedidoId),
+        servico: repos.profissional.servicoCheckOut(pedidoId, remoto: remoto),
+        remoto: remoto,
         tituloBarra: titulo,
         aoConcluir: () {
           pedidosMudaram.value++;
@@ -772,6 +787,8 @@ abstract final class RotasTrato {
     required String titulo,
     required VoidCallback aoCheckIn,
     EstadoAgendamento estado = EstadoAgendamento.agendado,
+    bool remoto = false,
+    String? consultaMapa,
   }) {
     // Só o que o momento do pedido permite (disputa e retrabalho vêm das notificações).
     final agendado = estado == EstadoAgendamento.agendado;
@@ -785,6 +802,15 @@ abstract final class RotasTrato {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+              if (!remoto && consultaMapa != null)
+                ListTile(
+                  leading: const Icon(Icons.map_outlined),
+                  title: const Text('Abrir o endereço no mapa'),
+                  onTap: () {
+                    Navigator.of(folha).pop();
+                    abrirNoMapa(consultaMapa);
+                  },
+                ),
               if (agendado)
                 ListTile(
                   leading: const Icon(Icons.event_available_outlined),
@@ -797,7 +823,7 @@ abstract final class RotasTrato {
               if (agendado)
                 ListTile(
                   leading: const Icon(Icons.place_outlined),
-                  title: const Text('Fazer check-in'),
+                  title: Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
                   onTap: () {
                     Navigator.of(folha).pop();
                     aoCheckIn();
@@ -809,7 +835,7 @@ abstract final class RotasTrato {
                   title: const Text('Concluir serviço (check-out)'),
                   onTap: () {
                     Navigator.of(folha).pop();
-                    _abrirCheckOut(context, pedidoId, titulo);
+                    _abrirCheckOut(context, pedidoId, titulo, remoto: remoto);
                   },
                 ),
               ListTile(

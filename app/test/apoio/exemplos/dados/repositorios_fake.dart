@@ -498,8 +498,8 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
       ServicoOrcamentoFake(taxaBps: taxaDemonstracaoBps);
 
   @override
-  ServicoCheckIn servicoCheckIn(String pedidoId) => ServicoCheckInFake();
+  ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) => ServicoCheckInFake();
 
   @override
-  ServicoCheckOut servicoCheckOut(String pedidoId) => ServicoCheckOutFake();
+  ServicoCheckOut servicoCheckOut(String pedidoId, {bool remoto = false}) => ServicoCheckOutFake();
 }

@@ -7,6 +7,7 @@ import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/endereco_pedido.dart';
 import 'apoio/exemplos/telas/pedido_novo/dados_exemplo.dart';
 
 /// Novo pedido com todos os atalhos ligados (como no protótipo e no app).
@@ -105,7 +106,7 @@ void main() {
     testWidgets('descrição vazia mostra erro', (tester) async {
       await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
 
-      await tester.enterText(find.byType(TextField), '   ');
+      await tester.enterText(find.byType(TextField).first, '   ');
       await _tocar(tester, find.text('Próximo'));
 
       expect(
@@ -122,6 +123,7 @@ void main() {
       await tester.tap(find.byTooltip('Aumentar'));
       await tester.tap(find.text('Sem pressa'));
       await tester.pump();
+      await preencherEnderecoDoPedido(tester);
       await _tocar(tester, find.text('Próximo'));
 
       expect(recebido, isNotNull);
@@ -141,11 +143,73 @@ void main() {
 
       await tester.enterText(find.widgetWithText(TextField, 'Ex.: 300,00'), '350,00');
       await tester.pump();
+      await preencherEnderecoDoPedido(tester);
       await _tocar(tester, find.text('Próximo'));
 
       expect(recebido, isNotNull);
       expect(recebido!.faixa.minimoCentavos, 35000);
       expect(recebido!.faixa.maximoCentavos, 35000);
+    });
+
+    testWidgets('presencial (padrão) exige endereço completo e mostra o que falta', (tester) async {
+      RascunhoPedido? recebido;
+      await _abrir(
+        tester,
+        NovoPedidoTela(formulario: formularioExemplo, aoEnviar: (r) => recebido = r),
+      );
+      expect(find.text('Endereço do serviço'), findsOneWidget);
+      expect(find.text('Como será o serviço?'), findsNothing); // categoria só presencial
+
+      await _tocar(tester, find.text('Próximo'));
+      expect(recebido, isNull);
+      expect(find.text('Informe a rua.'), findsOneWidget);
+      expect(find.text('Informe o número.'), findsOneWidget);
+      expect(find.text('Informe o bairro.'), findsOneWidget);
+      expect(find.text('Informe o CEP com 8 números (ex.: 35500-000).'), findsOneWidget);
+
+      await preencherEnderecoDoPedido(tester);
+      await _tocar(tester, find.text('Próximo'));
+      expect(recebido, isNotNull);
+      expect(recebido!.modalidade, Modalidade.presencial);
+      expect(recebido!.endereco!.logradouro, 'Rua das Flores');
+      expect(recebido!.endereco!.paraJson()['cep'], '35500-000');
+    });
+
+    testWidgets('categoria que aceita remoto: escolhe remoto e não pede endereço', (tester) async {
+      RascunhoPedido? recebido;
+      await _abrir(
+        tester,
+        NovoPedidoTela(
+          formulario: formularioExemplo.comAceitaRemoto(true),
+          aoEnviar: (r) => recebido = r,
+        ),
+      );
+      expect(find.text('Como será o serviço?'), findsOneWidget);
+      expect(find.text('Presencial'), findsOneWidget);
+      expect(find.text('Remoto'), findsOneWidget);
+      expect(find.text('Endereço do serviço'), findsOneWidget); // padrão: presencial
+
+      await _tocar(tester, find.text('Remoto'));
+      expect(find.text('Endereço do serviço'), findsNothing);
+      await _tocar(tester, find.text('Próximo'));
+
+      expect(recebido, isNotNull);
+      expect(recebido!.modalidade, Modalidade.remoto);
+      expect(recebido!.endereco, isNull);
+    });
+
+    testWidgets('categoria que aceita remoto continua exigindo endereço no presencial', (tester) async {
+      RascunhoPedido? recebido;
+      await _abrir(
+        tester,
+        NovoPedidoTela(
+          formulario: formularioExemplo.comAceitaRemoto(true),
+          aoEnviar: (r) => recebido = r,
+        ),
+      );
+      await _tocar(tester, find.text('Próximo'));
+      expect(recebido, isNull);
+      expect(find.text('Informe a rua.'), findsOneWidget);
     });
 
     for (final texto in ['Trocar', 'Mudar', 'Adicionar']) {
