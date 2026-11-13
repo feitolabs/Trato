@@ -389,6 +389,17 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
       'retrabalho' => ('Retrabalho em andamento', TipoStatus.info),
       _ => (pedido.estadoNome, TipoStatus.info),
     };
+    // Nome curto de quem foi contratado ("Gabriel L."); sem ele (falha de rede), o rótulo genérico.
+    String? nomeProfissional;
+    if (pedido.profissionalId != null) {
+      try {
+        final o = await _api.get('/v1/pedidos/${pedido.id}/interlocutor');
+        final nome = (o is Map ? (o['nome'] as String?) : null)?.trim();
+        if (nome != null && nome.isNotEmpty) nomeProfissional = nome;
+      } on Object {
+        nomeProfissional = null;
+      }
+    }
     return DetalheServico(
       pedidoId: pedido.id,
       numero: pedido.numero,
@@ -402,13 +413,21 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
           ? null
           : ProfissionalDoServico(
               id: pedido.profissionalId,
-              nome: 'Profissional contratado',
-              iniciais: 'PC',
+              nome: nomeProfissional ?? 'Profissional contratado',
+              iniciais: _iniciaisDe(nomeProfissional) ?? 'PC',
             ),
       valores: valores,
       avisoValores: valores.isEmpty ? null : 'Valores informados pelo sistema.',
     );
   }
+}
+
+/// "Gabriel L." -> "GL"; "Ana" -> "A". Nulo se não há nome.
+String? _iniciaisDe(String? nome) {
+  final partes = (nome ?? '').split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (partes.isEmpty) return null;
+  final primeira = partes.first[0].toUpperCase();
+  return partes.length == 1 ? primeira : '$primeira${partes.last[0].toUpperCase()}';
 }
 
 /// Agenda do profissional. O backend ainda não tem a lista de agendamentos: usa o próximo
