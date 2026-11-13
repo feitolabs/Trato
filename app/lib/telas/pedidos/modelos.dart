@@ -64,7 +64,12 @@ class PedidoEmExecucao {
     required this.fotos,
     this.aditivo,
     this.codigoInicio,
+    this.podeVerConclusao = true,
   });
+
+  /// "Ver conclusão" só faz sentido quando o profissional já terminou o serviço. Antes disso o
+  /// botão abria "fulano terminou o serviço" com um pedido que nem tinha começado.
+  final bool podeVerConclusao;
 
   /// Código que o cliente passa ao profissional para começar. Só o backend o gera e confere.
   final String? codigoInicio;

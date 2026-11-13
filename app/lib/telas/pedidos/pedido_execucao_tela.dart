@@ -126,7 +126,11 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 ),
               ),
             ),
-            _Rodape(aoConversar: widget.aoConversar, aoVerConclusao: widget.aoVerConclusao),
+            _Rodape(
+              aoConversar: widget.aoConversar,
+              aoVerConclusao: widget.pedido.podeVerConclusao ? widget.aoVerConclusao : null,
+              mostrarConclusao: widget.pedido.podeVerConclusao,
+            ),
           ],
         ),
       ),
@@ -167,10 +171,17 @@ class _Topo extends StatelessWidget {
 }
 
 class _Rodape extends StatelessWidget {
-  const _Rodape({required this.aoConversar, required this.aoVerConclusao});
+  const _Rodape({
+    required this.aoConversar,
+    required this.aoVerConclusao,
+    required this.mostrarConclusao,
+  });
 
   final VoidCallback? aoConversar;
   final VoidCallback? aoVerConclusao;
+
+  /// Sem serviço terminado, só "Conversar" (em largura cheia).
+  final bool mostrarConclusao;
 
   @override
   Widget build(BuildContext context) {
@@ -191,9 +202,12 @@ class _Rodape extends StatelessWidget {
                   aoTocar: aoConversar ?? () {},
                 ),
               ),
-              const SizedBox(width: EspacosTrato.x3),
-              Expanded(
-                  child: BotaoSecundario(texto: 'Ver conclusão', aoTocar: aoVerConclusao ?? () {})),
+              if (mostrarConclusao) ...[
+                const SizedBox(width: EspacosTrato.x3),
+                Expanded(
+                  child: BotaoSecundario(texto: 'Ver conclusão', aoTocar: aoVerConclusao ?? () {}),
+                ),
+              ],
             ],
           ),
         ),

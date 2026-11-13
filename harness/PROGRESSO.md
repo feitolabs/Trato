@@ -903,3 +903,10 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - **"Pagamento com cartão indisponível no momento".** O APK foi compilado sem `STRIPE_PUBLISHABLE_KEY` (`folha_cartao.dart` recusa abrir sem ela). A cobrança no backend já dava 201 depois do conserto da idempotência (v0.1.13). O build de teste de pagamento inclui a `pk_test_` do `.env` num arquivo de defines fora do git; `docs/BUILD.md` lista a variável como permitida (chave pública; nunca a `sk_`).
 - Testes: 2 casos novos em `conversas_chat_horas_test.dart` (nome real e queda para o rótulo genérico); arquivo inteiro passa (12).
 
+## 2026-11-13 — Estado real do pedido no acompanhamento (v0.1.15)
+
+- **Pagamento de teste funcionou:** o webhook do Stripe levou o pedido #02D8 de `orcamento_aceito` para `pago_retido` (19:26, ator sistema). O serviço não tinha começado (sem visita, sem check-in).
+- **Bug do app:** a tela de acompanhar o pedido dizia "Serviço em execução" em qualquer estado, e o botão "Ver conclusão" abria "fulano terminou o serviço" (com "Sem foto" e "Confirmar serviço") antes de o serviço existir. Agora o título acompanha o estado (aguardando pagamento, pagamento confirmado, visita marcada, em execução, confirme o serviço, finalizado...) e "Ver conclusão" só aparece em `em_confirmacao` e `concluido`. Antes disso só "Conversar".
+- Testes: 2 casos novos em `conversas_chat_horas_test.dart`; `pedidos_test.dart` passa.
+- Para o pedido andar: o profissional marca a visita, faz o check-in com o código de início e o check-out com a foto final; só então o cliente confirma.
+

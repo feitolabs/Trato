@@ -353,6 +353,43 @@ void main() {
     });
   });
 
+  group('Acompanhar o pedido (estado real, sem fingir que o serviço começou)', () {
+    Future<PedidoEmExecucao> acompanhar(String estado) async {
+      final (api, _) = _cliente((r) {
+        if (r.url.path.endsWith('/eventos')) return _json(<Object>[]);
+        return _json({
+          'id': 'aaaa1111',
+          'estado': estado,
+          'estado_nome': estado,
+          'cliente_id': 'c1',
+          'profissional_id': 'pro-1',
+          'aberto_em': '2026-11-07T12:00:00Z',
+          'janela': null,
+          'concluido_em': null,
+          'acoes_permitidas': <String>[],
+          'codigo_inicio': null,
+          'codigo_conclusao': null,
+        });
+      });
+      return RepositorioPedidosApi(api).acompanhar('aaaa1111');
+    }
+
+    test('pago e retido: não diz "em execução" nem oferece "Ver conclusão"', () async {
+      final p = await acompanhar('pago_e_retido');
+      expect(p.titulo, 'Pagamento confirmado');
+      expect(p.podeVerConclusao, isFalse);
+    });
+
+    test('só depois do check-out o cliente pode ver a conclusão', () async {
+      expect((await acompanhar('em_andamento')).titulo, 'Serviço em execução');
+      expect((await acompanhar('em_andamento')).podeVerConclusao, isFalse);
+      expect((await acompanhar('em_confirmacao')).podeVerConclusao, isTrue);
+      expect((await acompanhar('concluido')).titulo, 'Serviço finalizado');
+      expect((await acompanhar('concluido')).podeVerConclusao, isTrue);
+      expect((await acompanhar('orcamento_aceito')).titulo, 'Aguardando o pagamento');
+    });
+  });
+
   group('Detalhe do pedido do cliente', () {
     Map<String, Object?> pedidoJson() => {
           'id': 'aaaa1111',
