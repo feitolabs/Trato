@@ -359,7 +359,18 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     ];
     return PedidoEmExecucao(
       numero: pedido.numero,
-      titulo: 'Serviço em execução',
+      titulo: switch (pedido.estado) {
+        'orcamento_aceito' => 'Aguardando o pagamento',
+        'pago_e_retido' => 'Pagamento confirmado',
+        'agendado' => 'Visita marcada',
+        'em_andamento' => 'Serviço em execução',
+        'em_confirmacao' => 'Confirme o serviço',
+        'concluido' => 'Serviço finalizado',
+        'em_disputa' => 'Reclamação em análise',
+        'retrabalho' => 'Retrabalho em andamento',
+        _ => 'Seu pedido',
+      },
+      podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
       etapas: etapas,
       fotos: const [],
       // O código de início só serve até o profissional chegar.
