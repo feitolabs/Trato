@@ -130,7 +130,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const LogoFeitoLabs(tamanho: 28),
+                          const LogoFeitoLabs(tamanho: 28, sobreFundoClaro: true),
                           const SizedBox(width: EspacosTrato.x2),
                           Flexible(
                             child: Text(
