@@ -1058,7 +1058,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// faixa de preço e recusas; não vêm distância, nem quantos já orçaram.
   @override
   Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro) async {
-    final onde = await posicao?.call();
+    final onde = await _posicaoRapida();
     final consulta = {
       ...filtro.consulta,
       if (onde != null) 'lat': '${onde.latitude}',
@@ -1066,6 +1066,19 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     };
     final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos', consulta: consulta));
     return [for (final j in itens) _pedidoAberto(j)];
+  }
+
+  /// A localização só serve para mostrar a distância dos pedidos. Se o aparelho demorar (permissão
+  /// sem resposta, GPS desligado, emulador), segue sem ela: antes a tela ficava no esqueleto para
+  /// sempre esperando o GPS.
+  Future<PosicaoAtual?> _posicaoRapida() async {
+    final buscar = posicao;
+    if (buscar == null) return null;
+    try {
+      return await buscar().timeout(const Duration(seconds: 4));
+    } on Object {
+      return null;
+    }
   }
 
   PedidoAberto _pedidoAberto(Map<String, dynamic> j) {
