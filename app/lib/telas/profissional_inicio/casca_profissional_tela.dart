@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
+import '../../dados/relogio_de_atualizacao.dart';
 import '../../dados/repositorios.dart' show FiltroPedidosAbertos;
 import '../agenda/agenda_tela.dart';
 import '../cliente/modelos.dart' show CategoriaServico;
@@ -43,7 +44,18 @@ class CascaProfissionalTela extends StatefulWidget {
     this.carregarCategorias,
     this.aoAbrirNotificacoes,
     this.aoUsarComoCliente,
+    this.aoAbrirContratado,
+    this.recarregarInicio,
+    this.atualizarACada,
   });
+
+  /// Toque num pedido que o cliente já aceitou (aba Pedidos > Em andamento).
+  final ValueChanged<PedidoContratado>? aoAbrirContratado;
+
+  /// Busca o Início de novo (pedidos abertos, pedidos aceitos, carteira). Com [atualizarACada], a
+  /// casca se atualiza sozinha: pedido novo e pedido aceito aparecem sem fechar o app.
+  final Future<InicioProfissional> Function()? recarregarInicio;
+  final Duration? atualizarACada;
 
   /// Permite trocar para a casca do cliente.
   final VoidCallback? aoUsarComoCliente;
@@ -100,6 +112,40 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   late InicioProfissional _inicio = widget.inicio;
   var _filtro = const FiltroPedidosAbertos();
   var _carregandoPedidos = false;
+  RelogioDeAtualizacao? _relogio;
+
+  @override
+  void initState() {
+    super.initState();
+    final intervalo = widget.atualizarACada;
+    if (intervalo != null && widget.recarregarInicio != null) {
+      _relogio = RelogioDeAtualizacao(
+        intervalo: intervalo,
+        aoAtualizar: _atualizarEmSilencio,
+        // Com outra tela aberta por cima (detalhe, chat), espera: a lista volta ao fechar.
+        deveAtualizar: () =>
+            mounted && !_carregandoPedidos && (ModalRoute.of(context)?.isCurrent ?? true),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _relogio?.parar();
+    super.dispose();
+  }
+
+  /// Traz o Início de novo sem tela de carregando. Mantém o filtro de pedidos escolhido.
+  Future<void> _atualizarEmSilencio() async {
+    final novo = await widget.recarregarInicio!();
+    var pedidos = novo.pedidos;
+    if (_filtrosAtivos > 0) {
+      final filtrados = await widget.carregarPedidos?.call(_filtro);
+      if (filtrados != null) pedidos = filtrados;
+    }
+    if (!mounted) return;
+    setState(() => _inicio = novo.comPedidos(pedidos));
+  }
 
   void _ir(int indice) => setState(() => _aba = indice);
 
@@ -192,6 +238,8 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       ),
       PedidosProfissionalTela(
         pedidos: _inicio.pedidos,
+        contratados: _inicio.contratados,
+        aoAbrirContratado: widget.aoAbrirContratado,
         carregando: _carregandoPedidos,
         filtrosAtivos: _filtrosAtivos,
         aoAbrirFiltros: _filtros,

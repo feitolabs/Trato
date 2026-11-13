@@ -20,6 +20,7 @@ class Categoria(StrEnum):
     EXECUCAO = "execucao"
     DISPUTAS = "disputas"
     AVALIACOES = "avaliacoes"
+    MENSAGENS = "mensagens"
 
 
 class Evento(StrEnum):
@@ -36,6 +37,7 @@ class Evento(StrEnum):
     LEMBRETE_RESPOSTA_DISPUTA = "disputa.lembrete_resposta"
     RETRABALHO = "garantia.retrabalho"
     AVALIACAO = "avaliacao.recebida"
+    MENSAGEM_NOVA = "mensagem.nova"
 
 
 @dataclass(frozen=True)
@@ -132,6 +134,14 @@ MODELOS: dict[Evento, ModeloEvento] = {
     ),
     Evento.AVALIACAO: ModeloEvento(
         Categoria.AVALIACOES, "Nova avaliação", "Você recebeu uma avaliação.", "avaliacao"
+    ),
+    # O texto da mensagem NUNCA vai na notificação (pode ter dado pessoal): só o aviso.
+    Evento.MENSAGEM_NOVA: ModeloEvento(
+        Categoria.MENSAGENS,
+        "Nova mensagem",
+        "Você recebeu uma mensagem. Abra a conversa para ler.",
+        "mensagens",
+        essencial=True,
     ),
 }
 

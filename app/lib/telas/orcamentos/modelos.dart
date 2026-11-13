@@ -16,6 +16,9 @@ class DetalheOrcamento {
     required this.notaMaterial,
     required this.agendaTitulo,
     required this.agendaDetalhe,
+    this.totalHoras = '',
+    this.horasDeslocamento = '',
+    this.horasTrabalhadas = '',
     required this.garantiaTitulo,
     required this.garantiaDetalhe,
     required this.foraDoEscopo,
@@ -25,6 +28,11 @@ class DetalheOrcamento {
   /// Ex.: "31/10" (a barra mostra "Válido até 31/10").
   final String validoAte;
   final List<ItemOrcamento> itens;
+
+  /// Texto pronto do total de horas ("5,5 h"); vazio se o orçamento não é por hora.
+  final String totalHoras;
+  final String horasDeslocamento;
+  final String horasTrabalhadas;
   final String notaMaterial;
   final String agendaTitulo;
   final String agendaDetalhe;

@@ -1,4 +1,4 @@
-/// Uma conversa na lista de Mensagens: há uma por pedido.
+/// Uma conversa na lista de Mensagens: uma por pedido e profissional.
 /// O chat em si é `ChatPedidoTela` (telas/pedidos/chat_pedido_tela.dart).
 class ConversaResumo {
   const ConversaResumo({
@@ -9,6 +9,8 @@ class ConversaResumo {
     required this.ultimaMensagem,
     required this.quando,
     this.naoLidas = 0,
+    this.outraParteId,
+    this.profissionalId,
   });
 
   final String pedidoId;
@@ -20,6 +22,12 @@ class ConversaResumo {
   /// Texto pronto, ex.: "10h20" ou "ontem".
   final String quando;
   final int naoLidas;
+
+  /// Quem está do outro lado (para buscar a foto de perfil).
+  final String? outraParteId;
+
+  /// Preenchido só quando QUEM VÊ é o cliente: com qual profissional abrir o chat do pedido.
+  final String? profissionalId;
 }
 
 /// Contrato com o backend. A tela só pede e mostra.

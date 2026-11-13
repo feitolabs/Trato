@@ -10,8 +10,8 @@ abstract final class Dinheiro {
   /// Limite máximo do valor da hora (R$ 5.000,00 / hora).
   static const int limiteValorHoraMaximoCentavos = 500000;
 
-  /// Limite máximo para valor de deslocamento (R$ 5.000,00).
-  static const int limiteDeslocamentoMaximoCentavos = 500000;
+  /// Limite máximo de horas de deslocamento (100 horas = 1000 décimos de hora).
+  static const int limiteDecimosDeslocamentoMaximo = 1000;
 
   /// Limite máximo para horas (500 horas = 5000 décimos de hora).
   static const int limiteDecimosHorasMaximo = 5000;
@@ -49,6 +49,13 @@ abstract final class Dinheiro {
     final inteiras = int.tryParse(parteInteira);
     if (inteiras == null || inteiras > 10000) return null;
     return inteiras * 10 + int.parse(m.group(2) ?? '0');
+  }
+
+  /// Décimos de hora -> texto: 30 -> "3 h", 25 -> "2,5 h", 0 -> "0 h".
+  static String formatarHoras(int decimos) {
+    final inteiras = decimos ~/ 10;
+    final resto = decimos % 10;
+    return resto == 0 ? '$inteiras h' : '$inteiras,$resto h';
   }
 
   /// Valor da hora x horas, em centavos, arredondando meio centavo para cima. Só para exibir.

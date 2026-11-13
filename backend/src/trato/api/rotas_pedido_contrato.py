@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
+from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
@@ -74,6 +75,28 @@ class OrcamentoDetalheOut(BaseModel):
     enviado_em: datetime | None
     aceito: bool
     itens: list[ItemOrcamentoOut]
+    horas_deslocamento: str | None = Field(
+        None, description="Horas de deslocamento (soma dos itens `deslocamento`), ex.: `1.5`."
+    )
+    horas_trabalhadas: str | None = Field(
+        None, description="Horas trabalhadas (soma dos itens `horas`), ex.: `3.5`."
+    )
+    total_horas: str | None = Field(
+        None, description="Deslocamento + trabalhadas: o total de horas que o cliente vê."
+    )
+
+
+def somar_horas(itens, tipo: str) -> Decimal | None:  # type: ignore[no-untyped-def]
+    """Soma a quantidade dos itens de um tipo (quantidade = horas). None se não há item do tipo."""
+    achados = [Decimal(str(i.quantidade)) for i in itens if i.tipo == tipo]
+    return sum(achados, Decimal(0)) if achados else None
+
+
+def _texto_horas(valor: Decimal | None) -> str | None:
+    if valor is None:
+        return None
+    texto = format(valor.normalize(), "f")
+    return texto
 
 
 class CobrancaContratoOut(BaseModel):
@@ -285,10 +308,16 @@ def detalhe_do_orcamento(
     if not (dono or autor):
         raise HTTPException(404, "Orçamento não encontrado.")
     campos = {k: v for k, v in vars(orc).items() if k != "itens"}
+    desloc = somar_horas(orc.itens, "deslocamento")
+    trab = somar_horas(orc.itens, "horas")
+    total = None if desloc is None and trab is None else (desloc or Decimal(0)) + (trab or 0)
     return OrcamentoDetalheOut(
         **campos,
         aceito=orc.id == pedido.orcamento_id,
         itens=[ItemOrcamentoOut(**vars(i)) for i in orc.itens],
+        horas_deslocamento=_texto_horas(desloc),
+        horas_trabalhadas=_texto_horas(trab),
+        total_horas=_texto_horas(total),
     )
 
 
@@ -796,6 +825,7 @@ def contraproposta(
     pedido_id: str,
     orcamento_id: str,
     corpo: ContrapropostaIn,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> ContrapropostaOut:
@@ -819,6 +849,15 @@ def contraproposta(
     )
     conversa = contexto.conversas.abrir(pedido.id, detalhe.profissional_id)
     mensagem_id = contexto.conversas.enviar(conversa, usuario.id, texto)
+    avisar_mensagem_nova(
+        request,
+        contexto,
+        conversa_id=conversa,
+        pedido_id=pedido.id,
+        autor_id=usuario.id,
+        destinatario_id=detalhe.profissional_id,
+        mensagem_id=mensagem_id,
+    )
     return ContrapropostaOut(
         mensagem_id=mensagem_id, valor_centavos=corpo.valor_centavos, orcamento_id=orcamento_id
     )
@@ -839,6 +878,7 @@ def aceitar_contraproposta(
     pedido_id: str,
     orcamento_id: str,
     corpo: AceiteContrapropostaIn,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AceiteContrapropostaOut:
@@ -860,17 +900,39 @@ def aceitar_contraproposta(
         raise HTTPException(422, "O cliente não fez essa contraproposta.")
     if corpo.valor_centavos >= detalhe.valor_centavos:
         raise HTTPException(409, "O orçamento já está nesse valor ou abaixo.")
+    itens_novos = [
+        ItemOrcamento(
+            tipo="outro",
+            descricao="Valor combinado na contraproposta",
+            quantidade=Decimal(1),
+            valor_unitario_centavos=corpo.valor_centavos,
+        )
+    ]
+    # O cliente continua vendo as horas: itens de valor zero (o preço já está no combinado).
+    desloc = somar_horas(detalhe.itens, "deslocamento")
+    trab = somar_horas(detalhe.itens, "horas")
+    if desloc is not None and desloc > 0:
+        itens_novos.append(
+            ItemOrcamento(
+                tipo="deslocamento",
+                descricao="Horas de deslocamento",
+                quantidade=desloc,
+                valor_unitario_centavos=0,
+            )
+        )
+    if trab is not None and trab > 0:
+        itens_novos.append(
+            ItemOrcamento(
+                tipo="horas",
+                descricao="Horas trabalhadas",
+                quantidade=trab,
+                valor_unitario_centavos=0,
+            )
+        )
     novo_id = contexto.orcamentos.enviar(
         pedido_id=pedido.id,
         profissional_id=usuario.id,
-        itens=[
-            ItemOrcamento(
-                tipo="outro",
-                descricao="Valor combinado na contraproposta",
-                quantidade=Decimal(1),
-                valor_unitario_centavos=corpo.valor_centavos,
-            )
-        ],
+        itens=itens_novos,
         agora=contexto.agora(),
         prazo_execucao_dias=detalhe.prazo_execucao_dias,
         validade_ate=detalhe.validade_ate,
@@ -878,10 +940,26 @@ def aceitar_contraproposta(
         fora_do_escopo=detalhe.fora_do_escopo,
         observacoes=detalhe.observacoes,
     )
-    contexto.conversas.enviar(
+    aviso_id = contexto.conversas.enviar(
         conversa,
         usuario.id,
         f"Contraproposta aceita. Novo orçamento de {_reais(corpo.valor_centavos)}.",
+    )
+    avisar_mensagem_nova(
+        request,
+        contexto,
+        conversa_id=conversa,
+        pedido_id=pedido.id,
+        autor_id=usuario.id,
+        destinatario_id=pedido.cliente_id,
+        mensagem_id=aviso_id,
+    )
+    avisar_orcamento_recebido(
+        request,
+        contexto,
+        pedido_id=pedido.id,
+        cliente_id=pedido.cliente_id,
+        orcamento_id=novo_id,
     )
     novo = contexto.orcamentos.detalhe(novo_id)
     return AceiteContrapropostaOut(

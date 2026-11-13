@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../componentes/componentes.dart';
 import '../tema/tema.dart';
 import 'erros.dart';
+import 'relogio_de_atualizacao.dart';
 
 /// Carrega algo e mostra os estados que toda tela ligada precisa ter: carregando, erro
 /// (com "Tentar de novo") e vazio. Pronto, entrega o dado a [construir].
+///
+/// Com [atualizarACada], a tela se atualiza sozinha (e quando o app volta do segundo plano),
+/// em silêncio: sem spinner e mantendo o que já está na tela se a rede falhar.
 class Carregador<T> extends StatefulWidget {
   const Carregador({
     super.key,
@@ -16,12 +20,17 @@ class Carregador<T> extends StatefulWidget {
     this.tituloVazio = 'Nada por aqui ainda',
     this.textoVazio = '',
     this.atualizarQuando,
+    this.atualizarACada,
   });
 
   final Future<T> Function() carregar;
 
   /// Quando este aviso dispara, recarrega do servidor (ex.: depois de criar um pedido).
   final Listenable? atualizarQuando;
+
+  /// Atualiza sozinho neste intervalo (ver [RelogioDeAtualizacao.intervaloPadrao]). Nulo = só
+  /// carrega uma vez.
+  final Duration? atualizarACada;
   final Widget Function(BuildContext context, T dado) construir;
 
   /// Esqueleto opcional para loading (Skeleton loading).
@@ -37,12 +46,25 @@ class Carregador<T> extends StatefulWidget {
 }
 
 class _CarregadorState<T> extends State<Carregador<T>> {
-  late Future<T> _futuro = widget.carregar();
+  T? _dado;
+  Object? _erro;
+  var _pronto = false;
+  var _geracao = 0;
+  RelogioDeAtualizacao? _relogio;
 
   @override
   void initState() {
     super.initState();
     widget.atualizarQuando?.addListener(_recarregar);
+    final intervalo = widget.atualizarACada;
+    if (intervalo != null) {
+      _relogio = RelogioDeAtualizacao(
+        intervalo: intervalo,
+        aoAtualizar: _atualizarEmSilencio,
+        deveAtualizar: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+      );
+    }
+    _carregar();
   }
 
   @override
@@ -56,44 +78,73 @@ class _CarregadorState<T> extends State<Carregador<T>> {
 
   @override
   void dispose() {
+    _relogio?.parar();
     widget.atualizarQuando?.removeListener(_recarregar);
     super.dispose();
   }
 
+  Future<void> _carregar() async {
+    final minha = ++_geracao;
+    try {
+      final dado = await widget.carregar();
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _dado = dado;
+        _erro = null;
+        _pronto = true;
+      });
+    } on Object catch (erro) {
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _erro = erro;
+        _pronto = true;
+      });
+    }
+  }
+
+  /// Mostra o carregando e busca de novo (depois de uma ação ou do "Tentar de novo").
   void _recarregar() {
     if (!mounted) return;
     setState(() {
-      _futuro = widget.carregar();
+      _pronto = false;
+      _erro = null;
+    });
+    _carregar();
+  }
+
+  /// Busca de novo sem mexer na tela; só troca o dado quando chega. Erro: segue com o que tem.
+  Future<void> _atualizarEmSilencio() async {
+    if (!_pronto) return;
+    final minha = ++_geracao;
+    final dado = await widget.carregar();
+    if (!mounted || minha != _geracao) return;
+    setState(() {
+      _dado = dado;
+      _erro = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<T>(
-      future: _futuro,
-      builder: (context, foto) {
-        if (foto.connectionState != ConnectionState.done) {
-          if (widget.esqueleto != null) {
-            return widget.esqueleto!(context);
-          }
-          return const EstadoTela(carregando: true);
-        }
-        if (foto.hasError) {
-          final erro = foto.error;
-          return EstadoTela(
-            titulo: 'Não deu certo',
-            texto:
-                erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo em instantes.',
-            aoTentarNovamente: _recarregar,
-          );
-        }
-        final dado = foto.data as T;
-        if (widget.vazio?.call(dado) ?? false) {
-          return EstadoTela(titulo: widget.tituloVazio, texto: widget.textoVazio);
-        }
-        return widget.construir(context, dado);
-      },
-    );
+    if (!_pronto) {
+      if (widget.esqueleto != null) {
+        return widget.esqueleto!(context);
+      }
+      return const EstadoTela(carregando: true);
+    }
+    if (_erro != null) {
+      final erro = _erro;
+      return EstadoTela(
+        titulo: 'Não deu certo',
+        texto: erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo em instantes.',
+        aoTentarNovamente: _recarregar,
+      );
+    }
+    final dado = _dado as T;
+    if (widget.vazio?.call(dado) ?? false) {
+      return EstadoTela(titulo: widget.tituloVazio, texto: widget.textoVazio);
+    }
+    return widget.construir(context, dado);
   }
 }
 

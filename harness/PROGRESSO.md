@@ -839,3 +839,28 @@ Decisão do João (D17), substitui a taxa somada de 31/10/2026. Detalhe: `docs/t
 - Causa: `trato/seguranca/logs.py` trocava `registro.msg` pela mensagem redigida e zerava `registro.args`, mas o `AccessFormatter` do uvicorn desempacota 5 argumentos de `args`.
 - Correção: para o logger `uvicorn.access`, mantém a estrutura de `args` e redige cada texto (o caminho leva a query com dado pessoal). Os demais loggers seguem como antes. Teste novo em `tests/seguranca/test_http.py` (reproduzia o erro antes do ajuste).
 - Verificação: backend 1438 testes passaram; `ruff` limpo nos dois arquivos. Sem migration. Precisa de novo `fly deploy` para valer em produção.
+
+## 2026-11-12 — Correções de chat, orçamento por hora, notificações e perfil (`feature/correcoes-chat-orcamento`)
+
+Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`. Sem migration, sem escrita no banco, nada publicado.
+
+**Causas e correções**
+1. **Chat não chegava / tela não atualizava.** O cliente abria o chat sem dizer o profissional e, antes de contratar, o backend respondia 422; só funcionava a partir de um orçamento. Agora, sem `profissional_id`, vale a conversa mais recente do pedido (ou o único que orçou); com dois e sem conversa, segue 422. As listas carregavam uma vez só: novo `RelogioDeAtualizacao` (12 s e ao voltar do segundo plano, em silêncio, só no modo `api`) em Mensagens, Pedidos, Início, orçamentos recebidos, acompanhamento do pedido, notificações, agenda e na casca do profissional. O detalhe do orçamento do cliente também acompanha o servidor.
+2. **Orçamento por hora.** A calculadora tem "Horas de deslocamento" e "Horas trabalhadas" (antes: deslocamento em R$ e um campo de horas). Total = (deslocamento + trabalhadas) × valor da hora + material. O deslocamento é cobrado pelo mesmo valor da hora (assumido, a confirmar). Itens vão com `quantidade` = horas e valor unitário = valor da hora. `GET /v1/orcamentos/{id}` devolve `horas_deslocamento`, `horas_trabalhadas` e `total_horas`; o cliente vê "Total de horas". Contraproposta aceita mantém as horas (itens de valor zero).
+3. **Notificações.** `ORCAMENTO_RECEBIDO` existia e ninguém disparava: agora `enviar_orcamento` avisa o cliente (e a contraproposta aceita também). Novo evento `MENSAGEM_NOVA` (categoria `mensagens`, sem o texto da mensagem; várias seguidas sem leitura geram um aviso só). Abrir a conversa marca as mensagens como lidas.
+3b. **Lista de conversas errada.** O app montava a lista a partir dos pedidos (só "orçamento aceito" em diante, nome fixo). Passou a usar `GET /v1/conversas` (já existia), que ganhou `outra_parte_nome`, `titulo_pedido` e `contratado`.
+4. **Pagamento: pedido sumia para o profissional.** Ao aceitar, o pedido sai de "abertos" e o app só mostrava `pago_e_retido`, `agendado` e `em_andamento`. Nova lista `contratados` (aba Pedidos > "Em andamento") com `orcamento_aceito`, `aguardando_confirmacao` e os demais estados até o fim. A Agenda passou a listar todos os atendimentos pagos (antes só o primeiro).
+5. **Aba de mensagens** só com contraproposta: resolvido pelo item 3b (conversa a qualquer momento).
+6. **Perfil do profissional**: dados pessoais, notificações, contatos de confiança, "Meus dados e excluir conta" (LGPD), ajuda e termos (mesmas telas do cliente).
+7. **Foto.** A lista de conversas, a busca, o catálogo, o detalhe do serviço e o perfil público do profissional usavam só iniciais (`AvatarIniciais`); agora `AvatarDeUsuario`. Cache da URL da foto de 4 min para 45 s.
+8. **Foto no chat.** Causa achada: o app mandava o CAMINHO do arquivo no celular de quem enviou como texto da mensagem (`EnvioMidiaSemRota`), que não abre em outro aparelho. Agora a foto sobe como anexo de chat (`destino chat`) e a mensagem leva `[Foto:<id>]`; novo `GET /v1/pedidos/{id}/anexos-chat/{midia_id}` devolve URL curta. O marcador não é mascarado como telefone. **O sintoma exato do João ("o orçamento sumiu para ele") não foi reproduzido**: provável efeito do item 4 se o pedido já estava aceito; precisa de teste no aparelho.
+
+**Testes novos**: backend `test_conversas_e_avisos.py`, `test_orcamento_horas.py`, `test_chat_foto.py`; app `atualizacao_automatica_test.dart`, `dados/conversas_chat_horas_test.dart`, `perfil_profissional_conta_test.dart` e casos em `orcamentos_test.dart` e `profissional_test.dart`. 3 goldens da calculadora refeitos.
+
+**Pendente / riscos**
+- Orçamentos antigos com item `horas` de quantidade 1 mostrariam "1 h" (só dados de teste).
+- Push (FCM) para o app em segundo plano: o aviso fica na caixa de notificações e na lista; o envio por push depende dos tokens já existentes.
+- O bucket `chat-anexos` já existe na migration F3.8c; não testado contra o Storage real.
+- Segundo plano usa polling (12 s), não Realtime.
+- Regra do chat ajustada: o cliente também lê e responde a um profissional que puxou conversa antes de orçar (antes a conversa aparecia na lista e dava 404 ao abrir). Quem nunca falou nem orçou continua de fora. Dois testes antigos que esperavam 422/404 foram atualizados.
+- Verificação (`harness/verificar.py`, 12/11): backend 1449 passaram, app 850, painel 175 (8 pulados). "VERIFICAÇÃO FALHOU" só pelos itens antigos (ruff lint/formatação em `admin/rotas_catalogo.py`, `rotas_pedidos.py`, `postgres.py` e afins, `flutter analyze` antigos, APKs em `builds/`); nenhum nos arquivos desta tarefa.

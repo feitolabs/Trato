@@ -17,9 +17,15 @@ class PedidosProfissionalTela extends StatefulWidget {
     this.filtrosAtivos = 0,
     this.aoAbrirFiltros,
     this.aoAbrirPedido,
+    this.contratados = const [],
+    this.aoAbrirContratado,
   });
 
   final List<PedidoAberto> pedidos;
+
+  /// Pedidos que o cliente já aceitou (do aceite ao fim): não somem quando deixam de ser "abertos".
+  final List<PedidoContratado> contratados;
+  final ValueChanged<PedidoContratado>? aoAbrirContratado;
 
   /// Lista de conversas (aba "Conversas").
   final Widget conversas;
@@ -34,8 +40,10 @@ class PedidosProfissionalTela extends StatefulWidget {
   State<PedidosProfissionalTela> createState() => _PedidosProfissionalTelaState();
 }
 
+enum _Aba { abertos, andamento, conversas }
+
 class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
-  var _conversas = false;
+  var _aba = _Aba.abertos;
 
   @override
   Widget build(BuildContext context) {
@@ -48,27 +56,83 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
               const SizedBox(height: EspacosTrato.x4),
               Text('Pedidos', style: TipografiaTrato.tituloGrande),
               const SizedBox(height: EspacosTrato.x4),
-              Row(
+              Wrap(
+                spacing: EspacosTrato.x2,
+                runSpacing: EspacosTrato.x2,
                 children: [
                   _Segmento(
                     texto: 'Abertos',
-                    ativo: !_conversas,
-                    aoTocar: () => setState(() => _conversas = false),
+                    ativo: _aba == _Aba.abertos,
+                    aoTocar: () => setState(() => _aba = _Aba.abertos),
                   ),
-                  const SizedBox(width: EspacosTrato.x2),
+                  _Segmento(
+                    texto: widget.contratados.isEmpty
+                        ? 'Em andamento'
+                        : 'Em andamento (${widget.contratados.length})',
+                    ativo: _aba == _Aba.andamento,
+                    aoTocar: () => setState(() => _aba = _Aba.andamento),
+                  ),
                   _Segmento(
                     texto: 'Conversas',
-                    ativo: _conversas,
-                    aoTocar: () => setState(() => _conversas = true),
+                    ativo: _aba == _Aba.conversas,
+                    aoTocar: () => setState(() => _aba = _Aba.conversas),
                   ),
                 ],
               ),
               const SizedBox(height: EspacosTrato.x3),
-              Expanded(child: _conversas ? widget.conversas : _abertos()),
+              Expanded(
+                child: switch (_aba) {
+                  _Aba.conversas => widget.conversas,
+                  _Aba.andamento => _andamento(),
+                  _Aba.abertos => _abertos(),
+                },
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _andamento() {
+    if (widget.contratados.isEmpty) {
+      return const EstadoVazio(
+        icone: Icons.handyman_outlined,
+        titulo: 'Nenhum pedido em andamento',
+        texto:
+            'Quando um cliente aceitar o seu orçamento, o pedido aparece aqui, do aceite até o fim.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+      itemCount: widget.contratados.length,
+      separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+      itemBuilder: (_, i) {
+        final c = widget.contratados[i];
+        return CartaoTrato(
+          aoTocar: widget.aoAbrirContratado == null ? null : () => widget.aoAbrirContratado!(c),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(c.titulo, style: TipografiaTrato.tituloCartao),
+              const SizedBox(height: EspacosTrato.x1),
+              Text(
+                c.situacao,
+                style: TipografiaTrato.corpoPequeno.copyWith(
+                  color: c.aguardandoPagamento ? CoresTrato.laranja : CoresTrato.textoSecundario,
+                ),
+              ),
+              if (c.quando != null) ...[
+                const SizedBox(height: EspacosTrato.x1),
+                Text(
+                  c.quando!,
+                  style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 

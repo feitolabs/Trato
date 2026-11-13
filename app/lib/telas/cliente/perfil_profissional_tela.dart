@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import 'avatar_iniciais.dart';
+import 'avatar_de_usuario.dart';
+import 'avatar_iniciais.dart' show SeloVerificacao;
 import 'modelos.dart';
 
 /// Tela 10 do protótipo: perfil público do profissional. Só abre para quem tem
@@ -49,7 +50,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    AvatarIniciais(iniciais: p.iniciais, tamanho: 80),
+                    AvatarDeUsuario(iniciais: p.iniciais, usuarioId: p.id, tamanho: 80),
                     const SizedBox(width: EspacosTrato.x4),
                     Expanded(
                       child: Column(

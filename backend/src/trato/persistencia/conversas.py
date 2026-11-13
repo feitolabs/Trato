@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,9 +19,16 @@ from trato.seguranca.mascaramento import mascarar as _mascarar
 AVISO_MASCARA = _AVISO_MASCARA
 
 
+# Mensagem de foto: `[Foto:<id da mídia>]`. O id é hexadecimal e pode ter 10+ dígitos seguidos, que
+# o mascaramento confundiria com telefone. É só uma referência, nunca um contato.
+MARCADOR_FOTO = re.compile(r"^\[Foto:[0-9a-fA-F-]{16,40}\]$")
+
+
 def mascarar_contatos(texto: str) -> str:
     """Esconde telefone, e-mail, link, perfil e endereço antes da contratação (o original fica em
     `corpo`, só o `corpo_exibido` é mascarado). A regra mora em `trato.seguranca.mascaramento`."""
+    if MARCADOR_FOTO.match(texto.strip()):
+        return texto
     return _mascarar(texto).exibido
 
 

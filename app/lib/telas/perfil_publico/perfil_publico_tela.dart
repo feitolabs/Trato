@@ -10,6 +10,15 @@ import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import '../profissional_apoio/apoio.dart';
 import 'perfil_publico.dart';
 
+/// Uma linha da seção "Conta" do perfil do profissional (dados pessoais, notificações, ajuda...).
+class ItemContaPerfil {
+  const ItemContaPerfil({required this.icone, required this.titulo, required this.aoTocar});
+
+  final IconData icone;
+  final String titulo;
+  final VoidCallback aoTocar;
+}
+
 /// Como os clientes veem o profissional. Não é a tela 10 do cliente: aqui é a pré-visualização
 /// do próprio perfil, com atalho para as avaliações recebidas.
 class PerfilPublicoTela extends StatefulWidget {
@@ -21,7 +30,12 @@ class PerfilPublicoTela extends StatefulWidget {
     this.aoSair,
     this.aoUsarComoCliente,
     this.aoCapturarFotoPerfil,
+    this.itensConta = const [],
   });
+
+  /// Opções da conta que o perfil do cliente também tem (dados pessoais, notificações, privacidade
+  /// e exclusão da conta, ajuda, termos). Aparecem antes de "Usar como cliente" e "Sair".
+  final List<ItemContaPerfil> itensConta;
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
@@ -188,7 +202,9 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 ),
               ],
             ],
-            if (widget.aoUsarComoCliente != null || widget.aoSair != null) ...[
+            if (widget.itensConta.isNotEmpty ||
+                widget.aoUsarComoCliente != null ||
+                widget.aoSair != null) ...[
               const SizedBox(height: EspacosTrato.x6),
               const TituloSecao('Conta'),
               Card(
@@ -196,29 +212,46 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   children: [
-                    if (widget.aoUsarComoCliente != null)
-                      ListTile(
-                        leading: const Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
-                        title: Text('Usar como cliente', style: TipografiaTrato.corpoForte),
-                        subtitle: Text('Trocar para contratar serviços', style: TipografiaTrato.legenda),
-                        trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
-                        onTap: widget.aoUsarComoCliente,
-                      ),
-                    if (widget.aoUsarComoCliente != null && widget.aoSair != null)
-                      const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: CoresTrato.borda,
-                        indent: EspacosTrato.x4,
-                        endIndent: EspacosTrato.x4,
-                      ),
-                    if (widget.aoSair != null)
-                      ListTile(
-                        leading: const Icon(Icons.logout, color: CoresTrato.petroleo),
-                        title: Text('Sair', style: TipografiaTrato.corpoForte),
-                        trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
-                        onTap: widget.aoSair,
-                      ),
+                    for (final (i, linha) in [
+                      for (final item in widget.itensConta)
+                        ListTile(
+                          leading: Icon(item.icone, color: CoresTrato.petroleo),
+                          title: Text(item.titulo, style: TipografiaTrato.corpoForte),
+                          trailing:
+                              const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                          onTap: item.aoTocar,
+                        ),
+                      if (widget.aoUsarComoCliente != null)
+                        ListTile(
+                          leading: const Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
+                          title: Text('Usar como cliente', style: TipografiaTrato.corpoForte),
+                          subtitle: Text(
+                            'Trocar para contratar serviços',
+                            style: TipografiaTrato.legenda,
+                          ),
+                          trailing:
+                              const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                          onTap: widget.aoUsarComoCliente,
+                        ),
+                      if (widget.aoSair != null)
+                        ListTile(
+                          leading: const Icon(Icons.logout, color: CoresTrato.petroleo),
+                          title: Text('Sair', style: TipografiaTrato.corpoForte),
+                          trailing:
+                              const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                          onTap: widget.aoSair,
+                        ),
+                    ].indexed) ...[
+                      if (i > 0)
+                        const Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: CoresTrato.borda,
+                          indent: EspacosTrato.x4,
+                          endIndent: EspacosTrato.x4,
+                        ),
+                      linha,
+                    ],
                   ],
                 ),
               ),

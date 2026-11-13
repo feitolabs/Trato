@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/relogio_de_atualizacao.dart';
 import '../../tema/tema.dart';
 
 /// Carrega dados de um serviço e mostra carregando, erro (com "Tentar de novo") ou o conteúdo.
 /// Quem decide o que é "vazio" é o [construir] (use [EstadoVazio]).
+///
+/// Com [atualizarACada], a lista se atualiza sozinha (e quando o app volta do segundo plano),
+/// em silêncio: sem spinner e mantendo o que já está na tela se a rede falhar.
 class CarregadorTela<T> extends StatefulWidget {
   const CarregadorTela({
     super.key,
@@ -12,6 +16,7 @@ class CarregadorTela<T> extends StatefulWidget {
     required this.construir,
     this.esqueleto,
     this.atualizarQuando,
+    this.atualizarACada,
   });
 
   final Future<T> Function() carregar;
@@ -21,46 +26,91 @@ class CarregadorTela<T> extends StatefulWidget {
   /// Quando este aviso dispara, recarrega do servidor.
   final Listenable? atualizarQuando;
 
+  /// Atualiza sozinho neste intervalo. Nulo = só carrega uma vez.
+  final Duration? atualizarACada;
+
   @override
   State<CarregadorTela<T>> createState() => _CarregadorTelaState<T>();
 }
 
 class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
-  late Future<T> _futuro = widget.carregar();
+  T? _dado;
+  Object? _erro;
+  var _pronto = false;
+  var _geracao = 0;
+  RelogioDeAtualizacao? _relogio;
 
   @override
   void initState() {
     super.initState();
     widget.atualizarQuando?.addListener(_recarregar);
+    final intervalo = widget.atualizarACada;
+    if (intervalo != null) {
+      _relogio = RelogioDeAtualizacao(
+        intervalo: intervalo,
+        aoAtualizar: _atualizarEmSilencio,
+        deveAtualizar: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+      );
+    }
+    _carregar();
   }
 
   @override
   void dispose() {
+    _relogio?.parar();
     widget.atualizarQuando?.removeListener(_recarregar);
     super.dispose();
+  }
+
+  Future<void> _carregar() async {
+    final minha = ++_geracao;
+    try {
+      final dado = await widget.carregar();
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _dado = dado;
+        _erro = null;
+        _pronto = true;
+      });
+    } on Object catch (erro) {
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _erro = erro;
+        _pronto = true;
+      });
+    }
   }
 
   void _recarregar() {
     if (!mounted) return;
     // Bloco, não seta: o setState do Flutter recusa callback que devolve Future (lança no debug).
     setState(() {
-      _futuro = widget.carregar();
+      _pronto = false;
+      _erro = null;
+    });
+    _carregar();
+  }
+
+  /// Busca de novo sem mexer na tela; só troca o dado quando chega. Erro: segue com o que tem.
+  Future<void> _atualizarEmSilencio() async {
+    if (!_pronto) return;
+    final minha = ++_geracao;
+    final dado = await widget.carregar();
+    if (!mounted || minha != _geracao) return;
+    setState(() {
+      _dado = dado;
+      _erro = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<T>(
-      future: _futuro,
-      builder: (context, snap) {
-        if (snap.hasError) return EstadoErro(aoTentarNovamente: _recarregar);
-        if (!snap.hasData) {
-          if (widget.esqueleto != null) return widget.esqueleto!(context);
-          return const EstadoCarregando();
-        }
-        return widget.construir(context, snap.data as T, _recarregar);
-      },
-    );
+    if (!_pronto) {
+      if (widget.esqueleto != null) return widget.esqueleto!(context);
+      return const EstadoCarregando();
+    }
+    if (_erro != null) return EstadoErro(aoTentarNovamente: _recarregar);
+    return widget.construir(context, _dado as T, _recarregar);
   }
 }
 
