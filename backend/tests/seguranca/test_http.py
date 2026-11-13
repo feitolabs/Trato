@@ -287,6 +287,12 @@ def test_idempotencia_em_metodos_mutantes():
         "cidade_id": "belo-horizonte",
         "titulo": "Troca de tomada",
         "descricao": "Instalar tomada 220v",
+        "endereco": {
+            "logradouro": "Rua das Flores",
+            "numero": "10",
+            "bairro": "Centro",
+            "cep": "35500-000",
+        },
     }
     # Primeira chamada
     r1 = amb.cliente.post("/v1/pedidos", json=corpo, headers=headers)

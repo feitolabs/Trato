@@ -149,6 +149,35 @@ def _exigir_dentro_do_teto(dados: Any, contexto: Contexto) -> None:
         )
 
 
+def _exigir_modalidade_e_endereco(dados: Any, contexto: Contexto) -> None:
+    """Remoto só onde o admin liberou. Presencial exige endereço completo: sem ele o profissional
+    contratado não sabe aonde ir."""
+    if dados.modalidade == "remoto":
+        if not contexto.pedidos.categoria_aceita_remoto(dados.categoria_id):
+            raise HTTPException(
+                422, "Esta categoria não atende de forma remota. Escolha atendimento presencial."
+            )
+        return
+    e = dados.endereco
+    faltam = [
+        nome
+        for nome, valor in (
+            ("rua", e.logradouro if e else None),
+            ("número", e.numero if e else None),
+            ("bairro", e.bairro if e else None),
+            ("CEP", e.cep if e else None),
+        )
+        if not (valor or "").strip()
+    ]
+    if faltam:
+        raise HTTPException(
+            422,
+            "Para serviço presencial, informe o endereço completo (falta: "
+            + ", ".join(faltam)
+            + "). O profissional só o vê depois de contratado.",
+        )
+
+
 @router.post("", response_model=PedidoOut, status_code=201, summary="Abrir pedido")
 def abrir_pedido(
     corpo: AbrirPedidoIn | None = None,
@@ -161,7 +190,10 @@ def abrir_pedido(
     )
     dados = corpo.para_dados() if corpo else None
     if dados is not None:
+        _exigir_modalidade_e_endereco(dados, contexto)
         _exigir_dentro_do_teto(dados, contexto)
+        if dados.modalidade == "remoto":
+            pedido = replace(pedido, remoto=True)
     if dados is not None:  # M9: limite e mascaramento de contato no texto livre
         cfg = obter_config_seguranca()
         dados = replace(
@@ -217,6 +249,7 @@ def _dados_out(d: DadosPedido) -> DadosPedidoOut:
         faixa_preco_max_centavos=d.faixa_preco_max_centavos,
         urgente=d.urgente,
         endereco=EnderecoIn(**asdict(d.endereco)) if d.endereco else None,
+        modalidade=d.modalidade,
     )
 
 

@@ -39,6 +39,7 @@ class CategoriaAdminOut(BaseModel):
     ordem: int = 0
     ativa: bool = True
     profissionais: int = 0
+    aceita_remoto: bool = False
 
 
 class CriarCategoriaIn(BaseModel):
@@ -48,6 +49,7 @@ class CriarCategoriaIn(BaseModel):
     garantia_retrabalho_dias: int | None = Field(default=None, ge=1, le=365)
     ordem: int = 0
     ativa: bool = True
+    aceita_remoto: bool = False
     motivo: str = Field(min_length=10, max_length=500)
 
 
@@ -58,6 +60,7 @@ class EditarCategoriaIn(BaseModel):
     garantia_retrabalho_dias: int | None = Field(default=None, ge=1, le=365)
     ordem: int | None = None
     ativa: bool | None = None
+    aceita_remoto: bool | None = None
     motivo: str = Field(min_length=10, max_length=500)
 
 
@@ -120,10 +123,11 @@ def listar_categorias(
         linhas = con.execute(
             """
             SELECT c.id, c.nome, c.slug, c.icone, c.garantia_retrabalho_dias, c.ordem, c.ativa,
-                   count(pc.profissional_id) as profissionais
+                   c.aceita_remoto, count(pc.profissional_id) as profissionais
             FROM public.categorias c
             LEFT JOIN public.profissional_categorias pc ON pc.categoria_id = c.id
-            GROUP BY c.id, c.nome, c.slug, c.icone, c.garantia_retrabalho_dias, c.ordem, c.ativa
+            GROUP BY c.id, c.nome, c.slug, c.icone, c.garantia_retrabalho_dias, c.ordem, c.ativa,
+                     c.aceita_remoto
             ORDER BY c.ordem, c.nome
             """
         ).fetchall()
@@ -137,6 +141,7 @@ def listar_categorias(
                 ordem=int(r["ordem"] or 0),
                 ativa=bool(r["ativa"]),
                 profissionais=int(r["profissionais"] or 0),
+                aceita_remoto=bool(r["aceita_remoto"]),
             )
             for r in linhas
         ]
@@ -161,18 +166,25 @@ def criar_categoria(
             raise HTTPException(409, f"Já existe uma categoria com o identificador (slug) '{slug}'.")
         linha = con.execute(
             """
-            INSERT INTO public.categorias (nome, slug, icone, garantia_retrabalho_dias, ordem, ativa)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id, nome, slug, icone, garantia_retrabalho_dias, ordem, ativa
+            INSERT INTO public.categorias
+                (nome, slug, icone, garantia_retrabalho_dias, ordem, ativa, aceita_remoto)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, nome, slug, icone, garantia_retrabalho_dias, ordem, ativa, aceita_remoto
             """,
-            (corpo.nome.strip(), slug, corpo.icone, corpo.garantia_retrabalho_dias, corpo.ordem, corpo.ativa),
+            (corpo.nome.strip(), slug, corpo.icone, corpo.garantia_retrabalho_dias, corpo.ordem,
+             corpo.ativa, corpo.aceita_remoto),
         ).fetchone()
         admin.auditoria.registrar(
             ator_id=operador.id,
             acao="categoria.criada",
             entidade="categorias",
             entidade_id=str(linha["id"]),
-            depois={"nome": corpo.nome, "slug": slug, "ativa": corpo.ativa},
+            depois={
+                "nome": corpo.nome,
+                "slug": slug,
+                "ativa": corpo.ativa,
+                "aceita_remoto": corpo.aceita_remoto,
+            },
             motivo=corpo.motivo,
         )
         return CategoriaAdminOut(
@@ -184,6 +196,7 @@ def criar_categoria(
             ordem=linha["ordem"],
             ativa=linha["ativa"],
             profissionais=0,
+            aceita_remoto=bool(linha["aceita_remoto"]),
         )
 
 
@@ -215,21 +228,43 @@ def editar_categoria(
         nova_garantia = corpo.garantia_retrabalho_dias if corpo.garantia_retrabalho_dias is not None else atual["garantia_retrabalho_dias"]
         nova_ordem = corpo.ordem if corpo.ordem is not None else atual["ordem"]
         nova_ativa = corpo.ativa if corpo.ativa is not None else atual["ativa"]
+        novo_remoto = (
+            corpo.aceita_remoto if corpo.aceita_remoto is not None else atual["aceita_remoto"]
+        )
+        if atual["aceita_remoto"] and not novo_remoto:
+            abertos = con.execute(
+                "SELECT count(*) AS n FROM public.pedidos WHERE categoria_id = %s "
+                "AND modalidade = 'remoto' AND status NOT IN ('concluido', 'cancelado')",
+                (uid,),
+            ).fetchone()
+            if abertos and int(abertos["n"] or 0) > 0:
+                raise HTTPException(
+                    409,
+                    "Há pedidos remotos em andamento nesta categoria. Termine ou cancele esses "
+                    "pedidos antes de desligar o atendimento remoto.",
+                )
 
         con.execute(
             """
             UPDATE public.categorias
-            SET nome = %s, slug = %s, icone = %s, garantia_retrabalho_dias = %s, ordem = %s, ativa = %s, atualizado_em = now()
+            SET nome = %s, slug = %s, icone = %s, garantia_retrabalho_dias = %s, ordem = %s,
+                ativa = %s, aceita_remoto = %s, atualizado_em = now()
             WHERE id = %s
             """,
-            (novo_nome, novo_slug, novo_icone, nova_garantia, nova_ordem, nova_ativa, uid),
+            (novo_nome, novo_slug, novo_icone, nova_garantia, nova_ordem, nova_ativa,
+             novo_remoto, uid),
         )
         admin.auditoria.registrar(
             ator_id=operador.id,
             acao="categoria.editada",
             entidade="categorias",
             entidade_id=str(uid),
-            depois={"nome": novo_nome, "slug": novo_slug, "ativa": nova_ativa},
+            depois={
+                "nome": novo_nome,
+                "slug": novo_slug,
+                "ativa": nova_ativa,
+                "aceita_remoto": bool(novo_remoto),
+            },
             motivo=corpo.motivo,
         )
         contagem = con.execute(
@@ -244,6 +279,7 @@ def editar_categoria(
             ordem=nova_ordem,
             ativa=nova_ativa,
             profissionais=int(contagem["total"] or 0) if contagem else 0,
+            aceita_remoto=bool(novo_remoto),
         )
 
 

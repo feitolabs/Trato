@@ -50,7 +50,7 @@ _TIPO_ATOR = {
 
 # Colunas explícitas (agendamentos tem colunas de hash: nada de `select *`).
 _SELECT_PEDIDO = """
-select p.id, p.cliente_id, p.status, p.criado_em,
+select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
        c.profissional_id, c.orcamento_id, c.aceito_em, c.id as contrato_id,
        ag.id as ag_id, ag.janela_inicio, ag.janela_fim,
        ci.registrada_em as check_in_em, co.registrada_em as check_out_em,
@@ -140,6 +140,16 @@ class PedidosPostgres:
             ).fetchall()
         return tuple(self._montar(linha) for linha in linhas)
 
+    def categoria_aceita_remoto(self, categoria_id: str) -> bool:
+        achado = como_uuid(categoria_id)
+        if achado is None:
+            return False
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select aceita_remoto from public.categorias where id = %s and ativa", (achado,)
+            ).fetchone()
+        return bool(linha and linha["aceita_remoto"])
+
     def listar_abertos(
         self, profissional_id: str, limite: int = 100, offset: int = 0
     ) -> Sequence[PedidoAberto]:
@@ -155,16 +165,24 @@ class PedidosPostgres:
                 "select p.id, p.titulo, p.descricao, p.bairro, p.categoria_id, "
                 "p.faixa_preco_min_centavos, p.faixa_preco_max_centavos, p.urgente, "
                 "p.prazo_desejado, p.criado_em, p.local_aprox_lat, p.local_aprox_lng, "
-                "p.cliente_id from public.pedidos p "
+                "p.cliente_id, p.modalidade from public.pedidos p "
                 "where p.status = 'aberto' and p.cliente_id <> %s "
                 "and exists (select 1 from public.profissional_categorias pc "
                 "            where pc.profissional_id = %s and pc.categoria_id = p.categoria_id "
                 "              and pc.suspensa_em is null) "
-                "and exists (select 1 from public.profissional_regioes pr "
-                "            where pr.profissional_id = %s and pr.cidade_id = p.cidade_id "
-                "              and (pr.bairro is null or pr.bairro = p.bairro)) "
+                # Presencial: precisa atender presencial E a região. Remoto: precisa atender remoto
+                # e vale de qualquer cidade.
+                "and ((p.modalidade = 'presencial' "
+                "      and exists (select 1 from public.perfis_profissional pf "
+                "                  where pf.usuario_id = %s and pf.atende_presencial) "
+                "      and exists (select 1 from public.profissional_regioes pr "
+                "                  where pr.profissional_id = %s and pr.cidade_id = p.cidade_id "
+                "                    and (pr.bairro is null or pr.bairro = p.bairro))) "
+                "  or (p.modalidade = 'remoto' "
+                "      and exists (select 1 from public.perfis_profissional pf "
+                "                  where pf.usuario_id = %s and pf.atende_remoto))) "
                 "order by p.criado_em desc limit %s offset %s",
-                (achado, achado, achado, limite_efetivo, offset_efetivo),
+                (achado, achado, achado, achado, achado, limite_efetivo, offset_efetivo),
             ).fetchall()
         return tuple(
             PedidoAberto(
@@ -181,6 +199,7 @@ class PedidosPostgres:
                 l["local_aprox_lat"],
                 l["local_aprox_lng"],
                 str(l["cliente_id"]),
+                l["modalidade"],
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )
@@ -249,7 +268,7 @@ class PedidosPostgres:
         p = con.execute(
             "select categoria_id, cidade_id, titulo, descricao, bairro, local_aprox_lat, "
             "local_aprox_lng, prazo_desejado, faixa_preco_min_centavos, "
-            "faixa_preco_max_centavos, urgente from public.pedidos where id = %s",
+            "faixa_preco_max_centavos, urgente, modalidade from public.pedidos where id = %s",
             (pid,),
         ).fetchone()
         if p is None:
@@ -271,6 +290,7 @@ class PedidosPostgres:
             faixa_preco_min_centavos=p["faixa_preco_min_centavos"],
             faixa_preco_max_centavos=p["faixa_preco_max_centavos"],
             urgente=p["urgente"],
+            modalidade=p["modalidade"],
             endereco=None
             if e is None
             else EnderecoPedido(
@@ -375,6 +395,7 @@ class PedidosPostgres:
             check_out_em=linha["check_out_em"],
             concluido_em=linha["concluido_em"],
             estado_antes_da_disputa=_estado(linha["antes_da_disputa"]) if em_disputa else None,
+            remoto=linha["modalidade"] == "remoto",
         )
 
     def _inserir(
@@ -431,8 +452,9 @@ class PedidosPostgres:
         con.execute(
             "insert into public.pedidos (id, cliente_id, categoria_id, cidade_id, bairro, "
             "local_aprox_lat, local_aprox_lng, titulo, descricao, prazo_desejado, "
-            "faixa_preco_min_centavos, faixa_preco_max_centavos, urgente, status, criado_em) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            "faixa_preco_min_centavos, faixa_preco_max_centavos, urgente, status, criado_em, "
+            "modalidade) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 pid,
                 exigir_uuid(pedido.cliente_id, "cliente"),
@@ -449,6 +471,7 @@ class PedidosPostgres:
                 d.urgente,
                 _banco(pedido.estado),
                 pedido.aberto_em,
+                "remoto" if d.modalidade == "remoto" else "presencial",
             ),
         )
         for resposta in d.respostas:

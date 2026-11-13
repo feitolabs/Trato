@@ -78,6 +78,11 @@ class AbrirPedidoIn(_Entrada):
     urgente: bool = False
     respostas: list[RespostaIn] = Field(default_factory=list)
     endereco: EnderecoIn | None = None
+    modalidade: Literal["presencial", "remoto"] = Field(
+        default="presencial",
+        description="`remoto` só em categoria que aceita remoto. Presencial exige endereço "
+        "(rua, número, bairro e CEP).",
+    )
 
     def para_dados(self) -> DadosPedido:
         return DadosPedido(
@@ -94,6 +99,7 @@ class AbrirPedidoIn(_Entrada):
             urgente=self.urgente,
             respostas=tuple(RespostaPedido(r.pergunta_id, r.resposta) for r in self.respostas),
             endereco=EnderecoPedido(**self.endereco.model_dump()) if self.endereco else None,
+            modalidade=self.modalidade,
         )
 
 
@@ -118,6 +124,7 @@ class DadosPedidoOut(BaseModel):
     faixa_preco_max_centavos: int | None = None
     urgente: bool = False
     endereco: EnderecoIn | None = None
+    modalidade: str = "presencial"
 
 
 class AceitarOrcamentoIn(_Entrada):
@@ -135,24 +142,30 @@ class ConfirmarAgendaIn(_Entrada):
 
 
 class CheckInIn(_Entrada):
-    foto: FotoIn
-    localizacao: LocalizacaoIn
+    # Foto e localização: obrigatórias no presencial (a regra confere), dispensadas no remoto.
+    foto: FotoIn | None = None
+    localizacao: LocalizacaoIn | None = None
     codigo_inicio: str
 
     def para_regra(self) -> ProvaCheckIn:
         return ProvaCheckIn(
-            self.foto.para_regra(),
-            Localizacao(self.localizacao.latitude, self.localizacao.longitude),
-            self.codigo_inicio,
+            foto=self.foto.para_regra() if self.foto else None,
+            localizacao=Localizacao(self.localizacao.latitude, self.localizacao.longitude)
+            if self.localizacao
+            else None,
+            codigo_inicio=self.codigo_inicio,
         )
 
 
 class CheckOutIn(_Entrada):
-    foto_final: FotoIn
+    foto_final: FotoIn | None = None
     codigo_conclusao: str
 
     def para_regra(self) -> ProvaCheckOut:
-        return ProvaCheckOut(self.foto_final.para_regra(), self.codigo_conclusao)
+        return ProvaCheckOut(
+            foto_final=self.foto_final.para_regra() if self.foto_final else None,
+            codigo_conclusao=self.codigo_conclusao,
+        )
 
 
 class CancelarIn(_Entrada):
@@ -220,6 +233,7 @@ class PedidoOut(BaseModel):
         None, description="Só o cliente vê; ele informa ao profissional."
     )
     codigo_conclusao: str | None = Field(None, description="Só o cliente vê.")
+    modalidade: str = Field("presencial", description="`presencial` ou `remoto`.")
 
 
 class EventoOut(BaseModel):

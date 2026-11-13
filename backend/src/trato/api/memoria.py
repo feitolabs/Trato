@@ -73,6 +73,12 @@ class PedidosEmMemoria:
         ordenados = sorted(achados, key=lambda p: p.aberto_em, reverse=True)
         return ordenados[offset : offset + limite]
 
+    # Categorias em que o admin liberou o remoto (a memória não tem catálogo: os testes ligam aqui).
+    categorias_remotas: set[str] = set()
+
+    def categoria_aceita_remoto(self, categoria_id: str) -> bool:
+        return categoria_id in self.categorias_remotas
+
     def listar_abertos(
         self, profissional_id: str, limite: int = 100, offset: int = 0
     ) -> Sequence[PedidoAberto]:
@@ -100,6 +106,7 @@ class PedidosEmMemoria:
                     local_aprox_lat=d.local_aprox_lat if d else None,
                     local_aprox_lng=d.local_aprox_lng if d else None,
                     cliente_id=p.cliente_id,
+                    modalidade="remoto" if p.remoto else "presencial",
                 )
             )
         return tuple(saida)

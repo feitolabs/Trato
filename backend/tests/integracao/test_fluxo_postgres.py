@@ -29,7 +29,14 @@ def corpo_pedido(c, **extra):
         "descricao": "Duas demãos, paredes brancas.",
         "bairro": "Centro",
         "respostas": [{"pergunta_id": c.pergunta_id, "resposta": 3}],
-        "endereco": {"logradouro": "Rua A", "numero": "10", "lat": -19.9, "lng": -43.9},
+        "endereco": {
+            "logradouro": "Rua A",
+            "numero": "10",
+            "bairro": "Centro",
+            "cep": "35500-000",
+            "lat": -19.9,
+            "lng": -43.9,
+        },
         **extra,
     }
 
