@@ -67,6 +67,32 @@ class PedidoContratado {
   bool get emAndamento => estadoApi == 'em_andamento';
 }
 
+/// Orçamento que o profissional enviou (a última versão), para ele acompanhar a resposta do cliente.
+class OrcamentoEnviado {
+  const OrcamentoEnviado({
+    required this.pedidoId,
+    required this.titulo,
+    required this.valorCentavos,
+    required this.versao,
+    required this.situacao,
+    this.enviadoEm,
+  });
+
+  final String pedidoId;
+
+  /// Título do pedido, ou "Pedido #AAAA".
+  final String titulo;
+  final int valorCentavos;
+  final int versao;
+
+  /// `aguardando` (o cliente ainda decide), `aceito` ou `encerrado`.
+  final String situacao;
+  final DateTime? enviadoEm;
+
+  bool get aguardando => situacao == 'aguardando';
+  bool get aceito => situacao == 'aceito';
+}
+
 class ResumoCarteira {
   const ResumoCarteira({required this.retidoCentavos, required this.paraSacarCentavos});
 
@@ -127,7 +153,11 @@ class InicioProfissional {
     required this.pedidos,
     this.proximo,
     this.contratados = const [],
+    this.orcamentosEnviados = const [],
   });
+
+  /// Os orçamentos que o profissional enviou, do mais novo ao mais antigo.
+  final List<OrcamentoEnviado> orcamentosEnviados;
 
   /// Pedidos aceitos pelo cliente, do aceite ao fim (inclui "aguardando pagamento").
   final List<PedidoContratado> contratados;
@@ -146,6 +176,7 @@ class InicioProfissional {
         carteira: carteira,
         pedidos: novos,
         contratados: contratados,
+        orcamentosEnviados: orcamentosEnviados,
       );
 }
 

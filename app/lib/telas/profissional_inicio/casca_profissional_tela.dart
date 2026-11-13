@@ -45,12 +45,16 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoAbrirNotificacoes,
     this.aoUsarComoCliente,
     this.aoAbrirContratado,
+    this.aoAbrirOrcamentoEnviado,
     this.recarregarInicio,
     this.atualizarACada,
   });
 
   /// Toque num pedido que o cliente já aceitou (aba Pedidos > Em andamento).
   final ValueChanged<PedidoContratado>? aoAbrirContratado;
+
+  /// Toque num orçamento que o profissional enviou (abre a conversa do pedido).
+  final ValueChanged<OrcamentoEnviado>? aoAbrirOrcamentoEnviado;
 
   /// Busca o Início de novo (pedidos abertos, pedidos aceitos, carteira). Com [atualizarACada], a
   /// casca se atualiza sozinha: pedido novo e pedido aceito aparecem sem fechar o app.
@@ -240,6 +244,8 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         pedidos: _inicio.pedidos,
         contratados: _inicio.contratados,
         aoAbrirContratado: widget.aoAbrirContratado,
+        orcamentosEnviados: _inicio.orcamentosEnviados,
+        aoAbrirOrcamentoEnviado: widget.aoAbrirOrcamentoEnviado,
         carregando: _carregandoPedidos,
         filtrosAtivos: _filtrosAtivos,
         aoAbrirFiltros: _filtros,

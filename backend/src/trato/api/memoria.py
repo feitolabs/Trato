@@ -22,6 +22,7 @@ from trato.api.repositorios_app import (
     ItemDoOrcamento,
     OrcamentoDetalhe,
     OrcamentoDoPedido,
+    OrcamentoDoProfissional,
     PedidoAberto,
 )
 from trato.disputas import Disputa
@@ -152,6 +153,26 @@ class OrcamentosEmMemoria:
 
     def obter(self, orcamento_id: str) -> Orcamento | None:
         return self._itens.get(orcamento_id)
+
+    def do_profissional(self, profissional_id: str) -> Sequence[OrcamentoDoProfissional]:
+        ultimos: dict[str, OrcamentoDetalhe] = {}
+        for d in self._detalhes.values():
+            if d.profissional_id != profissional_id or d.status not in (
+                "enviado",
+                "aceito",
+                "recusado",
+            ):
+                continue
+            atual = ultimos.get(d.pedido_id)
+            if atual is None or d.versao > atual.versao:
+                ultimos[d.pedido_id] = d
+        ordenados = sorted(ultimos.values(), key=lambda d: (d.enviado_em is None, d.id))
+        return tuple(
+            OrcamentoDoProfissional(
+                d.id, d.pedido_id, d.versao, d.valor_centavos, d.status, d.enviado_em
+            )
+            for d in ordenados
+        )
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:
         if self._detalhes:

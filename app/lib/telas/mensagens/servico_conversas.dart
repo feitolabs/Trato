@@ -17,7 +17,11 @@ class ServicoConversasApi implements ServicoMensagens {
 
   @override
   Future<List<ConversaResumo>> listar() async {
-    final bruto = await _api.get('/v1/conversas');
+    // A mesma conta pode ser cliente e profissional: cada aba mostra só as conversas do seu papel.
+    final bruto = await _api.get(
+      '/v1/conversas',
+      consulta: {'como': comoProfissional ? 'profissional' : 'cliente'},
+    );
     final itens = bruto is List ? bruto : const [];
     final rotuloPadrao = comoProfissional ? 'Cliente' : 'Profissional';
     final resumos = <ConversaResumo>[];
@@ -39,12 +43,25 @@ class ServicoConversasApi implements ServicoMensagens {
           ultimaMensagem: _previa(j['ultima_mensagem'] as String?, j['ultima_minha'] == true),
           quando: quando == null ? '' : _rotuloData(DateTime.parse(quando)),
           naoLidas: (j['nao_lidas'] as num?)?.toInt() ?? 0,
+          conversaId: j['id'] as String?,
           outraParteId: outraId,
           profissionalId: comoProfissional ? null : outraId,
         ),
       );
     }
     return resumos;
+  }
+
+  /// `POST /v1/conversas/{id}/lida`: tudo que a outra parte mandou passa a lido. Falha em silêncio
+  /// (o contador some na próxima atualização, que o backend também zera ao abrir o chat).
+  Future<void> marcarLida(ConversaResumo conversa) async {
+    final id = conversa.conversaId;
+    if (id == null) return;
+    try {
+      await _api.post('/v1/conversas/$id/lida');
+    } on Object {
+      // sem rede: tenta de novo no próximo ciclo
+    }
   }
 
   static String _numero(String id) {

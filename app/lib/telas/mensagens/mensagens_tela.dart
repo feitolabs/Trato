@@ -14,6 +14,7 @@ class MensagensTela extends StatelessWidget {
     this.aoAbrirConversa,
     this.comVoltar = false,
     this.atualizarACada,
+    this.atualizarQuando,
   });
 
   final ServicoMensagens servico;
@@ -21,6 +22,9 @@ class MensagensTela extends StatelessWidget {
 
   /// Atualiza a lista sozinha neste intervalo (mensagem nova aparece sem fechar o app).
   final Duration? atualizarACada;
+
+  /// Recarrega na hora quando dispara (ex.: ao voltar do chat).
+  final Listenable? atualizarQuando;
 
   /// Falso por padrão: a tela é uma aba da casca do cliente.
   final bool comVoltar;
@@ -34,6 +38,7 @@ class MensagensTela extends StatelessWidget {
         servico: servico,
         aoAbrirConversa: aoAbrirConversa,
         atualizarACada: atualizarACada,
+        atualizarQuando: atualizarQuando,
       ),
     );
   }
@@ -47,7 +52,10 @@ class ListaConversas extends StatelessWidget {
     this.aoAbrirConversa,
     this.textoVazio = 'Ao pedir um serviço, a conversa com o profissional aparece aqui.',
     this.atualizarACada,
+    this.atualizarQuando,
   });
+
+  final Listenable? atualizarQuando;
 
   final ServicoMensagens servico;
   final ValueChanged<ConversaResumo>? aoAbrirConversa;
@@ -59,6 +67,7 @@ class ListaConversas extends StatelessWidget {
     return CarregadorTela<List<ConversaResumo>>(
       carregar: servico.listar,
       atualizarACada: atualizarACada,
+      atualizarQuando: atualizarQuando,
       construir: (context, itens, _) => itens.isEmpty
           ? EstadoVazio(
               icone: Icons.chat_bubble_outline,

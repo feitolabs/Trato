@@ -181,6 +181,43 @@ void main() {
     expect(tocado?.pedidoId, 'p1');
   });
 
+  testWidgets('aba Pedidos do profissional lista os orçamentos que ele enviou', (tester) async {
+    OrcamentoEnviado? tocado;
+    await tester.pumpWidget(
+      _app(
+        PedidosProfissionalTela(
+          pedidos: const [],
+          conversas: const SizedBox.shrink(),
+          orcamentosEnviados: const [
+            OrcamentoEnviado(
+              pedidoId: 'p1',
+              titulo: 'Trocar chuveiro',
+              valorCentavos: 25000,
+              versao: 2,
+              situacao: 'aguardando',
+            ),
+            OrcamentoEnviado(
+              pedidoId: 'p2',
+              titulo: 'Pintura',
+              valorCentavos: 9000,
+              versao: 1,
+              situacao: 'encerrado',
+            ),
+          ],
+          aoAbrirOrcamentoEnviado: (o) => tocado = o,
+        ),
+      ),
+    );
+    await tester.tap(find.text('Orçamentos (2)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Trocar chuveiro'), findsOneWidget);
+    expect(find.text('R\$ 250,00 · versão 2'), findsOneWidget);
+    expect(find.text('Aguardando o cliente'), findsOneWidget);
+    expect(find.textContaining('Encerrado'), findsOneWidget);
+    await tester.tap(find.text('Trocar chuveiro'));
+    expect(tocado?.pedidoId, 'p1');
+  });
+
   testWidgets('sem pedido aceito, a aba explica quando ele aparece', (tester) async {
     await tester.pumpWidget(
       _app(PedidosProfissionalTela(pedidos: const [], conversas: const SizedBox.shrink())),

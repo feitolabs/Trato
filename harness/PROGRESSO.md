@@ -864,3 +864,14 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - Segundo plano usa polling (12 s), não Realtime.
 - Regra do chat ajustada: o cliente também lê e responde a um profissional que puxou conversa antes de orçar (antes a conversa aparecia na lista e dava 404 ao abrir). Quem nunca falou nem orçou continua de fora. Dois testes antigos que esperavam 422/404 foram atualizados.
 - Verificação (`harness/verificar.py`, 12/11): backend 1449 passaram, app 850, painel 175 (8 pulados). "VERIFICAÇÃO FALHOU" só pelos itens antigos (ruff lint/formatação em `admin/rotas_catalogo.py`, `rotas_pedidos.py`, `postgres.py` e afins, `flutter analyze` antigos, APKs em `builds/`); nenhum nos arquivos desta tarefa.
+
+## 2026-11-12 — Ajustes depois do teste no aparelho (v0.1.10)
+
+- **Chat de outro papel na aba errada.** A mesma conta é cliente e profissional e `GET /v1/conversas` misturava os dois. Novo `?como=cliente|profissional` (e `sou_cliente` na resposta); cada aba do app pede o seu.
+- **Contador de não lidas parado.** Ao voltar do chat o app chama `POST /v1/conversas/{id}/lida` e recarrega a lista na hora.
+- **Pinzinho no chat:** ✓ enviada, ✓✓ azul visualizada. "Recebido" (✓✓ cinza) exige coluna `entregue_em` (migration): aguarda OK do João.
+- **Orçamentos que o profissional enviou:** `GET /v1/profissional/orcamentos` (última versão de cada, com situação aguardando/aceito/encerrado) e aba "Orçamentos" em Pedidos. Antes não havia onde ver.
+- **Foto antiga** (caminho de arquivo do celular de quem enviou) aparece como "Foto indisponível" em quem recebe.
+- Testes: backend `test_orcamentos_do_profissional_e_papel.py`; app novos casos em `atualizacao_automatica_test.dart`, `conversas_chat_horas_test.dart`; 3 goldens do chat refeitos. Backend 1453, app 852.
+- **Pendente:** `fly deploy` (as rotas novas só existem depois) e migration do "recebido".
+

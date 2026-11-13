@@ -126,7 +126,8 @@ void main() {
       expect(find.text('Serviço iniciado com o seu código às 14h10.', skipOffstage: false),
           findsOneWidget);
       expect(find.text('Vi aqui, vou olhar agora.'), findsOneWidget);
-      expect(find.text('15h04 · lida'), findsOneWidget);
+      expect(find.text('15h04'), findsWidgets);
+      expect(find.byKey(const ValueKey('pino-visualizada')), findsOneWidget);
     });
 
     testWidgets('envia mensagem digitada e resposta rápida', (tester) async {
