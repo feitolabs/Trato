@@ -15,7 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
 from trato.api.repositorios_app import TIPOS_DOCUMENTO
-from trato.pedidos.estados import Pedido
+from trato.api.visibilidade import pedido_visivel_ao_profissional
+from trato.pedidos.estados import Estado, Pedido
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.upload import ErroUpload
 from trato.uploads import ArmazenamentoArquivos
@@ -162,12 +163,63 @@ def foto_de_perfil(
     return FotoDePerfilOut(url=url)
 
 
+def _pode_no_chat_do_pedido(
+    contexto: Contexto, pedido: Pedido, usuario: Usuario, destino: str = "chat"
+) -> bool:
+    """Parte do pedido, ou (só para anexo de chat) profissional que pode ver o pedido aberto e
+    conversa sobre ele antes de ser contratado (mesma regra das mensagens)."""
+    if usuario.id in (pedido.cliente_id, pedido.profissional_id):
+        return True
+    if destino != "chat" or usuario.papel is not PapelUsuario.PROFISSIONAL:
+        return False
+    return (
+        pedido.estado is Estado.ABERTO
+        and pedido_visivel_ao_profissional(contexto, pedido.id, usuario.id) is not None
+    )
+
+
+class AnexoChatOut(BaseModel):
+    url: str = Field(description="URL assinada e curta da foto. Não guarde.")
+    expira_em_segundos: int = URL_LEITURA_SEGUNDOS
+
+
+@router_fotos.get(
+    "/{pedido_id}/anexos-chat/{midia_id}",
+    response_model=AnexoChatOut,
+    summary="Foto enviada numa mensagem do chat (URL assinada curta)",
+    description=(
+        "Só quem participa da conversa do pedido. A mensagem leva `[Foto:<midia_id>]`; o app "
+        "troca isso pela imagem com esta rota. O arquivo fica em bucket privado."
+    ),
+)
+def anexo_do_chat(
+    pedido_id: str,
+    midia_id: str,
+    usuario: Usuario = Depends(_usuario),
+    contexto: Contexto = Depends(obter_contexto),
+    servico: ServicoUploads = Depends(obter_servico),
+) -> AnexoChatOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None or not _pode_no_chat_do_pedido(contexto, pedido, usuario):
+        raise HTTPException(404, "Pedido não encontrado.")
+    midia = servico.repo.midia(midia_id)
+    if midia is None or midia.pedido_id != pedido.id or midia.finalidade != "chat":
+        raise HTTPException(404, "Foto não encontrada.")
+    try:
+        url = servico.armazenamento.url_leitura(
+            midia.bucket, midia.storage_path, URL_LEITURA_SEGUNDOS
+        )
+    except Exception:  # noqa: BLE001 - storage fora do ar: o app mostra "Foto" sem a imagem
+        raise HTTPException(503, "A foto não está disponível agora.") from None
+    return AnexoChatOut(url=url)
+
+
 def _pedido_do_envio(contexto: Contexto, corpo: PedirUploadIn, usuario: Usuario) -> Pedido:
     if not corpo.pedido_id:
         raise HTTPException(422, "Diga a qual pedido o arquivo pertence.")
     pedido = contexto.pedidos.obter(corpo.pedido_id)
     # Quem não é parte do pedido recebe 404, como nas demais rotas: nada de "existe, mas não é seu".
-    if pedido is None or usuario.id not in (pedido.cliente_id, pedido.profissional_id):
+    if pedido is None or not _pode_no_chat_do_pedido(contexto, pedido, usuario, corpo.destino):
         raise HTTPException(404, "Pedido não encontrado.")
     eh_cliente = usuario.id == pedido.cliente_id
     if corpo.destino in SO_PROFISSIONAL and eh_cliente:

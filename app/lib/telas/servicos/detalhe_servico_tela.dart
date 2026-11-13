@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
-import '../cliente/avatar_iniciais.dart';
+import '../cliente/avatar_de_usuario.dart';
+import '../cliente/avatar_iniciais.dart' show SeloVerificacao;
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import 'modelos.dart';
 
@@ -56,7 +57,7 @@ class DetalheServicoTela extends StatelessWidget {
                         : () => aoVerProfissional!(pro),
                     child: Row(
                       children: [
-                        AvatarIniciais(iniciais: pro.iniciais),
+                        AvatarDeUsuario(iniciais: pro.iniciais, usuarioId: pro.id),
                         const SizedBox(width: EspacosTrato.x3),
                         Expanded(
                           child: Column(

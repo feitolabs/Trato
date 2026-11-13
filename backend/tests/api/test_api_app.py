@@ -218,7 +218,8 @@ def test_mensagens_antes_da_contratacao_mascaram_contato(amb):
     assert r.status_code == 201
     assert r.json()["mascarada"] is True and "99999" not in r.json()["texto"]
     assert r.json()["minha"] is True
-    assert get(amb, url).status_code == 422  # cliente sem dizer o profissional
+    # cliente sem dizer o profissional: vale a única conversa que o pedido tem
+    assert get(amb, url).status_code == 200
     lista = get(amb, url, params={"profissional_id": PROFISSIONAL.id}).json()
     assert len(lista) == 1 and lista[0]["minha"] is False
     r = post(

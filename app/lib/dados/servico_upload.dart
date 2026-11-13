@@ -16,6 +16,7 @@ enum FinalidadeArquivo {
   selfie('verificacao'),
   notaMaterial('nota_material'),
   fotoPedido('pedido'),
+  chat('chat'),
   evidenciaDisputa('disputa'),
   avatar('avatar'),
 

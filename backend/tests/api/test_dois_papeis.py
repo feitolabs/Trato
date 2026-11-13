@@ -62,8 +62,9 @@ def test_chat_do_proprio_pedido_nao_abre_conversa_consigo_mesmo(amb):
         headers=cab("t-prof"),
     )
     assert r.status_code == 200, r.text
+    # sem dizer com quem: vale a conversa que já existe neste pedido
     sem_alvo = amb.cliente.get("/v1/pedidos/ped-1/mensagens", headers=cab("t-prof"))
-    assert sem_alvo.status_code == 422
+    assert sem_alvo.status_code == 200
 
 
 def test_cliente_comum_continua_sem_ver_pedido_alheio(amb):

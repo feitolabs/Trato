@@ -13,7 +13,11 @@ class NotificacoesTela extends StatelessWidget {
     required this.servico,
     this.aoAbrirDestino,
     this.comVoltar = true,
+    this.atualizarACada,
   });
+
+  /// Atualiza a lista sozinha neste intervalo (aviso novo aparece sem fechar o app).
+  final Duration? atualizarACada;
 
   final ServicoNotificacoes servico;
   final ValueChanged<Notificacao>? aoAbrirDestino;
@@ -26,6 +30,7 @@ class NotificacoesTela extends StatelessWidget {
       comVoltar: comVoltar,
       child: CarregadorTela<List<Notificacao>>(
         carregar: servico.listar,
+        atualizarACada: atualizarACada,
         construir: (context, itens, _) => itens.isEmpty
             ? const EstadoVazio(
                 icone: Icons.notifications_none,
@@ -51,6 +56,15 @@ class _ListaNotificacoes extends StatefulWidget {
 
 class _ListaNotificacoesState extends State<_ListaNotificacoes> {
   late List<Notificacao> _itens = widget.itens;
+
+  @override
+  void didUpdateWidget(covariant _ListaNotificacoes antigo) {
+    super.didUpdateWidget(antigo);
+    if (identical(antigo.itens, widget.itens)) return;
+    // Lista nova do servidor (atualização automática): o que já li aqui continua lido.
+    final lidas = {for (final i in _itens) if (i.lida) i.id};
+    _itens = [for (final n in widget.itens) lidas.contains(n.id) ? n.comoLida() : n];
+  }
 
   int get _naoLidas => _itens.where((n) => !n.lida).length;
 

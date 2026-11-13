@@ -17,6 +17,7 @@ import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
 import 'repositorios_catalogo_api.dart';
 import 'repositorios_api.dart';
+import '../telas/mensagens/servico_conversas.dart';
 import 'servico_upload.dart';
 import 'servicos_api.dart';
 import 'sessao.dart';
@@ -92,7 +93,9 @@ class RepositoriosTrato {
         pedidos: pedidos,
         orcamentos: RepositorioOrcamentosApi(api),
         pagamento: RepositorioPagamentoApi(api),
-        chat: RepositorioChatApi(api),
+        chat: RepositorioChatApi(api, upload: upload),
+        mensagens: ServicoConversasApi(api, comoProfissional: false),
+        mensagensProfissional: ServicoConversasApi(api, comoProfissional: true),
         notificacoes: RepositorioNotificacoesApi(api),
         perfil: RepositorioPerfilApi(api, upload: upload),
         profissional: profissional,

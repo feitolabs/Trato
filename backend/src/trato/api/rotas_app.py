@@ -7,6 +7,7 @@ pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nun
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -16,6 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_
 
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
+from trato.api.avisos import (
+    avisar_mensagem_nova,
+    avisar_orcamento_recebido,
+    servicos_de_notificacao,
+)
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
@@ -35,6 +41,7 @@ from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_etiquetas, limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["app"])
+log = logging.getLogger("trato.api")
 
 TETO_ORCAMENTO_CENTAVOS = 50_000_000  # R$ 500.000,00
 
@@ -392,6 +399,7 @@ def listar_orcamentos(
 def enviar_orcamento(
     pedido_id: str,
     dados: CriarOrcamentoIn,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> CriarOrcamentoOut:
@@ -456,6 +464,13 @@ def enviar_orcamento(
                 "for aprovado e verificado.",
             ) from erro
         raise
+    avisar_orcamento_recebido(
+        request,
+        contexto,
+        pedido_id=pedido.id,
+        cliente_id=pedido.cliente_id,
+        orcamento_id=orcamento_id,
+    )
     detalhe = contexto.orcamentos.detalhe(orcamento_id)
     if detalhe is None:
         orc = contexto.orcamentos.obter(orcamento_id)
@@ -585,19 +600,70 @@ def _exigir_profissional_do_pedido(contexto: Contexto, pedido, usuario: Usuario)
         raise HTTPException(404, "Pedido não encontrado.")
 
 
+def _profissional_mais_recente(
+    contexto: Contexto, request: Request, pedido: Pedido, usuario: Usuario
+) -> str | None:
+    """Cliente sem dizer o profissional (ex.: toque numa notificação): usa a conversa mais recente
+    deste pedido; sem conversa, o único profissional que orçou."""
+    try:
+        _, mensagens = servicos_de_notificacao(request, contexto)
+        da_vez = [c for c in mensagens.conversas(usuario.id) if c.pedido_id == pedido.id]
+    except Exception:  # noqa: BLE001 - sem o atalho, vale a regra antiga (422)
+        da_vez = []
+    if da_vez:
+        return da_vez[0].outra_parte_id
+    orcaram = {o.profissional_id for o in contexto.orcamentos.do_pedido(pedido.id)}
+    return next(iter(orcaram)) if len(orcaram) == 1 else None
+
+
+def _ja_conversaram(
+    contexto: Contexto, request: Request, pedido: Pedido, usuario: Usuario, alvo: str
+) -> bool:
+    """O profissional puxou conversa (tirar dúvida) antes de orçar: o cliente precisa conseguir ler
+    e responder, senão a conversa aparece na lista e não abre."""
+    try:
+        _, mensagens = servicos_de_notificacao(request, contexto)
+        return any(
+            c.pedido_id == pedido.id and c.outra_parte_id == alvo
+            for c in mensagens.conversas(usuario.id)
+        )
+    except Exception:  # noqa: BLE001 - sem o atalho, vale a regra antiga (404)
+        return False
+
+
+def _profissional_da_conversa(
+    contexto: Contexto,
+    request: Request,
+    pedido: Pedido,
+    usuario: Usuario,
+    profissional_id: str | None,
+) -> str:
+    if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.cliente_id != usuario.id:
+        return usuario.id
+    alvo = profissional_id or pedido.profissional_id
+    if alvo is None:
+        alvo = _profissional_mais_recente(contexto, request, pedido, usuario)
+    if alvo is None:
+        raise HTTPException(422, "Diga com qual profissional você quer conversar.")
+    orcou = any(o.profissional_id == alvo for o in contexto.orcamentos.do_pedido(pedido.id))
+    if (
+        alvo != pedido.profissional_id
+        and not orcou
+        and not _ja_conversaram(contexto, request, pedido, usuario, alvo)
+    ):
+        raise HTTPException(404, "Esse profissional não está neste pedido.")
+    return alvo
+
+
 def _conversa_do_pedido(
-    contexto: Contexto, pedido: Pedido, usuario: Usuario, profissional_id: str | None
+    contexto: Contexto,
+    pedido: Pedido,
+    usuario: Usuario,
+    profissional_id: str | None,
+    request: Request,
 ) -> str:
     """Abre (ou acha) a conversa do pedido com UM profissional."""
-    if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.cliente_id != usuario.id:
-        alvo = usuario.id
-    else:
-        alvo = profissional_id or pedido.profissional_id
-        if alvo is None:
-            raise HTTPException(422, "Diga com qual profissional você quer conversar.")
-        orcou = any(o.profissional_id == alvo for o in contexto.orcamentos.do_pedido(pedido.id))
-        if alvo != pedido.profissional_id and not orcou:
-            raise HTTPException(404, "Esse profissional não está neste pedido.")
+    alvo = _profissional_da_conversa(contexto, request, pedido, usuario, profissional_id)
     return contexto.conversas.abrir(pedido.id, alvo)
 
 
@@ -642,7 +708,14 @@ def listar_mensagens(
         com_disputa=True,
     )
     _exigir_profissional_do_pedido(contexto, pedido, usuario)
-    conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
+    conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id, request)
+    if usuario.papel is not PapelUsuario.EQUIPE:
+        # Quem abre (ou atualiza) a conversa leu o que a outra parte mandou.
+        try:
+            servico, mensagens = servicos_de_notificacao(request, contexto)
+            mensagens.repo.marcar_conversa_lida(conversa, usuario.id, servico.agora())
+        except Exception:  # noqa: BLE001 - a leitura é secundária; a lista segue
+            log.exception("Não foi possível marcar a conversa como lida")
     return _mensagens_out(contexto, conversa, usuario)
 
 
@@ -670,11 +743,11 @@ def interlocutor(
 ) -> InterlocutorOut:
     pedido = _pedido_visivel(contexto, pedido_id, usuario, request, consulta="chat")
     # Valida o mesmo acesso da conversa (e 404/422 iguais).
-    _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
+    alvo = _profissional_da_conversa(contexto, request, pedido, usuario, profissional_id)
     if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.cliente_id != usuario.id:
         outro, papel = pedido.cliente_id, "cliente"
     else:
-        outro, papel = profissional_id or pedido.profissional_id, "profissional"
+        outro, papel = alvo, "profissional"
     detalhe = contexto.usuarios.detalhe(outro) if outro else None
     nome = (detalhe.nome if detalhe else None) or papel.capitalize()
     partes = nome.split()
@@ -691,14 +764,25 @@ def interlocutor(
 def enviar_mensagem(
     pedido_id: str,
     corpo: EnviarMensagemIn,
+    request: Request,
     profissional_id: Annotated[str | None, Query()] = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> MensagemOut:
     pedido = _pedido_visivel(contexto, pedido_id, usuario)
     _exigir_profissional_do_pedido(contexto, pedido, usuario)
-    conversa = _conversa_do_pedido(contexto, pedido, usuario, profissional_id)
+    alvo = _profissional_da_conversa(contexto, request, pedido, usuario, profissional_id)
+    conversa = contexto.conversas.abrir(pedido.id, alvo)
     nova = contexto.conversas.enviar(conversa, usuario.id, corpo.texto)
+    avisar_mensagem_nova(
+        request,
+        contexto,
+        conversa_id=conversa,
+        pedido_id=pedido.id,
+        autor_id=usuario.id,
+        destinatario_id=pedido.cliente_id if usuario.id == alvo else alvo,
+        mensagem_id=nova,
+    )
     return next(m for m in _mensagens_out(contexto, conversa, usuario) if m.id == nova)
 
 

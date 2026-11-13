@@ -14,7 +14,11 @@ class AgendaTela extends StatelessWidget {
     this.aoFazerCheckIn,
     this.hoje,
     this.atualizarQuando,
+    this.atualizarACada,
   });
+
+  /// Atualiza a agenda sozinha neste intervalo.
+  final Duration? atualizarACada;
 
   final Future<List<Agendamento>> Function() carregar;
 
@@ -33,6 +37,7 @@ class AgendaTela extends StatelessWidget {
       child: CarregadorTela<List<Agendamento>>(
         carregar: carregar,
         atualizarQuando: atualizarQuando,
+        atualizarACada: atualizarACada,
         construir: (context, itens, _) => itens.isEmpty
             ? const EstadoVazio(
                 icone: Icons.calendar_today_outlined,

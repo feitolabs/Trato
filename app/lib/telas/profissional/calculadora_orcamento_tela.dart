@@ -12,7 +12,8 @@ import 'servico_orcamento.dart';
 
 export 'servico_orcamento.dart' show ItemMaterial, OrcamentoPronto;
 
-/// Tela 25: "Seu orçamento". Soma deslocamento + horas x valor + material (só para exibir).
+/// Tela 25: "Seu orçamento". Soma (horas de deslocamento + horas trabalhadas) x valor da hora +
+/// material (só para exibir). O cliente vê o total de horas.
 /// Taxa e líquido NÃO são calculados aqui: vêm de [servico] (regra de dinheiro é do backend).
 class CalculadoraOrcamentoTela extends StatefulWidget {
   const CalculadoraOrcamentoTela({
@@ -66,7 +67,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
 
   static final _formatadoresDeslocamento = [
     FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-    LengthLimitingTextInputFormatter(8),
+    LengthLimitingTextInputFormatter(5),
   ];
   static final _formatadoresHoras = [
     FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
@@ -94,12 +95,16 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   int get _materialCentavos =>
       _materialPorMim ? _itens.fold(0, (soma, item) => soma + item.centavos) : 0;
 
+  /// Horas de deslocamento em décimos de hora (vazio = 0).
+  int get _decimosDeslocamento =>
+      _deslocamento.text.trim().isEmpty ? 0 : (Dinheiro.lerDecimosDeHora(_deslocamento.text) ?? 0);
+
+  int get _decimosTrabalhadas => Dinheiro.lerDecimosDeHora(_horas.text) ?? 0;
+
   int get _total {
-    final desloc =
-        _deslocamento.text.trim().isEmpty ? 0 : (Dinheiro.lerCentavos(_deslocamento.text) ?? 0);
-    final decimos = Dinheiro.lerDecimosDeHora(_horas.text) ?? 0;
     final valorHora = Dinheiro.lerCentavos(_valorHora.text) ?? 0;
-    return desloc + Dinheiro.valorDasHoras(valorHora, decimos) + _materialCentavos;
+    return Dinheiro.valorDasHoras(valorHora, _decimosDeslocamento + _decimosTrabalhadas) +
+        _materialCentavos;
   }
 
   void _mudou() {
@@ -124,12 +129,12 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   String? _erroDeslocamento() {
     final texto = _deslocamento.text.trim();
     if (texto.isEmpty) return null;
-    final centavos = Dinheiro.lerCentavos(texto);
-    if (centavos == null) {
-      return 'Valor de deslocamento inválido. Use só números, como 30 ou 30,50.';
+    final decimos = Dinheiro.lerDecimosDeHora(texto);
+    if (decimos == null) {
+      return 'Horas de deslocamento inválidas. Use só números, como 1 ou 1,5.';
     }
-    if (centavos > Dinheiro.limiteDeslocamentoMaximoCentavos) {
-      return 'Deslocamento máximo permitido é ${Dinheiro.formatar(Dinheiro.limiteDeslocamentoMaximoCentavos)}.';
+    if (decimos > Dinheiro.limiteDecimosDeslocamentoMaximo) {
+      return 'O limite de deslocamento é de ${Dinheiro.limiteDecimosDeslocamentoMaximo ~/ 10} horas.';
     }
     return null;
   }
@@ -137,7 +142,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   String? _erroHoras() {
     final decimos = Dinheiro.lerDecimosDeHora(_horas.text);
     if (decimos == null || decimos <= 0) {
-      return 'Quantidade de horas não informada. Digite as horas, como 3 ou 2,5.';
+      return 'Horas trabalhadas não informadas. Digite as horas, como 3 ou 2,5.';
     }
     if (decimos > Dinheiro.limiteDecimosHorasMaximo) {
       return 'O limite máximo é de ${Dinheiro.limiteDecimosHorasMaximo ~/ 10} horas.';
@@ -184,10 +189,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
         _erroTotal() != null) {
       return;
     }
-    final desloc =
-        _deslocamento.text.trim().isEmpty ? 0 : Dinheiro.lerCentavos(_deslocamento.text)!;
     final pronto = OrcamentoPronto(
-      deslocamentoCentavos: desloc,
+      decimosDeslocamento: _decimosDeslocamento,
       decimosDeHora: Dinheiro.lerDecimosDeHora(_horas.text)!,
       valorHoraCentavos: Dinheiro.lerCentavos(_valorHora.text)!,
       garantiaDias: _garantia,
@@ -242,9 +245,9 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           children: [
             Expanded(
               child: CampoTrato(
-                rotulo: 'Deslocamento',
+                rotulo: 'Horas de deslocamento',
                 controlador: _deslocamento,
-                prefixo: 'R\$ ',
+                sufixo: 'h',
                 teclado: TextInputType.number,
                 formatadores: _formatadoresDeslocamento,
                 aoMudar: (_) => _mudou(),
@@ -254,7 +257,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             const SizedBox(width: EspacosTrato.x4),
             Expanded(
               child: CampoTrato(
-                rotulo: 'Horas',
+                rotulo: 'Horas trabalhadas',
                 controlador: _horas,
                 sufixo: 'h',
                 teclado: TextInputType.number,
@@ -288,6 +291,13 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
               aoMudar: (dias) => setState(() => _garantia = dias),
             )),
           ],
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Text(
+          'Total de horas: ${Dinheiro.formatarHoras(_decimosDeslocamento + _decimosTrabalhadas)} '
+          '(o cliente vê esse total). O deslocamento é cobrado pelo mesmo valor da hora.',
+          key: const ValueKey('total-horas'),
+          style: TipografiaTrato.legenda,
         ),
         if (faixa != null) ...[
           const SizedBox(height: EspacosTrato.x3),
