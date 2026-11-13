@@ -198,6 +198,7 @@ def test_preferencias_efetivas_juntam_padrao_e_escolha(servico):
         "execucao",
         "disputas",
         "avaliacoes",
+        "mensagens",
     }
 
 

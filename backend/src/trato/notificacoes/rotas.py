@@ -73,6 +73,11 @@ class ConversaOut(BaseModel):
     id: str
     pedido_id: str
     outra_parte_id: str
+    outra_parte_nome: str | None = Field(
+        None, description="Primeiro nome e inicial do sobrenome de quem está do outro lado."
+    )
+    titulo_pedido: str | None = None
+    contratado: bool = False
     encerrada: bool
     nao_lidas: int
     ultima_mensagem: str | None
@@ -242,16 +247,33 @@ def remover_dispositivo(
 # --- conversas ------------------------------------------------------------------------------
 
 
+def _nome_curto(contexto: Contexto, usuario_id: str) -> str | None:
+    detalhe = contexto.usuarios.detalhe(usuario_id)
+    partes = (detalhe.nome or "").split() if detalhe else []
+    if not partes:
+        return None
+    return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
+
+
+def _titulo_do_pedido(contexto: Contexto, pedido_id: str) -> str | None:
+    dados = contexto.pedidos.dados_do_pedido(pedido_id)
+    return dados.titulo if dados else None
+
+
 @router.get("/conversas", response_model=list[ConversaOut], summary="Minhas conversas")
 def listar_conversas(
     usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
     mensagens: ServicoMensagens = Depends(_mensagens),
+    contexto: Contexto = Depends(obter_contexto),
 ) -> list[ConversaOut]:
     return [
         ConversaOut(
             id=c.id,
             pedido_id=c.pedido_id,
             outra_parte_id=c.outra_parte_id,
+            outra_parte_nome=_nome_curto(contexto, c.outra_parte_id),
+            titulo_pedido=_titulo_do_pedido(contexto, c.pedido_id),
+            contratado=c.contratado,
             encerrada=c.encerrada,
             nao_lidas=c.nao_lidas,
             ultima_mensagem=c.ultima_texto,

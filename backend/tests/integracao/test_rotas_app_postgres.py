@@ -86,13 +86,17 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     r = post(c, url_msg, "profissional", {"texto": "Posso ir amanhã. Zap 31 99999-8888"})
     assert r.status_code == 201, r.text
     assert r.json()["mascarada"] is True and "99999" not in r.json()["texto"]
-    assert (
-        get(c, url_msg, "cliente").status_code == 422
-    )  # ninguém contratado: escolha o profissional
+    # ninguém contratado e o profissional ainda não orçou, mas ele puxou conversa: o cliente lê e
+    # responde (a conversa aparece na lista, então tem de abrir), com ou sem dizer com quem.
+    assert get(c, url_msg, "cliente").status_code == 200
     assert (
         get(c, url_msg, "cliente", params={"profissional_id": c.ids["profissional"]}).status_code
-        == 404
-    )  # noqa: E501 - ainda não orçou
+        == 200
+    )
+    # quem nunca falou nem orçou continua de fora
+    assert get(
+        c, url_msg, "cliente", params={"profissional_id": "nao-e-deste-pedido"}
+    ).status_code in (404, 422)
 
     # orçamento do profissional via HTTP; o cliente vê (do mais barato ao mais caro) e conversa
     r_orc = post(
