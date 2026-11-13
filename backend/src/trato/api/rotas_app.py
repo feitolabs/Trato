@@ -389,6 +389,58 @@ def listar_orcamentos(
     ]
 
 
+class OrcamentoEnviadoOut(BaseModel):
+    orcamento_id: str
+    pedido_id: str
+    titulo_pedido: str | None
+    versao: int
+    valor_centavos: int
+    enviado_em: datetime | None
+    situacao: Literal["aguardando", "aceito", "encerrado"] = Field(
+        description="`aguardando`: o cliente ainda decide. `aceito`: virou contrato. "
+        "`encerrado`: o cliente escolheu outro orçamento ou o pedido acabou."
+    )
+
+
+@router.get(
+    "/profissional/orcamentos",
+    response_model=list[OrcamentoEnviadoOut],
+    summary="Os orçamentos que eu enviei",
+    description=(
+        "A última versão de cada orçamento do profissional, do mais novo ao mais antigo, com a "
+        "situação (aguardando o cliente, aceito ou encerrado) e o título do pedido."
+    ),
+)
+def meus_orcamentos(
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> list[OrcamentoEnviadoOut]:
+    saida = []
+    for o in contexto.orcamentos.do_profissional(usuario.id):
+        pedido = contexto.pedidos.obter(o.pedido_id)
+        if pedido is None:
+            continue
+        if pedido.orcamento_id == o.id or o.status == "aceito":
+            situacao = "aceito"
+        elif pedido.estado is Estado.ABERTO and o.status == "enviado":
+            situacao = "aguardando"
+        else:
+            situacao = "encerrado"
+        dados = contexto.pedidos.dados_do_pedido(pedido.id)
+        saida.append(
+            OrcamentoEnviadoOut(
+                orcamento_id=o.id,
+                pedido_id=o.pedido_id,
+                titulo_pedido=dados.titulo if dados else None,
+                versao=o.versao,
+                valor_centavos=o.valor_centavos,
+                enviado_em=o.enviado_em,
+                situacao=situacao,
+            )
+        )
+    return saida
+
+
 @router.post(
     "/pedidos/{pedido_id}/orcamentos",
     response_model=CriarOrcamentoOut,

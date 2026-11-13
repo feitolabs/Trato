@@ -29,7 +29,8 @@ import '../cliente/inicio_tela.dart';
 import '../cliente/modelos.dart'
     show CategoriaServico, DadosInicio, Profissional;
 import '../legal/texto_legal_tela.dart';
-import '../mensagens/modelos.dart' show ServicoMensagens;
+import '../mensagens/modelos.dart' show ConversaResumo, ServicoMensagens;
+import '../mensagens/servico_conversas.dart' show ServicoConversasApi;
 import '../mensagens/servico_pedidos.dart';
 import '../orcamentos/modelos.dart' show Orcamento;
 import '../pedido_novo/modelos.dart' show FormularioPedido;
@@ -569,11 +570,18 @@ abstract final class RotasTrato {
               textoVazio:
                   'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
               atualizarACada: _intervalo,
-              aoAbrirConversa: (c) => _abrir<void>(context, _chat(c.pedidoId)),
+              atualizarQuando: pedidosMudaram,
+              aoAbrirConversa: (c) => _abrirConversa(
+                context,
+                c,
+                repos.mensagensProfissional ?? _servicoMensagens,
+                comoProfissional: true,
+              ),
             ),
           ),
           carregarPedidos: repos.profissional.pedidosAbertos,
           recarregarInicio: repos.profissional.inicio,
+          aoAbrirOrcamentoEnviado: (o) => _abrir<void>(context, _chat(o.pedidoId)),
           atualizarACada: _intervalo,
           aoAbrirContratado: (c) => _acoesPedidoProfissional(
             context,
@@ -1060,12 +1068,29 @@ abstract final class RotasTrato {
         builder: (context) => MensagensTela(
           servico: _servicoMensagens,
           atualizarACada: _intervalo,
-          aoAbrirConversa: (conversa) => _abrir<void>(
-            context,
-            _chat(conversa.pedidoId, profissionalId: conversa.profissionalId),
-          ),
+          atualizarQuando: pedidosMudaram,
+          aoAbrirConversa: (conversa) => _abrirConversa(context, conversa, _servicoMensagens),
         ),
       );
+
+  /// Abre o chat e, ao voltar, marca a conversa como lida e atualiza a lista na hora (o contador
+  /// de não lidas não pode ficar parado depois de ler).
+  static Future<void> _abrirConversa(
+    BuildContext context,
+    ConversaResumo conversa,
+    ServicoMensagens servico, {
+    bool comoProfissional = false,
+  }) async {
+    await _abrir<void>(
+      context,
+      _chat(
+        conversa.pedidoId,
+        profissionalId: comoProfissional ? null : conversa.profissionalId,
+      ),
+    );
+    if (servico is ServicoConversasApi) await servico.marcarLida(conversa);
+    pedidosMudaram.value++;
+  }
 
   static Widget _notificacoes({required bool profissional}) => Builder(
         builder: (context) => NotificacoesTela(

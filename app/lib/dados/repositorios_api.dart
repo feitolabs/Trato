@@ -830,6 +830,11 @@ class RepositorioChatApi implements RepositorioChat {
         () async {
           final texto = ((m['texto'] as String?) ?? '').trim();
           final achou = _marcadorFoto.firstMatch(texto);
+          // Foto enviada por versão antiga do app: o texto é o CAMINHO do arquivo no celular de
+          // quem mandou. Em outro aparelho não abre (e mostrar o caminho confunde).
+          if (achou == null && m['minha'] != true && _ehCaminhoLocal(texto)) {
+            return {...m, 'texto': '[Foto indisponível]'};
+          }
           if (achou == null) return m;
           final url = await _urlDaFoto(pedidoId, achou.group(1)!);
           return {...m, 'texto': url ?? '[Foto indisponível]'};
@@ -871,6 +876,9 @@ class RepositorioChatApi implements RepositorioChat {
       corpo: {'texto': texto},
     );
   }
+
+  static bool _ehCaminhoLocal(String texto) =>
+      RegExp(r'^(/|file://)[^\s]+\.(jpe?g|png|webp|heic)$', caseSensitive: false).hasMatch(texto);
 
   static bool _ehArquivoLocal(String referencia) {
     if (referencia.startsWith('[') || referencia.startsWith('http')) return false;
@@ -1101,6 +1109,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     var abertos = <PedidoAberto>[];
     ProximoAtendimento? proximo;
     var contratados = <PedidoContratado>[];
+    var enviados = <OrcamentoEnviado>[];
     var carteira = const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0);
     var deuCerto = false;
     try {
@@ -1157,6 +1166,14 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     } catch (e) {
       primeiroErro ??= e;
     }
+    try {
+      enviados = [
+        for (final j in _lista(await _api.get('/v1/profissional/orcamentos')))
+          if (tentar(() => _orcamentoEnviado(j)) case final o?) o,
+      ];
+    } on Object {
+      // Backend sem a rota (ainda) ou fora do ar: o resto do Início segue.
+    }
     if (!deuCerto && primeiroErro != null) throw primeiroErro!;
     final nomeMe = ((me['nome'] as String?) ?? '').trim();
     final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
@@ -1167,6 +1184,21 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       pedidos: abertos,
       proximo: proximo,
       contratados: contratados,
+      orcamentosEnviados: enviados,
+    );
+  }
+
+  OrcamentoEnviado _orcamentoEnviado(Map<String, dynamic> j) {
+    final pedidoId = j['pedido_id'] as String;
+    final titulo = ((j['titulo_pedido'] as String?) ?? '').trim();
+    final enviado = j['enviado_em'] as String?;
+    return OrcamentoEnviado(
+      pedidoId: pedidoId,
+      titulo: titulo.isEmpty ? 'Pedido ${PedidoApi.numeroDe(pedidoId)}' : titulo,
+      valorCentavos: j['valor_centavos'] as int,
+      versao: (j['versao'] as int?) ?? 1,
+      situacao: (j['situacao'] as String?) ?? 'aguardando',
+      enviadoEm: enviado == null ? null : DateTime.parse(enviado).toLocal(),
     );
   }
 

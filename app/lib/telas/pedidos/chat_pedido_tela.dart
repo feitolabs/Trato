@@ -56,7 +56,8 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   void initState() {
     super.initState();
     if (widget.aoRecarregar != null) {
-      _relogio = Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
+      _relogio =
+          Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
     }
   }
 
@@ -87,7 +88,10 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     setState(() {
       _mensagens.add(
         MensagemChat(
-            tipo: TipoMensagem.texto, texto: conteudo, hora: widget.horaAgora(), minha: true),
+            tipo: TipoMensagem.texto,
+            texto: conteudo,
+            hora: widget.horaAgora(),
+            minha: true),
       );
       _controlador.clear();
     });
@@ -127,24 +131,27 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               child: ConteudoResponsivo(
                 child: ListView(
                   reverse: true,
-                  padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
                   children: [
                     // reverse: a lista começa colada embaixo, perto do campo de envio.
                     for (final m in _mensagens.reversed)
                       _LinhaMensagem(
                         mensagem: m,
-                        aoAceitarContraproposta: widget.aoAceitarContraproposta == null
-                            ? null
-                            : (c) async {
-                                await widget.aoAceitarContraproposta!(c);
-                                await _sincronizar();
-                              },
+                        aoAceitarContraproposta:
+                            widget.aoAceitarContraproposta == null
+                                ? null
+                                : (c) async {
+                                    await widget.aoAceitarContraproposta!(c);
+                                    await _sincronizar();
+                                  },
                       ),
                   ],
                 ),
               ),
             ),
-            _RespostasRapidas(respostas: conversa.respostasRapidas, aoTocar: _enviar),
+            _RespostasRapidas(
+                respostas: conversa.respostasRapidas, aoTocar: _enviar),
             _CampoEnvio(
               controlador: _controlador,
               aoEnviar: _enviar,
@@ -227,13 +234,15 @@ class _AvisoPrivacidade extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.shield_outlined, size: 20, color: CoresTrato.azulTexto),
+            const Icon(Icons.shield_outlined,
+                size: 20, color: CoresTrato.azulTexto),
             const SizedBox(width: EspacosTrato.x3),
             Expanded(
               child: Text(
                 'As mensagens ficam guardadas e servem de prova. '
                 'Antes de contratar, telefones e e-mails ficam ocultos.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                style: TipografiaTrato.corpoPequeno
+                    .copyWith(color: CoresTrato.azulTexto),
               ),
             ),
           ],
@@ -251,7 +260,8 @@ class _LinhaMensagem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final legendaHora = TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
+    final legendaHora =
+        TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
     if (mensagem.tipo == TipoMensagem.sistema) {
       return Padding(
         padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
@@ -260,7 +270,8 @@ class _LinhaMensagem extends StatelessWidget {
             Text(
               mensagem.texto ?? '',
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno
+                  .copyWith(color: CoresTrato.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x1),
             Text(mensagem.hora, style: legendaHora),
@@ -272,7 +283,8 @@ class _LinhaMensagem extends StatelessWidget {
     final minha = mensagem.minha;
     final larguraMaxima = MediaQuery.sizeOf(context).width * 0.72;
     final Widget corpo = mensagem.tipo == TipoMensagem.foto
-        ? EspacoFoto(rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
+        ? EspacoFoto(
+            rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
         : Container(
             padding: const EdgeInsets.symmetric(
               horizontal: EspacosTrato.x4,
@@ -291,7 +303,8 @@ class _LinhaMensagem extends StatelessWidget {
                   Text(
                     'Contraproposta',
                     style: TipografiaTrato.sobretitulo.copyWith(
-                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                      color:
+                          minha ? CoresTrato.creme : CoresTrato.textoSecundario,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x1),
@@ -307,7 +320,8 @@ class _LinhaMensagem extends StatelessWidget {
                     aoAceitarContraproposta != null) ...[
                   const SizedBox(height: EspacosTrato.x3),
                   FilledButton(
-                    onPressed: () => aoAceitarContraproposta!(mensagem.contraproposta!),
+                    onPressed: () =>
+                        aoAceitarContraproposta!(mensagem.contraproposta!),
                     child: const Text('Aceitar e atualizar orçamento'),
                   ),
                 ],
@@ -318,11 +332,39 @@ class _LinhaMensagem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
       child: Column(
-        crossAxisAlignment: minha ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            minha ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          ConstrainedBox(constraints: BoxConstraints(maxWidth: larguraMaxima), child: corpo),
+          ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: larguraMaxima),
+              child: corpo),
           const SizedBox(height: EspacosTrato.x1),
-          Text(mensagem.lida ? '${mensagem.hora} · lida' : mensagem.hora, style: legendaHora),
+          if (!minha)
+            Text(mensagem.hora, style: legendaHora)
+          else
+            // Pinzinho de quem mandou: um = enviada; dois azuis = a outra pessoa já leu.
+            Semantics(
+              label: mensagem.lida
+                  ? 'Enviada às ${mensagem.hora}, visualizada'
+                  : 'Enviada às ${mensagem.hora}',
+              excludeSemantics: true,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(mensagem.hora, style: legendaHora),
+                  const SizedBox(width: EspacosTrato.x1),
+                  Icon(
+                    mensagem.lida ? Icons.done_all : Icons.done,
+                    key: ValueKey(
+                        mensagem.lida ? 'pino-visualizada' : 'pino-enviada'),
+                    size: 16,
+                    color: mensagem.lida
+                        ? CoresTrato.azulTexto
+                        : CoresTrato.textoSecundario,
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -342,7 +384,8 @@ class _RespostasRapidas extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
+        padding:
+            const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
         itemCount: respostas.length,
         separatorBuilder: (_, __) => const SizedBox(width: EspacosTrato.x2),
         itemBuilder: (_, i) => Material(
@@ -353,7 +396,9 @@ class _RespostasRapidas extends StatelessWidget {
             onTap: () => aoTocar(respostas[i]),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-              child: Center(child: Text(respostas[i], style: TipografiaTrato.corpoPequeno)),
+              child: Center(
+                  child:
+                      Text(respostas[i], style: TipografiaTrato.corpoPequeno)),
             ),
           ),
         ),

@@ -42,6 +42,18 @@ class OrcamentoDoPedido:
 
 
 @dataclass(frozen=True)
+class OrcamentoDoProfissional:
+    """Um orçamento (a última versão) que o profissional enviou, para ele acompanhar."""
+
+    id: str
+    pedido_id: str
+    versao: int
+    valor_centavos: int
+    status: str
+    enviado_em: datetime | None
+
+
+@dataclass(frozen=True)
 class ItemDoOrcamento:
     tipo: str
     descricao: str

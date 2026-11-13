@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
+import '../profissional/dinheiro.dart';
 import 'inicio_profissional_tela.dart' show CartaoPedidoAberto;
 import 'modelos.dart';
 
@@ -19,7 +20,13 @@ class PedidosProfissionalTela extends StatefulWidget {
     this.aoAbrirPedido,
     this.contratados = const [],
     this.aoAbrirContratado,
+    this.orcamentosEnviados = const [],
+    this.aoAbrirOrcamentoEnviado,
   });
+
+  /// Os orçamentos que o profissional enviou e a resposta do cliente (aguardando, aceito...).
+  final List<OrcamentoEnviado> orcamentosEnviados;
+  final ValueChanged<OrcamentoEnviado>? aoAbrirOrcamentoEnviado;
 
   final List<PedidoAberto> pedidos;
 
@@ -40,7 +47,7 @@ class PedidosProfissionalTela extends StatefulWidget {
   State<PedidosProfissionalTela> createState() => _PedidosProfissionalTelaState();
 }
 
-enum _Aba { abertos, andamento, conversas }
+enum _Aba { abertos, orcamentos, andamento, conversas }
 
 class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
   var _aba = _Aba.abertos;
@@ -66,6 +73,13 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                     aoTocar: () => setState(() => _aba = _Aba.abertos),
                   ),
                   _Segmento(
+                    texto: widget.orcamentosEnviados.isEmpty
+                        ? 'Orçamentos'
+                        : 'Orçamentos (${widget.orcamentosEnviados.length})',
+                    ativo: _aba == _Aba.orcamentos,
+                    aoTocar: () => setState(() => _aba = _Aba.orcamentos),
+                  ),
+                  _Segmento(
                     texto: widget.contratados.isEmpty
                         ? 'Em andamento'
                         : 'Em andamento (${widget.contratados.length})',
@@ -83,6 +97,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
               Expanded(
                 child: switch (_aba) {
                   _Aba.conversas => widget.conversas,
+                  _Aba.orcamentos => _orcamentos(),
                   _Aba.andamento => _andamento(),
                   _Aba.abertos => _abertos(),
                 },
@@ -91,6 +106,47 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _orcamentos() {
+    if (widget.orcamentosEnviados.isEmpty) {
+      return const EstadoVazio(
+        icone: Icons.request_quote_outlined,
+        titulo: 'Nenhum orçamento enviado',
+        texto: 'Os orçamentos que você enviar aparecem aqui, com a resposta do cliente.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+      itemCount: widget.orcamentosEnviados.length,
+      separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+      itemBuilder: (_, i) {
+        final o = widget.orcamentosEnviados[i];
+        final (rotulo, tipo) = switch (o.situacao) {
+          'aceito' => ('Aceito pelo cliente', TipoStatus.sucesso),
+          'aguardando' => ('Aguardando o cliente', TipoStatus.info),
+          _ => ('Encerrado (o cliente escolheu outro ou o pedido acabou)', TipoStatus.alerta),
+        };
+        return CartaoTrato(
+          aoTocar: widget.aoAbrirOrcamentoEnviado == null
+              ? null
+              : () => widget.aoAbrirOrcamentoEnviado!(o),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(o.titulo, style: TipografiaTrato.tituloCartao),
+              const SizedBox(height: EspacosTrato.x1),
+              Text(
+                '${Dinheiro.formatar(o.valorCentavos)}${o.versao > 1 ? ' · versão ${o.versao}' : ''}',
+                style: TipografiaTrato.corpoForte,
+              ),
+              const SizedBox(height: EspacosTrato.x2),
+              ChipStatus(texto: rotulo, tipo: tipo),
+            ],
+          ),
+        );
+      },
     );
   }
 
