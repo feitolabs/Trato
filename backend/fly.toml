@@ -1,7 +1,7 @@
 # Fly.io — backend do Trato. Rode `fly ...` dentro de backend/.
 # O nome do app é único no Fly inteiro: se "trato-backend" já existir, troque aqui.
 # SEGREDOS NÃO FICAM AQUI. Use `fly secrets set` (ver docs/hospedagem-fly-io.md).
-app = "trato-backend"
+app = "trato"
 primary_region = "gru" # São Paulo, mesma região do Supabase (sa-east-1)
 
 [build]

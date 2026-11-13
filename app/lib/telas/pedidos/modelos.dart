@@ -105,11 +105,15 @@ class MensagemChat {
     this.texto,
     this.minha = false,
     this.lida = false,
+    this.recebida = false,
     this.contraproposta,
   });
 
   /// Preenchida quando a mensagem é uma contraproposta de valor.
   final ContrapropostaChat? contraproposta;
+
+  /// Chegou ao aparelho de quem recebeu (✓✓ cinza). Mensagem lida conta como recebida.
+  final bool recebida;
 
   final TipoMensagem tipo;
   final String hora;

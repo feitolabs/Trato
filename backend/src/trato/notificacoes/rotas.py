@@ -6,6 +6,7 @@ registrado ANTES, então vale o daqui (mesmo formato de resposta, mais `canal`/`
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Annotated
 
@@ -275,8 +276,14 @@ def listar_conversas(
     ] = None,
     usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
     mensagens: ServicoMensagens = Depends(_mensagens),
+    servico: ServicoNotificacoes = Depends(_servico),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[ConversaOut]:
+    # O aparelho de quem recebe buscou a lista: o que a outra parte mandou "chegou" (recebido).
+    try:
+        mensagens.repo.marcar_entregues(usuario.id, servico.agora())
+    except Exception:  # noqa: BLE001 - o selo de recebido é secundário; a lista segue
+        logging.getLogger("trato.api").exception("Não foi possível marcar como recebidas")
     return [
         ConversaOut(
             id=c.id,

@@ -120,6 +120,46 @@ void main() {
   });
 
   group('Chat do pedido', () {
+    testWidgets('pinzinho: enviada, recebida e visualizada', (tester) async {
+      await _abrir(
+        tester,
+        ChatPedidoTela(
+          conversa: ConversaPedido(
+            nome: 'Ana S.',
+            iniciais: 'AS',
+            numeroPedido: '#AAAA',
+            situacao: 'Pedido aberto',
+            respostasRapidas: const [],
+            mensagens: const [
+              MensagemChat(tipo: TipoMensagem.texto, texto: 'um', hora: '10:00', minha: true),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'dois',
+                hora: '10:01',
+                minha: true,
+                recebida: true,
+              ),
+              MensagemChat(
+                tipo: TipoMensagem.texto,
+                texto: 'tres',
+                hora: '10:02',
+                minha: true,
+                recebida: true,
+                lida: true,
+              ),
+              MensagemChat(tipo: TipoMensagem.texto, texto: 'dela', hora: '10:03'),
+            ],
+          ),
+        ),
+      );
+      expect(find.byKey(const ValueKey('pino-enviada')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pino-recebida')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pino-visualizada')), findsOneWidget);
+      // O pinzinho é só de quem mandou: a mensagem da outra pessoa não tem.
+      expect(find.byIcon(Icons.done), findsOneWidget);
+      expect(find.byIcon(Icons.done_all), findsNWidgets(2));
+    });
+
     testWidgets('mostra o aviso, a mensagem de sistema e as bolhas', (tester) async {
       await _abrir(tester, const ChatPedidoTela(conversa: exped.DadosExemplo.conversa, ));
       expect(find.textContaining('telefones e e-mails ficam ocultos'), findsOneWidget);
