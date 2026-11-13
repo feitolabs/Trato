@@ -522,6 +522,7 @@ class ApiFake implements ApiAdmin {
     int? garantiaDias,
     int ordem = 0,
     bool ativa = true,
+    bool aceitaRemoto = false,
     required String motivo,
   }) async {
     await Future<void>.delayed(atraso);
@@ -534,6 +535,7 @@ class ApiFake implements ApiAdmin {
       ordem: ordem,
       ativa: ativa,
       profissionais: 0,
+      aceitaRemoto: aceitaRemoto,
     );
     _categorias = [..._categorias, cat];
     _registrar('categoria.criada', 'categoria:${cat.id}', motivo);
@@ -549,6 +551,7 @@ class ApiFake implements ApiAdmin {
     int? garantiaDias,
     int? ordem,
     bool? ativa,
+    bool? aceitaRemoto,
     required String motivo,
   }) async {
     await Future<void>.delayed(atraso);
@@ -565,6 +568,7 @@ class ApiFake implements ApiAdmin {
             ordem: ordem ?? c.ordem,
             ativa: ativa ?? c.ativa,
             profissionais: c.profissionais,
+            aceitaRemoto: aceitaRemoto ?? c.aceitaRemoto,
           )
         else
           c,

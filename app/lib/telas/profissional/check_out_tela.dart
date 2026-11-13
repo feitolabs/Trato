@@ -20,7 +20,11 @@ class CheckOutTela extends StatefulWidget {
     required this.tituloBarra,
     this.aoConcluir,
     this.permissao,
+    this.remoto = false,
   });
+
+  /// Serviço remoto: sem foto final; só o código de conclusão.
+  final bool remoto;
 
   final ServicoCheckOut servico;
   final String tituloBarra;
@@ -49,13 +53,15 @@ class _CheckOutTelaState extends State<CheckOutTela> {
     super.dispose();
   }
 
-  bool get _podeConcluir => _foto != null && _codigo.text.length == 4;
+  bool get _podeConcluir =>
+      _codigo.text.length == 4 && (widget.remoto || _foto != null);
 
   Future<void> _tirarFoto() async {
     setState(() => _erro = null);
     final p = widget.permissao;
     if (p != null &&
-        !await garantirPermissao(context, p, TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {
+        !await garantirPermissao(
+            context, p, TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {
       return;
     }
     try {
@@ -91,7 +97,8 @@ class _CheckOutTelaState extends State<CheckOutTela> {
         _erroCodigo = 'Código incorreto. Peça de novo ao cliente.';
       }
       if (r == ResultadoFim.guardadoOffline) {
-        _aviso = 'Sem internet. Guardamos a conclusão e enviamos assim que o sinal voltar. '
+        _aviso =
+            'Sem internet. Guardamos a conclusão e enviamos assim que o sinal voltar. '
             'O Trato ainda vai confirmar.';
       }
     });
@@ -111,27 +118,37 @@ class _CheckOutTelaState extends State<CheckOutTela> {
       children: [
         Text('Check-out', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
-        Text('Foto final e código de conclusão.', style: TipografiaTrato.corpo),
-        const SizedBox(height: EspacosTrato.x5),
-        CartaoTrato(
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Foto final', style: TipografiaTrato.tituloCartao),
-                    Text(foto?.hora ?? 'Mostre o serviço pronto', style: TipografiaTrato.legenda),
-                  ],
-                ),
-              ),
-              foto != null
-                  ? const ChipStatus(texto: 'Feito', tipo: TipoStatus.sucesso, icone: Icons.check)
-                  : BotaoLink(texto: 'Tirar foto', aoTocar: _tirarFoto),
-            ],
-          ),
+        Text(
+          widget.remoto
+              ? 'Atendimento remoto: digite o código de conclusão que o cliente informar.'
+              : 'Foto final e código de conclusão.',
+          style: TipografiaTrato.corpo,
         ),
-        const SizedBox(height: EspacosTrato.x3),
+        const SizedBox(height: EspacosTrato.x5),
+        if (!widget.remoto)
+          CartaoTrato(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Foto final', style: TipografiaTrato.tituloCartao),
+                      Text(foto?.hora ?? 'Mostre o serviço pronto',
+                          style: TipografiaTrato.legenda),
+                    ],
+                  ),
+                ),
+                foto != null
+                    ? const ChipStatus(
+                        texto: 'Feito',
+                        tipo: TipoStatus.sucesso,
+                        icone: Icons.check)
+                    : BotaoLink(texto: 'Tirar foto', aoTocar: _tirarFoto),
+              ],
+            ),
+          ),
+        if (!widget.remoto) const SizedBox(height: EspacosTrato.x3),
         TextField(
           controller: _codigo,
           keyboardType: TextInputType.number,
@@ -149,7 +166,10 @@ class _CheckOutTelaState extends State<CheckOutTela> {
         ),
         if (_erro != null) ...[
           const SizedBox(height: EspacosTrato.x3),
-          AvisoFaixa(texto: _erro!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
+          AvisoFaixa(
+              texto: _erro!,
+              tipo: TipoStatus.perigo,
+              icone: Icons.error_outline),
         ],
         if (_aviso != null) ...[
           const SizedBox(height: EspacosTrato.x3),

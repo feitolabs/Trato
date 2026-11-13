@@ -34,7 +34,13 @@ class DadosCadastroProfissional {
     required this.dias,
     required this.periodos,
     required this.portfolio,
+    this.atendePresencial = true,
+    this.atendeRemoto = false,
   });
+
+  /// Atende no local do cliente (padrão) e/ou à distância. Pelo menos um dos dois.
+  final bool atendePresencial;
+  final bool atendeRemoto;
 
   final String nome;
   final String sobre;

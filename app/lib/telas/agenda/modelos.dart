@@ -21,7 +21,15 @@ class Agendamento {
     required this.local,
     this.estado = EstadoAgendamento.agendado,
     this.cliente,
+    this.remoto = false,
+    this.consultaMapa,
   });
+
+  /// Serviço remoto: o check-in não pede foto nem localização.
+  final bool remoto;
+
+  /// Endereço para abrir no mapa (presencial).
+  final String? consultaMapa;
 
   final String id;
   final String pedidoId;

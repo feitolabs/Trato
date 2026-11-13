@@ -99,6 +99,10 @@ class _FormularioState extends State<_Formulario> {
   late int _raio = widget.opcoes.raiosKm.contains(_atual?.raioKm)
       ? _atual!.raioKm
       : (widget.opcoes.raiosKm.isEmpty ? 0 : widget.opcoes.raiosKm.first);
+  late final _modalidades = <String>{
+    if (_atual?.atendePresencial ?? true) 'Presencial',
+    if (_atual?.atendeRemoto ?? false) 'Remoto',
+  };
   bool _tentou = false;
   bool _enviando = false;
   String? _erroEnvio;
@@ -131,6 +135,7 @@ class _FormularioState extends State<_Formulario> {
       _erroNome == null &&
       _erroCidade == null &&
       _categorias.isNotEmpty &&
+      _modalidades.isNotEmpty &&
       _dias.isNotEmpty &&
       _periodos.isNotEmpty;
 
@@ -171,6 +176,8 @@ class _FormularioState extends State<_Formulario> {
         dias: {..._dias},
         periodos: {..._periodos},
         portfolio: [..._portfolio],
+        atendePresencial: _modalidades.contains('Presencial'),
+        atendeRemoto: _modalidades.contains('Remoto'),
       ));
       if (!mounted) return;
       setState(() => _enviando = false);
@@ -249,6 +256,19 @@ class _FormularioState extends State<_Formulario> {
         ),
         if (_tentou && _categorias.isEmpty)
           _erro('Nenhuma categoria selecionada. Escolha pelo menos uma área de atuação.'),
+        const TituloSecao(
+          'Como você atende',
+          ajuda: 'Presencial: você vai até o cliente (só pedidos da sua cidade). Remoto: atende '
+              'à distância, de qualquer cidade, nas categorias em que o Trato liberou o remoto. '
+              'Pode marcar os dois.',
+        ),
+        OpcoesPilula(
+          opcoes: const ['Presencial', 'Remoto'],
+          selecionadas: _modalidades,
+          aoAlternar: (v) => _alternar(_modalidades, v),
+        ),
+        if (_tentou && _modalidades.isEmpty)
+          _erro('Escolha atender presencial, remoto ou os dois.'),
         const TituloSecao('Área atendida'),
         Text('Cidade', style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x2),

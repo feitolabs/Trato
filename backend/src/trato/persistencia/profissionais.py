@@ -34,7 +34,7 @@ class CatalogoPostgres:
     def categorias_publicas(self) -> list[CategoriaPublica]:
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select id, nome, slug, icone, pai_id from public.categorias "
+                "select id, nome, slug, icone, pai_id, aceita_remoto from public.categorias "
                 "where ativa order by ordem, nome, id"
             ).fetchall()
         return [
@@ -44,6 +44,7 @@ class CatalogoPostgres:
                 l["slug"],
                 l["icone"],
                 str(l["pai_id"]) if l["pai_id"] else None,
+                bool(l["aceita_remoto"]),
             )  # fmt: skip
             for l in linhas  # noqa: E741
         ]
@@ -73,7 +74,8 @@ class ProfissionaisPostgres:
         with self._banco.transacao() as con:
             p = con.execute(
                 "select usuario_id, status, nivel_verificacao, bio, disponibilidade, portfolio, "
-                "criado_em from public.perfis_profissional where usuario_id = %s",
+                "criado_em, atende_presencial, atende_remoto "
+                "from public.perfis_profissional where usuario_id = %s",
                 (achado,),
             ).fetchone()
             if p is None:
@@ -103,6 +105,8 @@ class ProfissionaisPostgres:
             ),
             criado_em=p["criado_em"],
             nivel_verificacao=p["nivel_verificacao"],
+            atende_presencial=bool(p["atende_presencial"]),
+            atende_remoto=bool(p["atende_remoto"]),
         )
 
     def salvar(self, perfil: PerfilProfissional) -> None:
@@ -138,11 +142,15 @@ class ProfissionaisPostgres:
             # Status e nível só a equipe muda: o conflito não os toca.
             con.execute(
                 "insert into public.perfis_profissional (usuario_id, status, nivel_verificacao, "
-                "bio, disponibilidade, portfolio) values (%s, %s, %s, %s, %s, %s) "
+                "bio, disponibilidade, portfolio, atende_presencial, atende_remoto) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s) "
                 "on conflict (usuario_id) do update set bio = excluded.bio, "
-                "disponibilidade = excluded.disponibilidade, portfolio = excluded.portfolio",
+                "disponibilidade = excluded.disponibilidade, portfolio = excluded.portfolio, "
+                "atende_presencial = excluded.atende_presencial, "
+                "atende_remoto = excluded.atende_remoto",
                 (usuario, perfil.status, perfil.nivel_verificacao, perfil.bio,
-                 Jsonb(para_json(disponibilidade)), Jsonb(para_json(portfolio))),
+                 Jsonb(para_json(disponibilidade)), Jsonb(para_json(portfolio)),
+                 perfil.atende_presencial, perfil.atende_remoto),
             )  # fmt: skip
             con.execute(
                 "delete from public.profissional_categorias "

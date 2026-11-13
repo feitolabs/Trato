@@ -91,6 +91,7 @@ abstract interface class ApiAdmin {
     int? garantiaDias,
     int ordem = 0,
     bool ativa = true,
+    bool aceitaRemoto = false,
     required String motivo,
   });
   Future<CategoriaAdmin> editarCategoria(
@@ -101,6 +102,7 @@ abstract interface class ApiAdmin {
     int? garantiaDias,
     int? ordem,
     bool? ativa,
+    bool? aceitaRemoto,
     required String motivo,
   });
   Future<void> alterarCategoria(String id, {required bool ativa, required String motivo});

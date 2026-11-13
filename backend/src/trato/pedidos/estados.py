@@ -184,15 +184,15 @@ class ProvaRemarcacao:
 
 @dataclass(frozen=True)
 class ProvaCheckIn:
-    foto: Foto
-    localizacao: Localizacao
-    codigo_inicio: str
+    foto: Foto | None = None  # obrigatória no presencial
+    localizacao: Localizacao | None = None  # obrigatória no presencial
+    codigo_inicio: str = ""  # sempre conferido: vazio nunca bate com o código
 
 
 @dataclass(frozen=True)
 class ProvaCheckOut:
-    foto_final: Foto
-    codigo_conclusao: str
+    foto_final: Foto | None = None  # obrigatória no presencial
+    codigo_conclusao: str = ""
 
 
 @dataclass(frozen=True)
@@ -261,6 +261,9 @@ class Pedido:
     check_out_em: datetime | None = None
     concluido_em: datetime | None = None
     estado_antes_da_disputa: Estado | None = None
+    # Serviço remoto: sem foto nem localização no início e no fim (o código e a confirmação do
+    # cliente seguem valendo).
+    remoto: bool = False
 
 
 @dataclass(frozen=True)
@@ -562,8 +565,11 @@ def _remarcar(pedido, ator, agora, prova: ProvaRemarcacao, prazos, gerar):
 
 
 def _fazer_check_in(pedido, ator, agora, prova: ProvaCheckIn, prazos, gerar):
-    _exigir_foto(prova.foto, agora, "foto do check-in")
-    _exigir_localizacao(prova.localizacao)
+    if not pedido.remoto:
+        if prova.foto is None or prova.localizacao is None:
+            raise ProvaInvalida("O check-in precisa de foto e localização.")
+        _exigir_foto(prova.foto, agora, "foto do check-in")
+        _exigir_localizacao(prova.localizacao)
     _exigir_codigo(prova.codigo_inicio, pedido.codigo_inicio, "início")
     return replace(pedido, estado=Estado.EM_ANDAMENTO, check_in_em=agora, codigo_conclusao=gerar())
 
@@ -576,7 +582,10 @@ def _registrar_ausencia(pedido, ator, agora, prova, prazos, gerar):
 
 
 def _fazer_check_out(pedido, ator, agora, prova: ProvaCheckOut, prazos, gerar):
-    _exigir_foto(prova.foto_final, agora, "foto final")
+    if not pedido.remoto:
+        if prova.foto_final is None:
+            raise ProvaInvalida("O check-out precisa da foto final.")
+        _exigir_foto(prova.foto_final, agora, "foto final")
     _exigir_codigo(prova.codigo_conclusao, pedido.codigo_conclusao, "conclusão")
     return replace(pedido, estado=Estado.EM_CONFIRMACAO, check_out_em=agora)
 

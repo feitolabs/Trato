@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/componentes/componentes.dart';
+import '../apoio/endereco_pedido.dart';
 import 'package:trato/dados/carregador.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
@@ -168,6 +169,7 @@ void main() {
       await tester.tap(find.text('Elétrica'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'Trocar duas tomadas da cozinha');
+      await preencherEnderecoDoPedido(tester);
       final enviar = find.text('Próximo');
       await tester.ensureVisible(enviar.last);
       await tester.tap(enviar.last);

@@ -34,6 +34,7 @@ class ResponderAditivoTela extends StatelessWidget {
       construir: (context, d) => _Corpo(
         detalhe: d!,
         servico: servico,
+        aditivoId: aditivoId,
         aoResponder: aoResponder,
       ),
     );
@@ -41,8 +42,16 @@ class ResponderAditivoTela extends StatelessWidget {
 }
 
 class _Corpo extends StatefulWidget {
-  const _Corpo({required this.detalhe, required this.servico, required this.aoResponder});
+  const _Corpo({
+    required this.detalhe,
+    required this.servico,
+    required this.aditivoId,
+    required this.aoResponder,
+  });
 
+  /// O mesmo id com que a tela carregou o aditivo (o do pedido/contrato). `detalhe.id` é o do
+  /// próprio aditivo, que o servidor não aceita no lugar do contrato.
+  final String aditivoId;
   final DetalheAditivo detalhe;
   final ServicoAditivo servico;
   final ValueChanged<bool>? aoResponder;
@@ -76,7 +85,7 @@ class _CorpoState extends State<_Corpo> {
       _erro = null;
     });
     try {
-      await widget.servico.responder(widget.detalhe.id, aprovar: aprovar);
+      await widget.servico.responder(widget.aditivoId, aprovar: aprovar);
       if (!mounted) return;
       setState(() {
         _enviando = null;
@@ -122,7 +131,8 @@ class _CorpoState extends State<_Corpo> {
         Text('Cobrança extra', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
         Text(
-          '${d.profissional} pediu um valor a mais em "${d.pedidoTitulo}".',
+          '${d.profissional.isEmpty ? 'O profissional' : d.profissional} pediu um valor a mais em '
+          '"${d.pedidoTitulo}".',
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),

@@ -31,17 +31,23 @@ def _foto_do_servidor(
 def validar_prova_midia(
     servico: ServicoUploads, pedido: Pedido, usuario_id: str, acao: Acao, prova: object
 ) -> object:
-    if acao is Acao.FAZER_CHECK_IN and isinstance(prova, ProvaCheckIn):
+    if pedido.remoto and acao in (Acao.FAZER_CHECK_IN, Acao.FAZER_CHECK_OUT):
+        return prova  # serviço remoto: sem foto nem distância; vale o código do cliente
+    if acao is Acao.FAZER_CHECK_IN and isinstance(prova, ProvaCheckIn) and prova.foto is not None:
         foto = _foto_do_servidor(servico, prova.foto, pedido, usuario_id, "checkin")
         alvo = servico.local_do_pedido(pedido.id)
-        if alvo is not None:
+        if alvo is not None and prova.localizacao is not None:
             metros = distancia_metros(
                 prova.localizacao.latitude, prova.localizacao.longitude, alvo[0], alvo[1]
             )
             if metros > servico.config.checkin_distancia_max_m:
                 raise ProvaInvalida("Você parece estar longe do local do serviço.")
         return replace(prova, foto=foto)
-    if acao is Acao.FAZER_CHECK_OUT and isinstance(prova, ProvaCheckOut):
+    if (
+        acao is Acao.FAZER_CHECK_OUT
+        and isinstance(prova, ProvaCheckOut)
+        and prova.foto_final is not None
+    ):
         foto = _foto_do_servidor(servico, prova.foto_final, pedido, usuario_id, "checkout")
         return replace(prova, foto_final=foto)
     return prova

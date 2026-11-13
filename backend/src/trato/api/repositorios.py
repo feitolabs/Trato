@@ -114,6 +114,7 @@ class DadosPedido:
     urgente: bool = False
     respostas: tuple[RespostaPedido, ...] = ()
     endereco: EnderecoPedido | None = None
+    modalidade: str = "presencial"  # presencial | remoto
 
 
 @dataclass(frozen=True)
@@ -161,6 +162,9 @@ class ProvedorConfig(Protocol):
 
 
 class RepositorioPedidos(Protocol):
+    def categoria_aceita_remoto(self, categoria_id: str) -> bool:
+        """O admin liberou o serviço remoto nesta categoria?"""
+
     def obter(self, pedido_id: str) -> Pedido | None: ...
 
     def salvar(

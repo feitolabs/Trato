@@ -10,6 +10,12 @@ CORPO = {
     "titulo": "Pintar sala",
     "descricao": "Pintar a sala de 20 m2",
     "faixa_preco_max_centavos": 50000,
+    "endereco": {
+        "logradouro": "Rua das Flores",
+        "numero": "10",
+        "bairro": "Centro",
+        "cep": "35500-000",
+    },
 }
 
 

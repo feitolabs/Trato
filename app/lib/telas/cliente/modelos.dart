@@ -110,7 +110,12 @@ class CategoriaServico {
     this.id = '',
     this.servicos = const [],
     this.descricao = '',
+    this.aceitaRemoto = false,
   });
+
+  /// O admin liberou o atendimento remoto nesta categoria (o cliente escolhe presencial ou
+  /// remoto). Padrão: só presencial, com endereço obrigatório.
+  final bool aceitaRemoto;
 
   /// Id da categoria no catálogo (vazio nos dados do protótipo).
   final String id;

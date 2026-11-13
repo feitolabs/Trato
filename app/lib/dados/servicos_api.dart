@@ -55,10 +55,22 @@ class ServicoAditivoApi implements ServicoAditivo {
   Future<DetalheAditivo?> carregar(String aditivoId) async {
     final a = await _aberto(aditivoId);
     if (a == null) return null;
+    // Quem pediu e qual pedido: sem rede para isso, o texto cai no genérico.
+    var nome = nomeProfissional;
+    if (nome.isEmpty) {
+      try {
+        final o = await _api.get('/v1/pedidos/$aditivoId/interlocutor');
+        final n = (o is Map ? o['nome'] as String? : null)?.trim();
+        if (n != null && n.isNotEmpty) nome = n;
+      } on Object {
+        nome = '';
+      }
+    }
+    final curto = aditivoId.length >= 4 ? aditivoId.substring(0, 4).toUpperCase() : aditivoId;
     return DetalheAditivo(
       id: a['id'] as String,
-      pedidoTitulo: tituloPedido,
-      profissional: nomeProfissional,
+      pedidoTitulo: tituloPedido == 'Pedido' ? 'Pedido #$curto' : tituloPedido,
+      profissional: nome,
       motivo: a['descricao'] as String,
       valorCentavos: a['valor_centavos'] as int,
     );
@@ -75,7 +87,8 @@ class ServicoAditivoApi implements ServicoAditivo {
     final acao = aprovar ? 'aprovar' : 'recusar';
     await _api.post(
       '/v1/contratos/$aditivoId/aditivos/${a['id']}/$acao',
-      corpo: aprovar ? {'meio': 'pix'} : null,
+      // Cartão: é o meio que o Stripe da conta já aceita (o Pix ainda não está liberado).
+      corpo: aprovar ? {'meio': 'cartao'} : null,
     );
   }
 }
@@ -364,6 +377,8 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
         for (final item in _lista(p['portfolio'] ?? const []))
           if (item['descricao'] case final String ref when ref.isNotEmpty) ref,
       ],
+      atendePresencial: p['atende_presencial'] as bool? ?? true,
+      atendeRemoto: p['atende_remoto'] as bool? ?? false,
     );
   }
 
@@ -482,6 +497,8 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       'disponibilidade': disponibilidade,
       'bio': dados.sobre.trim(),
       'portfolio': portfolio,
+      'atende_presencial': dados.atendePresencial,
+      'atende_remoto': dados.atendeRemoto,
     };
     try {
       await _api.post('/v1/profissional/cadastro', corpo: corpo);

@@ -352,6 +352,38 @@ void main() {
       expect(chamados, isEmpty);
     });
 
+    test('categoria: aceita_remoto vem da lista e vai no criar e no editar', () async {
+      s.respostas['GET /v1/admin/categorias'] = (
+        200,
+        [
+          {'id': 'c1', 'nome': 'Eletricista', 'ativa': true, 'profissionais': 3},
+          {'id': 'c2', 'nome': 'Design', 'ativa': true, 'profissionais': 1, 'aceita_remoto': true},
+        ],
+      );
+      final cats = await api.listarCategorias();
+      expect(cats.map((c) => c.aceitaRemoto), [false, true]); // padrão: só presencial
+
+      s.respostas['POST /v1/admin/categorias'] = (
+        201,
+        {'id': 'c3', 'nome': 'Arquitetura', 'slug': 'arquitetura', 'ativa': true, 'aceita_remoto': true},
+      );
+      final criada = await api.criarCategoria(
+        nome: 'Arquitetura',
+        aceitaRemoto: true,
+        motivo: 'serviço feito à distância',
+      );
+      expect(criada.aceitaRemoto, isTrue);
+      expect(jsonDecode(s.chamada('POST', '/v1/admin/categorias').body)['aceita_remoto'], true);
+
+      s.respostas['PUT /v1/admin/categorias/c2'] = (
+        200,
+        {'id': 'c2', 'nome': 'Design', 'slug': 'design', 'ativa': true, 'aceita_remoto': false},
+      );
+      final editada = await api.editarCategoria('c2', aceitaRemoto: false, motivo: 'só presencial');
+      expect(editada.aceitaRemoto, isFalse);
+      expect(jsonDecode(s.chamada('PUT', '/v1/admin/categorias/c2').body)['aceita_remoto'], false);
+    });
+
     test('configuração: carrega, propõe (criar + enviar), aprova (aprovar + publicar)', () async {
       s.respostas['GET /v1/admin/config/definicoes'] = (
         200,

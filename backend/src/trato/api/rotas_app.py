@@ -198,6 +198,7 @@ class PedidoAbertoOut(BaseModel):
     cliente_nome: str | None = Field(
         default=None, description="Primeiro nome e inicial do sobrenome (nunca dado de contato)."
     )
+    modalidade: str = Field("presencial", description="`presencial` ou `remoto`.")
 
 
 class ResumoOrcamentoOut(BaseModel):

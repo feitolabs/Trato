@@ -308,6 +308,10 @@ class CartaoPedidoAberto extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: Text(pedido.titulo, style: TipografiaTrato.tituloCartao)),
+                  if (pedido.remoto) ...[
+                    const SizedBox(width: EspacosTrato.x2),
+                    const ChipStatus(texto: 'Remoto', tipo: TipoStatus.info),
+                  ],
                   if (pedido.urgente) ...[
                     const SizedBox(width: EspacosTrato.x2),
                     const ChipStatus(texto: 'Urgente', tipo: TipoStatus.destaque),
@@ -317,8 +321,12 @@ class CartaoPedidoAberto extends StatelessWidget {
               const SizedBox(height: EspacosTrato.x2),
               Text(
                 [
-                  if (pedido.bairro.isNotEmpty) pedido.bairro,
-                  textoDistancia(pedido.distanciaKm),
+                  if (pedido.remoto)
+                    'Atendimento remoto'
+                  else ...[
+                    if (pedido.bairro.isNotEmpty) pedido.bairro,
+                    textoDistancia(pedido.distanciaKm),
+                  ],
                   pedido.prazo,
                 ].join(' · '),
                 style: secundario,

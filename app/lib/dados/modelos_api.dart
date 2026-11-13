@@ -21,9 +21,16 @@ class PedidoApi {
     required this.codigoConclusao,
     this.janelaInicio,
     this.janelaFim,
+    this.modalidade = 'presencial',
   });
 
+  /// `presencial` ou `remoto`.
+  final String modalidade;
+
+  bool get remoto => modalidade == 'remoto';
+
   factory PedidoApi.deJson(Map<String, dynamic> j) => PedidoApi(
+        modalidade: (j['modalidade'] as String?) ?? 'presencial',
         janelaInicio: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['inicio']),
         janelaFim: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['fim']),
         id: j['id'] as String,

@@ -32,6 +32,9 @@ class DadosDoPedido {
     this.numero,
     this.bairro,
     this.complemento,
+    this.cep,
+    this.referencia,
+    this.modalidade = 'presencial',
   });
 
   final String titulo;
@@ -41,6 +44,40 @@ class DadosDoPedido {
   final String? numero;
   final String? bairro;
   final String? complemento;
+  final String? cep;
+  final String? referencia;
+
+  /// `presencial` ou `remoto`.
+  final String modalidade;
+  bool get remoto => modalidade == 'remoto';
+
+  /// Endereço por extenso para o profissional contratado e para o mapa: "Rua das Flores, 10 ·
+  /// apto 2 · Centro · CEP 35500-000 (perto da praça)". Nulo se não há endereço.
+  String? get enderecoCompleto {
+    final rua = logradouro;
+    if (rua == null || rua.isEmpty) return null;
+    String? parte(String? v, [String Function(String)? formato]) =>
+        (v == null || v.trim().isEmpty) ? null : (formato?.call(v.trim()) ?? v.trim());
+    final numeroTxt = parte(numero);
+    return [
+      numeroTxt == null ? rua : '$rua, $numeroTxt',
+      parte(complemento),
+      parte(bairro),
+      parte(cep, (c) => 'CEP $c'),
+      parte(referencia, (r) => '($r)'),
+    ].whereType<String>().join(' · ');
+  }
+
+  /// Texto para pesquisar no mapa (sem referência nem complemento).
+  String? get consultaDoMapa {
+    final rua = logradouro;
+    if (rua == null || rua.isEmpty) return null;
+    return [
+      if ((numero ?? '').trim().isNotEmpty) '$rua, ${numero!.trim()}' else rua,
+      if ((bairro ?? '').trim().isNotEmpty) bairro!.trim(),
+      if ((cep ?? '').trim().isNotEmpty) cep!.trim(),
+    ].join(', ');
+  }
 
   /// "Rua das Flores, 10 · Centro", ou nulo se não há endereço.
   String? get enderecoResumo {
@@ -251,9 +288,10 @@ abstract interface class RepositorioProfissional {
   /// Calculadora: taxa e líquido vêm do backend.
   ServicoOrcamento servicoOrcamento(String pedidoId);
 
-  /// Check-in do pedido.
-  ServicoCheckIn servicoCheckIn(String pedidoId);
+  /// Check-in do pedido. Remoto: só o código do cliente (sem foto nem localização).
+  ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false});
 
-  /// Check-out do pedido: foto final e código de conclusão que o cliente informa.
-  ServicoCheckOut servicoCheckOut(String pedidoId);
+  /// Check-out do pedido: foto final e código de conclusão que o cliente informa. Remoto: só o
+  /// código.
+  ServicoCheckOut servicoCheckOut(String pedidoId, {bool remoto = false});
 }
