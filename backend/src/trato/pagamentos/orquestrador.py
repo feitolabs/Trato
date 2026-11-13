@@ -19,6 +19,7 @@ Nada aqui conhece HTTP; as rotas ficam em `api/rotas_pagamento.py`.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
@@ -203,7 +204,15 @@ class ServicoPagamento:
             elif antiga.status is EstadoCobranca.PAGA:
                 raise ErroFluxo("Isto já foi pago.")
         total = self.total_a_cobrar(contexto, pedido, servico_centavos, aditivo_id, parcelas)
-        chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}"
+        # A chave leva o que define a cobrança (meio, valor, parcelas, cliente): o Stripe recusa a
+        # MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be used
+        # with the same parameters"). Sem isso, trocar Pix por cartão, ou o valor mudar depois de
+        # uma contraproposta, dava erro 500 na tela de pagamento. Mesmos parâmetros = mesma chave,
+        # então repetir o pedido continua idempotente.
+        assinatura = hashlib.sha256(
+            f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}".encode()
+        ).hexdigest()[:10]
+        chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}/{assinatura}"
         metadados = {"pedido_id": pedido.id}
         if aditivo_id:
             metadados["aditivo_id"] = aditivo_id

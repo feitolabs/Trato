@@ -77,3 +77,16 @@ def test_foto_de_chat_de_outro_pedido_nao_abre_aqui(e2, amb):
         )
     )
     assert e2.get(f"/v1/pedidos/ped-2/anexos-chat/{midia}", "t-cliente").status_code == 404
+
+
+def test_marca_de_contraproposta_nunca_e_mascarada_mas_o_texto_depois_dela_e():
+    import uuid
+
+    from trato.persistencia.conversas import mascarar_contatos
+
+    for _ in range(500):  # ~1 em 4 ids de orçamento tem dígitos que parecem telefone
+        orc = str(uuid.uuid4())
+        texto = f"[contraproposta:{orc}:25000] Fecho se der esse valor. Zap 31 99999-8888"
+        saida = mascarar_contatos(texto)
+        assert saida.startswith(f"[contraproposta:{orc}:25000] ")
+        assert "99999" not in saida  # o contato no texto continua escondido

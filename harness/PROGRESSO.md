@@ -889,3 +889,11 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - Verificação: app 854 testes passaram. Backend sem mudança.
 - Aviso de processo: não rodar duas execuções de `flutter test` ao mesmo tempo nem usar `timeout` curto: uma execução interrompida deixa `flutter_tester.exe` órfãos que travam a seguinte e apagam a pasta temporária ("did not complete").
 
+## 2026-11-13 — Pagamento, GPS e contraproposta (v0.1.13)
+
+- **Pagamento dava "Algo deu errado" (Pix e cartão).** Log do Fly: o Stripe recusou com "Keys for idempotent requests can only be used with the same parameters". A chave era `cob/<pedido>/principal/<n>`, sem meio nem valor; uma tentativa anterior que chegou ao Stripe e não ficou registrada aqui fazia as seguintes colidirem. A chave agora leva meio, valor, parcelas e cliente (hash curto). Mesmos parâmetros continuam idempotentes. Testes em `test_fluxo_pagamento_e2e.py` (provedor "estrito"); falham no código antigo.
+- **"Usar como profissional" ficava no esqueleto.** O Início pedia a localização antes de buscar os pedidos, sem limite de tempo; sem permissão respondida ou sem GPS esperava para sempre. Agora a localização tem limite de 4 s e a lista carrega sem a distância.
+- **Contraproposta falhava ao acaso (teste intermitente).** O mascaramento de telefone (antes da contratação) estragava o id do orçamento dentro de `[contraproposta:<uuid>:<centavos>]` em ~24% dos casos (715 de 3000 UUIDs), e o aceite não achava a marca. A marca agora é preservada e só o texto depois dela é mascarado.
+- Verificação: app 855 testes passaram; backend 1462 passaram + 1 intermitente (esta contraproposta), corrigida; 12 testes de contraproposta/horas/chat passaram 3x. Suíte completa do backend não repetida depois da correção, por decisão do João (demora ~17 min).
+- Stripe: o sandbox já tem webhook para `https://trato.fly.dev/v1/webhooks/stripe`; o CLI está logado. Para simular um pagamento: `stripe payment_intents confirm pi_... --payment-method pm_card_visa`.
+

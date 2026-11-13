@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,7 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/repositorios_api.dart';
+import 'package:trato/dados/repositorios.dart' show FiltroPedidosAbertos;
 import 'package:trato/dados/sessao.dart';
+import 'package:trato/dispositivo/servico_localizacao.dart' show PosicaoAtual;
 import 'package:trato/telas/mensagens/servico_conversas.dart';
 import 'package:trato/telas/pedidos/modelos.dart';
 
@@ -346,6 +349,23 @@ void main() {
       expect(detalhe.horasTrabalhadas, '3,5 h');
       expect(detalhe.itens.map((i) => i.descricao), ['Valor combinado na contraproposta']);
       expect(dados.orcamentos.single.totalCentavos, 30000);
+    });
+  });
+
+  group('Início do profissional sem localização', () {
+    test('GPS que nunca responde não trava a lista de pedidos abertos', () async {
+      final (api, chamadas) = _cliente((r) => _json(<Object>[]));
+      final repo = RepositorioProfissionalApi(
+        api,
+        posicao: () => Completer<PosicaoAtual?>().future, // nunca completa
+      );
+      final lista = await repo
+          .pedidosAbertos(const FiltroPedidosAbertos())
+          .timeout(const Duration(seconds: 10));
+      expect(lista, isEmpty);
+      final consulta = chamadas.single.caminho;
+      expect(consulta, startsWith('/v1/profissional/pedidos-abertos'));
+      expect(consulta, isNot(contains('lat='))); // sem posição, sem distância
     });
   });
 
