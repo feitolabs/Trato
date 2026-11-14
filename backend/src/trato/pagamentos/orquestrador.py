@@ -79,6 +79,12 @@ from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Estado, Papel, Pedido, ProvaPagamento
 
 
+def _mesmo_id(a: str, b: str) -> bool:
+    """Ids de pedido iguais mesmo em formatos diferentes (com ou sem hífen): o banco devolve o
+    aditivo com o id em hex e a rota traz o do pedido com hífen."""
+    return str(a).replace("-", "").lower() == str(b).replace("-", "").lower()
+
+
 class ErroFluxo(Exception):
     """Pedido de pagamento que não vale agora. `status` é o HTTP que a rota devolve."""
 
@@ -266,7 +272,7 @@ class ServicoPagamento:
         cliente_externo: str | None = None,
     ) -> tuple[Aditivo, CobrancaLocal]:
         aditivo = self.aditivos.obter(aditivo_id)
-        if aditivo is None or aditivo.pedido_id != pedido.id:
+        if aditivo is None or not _mesmo_id(aditivo.pedido_id, pedido.id):
             raise ErroFluxo("Aditivo não encontrado.", 404)
         if aditivo.estado is not EstadoAditivo.PROPOSTO:
             raise ErroFluxo("Este aditivo já foi aprovado.")
@@ -289,7 +295,7 @@ class ServicoPagamento:
 
     def recusar_aditivo(self, contexto: Contexto, pedido: Pedido, aditivo_id: str) -> Aditivo:
         aditivo = self.aditivos.obter(aditivo_id)
-        if aditivo is None or aditivo.pedido_id != pedido.id:
+        if aditivo is None or not _mesmo_id(aditivo.pedido_id, pedido.id):
             raise ErroFluxo("Aditivo não encontrado.", 404)
         if aditivo.estado is not EstadoAditivo.PROPOSTO:
             raise ErroFluxo("Este aditivo já foi decidido.")

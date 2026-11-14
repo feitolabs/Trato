@@ -285,6 +285,9 @@ abstract interface class RepositorioProfissional {
   /// Carteira como EXTRATO (D15): sem saldo próprio, sem saque.
   Future<List<ItemExtrato>> extrato();
 
+  /// Valor inteiro, taxa, líquido, aditivos e notas de um pedido (detalhe de uma linha do extrato).
+  Future<DetalheValoresPedido> valoresDoPedido(String pedidoId);
+
   /// Calculadora: taxa e líquido vêm do backend.
   ServicoOrcamento servicoOrcamento(String pedidoId);
 

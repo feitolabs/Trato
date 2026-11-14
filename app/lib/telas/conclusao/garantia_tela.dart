@@ -105,11 +105,11 @@ class GarantiaTela extends StatelessWidget {
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        const Row(
+        Row(
           children: [
-            Expanded(child: EspacoFoto(legenda: '[Antes]')),
-            SizedBox(width: EspacosTrato.x2),
-            Expanded(child: EspacoFoto(legenda: '[Depois]')),
+            Expanded(child: EspacoFoto(legenda: 'Antes', referencia: dados.fotoAntes)),
+            const SizedBox(width: EspacosTrato.x2),
+            Expanded(child: EspacoFoto(legenda: 'Depois', referencia: dados.fotoDepois)),
           ],
         ),
       ],

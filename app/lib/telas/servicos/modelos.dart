@@ -57,7 +57,11 @@ class DetalheServico {
     this.remoto = false,
     this.local,
     this.codigoConclusao,
+    this.jaAvaliou = false,
   });
+
+  /// Já avaliou: a ação "Avaliar o serviço" some.
+  final bool jaAvaliou;
 
   /// Código que o cliente passa ao profissional para encerrar o serviço (só em andamento).
   final String? codigoConclusao;
@@ -90,7 +94,9 @@ class DetalheServico {
   final String? avisoValores;
 
   /// Ações possíveis por estado. O backend continua sendo quem valida cada uma.
-  List<AcaoServico> get acoes => switch (estadoApi) {
+  List<AcaoServico> get acoes => _acoesDoEstado.where((a) => !(jaAvaliou && a == AcaoServico.avaliar)).toList();
+
+  List<AcaoServico> get _acoesDoEstado => switch (estadoApi) {
         'aberto' => const [AcaoServico.verOrcamentos],
         'orcamento_aceito' => const [AcaoServico.pagar, AcaoServico.verOrcamentos],
         'pago_e_retido' || 'agendado' => const [

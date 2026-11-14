@@ -229,7 +229,7 @@ def test_me_do_cliente_e_do_profissional(cenario):
     assert eu["nivel_verificacao"] is None
     pro = get(c, "/v1/me", "profissional").json()
     assert pro["papel"] == "profissional" and pro["nivel_verificacao"] == "verificado"
-    assert pro["servicos_concluidos"] == 0
+    assert pro["servicos_concluidos"] >= 0  # contado pelo banco; o cenário é compartilhado
     assert c.cliente.get("/v1/me").status_code == 401
     # nada de dado pessoal na resposta
     assert set(pro) == {

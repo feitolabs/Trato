@@ -16,7 +16,11 @@ class CarteiraTela extends StatelessWidget {
     this.aoTentarNovamente,
     this.barraInferior,
     this.soExtrato = false,
+    this.aoAbrirItem,
   });
+
+  /// Toque numa linha do extrato: abre o detalhe dos valores do pedido.
+  final ValueChanged<ItemExtrato>? aoAbrirItem;
 
   /// D15: a Carteira é só extrato (o Trato não guarda saldo nem faz saque). Esconde os
   /// cartões de saldo e o botão de saque e mostra apenas os lançamentos.
@@ -58,7 +62,7 @@ class CarteiraTela extends StatelessWidget {
                   if (dados.extrato.isEmpty)
                     const _ExtratoVazio()
                   else
-                    _Extrato(itens: dados.extrato),
+                    _Extrato(itens: dados.extrato, aoAbrir: aoAbrirItem),
                 ],
               ],
             ),
@@ -218,9 +222,10 @@ class _CabecalhoExtrato extends StatelessWidget {
 }
 
 class _Extrato extends StatelessWidget {
-  const _Extrato({required this.itens});
+  const _Extrato({required this.itens, this.aoAbrir});
 
   final List<ItemExtrato> itens;
+  final ValueChanged<ItemExtrato>? aoAbrir;
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +238,12 @@ class _Extrato extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: EspacosTrato.x3),
                 child: Divider(),
               ),
-            _LinhaExtrato(item: itens[i]),
+            InkWell(
+              onTap: aoAbrir == null || itens[i].pedidoId == null
+                  ? null
+                  : () => aoAbrir!(itens[i]),
+              child: _LinhaExtrato(item: itens[i]),
+            ),
           ],
         ],
       ),

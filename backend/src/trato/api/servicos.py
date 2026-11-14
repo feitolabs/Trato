@@ -57,7 +57,7 @@ def ator_de(usuario: Usuario, pedido: Pedido | None = None) -> Ator:
     return Ator(papel_das_regras(usuario), usuario.id)
 
 
-def pedido_out(pedido: Pedido, usuario: Usuario) -> PedidoOut:
+def pedido_out(pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False) -> PedidoOut:
     eh_cliente = pedido.cliente_id == usuario.id
     papel_no_pedido = (
         Papel.CLIENTE
@@ -84,4 +84,5 @@ def pedido_out(pedido: Pedido, usuario: Usuario) -> PedidoOut:
         codigo_inicio=pedido.codigo_inicio if eh_cliente else None,
         codigo_conclusao=pedido.codigo_conclusao if eh_cliente else None,
         modalidade="remoto" if pedido.remoto else "presencial",
+        ja_avaliou=ja_avaliou,
     )
