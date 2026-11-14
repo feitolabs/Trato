@@ -1366,6 +1366,45 @@ abstract final class RotasTrato {
         ),
       );
 
+  /// Cartão do aditivo: abre a folha do provedor e espera o backend confirmar (webhook).
+  static Future<void> _pagarAditivo(
+    BuildContext context,
+    String pedidoId,
+    Cobranca cobranca,
+  ) async {
+    if (!context.mounted) return;
+    if (cobranca.precisaDaFolhaDeCartao) {
+      ResultadoCartao? resultado;
+      final aberto = await _tentar(
+        context,
+        () async => resultado = await folhaCartao.pagar(
+          PreparoFolhaCartao(
+            segredoDoPagamento: cobranca.segredoCartao!,
+            clienteId: cobranca.clienteCartaoId!,
+            chaveEfemera: cobranca.chaveEfemera!,
+          ),
+        ),
+      );
+      if (!aberto || !context.mounted) return;
+      if (resultado == ResultadoCartao.cancelado) {
+        _avisoSimples(context,
+            'Pagamento cancelado. A cobrança extra continua pendente; abra o aditivo de novo.');
+        return;
+      }
+    }
+    _abrir<void>(
+      context,
+      AguardandoPagamentoTela(
+        cobranca: cobranca,
+        consultar: () => servicoAditivo.statusDoPagamento(pedidoId),
+        aoConfirmar: () => Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(builder: (_) => _pedidoEmExecucao(pedidoId)),
+          (rota) => rota.isFirst,
+        ),
+      ),
+    );
+  }
+
   static Widget _pagamento(String pedidoId) {
     var iniciandoPagamento = false;
     return Carregador<DadosPagamento>(
@@ -1476,11 +1515,8 @@ abstract final class RotasTrato {
             ResponderAditivoTela(
               servico: servicoAditivo,
               aditivoId: pedidoId,
-              aoResponder: (aprovado) {
-                if (aprovado && context.mounted) {
-                  _abrir<void>(context, _pagamento(pedidoId));
-                }
-              },
+              // Aprovou: o cliente paga a cobrança do aditivo (a do pedido já foi paga).
+              aoCobrancaCriada: (cobranca) => _pagarAditivo(context, pedidoId, cobranca),
             ),
           ),
         ),

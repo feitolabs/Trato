@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
+import '../auth/validacao.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
 
@@ -41,6 +42,8 @@ class _Formulario extends StatefulWidget {
 class _FormularioState extends State<_Formulario> {
   late final _telefone = TextEditingController(text: formatarTelefone(widget.dados.telefone));
   late DateTime? _nascimento = widget.dados.dataNascimento;
+  final _cpf = TextEditingController();
+  String? _erroCpf;
   var _salvando = false;
   String? _erro;
   String? _aviso;
@@ -48,6 +51,7 @@ class _FormularioState extends State<_Formulario> {
   @override
   void dispose() {
     _telefone.dispose();
+    _cpf.dispose();
     super.dispose();
   }
 
@@ -68,12 +72,26 @@ class _FormularioState extends State<_Formulario> {
       setState(() => _erro = 'Informe o telefone com DDD.');
       return;
     }
+    final semCpf = (widget.dados.cpfFinal ?? '').isEmpty;
+    final cpfDigitos = _cpf.text.replaceAll(RegExp(r'\D'), '');
+    if (semCpf && (cpfDigitos.isNotEmpty || digitos.isNotEmpty)) {
+      final msg = ValidacaoAuth.cpf(_cpf.text);
+      if (msg != null) {
+        setState(() => _erroCpf = msg);
+        return;
+      }
+    }
     setState(() {
       _salvando = true;
       _erro = null;
+      _erroCpf = null;
       _aviso = null;
     });
     try {
+      // Conta sem CPF: o telefone só salva depois de vincular o CPF (o servidor guarda os dois juntos).
+      if (semCpf && cpfDigitos.isNotEmpty) {
+        await widget.servico.registrarCpf(cpfDigitos);
+      }
       await widget.servico.salvarDados(
         telefone: digitos.isEmpty ? null : digitos,
         nascimento: _nascimento,
@@ -111,6 +129,22 @@ class _FormularioState extends State<_Formulario> {
           'Nome, e-mail e CPF não mudam por aqui. Para corrigir, fale com a Central de ajuda.',
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),
+        if ((d.cpfFinal ?? '').isEmpty) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          CampoTrato(
+            rotulo: 'CPF',
+            controlador: _cpf,
+            dica: '000.000.000-00',
+            teclado: TextInputType.number,
+            formatadores: [MascaraNumerica.cpf],
+            erro: _erroCpf,
+          ),
+          const SizedBox(height: EspacosTrato.x1),
+          Text(
+            'Sua conta ainda não tem CPF. Ele é gravado uma única vez e não muda depois.',
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         CampoTrato(
           rotulo: 'Telefone',

@@ -85,6 +85,9 @@ abstract interface class ServicoConta {
     bool removerNascimento = false,
   });
 
+  /// Conta criada sem CPF: grava o CPF uma única vez (só dígitos). CPF de outra conta é recusado.
+  Future<DadosPessoaisConta> registrarCpf(String cpf);
+
   Future<List<EnderecoSalvo>> enderecos();
 
   /// Sem [id], cria; com [id], edita.

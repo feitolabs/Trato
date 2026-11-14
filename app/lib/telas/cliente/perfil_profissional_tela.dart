@@ -152,6 +152,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                       Expanded(
                         child: _FotoReservada(
                           legenda: i < d.trabalhos.length ? d.trabalhos[i] : 'Trabalho ${i + 1}',
+                          url: i < d.fotosUrls.length ? d.fotosUrls[i] : null,
                         ),
                       ),
                     ],
@@ -315,25 +316,28 @@ class _Indicador extends StatelessWidget {
 /// Espaço da foto de um trabalho do portfólio: quadrado azul-claro com a legenda. A foto em si
 /// chega por URL assinada quando o portfólio tiver imagens.
 class _FotoReservada extends StatelessWidget {
-  const _FotoReservada({required this.legenda});
+  const _FotoReservada({required this.legenda, this.url});
 
   final String legenda;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
+    final imagem = construirImagemReal(url);
     return ToquePreviewImagem(
-      referencia: legenda,
+      referencia: url ?? legenda,
       legenda: legenda,
       child: AspectRatio(
         aspectRatio: 1,
         child: Container(
           alignment: Alignment.bottomLeft,
-          padding: const EdgeInsets.all(EspacosTrato.x2),
+          clipBehavior: imagem != null ? Clip.antiAlias : Clip.none,
+          padding: imagem != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
           decoration: BoxDecoration(
             color: CoresTrato.azulClaro,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
-          child: Semantics(
+          child: imagem ?? Semantics(
             label: 'Trabalho: $legenda',
             child: Text(
               legenda,

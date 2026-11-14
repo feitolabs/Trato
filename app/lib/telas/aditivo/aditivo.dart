@@ -2,6 +2,7 @@
 /// Só vale com aprovação do cliente no app (D9). Valores em centavos inteiros.
 library;
 
+import '../../dados/repositorios.dart' show Cobranca, StatusPagamento;
 import '../pedidos/modelos.dart' show EstadoAditivo;
 
 export '../pedidos/modelos.dart' show EstadoAditivo;
@@ -39,7 +40,11 @@ abstract interface class ServicoAditivo {
   /// null = não há aditivo para este pedido.
   Future<DetalheAditivo?> carregar(String aditivoId);
 
-  /// Quem decide e registra é o backend. O app só pede.
-  Future<void> responder(String aditivoId, {required bool aprovar});
+  /// Quem decide e registra é o backend. O app só pede. Ao aprovar, devolve a cobrança do aditivo
+  /// (para o cliente pagar); ao recusar, `null`.
+  Future<Cobranca?> responder(String aditivoId, {required bool aprovar});
+
+  /// Se o aditivo aprovado deste contrato já foi pago (só o backend, pelo webhook, diz que sim).
+  Future<StatusPagamento> statusDoPagamento(String contratoId);
 }
 

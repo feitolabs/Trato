@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../componentes/imagem_trato.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/aditivo/aditivo.dart';
+import 'repositorios.dart' show Cobranca, StatusPagamento;
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
 import '../telas/nota_material/nota_material.dart';
@@ -22,6 +23,19 @@ import 'paralelo.dart';
 Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
 List<Map<String, dynamic>> _lista(Object? json) =>
     [for (final item in json! as List) item as Map<String, dynamic>];
+
+/// `[Foto:<id>]` vira a URL assinada da foto de trabalho; qualquer outra coisa (caminho antigo,
+/// sem rede) fica como veio.
+Future<String> _urlDaFotoDoPortfolio(ClienteApi api, String usuarioId, String ref) async {
+  final achou = RegExp(r'^\[Foto:([^\]]+)\]$').firstMatch(ref);
+  if (achou == null || usuarioId.isEmpty) return ref;
+  try {
+    final r = _mapa(await api.get('/v1/usuarios/$usuarioId/portfolio/${achou.group(1)}/foto'));
+    return (r['url'] as String?) ?? ref;
+  } on ErroTrato {
+    return ref;
+  }
+}
 
 /// Aditivo do contrato. As telas ainda passam o **id do pedido** no lugar do id do aditivo
 /// (na demonstração não havia id próprio): aqui o id recebido é o do contrato e o aditivo
@@ -79,17 +93,37 @@ class ServicoAditivoApi implements ServicoAditivo {
   /// `POST .../aditivos/{aditivo_id}/aprovar` (a cobrança nasce `aguardando_confirmacao`) ou
   /// `.../recusar`. Só o cliente decide; o profissional recebe 403.
   @override
-  Future<void> responder(String aditivoId, {required bool aprovar}) async {
+  Future<Cobranca?> responder(String aditivoId, {required bool aprovar}) async {
     final a = await _aberto(aditivoId);
     if (a == null) {
       throw const ErroTrato(TipoErro.naoEncontrado, 'Este aditivo já foi respondido.');
     }
     final acao = aprovar ? 'aprovar' : 'recusar';
-    await _api.post(
+    final r = await _api.post(
       '/v1/contratos/$aditivoId/aditivos/${a['id']}/$acao',
       // Cartão: é o meio que o Stripe da conta já aceita (o Pix ainda não está liberado).
       corpo: aprovar ? {'meio': 'cartao'} : null,
     );
+    final c = (aprovar && r is Map) ? r['cobranca'] : null;
+    if (c is! Map) return null;
+    return Cobranca(
+      id: c['cobranca_id'] as String,
+      pixCopiaECola: c['tipo_instrucao'] == 'pix_copia_e_cola' ? c['instrucao'] as String? : null,
+      segredoCartao:
+          c['tipo_instrucao'] == 'cartao_segredo_do_cliente' ? c['instrucao'] as String? : null,
+      clienteCartaoId: c['cliente_externo_id'] as String?,
+      chaveEfemera: c['chave_efemera'] as String?,
+    );
+  }
+
+  /// O aditivo aprovado do contrato virou `pago` (webhook)? Se não, segue aguardando.
+  @override
+  Future<StatusPagamento> statusDoPagamento(String contratoId) async {
+    final todos = _lista(await _api.get('/v1/contratos/$contratoId/aditivos'));
+    for (final a in todos) {
+      if (a['estado'] == 'pago') return StatusPagamento.pago;
+    }
+    return StatusPagamento.aguardando;
   }
 }
 
@@ -365,7 +399,18 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       if (periodo != null) periodos.add(periodo);
     }
     final regioes = _lista(p['regioes'] ?? const []);
+    final donoId = (p['usuario_id'] as String?) ?? '';
+    final portfolio = [
+      for (final item in _lista(p['portfolio'] ?? const []))
+        if (item['descricao'] case final String ref when ref.isNotEmpty) ref,
+    ];
+    final urlsDasFotos = <String, String>{};
+    for (final ref in portfolio) {
+      final url = await _urlDaFotoDoPortfolio(_api, donoId, ref);
+      if (url != ref) urlsDasFotos[ref] = url;
+    }
     return DadosCadastroProfissional(
+      urlsDasFotos: urlsDasFotos,
       nome: '',
       sobre: (p['bio'] as String?) ?? '',
       categorias: {
@@ -376,10 +421,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       raioKm: 0,
       dias: dias,
       periodos: periodos,
-      portfolio: [
-        for (final item in _lista(p['portfolio'] ?? const []))
-          if (item['descricao'] case final String ref when ref.isNotEmpty) ref,
-      ],
+      portfolio: portfolio,
       atendePresencial: p['atende_presencial'] as bool? ?? true,
       atendeRemoto: p['atende_remoto'] as bool? ?? false,
     );
@@ -548,18 +590,6 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
 
   final ClienteApi _api;
 
-  /// `[Foto:<id>]` vira a URL assinada da foto; qualquer outra coisa (caminho antigo) fica igual.
-  Future<String> _urlDaFotoDoPortfolio(String usuarioId, String ref) async {
-    final achou = RegExp(r'^\[Foto:([^\]]+)\]$').firstMatch(ref);
-    if (achou == null || usuarioId.isEmpty) return ref;
-    try {
-      final r = _mapa(await _api.get('/v1/usuarios/$usuarioId/portfolio/${achou.group(1)}/foto'));
-      return (r['url'] as String?) ?? ref;
-    } on ErroTrato {
-      return ref;
-    }
-  }
-
   @override
   Future<PerfilPublico> carregarPerfil() async {
     final me = _mapa(await _api.get('/v1/me'));
@@ -614,6 +644,7 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
     final fotosPortfolio = [
       for (final item in portfolioBruto)
         await _urlDaFotoDoPortfolio(
+          _api,
           usuarioId,
           ((item['descricao'] as String?)?.isNotEmpty == true
               ? item['descricao'] as String
