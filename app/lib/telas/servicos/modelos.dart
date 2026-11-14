@@ -56,7 +56,11 @@ class DetalheServico {
     this.descricao,
     this.remoto = false,
     this.local,
+    this.codigoConclusao,
   });
+
+  /// Código que o cliente passa ao profissional para encerrar o serviço (só em andamento).
+  final String? codigoConclusao;
 
   /// Serviço remoto (sem endereço). Presencial é o padrão.
   final bool remoto;

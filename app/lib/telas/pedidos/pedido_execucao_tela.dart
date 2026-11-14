@@ -94,6 +94,35 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         ),
                       ),
                     ],
+                    if (pedido.codigoConclusao != null) ...[
+                      const SizedBox(height: EspacosTrato.x4),
+                      CartaoTrato(
+                        key: const ValueKey('codigo-de-conclusao'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Código de conclusão', style: TipografiaTrato.tituloCartao),
+                            const SizedBox(height: EspacosTrato.x2),
+                            Semantics(
+                              label:
+                                  'Código de conclusão ${pedido.codigoConclusao!.split('').join(' ')}',
+                              child: ExcludeSemantics(
+                                child: Text(pedido.codigoConclusao!,
+                                    style: TipografiaTrato.tituloGrande),
+                              ),
+                            ),
+                            const SizedBox(height: EspacosTrato.x1),
+                            Text(
+                              'Quando o serviço estiver pronto, passe este código ao profissional '
+                              'para ele concluir.',
+                              style: TipografiaTrato.corpoPequeno.copyWith(
+                                color: CoresTrato.textoSecundario,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (_aditivo != null) ...[
                       const SizedBox(height: EspacosTrato.x4),
                       CartaoAditivo(

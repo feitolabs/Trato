@@ -80,6 +80,26 @@ class DetalheServicoTela extends StatelessWidget {
                     ],
                   ),
                 ),
+                if ((dados.codigoConclusao ?? '').isNotEmpty) ...[
+                  const SizedBox(height: EspacosTrato.x5),
+                  Text('Código de conclusão', style: TipografiaTrato.titulo),
+                  const SizedBox(height: EspacosTrato.x3),
+                  CartaoTrato(
+                    key: const ValueKey('codigo-de-conclusao'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(dados.codigoConclusao!, style: TipografiaTrato.tituloGrande),
+                        const SizedBox(height: EspacosTrato.x1),
+                        Text(
+                          'Quando o serviço estiver pronto, passe este código ao profissional '
+                          'para ele concluir.',
+                          style: secundario,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (pro != null) ...[
                   const SizedBox(height: EspacosTrato.x5),
                   Text('Profissional', style: TipografiaTrato.titulo),

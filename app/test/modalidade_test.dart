@@ -403,6 +403,30 @@ void main() {
       expect(find.textContaining('combina tudo'), findsOneWidget);
     });
 
+    testWidgets('em andamento o cliente vê o código de conclusão para passar ao profissional',
+        (tester) async {
+      await tester.pumpWidget(
+        _app(
+          DetalheServicoTela(
+            dados: DetalheServico(
+              pedidoId: 'p1',
+              numero: 'AAAA',
+              titulo: 'Pedido #AAAA',
+              estadoApi: 'em_andamento',
+              statusTexto: 'Em execução',
+              statusTipo: TipoStatus.info,
+              abertoEm: 'Aberto em 07/11',
+              etapas: const [],
+              codigoConclusao: '4821',
+            ),
+            aoAcao: (_) {},
+          ),
+        ),
+      );
+      expect(find.text('Código de conclusão'), findsOneWidget);
+      expect(find.text('4821'), findsOneWidget);
+    });
+
     testWidgets('presencial sem endereço avisa que não foi informado', (tester) async {
       await tester.pumpWidget(_app(DetalheServicoTela(dados: detalhe(), aoAcao: (_) {})));
       expect(find.text('Endereço não informado neste pedido.'), findsOneWidget);
