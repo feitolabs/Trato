@@ -15,6 +15,7 @@ import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dispositivo/servico_camera.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
+import 'package:trato/telas/nota_material/ver_nota_tela.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional/check_in_tela.dart';
 import 'package:trato/telas/profissional/check_out_tela.dart';
@@ -541,6 +542,52 @@ void main() {
       final servico = ServicoAditivoApi(api);
       expect(await servico.statusDoPagamento('pago-1'), StatusPagamento.pago);
       expect(await servico.statusDoPagamento('ped-1'), StatusPagamento.aguardando);
+    });
+  });
+
+  group('Notas de materiais', () {
+    Map<String, Object?> nota(String quando, String item, int centavos) => {
+          'enviada_em': quando,
+          'itens': [
+            {
+              'descricao': item,
+              'quantidade': '1.00',
+              'valor_unitario_centavos': centavos,
+              'total_centavos': centavos,
+            },
+          ],
+        };
+
+    http.Response responder(http.Request r) {
+      if (r.url.path == '/v1/contratos/ped-1/notas-material') {
+        return _json([
+          nota('2026-11-14T20:00:00Z', 'Cabo', 100000),
+          nota('2026-11-13T20:00:00Z', 'Tomadas', 4500),
+        ]);
+      }
+      if (r.url.path == '/v1/pedidos/ped-1/interlocutor') {
+        return _json({'id': 'pro', 'nome': 'Gabriel L.'});
+      }
+      return _json({'detail': 'não'}, 404);
+    }
+
+    test('carrega todas as notas, da mais antiga para a mais nova, com o nome de quem enviou', () async {
+      final (api, _) = _cliente(responder);
+      final todas = await ServicoNotaMaterialApi(api).carregarTodas('ped-1');
+      expect(todas.map((n) => n.itens.single.descricao), ['Tomadas', 'Cabo']);
+      expect(todas.first.profissional, 'Gabriel L.');
+      expect(todas.first.pedidoTitulo, startsWith('Pedido #'));
+    });
+
+    testWidgets('a tela mostra cada nota e a soma delas', (t) async {
+      final (api, _) = _cliente(responder);
+      await t.pumpWidget(_app(VerNotaTela(servico: ServicoNotaMaterialApi(api), pedidoId: 'ped-1')));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Nota 1'), findsWidgets);
+      expect(find.textContaining('Nota 2'), findsWidgets);
+      expect(find.text('Tomadas'), findsOneWidget);
+      expect(find.text('Cabo'), findsOneWidget);
+      expect(find.text('R\$ 1.045,00'), findsOneWidget); // soma das duas notas
     });
   });
 

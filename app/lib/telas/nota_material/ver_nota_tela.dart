@@ -16,51 +16,38 @@ class VerNotaTela extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PaginaCarregavel<NotaMaterial?>(
+    return PaginaCarregavel<List<NotaMaterial>>(
       titulo: 'Nota dos materiais',
-      carregar: () => servico.carregar(pedidoId),
-      estaVazio: (n) => n == null || n.itens.isEmpty,
+      carregar: () => servico.carregarTodas(pedidoId),
+      estaVazio: (notas) => notas.every((n) => n.itens.isEmpty),
       iconeVazio: Icons.receipt_long_outlined,
       tituloVazio: 'Nenhuma nota enviada',
       textoVazio: 'Quando o profissional enviar a notinha dos materiais, ela aparece aqui.',
-      construir: (context, nota) {
-        final n = nota!;
+      construir: (context, todas) {
+        final notas = [for (final n in todas) if (n.itens.isNotEmpty) n];
+        final varias = notas.length > 1;
+        final primeira = notas.first;
         return CorpoRolavel(
           children: [
             Text('Materiais do serviço', style: TipografiaTrato.tituloGrande),
             const SizedBox(height: EspacosTrato.x2),
             Text(
-              '${n.pedidoTitulo} · ${n.profissional} · enviada em ${formatarData(n.enviadaEm)}',
+              varias
+                  ? '${primeira.pedidoTitulo} · ${primeira.profissional} · ${notas.length} notas'
+                  : '${primeira.pedidoTitulo} · ${primeira.profissional} · '
+                      'enviada em ${formatarData(primeira.enviadaEm)}',
               style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
             ),
-            if (n.fotoNota != null) ...[
-              const TituloSecao('Foto da nota'),
-              EspacoFoto(
-            legenda: 'Nota enviada pelo profissional',
-            referencia: n.fotoNota,
-            altura: 160,
-          ),
-            ],
-            const TituloSecao('Itens'),
-            CartaoTrato(
-              child: Column(
-                children: [
-                  for (final i in n.itens)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
-                      child: LinhaValor(
-                        rotulo: i.quantidade > 1 && !RegExp(r'^\d+\s*x?\s+', caseSensitive: false).hasMatch(i.descricao)
-                            ? '${i.quantidade}x ${i.descricao}'
-                            : i.descricao,
-                        valor: formatarReais(i.centavos),
-                      ),
-                    ),
-                  const Divider(),
-                  const SizedBox(height: EspacosTrato.x1),
-                  LinhaValor(rotulo: 'Soma dos itens', valor: formatarReais(n.somaCentavos)),
-                ],
+            for (var k = 0; k < notas.length; k++) ..._nota(notas[k], k + 1, varias),
+            if (varias) ...[
+              const TituloSecao('Total dos materiais'),
+              CartaoTrato(
+                child: LinhaValor(
+                  rotulo: 'Soma das ${notas.length} notas',
+                  valor: formatarReais(notas.fold<int>(0, (s, n) => s + n.somaCentavos)),
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: EspacosTrato.x3),
             Text(
               'A nota serve para você conferir o custo de cada material.',
@@ -70,5 +57,41 @@ class VerNotaTela extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Uma nota: foto (se houver), itens e soma. Com mais de uma, cada uma ganha "Nota N".
+  List<Widget> _nota(NotaMaterial n, int numero, bool varias) {
+    return [
+      if (varias) TituloSecao('Nota $numero · ${formatarData(n.enviadaEm)}'),
+      if (n.fotoNota != null) ...[
+        const TituloSecao('Foto da nota'),
+        EspacoFoto(
+          legenda: 'Nota enviada pelo profissional',
+          referencia: n.fotoNota,
+          altura: 160,
+        ),
+      ],
+      TituloSecao(varias ? 'Itens da nota $numero' : 'Itens'),
+      CartaoTrato(
+        child: Column(
+          children: [
+            for (final i in n.itens)
+              Padding(
+                padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
+                child: LinhaValor(
+                  rotulo: i.quantidade > 1 &&
+                          !RegExp(r'^\d+\s*x?\s+', caseSensitive: false).hasMatch(i.descricao)
+                      ? '${i.quantidade}x ${i.descricao}'
+                      : i.descricao,
+                  valor: formatarReais(i.centavos),
+                ),
+              ),
+            const Divider(),
+            const SizedBox(height: EspacosTrato.x1),
+            LinhaValor(rotulo: 'Soma dos itens', valor: formatarReais(n.somaCentavos)),
+          ],
+        ),
+      ),
+    ];
   }
 }

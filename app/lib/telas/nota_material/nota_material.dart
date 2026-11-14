@@ -52,6 +52,10 @@ abstract interface class ServicoNotaMaterial {
   /// null ou sem itens = o profissional ainda não enviou nota.
   Future<NotaMaterial?> carregar(String pedidoId);
 
+  /// Todas as notas do pedido, da mais antiga para a mais nova (o profissional pode mandar mais
+  /// de uma). Vazio = ainda não enviou nota.
+  Future<List<NotaMaterial>> carregarTodas(String pedidoId);
+
   /// Lança exceção se falhar; a tela mostra mensagem simples.
   Future<void> enviar(EnvioNota envio);
 }
