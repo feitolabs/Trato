@@ -64,8 +64,13 @@ class PedidoEmExecucao {
     required this.fotos,
     this.aditivo,
     this.codigoInicio,
+    this.codigoConclusao,
     this.podeVerConclusao = true,
   });
+
+  /// Código que o cliente passa ao profissional para encerrar o serviço (check-out). Só aparece
+  /// com o serviço em andamento.
+  final String? codigoConclusao;
 
   /// "Ver conclusão" só faz sentido quando o profissional já terminou o serviço. Antes disso o
   /// botão abria "fulano terminou o serviço" com um pedido que nem tinha começado.
