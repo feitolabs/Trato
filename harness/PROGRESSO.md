@@ -948,3 +948,7 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - **"Avaliar o serviço" repetido:** `PedidoOut.ja_avaliou`; o app esconde a ação.
 - **Garantia:** mostra as fotos reais (check-in/check-out).
 - **Carteira do profissional:** toque na linha abre "Valores do pedido" (valor pago pelo cliente, taxa, líquido, aditivos e notas). Notas de materiais não geram cobrança; aditivo só entra depois de aprovado e pago.
+
+## 2026-11-14 — Taxa de conclusão (v0.1.22)
+
+- **Taxa de conclusão 0%:** o app tinha `taxaConclusao: 0` fixo. `PerfilPublicoOut.taxa_conclusao` = concluídos / (concluídos + cancelados) dos contratos do profissional (`UsuariosPostgres._taxa_conclusao`); sem encerrados vem nulo e o app mostra "—". "Responde em" segue vazio: o Trato não mede tempo de resposta.

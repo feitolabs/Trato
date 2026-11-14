@@ -192,7 +192,7 @@ class UsuariosPostgres:
         base = self.perfil(usuario_id)
         if base is None:
             return None
-        nivel = nota = servicos = None
+        nivel = nota = servicos = taxa = None
         if base.papel is PapelUsuario.PROFISSIONAL:
             with self._banco.transacao() as con:
                 linha = con.execute(
@@ -204,4 +204,20 @@ class UsuariosPostgres:
                 nivel = linha["nivel_verificacao"]
                 nota = float(linha["nota_publica"]) if linha["nota_publica"] is not None else None
                 servicos = int(linha["servicos_concluidos"])
-        return PerfilDetalhe(base.id, base.nome, base.papel, base.status, nivel, nota, servicos)
+                taxa = self._taxa_conclusao(base.id)
+        return PerfilDetalhe(base.id, base.nome, base.papel, base.status, nivel, nota, servicos, taxa)
+
+    def _taxa_conclusao(self, profissional_id: str) -> int | None:
+        """Concluídos / (concluídos + cancelados) dos contratos do profissional, em %."""
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select count(*) filter (where p.status = 'concluido') as feitos, "
+                "count(*) filter (where p.status = 'cancelado') as cancelados "
+                "from public.contratos c join public.pedidos p on p.id = c.pedido_id "
+                "where c.profissional_id = %s",
+                (profissional_id,),
+            ).fetchone()
+        encerrados = int(linha["feitos"]) + int(linha["cancelados"])
+        if encerrados == 0:
+            return None
+        return round(100 * int(linha["feitos"]) / encerrados)

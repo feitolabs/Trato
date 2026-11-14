@@ -38,7 +38,11 @@ class DetalhePerfil {
     this.servicos = const [],
     this.trabalhos = const [],
     this.fotosUrls = const [],
+    this.temHistorico = true,
   });
+
+  /// Falso quando o profissional ainda não encerrou nenhum serviço (a taxa aparece como "—").
+  final bool temHistorico;
 
   /// Texto de apresentação escrito pelo profissional (já filtrado pelo backend).
   final String? bio;

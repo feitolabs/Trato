@@ -110,6 +110,9 @@ class PerfilPublicoOut(BaseModel):
     nivel_verificacao: str
     nota_publica: float | None
     servicos_concluidos: int | None
+    taxa_conclusao: int | None = Field(
+        None, description="% de serviços encerrados que foram concluídos; nulo sem histórico."
+    )
     atende_presencial: bool = True
     atende_remoto: bool = False
     categorias: list[str]
@@ -507,6 +510,7 @@ def perfil_publico(
         nivel_verificacao=perfil.nivel_verificacao,
         nota_publica=detalhe.nota_publica,
         servicos_concluidos=detalhe.servicos_concluidos,
+        taxa_conclusao=detalhe.taxa_conclusao,
         atende_presencial=perfil.atende_presencial,
         atende_remoto=perfil.atende_remoto,
         categorias=base.categorias,

@@ -132,6 +132,9 @@ class PerfilDetalhe:
     nivel_verificacao: str | None = None
     nota_publica: float | None = None
     servicos_concluidos: int | None = None
+    # Percentual (0 a 100) dos serviços encerrados que foram concluídos (e não cancelados).
+    # `None` enquanto não há serviço encerrado.
+    taxa_conclusao: int | None = None
 
 
 @dataclass(frozen=True)
