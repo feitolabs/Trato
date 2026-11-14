@@ -19,7 +19,7 @@ from trato.api.conta import (
 )
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
-from trato.persistencia.erros import ErroPersistencia
+from trato.persistencia.erros import ErroPersistencia, RegraDoBanco
 
 _COLS_END = "id, apelido, cep, logradouro, numero, complemento, bairro, cidade, uf, principal"
 
@@ -95,7 +95,7 @@ class ContaPostgres:
                 (novo_tel, novo_nasc, uid),
             ).fetchone()
         if feito is None:  # conta sem CPF vinculado: não há linha privada para atualizar
-            raise ErroPersistencia("Complete o cadastro com o CPF antes de salvar estes dados.")
+            raise RegraDoBanco("Complete o cadastro com o CPF antes de salvar estes dados.")
         return self.dados(uid)
 
     # --- endereços --------------------------------------------------------------------

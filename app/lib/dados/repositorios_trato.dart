@@ -103,7 +103,7 @@ class RepositoriosTrato {
         notaMaterial: ServicoNotaMaterialApi(api, upload: upload),
         verificacao: ServicoVerificacaoApi(api),
         disputaProfissional: ServicoDisputaProfissionalApi(api),
-        cadastroProfissional: ServicoCadastroProfissionalApi(api),
+        cadastroProfissional: ServicoCadastroProfissionalApi(api, upload: upload),
         perfilPublico: ServicoPerfilPublicoApi(api),
         privacidade: ServicoPrivacidadeApi(api),
         conta: ServicoContaApi(api),

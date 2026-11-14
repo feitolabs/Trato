@@ -919,3 +919,8 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - **Admin:** chave "Atende remoto" no formulário da categoria; chip na lista; 409 se desligar com pedido remoto em andamento.
 - **Correções do mesmo release:** mensagens rápidas do check-in ("Cheguei"...) davam erro silencioso — agora saem no chat do pedido; aprovar aditivo falhava (o app mandava o id do aditivo onde o servidor espera o do pedido) e cobrava Pix, que o Stripe da conta não tem — agora cartão; cabeçalho do aditivo mostra o nome de quem pediu.
 - Testes: backend 138+24+127 (separados por pasta), admin 30, app `modalidade_test.dart` (21) e suíte inteira. O teste `navegacao_sem_placeholder_test.dart` derruba a VM do Dart nesta máquina (também no código sem estas mudanças), então não conta como regressão.
+
+## 2026-11-14 — Fotos de trabalhos e telefone (v0.1.17)
+
+- **Fotos de trabalhos não apareciam:** o cadastro guardava só o caminho do arquivo no celular. Agora a foto sobe (destino `portfolio`) e o perfil guarda `[Foto:<id>]`; nova rota `GET /v1/usuarios/{id}/portfolio/{upload}/foto` devolve a URL assinada (só para envio de portfólio concluído do próprio dono). O perfil do próprio profissional mostra as fotos; a vitrine para clientes ainda mostra só os títulos.
+- **Telefone com erro:** a conta de teste não tem linha em `usuarios_privados` (sem CPF vinculado) e o servidor respondia 500 genérico. Agora 409 "Complete o cadastro com o CPF antes de salvar estes dados.".
