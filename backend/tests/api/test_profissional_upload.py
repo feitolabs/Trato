@@ -237,6 +237,23 @@ def test_avatar_vai_para_o_bucket_com_o_id_do_dono(e2):
     assert sol.bucket == "avatar" and sol.caminho.startswith("cli-1/")
 
 
+def test_foto_do_portfolio_tem_url_para_qualquer_logado_e_so_do_dono(e2):
+    pedir, concluir = e2.enviar("t-prof", "portfolio", JPEG_COM_EXIF)
+    assert concluir.status_code == 200
+    upload_id = pedir.json()["upload_id"]
+    sol = e2.repo.solicitacao(upload_id)
+    r = e2.get(f"/v1/usuarios/{sol.dono_id}/portfolio/{upload_id}/foto", "t-cliente")
+    assert r.status_code == 200 and r.json()["url"]
+    # o id de outro usuário na rota não revela a foto
+    r2 = e2.get(f"/v1/usuarios/cli-1/portfolio/{upload_id}/foto", "t-cliente")
+    assert r2.status_code == 200 and r2.json()["url"] is None
+    # envio que não é de portfólio também não
+    pedir_av, _ = e2.enviar("t-prof", "avatar", JPEG_COM_EXIF)
+    av = e2.repo.solicitacao(pedir_av.json()["upload_id"])
+    r3 = e2.get(f"/v1/usuarios/{av.dono_id}/portfolio/{av.id}/foto", "t-cliente")
+    assert r3.json()["url"] is None
+
+
 # --- verificação ---------------------------------------------------------------------------
 
 

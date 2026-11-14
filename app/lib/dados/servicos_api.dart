@@ -303,9 +303,12 @@ String _iniciaisNome(String nome) {
 /// `GET /v1/catalogo/categorias`, `GET /v1/catalogo/cidades`, `PATCH /v1/me`,
 /// `POST /v1/profissional/cadastro` e `PATCH /v1/profissional/perfil`.
 class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
-  ServicoCadastroProfissionalApi(this._api);
+  ServicoCadastroProfissionalApi(this._api, {this.upload});
 
   final ClienteApi _api;
+
+  /// Sobe as fotos de trabalhos escolhidas no celular. Sem ele, o caminho local vai como estava.
+  final ServicoUpload? upload;
   Map<String, String> _idPorNomeCategoria = {};
   Map<String, String> _idPorNomeCidade = {};
 
@@ -380,6 +383,31 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       atendePresencial: p['atende_presencial'] as bool? ?? true,
       atendeRemoto: p['atende_remoto'] as bool? ?? false,
     );
+  }
+
+  /// Foto escolhida no celular (caminho de arquivo) sobe como foto de portfólio e vira
+  /// `[Foto:<id>]`, que qualquer aparelho consegue abrir. O que já é `[Foto:...]` fica como está.
+  Future<List<String>> _enviarFotosDoPortfolio(List<String> refs) async {
+    final envio = upload;
+    final saida = <String>[];
+    for (final ref in refs) {
+      final arquivo = File(ref);
+      if (envio == null || ref.startsWith('[') || !arquivo.existsSync()) {
+        saida.add(ref);
+        continue;
+      }
+      final bytes = await arquivo.readAsBytes();
+      final enviado = await envio.enviar(
+        ArquivoCapturado(
+          bytes: bytes,
+          sha256: crypto.sha256.convert(bytes).toString(),
+          capturadaEm: DateTime.now().toUtc(),
+        ),
+        FinalidadeArquivo.portfolio,
+      );
+      saida.add('[Foto:${enviado.arquivoId}]');
+    }
+    return saida;
   }
 
   /// Manhã/Tarde/Noite da janela salva: a exata de [_periodoParaJanela] ou, se o horário foi
@@ -484,11 +512,12 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
                 'fim': _periodoParaJanela[p]!.$2,
               },
     ];
+    final referencias = await _enviarFotosDoPortfolio(dados.portfolio);
     final portfolio = [
-      for (var i = 0; i < dados.portfolio.length; i++)
+      for (var i = 0; i < referencias.length; i++)
         {
           'titulo': 'Trabalho ${i + 1}',
-          'descricao': dados.portfolio[i],
+          'descricao': referencias[i],
         },
     ];
     final corpo = <String, Object?>{
@@ -518,6 +547,18 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
   ServicoPerfilPublicoApi(this._api);
 
   final ClienteApi _api;
+
+  /// `[Foto:<id>]` vira a URL assinada da foto; qualquer outra coisa (caminho antigo) fica igual.
+  Future<String> _urlDaFotoDoPortfolio(String usuarioId, String ref) async {
+    final achou = RegExp(r'^\[Foto:([^\]]+)\]$').firstMatch(ref);
+    if (achou == null || usuarioId.isEmpty) return ref;
+    try {
+      final r = _mapa(await _api.get('/v1/usuarios/$usuarioId/portfolio/${achou.group(1)}/foto'));
+      return (r['url'] as String?) ?? ref;
+    } on ErroTrato {
+      return ref;
+    }
+  }
 
   @override
   Future<PerfilPublico> carregarPerfil() async {
@@ -572,9 +613,12 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
     final portfolioBruto = (prof?['portfolio'] as List? ?? const []).cast<Map<String, dynamic>>();
     final fotosPortfolio = [
       for (final item in portfolioBruto)
-        ((item['descricao'] as String?)?.isNotEmpty == true
-            ? item['descricao'] as String
-            : (item['titulo'] as String? ?? 'Foto')),
+        await _urlDaFotoDoPortfolio(
+          usuarioId,
+          ((item['descricao'] as String?)?.isNotEmpty == true
+              ? item['descricao'] as String
+              : (item['titulo'] as String? ?? 'Foto')),
+        ),
     ];
     final status = (prof?['status'] as String?) ?? '';
     final nivel = (prof?['nivel_verificacao'] as String?) ?? '';

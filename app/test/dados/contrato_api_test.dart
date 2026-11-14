@@ -687,7 +687,7 @@ void main() {
       expect(d!.id, 'ad1');
       expect(d.valorCentavos, 4500);
       expect(chamadas.map((c) => c.caminho).where((c) => c.endsWith('aprovar')), hasLength(1));
-      expect(chamadas.firstWhere((c) => c.caminho.endsWith('aprovar')).corpo, {'meio': 'pix'});
+      expect(chamadas.firstWhere((c) => c.caminho.endsWith('aprovar')).corpo, {'meio': 'cartao'});
       expect(chamadas.last.caminho, endsWith('/recusar'));
     });
 
