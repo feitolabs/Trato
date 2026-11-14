@@ -7,14 +7,13 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dados/cliente_api.dart';
-import 'package:trato/dados/repositorios.dart';
+import 'package:trato/dados/repositorios.dart' show Cobranca, StatusPagamento;
 import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/repositorios_catalogo_api.dart';
 import 'package:trato/dados/servico_upload.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dispositivo/servico_camera.dart';
 import 'package:trato/dados/sessao.dart';
-import 'package:trato/telas/aditivo/aditivo.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional/check_in_tela.dart';
@@ -461,7 +460,21 @@ void main() {
         return _json({'id': 'pro', 'nome': 'Gabriel L.'});
       }
       if (r.url.path == '/v1/contratos/ped-1/aditivos/adit-9/aprovar') {
-        return _json({'aditivo': {'id': 'adit-9'}});
+        return _json({
+          'aditivo': {'id': 'adit-9'},
+          'cobranca': {
+            'cobranca_id': 'cob-1',
+            'tipo_instrucao': 'cartao_segredo_do_cliente',
+            'instrucao': 'segredo-de-teste',
+            'cliente_externo_id': 'cus_teste',
+            'chave_efemera': 'ek_teste',
+          },
+        });
+      }
+      if (r.method == 'GET' && r.url.path == '/v1/contratos/pago-1/aditivos') {
+        return _json([
+          {'id': 'a', 'descricao': 'x', 'valor_centavos': 100, 'estado': 'pago'},
+        ]);
       }
       return _json({'detail': 'não'}, 404);
     }
@@ -476,12 +489,14 @@ void main() {
     testWidgets('aprovar responde com o id do pedido (não o do aditivo) e cobra no cartão', (t) async {
       final (api, chamadas) = _cliente(responder);
       bool? aprovou;
+      Cobranca? cobrancaAditivo;
       await t.pumpWidget(
         _app(
           ResponderAditivoTela(
             servico: ServicoAditivoApi(api),
             aditivoId: 'ped-1',
             aoResponder: (a) => aprovou = a,
+            aoCobrancaCriada: (c) => cobrancaAditivo = c,
           ),
         ),
       );
@@ -492,6 +507,16 @@ void main() {
       final post = chamadas.firstWhere((c) => c.metodo == 'POST');
       expect(post.caminho, '/v1/contratos/ped-1/aditivos/adit-9/aprovar');
       expect(post.corpo, {'meio': 'cartao'});
+      // a cobrança do aditivo chega à tela, pronta para a folha do cartão
+      expect(cobrancaAditivo?.precisaDaFolhaDeCartao, isTrue);
+      expect(cobrancaAditivo?.id, 'cob-1');
+    });
+
+    test('o pagamento do aditivo só vira pago quando o backend diz', () async {
+      final (api, _) = _cliente(responder);
+      final servico = ServicoAditivoApi(api);
+      expect(await servico.statusDoPagamento('pago-1'), StatusPagamento.pago);
+      expect(await servico.statusDoPagamento('ped-1'), StatusPagamento.aguardando);
     });
   });
 

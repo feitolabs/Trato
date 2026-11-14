@@ -1,4 +1,5 @@
 export 'package:trato/telas/pedidos/modelos.dart' show EstadoAditivo;
+import 'package:trato/dados/repositorios.dart' show Cobranca, StatusPagamento;
 import 'package:trato/telas/aditivo/aditivo.dart';
 import 'package:trato/telas/pedidos/modelos.dart' show EstadoAditivo;
 
@@ -25,10 +26,14 @@ class ServicoAditivoFake implements ServicoAditivo {
   }
 
   @override
-  Future<void> responder(String aditivoId, {required bool aprovar}) async {
+  Future<Cobranca?> responder(String aditivoId, {required bool aprovar}) async {
     if (falharAoEnviar) throw Exception('falha de teste');
     respostas.add((aditivoId, aprovar));
+    return null;
   }
+
+  @override
+  Future<StatusPagamento> statusDoPagamento(String contratoId) async => StatusPagamento.aguardando;
 }
 
 const aditivoExemplo = DetalheAditivo(

@@ -37,6 +37,7 @@ class DetalhePerfil {
     this.bio,
     this.servicos = const [],
     this.trabalhos = const [],
+    this.fotosUrls = const [],
   });
 
   /// Texto de apresentação escrito pelo profissional (já filtrado pelo backend).
@@ -47,6 +48,9 @@ class DetalhePerfil {
 
   /// Legendas dos trabalhos do portfólio (as fotos vêm da URL assinada quando houver).
   final List<String> trabalhos;
+
+  /// URL assinada da foto de cada trabalho (mesma ordem de [trabalhos]); nulo = sem foto.
+  final List<String?> fotosUrls;
 
   final int noTratoDesde;
   final int totalAvaliacoes;

@@ -228,6 +228,19 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     );
   }
 
+  Future<String?> _urlDaFotoDeTrabalho(String profissionalId, Object? descricao) async {
+    final achou = RegExp(r'^\[Foto:([^\]]+)\]$').firstMatch('${descricao ?? ''}');
+    if (achou == null) return null;
+    try {
+      final r = _mapa(
+        await _api.get('/v1/usuarios/$profissionalId/portfolio/${achou.group(1)}/foto'),
+      );
+      return r['url'] as String?;
+    } on Object {
+      return null;
+    }
+  }
+
   @override
   Future<Profissional> perfil(String profissionalId) async {
     final (bruto, _) = await emParalelo2(
@@ -249,9 +262,13 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           ].join(' · '),
         ),
     ];
-    final portfolio = [
-      for (final p in (j['portfolio'] as List? ?? const []))
-        (p as Map)['titulo'] as String,
+    final itensPortfolio = [
+      for (final p in (j['portfolio'] as List? ?? const [])) p as Map,
+    ];
+    final portfolio = [for (final p in itensPortfolio) p['titulo'] as String];
+    // Foto de cada trabalho: `[Foto:<id>]` vira URL assinada; sem foto ou sem rede, fica a legenda.
+    final fotosUrls = [
+      for (final p in itensPortfolio) await _urlDaFotoDeTrabalho(profissionalId, p['descricao']),
     ];
     final regioes = [
       for (final r in (j['regioes'] as List? ?? const []))
@@ -279,6 +296,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
         bio: j['bio'] as String?,
         servicos: portfolio,
         trabalhos: portfolio,
+        fotosUrls: fotosUrls,
+        fotosTrabalhos: portfolio.isEmpty ? 3 : (portfolio.length > 3 ? 3 : portfolio.length),
       ),
     );
   }

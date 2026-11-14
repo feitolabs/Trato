@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/repositorios.dart' show Cobranca;
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
 import '../profissional_apoio/apoio.dart';
@@ -14,10 +15,14 @@ class ResponderAditivoTela extends StatelessWidget {
     required this.servico,
     required this.aditivoId,
     this.aoResponder,
+    this.aoCobrancaCriada,
   });
 
   final ServicoAditivo servico;
   final String aditivoId;
+
+  /// Ao aprovar: a cobrança do aditivo, para quem abriu a tela levar o cliente a pagar.
+  final ValueChanged<Cobranca>? aoCobrancaCriada;
 
   /// Depois que o serviço aceitou a resposta (true = aprovou).
   final ValueChanged<bool>? aoResponder;
@@ -36,6 +41,7 @@ class ResponderAditivoTela extends StatelessWidget {
         servico: servico,
         aditivoId: aditivoId,
         aoResponder: aoResponder,
+        aoCobrancaCriada: aoCobrancaCriada,
       ),
     );
   }
@@ -47,7 +53,10 @@ class _Corpo extends StatefulWidget {
     required this.servico,
     required this.aditivoId,
     required this.aoResponder,
+    required this.aoCobrancaCriada,
   });
+
+  final ValueChanged<Cobranca>? aoCobrancaCriada;
 
   /// O mesmo id com que a tela carregou o aditivo (o do pedido/contrato). `detalhe.id` é o do
   /// próprio aditivo, que o servidor não aceita no lugar do contrato.
@@ -85,13 +94,14 @@ class _CorpoState extends State<_Corpo> {
       _erro = null;
     });
     try {
-      await widget.servico.responder(widget.aditivoId, aprovar: aprovar);
+      final cobranca = await widget.servico.responder(widget.aditivoId, aprovar: aprovar);
       if (!mounted) return;
       setState(() {
         _enviando = null;
         _estado = aprovar ? EstadoAditivo.aprovado : EstadoAditivo.recusado;
       });
       widget.aoResponder?.call(aprovar);
+      if (aprovar && cobranca != null) widget.aoCobrancaCriada?.call(cobranca);
     } catch (_) {
       if (!mounted) return;
       setState(() {

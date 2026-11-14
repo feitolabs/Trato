@@ -34,6 +34,28 @@ void main() {
     expect((await servico.dados()).telefone, '11988887777');
   });
 
+  testWidgets('dados pessoais: conta sem CPF pede o CPF e grava junto com o telefone', (tester) async {
+    final servico = ServicoContaFake(
+      dados: const DadosPessoaisConta(nome: 'Gabriel', email: 'g@exemplo.com'),
+    );
+    await _abrir(tester, DadosPessoaisTela(servico: servico));
+    expect(find.text('CPF'), findsOneWidget);
+    // CPF inválido não grava nada
+    await tester.enterText(find.byType(TextField).first, '11111111111');
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+    expect((await servico.dados()).cpfFinal, isNull);
+    // CPF válido + telefone
+    await tester.enterText(find.byType(TextField).first, '52998224725');
+    await tester.enterText(find.byType(TextField).at(1), '37988199991');
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dados salvos.'), findsOneWidget);
+    final d = await servico.dados();
+    expect(d.cpfFinal, '25');
+    expect(d.telefone, '37988199991');
+  });
+
   testWidgets('dados pessoais: telefone curto mostra erro e não salva', (tester) async {
     final servico = ServicoContaFake();
     await _abrir(tester, DadosPessoaisTela(servico: servico));

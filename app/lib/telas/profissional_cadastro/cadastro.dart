@@ -36,7 +36,11 @@ class DadosCadastroProfissional {
     required this.portfolio,
     this.atendePresencial = true,
     this.atendeRemoto = false,
+    this.urlsDasFotos = const {},
   });
+
+  /// Para mostrar na edição as fotos já enviadas: `[Foto:id]` → URL assinada da imagem.
+  final Map<String, String> urlsDasFotos;
 
   /// Atende no local do cliente (padrão) e/ou à distância. Pelo menos um dos dois.
   final bool atendePresencial;

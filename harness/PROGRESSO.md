@@ -924,3 +924,11 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 
 - **Fotos de trabalhos não apareciam:** o cadastro guardava só o caminho do arquivo no celular. Agora a foto sobe (destino `portfolio`) e o perfil guarda `[Foto:<id>]`; nova rota `GET /v1/usuarios/{id}/portfolio/{upload}/foto` devolve a URL assinada (só para envio de portfólio concluído do próprio dono). O perfil do próprio profissional mostra as fotos; a vitrine para clientes ainda mostra só os títulos.
 - **Telefone com erro:** a conta de teste não tem linha em `usuarios_privados` (sem CPF vinculado) e o servidor respondia 500 genérico. Agora 409 "Complete o cadastro com o CPF antes de salvar estes dados.".
+
+## 2026-11-14 — Pendências do app (v0.1.18)
+
+- **Splash:** com login guardado, entra direto no início (sem tocar).
+- **Fotos de trabalhos:** aparecem no perfil que o cliente vê (`DetalhePerfil.fotosUrls`) e na edição do cadastro (`urlsDasFotos`). Fotos antigas (só caminho do celular) seguem sem imagem: é preciso reescolher.
+- **CPF:** conta sem CPF vê o campo CPF em Dados pessoais; grava via `POST /v1/me/dados-pessoais` (uma vez) e depois o telefone.
+- **Aditivo:** ao aprovar, a cobrança do aditivo (cartão) vem com cliente e chave efêmera, o app abre a folha do cartão e espera o webhook (`GET /v1/contratos/{id}/aditivos` com estado `pago`). Antes abria a tela de pagamento do pedido, que já estava pago.
+- **Pedido #02D8** (sem endereço): dado de teste; novos pedidos presenciais já exigem endereço. Não alterado.
