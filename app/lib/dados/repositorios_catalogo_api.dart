@@ -289,7 +289,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       detalhe: DetalhePerfil(
         noTratoDesde: DateTime.now().year,
         totalAvaliacoes: avaliacoes.length,
-        taxaConclusao: 0,
+        taxaConclusao: (j['taxa_conclusao'] as num?)?.toInt() ?? 0,
+        temHistorico: j['taxa_conclusao'] != null,
         respondeEm: '',
         verificacoes: const [],
         avaliacoes: avaliacoes,
