@@ -555,7 +555,26 @@ def _decidir_aditivo(
     if servico is not None:
         try:
             if aprovar:
-                aditivo, cobranca = servico.aprovar_aditivo(contexto, pedido, aditivo_id, meio)
+                # Cartão: a folha do provedor precisa do cliente e da chave efêmera (como no pedido).
+                preparo = None
+                if meio is MeioPagamento.CARTAO and hasattr(servico.provedor, "preparar_cartao"):
+                    try:
+                        preparo = servico.provedor.preparar_cartao(usuario.id)
+                    except ErroProvedor as erro:
+                        raise HTTPException(
+                            502, "O parceiro de pagamento não respondeu. Tente de novo."
+                        ) from erro
+                aditivo, cobranca = servico.aprovar_aditivo(
+                    contexto,
+                    pedido,
+                    aditivo_id,
+                    meio,
+                    cliente_externo=preparo.cliente_id if preparo else None,
+                )
+                saida_cobranca = _cobranca_out(pedido.id, cobranca)
+                if preparo is not None:
+                    saida_cobranca.cliente_externo_id = preparo.cliente_id
+                    saida_cobranca.chave_efemera = preparo.chave_efemera
                 return AditivoDecididoOut(
                     aditivo=AditivoContratoOut(
                         id=aditivo.id,
@@ -564,7 +583,7 @@ def _decidir_aditivo(
                         valor_centavos=aditivo.valor_centavos,
                         estado=aditivo.estado.value,
                     ),  # fmt: skip
-                    cobranca=_cobranca_out(pedido.id, cobranca),
+                    cobranca=saida_cobranca,
                 )
             aditivo = servico.recusar_aditivo(contexto, pedido, aditivo_id)
         except ErroFluxo as erro:

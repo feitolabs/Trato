@@ -125,14 +125,14 @@ void main() {
       expect(find.byType(CascaClienteTela), findsNothing);
     });
 
-    testWidgets('splash com sessão de cliente vai direto à casca do cliente', (tester) async {
+    testWidgets('splash com sessão de cliente entra sozinha na casca do cliente', (tester) async {
       final auth = ServicoAuthFake();
       ServicoAuthPadrao.atual = auth;
       await auth.entrarComEmail(email: 'a@b.com', senha: 'x');
+      // sem tocar em nada: quem já entrou antes não passa pela splash de novo
       await abrir(tester, const SplashTela());
-      await tester.tap(find.text('Toque para começar'));
-      await tester.pumpAndSettle();
       expect(find.byType(CascaClienteTela), findsOneWidget);
+      expect(find.byType(SplashTela), findsNothing);
     });
 
     testWidgets('login de conta profissional entra na casca do profissional', (tester) async {

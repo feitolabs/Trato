@@ -258,7 +258,12 @@ class ServicoPagamento:
         return aditivo
 
     def aprovar_aditivo(
-        self, contexto: Contexto, pedido: Pedido, aditivo_id: str, meio: MeioPagamento
+        self,
+        contexto: Contexto,
+        pedido: Pedido,
+        aditivo_id: str,
+        meio: MeioPagamento,
+        cliente_externo: str | None = None,
     ) -> tuple[Aditivo, CobrancaLocal]:
         aditivo = self.aditivos.obter(aditivo_id)
         if aditivo is None or aditivo.pedido_id != pedido.id:
@@ -272,7 +277,14 @@ class ServicoPagamento:
         # se a cobrança falhar a aprovação volta junto (o cliente pode tentar de novo).
         with contexto.transacao():
             self.aditivos.salvar(aprovado)
-            cobranca = self.cobrar(contexto, pedido, aprovado.valor_centavos, meio, aprovado.id)
+            cobranca = self.cobrar(
+                contexto,
+                pedido,
+                aprovado.valor_centavos,
+                meio,
+                aprovado.id,
+                cliente_externo=cliente_externo,
+            )
         return aprovado, cobranca
 
     def recusar_aditivo(self, contexto: Contexto, pedido: Pedido, aditivo_id: str) -> Aditivo:

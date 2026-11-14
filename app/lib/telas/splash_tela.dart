@@ -6,8 +6,24 @@ import 'fluxo/rotas.dart';
 import 'onboarding/onboarding_tela.dart';
 
 /// Tela 1 do protótipo: logo Feito Labs, "Trato" e o lema. Toque em qualquer lugar para começar.
-class SplashTela extends StatelessWidget {
+class SplashTela extends StatefulWidget {
   const SplashTela({super.key});
+
+  @override
+  State<SplashTela> createState() => _SplashTelaState();
+}
+
+class _SplashTelaState extends State<SplashTela> {
+  @override
+  void initState() {
+    super.initState();
+    // Quem já entrou antes não precisa tocar de novo: com login guardado, abre direto no início.
+    if (RotasTrato.temSessao) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _comecar(context);
+      });
+    }
+  }
 
   /// Com sessão guardada, vai direto para a casca do perfil; sem ela, onboarding.
   void _comecar(BuildContext context) {

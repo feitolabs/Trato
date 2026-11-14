@@ -316,7 +316,7 @@ class _FormularioState extends State<_Formulario> {
               for (var i = 0; i < _portfolio.length; i++)
                 _MiniFoto(
                   numero: i + 1,
-                  referencia: _portfolio[i],
+                  referencia: _atual?.urlsDasFotos[_portfolio[i]] ?? _portfolio[i],
                   aoRemover: () => setState(() => _portfolio.removeAt(i)),
                 ),
             ],

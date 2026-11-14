@@ -50,6 +50,12 @@ class ServicoContaApi implements ServicoConta {
       _dadosDe(_mapa(await _api.get('/v1/me/dados-pessoais')));
 
   @override
+  Future<DadosPessoaisConta> registrarCpf(String cpf) async {
+    await _api.post('/v1/me/dados-pessoais', corpo: {'cpf': cpf});
+    return dados();
+  }
+
+  @override
   Future<DadosPessoaisConta> salvarDados({
     String? telefone,
     DateTime? nascimento,

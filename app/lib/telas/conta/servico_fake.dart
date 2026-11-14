@@ -36,6 +36,19 @@ class ServicoContaFake implements ServicoConta {
   }
 
   @override
+  Future<DadosPessoaisConta> registrarCpf(String cpf) async {
+    _checar();
+    _dados = DadosPessoaisConta(
+      nome: _dados.nome,
+      email: _dados.email,
+      cpfFinal: cpf.substring(cpf.length - 2),
+      telefone: _dados.telefone,
+      dataNascimento: _dados.dataNascimento,
+    );
+    return _dados;
+  }
+
+  @override
   Future<DadosPessoaisConta> salvarDados({
     String? telefone,
     DateTime? nascimento,
