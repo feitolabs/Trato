@@ -492,7 +492,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     }
     final fim = DateTime.parse(j['fim_em'] as String);
     final falta = fim.toLocal().difference(DateTime.now()).inDays;
+    final fotos = await _fotosDoServico(pedidoId);
     return DadosGarantia(
+      fotoAntes: fotos['antes'],
+      fotoDepois: fotos['depois'],
       titulo: 'Garantia do pedido ${PedidoApi.numeroDe(pedidoId)}',
       diasTotal: (j['dias'] as int?) ?? 0,
       diasRestantes: falta < 0 ? 0 : falta,
@@ -1364,10 +1367,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       return [
         for (final l in ExtratoApi.deJson(json).itens)
           ItemExtrato(
-            titulo: 'Pedido ${_curto(l.pedidoId)} · ${l.tipo.replaceAll('_', ' ')}',
+            titulo: 'Pedido ${_curto(l.pedidoId)} · ${switch (l.tipo) {
+              'retencao' => 'valor retido',
+              'repasse' => 'valor liberado',
+              'cobranca' => 'pagamento',
+              'taxa' => 'taxa do Trato',
+              'estorno' => 'estorno',
+              _ => l.tipo.replaceAll('_', ' '),
+            }}',
             detalheData: _dia(l.data.toLocal()),
             brutoCentavos: l.valorCentavos,
-            textoTaxa: l.estornoDe != null ? 'Estorno' : 'Lançamento do ledger',
+            pedidoId: l.pedidoId,
+            textoTaxa: l.estornoDe != null ? 'Estorno' : 'Toque para ver os valores',
             liquidoCentavos: l.valorCentavos,
             status: StatusExtrato.liberado,
           ),
@@ -1375,6 +1386,60 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     } catch (_) {
       return const [];
     }
+  }
+
+  /// `GET /v1/pedidos/{id}/saldo` (ledger), `GET /v1/contratos/{id}/aditivos` e `.../notas-material`.
+  @override
+  Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async {
+    final saldo = _mapa(await _api.get('/v1/pedidos/$pedidoId/saldo'));
+    var aditivos = <Map<String, dynamic>>[];
+    var notas = <Map<String, dynamic>>[];
+    try {
+      aditivos = _lista(await _api.get('/v1/contratos/$pedidoId/aditivos'));
+    } on ErroTrato {
+      aditivos = [];
+    }
+    try {
+      notas = _lista(await _api.get('/v1/contratos/$pedidoId/notas-material'));
+    } on ErroTrato {
+      notas = [];
+    }
+    int cent(Object? v) => v is num ? v.toInt() : 0;
+    final retido = cent(saldo['retido_centavos']);
+    final aLiberar = cent(saldo['a_liberar_centavos']);
+    final liberado = cent(saldo['liberado_centavos']);
+    final situacao = liberado > 0
+        ? 'Valor já liberado para você.'
+        : aLiberar > 0
+            ? 'Serviço concluído: o valor está a liberar.'
+            : 'Retido até o cliente confirmar o serviço.';
+    String estadoAditivo(String? e) => switch (e) {
+          'proposto' => 'Aguardando o cliente aprovar',
+          'aprovado' => 'Aprovado: aguardando o pagamento do cliente',
+          'pago' => 'Pago pelo cliente',
+          'recusado' => 'Recusado pelo cliente',
+          _ => e ?? '',
+        };
+    notas.sort((a, b) => '${a['enviada_em']}'.compareTo('${b['enviada_em']}'));
+    return DetalheValoresPedido(
+      pedidoNumero: _curto(pedidoId),
+      pagoPeloClienteCentavos: cent(saldo['cliente_pagou_centavos']),
+      taxaCentavos: cent(saldo['taxa_trato_centavos']),
+      voceRecebeCentavos: retido + aLiberar + liberado,
+      situacao: situacao,
+      aditivos: [
+        for (final a in aditivos)
+          LinhaDeValor(
+            '${a['descricao'] ?? 'Aditivo'}',
+            cent(a['valor_centavos']),
+            nota: estadoAditivo(a['estado'] as String?),
+          ),
+      ],
+      notas: [
+        for (var i = 0; i < notas.length; i++)
+          LinhaDeValor('Nota ${i + 1}', cent(notas[i]['total_centavos'])),
+      ],
+    );
   }
 
   String _curto(String id) => '#${id.substring(0, id.length < 4 ? id.length : 4).toUpperCase()}';

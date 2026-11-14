@@ -459,6 +459,33 @@ class AvaliacoesPostgres:
             criada_em=l["criada_em"],
         )
 
+    def recebidas(self, avaliado_id: str) -> list[Avaliacao]:
+        """Avaliações recebidas por uma pessoa, da mais recente para a mais antiga (perfil público)."""
+        uid = como_uuid(avaliado_id)
+        if uid is None:
+            return []
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, a.nota_geral, "
+                "a.comentario, a.etiquetas, a.criada_em from public.avaliacoes a "
+                "join public.contratos c on c.id = a.contrato_id "
+                "where a.avaliado_id = %s order by a.criada_em desc",
+                (uid,),
+            ).fetchall()
+        return [
+            Avaliacao(
+                pedido_id=str(l["pedido_id"]),
+                direcao=l["direcao"],
+                avaliador_id=str(l["avaliador_id"]),
+                avaliado_id=str(l["avaliado_id"]),
+                nota_geral=int(l["nota_geral"]),
+                comentario=l["comentario"],
+                etiquetas=tuple(l["etiquetas"] or ()),
+                criada_em=l["criada_em"],
+            )
+            for l in linhas  # noqa: E741
+        ]
+
     def salvar(self, avaliacao: Avaliacao) -> None:
         with self._banco.transacao() as con:
             contrato = _exigir_contrato(con, avaliacao.pedido_id)

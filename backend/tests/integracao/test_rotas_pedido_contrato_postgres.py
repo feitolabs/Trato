@@ -385,3 +385,11 @@ def test_garantia_aditivo_e_nota_de_material(cenario):
         post(c, f"/v1/contratos/{pedido_id}/avaliacao", "cliente", {"nota_geral": 5}).status_code
         == 409
     )
+    # o pedido diz que o cliente já avaliou (o app esconde "Avaliar") e o perfil público conta
+    assert get(c, f"/v1/pedidos/{pedido_id}", "cliente").json()["ja_avaliou"] is True
+    assert get(c, f"/v1/pedidos/{pedido_id}", "profissional").json()["ja_avaliou"] is False
+    perfil = get(c, f"/v1/profissionais/{c.ids['profissional']}", "cliente")
+    assert perfil.status_code == 200, perfil.text
+    assert perfil.json()["servicos_concluidos"] >= 1  # o cenário é compartilhado entre testes
+    assert perfil.json()["nota_publica"] == 5.0
+    assert len(perfil.json()["avaliacoes"]) >= 1

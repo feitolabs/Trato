@@ -37,7 +37,11 @@ class ItemExtrato {
     required this.textoTaxa,
     required this.liquidoCentavos,
     required this.status,
+    this.pedidoId,
   });
+
+  /// Para abrir o detalhe dos valores do pedido ao tocar na linha.
+  final String? pedidoId;
 
   final String titulo;
 
@@ -50,6 +54,47 @@ class ItemExtrato {
   final String textoTaxa;
   final int liquidoCentavos;
   final StatusExtrato status;
+}
+
+/// Um valor com nome, na tela de detalhe do pedido.
+class LinhaDeValor {
+  const LinhaDeValor(this.rotulo, this.centavos, {this.nota});
+
+  final String rotulo;
+  final int centavos;
+
+  /// Texto pequeno abaixo (ex.: "Aguardando o cliente pagar").
+  final String? nota;
+}
+
+/// Valores de um pedido para o profissional. Tudo sai pronto do backend (saldo do ledger,
+/// aditivos e notas); o app só mostra.
+class DetalheValoresPedido {
+  const DetalheValoresPedido({
+    required this.pedidoNumero,
+    required this.pagoPeloClienteCentavos,
+    required this.taxaCentavos,
+    required this.voceRecebeCentavos,
+    required this.situacao,
+    this.aditivos = const [],
+    this.notas = const [],
+  });
+
+  final String pedidoNumero;
+
+  /// O valor inteiro que o cliente pagou (antes da taxa).
+  final int pagoPeloClienteCentavos;
+
+  /// Taxa do Trato descontada.
+  final int taxaCentavos;
+
+  /// O que fica para o profissional (já sem a taxa).
+  final int voceRecebeCentavos;
+
+  /// Ex.: "Retido até o serviço ser confirmado".
+  final String situacao;
+  final List<LinhaDeValor> aditivos;
+  final List<LinhaDeValor> notas;
 }
 
 /// Tudo que a tela precisa. [erro] preenchido mostra a mensagem com "Tentar de novo".

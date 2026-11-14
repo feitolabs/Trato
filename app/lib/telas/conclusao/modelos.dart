@@ -121,7 +121,13 @@ class DadosGarantia {
     required this.cobre,
     required this.naoCobre,
     required this.prazoAtendimentoDias,
+    this.fotoAntes,
+    this.fotoDepois,
   });
+
+  /// Fotos do serviço (check-in e check-out), por URL assinada. Nulo = sem foto.
+  final String? fotoAntes;
+  final String? fotoDepois;
 
   final String titulo;
 

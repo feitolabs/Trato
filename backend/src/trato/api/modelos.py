@@ -234,6 +234,9 @@ class PedidoOut(BaseModel):
     )
     codigo_conclusao: str | None = Field(None, description="Só o cliente vê.")
     modalidade: str = Field("presencial", description="`presencial` ou `remoto`.")
+    ja_avaliou: bool = Field(
+        False, description="Quem pergunta já avaliou este serviço (só preenchido ao ver o pedido)."
+    )
 
 
 class EventoOut(BaseModel):

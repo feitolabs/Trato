@@ -494,6 +494,15 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   Future<List<ItemExtrato>> extrato() async => DadosExemploCarteira.completo.extrato;
 
   @override
+  Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async => const DetalheValoresPedido(
+        pedidoNumero: '#AAAA',
+        pagoPeloClienteCentavos: 70500,
+        taxaCentavos: 5288,
+        voceRecebeCentavos: 65212,
+        situacao: 'Retido até o cliente confirmar o serviço.',
+      );
+
+  @override
   ServicoOrcamento servicoOrcamento(String pedidoId) =>
       ServicoOrcamentoFake(taxaBps: taxaDemonstracaoBps);
 
