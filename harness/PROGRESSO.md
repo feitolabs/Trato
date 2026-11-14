@@ -936,3 +936,7 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 ## 2026-11-14 — Código de conclusão visível (v0.1.19)
 
 - **Bug (da v0.1.15):** o cliente não via o código de conclusão com o serviço em andamento (o botão "Ver conclusão" só aparece depois do check-out), mas o profissional precisa dele para o check-out. Agora o código aparece em "Código de conclusão" no detalhe do pedido e no acompanhamento, só em `em_andamento`. O backend guarda só o hash do código; não há como recuperá-lo pelo banco.
+
+## 2026-11-14 — Todas as notas de materiais (v0.1.20)
+
+- **Bug:** `ServicoNotaMaterialApi.carregar` devolvia só a nota mais recente; com duas notas, a primeira "sumia" para o cliente. Agora `carregarTodas` lista todas (mais antiga primeiro), a tela numera "Nota 1", "Nota 2", mostra a soma delas, e o cabeçalho traz "Pedido #XXXX · nome do profissional".

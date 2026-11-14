@@ -16,6 +16,13 @@ class ServicoNotaMaterialFake implements ServicoNotaMaterial {
   }
 
   @override
+  Future<List<NotaMaterial>> carregarTodas(String pedidoId) async {
+    if (falharAoCarregar) throw Exception('falha de teste');
+    final n = nota;
+    return n == null ? const [] : [n];
+  }
+
+  @override
   Future<void> enviar(EnvioNota envio) async {
     if (falharAoEnviar) throw Exception('falha de teste');
     enviados.add(envio);

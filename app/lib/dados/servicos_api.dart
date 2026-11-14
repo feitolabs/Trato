@@ -144,26 +144,47 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
   /// `GET /v1/contratos/{id}/notas-material`: a nota mais recente, ou `null`.
   @override
   Future<NotaMaterial?> carregar(String pedidoId) async {
+    final todas = await carregarTodas(pedidoId);
+    return todas.isEmpty ? null : todas.last;
+  }
+
+  /// `GET /v1/contratos/{id}/notas-material`: todas, da mais antiga para a mais nova.
+  @override
+  Future<List<NotaMaterial>> carregarTodas(String pedidoId) async {
     final notas = _lista(await _api.get('/v1/contratos/$pedidoId/notas-material'));
-    if (notas.isEmpty) return null;
+    if (notas.isEmpty) return const [];
     notas.sort((a, b) => (a['enviada_em'] as String).compareTo(b['enviada_em'] as String));
-    final n = notas.last;
-    return NotaMaterial(
-      pedidoTitulo: tituloPedido,
-      profissional: nomeProfissional,
-      enviadaEm: DateTime.parse(n['enviada_em'] as String).toLocal(),
-      itens: [
-        for (final i in (n['itens'] as List).cast<Map<String, dynamic>>())
-          ItemNota(
-            descricao: i['descricao'] as String,
-            // O backend manda a quantidade como texto decimal ("2.00").
-            quantidade: num.tryParse('${i['quantidade']}')?.toInt() ?? 1,
-            valorUnitarioCentavos: (i['valor_unitario_centavos'] is num)
-                ? (i['valor_unitario_centavos'] as num).toInt()
-                : (i['total_centavos'] as int? ?? 0),
-          ),
-      ],
-    );
+    // Quem enviou e qual pedido: sem rede para isso, o texto cai no genérico.
+    var nome = nomeProfissional;
+    if (nome.isEmpty) {
+      try {
+        final o = await _api.get('/v1/pedidos/$pedidoId/interlocutor');
+        final n = (o is Map ? o['nome'] as String? : null)?.trim();
+        if (n != null && n.isNotEmpty) nome = n;
+      } on Object {
+        nome = '';
+      }
+    }
+    final curto = pedidoId.length >= 4 ? pedidoId.substring(0, 4).toUpperCase() : pedidoId;
+    return [
+      for (final n in notas)
+        NotaMaterial(
+          pedidoTitulo: tituloPedido == 'Pedido' ? 'Pedido #$curto' : tituloPedido,
+          profissional: nome.isEmpty ? 'Profissional' : nome,
+          enviadaEm: DateTime.parse(n['enviada_em'] as String).toLocal(),
+          itens: [
+            for (final i in (n['itens'] as List).cast<Map<String, dynamic>>())
+              ItemNota(
+                descricao: i['descricao'] as String,
+                // O backend manda a quantidade como texto decimal ("2.00").
+                quantidade: num.tryParse('${i['quantidade']}')?.toInt() ?? 1,
+                valorUnitarioCentavos: (i['valor_unitario_centavos'] is num)
+                    ? (i['valor_unitario_centavos'] as num).toInt()
+                    : (i['total_centavos'] as int? ?? 0),
+              ),
+          ],
+        ),
+    ];
   }
 
   /// `POST /v1/contratos/{id}/notas-material`. A tela informa descrição e valor de cada item;
