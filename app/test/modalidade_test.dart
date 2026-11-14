@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dados/cliente_api.dart';
+import 'package:trato/dados/modelos_api.dart' show PedidoApi;
 import 'package:trato/dados/repositorios.dart' show Cobranca, StatusPagamento;
 import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/repositorios_catalogo_api.dart';
@@ -15,6 +16,7 @@ import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dispositivo/servico_camera.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
+import 'package:trato/telas/carteira/detalhe_valores_tela.dart';
 import 'package:trato/telas/nota_material/ver_nota_tela.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional/check_in_tela.dart';
@@ -542,6 +544,86 @@ void main() {
       final servico = ServicoAditivoApi(api);
       expect(await servico.statusDoPagamento('pago-1'), StatusPagamento.pago);
       expect(await servico.statusDoPagamento('ped-1'), StatusPagamento.aguardando);
+    });
+  });
+
+  group('Avaliação e garantia', () {
+    DetalheServico concluido({required bool jaAvaliou}) => DetalheServico(
+          pedidoId: 'p1',
+          numero: 'AAAA',
+          titulo: 'Pedido #AAAA',
+          estadoApi: 'concluido',
+          statusTexto: 'Finalizado',
+          statusTipo: TipoStatus.sucesso,
+          abertoEm: 'Aberto em 07/11',
+          etapas: const [],
+          jaAvaliou: jaAvaliou,
+        );
+
+    test('"Avaliar o serviço" some depois que o cliente avaliou', () {
+      expect(concluido(jaAvaliou: false).acoes, contains(AcaoServico.avaliar));
+      final depois = concluido(jaAvaliou: true).acoes;
+      expect(depois, isNot(contains(AcaoServico.avaliar)));
+      expect(depois, contains(AcaoServico.verGarantia));
+    });
+
+    test('o pedido do servidor diz se já foi avaliado', () {
+      final j = {..._pedidoJson('p1', 'concluido'), 'ja_avaliou': true};
+      expect(PedidoApi.deJson(j).jaAvaliou, isTrue);
+      expect(PedidoApi.deJson(_pedidoJson('p1', 'concluido')).jaAvaliou, isFalse);
+    });
+  });
+
+  group('Valores do pedido na Carteira do profissional', () {
+    http.Response responder(http.Request r) {
+      switch (r.url.path) {
+        case '/v1/pedidos/ped-1/saldo':
+          return _json({
+            'cliente_pagou_centavos': 70500,
+            'retido_centavos': 65212,
+            'a_liberar_centavos': 0,
+            'liberado_centavos': 0,
+            'taxa_trato_centavos': 5288,
+          });
+        case '/v1/contratos/ped-1/aditivos':
+          return _json([
+            {'id': 'a', 'descricao': 'Horas extras', 'valor_centavos': 45000, 'estado': 'proposto'},
+          ]);
+        case '/v1/contratos/ped-1/notas-material':
+          return _json([
+            {'enviada_em': '2026-11-13T10:00:00Z', 'total_centavos': 24000, 'itens': <Object>[]},
+            {'enviada_em': '2026-11-14T10:00:00Z', 'total_centavos': 5000, 'itens': <Object>[]},
+          ]);
+      }
+      return _json({'detail': 'não'}, 404);
+    }
+
+    test('mostra o valor inteiro, a taxa, o líquido, os aditivos e as notas', () async {
+      final (api, _) = _cliente(responder);
+      final d = await RepositorioProfissionalApi(api).valoresDoPedido('ped-1');
+      expect(d.pagoPeloClienteCentavos, 70500);
+      expect(d.taxaCentavos, 5288);
+      expect(d.voceRecebeCentavos, 65212);
+      expect(d.situacao, contains('Retido'));
+      expect(d.aditivos.single.centavos, 45000);
+      expect(d.aditivos.single.nota, contains('Aguardando o cliente aprovar'));
+      expect(d.notas.map((n) => n.centavos), [24000, 5000]);
+    });
+
+    testWidgets('a tela de detalhe lista tudo e avisa que nota não cobra', (t) async {
+      final (api, _) = _cliente(responder);
+      await t.pumpWidget(
+        _app(
+          DetalheValoresTela(
+            carregar: () => RepositorioProfissionalApi(api).valoresDoPedido('ped-1'),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(find.text('Valor pago pelo cliente'), findsOneWidget);
+      expect(find.text('Você recebe'), findsOneWidget);
+      expect(find.text('Horas extras'), findsOneWidget);
+      expect(find.textContaining('não geram cobrança'), findsOneWidget);
     });
   });
 

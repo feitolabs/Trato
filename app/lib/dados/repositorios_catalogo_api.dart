@@ -435,6 +435,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
     }
     return DetalheServico(
       remoto: pedido.remoto,
+      jaAvaliou: pedido.jaAvaliou,
       local: local,
       codigoConclusao: pedido.estado == 'em_andamento' ? pedido.codigoConclusao : null,
       pedidoId: pedido.id,

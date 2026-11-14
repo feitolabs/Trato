@@ -299,7 +299,7 @@ void main() {
 
       final g = await RepositorioPedidosApi(api).garantia('ab12cd34');
 
-      expect(chamadas.single.caminho, '/v1/contratos/ab12cd34/garantia');
+      expect(chamadas.first.caminho, '/v1/contratos/ab12cd34/garantia'); // depois busca as fotos do serviço
       expect(g.diasTotal, 90);
       expect(g.diasRestantes, 64);
       expect(g.ativa, isTrue);

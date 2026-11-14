@@ -61,6 +61,7 @@ import '../verificacao/verificacao_tela.dart';
 import '../carteira/carteira_tela.dart';
 import '../carteira/modelos.dart';
 import '../cliente/casca_cliente_tela.dart';
+import '../carteira/detalhe_valores_tela.dart';
 import '../conclusao/avaliacao_tela.dart';
 import '../conclusao/conclusao_tela.dart';
 import '../conclusao/modelos.dart';
@@ -924,6 +925,12 @@ abstract final class RotasTrato {
         construir: (context, itens) => CarteiraTela(
           soExtrato: true,
           dados: DadosCarteira(extrato: itens),
+          aoAbrirItem: (item) => _abrir<void>(
+            context,
+            DetalheValoresTela(
+              carregar: () => repos.profissional.valoresDoPedido(item.pedidoId!),
+            ),
+          ),
         ),
       );
 

@@ -24,6 +24,7 @@ MIGRATIONS = (
     "f37_chat",
     "mensagens_entregue_em",
     "modalidade_remoto",
+    "perfil_nota_e_concluidos",
     "profissional_disponibilidade_portfolio_uploads",
     "lgpd_exclusao_consentimentos",
     "admin_sugestoes_completas",

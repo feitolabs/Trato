@@ -22,7 +22,11 @@ class PedidoApi {
     this.janelaInicio,
     this.janelaFim,
     this.modalidade = 'presencial',
+    this.jaAvaliou = false,
   });
+
+  /// Quem consultou já avaliou este serviço (o app não oferece "Avaliar" de novo).
+  final bool jaAvaliou;
 
   /// `presencial` ou `remoto`.
   final String modalidade;
@@ -31,6 +35,7 @@ class PedidoApi {
 
   factory PedidoApi.deJson(Map<String, dynamic> j) => PedidoApi(
         modalidade: (j['modalidade'] as String?) ?? 'presencial',
+        jaAvaliou: j['ja_avaliou'] == true,
         janelaInicio: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['inicio']),
         janelaFim: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['fim']),
         id: j['id'] as String,

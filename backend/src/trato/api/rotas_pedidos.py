@@ -236,7 +236,15 @@ def ver_pedido(
     pedido = carregar_pedido(
         contexto, pedido_id, usuario, request=request, equipe=(Permissao.PEDIDOS_BUSCAR,)
     )
-    return pedido_out(pedido, usuario)
+    ja_avaliou = False
+    if pedido.estado is Estado.CONCLUIDO:
+        direcao = (
+            "cliente_para_profissional"
+            if pedido.cliente_id == usuario.id
+            else "profissional_para_cliente"
+        )
+        ja_avaliou = contexto.avaliacoes.obter(pedido.id, direcao) is not None
+    return pedido_out(pedido, usuario, ja_avaliou)
 
 
 def _dados_out(d: DadosPedido) -> DadosPedidoOut:

@@ -940,3 +940,11 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 ## 2026-11-14 — Todas as notas de materiais (v0.1.20)
 
 - **Bug:** `ServicoNotaMaterialApi.carregar` devolvia só a nota mais recente; com duas notas, a primeira "sumia" para o cliente. Agora `carregarTodas` lista todas (mais antiga primeiro), a tela numera "Nota 1", "Nota 2", mostra a soma delas, e o cabeçalho traz "Pedido #XXXX · nome do profissional".
+
+## 2026-11-14 — Aditivo, perfil, carteira (v0.1.21)
+
+- **Aprovar aditivo dava 404:** `ServicoPagamento` comparava `aditivo.pedido_id != pedido.id` como texto (hex × com hífen). Agora `_mesmo_id`.
+- **Perfil do profissional com nota 0,0 / 0 serviços / sem avaliações:** nada atualizava `perfis_profissional.nota_publica` e `servicos_concluidos`, e `AvaliacoesPostgres` não tinha `recebidas`. Migration `20261114120000_perfil_nota_e_concluidos.sql` (gatilhos + recálculo do que já existe; rollback em `supabase/rollback/`) e `recebidas` implementado.
+- **"Avaliar o serviço" repetido:** `PedidoOut.ja_avaliou`; o app esconde a ação.
+- **Garantia:** mostra as fotos reais (check-in/check-out).
+- **Carteira do profissional:** toque na linha abre "Valores do pedido" (valor pago pelo cliente, taxa, líquido, aditivos e notas). Notas de materiais não geram cobrança; aditivo só entra depois de aprovado e pago.
