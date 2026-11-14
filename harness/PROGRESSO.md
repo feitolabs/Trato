@@ -932,3 +932,7 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - **CPF:** conta sem CPF vê o campo CPF em Dados pessoais; grava via `POST /v1/me/dados-pessoais` (uma vez) e depois o telefone.
 - **Aditivo:** ao aprovar, a cobrança do aditivo (cartão) vem com cliente e chave efêmera, o app abre a folha do cartão e espera o webhook (`GET /v1/contratos/{id}/aditivos` com estado `pago`). Antes abria a tela de pagamento do pedido, que já estava pago.
 - **Pedido #02D8** (sem endereço): dado de teste; novos pedidos presenciais já exigem endereço. Não alterado.
+
+## 2026-11-14 — Código de conclusão visível (v0.1.19)
+
+- **Bug (da v0.1.15):** o cliente não via o código de conclusão com o serviço em andamento (o botão "Ver conclusão" só aparece depois do check-out), mas o profissional precisa dele para o check-out. Agora o código aparece em "Código de conclusão" no detalhe do pedido e no acompanhamento, só em `em_andamento`. O backend guarda só o hash do código; não há como recuperá-lo pelo banco.
