@@ -163,6 +163,36 @@ def foto_de_perfil(
     return FotoDePerfilOut(url=url)
 
 
+@router_usuarios.get(
+    "/{usuario_id}/portfolio/{upload_id}/foto",
+    response_model=FotoDePerfilOut,
+    summary="Foto de trabalho do portfólio de um profissional (URL assinada curta)",
+    description=(
+        "Qualquer usuário logado pode pedir: o portfólio é a vitrine pública do profissional. "
+        "Só vale para envio de portfólio concluído do próprio dono; senão `url` vem `null`."
+    ),
+)
+def foto_do_portfolio(
+    usuario_id: str,
+    upload_id: str,
+    usuario: Usuario = Depends(_usuario),
+    servico: ServicoUploads = Depends(obter_servico),
+) -> FotoDePerfilOut:
+    sol = servico.repo.solicitacao(upload_id)
+    if (
+        sol is None
+        or sol.destino != "portfolio"
+        or sol.status != "concluida"
+        or str(sol.dono_id).replace("-", "") != str(usuario_id).replace("-", "")
+    ):
+        return FotoDePerfilOut(url=None)
+    try:
+        url = servico.armazenamento.url_leitura(sol.bucket, sol.caminho, URL_LEITURA_SEGUNDOS)
+    except Exception:  # noqa: BLE001 - storage fora do ar: o app mostra o quadrado de foto
+        return FotoDePerfilOut(url=None)
+    return FotoDePerfilOut(url=url)
+
+
 def _pode_no_chat_do_pedido(
     contexto: Contexto, pedido: Pedido, usuario: Usuario, destino: str = "chat"
 ) -> bool:

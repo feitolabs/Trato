@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,9 @@ import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/repositorios.dart';
 import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/repositorios_catalogo_api.dart';
+import 'package:trato/dados/servico_upload.dart';
 import 'package:trato/dados/servicos_api.dart';
+import 'package:trato/dispositivo/servico_camera.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
@@ -492,6 +495,48 @@ void main() {
     });
   });
 
+  group('Fotos de trabalhos do portfólio', () {
+    test('a foto do celular sobe como portfólio e vai como [Foto:id]', () async {
+      final dir = Directory.systemTemp.createTempSync('trato_portfolio');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final foto = File('${dir.path}/trabalho.jpg')..writeAsBytesSync([1, 2, 3, 4]);
+      final (api, chamadas) = _cliente((r) {
+        if (r.url.path == '/v1/catalogo/categorias') {
+          return _json([
+            {'id': 'c1', 'nome': 'Design'},
+          ]);
+        }
+        if (r.url.path == '/v1/catalogo/cidades') {
+          return _json([
+            {'id': 'cid-1', 'nome': 'Divinopolis', 'uf': 'MG'},
+          ]);
+        }
+        return _json({'id': 'u'}, 201);
+      });
+      final envio = _UploadFake();
+      final servico = ServicoCadastroProfissionalApi(api, upload: envio);
+      await servico.carregarOpcoes();
+      await servico.salvar(
+        DadosCadastroProfissional(
+          nome: 'Ana',
+          sobre: '',
+          categorias: const {'Design'},
+          cidade: 'Divinopolis',
+          raioKm: 10,
+          dias: const {'Seg'},
+          periodos: const {'Manhã'},
+          portfolio: [foto.path, '[Foto:ja-enviada]'],
+        ),
+      );
+      expect(envio.finalidades, [FinalidadeArquivo.portfolio]);
+      final corpo = chamadas.firstWhere((c) => c.caminho == '/v1/profissional/cadastro').corpo!;
+      expect(
+        [for (final i in corpo['portfolio'] as List) (i as Map)['descricao']],
+        ['[Foto:up-1]', '[Foto:ja-enviada]'],
+      );
+    });
+  });
+
   group('Cadastro do profissional: como atende', () {
     test('salvar envia presencial/remoto e carregar lê de volta', () async {
       final (api, chamadas) = _cliente((r) {
@@ -553,4 +598,18 @@ class _CheckOutFake implements ServicoCheckOut {
 
   @override
   Future<ResultadoFim> finalizar(String codigo) async => ResultadoFim.concluido;
+}
+
+class _UploadFake implements ServicoUpload {
+  final finalidades = <FinalidadeArquivo>[];
+
+  @override
+  Future<ArquivoEnviado> enviar(
+    ArquivoCapturado arquivo,
+    FinalidadeArquivo finalidade, {
+    String? pedidoId,
+  }) async {
+    finalidades.add(finalidade);
+    return const ArquivoEnviado(arquivoId: 'up-1');
+  }
 }
