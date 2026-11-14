@@ -392,4 +392,5 @@ def test_garantia_aditivo_e_nota_de_material(cenario):
     assert perfil.status_code == 200, perfil.text
     assert perfil.json()["servicos_concluidos"] >= 1  # o cenário é compartilhado entre testes
     assert perfil.json()["nota_publica"] == 5.0
+    assert 0 <= perfil.json()["taxa_conclusao"] <= 100  # concluídos entre os encerrados
     assert len(perfil.json()["avaliacoes"]) >= 1
