@@ -385,6 +385,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
       etapas: etapas,
       fotos: const [],
+      // O código de conclusão é o que o cliente passa ao profissional para encerrar o serviço.
+      codigoConclusao: pedido.estado == 'em_andamento' && (pedido.codigoConclusao ?? '').isNotEmpty
+          ? pedido.codigoConclusao
+          : null,
       // O código de início só serve até o profissional chegar.
       codigoInicio: const {'em_andamento', 'em_confirmacao', 'concluido'}.contains(pedido.estado)
           ? null
