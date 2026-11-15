@@ -101,6 +101,10 @@ class AvaliacaoRecebidaOut(BaseModel):
     comentario: str | None
     etiquetas: list[str]
     criada_em: datetime
+    cliente_nome: str | None = Field(
+        None, description="Quem avaliou, abreviado (primeiro nome e inicial do último)."
+    )
+    categoria: str | None = Field(None, description="Categoria do serviço avaliado.")
 
 
 class PerfilPublicoOut(BaseModel):
@@ -499,6 +503,20 @@ def perfil_publico(
     nomes = {
         c.id: f"{c.nome}/{c.uf}" if c.uf else c.nome for c in modulo.catalogo.cidades_publicas()
     }
+    nomes_categorias = {c.id: c.nome for c in modulo.catalogo.categorias_publicas()}
+
+    def _avaliacao_out(a) -> AvaliacaoRecebidaOut:  # type: ignore[no-untyped-def]
+        quem = contexto.usuarios.detalhe(a.avaliador_id)
+        dados = contexto.pedidos.dados_do_pedido(a.pedido_id)
+        return AvaliacaoRecebidaOut(
+            nota_geral=a.nota_geral,
+            comentario=a.comentario,
+            etiquetas=list(a.etiquetas),
+            criada_em=a.criada_em,
+            cliente_nome=_nome_abreviado(quem.nome) if quem else None,
+            categoria=nomes_categorias.get(dados.categoria_id) if dados else None,
+        )
+
     return PerfilPublicoOut(
         no_trato_desde=perfil.criado_em,
         cidades=list(
@@ -517,14 +535,5 @@ def perfil_publico(
         regioes=base.regioes,
         disponibilidade=base.disponibilidade,
         portfolio=base.portfolio,
-        avaliacoes=[
-            AvaliacaoRecebidaOut(
-                nota_geral=a.nota_geral,
-                comentario=a.comentario,
-                etiquetas=list(a.etiquetas),
-                criada_em=a.criada_em,
-            )
-            for a in avaliacoes
-            if a.direcao == "cliente_para_profissional"
-        ],
+        avaliacoes=[_avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"],
     )

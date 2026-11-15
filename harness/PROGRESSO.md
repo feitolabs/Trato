@@ -952,3 +952,7 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 ## 2026-11-14 — Taxa de conclusão (v0.1.22)
 
 - **Taxa de conclusão 0%:** o app tinha `taxaConclusao: 0` fixo. `PerfilPublicoOut.taxa_conclusao` = concluídos / (concluídos + cancelados) dos contratos do profissional (`UsuariosPostgres._taxa_conclusao`); sem encerrados vem nulo e o app mostra "—". "Responde em" segue vazio: o Trato não mede tempo de resposta.
+
+## 2026-11-14 — Avaliações com nome e categoria (v0.1.23)
+
+- `AvaliacaoRecebidaOut` ganhou `cliente_nome` (abreviado, "Mariana S.") e `categoria`. O campo não se chama `avaliador` de propósito: o teste de privacidade do perfil público proíbe esse nome (guarda contra vazar o id de quem avaliou). O app mostra "Nome · Categoria · dia" no lugar do texto fixo "Cliente · serviço".
