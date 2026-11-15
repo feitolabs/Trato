@@ -394,6 +394,7 @@ def test_garantia_aditivo_e_nota_de_material(cenario):
     visto_pelo_cliente = get(c, f"/v1/pedidos/{pedido_id}", "cliente").json()
     assert visto_pelo_cliente["titulo"] == visto_pelo_pro["titulo"]
     assert visto_pelo_cliente["cliente_nome"] is None
+    assert visto_pelo_cliente["contratado_em"]  # data do aceite
     lista = get(c, "/v1/pedidos?como=cliente", "cliente").json()
     assert any(p["id"] == pedido_id and p["titulo"] for p in lista)
     cfg = get(c, "/v1/config/publica", "cliente")
