@@ -956,3 +956,12 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 ## 2026-11-14 — Avaliações com nome e categoria (v0.1.23)
 
 - `AvaliacaoRecebidaOut` ganhou `cliente_nome` (abreviado, "Mariana S.") e `categoria`. O campo não se chama `avaliador` de propósito: o teste de privacidade do perfil público proíbe esse nome (guarda contra vazar o id de quem avaliou). O app mostra "Nome · Categoria · dia" no lugar do texto fixo "Cliente · serviço".
+
+## 2026-11-15 — Dados reais no lugar de textos fixos (v0.1.24)
+
+- Pedido: `PedidoOut.titulo` e `cliente_nome` (abreviado, só para o profissional); o app usa `PedidoApi.rotulo` em lista, detalhe, contratados, próximo atendimento, agenda, orçamentos e relato.
+- `GET /v1/config/publica` (sem login, sem dado pessoal): limite de orçamentos, validade do pedido, prazo de confirmação, prazo de retrabalho, prazo de resposta da disputa, prazo de liberação. App: `ConfigPublica` (padrões = valores vigentes).
+- Orçamentos: nota/serviços/selo do servidor; "Sem avaliações"; limite e tempo restante da configuração.
+- Disputa: `DisputaOut.descricao`; app separa solução, usa prazo real (`resposta_ate - aberta_em`) e o nome do cliente.
+- Gorjeta escondida (não há rota); conclusão separa aditivo pago; selo "R$ X pagos".
+- Agenda "Sem data marcada"; chip "Aguardando o pagamento"; perfil com selo só para verificado, ano real, verificações e cidade; "Responde em" com traço.

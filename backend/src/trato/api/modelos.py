@@ -237,6 +237,10 @@ class PedidoOut(BaseModel):
     ja_avaliou: bool = Field(
         False, description="Quem pergunta já avaliou este serviço (só preenchido ao ver o pedido)."
     )
+    titulo: str | None = Field(None, description="O que o cliente pediu (ex.: Montagem de móveis).")
+    cliente_nome: str | None = Field(
+        None, description="Nome abreviado do cliente; só para o profissional do pedido."
+    )
 
 
 class EventoOut(BaseModel):
@@ -295,6 +299,9 @@ class DisputaOut(BaseModel):
     decisao_ate: datetime
     respondida_em: datetime | None
     sem_resposta: bool
+    descricao: str | None = Field(
+        None, description="O relato do cliente ao abrir (só em `GET .../disputa`)."
+    )
 
 
 class RetrabalhoOut(BaseModel):

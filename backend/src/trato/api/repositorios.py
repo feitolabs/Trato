@@ -155,6 +155,9 @@ class ConfigApi:
     garantias: ConfigGarantia
     # Teto de valor do pedido (RN-07). Vazio = ainda não aprovado em Configurações: sem teto.
     valor_maximo_servico_centavos: int | None = None
+    # Quantos orçamentos um pedido recebe e em quantos dias o valor é liberado (só exibição).
+    limite_orcamentos_por_pedido: int | None = None
+    prazo_liberacao_dias: int | None = None
 
 
 class ProvedorConfig(Protocol):

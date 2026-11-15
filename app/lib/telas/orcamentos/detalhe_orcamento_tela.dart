@@ -110,9 +110,12 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      SeloVerificacao(o.verificacao),
+                      if (o.verificacao.isNotEmpty) SeloVerificacao(o.verificacao),
                       Text(
-                        ' · Nota ${formatarNota(o.nota)} · ${o.servicosConcluidos} serviços',
+                        '${o.verificacao.isNotEmpty ? ' · ' : ''}'
+                        '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
+                        ' · ${o.servicosConcluidos} '
+                        '${o.servicosConcluidos == 1 ? 'serviço' : 'serviços'}',
                         style: secundario,
                       ),
                     ],

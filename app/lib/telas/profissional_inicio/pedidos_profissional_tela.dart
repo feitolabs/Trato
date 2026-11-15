@@ -175,6 +175,12 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(c.titulo, style: TipografiaTrato.tituloCartao),
+              if (c.cliente != null)
+                Text(
+                  'Cliente: ${c.cliente}',
+                  key: const ValueKey('cliente-do-pedido'),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                ),
               const SizedBox(height: EspacosTrato.x1),
               Text(
                 c.situacao,

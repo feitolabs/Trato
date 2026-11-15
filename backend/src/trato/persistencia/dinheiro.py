@@ -180,6 +180,19 @@ class DisputasPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
+    def descricao(self, pedido_id: str) -> str | None:
+        """O relato que o cliente escreveu ao abrir a disputa."""
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return None
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select descricao from public.disputas where pedido_id = %s "
+                "order by aberta_em desc limit 1",
+                (pid,),
+            ).fetchone()
+        return linha["descricao"] if linha else None
+
     def obter(self, pedido_id: str) -> Disputa | None:
         pid = como_uuid(pedido_id)
         if pid is None:

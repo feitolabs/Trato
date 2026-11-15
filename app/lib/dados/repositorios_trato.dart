@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../telas/conta/modelos.dart';
 import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
@@ -12,6 +14,7 @@ import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
+import 'config_publica.dart';
 import 'config.dart';
 import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
@@ -85,6 +88,8 @@ class RepositoriosTrato {
       upload: upload,
       posicao: posicao,
     );
+    // Prazos e limites para os textos das telas (sem esperar: até chegar, valem os padrões).
+    unawaited(ConfigPublica.carregar(api));
     return RepositoriosTrato(
         modoApi: true,
         catalogo: RepositorioCatalogoApi(api),

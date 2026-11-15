@@ -82,8 +82,10 @@ class CartaoProfissional extends StatelessWidget {
                         children: [
                           Text(p.nome, style: TipografiaTrato.tituloCartao),
                           const SizedBox(height: EspacosTrato.x1),
-                          SeloVerificacao(p.verificacao),
-                          const SizedBox(height: EspacosTrato.x1),
+                          if (p.verificacao.isNotEmpty) ...[
+                            SeloVerificacao(p.verificacao),
+                            const SizedBox(height: EspacosTrato.x1),
+                          ],
                           Text(
                             '${p.servicosConcluidos} serviços concluídos'
                             '${p.regiao == null ? '' : ' · ${p.regiao}'}',

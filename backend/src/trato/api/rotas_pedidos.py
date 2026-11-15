@@ -40,7 +40,7 @@ from trato.api.modelos import (
     RetrabalhoOut,
 )
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
-from trato.api.servicos import ator_de, carregar_pedido, pedido_out
+from trato.api.servicos import ator_de, carregar_pedido, pedido_out, pedido_out_completo
 from trato.financeiro.ledger import taxa_descontada
 from trato.garantias import (
     ErroRetrabalho,
@@ -212,7 +212,7 @@ def abrir_pedido(
     if dados is not None and not dados.bairro and dados.endereco and dados.endereco.bairro:
         dados = replace(dados, bairro=dados.endereco.bairro)  # o profissional vê o bairro
     gravado = contexto.pedidos.salvar(pedido, None, dados)
-    return pedido_out(gravado, usuario)
+    return pedido_out_completo(contexto, gravado, usuario)
 
 
 @router.get("", response_model=list[PedidoOut], summary="Meus pedidos")
@@ -223,7 +223,7 @@ def listar_pedidos(
 ) -> list[PedidoOut]:
     como_cliente = (como == "cliente") if como else (usuario.papel is PapelUsuario.CLIENTE)
     achados = contexto.pedidos.listar_do_usuario(usuario.id, como_cliente)
-    return [pedido_out(p, usuario) for p in achados]
+    return [pedido_out_completo(contexto, p, usuario) for p in achados]
 
 
 @router.get("/{pedido_id}", response_model=PedidoOut, summary="Ver pedido")
@@ -244,7 +244,7 @@ def ver_pedido(
             else "profissional_para_cliente"
         )
         ja_avaliou = contexto.avaliacoes.obter(pedido.id, direcao) is not None
-    return pedido_out(pedido, usuario, ja_avaliou)
+    return pedido_out_completo(contexto, pedido, usuario, ja_avaliou)
 
 
 def _dados_out(d: DadosPedido) -> DadosPedidoOut:
@@ -510,7 +510,9 @@ def ver_disputa(
     disputa = contexto.disputas.obter(pedido_id)
     if disputa is None:
         raise HTTPException(404, "Este pedido não tem disputa.")
-    return _disputa_out(pedido_id, disputa)
+    ler_descricao = getattr(contexto.disputas, "descricao", None)
+    descricao = ler_descricao(pedido_id) if ler_descricao else None
+    return _disputa_out(pedido_id, disputa).model_copy(update={"descricao": descricao})
 
 
 @router.post(

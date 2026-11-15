@@ -23,7 +23,11 @@ class Agendamento {
     this.cliente,
     this.remoto = false,
     this.consultaMapa,
+    this.semData = false,
   });
+
+  /// A visita ainda não foi marcada: o atendimento aparece em "Sem data marcada", não em "Hoje".
+  final bool semData;
 
   /// Serviço remoto: o check-in não pede foto nem localização.
   final bool remoto;

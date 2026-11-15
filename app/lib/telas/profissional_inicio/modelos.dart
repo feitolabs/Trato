@@ -49,7 +49,11 @@ class PedidoContratado {
     this.remoto = false,
     this.endereco,
     this.consultaMapa,
+    this.cliente,
   });
+
+  /// Nome abreviado do cliente ("Mariana S."), quando o servidor manda.
+  final String? cliente;
 
   /// Serviço remoto (sem endereço).
   final bool remoto;

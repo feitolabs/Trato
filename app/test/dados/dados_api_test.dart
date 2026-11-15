@@ -693,11 +693,38 @@ void main() {
       final servico = ServicoDisputaProfissionalApi(api);
       final detalhe = await servico.carregarDisputa('ped-1');
 
-      expect(chamadas.single.caminho, '/v1/pedidos/ped-1/disputa');
+      // a disputa e depois o nome do cliente
+      expect(chamadas.first.caminho, '/v1/pedidos/ped-1/disputa');
+      expect(chamadas.last.caminho, '/v1/pedidos/ped-1/interlocutor');
       expect(detalhe, isNotNull);
       expect(detalhe!.id, 'ped-1');
       expect(detalhe.valorCongeladoCentavos, 15000);
       expect(detalhe.descricao, 'Serviço incompleto');
+      expect(detalhe.motivo, 'Qualidade abaixo do combinado'); // o texto que o cliente escolheu
+      expect(detalhe.solucaoPedida, 'Não informada');
+    });
+
+    test('carregarDisputa separa a solução do relato, usa o prazo real e o nome do cliente',
+        () async {
+      final (api, _) = _cliente((r) {
+        if (r.url.path.endsWith('/interlocutor')) {
+          return _json({'id': 'c1', 'nome': 'Mariana S.'});
+        }
+        return _json({
+          'pedido_id': 'ped-1',
+          'motivo': 'mal_feito',
+          'descricao': 'Vazou de novo.\n\nSolução que o cliente prefere: Reembolso parcial',
+          'valor_congelado_centavos': 15000,
+          'aberta_em': '2026-11-14T10:00:00Z',
+          'resposta_ate': '2026-11-16T10:00:00Z',
+        });
+      });
+      final d = (await ServicoDisputaProfissionalApi(api).carregarDisputa('ped-1'))!;
+      expect(d.cliente, 'Mariana S.');
+      expect(d.descricao, 'Vazou de novo.');
+      expect(d.solucaoPedida, 'Reembolso parcial');
+      expect(d.prazoRespostaHoras, 48);
+      expect(d.motivo, 'O problema voltou ou não foi resolvido');
     });
 
     test('responder chama POST /v1/pedidos/{id}/disputa/resposta', () async {
