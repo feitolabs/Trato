@@ -86,6 +86,17 @@ class RespostaPedido:
 
 
 @dataclass(frozen=True)
+class PerguntaCategoria:
+    """Pergunta que o admin configurou para a categoria (`categoria_perguntas`)."""
+
+    id: str
+    texto: str
+    tipo: str  # texto | numero | escolha_unica | multipla | sim_nao
+    opcoes: tuple[str, ...] = ()
+    obrigatoria: bool = False
+
+
+@dataclass(frozen=True)
 class EnderecoPedido:
     logradouro: str
     numero: str | None = None

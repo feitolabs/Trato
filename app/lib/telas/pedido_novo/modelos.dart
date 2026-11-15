@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 /// Faixa de preço em centavos inteiros ("R$ 200 a R$ 500"). Só exibe: não há regra no app.
 class FaixaPreco {
-  const FaixaPreco({required this.minimoCentavos, required this.maximoCentavos});
+  const FaixaPreco(
+      {required this.minimoCentavos, required this.maximoCentavos});
 
   final int minimoCentavos;
   final int maximoCentavos;
@@ -19,6 +20,33 @@ class CidadeOpcao {
   final String uf;
 
   String get rotulo => uf.isEmpty ? nome : '$nome · $uf';
+}
+
+/// Pergunta que o admin configurou para a categoria (painel > Categorias > Perguntas).
+class PerguntaPedido {
+  const PerguntaPedido({
+    required this.id,
+    required this.texto,
+    required this.tipo,
+    this.opcoes = const [],
+    this.obrigatoria = false,
+  });
+
+  factory PerguntaPedido.deJson(Map<String, dynamic> j) => PerguntaPedido(
+        id: j['id'] as String,
+        texto: j['texto'] as String,
+        tipo: (j['tipo'] as String?) ?? 'texto',
+        opcoes: [for (final o in (j['opcoes'] as List? ?? const [])) '$o'],
+        obrigatoria: j['obrigatoria'] == true,
+      );
+
+  final String id;
+  final String texto;
+
+  /// texto, numero, escolha_unica, multipla ou sim_nao.
+  final String tipo;
+  final List<String> opcoes;
+  final bool obrigatoria;
 }
 
 /// Perguntas e opções do formulário da categoria escolhida.
@@ -44,7 +72,12 @@ class FormularioPedido {
     this.icone = Icons.bolt,
     this.cidades = const [],
     this.aceitaRemoto = false,
+    this.perguntas = const [],
   });
+
+  /// Perguntas da categoria. Com elas, o formulário troca "O que precisa ser feito?" e a
+  /// quantidade genéricos pelas perguntas que o admin configurou.
+  final List<PerguntaPedido> perguntas;
 
   /// A categoria aceita atendimento remoto: o cliente escolhe presencial ou remoto.
   final bool aceitaRemoto;
@@ -100,6 +133,7 @@ class FormularioPedido {
         icone: icone,
         cidades: cidades,
         aceitaRemoto: valor,
+        perguntas: perguntas,
       );
 
   /// Cópia deste formulário com a lista de cidades para escolher.
@@ -124,6 +158,32 @@ class FormularioPedido {
         icone: icone,
         cidades: novas,
         aceitaRemoto: aceitaRemoto,
+        perguntas: perguntas,
+      );
+
+  /// Cópia deste formulário com as perguntas da categoria.
+  FormularioPedido comPerguntas(List<PerguntaPedido> novas) => FormularioPedido(
+        categoria: categoria,
+        servicos: servicos,
+        servicosIniciais: servicosIniciais,
+        perguntaQuantidade: perguntaQuantidade,
+        dicaQuantidade: dicaQuantidade,
+        quantidadeInicial: quantidadeInicial,
+        perguntaVoltagem: perguntaVoltagem,
+        voltagens: voltagens,
+        voltagemInicial: voltagemInicial,
+        descricaoInicial: descricaoInicial,
+        fotos: fotos,
+        prazos: prazos,
+        faixas: faixas,
+        endereco: endereco,
+        avisoEndereco: avisoEndereco,
+        avisoPrazo: avisoPrazo,
+        categoriaId: categoriaId,
+        icone: icone,
+        cidades: cidades,
+        aceitaRemoto: aceitaRemoto,
+        perguntas: novas,
       );
 }
 
@@ -184,7 +244,12 @@ class RascunhoPedido {
     this.prazoDesejado,
     this.modalidade = Modalidade.presencial,
     this.endereco,
+    this.respostas = const {},
   });
+
+  /// Respostas às perguntas da categoria: id da pergunta -> resposta (texto, número, bool ou
+  /// lista de textos), como o backend grava.
+  final Map<String, Object> respostas;
 
   /// Presencial (padrão, com [endereco]) ou remoto (sem endereço).
   final Modalidade modalidade;

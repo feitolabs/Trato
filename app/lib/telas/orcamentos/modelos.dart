@@ -68,6 +68,7 @@ class Orcamento {
     required this.garantia,
     required this.observacao,
     this.detalhe,
+    this.aceito = false,
     this.profissionalId,
   });
 
@@ -98,6 +99,9 @@ class Orcamento {
 
   /// Ausente quando o protótipo não traz a tela de detalhe desse orçamento.
   final DetalheOrcamento? detalhe;
+
+  /// O orçamento que o cliente aceitou: é o contrato do serviço.
+  final bool aceito;
 
   String get primeiroNome => profissional.split(' ').first;
 }

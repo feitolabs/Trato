@@ -965,3 +965,8 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 - Disputa: `DisputaOut.descricao`; app separa solução, usa prazo real (`resposta_ate - aberta_em`) e o nome do cliente.
 - Gorjeta escondida (não há rota); conclusão separa aditivo pago; selo "R$ X pagos".
 - Agenda "Sem data marcada"; chip "Aguardando o pagamento"; perfil com selo só para verificado, ano real, verificações e cidade; "Responde em" com traço.
+
+## 2026-11-15 — Contrato do serviço e perguntas da categoria (v0.1.25)
+
+- "Ver contrato do serviço" (garantia) não fazia nada: agora abre o orçamento aceito (`Orcamento.aceito`) em `DetalheOrcamentoTela(contrato: true)`, só leitura.
+- Perguntas por categoria (painel): `GET /v1/catalogo/categorias/{id}/perguntas`; ao abrir o pedido o servidor exige as obrigatórias e confere as opções (`_exigir_respostas`); respostas em `DadosPedidoOut.respostas` e `PedidoAbertoDetalheOut.respostas`. App: o Novo pedido troca "O que precisa ser feito?"/quantidade pelas perguntas (escolha, múltipla, sim/não, número, texto); o profissional vê as respostas no detalhe do pedido aberto.
