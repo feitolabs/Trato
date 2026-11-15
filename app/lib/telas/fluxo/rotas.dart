@@ -1479,6 +1479,27 @@ abstract final class RotasTrato {
     );
   }
 
+  /// O contrato do serviço é o orçamento que o cliente aceitou (escopo, valor e garantia).
+  static void abrirContrato(BuildContext context, String pedidoId) => _abrir<void>(
+        context,
+        Carregador<Orcamento?>(
+          carregar: () async {
+            final todos = await repos.orcamentos.listar(pedidoId);
+            return todos.orcamentos
+                .where((o) => o.aceito && o.detalhe != null)
+                .firstOrNull;
+          },
+          vazio: (o) => o == null,
+          tituloVazio: 'Contrato indisponível',
+          textoVazio: 'Não encontramos o orçamento aceito deste pedido.',
+          construir: (context, o) => DetalheOrcamentoTela(
+            orcamento: o!,
+            contrato: true,
+            aoVerPerfil: (x) => abrirPerfilDoOrcamento(context, x),
+          ),
+        ),
+      );
+
   static void abrirGarantia(BuildContext context, {String pedidoId = _semId}) =>
       _abrir<void>(
         context,
@@ -1487,6 +1508,7 @@ abstract final class RotasTrato {
           construir: (context, dados) => GarantiaTela(
             dados: dados,
             aoPedirRetrabalho: () => _pedirRetrabalho(context, pedidoId),
+            aoVerContrato: () => abrirContrato(context, pedidoId),
           ),
         ),
       );

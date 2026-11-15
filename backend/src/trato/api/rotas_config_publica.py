@@ -13,6 +13,32 @@ from pydantic import BaseModel
 from trato.api.contexto import Contexto, obter_contexto
 
 router = APIRouter(prefix="/v1/config", tags=["config"])
+router_catalogo = APIRouter(prefix="/v1/catalogo", tags=["catalogo"])
+
+
+class PerguntaOut(BaseModel):
+    id: str
+    texto: str
+    tipo: str
+    opcoes: list[str] = []
+    obrigatoria: bool = False
+
+
+@router_catalogo.get(
+    "/categorias/{categoria_id}/perguntas",
+    response_model=list[PerguntaOut],
+    summary="Perguntas que o cliente responde ao abrir um pedido nesta categoria",
+)
+def perguntas_da_categoria(
+    categoria_id: str, contexto: Contexto = Depends(obter_contexto)
+) -> list[PerguntaOut]:
+    ler = getattr(contexto.pedidos, "perguntas_da_categoria", None)
+    return [
+        PerguntaOut(
+            id=q.id, texto=q.texto, tipo=q.tipo, opcoes=list(q.opcoes), obrigatoria=q.obrigatoria
+        )
+        for q in (ler(categoria_id) if ler else [])
+    ]
 
 
 class ConfigPublicaOut(BaseModel):

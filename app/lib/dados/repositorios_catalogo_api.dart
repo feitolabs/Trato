@@ -23,6 +23,8 @@ String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
 
 Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
+List<Map<String, dynamic>> _lista(Object? json) =>
+    [for (final item in (json as List? ?? const [])) item as Map<String, dynamic>];
 
 /// Ícone de cada categoria pelo slug (o backend não manda ícone). Categoria nova usa o genérico.
 /// Os slugs são os de `public.categorias`; os curtos antigos ficam para não quebrar dados velhos.
@@ -186,15 +188,31 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   @override
   Future<FormularioPedido> formulario(String categoriaId) async {
     // Em paralelo. Sem a lista de cidades não dá para abrir o pedido: o erro vira "Tentar de novo".
-    final (base, cidades) =
-        await emParalelo2(_formularioBase(categoriaId), _cidades());
+    final (base, cidades, perguntas) = await emParalelo3(
+      _formularioBase(categoriaId),
+      _cidades(),
+      _perguntas(categoriaId),
+    );
     if (cidades.isEmpty) {
       throw const ErroTrato(
         TipoErro.indisponivel,
         'Ainda não atendemos nenhuma cidade. Volte daqui a pouco.',
       );
     }
-    return base.comCidades(cidades);
+    return base.comCidades(cidades).comPerguntas(perguntas);
+  }
+
+  /// `GET /v1/catalogo/categorias/{id}/perguntas`: as perguntas que o admin configurou.
+  /// Sem a rota ou sem rede, o formulário segue com as perguntas genéricas.
+  Future<List<PerguntaPedido>> _perguntas(String categoriaId) async {
+    try {
+      return [
+        for (final j in _lista(await _api.get('/v1/catalogo/categorias/$categoriaId/perguntas')))
+          PerguntaPedido.deJson(j),
+      ];
+    } on ErroTrato {
+      return const [];
+    }
   }
 
   Future<FormularioPedido> _formularioBase(String categoriaId) async {

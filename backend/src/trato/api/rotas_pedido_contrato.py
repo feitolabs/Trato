@@ -25,6 +25,8 @@ from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_a
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
+from trato.api.modelos import RespostaPedidoOut
+from trato.api.rotas_pedidos import respostas_out
 from trato.api.servicos import carregar_pedido
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.pagamentos.custo import MeioPagamento
@@ -1109,6 +1111,9 @@ def pedidos_abertos(
 class PedidoAbertoDetalheOut(PedidoAbertoOut):
     orcamentos_recebidos: int = Field(description="Quantos orçamentos enviados o pedido já tem.")
     ja_orcou: bool = Field(description="Se este profissional já enviou orçamento.")
+    respostas: list[RespostaPedidoOut] = Field(
+        default_factory=list, description="Respostas do cliente às perguntas da categoria."
+    )
 
 
 @router.get(
@@ -1138,6 +1143,7 @@ def pedido_aberto(
         **_saida_aberto(achado, lat, lng, contexto).model_dump(),
         orcamentos_recebidos=len(orcamentos),
         ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
+        respostas=respostas_out(contexto, achado.id),
     )
 
 

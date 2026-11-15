@@ -31,6 +31,7 @@ from trato.api.modelos import (
     CheckOutIn,
     ConfirmarAgendaIn,
     DadosPedidoOut,
+    RespostaPedidoOut,
     DisputaOut,
     EditarPedidoIn,
     EnderecoIn,
@@ -149,6 +150,41 @@ def _exigir_dentro_do_teto(dados: Any, contexto: Contexto) -> None:
         )
 
 
+def respostas_out(contexto: Contexto, pedido_id: str) -> list[RespostaPedidoOut]:
+    ler = getattr(contexto.pedidos, "respostas_do_pedido", None)
+    return [RespostaPedidoOut(pergunta=p, resposta=r) for p, r in (ler(pedido_id) if ler else [])]
+
+
+def _vazia(resposta: Any) -> bool:
+    if resposta is None:
+        return True
+    if isinstance(resposta, str):
+        return not resposta.strip()
+    if isinstance(resposta, list | tuple | set | dict):
+        return len(resposta) == 0
+    return False
+
+
+def _exigir_respostas(dados: Any, contexto: Contexto) -> None:
+    """Perguntas obrigatórias da categoria respondidas, e escolhas dentro das opções."""
+    ler = getattr(contexto.pedidos, "perguntas_da_categoria", None)
+    perguntas = ler(dados.categoria_id) if ler else []
+    if not perguntas:
+        return
+    respostas = {r.pergunta_id: r.resposta for r in dados.respostas}
+    for q in perguntas:
+        r = respostas.get(q.id)
+        if _vazia(r):
+            if q.obrigatoria:
+                raise HTTPException(422, f"Responda: {q.texto}")
+            continue
+        if q.tipo == "escolha_unica" and q.opcoes and r not in q.opcoes:
+            raise HTTPException(422, f"Escolha uma das opções em: {q.texto}")
+        if q.tipo == "multipla" and q.opcoes:
+            if not isinstance(r, list) or any(x not in q.opcoes for x in r):
+                raise HTTPException(422, f"Escolha entre as opções em: {q.texto}")
+
+
 def _exigir_modalidade_e_endereco(dados: Any, contexto: Contexto) -> None:
     """Remoto só onde o admin liberou. Presencial exige endereço completo: sem ele o profissional
     contratado não sabe aonde ir."""
@@ -191,6 +227,7 @@ def abrir_pedido(
     dados = corpo.para_dados() if corpo else None
     if dados is not None:
         _exigir_modalidade_e_endereco(dados, contexto)
+        _exigir_respostas(dados, contexto)
         _exigir_dentro_do_teto(dados, contexto)
         if dados.modalidade == "remoto":
             pedido = replace(pedido, remoto=True)
@@ -274,7 +311,7 @@ def ver_dados_do_pedido(
     dados = contexto.pedidos.dados_do_pedido(pedido.id)
     if dados is None:
         raise HTTPException(404, "Este pedido não tem descrição gravada.")
-    return _dados_out(dados)
+    return _dados_out(dados).model_copy(update={"respostas": respostas_out(contexto, pedido.id)})
 
 
 @router.patch(

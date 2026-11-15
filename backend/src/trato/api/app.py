@@ -35,6 +35,7 @@ def criar_router() -> APIRouter:
     roteador.include_router(rotas_cadastro.router)
     roteador.include_router(rotas_pedidos.router)
     roteador.include_router(rotas_config_publica.router)
+    roteador.include_router(rotas_config_publica.router_catalogo)
     roteador.include_router(rotas_app.router)
     roteador.include_router(rotas_pedido_contrato.router)
     roteador.include_router(conta.router)
