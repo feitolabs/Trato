@@ -135,3 +135,34 @@ def test_modalidade_do_pedido_nao_muda_depois_de_criado(cenario):
     with cenario.local.admin() as con:
         with pytest.raises(psycopg.errors.RestrictViolation):
             con.execute("update public.pedidos set modalidade = 'remoto' where id = %s", (pid,))
+
+
+def test_perguntas_da_categoria_no_postgres(cenario):
+    """Perguntas configuradas no painel chegam ao app, obrigatória é exigida e a resposta volta
+    nos dados do pedido com o texto da pergunta."""
+    c = cenario
+    with c.local.admin() as con:
+        qid = con.execute(
+            "insert into public.categoria_perguntas (categoria_id, texto, tipo, opcoes, "
+            "obrigatoria, ordem) values (%s, 'Qual é o tipo de imóvel?', 'escolha_unica', "
+            "'[\"Apartamento\", \"Casa\"]'::jsonb, true, 1) returning id",
+            (c.categoria_id,),
+        ).fetchone()[0]
+    try:
+        r = c.cliente.get(f"/v1/catalogo/categorias/{c.categoria_id}/perguntas")
+        assert r.status_code == 200, r.text
+        q = next(x for x in r.json() if x["id"] == str(qid))
+        assert q["opcoes"] == ["Apartamento", "Casa"] and q["obrigatoria"] is True
+
+        sem = c.cliente.post("/v1/pedidos", json=corpo_pedido(c), headers=c.token("cliente"))
+        assert sem.status_code == 422 and "tipo de imóvel" in sem.json()["detail"]
+
+        corpo = corpo_pedido(c)
+        corpo["respostas"] = [*corpo["respostas"], {"pergunta_id": str(qid), "resposta": "Casa"}]
+        ok = c.cliente.post("/v1/pedidos", json=corpo, headers=c.token("cliente"))
+        assert ok.status_code == 201, ok.text
+        dados = c.cliente.get(f"/v1/pedidos/{ok.json()['id']}/dados", headers=c.token("cliente"))
+        assert {"pergunta": "Qual é o tipo de imóvel?", "resposta": "Casa"} in dados.json()["respostas"]
+    finally:
+        with c.local.admin() as con:
+            con.execute("update public.categoria_perguntas set ativa = false where id = %s", (qid,))

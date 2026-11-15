@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
+from typing import Any
 
 from trato.api.repositorios import (
     ConfigApi,
@@ -17,6 +18,7 @@ from trato.api.repositorios import (
     ItemOrcamento,
     Orcamento,
     Repasse,
+    PerguntaCategoria,
 )
 from trato.api.repositorios_app import (
     ItemDoOrcamento,
@@ -75,6 +77,19 @@ class PedidosEmMemoria:
 
     # Categorias em que o admin liberou o remoto (a memória não tem catálogo: os testes ligam aqui).
     categorias_remotas: set[str] = set()
+
+    # Perguntas por categoria (os testes ligam aqui).
+    perguntas: dict[str, list[PerguntaCategoria]] = {}
+
+    def perguntas_da_categoria(self, categoria_id: str) -> list[PerguntaCategoria]:
+        return list(self.perguntas.get(categoria_id, []))
+
+    def respostas_do_pedido(self, pedido_id: str) -> list[tuple[str, Any]]:
+        dados = self._dados.get(pedido_id)
+        if dados is None:
+            return []
+        textos = {q.id: q.texto for q in self.perguntas.get(dados.categoria_id, [])}
+        return [(textos[r.pergunta_id], r.resposta) for r in dados.respostas if r.pergunta_id in textos]
 
     def categoria_aceita_remoto(self, categoria_id: str) -> bool:
         return categoria_id in self.categorias_remotas

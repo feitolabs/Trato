@@ -21,7 +21,12 @@ class DetalheOrcamentoTela extends StatefulWidget {
     this.aoFazerContraproposta,
     this.aoConversar,
     this.aoVerPerfil,
+    this.contrato = false,
   });
+
+  /// Mostra o orçamento aceito como o contrato do serviço: só leitura, sem aceitar,
+  /// contraproposta nem a caixa de "li e aceito".
+  final bool contrato;
 
   final Orcamento orcamento;
   final dynamic Function(Orcamento)? aoAceitar;
@@ -48,7 +53,9 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Marque "Li o escopo, a garantia e as regras" para aceitar.')),
+          const SnackBar(
+              content: Text(
+                  'Marque "Li o escopo, a garantia e as regras" para aceitar.')),
         );
       return;
     }
@@ -64,9 +71,11 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   Widget build(BuildContext context) {
     final o = widget.orcamento;
     final d = o.detalhe!; // a tela só abre para orçamento com detalhe
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno
+        .copyWith(color: CoresTrato.textoSecundario);
     return EstruturaPedido(
-      tituloBarra: 'Válido até ${d.validoAte}',
+      tituloBarra:
+          widget.contrato ? 'Contrato do serviço' : 'Válido até ${d.validoAte}',
       acoesBarra: [
         if (widget.aoConversar != null) ...[
           TextButton.icon(
@@ -74,32 +83,37 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             icon: const Icon(Icons.chat_bubble_outline, size: EspacosTrato.x5),
             label: const Text('Conversar'),
             style: TextButton.styleFrom(
-              textStyle: TipografiaTrato.corpoForte.copyWith(decoration: TextDecoration.none),
+              textStyle: TipografiaTrato.corpoForte
+                  .copyWith(decoration: TextDecoration.none),
             ),
           ),
           const SizedBox(width: EspacosTrato.x2),
         ],
       ],
-      rodape: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          BotaoPrimario(
-            texto: 'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
-            carregando: _aceitando,
-            aoTocar: _aceitando ? null : _aceitar,
-          ),
-          if (widget.aoFazerContraproposta != null)
-            BotaoLink(
-              texto: 'Fazer contraproposta',
-              aoTocar: () => widget.aoFazerContraproposta!(o),
+      rodape: widget.contrato
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BotaoPrimario(
+                  texto:
+                      'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
+                  carregando: _aceitando,
+                  aoTocar: _aceitando ? null : _aceitar,
+                ),
+                if (widget.aoFazerContraproposta != null)
+                  BotaoLink(
+                    texto: 'Fazer contraproposta',
+                    aoTocar: () => widget.aoFazerContraproposta!(o),
+                  ),
+              ],
             ),
-        ],
-      ),
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            AvatarDeUsuario(iniciais: o.iniciais, usuarioId: o.profissionalId, tamanho: 64),
+            AvatarDeUsuario(
+                iniciais: o.iniciais, usuarioId: o.profissionalId, tamanho: 64),
             const SizedBox(width: EspacosTrato.x4),
             Expanded(
               child: Column(
@@ -110,7 +124,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (o.verificacao.isNotEmpty) SeloVerificacao(o.verificacao),
+                      if (o.verificacao.isNotEmpty)
+                        SeloVerificacao(o.verificacao),
                       Text(
                         '${o.verificacao.isNotEmpty ? ' · ' : ''}'
                         '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
@@ -138,7 +153,9 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               Text('O que está incluso', style: TipografiaTrato.tituloOpcao),
               const SizedBox(height: EspacosTrato.x4),
               for (final item in d.itens) ...[
-                LinhaValor(rotulo: item.descricao, valor: formatarReais(item.centavos)),
+                LinhaValor(
+                    rotulo: item.descricao,
+                    valor: formatarReais(item.centavos)),
                 const SizedBox(height: EspacosTrato.x3),
               ],
               if (d.totalHoras.isNotEmpty) ...[
@@ -147,7 +164,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   rotulo: 'Total de horas',
                   valor: d.totalHoras,
                 ),
-                if (d.horasDeslocamento.isNotEmpty && d.horasTrabalhadas.isNotEmpty)
+                if (d.horasDeslocamento.isNotEmpty &&
+                    d.horasTrabalhadas.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: EspacosTrato.x1),
                     child: Text(
@@ -159,7 +177,10 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               ],
               const Divider(),
               const SizedBox(height: EspacosTrato.x3),
-              LinhaValor(rotulo: 'Total', valor: formatarReais(o.totalCentavos), destaque: true),
+              LinhaValor(
+                  rotulo: 'Total',
+                  valor: formatarReais(o.totalCentavos),
+                  destaque: true),
               const SizedBox(height: EspacosTrato.x3),
               Text(d.notaMaterial, style: secundario),
             ],
@@ -200,36 +221,51 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             ],
           ),
         ),
-        const SizedBox(height: EspacosTrato.x4),
-        MergeSemantics(child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(value: _leu, onChanged: (v) => setState(() => _leu = v ?? false)),
-            const SizedBox(width: EspacosTrato.x2),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: EspacosTrato.x3),
-                child: Text(
-                  'Li o escopo, a garantia e as regras de cancelamento. '
-                  'Ao aceitar, este orçamento vira o contrato do serviço.',
-                  style: TipografiaTrato.corpo,
+        if (widget.contrato) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          Text(
+            'Este é o orçamento que você aceitou: ele vale como o contrato do serviço '
+            '(escopo, valor e garantia).',
+            key: const ValueKey('aviso-contrato'),
+            style: TipografiaTrato.corpo,
+          ),
+        ] else ...[
+          const SizedBox(height: EspacosTrato.x4),
+          MergeSemantics(
+              child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                  value: _leu,
+                  onChanged: (v) => setState(() => _leu = v ?? false)),
+              const SizedBox(width: EspacosTrato.x2),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: EspacosTrato.x3),
+                  child: Text(
+                    'Li o escopo, a garantia e as regras de cancelamento. '
+                    'Ao aceitar, este orçamento vira o contrato do serviço.',
+                    style: TipografiaTrato.corpo,
+                  ),
                 ),
               ),
+            ],
+          )),
+          if (_tentou && !_leu)
+            Text(
+              'Marque que leu para aceitar o orçamento.',
+              style: TipografiaTrato.legenda
+                  .copyWith(color: CoresTrato.vermelhoTexto),
             ),
-          ],
-        )),
-        if (_tentou && !_leu)
-          Text(
-            'Marque que leu para aceitar o orçamento.',
-            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
-          ),
+        ],
       ],
     );
   }
 }
 
 class _BlocoRegra extends StatelessWidget {
-  const _BlocoRegra({required this.icone, required this.titulo, required this.texto});
+  const _BlocoRegra(
+      {required this.icone, required this.titulo, required this.texto});
 
   final IconData icone;
   final String titulo;
@@ -252,7 +288,8 @@ class _BlocoRegra extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   texto,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno
+                      .copyWith(color: CoresTrato.textoSecundario),
                 ),
               ],
             ),

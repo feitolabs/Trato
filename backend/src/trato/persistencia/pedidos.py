@@ -19,7 +19,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from trato.api.repositorios import DadosPedido, EnderecoPedido
+from trato.api.repositorios import DadosPedido, EnderecoPedido, PerguntaCategoria
 from trato.api.repositorios_app import PedidoAberto
 from trato.pedidos.estados import (
     Acao,
@@ -257,6 +257,42 @@ class PedidosPostgres:
 
     # --- internos ----------------------------------------------------------------------
     # --- dados descritos pelo cliente (editáveis enquanto o pedido aguarda orçamentos) --------
+    def perguntas_da_categoria(self, categoria_id: str) -> list[PerguntaCategoria]:
+        """Perguntas ativas da categoria, na ordem que o admin definiu."""
+        cid = como_uuid(categoria_id)
+        if cid is None:
+            return []
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select id, texto, tipo, opcoes, obrigatoria from public.categoria_perguntas "
+                "where categoria_id = %s and ativa order by ordem, criado_em",
+                (cid,),
+            ).fetchall()
+        return [
+            PerguntaCategoria(
+                id=str(x["id"]),
+                texto=x["texto"],
+                tipo=x["tipo"],
+                opcoes=tuple(str(o) for o in (x["opcoes"] or []) if str(o).strip()),
+                obrigatoria=bool(x["obrigatoria"]),
+            )
+            for x in linhas
+        ]
+
+    def respostas_do_pedido(self, pedido_id: str) -> list[tuple[str, Any]]:
+        """(texto da pergunta, resposta) do que o cliente respondeu ao abrir o pedido."""
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return []
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select r.pergunta_texto, r.resposta from public.pedido_respostas r "
+                "left join public.categoria_perguntas q on q.id = r.pergunta_id "
+                "where r.pedido_id = %s order by q.ordem nulls last, r.pergunta_texto",
+                (pid,),
+            ).fetchall()
+        return [(x["pergunta_texto"], x["resposta"]) for x in linhas]
+
     def dados_do_pedido(self, pedido_id: str) -> DadosPedido | None:
         achado = como_uuid(pedido_id)
         if achado is None:

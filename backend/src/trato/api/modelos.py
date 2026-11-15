@@ -115,6 +115,11 @@ class EditarPedidoIn(_Entrada):
     endereco: EnderecoIn | None = None
 
 
+class RespostaPedidoOut(BaseModel):
+    pergunta: str
+    resposta: Any
+
+
 class DadosPedidoOut(BaseModel):
     titulo: str
     descricao: str
@@ -125,6 +130,9 @@ class DadosPedidoOut(BaseModel):
     urgente: bool = False
     endereco: EnderecoIn | None = None
     modalidade: str = "presencial"
+    respostas: list[RespostaPedidoOut] = Field(
+        default_factory=list, description="Respostas às perguntas da categoria."
+    )
 
 
 class AceitarOrcamentoIn(_Entrada):

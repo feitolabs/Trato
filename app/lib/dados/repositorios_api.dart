@@ -92,6 +92,15 @@ String _tempoRestante(DateTime fim, {DateTime? agora}) {
   return '${falta.inMinutes} ${falta.inMinutes == 1 ? 'minuto' : 'minutos'}';
 }
 
+/// Resposta do cliente em texto: "Sim"/"Não", lista separada por vírgula, número ou texto.
+String textoDaResposta(Object? r) => switch (r) {
+      true => 'Sim',
+      false => 'Não',
+      final List<dynamic> l => l.join(', '),
+      null => '—',
+      _ => '$r',
+    };
+
 String _quandoRelativo(DateTime data, {DateTime? agora}) {
   final dif = (agora ?? DateTime.now()).difference(data.toLocal());
   if (dif.inMinutes < 1) return 'agora';
@@ -284,6 +293,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       'faixa_preco_min_centavos': rascunho.faixa.minimoCentavos,
       'faixa_preco_max_centavos': rascunho.faixa.maximoCentavos,
       'respostas': [
+        for (final e in rascunho.respostas.entries)
+          {'pergunta_id': e.key, 'resposta': e.value},
         if (rascunho.servicos.isNotEmpty)
           {'pergunta_id': 'servicos', 'resposta': rascunho.servicos.join(', ')},
         if (rascunho.quantidade > 0)
@@ -683,6 +694,7 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
       garantia: garantia == null ? '' : '$garantia dias',
       observacao: (j['observacoes'] as String?) ?? '',
       detalhe: detalhe,
+      aceito: j['aceito'] == true,
       profissionalId: j['profissional_id'] as String?,
     );
   }
@@ -1396,6 +1408,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       linhas: [
         LinhaDetalhe('Modalidade', aberto.remoto ? 'Remoto' : 'Presencial'),
         if (!aberto.remoto && aberto.bairro.isNotEmpty) LinhaDetalhe('Bairro', aberto.bairro),
+        // O que o cliente respondeu às perguntas da categoria.
+        for (final r in _lista(j['respostas'] ?? const []))
+          LinhaDetalhe('${r['pergunta']}', textoDaResposta(r['resposta'])),
       ],
     );
   }

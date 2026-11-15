@@ -15,7 +15,10 @@ import 'package:trato/telas/agenda/agenda_tela.dart';
 import 'package:trato/telas/agenda/modelos.dart';
 import 'package:trato/telas/conclusao/avaliacao_tela.dart';
 import 'package:trato/telas/conclusao/modelos.dart';
+import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/modelos.dart' show semAvaliacoes;
+
+import 'apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/tema/tema.dart';
 
 http.Response _json(Object corpo, [int status = 200]) => http.Response(
@@ -241,6 +244,33 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Gorjeta (opcional)'), findsNothing);
       expect(find.textContaining('pagos'), findsOneWidget);
+    });
+  });
+
+  group('Contrato do serviço', () {
+    testWidgets('o orçamento aceito abre como contrato, só leitura', (t) async {
+      final o = orcamentosExemplo.firstWhere((x) => x.detalhe != null);
+      await t.pumpWidget(_app(DetalheOrcamentoTela(orcamento: o, contrato: true)));
+      await t.pumpAndSettle();
+      expect(find.text('Contrato do serviço'), findsOneWidget);
+      expect(find.byKey(const ValueKey('aviso-contrato')), findsOneWidget);
+      expect(find.textContaining('Aceitar orçamento'), findsNothing);
+      expect(find.byType(Checkbox), findsNothing);
+    });
+
+    test('o servidor marca qual orçamento foi aceito', () async {
+      final api = _api((r) {
+        if (r.url.path == '/v1/pedidos/p1') return _json(_pedido('p1', 'concluido'));
+        if (r.url.path == '/v1/pedidos/p1/orcamentos') {
+          return _json([
+            {'id': 'o1', 'profissional_nome': 'A', 'valor_centavos': 100, 'aceito': false},
+            {'id': 'o2', 'profissional_nome': 'B', 'valor_centavos': 200, 'aceito': true},
+          ]);
+        }
+        return _json({'detail': 'não'}, 404);
+      });
+      final r = await RepositorioOrcamentosApi(api).listar('p1');
+      expect([for (final o in r.orcamentos) if (o.aceito) o.id], ['o2']);
     });
   });
 
