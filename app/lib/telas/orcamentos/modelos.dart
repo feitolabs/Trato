@@ -2,10 +2,25 @@
 // dos dados (total, itens, valores de cancelamento): nenhuma conta de dinheiro roda aqui.
 
 class ItemOrcamento {
-  const ItemOrcamento({required this.descricao, required this.centavos});
+  const ItemOrcamento({
+    required this.descricao,
+    required this.centavos,
+    this.quantidade,
+    this.unitarioCentavos,
+    this.porHora = false,
+  });
 
   final String descricao;
+
+  /// Total da linha (quantidade x valor unitário), como o backend calculou.
   final int centavos;
+
+  /// Quantidade e valor unitário, para a tela mostrar a conta ("45 h × R\$ 15,00").
+  final double? quantidade;
+  final int? unitarioCentavos;
+
+  /// Item cobrado por hora (horas trabalhadas ou deslocamento).
+  final bool porHora;
 }
 
 /// Os quatro blocos de regras do detalhe: agenda, garantia, fora do escopo e cancelamento.
@@ -126,3 +141,55 @@ class ResumoPedido {
 }
 /// Texto quando o profissional ainda não tem nota.
 const semAvaliacoes = 'Sem avaliações';
+
+/// Linha de valor com nome e, se houver, a situação ("Aditivo · Pago").
+class LinhaContrato {
+  const LinhaContrato(this.rotulo, this.valor);
+
+  final String rotulo;
+  final String valor;
+}
+
+/// O que o contrato do serviço mostra além do orçamento aceito. Tudo vem do backend.
+class DadosContrato {
+  const DadosContrato({
+    required this.numeroPedido,
+    required this.titulo,
+    required this.descricao,
+    required this.local,
+    this.cliente,
+    this.contratadoEm,
+    this.visita,
+    this.respostas = const [],
+    this.pagoCentavos,
+    this.aditivos = const [],
+    this.prazoRetrabalhoDias = 7,
+  });
+
+  /// "#02D8".
+  final String numeroPedido;
+
+  /// O que o cliente pediu e descreveu.
+  final String titulo;
+  final String descricao;
+
+  /// Endereço por extenso, "Atendimento remoto" ou "Endereço não informado".
+  final String local;
+  final String? cliente;
+
+  /// "14/11/2026" (data do aceite).
+  final String? contratadoEm;
+
+  /// "14/11 · 09:00" (visita marcada).
+  final String? visita;
+
+  /// Respostas às perguntas da categoria.
+  final List<LinhaContrato> respostas;
+
+  /// Quanto o cliente pagou (confirmado pelo parceiro). Nulo antes do pagamento.
+  final int? pagoCentavos;
+
+  /// Aditivos do contrato com a situação de cada um.
+  final List<LinhaContrato> aditivos;
+  final int prazoRetrabalhoDias;
+}

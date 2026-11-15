@@ -22,7 +22,15 @@ class DetalheOrcamentoTela extends StatefulWidget {
     this.aoConversar,
     this.aoVerPerfil,
     this.contrato = false,
+    this.dadosContrato,
+    this.aoVerTermos,
   });
+
+  /// No modo contrato: o pedido, as partes, datas, local, pagamento e aditivos.
+  final DadosContrato? dadosContrato;
+
+  /// Abre os Termos de uso (regras de cancelamento e garantia).
+  final VoidCallback? aoVerTermos;
 
   /// Mostra o orçamento aceito como o contrato do serviço: só leitura, sem aceitar,
   /// contraproposta nem a caixa de "li e aceito".
@@ -109,6 +117,15 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               ],
             ),
       children: [
+        if (widget.contrato && widget.dadosContrato != null) ...[
+          Text(
+            'Pedido ${widget.dadosContrato!.numeroPedido}'
+            '${widget.dadosContrato!.contratadoEm == null ? '' : ' · contratado em ${widget.dadosContrato!.contratadoEm}'}',
+            key: const ValueKey('contrato-cabecalho'),
+            style: secundario,
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -156,6 +173,11 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                 LinhaValor(
                     rotulo: item.descricao,
                     valor: formatarReais(item.centavos)),
+                if (contaDoItem(item) case final conta?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: EspacosTrato.x1),
+                    child: Text(conta, style: secundario),
+                  ),
                 const SizedBox(height: EspacosTrato.x3),
               ],
               if (d.totalHoras.isNotEmpty) ...[
@@ -202,12 +224,14 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                 texto: d.garantiaDetalhe,
               ),
               // Bloco sem texto não aparece: o profissional pode não ter preenchido.
-              if (d.foraDoEscopo.trim().isNotEmpty) ...[
+              if (d.foraDoEscopo.trim().isNotEmpty || widget.contrato) ...[
                 const Divider(height: 1),
                 _BlocoRegra(
                   icone: Icons.warning_amber_rounded,
                   titulo: 'Fora do escopo',
-                  texto: d.foraDoEscopo,
+                  texto: d.foraDoEscopo.trim().isNotEmpty
+                      ? d.foraDoEscopo
+                      : 'O profissional não listou exclusões. Vale o que está nos itens acima.',
                 ),
               ],
               if (d.cancelamento.trim().isNotEmpty) ...[
@@ -222,6 +246,12 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
           ),
         ),
         if (widget.contrato) ...[
+          if (widget.dadosContrato != null)
+            _SecoesDoContrato(
+              dados: widget.dadosContrato!,
+              profissional: o.profissional,
+              aoVerTermos: widget.aoVerTermos,
+            ),
           const SizedBox(height: EspacosTrato.x4),
           Text(
             'Este é o orçamento que você aceitou: ele vale como o contrato do serviço '
@@ -296,6 +326,116 @@ class _BlocoRegra extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A conta da linha: "45 h × R\$ 15,00 por hora" ou "2 × R\$ 30,00". Nula quando não há o que
+/// explicar (quantidade 1 de item comum, ou dado faltando).
+String? contaDoItem(ItemOrcamento item) {
+  final q = item.quantidade;
+  final u = item.unitarioCentavos;
+  if (q == null || u == null || q <= 0) return null;
+  final qtd = q == q.roundToDouble()
+      ? q.toInt().toString()
+      : q.toString().replaceAll('.', ',');
+  if (item.porHora) return '$qtd h × ${formatarReais(u)} por hora';
+  if (q == 1) return null;
+  return '$qtd × ${formatarReais(u)}';
+}
+
+/// O contrato além do orçamento: o que foi pedido, as partes, quando e onde, pagamento e regras.
+class _SecoesDoContrato extends StatelessWidget {
+  const _SecoesDoContrato(
+      {required this.dados, required this.profissional, this.aoVerTermos});
+
+  final DadosContrato dados;
+  final String profissional;
+  final VoidCallback? aoVerTermos;
+
+  @override
+  Widget build(BuildContext context) {
+    final secundario = TipografiaTrato.corpoPequeno
+        .copyWith(color: CoresTrato.textoSecundario);
+    Widget secao(String titulo, List<Widget> filhos, {Key? key}) => Padding(
+          padding: const EdgeInsets.only(top: EspacosTrato.x4),
+          child: CartaoTrato(
+            key: key,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo, style: TipografiaTrato.tituloOpcao),
+                const SizedBox(height: EspacosTrato.x3),
+                ...filhos,
+              ],
+            ),
+          ),
+        );
+    Widget linha(String rotulo, String valor) => Padding(
+          padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(rotulo, style: secundario),
+              Text(valor, style: TipografiaTrato.corpo),
+            ],
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        secao('O que foi contratado', key: const ValueKey('contrato-servico'), [
+          Text(dados.titulo, style: TipografiaTrato.corpoForte),
+          if (dados.descricao.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x1),
+            Text(dados.descricao, style: TipografiaTrato.corpo),
+          ],
+          if (dados.respostas.isNotEmpty)
+            const SizedBox(height: EspacosTrato.x3),
+          for (final r in dados.respostas) linha(r.rotulo, r.valor),
+        ]),
+        secao('Partes', key: const ValueKey('contrato-partes'), [
+          linha('Contratante', dados.cliente ?? 'Você'),
+          linha('Profissional', profissional),
+        ]),
+        secao('Quando e onde', key: const ValueKey('contrato-local'), [
+          linha('Visita', dados.visita ?? 'Ainda não marcada'),
+          linha('Local do serviço', dados.local),
+        ]),
+        secao('Pagamento', key: const ValueKey('contrato-pagamento'), [
+          linha(
+            'Pago pelo app',
+            dados.pagoCentavos == null
+                ? 'Aguardando a confirmação do pagamento'
+                : formatarReais(dados.pagoCentavos!),
+          ),
+          if (dados.aditivos.isEmpty)
+            linha('Aditivos', 'Nenhum')
+          else
+            for (final a in dados.aditivos) linha(a.rotulo, a.valor),
+          Text(
+            'O valor fica retido pelo parceiro de pagamento e só é liberado ao profissional '
+            'depois que você confirma o serviço.',
+            style: secundario,
+          ),
+        ]),
+        secao('Regras', key: const ValueKey('contrato-regras'), [
+          Text(
+            'Garantia: se o problema voltar dentro do prazo, peça o retrabalho pela tela de '
+            'garantia. O profissional tem ${dados.prazoRetrabalhoDias} '
+            '${dados.prazoRetrabalhoDias == 1 ? 'dia' : 'dias'} para atender; sem atendimento, '
+            'o suporte analisa o caso.',
+            style: TipografiaTrato.corpo,
+          ),
+          const SizedBox(height: EspacosTrato.x2),
+          Text(
+            'Cancelamento e demais regras seguem os Termos de uso do Trato.',
+            style: TipografiaTrato.corpo,
+          ),
+          if (aoVerTermos != null)
+            BotaoLink(texto: 'Ver termos de uso', aoTocar: aoVerTermos!),
+        ]),
+      ],
     );
   }
 }

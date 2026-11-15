@@ -16,7 +16,8 @@ import 'package:trato/telas/agenda/modelos.dart';
 import 'package:trato/telas/conclusao/avaliacao_tela.dart';
 import 'package:trato/telas/conclusao/modelos.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
-import 'package:trato/telas/orcamentos/modelos.dart' show semAvaliacoes;
+import 'package:trato/telas/orcamentos/modelos.dart'
+    show DadosContrato, ItemOrcamento, LinhaContrato, semAvaliacoes;
 
 import 'apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/tema/tema.dart';
@@ -258,6 +259,45 @@ void main() {
       expect(find.byType(Checkbox), findsNothing);
     });
 
+    testWidgets('o contrato mostra o pedido, as partes, quando e onde, pagamento e regras',
+        (t) async {
+      t.view.physicalSize = const Size(420, 4000);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final o = orcamentosExemplo.firstWhere((x) => x.detalhe != null);
+      var termos = false;
+      await t.pumpWidget(_app(DetalheOrcamentoTela(
+        orcamento: o,
+        contrato: true,
+        aoVerTermos: () => termos = true,
+        dadosContrato: const DadosContrato(
+          numeroPedido: '#02D8',
+          titulo: 'Montagem de móveis',
+          descricao: 'Montar guarda-roupa.',
+          local: 'Rua das Flores, 10 · Centro',
+          cliente: 'João Cardoso',
+          contratadoEm: '13/11/2026',
+          visita: '14/11 · 09:00',
+          respostas: [LinhaContrato('Qual é o tipo de imóvel?', 'Casa')],
+          pagoCentavos: 70500,
+          aditivos: [LinhaContrato('Horas extras · aguardando sua aprovação', 'R\$ 450,00')],
+        ),
+      )));
+      await t.pumpAndSettle();
+      expect(find.text('Pedido #02D8 · contratado em 13/11/2026'), findsOneWidget);
+      expect(find.text('Montagem de móveis'), findsOneWidget);
+      expect(find.text('Casa'), findsOneWidget);
+      expect(find.text('João Cardoso'), findsOneWidget);
+      expect(find.text('Rua das Flores, 10 · Centro'), findsOneWidget);
+      expect(find.text('R\$ 705,00'), findsWidgets);
+      expect(find.text('Horas extras · aguardando sua aprovação'), findsOneWidget);
+      expect(find.textContaining('7 dias para atender'), findsOneWidget);
+      expect(find.text('Fora do escopo'), findsOneWidget);
+      await t.ensureVisible(find.text('Ver termos de uso'));
+      await t.tap(find.text('Ver termos de uso'));
+      expect(termos, isTrue);
+    });
+
     test('o servidor marca qual orçamento foi aceito', () async {
       final api = _api((r) {
         if (r.url.path == '/v1/pedidos/p1') return _json(_pedido('p1', 'concluido'));
@@ -271,6 +311,28 @@ void main() {
       });
       final r = await RepositorioOrcamentosApi(api).listar('p1');
       expect([for (final o in r.orcamentos) if (o.aceito) o.id], ['o2']);
+    });
+  });
+
+  group('Itens do orçamento mostram a conta', () {
+    test('horas: quantidade × valor por hora; item comum só com quantidade > 1', () {
+      expect(
+        contaDoItem(const ItemOrcamento(
+            descricao: 'Horas trabalhadas', centavos: 67500, quantidade: 45,
+            unitarioCentavos: 1500, porHora: true)),
+        '45 h × R\$ 15,00 por hora',
+      );
+      expect(
+        contaDoItem(const ItemOrcamento(
+            descricao: 'Tinta', centavos: 6000, quantidade: 2, unitarioCentavos: 3000)),
+        '2 × R\$ 30,00',
+      );
+      expect(
+        contaDoItem(const ItemOrcamento(
+            descricao: 'Serviço', centavos: 6000, quantidade: 1, unitarioCentavos: 6000)),
+        isNull,
+      );
+      expect(contaDoItem(const ItemOrcamento(descricao: 'X', centavos: 1)), isNull);
     });
   });
 

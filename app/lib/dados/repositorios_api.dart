@@ -548,6 +548,76 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     );
   }
 
+  /// O contrato: pedido (`/v1/pedidos/{id}`), o que foi descrito (`/dados`), o saldo do ledger,
+  /// os aditivos e o nome de quem contratou (`/v1/me`). Falha numa parte só esconde a parte.
+  @override
+  Future<DadosContrato> contrato(String pedidoId) async {
+    final pedido = await _pedido(pedidoId);
+    Map<String, dynamic> dados = const {};
+    try {
+      dados = _mapa(await _api.get('/v1/pedidos/$pedidoId/dados'));
+    } on ErroTrato {
+      dados = const {};
+    }
+    int? pago;
+    try {
+      final s = await _saldo(pedidoId);
+      pago = pedido.pagamentoConfirmado ? s.clientePagouCentavos : null;
+    } on ErroTrato {
+      pago = null;
+    }
+    var aditivos = <Map<String, dynamic>>[];
+    try {
+      aditivos = _lista(await _api.get('/v1/contratos/$pedidoId/aditivos'));
+    } on ErroTrato {
+      aditivos = [];
+    }
+    String? cliente;
+    try {
+      final eu = _mapa(await _api.get('/v1/me'));
+      final nome = ((eu['nome'] as String?) ?? '').trim();
+      cliente = nome.isEmpty ? null : nome;
+    } on ErroTrato {
+      cliente = null;
+    }
+    final remoto = dados['modalidade'] == 'remoto' || pedido.remoto;
+    final endereco = dados.isEmpty ? null : RepositorioPedidosApi.dadosDeJson(dados).enderecoCompleto;
+    String situacao(String? e) => switch (e) {
+          'proposto' => 'aguardando sua aprovação',
+          'aprovado' => 'aprovado, aguardando pagamento',
+          'pago' => 'pago',
+          'recusado' => 'recusado',
+          _ => e ?? '',
+        };
+    final aceite = pedido.contratadoEm?.toLocal();
+    return DadosContrato(
+      numeroPedido: pedido.numero,
+      titulo: pedido.rotulo,
+      descricao: ((dados['descricao'] as String?) ?? '').trim(),
+      local: remoto
+          ? 'Atendimento remoto'
+          : (endereco == null || endereco.isEmpty ? 'Endereço não informado' : endereco),
+      cliente: cliente,
+      contratadoEm: aceite == null
+          ? null
+          : '${_doisDigitos(aceite.day)}/${_doisDigitos(aceite.month)}/${aceite.year}',
+      visita: pedido.janelaRotulo,
+      respostas: [
+        for (final r in _lista(dados['respostas'] ?? const []))
+          LinhaContrato('${r['pergunta']}', textoDaResposta(r['resposta'])),
+      ],
+      pagoCentavos: pago,
+      aditivos: [
+        for (final a in aditivos)
+          LinhaContrato(
+            '${a['descricao'] ?? 'Aditivo'} · ${situacao(a['estado'] as String?)}',
+            formatarReais((a['valor_centavos'] as num?)?.toInt() ?? 0),
+          ),
+      ],
+      prazoRetrabalhoDias: ConfigPublica.atual.prazoRetrabalhoDias,
+    );
+  }
+
   @override
   Future<void> pedirRetrabalho(String pedidoId, String descricao) async {
     await _api.post(
@@ -636,6 +706,10 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
             ItemOrcamento(
               descricao: i['descricao'] as String,
               centavos: i['total_centavos'] as int,
+              // O backend manda a quantidade como texto decimal ("45.00").
+              quantidade: double.tryParse('${i['quantidade']}'),
+              unitarioCentavos: (i['valor_unitario_centavos'] as num?)?.toInt(),
+              porHora: const {'horas', 'deslocamento'}.contains(i['tipo']),
             ),
       ];
       final validade = j['validade_ate'] as String?;

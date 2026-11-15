@@ -79,7 +79,20 @@ def pedido_out_completo(
     if pedido.profissional_id == usuario.id and pedido.cliente_id != usuario.id:
         quem = contexto.usuarios.detalhe(pedido.cliente_id)
         cliente_nome = nome_abreviado(quem.nome) if quem is not None else None
-    return saida.model_copy(update={"titulo": titulo or None, "cliente_nome": cliente_nome})
+    contratado_em = None
+    if pedido.profissional_id is not None:
+        try:
+            contrato = contexto.contratos.obter_do_pedido(pedido.id)
+        except Exception:  # noqa: BLE001 - sem o contrato, a data só não aparece
+            contrato = None
+        contratado_em = contrato.aceito_em if contrato is not None else None
+    return saida.model_copy(
+        update={
+            "titulo": titulo or None,
+            "cliente_nome": cliente_nome,
+            "contratado_em": contratado_em,
+        }
+    )
 
 
 def pedido_out(pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False) -> PedidoOut:

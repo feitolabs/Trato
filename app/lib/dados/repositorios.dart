@@ -129,6 +129,9 @@ abstract interface class RepositorioPedidos {
 
   Future<DadosGarantia> garantia(String pedidoId);
 
+  /// O contrato do serviço (o pedido, as partes, datas, local, pagamento e aditivos).
+  Future<DadosContrato> contrato(String pedidoId);
+
   Future<void> pedirRetrabalho(String pedidoId, String descricao);
 }
 
