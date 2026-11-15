@@ -11,6 +11,7 @@ import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'repositorios_api.dart' show RepositorioPedidosApi;
 import 'repositorios_catalogo.dart';
+import 'servicos_api.dart' show servicoDaAvaliacao;
 import 'paralelo.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`) do catálogo, dos serviços e da agenda.
@@ -253,9 +254,9 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final avaliacoes = [
       for (final a in (j['avaliacoes'] as List? ?? const []))
         Avaliacao(
-          cliente: 'Cliente',
-          servico: 'serviço',
-          nota: ((a as Map)['nota_geral'] as num).toDouble(),
+          cliente: ((a as Map)['cliente_nome'] as String?) ?? 'Cliente',
+          servico: servicoDaAvaliacao(a),
+          nota: (a['nota_geral'] as num).toDouble(),
           comentario: (a['comentario'] as String?) ?? '',
           detalhes: [
             for (final e in (a['etiquetas'] as List? ?? const [])) '$e'
