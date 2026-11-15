@@ -57,6 +57,31 @@ def ator_de(usuario: Usuario, pedido: Pedido | None = None) -> Ator:
     return Ator(papel_das_regras(usuario), usuario.id)
 
 
+def nome_abreviado(nome: str | None) -> str | None:
+    """"Gabriel Victor Lopes" -> "Gabriel L." (como o app mostra pessoas)."""
+    partes = (nome or "").split()
+    if not partes:
+        return None
+    return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
+
+
+def pedido_out_completo(
+    contexto: Contexto, pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False
+) -> PedidoOut:
+    """`pedido_out` mais o título do serviço e, para o profissional, o nome do cliente."""
+    saida = pedido_out(pedido, usuario, ja_avaliou)
+    try:
+        dados = contexto.pedidos.dados_do_pedido(pedido.id)
+    except Exception:  # noqa: BLE001 - sem os dados, o app mostra o número do pedido
+        dados = None
+    titulo = (dados.titulo or "").strip() if dados is not None else ""
+    cliente_nome = None
+    if pedido.profissional_id == usuario.id and pedido.cliente_id != usuario.id:
+        quem = contexto.usuarios.detalhe(pedido.cliente_id)
+        cliente_nome = nome_abreviado(quem.nome) if quem is not None else None
+    return saida.model_copy(update={"titulo": titulo or None, "cliente_nome": cliente_nome})
+
+
 def pedido_out(pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False) -> PedidoOut:
     eh_cliente = pedido.cliente_id == usuario.id
     papel_no_pedido = (

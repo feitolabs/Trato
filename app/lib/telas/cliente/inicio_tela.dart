@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/config_publica.dart';
+
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../servicos/servicos_recentes_tela.dart';
@@ -40,9 +42,12 @@ class InicioTela extends StatelessWidget {
     final recentesBrutos = dados?.recentes ?? const <ServicoRecente>[];
     final recentes = [
       for (final r in recentesBrutos)
-        if ((andamento?.pedidoId == null ||
-                r.pedidoId != andamento?.pedidoId) &&
-            (andamento == null || r.titulo != andamento.titulo))
+        // Pelo id quando há (títulos se repetem: dois pedidos de "Pintura"); pelo título só
+        // nos dados de exemplo, que não têm id.
+        if (andamento == null ||
+            (andamento.pedidoId != null
+                ? r.pedidoId != andamento.pedidoId
+                : r.titulo != andamento.titulo))
           r,
     ];
     final grade = dados == null
@@ -107,7 +112,8 @@ class InicioTela extends StatelessWidget {
                       ),
                       const SizedBox(height: EspacosTrato.x3),
                       Text(
-                        'Receba até 5 orçamentos de profissionais com identidade verificada. '
+                        'Receba até ${ConfigPublica.atual.limiteOrcamentos} orçamentos de '
+                        'profissionais com identidade verificada. '
                         'O pagamento é processado por parceiro e acompanhado no app.',
                         style: TipografiaTrato.corpo
                             .copyWith(color: CoresTrato.creme),

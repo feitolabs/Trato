@@ -59,7 +59,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                         children: [
                           Text(p.nome, style: TipografiaTrato.tituloGrande),
                           const SizedBox(height: EspacosTrato.x1),
-                          SeloVerificacao(p.verificacao),
+                          if (p.verificacao.isNotEmpty) SeloVerificacao(p.verificacao),
                           const SizedBox(height: EspacosTrato.x1),
                           Text(
                             '${p.especialidade} · no Trato desde ${d.noTratoDesde}',

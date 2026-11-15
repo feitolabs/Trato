@@ -60,13 +60,19 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                     const SizedBox(height: EspacosTrato.x3),
                     Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
                     const SizedBox(height: EspacosTrato.x3),
-                    const Align(
+                    Align(
                       alignment: Alignment.centerLeft,
-                      child: ChipStatus(
-                        texto: 'Pagamento acompanhado no app',
-                        tipo: TipoStatus.info,
-                        icone: Icons.lock_outline,
-                      ),
+                      child: pedido.pagamentoConfirmado
+                          ? const ChipStatus(
+                              texto: 'Pagamento acompanhado no app',
+                              tipo: TipoStatus.info,
+                              icone: Icons.lock_outline,
+                            )
+                          : const ChipStatus(
+                              texto: 'Aguardando o pagamento',
+                              tipo: TipoStatus.alerta,
+                              icone: Icons.schedule,
+                            ),
                     ),
                     if (pedido.codigoInicio != null) ...[
                       const SizedBox(height: EspacosTrato.x4),

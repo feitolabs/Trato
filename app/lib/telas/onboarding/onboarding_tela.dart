@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/config_publica.dart';
+
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../auth/login_tela.dart';
@@ -16,18 +18,19 @@ class _PaginaOnboarding {
 /// Os textos da página 1 são do protótipo. As páginas 2 e 3 seguem o escopo (5.1: orçamento,
 /// pagamento retido e garantia) e usam frases já presentes nas telas de pagamento e disputa.
 /// Confirmar o texto com o João (P14).
-const _paginas = [
+List<_PaginaOnboarding> get _paginas => [
   _PaginaOnboarding(
     icone: Icons.format_list_bulleted,
     titulo: 'Descreva o problema,\nreceba orçamentos',
-    texto: 'Até 5 profissionais com identidade verificada respondem em até 48 horas.',
+    texto: 'Até ${ConfigPublica.atual.limiteOrcamentos} profissionais com identidade verificada '
+        'respondem em até ${ConfigPublica.horas(ConfigPublica.atual.validadePedidoHoras)}.',
   ),
-  _PaginaOnboarding(
+  const _PaginaOnboarding(
     icone: Icons.lock_outline,
     titulo: 'Pagamento por parceiro,\nacompanhado no app',
     texto: 'O pagamento é processado por parceiro e acompanhado no app. Você confirma o serviço ao final.',
   ),
-  _PaginaOnboarding(
+  const _PaginaOnboarding(
     icone: Icons.verified_user_outlined,
     titulo: 'Se algo der errado,\nhá suporte',
     texto: 'Abra uma disputa e o caso passa por suporte e análise de problemas. O prazo de garantia do serviço vem no orçamento.',

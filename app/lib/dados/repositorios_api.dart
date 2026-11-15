@@ -19,6 +19,7 @@ import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
 import '../telas/comuns/formato_aparelho.dart';
 import 'cliente_api.dart';
+import 'config_publica.dart';
 import 'erros.dart';
 import 'fila_offline.dart';
 import 'modelos_api.dart';
@@ -65,15 +66,30 @@ class TextosPadraoTelas {
       ];
   List<String> get solucoes =>
       const ['Retrabalho sem custo', 'Reembolso parcial', 'Reembolso total'];
-  int get prazoRespostaHoras => 48;
+  int get prazoRespostaHoras => ConfigPublica.atual.prazoRespostaDisputaHoras;
   List<String> get criterios =>
       const ['Pontualidade', 'Qualidade', 'Limpeza', 'Comunicação', 'Preço justo'];
   List<int> get gorjetas => const [1000, 2000];
   String get garantiaCobre => 'Refazer o que está no orçamento, sem custo.';
   String get garantiaNaoCobre => 'Não cobre problemas novos nem serviços fora do orçamento.';
-  int get prazoAtendimentoRetrabalhoDias => 7;
+  int get prazoAtendimentoRetrabalhoDias => ConfigPublica.atual.prazoRetrabalhoDias;
   List<String> get respostasRapidas =>
       const ['Tudo certo', 'Pode me mandar foto?', 'Que horas termina?'];
+}
+
+/// Selo do nível de verificação: vazio no nível básico (a tela esconde o selo).
+String seloDeVerificacao(String? nivel) => switch (nivel) {
+      'verificado_plus' => 'Verificado Plus',
+      'verificado' => 'Verificado',
+      _ => '',
+    };
+
+/// "12 horas", "40 minutos" até [fim]; vazio se já passou.
+String _tempoRestante(DateTime fim, {DateTime? agora}) {
+  final falta = fim.toLocal().difference((agora ?? DateTime.now()).toLocal());
+  if (falta.inMinutes <= 0) return '';
+  if (falta.inHours >= 1) return ConfigPublica.horas(falta.inHours);
+  return '${falta.inMinutes} ${falta.inMinutes == 1 ? 'minuto' : 'minutos'}';
 }
 
 String _quandoRelativo(DateTime data, {DateTime? agora}) {
@@ -228,8 +244,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     return PedidoResumo(
       id: p.id,
       estadoApi: p.estado,
-      titulo: 'Pedido ${p.numero}',
-      subtitulo: 'Aberto em ${_dia(p.abertoEm)}',
+      titulo: p.rotulo,
+      subtitulo: p.rotulo == 'Pedido ${p.numero}'
+          ? 'Aberto em ${_dia(p.abertoEm)}'
+          : 'Pedido ${p.numero} · aberto em ${_dia(p.abertoEm)}',
       statusTexto: texto,
       statusTipo: tipo,
     );
@@ -383,6 +401,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
         _ => 'Seu pedido',
       },
       podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
+      pagamentoConfirmado: pedido.pagamentoConfirmado,
       etapas: etapas,
       fotos: const [],
       // O código de conclusão é o que o cliente passa ao profissional para encerrar o serviço.
@@ -400,6 +419,16 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<ResumoConclusao> conclusao(String pedidoId) async {
     final (pedido, saldo, fotos) =
         await emParalelo3(_pedido(pedidoId), _saldo(pedidoId), _fotosDoServico(pedidoId));
+    // Aditivos já pagos: saem do total para a linha "Orçamento" mostrar só o combinado.
+    var aditivosPagos = 0;
+    try {
+      for (final a in _lista(await _api.get('/v1/contratos/$pedidoId/aditivos'))) {
+        if (a['estado'] == 'pago') aditivosPagos += (a['valor_centavos'] as num).toInt();
+      }
+    } on ErroTrato {
+      aditivosPagos = 0;
+    }
+    if (aditivosPagos > saldo.clientePagouCentavos) aditivosPagos = 0;
     return ResumoConclusao(
       numeroPedido: pedido.numero,
       nomeProfissional: await _nomeDoProfissional(pedido),
@@ -408,10 +437,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       fotosCarregadas: true,
       legendaFotoAntes: 'Antes',
       legendaFotoDepois: 'Depois',
-      orcamentoCentavos: saldo.clientePagouCentavos,
-      aditivoCentavos: 0,
+      orcamentoCentavos: saldo.clientePagouCentavos - aditivosPagos,
+      aditivoCentavos: aditivosPagos,
       codigo: pedido.codigoConclusao ?? '',
-      avisoLiberacao: 'Depois da sua confirmação, a liberação segue as regras do pedido.',
+      avisoLiberacao: ConfigPublica.atual.textoLiberacao,
     );
   }
 
@@ -424,7 +453,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<DadosRelatoProblema> dadosRelato(String pedidoId) async {
     final (pedido, saldo) = await emParalelo2(_pedido(pedidoId), _saldo(pedidoId));
     return DadosRelatoProblema(
-      titulo: 'Pedido ${pedido.numero}',
+      titulo: pedido.rotulo,
       valorCongeladoCentavos: saldo.retidoCentavos + saldo.aLiberarCentavos,
       motivos: textos.motivos,
       solucoes: textos.solucoes,
@@ -476,6 +505,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       valorLiberadoCentavos: saldo.clientePagouCentavos,
       criterios: textos.criterios,
       gorjetasCentavos: textos.gorjetas,
+      // Sem rota de gorjeta no servidor: a tela não oferece o que não dá para pagar.
+      gorjetaDisponivel: false,
     );
   }
 
@@ -564,10 +595,18 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
     return OrcamentosDoPedido(
       pedido: ResumoPedido(
         numero: PedidoApi.numeroDe(pedido.id).substring(1),
-        titulo: 'Pedido ${pedido.numero}',
+        titulo: pedido.rotulo,
         recebidos: brutos.length,
-        limite: brutos.length,
-        tempoRestante: '',
+        // O limite e a janela vêm da configuração (`limite_orcamentos_por_pedido` e
+        // `validade_pedido_horas`); o tempo restante só enquanto o pedido está aberto.
+        limite: brutos.length > ConfigPublica.atual.limiteOrcamentos
+            ? brutos.length
+            : ConfigPublica.atual.limiteOrcamentos,
+        tempoRestante: pedido.estado == 'aberto'
+            ? _tempoRestante(
+                pedido.abertoEm.add(Duration(hours: ConfigPublica.atual.validadePedidoHoras)),
+              )
+            : '',
       ),
       orcamentos: [
         for (var i = 0; i < brutos.length; i++) _orcamento(brutos[i], detalhes[i]),
@@ -627,17 +666,18 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
     final enviado = j['enviado_em'] as String?;
     final enviadoEm = enviado == null ? DateTime.now() : DateTime.parse(enviado);
     final garantia = j['garantia_dias'] as int?;
+    final nota = (j['profissional_nota'] as num?)?.toDouble();
+    final servicos = (j['profissional_servicos_concluidos'] as num?)?.toInt();
     return Orcamento(
       id: j['id'] as String,
       profissional: nome,
       iniciais: _iniciais(nome),
-      // A API de orçamentos ainda não devolve selo, nota nem total de serviços do profissional.
-      verificacao: '',
+      verificacao: seloDeVerificacao(j['profissional_nivel_verificacao'] as String?),
       totalCentavos: j['valor_centavos'] as int,
-      nota: 0,
-      notaResumo: '—',
-      servicosResumo: '—',
-      servicosConcluidos: 0,
+      nota: nota ?? 0,
+      notaResumo: nota == null ? semAvaliacoes : nota.toStringAsFixed(1).replaceAll('.', ','),
+      servicosResumo: '${servicos ?? 0}',
+      servicosConcluidos: servicos ?? 0,
       quando: _quandoRelativo(enviadoEm),
       inicio: enviadoEm,
       garantia: garantia == null ? '' : '$garantia dias',
@@ -1204,7 +1244,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
             pedidoId: p.id,
             // Data e hora combinadas; antes de marcar a visita, diz isso em vez do nome do estado.
             quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
-            titulo: 'Pedido ${p.numero}',
+            titulo: p.clienteNome == null ? p.rotulo : '${p.rotulo} · ${p.clienteNome}',
             endereco: p.remoto ? 'Atendimento remoto' : (enderecos[p.id]?.enderecoCompleto ?? ''),
             janelaInicio: p.janelaInicio?.toLocal(),
             emAndamento: p.estado == 'em_andamento',
@@ -1299,7 +1339,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     };
     return PedidoContratado(
       pedidoId: p.id,
-      titulo: 'Pedido ${p.numero}',
+      titulo: p.rotulo,
+      cliente: p.clienteNome,
       situacao: situacao,
       estadoApi: p.estado,
       quando: p.janelaRotulo,
@@ -1340,10 +1381,16 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       rethrow;
     }
     final aberto = _pedidoAberto(j);
+    // Resumo do que o cliente pediu de prazo (o nome já aparece em cima, com o avatar).
+    final prazo = DateTime.tryParse('${j['prazo_desejado']}');
+    final resumo = [
+      if (j['urgente'] == true) 'Urgente',
+      if (prazo != null) 'Para até ${_dia(prazo)}',
+    ].join(' · ');
     return DetalhePedido(
       pedido: aberto,
       fechaEm: 'Aberto ${_quandoRelativo(DateTime.parse(j['aberto_em'] as String))}',
-      clienteResumo: '',
+      clienteResumo: resumo,
       legendasFotos: const [],
       descricao: (j['descricao'] as String?) ?? '',
       linhas: [

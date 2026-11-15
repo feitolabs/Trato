@@ -120,3 +120,5 @@ class ResumoPedido {
   /// "31 horas".
   final String tempoRestante;
 }
+/// Texto quando o profissional ainda não tem nota.
+const semAvaliacoes = 'Sem avaliações';

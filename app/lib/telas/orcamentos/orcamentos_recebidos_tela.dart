@@ -132,8 +132,10 @@ class _CartaoOrcamento extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(o.profissional, style: TipografiaTrato.tituloCartao),
-                    const SizedBox(height: EspacosTrato.x1),
-                    SeloVerificacao(o.verificacao),
+                    if (o.verificacao.isNotEmpty) ...[
+                      const SizedBox(height: EspacosTrato.x1),
+                      SeloVerificacao(o.verificacao),
+                    ],
                   ],
                 ),
               ),
