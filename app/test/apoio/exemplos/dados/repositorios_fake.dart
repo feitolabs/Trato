@@ -1,5 +1,6 @@
 import 'package:trato/auth/servico_auth.dart';
 import '../telas/carteira/dados_exemplo.dart';
+import 'package:trato/telas/orcamentos/modelos.dart' show DadosContrato;
 import 'package:trato/telas/carteira/modelos.dart';
 import '../telas/conclusao/dados_exemplo.dart';
 import '../telas/orcamentos/dados_exemplo.dart';
@@ -27,6 +28,16 @@ import 'package:trato/telas/conclusao/modelos.dart';
 const _idDemo = 'demo-4821';
 
 class RepositorioPedidosFake implements RepositorioPedidos {
+  @override
+  Future<DadosContrato> contrato(String pedidoId) async => const DadosContrato(
+        numeroPedido: '#AAAA',
+        titulo: 'Troca de tomadas e chuveiro',
+        descricao: 'Trocar 4 tomadas e o chuveiro do banheiro.',
+        local: 'Rua das Flores, 10 · Centro',
+        cliente: 'Mariana A.',
+        contratadoEm: '28/10/2026',
+      );
+
   final List<String> criados = [];
   final List<EnvioRelato> relatos = [];
   final List<String> retrabalhos = [];

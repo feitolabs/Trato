@@ -34,7 +34,7 @@ import '../legal/texto_legal_tela.dart';
 import '../mensagens/modelos.dart' show ConversaResumo, ServicoMensagens;
 import '../mensagens/servico_conversas.dart' show ServicoConversasApi;
 import '../mensagens/servico_pedidos.dart';
-import '../orcamentos/modelos.dart' show Orcamento;
+import '../orcamentos/modelos.dart' show DadosContrato, Orcamento;
 import '../pedido_novo/modelos.dart' show FormularioPedido;
 import '../servicos/detalhe_servico_tela.dart';
 import '../servicos/modelos.dart';
@@ -1482,20 +1482,26 @@ abstract final class RotasTrato {
   /// O contrato do serviço é o orçamento que o cliente aceitou (escopo, valor e garantia).
   static void abrirContrato(BuildContext context, String pedidoId) => _abrir<void>(
         context,
-        Carregador<Orcamento?>(
+        Carregador<(Orcamento?, DadosContrato)>(
           carregar: () async {
-            final todos = await repos.orcamentos.listar(pedidoId);
-            return todos.orcamentos
+            final (todos, contrato) = await emParalelo2(
+              repos.orcamentos.listar(pedidoId),
+              repos.pedidos.contrato(pedidoId),
+            );
+            final aceito = todos.orcamentos
                 .where((o) => o.aceito && o.detalhe != null)
                 .firstOrNull;
+            return (aceito, contrato);
           },
-          vazio: (o) => o == null,
+          vazio: (x) => x.$1 == null,
           tituloVazio: 'Contrato indisponível',
           textoVazio: 'Não encontramos o orçamento aceito deste pedido.',
-          construir: (context, o) => DetalheOrcamentoTela(
-            orcamento: o!,
+          construir: (context, x) => DetalheOrcamentoTela(
+            orcamento: x.$1!,
             contrato: true,
-            aoVerPerfil: (x) => abrirPerfilDoOrcamento(context, x),
+            dadosContrato: x.$2,
+            aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
+            aoVerTermos: () => abrirTermos(context),
           ),
         ),
       );

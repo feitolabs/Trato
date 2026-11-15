@@ -26,7 +26,11 @@ class PedidoApi {
     this.titulo,
     this.clienteNome,
     this.pagamentoConfirmado = false,
+    this.contratadoEm,
   });
+
+  /// Quando o cliente aceitou o orçamento.
+  final DateTime? contratadoEm;
 
   /// Só o webhook do parceiro de pagamento deixa isto verdadeiro.
   final bool pagamentoConfirmado;
@@ -57,6 +61,7 @@ class PedidoApi {
         titulo: j['titulo'] as String?,
         clienteNome: j['cliente_nome'] as String?,
         pagamentoConfirmado: j['pagamento_confirmado'] == true,
+        contratadoEm: _dataOuNulo(j['contratado_em']),
         janelaInicio: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['inicio']),
         janelaFim: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['fim']),
         id: j['id'] as String,

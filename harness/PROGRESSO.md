@@ -970,3 +970,8 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 
 - "Ver contrato do serviço" (garantia) não fazia nada: agora abre o orçamento aceito (`Orcamento.aceito`) em `DetalheOrcamentoTela(contrato: true)`, só leitura.
 - Perguntas por categoria (painel): `GET /v1/catalogo/categorias/{id}/perguntas`; ao abrir o pedido o servidor exige as obrigatórias e confere as opções (`_exigir_respostas`); respostas em `DadosPedidoOut.respostas` e `PedidoAbertoDetalheOut.respostas`. App: o Novo pedido troca "O que precisa ser feito?"/quantidade pelas perguntas (escolha, múltipla, sim/não, número, texto); o profissional vê as respostas no detalhe do pedido aberto.
+
+## 2026-11-15 — Contrato completo (v0.1.26)
+
+- Itens mostram a conta (`contaDoItem`: "45 h × R$ 15,00 por hora").
+- Contrato (`DetalheOrcamentoTela(contrato: true, dadosContrato:)`): cabeçalho com pedido e data do aceite (`PedidoOut.contratado_em`), o que foi contratado (título, descrição, respostas), partes, visita e local, pagamento e aditivos, fora do escopo sempre visível, regras (garantia com prazo da configuração; cancelamento remete aos Termos de uso, com link). Texto próprio de cancelamento depende do João.
