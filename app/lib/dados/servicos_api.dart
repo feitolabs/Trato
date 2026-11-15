@@ -24,6 +24,17 @@ Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
 List<Map<String, dynamic>> _lista(Object? json) =>
     [for (final item in json! as List) item as Map<String, dynamic>];
 
+/// "Eletricista · 14/11/2026": a categoria e o dia da avaliação (o que o servidor mandar).
+String servicoDaAvaliacao(Map<dynamic, dynamic> a) {
+  final categoria = (a['categoria'] as String?)?.trim() ?? '';
+  final quando = DateTime.tryParse('${a['criada_em']}')?.toLocal();
+  final dia = quando == null
+      ? ''
+      : '${quando.day.toString().padLeft(2, '0')}/${quando.month.toString().padLeft(2, '0')}/${quando.year}';
+  final partes = [if (categoria.isNotEmpty) categoria, if (dia.isNotEmpty) dia];
+  return partes.isEmpty ? 'Serviço concluído' : partes.join(' · ');
+}
+
 /// `[Foto:<id>]` vira a URL assinada da foto de trabalho; qualquer outra coisa (caminho antigo,
 /// sem rede) fica como veio.
 Future<String> _urlDaFotoDoPortfolio(ClienteApi api, String usuarioId, String ref) async {
@@ -734,8 +745,8 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
         for (final a in brutas)
           if (a is Map)
             Avaliacao(
-              cliente: 'Cliente',
-              servico: 'Serviço concluído',
+              cliente: (a['cliente_nome'] as String?) ?? 'Cliente',
+              servico: servicoDaAvaliacao(a),
               nota: (a['nota_geral'] as num).toDouble(),
               comentario: (a['comentario'] as String?) ?? '',
               detalhes: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'].join(' · '),

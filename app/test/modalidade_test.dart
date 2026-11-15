@@ -627,6 +627,18 @@ void main() {
     });
   });
 
+  group('Avaliações recebidas', () {
+    test('mostra o nome abreviado de quem avaliou e a categoria com o dia', () {
+      final texto = servicoDaAvaliacao({
+        'categoria': 'Eletricista',
+        'criada_em': '2026-11-14T15:00:00Z',
+      });
+      expect(texto, startsWith('Eletricista · '));
+      expect(texto, endsWith('/2026'));
+      expect(servicoDaAvaliacao({}), 'Serviço concluído'); // servidor antigo
+    });
+  });
+
   group('Notas de materiais', () {
     Map<String, Object?> nota(String quando, String item, int centavos) => {
           'enviada_em': quando,
