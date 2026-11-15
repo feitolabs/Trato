@@ -97,7 +97,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
           child: ChipStatus(
             // O pagamento já foi confirmado pelo parceiro antes do serviço; aqui o que acabou
             // de acontecer é a confirmação do serviço pelo cliente.
-            texto: 'Serviço confirmado · ${formatarReais(dados.valorLiberadoCentavos)}',
+            texto: 'Serviço confirmado · ${formatarReais(dados.valorLiberadoCentavos)} pagos',
             tipo: TipoStatus.sucesso,
             icone: Icons.check,
           ),
@@ -127,6 +127,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
         ),
         const SizedBox(height: EspacosTrato.x5),
         CampoLongo(rotulo: 'Conte como foi (opcional)', controlador: _comentario),
+        if (dados.gorjetaDisponivel) ...[
         const SizedBox(height: EspacosTrato.x5),
         Text('Gorjeta (opcional)', style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x1),
@@ -164,6 +165,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
             teclado: TextInputType.number,
             formatadores: [FilteringTextInputFormatter.digitsOnly],
           ),
+        ],
         ],
       ],
     );

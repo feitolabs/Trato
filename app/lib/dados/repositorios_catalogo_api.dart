@@ -6,10 +6,11 @@ import '../telas/cliente/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
 import '../telas/servicos/modelos.dart';
 import 'cliente_api.dart';
+import 'config_publica.dart';
 import 'erros.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
-import 'repositorios_api.dart' show RepositorioPedidosApi;
+import 'repositorios_api.dart' show RepositorioPedidosApi, seloDeVerificacao;
 import 'repositorios_catalogo.dart';
 import 'servicos_api.dart' show servicoDaAvaliacao;
 import 'paralelo.dart';
@@ -121,12 +122,13 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       id: id,
       nome: nome,
       iniciais: _iniciais(nome),
-      verificacao: nivel.contains('plus') ? 'Verificado Plus' : 'Verificado',
+      verificacao: seloDeVerificacao(nivel),
       especialidade: _especialidade(categorias),
       servicosConcluidos: servicosConcluidos,
       nota: notaPublica,
       distanciaKm: 0,
-      regiao: '',
+      // A busca não devolve região nem distância: sem texto, a tela não mostra o separador.
+      regiao: null,
     );
   }
 
@@ -224,7 +226,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       endereco: 'Seu endereço atual',
       avisoEndereco:
           'O endereço completo só aparece para o profissional contratado.',
-      avisoPrazo: 'Você recebe até 5 orçamentos em 48 horas.',
+      avisoPrazo: 'Você recebe até ${ConfigPublica.atual.limiteOrcamentos} orçamentos em '
+          '${ConfigPublica.horas(ConfigPublica.atual.validadePedidoHoras)}.',
       aceitaRemoto: c?.aceitaRemoto ?? false,
     );
   }
@@ -275,12 +278,17 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       for (final r in (j['regioes'] as List? ?? const []))
         ((r as Map)['bairro'] ?? r['cidade'] ?? '') as String,
     ].where((r) => r.isNotEmpty).toList();
+    // Sem bairro, as cidades em texto ("Divinópolis/MG") que o servidor manda.
+    if (regioes.isEmpty) {
+      regioes.addAll([for (final c in (j['cidades'] as List? ?? const [])) '$c']);
+    }
+    final desde = DateTime.tryParse('${j['no_trato_desde']}');
     final notaPublica = (j['nota_publica'] as num?)?.toDouble();
     return Profissional(
       id: profissionalId,
       nome: nome,
       iniciais: _iniciais(nome),
-      verificacao: nivel.contains('plus') ? 'Verificado Plus' : 'Verificado',
+      verificacao: seloDeVerificacao(nivel),
       especialidade:
           _especialidade((j['categorias'] as List?) ?? const <Object?>[]),
       servicosConcluidos: (j['servicos_concluidos'] as int?) ?? 0,
@@ -288,12 +296,16 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       distanciaKm: 0,
       regiao: regioes.join(', '),
       detalhe: DetalhePerfil(
-        noTratoDesde: DateTime.now().year,
+        noTratoDesde: (desde ?? DateTime.now()).year,
         totalAvaliacoes: avaliacoes.length,
         taxaConclusao: (j['taxa_conclusao'] as num?)?.toInt() ?? 0,
         temHistorico: j['taxa_conclusao'] != null,
-        respondeEm: '',
-        verificacoes: const [],
+        // O Trato ainda não mede o tempo de resposta: traço em vez de um número inventado.
+        respondeEm: '—',
+        verificacoes: [
+          if (nivel == 'verificado' || nivel == 'verificado_plus') 'Identidade conferida',
+          if (nivel == 'verificado_plus') 'Antecedentes conferidos',
+        ],
         avaliacoes: avaliacoes,
         bio: j['bio'] as String?,
         servicos: portfolio,
@@ -363,19 +375,21 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
     final pedido =
         PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
     final antesDaContratacao = pedido.estado == 'aberto';
+    final cfg = ConfigPublica.atual;
     final etapas = antesDaContratacao
-        ? const [
-            EtapaLinhaDoTempo(
+        ? [
+            const EtapaLinhaDoTempo(
               titulo: 'Pedido enviado',
               detalhe: '',
               estado: EstadoEtapa.feita,
             ),
             EtapaLinhaDoTempo(
               titulo: 'Orçamentos',
-              detalhe: 'Você recebe até 5 em 48 horas',
+              detalhe: 'Você recebe até ${cfg.limiteOrcamentos} em '
+                  '${ConfigPublica.horas(cfg.validadePedidoHoras)}',
               estado: EstadoEtapa.atual,
             ),
-            EtapaLinhaDoTempo(
+            const EtapaLinhaDoTempo(
               titulo: 'Contratação',
               detalhe: 'Você escolhe e aceita um orçamento',
               estado: EstadoEtapa.futura,
@@ -442,7 +456,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
       codigoConclusao: pedido.estado == 'em_andamento' ? pedido.codigoConclusao : null,
       pedidoId: pedido.id,
       numero: pedido.numero,
-      titulo: 'Pedido ${pedido.numero}',
+      titulo: pedido.rotulo,
       estadoApi: pedido.estado,
       statusTexto: texto,
       statusTipo: tipo,
@@ -481,7 +495,7 @@ class RepositorioAgendaApi implements RepositorioAgenda {
   Future<List<Agendamento>> listar() async {
     final inicio = await _profissional.inicio();
     // Todos os atendimentos pagos, não só o primeiro. O dia vem da visita marcada; sem visita
-    // marcada, fica em "hoje" com o aviso no horário.
+    // marcada, fica em "Sem data marcada" (não em "hoje").
     return [
       for (final c in inicio.contratados)
         if (c.naAgenda)
@@ -494,6 +508,8 @@ class RepositorioAgendaApi implements RepositorioAgenda {
               (c.janelaInicio ?? DateTime.now()).day,
             ),
             horario: c.quando ?? 'Data da visita ainda não marcada',
+            semData: c.janelaInicio == null,
+            cliente: c.cliente,
             titulo: c.titulo,
             local: c.remoto ? 'Atendimento remoto' : (c.endereco ?? ''),
             remoto: c.remoto,

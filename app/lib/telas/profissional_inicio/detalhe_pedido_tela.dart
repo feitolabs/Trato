@@ -85,12 +85,14 @@ class DetalhePedidoTela extends StatelessWidget {
                       const SizedBox(height: EspacosTrato.x3),
                     ],
                     Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
-                    const SizedBox(height: EspacosTrato.x2),
-                    Text(
-                      dados.clienteResumo,
-                      style: TipografiaTrato.corpo
-                          .copyWith(color: CoresTrato.textoSecundario),
-                    ),
+                    if (dados.clienteResumo.isNotEmpty) ...[
+                      const SizedBox(height: EspacosTrato.x2),
+                      Text(
+                        dados.clienteResumo,
+                        style: TipografiaTrato.corpo
+                            .copyWith(color: CoresTrato.textoSecundario),
+                      ),
+                    ],
                     const SizedBox(height: EspacosTrato.x5),
                     Row(
                       children: [

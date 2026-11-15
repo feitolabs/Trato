@@ -126,4 +126,6 @@ class ConfigPostgres:
                 garantia_dias_por_categoria=por_categoria,
             ),
             valor_maximo_servico_centavos=p.get("valor_maximo_servico_centavos"),
+            limite_orcamentos_por_pedido=p.get("limite_orcamentos_por_pedido"),
+            prazo_liberacao_dias=p.get("prazo_liberacao_dias"),
         )

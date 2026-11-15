@@ -13,6 +13,7 @@ import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
+import 'config_publica.dart';
 import 'erros.dart';
 import 'servico_upload.dart';
 import 'paralelo.dart';
@@ -23,6 +24,19 @@ import 'paralelo.dart';
 Map<String, dynamic> _mapa(Object? json) => json! as Map<String, dynamic>;
 List<Map<String, dynamic>> _lista(Object? json) =>
     [for (final item in json! as List) item as Map<String, dynamic>];
+
+/// Motivo da disputa como o cliente escolheu (o servidor guarda um código).
+String _motivoDisputa(String? codigo) => switch (codigo) {
+      // Os mesmos textos que o cliente vê ao abrir (TextosPadraoTelas.motivos).
+      'mal_feito' => 'O problema voltou ou não foi resolvido',
+      'diferente_do_combinado' => 'Qualidade abaixo do combinado',
+      'cobranca_extra' => 'Cobrança extra não combinada',
+      'dano' => 'Dano no local',
+      'abandono' => 'Outro motivo',
+      'nao_compareceu' => 'O profissional não compareceu',
+      null || '' => 'Disputa',
+      _ => codigo.replaceAll('_', ' '),
+    };
 
 /// "Eletricista · 14/11/2026": a categoria e o dia da avaliação (o que o servidor mandar).
 String servicoDaAvaliacao(Map<dynamic, dynamic> a) {
@@ -764,15 +778,35 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
   Future<DetalheDisputa?> carregarDisputa(String disputaId) async {
     try {
       final j = _mapa(await _api.get('/v1/pedidos/$disputaId/disputa'));
+      // O relato do cliente leva a solução preferida no fim (é como o app do cliente envia).
+      const marca = 'Solução que o cliente prefere:';
+      final relato = ((j['descricao'] as String?) ?? '').trim();
+      final corte = relato.lastIndexOf(marca);
+      final descricao = corte < 0 ? relato : relato.substring(0, corte).trim();
+      final solucao = corte < 0 ? '' : relato.substring(corte + marca.length).trim();
+      // Prazo real desta disputa (resposta_ate - aberta_em); sem as datas, o da configuração.
+      final aberta = DateTime.tryParse('${j['aberta_em']}');
+      final ate = DateTime.tryParse('${j['resposta_ate']}');
+      final prazo = aberta != null && ate != null && ate.isAfter(aberta)
+          ? ate.difference(aberta).inHours
+          : ConfigPublica.atual.prazoRespostaDisputaHoras;
+      var cliente = 'Cliente';
+      try {
+        final o = await _api.get('/v1/pedidos/$disputaId/interlocutor');
+        final n = (o is Map ? o['nome'] as String? : null)?.trim();
+        if (n != null && n.isNotEmpty) cliente = n;
+      } on Object {
+        cliente = 'Cliente';
+      }
       return DetalheDisputa(
         id: disputaId,
         titulo:
-            'Disputa do pedido #${disputaId.substring(0, disputaId.length < 6 ? disputaId.length : 6).toUpperCase()}',
-        cliente: 'Cliente',
-        motivo: (j['motivo'] as String?) ?? 'Disputa',
-        descricao: (j['descricao'] as String?) ?? '',
-        solucaoPedida: 'Análise do suporte',
-        prazoRespostaHoras: 48,
+            'Disputa do pedido #${disputaId.substring(0, disputaId.length < 4 ? disputaId.length : 4).toUpperCase()}',
+        cliente: cliente,
+        motivo: _motivoDisputa(j['motivo'] as String?),
+        descricao: descricao,
+        solucaoPedida: solucao.isEmpty ? 'Não informada' : solucao,
+        prazoRespostaHoras: prazo,
         valorCongeladoCentavos: (j['valor_congelado_centavos'] as int?) ?? 0,
       );
     } on ErroTrato catch (e) {

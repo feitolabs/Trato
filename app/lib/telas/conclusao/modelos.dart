@@ -56,9 +56,15 @@ class DadosAvaliacao {
     required this.valorLiberadoCentavos,
     required this.criterios,
     required this.gorjetasCentavos,
+    this.gorjetaDisponivel = true,
   });
 
+  /// Falso enquanto o servidor não recebe gorjeta: a seção some da tela.
+  final bool gorjetaDisponivel;
+
   final String nomeProfissional;
+
+  /// O que o cliente pagou pelo serviço (o selo da tela diz "pago").
   final int valorLiberadoCentavos;
 
   /// Critérios do cliente (modelo de dados 8.4).

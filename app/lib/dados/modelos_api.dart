@@ -23,7 +23,25 @@ class PedidoApi {
     this.janelaFim,
     this.modalidade = 'presencial',
     this.jaAvaliou = false,
+    this.titulo,
+    this.clienteNome,
+    this.pagamentoConfirmado = false,
   });
+
+  /// Só o webhook do parceiro de pagamento deixa isto verdadeiro.
+  final bool pagamentoConfirmado;
+
+  /// O que o cliente pediu ("Montagem de móveis"). Nulo em servidor antigo.
+  final String? titulo;
+
+  /// Nome abreviado do cliente ("Mariana S."); só vem para o profissional do pedido.
+  final String? clienteNome;
+
+  /// Título para mostrar: o do serviço, ou "Pedido #AB12" quando não houver.
+  String get rotulo {
+    final t = titulo?.trim() ?? '';
+    return t.isEmpty ? 'Pedido $numero' : t;
+  }
 
   /// Quem consultou já avaliou este serviço (o app não oferece "Avaliar" de novo).
   final bool jaAvaliou;
@@ -36,6 +54,9 @@ class PedidoApi {
   factory PedidoApi.deJson(Map<String, dynamic> j) => PedidoApi(
         modalidade: (j['modalidade'] as String?) ?? 'presencial',
         jaAvaliou: j['ja_avaliou'] == true,
+        titulo: j['titulo'] as String?,
+        clienteNome: j['cliente_nome'] as String?,
+        pagamentoConfirmado: j['pagamento_confirmado'] == true,
         janelaInicio: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['inicio']),
         janelaFim: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['fim']),
         id: j['id'] as String,

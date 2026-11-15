@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../agenda/modelos.dart' show EstadoAgendamento;
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
+import '../../dados/config_publica.dart';
 import '../../dados/relogio_de_atualizacao.dart';
 import '../../dispositivo/mapa.dart';
 import '../../dados/repositorios.dart';
@@ -441,9 +442,11 @@ abstract final class RotasTrato {
     );
     final recentesFiltrados = [
       for (final r in recentes)
-        if ((andamento?.pedidoId == null ||
-                r.pedidoId != andamento?.pedidoId) &&
-            (andamento == null || r.titulo != andamento.titulo))
+        // Pelo id quando há (títulos se repetem); pelo título só sem id (dados de exemplo).
+        if (andamento == null ||
+            (andamento.pedidoId != null
+                ? r.pedidoId != andamento.pedidoId
+                : r.titulo != andamento.titulo))
           r,
     ];
     return DadosInicio(
@@ -772,9 +775,10 @@ abstract final class RotasTrato {
           pedidosMudaram.value++;
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                  'Serviço concluído. O cliente tem até 48 h para confirmar.'),
+                  'Serviço concluído. O cliente tem até '
+                  '${ConfigPublica.horas(ConfigPublica.atual.prazoConfirmacaoHoras)} para confirmar.'),
             ),
           );
         },

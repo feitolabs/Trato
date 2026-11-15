@@ -75,13 +75,31 @@ class _Dias extends StatelessWidget {
   Widget build(BuildContext context) {
     final agora = hoje ?? DateTime.now();
     final porDia = <DateTime, List<Agendamento>>{};
+    final semData = [for (final a in itens) if (a.semData) a];
     for (final a in itens) {
+      if (a.semData) continue;
       porDia.putIfAbsent(DateTime(a.dia.year, a.dia.month, a.dia.day), () => []).add(a);
     }
     final dias = porDia.keys.toList()..sort();
     return ListView(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
       children: [
+        if (semData.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x2),
+            child: Semantics(
+              header: true,
+              child: Text('SEM DATA MARCADA', style: TipografiaTrato.sobretitulo),
+            ),
+          ),
+          for (final a in semData) ...[
+            _CartaoAgendamento(
+              agendamento: a,
+              aoFazerCheckIn: aoFazerCheckIn == null ? null : () => aoFazerCheckIn!(a),
+            ),
+            const SizedBox(height: EspacosTrato.x3),
+          ],
+        ],
         for (final dia in dias) ...[
           Padding(
             padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x2),

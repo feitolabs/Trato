@@ -66,7 +66,11 @@ class PedidoEmExecucao {
     this.codigoInicio,
     this.codigoConclusao,
     this.podeVerConclusao = true,
+    this.pagamentoConfirmado = true,
   });
+
+  /// O parceiro de pagamento já confirmou? Antes disso o selo diz que aguarda o pagamento.
+  final bool pagamentoConfirmado;
 
   /// Código que o cliente passa ao profissional para encerrar o serviço (check-out). Só aparece
   /// com o serviço em andamento.
