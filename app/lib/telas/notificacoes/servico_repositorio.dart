@@ -20,29 +20,55 @@ TipoNotificacao tipoDaNotificacao(String? tipo) {
 }
 
 /// Liga a tela de notificações ao repositório de dados (modo demo ou API).
-/// O repositório só lista; marcar como lida ainda não existe na API, então é local.
+/// Listar e marcar como lida (`POST /v1/notificacoes/{id}/lida`).
 class ServicoNotificacoesRepositorio implements ServicoNotificacoes {
   ServicoNotificacoesRepositorio(this._repositorio);
 
   final dados.RepositorioNotificacoes _repositorio;
 
-  @override
-  Future<List<Notificacao>> listar() async => [
-        for (final n in await _repositorio.listar())
-          Notificacao(
-            id: n.id,
-            tipo: tipoDaNotificacao(n.tipo),
-            destinoId: n.destinoId,
-            titulo: n.titulo,
-            texto: n.texto,
-            quando: n.quando,
-            lida: n.lida,
-          ),
-      ];
+  /// Ids ainda não lidos da última lista: "marcar todas" grava um a um.
+  List<String> _pendentes = const [];
 
   @override
-  Future<void> marcarLida(String id) async {}
+  Future<List<Notificacao>> listar() async {
+    final itens = await _repositorio.listar();
+    _pendentes = [for (final n in itens) if (!n.lida) n.id];
+    return [
+      for (final n in itens)
+        Notificacao(
+          id: n.id,
+          tipo: tipoDaNotificacao(n.tipo),
+          destinoId: n.destinoId,
+          titulo: n.titulo,
+          texto: n.texto,
+          quando: n.quando,
+          lida: n.lida,
+        ),
+    ];
+  }
+
+  /// A tela já mostra como lida na hora; se a gravação falhar, a notificação volta como não
+  /// lida na próxima atualização (nada é perdido).
+  @override
+  Future<void> marcarLida(String id) async {
+    _pendentes = [for (final p in _pendentes) if (p != id) p];
+    try {
+      await _repositorio.marcarLida(id);
+    } on Object {
+      // sem rede: tenta de novo da próxima vez que a pessoa abrir
+    }
+  }
 
   @override
-  Future<void> marcarTodasLidas() async {}
+  Future<void> marcarTodasLidas() async {
+    final ids = _pendentes;
+    _pendentes = const [];
+    for (final id in ids) {
+      try {
+        await _repositorio.marcarLida(id);
+      } on Object {
+        // segue com as outras
+      }
+    }
+  }
 }

@@ -15,6 +15,7 @@ class ServicoDisputaProfissionalFake implements ServicoDisputaProfissional {
   final bool falharAoEnviar;
   final List<RespostaDisputa> respostas = [];
   final List<AgendamentoRetrabalho> agendamentos = [];
+  final List<String> passos = [];
 
   @override
   Future<DetalheDisputa?> carregarDisputa(String disputaId) async {
@@ -38,6 +39,12 @@ class ServicoDisputaProfissionalFake implements ServicoDisputaProfissional {
   Future<void> agendarRetrabalho(AgendamentoRetrabalho agendamento) async {
     if (falharAoEnviar) throw Exception('falha de teste');
     agendamentos.add(agendamento);
+  }
+
+  @override
+  Future<void> avancarRetrabalho(String disputaId, String etapa) async {
+    if (falharAoEnviar) throw Exception('falha de teste');
+    passos.add(etapa);
   }
 }
 

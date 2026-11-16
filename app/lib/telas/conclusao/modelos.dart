@@ -110,11 +110,19 @@ class DadosRelatoProblema {
 }
 
 class EnvioRelato {
-  const EnvioRelato({required this.motivo, required this.descricao, required this.solucao});
+  const EnvioRelato({
+    required this.motivo,
+    required this.descricao,
+    required this.solucao,
+    this.fotos = const [],
+  });
 
   final String motivo;
   final String descricao;
   final String solucao;
+
+  /// Fotos tiradas no aparelho (caminhos); o repositório sobe e manda os ids.
+  final List<String> fotos;
 }
 
 /// Tela 21: Garantia do serviço.

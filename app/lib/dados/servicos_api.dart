@@ -14,6 +14,7 @@ import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'config_publica.dart';
+import 'envio_fotos.dart';
 import 'erros.dart';
 import 'servico_upload.dart';
 import 'paralelo.dart';
@@ -32,7 +33,7 @@ String _motivoDisputa(String? codigo) => switch (codigo) {
       'diferente_do_combinado' => 'Qualidade abaixo do combinado',
       'cobranca_extra' => 'Cobrança extra não combinada',
       'dano' => 'Dano no local',
-      'abandono' => 'Outro motivo',
+      'abandono' => 'O profissional abandonou o serviço',
       'nao_compareceu' => 'O profissional não compareceu',
       null || '' => 'Disputa',
       _ => codigo.replaceAll('_', ' '),
@@ -770,9 +771,12 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
 
 /// Disputa e retrabalho do lado do profissional falando com a API.
 class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
-  ServicoDisputaProfissionalApi(this._api);
+  ServicoDisputaProfissionalApi(this._api, {this.upload});
 
   final ClienteApi _api;
+
+  /// Sobe as fotos de prova da resposta. Sem ele, a resposta vai sem fotos.
+  final ServicoUpload? upload;
 
   @override
   Future<DetalheDisputa?> carregarDisputa(String disputaId) async {
@@ -817,21 +821,44 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
 
   @override
   Future<void> responder(RespostaDisputa resposta) async {
-    await _api.post('/v1/pedidos/${resposta.disputaId}/disputa/resposta');
+    final fotos = await enviarFotosLocais(
+      upload,
+      resposta.evidencias,
+      FinalidadeArquivo.evidenciaDisputa,
+      pedidoId: resposta.disputaId,
+    );
+    await _api.post(
+      '/v1/pedidos/${resposta.disputaId}/disputa/resposta',
+      corpo: {
+        'mensagem': resposta.mensagem,
+        'solucao': switch (resposta.tipo) {
+          TipoRespostaDisputa.atenderRetrabalho => 'retrabalho',
+          TipoRespostaDisputa.proporReembolsoParcial => 'reembolso_parcial',
+          TipoRespostaDisputa.discordar => 'discordar',
+        },
+        if (resposta.reembolsoParcialCentavos != null)
+          'reembolso_parcial_centavos': resposta.reembolsoParcialCentavos,
+        'fotos': fotos,
+      },
+    );
   }
 
   @override
   Future<DadosRetrabalho?> carregarRetrabalho(String disputaId) async {
     try {
       final lista = _lista(await _api.get('/v1/pedidos/$disputaId/retrabalho'));
-      if (lista.isEmpty) return null;
-      final ultimo = lista.last;
+      // Só o que ainda pede ação do profissional; retrabalho resolvido ou vencido não abre tela.
+      const emCurso = {'aberto', 'aceito', 'em_execucao'};
+      final abertos = [for (final r in lista) if (emCurso.contains(r['estado'])) r];
+      if (abertos.isEmpty) return null;
+      final ultimo = abertos.last;
       return DadosRetrabalho(
+        estado: ultimo['estado'] as String,
         disputaId: disputaId,
         titulo:
             'Retrabalho do pedido #${disputaId.substring(0, disputaId.length < 6 ? disputaId.length : 6).toUpperCase()}',
         descricaoProblema: (ultimo['descricao'] as String?) ?? 'Retrabalho solicitado',
-        prazoAtendimentoDias: 7,
+        prazoAtendimentoDias: ConfigPublica.atual.prazoRetrabalhoDias,
         opcoesHorario: const ['Manhã', 'Tarde'],
       );
     } on ErroTrato catch (e) {
@@ -846,6 +873,21 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
       '/v1/pedidos/${agendamento.disputaId}/retrabalho/atender',
       corpo: {'etapa': 'aceitar'},
     );
+    // O horário e o recado do profissional vão para o cliente pelo chat do pedido (fica guardado).
+    final recado = agendamento.mensagem.isEmpty ? '' : ' ${agendamento.mensagem}';
+    try {
+      await _api.post(
+        '/v1/pedidos/${agendamento.disputaId}/mensagens',
+        corpo: {'texto': 'Retrabalho aceito. Posso voltar: ${agendamento.horario}.$recado'},
+      );
+    } on ErroTrato {
+      // O retrabalho já foi aceito; o recado é cortesia e não deve desfazer isso.
+    }
+  }
+
+  @override
+  Future<void> avancarRetrabalho(String disputaId, String etapa) async {
+    await _api.post('/v1/pedidos/$disputaId/retrabalho/atender', corpo: {'etapa': etapa});
   }
 }
 

@@ -116,6 +116,41 @@ def test_responder_duas_vezes_da_409(amb):
     assert amb.cliente.post(url, headers=cab("t-prof")).status_code == 409
 
 
+def test_resposta_com_corpo_guarda_relato_proposta_e_fotos(amb):
+    amb.semear_pedido(Estado.EM_CONFIRMACAO)
+    amb.semear_dinheiro(100_000)
+    abrir(amb)
+    corpo = {
+        "mensagem": "Fiz como combinado, tenho foto.",
+        "solucao": "reembolso_parcial",
+        "reembolso_parcial_centavos": 20_000,
+        "fotos": [{"arquivo_id": "midia-1", "tirada_em": "2026-10-30T12:00:00Z"}],
+    }
+
+    r = amb.cliente.post("/v1/pedidos/ped-1/disputa/resposta", json=corpo, headers=cab("t-prof"))
+
+    assert r.status_code == 200, r.text
+    assert r.json()["respondida_em"] is not None
+    provas = amb.contexto.disputas.evidencias("ped-1")
+    assert [p["tipo"] for p in provas] == ["resposta", "proposta_retorno", "foto"]
+    assert provas[0]["texto"] == "Fiz como combinado, tenho foto."
+    assert "200,00" in provas[1]["texto"]
+    assert provas[2]["midia_id"] == "midia-1"
+
+
+def test_reembolso_parcial_precisa_de_valor_menor_que_o_retido(amb):
+    amb.semear_pedido(Estado.EM_CONFIRMACAO)
+    amb.semear_dinheiro(100_000)
+    abrir(amb)
+    url = "/v1/pedidos/ped-1/disputa/resposta"
+
+    sem_valor = {"mensagem": "ok", "solucao": "reembolso_parcial"}
+    assert amb.cliente.post(url, json=sem_valor, headers=cab("t-prof")).status_code == 422
+    todo = {"mensagem": "ok", "solucao": "reembolso_parcial", "reembolso_parcial_centavos": 100_000}
+    assert amb.cliente.post(url, json=todo, headers=cab("t-prof")).status_code == 422
+    assert amb.contexto.disputas.obter("ped-1").estado.value == "aberta"
+
+
 # --- retrabalho -------------------------------------------------------------------------
 
 

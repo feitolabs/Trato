@@ -142,6 +142,24 @@ def _detalhe(
         for e in eventos
         if e.prova is not None
     ]
+    ler_evidencias = getattr(contexto.disputas, "evidencias", None)
+    for ev in ler_evidencias(pedido_id) if ler_evidencias else []:
+        evidencias.append(
+            EvidenciaOut(
+                origem=f"disputa.{ev['tipo']}",
+                em=ev["em"],
+                ator_papel=(
+                    "profissional"
+                    if pedido and ev["autor_id"] == pedido.profissional_id
+                    else "cliente"
+                    if pedido and ev["autor_id"] == pedido.cliente_id
+                    else "equipe"
+                ),
+                ator_id=ev["autor_id"],
+                dados={"texto": ev["texto"], "midia_id": ev["midia_id"]},
+            )
+        )
+    evidencias.sort(key=lambda x: x.em)
     partes = (
         (nomes.get(pedido.cliente_id), nomes.get(pedido.profissional_id or ""))
         if pedido

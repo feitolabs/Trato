@@ -41,7 +41,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   late final _toquePolitica = TapGestureRecognizer()
     ..onTap = () => _abrirTexto(TextoLegal.privacidade);
   var _aceitouTermos = false;
-  var _avisosWhatsapp = false;
   var _tentou = false;
   var _carregando = false;
   String? _erroServico;
@@ -268,23 +267,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
                   recognizer: _toquePolitica,
                 ),
                 const TextSpan(text: '.'),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: EspacosTrato.x3),
-        _LinhaMarcar(
-          marcado: _avisosWhatsapp,
-          aoMudar: (v) => setState(() => _avisosWhatsapp = v),
-          texto: Text.rich(
-            TextSpan(
-              style: estiloTexto,
-              children: [
-                const TextSpan(text: 'Quero receber avisos dos meus pedidos pelo WhatsApp. '),
-                TextSpan(
-                  text: '(opcional)',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-                ),
               ],
             ),
           ),

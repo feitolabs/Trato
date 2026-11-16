@@ -56,7 +56,8 @@ Netlify). Vercel Hobby não vale para uso comercial. Depois de publicar, colocar
 
 ## Fora do escopo desta tarefa
 
-- **Agendador** (`python -m trato.agendador`): lembretes, liberação por prazo e reenvio de notificações rodam em outro
-  processo. O `render.yaml` também não o sobe. Quando for ligar, vira um segundo processo no `fly.toml`
-  (`[processes]`) ou um cron; custa mais uma máquina. Ver `docs/backend-notificacoes.md`.
+- **Agendador** (liberação por prazo, expiração, lembretes, reenvio de notificações): com `TRATO_AGENDADOR_EMBUTIDO=true`
+  (já no `fly.toml`) a própria API roda o laço num fio, sem máquina extra; a trava no banco evita ciclo duplicado.
+  Conferir depois do deploy: `select count(*) from agendador_execucoes` deve crescer a cada minuto. Se a memória de
+  512 MB apertar, volte a `false` e rode `python -m trato.agendador` como segundo processo. Ver `docs/backend-notificacoes.md`.
 - Nada foi implantado nem criado no Fly. Nenhuma conta, cartão ou segredo foi tocado.

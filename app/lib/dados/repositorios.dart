@@ -132,7 +132,11 @@ abstract interface class RepositorioPedidos {
   /// O contrato do serviço (o pedido, as partes, datas, local, pagamento e aditivos).
   Future<DadosContrato> contrato(String pedidoId);
 
-  Future<void> pedirRetrabalho(String pedidoId, String descricao);
+  Future<void> pedirRetrabalho(String pedidoId, String descricao, {List<String> fotos});
+
+  /// Cancela o pedido (cliente ou profissional contratado). O servidor diz se o estado permite e
+  /// devolve o dinheiro quando já houve pagamento.
+  Future<void> cancelar(String pedidoId, String motivo);
 }
 
 class OrcamentosDoPedido {
@@ -231,6 +235,9 @@ class Notificacao {
 
 abstract interface class RepositorioNotificacoes {
   Future<List<Notificacao>> listar();
+
+  /// Grava no servidor que a notificação foi lida (o contador não volta depois).
+  Future<void> marcarLida(String id);
 }
 
 abstract interface class RepositorioPerfil {
@@ -290,6 +297,9 @@ abstract interface class RepositorioProfissional {
 
   /// Valor inteiro, taxa, líquido, aditivos e notas de um pedido (detalhe de uma linha do extrato).
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId);
+
+  /// O profissional avalia o cliente de um pedido concluído (uma vez).
+  Future<void> avaliarCliente(String pedidoId, int nota, String comentario);
 
   /// Calculadora: taxa e líquido vêm do backend.
   ServicoOrcamento servicoOrcamento(String pedidoId);

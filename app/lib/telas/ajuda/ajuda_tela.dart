@@ -53,25 +53,36 @@ class AjudaTela extends StatelessWidget {
                   ],
                 ),
               ),
-            const SizedBox(height: EspacosTrato.x6),
-            Text('PRECISA DE MAIS AJUDA?', style: TipografiaTrato.sobretitulo),
-            const SizedBox(height: EspacosTrato.x3),
-            Text(
-              'Nossa equipe responde por mensagem, com atenção a cada caso.',
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
-            ),
-            const SizedBox(height: EspacosTrato.x4),
-            BotaoPrimario(
-              texto: 'Falar com o suporte',
-              icone: Icons.support_agent,
-              aoTocar: aoFalarComSuporte,
-            ),
-            const SizedBox(height: EspacosTrato.x3),
-            BotaoSecundario(
-              texto: 'Relatar um problema',
-              icone: Icons.flag_outlined,
-              aoTocar: aoRelatarProblema,
-            ),
+            if (aoFalarComSuporte != null || aoRelatarProblema != null) ...[
+              const SizedBox(height: EspacosTrato.x6),
+              Text('PRECISA DE MAIS AJUDA?', style: TipografiaTrato.sobretitulo),
+              const SizedBox(height: EspacosTrato.x3),
+              Text(
+                'Nossa equipe responde por mensagem, com atenção a cada caso.',
+                style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              ),
+              const SizedBox(height: EspacosTrato.x4),
+              if (aoFalarComSuporte != null)
+                BotaoPrimario(
+                  texto: 'Falar com o suporte',
+                  icone: Icons.support_agent,
+                  aoTocar: aoFalarComSuporte,
+                ),
+              if (aoFalarComSuporte != null && aoRelatarProblema != null)
+                const SizedBox(height: EspacosTrato.x3),
+              if (aoRelatarProblema != null)
+                aoFalarComSuporte == null
+                    ? BotaoPrimario(
+                        texto: 'Relatar um problema',
+                        icone: Icons.flag_outlined,
+                        aoTocar: aoRelatarProblema,
+                      )
+                    : BotaoSecundario(
+                        texto: 'Relatar um problema',
+                        icone: Icons.flag_outlined,
+                        aoTocar: aoRelatarProblema,
+                      ),
+            ],
           ],
         ),
       ),

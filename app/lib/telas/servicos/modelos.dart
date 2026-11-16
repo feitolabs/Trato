@@ -11,7 +11,8 @@ enum AcaoServico {
   conversar('Conversar com o profissional'),
   avaliar('Avaliar o serviço'),
   verGarantia('Ver a garantia'),
-  abrirProblema('Abrir um problema');
+  abrirProblema('Abrir um problema'),
+  cancelar('Cancelar o pedido');
 
   const AcaoServico(this.rotulo);
 
@@ -97,11 +98,16 @@ class DetalheServico {
   List<AcaoServico> get acoes => _acoesDoEstado.where((a) => !(jaAvaliou && a == AcaoServico.avaliar)).toList();
 
   List<AcaoServico> get _acoesDoEstado => switch (estadoApi) {
-        'aberto' => const [AcaoServico.verOrcamentos],
-        'orcamento_aceito' => const [AcaoServico.pagar, AcaoServico.verOrcamentos],
+        'aberto' => const [AcaoServico.verOrcamentos, AcaoServico.cancelar],
+        'orcamento_aceito' => const [
+            AcaoServico.pagar,
+            AcaoServico.verOrcamentos,
+            AcaoServico.cancelar,
+          ],
         'pago_e_retido' || 'agendado' => const [
             AcaoServico.acompanhar,
             AcaoServico.conversar,
+            AcaoServico.cancelar,
           ],
         'em_andamento' || 'em_confirmacao' => const [
             AcaoServico.acompanhar,

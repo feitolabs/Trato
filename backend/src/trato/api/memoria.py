@@ -6,7 +6,7 @@ import threading
 import uuid
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from trato.api.repositorios import (
@@ -383,6 +383,7 @@ class LedgerEmMemoria:
 class DisputasEmMemoria:
     def __init__(self) -> None:
         self._itens: dict[str, Disputa] = {}
+        self._evidencias: dict[str, list[dict[str, Any]]] = {}
 
     def obter(self, pedido_id: str) -> Disputa | None:
         return self._itens.get(pedido_id)
@@ -392,6 +393,18 @@ class DisputasEmMemoria:
 
     def listar(self) -> list[tuple[str, Disputa]]:
         return list(self._itens.items())
+
+    def registrar_evidencias(
+        self, pedido_id: str, autor_id: str, itens: list[tuple[str, str | None, str | None]]
+    ) -> None:
+        for tipo, texto, midia in itens:
+            self._evidencias.setdefault(pedido_id, []).append(
+                {"tipo": tipo, "texto": texto, "midia_id": midia, "autor_id": autor_id,
+                 "em": datetime.now(UTC)}
+            )
+
+    def evidencias(self, pedido_id: str) -> list[dict[str, Any]]:
+        return list(self._evidencias.get(pedido_id, []))
 
 
 class GarantiasEmMemoria:

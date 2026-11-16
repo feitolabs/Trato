@@ -975,3 +975,21 @@ Lista de 8 problemas do João (teste no aparelho). Branch a partir da `develop`.
 
 - Itens mostram a conta (`contaDoItem`: "45 h × R$ 15,00 por hora").
 - Contrato (`DetalheOrcamentoTela(contrato: true, dadosContrato:)`): cabeçalho com pedido e data do aceite (`PedidoOut.contratado_em`), o que foi contratado (título, descrição, respostas), partes, visita e local, pagamento e aditivos, fora do escopo sempre visível, regras (garantia com prazo da configuração; cancelamento remete aos Termos de uso, com link). Texto próprio de cancelamento depende do João.
+
+## 2026-11-15 — Correções da auditoria do app (`harness/AUDITORIA-APP.md`)
+
+Branch `feature/correcoes-auditoria-app` (de `develop`), sem commit nem push.
+
+- **Disputa:** a resposta do profissional agora leva texto, proposta (retrabalho, reembolso parcial ou discordar) e fotos: `POST /v1/pedidos/{id}/disputa/resposta` aceita `RespostaDisputaIn` (corpo opcional, apps antigos seguem) e grava em `disputa_evidencias` (tabela que já existia; sem migration). Isso também corrige `respondida_em`, que lia `disputa_evidencias` e nunca achava nada (a disputa ficava "sem resposta"). O painel mostra as evidências no detalhe. Fotos do relato do cliente e do pedido de retrabalho agora sobem (`enviarFotosLocais`). "Outro motivo" saiu: viraram "abandonou o serviço" (`abandono`) e "não compareceu" (`nao_compareceu`).
+- **Retrabalho:** o profissional aceita, começa e marca como resolvido (`aceitar`, `iniciar`, `resolver`); horário e recado vão ao cliente pelo chat; prazo vem da configuração (era 7 fixo); só aparece retrabalho que ainda pede ação.
+- **Cancelar pedido** (cliente: aberto, orçamento aceito, pago, agendado; profissional: atendimento agendado) com motivo; o servidor valida e devolve o dinheiro.
+- **Notificações:** marcar como lida e "marcar todas" gravam no servidor.
+- **Central de ajuda:** "Falar com o suporte" abre o e-mail (só aparece se `TRATO_SUPORTE_EMAIL` estiver no servidor, exposto em `/v1/config/publica`); "Relatar um problema" leva aos serviços. Sem destino, o botão some.
+- **Cadastro:** removida a caixa "avisos pelo WhatsApp" (não gravava nada e não há provedor, P11).
+- **Login:** Google e Apple só aparecem se o Supabase os tem ligados (`/auth/v1/settings`) e, no Google, se houver client id. Hoje ambos estão desligados no Supabase.
+- **CI:** `build.yml` passa `STRIPE_PUBLISHABLE_KEY`, `GOOGLE_WEB_CLIENT_ID` e `GOOGLE_IOS_CLIENT_ID` (cadastrar em Settings > Variables do GitHub). `app/dart-defines.json` (fora do git) aponta para o Fly e leva a chave publicável.
+- **Fila offline:** check-in e check-out sem internet ficam em disco (`FilaOfflineArquivo`, dependência `path_provider`) e são reenviados sempre que o início do profissional carrega.
+- **Avaliar o cliente:** botão em "Valores do pedido" (carteira do profissional) para pedido concluído ainda não avaliado.
+- **Agendador:** `TRATO_AGENDADOR_EMBUTIDO=true` no `fly.toml` faz a API rodar o agendador num fio (sem máquina extra; trava no banco). **Só vale depois do deploy**; conferir `agendador_execucoes`.
+- **Não feito, de propósito:** SOS e compartilhar atendimento (fora do MVP, D13); saque/repasse ao profissional (D15, depende de P7); registrar ausência do cliente (a máquina de estados só tem ausência do profissional, feita pelo sistema); chamado de suporte dentro do app (precisaria de tabela nova); push (precisa de projeto Firebase, chaves e OK).
+- Testes: backend 738 + 580 passam (pastas `tests/api` e o restante; `integracao*` pedem banco real); app 915+ e goldens passam (goldens regerados: `criar_conta` tablet e `ajuda`). Novos: `app/test/dados/correcoes_auditoria_test.dart` (17), `backend/tests/api/test_agendador_embutido.py`, mais casos em `test_api_disputa_retrabalho.py` e `test_config_publica_titulo.py`.

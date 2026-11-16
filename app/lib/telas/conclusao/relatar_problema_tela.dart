@@ -49,7 +49,12 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
     setState(() => _enviando = true);
     try {
       await widget.aoEnviar?.call(
-        EnvioRelato(motivo: _motivo!, descricao: _descricao.text.trim(), solucao: _solucao),
+        EnvioRelato(
+          motivo: _motivo!,
+          descricao: _descricao.text.trim(),
+          solucao: _solucao,
+          fotos: [..._fotos],
+        ),
       );
     } finally {
       if (mounted) setState(() => _enviando = false);

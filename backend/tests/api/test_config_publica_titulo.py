@@ -31,7 +31,21 @@ def test_config_publica_nao_exige_login_e_nao_tem_dado_pessoal(amb):
         "prazo_retrabalho_atendimento_dias",
         "prazo_resposta_disputa_horas",
         "prazo_liberacao_dias",
+        "suporte_email",
     }
+
+
+def test_config_publica_traz_o_email_de_suporte_so_se_configurado(amb, monkeypatch):
+    from trato.config import obter_config
+
+    assert amb.cliente.get("/v1/config/publica").json()["suporte_email"] is None
+    monkeypatch.setenv("TRATO_SUPORTE_EMAIL", "ajuda@exemplo.test")
+    obter_config.cache_clear()
+    try:
+        assert amb.cliente.get("/v1/config/publica").json()["suporte_email"] == "ajuda@exemplo.test"
+    finally:
+        monkeypatch.delenv("TRATO_SUPORTE_EMAIL")
+        obter_config.cache_clear()
 
 
 def test_nome_abreviado():

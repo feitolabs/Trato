@@ -18,6 +18,7 @@ enum FinalidadeArquivo {
   fotoPedido('pedido'),
   chat('chat'),
   evidenciaDisputa('disputa'),
+  retrabalho('retrabalho'),
   avatar('avatar'),
 
   /// Sem destino no backend ainda (`docs/app-divergencias.md`).

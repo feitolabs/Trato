@@ -205,6 +205,15 @@ class AbrirDisputaIn(_Entrada):
     fotos: list[FotoIn] = []
 
 
+class RespostaDisputaIn(_Entrada):
+    """O que o profissional diz ao responder: o relato, o que propõe e as provas (fotos)."""
+
+    mensagem: str = Field(min_length=1, max_length=2000)
+    solucao: Literal["retrabalho", "reembolso_parcial", "discordar"] | None = None
+    reembolso_parcial_centavos: int | None = Field(None, gt=0)
+    fotos: list[FotoIn] = Field(default_factory=list, max_length=10)
+
+
 class AtenderRetrabalhoIn(_Entrada):
     etapa: Literal["aceitar", "iniciar", "resolver"]
 
