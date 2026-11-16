@@ -1,4 +1,5 @@
 import '../dispositivo/servico_localizacao.dart';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
@@ -20,6 +21,7 @@ import '../telas/profissional_inicio/modelos.dart';
 import '../telas/comuns/formato_aparelho.dart';
 import 'cliente_api.dart';
 import 'config_publica.dart';
+import 'envio_fotos.dart';
 import 'erros.dart';
 import 'fila_offline.dart';
 import 'modelos_api.dart';
@@ -51,6 +53,7 @@ const _motivosDisputa = [
   'cobranca_extra',
   'dano',
   'abandono',
+  'nao_compareceu',
 ];
 
 /// Textos e opções de tela que a API ainda não entrega. NÃO são regra de negócio.
@@ -62,7 +65,8 @@ class TextosPadraoTelas {
         'Qualidade abaixo do combinado',
         'Cobrança extra não combinada',
         'Dano no local',
-        'Outro motivo',
+        'O profissional abandonou o serviço',
+        'O profissional não compareceu',
       ];
   List<String> get solucoes =>
       const ['Retrabalho sem custo', 'Reembolso parcial', 'Reembolso total'];
@@ -476,12 +480,18 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<void> relatarProblema(String pedidoId, EnvioRelato relato) async {
     final indice = textos.motivos.indexOf(relato.motivo);
+    final fotos = await enviarFotosLocais(
+      upload,
+      relato.fotos,
+      FinalidadeArquivo.evidenciaDisputa,
+      pedidoId: pedidoId,
+    );
     await _api.post(
       '/v1/pedidos/$pedidoId/disputa',
       corpo: {
         'motivo': _motivosDisputa[indice < 0 ? 0 : indice],
         'descricao': '${relato.descricao}\n\nSolução que o cliente prefere: ${relato.solucao}',
-        'fotos': <Object?>[],
+        'fotos': fotos,
       },
     );
   }
@@ -618,11 +628,32 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     );
   }
 
+  /// `POST /v1/pedidos/{id}/acoes/cancelar` `{prova: {motivo}}`.
   @override
-  Future<void> pedirRetrabalho(String pedidoId, String descricao) async {
+  Future<void> cancelar(String pedidoId, String motivo) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/acoes/cancelar',
+      corpo: {
+        'prova': {'motivo': motivo},
+      },
+    );
+  }
+
+  @override
+  Future<void> pedirRetrabalho(
+    String pedidoId,
+    String descricao, {
+    List<String> fotos = const [],
+  }) async {
+    final enviadas = await enviarFotosLocais(
+      upload,
+      fotos,
+      FinalidadeArquivo.retrabalho,
+      pedidoId: pedidoId,
+    );
     await _api.post(
       '/v1/pedidos/$pedidoId/retrabalho',
-      corpo: {'descricao': descricao, 'fotos': <Object?>[]},
+      corpo: {'descricao': descricao, 'fotos': enviadas},
     );
   }
 }
@@ -1071,6 +1102,12 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
     ];
   }
 
+  /// `POST /v1/notificacoes/{id}/lida`. Repetir é seguro.
+  @override
+  Future<void> marcarLida(String id) async {
+    await _api.post('/v1/notificacoes/$id/lida');
+  }
+
   String? _destino(Object? dados) {
     if (dados is! Map) return null;
     final id = dados['disputa_id'] ?? dados['pedido_id'];
@@ -1266,6 +1303,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// novo"; falha parcial mostra o que deu certo.
   @override
   Future<InicioProfissional> inicio() async {
+    unawaited(_reenviarFila());
     Object? primeiroErro;
     T? tentar<T>(T? Function() ler) {
       try {
@@ -1528,6 +1566,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   @override
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async {
     final saldo = _mapa(await _api.get('/v1/pedidos/$pedidoId/saldo'));
+    var concluidoSemAvaliar = false;
+    try {
+      final pedido = _mapa(await _api.get('/v1/pedidos/$pedidoId'));
+      concluidoSemAvaliar = pedido['estado'] == 'concluido' && pedido['ja_avaliou'] != true;
+    } on ErroTrato {
+      concluidoSemAvaliar = false;
+    }
     var aditivos = <Map<String, dynamic>>[];
     var notas = <Map<String, dynamic>>[];
     try {
@@ -1563,6 +1608,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       taxaCentavos: cent(saldo['taxa_trato_centavos']),
       voceRecebeCentavos: retido + aLiberar + liberado,
       situacao: situacao,
+      podeAvaliarCliente: concluidoSemAvaliar,
       aditivos: [
         for (final a in aditivos)
           LinhaDeValor(
@@ -1579,6 +1625,33 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   }
 
   String _curto(String id) => '#${id.substring(0, id.length < 4 ? id.length : 4).toUpperCase()}';
+
+  /// Manda o que ficou guardado sem internet (check-in e check-out). Roda sempre que o início do
+  /// profissional carrega, que é atualizado sozinho; falha em silêncio e tenta de novo depois.
+  Future<void> _reenviarFila() async {
+    final f = fila;
+    if (f == null || f.pendentes.isEmpty) return;
+    for (final id in {for (final a in f.pendentes) a.pedidoId}) {
+      try {
+        await (servicoCheckIn(id) as ServicoCheckInApi).reenviarPendentes();
+      } on Object {
+        // sem internet de novo: fica na fila
+      }
+    }
+  }
+
+  /// `POST /v1/pedidos/{id}/avaliacao` `{nota_geral}`: o servidor vê que quem avalia é o
+  /// profissional e grava como avaliação do cliente.
+  @override
+  Future<void> avaliarCliente(String pedidoId, int nota, String comentario) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/avaliacao',
+      corpo: {
+        'nota_geral': nota,
+        if (comentario.isNotEmpty) 'comentario': comentario,
+      },
+    );
+  }
 
   @override
   ServicoOrcamento servicoOrcamento(String pedidoId) =>

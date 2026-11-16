@@ -168,7 +168,8 @@ void main() {
 
     test('ações por estado', () async {
       Future<List<AcaoServico>> acoes(String id) async => (await repo.detalhe(id)).acoes;
-      expect(await acoes(ServicosExemplo.orcamentos), [AcaoServico.verOrcamentos]);
+      expect(await acoes(ServicosExemplo.orcamentos),
+          [AcaoServico.verOrcamentos, AcaoServico.cancelar]);
       expect(await acoes(ServicosExemplo.tomadasEmPagamento), contains(AcaoServico.pagar));
       expect(await acoes(ServicosExemplo.tomadas), contains(AcaoServico.acompanhar));
       expect(await acoes(ServicosExemplo.pintura), contains(AcaoServico.avaliar));

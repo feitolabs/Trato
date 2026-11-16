@@ -112,8 +112,14 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   @override
   Future<DadosGarantia> garantia(String pedidoId) async => dadosGarantiaExemplo;
 
+  final List<String> cancelados = [];
+
   @override
-  Future<void> pedirRetrabalho(String pedidoId, String descricao) async =>
+  Future<void> cancelar(String pedidoId, String motivo) async => cancelados.add(pedidoId);
+
+  @override
+  Future<void> pedirRetrabalho(String pedidoId, String descricao,
+          {List<String> fotos = const []}) async =>
       retrabalhos.add(descricao);
 }
 
@@ -373,6 +379,11 @@ class RepositorioChatFake implements RepositorioChat {
 }
 
 class RepositorioNotificacoesFake implements RepositorioNotificacoes {
+  final List<String> lidas = [];
+
+  @override
+  Future<void> marcarLida(String id) async => lidas.add(id);
+
   @override
   Future<List<Notificacao>> listar() async => const [
         Notificacao(
@@ -503,6 +514,12 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
 
   @override
   Future<List<ItemExtrato>> extrato() async => DadosExemploCarteira.completo.extrato;
+
+  final List<int> notasDoCliente = [];
+
+  @override
+  Future<void> avaliarCliente(String pedidoId, int nota, String comentario) async =>
+      notasDoCliente.add(nota);
 
   @override
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async => const DetalheValoresPedido(

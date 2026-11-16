@@ -10,6 +10,8 @@ import 'telas/auth/login_tela.dart';
 import 'telas/auth/nova_senha_tela.dart';
 import 'dados/cliente_api.dart';
 import 'dados/config.dart';
+import 'dados/fila_offline.dart';
+import 'dados/fila_offline_arquivo.dart';
 import 'dados/repositorios_trato.dart';
 import 'dados/sessao.dart';
 import 'dados/servico_upload.dart';
@@ -100,9 +102,20 @@ Future<void> main() async {
     criarUpload: ServicoUploadApi.new,
     camera: ServicoCameraReal(),
     localizacao: const ServicoLocalizacaoReal(),
+    fila: await _abrirFilaOffline(),
   );
   RotasTrato.folhaCartao = FolhaCartaoStripe();
   runApp(const TratoApp());
+}
+
+/// Fila de check-in/check-out sem internet, guardada no aparelho. Se o armazenamento falhar, o
+/// app segue sem fila (o check-in só funciona com internet) em vez de não abrir.
+Future<FilaOffline?> _abrirFilaOffline() async {
+  try {
+    return await FilaOfflineArquivo.abrir();
+  } on Object {
+    return null;
+  }
 }
 
 /// Abre a tela de senha nova por cima de tudo. Se o link abriu o app agora (partida a frio), o

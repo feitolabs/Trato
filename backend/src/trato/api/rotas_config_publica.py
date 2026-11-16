@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from trato.api.contexto import Contexto, obter_contexto
+from trato.config import obter_config
 
 router = APIRouter(prefix="/v1/config", tags=["config"])
 router_catalogo = APIRouter(prefix="/v1/catalogo", tags=["catalogo"])
@@ -48,6 +49,8 @@ class ConfigPublicaOut(BaseModel):
     prazo_retrabalho_atendimento_dias: int | None = None
     prazo_resposta_disputa_horas: int | None = None
     prazo_liberacao_dias: int | None = None
+    # Para onde o app manda quem pede ajuda; nulo = sem canal configurado.
+    suporte_email: str | None = None
 
 
 def _horas(valor) -> int | None:  # type: ignore[no-untyped-def]
@@ -64,4 +67,5 @@ def config_publica(contexto: Contexto = Depends(obter_contexto)) -> ConfigPublic
         prazo_retrabalho_atendimento_dias=cfg.garantias.prazo_atendimento_dias,
         prazo_resposta_disputa_horas=cfg.disputas.prazo_resposta_horas,
         prazo_liberacao_dias=cfg.prazo_liberacao_dias,
+        suporte_email=obter_config().trato_suporte_email.strip() or None,
     )

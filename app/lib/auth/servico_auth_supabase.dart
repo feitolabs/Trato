@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
@@ -29,7 +30,9 @@ class ServicoAuthSupabase implements ServicoAuth {
     sb.SupabaseClient? cliente,
     ControleCodigoCelular? codigo,
     ClienteApi? api,
+    Set<ProvedorAuth>? provedoresAtivos,
   })  : _cliente = cliente ?? sb.Supabase.instance.client,
+        _provedoresAtivos = provedoresAtivos,
         _codigo = codigo ?? ControleCodigoCelular(),
         _api = api {
     _vigiarRecuperacao();
@@ -46,13 +49,47 @@ class ServicoAuthSupabase implements ServicoAuth {
         localStorage: LocalStorageSeguro(chave: LocalStorageSeguro.chaveDaUrl(config.supabaseUrl)),
       ),
     );
-    return ServicoAuthSupabase(config, api: api);
+    return ServicoAuthSupabase(
+      config,
+      api: api,
+      provedoresAtivos: await provedoresLigadosNoServidor(config),
+    );
+  }
+
+  /// Quais entradas (Google, Apple) o Supabase deste projeto aceita (`/auth/v1/settings`).
+  /// Sem resposta, nulo: vale só a configuração do app. Evita mostrar um botão que o servidor
+  /// vai recusar.
+  static Future<Set<ProvedorAuth>?> provedoresLigadosNoServidor(
+    ConfigAuth config, {
+    http.Client? cliente,
+  }) async {
+    final c = cliente ?? http.Client();
+    try {
+      final r = await c
+          .get(
+            Uri.parse('${config.supabaseUrl}/auth/v1/settings'),
+            headers: {'apikey': config.supabaseAnonKey},
+          )
+          .timeout(const Duration(seconds: 4));
+      if (r.statusCode != 200) return null;
+      final externos = (jsonDecode(r.body) as Map)['external'];
+      if (externos is! Map) return null;
+      return {
+        if (externos['google'] == true) ProvedorAuth.google,
+        if (externos['apple'] == true) ProvedorAuth.apple,
+      };
+    } on Object {
+      return null;
+    } finally {
+      if (cliente == null) c.close();
+    }
   }
 
   final ConfigAuth _config;
   final sb.SupabaseClient _cliente;
   final ControleCodigoCelular _codigo;
   final ClienteApi? _api;
+  final Set<ProvedorAuth>? _provedoresAtivos;
   String? _cpfPendente;
 
   // Link de recuperação: o evento pode chegar antes de a tela escutar (app fechado, aberto pelo
@@ -88,10 +125,15 @@ class ServicoAuthSupabase implements ServicoAuth {
       _proteger(() => _auth.updateUser(sb.UserAttributes(password: senha)));
 
   @override
-  bool provedorHabilitado(ProvedorAuth provedor) => switch (provedor) {
-        ProvedorAuth.google => true,
-        ProvedorAuth.apple => defaultTargetPlatform == TargetPlatform.iOS,
-      };
+  bool provedorHabilitado(ProvedorAuth provedor) {
+    final ativos = _provedoresAtivos;
+    if (ativos != null && !ativos.contains(provedor)) return false;
+    return switch (provedor) {
+      ProvedorAuth.google =>
+        _config.googleWebClientId.isNotEmpty || _config.googleIosClientId.isNotEmpty,
+      ProvedorAuth.apple => defaultTargetPlatform == TargetPlatform.iOS,
+    };
+  }
 
   static SessaoAuth? _paraSessao(sb.User? u) => u == null
       ? null

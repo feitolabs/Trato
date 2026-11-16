@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
+import '../../dados/config_publica.dart';
+import '../../dispositivo/abrir_email.dart';
 import '../../tema/tema.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
@@ -34,9 +36,18 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
     super.dispose();
   }
 
-  void _abrirAjuda() => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const AjudaTela(servico: ServicoAjudaLocal())),
-      );
+  void _abrirAjuda() {
+    final email = ConfigPublica.atual.suporteEmail;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AjudaTela(
+          servico: const ServicoAjudaLocal(),
+          aoFalarComSuporte:
+              email == null ? null : () => abrirEmail(email, 'Ajuda com o Trato'),
+        ),
+      ),
+    );
+  }
 
   Future<void> _enviar() async {
     if (_carregando) return;

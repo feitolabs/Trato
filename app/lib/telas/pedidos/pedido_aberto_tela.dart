@@ -29,6 +29,7 @@ class PedidoAbertoTela extends StatefulWidget {
     required this.dados,
     required this.aoSalvar,
     required this.aoVerOrcamentos,
+    this.aoCancelar,
   });
 
   final String numero;
@@ -44,6 +45,9 @@ class PedidoAbertoTela extends StatefulWidget {
   })
   aoSalvar;
   final VoidCallback aoVerOrcamentos;
+
+  /// Cancelar o pedido; o botão some se nulo.
+  final VoidCallback? aoCancelar;
 
   @override
   State<PedidoAbertoTela> createState() => _PedidoAbertoTelaState();
@@ -144,6 +148,8 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
                 BotaoPrimario(texto: 'Ver orçamentos', aoTocar: widget.aoVerOrcamentos),
                 const SizedBox(height: EspacosTrato.x2),
                 BotaoSecundario(texto: 'Editar pedido', aoTocar: _comecarEdicao),
+                if (widget.aoCancelar != null)
+                  BotaoLink(texto: 'Cancelar pedido', aoTocar: widget.aoCancelar!),
               ],
             ),
       children: [

@@ -78,9 +78,13 @@ class DetalheValoresPedido {
     required this.situacao,
     this.aditivos = const [],
     this.notas = const [],
+    this.podeAvaliarCliente = false,
   });
 
   final String pedidoNumero;
+
+  /// Pedido concluído que o profissional ainda não avaliou.
+  final bool podeAvaliarCliente;
 
   /// O valor inteiro que o cliente pagou (antes da taxa).
   final int pagoPeloClienteCentavos;

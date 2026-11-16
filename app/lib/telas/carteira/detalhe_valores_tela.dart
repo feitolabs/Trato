@@ -10,9 +10,12 @@ import 'modelos.dart';
 /// Trato descontada e o que fica para ele. Também lista aditivos e notas de materiais.
 /// Nada é calculado aqui: tudo vem pronto do backend.
 class DetalheValoresTela extends StatelessWidget {
-  const DetalheValoresTela({super.key, required this.carregar});
+  const DetalheValoresTela({super.key, required this.carregar, this.aoAvaliarCliente});
 
   final Future<DetalheValoresPedido> Function() carregar;
+
+  /// Abre a avaliação do cliente (o botão só aparece em pedido concluído e ainda não avaliado).
+  final VoidCallback? aoAvaliarCliente;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +84,14 @@ class DetalheValoresTela extends StatelessWidget {
                 'As notas são só o registro do custo dos materiais: não geram cobrança nem '
                 'pagamento. Para cobrar um valor a mais, use um aditivo.',
                 style: secundario,
+              ),
+            ],
+            if (d.podeAvaliarCliente && aoAvaliarCliente != null) ...[
+              const SizedBox(height: EspacosTrato.x5),
+              BotaoSecundario(
+                texto: 'Avaliar o cliente',
+                icone: Icons.star_outline,
+                aoTocar: aoAvaliarCliente,
               ),
             ],
           ],

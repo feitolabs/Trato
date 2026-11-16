@@ -202,6 +202,13 @@ void main() {
       expect(problema, isTrue);
     });
 
+    testWidgets('sem destino, os botões de suporte e de relato não aparecem', (tester) async {
+      await _abrir(tester, const AjudaTela(servico: ServicoAjudaFake()));
+      expect(find.text('Falar com o suporte'), findsNothing);
+      expect(find.text('Relatar um problema'), findsNothing);
+      expect(find.text('Como peço um serviço?'), findsOneWidget);
+    });
+
     testWidgets('textos sem promessas proibidas', (tester) async {
       await _abrir(
         tester,
