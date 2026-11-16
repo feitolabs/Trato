@@ -44,8 +44,9 @@ class DetalhePedidoTela extends StatelessWidget {
     final pedido = dados.pedido;
     final linhas = [
       ...dados.linhas,
-      LinhaDetalhe('Prazo', _capitalizar(pedido.prazo)),
-      LinhaDetalhe('Cliente pensa gastar', textoFaixa(pedido)),
+      if (!pedido.urgente || pedido.prazo.toLowerCase() != 'urgente')
+        LinhaDetalhe('Prazo', _capitalizar(pedido.prazo)),
+      LinhaDetalhe('Orçamento estimado', textoFaixa(pedido)),
     ];
     return Scaffold(
       appBar: AppBar(
@@ -140,9 +141,14 @@ class DetalhePedidoTela extends StatelessWidget {
                         const SizedBox(width: EspacosTrato.x2),
                         Expanded(
                           child: Text(
-                            '${pedido.bairro.isEmpty ? 'Distância' : '${pedido.bairro}, a'} '
-                            '${textoDistancia(pedido.distanciaKm)}. '
-                            'O endereço completo aparece depois da contratação.',
+                            pedido.bairro.isEmpty
+                                ? 'Região: ${textoDistancia(pedido.distanciaKm)}. '
+                                    'O endereço completo aparece depois da contratação.'
+                                : pedido.distanciaKm == null
+                                    ? 'Bairro ${pedido.bairro}. '
+                                        'O endereço completo aparece depois da contratação.'
+                                    : '${pedido.bairro}, a ${textoDistancia(pedido.distanciaKm)}. '
+                                        'O endereço completo aparece depois da contratação.',
                             style: TipografiaTrato.corpoPequeno
                                 .copyWith(color: CoresTrato.textoSecundario),
                           ),

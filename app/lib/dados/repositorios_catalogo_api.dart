@@ -141,6 +141,9 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       'categoria_id': categoriaId,
       if (filtro.bairro != null && filtro.bairro!.isNotEmpty)
         'bairro': filtro.bairro!,
+      if (filtro.notaMinima != null)
+        'nota_minima': filtro.notaMinima!.toString(),
+      if (filtro.soDisponiveisHoje) 'atende_hoje': 'true',
     };
     final (bruto, _) = await emParalelo2(
       _api.get('/v1/profissionais', consulta: consulta),
@@ -329,7 +332,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
         servicos: portfolio,
         trabalhos: portfolio,
         fotosUrls: fotosUrls,
-        fotosTrabalhos: portfolio.isEmpty ? 3 : (portfolio.length > 3 ? 3 : portfolio.length),
+        fotosTrabalhos: portfolio.isEmpty ? 0 : (portfolio.length > 3 ? 3 : portfolio.length),
       ),
     );
   }
@@ -368,7 +371,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
           ServicoRecente(
             pedidoId: p.id,
             titulo: p.titulo,
-            profissional: '',
+            profissional: p.profissionalNome,
             data: p.subtitulo,
             statusTexto: p.statusTexto,
           ),

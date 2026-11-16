@@ -173,7 +173,8 @@ class _ShellPainelState extends State<ShellPainel> {
     }
     final atual = secoes.firstWhere((s) => s.id == _idAtual, orElse: () => secoes.first);
     if (context.pode(Permissao.verificacoesVer)) _pendentes ??= _contarPendentes();
-    final conteudo = KeyedSubtree(key: ValueKey(atual.id), child: atual.construir());
+    final widgetConteudo = atual.id == 'dashboard' ? DashboardTela(aoAbrirSecao: _ir) : atual.construir();
+    final conteudo = KeyedSubtree(key: ValueKey(atual.id), child: widgetConteudo);
 
     return Listener(
       behavior: HitTestBehavior.translucent,

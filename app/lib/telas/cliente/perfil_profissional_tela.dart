@@ -153,21 +153,28 @@ class PerfilProfissionalTela extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x6),
                 Text('Trabalhos', style: TipografiaTrato.titulo),
                 const SizedBox(height: EspacosTrato.x3),
-                Row(
-                  children: [
-                    for (var i = 0; i < d.fotosTrabalhos; i++) ...[
-                      if (i > 0) const SizedBox(width: EspacosTrato.x3),
-                      Expanded(
-                        child: _FotoReservada(
-                          legenda: i < d.trabalhos.length
-                              ? d.trabalhos[i]
-                              : 'Trabalho ${i + 1}',
-                          url: i < d.fotosUrls.length ? d.fotosUrls[i] : null,
+                if (d.fotosTrabalhos == 0 && d.trabalhos.isEmpty)
+                  Text(
+                    'Sem fotos de trabalhos ainda.',
+                    style: TipografiaTrato.corpo
+                        .copyWith(color: CoresTrato.textoSecundario),
+                  )
+                else
+                  Row(
+                    children: [
+                      for (var i = 0; i < d.fotosTrabalhos; i++) ...[
+                        if (i > 0) const SizedBox(width: EspacosTrato.x3),
+                        Expanded(
+                          child: _FotoReservada(
+                            legenda: i < d.trabalhos.length
+                                ? d.trabalhos[i]
+                                : 'Trabalho ${i + 1}',
+                            url: i < d.fotosUrls.length ? d.fotosUrls[i] : null,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
                 const SizedBox(height: EspacosTrato.x6),
                 Row(
                   children: [

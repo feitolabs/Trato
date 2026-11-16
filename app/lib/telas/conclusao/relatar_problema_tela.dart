@@ -110,10 +110,9 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
           spacing: EspacosTrato.x2,
           runSpacing: EspacosTrato.x2,
           children: [
-            const EspacoFoto(legenda: '[Foto]', altura: 100, largura: 100),
             for (var i = 0; i < _fotos.length; i++)
               EspacoFoto(
-                legenda: '[Foto ${i + 2}]',
+                legenda: '[Foto ${i + 1}]',
                 referencia: _fotos[i],
                 altura: 100,
                 largura: 100,

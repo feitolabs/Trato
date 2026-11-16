@@ -258,6 +258,9 @@ class PedidoOut(BaseModel):
     cliente_nome: str | None = Field(
         None, description="Nome abreviado do cliente; só para o profissional do pedido."
     )
+    profissional_nome: str | None = Field(
+        None, description="Nome abreviado do profissional contratado; só para o cliente do pedido."
+    )
     contratado_em: datetime | None = Field(
         None, description="Quando o cliente aceitou o orçamento (o contrato nasceu)."
     )

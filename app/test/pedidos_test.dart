@@ -123,7 +123,7 @@ void main() {
     testWidgets('pinzinho: enviada, recebida e visualizada', (tester) async {
       await _abrir(
         tester,
-        ChatPedidoTela(
+        const ChatPedidoTela(
           conversa: ConversaPedido(
             nome: 'Ana S.',
             iniciais: 'AS',

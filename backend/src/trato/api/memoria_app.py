@@ -125,7 +125,11 @@ class UsuariosEmMemoria:
         return cpf not in self._cpfs
 
     def registrar_dados_privados(
-        self, usuario_id: str, cpf: str, telefone: str | None = None
+        self,
+        usuario_id: str,
+        cpf: str,
+        telefone: str | None = None,
+        data_nascimento: object | None = None,
     ) -> bool:
         dono = self._cpfs.get(cpf)
         if dono is not None and dono != usuario_id:
@@ -155,10 +159,11 @@ class UsuariosEmMemoria:
         nome: str,
         cpf: str,
         telefone: str | None = None,
+        data_nascimento: object | None = None,
     ) -> bool:
         self.emails[usuario_id] = email.strip().lower()
         self.garantir(usuario_id, nome)
-        return self.registrar_dados_privados(usuario_id, cpf, telefone)
+        return self.registrar_dados_privados(usuario_id, cpf, telefone, data_nascimento)
 
 
 class VerificacoesEmMemoria:

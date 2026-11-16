@@ -36,7 +36,7 @@ class _RiscoTelaState extends State<RiscoTela> {
         'troca_de_chave_pix' => 'Troca de chave PIX',
         'cupom_reutilizado' => 'Cupom reutilizado',
         'mesmo_aparelho_em_2_contas' => 'Mesmo aparelho em 2 contas',
-        'saque_travado' => 'Saques travados',
+        'saque_travado' => 'Repasses retidos',
         final t => '${t[0].toUpperCase()}${t.substring(1).replaceAll('_', ' ')}',
       };
 
@@ -256,8 +256,8 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
           BannerInfo(
             a.contaBloqueada
                 ? 'A conta não cria nem recebe pedidos novos. Reversível com motivo.'
-                : 'Novos repasses ficam retidos até alguém destravar. Pedidos em andamento continuam.',
-            titulo: a.contaBloqueada ? 'Conta bloqueada.' : 'Saques travados.',
+                : 'Novos repasses ficam retidos até alguém liberar. Pedidos em andamento continuam.',
+            titulo: a.contaBloqueada ? 'Conta bloqueada.' : 'Repasses retidos.',
             tom: Tom.alerta,
             icone: IconesTrato.travar,
           ),
@@ -308,22 +308,22 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
           Text('Ações preventivas', style: TipografiaTrato.secao),
           const SizedBox(height: EspacosTrato.x3),
           _AcaoPreventiva(
-            titulo: a.saquesTravados ? 'Destravar saques' : 'Travar saques',
+            titulo: a.saquesTravados ? 'Liberar repasses' : 'Reter repasses',
             descricao: a.saquesTravados
-                ? 'Os repasses voltam a sair normalmente. Exige motivo.'
+                ? 'Os repasses voltam a seguir o fluxo normal. Exige motivo.'
                 : 'Novos repasses ficam retidos. Pedidos em andamento continuam. Reversível com motivo.',
-            verbo: a.saquesTravados ? 'Destravar saques' : 'Travar saques',
+            verbo: a.saquesTravados ? 'Liberar repasses' : 'Reter repasses',
             icone: a.saquesTravados ? IconesTrato.destravar : IconesTrato.travar,
             aoPressionar: () => _acao(
-              titulo: a.saquesTravados ? 'Destravar saques de $nome?' : 'Travar saques de $nome?',
+              titulo: a.saquesTravados ? 'Liberar repasses de $nome?' : 'Reter repasses de $nome?',
               descricao: a.saquesTravados
-                  ? 'Os repasses de $nome voltam a sair normalmente.'
-                  : 'Novos repasses ficam retidos até alguém destravar. Pedidos em andamento continuam normalmente.',
-              verbo: a.saquesTravados ? 'Destravar saques' : 'Travar saques',
+                  ? 'Os repasses de $nome voltam a seguir o fluxo normal.'
+                  : 'Novos repasses ficam retidos até alguém liberar. Pedidos em andamento continuam normalmente.',
+              verbo: a.saquesTravados ? 'Liberar repasses' : 'Reter repasses',
               executarAcao: (m) => a.saquesTravados
                   ? api.destravarSaque(a.usuarioId!, motivo: m)
                   : api.travarSaque(a.usuarioId!, motivo: m),
-              sucesso: a.saquesTravados ? 'Saques destravados.' : 'Saques travados.',
+              sucesso: a.saquesTravados ? 'Repasses liberados.' : 'Repasses retidos.',
             ),
           ),
           const SizedBox(height: EspacosTrato.x3),

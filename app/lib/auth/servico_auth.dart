@@ -35,6 +35,7 @@ class DadosCadastro {
     required this.senha,
     required this.celular,
     this.cpf = '',
+    this.nascimento = '',
     this.perfil,
     this.termosAceitos = true,
   });
@@ -48,6 +49,9 @@ class DadosCadastro {
 
   /// Como digitado, ex.: "123.456.789-09". Não vai para o login: o backend grava.
   final String cpf;
+
+  /// Data de nascimento como digitada, ex.: "15/03/1992". Não vai para o login: o backend grava.
+  final String nascimento;
 
   /// `cliente` ou `profissional` (escolha da tela "Como você quer usar o Trato?").
   final String? perfil;

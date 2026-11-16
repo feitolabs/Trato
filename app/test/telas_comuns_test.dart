@@ -119,7 +119,7 @@ void main() {
       await tester.tap(find.text('Exportar meus dados'));
       await tester.pump();
       expect(servico.exportacoes, 1);
-      expect(find.textContaining('Pedido registrado'), findsOneWidget);
+      expect(find.textContaining('Cópia dos seus dados'), findsWidgets);
     });
 
     testWidgets('excluir conta só chama o serviço depois dos 2 passos', (tester) async {

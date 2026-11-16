@@ -335,6 +335,7 @@ def consultar_cobranca(
         ator_id=operador.id,
         acao="pagamento.consultado_no_provedor",
         entidade="pagamentos",
+        motivo=f"Consulta manual da cobrança {cobranca_id} no provedor",
         depois={"cobranca_id": cobranca_id, "status_no_provedor": remota.status.value},
     )
     return ConsultaCobrancaOut(
@@ -387,6 +388,7 @@ def conciliacao(
         ator_id=operador.id,
         acao="pagamento.conciliacao_executada",
         entidade="pagamentos",
+        motivo=f"Conciliação financeira executada para o dia {dia.isoformat()}",
         depois={"dia": dia.isoformat(), "divergencias": len(resultado.divergencias)},
     )
     return ConciliacaoOut(

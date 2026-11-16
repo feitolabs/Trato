@@ -56,6 +56,7 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   Future<DadosDoPedido> editar(
     String pedidoId, {
     String? descricao,
+    int? faixaMinCentavos,
     int? faixaMaxCentavos,
     String? logradouro,
     String? numero,
@@ -65,6 +66,9 @@ class RepositorioPedidosFake implements RepositorioPedidos {
     _dadosDemo = DadosDoPedido(
       titulo: _dadosDemo.titulo,
       descricao: descricao ?? _dadosDemo.descricao,
+      faixaMinCentavos: faixaMinCentavos == 0
+          ? null
+          : (faixaMinCentavos ?? _dadosDemo.faixaMinCentavos),
       faixaMaxCentavos: faixaMaxCentavos == 0
           ? null
           : (faixaMaxCentavos ?? _dadosDemo.faixaMaxCentavos),

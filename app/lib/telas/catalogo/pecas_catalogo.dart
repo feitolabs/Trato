@@ -65,7 +65,7 @@ class CartaoProfissional extends StatelessWidget {
           Semantics(
             button: true,
             label: 'Perfil de ${p.nome}, nota ${formatarNota(p.nota)}, '
-                '${p.servicosConcluidos} serviços concluídos',
+                '${p.servicosConcluidos} ${p.servicosConcluidos == 1 ? 'serviço concluído' : 'serviços concluídos'}',
             excludeSemantics: true,
             child: InkWell(
               onTap: aoAbrir,
@@ -87,7 +87,7 @@ class CartaoProfissional extends StatelessWidget {
                             const SizedBox(height: EspacosTrato.x1),
                           ],
                           Text(
-                            '${p.servicosConcluidos} serviços concluídos'
+                            '${p.servicosConcluidos} ${p.servicosConcluidos == 1 ? 'serviço concluído' : 'serviços concluídos'}'
                             '${p.regiao == null ? '' : ' · ${p.regiao}'}',
                             style: secundario,
                           ),

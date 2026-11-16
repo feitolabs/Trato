@@ -73,7 +73,61 @@ MIGRATIONS_EXTRAS = (
     "pagamentos_instrucao",
     "login_cpf_telefone",
     "admin_sugestoes_completas",
+    "conta_enderecos_favoritos_contatos",
 )
+
+_SQL_DISPUTAS_LOCAL = """
+create or replace function public.disputas_validar()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  ctr public.contratos%rowtype;
+  decisor public.equipe%rowtype;
+  aprovador public.equipe%rowtype;
+  valor_em_jogo bigint;
+begin
+  select * into ctr from public.contratos where id = new.contrato_id;
+
+  if tg_op = 'INSERT' then
+    if new.pedido_id is distinct from ctr.pedido_id then
+      raise exception 'O pedido da disputa não é o pedido do contrato' using errcode = 'check_violation';
+    end if;
+    if new.aberta_por not in (ctr.cliente_id, ctr.profissional_id) then
+      raise exception 'Só uma das partes do contrato abre disputa' using errcode = 'check_violation';
+    end if;
+  else
+    if old.status in ('decidida', 'cancelada') then
+      raise exception 'Disputa % não pode mais mudar', old.status using errcode = 'restrict_violation';
+    end if;
+  end if;
+
+  if new.status = 'decidida' then
+    select * into decisor from public.equipe where usuario_id = new.decidida_por;
+    if not found or not decisor.ativo or decisor.revogado_em is not null
+       or decisor.papel not in ('mediador', 'lider_suporte', 'administrador') then
+      raise exception 'Só um mediador, líder de suporte ou administrador ativo decide a disputa'
+        using errcode = 'check_violation';
+    end if;
+    valor_em_jogo := case new.decisao
+                       when 'reembolso_total' then new.valor_congelado_centavos
+                       when 'reembolso_parcial' then coalesce(new.valor_reembolso_centavos, 0)
+                       else 0 end;
+    if valor_em_jogo > coalesce(decisor.alcada_centavos, 0) then
+      select * into aprovador from public.equipe where usuario_id = new.aprovada_por;
+      if not found or not aprovador.ativo or aprovador.revogado_em is not null
+         or aprovador.papel not in ('lider_suporte', 'administrador')
+         or aprovador.usuario_id = new.decidida_por then
+        raise exception 'Valor acima da alçada: exige aprovação de outra pessoa (líder de suporte ou administrador)'
+          using errcode = 'check_violation';
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+"""
 
 
 def aplicar_migrations_extras(banco_local) -> None:
@@ -92,6 +146,8 @@ def aplicar_migrations_extras(banco_local) -> None:
             print(f"  migration extra aplicada: {chave}", flush=True)
         except Exception as erro:  # noqa: BLE001 - segue sem ela e avisa
             print(f"  migration extra FALHOU ({chave}): {str(erro).splitlines()[0]}", flush=True)
+    with banco_local.admin() as con:
+        con.execute(_SQL_DISPUTAS_LOCAL)
 
 
 def semear(banco_local) -> None:
@@ -209,6 +265,14 @@ def instalar_auth_local(app, segredo: str, emissor: str) -> None:
                 return _usuario(email, conta)
         return JSONResponse({"msg": "user not found"}, 404)
 
+    @app.get("/auth/v1/settings")
+    async def auth_settings():
+        return {
+            "external": {"email": True, "google": False, "apple": False},
+            "disable_signup": False,
+            "mailer_autoconfirm": True,
+        }
+
     @app.post("/auth/v1/logout")
     async def sair():
         return Response(status_code=204)
@@ -273,9 +337,24 @@ def main() -> None:
         "SUPABASE_SERVICE_ROLE_KEY": "chave-de-servico-local-de-teste",
     })
     os.chdir(pasta)  # nada de .env real por perto
+    from trato import __version__
     from trato.api.fabrica import criar_app_da_config
+    from trato.config import obter_config
+    from trato.seguranca import registrar_rotas
 
-    app = criar_app_da_config()
+    app = registrar_rotas(criar_app_da_config())
+
+    @app.get("/saude")
+    def saude() -> dict[str, str | bool]:
+        config = obter_config()
+        return {
+            "status": "ok",
+            "app": "Trato",
+            "versao": __version__,
+            "ambiente": config.trato_ambiente,
+            "supabase_configurado": bool(config.supabase_url),
+            "stripe_modo_teste": config.stripe_em_modo_teste,
+        }
 
     def criar_usuario_no_banco(uid: str) -> None:
         with local.admin() as con:

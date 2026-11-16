@@ -24,6 +24,7 @@ from trato.profissional.repositorio import (
     PerfilProfissional,
     Regiao,
     ResultadoBusca,
+    dia_semana_hoje,
 )
 
 
@@ -217,6 +218,15 @@ class ProfissionaisPostgres:
                 "and (%s::text is null or r.bairro is null or lower(btrim(r.bairro)) = %s::text))"
             )
             params += [cidade, cidade, bairro, bairro]
+        if filtro.nota_minima is not None:
+            onde.append("p.nota_publica is not null and p.nota_publica >= %s")
+            params.append(filtro.nota_minima)
+        if filtro.atende_hoje:
+            onde.append(
+                "exists (select 1 from jsonb_array_elements(coalesce(p.disponibilidade, "
+                "'[]'::jsonb)) j where (j->>'dia_semana')::int = %s)"
+            )
+            params.append(dia_semana_hoje())
         base = (
             "from public.perfis_profissional p join public.usuarios u on u.id = p.usuario_id "
             "where " + " and ".join(onde)

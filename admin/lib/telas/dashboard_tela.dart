@@ -4,11 +4,14 @@ import '../componentes/base.dart';
 import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
+import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
 
 /// Painel executivo (RF-DAS-01 a RF-DAS-05).
 class DashboardTela extends StatefulWidget {
-  const DashboardTela({super.key});
+  const DashboardTela({super.key, this.aoAbrirSecao});
+
+  final ValueChanged<String>? aoAbrirSecao;
 
   @override
   State<DashboardTela> createState() => _DashboardTelaState();
@@ -47,7 +50,7 @@ class _DashboardTelaState extends State<DashboardTela> {
                     children: [
                       _Indicadores(metricas: m, periodo: p),
                       const SizedBox(height: EspacosTrato.intervaloCartoes),
-                      _Atalhos(metricas: m),
+                      _Atalhos(metricas: m, aoAbrirSecao: widget.aoAbrirSecao),
                     ],
                   ),
                 ),
@@ -166,35 +169,53 @@ class _Indicadores extends StatelessWidget {
 
 /// Cards extras do RF-DAS-05: o que está esperando alguém da equipe.
 class _Atalhos extends StatelessWidget {
-  const _Atalhos({required this.metricas});
+  const _Atalhos({required this.metricas, this.aoAbrirSecao});
   final MetricasDashboard metricas;
+  final ValueChanged<String>? aoAbrirSecao;
 
   @override
   Widget build(BuildContext context) {
-    Widget item(String rotulo, int n, bool atencao) => Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4, vertical: EspacosTrato.x3),
-            decoration: BoxDecoration(
-              color: CoresTrato.fundoSuperficie,
-              borderRadius: BorderRadius.circular(EspacosTrato.raio),
-              border: Border.all(color: CoresTrato.bordaSuave),
-            ),
-            child: Row(
-              children: [
-                Expanded(child: Text(rotulo, style: TipografiaTrato.corpo)),
-                Text(
-                  '$n',
-                  style: TipografiaTrato.secao.copyWith(color: atencao && n > 0 ? CoresTrato.avisoTexto : CoresTrato.textoPadrao),
-                ),
-              ],
+    Widget item(String rotulo, int n, bool atencao, String secaoId, Permissao permissao) {
+      final aoTocar = aoAbrirSecao != null && context.pode(permissao)
+          ? () => aoAbrirSecao!(secaoId)
+          : null;
+      return Expanded(
+        child: Material(
+          color: CoresTrato.fundoSuperficie,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(EspacosTrato.raio),
+            side: const BorderSide(color: CoresTrato.bordaSuave),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: aoTocar,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4, vertical: EspacosTrato.x3),
+              child: Row(
+                children: [
+                  Expanded(child: Text(rotulo, style: TipografiaTrato.corpo)),
+                  Text(
+                    '$n',
+                    style: TipografiaTrato.secao
+                        .copyWith(color: atencao && n > 0 ? CoresTrato.avisoTexto : CoresTrato.textoPadrao),
+                  ),
+                  if (aoTocar != null) ...[
+                    const SizedBox(width: EspacosTrato.x2),
+                    const Icon(Icons.chevron_right, size: 18, color: CoresTrato.textoMudo),
+                  ],
+                ],
+              ),
             ),
           ),
-        );
+        ),
+      );
+    }
+
     return LayoutBuilder(builder: (context, c) {
       final itens = [
-        item('Verificações pendentes', metricas.profissionaisPendentes, true),
-        item('Disputas abertas', metricas.disputasAbertas, true),
-        item('Alertas de risco abertos', metricas.alertasRiscoAbertos, true),
+        item('Verificações pendentes', metricas.profissionaisPendentes, true, 'verificacao', Permissao.verificacoesVer),
+        item('Disputas abertas', metricas.disputasAbertas, true, 'disputas', Permissao.disputasVer),
+        item('Alertas de risco abertos', metricas.alertasRiscoAbertos, true, 'risco', Permissao.riscoVer),
       ];
       if (c.maxWidth < 700) {
         return Column(children: [

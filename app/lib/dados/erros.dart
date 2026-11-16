@@ -30,3 +30,9 @@ class ErroTrato implements Exception {
   @override
   String toString() => mensagem;
 }
+
+/// Mensagem amigável de erro exibida em telas carregáveis.
+/// Preserva o texto real do backend/http ([ErroTrato]) em vez de fingir falha de rede.
+String mensagemErroTrato(Object erro) => erro is ErroTrato
+    ? erro.mensagem
+    : 'Não foi possível carregar agora. Confira sua conexão e tente de novo.';

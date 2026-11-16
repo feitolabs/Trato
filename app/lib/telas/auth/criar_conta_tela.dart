@@ -111,6 +111,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         senha: _senha.text,
         celular: _celular.text,
         cpf: _cpf.text,
+        nascimento: _nascimento.text.trim(),
         perfil: widget.perfil.name,
         termosAceitos: _aceitouTermos,
       ));
