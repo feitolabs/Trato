@@ -19,6 +19,12 @@ class Config(BaseSettings):
     trato_ambiente: str = "desenvolvimento"
     # memoria (padrão, para testes rápidos) | postgres (Supabase)
     trato_persistencia: str = "memoria"
+    # E-mail do atendimento ao usuário (aparece na Central de ajuda). Vazio = o botão não aparece.
+    trato_suporte_email: str = ""
+    # true = o próprio processo da API roda o agendador (liberação por prazo, expiração de pedido
+    # e de pagamento, lembretes). Vários processos juntos são seguros: o agendador usa trava no
+    # banco. false = rode `python -m trato.agendador` à parte.
+    trato_agendador_embutido: bool = False
 
     supabase_url: str = ""
     supabase_anon_key: SecretStr = SecretStr("")

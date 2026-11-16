@@ -134,3 +134,22 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 - Fechamento sem o custo de cupom: o pedido não guarda o desconto (quem paga já foi decidido: o Trato).
 - Extrato em PDF só pelo painel; o app do profissional ainda não tem o botão.
 - Prazo do alerta de pagamento parado: 30 min até alguém propor e aprovar `alerta_pagamento_parado_minutos`.
+
+## Auditoria do app (15/11/2026)
+
+Detalhe em `harness/AUDITORIA-APP.md`.
+
+- **Ligar o agendador (decisão do João: ainda não).** Código pronto e testado. Para ligar: trocar
+  `TRATO_AGENDADOR_EMBUTIDO` para `"true"` em `backend/fly.toml` (ou `fly secrets set TRATO_AGENDADOR_EMBUTIDO=true`),
+  fazer o deploy e conferir que `select count(*) from agendador_execucoes` cresce a cada minuto; vigiar a memória
+  (512 MB). **Enquanto estiver desligado não acontecem:** confirmação automática por prazo, expiração de pedido e de
+  pagamento, lembretes, reenvio de notificações e processamento de exclusão LGPD. Não dá para piloto com dinheiro real
+  sem isso. Alternativa se a memória apertar: segundo processo `python -m trato.agendador`.
+- Cadastrar `STRIPE_PUBLISHABLE_KEY` (e, se usar Google, `GOOGLE_WEB_CLIENT_ID` e `GOOGLE_IOS_CLIENT_ID`) em Settings > Variables do GitHub. Sem a Stripe, o cartão não abre nos builds do CI.
+- Push: precisa de projeto Firebase, arquivos de configuração, chave do FCM/APNs no servidor e OK.
+- Chamado de suporte dentro do app: precisa de tabela nova (migration, com OK). Hoje: `TRATO_SUPORTE_EMAIL` (vazio, então o botão não aparece).
+- Ausência do cliente: a máquina de estados só tem ausência do profissional (feita pelo sistema). Definir a regra.
+- Google e Apple: ligar no Supabase (hoje desligados) e passar os client ids.
+- Preferências de notificação (o backend tem a rota; o app não tem a tela). Remarcar visita (o servidor responde 501).
+- Dados fixos no app: faixas de preço e prazos do Novo pedido; quadrinhos "Trabalho 1/2/3" do perfil sem portfólio.
+

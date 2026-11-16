@@ -56,9 +56,14 @@ class DadosRetrabalho {
     required this.descricaoProblema,
     required this.prazoAtendimentoDias,
     required this.opcoesHorario,
+    this.estado = 'aberto',
   });
 
   final String disputaId;
+
+  /// Onde o retrabalho está: `aberto`, `aceito` ou `em_execucao` (os dois últimos já passaram
+  /// do agendamento e só falta andar um passo).
+  final String estado;
   final String titulo;
   final String descricaoProblema;
   final int prazoAtendimentoDias;
@@ -83,5 +88,8 @@ abstract interface class ServicoDisputaProfissional {
   /// null = não há retrabalho pendente.
   Future<DadosRetrabalho?> carregarRetrabalho(String disputaId);
   Future<void> agendarRetrabalho(AgendamentoRetrabalho agendamento);
+
+  /// Anda um passo do retrabalho já aceito: `iniciar` ou `resolver`.
+  Future<void> avancarRetrabalho(String disputaId, String etapa);
 }
 

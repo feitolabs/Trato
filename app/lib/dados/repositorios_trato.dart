@@ -15,6 +15,7 @@ import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
 import 'config_publica.dart';
+import 'fila_offline.dart';
 import 'config.dart';
 import 'repositorios.dart';
 import 'repositorios_catalogo.dart';
@@ -78,6 +79,7 @@ class RepositoriosTrato {
     ServicoUpload? upload,
     ServicoCamera? camera,
     Future<PosicaoAtual?> Function()? posicao,
+    FilaOffline? fila,
   }) {
     final pedidos = RepositorioPedidosApi(api, upload: upload, posicao: posicao);
     final profissional = RepositorioProfissionalApi(
@@ -87,6 +89,7 @@ class RepositoriosTrato {
       capturaFinalDoPedido: capturaFinalDoPedido,
       upload: upload,
       posicao: posicao,
+      fila: fila,
     );
     // Prazos e limites para os textos das telas (sem esperar: até chegar, valem os padrões).
     unawaited(ConfigPublica.carregar(api));
@@ -107,7 +110,7 @@ class RepositoriosTrato {
         aditivo: ServicoAditivoApi(api),
         notaMaterial: ServicoNotaMaterialApi(api, upload: upload),
         verificacao: ServicoVerificacaoApi(api),
-        disputaProfissional: ServicoDisputaProfissionalApi(api),
+        disputaProfissional: ServicoDisputaProfissionalApi(api, upload: upload),
         cadastroProfissional: ServicoCadastroProfissionalApi(api, upload: upload),
         perfilPublico: ServicoPerfilPublicoApi(api),
         privacidade: ServicoPrivacidadeApi(api),
@@ -124,6 +127,7 @@ class RepositoriosTrato {
     ServicoUpload Function(ClienteApi api)? criarUpload,
     ServicoCamera? camera,
     ServicoLocalizacao? localizacao,
+    FilaOffline? fila,
   }) {
     if (!config.usaApi) {
       throw StateError('App sem API configurada: passe TRATO_MODO=api e TRATO_API_URL.');
@@ -152,6 +156,7 @@ class RepositoriosTrato {
           : null,
       upload: upload,
       camera: camera,
+      fila: fila,
       posicao: localizacao == null
           ? null
           : () async {

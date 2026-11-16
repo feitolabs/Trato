@@ -12,9 +12,12 @@ RECUSA subir se algum repositório de dinheiro for em memória (`exigir_dinheiro
 
 from __future__ import annotations
 
+import logging
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -169,6 +172,32 @@ def montar_servico_pagamento(banco: Banco, config: Config) -> ServicoPagamento:
     )
 
 
+def iniciar_agendador_embutido(
+    config: Config, parar: threading.Event, montar: Callable[[], Any] | None = None
+) -> threading.Thread | None:
+    """Liga o agendador num fio do próprio processo. Se não conseguir montar, a API segue de pé
+    (o erro vai para o log) em vez de não subir."""
+    try:
+        if montar is None:
+            from trato.agendador.__main__ import montar as montar_padrao
+
+            montar = montar_padrao
+        agendador, banco_agendador, intervalo = montar()
+    except (Exception, SystemExit):
+        logging.getLogger(__name__).exception("Agendador embutido não subiu")
+        return None
+
+    def laco() -> None:
+        try:
+            agendador.rodar_sempre(parar, intervalo)
+        finally:
+            banco_agendador.fechar()
+
+    fio = threading.Thread(target=laco, name="agendador", daemon=True)
+    fio.start()
+    return fio
+
+
 def criar_app_da_config(config: Config | None = None) -> FastAPI:
     """O app de produção/desenvolvimento, conforme `TRATO_PERSISTENCIA`."""
     config = config or obter_config()
@@ -190,9 +219,14 @@ def criar_app_da_config(config: Config | None = None) -> FastAPI:
     @asynccontextmanager
     async def ciclo(_: FastAPI) -> AsyncIterator[None]:
         banco.abrir()
+        parar = threading.Event()
+        fio = iniciar_agendador_embutido(config, parar) if config.trato_agendador_embutido else None
         try:
             yield
         finally:
+            parar.set()
+            if fio is not None:
+                fio.join(timeout=10)
             banco.fechar()
 
     app = FastAPI(

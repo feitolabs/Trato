@@ -36,7 +36,11 @@ void main() {
     'mensagens_vazio': () => const MensagensTela(servico: ServicoMensagensFake(itens: [])),
     'privacidade': () => CentralPrivacidadeTela(servico: ServicoPrivacidadeFake()),
     'excluir_conta': () => ExcluirContaTela(servico: ServicoPrivacidadeFake()),
-    'ajuda': () => const AjudaTela(servico: ServicoAjudaFake()),
+    'ajuda': () => AjudaTela(
+          servico: const ServicoAjudaFake(),
+          aoFalarComSuporte: () {},
+          aoRelatarProblema: () {},
+        ),
     'busca': () =>
         BuscaProfissionaisTela(servico: const ServicoBuscaFake(), sugestoes: excli.categorias),
     'busca_resultados': () =>

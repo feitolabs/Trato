@@ -49,8 +49,9 @@ class _CorpoState extends State<_Corpo> {
   final _mensagem = TextEditingController();
   String? _horario;
   bool _enviando = false;
-  bool _agendado = false;
+  String? _aviso;
   String? _erro;
+  late String _estado = widget.dados.estado;
 
   @override
   void dispose() {
@@ -58,31 +59,52 @@ class _CorpoState extends State<_Corpo> {
     super.dispose();
   }
 
-  Future<void> _agendar() async {
+  Future<void> _executar(Future<void> Function() acao, String aviso, String proximo) async {
     setState(() {
       _enviando = true;
       _erro = null;
     });
     try {
-      await widget.servico.agendarRetrabalho(AgendamentoRetrabalho(
-        disputaId: widget.dados.disputaId,
-        horario: _horario!,
-        mensagem: _mensagem.text.trim(),
-      ));
+      await acao();
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        _agendado = true;
+        _aviso = aviso;
+        _estado = proximo;
       });
-      widget.aoAgendado?.call(_horario!);
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        _erro = 'Não foi possível agendar. Tente de novo.';
+        _erro = 'Não foi possível salvar. Tente de novo.';
       });
     }
   }
+
+  Future<void> _agendar() => _executar(
+        () async {
+          await widget.servico.agendarRetrabalho(AgendamentoRetrabalho(
+            disputaId: widget.dados.disputaId,
+            horario: _horario!,
+            mensagem: _mensagem.text.trim(),
+          ));
+          widget.aoAgendado?.call(_horario!);
+        },
+        'Retrabalho agendado. O cliente será avisado.',
+        'aceito',
+      );
+
+  Future<void> _iniciar() => _executar(
+        () => widget.servico.avancarRetrabalho(widget.dados.disputaId, 'iniciar'),
+        'Retrabalho em andamento.',
+        'em_execucao',
+      );
+
+  Future<void> _resolver() => _executar(
+        () => widget.servico.avancarRetrabalho(widget.dados.disputaId, 'resolver'),
+        'Retrabalho concluído. O cliente será avisado.',
+        'resolvido',
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -95,18 +117,24 @@ class _CorpoState extends State<_Corpo> {
             AvisoFaixa(texto: _erro!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
             const SizedBox(height: EspacosTrato.x3),
           ],
-          if (_agendado)
-            const AvisoFaixa(
-              texto: 'Retrabalho agendado. O cliente será avisado.',
+          if (_aviso != null) ...[
+            AvisoFaixa(
+              texto: _aviso!,
               tipo: TipoStatus.sucesso,
               icone: Icons.check_circle_outline,
-            )
-          else
+            ),
+            if (_estado != 'resolvido') const SizedBox(height: EspacosTrato.x3),
+          ],
+          if (_estado == 'aberto')
             BotaoPrimario(
               texto: 'Confirmar horário',
               carregando: _enviando,
               aoTocar: _horario == null ? null : _agendar,
-            ),
+            )
+          else if (_estado == 'aceito')
+            BotaoPrimario(texto: 'Começar o retrabalho', carregando: _enviando, aoTocar: _iniciar)
+          else if (_estado == 'em_execucao')
+            BotaoPrimario(texto: 'Marcar como resolvido', carregando: _enviando, aoTocar: _resolver),
         ],
       ),
       children: [
@@ -129,21 +157,21 @@ class _CorpoState extends State<_Corpo> {
             ],
           ),
         ),
-        const TituloSecao('Escolha um horário'),
-        OpcoesPilula(
-          opcoes: d.opcoesHorario,
-          selecionadas: {if (_horario != null) _horario!},
-          aoAlternar: (v) {
-            if (!_agendado) setState(() => _horario = v);
-          },
-        ),
-        const SizedBox(height: EspacosTrato.x5),
-        CampoLongo(
-          rotulo: 'Mensagem ao cliente (opcional)',
-          controlador: _mensagem,
-          dica: 'Ex.: levo a peça nova para trocar',
-          linhas: 3,
-        ),
+        if (_estado == 'aberto') ...[
+          const TituloSecao('Escolha um horário'),
+          OpcoesPilula(
+            opcoes: d.opcoesHorario,
+            selecionadas: {if (_horario != null) _horario!},
+            aoAlternar: (v) => setState(() => _horario = v),
+          ),
+          const SizedBox(height: EspacosTrato.x5),
+          CampoLongo(
+            rotulo: 'Mensagem ao cliente (opcional)',
+            controlador: _mensagem,
+            dica: 'Ex.: levo a peça nova para trocar',
+            linhas: 3,
+          ),
+        ],
       ],
     );
   }

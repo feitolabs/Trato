@@ -13,6 +13,7 @@ class ConfigPublica {
     this.prazoRetrabalhoDias = 7,
     this.prazoRespostaDisputaHoras = 48,
     this.prazoLiberacaoDias = 0,
+    this.suporteEmail,
   });
 
   factory ConfigPublica.deJson(Map<String, dynamic> j) {
@@ -30,8 +31,17 @@ class ConfigPublica {
       prazoRespostaDisputaHoras:
           valor('prazo_resposta_disputa_horas', p.prazoRespostaDisputaHoras),
       prazoLiberacaoDias: valor('prazo_liberacao_dias', p.prazoLiberacaoDias),
+      suporteEmail: _email(j['suporte_email']),
     );
   }
+
+  static String? _email(Object? v) {
+    final t = v is String ? v.trim() : '';
+    return t.contains('@') ? t : null;
+  }
+
+  /// E-mail do atendimento; nulo = o servidor não configurou (o botão "Falar com o suporte" some).
+  final String? suporteEmail;
 
   /// Quantos orçamentos um pedido recebe.
   final int limiteOrcamentos;

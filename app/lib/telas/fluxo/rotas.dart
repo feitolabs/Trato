@@ -52,6 +52,8 @@ import '../conta/dados_pessoais_tela.dart';
 import '../conta/enderecos_tela.dart';
 import '../conta/favoritos_contatos_telas.dart';
 import '../conta/modelos.dart' show ServicoConta;
+import '../../dados/modelos_api.dart' show PedidoApi;
+import '../../dispositivo/abrir_email.dart';
 import '../conta/servico_fake.dart';
 import '../lgpd/central_privacidade_tela.dart';
 import '../mensagens/mensagens_tela.dart';
@@ -62,6 +64,8 @@ import '../verificacao/verificacao_tela.dart';
 import '../carteira/carteira_tela.dart';
 import '../carteira/modelos.dart';
 import '../cliente/casca_cliente_tela.dart';
+import '../carteira/avaliar_cliente_tela.dart';
+import '../configuracoes/configuracoes_tela.dart';
 import '../carteira/detalhe_valores_tela.dart';
 import '../conclusao/avaliacao_tela.dart';
 import '../conclusao/conclusao_tela.dart';
@@ -394,7 +398,24 @@ abstract final class RotasTrato {
         abrirGarantia(context, pedidoId: pedidoId);
       case AcaoServico.abrirProblema:
         _abrir<void>(context, _relatarProblema(pedidoId));
+      case AcaoServico.cancelar:
+        _cancelarPedido(context, pedidoId);
     }
+  }
+
+  /// Pede o motivo, confirma e cancela. Quem decide se pode (estado, quem pede) e devolve o
+  /// dinheiro é o servidor; se ele recusar, a pessoa vê o motivo.
+  static Future<void> _cancelarPedido(BuildContext context, String pedidoId) async {
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (_) => const _DialogoCancelarPedido(),
+    );
+    if (motivo == null || motivo.isEmpty || !context.mounted) return;
+    final ok = await _tentar(context, () => repos.pedidos.cancelar(pedidoId, motivo));
+    if (!ok || !context.mounted) return;
+    pedidosMudaram.value++;
+    _voltarAoInicio(context);
+    _avisoSimples(context, 'Pedido cancelado.');
   }
 
   /// Notificações. [profissional] muda para onde o toque leva (disputa e retrabalho abrem as
@@ -851,6 +872,15 @@ abstract final class RotasTrato {
                   _abrir<void>(context, _chat(pedidoId));
                 },
               ),
+              if (agendado)
+                ListTile(
+                  leading: const Icon(Icons.cancel_outlined),
+                  title: const Text('Cancelar o atendimento'),
+                  onTap: () {
+                    Navigator.of(folha).pop();
+                    _cancelarPedido(context, pedidoId);
+                  },
+                ),
               if (agendado || emAndamento)
                 ListTile(
                   leading: const Icon(Icons.receipt_long_outlined),
@@ -933,6 +963,21 @@ abstract final class RotasTrato {
             context,
             DetalheValoresTela(
               carregar: () => repos.profissional.valoresDoPedido(item.pedidoId!),
+              aoAvaliarCliente: () async {
+                final id = item.pedidoId!;
+                final enviou = await _abrir<bool>(
+                  context,
+                  AvaliarClienteTela(
+                    pedidoNumero: PedidoApi.numeroDe(id),
+                    aoEnviar: (nota, comentario) =>
+                        repos.profissional.avaliarCliente(id, nota, comentario),
+                  ),
+                );
+                if (enviou == true && context.mounted) {
+                  _avisoSimples(context, 'Avaliação enviada. Obrigado!');
+                  Navigator.of(context).pop();
+                }
+              },
             ),
           ),
         ),
@@ -951,41 +996,7 @@ abstract final class RotasTrato {
             ),
             aoEditarCadastro: () => _editarCadastroProfissional(context),
             aoUsarComoCliente: () => irParaCliente(context),
-            aoSair: () => sair(context),
-            // As mesmas opções de conta do perfil do cliente (menos as de quem contrata).
-            itensConta: [
-              ItemContaPerfil(
-                icone: Icons.person_outline,
-                titulo: 'Dados pessoais',
-                aoTocar: () => _abrir<void>(context, DadosPessoaisTela(servico: _conta)),
-              ),
-              ItemContaPerfil(
-                icone: Icons.notifications_none,
-                titulo: 'Notificações',
-                aoTocar: () => abrirNotificacoes(context, profissional: true),
-              ),
-              ItemContaPerfil(
-                icone: Icons.shield_outlined,
-                titulo: 'Contatos de confiança',
-                aoTocar: () => _abrir<void>(context, ContatosConfiancaTela(servico: _conta)),
-              ),
-              ItemContaPerfil(
-                icone: Icons.lock_outline,
-                titulo: 'Meus dados e excluir conta',
-                aoTocar: () => _abrirPrivacidade(context),
-              ),
-              ItemContaPerfil(
-                icone: Icons.help_outline,
-                titulo: 'Central de ajuda',
-                aoTocar: () =>
-                    _abrir<void>(context, const AjudaTela(servico: ServicoAjudaLocal())),
-              ),
-              ItemContaPerfil(
-                icone: Icons.description_outlined,
-                titulo: 'Termos e políticas',
-                aoTocar: () => abrirTermos(context),
-              ),
-            ],
+            aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: true),
           );
         },
       );
@@ -996,9 +1007,9 @@ abstract final class RotasTrato {
   static Widget abaPerfil() => Carregador<PerfilCliente>(
         carregar: repos.perfil.carregar,
         construir: (context, perfil) => PerfilClienteTela(
-          perfil: _soComDestino(perfil),
+          perfil: _soNoPerfil(perfil),
           aoCapturarFotoPerfil: _fotografarPerfil,
-          aoSair: () => sair(context),
+          aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: false),
           aoTocarItem: (acao) {
             switch (acao) {
               case AcaoPerfil.usarComoProfissional:
@@ -1010,8 +1021,7 @@ abstract final class RotasTrato {
               case AcaoPerfil.meusDados:
                 _abrirPrivacidade(context);
               case AcaoPerfil.centralAjuda:
-                _abrir<void>(
-                    context, const AjudaTela(servico: ServicoAjudaLocal()));
+                _abrir<void>(context, _telaAjuda(context));
               case AcaoPerfil.dadosPessoais:
                 _abrir<void>(context, DadosPessoaisTela(servico: _conta));
               case AcaoPerfil.enderecos:
@@ -1065,39 +1075,103 @@ abstract final class RotasTrato {
         ),
       );
 
+  /// Central de ajuda. "Falar com o suporte" só aparece se o servidor tem o e-mail do
+  /// atendimento; "Relatar um problema" leva o cliente aos serviços, onde ele abre o relato.
+  static Widget _telaAjuda(BuildContext context, {bool comoCliente = true}) {
+    final email = ConfigPublica.atual.suporteEmail;
+    return AjudaTela(
+      servico: const ServicoAjudaLocal(),
+      aoFalarComSuporte: email == null
+          ? null
+          : () async {
+              final abriu = await abrirEmail(email, 'Ajuda com o Trato');
+              if (!abriu && context.mounted) {
+                _avisoSimples(context, 'Não achamos um app de e-mail. Escreva para $email.');
+              }
+            },
+      aoRelatarProblema: comoCliente ? () => abrirServicos(context) : null,
+    );
+  }
+
   static final ServicoConta _contaDemo = ServicoContaFake();
   static ServicoConta get _conta => repos.conta ?? _contaDemo;
 
-  /// Itens do Perfil sem tela ainda (hoje só "Formas de pagamento") saem da lista em vez de
-  /// abrir uma tela vazia. Voltam quando a tela existir (`docs/placeholders.md`).
-  static const _acoesComTela = {
-    AcaoPerfil.dadosPessoais,
+  /// O que fica no Perfil do cliente: o que ele usa no dia a dia. O resto mora em Configurações.
+  static const _acoesNoPerfil = {
     AcaoPerfil.enderecos,
     AcaoPerfil.favoritos,
-    AcaoPerfil.contatosConfianca,
     AcaoPerfil.usarComoProfissional,
-    AcaoPerfil.notificacoes,
-    AcaoPerfil.meusDados,
-    AcaoPerfil.centralAjuda,
-    AcaoPerfil.termos,
   };
 
-  static PerfilCliente _soComDestino(PerfilCliente p) => PerfilCliente(
-        nome: p.nome,
-        iniciais: p.iniciais,
-        resumo: p.resumo,
-        fotoReferencia: p.fotoReferencia,
-        grupos: [
-          for (final g in p.grupos)
-            if (g.itens.any((i) => _acoesComTela.contains(i.acao)))
-              GrupoPerfil(
-                titulo: g.titulo,
+  static PerfilCliente _soNoPerfil(PerfilCliente p) {
+    final itens = [
+      for (final g in p.grupos)
+        for (final i in g.itens)
+          if (_acoesNoPerfil.contains(i.acao)) i,
+    ];
+    return PerfilCliente(
+      nome: p.nome,
+      iniciais: p.iniciais,
+      resumo: p.resumo,
+      fotoReferencia: p.fotoReferencia,
+      grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
+    );
+  }
+
+  /// Configurações da conta (engrenagem do Perfil), iguais para cliente e profissional. Formas de
+  /// pagamento salvas ficam de fora: o cartão é guardado pelo Stripe, sem rota no Trato.
+  static void abrirConfiguracoes(BuildContext context, {required bool profissional}) =>
+      _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => ConfiguracoesTela(
+            grupos: [
+              GrupoConfiguracao(
+                titulo: 'CONTA',
                 itens: [
-                  for (final i in g.itens)
-                    if (_acoesComTela.contains(i.acao)) i,
+                  ItemContaPerfil(
+                    icone: Icons.person_outline,
+                    titulo: 'Dados pessoais',
+                    aoTocar: () => _abrir<void>(context, DadosPessoaisTela(servico: _conta)),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.notifications_none,
+                    titulo: 'Notificações',
+                    aoTocar: () => abrirNotificacoes(context, profissional: profissional),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.shield_outlined,
+                    titulo: 'Contatos de confiança',
+                    aoTocar: () =>
+                        _abrir<void>(context, ContatosConfiancaTela(servico: _conta)),
+                  ),
                 ],
               ),
-        ],
+              GrupoConfiguracao(
+                titulo: 'PRIVACIDADE E AJUDA',
+                itens: [
+                  ItemContaPerfil(
+                    icone: Icons.lock_outline,
+                    titulo: 'Meus dados e excluir conta',
+                    aoTocar: () => _abrirPrivacidade(context),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.help_outline,
+                    titulo: 'Central de ajuda',
+                    aoTocar: () => _abrir<void>(
+                        context, _telaAjuda(context, comoCliente: !profissional)),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.description_outlined,
+                    titulo: 'Termos e políticas',
+                    aoTocar: () => abrirTermos(context),
+                  ),
+                ],
+              ),
+            ],
+            aoSair: () => sair(context),
+          ),
+        ),
       );
 
   /// Aba "Mensagens" da casca do cliente: lista de conversas, cada uma abre o chat do pedido.
@@ -1285,6 +1359,7 @@ abstract final class RotasTrato {
           dados: dados,
           aoVerOrcamentos: () =>
               _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
+          aoCancelar: () => _cancelarPedido(context, pedidoId),
           aoSalvar: ({
             required String descricao,
             required int faixaMaxCentavos,
@@ -1521,13 +1596,15 @@ abstract final class RotasTrato {
 
   static Future<void> _pedirRetrabalho(
       BuildContext context, String pedidoId) async {
-    final descricao = await showDialog<String>(
+    final pedido = await showDialog<({String descricao, List<String> fotos})>(
       context: context,
       builder: (_) => const _DialogoPedirRetrabalho(),
     );
-    if (descricao == null || descricao.isEmpty || !context.mounted) return;
+    if (pedido == null || pedido.descricao.isEmpty || !context.mounted) return;
     final ok = await _tentar(
-        context, () => repos.pedidos.pedirRetrabalho(pedidoId, descricao));
+        context,
+        () => repos.pedidos
+            .pedirRetrabalho(pedidoId, pedido.descricao, fotos: pedido.fotos));
     if (ok && context.mounted) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -1655,6 +1732,7 @@ class _DialogoPedirRetrabalho extends StatefulWidget {
 
 class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
   final _controlador = TextEditingController();
+  final _fotos = <String>[];
 
   @override
   void dispose() {
@@ -1662,15 +1740,34 @@ class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
     super.dispose();
   }
 
+  Future<void> _adicionarFoto() async {
+    final ref = await RotasTrato._fotografar();
+    if (ref != null && mounted) setState(() => _fotos.add(ref));
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Pedir retrabalho'),
-      content: TextField(
-        controller: _controlador,
-        maxLines: 4,
-        decoration:
-            const InputDecoration(labelText: 'O que precisa ser refeito?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controlador,
+            maxLines: 4,
+            decoration:
+                const InputDecoration(labelText: 'O que precisa ser refeito?'),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _adicionarFoto,
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: Text(_fotos.isEmpty
+                ? 'Adicionar foto'
+                : '${_fotos.length} ${_fotos.length == 1 ? 'foto' : 'fotos'} · adicionar outra'),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -1678,8 +1775,59 @@ class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
           child: const Text('Cancelar'),
         ),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(_controlador.text.trim()),
+          onPressed: () => Navigator.of(context)
+              .pop((descricao: _controlador.text.trim(), fotos: [..._fotos])),
           child: const Text('Enviar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DialogoCancelarPedido extends StatefulWidget {
+  const _DialogoCancelarPedido();
+
+  @override
+  State<_DialogoCancelarPedido> createState() => _DialogoCancelarPedidoState();
+}
+
+class _DialogoCancelarPedidoState extends State<_DialogoCancelarPedido> {
+  final _motivo = TextEditingController();
+
+  @override
+  void dispose() {
+    _motivo.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Cancelar o pedido?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Conte o motivo. Se já houve pagamento, o servidor cuida da devolução.'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _motivo,
+            maxLines: 3,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(labelText: 'Motivo do cancelamento'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Voltar'),
+        ),
+        TextButton(
+          onPressed: _motivo.text.trim().isEmpty
+              ? null
+              : () => Navigator.of(context).pop(_motivo.text.trim()),
+          child: const Text('Cancelar pedido'),
         ),
       ],
     );

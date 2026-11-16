@@ -8,6 +8,10 @@ name: Build de teste
 #   vars.TRATO_API_URL         - endereço base da API
 #   secrets.SUPABASE_URL       - URL do projeto Supabase
 #   secrets.SUPABASE_ANON_KEY  - chave pública (anon/publishable) do Supabase
+#   vars.STRIPE_PUBLISHABLE_KEY - chave PÚBLICA do Stripe (pk_test_/pk_live_); sem ela o cartão
+#                                 não abre. Nunca a sk_.
+#   vars.GOOGLE_WEB_CLIENT_ID, vars.GOOGLE_IOS_CLIENT_ID - só quando o Google estiver ligado no
+#                                 Supabase; sem eles o botão "Entrar com Google" não aparece.
 
 on:
   workflow_dispatch:
@@ -46,6 +50,9 @@ jobs:
           TRATO_API_URL: ${{ vars.TRATO_API_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ vars.STRIPE_PUBLISHABLE_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
         run: |
           flutter pub get
           MODO=demo
@@ -54,7 +61,7 @@ jobs:
             --dart-define=TRATO_MODO="$MODO" \
             --dart-define=TRATO_API_URL="$TRATO_API_URL" \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"             --dart-define=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"             --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"             --dart-define=GOOGLE_IOS_CLIENT_ID="$GOOGLE_IOS_CLIENT_ID"
 
       - name: Guardar o APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -84,6 +91,9 @@ jobs:
           TRATO_API_URL: ${{ vars.TRATO_API_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ vars.STRIPE_PUBLISHABLE_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+          GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
         run: |
           flutter pub get
           MODO=demo
@@ -92,4 +102,4 @@ jobs:
             --dart-define=TRATO_MODO="$MODO" \
             --dart-define=TRATO_API_URL="$TRATO_API_URL" \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"             --dart-define=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY"             --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"             --dart-define=GOOGLE_IOS_CLIENT_ID="$GOOGLE_IOS_CLIENT_ID"

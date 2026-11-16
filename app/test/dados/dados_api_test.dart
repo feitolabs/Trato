@@ -754,8 +754,10 @@ void main() {
         ),
       );
 
-      expect(chamadas.single.caminho, '/v1/pedidos/ped-2/retrabalho/atender');
-      expect(chamadas.single.corpo, {'etapa': 'aceitar'});
+      expect(chamadas.first.caminho, '/v1/pedidos/ped-2/retrabalho/atender');
+      expect(chamadas.first.corpo, {'etapa': 'aceitar'});
+      // O horário e o recado vão ao cliente pelo chat.
+      expect(chamadas.last.caminho, '/v1/pedidos/ped-2/mensagens');
     });
   });
 

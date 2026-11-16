@@ -253,6 +253,52 @@ class DisputasPostgres:
             else None,
         )
 
+    def registrar_evidencias(
+        self, pedido_id: str, autor_id: str, itens: list[tuple[str, str | None, str | None]]
+    ) -> None:
+        """Acrescenta provas à disputa do pedido (tabela imutável): (tipo, texto, midia)."""
+        pid = exigir_uuid(pedido_id, "pedido")
+        autor = exigir_uuid(autor_id, "autor")
+        with self._banco.transacao() as con:
+            disputa = con.execute(_SELECT_DISPUTA, (pid,)).fetchone()
+            if disputa is None:
+                raise RegraDoBanco("Este pedido não tem disputa.")
+            for tipo, texto, midia in itens:
+                con.execute(
+                    "insert into public.disputa_evidencias (disputa_id, autor_id, tipo, texto, "
+                    "midia_id) values (%s, %s, %s, %s, %s)",
+                    (
+                        disputa["id"],
+                        autor,
+                        tipo,
+                        texto,
+                        exigir_uuid(midia, "mídia") if midia else None,
+                    ),
+                )
+
+    def evidencias(self, pedido_id: str) -> list[dict[str, Any]]:
+        """As provas da disputa, da mais antiga para a mais nova (sem notas internas)."""
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return []
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select e.tipo, e.texto, e.midia_id, e.autor_id, e.criado_em "
+                "from public.disputa_evidencias e join public.disputas d on d.id = e.disputa_id "
+                "where d.pedido_id = %s and e.tipo <> 'nota_interna' order by e.criado_em",
+                (pid,),
+            ).fetchall()
+        return [
+            {
+                "tipo": r["tipo"],
+                "texto": r["texto"],
+                "midia_id": str(r["midia_id"]) if r["midia_id"] else None,
+                "autor_id": str(r["autor_id"]),
+                "em": r["criado_em"],
+            }
+            for r in linhas
+        ]
+
     def listar(self) -> list[tuple[str, Disputa]]:
         with self._banco.transacao() as con:
             linhas = con.execute(

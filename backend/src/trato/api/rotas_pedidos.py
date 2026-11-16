@@ -38,6 +38,7 @@ from trato.api.modelos import (
     EventoOut,
     PedidoOut,
     PedirRetrabalhoIn,
+    RespostaDisputaIn,
     RetrabalhoOut,
 )
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
@@ -559,18 +560,52 @@ def ver_disputa(
 )
 def responder_disputa(
     pedido_id: str,
+    corpo: RespostaDisputaIn | None = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaOut:
+    """Sem corpo (apps antigos) só marca que respondeu. Com corpo, guarda o relato, a proposta e
+    as fotos como evidência da disputa (imutável), para quem vai decidir ler."""
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.profissional_id != usuario.id:
         raise HTTPException(403, "Só o profissional contratado neste pedido pode responder.")
     disputa = contexto.disputas.obter(pedido_id)
     if disputa is None:
         raise HTTPException(404, "Este pedido não tem disputa.")
+    if corpo is not None and corpo.solucao == "reembolso_parcial":
+        if corpo.reembolso_parcial_centavos is None:
+            raise HTTPException(422, "Informe o valor do reembolso parcial.")
+        if corpo.reembolso_parcial_centavos >= disputa.valor_congelado:
+            raise HTTPException(422, "O reembolso parcial precisa ser menor que o valor retido.")
     nova = disputa.responder(disputas.Ator.PROFISSIONAL, contexto.agora())
-    contexto.disputas.salvar(pedido_id, nova)
+    itens = _evidencias_da_resposta(corpo)
+    with contexto.transacao():
+        contexto.disputas.salvar(pedido_id, nova)
+        registrar = getattr(contexto.disputas, "registrar_evidencias", None)
+        if registrar is not None and itens:
+            registrar(pedido_id, usuario.id, itens)
     return _disputa_out(pedido_id, nova)
+
+
+def _evidencias_da_resposta(
+    corpo: RespostaDisputaIn | None,
+) -> list[tuple[str, str | None, str | None]]:
+    """(tipo, texto, midia) de cada evidência: o relato, a proposta e uma linha por foto."""
+    if corpo is None:
+        return []
+    cfg = obter_config_seguranca()
+    itens: list[tuple[str, str | None, str | None]] = [
+        ("resposta", limpar_texto(corpo.mensagem, "resposta", 2000, cfg), None)
+    ]
+    if corpo.solucao == "retrabalho":
+        itens.append(("proposta_retorno", "Propõe atender o retrabalho sem custo.", None))
+    elif corpo.solucao == "reembolso_parcial" and corpo.reembolso_parcial_centavos:
+        reais = f"{corpo.reembolso_parcial_centavos / 100:.2f}".replace(".", ",")
+        itens.append(("proposta_retorno", f"Propõe reembolso parcial de R$ {reais}.", None))
+    elif corpo.solucao == "discordar":
+        itens.append(("proposta_retorno", "Discorda do relato e pede análise.", None))
+    itens += [("foto", None, f.arquivo_id) for f in corpo.fotos]
+    return itens
 
 
 # --- Retrabalho -------------------------------------------------------------------------
