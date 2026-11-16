@@ -213,6 +213,8 @@ abstract final class RotasTrato {
     } on Object {
       // Mesmo sem rede, o token local é descartado abaixo.
     }
+    PerfilClienteTela.limparFotoSessao();
+    PerfilPublicoTela.limparFotoSessao();
     sessao?.sair();
     navegador.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginTela()),
@@ -821,9 +823,12 @@ abstract final class RotasTrato {
     final emAndamento = estado == EstadoAgendamento.emAndamento;
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       // Rolável: com 8 ações a lista passa da altura de um celular menor e estourava embaixo.
-      builder: (folha) => SafeArea(
-        child: SingleChildScrollView(
+      builder: (folha) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+        child: SafeArea(
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -901,6 +906,7 @@ abstract final class RotasTrato {
                 ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -1352,41 +1358,49 @@ abstract final class RotasTrato {
   /// Pedido aguardando orçamentos: o que foi descrito (editável) e a porta para os orçamentos.
   static Widget _pedidoAberto(String pedidoId) => Carregador<DadosDoPedido>(
         carregar: () => repos.pedidos.dados(pedidoId),
-        construir: (context, dados) => PedidoAbertoTela(
-          numero: pedidoId
-              .substring(0, pedidoId.length < 4 ? pedidoId.length : 4)
-              .toUpperCase(),
-          dados: dados,
-          aoVerOrcamentos: () =>
-              _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
-          aoCancelar: () => _cancelarPedido(context, pedidoId),
-          aoSalvar: ({
-            required String descricao,
-            required int faixaMaxCentavos,
-            required String logradouro,
-            required String numero,
-            required String bairro,
-          }) async {
-            try {
-              final novos = await repos.pedidos.editar(
-                pedidoId,
-                descricao: descricao,
-                faixaMaxCentavos: faixaMaxCentavos,
-                logradouro: logradouro,
-                numero: numero,
-                bairro: bairro,
-              );
-              if (context.mounted) {
-                _avisoSimples(context,
-                    'Pedido atualizado. Os profissionais já veem a mudança.');
+        construir: (context, dados) {
+          var dadosAtuais = dados;
+          return PedidoAbertoTela(
+            numero: pedidoId
+                .substring(0, pedidoId.length < 4 ? pedidoId.length : 4)
+                .toUpperCase(),
+            dados: dados,
+            aoVerOrcamentos: () =>
+                _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
+            aoCancelar: () => _cancelarPedido(context, pedidoId),
+            aoSalvar: ({
+              required String descricao,
+              required int faixaMaxCentavos,
+              required String logradouro,
+              required String numero,
+              required String bairro,
+            }) async {
+              try {
+                final ajustarMin = faixaMaxCentavos == 0 ||
+                    (dadosAtuais.faixaMinCentavos != null &&
+                        faixaMaxCentavos < dadosAtuais.faixaMinCentavos!);
+                final novos = await repos.pedidos.editar(
+                  pedidoId,
+                  descricao: descricao,
+                  faixaMinCentavos: ajustarMin ? 0 : null,
+                  faixaMaxCentavos: faixaMaxCentavos,
+                  logradouro: logradouro,
+                  numero: numero,
+                  bairro: bairro,
+                );
+                dadosAtuais = novos;
+                if (context.mounted) {
+                  _avisoSimples(context,
+                      'Pedido atualizado. Os profissionais já veem a mudança.');
+                }
+                return novos;
+              } on Object catch (erro) {
+                if (context.mounted) _aviso(context, erro);
+                return null;
               }
-              return novos;
-            } on Object catch (erro) {
-              if (context.mounted) _aviso(context, erro);
-              return null;
-            }
-          },
-        ),
+            },
+          );
+        },
       );
 
   static Widget _orcamentosRecebidos(String pedidoId) =>
@@ -1594,6 +1608,41 @@ abstract final class RotasTrato {
         ),
       );
 
+  static Future<void> _responderAditivoInline(
+    BuildContext context,
+    String pedidoId, {
+    required bool aprovar,
+  }) async {
+    if (!aprovar) {
+      final confirma = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Recusar o aditivo?'),
+          content: const Text('O serviço segue pelo valor combinado antes.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Voltar')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Recusar')),
+          ],
+        ),
+      );
+      if (confirma != true || !context.mounted) return;
+      final ok = await _tentar(
+        context,
+        () => servicoAditivo.responder(pedidoId, aprovar: false),
+      );
+      if (ok) pedidosMudaram.value++;
+      return;
+    }
+    Cobranca? cobranca;
+    final ok = await _tentar(
+      context,
+      () async => cobranca = await servicoAditivo.responder(pedidoId, aprovar: true),
+    );
+    if (!ok || !context.mounted) return;
+    pedidosMudaram.value++;
+    if (cobranca != null) await _pagarAditivo(context, pedidoId, cobranca!);
+  }
+
   static Future<void> _pedirRetrabalho(
       BuildContext context, String pedidoId) async {
     final pedido = await showDialog<({String descricao, List<String> fotos})>(
@@ -1619,6 +1668,8 @@ abstract final class RotasTrato {
         atualizarACada: _intervalo,
         construir: (context, pedido) => PedidoExecucaoTela(
           pedido: pedido,
+          aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
+          aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
           aoConversar: () => _abrir<void>(context, _chat(pedidoId)),
           aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
           aoVerNota: () => _abrir<void>(
@@ -1733,6 +1784,7 @@ class _DialogoPedirRetrabalho extends StatefulWidget {
 class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
   final _controlador = TextEditingController();
   final _fotos = <String>[];
+  String? _erro;
 
   @override
   void dispose() {
@@ -1745,29 +1797,45 @@ class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
     if (ref != null && mounted) setState(() => _fotos.add(ref));
   }
 
+  void _enviar() {
+    final texto = _controlador.text.trim();
+    if (texto.isEmpty) {
+      setState(() => _erro = 'Descreva o que precisa ser refeito.');
+      return;
+    }
+    Navigator.of(context).pop((descricao: texto, fotos: [..._fotos]));
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Pedir retrabalho'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _controlador,
-            maxLines: 4,
-            decoration:
-                const InputDecoration(labelText: 'O que precisa ser refeito?'),
-          ),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: _adicionarFoto,
-            icon: const Icon(Icons.photo_camera_outlined),
-            label: Text(_fotos.isEmpty
-                ? 'Adicionar foto'
-                : '${_fotos.length} ${_fotos.length == 1 ? 'foto' : 'fotos'} · adicionar outra'),
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _controlador,
+              maxLines: 4,
+              onChanged: (_) {
+                if (_erro != null) setState(() => _erro = null);
+              },
+              decoration: InputDecoration(
+                labelText: 'O que precisa ser refeito?',
+                errorText: _erro,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _adicionarFoto,
+              icon: const Icon(Icons.photo_camera_outlined),
+              label: Text(_fotos.isEmpty
+                  ? 'Adicionar foto'
+                  : '${_fotos.length} ${_fotos.length == 1 ? 'foto' : 'fotos'} · adicionar outra'),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -1775,8 +1843,7 @@ class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
           child: const Text('Cancelar'),
         ),
         TextButton(
-          onPressed: () => Navigator.of(context)
-              .pop((descricao: _controlador.text.trim(), fotos: [..._fotos])),
+          onPressed: _enviar,
           child: const Text('Enviar'),
         ),
       ],
@@ -1793,6 +1860,7 @@ class _DialogoCancelarPedido extends StatefulWidget {
 
 class _DialogoCancelarPedidoState extends State<_DialogoCancelarPedido> {
   final _motivo = TextEditingController();
+  String? _erro;
 
   @override
   void dispose() {
@@ -1800,23 +1868,39 @@ class _DialogoCancelarPedidoState extends State<_DialogoCancelarPedido> {
     super.dispose();
   }
 
+  void _confirmar() {
+    final texto = _motivo.text.trim();
+    if (texto.isEmpty) {
+      setState(() => _erro = 'Informe o motivo do cancelamento.');
+      return;
+    }
+    Navigator.of(context).pop(texto);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Cancelar o pedido?'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Conte o motivo. Se já houve pagamento, o servidor cuida da devolução.'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _motivo,
-            maxLines: 3,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(labelText: 'Motivo do cancelamento'),
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Conte o motivo. Se já houve pagamento, o servidor cuida da devolução.'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _motivo,
+              maxLines: 3,
+              onChanged: (_) {
+                if (_erro != null) setState(() => _erro = null);
+              },
+              decoration: InputDecoration(
+                labelText: 'Motivo do cancelamento',
+                errorText: _erro,
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -1824,9 +1908,7 @@ class _DialogoCancelarPedidoState extends State<_DialogoCancelarPedido> {
           child: const Text('Voltar'),
         ),
         TextButton(
-          onPressed: _motivo.text.trim().isEmpty
-              ? null
-              : () => Navigator.of(context).pop(_motivo.text.trim()),
+          onPressed: _confirmar,
           child: const Text('Cancelar pedido'),
         ),
       ],

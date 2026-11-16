@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_de_usuario.dart';
 import '../cliente/modelos.dart';
@@ -107,7 +108,12 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
       key: ValueKey(_busca),
       future: _busca,
       builder: (context, snap) {
-        if (snap.hasError) return EstadoErro(aoTentarNovamente: () => _buscar(_termo));
+        if (snap.hasError) {
+          return EstadoErro(
+            mensagem: mensagemErroTrato(snap.error!),
+            aoTentarNovamente: () => _buscar(_termo),
+          );
+        }
         if (!snap.hasData) return const EstadoCarregando();
         final lista = snap.data!;
         if (lista.isEmpty) {

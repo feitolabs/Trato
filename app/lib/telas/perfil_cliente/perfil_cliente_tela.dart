@@ -23,6 +23,9 @@ class PerfilClienteTela extends StatefulWidget {
   final VoidCallback? aoAbrirConfiguracoes;
   final Future<String?> Function()? aoCapturarFotoPerfil;
 
+  /// Limpa a foto guardada em memória ao encerrar a sessão.
+  static void limparFotoSessao() => _PerfilClienteTelaState._fotoSalvaSessao = null;
+
   @override
   State<PerfilClienteTela> createState() => _PerfilClienteTelaState();
 }

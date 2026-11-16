@@ -35,6 +35,9 @@ class PerfilPublicoTela extends StatefulWidget {
 
   final Future<String?> Function()? aoCapturarFotoPerfil;
 
+  /// Limpa a foto guardada em memória ao encerrar a sessão.
+  static void limparFotoSessao() => _PerfilPublicoTelaState._fotoSalvaSessao = null;
+
   @override
   State<PerfilPublicoTela> createState() => _PerfilPublicoTelaState();
 }

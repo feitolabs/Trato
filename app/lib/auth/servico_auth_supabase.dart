@@ -91,6 +91,7 @@ class ServicoAuthSupabase implements ServicoAuth {
   final ClienteApi? _api;
   final Set<ProvedorAuth>? _provedoresAtivos;
   String? _cpfPendente;
+  String? _nascimentoPendente;
 
   // Link de recuperação: o evento pode chegar antes de a tela escutar (app fechado, aberto pelo
   // e-mail). Guardamos o aviso até o primeiro ouvinte.
@@ -170,6 +171,23 @@ class ServicoAuthSupabase implements ServicoAuth {
 
   static String _digitos(String valor) => valor.replaceAll(RegExp(r'\D'), '');
 
+  /// "15/03/1992" vira "1992-03-15" (formato ISO esperado pelo backend).
+  static String? isoDataNascimento(String? valor) {
+    if (valor == null) return null;
+    final m = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(valor.trim());
+    if (m == null) return null;
+    final d = int.tryParse(m.group(1)!);
+    final mes = int.tryParse(m.group(2)!);
+    final ano = int.tryParse(m.group(3)!);
+    if (d == null || mes == null || ano == null) return null;
+    if (mes < 1 || mes > 12 || d < 1 || d > 31) return null;
+    final parsed = DateTime.tryParse('$ano-${m.group(2)}-${m.group(1)}');
+    if (parsed == null || parsed.year != ano || parsed.month != mes || parsed.day != d) {
+      return null;
+    }
+    return '${m.group(3)}-${m.group(2)}-${m.group(1)}';
+  }
+
   ErroAuth _deApi(ErroTrato erro) => erro.tipo == TipoErro.semInternet
       ? const ErroAuth(TipoErroAuth.semInternet)
       : ErroAuth(TipoErroAuth.dadosInvalidos, erro.mensagem);
@@ -191,7 +209,7 @@ class ServicoAuthSupabase implements ServicoAuth {
 
   /// Depois do primeiro login: grava o CPF uma única vez. Se já for de outra conta, desloga.
   /// Sem API (modo demo), não grava: o CPF fica só na tela.
-  Future<void> _gravarCpf(String cpf, {String? token}) async {
+  Future<void> _gravarCpf(String cpf, {String? token, String? nascimentoIso}) async {
     final api = _api;
     if (api == null) return;
     final acesso = token ?? _auth.currentSession?.accessToken;
@@ -199,7 +217,14 @@ class ServicoAuthSupabase implements ServicoAuth {
       throw const ErroAuth(TipoErroAuth.cpfNaoVerificado);
     }
     try {
-      await api.post('/v1/me/dados-pessoais', corpo: {'cpf': cpf}, token: acesso);
+      await api.post(
+        '/v1/me/dados-pessoais',
+        corpo: {
+          'cpf': cpf,
+          if (nascimentoIso != null) 'data_nascimento': nascimentoIso,
+        },
+        token: acesso,
+      );
     } on ErroTrato catch (e) {
       try {
         await _auth.signOut();
@@ -301,10 +326,12 @@ class ServicoAuthSupabase implements ServicoAuth {
         final emailLogin = limpo.contains('@') ? limpo : await _resolverIdentificador(limpo);
         final r = await _auth.signInWithPassword(email: emailLogin, password: senha);
         final pendente = _cpfPendente;
+        final nascPendente = _nascimentoPendente;
         _cpfPendente = null;
+        _nascimentoPendente = null;
         if (pendente != null && pendente.isNotEmpty && r.session != null) {
           try {
-            await _gravarCpf(pendente, token: r.session!.accessToken);
+            await _gravarCpf(pendente, token: r.session!.accessToken, nascimentoIso: nascPendente);
           } on Object {
             // Se falhar, não impede o login.
           }
@@ -315,6 +342,7 @@ class ServicoAuthSupabase implements ServicoAuth {
   @override
   Future<ResultadoCadastro> criarConta(DadosCadastro dados) => _proteger(() async {
         final cpf = _digitos(dados.cpf);
+        final nascIso = isoDataNascimento(dados.nascimento);
         // Um CPF, uma conta: confere antes de criar a conta no Auth.
         await _exigirCpfLivre(cpf);
         final r = await _auth.signUp(
@@ -346,6 +374,7 @@ class ServicoAuthSupabase implements ServicoAuth {
                 'nome': dados.nome,
                 'cpf': cpf,
                 'telefone': celularE164(dados.celular),
+                if (nascIso != null) 'data_nascimento': nascIso,
               },
             );
           } on Object catch (e) {
@@ -354,10 +383,11 @@ class ServicoAuthSupabase implements ServicoAuth {
         }
         final sessao = r.session == null ? null : _paraSessao(r.user);
         if (sessao != null) {
-          await _gravarCpf(cpf, token: r.session!.accessToken);
+          await _gravarCpf(cpf, token: r.session!.accessToken, nascimentoIso: nascIso);
           return CadastroComSessao(sessao);
         }
         _cpfPendente = cpf;
+        _nascimentoPendente = nascIso;
         return CadastroAguardandoEmail(dados.email.trim());
       });
 

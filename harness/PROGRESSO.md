@@ -1005,3 +1005,15 @@ Branch `feature/tela-configuracoes`. Pedido do João: o Perfil estava misturando
 ## 2026-11-15 — Versão 0.1.27
 
 App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho, cancelar pedido, fila offline, login, notificações, ajuda) e tela Configurações. Agendador embutido continua desligado no `fly.toml`. Backend e tag `v0.1.27`: deploy no Fly fica com o João.
+
+## 2026-11-16 — QA tela a tela, correções e validação no Supabase real + Fly.io
+
+- **Críticos corrigidos e validados ao vivo:**
+  - `disputas_validar()` (`supabase/migrations/20261116120000_disputas_decisor_lider_admin.sql`, rollback em `supabase/rollback/disputas_decisor_lider_admin_rollback.sql`, aplicada no Supabase com OK do João): libera `mediador`, `lider_suporte` e `administrador` ativos.
+  - `rotas_financeiro.py`: `pagamento.consultado_no_provedor` e `pagamento.conciliacao_executada` passam `motivo=` para a auditoria (antes retornavam HTTP 409).
+  - `NotaMaterialOut.foto_url`: URL assinada de 300 s retornada no backend e exibida em `VerNotaTela` (Storage real testado).
+  - `PedidoAbertoTela` / `RepositorioPedidosApi.editar`: rebaixa `faixa_preco_min_centavos` quando `faixaMaxCentavos` cai abaixo do mínimo anterior.
+  - Descoberto no Postgres real e corrigido/publicado no Fly: `GET /v1/me/dados` usava `JSONResponse` cru e falhava com HTTP 500 por `UUID`/`date` (`jsonable_encoder` em `backend/src/trato/lgpd/rotas.py`).
+- **Altas, médias e baixas:** `data_nascimento` em `/v1/cadastro/vincular` e `/v1/me/dados-pessoais`; filtros reais `nota_minima` e `atende_hoje` em `GET /v1/profissionais` (removidos chips sem suporte); diálogo com JSON copiável na exportação LGPD; callbacks de aditivo inline ligados em `PedidoExecucaoTela`; linha do tempo de `em_disputa`/`retrabalho`/`cancelado` por datas registradas; `"Para sacar"` -> `"Liberado"` e D15 `"Repasses retidos"`/`"Reter repasses"` no painel; ocultado divisor órfão do login, card dummy `[Foto]` em `RelatarProblemaTela`, cards fantasma `"Trabalho 1..3"` sem portfólio e seção de raio sem suporte; envio de `urgente: true` + grade limitada de fotos em `NovoPedidoTela`; `profissional_nome` em `PedidoOut`, formato 24h fixo, `PopScope` em abas, atalhos clicáveis no Dashboard, `clientes_total` corrigido, `config/versoes` (`limite` e `DELETE` com `?motivo=`), limpeza de avatar estático no logout e operação OpenAPI duplicada corrigida.
+- **Pilha local (`harness/subir-pilha-local.py`):** adicionadas rotas `trato.seguranca`, `/saude`, `/auth/v1/settings` e migração `conta_enderecos_favoritos_contatos`.
+- **Verificação:** backend `tests/api` + `tests/integracao_painel` (`781 passed` antes do ajuste pontual em `trato/lgpd/rotas.py`), `tests/seguranca` (`128 passed`), `app` (`937 passed`, 0 erros no analyze), `admin` (`177 passed, 8 skipped` sem `TRATO_BACKEND_TESTE`, 0 erros no analyze), E2E ao vivo contra `https://trato.fly.dev` + Supabase real + Stripe Sandbox (`7/7` etapas) e caminhada no emulador Android (`emulator-5554`). Única lacuna restante: caminhada visual no Chrome pelo Painel Admin (bloqueada localmente por ausência do MCP `chrome_devtools` na sessão do subagente `browser`).

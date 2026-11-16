@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:path_provider/path_provider.dart';
 
 import '../componentes/imagem_trato.dart';
 import '../dispositivo/servico_camera.dart';
@@ -198,6 +201,7 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
           pedidoTitulo: tituloPedido == 'Pedido' ? 'Pedido #$curto' : tituloPedido,
           profissional: nome.isEmpty ? 'Profissional' : nome,
           enviadaEm: DateTime.parse(n['enviada_em'] as String).toLocal(),
+          fotoNota: (n['foto_url'] as String?)?.isNotEmpty == true ? n['foto_url'] as String : null,
           itens: [
             for (final i in (n['itens'] as List).cast<Map<String, dynamic>>())
               ItemNota(
@@ -529,7 +533,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     return OpcoesCadastro(
       categorias: _idPorNomeCategoria.keys.toList(),
       cidades: _idPorNomeCidade.keys.toList(),
-      raiosKm: opcoesCadastroPadrao.raiosKm,
+      raiosKm: const [],
       dias: opcoesCadastroPadrao.dias,
       periodos: opcoesCadastroPadrao.periodos,
     );
@@ -962,8 +966,19 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
   }
 
   @override
-  Future<void> solicitarExportacao() async {
-    await _api.get('/v1/me/dados');
+  Future<String?> solicitarExportacao() async {
+    final dados = await _api.get('/v1/me/dados');
+    final jsonFormatado = const JsonEncoder.withIndent('  ').convert(dados);
+    if (!kIsWeb) {
+      try {
+        final dir = await getTemporaryDirectory();
+        final arquivo = File('${dir.path}${Platform.pathSeparator}trato_meus_dados.json');
+        await arquivo.writeAsString(jsonFormatado);
+      } on Object {
+        // Sem acesso ao diretório temporário (ex.: testes): devolve o JSON mesmo assim.
+      }
+    }
+    return jsonFormatado;
   }
 
   @override

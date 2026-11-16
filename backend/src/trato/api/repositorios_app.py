@@ -197,7 +197,11 @@ class RepositorioUsuarios(Protocol):
         """Verdadeiro se nenhuma conta tem esse CPF (já normalizado em 11 dígitos)."""
 
     def registrar_dados_privados(
-        self, usuario_id: str, cpf: str, telefone: str | None = None
+        self,
+        usuario_id: str,
+        cpf: str,
+        telefone: str | None = None,
+        data_nascimento: object | None = None,
     ) -> bool:
         """Grava CPF (e telefone) uma única vez; falso se a pessoa já tinha a linha."""
 
@@ -211,6 +215,7 @@ class RepositorioUsuarios(Protocol):
         nome: str,
         cpf: str,
         telefone: str | None = None,
+        data_nascimento: object | None = None,
     ) -> bool:
         """Vincula nome, CPF e telefone à conta recém-criada em `auth.users`
         se o e-mail conferir.

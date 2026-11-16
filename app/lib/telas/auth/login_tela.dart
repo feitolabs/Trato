@@ -196,8 +196,10 @@ class _LoginTelaState extends State<LoginTela> {
           ),
         BotaoPrimario(texto: 'Entrar', aoTocar: _entrar, carregando: _carregando),
         const SizedBox(height: EspacosTrato.x4),
-        const _DivisorOu(),
-        const SizedBox(height: EspacosTrato.x4),
+        if (_mostra(ProvedorAuth.google) || _mostra(ProvedorAuth.apple)) ...[
+          const _DivisorOu(),
+          const SizedBox(height: EspacosTrato.x4),
+        ],
         if (_mostra(ProvedorAuth.google)) ...[
           BotaoSecundario(
             texto: 'Entrar com Google',

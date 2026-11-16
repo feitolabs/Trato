@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../comuns/estados.dart';
 import 'modelos.dart';
 
 /// Tela 15 — Seus pedidos, com abas "Em andamento" e "Finalizados".
@@ -41,13 +42,24 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
                 aoTrocar: (finalizados) => setState(() => _verFinalizados = finalizados),
               ),
               const SizedBox(height: EspacosTrato.x4),
-              for (final pedido in pedidos) ...[
-                _CartaoPedido(
-                  pedido: pedido,
-                  aoTocar: () => widget.aoAbrirPedido?.call(pedido),
-                ),
-                const SizedBox(height: EspacosTrato.x4),
-              ],
+              if (pedidos.isEmpty)
+                EstadoVazio(
+                  icone: _verFinalizados ? Icons.task_alt_outlined : Icons.assignment_outlined,
+                  titulo: _verFinalizados
+                      ? 'Nenhum serviço finalizado ainda'
+                      : 'Nenhum pedido em andamento',
+                  texto: _verFinalizados
+                      ? 'Os serviços concluídos ou cancelados aparecem aqui.'
+                      : 'Toque em "Novo pedido" para pedir orçamentos.',
+                )
+              else
+                for (final pedido in pedidos) ...[
+                  _CartaoPedido(
+                    pedido: pedido,
+                    aoTocar: () => widget.aoAbrirPedido?.call(pedido),
+                  ),
+                  const SizedBox(height: EspacosTrato.x4),
+                ],
             ],
           ),
         ),

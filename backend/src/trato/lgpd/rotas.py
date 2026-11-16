@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,7 +44,7 @@ def exportar_meus_dados(
 ) -> JSONResponse:
     dados = servico.exportar(usuario, contexto.agora())
     return JSONResponse(
-        dados,
+        jsonable_encoder(dados),
         headers={"Content-Disposition": 'attachment; filename="meus-dados-trato.json"'},
     )
 

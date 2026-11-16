@@ -293,6 +293,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         prazo:
             '${_comPressa ? 'Com pressa' : 'Sem pressa'} · ${_formatarData(_dataPrazo)}',
         prazoDesejado: _dataPrazo,
+        urgente: _comPressa,
         faixa: _faixa,
         fotos: List.of(_fotosNovas),
         categoriaId: widget.formulario.categoriaId,
@@ -442,27 +443,31 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         const SizedBox(height: EspacosTrato.x5),
         const RotuloSecao('Fotos'),
         const SizedBox(height: EspacosTrato.x3),
-        Row(
-          children: [
-            for (final foto in f.fotos) ...[
-              Expanded(child: _FotoReservada(foto)),
-              const SizedBox(width: EspacosTrato.x3),
-            ],
-            for (var i = 0; i < _fotosNovas.length; i++) ...[
-              Expanded(
-                child: _FotoReservada(
-                  '[Foto ${f.fotos.length + i + 1}]',
-                  referencia: _fotosNovas[i],
-                ),
-              ),
-              const SizedBox(width: EspacosTrato.x3),
-            ],
-            if (f.fotos.length + _fotosNovas.length < _maxFotos &&
-                _podeAdicionarFoto)
-              Expanded(child: _AdicionarFoto(aoTocar: _adicionarFoto))
-            else
-              const Spacer(),
-          ],
+        LayoutBuilder(
+          builder: (context, c) {
+            final tamanho = ((c.maxWidth - 3 * EspacosTrato.x3) / 4).clamp(64.0, 120.0);
+            return Wrap(
+              spacing: EspacosTrato.x3,
+              runSpacing: EspacosTrato.x3,
+              children: [
+                for (final foto in f.fotos)
+                  SizedBox.square(dimension: tamanho, child: _FotoReservada(foto)),
+                for (var i = 0; i < _fotosNovas.length; i++)
+                  SizedBox.square(
+                    dimension: tamanho,
+                    child: _FotoReservada(
+                      '[Foto ${f.fotos.length + i + 1}]',
+                      referencia: _fotosNovas[i],
+                    ),
+                  ),
+                if (f.fotos.length + _fotosNovas.length < _maxFotos && _podeAdicionarFoto)
+                  SizedBox.square(
+                    dimension: tamanho,
+                    child: _AdicionarFoto(aoTocar: _adicionarFoto),
+                  ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: EspacosTrato.x5),
         const RotuloSecao('Prazo'),

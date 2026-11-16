@@ -23,8 +23,8 @@ abstract interface class ServicoPrivacidade {
   Future<List<Consentimento>> consentimentos();
   Future<void> alterarConsentimento(String id, {required bool ativo});
 
-  /// Pede a cópia dos dados. O backend avisa quando estiver pronta.
-  Future<void> solicitarExportacao();
+  /// Baixa a cópia dos dados pessoais do usuário (JSON formatado quando disponível).
+  Future<String?> solicitarExportacao();
 
   /// Pede a exclusão da conta (só depois da confirmação em 2 passos).
   Future<void> solicitarExclusao();

@@ -31,7 +31,7 @@ class _SplashTelaState extends State<SplashTela> {
       RotasTrato.irParaInicio(context);
       return;
     }
-    Navigator.of(context).push(
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const OnboardingTela()),
     );
   }
@@ -44,62 +44,72 @@ class _SplashTelaState extends State<SplashTela> {
         behavior: HitTestBehavior.opaque,
         onTap: () => _comecar(context),
         child: SafeArea(
-          child: Column(
-            children: [
-              const Spacer(flex: 2),
-              const LogoFeitoLabs(),
-              const SizedBox(height: EspacosTrato.x6),
-              Text(
-                'FEITO LABS APRESENTA',
-                style: TipografiaTrato.sobretitulo.copyWith(color: CoresTrato.creme),
-              ),
-              const Spacer(flex: 6),
-              ConteudoResponsivo(
-                child: Column(
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Trato',
-                        style: TipografiaTrato.marca.copyWith(color: CoresTrato.creme),
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 2),
+                      const LogoFeitoLabs(),
+                      const SizedBox(height: EspacosTrato.x6),
+                      Text(
+                        'FEITO LABS APRESENTA',
+                        style: TipografiaTrato.sobretitulo.copyWith(color: CoresTrato.creme),
                       ),
-                    ),
-                    const SizedBox(height: EspacosTrato.x4),
-                    Text(
-                      'Serviço combinado, tudo no app.',
-                      textAlign: TextAlign.center,
-                      style: TipografiaTrato.lema.copyWith(color: CoresTrato.logoAzulClaro),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(flex: 7),
-              const IndicadorPaginas(
-                total: 3,
-                atual: 0,
-                pilula: false,
-                corAtiva: CoresTrato.creme,
-                corInativa: CoresTrato.pontoSobrePetroleo,
-              ),
-              const SizedBox(height: EspacosTrato.x5),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4, vertical: EspacosTrato.x2),
-                decoration: BoxDecoration(
-                  color: CoresTrato.creme.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-                ),
-                child: Text(
-                  'Toque para começar',
-                  style: TipografiaTrato.lema.copyWith(
-                    fontSize: 21,
-                    color: CoresTrato.creme,
-                    fontWeight: FontWeight.w700,
-                    fontVariations: const [FontVariation('wght', 700)],
+                      const Spacer(flex: 6),
+                      ConteudoResponsivo(
+                        child: Column(
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Trato',
+                                style: TipografiaTrato.marca.copyWith(color: CoresTrato.creme),
+                              ),
+                            ),
+                            const SizedBox(height: EspacosTrato.x4),
+                            Text(
+                              'Serviço combinado, tudo no app.',
+                              textAlign: TextAlign.center,
+                              style: TipografiaTrato.lema.copyWith(color: CoresTrato.logoAzulClaro),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(flex: 7),
+                      const IndicadorPaginas(
+                        total: 3,
+                        atual: 0,
+                        pilula: false,
+                        corAtiva: CoresTrato.creme,
+                        corInativa: CoresTrato.pontoSobrePetroleo,
+                      ),
+                      const SizedBox(height: EspacosTrato.x5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: EspacosTrato.x4, vertical: EspacosTrato.x2),
+                        decoration: BoxDecoration(
+                          color: CoresTrato.creme.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+                        ),
+                        child: Text(
+                          'Toque para começar',
+                          style: TipografiaTrato.lema.copyWith(
+                            fontSize: 21,
+                            color: CoresTrato.creme,
+                            fontWeight: FontWeight.w700,
+                            fontVariations: const [FontVariation('wght', 700)],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: EspacosTrato.x8),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: EspacosTrato.x8),
-            ],
+            ),
           ),
         ),
       ),

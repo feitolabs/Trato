@@ -25,6 +25,7 @@ class PedidoApi {
     this.jaAvaliou = false,
     this.titulo,
     this.clienteNome,
+    this.profissionalNome,
     this.pagamentoConfirmado = false,
     this.contratadoEm,
   });
@@ -40,6 +41,9 @@ class PedidoApi {
 
   /// Nome abreviado do cliente ("Mariana S."); só vem para o profissional do pedido.
   final String? clienteNome;
+
+  /// Nome abreviado do profissional contratado ("Carlos M."); só vem para o cliente do pedido.
+  final String? profissionalNome;
 
   /// Título para mostrar: o do serviço, ou "Pedido #AB12" quando não houver.
   String get rotulo {
@@ -60,6 +64,7 @@ class PedidoApi {
         jaAvaliou: j['ja_avaliou'] == true,
         titulo: j['titulo'] as String?,
         clienteNome: j['cliente_nome'] as String?,
+        profissionalNome: j['profissional_nome'] as String?,
         pagamentoConfirmado: j['pagamento_confirmado'] == true,
         contratadoEm: _dataOuNulo(j['contratado_em']),
         janelaInicio: _dataOuNulo((j['janela'] as Map<String, dynamic>?)?['inicio']),

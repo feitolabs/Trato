@@ -22,6 +22,7 @@ class PedidoResumo {
     required this.statusTipo,
     this.id,
     this.estadoApi,
+    this.profissionalNome = '',
   });
 
   /// Id do pedido na API (nulo nos dados de exemplo).
@@ -35,6 +36,7 @@ class PedidoResumo {
   final String subtitulo;
   final String statusTexto;
   final TipoStatus statusTipo;
+  final String profissionalNome;
 }
 
 enum EstadoAditivo { aguardando, aprovado, recusado }

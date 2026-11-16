@@ -242,6 +242,7 @@ class RascunhoPedido {
     this.cidadeId,
     this.bairro,
     this.prazoDesejado,
+    this.urgente = false,
     this.modalidade = Modalidade.presencial,
     this.endereco,
     this.respostas = const {},
@@ -257,6 +258,7 @@ class RascunhoPedido {
 
   /// Data que o cliente informou em "Sem pressa" / "Com pressa".
   final DateTime? prazoDesejado;
+  final bool urgente;
 
   /// Cidade escolhida (id do catálogo); nula no formulário de exemplo.
   final String? cidadeId;

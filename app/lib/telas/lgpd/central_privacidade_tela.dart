@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
@@ -78,12 +79,41 @@ class _CorpoState extends State<_Corpo> {
       _aviso = null;
     });
     try {
-      await widget.servico.solicitarExportacao();
+      final copia = await widget.servico.solicitarExportacao();
       if (!mounted) return;
-      setState(() => _aviso = 'Pedido registrado. Avisamos você quando a cópia estiver pronta.');
+      setState(() => _aviso = 'Cópia dos seus dados gerada.');
+      if (copia != null && copia.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (d) => AlertDialog(
+            title: const Text('Cópia dos seus dados'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: SelectableText(copia, style: TipografiaTrato.corpoPequeno),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: copia));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cópia dos dados copiada.')),
+                  );
+                },
+                child: const Text('Copiar JSON'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(d).pop(),
+                child: const Text('Fechar'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _aviso = 'Não foi possível pedir a cópia agora. Tente de novo.');
+      setState(() => _aviso = 'Não foi possível gerar a cópia agora. Tente de novo.');
     } finally {
       if (mounted) setState(() => _exportando = false);
     }

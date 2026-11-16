@@ -147,6 +147,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     return DadosDoPedido(
       titulo: j['titulo'] as String,
       descricao: j['descricao'] as String,
+      faixaMinCentavos: j['faixa_preco_min_centavos'] as int?,
       faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
       logradouro: e?['logradouro'] as String?,
       numero: e?['numero'] as String?,
@@ -166,6 +167,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<DadosDoPedido> editar(
     String pedidoId, {
     String? descricao,
+    int? faixaMinCentavos,
     int? faixaMaxCentavos,
     String? logradouro,
     String? numero,
@@ -174,6 +176,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   }) async {
     final corpo = <String, Object?>{
       if (descricao != null) 'descricao': descricao,
+      if (faixaMinCentavos != null) 'faixa_preco_min_centavos': faixaMinCentavos,
       if (faixaMaxCentavos != null) 'faixa_preco_max_centavos': faixaMaxCentavos,
       if (logradouro != null && logradouro.trim().isNotEmpty)
         'endereco': {
@@ -257,6 +260,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     return PedidoResumo(
       id: p.id,
       estadoApi: p.estado,
+      profissionalNome: p.profissionalNome ?? '',
       titulo: p.rotulo,
       subtitulo: p.rotulo == 'Pedido ${p.numero}'
           ? 'Aberto em ${_dia(p.abertoEm)}'
@@ -296,6 +300,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
           : 'Serviço solicitado pelo cliente',
       'faixa_preco_min_centavos': rascunho.faixa.minimoCentavos,
       'faixa_preco_max_centavos': rascunho.faixa.maximoCentavos,
+      'urgente': rascunho.urgente,
       'respostas': [
         for (final e in rascunho.respostas.entries)
           {'pergunta_id': e.key, 'resposta': e.value},
@@ -382,7 +387,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       'Aguardando sua confirmação',
       'Finalizado',
     ];
-    final atual = etapaDoEstado[pedido.estado] ?? 0;
+    final etapaMapeada = etapaDoEstado[pedido.estado];
     final quando = <int, DateTime>{};
     for (final e in eventos) {
       final etapa = etapaDaAcao[e.acao];
@@ -390,18 +395,47 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     }
     final checkIn = quando[3];
     if (checkIn != null) quando[2] = checkIn;
+    var maiorRegistrada = -1;
+    for (final k in quando.keys) {
+      if (k > maiorRegistrada) maiorRegistrada = k;
+    }
     final etapas = [
       for (var i = 0; i < titulos.length; i++)
         EtapaLinhaDoTempo(
           titulo: titulos[i],
           detalhe: quando[i] != null ? '${_dia(quando[i]!)} · ${_hora(quando[i]!)}' : '',
-          estado: i < atual
-              ? EstadoEtapa.feita
-              : i == atual
-                  ? EstadoEtapa.atual
-                  : EstadoEtapa.futura,
+          estado: etapaMapeada != null
+              ? (i < etapaMapeada
+                  ? EstadoEtapa.feita
+                  : i == etapaMapeada
+                      ? EstadoEtapa.atual
+                      : EstadoEtapa.futura)
+              : pedido.estado == 'cancelado'
+                  ? (quando.containsKey(i) ? EstadoEtapa.feita : EstadoEtapa.futura)
+                  : quando.containsKey(5)
+                      ? EstadoEtapa.feita
+                      : (i < maiorRegistrada
+                          ? EstadoEtapa.feita
+                          : i == maiorRegistrada
+                              ? EstadoEtapa.atual
+                              : EstadoEtapa.futura),
         ),
     ];
+    Aditivo? aditivoPendente;
+    try {
+      for (final a in _lista(await _api.get('/v1/contratos/$pedidoId/aditivos'))) {
+        if (a['estado'] == 'proposto') {
+          aditivoPendente = Aditivo(
+            titulo: 'Aditivo proposto',
+            valorCentavos: (a['valor_centavos'] as num).toInt(),
+            descricao: (a['descricao'] as String?) ?? '',
+          );
+          break;
+        }
+      }
+    } on Object {
+      aditivoPendente = null;
+    }
     return PedidoEmExecucao(
       numero: pedido.numero,
       titulo: switch (pedido.estado) {
@@ -413,11 +447,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
         'concluido' => 'Serviço finalizado',
         'em_disputa' => 'Reclamação em análise',
         'retrabalho' => 'Retrabalho em andamento',
+        'cancelado' => 'Pedido cancelado',
         _ => 'Seu pedido',
       },
       podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
       pagamentoConfirmado: pedido.pagamentoConfirmado,
       etapas: etapas,
+      aditivo: aditivoPendente,
       fotos: const [],
       // O código de conclusão é o que o cliente passa ao profissional para encerrar o serviço.
       codigoConclusao: pedido.estado == 'em_andamento' && (pedido.codigoConclusao ?? '').isNotEmpty
@@ -1246,6 +1282,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   final CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido;
   final ServicoUpload? upload;
   final FilaOffline? fila;
+  Future<InicioProfissional>? _inicioEmVoo;
 
   /// `GET /v1/profissional/pedidos-abertos`. O backend já filtra por categoria, cidade, bairro,
   /// faixa de preço e recusas; não vêm distância, nem quantos já orçaram.
@@ -1302,7 +1339,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// (`/v1/profissionais/me/saldo`). Se TUDO falhar, o erro sobe para a tela mostrar "tentar de
   /// novo"; falha parcial mostra o que deu certo.
   @override
-  Future<InicioProfissional> inicio() async {
+  Future<InicioProfissional> inicio() {
+    final emVoo = _inicioEmVoo;
+    if (emVoo != null) return emVoo;
+    final novo = _carregarInicio();
+    _inicioEmVoo = novo;
+    novo.whenComplete(() {
+      if (identical(_inicioEmVoo, novo)) _inicioEmVoo = null;
+    }).ignore();
+    return novo;
+  }
+
+  Future<InicioProfissional> _carregarInicio() async {
     unawaited(_reenviarFila());
     Object? primeiroErro;
     T? tentar<T>(T? Function() ler) {

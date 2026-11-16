@@ -36,12 +36,18 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
       for (var i = 0; i < construtores.length; i++)
         _visitadas.contains(i) ? construtores[i]() : const SizedBox.shrink(),
     ];
-    return Scaffold(
-      body: IndexedStack(index: _aba, children: paginas),
-      bottomNavigationBar: BarraAbasTrato(
-        abas: abasCliente,
-        indiceAtual: _aba,
-        aoSelecionar: _ir,
+    return PopScope(
+      canPop: _aba == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _aba != 0) _ir(0);
+      },
+      child: Scaffold(
+        body: IndexedStack(index: _aba, children: paginas),
+        bottomNavigationBar: BarraAbasTrato(
+          abas: abasCliente,
+          indiceAtual: _aba,
+          aoSelecionar: _ir,
+        ),
       ),
     );
   }

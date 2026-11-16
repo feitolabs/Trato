@@ -846,7 +846,13 @@ def enviar_mensagem(
 # --- Notificações, perfil, pedidos abertos ----------------------------------------------
 
 
-@router.get("/notificacoes", response_model=list[NotificacaoOut], summary="Minhas notificações")
+@router.get(
+    "/notificacoes",
+    response_model=list[NotificacaoOut],
+    summary="Minhas notificações",
+    include_in_schema=False,
+    operation_id="listar_notificacoes_app_legado",
+)
 def listar_notificacoes(
     nao_lidas: bool = False,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),

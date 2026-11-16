@@ -10,6 +10,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
+from zoneinfo import ZoneInfo
+
+_FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
+
+
+def dia_semana_hoje() -> int:
+    return datetime.now(_FUSO_BRASILIA).weekday()
 
 if TYPE_CHECKING:
     from trato.api.repositorios_app import PerfilDetalhe
@@ -74,6 +81,8 @@ class FiltroBusca:
     categoria_ids: frozenset[str] | None = None  # None = qualquer categoria
     cidade_id: str | None = None
     bairro: str | None = None  # quem atende a cidade toda (sem bairro) também entra
+    nota_minima: float | None = None
+    atende_hoje: bool = False
     limite: int = 20
     deslocamento: int = 0
 
@@ -129,6 +138,7 @@ class ProfissionaisEmMemoria:
     def buscar(
         self, filtro: FiltroBusca, detalhe: Callable[[str], PerfilDetalhe | None]
     ) -> tuple[list[ResultadoBusca], int]:
+        hoje = dia_semana_hoje() if filtro.atende_hoje else None
         achados = []
         for p in self._itens.values():
             if p.status != "aprovado":
@@ -137,14 +147,19 @@ class ProfissionaisEmMemoria:
                 continue
             if not _atende(p, filtro):
                 continue
+            if hoje is not None and not any(j.dia_semana == hoje for j in p.disponibilidade):
+                continue
             d = detalhe(p.usuario_id)
+            nota = d.nota_publica if d else None
+            if filtro.nota_minima is not None and (nota is None or nota < filtro.nota_minima):
+                continue
             achados.append(
                 ResultadoBusca(
                     p.usuario_id,
                     d.nome if d else None,
                     p.bio,
                     p.nivel_verificacao,
-                    d.nota_publica if d else None,
+                    nota,
                     d.servicos_concluidos if d else None,
                     p.categorias,
                 )

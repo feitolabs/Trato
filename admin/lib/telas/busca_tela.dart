@@ -591,7 +591,8 @@ class _AbaSuporte extends StatelessWidget {
       carregar: context.api.listarChamados,
       estaVazio: (l) => l.isEmpty,
       mensagemVazia: 'Nenhum chamado aberto.',
-      detalheVazio: 'Quando alguém pedir ajuda, o chamado aparece aqui com prioridade e prazo.',
+      detalheVazio:
+          'Sem fila de chamados no painel no piloto (atendimento via suporte externo ou disputas).',
       construir: (context, lista, _) => ListaPaginada<Chamado>(
         itens: lista,
         rotuloBusca: 'Buscar chamado',
