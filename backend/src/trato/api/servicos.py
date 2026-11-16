@@ -58,7 +58,7 @@ def ator_de(usuario: Usuario, pedido: Pedido | None = None) -> Ator:
 
 
 def nome_abreviado(nome: str | None) -> str | None:
-    """"Gabriel Victor Lopes" -> "Gabriel L." (como o app mostra pessoas)."""
+    """'Gabriel Victor Lopes' -> 'Gabriel L.' (como o app mostra pessoas)."""
     partes = (nome or "").split()
     if not partes:
         return None
@@ -76,9 +76,13 @@ def pedido_out_completo(
         dados = None
     titulo = (dados.titulo or "").strip() if dados is not None else ""
     cliente_nome = None
+    profissional_nome = None
     if pedido.profissional_id == usuario.id and pedido.cliente_id != usuario.id:
         quem = contexto.usuarios.detalhe(pedido.cliente_id)
         cliente_nome = nome_abreviado(quem.nome) if quem is not None else None
+    elif pedido.profissional_id is not None and pedido.cliente_id == usuario.id:
+        quem = contexto.usuarios.detalhe(pedido.profissional_id)
+        profissional_nome = nome_abreviado(quem.nome) if quem is not None else None
     contratado_em = None
     if pedido.profissional_id is not None:
         try:
@@ -90,6 +94,7 @@ def pedido_out_completo(
         update={
             "titulo": titulo or None,
             "cliente_nome": cliente_nome,
+            "profissional_nome": profissional_nome,
             "contratado_em": contratado_em,
         }
     )

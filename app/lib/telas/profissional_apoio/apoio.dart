@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 
 /// Peças comuns das telas do profissional (cadastro, verificação, nota, aditivo, disputa, perfil).
@@ -129,7 +130,9 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
             return MensagemCentral(
               icone: Icons.error_outline,
               titulo: 'Não foi possível carregar',
-              texto: 'Confira a conexão e tente de novo.',
+              texto: snap.error is ErroTrato
+                  ? (snap.error! as ErroTrato).mensagem
+                  : 'Confira a conexão e tente de novo.',
               acao: BotaoSecundario(texto: 'Tentar de novo', aoTocar: _tentarDeNovo),
             );
           }

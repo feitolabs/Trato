@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../dados/relogio_de_atualizacao.dart';
 import '../../tema/tema.dart';
 
@@ -109,7 +110,12 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
       if (widget.esqueleto != null) return widget.esqueleto!(context);
       return const EstadoCarregando();
     }
-    if (_erro != null) return EstadoErro(aoTentarNovamente: _recarregar);
+    if (_erro != null) {
+      return EstadoErro(
+        mensagem: mensagemErroTrato(_erro!),
+        aoTentarNovamente: _recarregar,
+      );
+    }
     return widget.construir(context, _dado as T, _recarregar);
   }
 }

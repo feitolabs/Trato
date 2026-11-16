@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../dados/repositorios_catalogo.dart';
 import '../../tema/tema.dart';
 import '../cliente/modelos.dart';
@@ -94,7 +95,12 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                   key: ValueKey(_futuro),
                   future: _futuro,
                   builder: (context, snap) {
-                    if (snap.hasError) return EstadoErro(aoTentarNovamente: _recarregar);
+                    if (snap.hasError) {
+                      return EstadoErro(
+                        mensagem: mensagemErroTrato(snap.error!),
+                        aoTentarNovamente: _recarregar,
+                      );
+                    }
                     if (!snap.hasData) return const EstadoCarregando();
                     final lista = snap.data!;
                     if (lista.isEmpty) {
@@ -171,11 +177,9 @@ class _FolhaFiltros extends StatefulWidget {
 }
 
 class _FolhaFiltrosState extends State<_FolhaFiltros> {
-  static const _precos = [(null, 'Qualquer'), (8000, 'Até R\$ 80'), (12000, 'Até R\$ 120'), (18000, 'Até R\$ 180')];
   static const _notas = [(null, 'Qualquer'), (4.5, '4,5 ou mais'), (4.8, '4,8 ou mais')];
 
   late final _bairro = TextEditingController(text: widget.atual.bairro ?? '');
-  late int? _preco = widget.atual.precoMaxCentavos;
   late double? _nota = widget.atual.notaMinima;
   late bool _hoje = widget.atual.soDisponiveisHoje;
 
@@ -187,7 +191,6 @@ class _FolhaFiltrosState extends State<_FolhaFiltros> {
 
   FiltroProfissionais get _filtro => FiltroProfissionais(
         bairro: _bairro.text.trim().isEmpty ? null : _bairro.text.trim(),
-        precoMaxCentavos: _preco,
         notaMinima: _nota,
         soDisponiveisHoje: _hoje,
       );
@@ -211,21 +214,6 @@ class _FolhaFiltrosState extends State<_FolhaFiltros> {
                 controller: _bairro,
                 style: TipografiaTrato.corpo,
                 decoration: const InputDecoration(hintText: 'Ex.: Savassi'),
-              ),
-              const SizedBox(height: EspacosTrato.x4),
-              const RotuloSecao('Faixa de preço'),
-              const SizedBox(height: EspacosTrato.x2),
-              Wrap(
-                spacing: EspacosTrato.x2,
-                runSpacing: EspacosTrato.x2,
-                children: [
-                  for (final (valor, rotulo) in _precos)
-                    ChipOpcao(
-                      texto: rotulo,
-                      marcado: _preco == valor,
-                      aoTocar: () => setState(() => _preco = valor),
-                    ),
-                ],
               ),
               const SizedBox(height: EspacosTrato.x4),
               const RotuloSecao('Avaliação'),

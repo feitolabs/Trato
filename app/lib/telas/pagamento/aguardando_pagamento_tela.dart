@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
@@ -109,6 +110,19 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
                       Text('Pix copia e cola', style: TipografiaTrato.tituloCartao),
                       const SizedBox(height: EspacosTrato.x2),
                       SelectableText(pix, style: TipografiaTrato.corpoPequeno),
+                      const SizedBox(height: EspacosTrato.x3),
+                      BotaoSecundario(
+                        texto: 'Copiar código Pix',
+                        icone: Icons.copy_outlined,
+                        aoTocar: () {
+                          Clipboard.setData(ClipboardData(text: pix));
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(content: Text('Código Pix copiado.')),
+                            );
+                        },
+                      ),
                     ],
                   ),
                 ),

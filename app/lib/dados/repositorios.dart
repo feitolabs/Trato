@@ -27,6 +27,7 @@ class DadosDoPedido {
   const DadosDoPedido({
     required this.titulo,
     required this.descricao,
+    this.faixaMinCentavos,
     this.faixaMaxCentavos,
     this.logradouro,
     this.numero,
@@ -39,6 +40,7 @@ class DadosDoPedido {
 
   final String titulo;
   final String descricao;
+  final int? faixaMinCentavos;
   final int? faixaMaxCentavos;
   final String? logradouro;
   final String? numero;
@@ -100,6 +102,7 @@ abstract interface class RepositorioPedidos {
   Future<DadosDoPedido> editar(
     String pedidoId, {
     String? descricao,
+    int? faixaMinCentavos,
     int? faixaMaxCentavos,
     String? logradouro,
     String? numero,

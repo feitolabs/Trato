@@ -434,6 +434,8 @@ def buscar_profissionais(
     categoria_id: Annotated[str | None, Query(max_length=64)] = None,
     cidade_id: Annotated[str | None, Query(max_length=64)] = None,
     bairro: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
+    nota_minima: Annotated[float | None, Query(ge=0.0, le=5.0)] = None,
+    atende_hoje: Annotated[bool, Query()] = False,
     pagina: Annotated[int, Query(ge=1, le=1000)] = 1,
     limite: Annotated[int, Query(ge=1, le=50)] = 20,
     _: Usuario = Depends(_pessoa),
@@ -452,6 +454,8 @@ def buscar_profissionais(
         categoria_ids=frozenset(categorias) if categorias is not None else None,
         cidade_id=cidade_id,
         bairro=bairro,
+        nota_minima=nota_minima,
+        atende_hoje=atende_hoje,
         limite=limite,
         deslocamento=(pagina - 1) * limite,
     )

@@ -278,14 +278,16 @@ class _FormularioState extends State<_Formulario> {
           aoAlternar: (v) => setState(() => _cidade = v),
         ),
         if (_tentou && _erroCidade != null) _erro(_erroCidade!),
-        const SizedBox(height: EspacosTrato.x3),
-        Text('Até onde você vai', style: TipografiaTrato.corpoForte),
-        const SizedBox(height: EspacosTrato.x2),
-        OpcoesPilula(
-          opcoes: [for (final r in o.raiosKm) '$r km'],
-          selecionadas: {'$_raio km'},
-          aoAlternar: (v) => setState(() => _raio = int.parse(v.split(' ').first)),
-        ),
+        if (o.raiosKm.isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Text('Até onde você vai', style: TipografiaTrato.corpoForte),
+          const SizedBox(height: EspacosTrato.x2),
+          OpcoesPilula(
+            opcoes: [for (final r in o.raiosKm) '$r km'],
+            selecionadas: {'$_raio km'},
+            aoAlternar: (v) => setState(() => _raio = int.parse(v.split(' ').first)),
+          ),
+        ],
         const TituloSecao('Disponibilidade', ajuda: 'Você pode mudar quando quiser.'),
         OpcoesPilula(
           opcoes: o.dias,

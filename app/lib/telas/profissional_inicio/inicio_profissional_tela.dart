@@ -254,7 +254,7 @@ class _CartaoCarteira extends StatelessWidget {
         children: [
           Expanded(child: _Valor(rotulo: 'Em andamento', centavos: carteira.retidoCentavos)),
           const SizedBox(width: EspacosTrato.x3),
-          Expanded(child: _Valor(rotulo: 'Para sacar', centavos: carteira.paraSacarCentavos)),
+          Expanded(child: _Valor(rotulo: 'Liberado', centavos: carteira.paraSacarCentavos)),
         ],
       ),
     );
@@ -295,8 +295,18 @@ class CartaoPedidoAberto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final partesSub = [
+      if (pedido.remoto)
+        'Atendimento remoto'
+      else ...[
+        if (pedido.bairro.isNotEmpty) pedido.bairro,
+        textoDistancia(pedido.distanciaKm),
+      ],
+      if (!pedido.urgente || pedido.prazo.toLowerCase() != 'urgente') pedido.prazo,
+    ];
     return Semantics(
       button: true,
+      label: '${pedido.titulo}${pedido.urgente ? ', urgente' : ''}, ${textoFaixa(pedido)}',
       child: GestureDetector(
         onTap: aoTocar,
         behavior: HitTestBehavior.opaque,
@@ -320,15 +330,7 @@ class CartaoPedidoAberto extends StatelessWidget {
               ),
               const SizedBox(height: EspacosTrato.x2),
               Text(
-                [
-                  if (pedido.remoto)
-                    'Atendimento remoto'
-                  else ...[
-                    if (pedido.bairro.isNotEmpty) pedido.bairro,
-                    textoDistancia(pedido.distanciaKm),
-                  ],
-                  pedido.prazo,
-                ].join(' · '),
+                partesSub.join(' · '),
                 style: secundario,
               ),
               const SizedBox(height: EspacosTrato.x2),

@@ -187,6 +187,17 @@ def obter_metricas(
             or {}
         )
         profissionais = _uma(con, "select count(*) as n from public.perfis_profissional")
+        clientes = _uma(
+            con,
+            "select count(*) as n from public.usuarios u "
+            "where u.status = 'ativo' and u.criado_em < %s "
+            "and not exists (select 1 from public.equipe e where e.usuario_id = u.id "
+            "                and e.ativo and e.revogado_em is null) "
+            "and (not exists (select 1 from public.perfis_profissional p "
+            "                 where p.usuario_id = u.id) "
+            "     or exists (select 1 from public.pedidos pd where pd.cliente_id = u.id))",
+            (fim_aberto,),
+        )
         base_agora = _base(con, fim_aberto)
         return ResumoMetricas(
             gmv_centavos=_gmv(con, comeco, fim_aberto),
@@ -196,7 +207,7 @@ def obter_metricas(
             pedidos_em_andamento=int(lin_ped.get("em_andamento") or 0),
             pedidos_abertos=int(lin_ped.get("abertos") or 0),
             pedidos_disputa=int(lin_ped.get("disputa") or 0),
-            clientes_total=max(0, base_agora - profissionais),
+            clientes_total=clientes,
             profissionais_total=profissionais,
             profissionais_pendentes=_uma(
                 con,

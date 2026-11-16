@@ -47,6 +47,25 @@ def test_exporta_meus_dados_em_json_sem_dados_de_outros():
     assert evento["motivo"] and "Ana" not in repr(evento)  # motivo obrigatório, sem dado pessoal
 
 
+def test_exporta_meus_dados_serializa_uuid_date_decimal():
+    import uuid
+    from datetime import UTC, date, datetime
+    from decimal import Decimal
+
+    amb = montar()
+    semear(amb)
+    amb.fonte.perfis[CLIENTE.id] = {
+        "id": uuid.uuid4(),
+        "nome": "Ana Souza",
+        "data_nascimento": date(1992, 5, 14),
+        "criado_em": datetime(2026, 11, 16, 12, 0, tzinfo=UTC),
+    }
+    amb.fonte.ledger.append({"id": uuid.uuid4(), "valor": Decimal("123.45")})
+    r = amb.cliente.get("/v1/me/dados", headers=cab("t-cli"))
+    assert r.status_code == 200
+    assert r.json()["dados"]["perfil"]["data_nascimento"] == "1992-05-14"
+
+
 def test_exportar_exige_login_e_tem_limite_de_taxa():
     amb = montar()
     assert amb.cliente.get("/v1/me/dados").status_code == 401

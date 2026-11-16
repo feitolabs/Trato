@@ -63,24 +63,37 @@ class UsuariosPostgres:
         return achado is None
 
     def registrar_dados_privados(
-        self, usuario_id: str, cpf: str, telefone: str | None = None
+        self,
+        usuario_id: str,
+        cpf: str,
+        telefone: str | None = None,
+        data_nascimento: object | None = None,
     ) -> bool:
-        """Cria `usuarios_privados` (CPF e telefone) uma única vez. Verdadeiro se criou, falso se
-        a pessoa já tinha a linha (nada é sobrescrito). CPF de outra pessoa: `Duplicado`."""
+        """Cria `usuarios_privados` (CPF, telefone e nascimento) uma única vez. Verdadeiro se
+        criou, falso se a pessoa já tinha a linha (só preenche campos nulos). CPF de outra pessoa:
+        `Duplicado`."""
         achado = como_uuid(usuario_id)
         if achado is None:
             raise DadosInvalidos("Usuário inválido.")
         with self._banco.transacao() as con:
             criada = con.execute(
-                "insert into public.usuarios_privados (usuario_id, cpf, telefone) "
-                "values (%s, %s, %s) on conflict (usuario_id) do nothing returning usuario_id",
-                (achado, cpf, telefone),
+                "insert into public.usuarios_privados "
+                "(usuario_id, cpf, telefone, data_nascimento) "
+                "values (%s, %s, %s, %s) on conflict (usuario_id) do nothing "
+                "returning usuario_id",
+                (achado, cpf, telefone, data_nascimento),
             ).fetchone()
             if criada is None and telefone:
                 con.execute(
                     "update public.usuarios_privados set telefone = %s "
                     "where usuario_id = %s and telefone is null",
                     (telefone, achado),
+                )
+            if criada is None and data_nascimento is not None:
+                con.execute(
+                    "update public.usuarios_privados set data_nascimento = %s "
+                    "where usuario_id = %s and data_nascimento is null",
+                    (data_nascimento, achado),
                 )
         return criada is not None
 
@@ -108,6 +121,7 @@ class UsuariosPostgres:
         nome: str,
         cpf: str,
         telefone: str | None = None,
+        data_nascimento: object | None = None,
     ) -> bool:
         """Confere em `auth.users` se `(usuario_id, email)` confere e grava `usuarios_privados`."""
         achado = como_uuid(usuario_id)
@@ -121,7 +135,7 @@ class UsuariosPostgres:
             if not (confere and confere["ok"]):
                 return False
         self.garantir(usuario_id, nome)
-        return self.registrar_dados_privados(usuario_id, cpf, telefone)
+        return self.registrar_dados_privados(usuario_id, cpf, telefone, data_nascimento)
 
     def perfil(self, usuario_id: str) -> PerfilUsuario | None:
         """Quem é e o que pode ser: equipe ativa > profissional aprovado > cliente.

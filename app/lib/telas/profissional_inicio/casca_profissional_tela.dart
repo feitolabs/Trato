@@ -117,6 +117,7 @@ class CascaProfissionalTela extends StatefulWidget {
 
 class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   late int _aba = widget.abaInicial;
+  late final Set<int> _visitadas = {widget.abaInicial};
   late InicioProfissional _inicio = widget.inicio;
   var _filtro = const FiltroPedidosAbertos();
   var _carregandoPedidos = false;
@@ -155,7 +156,10 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     setState(() => _inicio = novo.comPedidos(pedidos));
   }
 
-  void _ir(int indice) => setState(() => _aba = indice);
+  void _ir(int indice) => setState(() {
+        _aba = indice;
+        _visitadas.add(indice);
+      });
 
   int get _filtrosAtivos => [
         if (_filtro.categoriaId != null) 1,
@@ -261,20 +265,32 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
               textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
             ),
       ),
-      widget.abaAgenda ??
-          AgendaTela(
-            carregar: () async => const [],
-            aoFazerCheckIn: (_) => widget.aoFazerCheckIn?.call(),
-          ),
-      widget.abaCarteira ?? const SizedBox.shrink(),
-      widget.abaPerfil ?? const SizedBox.shrink(),
+      _visitadas.contains(2)
+          ? (widget.abaAgenda ??
+              AgendaTela(
+                carregar: () async => const [],
+                aoFazerCheckIn: (_) => widget.aoFazerCheckIn?.call(),
+              ))
+          : const SizedBox.shrink(),
+      _visitadas.contains(3)
+          ? (widget.abaCarteira ?? const SizedBox.shrink())
+          : const SizedBox.shrink(),
+      _visitadas.contains(4)
+          ? (widget.abaPerfil ?? const SizedBox.shrink())
+          : const SizedBox.shrink(),
     ];
-    return Scaffold(
-      body: IndexedStack(index: _aba, children: paginas),
-      bottomNavigationBar: BarraAbasTrato(
-        abas: abasProfissional,
-        indiceAtual: _aba,
-        aoSelecionar: _ir,
+    return PopScope(
+      canPop: _aba == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _aba != 0) _ir(0);
+      },
+      child: Scaffold(
+        body: IndexedStack(index: _aba, children: paginas),
+        bottomNavigationBar: BarraAbasTrato(
+          abas: abasProfissional,
+          indiceAtual: _aba,
+          aoSelecionar: _ir,
+        ),
       ),
     );
   }

@@ -32,7 +32,7 @@ class TermosEPoliticaTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MolduraTelaComum(
-      titulo: 'Termos e política',
+      titulo: 'Termos e políticas',
       child: ListView(
         children: [
           for (final t in TextoLegal.values)

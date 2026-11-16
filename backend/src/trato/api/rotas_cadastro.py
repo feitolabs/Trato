@@ -7,8 +7,10 @@ cadastros simultâneos.
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from trato.api.auth import Usuario
 from trato.api.contexto import Contexto, obter_contexto, usuario_atual
@@ -22,9 +24,18 @@ class _Entrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+def _validar_nascimento(v: date | None) -> date | None:
+    if v is not None and not (date(1900, 1, 1) <= v < date.today()):
+        raise ValueError("Data de nascimento inválida.")
+    return v
+
+
 class CpfIn(_Entrada):
     cpf: str = Field(min_length=11, max_length=14)
     telefone: str | None = Field(default=None, max_length=24)
+    data_nascimento: date | None = None
+
+    _chk_nasc = field_validator("data_nascimento")(_validar_nascimento)
 
 
 class CpfDisponivelOut(BaseModel):
@@ -45,6 +56,9 @@ class VincularCadastroIn(_Entrada):
     nome: str = Field(default="", max_length=120)
     cpf: str = Field(min_length=11, max_length=14)
     telefone: str | None = Field(default=None, max_length=24)
+    data_nascimento: date | None = None
+
+    _chk_nasc = field_validator("data_nascimento")(_validar_nascimento)
 
 
 @router.post(
@@ -94,6 +108,7 @@ def vincular_cadastro(
         corpo.nome,
         cpf,
         corpo.telefone,
+        corpo.data_nascimento,
     )
     return Response(status_code=204)
 
@@ -116,5 +131,7 @@ def registrar_cpf(
     if not cpf_valido(cpf):
         raise DadosInvalidos("CPF inválido.")
     contexto.usuarios.garantir(usuario.id)
-    contexto.usuarios.registrar_dados_privados(usuario.id, cpf, corpo.telefone)
+    contexto.usuarios.registrar_dados_privados(
+        usuario.id, cpf, corpo.telefone, corpo.data_nascimento
+    )
     return Response(status_code=204)

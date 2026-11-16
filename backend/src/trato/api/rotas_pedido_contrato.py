@@ -22,10 +22,10 @@ from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.modelos import RespostaPedidoOut
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
-from trato.api.modelos import RespostaPedidoOut
 from trato.api.rotas_pedidos import respostas_out
 from trato.api.servicos import carregar_pedido
 from trato.api.visibilidade import pedido_visivel_ao_profissional
@@ -181,6 +181,10 @@ class NotaMaterialOut(BaseModel):
     itens: list[ItemNotaOut]
     total_centavos: int
     enviada_em: datetime
+    foto_url: str | None = Field(
+        default=None,
+        description="URL assinada e curta para abrir a foto da nota. Não guarde.",
+    )
 
 
 class RecusaOut(BaseModel):
@@ -684,7 +688,15 @@ def _foto_da_nota(request: Request, corpo: NotaMaterialIn, pedido: Pedido, usuar
     return caminho
 
 
-def _nota_out(nota: NotaMaterial) -> NotaMaterialOut:
+def _nota_out(nota: NotaMaterial, servico_uploads: object | None = None) -> NotaMaterialOut:
+    foto_url: str | None = None
+    if servico_uploads is not None and nota.foto_storage_path:
+        try:
+            foto_url = servico_uploads.armazenamento.url_leitura(  # type: ignore[attr-defined]
+                "pedido-midias", nota.foto_storage_path, 300
+            )
+        except Exception:  # noqa: BLE001 - falha no storage não derruba a nota
+            foto_url = None
     return NotaMaterialOut(
         id=nota.id,
         contrato_id=nota.pedido_id,
@@ -694,6 +706,7 @@ def _nota_out(nota: NotaMaterial) -> NotaMaterialOut:
         ],  # fmt: skip
         total_centavos=nota.total_centavos,
         enviada_em=nota.enviada_em,
+        foto_url=foto_url,
     )
 
 
@@ -747,7 +760,7 @@ def enviar_nota_material(
             contexto.agora(),
         )  # fmt: skip
     )
-    return _nota_out(nota)
+    return _nota_out(nota, getattr(request.app.state, "servico_uploads", None))
 
 
 @router.get(
@@ -757,11 +770,13 @@ def enviar_nota_material(
 )
 def listar_notas_material(
     contrato_id: str,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[NotaMaterialOut]:
     pedido, _ = _contrato_do_usuario(contexto, contrato_id, usuario)
-    return [_nota_out(n) for n in contexto.notas_material.do_pedido(pedido.id)]
+    uploads = getattr(request.app.state, "servico_uploads", None)
+    return [_nota_out(n, uploads) for n in contexto.notas_material.do_pedido(pedido.id)]
 
 
 # --- Avaliação --------------------------------------------------------------------------

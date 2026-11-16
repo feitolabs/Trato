@@ -6,7 +6,7 @@ Versão publicada nunca é editada: mudar = criar nova versão. As regras do cic
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
@@ -73,10 +73,11 @@ def vigente(
 
 @router.get("/versoes", response_model=list[VersaoConfigOut], summary="Histórico de versões")
 def versoes(
+    limite: int = Query(50, ge=1, le=200),
     _: Operador = Depends(exigir(Permissao.CONFIG_VER)),
     admin: AdminContexto = Depends(obter_admin),
 ) -> list[VersaoConfigOut]:
-    return _com_nomes(admin, list(admin.config.versoes()))
+    return _com_nomes(admin, list(admin.config.versoes())[:limite])
 
 
 @router.get("/versoes/{versao_id}", response_model=VersaoConfigOut, summary="Uma versão completa")
@@ -174,8 +175,12 @@ def reverter(
 @router.delete("/versoes/{versao_id}", status_code=204, summary="Descartar rascunho")
 def descartar(
     versao_id: str,
-    corpo: ComMotivo,
+    motivo: str | None = Query(default=None, min_length=10, max_length=500),
+    corpo: ComMotivo | None = None,
     operador: Operador = Depends(exigir(Permissao.CONFIG_PROPOR, Permissao.CONFIG_APROVAR)),
     admin: AdminContexto = Depends(obter_admin),
 ) -> None:
-    admin.config.descartar_rascunho(versao_id, operador.id, corpo.motivo)
+    motivo_final = corpo.motivo if corpo is not None else motivo
+    if not motivo_final:
+        raise HTTPException(422, "Informe o motivo para descartar o rascunho.")
+    admin.config.descartar_rascunho(versao_id, operador.id, motivo_final)

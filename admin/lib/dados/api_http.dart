@@ -41,8 +41,6 @@ class ApiAdminHttp implements ApiAdmin {
 
   static String _semBarraFinal(String u) => u.endsWith('/') ? u.substring(0, u.length - 1) : u;
 
-  static const _semRota = 'Esta função ainda não existe no servidor.';
-
   // ---------- transporte ----------
 
   Future<_Resposta> _enviar(
@@ -843,7 +841,8 @@ class ApiAdminHttp implements ApiAdmin {
     final versoes = await Future.wait([
       for (final v in lista)
         () async {
-          // A lista não traz os itens; o detalhe traz.
+          if (v['parametros'] is List) return _versao(v);
+          // Servidores antigos ou mocks podem devolver apenas o resumo; busca o detalhe se faltar.
           final d = _mapa(await _chamar('GET', '/v1/admin/config/versoes/${v['id']}'));
           return _versao(d);
         }(),
@@ -909,7 +908,7 @@ class ApiAdminHttp implements ApiAdmin {
 
   @override
   Future<void> recusarConfig(String versaoId, String motivo) async {
-    await _chamar('DELETE', '/v1/admin/config/versoes/$versaoId', corpo: {'motivo': motivo});
+    await _chamar('DELETE', '/v1/admin/config/versoes/$versaoId', consulta: {'motivo': motivo});
   }
 
   @override

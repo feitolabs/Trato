@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
@@ -86,19 +85,21 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: EspacosTrato.x2,
           children: [
-            Flexible(
-              child: Text(
-                _naoLidas == 0
-                    ? 'Tudo lido'
-                    : '$_naoLidas ${_naoLidas == 1 ? 'não lida' : 'não lidas'}',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-              ),
+            Text(
+              _naoLidas == 0
+                  ? 'Tudo lido'
+                  : '$_naoLidas ${_naoLidas == 1 ? 'não lida' : 'não lidas'}',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
             if (_naoLidas > 0)
-              Flexible(
-                child: BotaoLink(texto: 'Marcar todas como lidas', aoTocar: _marcarTodas),
+              TextButton(
+                onPressed: _marcarTodas,
+                child: const Text('Marcar todas como lidas', maxLines: 1),
               ),
           ],
         ),
