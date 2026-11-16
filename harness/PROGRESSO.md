@@ -1001,3 +1001,7 @@ Branch `feature/tela-configuracoes`. Pedido do João: o Perfil estava misturando
 - Nova `ConfiguracoesTela` (`app/lib/telas/configuracoes/`), aberta pela engrenagem no topo do Perfil, igual para cliente e profissional: grupos CONTA (dados pessoais, notificações, contatos de confiança) e PRIVACIDADE E AJUDA (meus dados e excluir conta, central de ajuda, termos e políticas), e "Sair" no fim.
 - Perfil do cliente: ficam endereços salvos, favoritos e "Usar como profissional"; o link "Sair" saiu do rodapé. Perfil do profissional: ficam perfil público, avaliações, "Editar cadastro" e "Usar como cliente". Parâmetros `aoSair` e `itensConta` saíram das duas telas; entrou `aoAbrirConfiguracoes`.
 - Foge do PDF de telas no Perfil do cliente (tela 22), com OK do João. Goldens do perfil do cliente regerados.
+
+## 2026-11-15 — Versão 0.1.27
+
+App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho, cancelar pedido, fila offline, login, notificações, ajuda) e tela Configurações. Agendador embutido continua desligado no `fly.toml`. Backend e tag `v0.1.27`: deploy no Fly fica com o João.
