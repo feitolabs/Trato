@@ -96,18 +96,28 @@ void main() {
       expect(find.text('Pix, Visa'), findsOneWidget);
     });
 
-    testWidgets('itens e Sair chamam os callbacks', (tester) async {
+    testWidgets('itens e engrenagem chamam os callbacks', (tester) async {
       final toques = <AcaoPerfil>[];
-      var saiu = false;
+      var configuracoes = false;
       await _abrir(
         tester,
-        PerfilClienteTela(perfil: expcl.DadosExemplo.perfil, aoTocarItem: toques.add, aoSair: () => saiu = true),
+        PerfilClienteTela(
+          perfil: expcl.DadosExemplo.perfil,
+          aoTocarItem: toques.add,
+          aoAbrirConfiguracoes: () => configuracoes = true,
+        ),
       );
       await tester.tap(find.text('Usar como profissional'));
       await tester.tap(find.text('Meus dados (LGPD)'));
-      await tester.tap(find.text('Sair'));
+      await tester.tap(find.byTooltip('Configurações'));
       expect(toques, [AcaoPerfil.usarComoProfissional, AcaoPerfil.meusDados]);
-      expect(saiu, isTrue);
+      expect(configuracoes, isTrue);
+    });
+
+    testWidgets('o Perfil não tem mais o link Sair (ele fica em Configurações)', (tester) async {
+      await _abrir(tester, const PerfilClienteTela(perfil: expcl.DadosExemplo.perfil));
+      expect(find.text('Sair'), findsNothing);
+      expect(find.byTooltip('Configurações'), findsNothing);
     });
   });
 

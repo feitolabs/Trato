@@ -12,13 +12,15 @@ class PerfilClienteTela extends StatefulWidget {
     super.key,
     required this.perfil,
     this.aoTocarItem,
-    this.aoSair,
+    this.aoAbrirConfiguracoes,
     this.aoCapturarFotoPerfil,
   });
 
   final PerfilCliente perfil;
   final ValueChanged<AcaoPerfil>? aoTocarItem;
-  final VoidCallback? aoSair;
+
+  /// Abre as configurações; a engrenagem só aparece se vier.
+  final VoidCallback? aoAbrirConfiguracoes;
   final Future<String?> Function()? aoCapturarFotoPerfil;
 
   @override
@@ -112,6 +114,12 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                       ],
                     ),
                   ),
+                  if (widget.aoAbrirConfiguracoes != null)
+                    IconButton(
+                      tooltip: 'Configurações',
+                      icon: const Icon(Icons.settings_outlined, color: CoresTrato.petroleo),
+                      onPressed: widget.aoAbrirConfiguracoes,
+                    ),
                 ],
               ),
               for (final grupo in perfil.grupos) ...[
@@ -123,7 +131,6 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               const SizedBox(height: EspacosTrato.x6),
               Row(
                 children: [
-                  BotaoLink(texto: 'Sair', aoTocar: widget.aoSair),
                   Expanded(
                     child: Align(
                       alignment: Alignment.centerRight,

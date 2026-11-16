@@ -65,6 +65,7 @@ import '../carteira/carteira_tela.dart';
 import '../carteira/modelos.dart';
 import '../cliente/casca_cliente_tela.dart';
 import '../carteira/avaliar_cliente_tela.dart';
+import '../configuracoes/configuracoes_tela.dart';
 import '../carteira/detalhe_valores_tela.dart';
 import '../conclusao/avaliacao_tela.dart';
 import '../conclusao/conclusao_tela.dart';
@@ -995,41 +996,7 @@ abstract final class RotasTrato {
             ),
             aoEditarCadastro: () => _editarCadastroProfissional(context),
             aoUsarComoCliente: () => irParaCliente(context),
-            aoSair: () => sair(context),
-            // As mesmas opções de conta do perfil do cliente (menos as de quem contrata).
-            itensConta: [
-              ItemContaPerfil(
-                icone: Icons.person_outline,
-                titulo: 'Dados pessoais',
-                aoTocar: () => _abrir<void>(context, DadosPessoaisTela(servico: _conta)),
-              ),
-              ItemContaPerfil(
-                icone: Icons.notifications_none,
-                titulo: 'Notificações',
-                aoTocar: () => abrirNotificacoes(context, profissional: true),
-              ),
-              ItemContaPerfil(
-                icone: Icons.shield_outlined,
-                titulo: 'Contatos de confiança',
-                aoTocar: () => _abrir<void>(context, ContatosConfiancaTela(servico: _conta)),
-              ),
-              ItemContaPerfil(
-                icone: Icons.lock_outline,
-                titulo: 'Meus dados e excluir conta',
-                aoTocar: () => _abrirPrivacidade(context),
-              ),
-              ItemContaPerfil(
-                icone: Icons.help_outline,
-                titulo: 'Central de ajuda',
-                aoTocar: () => _abrir<void>(
-                    context, _telaAjuda(context, comoCliente: false)),
-              ),
-              ItemContaPerfil(
-                icone: Icons.description_outlined,
-                titulo: 'Termos e políticas',
-                aoTocar: () => abrirTermos(context),
-              ),
-            ],
+            aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: true),
           );
         },
       );
@@ -1040,9 +1007,9 @@ abstract final class RotasTrato {
   static Widget abaPerfil() => Carregador<PerfilCliente>(
         carregar: repos.perfil.carregar,
         construir: (context, perfil) => PerfilClienteTela(
-          perfil: _soComDestino(perfil),
+          perfil: _soNoPerfil(perfil),
           aoCapturarFotoPerfil: _fotografarPerfil,
-          aoSair: () => sair(context),
+          aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: false),
           aoTocarItem: (acao) {
             switch (acao) {
               case AcaoPerfil.usarComoProfissional:
@@ -1129,36 +1096,82 @@ abstract final class RotasTrato {
   static final ServicoConta _contaDemo = ServicoContaFake();
   static ServicoConta get _conta => repos.conta ?? _contaDemo;
 
-  /// Itens do Perfil sem tela ainda (hoje só "Formas de pagamento") saem da lista em vez de
-  /// abrir uma tela vazia. Voltam quando a tela existir (`docs/placeholders.md`).
-  static const _acoesComTela = {
-    AcaoPerfil.dadosPessoais,
+  /// O que fica no Perfil do cliente: o que ele usa no dia a dia. O resto mora em Configurações.
+  static const _acoesNoPerfil = {
     AcaoPerfil.enderecos,
     AcaoPerfil.favoritos,
-    AcaoPerfil.contatosConfianca,
     AcaoPerfil.usarComoProfissional,
-    AcaoPerfil.notificacoes,
-    AcaoPerfil.meusDados,
-    AcaoPerfil.centralAjuda,
-    AcaoPerfil.termos,
   };
 
-  static PerfilCliente _soComDestino(PerfilCliente p) => PerfilCliente(
-        nome: p.nome,
-        iniciais: p.iniciais,
-        resumo: p.resumo,
-        fotoReferencia: p.fotoReferencia,
-        grupos: [
-          for (final g in p.grupos)
-            if (g.itens.any((i) => _acoesComTela.contains(i.acao)))
-              GrupoPerfil(
-                titulo: g.titulo,
+  static PerfilCliente _soNoPerfil(PerfilCliente p) {
+    final itens = [
+      for (final g in p.grupos)
+        for (final i in g.itens)
+          if (_acoesNoPerfil.contains(i.acao)) i,
+    ];
+    return PerfilCliente(
+      nome: p.nome,
+      iniciais: p.iniciais,
+      resumo: p.resumo,
+      fotoReferencia: p.fotoReferencia,
+      grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
+    );
+  }
+
+  /// Configurações da conta (engrenagem do Perfil), iguais para cliente e profissional. Formas de
+  /// pagamento salvas ficam de fora: o cartão é guardado pelo Stripe, sem rota no Trato.
+  static void abrirConfiguracoes(BuildContext context, {required bool profissional}) =>
+      _abrir<void>(
+        context,
+        Builder(
+          builder: (context) => ConfiguracoesTela(
+            grupos: [
+              GrupoConfiguracao(
+                titulo: 'CONTA',
                 itens: [
-                  for (final i in g.itens)
-                    if (_acoesComTela.contains(i.acao)) i,
+                  ItemContaPerfil(
+                    icone: Icons.person_outline,
+                    titulo: 'Dados pessoais',
+                    aoTocar: () => _abrir<void>(context, DadosPessoaisTela(servico: _conta)),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.notifications_none,
+                    titulo: 'Notificações',
+                    aoTocar: () => abrirNotificacoes(context, profissional: profissional),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.shield_outlined,
+                    titulo: 'Contatos de confiança',
+                    aoTocar: () =>
+                        _abrir<void>(context, ContatosConfiancaTela(servico: _conta)),
+                  ),
                 ],
               ),
-        ],
+              GrupoConfiguracao(
+                titulo: 'PRIVACIDADE E AJUDA',
+                itens: [
+                  ItemContaPerfil(
+                    icone: Icons.lock_outline,
+                    titulo: 'Meus dados e excluir conta',
+                    aoTocar: () => _abrirPrivacidade(context),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.help_outline,
+                    titulo: 'Central de ajuda',
+                    aoTocar: () => _abrir<void>(
+                        context, _telaAjuda(context, comoCliente: !profissional)),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.description_outlined,
+                    titulo: 'Termos e políticas',
+                    aoTocar: () => abrirTermos(context),
+                  ),
+                ],
+              ),
+            ],
+            aoSair: () => sair(context),
+          ),
+        ),
       );
 
   /// Aba "Mensagens" da casca do cliente: lista de conversas, cada uma abre o chat do pedido.

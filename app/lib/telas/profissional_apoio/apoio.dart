@@ -85,9 +85,13 @@ class PaginaCarregavel<T> extends StatefulWidget {
     this.tituloVazio = 'Nada por aqui ainda',
     this.textoVazio = '',
     this.iconeVazio = Icons.inbox_outlined,
+    this.acoes = const [],
   });
 
   final String titulo;
+
+  /// Botões à direita da barra (ex.: a engrenagem das configurações).
+  final List<Widget> acoes;
   final Future<T> Function() carregar;
   final Widget Function(BuildContext context, T dados) construir;
   final bool Function(T dados)? estaVazio;
@@ -111,7 +115,7 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.titulo)),
+      appBar: AppBar(title: Text(widget.titulo), actions: widget.acoes),
       body: FutureBuilder<T>(
         future: _futuro,
         builder: (context, snap) {
