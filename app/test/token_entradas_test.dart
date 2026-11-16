@@ -168,6 +168,8 @@ void main() {
       await abrir(tester, const CascaClienteTela());
       await tester.tap(find.text('Perfil').last);
       await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Configurações'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Sair'));
       await tester.pumpAndSettle();
       expect(find.byType(LoginTela), findsOneWidget);
@@ -178,6 +180,10 @@ void main() {
     testWidgets('Perfil só lista itens com destino real', (tester) async {
       await abrir(tester, const CascaClienteTela());
       await tester.tap(find.text('Perfil').last);
+      await tester.pumpAndSettle();
+      // Perfil limpo: a conta fica atrás da engrenagem.
+      expect(find.text('Central de ajuda'), findsNothing);
+      await tester.tap(find.byTooltip('Configurações'));
       await tester.pumpAndSettle();
       expect(find.text('Central de ajuda'), findsOneWidget);
       expect(find.text('Endereços'), findsNothing);

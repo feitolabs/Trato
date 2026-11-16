@@ -993,3 +993,15 @@ Branch `feature/correcoes-auditoria-app` (de `develop`), sem commit nem push.
 - **Agendador:** `TRATO_AGENDADOR_EMBUTIDO=true` faz a API rodar o agendador num fio (sem máquina extra; trava no banco). **Está `"false"` no `fly.toml`**: o João não quer ligar ainda (15/11/2026). Pendência em `PENDENCIAS.md`.
 - **Não feito, de propósito:** SOS e compartilhar atendimento (fora do MVP, D13); saque/repasse ao profissional (D15, depende de P7); registrar ausência do cliente (a máquina de estados só tem ausência do profissional, feita pelo sistema); chamado de suporte dentro do app (precisaria de tabela nova); push (precisa de projeto Firebase, chaves e OK).
 - Testes: backend 738 + 580 passam (pastas `tests/api` e o restante; `integracao*` pedem banco real); app 915+ e goldens passam (goldens regerados: `criar_conta` tablet e `ajuda`). Novos: `app/test/dados/correcoes_auditoria_test.dart` (17), `backend/tests/api/test_agendador_embutido.py`, mais casos em `test_api_disputa_retrabalho.py` e `test_config_publica_titulo.py`.
+
+## 2026-11-15 — Tela Configurações (engrenagem no Perfil)
+
+Branch `feature/tela-configuracoes`. Pedido do João: o Perfil estava misturando o dia a dia com a conta.
+
+- Nova `ConfiguracoesTela` (`app/lib/telas/configuracoes/`), aberta pela engrenagem no topo do Perfil, igual para cliente e profissional: grupos CONTA (dados pessoais, notificações, contatos de confiança) e PRIVACIDADE E AJUDA (meus dados e excluir conta, central de ajuda, termos e políticas), e "Sair" no fim.
+- Perfil do cliente: ficam endereços salvos, favoritos e "Usar como profissional"; o link "Sair" saiu do rodapé. Perfil do profissional: ficam perfil público, avaliações, "Editar cadastro" e "Usar como cliente". Parâmetros `aoSair` e `itensConta` saíram das duas telas; entrou `aoAbrirConfiguracoes`.
+- Foge do PDF de telas no Perfil do cliente (tela 22), com OK do João. Goldens do perfil do cliente regerados.
+
+## 2026-11-15 — Versão 0.1.27
+
+App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho, cancelar pedido, fila offline, login, notificações, ajuda) e tela Configurações. Agendador embutido continua desligado no `fly.toml`. Backend e tag `v0.1.27`: deploy no Fly fica com o João.

@@ -185,6 +185,8 @@ void main() {
   testWidgets('Perfil: dados e privacidade e ajuda abrem as telas', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Perfil');
+    await tester.tap(find.byTooltip('Configurações'));
+    await tester.pumpAndSettle();
     await _tocar(tester, 'Central de ajuda');
     expect(find.byType(AjudaTela), findsOneWidget);
   });
@@ -206,6 +208,8 @@ void main() {
   testWidgets('notificações do cliente abrem o serviço, o orçamento e o chat', (tester) async {
     await _abrir(tester, const CascaClienteTela());
     await _tocar(tester, 'Perfil');
+    await tester.tap(find.byTooltip('Configurações'));
+    await tester.pumpAndSettle();
     await _tocar(tester, 'Notificações');
 
     await _tocar(tester, 'Disputa aberta no seu serviço');

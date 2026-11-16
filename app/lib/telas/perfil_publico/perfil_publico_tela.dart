@@ -10,15 +10,6 @@ import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import '../profissional_apoio/apoio.dart';
 import 'perfil_publico.dart';
 
-/// Uma linha da seção "Conta" do perfil do profissional (dados pessoais, notificações, ajuda...).
-class ItemContaPerfil {
-  const ItemContaPerfil({required this.icone, required this.titulo, required this.aoTocar});
-
-  final IconData icone;
-  final String titulo;
-  final VoidCallback aoTocar;
-}
-
 /// Como os clientes veem o profissional. Não é a tela 10 do cliente: aqui é a pré-visualização
 /// do próprio perfil, com atalho para as avaliações recebidas.
 class PerfilPublicoTela extends StatefulWidget {
@@ -27,15 +18,14 @@ class PerfilPublicoTela extends StatefulWidget {
     required this.servico,
     this.aoVerAvaliacoes,
     this.aoEditarCadastro,
-    this.aoSair,
     this.aoUsarComoCliente,
     this.aoCapturarFotoPerfil,
-    this.itensConta = const [],
+    this.aoAbrirConfiguracoes,
   });
 
-  /// Opções da conta que o perfil do cliente também tem (dados pessoais, notificações, privacidade
-  /// e exclusão da conta, ajuda, termos). Aparecem antes de "Usar como cliente" e "Sair".
-  final List<ItemContaPerfil> itensConta;
+  /// Abre as configurações (dados pessoais, notificações, privacidade, ajuda, termos, sair).
+  /// A engrenagem só aparece se vier.
+  final VoidCallback? aoAbrirConfiguracoes;
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
@@ -43,8 +33,6 @@ class PerfilPublicoTela extends StatefulWidget {
   final FutureOr<void> Function()? aoEditarCadastro;
   final VoidCallback? aoUsarComoCliente;
 
-  /// Sai da conta (limpa a sessão). Sem ele, o botão não aparece.
-  final VoidCallback? aoSair;
   final Future<String?> Function()? aoCapturarFotoPerfil;
 
   @override
@@ -112,6 +100,14 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
     return PaginaCarregavel<PerfilPublico>(
       key: ValueKey(_versao),
       titulo: 'Seu perfil público',
+      acoes: [
+        if (widget.aoAbrirConfiguracoes != null)
+          IconButton(
+            tooltip: 'Configurações',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: widget.aoAbrirConfiguracoes,
+          ),
+      ],
       carregar: widget.servico.carregarPerfil,
       construir: (context, p) {
         final fotoExibida = _fotoAtual ?? p.fotoReferencia ?? _fotoSalvaSessao;
@@ -202,57 +198,17 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 ),
               ],
             ],
-            if (widget.itensConta.isNotEmpty ||
-                widget.aoUsarComoCliente != null ||
-                widget.aoSair != null) ...[
+            if (widget.aoUsarComoCliente != null) ...[
               const SizedBox(height: EspacosTrato.x6),
-              const TituloSecao('Conta'),
               Card(
                 margin: EdgeInsets.zero,
                 clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    for (final (i, linha) in [
-                      for (final item in widget.itensConta)
-                        ListTile(
-                          leading: Icon(item.icone, color: CoresTrato.petroleo),
-                          title: Text(item.titulo, style: TipografiaTrato.corpoForte),
-                          trailing:
-                              const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
-                          onTap: item.aoTocar,
-                        ),
-                      if (widget.aoUsarComoCliente != null)
-                        ListTile(
-                          leading: const Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
-                          title: Text('Usar como cliente', style: TipografiaTrato.corpoForte),
-                          subtitle: Text(
-                            'Trocar para contratar serviços',
-                            style: TipografiaTrato.legenda,
-                          ),
-                          trailing:
-                              const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
-                          onTap: widget.aoUsarComoCliente,
-                        ),
-                      if (widget.aoSair != null)
-                        ListTile(
-                          leading: const Icon(Icons.logout, color: CoresTrato.petroleo),
-                          title: Text('Sair', style: TipografiaTrato.corpoForte),
-                          trailing:
-                              const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
-                          onTap: widget.aoSair,
-                        ),
-                    ].indexed) ...[
-                      if (i > 0)
-                        const Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: CoresTrato.borda,
-                          indent: EspacosTrato.x4,
-                          endIndent: EspacosTrato.x4,
-                        ),
-                      linha,
-                    ],
-                  ],
+                child: ListTile(
+                  leading: const Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
+                  title: Text('Usar como cliente', style: TipografiaTrato.corpoForte),
+                  subtitle: Text('Trocar para contratar serviços', style: TipografiaTrato.legenda),
+                  trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                  onTap: widget.aoUsarComoCliente,
                 ),
               ),
             ],
