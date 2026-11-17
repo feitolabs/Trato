@@ -97,7 +97,7 @@ class _FiltrosPedidosAbertosTelaState extends State<FiltrosPedidosAbertosTela> {
                   'Escolha o que aparece em "Pedidos abertos".',
                   style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
                 ),
-                if (widget.categorias.isNotEmpty) ...[
+                if (widget.categorias.length > 1) ...[
                   const SizedBox(height: EspacosTrato.x5),
                   const RotuloSecao('Categoria'),
                   const SizedBox(height: EspacosTrato.x3),

@@ -105,6 +105,7 @@ class FiltroBusca:
     # Preenchidos pela rota quando há `texto` para permitir casar categoria/cidade em memória.
     categorias_texto: frozenset[str] = field(default_factory=frozenset)
     cidades_texto: frozenset[str] = field(default_factory=frozenset)
+    excluir_usuario_id: str | None = None
     limite: int = 20
     deslocamento: int = 0
 
@@ -223,6 +224,8 @@ class ProfissionaisEmMemoria:
         ranqueados: list[tuple[tuple[object, ...], ResultadoBusca]] = []
         for p in self._itens.values():
             if p.status != "aprovado":
+                continue
+            if filtro.excluir_usuario_id and p.usuario_id == filtro.excluir_usuario_id:
                 continue
             if filtro.categoria_ids is not None and not filtro.categoria_ids & set(p.categorias):
                 continue

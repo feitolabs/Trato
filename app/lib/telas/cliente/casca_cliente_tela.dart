@@ -18,6 +18,7 @@ class CascaClienteTela extends StatefulWidget {
 class _CascaClienteTelaState extends State<CascaClienteTela> {
   late int _aba = widget.abaInicial;
   late final Set<int> _visitadas = {widget.abaInicial};
+  DateTime? _ultimaAtualizacaoAba;
 
   @override
   void initState() {
@@ -35,13 +36,19 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
   }
 
   void _ir(int indice) {
+    if (_aba == indice) return;
     final jaVisitada = _visitadas.contains(indice);
     setState(() {
       _aba = indice;
       _visitadas.add(indice);
     });
     if (jaVisitada) {
-      RotasTrato.pedidosMudaram.value++;
+      final agora = DateTime.now();
+      if (_ultimaAtualizacaoAba == null ||
+          agora.difference(_ultimaAtualizacaoAba!) >= const Duration(milliseconds: 1500)) {
+        _ultimaAtualizacaoAba = agora;
+        RotasTrato.pedidosMudaram.value++;
+      }
     }
   }
 

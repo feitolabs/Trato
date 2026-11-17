@@ -297,14 +297,32 @@ class _FormularioState extends State<_Formulario> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const TituloSecao('Categorias', ajuda: 'Escolha o que você atende.'),
-              OpcoesPilula(
-                opcoes: categoriasOrdenadas,
-                selecionadas: _categorias,
-                aoAlternar: (v) => _alternar(_categorias, v),
-              ),
-              if (_tentou && _categorias.isEmpty)
-                _erro('Escolha pelo menos uma categoria.'),
+              if (widget.edicao &&
+                  (_atual?.categoriasTravadas ?? false) &&
+                  _categorias.isNotEmpty) ...[
+                const TituloSecao('Categorias'),
+                OpcoesPilula(
+                  opcoes: _categorias.toList()..sort(compararAlfabeticoPtBr),
+                  selecionadas: _categorias,
+                  aoAlternar: (_) {},
+                ),
+                const SizedBox(height: EspacosTrato.x2),
+                const AvisoFaixa(
+                  texto:
+                      'Categorias vinculadas à sua verificação. Para atuar em novas áreas, é necessário passar por nova verificação.',
+                  tipo: TipoStatus.info,
+                  icone: Icons.lock_outline,
+                ),
+              ] else ...[
+                const TituloSecao('Categorias', ajuda: 'Escolha o que você atende.'),
+                OpcoesPilula(
+                  opcoes: categoriasOrdenadas,
+                  selecionadas: _categorias,
+                  aoAlternar: (v) => _alternar(_categorias, v),
+                ),
+                if (_tentou && _categorias.isEmpty)
+                  _erro('Escolha pelo menos uma categoria.'),
+              ],
             ],
           ),
         ),

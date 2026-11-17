@@ -15,11 +15,15 @@ class VerificacaoTela extends StatelessWidget {
     this.aoCapturarDocumento,
     this.aoCapturarSelfie,
     this.aoConcluir,
+    this.obrigatoria = false,
+    this.aoVoltarCliente,
   });
 
   final ServicoVerificacao servico;
   final CapturarFoto? aoCapturarDocumento;
   final CapturarFoto? aoCapturarSelfie;
+  final bool obrigatoria;
+  final VoidCallback? aoVoltarCliente;
 
   /// Depois que o envio foi aceito pelo serviço. Com a verificação já aprovada ou em análise,
   /// é o botão "Continuar".
@@ -37,6 +41,8 @@ class VerificacaoTela extends StatelessWidget {
         aoCapturarDocumento: aoCapturarDocumento,
         aoCapturarSelfie: aoCapturarSelfie,
         aoConcluir: aoConcluir,
+        obrigatoria: obrigatoria,
+        aoVoltarCliente: aoVoltarCliente,
       ),
     );
   }
@@ -50,6 +56,8 @@ class _Corpo extends StatefulWidget {
     required this.aoCapturarDocumento,
     required this.aoCapturarSelfie,
     required this.aoConcluir,
+    required this.obrigatoria,
+    required this.aoVoltarCliente,
   });
 
   final SituacaoVerificacao situacao;
@@ -58,6 +66,8 @@ class _Corpo extends StatefulWidget {
   final CapturarFoto? aoCapturarDocumento;
   final CapturarFoto? aoCapturarSelfie;
   final VoidCallback? aoConcluir;
+  final bool obrigatoria;
+  final VoidCallback? aoVoltarCliente;
 
   @override
   State<_Corpo> createState() => _CorpoState();
@@ -137,29 +147,39 @@ class _CorpoState extends State<_Corpo> {
   @override
   Widget build(BuildContext context) {
     final l = widget.lgpd;
-    return CorpoRolavel(
-      scrollController: _scrollController,
-      rodape: _podeEnviar
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_erro != null) ...[
-                  AvisoFaixa(texto: _erro!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
-                  const SizedBox(height: EspacosTrato.x3),
+    final bloquearSaida = widget.obrigatoria && _podeEnviar && !_enviado;
+    return PopScope(
+      canPop: !bloquearSaida,
+      child: CorpoRolavel(
+        scrollController: _scrollController,
+        rodape: _podeEnviar
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_erro != null) ...[
+                    AvisoFaixa(texto: _erro!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
+                    const SizedBox(height: EspacosTrato.x3),
+                  ],
+                  BotaoPrimario(
+                    texto: 'Enviar para análise',
+                    carregando: _enviando,
+                    aoTocar: _completo ? _enviar : null,
+                  ),
+                  if (widget.aoVoltarCliente != null) ...[
+                    const SizedBox(height: EspacosTrato.x2),
+                    BotaoSecundario(
+                      texto: 'Voltar para modo cliente',
+                      aoTocar: widget.aoVoltarCliente,
+                    ),
+                  ],
                 ],
-                BotaoPrimario(
-                  texto: 'Enviar para análise',
-                  carregando: _enviando,
-                  aoTocar: _completo ? _enviar : null,
-                ),
-              ],
-            )
-          // Já aprovada ou em análise dentro de um fluxo (ex.: depois do cadastro): nada a
-          // enviar, mas a pessoa precisa de um caminho para seguir em frente.
-          : (widget.aoConcluir != null && !_enviado)
-              ? BotaoPrimario(texto: 'Continuar', aoTocar: widget.aoConcluir)
-              : null,
-      children: [
+              )
+            // Já aprovada ou em análise dentro de um fluxo (ex.: depois do cadastro): nada a
+            // enviar, mas a pessoa precisa de um caminho para seguir em frente.
+            : (widget.aoConcluir != null && !_enviado)
+                ? BotaoPrimario(texto: 'Continuar', aoTocar: widget.aoConcluir)
+                : null,
+        children: [
         Text('Confirme sua identidade', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x3),
         _CartaoStatus(status: _status, motivo: widget.situacao.motivo),
@@ -254,6 +274,7 @@ class _CorpoState extends State<_Corpo> {
           ),
         ],
       ],
+      ),
     );
   }
 }

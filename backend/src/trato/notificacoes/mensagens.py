@@ -96,6 +96,8 @@ class ConversasAppEmMemoria:
             if partes is None or usuario_id not in partes[:2]:
                 continue
             cliente, profissional, pedido_id = partes
+            if cliente == profissional:
+                continue
             ultima = mensagens[-1] if mensagens else None
             saida.append(
                 ResumoConversa(
@@ -183,7 +185,8 @@ class ConversasAppPostgres:
                 "left join lateral (select corpo_exibido, enviada_em, autor_id "
                 " from public.mensagens m where m.conversa_id = cv.id "
                 " order by m.id desc limit 1) u on true "
-                "where cv.cliente_id = %(u)s or cv.profissional_id = %(u)s "
+                "where (cv.cliente_id = %(u)s or cv.profissional_id = %(u)s) "
+                "and cv.cliente_id <> cv.profissional_id "
                 "order by u.enviada_em desc nulls last, cv.id",
                 {"u": usuario},
             ).fetchall()

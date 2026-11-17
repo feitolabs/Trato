@@ -36,8 +36,8 @@ class RegraUpload(BaseModel):
 
 def _limites_padrao() -> list[RegraLimite]:
     return [
-        RegraLimite(nome="geral_ip", escopo="ip", maximo=300, janela_s=60),
-        RegraLimite(nome="geral_usuario", escopo="usuario", maximo=120, janela_s=60),
+        RegraLimite(nome="geral_ip", escopo="ip", maximo=1200, janela_s=60),
+        RegraLimite(nome="geral_usuario", escopo="usuario", maximo=600, janela_s=60),
         RegraLimite(
             nome="mensagens",
             prefixo="/v1/pedidos",

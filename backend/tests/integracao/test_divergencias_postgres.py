@@ -172,17 +172,31 @@ def test_busca_nao_vaza_dado_pessoal(mundo):
 
 def test_editar_perfil_troca_categorias_e_regioes_no_banco(mundo):
     c = mundo
-    r = c.cliente.patch(
+    # Profissional já aprovado não pode trocar categorias (ficam vinculadas à verificação).
+    negado = c.cliente.patch(
         "/v1/profissional/perfil",
         json={"categorias": [c.categoria_id], "regioes": [{"cidade_id": c.cidade_id}]},
         headers=c.token("ana_pro"),
     )
+    assert negado.status_code == 409
+    # Mantendo a categoria aprovada, ainda pode atualizar região/bio/disponibilidade.
+    r = c.cliente.patch(
+        "/v1/profissional/perfil",
+        json={"categorias": [c.cat_eletrica], "regioes": [{"cidade_id": c.cidade_id}]},
+        headers=c.token("ana_pro"),
+    )
     assert r.status_code == 200, r.text
-    assert r.json()["categorias"] == [c.categoria_id]
-    ids = [
-        i["id"] for i in get(c, f"/v1/profissionais?categoria_id={c.cat_eletrica}").json()["itens"]
-    ]
-    assert c.ids["ana_pro"] not in ids
+    assert r.json()["categorias"] == [c.cat_eletrica]
+    assert r.json()["regioes"] == [{"cidade_id": c.cidade_id, "bairro": None}]
+    # Ainda em análise e sem verificação enviada, a troca de categorias funciona no banco.
+    assert cadastrar(c, "cli_busca").status_code == 201
+    ok = c.cliente.patch(
+        "/v1/profissional/perfil",
+        json={"categorias": [c.categoria_id], "regioes": [{"cidade_id": c.cidade_id}]},
+        headers=c.token("cli_busca"),
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["categorias"] == [c.categoria_id]
 
 
 def test_migration_nova_do_destino_portfolio_aplica_e_desfaz(mundo):

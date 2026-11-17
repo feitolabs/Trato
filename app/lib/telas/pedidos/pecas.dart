@@ -172,8 +172,10 @@ class CartaoAditivo extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const EspacoFoto(rotulo: '[Foto]', largura: 80, altura: 80),
-              const SizedBox(width: EspacosTrato.x3),
+              if (aditivo.mostrarFoto) ...[
+                const EspacoFoto(rotulo: '[Foto]', largura: 80, altura: 80),
+                const SizedBox(width: EspacosTrato.x3),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../agenda/modelos.dart' show EstadoAgendamento;
@@ -62,7 +64,10 @@ import '../lgpd/central_privacidade_tela.dart';
 import '../mensagens/mensagens_tela.dart';
 import '../perfil_publico/avaliacoes_recebidas_tela.dart';
 import '../perfil_publico/perfil_publico_tela.dart';
+import '../profissional_cadastro/cadastro.dart';
 import '../profissional_cadastro/cadastro_profissional_tela.dart';
+import '../verificacao/verificacao.dart'
+    show ServicoVerificacao, SituacaoVerificacao, StatusVerificacao;
 import '../verificacao/verificacao_tela.dart';
 import '../carteira/carteira_tela.dart';
 import '../carteira/modelos.dart';
@@ -149,19 +154,26 @@ abstract final class RotasTrato {
           .push(MaterialPageRoute<T>(builder: (_) => tela))
           .whenComplete(() => pedidosMudaram.value++);
 
-  static void _voltarAoInicio(BuildContext context, {int aba = 0}) {
-    Navigator.of(context).popUntil((rota) => rota.isFirst);
+  static void _voltarAoInicio(
+    BuildContext context, {
+    int aba = 0,
+    NavigatorState? nav,
+  }) {
+    final navigator = nav ?? Navigator.maybeOf(context);
+    navigator?.popUntil((rota) => rota.isFirst);
     ControladorCasca.selecionarAba(aba);
     pedidosMudaram.value++;
   }
 
   static Future<T?> _abrirSucesso<T>(
     BuildContext context,
-    Widget tela, {
+    Widget Function(BuildContext ctxSucesso) construtor, {
     bool substituirAtual = false,
   }) {
     final nav = Navigator.of(context);
-    final rota = MaterialPageRoute<T>(builder: (_) => tela);
+    final rota = MaterialPageRoute<T>(
+      builder: (ctxSucesso) => construtor(ctxSucesso),
+    );
     return (substituirAtual ? nav.pushReplacement<T, void>(rota) : nav.push<T>(rota))
         .whenComplete(() => pedidosMudaram.value++);
   }
@@ -216,7 +228,11 @@ abstract final class RotasTrato {
   static void irParaInicio(BuildContext context, [SessaoAuth? quem]) {
     final s = quem ?? ServicoAuthPadrao.atual.sessaoAtual;
     if (s != null && s.ehProfissional) {
-      _entrarNaCascaProfissional(context);
+      if (repos.modoApi) {
+        unawaited(irParaProfissional(context));
+      } else {
+        _entrarNaCascaProfissional(context);
+      }
     } else {
       irParaCliente(context);
     }
@@ -288,23 +304,27 @@ abstract final class RotasTrato {
           vazio: (perfil) => perfil.detalhe == null,
           tituloVazio: 'Perfil indisponível',
           textoVazio: 'Este perfil ainda não tem as informações completas.',
-          construir: (context, perfil) => PerfilProfissionalTela(
-            profissional: perfil,
-            aoPedirOrcamento: (x) => _pedirOrcamentoA(context, x),
-            aoVerAvaliacoes: (x) => _abrir<void>(
-              context,
-              AvaliacoesProfissionalTela(profissional: x),
-            ),
-            favoritoAtual: perfil.id == null
-                ? null
-                : () async => (await _conta.favoritos())
-                    .any((f) => f.profissionalId == perfil.id),
-            aoMudarFavorito: perfil.id == null
-                ? null
-                : (v) => v
-                    ? _conta.favoritar(perfil.id!)
-                    : _conta.desfavoritar(perfil.id!),
-          ),
+          construir: (context, perfil) {
+            final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id;
+            final ehProprio = meuId != null && perfil.id == meuId;
+            return PerfilProfissionalTela(
+              profissional: perfil,
+              aoPedirOrcamento: ehProprio ? null : (x) => _pedirOrcamentoA(context, x),
+              aoVerAvaliacoes: (x) => _abrir<void>(
+                context,
+                AvaliacoesProfissionalTela(profissional: x),
+              ),
+              favoritoAtual: perfil.id == null || ehProprio
+                  ? null
+                  : () async => (await _conta.favoritos())
+                      .any((f) => f.profissionalId == perfil.id),
+              aoMudarFavorito: perfil.id == null || ehProprio
+                  ? null
+                  : (v) => v
+                      ? _conta.favoritar(perfil.id!)
+                      : _conta.desfavoritar(perfil.id!),
+            );
+          },
         ),
       );
 
@@ -391,6 +411,27 @@ abstract final class RotasTrato {
             aoVerContrato: dados.profissional != null
                 ? () => abrirContrato(context, pedidoId)
                 : null,
+            aoVerNota: dados.profissional != null
+                ? () => _abrir<void>(
+                      context,
+                      VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
+                    )
+                : null,
+            aoVerAditivo: dados.profissional != null
+                ? () => _abrir<void>(
+                      context,
+                      ResponderAditivoTela(
+                        servico: servicoAditivo,
+                        aditivoId: pedidoId,
+                        aoCobrancaCriada: (cobranca) =>
+                            _pagarAditivo(context, pedidoId, cobranca),
+                      ),
+                    )
+                : null,
+            aoVerConclusao: const {'em_confirmacao', 'concluido'}
+                    .contains(dados.estadoApi)
+                ? () => _abrir<void>(context, _conclusao(pedidoId))
+                : null,
             aoVerProfissional: (pro) => abrirPerfil(
               context,
               Profissional(
@@ -418,7 +459,7 @@ abstract final class RotasTrato {
       case AcaoServico.acompanhar:
         _abrir<void>(context, _pedidoEmExecucao(pedidoId));
       case AcaoServico.conversar:
-        _abrir<void>(context, _chat(pedidoId));
+        _abrir<void>(context, _chat(pedidoId, comoProfissional: false));
       case AcaoServico.avaliar:
         _abrir<void>(context, _avaliacao(pedidoId));
       case AcaoServico.verGarantia:
@@ -443,11 +484,11 @@ abstract final class RotasTrato {
     pedidosMudaram.value++;
     await _abrirSucesso<void>(
       context,
-      SucessoAcaoTela(
+      (ctxSucesso) => SucessoAcaoTela(
         titulo: 'Pedido cancelado',
         subtitulo:
             'O cancelamento foi registrado. Se houve pagamento, o estorno segue automaticamente.',
-        aoVoltarInicio: () => _voltarAoInicio(context),
+        aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
       ),
       substituirAtual: Navigator.of(context).canPop(),
     );
@@ -518,9 +559,40 @@ abstract final class RotasTrato {
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static Future<void> irParaProfissional(BuildContext context) async {
-    final tem = (ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true) ||
-        (await repos.perfilPublico?.temPerfilProfissional() ?? false);
+    final tem = repos.modoApi
+        ? (await repos.perfilPublico?.temPerfilProfissional() ?? false)
+        : ((ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true) ||
+            (await repos.perfilPublico?.temPerfilProfissional() ?? false));
     if (tem && context.mounted) {
+      if (repos.modoApi && repos.verificacao != null) {
+        SituacaoVerificacao? sit;
+        try {
+          sit = await repos.verificacao!.carregarSituacao();
+        } on Object {
+          sit = null;
+        }
+        if (!context.mounted) return;
+        if (sit != null &&
+            (sit.status == StatusVerificacao.naoEnviada ||
+                sit.status == StatusVerificacao.pendente)) {
+          await _abrir<void>(
+            context,
+            Builder(
+              builder: (ctxVerif) => VerificacaoTela(
+                servico: repos.verificacao!,
+                obrigatoria: true,
+                aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
+                aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
+                aoVoltarCliente: () => irParaCliente(ctxVerif),
+                aoConcluir: () {
+                  if (ctxVerif.mounted) _entrarNaCascaProfissional(ctxVerif);
+                },
+              ),
+            ),
+          );
+          return;
+        }
+      }
       _entrarNaCascaProfissional(context);
       return;
     }
@@ -568,15 +640,19 @@ abstract final class RotasTrato {
             aoAdicionarFotos: _selecionarFotos,
             aoConcluir: () => _abrir<void>(
               context,
-              VerificacaoTela(
-                servico: repos.verificacao!,
-                aoCapturarDocumento:
-                    repos.capturaVerificacao?.documento ?? _fotografar,
-                aoCapturarSelfie:
-                    repos.capturaVerificacao?.selfie ?? _fotografar,
-                aoConcluir: () {
-                  _entrarNaCascaProfissional(context);
-                },
+              Builder(
+                builder: (ctxVerif) => VerificacaoTela(
+                  servico: repos.verificacao!,
+                  obrigatoria: true,
+                  aoCapturarDocumento:
+                      repos.capturaVerificacao?.documento ?? _fotografar,
+                  aoCapturarSelfie:
+                      repos.capturaVerificacao?.selfie ?? _fotografar,
+                  aoVoltarCliente: () => irParaCliente(ctxVerif),
+                  aoConcluir: () {
+                    if (ctxVerif.mounted) _entrarNaCascaProfissional(ctxVerif);
+                  },
+                ),
               ),
             ),
           ),
@@ -594,7 +670,10 @@ abstract final class RotasTrato {
             nomeInicial: repos.perfil.nomeSalvo ??
                 ServicoAuthPadrao.atual.sessaoAtual?.nome ??
                 '',
-            servico: repos.cadastroProfissional!,
+            servico: _ServicoCadastroEdicao(
+              repos.cadastroProfissional!,
+              repos.verificacao,
+            ),
             servicoCep: repos.cep,
             aoAdicionarFoto: _fotografar,
             aoAdicionarFotos: _selecionarFotos,
@@ -602,13 +681,13 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               _abrirSucesso<void>(
                 tela,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Cadastro atualizado!',
                   subtitulo: 'Suas informações já estão atualizadas para os clientes.',
                   textoBotaoPrimario: 'Voltar ao perfil',
-                  aoTocarPrimario: () => Navigator.of(tela).pop(),
+                  aoTocarPrimario: () => Navigator.of(ctxSucesso).pop(),
                   textoBotaoSecundario: 'Voltar ao início',
-                  aoVoltarInicio: () => _voltarAoInicio(tela),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
               );
@@ -656,7 +735,10 @@ abstract final class RotasTrato {
           ),
           carregarPedidos: repos.profissional.pedidosAbertos,
           recarregarInicio: repos.profissional.inicio,
-          aoAbrirOrcamentoEnviado: (o) => _abrir<void>(context, _chat(o.pedidoId)),
+          aoAbrirOrcamentoEnviado: (o) => _abrir<void>(
+            context,
+            _chat(o.pedidoId, comoProfissional: true),
+          ),
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
           aoAbrirMapa: abrirNoMapa,
@@ -683,7 +765,20 @@ abstract final class RotasTrato {
               ),
             ),
           ),
-          carregarCategorias: repos.catalogo.categorias,
+          carregarCategorias: () async {
+            final todas = await repos.catalogo.categorias();
+            final cadastro = repos.cadastroProfissional;
+            if (cadastro == null) return todas;
+            try {
+              final atual = await cadastro.carregarAtual();
+              if (atual == null || atual.categorias.isEmpty) return todas;
+              final filtradas =
+                  todas.where((c) => atual.categorias.contains(c.nome)).toList();
+              return filtradas.isEmpty ? todas : filtradas;
+            } on Object {
+              return todas;
+            }
+          },
           aoAbrirNotificacoes: () =>
               abrirNotificacoes(context, profissional: true),
           aoUsarComoCliente: () => irParaCliente(context),
@@ -692,6 +787,7 @@ abstract final class RotasTrato {
             pedidoId: proximo?.pedidoId ?? _semId,
             titulo: proximo?.titulo ?? 'Pedido de hoje',
             remoto: proximo?.remoto ?? false,
+            estadoApi: proximo?.estadoApi,
             estado: (proximo?.emAndamento == true)
                 ? EstadoAgendamento.emAndamento
                 : EstadoAgendamento.agendado,
@@ -715,6 +811,7 @@ abstract final class RotasTrato {
             pedidoId: inicio.proximo?.pedidoId ?? _semId,
             titulo: inicio.proximo?.titulo ?? 'Pedido de hoje',
             remoto: inicio.proximo?.remoto ?? false,
+            estadoApi: inicio.proximo?.estadoApi,
             estado: (inicio.proximo?.emAndamento == true)
                 ? EstadoAgendamento.emAndamento
                 : EstadoAgendamento.agendado,
@@ -745,10 +842,13 @@ abstract final class RotasTrato {
           aoPerguntar: () {
             final pedido =
                 inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
-            _abrir<void>(context, _chat(pedido?.id ?? _semId));
+            _abrir<void>(
+              context,
+              _chat(pedido?.id ?? _semId, comoProfissional: true),
+            );
           },
           aoPerguntarDoPedido: (pedido) =>
-              _abrir<void>(context, _chat(pedido.id)),
+              _abrir<void>(context, _chat(pedido.id, comoProfissional: true)),
         ),
       );
 
@@ -777,7 +877,7 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 tela,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Orçamento enviado!',
                   subtitulo:
                       'O cliente já pode analisar o valor e o prazo combinados.',
@@ -788,9 +888,9 @@ abstract final class RotasTrato {
                       '${pronto.prazoExecucaoDias} ${pronto.prazoExecucaoDias == 1 ? 'dia' : 'dias'}',
                     ),
                   ],
-                  aoVoltarInicio: () => _voltarAoInicio(tela),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                   textoBotaoSecundario: 'Ir para pedidos',
-                  aoTocarSecundario: () => _voltarAoInicio(tela, aba: 1),
+                  aoTocarSecundario: () => _voltarAoInicio(ctxSucesso, aba: 1),
                 ),
                 substituirAtual: true,
               );
@@ -872,12 +972,12 @@ abstract final class RotasTrato {
     if (!context.mounted) return;
     _abrirSucesso<void>(
       context,
-      SucessoAcaoTela(
+      (ctxSucesso) => SucessoAcaoTela(
         titulo: 'Serviço iniciado!',
         subtitulo: 'O cliente foi avisado. Ao concluir, faça o check-out no app.',
-        aoVoltarInicio: () => _voltarAoInicio(context),
+        aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
         textoBotaoSecundario: 'Ir para a agenda',
-        aoTocarSecundario: () => _voltarAoInicio(context, aba: 2),
+        aoTocarSecundario: () => _voltarAoInicio(ctxSucesso, aba: 2),
       ),
       substituirAtual: true,
     );
@@ -899,13 +999,13 @@ abstract final class RotasTrato {
             pedidosMudaram.value++;
             _abrirSucesso<void>(
               tela,
-              SucessoAcaoTela(
+              (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Serviço concluído!',
                 subtitulo:
                     'O cliente tem até ${ConfigPublica.horas(ConfigPublica.atual.prazoConfirmacaoHoras)} para confirmar a conclusão.',
-                aoVoltarInicio: () => _voltarAoInicio(tela),
+                aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 textoBotaoSecundario: 'Ir para pedidos',
-                aoTocarSecundario: () => _voltarAoInicio(tela, aba: 1),
+                aoTocarSecundario: () => _voltarAoInicio(ctxSucesso, aba: 1),
               ),
               substituirAtual: true,
             );
@@ -933,10 +1033,10 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 context,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Avaliação enviada!',
                   subtitulo: 'Obrigado por avaliar o atendimento.',
-                  aoVoltarInicio: () => _voltarAoInicio(context),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
               );
@@ -955,11 +1055,15 @@ abstract final class RotasTrato {
     bool remoto = false,
     String? consultaMapa,
   }) {
+    final precisaAgendar = estadoApi == 'pago_e_retido';
     final agendado = estado == EstadoAgendamento.agendado;
+    final podeCheckIn = agendado && !precisaAgendar;
     final emAndamento = estado == EstadoAgendamento.emAndamento;
-    final finalizado = estado == EstadoAgendamento.concluido ||
-        estadoApi == 'concluido' ||
-        estadoApi == 'em_confirmacao';
+    final emDisputa = estadoApi == 'em_disputa';
+    final emRetrabalho = estadoApi == 'retrabalho';
+    final finalizado = estadoApi == 'concluido' ||
+        estadoApi == 'em_confirmacao' ||
+        (estadoApi == null && estado == EstadoAgendamento.concluido);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -981,7 +1085,7 @@ abstract final class RotasTrato {
                     abrirNoMapa(consultaMapa);
                   },
                 ),
-              if (agendado)
+              if (precisaAgendar || agendado)
                 ListTile(
                   leading: const Icon(Icons.event_available_outlined),
                   title: const Text('Marcar data da visita'),
@@ -990,7 +1094,7 @@ abstract final class RotasTrato {
                     _marcarVisita(context, pedidoId);
                   },
                 ),
-              if (agendado)
+              if (podeCheckIn)
                 ListTile(
                   leading: const Icon(Icons.place_outlined),
                   title: Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
@@ -1008,12 +1112,30 @@ abstract final class RotasTrato {
                     _abrirCheckOut(context, pedidoId, titulo, remoto: remoto);
                   },
                 ),
+              if (emDisputa)
+                ListTile(
+                  leading: const Icon(Icons.gavel_outlined),
+                  title: const Text('Responder disputa'),
+                  onTap: () {
+                    Navigator.of(folha).pop();
+                    abrirDisputa(context, pedidoId);
+                  },
+                ),
+              if (emRetrabalho)
+                ListTile(
+                  leading: const Icon(Icons.build_outlined),
+                  title: const Text('Atender retrabalho'),
+                  onTap: () {
+                    Navigator.of(folha).pop();
+                    abrirRetrabalho(context, pedidoId);
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.chat_bubble_outline),
                 title: const Text('Conversar com o cliente'),
                 onTap: () {
                   Navigator.of(folha).pop();
-                  _abrir<void>(context, _chat(pedidoId));
+                  _abrir<void>(context, _chat(pedidoId, comoProfissional: true));
                 },
               ),
               if (agendado)
@@ -1043,10 +1165,10 @@ abstract final class RotasTrato {
                     _abrir<void>(context, _criarAditivo(pedidoId, titulo));
                   },
                 ),
-              if (finalizado)
+              if (agendado || emAndamento || finalizado)
                 ListTile(
                   leading: const Icon(Icons.receipt_outlined),
-                  title: const Text('Ver valores e avaliar cliente'),
+                  title: Text(finalizado ? 'Ver valores e avaliar cliente' : 'Ver valores do pedido'),
                   onTap: () {
                     Navigator.of(folha).pop();
                     _abrirValoresEAvaliar(context, pedidoId);
@@ -1070,10 +1192,10 @@ abstract final class RotasTrato {
             pedidosMudaram.value++;
             _abrirSucesso<void>(
               context,
-              SucessoAcaoTela(
+              (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Nota enviada!',
                 subtitulo: 'O cliente já recebeu a nota dos materiais no pedido.',
-                aoVoltarInicio: () => _voltarAoInicio(context),
+                aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
               ),
               substituirAtual: true,
             );
@@ -1091,11 +1213,11 @@ abstract final class RotasTrato {
             pedidosMudaram.value++;
             _abrirSucesso<void>(
               context,
-              SucessoAcaoTela(
+              (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Aditivo enviado!',
                 subtitulo:
                     'O cliente foi notificado para aprovar a cobrança extra.',
-                aoVoltarInicio: () => _voltarAoInicio(context),
+                aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
               ),
               substituirAtual: true,
             );
@@ -1116,10 +1238,10 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               _abrirSucesso<void>(
                 context,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Resposta enviada!',
                   subtitulo: 'O cliente e nossa equipe foram avisados da sua posição.',
-                  aoVoltarInicio: () => _voltarAoInicio(context),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
               );
@@ -1140,10 +1262,10 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               _abrirSucesso<void>(
                 context,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Retrabalho agendado!',
                   subtitulo: 'O cliente recebeu a data e o horário escolhidos.',
-                  aoVoltarInicio: () => _voltarAoInicio(context),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
               );
@@ -1175,6 +1297,18 @@ abstract final class RotasTrato {
               AvaliacoesRecebidasTela(servico: servico),
             ),
             aoEditarCadastro: () => _editarCadastroProfissional(context),
+            aoAbrirVerificacao: repos.verificacao == null
+                ? null
+                : () => _abrir<void>(
+                      context,
+                      VerificacaoTela(
+                        servico: repos.verificacao!,
+                        aoCapturarDocumento:
+                            repos.capturaVerificacao?.documento ?? _fotografar,
+                        aoCapturarSelfie:
+                            repos.capturaVerificacao?.selfie ?? _fotografar,
+                      ),
+                    ),
             aoUsarComoCliente: () => irParaCliente(context),
             aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: true),
           );
@@ -1383,6 +1517,7 @@ abstract final class RotasTrato {
       _chat(
         conversa.pedidoId,
         profissionalId: comoProfissional ? null : conversa.profissionalId,
+        comoProfissional: comoProfissional,
       ),
     );
     if (servico is ServicoConversasApi) await servico.marcarLida(conversa);
@@ -1509,14 +1644,14 @@ abstract final class RotasTrato {
             if (!ok || id == null || !context.mounted) return;
             await _abrirSucesso<void>(
               context,
-              SucessoAcaoTela(
+              (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Pedido enviado!',
                 subtitulo:
                     'Os profissionais da sua região foram notificados e você já pode acompanhar os orçamentos.',
                 textoBotaoPrimario: 'Ver pedidos',
-                aoTocarPrimario: () => _voltarAoInicio(context, aba: 2),
+                aoTocarPrimario: () => _voltarAoInicio(ctxSucesso, aba: 2),
                 textoBotaoSecundario: 'Voltar ao início',
-                aoVoltarInicio: () => _voltarAoInicio(context),
+                aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
               ),
               substituirAtual: true,
             );
@@ -1660,19 +1795,19 @@ abstract final class RotasTrato {
                           pedidosMudaram.value++;
                           await _abrirSucesso<void>(
                             context,
-                            SucessoAcaoTela(
+                            (ctxSucesso) => SucessoAcaoTela(
                               titulo: 'Contraproposta enviada!',
                               subtitulo:
                                   'O profissional recebeu sua proposta na conversa e pode aceitar ou responder.',
                               textoBotaoPrimario: 'Abrir conversa',
-                              aoTocarPrimario: () => Navigator.of(context).pushReplacement(
+                              aoTocarPrimario: () => Navigator.of(ctxSucesso).pushReplacement(
                                 MaterialPageRoute<void>(
                                   builder: (_) =>
-                                      _chat(pedidoId, profissionalId: o.profissionalId),
+                                      _chat(pedidoId, profissionalId: o.profissionalId, comoProfissional: false),
                                 ),
                               ),
                               textoBotaoSecundario: 'Voltar ao início',
-                              aoVoltarInicio: () => _voltarAoInicio(context),
+                              aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                             ),
                           );
                         }
@@ -1887,10 +2022,10 @@ abstract final class RotasTrato {
       pedidosMudaram.value++;
       await _abrirSucesso<void>(
         context,
-        SucessoAcaoTela(
+        (ctxSucesso) => SucessoAcaoTela(
           titulo: 'Pedido de retrabalho enviado!',
           subtitulo: 'O profissional foi notificado para agendar o atendimento.',
-          aoVoltarInicio: () => _voltarAoInicio(context),
+          aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
         ),
       );
     }
@@ -1903,9 +2038,11 @@ abstract final class RotasTrato {
         atualizarACada: _intervalo,
         construir: (context, pedido) => PedidoExecucaoTela(
           pedido: pedido,
+          atualizarAditivoLocalmente: false,
           aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
           aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
-          aoConversar: () => _abrir<void>(context, _chat(pedidoId)),
+          aoConversar: () =>
+              _abrir<void>(context, _chat(pedidoId, comoProfissional: false)),
           aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
           aoVerNota: () => _abrir<void>(
             context,
@@ -1929,13 +2066,20 @@ abstract final class RotasTrato {
         ),
       );
 
-  static Widget _chat(String pedidoId, {String? profissionalId}) =>
+  static Widget _chat(
+    String pedidoId, {
+    String? profissionalId,
+    bool? comoProfissional,
+  }) =>
       Carregador<ConversaPedido>(
         carregar: () =>
             repos.chat.conversa(pedidoId, profissionalId: profissionalId),
         atualizarQuando: pedidosMudaram,
         construir: (context, conversa) {
-          final ehPro = ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true;
+          final ehPro = comoProfissional ??
+              (!conversa.souCliente ||
+                  (!repos.modoApi &&
+                      ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true));
           return ChatPedidoTela(
             conversa: conversa,
             aoCapturarFoto: _fotografar,
@@ -2038,10 +2182,10 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 context,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Avaliação enviada!',
                   subtitulo: 'Obrigado por avaliar o profissional.',
-                  aoVoltarInicio: () => _voltarAoInicio(context),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
               );
@@ -2064,11 +2208,11 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 context,
-                SucessoAcaoTela(
+                (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Problema registrado!',
                   subtitulo:
                       'Nossa equipe e o profissional receberam seu relato. Você pode acompanhar pelo pedido.',
-                  aoVoltarInicio: () => _voltarAoInicio(context),
+                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
               );
@@ -2318,4 +2462,35 @@ class _ServicoBuscaCatalogo implements ServicoBusca {
 
   @override
   Future<List<Profissional>> buscar(String termo) => _catalogo.buscar(termo);
+}
+
+class _ServicoCadastroEdicao implements ServicoCadastroProfissional {
+  const _ServicoCadastroEdicao(this._base, this._verificacao);
+
+  final ServicoCadastroProfissional _base;
+  final ServicoVerificacao? _verificacao;
+
+  @override
+  Future<OpcoesCadastro> carregarOpcoes() => _base.carregarOpcoes();
+
+  @override
+  Future<DadosCadastroProfissional?> carregarAtual() async {
+    final atual = await _base.carregarAtual();
+    if (atual == null || atual.categoriasTravadas || _verificacao == null) {
+      return atual;
+    }
+    try {
+      final sit = await _verificacao.carregarSituacao();
+      if (sit.status == StatusVerificacao.emAnalise ||
+          sit.status == StatusVerificacao.aprovada) {
+        return atual.comCategoriasTravadas(true);
+      }
+    } on Object {
+      // Sem verificação consultável agora: mantém a sinalização do perfil.
+    }
+    return atual;
+  }
+
+  @override
+  Future<void> salvar(DadosCadastroProfissional dados) => _base.salvar(dados);
 }

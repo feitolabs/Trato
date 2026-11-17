@@ -132,6 +132,7 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
   T? _dados;
   Object? _erro;
   var _pronto = false;
+  var _emVoo = false;
   var _geracao = 0;
 
   @override
@@ -157,7 +158,7 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
   }
 
   void _aoAtualizarQuando() {
-    if (!mounted) return;
+    if (!mounted || _emVoo) return;
     if (_pronto && _erro == null) {
       _recarregarEmSilencio();
     } else {
@@ -166,6 +167,7 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
   }
 
   Future<void> _carregar() async {
+    _emVoo = true;
     final g = ++_geracao;
     try {
       final d = await widget.carregar();
@@ -181,14 +183,18 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
         _erro = e;
         _pronto = true;
       });
+    } finally {
+      _emVoo = false;
     }
   }
 
   Future<void> _recarregarEmSilencio() async {
+    if (_emVoo) return;
     if (!_pronto) {
       await _carregar();
       return;
     }
+    _emVoo = true;
     final g = ++_geracao;
     try {
       final d = await widget.carregar();
@@ -199,6 +205,8 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
       });
     } on Object {
       // Silencioso ao puxar/atualizar se já havia dado na tela.
+    } finally {
+      _emVoo = false;
     }
   }
 

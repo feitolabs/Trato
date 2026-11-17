@@ -21,11 +21,13 @@ class PerfilPublicoTela extends StatefulWidget {
     this.aoUsarComoCliente,
     this.aoCapturarFotoPerfil,
     this.aoAbrirConfiguracoes,
+    this.aoAbrirVerificacao,
   });
 
   /// Abre as configurações (dados pessoais, notificações, privacidade, ajuda, termos, sair).
   /// A engrenagem só aparece se vier.
   final VoidCallback? aoAbrirConfiguracoes;
+  final VoidCallback? aoAbrirVerificacao;
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
@@ -137,7 +139,11 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                       if (p.verificacao != null) SeloVerificacao(p.verificacao!),
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
-                        '${p.categoria} · ${p.cidade} · no Trato desde ${p.noTratoDesde}',
+                        [
+                          if (p.categoria.trim().isNotEmpty) p.categoria.trim(),
+                          if (p.cidade.trim().isNotEmpty) p.cidade.trim(),
+                          'no Trato desde ${p.noTratoDesde}',
+                        ].join(' · '),
                         style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                       ),
                     ],
@@ -201,8 +207,22 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 ),
               ],
             ],
+            if (widget.aoAbrirVerificacao != null) ...[
+              const SizedBox(height: EspacosTrato.x5),
+              Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const Icon(Icons.verified_user_outlined, color: CoresTrato.petroleo),
+                  title: Text('Verificação de identidade', style: TipografiaTrato.corpoForte),
+                  subtitle: Text('Enviar ou acompanhar documentos', style: TipografiaTrato.legenda),
+                  trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                  onTap: widget.aoAbrirVerificacao,
+                ),
+              ),
+            ],
             if (widget.aoUsarComoCliente != null) ...[
-              const SizedBox(height: EspacosTrato.x6),
+              const SizedBox(height: EspacosTrato.x3),
               Card(
                 margin: EdgeInsets.zero,
                 clipBehavior: Clip.antiAlias,

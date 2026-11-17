@@ -47,15 +47,52 @@ class Aditivo {
     required this.valorCentavos,
     required this.descricao,
     this.estado = EstadoAditivo.aguardando,
+    this.mostrarFoto = true,
   });
 
   final String titulo;
   final int valorCentavos;
   final String descricao;
   final EstadoAditivo estado;
+  final bool mostrarFoto;
 
-  Aditivo comEstado(EstadoAditivo novo) =>
-      Aditivo(titulo: titulo, valorCentavos: valorCentavos, descricao: descricao, estado: novo);
+  Aditivo comEstado(EstadoAditivo novo) => Aditivo(
+        titulo: titulo,
+        valorCentavos: valorCentavos,
+        descricao: descricao,
+        estado: novo,
+        mostrarFoto: mostrarFoto,
+      );
+}
+
+class ItemResumoAditivo {
+  const ItemResumoAditivo({
+    required this.id,
+    required this.descricao,
+    required this.valorCentavos,
+    required this.estadoTexto,
+    required this.estado,
+  });
+
+  final String id;
+  final String descricao;
+  final int valorCentavos;
+  final String estadoTexto;
+  final String estado;
+}
+
+class ItemResumoNota {
+  const ItemResumoNota({
+    required this.numero,
+    required this.totalCentavos,
+    required this.itensResumo,
+    required this.enviadaEm,
+  });
+
+  final int numero;
+  final int totalCentavos;
+  final String itensResumo;
+  final DateTime enviadaEm;
 }
 
 class PedidoEmExecucao {
@@ -65,6 +102,11 @@ class PedidoEmExecucao {
     required this.etapas,
     required this.fotos,
     this.aditivo,
+    this.aditivos = const [],
+    this.notas = const [],
+    this.orcamentoCentavos,
+    this.totalAtualizadoCentavos,
+    this.totalNotasCentavos,
     this.codigoInicio,
     this.codigoConclusao,
     this.podeVerConclusao = true,
@@ -92,6 +134,11 @@ class PedidoEmExecucao {
   /// Rótulos das fotos de check-in ("[Check-in · 14h06]", "[Antes]").
   final List<String> fotos;
   final Aditivo? aditivo;
+  final List<ItemResumoAditivo> aditivos;
+  final List<ItemResumoNota> notas;
+  final int? orcamentoCentavos;
+  final int? totalAtualizadoCentavos;
+  final int? totalNotasCentavos;
 }
 
 enum TipoMensagem { texto, foto, sistema }
@@ -168,12 +215,14 @@ class ConversaPedido {
     this.usuarioId,
     this.orcamentosAtivos = const {},
     this.pedidoAberto = true,
+    this.souCliente = true,
   });
 
   /// Quem está do outro lado (para buscar a foto de perfil).
   final String? usuarioId;
   final Set<String> orcamentosAtivos;
   final bool pedidoAberto;
+  final bool souCliente;
   final String nome;
   final String iniciais;
   final String numeroPedido;

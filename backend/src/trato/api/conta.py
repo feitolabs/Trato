@@ -245,8 +245,13 @@ class DadosPessoaisIn(BaseModel):
     @field_validator("data_nascimento")
     @classmethod
     def _nascimento(cls, v: date | None) -> date | None:
-        if v is not None and not (date(1900, 1, 1) <= v < date.today()):
-            raise ValueError("Data de nascimento inválida.")
+        if v is not None:
+            hoje = date.today()
+            if not (date(1900, 1, 1) <= v < hoje):
+                raise ValueError("Data de nascimento inválida.")
+            idade = hoje.year - v.year - ((hoje.month, hoje.day) < (v.month, v.day))
+            if idade < 18:
+                raise ValueError("O cadastro é exclusivo para maiores de 18 anos.")
         return v
 
 
@@ -340,12 +345,15 @@ def atualizar_dados(
     contexto: Contexto = Depends(obter_contexto),
 ) -> DadosPessoaisOut:
     contexto.usuarios.garantir(usuario.id)
-    novo = _conta(contexto).atualizar_dados(
+    repo = _conta(contexto)
+    if corpo.remover_data_nascimento and repo.dados(usuario.id).data_nascimento is not None:
+        raise HTTPException(422, "A data de nascimento é obrigatória.")
+    novo = repo.atualizar_dados(
         usuario.id,
         telefone=corpo.telefone,
         data_nascimento=corpo.data_nascimento,
         limpar_telefone=corpo.remover_telefone,
-        limpar_nascimento=corpo.remover_data_nascimento,
+        limpar_nascimento=False,
     )
     return DadosPessoaisOut(**vars(novo))
 

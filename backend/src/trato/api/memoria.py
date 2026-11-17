@@ -70,8 +70,14 @@ class PedidosEmMemoria:
     def listar_do_usuario(
         self, usuario_id: str, como_cliente: bool, limite: int = 100, offset: int = 0
     ) -> Sequence[Pedido]:
-        campo = "cliente_id" if como_cliente else "profissional_id"
-        achados = [p for p in self._pedidos.values() if getattr(p, campo) == usuario_id]
+        if como_cliente:
+            achados = [p for p in self._pedidos.values() if p.cliente_id == usuario_id]
+        else:
+            achados = [
+                p
+                for p in self._pedidos.values()
+                if p.profissional_id == usuario_id and p.cliente_id != usuario_id
+            ]
         ordenados = sorted(achados, key=lambda p: p.aberto_em, reverse=True)
         return ordenados[offset : offset + limite]
 
