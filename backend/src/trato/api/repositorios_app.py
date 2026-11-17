@@ -51,6 +51,7 @@ class OrcamentoDoProfissional:
     valor_centavos: int
     status: str
     enviado_em: datetime | None
+    prazo_execucao_dias: int | None = None
 
 
 @dataclass(frozen=True)

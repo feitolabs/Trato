@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/modelos.dart';
 import '../comuns/estados.dart';
+import '../comuns/foco_rolagem.dart';
 
 /// Todas as categorias ativas do catálogo, com busca por nome. Serve para explorar e também
 /// para escolher a categoria do pedido ([titulo] muda). Só mostra o que o catálogo devolveu.
@@ -24,13 +26,22 @@ class TodasCategoriasTela extends StatelessWidget {
       titulo: titulo,
       child: CarregadorTela<List<CategoriaServico>>(
         carregar: carregar,
-        construir: (context, itens, _) => itens.isEmpty
-            ? const EstadoVazio(
-                icone: Icons.grid_view,
-                titulo: 'Nenhuma categoria por enquanto',
-                texto: 'Quando houver serviços disponíveis, eles aparecem aqui.',
-              )
-            : _Grade(itens: itens, aoEscolher: aoEscolher),
+        construir: (context, itens, _) {
+          final ordenadas = [...itens]
+            ..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));
+          if (ordenadas.isEmpty) {
+            final recarregar = AtualizadorTela.de(context);
+            const vazio = EstadoVazio(
+              icone: Icons.grid_view,
+              titulo: 'Nenhuma categoria por enquanto',
+              texto: 'Quando houver serviços disponíveis, eles aparecem aqui.',
+            );
+            return recarregar == null
+                ? vazio
+                : RefreshIndicator(onRefresh: recarregar, child: vazio);
+          }
+          return _Grade(itens: ordenadas, aoEscolher: aoEscolher);
+        },
       ),
     );
   }
@@ -55,23 +66,40 @@ class _GradeState extends State<_Grade> {
     super.dispose();
   }
 
-  static String _sem(String s) => s
-      .toLowerCase()
-      .replaceAll(RegExp('[áàâãä]'), 'a')
-      .replaceAll(RegExp('[éèêë]'), 'e')
-      .replaceAll(RegExp('[íìîï]'), 'i')
-      .replaceAll(RegExp('[óòôõö]'), 'o')
-      .replaceAll(RegExp('[úùûü]'), 'u')
-      .replaceAll('ç', 'c');
-
   @override
   Widget build(BuildContext context) {
-    final termo = _sem(_campo.text.trim());
+    final termo = normalizarTextoBusca(_campo.text);
     final lista = [
       for (final c in widget.itens)
-        if (termo.isEmpty || _sem(c.nome).contains(termo) || _sem(c.descricao).contains(termo)) c,
+        if (termo.isEmpty ||
+            normalizarTextoBusca(c.nome).contains(termo) ||
+            normalizarTextoBusca(c.descricao).contains(termo))
+          c,
     ];
     final escala = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
+    final recarregar = AtualizadorTela.de(context);
+    final Widget resultado = lista.isEmpty
+        ? EstadoVazio(
+            icone: Icons.search_off,
+            titulo: 'Nenhuma categoria encontrada',
+            texto: 'Não achamos "${_campo.text.trim()}". Tente outro nome.',
+          )
+        : GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 200,
+              mainAxisExtent: 116 * escala,
+              mainAxisSpacing: EspacosTrato.x3,
+              crossAxisSpacing: EspacosTrato.x3,
+            ),
+            itemCount: lista.length,
+            itemBuilder: (_, i) => _Bloco(
+              categoria: lista[i],
+              aoTocar: () => widget.aoEscolher(lista[i]),
+            ),
+          );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -80,33 +108,26 @@ class _GradeState extends State<_Grade> {
           style: TipografiaTrato.corpo,
           textInputAction: TextInputAction.search,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Buscar categoria',
-            prefixIcon: Icon(Icons.search),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _campo.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Limpar',
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () {
+                      _campo.clear();
+                      setState(() {});
+                    },
+                  ),
           ),
         ),
         const SizedBox(height: EspacosTrato.x4),
         Expanded(
-          child: lista.isEmpty
-              ? EstadoVazio(
-                  icone: Icons.search_off,
-                  titulo: 'Nenhuma categoria encontrada',
-                  texto: 'Não achamos "${_campo.text.trim()}". Tente outro nome.',
-                )
-              : GridView.builder(
-                  padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 200,
-                    mainAxisExtent: 116 * escala,
-                    mainAxisSpacing: EspacosTrato.x3,
-                    crossAxisSpacing: EspacosTrato.x3,
-                  ),
-                  itemCount: lista.length,
-                  itemBuilder: (_, i) => _Bloco(
-                    categoria: lista[i],
-                    aoTocar: () => widget.aoEscolher(lista[i]),
-                  ),
-                ),
+          child: recarregar == null
+              ? resultado
+              : RefreshIndicator(onRefresh: recarregar, child: resultado),
         ),
       ],
     );

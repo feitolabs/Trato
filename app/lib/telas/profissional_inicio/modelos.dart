@@ -96,6 +96,7 @@ class OrcamentoEnviado {
     required this.versao,
     required this.situacao,
     this.enviadoEm,
+    this.prazoExecucaoDias,
   });
 
   final String pedidoId;
@@ -108,6 +109,7 @@ class OrcamentoEnviado {
   /// `aguardando` (o cliente ainda decide), `aceito` ou `encerrado`.
   final String situacao;
   final DateTime? enviadoEm;
+  final int? prazoExecucaoDias;
 
   bool get aguardando => situacao == 'aguardando';
   bool get aceito => situacao == 'aceito';

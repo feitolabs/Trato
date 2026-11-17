@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato/componentes/componentes.dart';
 import 'apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/modelos.dart';
@@ -55,7 +56,7 @@ void main() {
     testWidgets('mostra os textos do protótipo', (tester) async {
       await _abrir(tester, _novoPedidoCompleto());
 
-      expect(find.text('Passo 2 de 3'), findsOneWidget);
+      expect(find.text('Novo pedido'), findsOneWidget);
       expect(find.text('Conte o que precisa'), findsOneWidget);
       expect(find.text('Elétrica · Tomadas e chuveiro'), findsOneWidget);
       expect(find.text('O que precisa ser feito?'), findsOneWidget);
@@ -64,8 +65,8 @@ void main() {
       expect(find.text('Voltagem do chuveiro'), findsOneWidget);
       expect(find.text('[Foto 1]'), findsOneWidget);
       expect(find.text('Adicionar'), findsOneWidget);
-      expect(find.text('Sem pressa'), findsOneWidget);
-      expect(find.text('Com pressa'), findsOneWidget);
+      expect(find.text('Flexível (sem data fixa)'), findsOneWidget);
+      expect(find.text('Tenho data limite'), findsOneWidget);
       expect(find.text('R\$ 200 a R\$ 500'), findsOneWidget);
       expect(
           find.textContaining('até 5 orçamentos em 48 horas', findRichText: true), findsOneWidget);
@@ -94,10 +95,10 @@ void main() {
       await tester.tap(find.text('Trocar tomada'));
       await tester.tap(find.text('Trocar chuveiro'));
       await tester.pump();
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
 
       expect(
-        find.text('Nenhum serviço selecionado. Escolha pelo menos uma das opções acima.'),
+        find.text('Escolha pelo menos um serviço.'),
         findsOneWidget,
       );
       expect(recebido, isNull);
@@ -107,24 +108,24 @@ void main() {
       await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
 
       await tester.enterText(find.byType(TextField).first, '   ');
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
 
       expect(
-        find.text('Descrição não preenchida. Explique em detalhes o que precisa ser feito.'),
+        find.text('Descreva o que precisa ser feito.'),
         findsOneWidget,
       );
     });
 
-    testWidgets('Próximo devolve o que foi preenchido', (tester) async {
+    testWidgets('Enviar pedido devolve o que foi preenchido', (tester) async {
       RascunhoPedido? recebido;
       await _abrir(tester, NovoPedidoTela(formulario: formularioExemplo, aoEnviar: (r) => recebido = r));
 
       await tester.tap(find.text('127 V'));
       await tester.tap(find.byTooltip('Aumentar'));
-      await tester.tap(find.text('Sem pressa'));
+      await tester.tap(find.text('Flexível (sem data fixa)'));
       await tester.pump();
       await preencherEnderecoDoPedido(tester);
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
 
       expect(recebido, isNotNull);
       expect(recebido!.servicos, ['Trocar tomada', 'Trocar chuveiro']);
@@ -144,7 +145,7 @@ void main() {
       await tester.enterText(find.widgetWithText(TextField, 'Ex.: 300,00'), '350,00');
       await tester.pump();
       await preencherEnderecoDoPedido(tester);
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
 
       expect(recebido, isNotNull);
       expect(recebido!.faixa.minimoCentavos, 35000);
@@ -160,15 +161,15 @@ void main() {
       expect(find.text('Endereço do serviço'), findsOneWidget);
       expect(find.text('Como será o serviço?'), findsNothing); // categoria só presencial
 
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
       expect(recebido, isNull);
       expect(find.text('Informe a rua.'), findsOneWidget);
       expect(find.text('Informe o número.'), findsOneWidget);
       expect(find.text('Informe o bairro.'), findsOneWidget);
-      expect(find.text('Informe o CEP com 8 números (ex.: 35500-000).'), findsOneWidget);
+      expect(find.text('CEP inválido. Use 8 dígitos.'), findsOneWidget);
 
       await preencherEnderecoDoPedido(tester);
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
       expect(recebido, isNotNull);
       expect(recebido!.modalidade, Modalidade.presencial);
       expect(recebido!.endereco!.logradouro, 'Rua das Flores');
@@ -191,7 +192,7 @@ void main() {
 
       await _tocar(tester, find.text('Remoto'));
       expect(find.text('Endereço do serviço'), findsNothing);
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
 
       expect(recebido, isNotNull);
       expect(recebido!.modalidade, Modalidade.remoto);
@@ -207,7 +208,7 @@ void main() {
           aoEnviar: (r) => recebido = r,
         ),
       );
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
       expect(recebido, isNull);
       expect(find.text('Informe a rua.'), findsOneWidget);
     });
@@ -219,9 +220,9 @@ void main() {
       });
     }
 
-    testWidgets('sem callback, Próximo não abre outra tela', (tester) async {
+    testWidgets('sem callback, Enviar pedido não abre outra tela', (tester) async {
       await _abrir(tester, const NovoPedidoTela(formulario: formularioExemplo, ));
-      await _tocar(tester, find.text('Próximo'));
+      await _tocar(tester, find.text('Enviar pedido'));
       expect(find.byType(NovoPedidoTela), findsOneWidget);
     });
   });
@@ -238,6 +239,26 @@ void main() {
       expect(find.text('R\$ 380,00'), findsOneWidget);
       expect(find.text('R\$ 455,00'), findsOneWidget);
       expect(find.text('Ver orçamento'), findsNWidgets(3));
+      final primeiroCartao = find.byType(CartaoTrato).first;
+      final direitaBotao = tester
+          .getTopRight(
+            find.descendant(of: primeiroCartao, matching: find.byType(BotaoSecundario)),
+          )
+          .dx;
+      final direitaColunaCard = tester
+          .getTopRight(
+            find.descendant(of: primeiroCartao, matching: find.byType(Column)).first,
+          )
+          .dx;
+      expect(
+        tester
+            .getTopRight(
+              find.descendant(of: primeiroCartao, matching: find.text('R\$ 340,00')),
+            )
+            .dx,
+        closeTo(direitaColunaCard, 0.5),
+      );
+      expect(direitaBotao, closeTo(direitaColunaCard, 0.5));
     });
 
     testWidgets('ordenação: menor valor, maior nota e mais cedo', (tester) async {

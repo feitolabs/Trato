@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import 'modelos.dart';
@@ -44,14 +45,13 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
   @override
   Widget build(BuildContext context) {
     final dados = widget.dados;
-    return Scaffold(
-      body: SafeArea(
-        child: ConteudoResponsivo(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final recarregar = AtualizadorTela.de(context);
+    final rolagem = SingleChildScrollView(
+      physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -146,7 +146,13 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                 ],
               ],
             ),
-          ),
+          );
+    return Scaffold(
+      body: SafeArea(
+        child: ConteudoResponsivo(
+          child: recarregar == null
+              ? rolagem
+              : RefreshIndicator(onRefresh: recarregar, child: rolagem),
         ),
       ),
     );
@@ -233,7 +239,10 @@ class _CartaoProximo extends StatelessWidget {
             ],
           ),
           const SizedBox(height: EspacosTrato.x4),
-          BotaoSecundario(texto: 'Fazer check-in', aoTocar: aoFazerCheckIn ?? () {}),
+          BotaoSecundario(
+            texto: proximo.emAndamento ? 'Gerenciar serviço (check-out)' : 'Fazer check-in',
+            aoTocar: aoFazerCheckIn ?? () {},
+          ),
         ],
       ),
     );
@@ -303,7 +312,7 @@ class CartaoPedidoAberto extends StatelessWidget {
         textoDistancia(pedido.distanciaKm),
       ],
       if (!pedido.urgente || pedido.prazo.toLowerCase() != 'urgente') pedido.prazo,
-    ];
+    ].where((t) => t.isNotEmpty);
     return Semantics(
       button: true,
       label: '${pedido.titulo}${pedido.urgente ? ', urgente' : ''}, ${textoFaixa(pedido)}',

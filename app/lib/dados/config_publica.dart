@@ -63,15 +63,28 @@ class ConfigPublica {
 
   /// A configuração em uso pelas telas.
   static ConfigPublica atual = const ConfigPublica();
+  static DateTime? _ultimaCarga;
 
   /// Busca no servidor e troca [atual]. Sem rede ou sem a rota, fica como estava.
   static Future<void> carregar(ClienteApi api) async {
     try {
       final j = await api.get('/v1/config/publica');
-      if (j is Map<String, dynamic>) atual = ConfigPublica.deJson(j);
+      if (j is Map<String, dynamic>) {
+        atual = ConfigPublica.deJson(j);
+        _ultimaCarga = DateTime.now();
+      }
     } on Object {
       // Segue com os valores que já estavam.
     }
+  }
+
+  /// Atualiza em segundo plano quando o cache passar de 60 segundos.
+  static Future<void> garantirAtualizada(ClienteApi api) async {
+    final ultima = _ultimaCarga;
+    if (ultima != null && DateTime.now().difference(ultima) < const Duration(seconds: 60)) {
+      return;
+    }
+    await carregar(api);
   }
 
   /// "48 horas", "1 hora".

@@ -166,6 +166,13 @@ void main() {
       );
       expect(find.text('64 dias'), findsOneWidget);
       expect(find.text('até 31/12/2026'), findsOneWidget);
+      expect(
+        tester.getTopRight(find.text('até 31/12/2026')).dx,
+        closeTo(
+          tester.getTopRight(find.byType(LinearProgressIndicator)).dx,
+          0.5,
+        ),
+      );
       expect(find.textContaining('7 dias para atender'), findsOneWidget);
       await tester.tap(find.text('Pedir retrabalho'));
       expect(pediu, isTrue);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../comuns/foco_rolagem.dart';
 import 'estrutura_auth.dart';
 import 'login_tela.dart';
 import 'validacao.dart';
@@ -21,6 +22,11 @@ class NovaSenhaTela extends StatefulWidget {
 }
 
 class _NovaSenhaTelaState extends State<NovaSenhaTela> {
+  final _scroll = ScrollController();
+  final _keySenha = GlobalKey();
+  final _keyConfirmacao = GlobalKey();
+  final _focoSenha = FocusNode();
+  final _focoConfirmacao = FocusNode();
   final _senha = TextEditingController();
   final _confirmacao = TextEditingController();
   var _tentou = false;
@@ -32,6 +38,9 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _focoSenha.dispose();
+    _focoConfirmacao.dispose();
     _senha.dispose();
     _confirmacao.dispose();
     super.dispose();
@@ -40,7 +49,7 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
   String? get _erroSenha => _tentou ? ValidacaoAuth.senhaNova(_senha.text) : null;
 
   String? get _erroConfirmacao => _tentou && _senha.text != _confirmacao.text
-      ? 'As senhas não são iguais. Digite a mesma senha nos dois campos.'
+      ? 'As senhas não são iguais.'
       : null;
 
   void _irParaLogin(String aviso) {
@@ -55,7 +64,21 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
   Future<void> _salvar() async {
     if (_carregando) return;
     setState(() => _tentou = true);
-    if (_erroSenha != null || _erroConfirmacao != null) return;
+    if (_erroSenha != null || _erroConfirmacao != null) {
+      focarPrimeiroErro([
+        EntradaCampoErro(
+          key: _keySenha,
+          focusNode: _focoSenha,
+          temErro: () => _erroSenha != null,
+        ),
+        EntradaCampoErro(
+          key: _keyConfirmacao,
+          focusNode: _focoConfirmacao,
+          temErro: () => _erroConfirmacao != null,
+        ),
+      ]);
+      return;
+    }
     setState(() {
       _carregando = true;
       _erroServico = null;
@@ -97,6 +120,7 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
       canPop: false,
       child: EstruturaAuth(
         comVoltar: false,
+        scrollController: _scroll,
         rodape: BotaoLink(texto: 'Cancelar', aoTocar: _desistir),
         children: [
           const SizedBox(height: EspacosTrato.x4),
@@ -107,22 +131,30 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
             style: TipografiaTrato.corpo,
           ),
           const SizedBox(height: EspacosTrato.x6),
-          CampoTrato(
-            rotulo: 'Senha nova',
-            controlador: _senha,
-            senha: !_mostrar,
-            erro: _erroSenha,
-            textoAcao: _mostrar ? 'Ocultar' : 'Mostrar',
-            aoTocarAcao: () => setState(() => _mostrar = !_mostrar),
-            aoMudar: (_) => setState(() {}),
+          KeyedSubtree(
+            key: _keySenha,
+            child: CampoTrato(
+              rotulo: 'Senha nova',
+              controlador: _senha,
+              foco: _focoSenha,
+              senha: !_mostrar,
+              erro: _erroSenha,
+              textoAcao: _mostrar ? 'Ocultar' : 'Mostrar',
+              aoTocarAcao: () => setState(() => _mostrar = !_mostrar),
+              aoMudar: (_) => setState(() {}),
+            ),
           ),
           const SizedBox(height: EspacosTrato.x5),
-          CampoTrato(
-            rotulo: 'Repita a senha nova',
-            controlador: _confirmacao,
-            senha: !_mostrar,
-            erro: _erroConfirmacao,
-            aoMudar: (_) => setState(() {}),
+          KeyedSubtree(
+            key: _keyConfirmacao,
+            child: CampoTrato(
+              rotulo: 'Repita a senha nova',
+              controlador: _confirmacao,
+              foco: _focoConfirmacao,
+              senha: !_mostrar,
+              erro: _erroConfirmacao,
+              aoMudar: (_) => setState(() {}),
+            ),
           ),
           const SizedBox(height: EspacosTrato.x5),
           MensagemErroAuth(_erroServico),

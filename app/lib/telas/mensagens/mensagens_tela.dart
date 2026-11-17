@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_de_usuario.dart';
 import '../comuns/estados.dart';
@@ -68,19 +69,24 @@ class ListaConversas extends StatelessWidget {
       carregar: servico.listar,
       atualizarACada: atualizarACada,
       atualizarQuando: atualizarQuando,
-      construir: (context, itens, _) => itens.isEmpty
-          ? EstadoVazio(
-              icone: Icons.chat_bubble_outline,
-              titulo: 'Nenhuma conversa ainda',
-              texto: textoVazio,
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-              itemCount: itens.length,
-              separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-              itemBuilder: (_, i) =>
-                  _LinhaConversa(item: itens[i], aoTocar: () => aoAbrirConversa?.call(itens[i])),
-            ),
+      construir: (context, itens, _) {
+        final recarregar = AtualizadorTela.de(context);
+        final Widget corpo = itens.isEmpty
+            ? EstadoVazio(
+                icone: Icons.chat_bubble_outline,
+                titulo: 'Nenhuma conversa ainda',
+                texto: textoVazio,
+              )
+            : ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+                itemCount: itens.length,
+                separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+                itemBuilder: (_, i) =>
+                    _LinhaConversa(item: itens[i], aoTocar: () => aoAbrirConversa?.call(itens[i])),
+              );
+        return recarregar == null ? corpo : RefreshIndicator(onRefresh: recarregar, child: corpo);
+      },
     );
   }
 }

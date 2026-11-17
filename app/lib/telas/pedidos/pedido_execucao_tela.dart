@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import 'modelos.dart';
 import 'pecas.dart';
 import 'recursos_mvp.dart';
 
-/// Tela 16 — Serviço em execução. O app só mostra e pede: aprovar/recusar o aditivo
-/// chama os callbacks (o backend decide); o estado local é provisório.
+/// Tela 16 — Serviço em execução. Centraliza acompanhamento, código, chat, contrato e aditivos.
 class PedidoExecucaoTela extends StatefulWidget {
   const PedidoExecucaoTela({
     super.key,
@@ -19,6 +19,9 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoVerConclusao,
     this.aoVerNota,
     this.aoVerAditivo,
+    this.aoVerContrato,
+    this.aoAbrirProblema,
+    this.aoCancelarPedido,
   });
 
   final PedidoEmExecucao pedido;
@@ -31,6 +34,9 @@ class PedidoExecucaoTela extends StatefulWidget {
   /// Abrem a nota de materiais e o aditivo do pedido (quem liga as telas é o `rotas.dart`).
   final VoidCallback? aoVerNota;
   final VoidCallback? aoVerAditivo;
+  final VoidCallback? aoVerContrato;
+  final VoidCallback? aoAbrirProblema;
+  final VoidCallback? aoCancelarPedido;
 
   @override
   State<PedidoExecucaoTela> createState() => _PedidoExecucaoTelaState();
@@ -47,15 +53,11 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
   @override
   Widget build(BuildContext context) {
     final pedido = widget.pedido;
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ConteudoResponsivo(
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
-                  children: [
+    final recarregar = AtualizadorTela.de(context);
+    final lista = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
+      children: [
                     _Topo(numero: pedido.numero, aoTocarSos: widget.aoTocarSos),
                     const SizedBox(height: EspacosTrato.x3),
                     Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
@@ -137,12 +139,22 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
                       ),
                     ],
-                    if (widget.aoVerNota != null || widget.aoVerAditivo != null) ...[
+                    if (widget.aoVerNota != null ||
+                        widget.aoVerAditivo != null ||
+                        widget.aoVerContrato != null ||
+                        widget.aoAbrirProblema != null ||
+                        widget.aoCancelarPedido != null) ...[
                       const SizedBox(height: EspacosTrato.x3),
+                      if (widget.aoVerContrato != null)
+                        BotaoLink(texto: 'Ver contrato do serviço', aoTocar: widget.aoVerContrato!),
                       if (widget.aoVerNota != null)
                         BotaoLink(texto: 'Ver nota de materiais', aoTocar: widget.aoVerNota!),
                       if (widget.aoVerAditivo != null)
                         BotaoLink(texto: 'Ver aditivo do serviço', aoTocar: widget.aoVerAditivo!),
+                      if (widget.aoAbrirProblema != null)
+                        BotaoLink(texto: 'Relatar problema', aoTocar: widget.aoAbrirProblema!),
+                      if (widget.aoCancelarPedido != null)
+                        BotaoLink(texto: 'Cancelar pedido', aoTocar: widget.aoCancelarPedido!),
                     ],
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Linha do tempo', style: TipografiaTrato.titulo),
@@ -158,7 +170,16 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                       ],
                     ),
                   ],
-                ),
+                );
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ConteudoResponsivo(
+                child: recarregar == null
+                    ? lista
+                    : RefreshIndicator(onRefresh: recarregar, child: lista),
               ),
             ),
             _Rodape(

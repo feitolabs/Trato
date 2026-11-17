@@ -54,7 +54,7 @@ class OrcamentosPostgres:
         with self._banco.transacao() as con:
             linhas = con.execute(
                 "select o.id, o.pedido_id, o.versao, o.valor_total_centavos, o.status, "
-                "o.enviado_em from public.orcamentos o "
+                "o.enviado_em, o.prazo_execucao_dias from public.orcamentos o "
                 "where o.profissional_id = %s and o.status in ('enviado', 'aceito', 'recusado') "
                 "order by o.enviado_em desc nulls last, o.id limit 200",
                 (achado,),
@@ -67,6 +67,7 @@ class OrcamentosPostgres:
                 int(l["valor_total_centavos"]),
                 l["status"],
                 l["enviado_em"],
+                l["prazo_execucao_dias"],
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )

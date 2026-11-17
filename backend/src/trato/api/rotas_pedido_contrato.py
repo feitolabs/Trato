@@ -797,13 +797,14 @@ def avaliar_contrato(
     return rotas_app.avaliar(contrato_id, corpo, usuario, contexto)
 
 
-# --- Contraproposta de valor -------------------------------------------------------------
+# --- Contraproposta de valor e prazo ------------------------------------------------------
 #
-# O cliente propõe um valor menor para um orçamento; o profissional aceita (vira uma nova versão
-# do orçamento, com um item só, no valor combinado) ou responde pelo chat. Nada muda no banco:
-# a proposta fica no chat, com uma marca no começo do texto que o app esconde.
+# O cliente pode propor outro valor e/ou prazo de execução em dias; o profissional aceita
+# (cria uma nova versão do orçamento mantendo as horas originais) ou envia uma nova proposta
+# diretamente no chat. A negociação fica na conversa e cada nova proposta traz ação de aceite.
 
 MARCA_CONTRAPROPOSTA = "[contraproposta:"
+MARCA_PROPOSTA = "[proposta:"
 
 
 def _reais(centavos: int) -> str:
@@ -811,11 +812,20 @@ def _reais(centavos: int) -> str:
     return f"R$ {inteiro},{centavos % 100:02d}"
 
 
+def _rotulo_dias(dias: int | None) -> str:
+    if dias is None:
+        return ""
+    return "1 dia" if dias == 1 else f"{dias} dias"
+
+
 class ContrapropostaIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    valor_centavos: StrictInt = Field(
-        gt=0, le=TETO_CENTAVOS, description="O valor que o cliente propõe."
+    valor_centavos: StrictInt | None = Field(
+        default=None, gt=0, le=TETO_CENTAVOS, description="O valor que o cliente propõe."
+    )
+    prazo_execucao_dias: StrictInt | None = Field(
+        default=None, ge=1, le=365, description="O prazo de execução em dias proposto."
     )
     mensagem: str | None = Field(default=None, max_length=500)
 
@@ -824,18 +834,29 @@ class ContrapropostaOut(BaseModel):
     mensagem_id: int
     valor_centavos: int
     orcamento_id: str
+    prazo_execucao_dias: int | None = None
 
 
 class AceiteContrapropostaIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     valor_centavos: StrictInt = Field(gt=0, le=TETO_CENTAVOS)
+    prazo_execucao_dias: StrictInt | None = Field(default=None, ge=1, le=365)
 
 
 class AceiteContrapropostaOut(BaseModel):
     orcamento_id: str
     valor_centavos: int
     versao: int | None = None
+    prazo_execucao_dias: int | None = None
+
+
+class NovaPropostaProfissionalIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    valor_centavos: StrictInt = Field(gt=0, le=TETO_CENTAVOS)
+    prazo_execucao_dias: StrictInt | None = Field(default=None, ge=1, le=365)
+    mensagem: str | None = Field(default=None, max_length=500)
 
 
 def _orcamento_do_pedido(contexto: Contexto, pedido: Pedido, orcamento_id: str):  # type: ignore[no-untyped-def]
@@ -847,101 +868,13 @@ def _orcamento_do_pedido(contexto: Contexto, pedido: Pedido, orcamento_id: str):
     return detalhe
 
 
-@router.post(
-    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta",
-    response_model=ContrapropostaOut,
-    status_code=201,
-    summary="Cliente propõe um valor menor para o orçamento",
-    description=(
-        "Só o cliente dono do pedido, enquanto o pedido ainda recebe orçamentos. O valor precisa "
-        "ser menor que o do orçamento. A proposta vai para a conversa com aquele profissional."
-    ),
-)
-def contraproposta(
-    pedido_id: str,
-    orcamento_id: str,
-    corpo: ContrapropostaIn,
-    request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
-    contexto: Contexto = Depends(obter_contexto),
-) -> ContrapropostaOut:
-    pedido = contexto.pedidos.obter(pedido_id)
-    if pedido is None or pedido.cliente_id != usuario.id:
-        raise HTTPException(404, "Pedido não encontrado.")
-    if pedido.estado is not Estado.ABERTO:
-        raise HTTPException(409, "Este pedido já não aceita contraproposta.")
-    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
-    if corpo.valor_centavos >= detalhe.valor_centavos:
-        raise HTTPException(
-            422, f"A contraproposta precisa ser menor que {_reais(detalhe.valor_centavos)}."
-        )
-    extra = ""
-    if corpo.mensagem:
-        extra = " " + limpar_texto(corpo.mensagem, "mensagem", 500, obter_config_seguranca())
-    texto = (
-        f"{MARCA_CONTRAPROPOSTA}{orcamento_id}:{corpo.valor_centavos}] "
-        f"Contraproposta de {_reais(corpo.valor_centavos)} "
-        f"(o orçamento atual é {_reais(detalhe.valor_centavos)}).{extra}"
-    )
-    conversa = contexto.conversas.abrir(pedido.id, detalhe.profissional_id)
-    mensagem_id = contexto.conversas.enviar(conversa, usuario.id, texto)
-    avisar_mensagem_nova(
-        request,
-        contexto,
-        conversa_id=conversa,
-        pedido_id=pedido.id,
-        autor_id=usuario.id,
-        destinatario_id=detalhe.profissional_id,
-        mensagem_id=mensagem_id,
-    )
-    return ContrapropostaOut(
-        mensagem_id=mensagem_id, valor_centavos=corpo.valor_centavos, orcamento_id=orcamento_id
-    )
-
-
-@router.post(
-    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta/aceitar",
-    response_model=AceiteContrapropostaOut,
-    status_code=201,
-    summary="Profissional aceita a contraproposta e atualiza o orçamento",
-    description=(
-        "Só o autor do orçamento. O valor tem de ser o de uma contraproposta que o cliente "
-        "mandou na conversa. Cria uma nova versão do orçamento com um item só, no valor "
-        "combinado, mantendo prazo e garantia."
-    ),
-)
-def aceitar_contraproposta(
-    pedido_id: str,
-    orcamento_id: str,
-    corpo: AceiteContrapropostaIn,
-    request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
-    contexto: Contexto = Depends(obter_contexto),
-) -> AceiteContrapropostaOut:
-    pedido = contexto.pedidos.obter(pedido_id)
-    if pedido is None:
-        raise HTTPException(404, "Pedido não encontrado.")
-    if pedido.estado is not Estado.ABERTO:
-        raise HTTPException(409, "Este pedido já não recebe mudança no orçamento.")
-    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
-    if detalhe.profissional_id != usuario.id:
-        raise HTTPException(404, "Orçamento não encontrado.")
-    conversa = contexto.conversas.abrir(pedido.id, usuario.id)
-    marca = f"{MARCA_CONTRAPROPOSTA}{orcamento_id}:{corpo.valor_centavos}]"
-    houve = any(
-        m.autor_id == pedido.cliente_id and m.texto.startswith(marca)
-        for m in contexto.conversas.listar(conversa)
-    )
-    if not houve:
-        raise HTTPException(422, "O cliente não fez essa contraproposta.")
-    if corpo.valor_centavos >= detalhe.valor_centavos:
-        raise HTTPException(409, "O orçamento já está nesse valor ou abaixo.")
+def _itens_preservando_horas(detalhe, valor_centavos: int) -> list[ItemOrcamento]:  # type: ignore[no-untyped-def]
     itens_novos = [
         ItemOrcamento(
             tipo="outro",
             descricao="Valor combinado na contraproposta",
             quantidade=Decimal(1),
-            valor_unitario_centavos=corpo.valor_centavos,
+            valor_unitario_centavos=valor_centavos,
         )
     ]
     # O cliente continua vendo as horas: itens de valor zero (o preço já está no combinado).
@@ -965,28 +898,44 @@ def aceitar_contraproposta(
                 valor_unitario_centavos=0,
             )
         )
+    return itens_novos
+
+
+def _publicar_nova_versao_orcamento(
+    *,
+    request: Request,
+    contexto: Contexto,
+    pedido: Pedido,
+    detalhe,  # type: ignore[no-untyped-def]
+    profissional_id: str,
+    valor_centavos: int,
+    prazo_execucao_dias: int | None,
+    texto_aviso: str,
+) -> AceiteContrapropostaOut:
+    prazo_final = (
+        prazo_execucao_dias if prazo_execucao_dias is not None else detalhe.prazo_execucao_dias
+    )
     novo_id = contexto.orcamentos.enviar(
         pedido_id=pedido.id,
-        profissional_id=usuario.id,
-        itens=itens_novos,
+        profissional_id=profissional_id,
+        itens=_itens_preservando_horas(detalhe, valor_centavos),
         agora=contexto.agora(),
-        prazo_execucao_dias=detalhe.prazo_execucao_dias,
+        prazo_execucao_dias=prazo_final,
         validade_ate=detalhe.validade_ate,
         garantia_dias=detalhe.garantia_dias,
         fora_do_escopo=detalhe.fora_do_escopo,
         observacoes=detalhe.observacoes,
     )
-    aviso_id = contexto.conversas.enviar(
-        conversa,
-        usuario.id,
-        f"Contraproposta aceita. Novo orçamento de {_reais(corpo.valor_centavos)}.",
-    )
+    conversa = contexto.conversas.abrir(pedido.id, profissional_id)
+    dias_sufixo = f":{prazo_final}" if prazo_final is not None else ""
+    texto_chat = f"{MARCA_PROPOSTA}{novo_id}:{valor_centavos}{dias_sufixo}] {texto_aviso}"
+    aviso_id = contexto.conversas.enviar(conversa, profissional_id, texto_chat)
     avisar_mensagem_nova(
         request,
         contexto,
         conversa_id=conversa,
         pedido_id=pedido.id,
-        autor_id=usuario.id,
+        autor_id=profissional_id,
         destinatario_id=pedido.cliente_id,
         mensagem_id=aviso_id,
     )
@@ -1000,8 +949,194 @@ def aceitar_contraproposta(
     novo = contexto.orcamentos.detalhe(novo_id)
     return AceiteContrapropostaOut(
         orcamento_id=novo_id,
-        valor_centavos=corpo.valor_centavos,
+        valor_centavos=valor_centavos,
         versao=novo.versao if novo else None,
+        prazo_execucao_dias=prazo_final,
+    )
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta",
+    response_model=ContrapropostaOut,
+    status_code=201,
+    summary="Cliente propõe novo valor e/ou prazo em dias para o orçamento",
+    description=(
+        "Só o cliente dono do pedido, enquanto o pedido ainda recebe orçamentos. O valor não pode "
+        "ultrapassar o orçamento atual e ao menos valor ou prazo em dias precisa mudar."
+    ),
+)
+def contraproposta(
+    pedido_id: str,
+    orcamento_id: str,
+    corpo: ContrapropostaIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> ContrapropostaOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None or pedido.cliente_id != usuario.id:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido já não aceita contraproposta.")
+    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
+    valor = corpo.valor_centavos if corpo.valor_centavos is not None else detalhe.valor_centavos
+    if valor > detalhe.valor_centavos:
+        raise HTTPException(
+            422, f"A contraproposta não pode passar de {_reais(detalhe.valor_centavos)}."
+        )
+    mudou_valor = valor < detalhe.valor_centavos
+    mudou_dias = (
+        corpo.prazo_execucao_dias is not None
+        and corpo.prazo_execucao_dias != detalhe.prazo_execucao_dias
+    )
+    if not (mudou_valor or mudou_dias):
+        raise HTTPException(
+            422,
+            f"A contraproposta precisa ser menor que {_reais(detalhe.valor_centavos)} "
+            "ou propor outro prazo em dias.",
+        )
+    extra = ""
+    if corpo.mensagem:
+        extra = " " + limpar_texto(corpo.mensagem, "mensagem", 500, obter_config_seguranca())
+    dias_marca = f":{corpo.prazo_execucao_dias}" if corpo.prazo_execucao_dias is not None else ""
+    dias_texto = (
+        f" para executar em {_rotulo_dias(corpo.prazo_execucao_dias)}"
+        if corpo.prazo_execucao_dias is not None
+        else ""
+    )
+    texto = (
+        f"{MARCA_CONTRAPROPOSTA}{orcamento_id}:{valor}{dias_marca}] "
+        f"Contraproposta de {_reais(valor)}{dias_texto} "
+        f"(o orçamento atual é {_reais(detalhe.valor_centavos)}).{extra}"
+    )
+    conversa = contexto.conversas.abrir(pedido.id, detalhe.profissional_id)
+    mensagem_id = contexto.conversas.enviar(conversa, usuario.id, texto)
+    avisar_mensagem_nova(
+        request,
+        contexto,
+        conversa_id=conversa,
+        pedido_id=pedido.id,
+        autor_id=usuario.id,
+        destinatario_id=detalhe.profissional_id,
+        mensagem_id=mensagem_id,
+    )
+    return ContrapropostaOut(
+        mensagem_id=mensagem_id,
+        valor_centavos=valor,
+        orcamento_id=orcamento_id,
+        prazo_execucao_dias=corpo.prazo_execucao_dias,
+    )
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta/aceitar",
+    response_model=AceiteContrapropostaOut,
+    status_code=201,
+    summary="Profissional aceita a contraproposta e atualiza o orçamento",
+    description=(
+        "Só o autor do orçamento. Confere a contraproposta na conversa e cria uma nova versão "
+        "do orçamento com o valor e prazo combinados, mantendo garantia e fora do escopo."
+    ),
+)
+def aceitar_contraproposta(
+    pedido_id: str,
+    orcamento_id: str,
+    corpo: AceiteContrapropostaIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> AceiteContrapropostaOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido já não recebe mudança no orçamento.")
+    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
+    if detalhe.profissional_id != usuario.id:
+        raise HTTPException(404, "Orçamento não encontrado.")
+    conversa = contexto.conversas.abrir(pedido.id, usuario.id)
+    dias_marca = f":{corpo.prazo_execucao_dias}" if corpo.prazo_execucao_dias is not None else ""
+    marca_exata = f"{MARCA_CONTRAPROPOSTA}{orcamento_id}:{corpo.valor_centavos}{dias_marca}]"
+    houve = any(
+        m.autor_id == pedido.cliente_id and m.texto.startswith(marca_exata)
+        for m in contexto.conversas.listar(conversa)
+    )
+    if not houve:
+        raise HTTPException(422, "O cliente não fez essa contraproposta.")
+    mudou_dias = (
+        corpo.prazo_execucao_dias is not None
+        and corpo.prazo_execucao_dias != detalhe.prazo_execucao_dias
+    )
+    if corpo.valor_centavos > detalhe.valor_centavos or (
+        corpo.valor_centavos == detalhe.valor_centavos and not mudou_dias
+    ):
+        raise HTTPException(409, "O orçamento já está nesse valor ou abaixo.")
+    prazo_final = (
+        corpo.prazo_execucao_dias
+        if corpo.prazo_execucao_dias is not None
+        else detalhe.prazo_execucao_dias
+    )
+    prazo_txt = f" em {_rotulo_dias(prazo_final)}" if prazo_final is not None else ""
+    return _publicar_nova_versao_orcamento(
+        request=request,
+        contexto=contexto,
+        pedido=pedido,
+        detalhe=detalhe,
+        profissional_id=usuario.id,
+        valor_centavos=corpo.valor_centavos,
+        prazo_execucao_dias=prazo_final,
+        texto_aviso=(
+            f"Contraproposta aceita. Novo orçamento de {_reais(corpo.valor_centavos)}{prazo_txt}."
+        ),
+    )
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/propor",
+    response_model=AceiteContrapropostaOut,
+    status_code=201,
+    summary="Profissional envia nova proposta de valor/dias pelo chat",
+    description=(
+        "Só o profissional autor do orçamento enquanto o pedido está aberto. Cria uma nova "
+        "versão do orçamento com valor e/ou dias ajustados e coloca o cartão de aceite no chat."
+    ),
+)
+def propor_nova_condicao(
+    pedido_id: str,
+    orcamento_id: str,
+    corpo: NovaPropostaProfissionalIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> AceiteContrapropostaOut:
+    pedido = contexto.pedidos.obter(pedido_id)
+    if pedido is None:
+        raise HTTPException(404, "Pedido não encontrado.")
+    if pedido.estado is not Estado.ABERTO:
+        raise HTTPException(409, "Este pedido já não recebe mudança no orçamento.")
+    detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
+    if detalhe.profissional_id != usuario.id:
+        raise HTTPException(404, "Orçamento não encontrado.")
+    prazo_final = (
+        corpo.prazo_execucao_dias
+        if corpo.prazo_execucao_dias is not None
+        else detalhe.prazo_execucao_dias
+    )
+    prazo_txt = f" em {_rotulo_dias(prazo_final)}" if prazo_final is not None else ""
+    extra = ""
+    if corpo.mensagem:
+        extra = " " + limpar_texto(corpo.mensagem, "mensagem", 500, obter_config_seguranca())
+    return _publicar_nova_versao_orcamento(
+        request=request,
+        contexto=contexto,
+        pedido=pedido,
+        detalhe=detalhe,
+        profissional_id=usuario.id,
+        valor_centavos=corpo.valor_centavos,
+        prazo_execucao_dias=prazo_final,
+        texto_aviso=(
+            f"Nova proposta de {_reais(corpo.valor_centavos)}{prazo_txt}.{extra}"
+        ),
     )
 
 

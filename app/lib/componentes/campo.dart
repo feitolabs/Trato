@@ -24,6 +24,9 @@ class CampoTrato extends StatelessWidget {
     this.centralizado = false,
     this.textoAcao,
     this.aoTocarAcao,
+    this.foco,
+    this.acaoTeclado,
+    this.aoEnviarTeclado,
   });
 
   final String rotulo;
@@ -51,6 +54,9 @@ class CampoTrato extends StatelessWidget {
   /// Ação tocável dentro do campo, à direita. Ex.: "Mostrar" na senha.
   final String? textoAcao;
   final VoidCallback? aoTocarAcao;
+  final FocusNode? foco;
+  final TextInputAction? acaoTeclado;
+  final ValueChanged<String>? aoEnviarTeclado;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +75,9 @@ class CampoTrato extends StatelessWidget {
         ],
         TextField(
           controller: controlador,
+          focusNode: foco,
+          textInputAction: acaoTeclado,
+          onSubmitted: aoEnviarTeclado,
           obscureText: senha,
           keyboardType: teclado,
           inputFormatters: formatadores,

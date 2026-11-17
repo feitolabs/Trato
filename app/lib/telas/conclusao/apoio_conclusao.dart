@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/imagem_trato.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 
 /// Início de frase: "o profissional" vira "O profissional"; "Maria" continua "Maria".
@@ -33,6 +34,8 @@ class EstruturaConclusao extends StatelessWidget {
     required this.children,
     this.rodape,
     this.tituloBarra,
+    this.scrollController,
+    this.aoAtualizar,
   });
 
   final List<Widget> children;
@@ -40,9 +43,20 @@ class EstruturaConclusao extends StatelessWidget {
 
   /// Sem título, a tela fica sem barra (como a Avaliação).
   final String? tituloBarra;
+  final ScrollController? scrollController;
+  final Future<void> Function()? aoAtualizar;
 
   @override
   Widget build(BuildContext context) {
+    final recarregar = aoAtualizar ?? AtualizadorTela.de(context);
+    final rolagem = SingleChildScrollView(
+      controller: scrollController,
+      physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
+      child: ConteudoResponsivo(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      ),
+    );
     return Scaffold(
       appBar: tituloBarra == null ? null : AppBar(title: Text(tituloBarra!)),
       body: Column(
@@ -50,12 +64,9 @@ class EstruturaConclusao extends StatelessWidget {
           Expanded(
             child: SafeArea(
               bottom: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
-                child: ConteudoResponsivo(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
-                ),
-              ),
+              child: recarregar == null
+                  ? rolagem
+                  : RefreshIndicator(onRefresh: recarregar, child: rolagem),
             ),
           ),
           if (rodape != null)

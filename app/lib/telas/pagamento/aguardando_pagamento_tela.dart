@@ -39,6 +39,9 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(widget.intervalo, (_) => _consultar());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _consultar();
+    });
   }
 
   @override
@@ -88,8 +91,8 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
               Text(
                 _falhou
                     ? 'Nada foi cobrado. Volte e tente de novo.'
-                    : 'Assim que o parceiro de pagamento confirmar, o Trato avisa aqui. '
-                        'Isso pode levar alguns instantes.',
+                    : 'Assim que o pagamento for confirmado, avisamos você por aqui. '
+                        'Isso leva apenas alguns instantes.',
                 style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
               ),
               if (!_falhou) ...[

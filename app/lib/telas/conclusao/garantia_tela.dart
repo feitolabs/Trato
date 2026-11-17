@@ -49,11 +49,13 @@ class GarantiaTela extends StatelessWidget {
               ),
               const SizedBox(height: EspacosTrato.x3),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
                       child: Text(
                         '${dados.diasRestantes} ${dados.diasRestantes == 1 ? 'dia' : 'dias'}',
                         style: TipografiaTrato.tituloGrande,
@@ -62,18 +64,16 @@ class GarantiaTela extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: EspacosTrato.x3),
-                  Expanded(
-                    child: Align(
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
                       alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'até ${formatarData(dados.fimEm)}',
-                          style: TipografiaTrato.corpoPequeno.copyWith(
-                            color: CoresTrato.textoSecundario,
-                          ),
-                          maxLines: 1,
+                      child: Text(
+                        'até ${formatarData(dados.fimEm)}',
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: CoresTrato.textoSecundario,
                         ),
+                        maxLines: 1,
                       ),
                     ),
                   ),

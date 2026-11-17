@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../dados/relogio_de_atualizacao.dart';
 import '../../tema/tema.dart';
@@ -44,7 +45,7 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   @override
   void initState() {
     super.initState();
-    widget.atualizarQuando?.addListener(_recarregar);
+    widget.atualizarQuando?.addListener(_aoDispararAtualizacao);
     final intervalo = widget.atualizarACada;
     if (intervalo != null) {
       _relogio = RelogioDeAtualizacao(
@@ -57,10 +58,28 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   }
 
   @override
+  void didUpdateWidget(covariant CarregadorTela<T> antigo) {
+    super.didUpdateWidget(antigo);
+    if (antigo.atualizarQuando != widget.atualizarQuando) {
+      antigo.atualizarQuando?.removeListener(_aoDispararAtualizacao);
+      widget.atualizarQuando?.addListener(_aoDispararAtualizacao);
+    }
+  }
+
+  @override
   void dispose() {
     _relogio?.parar();
-    widget.atualizarQuando?.removeListener(_recarregar);
+    widget.atualizarQuando?.removeListener(_aoDispararAtualizacao);
     super.dispose();
+  }
+
+  void _aoDispararAtualizacao() {
+    if (!mounted) return;
+    if (_pronto && _erro == null) {
+      _atualizarEmSilencio();
+    } else {
+      _recarregar();
+    }
   }
 
   Future<void> _carregar() async {
@@ -94,14 +113,23 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
 
   /// Busca de novo sem mexer na tela; só troca o dado quando chega. Erro: segue com o que tem.
   Future<void> _atualizarEmSilencio() async {
-    if (!_pronto) return;
+    if (!_pronto) {
+      await _carregar();
+      return;
+    }
     final minha = ++_geracao;
-    final dado = await widget.carregar();
-    if (!mounted || minha != _geracao) return;
-    setState(() {
-      _dado = dado;
-      _erro = null;
-    });
+    try {
+      final dado = await widget.carregar();
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _dado = dado;
+        _erro = null;
+      });
+    } on Object catch (erro) {
+      if (_erro != null && mounted && minha == _geracao) {
+        setState(() => _erro = erro);
+      }
+    }
   }
 
   @override
@@ -111,12 +139,18 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
       return const EstadoCarregando();
     }
     if (_erro != null) {
-      return EstadoErro(
-        mensagem: mensagemErroTrato(_erro!),
-        aoTentarNovamente: _recarregar,
+      return RefreshIndicator(
+        onRefresh: _atualizarEmSilencio,
+        child: EstadoErro(
+          mensagem: mensagemErroTrato(_erro!),
+          aoTentarNovamente: _recarregar,
+        ),
       );
     }
-    return widget.construir(context, _dado as T, _recarregar);
+    return AtualizadorTela(
+      recarregar: _atualizarEmSilencio,
+      child: widget.construir(context, _dado as T, _recarregar),
+    );
   }
 }
 
@@ -145,24 +179,35 @@ class EstadoVazio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(EspacosTrato.x6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icone, size: 48, color: CoresTrato.petroleo),
-            const SizedBox(height: EspacosTrato.x4),
-            Text(titulo, textAlign: TextAlign.center, style: TipografiaTrato.titulo),
-            const SizedBox(height: EspacosTrato.x2),
-            Text(
-              texto,
-              textAlign: TextAlign.center,
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+    return LayoutBuilder(
+      builder: (context, limites) {
+        final alturaMinima = limites.hasBoundedHeight
+            ? (limites.maxHeight - EspacosTrato.x6 * 2).clamp(0.0, double.infinity)
+            : 0.0;
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(EspacosTrato.x6),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: alturaMinima),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icone, size: 48, color: CoresTrato.petroleo),
+                  const SizedBox(height: EspacosTrato.x4),
+                  Text(titulo, textAlign: TextAlign.center, style: TipografiaTrato.titulo),
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    texto,
+                    textAlign: TextAlign.center,
+                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -179,20 +224,31 @@ class EstadoErro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(EspacosTrato.x6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: CoresTrato.vermelhoTexto),
-            const SizedBox(height: EspacosTrato.x4),
-            Text(mensagem, textAlign: TextAlign.center, style: TipografiaTrato.corpo),
-            const SizedBox(height: EspacosTrato.x5),
-            BotaoSecundario(texto: 'Tentar de novo', aoTocar: aoTentarNovamente),
-          ],
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, limites) {
+        final alturaMinima = limites.hasBoundedHeight
+            ? (limites.maxHeight - EspacosTrato.x6 * 2).clamp(0.0, double.infinity)
+            : 0.0;
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(EspacosTrato.x6),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: alturaMinima),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: CoresTrato.vermelhoTexto),
+                  const SizedBox(height: EspacosTrato.x4),
+                  Text(mensagem, textAlign: TextAlign.center, style: TipografiaTrato.corpo),
+                  const SizedBox(height: EspacosTrato.x5),
+                  BotaoSecundario(texto: 'Tentar de novo', aoTocar: aoTentarNovamente),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

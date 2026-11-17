@@ -102,11 +102,8 @@ void main() {
 
       await _tocar(tester, 'Entrar');
 
-      expect(
-        find.text('Campo não preenchido. Digite seu e-mail, CPF ou celular para continuar.'),
-        findsOneWidget,
-      );
-      expect(find.text('Senha não informada. Digite sua senha para entrar.'), findsOneWidget);
+      expect(find.text('Informe seu e-mail, CPF ou celular.'), findsOneWidget);
+      expect(find.text('Informe sua senha.'), findsOneWidget);
     });
 
     testWidgets('Mostrar alterna a visibilidade da senha', (tester) async {
@@ -186,9 +183,7 @@ void main() {
       await _tocar(tester, 'Entrar');
 
       expect(
-        find.text(
-          'Identificador incompleto. Digite um e-mail válido, CPF (11 números) ou telefone com DDD.',
-        ),
+        find.text('Informe um e-mail, CPF ou telefone com DDD.'),
         findsOneWidget,
       );
       expect(find.byType(CascaClienteTela), findsNothing);
@@ -286,6 +281,7 @@ void main() {
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
+      await _digitar(tester, 'Confirmar senha', 'segredo123');
     }
 
     testWidgets('mostra "Passo 1 de 2" e valida tudo ao tentar criar', (tester) async {
@@ -295,16 +291,16 @@ void main() {
       await _tocar(tester, 'Criar conta');
 
       expect(
-        find.text('Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'),
+        find.text('Informe seu nome completo (mínimo 3 letras).'),
         findsOneWidget,
       );
       expect(
-        find.text('CPF incompleto. Digite os 11 números do seu documento.'),
+        find.text('CPF incompleto. Digite os 11 números.'),
         findsOneWidget,
       );
       expect(
         find.text(
-          'Termos não aceitos. Marque a caixa para concordar com os Termos de uso e continuar.',
+          'Marque para concordar com os Termos de uso e continuar.',
         ),
         findsOneWidget,
       );
@@ -319,7 +315,7 @@ void main() {
 
       expect(
         find.text(
-          'Termos não aceitos. Marque a caixa para concordar com os Termos de uso e continuar.',
+          'Marque para concordar com os Termos de uso e continuar.',
         ),
         findsOneWidget,
       );
@@ -422,6 +418,7 @@ void main() {
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
+      await _digitar(tester, 'Confirmar senha', 'segredo123');
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
       await _tocar(tester, 'Criar conta');
@@ -471,7 +468,7 @@ void main() {
 
       await _tocar(tester, 'Confirmar código');
       expect(
-        find.text('Código incompleto. Digite os 6 números recebidos por SMS.'),
+        find.text('Código incompleto. Digite os 6 números.'),
         findsOneWidget,
       );
 
@@ -569,7 +566,7 @@ void main() {
       await _digitar(tester, 'E-mail', 'mariana');
       await _tocar(tester, 'Enviar link');
       expect(
-        find.text('E-mail incompleto ou sem arroba. Digite no formato nome@exemplo.com.'),
+        find.text('E-mail inválido. Ex.: nome@exemplo.com.'),
         findsOneWidget,
       );
 
@@ -577,7 +574,7 @@ void main() {
       await _tocar(tester, 'Enviar link');
       expect(find.textContaining('você vai receber as instruções'), findsOneWidget);
       expect(
-        find.text('E-mail incompleto ou sem arroba. Digite no formato nome@exemplo.com.'),
+        find.text('E-mail inválido. Ex.: nome@exemplo.com.'),
         findsNothing,
       );
     });
@@ -640,7 +637,7 @@ void main() {
       await _digitar(tester, 'Senha nova', 'curta');
       await _digitar(tester, 'Repita a senha nova', 'curta');
       await _tocar(tester, 'Salvar senha');
-      expect(find.textContaining('Senha fraca'), findsOneWidget);
+      expect(find.textContaining('Use pelo menos 8 caracteres, com letra e número.'), findsOneWidget);
 
       await _digitar(tester, 'Senha nova', 'SenhaBoa123');
       await _digitar(tester, 'Repita a senha nova', 'SenhaBoa124');

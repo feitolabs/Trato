@@ -71,7 +71,7 @@ void main() {
     await preencherEnderecoDoPedido(t);
     // o 1º campo de texto é a pergunta "Algo mais?"; o 2º é a descrição
     await t.enterText(find.byType(TextField).at(1), 'Limpeza completa do apartamento.');
-    await _tocar(t, find.text('Próximo'));
+    await _tocar(t, find.text('Enviar pedido'));
     expect(enviado, isNull);
     expect(find.text('Responda esta pergunta.'), findsOneWidget); // só o tipo de imóvel
   });
@@ -87,7 +87,7 @@ void main() {
     await _tocar(t, find.text('Forno'));
     await _tocar(t, find.text('Janelas'));
     await _tocar(t, find.byTooltip('Aumentar').first);
-    await _tocar(t, find.text('Próximo'));
+    await _tocar(t, find.text('Enviar pedido'));
     expect(enviado, isNotNull);
     expect(enviado!.respostas, {
       'q-tipo': 'Casa',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 
@@ -13,17 +14,31 @@ typedef CapturarFoto = Future<String?> Function();
 
 /// Barra + corpo que rola (limitado em tablet) + rodapé fixo opcional.
 class PaginaTrato extends StatelessWidget {
-  const PaginaTrato({super.key, required this.titulo, required this.children, this.rodape});
+  const PaginaTrato({
+    super.key,
+    required this.titulo,
+    required this.children,
+    this.rodape,
+    this.scrollController,
+    this.aoAtualizar,
+  });
 
   final String titulo;
   final List<Widget> children;
   final Widget? rodape;
+  final ScrollController? scrollController;
+  final Future<void> Function()? aoAtualizar;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(titulo)),
-      body: CorpoRolavel(rodape: rodape, children: children),
+      body: CorpoRolavel(
+        rodape: rodape,
+        scrollController: scrollController,
+        aoAtualizar: aoAtualizar,
+        children: children,
+      ),
     );
   }
 }
@@ -35,26 +50,33 @@ class CorpoRolavel extends StatelessWidget {
     required this.children,
     this.rodape,
     this.scrollController,
+    this.aoAtualizar,
   });
 
   final List<Widget> children;
   final Widget? rodape;
   final ScrollController? scrollController;
+  final Future<void> Function()? aoAtualizar;
 
   @override
   Widget build(BuildContext context) {
+    final recarregar = aoAtualizar ?? AtualizadorTela.de(context);
+    final conteudo = SingleChildScrollView(
+      controller: scrollController,
+      physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
+      child: ConteudoResponsivo(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      ),
+    );
     return Column(
       children: [
         Expanded(
           child: SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
-              child: ConteudoResponsivo(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
-              ),
-            ),
+            child: recarregar == null
+                ? conteudo
+                : RefreshIndicator(onRefresh: recarregar, child: conteudo),
           ),
         ),
         if (rodape != null)
@@ -87,6 +109,7 @@ class PaginaCarregavel<T> extends StatefulWidget {
     this.textoVazio = '',
     this.iconeVazio = Icons.inbox_outlined,
     this.acoes = const [],
+    this.atualizarQuando,
   });
 
   final String titulo;
@@ -99,55 +122,132 @@ class PaginaCarregavel<T> extends StatefulWidget {
   final String tituloVazio;
   final String textoVazio;
   final IconData iconeVazio;
+  final Listenable? atualizarQuando;
 
   @override
   State<PaginaCarregavel<T>> createState() => _PaginaCarregavelState<T>();
 }
 
 class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
-  late Future<T> _futuro = widget.carregar()..ignore();
+  T? _dados;
+  Object? _erro;
+  var _pronto = false;
+  var _geracao = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.atualizarQuando?.addListener(_aoAtualizarQuando);
+    _carregar();
+  }
+
+  @override
+  void didUpdateWidget(covariant PaginaCarregavel<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.atualizarQuando != widget.atualizarQuando) {
+      oldWidget.atualizarQuando?.removeListener(_aoAtualizarQuando);
+      widget.atualizarQuando?.addListener(_aoAtualizarQuando);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.atualizarQuando?.removeListener(_aoAtualizarQuando);
+    super.dispose();
+  }
+
+  void _aoAtualizarQuando() {
+    if (!mounted) return;
+    if (_pronto && _erro == null) {
+      _recarregarEmSilencio();
+    } else {
+      _tentarDeNovo();
+    }
+  }
+
+  Future<void> _carregar() async {
+    final g = ++_geracao;
+    try {
+      final d = await widget.carregar();
+      if (!mounted || g != _geracao) return;
+      setState(() {
+        _dados = d;
+        _erro = null;
+        _pronto = true;
+      });
+    } on Object catch (e) {
+      if (!mounted || g != _geracao) return;
+      setState(() {
+        _erro = e;
+        _pronto = true;
+      });
+    }
+  }
+
+  Future<void> _recarregarEmSilencio() async {
+    if (!_pronto) {
+      await _carregar();
+      return;
+    }
+    final g = ++_geracao;
+    try {
+      final d = await widget.carregar();
+      if (!mounted || g != _geracao) return;
+      setState(() {
+        _dados = d;
+        _erro = null;
+      });
+    } on Object {
+      // Silencioso ao puxar/atualizar se já havia dado na tela.
+    }
+  }
 
   void _tentarDeNovo() {
     setState(() {
-      _futuro = widget.carregar()..ignore();
+      _pronto = false;
+      _erro = null;
     });
+    _carregar();
   }
 
   @override
   Widget build(BuildContext context) {
+    Widget corpo;
+    if (!_pronto) {
+      corpo = Semantics(
+        label: 'Carregando',
+        child: const Align(alignment: Alignment.topCenter, child: EsqueletoLista()),
+      );
+    } else if (_erro != null) {
+      corpo = RefreshIndicator(
+        onRefresh: _carregar,
+        child: MensagemCentral(
+          icone: Icons.error_outline,
+          titulo: 'Não foi possível carregar',
+          texto: _erro is ErroTrato
+              ? (_erro! as ErroTrato).mensagem
+              : 'Confira a conexão e tente de novo.',
+          acao: BotaoSecundario(texto: 'Tentar de novo', aoTocar: _tentarDeNovo),
+        ),
+      );
+    } else if (widget.estaVazio?.call(_dados as T) ?? false) {
+      corpo = RefreshIndicator(
+        onRefresh: _recarregarEmSilencio,
+        child: MensagemCentral(
+          icone: widget.iconeVazio,
+          titulo: widget.tituloVazio,
+          texto: widget.textoVazio,
+        ),
+      );
+    } else {
+      corpo = AtualizadorTela(
+        recarregar: _recarregarEmSilencio,
+        child: widget.construir(context, _dados as T),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: Text(widget.titulo), actions: widget.acoes),
-      body: FutureBuilder<T>(
-        future: _futuro,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return Semantics(
-              label: 'Carregando',
-              child: const Align(alignment: Alignment.topCenter, child: EsqueletoLista()),
-            );
-          }
-          if (snap.hasError) {
-            return MensagemCentral(
-              icone: Icons.error_outline,
-              titulo: 'Não foi possível carregar',
-              texto: snap.error is ErroTrato
-                  ? (snap.error! as ErroTrato).mensagem
-                  : 'Confira a conexão e tente de novo.',
-              acao: BotaoSecundario(texto: 'Tentar de novo', aoTocar: _tentarDeNovo),
-            );
-          }
-          // T pode ser anulável (null = "não existe"): não usar requireData.
-          final dados = snap.data as T;
-          if (widget.estaVazio?.call(dados) ?? false) {
-            return MensagemCentral(
-              icone: widget.iconeVazio,
-              titulo: widget.tituloVazio,
-              texto: widget.textoVazio,
-            );
-          }
-          return widget.construir(context, dados);
-        },
-      ),
+      body: corpo,
     );
   }
 }
@@ -170,12 +270,17 @@ class MensagemCentral extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: SingleChildScrollView(
-        child: ConteudoResponsivo(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x12),
-            child: Column(
-              children: [
+      child: LayoutBuilder(
+        builder: (context, limites) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: limites.maxHeight),
+            child: ConteudoResponsivo(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                 Icon(icone, size: 48, color: CoresTrato.textoSecundario),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(titulo, style: TipografiaTrato.titulo, textAlign: TextAlign.center),
@@ -193,6 +298,8 @@ class MensagemCentral extends StatelessWidget {
           ),
         ),
       ),
+    ),
+    ),
     );
   }
 }

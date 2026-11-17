@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
+import '../comuns/foco_rolagem.dart';
 import 'dados_pessoais_tela.dart' show textoDoErro;
 import 'modelos.dart';
 
@@ -47,49 +49,54 @@ class _FavoritosTelaState extends State<FavoritosTela> {
         carregar: widget.servico.favoritos,
         atualizarQuando: _mudou,
         construir: (context, itens, _) {
+          final recarregar = AtualizadorTela.de(context);
+          final Widget body;
           if (itens.isEmpty) {
-            return const EstadoVazio(
+            body = const EstadoVazio(
               icone: Icons.favorite_border,
               titulo: 'Nenhum favorito ainda',
               texto: 'Toque no coração no perfil de um profissional para guardá-lo aqui.',
             );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-            itemCount: itens.length,
-            separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-            itemBuilder: (context, i) {
-              final f = itens[i];
-              final detalhe = [
-                if (f.nota != null) 'Nota ${f.nota!.toStringAsFixed(1).replaceAll('.', ',')}',
-                if (f.servicos != null) '${f.servicos} serviços',
-              ].join(' · ');
-              return CartaoTrato(
-                aoTocar: widget.aoAbrir == null ? null : () => widget.aoAbrir!(f),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(f.nome ?? 'Profissional', style: TipografiaTrato.corpo),
-                          if (detalhe.isNotEmpty)
-                            Text(detalhe,
-                                style: TipografiaTrato.corpoPequeno
-                                    .copyWith(color: CoresTrato.textoSecundario)),
-                        ],
+          } else {
+            body = ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+              itemCount: itens.length,
+              separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+              itemBuilder: (context, i) {
+                final f = itens[i];
+                final detalhe = [
+                  if (f.nota != null) 'Nota ${f.nota!.toStringAsFixed(1).replaceAll('.', ',')}',
+                  if (f.servicos != null) '${f.servicos} serviços',
+                ].join(' · ');
+                return CartaoTrato(
+                  aoTocar: widget.aoAbrir == null ? null : () => widget.aoAbrir!(f),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(f.nome ?? 'Profissional', style: TipografiaTrato.corpo),
+                            if (detalhe.isNotEmpty)
+                              Text(detalhe,
+                                  style: TipografiaTrato.corpoPequeno
+                                      .copyWith(color: CoresTrato.textoSecundario)),
+                          ],
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Tirar dos favoritos',
-                      onPressed: () => _tirar(f),
-                      icon: const Icon(Icons.favorite, color: CoresTrato.petroleo),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
+                      IconButton(
+                        tooltip: 'Tirar dos favoritos',
+                        onPressed: () => _tirar(f),
+                        icon: const Icon(Icons.favorite, color: CoresTrato.petroleo),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          }
+          return recarregar == null ? body : RefreshIndicator(onRefresh: recarregar, child: body);
         },
       ),
     );
@@ -152,55 +159,60 @@ class _ContatosConfiancaTelaState extends State<ContatosConfiancaTela> {
       child: CarregadorTela<List<ContatoDeConfianca>>(
         carregar: widget.servico.contatos,
         atualizarQuando: _mudou,
-        construir: (context, itens, _) => ListView(
-          padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-          children: [
-            Text(
-              'Pessoas de confiança que você quer ter à mão durante um serviço. Até 5.',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-            ),
-            const SizedBox(height: EspacosTrato.x4),
-            if (itens.isEmpty)
-              const EstadoVazio(
-                icone: Icons.people_outline,
-                titulo: 'Nenhum contato ainda',
-                texto: 'Adicione alguém de confiança.',
+        construir: (context, itens, _) {
+          final recarregar = AtualizadorTela.de(context);
+          final lista = ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+            children: [
+              Text(
+                'Pessoas de confiança que você quer ter à mão durante um serviço. Até 5.',
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
               ),
-            for (final c in itens) ...[
-              CartaoTrato(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(c.nome, style: TipografiaTrato.corpo),
-                          Text(
-                            [
-                              formatarTelefone(c.telefone),
-                              if ((c.parentesco ?? '').isNotEmpty) c.parentesco!,
-                            ].join(' · '),
-                            style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.textoSecundario),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Remover',
-                      onPressed: () => _remover(c),
-                      icon: const Icon(Icons.delete_outline, color: CoresTrato.petroleo),
-                    ),
-                  ],
+              const SizedBox(height: EspacosTrato.x4),
+              if (itens.isEmpty)
+                const EstadoVazio(
+                  icone: Icons.people_outline,
+                  titulo: 'Nenhum contato ainda',
+                  texto: 'Adicione alguém de confiança.',
                 ),
-              ),
+              for (final c in itens) ...[
+                CartaoTrato(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.nome, style: TipografiaTrato.corpo),
+                            Text(
+                              [
+                                formatarTelefone(c.telefone),
+                                if ((c.parentesco ?? '').isNotEmpty) c.parentesco!,
+                              ].join(' · '),
+                              style: TipografiaTrato.corpoPequeno
+                                  .copyWith(color: CoresTrato.textoSecundario),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Remover',
+                        onPressed: () => _remover(c),
+                        icon: const Icon(Icons.delete_outline, color: CoresTrato.petroleo),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: EspacosTrato.x3),
+              ],
               const SizedBox(height: EspacosTrato.x3),
+              if (itens.length < 5)
+                BotaoPrimario(texto: 'Adicionar contato', aoTocar: _adicionar),
             ],
-            const SizedBox(height: EspacosTrato.x3),
-            if (itens.length < 5)
-              BotaoPrimario(texto: 'Adicionar contato', aoTocar: _adicionar),
-          ],
-        ),
+          );
+          return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
+        },
       ),
     );
   }
@@ -216,14 +228,25 @@ class _FormContatoTela extends StatefulWidget {
 }
 
 class _FormContatoTelaState extends State<_FormContatoTela> {
+  final _scroll = ScrollController();
+  final _keyNome = GlobalKey();
+  final _keyTelefone = GlobalKey();
+  final _focoNome = FocusNode();
+  final _focoTelefone = FocusNode();
   final _nome = TextEditingController();
   final _telefone = TextEditingController();
   final _parentesco = TextEditingController();
   var _salvando = false;
+  var _tentou = false;
+  String? _erroNome;
+  String? _erroTelefone;
   String? _erro;
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _focoNome.dispose();
+    _focoTelefone.dispose();
     _nome.dispose();
     _telefone.dispose();
     _parentesco.dispose();
@@ -232,18 +255,24 @@ class _FormContatoTelaState extends State<_FormContatoTela> {
 
   Future<void> _salvar() async {
     final digitos = _telefone.text.replaceAll(RegExp(r'\D'), '');
-    if (_nome.text.trim().length < 2) {
-      setState(() => _erro = 'Informe o nome.');
-      return;
-    }
-    if (digitos.length != 10 && digitos.length != 11) {
-      setState(() => _erro = 'Informe o telefone com DDD.');
-      return;
-    }
+    final errNome = _nome.text.trim().length < 2 ? 'Informe o nome.' : null;
+    final errTel = (digitos.length != 10 && digitos.length != 11)
+        ? 'Informe o telefone com DDD.'
+        : null;
     setState(() {
-      _salvando = true;
+      _tentou = true;
+      _erroNome = errNome;
+      _erroTelefone = errTel;
       _erro = null;
     });
+    if (errNome != null || errTel != null) {
+      focarPrimeiroErro([
+        EntradaCampoErro(key: _keyNome, focusNode: _focoNome, temErro: () => _erroNome != null),
+        EntradaCampoErro(key: _keyTelefone, focusNode: _focoTelefone, temErro: () => _erroTelefone != null),
+      ]);
+      return;
+    }
+    setState(() => _salvando = true);
     try {
       await widget.servico.adicionarContato(
         nome: _nome.text.trim(),
@@ -263,15 +292,35 @@ class _FormContatoTelaState extends State<_FormContatoTela> {
     return MolduraTelaComum(
       titulo: 'Novo contato',
       child: ListView(
+        controller: _scroll,
         children: [
-          CampoTrato(rotulo: 'Nome', controlador: _nome),
+          KeyedSubtree(
+            key: _keyNome,
+            child: CampoTrato(
+              rotulo: 'Nome',
+              controlador: _nome,
+              foco: _focoNome,
+              erro: _tentou ? _erroNome : null,
+              aoMudar: (_) {
+                if (_erroNome != null) setState(() => _erroNome = null);
+              },
+            ),
+          ),
           const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(
-            rotulo: 'Telefone',
-            controlador: _telefone,
-            dica: '(11) 98888-7777',
-            teclado: TextInputType.phone,
-            formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9()\- ]'))],
+          KeyedSubtree(
+            key: _keyTelefone,
+            child: CampoTrato(
+              rotulo: 'Telefone',
+              controlador: _telefone,
+              foco: _focoTelefone,
+              dica: '(11) 98888-7777',
+              teclado: TextInputType.phone,
+              formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9()\- ]'))],
+              erro: _tentou ? _erroTelefone : null,
+              aoMudar: (_) {
+                if (_erroTelefone != null) setState(() => _erroTelefone = null);
+              },
+            ),
           ),
           const SizedBox(height: EspacosTrato.x3),
           CampoTrato(rotulo: 'Parentesco (opcional)', controlador: _parentesco, dica: 'Irmã, amigo...'),

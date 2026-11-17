@@ -6,6 +6,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../onboarding/escolha_perfil_tela.dart';
+import '../comuns/foco_rolagem.dart';
 import '../fluxo/rotas.dart';
 import 'estrutura_auth.dart';
 import 'recuperar_senha_tela.dart';
@@ -32,6 +33,10 @@ class _LoginTelaState extends State<LoginTela> {
   final _identificador = TextEditingController();
   final _senha = TextEditingController();
   final _scrollController = ScrollController();
+  final _keyIdentificador = GlobalKey();
+  final _keySenha = GlobalKey();
+  final _focoIdentificador = FocusNode();
+  final _focoSenha = FocusNode();
   var _mostrarSenha = false;
   var _tentou = false;
   var _carregando = false;
@@ -49,6 +54,8 @@ class _LoginTelaState extends State<LoginTela> {
   void dispose() {
     _identificador.dispose();
     _senha.dispose();
+    _focoIdentificador.dispose();
+    _focoSenha.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -70,7 +77,7 @@ class _LoginTelaState extends State<LoginTela> {
       _tentou ? ValidacaoAuth.identificadorLogin(_identificador.text) : null;
 
   String? get _erroSenha =>
-      _tentou ? ValidacaoAuth.obrigatorio(_senha.text, 'Senha não informada. Digite sua senha para entrar.') : null;
+      _tentou ? ValidacaoAuth.obrigatorio(_senha.text, 'Informe sua senha.') : null;
 
   /// Roda [acao]; se der certo vai para o app, se não mostra o erro em português.
   Future<void> _tentar(Future<SessaoAuth> Function() acao) async {
@@ -129,7 +136,18 @@ class _LoginTelaState extends State<LoginTela> {
     if (_carregando) return;
     setState(() => _tentou = true);
     if (_erroIdentificador != null || _erroSenha != null) {
-      _rolarParaInicio();
+      focarPrimeiroErro([
+        EntradaCampoErro(
+          key: _keyIdentificador,
+          focusNode: _focoIdentificador,
+          temErro: () => _erroIdentificador != null,
+        ),
+        EntradaCampoErro(
+          key: _keySenha,
+          focusNode: _focoSenha,
+          temErro: () => _erroSenha != null,
+        ),
+      ]);
       return;
     }
     _tentar(() => _servico.entrarComEmail(
@@ -160,23 +178,31 @@ class _LoginTelaState extends State<LoginTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text('Entrar na sua conta', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x6),
-        CampoTrato(
-          rotulo: 'E-mail, CPF ou telefone',
-          controlador: _identificador,
-          dica: 'voce@email.com, CPF ou celular',
-          teclado: TextInputType.emailAddress,
-          erro: _erroIdentificador,
-          aoMudar: (_) => setState(() {}),
+        KeyedSubtree(
+          key: _keyIdentificador,
+          child: CampoTrato(
+            rotulo: 'E-mail, CPF ou telefone',
+            controlador: _identificador,
+            foco: _focoIdentificador,
+            dica: 'voce@email.com, CPF ou celular',
+            teclado: TextInputType.emailAddress,
+            erro: _erroIdentificador,
+            aoMudar: (_) => setState(() {}),
+          ),
         ),
         const SizedBox(height: EspacosTrato.x5),
-        CampoTrato(
-          rotulo: 'Senha',
-          controlador: _senha,
-          senha: !_mostrarSenha,
-          erro: _erroSenha,
-          textoAcao: _mostrarSenha ? 'Ocultar' : 'Mostrar',
-          aoTocarAcao: () => setState(() => _mostrarSenha = !_mostrarSenha),
-          aoMudar: (_) => setState(() {}),
+        KeyedSubtree(
+          key: _keySenha,
+          child: CampoTrato(
+            rotulo: 'Senha',
+            controlador: _senha,
+            foco: _focoSenha,
+            senha: !_mostrarSenha,
+            erro: _erroSenha,
+            textoAcao: _mostrarSenha ? 'Ocultar' : 'Mostrar',
+            aoTocarAcao: () => setState(() => _mostrarSenha = !_mostrarSenha),
+            aoMudar: (_) => setState(() {}),
+          ),
         ),
         Align(
           alignment: Alignment.centerRight,

@@ -7,6 +7,8 @@ import '../../dados/relogio_de_atualizacao.dart';
 import '../../dados/repositorios.dart' show FiltroPedidosAbertos;
 import '../agenda/agenda_tela.dart';
 import '../cliente/modelos.dart' show CategoriaServico;
+import '../fluxo/navegacao_casca.dart';
+import '../fluxo/rotas.dart';
 import '../mensagens/mensagens_tela.dart';
 import '../mensagens/modelos.dart';
 import 'detalhe_pedido_tela.dart';
@@ -44,11 +46,13 @@ class CascaProfissionalTela extends StatefulWidget {
     this.carregarCategorias,
     this.aoAbrirNotificacoes,
     this.aoUsarComoCliente,
+    this.aoGerenciarProximo,
     this.aoAbrirContratado,
     this.aoAbrirOrcamentoEnviado,
     this.aoAbrirMapa,
     this.recarregarInicio,
     this.atualizarACada,
+    this.atualizarQuando,
   });
 
   /// Toque num pedido que o cliente já aceitou (aba Pedidos > Em andamento).
@@ -64,9 +68,11 @@ class CascaProfissionalTela extends StatefulWidget {
   /// casca se atualiza sozinha: pedido novo e pedido aceito aparecem sem fechar o app.
   final Future<InicioProfissional> Function()? recarregarInicio;
   final Duration? atualizarACada;
+  final Listenable? atualizarQuando;
 
   /// Permite trocar para a casca do cliente.
   final VoidCallback? aoUsarComoCliente;
+  final ValueChanged<ProximoAtendimento?>? aoGerenciarProximo;
 
   /// Carrega o detalhe do pedido tocado (API). Sem isso, mostra [detalhe].
   final Future<DetalhePedido> Function(PedidoAberto pedido)? carregarDetalhe;
@@ -126,6 +132,11 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   @override
   void initState() {
     super.initState();
+    ControladorCasca.registrar(
+      irParaAba: _ir,
+      recarregarCasca: _atualizarEmSilencio,
+    );
+    widget.atualizarQuando?.addListener(_aoAtualizarExternamente);
     final intervalo = widget.atualizarACada;
     if (intervalo != null && widget.recarregarInicio != null) {
       _relogio = RelogioDeAtualizacao(
@@ -139,27 +150,57 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   }
 
   @override
+  void didUpdateWidget(covariant CascaProfissionalTela antigo) {
+    super.didUpdateWidget(antigo);
+    if (antigo.atualizarQuando != widget.atualizarQuando) {
+      antigo.atualizarQuando?.removeListener(_aoAtualizarExternamente);
+      widget.atualizarQuando?.addListener(_aoAtualizarExternamente);
+    }
+    if (antigo.inicio != widget.inicio) {
+      _inicio = widget.inicio;
+    }
+  }
+
+  @override
   void dispose() {
+    ControladorCasca.desregistrar(_ir);
+    widget.atualizarQuando?.removeListener(_aoAtualizarExternamente);
     _relogio?.parar();
     super.dispose();
   }
 
-  /// Traz o Início de novo sem tela de carregando. Mantém o filtro de pedidos escolhido.
-  Future<void> _atualizarEmSilencio() async {
-    final novo = await widget.recarregarInicio!();
-    var pedidos = novo.pedidos;
-    if (_filtrosAtivos > 0) {
-      final filtrados = await widget.carregarPedidos?.call(_filtro);
-      if (filtrados != null) pedidos = filtrados;
-    }
-    if (!mounted) return;
-    setState(() => _inicio = novo.comPedidos(pedidos));
+  void _aoAtualizarExternamente() {
+    if (widget.recarregarInicio != null) _atualizarEmSilencio();
   }
 
-  void _ir(int indice) => setState(() {
-        _aba = indice;
-        _visitadas.add(indice);
-      });
+  /// Traz o Início de novo sem tela de carregando. Mantém o filtro de pedidos escolhido.
+  Future<void> _atualizarEmSilencio() async {
+    if (widget.recarregarInicio == null) return;
+    try {
+      final novo = await widget.recarregarInicio!();
+      var pedidos = novo.pedidos;
+      if (_filtrosAtivos > 0) {
+        final filtrados = await widget.carregarPedidos?.call(_filtro);
+        if (filtrados != null) pedidos = filtrados;
+      }
+      if (!mounted) return;
+      setState(() => _inicio = novo.comPedidos(pedidos));
+    } on Object {
+      // Falha em segundo plano mantém o que já está visível.
+    }
+  }
+
+  void _ir(int indice) {
+    final mudou = _aba != indice;
+    setState(() {
+      _aba = indice;
+      _visitadas.add(indice);
+    });
+    if (mudou) {
+      if (widget.recarregarInicio != null) _atualizarEmSilencio();
+      RotasTrato.pedidosMudaram.value++;
+    }
+  }
 
   int get _filtrosAtivos => [
         if (_filtro.categoriaId != null) 1,
@@ -177,10 +218,35 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
           aoPerguntar: widget.aoPerguntarDoPedido != null
               ? () => widget.aoPerguntarDoPedido!(pedido)
               : widget.aoPerguntar,
-          aoRecusar: (motivo) {
+          aoRecusar: (motivo) async {
+            final navegador = Navigator.of(context);
+            final mensagens = ScaffoldMessenger.of(context);
             widget.aoRecusar?.call(motivo);
-            widget.recusarPedido?.call(pedido, motivo);
-            Navigator.of(context).pop();
+            try {
+              if (widget.recusarPedido != null) {
+                await widget.recusarPedido!(pedido, motivo);
+                await _atualizarEmSilencio();
+              }
+              if (mounted) {
+                navegador.pop();
+                mensagens
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('Pedido recusado e removido da lista.')),
+                  );
+              }
+            } on Object catch (erro) {
+              if (!mounted) return;
+              mensagens
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      erro is ErroTrato ? erro.mensagem : 'Não foi possível recusar agora.',
+                    ),
+                  ),
+                );
+            }
           },
         );
     final carregar = widget.carregarDetalhe;
@@ -241,7 +307,9 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     final paginas = <Widget>[
       InicioProfissionalTela(
         dados: _inicio,
-        aoFazerCheckIn: widget.aoFazerCheckIn,
+        aoFazerCheckIn: widget.aoGerenciarProximo != null
+            ? () => widget.aoGerenciarProximo!(_inicio.proximo)
+            : widget.aoFazerCheckIn,
         aoAbrirCarteira: () => _ir(3),
         aoAbrirFiltros: _filtros,
         aoAbrirPedido: _abrirDetalhe,
@@ -284,12 +352,15 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _aba != 0) _ir(0);
       },
-      child: Scaffold(
-        body: IndexedStack(index: _aba, children: paginas),
-        bottomNavigationBar: BarraAbasTrato(
-          abas: abasProfissional,
-          indiceAtual: _aba,
-          aoSelecionar: _ir,
+      child: AtualizadorTela(
+        recarregar: _atualizarEmSilencio,
+        child: Scaffold(
+          body: IndexedStack(index: _aba, children: paginas),
+          bottomNavigationBar: BarraAbasTrato(
+            abas: abasProfissional,
+            indiceAtual: _aba,
+            aoSelecionar: _ir,
+          ),
         ),
       ),
     );

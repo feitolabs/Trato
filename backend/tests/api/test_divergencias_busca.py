@@ -73,8 +73,17 @@ def test_busca_so_aprovados_ordenada_e_sem_dado_pessoal(amb, busca):
     p1 = next(i for i in corpo["itens"] if i["id"] == "p1")
     assert p1["nome"] == "Maria S."  # abreviado
     assert set(p1) == {
-        "id", "nome", "bio", "nivel_verificacao", "nota_publica", "servicos_concluidos", "categorias",
-    }  # fmt: skip
+        "id",
+        "nome",
+        "bio",
+        "nivel_verificacao",
+        "nota_publica",
+        "servicos_concluidos",
+        "categorias",
+        "cidades",
+        "bairros",
+        "atende_remoto",
+    }
     assert "Aparecida" not in r.text and "cpf" not in r.text.lower()
 
 

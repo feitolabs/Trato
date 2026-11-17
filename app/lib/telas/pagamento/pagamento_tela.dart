@@ -40,10 +40,10 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   }
 
   static const _passos = [
-    'Você paga e o app mostra "Aguardando confirmação do pagamento" até o parceiro confirmar.',
-    'O pagamento é processado por parceiro e acompanhado no app.',
+    'Você paga e o app confirma o recebimento em instantes.',
+    'O valor fica protegido até você confirmar que o serviço foi realizado.',
     'Você confirma o serviço ao final. Se algo der errado, abra uma disputa: '
-        'o caso passa por suporte e análise de problemas.',
+        'o caso passa por suporte e análise.',
   ];
 
   @override

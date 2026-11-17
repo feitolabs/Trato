@@ -258,13 +258,13 @@ void main() {
       expect(find.text('Nada encontrado'), findsOneWidget);
       await _abrir(
         tester,
-        const BuscaProfissionaisTela(servico: ServicoBuscaFake(falhar: true), termoInicial: 'a'),
+        const BuscaProfissionaisTela(servico: ServicoBuscaFake(falhar: true), termoInicial: 'ab'),
       );
       await tester.pump();
       expect(find.text('Tentar de novo'), findsOneWidget);
       await _abrir(
         tester,
-        const BuscaProfissionaisTela(servico: ServicoBuscaFake(travar: true), termoInicial: 'a'),
+        const BuscaProfissionaisTela(servico: ServicoBuscaFake(travar: true), termoInicial: 'ab'),
       );
       expect(find.byType(EsqueletoLista), findsOneWidget);
     });

@@ -170,7 +170,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'Trocar duas tomadas da cozinha');
       await preencherEnderecoDoPedido(tester);
-      final enviar = find.text('Próximo');
+      final enviar = find.text('Enviar pedido');
       await tester.ensureVisible(enviar.last);
       await tester.tap(enviar.last);
       await tester.pumpAndSettle();
@@ -189,7 +189,7 @@ void main() {
         AguardandoPagamentoTela(
           intervalo: const Duration(seconds: 1),
           consultar: () async =>
-              ++consultas < 3 ? StatusPagamento.aguardando : StatusPagamento.pago,
+              ++consultas < 4 ? StatusPagamento.aguardando : StatusPagamento.pago,
           aoConfirmar: () => confirmado = true,
         ),
         esperar: false,

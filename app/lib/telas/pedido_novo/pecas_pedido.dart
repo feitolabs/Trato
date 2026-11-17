@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 
 /// Esqueleto das telas de pedido e orçamento: barra (título pequeno e ações), conteúdo que
@@ -11,15 +12,28 @@ class EstruturaPedido extends StatelessWidget {
     this.rodape,
     this.tituloBarra,
     this.acoesBarra,
+    this.scrollController,
+    this.aoAtualizar,
   });
 
   final List<Widget> children;
   final Widget? rodape;
   final String? tituloBarra;
   final List<Widget>? acoesBarra;
+  final ScrollController? scrollController;
+  final Future<void> Function()? aoAtualizar;
 
   @override
   Widget build(BuildContext context) {
+    final recarregar = aoAtualizar ?? AtualizadorTela.de(context);
+    final rolagem = SingleChildScrollView(
+      controller: scrollController,
+      physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
+      child: ConteudoResponsivo(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      ),
+    );
     return Scaffold(
       appBar: AppBar(
         title: tituloBarra == null ? null : Text(tituloBarra!),
@@ -30,12 +44,9 @@ class EstruturaPedido extends StatelessWidget {
           Expanded(
             child: SafeArea(
               bottom: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
-                child: ConteudoResponsivo(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
-                ),
-              ),
+              child: recarregar == null
+                  ? rolagem
+                  : RefreshIndicator(onRefresh: recarregar, child: rolagem),
             ),
           ),
           if (rodape != null)

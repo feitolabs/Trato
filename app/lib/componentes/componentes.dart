@@ -1,6 +1,7 @@
 export 'barra_abas.dart';
 export 'botoes.dart';
 export 'campo.dart';
+export 'cep_campo.dart';
 export 'carregamento_latencia.dart';
 export 'cartao.dart';
 export 'chip_status.dart';

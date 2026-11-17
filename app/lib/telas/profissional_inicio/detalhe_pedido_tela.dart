@@ -45,7 +45,7 @@ class DetalhePedidoTela extends StatelessWidget {
     final linhas = [
       ...dados.linhas,
       if (!pedido.urgente || pedido.prazo.toLowerCase() != 'urgente')
-        LinhaDetalhe('Prazo', _capitalizar(pedido.prazo)),
+        LinhaDetalhe('Quando precisa', _capitalizar(pedido.prazo)),
       LinhaDetalhe('Orçamento estimado', textoFaixa(pedido)),
     ];
     return Scaffold(
@@ -115,7 +115,10 @@ class DetalhePedidoTela extends StatelessWidget {
                         children: [
                           for (var i = 0; i < linhas.length; i++) ...[
                             if (i > 0) const Divider(height: EspacosTrato.x6),
-                            _LinhaDoCartao(linha: linhas[i]),
+                            LinhaDetalheCartao(
+                              rotulo: linhas[i].rotulo,
+                              valor: linhas[i].valor,
+                            ),
                           ],
                         ],
                       ),
@@ -142,7 +145,7 @@ class DetalhePedidoTela extends StatelessWidget {
                         Expanded(
                           child: Text(
                             pedido.bairro.isEmpty
-                                ? 'Região: ${textoDistancia(pedido.distanciaKm)}. '
+                                ? 'Região da sua área. '
                                     'O endereço completo aparece depois da contratação.'
                                 : pedido.distanciaKm == null
                                     ? 'Bairro ${pedido.bairro}. '
@@ -199,35 +202,6 @@ class DetalhePedidoTela extends StatelessWidget {
 
   static String _capitalizar(String t) =>
       t.isEmpty ? t : t[0].toUpperCase() + t.substring(1);
-}
-
-class _LinhaDoCartao extends StatelessWidget {
-  const _LinhaDoCartao({required this.linha});
-
-  final LinhaDetalhe linha;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Flexible(
-          flex: 2,
-          child: Text(
-            linha.rotulo,
-            style: TipografiaTrato.corpo
-                .copyWith(color: CoresTrato.textoSecundario),
-          ),
-        ),
-        const SizedBox(width: EspacosTrato.x3),
-        Expanded(
-          flex: 3,
-          child: Text(linha.valor,
-              textAlign: TextAlign.end, style: TipografiaTrato.corpoForte),
-        ),
-      ],
-    );
-  }
 }
 
 /// Espaço do mapa do protótipo (área aproximada, sem endereço exato).

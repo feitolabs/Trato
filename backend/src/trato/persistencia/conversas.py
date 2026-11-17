@@ -24,10 +24,12 @@ AVISO_MASCARA = _AVISO_MASCARA
 MARCADOR_FOTO = re.compile(r"^\[Foto:[0-9a-fA-F-]{16,40}\]$")
 
 
-# Contraproposta: `[contraproposta:<id do orçamento>:<centavos>] texto`. O id (UUID) pode ter uma
-# sequência de dígitos que o mascaramento confundiria com telefone, e o aceite procura essa marca
-# EXATA na conversa. Só o texto depois da marca é mascarado.
-MARCADOR_CONTRAPROPOSTA = re.compile(r"^\[contraproposta:[0-9a-zA-Z-]{1,64}:\d{1,12}\]")
+# Contraproposta/proposta: `[contraproposta:<id>:<centavos>(:<dias>)?] texto` ou
+# `[proposta:<id>:<centavos>(:<dias>)?] texto`. O id (UUID) pode ter dígitos seguidos que o
+# mascaramento confundiria com telefone; só o texto depois da marca é mascarado.
+MARCADOR_CONTRAPROPOSTA = re.compile(
+    r"^\[(?:contraproposta|proposta):[0-9a-zA-Z-]{1,64}:\d{1,12}(?::\d{1,3})?\]"
+)
 
 
 def mascarar_contatos(texto: str) -> str:

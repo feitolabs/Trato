@@ -96,19 +96,36 @@ class PedidoEmExecucao {
 
 enum TipoMensagem { texto, foto, sistema }
 
-/// Proposta de valor menor feita pelo cliente, vinda na conversa (o backend marca o texto).
+/// Proposta de valor/prazo vinda na conversa (`[contraproposta:...]` do cliente ou
+/// `[proposta:...]` do profissional).
 class ContrapropostaChat {
-  const ContrapropostaChat({required this.orcamentoId, required this.valorCentavos});
+  const ContrapropostaChat({
+    required this.orcamentoId,
+    required this.valorCentavos,
+    this.prazoExecucaoDias,
+    this.ehPropostaDoProfissional = false,
+  });
 
   final String orcamentoId;
   final int valorCentavos;
+  final int? prazoExecucaoDias;
+  final bool ehPropostaDoProfissional;
 
-  /// Lê `[contraproposta:<orcamento>:<centavos>] texto`. Devolve a proposta e o texto limpo.
+  /// Lê `[contraproposta:<orcamento>:<centavos>(:<dias>)?] texto` ou
+  /// `[proposta:<orcamento>:<centavos>(:<dias>)?] texto`.
   static (ContrapropostaChat?, String) ler(String texto) {
-    final m = RegExp(r'^\[contraproposta:([^:\]]+):(\d+)\]\s*').firstMatch(texto);
+    final m = RegExp(
+      r'^\[(contraproposta|proposta):([^:\]]+):(\d+)(?::(\d+))?\]\s*',
+    ).firstMatch(texto);
     if (m == null) return (null, texto);
+    final diasStr = m.group(4);
     return (
-      ContrapropostaChat(orcamentoId: m.group(1)!, valorCentavos: int.parse(m.group(2)!)),
+      ContrapropostaChat(
+        orcamentoId: m.group(2)!,
+        valorCentavos: int.parse(m.group(3)!),
+        prazoExecucaoDias: diasStr == null ? null : int.parse(diasStr),
+        ehPropostaDoProfissional: m.group(1) == 'proposta',
+      ),
       texto.substring(m.end),
     );
   }
@@ -149,10 +166,14 @@ class ConversaPedido {
     required this.mensagens,
     required this.respostasRapidas,
     this.usuarioId,
+    this.orcamentosAtivos = const {},
+    this.pedidoAberto = true,
   });
 
   /// Quem está do outro lado (para buscar a foto de perfil).
   final String? usuarioId;
+  final Set<String> orcamentosAtivos;
+  final bool pedidoAberto;
   final String nome;
   final String iniciais;
   final String numeroPedido;

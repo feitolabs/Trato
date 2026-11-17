@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
+import '../comuns/foco_rolagem.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
+import '../conta/modelos.dart' show EnderecoSalvo;
 import '../profissional/dinheiro.dart' show Dinheiro;
 import '../profissional_apoio/apoio.dart' show CapturarFoto;
 import 'modelos.dart';
 import 'pecas_pedido.dart';
 
-/// Tela 11 do protótipo: "Conte o que precisa", passo 2 de 3.
-///
-/// Só coleta e mostra: quem decide o que acontece depois é o backend. Os callbacks são
-/// opcionais; sem eles, o botão correspondente não aparece.
+/// Formulário de solicitação de serviço (descrição, prazo, faixa e endereço).
 const _maxFotos = 4;
 
 class NovoPedidoTela extends StatefulWidget {
@@ -25,6 +25,8 @@ class NovoPedidoTela extends StatefulWidget {
     this.aoAdicionarFoto,
     this.aoCapturarFoto,
     this.agora,
+    this.servicoCep,
+    this.enderecosSalvos = const [],
   });
 
   final FormularioPedido formulario;
@@ -41,6 +43,12 @@ class NovoPedidoTela extends StatefulWidget {
 
   /// Relógio da tela (prazo padrão e calendário). Nulo = hora do aparelho; testes fixam a data.
   final DateTime Function()? agora;
+
+  /// Consulta de CEP para preenchimento automático de rua, bairro e cidade.
+  final ServicoCep? servicoCep;
+
+  /// Endereços salvos na conta para preenchimento rápido com 1 toque.
+  final List<EnderecoSalvo> enderecosSalvos;
 
   @override
   State<NovoPedidoTela> createState() => _NovoPedidoTelaState();
@@ -88,7 +96,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late int _quantidade = widget.formulario.quantidadeInicial;
   late String _voltagem = widget.formulario.voltagemInicial;
 
-  /// `false` = sem pressa (padrão); `true` = com pressa.
+  /// `false` = prazo flexível (padrão); `true` = data limite específica.
   bool _comPressa = false;
   late DateTime _dataPrazo = _agora().add(const Duration(days: 7));
   late FaixaPreco _faixa = widget.formulario.faixas.first;
@@ -101,6 +109,26 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   var _enviando = false;
   final _fotosNovas = <String>[];
   CidadeOpcao? _cidade;
+
+  final _scroll = ScrollController();
+  late final Map<String, GlobalKey> _keyPerguntas = {
+    for (final q in widget.formulario.perguntas) q.id: GlobalKey(),
+  };
+  final _keyServicos = GlobalKey();
+  final _keyDescricao = GlobalKey();
+  final _keyValorProprio = GlobalKey();
+  final _keyCidade = GlobalKey();
+  final _keyCep = GlobalKey();
+  final _keyRua = GlobalKey();
+  final _keyNumero = GlobalKey();
+  final _keyBairro = GlobalKey();
+
+  final _focoDescricao = FocusNode();
+  final _focoValorProprio = FocusNode();
+  final _focoCep = FocusNode();
+  final _focoRua = FocusNode();
+  final _focoNumero = FocusNode();
+  final _focoBairro = FocusNode();
 
   /// Presencial (padrão) ou remoto. Remoto só existe quando a categoria aceita.
   var _modalidade = Modalidade.presencial;
@@ -122,9 +150,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   String? get _erroCep {
     if (!(_tentou && _presencial)) return null;
     final digitos = _cep.text.replaceAll(RegExp(r'\D'), '');
-    return digitos.length == 8
-        ? null
-        : 'Informe o CEP com 8 números (ex.: 35500-000).';
+    return digitos.length == 8 ? null : 'CEP inválido. Use 8 dígitos.';
   }
 
   bool get _enderecoCompleto =>
@@ -141,6 +167,50 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     if (widget.formulario.cidades.isNotEmpty) {
       _cidade = widget.formulario.cidades.first;
     }
+    if (widget.enderecosSalvos.isNotEmpty) {
+      final principal = widget.enderecosSalvos.where((e) => e.principal).firstOrNull ??
+          widget.enderecosSalvos.first;
+      _aplicarEnderecoSalvo(principal, atualizarEstado: false);
+    }
+  }
+
+  void _aplicarEnderecoSalvo(EnderecoSalvo end, {bool atualizarEstado = true}) {
+    void preencher() {
+      final digitos = end.cep.replaceAll(RegExp(r'\D'), '');
+      _cep.text = digitos.length == 8
+          ? '${digitos.substring(0, 5)}-${digitos.substring(5)}'
+          : end.cep;
+      _rua.text = end.logradouro;
+      _numero.text = end.numero;
+      _complemento.text = end.complemento ?? '';
+      _bairro.text = end.bairro;
+      _selecionarCidadePorNome(end.cidade);
+    }
+
+    if (atualizarEstado) {
+      setState(preencher);
+    } else {
+      preencher();
+    }
+  }
+
+  void _selecionarCidadePorNome(String nomeCidade) {
+    final alvo = normalizarTextoBusca(nomeCidade);
+    if (alvo.isEmpty) return;
+    for (final c in widget.formulario.cidades) {
+      if (normalizarTextoBusca(c.nome) == alvo) {
+        _cidade = c;
+        return;
+      }
+    }
+  }
+
+  void _aplicarCep(EnderecoPorCep end) {
+    setState(() {
+      if (end.logradouro.trim().isNotEmpty) _rua.text = end.logradouro;
+      if (end.bairro.trim().isNotEmpty) _bairro.text = end.bairro;
+      _selecionarCidadePorNome(end.cidade);
+    });
   }
 
   void _selecionarPressa(bool comPressa) {
@@ -164,9 +234,9 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       initialDate: _dataPrazo,
       firstDate: inicio,
       lastDate: inicio.add(const Duration(days: 365)),
-      helpText: _comPressa == true
-          ? 'Para quando você precisa?'
-          : 'Até quando está bom?',
+      helpText: _comPressa
+          ? 'Escolha a data limite'
+          : 'Sugira uma data aproximada',
     );
     if (data != null && mounted) setState(() => _dataPrazo = data);
   }
@@ -174,7 +244,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   bool get _exigeCidade => widget.formulario.cidades.isNotEmpty;
 
   String? get _erroCidade => _tentou && _exigeCidade && _cidade == null
-      ? 'Cidade não selecionada. Escolha a cidade onde o serviço será realizado.'
+      ? 'Escolha a cidade onde será o serviço.'
       : null;
 
   Future<void> _escolherCidade() async {
@@ -230,6 +300,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _descricao.dispose();
     _controladorValorProprio.dispose();
     for (final c in _textos.values) {
@@ -237,6 +308,16 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     }
     for (final c in [_rua, _numero, _complemento, _bairro, _cep, _referencia]) {
       c.dispose();
+    }
+    for (final f in [
+      _focoDescricao,
+      _focoValorProprio,
+      _focoCep,
+      _focoRua,
+      _focoNumero,
+      _focoBairro,
+    ]) {
+      f.dispose();
     }
     super.dispose();
   }
@@ -251,72 +332,129 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     if (ref != null && mounted) setState(() => _fotosNovas.add(ref));
   }
 
-  String? get _erroServicos => _tentou && _servicos.isEmpty
-      ? 'Nenhum serviço selecionado. Escolha pelo menos uma das opções acima.'
-      : null;
+  String? get _erroServicos =>
+      _tentou && _servicos.isEmpty ? 'Escolha pelo menos um serviço.' : null;
 
   String? get _erroDescricao => _tentou && _descricao.text.trim().isEmpty
-      ? 'Descrição não preenchida. Explique em detalhes o que precisa ser feito.'
+      ? 'Descreva o que precisa ser feito.'
       : null;
 
   Future<void> _enviar() async {
     if (_enviando) return;
-    setState(() => _tentou = true);
-    if (_exigeCidade && _cidade == null) return;
-    // Os erros aparecem nos campos e em cada pergunta.
-    if (_presencial && !_enderecoCompleto) return;
-    if (_erroPrazo != null) return;
-    if (_temPerguntas && !_perguntasOk) return;
+    String? errValor;
     if (_informarValorProprio) {
       final c = _lerCentavos(_controladorValorProprio.text);
       if (c == null || c <= 0) {
-        setState(() => _erroValor =
-            'Valor não preenchido. Digite um valor em reais maior que zero (ex.: R\$ 80,00).');
-        return;
+        errValor = 'Informe um valor maior que zero.';
+      } else {
+        _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
       }
-      _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
     }
-    if ((_temPerguntas || _servicos.isNotEmpty) &&
-        _descricao.text.trim().isNotEmpty) {
-      final rascunho = RascunhoPedido(
-        // Com perguntas da categoria, o título do pedido é o nome da categoria.
-        servicos: _temPerguntas
-            ? [widget.formulario.categoria]
-            : [
-                for (final s in widget.formulario.servicos)
-                  if (_servicos.contains(s)) s
-              ],
-        respostas: _temPerguntas ? _respostasParaEnviar : const {},
-        quantidade: _quantidade,
-        voltagem: _voltagem,
-        descricao: _descricao.text.trim(),
-        prazo:
-            '${_comPressa ? 'Com pressa' : 'Sem pressa'} · ${_formatarData(_dataPrazo)}',
-        prazoDesejado: _dataPrazo,
-        urgente: _comPressa,
-        faixa: _faixa,
-        fotos: List.of(_fotosNovas),
-        categoriaId: widget.formulario.categoriaId,
-        // Sem cidade carregada o pedido não abre (o repositório avisa); nada de cidade inventada.
-        cidadeId: _cidade?.id ?? widget.formulario.cidades.firstOrNull?.id,
-        modalidade: _presencial ? Modalidade.presencial : Modalidade.remoto,
-        endereco: _presencial
-            ? EnderecoRascunho(
-                logradouro: _rua.text,
-                numero: _numero.text,
-                bairro: _bairro.text,
-                cep: _cep.text,
-                complemento: _complemento.text,
-                referencia: _referencia.text,
-              )
-            : null,
-      );
-      setState(() => _enviando = true);
-      try {
-        await widget.aoEnviar?.call(rascunho);
-      } finally {
-        if (mounted) setState(() => _enviando = false);
-      }
+    setState(() {
+      _tentou = true;
+      _erroValor = errValor;
+    });
+
+    final faltamPerguntas = _temPerguntas && !_perguntasOk;
+    final faltamServicos = !_temPerguntas && _servicos.isEmpty;
+    final faltaDesc = _descricao.text.trim().isEmpty;
+    final faltaValor = _informarValorProprio && errValor != null;
+    final faltaCidade = _exigeCidade && _cidade == null;
+    final faltaEndereco = _presencial && !_enderecoCompleto;
+
+    if (faltamPerguntas ||
+        faltamServicos ||
+        faltaDesc ||
+        faltaValor ||
+        faltaCidade ||
+        _erroPrazo != null ||
+        faltaEndereco) {
+      focarPrimeiroErro([
+        if (_temPerguntas)
+          for (final q in widget.formulario.perguntas)
+            if (q.obrigatoria)
+              EntradaCampoErro(
+                key: _keyPerguntas[q.id]!,
+                temErro: () => !_respondida(q),
+              ),
+        if (!_temPerguntas)
+          EntradaCampoErro(key: _keyServicos, temErro: () => _servicos.isEmpty),
+        EntradaCampoErro(
+          key: _keyDescricao,
+          focusNode: _focoDescricao,
+          temErro: () => _descricao.text.trim().isEmpty,
+        ),
+        if (_informarValorProprio)
+          EntradaCampoErro(
+            key: _keyValorProprio,
+            focusNode: _focoValorProprio,
+            temErro: () => _erroValor != null,
+          ),
+        if (_exigeCidade)
+          EntradaCampoErro(key: _keyCidade, temErro: () => _cidade == null),
+        if (_presencial) ...[
+          EntradaCampoErro(
+            key: _keyCep,
+            focusNode: _focoCep,
+            temErro: () => _cep.text.replaceAll(RegExp(r'\D'), '').length != 8,
+          ),
+          EntradaCampoErro(
+            key: _keyRua,
+            focusNode: _focoRua,
+            temErro: () => _rua.text.trim().isEmpty,
+          ),
+          EntradaCampoErro(
+            key: _keyNumero,
+            focusNode: _focoNumero,
+            temErro: () => _numero.text.trim().isEmpty,
+          ),
+          EntradaCampoErro(
+            key: _keyBairro,
+            focusNode: _focoBairro,
+            temErro: () => _bairro.text.trim().isEmpty,
+          ),
+        ],
+      ]);
+      return;
+    }
+
+    final rascunho = RascunhoPedido(
+      // Com perguntas da categoria, o título do pedido é o nome da categoria.
+      servicos: _temPerguntas
+          ? [widget.formulario.categoria]
+          : [
+              for (final s in widget.formulario.servicos)
+                if (_servicos.contains(s)) s
+            ],
+      respostas: _temPerguntas ? _respostasParaEnviar : const {},
+      quantidade: _quantidade,
+      voltagem: _voltagem,
+      descricao: _descricao.text.trim(),
+      prazo: '${_comPressa ? 'Urgente' : 'Flexível'} · ${_formatarData(_dataPrazo)}',
+      prazoDesejado: _dataPrazo,
+      urgente: _comPressa,
+      faixa: _faixa,
+      fotos: List.of(_fotosNovas),
+      categoriaId: widget.formulario.categoriaId,
+      // Sem cidade carregada o pedido não abre (o repositório avisa); nada de cidade inventada.
+      cidadeId: _cidade?.id ?? widget.formulario.cidades.firstOrNull?.id,
+      modalidade: _presencial ? Modalidade.presencial : Modalidade.remoto,
+      endereco: _presencial
+          ? EnderecoRascunho(
+              logradouro: _rua.text,
+              numero: _numero.text,
+              bairro: _bairro.text,
+              cep: _cep.text,
+              complemento: _complemento.text,
+              referencia: _referencia.text,
+            )
+          : null,
+    );
+    setState(() => _enviando = true);
+    try {
+      await widget.aoEnviar?.call(rascunho);
+    } finally {
+      if (mounted) setState(() => _enviando = false);
     }
   }
 
@@ -332,9 +470,10 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     final secundario = TipografiaTrato.corpoPequeno
         .copyWith(color: CoresTrato.textoSecundario);
     return EstruturaPedido(
-      tituloBarra: 'Passo 2 de 3',
+      scrollController: _scroll,
+      tituloBarra: 'Novo pedido',
       rodape: BotaoPrimario(
-        texto: 'Próximo',
+        texto: 'Enviar pedido',
         carregando: _enviando,
         aoTocar: _enviando ? null : _enviar,
       ),
@@ -354,41 +493,52 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         const SizedBox(height: EspacosTrato.x4),
         if (_temPerguntas)
           for (final q in f.perguntas) ...[
-            _PerguntaCategoria(
-              key: ValueKey('pergunta-${q.id}'),
-              pergunta: q,
-              resposta: _respostas[q.id],
-              controlador: _textos[q.id],
-              erro: _erroPergunta(q),
-              aoMudar: (v) => setState(() {
-                if (v == null) {
-                  _respostas.remove(q.id);
-                } else {
-                  _respostas[q.id] = v;
-                }
-              }),
-              aoDigitar: () => setState(() {}),
+            KeyedSubtree(
+              key: _keyPerguntas[q.id],
+              child: _PerguntaCategoria(
+                key: ValueKey('pergunta-${q.id}'),
+                pergunta: q,
+                resposta: _respostas[q.id],
+                controlador: _textos[q.id],
+                erro: _erroPergunta(q),
+                aoMudar: (v) => setState(() {
+                  if (v == null) {
+                    _respostas.remove(q.id);
+                  } else {
+                    _respostas[q.id] = v;
+                  }
+                }),
+                aoDigitar: () => setState(() {}),
+              ),
             ),
             const SizedBox(height: EspacosTrato.x5),
           ]
         else ...[
-          const RotuloSecao('O que precisa ser feito?'),
-          const SizedBox(height: EspacosTrato.x3),
-          Wrap(
-            spacing: EspacosTrato.x2,
-            runSpacing: EspacosTrato.x2,
-            children: [
-              for (final s in f.servicos)
-                ChipOpcao(
-                  texto: s,
-                  marcado: _servicos.contains(s),
-                  aoTocar: () => setState(() => _servicos.contains(s)
-                      ? _servicos.remove(s)
-                      : _servicos.add(s)),
+          KeyedSubtree(
+            key: _keyServicos,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const RotuloSecao('O que precisa ser feito?'),
+                const SizedBox(height: EspacosTrato.x3),
+                Wrap(
+                  spacing: EspacosTrato.x2,
+                  runSpacing: EspacosTrato.x2,
+                  children: [
+                    for (final s in f.servicos)
+                      ChipOpcao(
+                        texto: s,
+                        marcado: _servicos.contains(s),
+                        aoTocar: () => setState(() => _servicos.contains(s)
+                            ? _servicos.remove(s)
+                            : _servicos.add(s)),
+                      ),
+                  ],
                 ),
-            ],
+                if (_erroServicos != null) _MensagemErro(_erroServicos!),
+              ],
+            ),
           ),
-          if (_erroServicos != null) _MensagemErro(_erroServicos!),
           const SizedBox(height: EspacosTrato.x5),
           Row(
             children: [
@@ -429,16 +579,25 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           ),
         ],
         const SizedBox(height: EspacosTrato.x5),
-        const RotuloSecao('Descreva o problema'),
-        const SizedBox(height: EspacosTrato.x3),
-        TextField(
-          controller: _descricao,
-          minLines: 3,
-          maxLines: 6,
-          keyboardType: TextInputType.multiline,
-          style: TipografiaTrato.corpo,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(errorText: _erroDescricao),
+        KeyedSubtree(
+          key: _keyDescricao,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const RotuloSecao('Descreva o problema'),
+              const SizedBox(height: EspacosTrato.x3),
+              TextField(
+                controller: _descricao,
+                focusNode: _focoDescricao,
+                minLines: 3,
+                maxLines: 6,
+                keyboardType: TextInputType.multiline,
+                style: TipografiaTrato.corpo,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(errorText: _erroDescricao),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: EspacosTrato.x5),
         const RotuloSecao('Fotos'),
@@ -470,13 +629,13 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           },
         ),
         const SizedBox(height: EspacosTrato.x5),
-        const RotuloSecao('Prazo'),
+        const RotuloSecao('Quando precisa?'),
         const SizedBox(height: EspacosTrato.x3),
         Row(
           children: [
             Expanded(
               child: _OpcaoRadio(
-                texto: 'Sem pressa',
+                texto: 'Flexível (sem data fixa)',
                 marcada: _comPressa == false,
                 aoTocar: () => _selecionarPressa(false),
               ),
@@ -484,7 +643,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             const SizedBox(width: EspacosTrato.x2),
             Expanded(
               child: _OpcaoRadio(
-                texto: 'Com pressa',
+                texto: 'Tenho data limite',
                 marcada: _comPressa == true,
                 aoTocar: () => _selecionarPressa(true),
               ),
@@ -494,8 +653,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         const SizedBox(height: EspacosTrato.x3),
         Text(
           _comPressa
-              ? 'Para quando você precisa?'
-              : 'Até quando está bom para você?',
+              ? 'Escolha a data máxima para o serviço:'
+              : 'Se quiser, sugira uma data aproximada:',
           style: secundario,
         ),
         const SizedBox(height: EspacosTrato.x2),
@@ -555,29 +714,33 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             aoMudar: (v) => setState(() => _faixa = v),
           ),
         ] else ...[
-          CampoTrato(
-            rotulo: 'Valor que pretende gastar',
-            controlador: _controladorValorProprio,
-            dica: 'Ex.: 300,00',
-            prefixo: 'R\$ ',
-            teclado: const TextInputType.numberWithOptions(decimal: true),
-            formatadores: [
-              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
-            ],
-            erro: _tentou ? _erroValor : null,
-            ajuda:
-                'Os profissionais receberão o seu valor como estimativa inicial.',
-            aoMudar: (v) {
-              final c = _lerCentavos(v);
-              setState(() {
-                if (c != null && c > 0) {
-                  _erroValor = null;
-                  _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
-                } else {
-                  _erroValor = 'Informe um valor válido maior que zero.';
-                }
-              });
-            },
+          KeyedSubtree(
+            key: _keyValorProprio,
+            child: CampoTrato(
+              rotulo: 'Valor que pretende gastar',
+              controlador: _controladorValorProprio,
+              foco: _focoValorProprio,
+              dica: 'Ex.: 300,00',
+              prefixo: 'R\$ ',
+              teclado: const TextInputType.numberWithOptions(decimal: true),
+              formatadores: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+              ],
+              erro: _tentou ? _erroValor : null,
+              ajuda:
+                  'Os profissionais receberão o seu valor como estimativa inicial.',
+              aoMudar: (v) {
+                final c = _lerCentavos(v);
+                setState(() {
+                  if (c != null && c > 0) {
+                    _erroValor = null;
+                    _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+                  } else {
+                    _erroValor = 'Informe um valor maior que zero.';
+                  }
+                });
+              },
+            ),
           ),
         ],
         const SizedBox(height: EspacosTrato.x5),
@@ -609,32 +772,35 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           const SizedBox(height: EspacosTrato.x5),
         ],
         if (_exigeCidade)
-          InkWell(
-            borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-            onTap: _escolherCidade,
-            child: CartaoTrato(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.location_on_outlined,
-                      color: CoresTrato.petroleo),
-                  const SizedBox(width: EspacosTrato.x3),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _cidade?.rotulo ?? 'Selecionar cidade',
-                          style: TipografiaTrato.corpoForte,
-                        ),
-                        Text(f.avisoEndereco, style: secundario),
-                        if (_erroCidade != null) _MensagemErro(_erroCidade!),
-                      ],
+          KeyedSubtree(
+            key: _keyCidade,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+              onTap: _escolherCidade,
+              child: CartaoTrato(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        color: CoresTrato.petroleo),
+                    const SizedBox(width: EspacosTrato.x3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _cidade?.rotulo ?? 'Selecionar cidade',
+                            style: TipografiaTrato.corpoForte,
+                          ),
+                          Text(f.avisoEndereco, style: secundario),
+                          if (_erroCidade != null) _MensagemErro(_erroCidade!),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.keyboard_arrow_down,
-                      color: CoresTrato.petroleo),
-                ],
+                    const Icon(Icons.keyboard_arrow_down,
+                        color: CoresTrato.petroleo),
+                  ],
+                ),
               ),
             ),
           )
@@ -676,39 +842,64 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             'Só o profissional que você contratar vê o endereço completo.',
             style: secundario,
           ),
+          if (widget.enderecosSalvos.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            Wrap(
+              spacing: EspacosTrato.x2,
+              runSpacing: EspacosTrato.x2,
+              children: [
+                for (final saved in widget.enderecosSalvos)
+                  ActionChip(
+                    avatar: const Icon(Icons.home_outlined, size: 18, color: CoresTrato.petroleo),
+                    label: Text(saved.apelido.isNotEmpty ? saved.apelido : 'Endereço salvo'),
+                    backgroundColor: CoresTrato.superficie,
+                    side: const BorderSide(color: CoresTrato.borda),
+                    onPressed: () => _aplicarEnderecoSalvo(saved),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(
-            key: const ValueKey('campo-cep'),
-            rotulo: 'CEP',
-            controlador: _cep,
-            dica: '00000-000',
-            teclado: TextInputType.number,
-            formatadores: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
-              LengthLimitingTextInputFormatter(9),
-            ],
-            aoMudar: (_) => setState(() {}),
-            erro: _erroCep,
+          KeyedSubtree(
+            key: _keyCep,
+            child: CampoCepAutoPreenchimento(
+              key: const ValueKey('campo-cep'),
+              controlador: _cep,
+              servico: widget.servicoCep,
+              foco: _focoCep,
+              proximoFoco: _focoNumero,
+              erro: _erroCep,
+              aoAlterar: () => setState(() {}),
+              aoEncontrar: _aplicarCep,
+            ),
           ),
           const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(
-            key: const ValueKey('campo-rua'),
-            rotulo: 'Rua',
-            controlador: _rua,
-            aoMudar: (_) => setState(() {}),
-            erro: _erroEndereco(_rua, 'a rua'),
+          KeyedSubtree(
+            key: _keyRua,
+            child: CampoTrato(
+              key: const ValueKey('campo-rua'),
+              rotulo: 'Rua',
+              controlador: _rua,
+              foco: _focoRua,
+              aoMudar: (_) => setState(() {}),
+              erro: _erroEndereco(_rua, 'a rua'),
+            ),
           ),
           const SizedBox(height: EspacosTrato.x3),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: CampoTrato(
-                  key: const ValueKey('campo-numero'),
-                  rotulo: 'Número',
-                  controlador: _numero,
-                  aoMudar: (_) => setState(() {}),
-                  erro: _erroEndereco(_numero, 'o número'),
+                child: KeyedSubtree(
+                  key: _keyNumero,
+                  child: CampoTrato(
+                    key: const ValueKey('campo-numero'),
+                    rotulo: 'Número',
+                    controlador: _numero,
+                    foco: _focoNumero,
+                    aoMudar: (_) => setState(() {}),
+                    erro: _erroEndereco(_numero, 'o número'),
+                  ),
                 ),
               ),
               const SizedBox(width: EspacosTrato.x3),
@@ -723,12 +914,16 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             ],
           ),
           const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(
-            key: const ValueKey('campo-bairro'),
-            rotulo: 'Bairro',
-            controlador: _bairro,
-            aoMudar: (_) => setState(() {}),
-            erro: _erroEndereco(_bairro, 'o bairro'),
+          KeyedSubtree(
+            key: _keyBairro,
+            child: CampoTrato(
+              key: const ValueKey('campo-bairro'),
+              rotulo: 'Bairro',
+              controlador: _bairro,
+              foco: _focoBairro,
+              aoMudar: (_) => setState(() {}),
+              erro: _erroEndereco(_bairro, 'o bairro'),
+            ),
           ),
           const SizedBox(height: EspacosTrato.x3),
           CampoTrato(

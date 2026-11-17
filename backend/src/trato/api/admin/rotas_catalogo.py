@@ -128,7 +128,8 @@ def listar_categorias(
             LEFT JOIN public.profissional_categorias pc ON pc.categoria_id = c.id
             GROUP BY c.id, c.nome, c.slug, c.icone, c.garantia_retrabalho_dias, c.ordem, c.ativa,
                      c.aceita_remoto
-            ORDER BY c.ordem, c.nome
+            ORDER BY translate(lower(c.nome), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'),
+                     lower(c.nome), c.id
             """
         ).fetchall()
         return [

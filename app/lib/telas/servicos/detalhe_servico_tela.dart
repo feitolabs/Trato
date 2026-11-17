@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_de_usuario.dart';
 import '../cliente/avatar_iniciais.dart' show SeloVerificacao;
@@ -15,24 +16,32 @@ class DetalheServicoTela extends StatelessWidget {
     required this.dados,
     required this.aoAcao,
     this.aoVerProfissional,
+    this.aoEditarPedido,
+    this.aoVerContrato,
+    this.aoVerNota,
+    this.aoVerAditivo,
+    this.aoVerConclusao,
   });
 
   final DetalheServico dados;
   final ValueChanged<AcaoServico> aoAcao;
   final ValueChanged<ProfissionalDoServico>? aoVerProfissional;
+  final VoidCallback? aoEditarPedido;
+  final VoidCallback? aoVerContrato;
+  final VoidCallback? aoVerNota;
+  final VoidCallback? aoVerAditivo;
+  final VoidCallback? aoVerConclusao;
 
   @override
   Widget build(BuildContext context) {
     final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     final acoes = dados.acoes;
     final pro = dados.profissional;
-    return Scaffold(
-      appBar: AppBar(),
-      body: SafeArea(
-        child: ConteudoResponsivo(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-            child: Column(
+    final recarregar = AtualizadorTela.de(context);
+    final conteudo = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+      child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(dados.titulo, style: TipografiaTrato.tituloGrande),
@@ -175,9 +184,36 @@ class DetalheServicoTela extends StatelessWidget {
                         : BotaoSecundario(texto: a.rotulo, aoTocar: () => aoAcao(a)),
                   ],
                 ],
+                if (aoEditarPedido != null ||
+                    aoVerContrato != null ||
+                    aoVerNota != null ||
+                    aoVerAditivo != null ||
+                    aoVerConclusao != null) ...[
+                  const SizedBox(height: EspacosTrato.x4),
+                  if (aoEditarPedido != null)
+                    BotaoSecundario(
+                      texto: 'Editar pedido',
+                      aoTocar: aoEditarPedido,
+                    ),
+                  if (aoVerContrato != null)
+                    BotaoLink(texto: 'Ver contrato', aoTocar: aoVerContrato),
+                  if (aoVerNota != null)
+                    BotaoLink(texto: 'Ver nota de materiais', aoTocar: aoVerNota),
+                  if (aoVerAditivo != null)
+                    BotaoLink(texto: 'Ver aditivo do serviço', aoTocar: aoVerAditivo),
+                  if (aoVerConclusao != null)
+                    BotaoLink(texto: 'Ver conclusão do serviço', aoTocar: aoVerConclusao),
+                ],
               ],
             ),
-          ),
+          );
+    return Scaffold(
+      appBar: AppBar(),
+      body: SafeArea(
+        child: ConteudoResponsivo(
+          child: recarregar == null
+              ? conteudo
+              : RefreshIndicator(onRefresh: recarregar, child: conteudo),
         ),
       ),
     );

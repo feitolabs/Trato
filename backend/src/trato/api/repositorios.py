@@ -77,6 +77,7 @@ class Contrato:
     # (disputa, liquidação) usa estes dois números, nunca a configuração vigente (A3).
     taxa_bps_aplicada: int | None = None
     taxa_minima_centavos: int = 0
+    prazo_execucao_dias: int | None = None
 
 
 @dataclass(frozen=True)

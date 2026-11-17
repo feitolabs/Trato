@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/repositorios.dart';
 import '../../tema/tema.dart';
 import '../cliente/modelos.dart';
+import '../comuns/foco_rolagem.dart';
 import '../pedido_novo/pecas_pedido.dart';
 
 /// Filtros dos pedidos abertos do profissional (categoria, bairro, faixa de preço e ordem).
@@ -79,6 +80,8 @@ class _FiltrosPedidosAbertosTelaState extends State<FiltrosPedidosAbertosTela> {
 
   @override
   Widget build(BuildContext context) {
+    final categoriasOrdenadas = [...widget.categorias]
+      ..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
@@ -107,7 +110,7 @@ class _FiltrosPedidosAbertosTelaState extends State<FiltrosPedidosAbertosTela> {
                         marcado: _categoria == null,
                         aoTocar: () => setState(() => _categoria = null),
                       ),
-                      for (final c in widget.categorias)
+                      for (final c in categoriasOrdenadas)
                         ChipOpcao(
                           texto: c.nome,
                           marcado: _categoria == c.id,
