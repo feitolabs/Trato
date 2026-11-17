@@ -80,9 +80,23 @@ void main() {
       expect(find.text('Pedir orçamento'), findsOneWidget);
       expect(find.text('Troca de tomadas e chuveiro'), findsOneWidget);
       expect(find.text('3 orçamentos novos'), findsOneWidget);
-      for (final c in categorias) {
-        expect(find.text(c.nome), findsOneWidget);
+      for (final nome in [
+        'Ar-cond.',
+        'Chaveiro',
+        'Elétrica',
+        'Hidráulica',
+        'Jardinagem',
+        'Limpeza',
+        'Montagem',
+        'Ver todas',
+      ]) {
+        expect(find.text(nome), findsOneWidget);
       }
+      expect(
+        tester.getTopLeft(find.text('Ar-cond.')).dx <
+            tester.getTopLeft(find.text('Chaveiro')).dx,
+        isTrue,
+      );
       expect(find.text('Pintura da sala'), findsOneWidget);
       expect(find.text('Garantia ativa até 31/12/2026'), findsOneWidget);
     });

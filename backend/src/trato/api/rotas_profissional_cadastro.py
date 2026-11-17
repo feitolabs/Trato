@@ -8,7 +8,6 @@ endereço; o nome sai abreviado). O texto livre passa pelo mascaramento de conta
 from __future__ import annotations
 
 import re
-import unicodedata
 from datetime import datetime
 from typing import Annotated
 
@@ -29,6 +28,7 @@ from trato.profissional.repositorio import (
     ProfissionaisEmMemoria,
     Regiao,
     RepositorioProfissionais,
+    normalizar_busca,
     slugs,
 )
 from trato.seguranca.config import obter_config_seguranca
@@ -371,6 +371,11 @@ class ProfissionalBuscaOut(BaseModel):
     nota_publica: float | None
     servicos_concluidos: int | None
     categorias: list[str] = Field(description="Ids das categorias em que atua (não suspensas).")
+    cidades: list[str] = Field(
+        default_factory=list, description='Cidades que atende ("Divinópolis/MG").'
+    )
+    bairros: list[str] = Field(default_factory=list)
+    atende_remoto: bool = False
 
 
 class BuscaProfissionaisOut(BaseModel):
@@ -406,36 +411,75 @@ def catalogo_cidades(
 
 
 def _normalizar(texto: str) -> str:
-    sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
-    return " ".join(sem_acento.casefold().split())
+    return normalizar_busca(texto)
 
 
 def _categorias_do_servico(modulo: Modulo, servico: str) -> set[str]:
     """Ids das categorias cujo nome ou slug contém o texto (e as filhas delas)."""
     busca = _normalizar(servico)
+    if not busca:
+        return set()
     todas = modulo.catalogo.categorias_publicas()
-    achadas = {c.id for c in todas if busca in _normalizar(c.nome) or busca in _normalizar(c.slug)}
+    tokens = busca.split()
+    achadas = {
+        c.id
+        for c in todas
+        if busca in _normalizar(c.nome)
+        or busca in _normalizar(c.slug)
+        or all(t in f"{_normalizar(c.nome)} {_normalizar(c.slug)}" for t in tokens)
+    }
     return achadas | {c.id for c in todas if c.pai_id in achadas}
+
+
+def _cidades_nomes_map(modulo: Modulo) -> dict[str, str]:
+    return {
+        c.id: f"{c.nome}/{c.uf}" if c.uf else c.nome for c in modulo.catalogo.cidades_publicas()
+    }
+
+
+def _categorias_por_tokens(modulo: Modulo, tokens: list[str]) -> frozenset[str]:
+    if not tokens:
+        return frozenset()
+    todas = modulo.catalogo.categorias_publicas()
+    achadas = {
+        c.id
+        for c in todas
+        if any(t in _normalizar(c.nome) or t in _normalizar(c.slug) for t in tokens)
+    }
+    return frozenset(achadas | {c.id for c in todas if c.pai_id in achadas})
+
+
+def _cidades_por_tokens(modulo: Modulo, tokens: list[str]) -> frozenset[str]:
+    if not tokens:
+        return frozenset()
+    return frozenset(
+        c.id
+        for c in modulo.catalogo.cidades_publicas()
+        if any(t in _normalizar(f"{c.nome} {c.uf}") for t in tokens)
+    )
 
 
 @router.get(
     "/profissionais",
     response_model=BuscaProfissionaisOut,
-    summary="Buscar profissionais por serviço, categoria ou bairro",
+    summary="Buscar profissionais por texto, serviço, categoria ou região",
     description=(
         "Só profissionais APROVADOS. Sem documento, telefone, e-mail nem endereço; o nome sai "
-        "abreviado. `servico` procura no nome da categoria (sem acento, sem maiúsculas); "
+        "abreviado. `q` procura em categoria, nome abreviado, bio, portfólio, cidade e bairro; "
+        "`servico` procura na categoria (sem acento, sem hífen, sem maiúsculas); "
         "`categoria_id` é exato; `cidade_id` e `bairro` filtram a região (quem atende a cidade "
-        "toda também entra). Ordem: melhor nota, mais serviços. Paginada (`pagina` a partir de 1)."
+        "toda também entra). Paginada (`pagina` a partir de 1)."
     ),
 )
 def buscar_profissionais(
+    q: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
     servico: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
     categoria_id: Annotated[str | None, Query(max_length=64)] = None,
     cidade_id: Annotated[str | None, Query(max_length=64)] = None,
     bairro: Annotated[str | None, Query(min_length=2, max_length=80)] = None,
     nota_minima: Annotated[float | None, Query(ge=0.0, le=5.0)] = None,
     atende_hoje: Annotated[bool, Query()] = False,
+    atende_remoto: Annotated[bool | None, Query()] = None,
     pagina: Annotated[int, Query(ge=1, le=1000)] = 1,
     limite: Annotated[int, Query(ge=1, le=50)] = 20,
     _: Usuario = Depends(_pessoa),
@@ -450,16 +494,22 @@ def buscar_profissionais(
     vazio = BuscaProfissionaisOut(itens=[], pagina=pagina, limite=limite, total=0, tem_mais=False)
     if categorias is not None and not categorias:
         return vazio
+    tokens_texto = [t for t in _normalizar(q or "").split() if t]
     filtro = FiltroBusca(
         categoria_ids=frozenset(categorias) if categorias is not None else None,
         cidade_id=cidade_id,
         bairro=bairro,
         nota_minima=nota_minima,
         atende_hoje=atende_hoje,
+        atende_remoto=atende_remoto,
+        texto=q,
+        categorias_texto=_categorias_por_tokens(modulo, tokens_texto),
+        cidades_texto=_cidades_por_tokens(modulo, tokens_texto),
         limite=limite,
         deslocamento=(pagina - 1) * limite,
     )
     achados, total = modulo.repo.buscar(filtro, contexto.usuarios.detalhe)
+    mapa_cidades = _cidades_nomes_map(modulo)
     return BuscaProfissionaisOut(
         itens=[
             ProfissionalBuscaOut(
@@ -470,6 +520,16 @@ def buscar_profissionais(
                 nota_publica=r.nota_publica,
                 servicos_concluidos=r.servicos_concluidos,
                 categorias=list(r.categorias),
+                cidades=list(
+                    r.cidades
+                    or dict.fromkeys(
+                        mapa_cidades[reg.cidade_id]
+                        for reg in r._regioes_ids
+                        if reg.cidade_id in mapa_cidades
+                    )
+                ),
+                bairros=list(r.bairros),
+                atende_remoto=r.atende_remoto,
             )
             for r in achados
         ],

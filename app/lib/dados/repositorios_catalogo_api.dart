@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../componentes/componentes.dart';
 import '../telas/agenda/modelos.dart';
 import '../telas/cliente/modelos.dart';
+import '../telas/comuns/foco_rolagem.dart';
 import '../telas/pedido_novo/modelos.dart';
 import '../telas/servicos/modelos.dart';
 import 'cliente_api.dart';
@@ -72,13 +73,19 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
 
   final ClienteApi _api;
 
-  /// Só o que está no banco. Sem rede, o erro vai para a tela ("Tentar de novo").
+  /// Só o que está no banco, em ordem alfabética PT-BR. Sem rede, o erro vai para a tela ("Tentar de novo").
   @override
   Future<List<CategoriaServico>> categorias() async {
     final resposta = await _api.get('/v1/catalogo/categorias');
-    return [
-      for (final item
-          in (resposta as List? ?? const []).cast<Map<String, dynamic>>())
+    final itens = (resposta as List? ?? const []).cast<Map<String, dynamic>>();
+    _nomesCategorias = {
+      for (final c in itens)
+        if (c['id'] is String && c['nome'] is String)
+          c['id'] as String: c['nome'] as String,
+    };
+    _nomesCarregadosEm = DateTime.now();
+    final lista = [
+      for (final item in itens)
         CategoriaServico(
           (item['nome'] as String?) ?? 'Serviço',
           iconeDaCategoria(
@@ -87,13 +94,21 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           aceitaRemoto: item['aceita_remoto'] == true,
         ),
     ];
+    lista.sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));
+    return lista;
   }
 
   Map<String, String>? _nomesCategorias;
+  DateTime? _nomesCarregadosEm;
 
-  /// A API devolve as categorias do profissional como id; a tela mostra o nome.
+  /// A API devolve as categorias do profissional como id; a tela mostra o nome (cache com TTL de 2 min).
   Future<void> _carregarNomesCategorias() async {
-    if (_nomesCategorias != null) return;
+    final ultima = _nomesCarregadosEm;
+    if (_nomesCategorias != null &&
+        ultima != null &&
+        DateTime.now().difference(ultima) < const Duration(minutes: 2)) {
+      return;
+    }
     try {
       final resposta = await _api.get('/v1/catalogo/categorias');
       if (resposta is List) {
@@ -102,6 +117,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
             if (c is Map && c['id'] is String && c['nome'] is String)
               c['id'] as String: c['nome'] as String,
         };
+        _nomesCarregadosEm = DateTime.now();
       }
     } on ErroTrato {
       // Sem os nomes, a especialidade só fica em branco; a lista continua.
@@ -120,6 +136,18 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final categorias = (j['categorias'] as List?) ?? const <Object?>[];
     final notaPublica = (j['nota_publica'] as num?)?.toDouble() ?? 0.0;
     final servicosConcluidos = (j['servicos_concluidos'] as int?) ?? 0;
+    final cidades = [for (final c in (j['cidades'] as List? ?? const [])) '$c']
+        .where((c) => c.trim().isNotEmpty)
+        .toList();
+    final bairros = [for (final b in (j['bairros'] as List? ?? const [])) '$b']
+        .where((b) => b.trim().isNotEmpty)
+        .toList();
+    final atendeRemoto = j['atende_remoto'] == true;
+    final regiao = [
+      if (bairros.isNotEmpty) bairros.first,
+      if (cidades.isNotEmpty) cidades.first,
+      if (bairros.isEmpty && cidades.isEmpty && atendeRemoto) 'Atende remoto',
+    ].join(' · ');
     return Profissional(
       id: id,
       nome: nome,
@@ -129,8 +157,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       servicosConcluidos: servicosConcluidos,
       nota: notaPublica,
       distanciaKm: 0,
-      // A busca não devolve região nem distância: sem texto, a tela não mostra o separador.
-      regiao: null,
+      regiao: regiao.isEmpty ? null : regiao,
+      categoriaId: categorias.isEmpty ? null : '${categorias.first}',
     );
   }
 
@@ -159,12 +187,9 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   @override
   Future<List<Profissional>> buscar(String termo) async {
     final limpo = termo.trim();
-    final consulta = <String, String>{
-      if (limpo.length >= 2) 'servico': limpo,
-    };
+    if (limpo.length < 2) return const [];
     final (bruto, _) = await emParalelo2(
-      _api.get('/v1/profissionais',
-          consulta: consulta.isEmpty ? null : consulta),
+      _api.get('/v1/profissionais', consulta: {'q': limpo}),
       _carregarNomesCategorias(),
     );
     final resposta = _mapa(bruto);
@@ -291,10 +316,10 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       for (final p in (j['portfolio'] as List? ?? const [])) p as Map,
     ];
     final portfolio = [for (final p in itensPortfolio) p['titulo'] as String];
-    // Foto de cada trabalho: `[Foto:<id>]` vira URL assinada; sem foto ou sem rede, fica a legenda.
-    final fotosUrls = [
-      for (final p in itensPortfolio) await _urlDaFotoDeTrabalho(profissionalId, p['descricao']),
-    ];
+    // Foto de cada trabalho em paralelo: `[Foto:<id>]` vira URL assinada.
+    final fotosUrls = await Future.wait([
+      for (final p in itensPortfolio) _urlDaFotoDeTrabalho(profissionalId, p['descricao']),
+    ]);
     final regioes = [
       for (final r in (j['regioes'] as List? ?? const []))
         ((r as Map)['bairro'] ?? r['cidade'] ?? '') as String,
@@ -305,17 +330,18 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     }
     final desde = DateTime.tryParse('${j['no_trato_desde']}');
     final notaPublica = (j['nota_publica'] as num?)?.toDouble();
+    final categoriasIds = (j['categorias'] as List?) ?? const <Object?>[];
     return Profissional(
       id: profissionalId,
       nome: nome,
       iniciais: _iniciais(nome),
       verificacao: seloDeVerificacao(nivel),
-      especialidade:
-          _especialidade((j['categorias'] as List?) ?? const <Object?>[]),
+      especialidade: _especialidade(categoriasIds),
       servicosConcluidos: (j['servicos_concluidos'] as int?) ?? 0,
       nota: notaPublica ?? 0,
       distanciaKm: 0,
       regiao: regioes.join(', '),
+      categoriaId: categoriasIds.isEmpty ? null : '${categoriasIds.first}',
       detalhe: DetalhePerfil(
         noTratoDesde: (desde ?? DateTime.now()).year,
         totalAvaliacoes: avaliacoes.length,

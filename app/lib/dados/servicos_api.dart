@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../componentes/imagem_trato.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/aditivo/aditivo.dart';
+import '../telas/comuns/foco_rolagem.dart';
 import 'repositorios.dart' show Cobranca, StatusPagamento;
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
@@ -341,9 +342,11 @@ class ServicoVerificacaoApi implements ServicoVerificacao {
           ],
         },
       );
+      _cache = null;
     } on ErroTrato catch (e) {
       // Se já está em análise ou já foi enviada, considera concluído com sucesso.
       if (e.codigoHttp == 409 || e.mensagem.contains('já tem uma verificação')) {
+        _cache = null;
         return;
       }
       rethrow;
@@ -456,9 +459,13 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
         if (item['descricao'] case final String ref when ref.isNotEmpty) ref,
     ];
     final urlsDasFotos = <String, String>{};
-    for (final ref in portfolio) {
-      final url = await _urlDaFotoDoPortfolio(_api, donoId, ref);
-      if (url != ref) urlsDasFotos[ref] = url;
+    final urlsResolvidas = await Future.wait([
+      for (final ref in portfolio) _urlDaFotoDoPortfolio(_api, donoId, ref),
+    ]);
+    for (var i = 0; i < portfolio.length; i++) {
+      if (urlsResolvidas[i] != portfolio[i]) {
+        urlsDasFotos[portfolio[i]] = urlsResolvidas[i];
+      }
     }
     return DadosCadastroProfissional(
       urlsDasFotos: urlsDasFotos,
@@ -530,9 +537,13 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       for (final c in cids)
         if (c['nome'] is String && c['id'] is String) (c['nome'] as String): (c['id'] as String),
     };
+    final categoriasOrdenadas = _idPorNomeCategoria.keys.toList()
+      ..sort(compararAlfabeticoPtBr);
+    final cidadesOrdenadas = _idPorNomeCidade.keys.toList()
+      ..sort(compararAlfabeticoPtBr);
     return OpcoesCadastro(
-      categorias: _idPorNomeCategoria.keys.toList(),
-      cidades: _idPorNomeCidade.keys.toList(),
+      categorias: categoriasOrdenadas,
+      cidades: cidadesOrdenadas,
       raiosKm: const [],
       dias: opcoesCadastroPadrao.dias,
       periodos: opcoesCadastroPadrao.periodos,
@@ -692,16 +703,16 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
           c,
     ];
     final portfolioBruto = (prof?['portfolio'] as List? ?? const []).cast<Map<String, dynamic>>();
-    final fotosPortfolio = [
+    final fotosPortfolio = await Future.wait([
       for (final item in portfolioBruto)
-        await _urlDaFotoDoPortfolio(
+        _urlDaFotoDoPortfolio(
           _api,
           usuarioId,
           ((item['descricao'] as String?)?.isNotEmpty == true
               ? item['descricao'] as String
               : (item['titulo'] as String? ?? 'Foto')),
         ),
-    ];
+    ]);
     final status = (prof?['status'] as String?) ?? '';
     final nivel = (prof?['nivel_verificacao'] as String?) ?? '';
     final estaAprovado = status == 'aprovado';

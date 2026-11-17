@@ -138,6 +138,32 @@ void main() {
       expect(find.text('Trocar tomada, trocar chuveiro'), findsOneWidget);
     });
 
+    testWidgets('valores do cartão ficam alinhados à direita', (tester) async {
+      await _abrir(
+        tester,
+        const DetalhePedidoTela(dados: detalhePedidoExemplo),
+        tamanho: const Size(390, 2000),
+      );
+      final cartao = find.byType(CartaoTrato);
+      final direitaColuna = tester
+          .getTopRight(
+            find.descendant(of: cartao, matching: find.byType(Column)).first,
+          )
+          .dx;
+      for (final valor in [
+        'Trocar tomada, trocar chuveiro',
+        '2',
+        '220 V',
+        'Até sexta, 30/10',
+        'R\$ 200 a R\$ 500',
+      ]) {
+        final direitaValor = tester
+            .getTopRight(find.descendant(of: cartao, matching: find.text(valor)))
+            .dx;
+        expect(direitaValor, closeTo(direitaColuna, 0.5), reason: valor);
+      }
+    });
+
     testWidgets('tocar a área aproximada abre o mapa só quando há ponto',
         (tester) async {
       final abertos = <(double, double)>[];

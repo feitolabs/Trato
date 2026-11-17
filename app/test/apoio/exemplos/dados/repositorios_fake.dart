@@ -58,6 +58,7 @@ class RepositorioPedidosFake implements RepositorioPedidos {
     String? descricao,
     int? faixaMinCentavos,
     int? faixaMaxCentavos,
+    String? cep,
     String? logradouro,
     String? numero,
     String? bairro,
@@ -72,6 +73,7 @@ class RepositorioPedidosFake implements RepositorioPedidos {
       faixaMaxCentavos: faixaMaxCentavos == 0
           ? null
           : (faixaMaxCentavos ?? _dadosDemo.faixaMaxCentavos),
+      cep: cep ?? _dadosDemo.cep,
       logradouro: logradouro ?? _dadosDemo.logradouro,
       numero: numero ?? _dadosDemo.numero,
       bairro: bairro ?? _dadosDemo.bairro,
@@ -137,6 +139,7 @@ class RepositorioOrcamentosFake implements RepositorioOrcamentos {
     String pedidoId,
     String orcamentoId,
     int valorCentavos, {
+    int? prazoExecucaoDias,
     String? mensagem,
   }) async {
     contrapropostas.add((pedidoId, orcamentoId, valorCentavos));
@@ -144,7 +147,22 @@ class RepositorioOrcamentosFake implements RepositorioOrcamentos {
 
   @override
   Future<void> aceitarContraproposta(
-      String pedidoId, String orcamentoId, int valorCentavos) async {
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    int? prazoExecucaoDias,
+  }) async {
+    aceitesDeContraproposta.add((pedidoId, orcamentoId, valorCentavos));
+  }
+
+  @override
+  Future<void> proporNovaCondicao(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    int? prazoExecucaoDias,
+    String? mensagem,
+  }) async {
     aceitesDeContraproposta.add((pedidoId, orcamentoId, valorCentavos));
   }
 

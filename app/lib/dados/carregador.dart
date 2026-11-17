@@ -5,6 +5,25 @@ import '../tema/tema.dart';
 import 'erros.dart';
 import 'relogio_de_atualizacao.dart';
 
+/// Expõe o callback assíncrono de atualização do [Carregador]/[CarregadorTela] para telas filhas
+/// usarem diretamente no `RefreshIndicator`.
+class AtualizadorTela extends InheritedWidget {
+  const AtualizadorTela({
+    super.key,
+    required this.recarregar,
+    required super.child,
+  });
+
+  final Future<void> Function() recarregar;
+
+  static Future<void> Function()? de(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AtualizadorTela>()?.recarregar;
+
+  @override
+  bool updateShouldNotify(AtualizadorTela oldWidget) =>
+      oldWidget.recarregar != recarregar;
+}
+
 /// Carrega algo e mostra os estados que toda tela ligada precisa ter: carregando, erro
 /// (com "Tentar de novo") e vazio. Pronto, entrega o dado a [construir].
 ///
@@ -25,7 +44,7 @@ class Carregador<T> extends StatefulWidget {
 
   final Future<T> Function() carregar;
 
-  /// Quando este aviso dispara, recarrega do servidor (ex.: depois de criar um pedido).
+  /// Quando este aviso dispara, recarrega do servidor (em silêncio se a tela já estava pronta).
   final Listenable? atualizarQuando;
 
   /// Atualiza sozinho neste intervalo (ver [RelogioDeAtualizacao.intervaloPadrao]). Nulo = só
@@ -55,7 +74,7 @@ class _CarregadorState<T> extends State<Carregador<T>> {
   @override
   void initState() {
     super.initState();
-    widget.atualizarQuando?.addListener(_recarregar);
+    widget.atualizarQuando?.addListener(_aoDispararAtualizacao);
     final intervalo = widget.atualizarACada;
     if (intervalo != null) {
       _relogio = RelogioDeAtualizacao(
@@ -71,16 +90,25 @@ class _CarregadorState<T> extends State<Carregador<T>> {
   void didUpdateWidget(covariant Carregador<T> antigo) {
     super.didUpdateWidget(antigo);
     if (antigo.atualizarQuando != widget.atualizarQuando) {
-      antigo.atualizarQuando?.removeListener(_recarregar);
-      widget.atualizarQuando?.addListener(_recarregar);
+      antigo.atualizarQuando?.removeListener(_aoDispararAtualizacao);
+      widget.atualizarQuando?.addListener(_aoDispararAtualizacao);
     }
   }
 
   @override
   void dispose() {
     _relogio?.parar();
-    widget.atualizarQuando?.removeListener(_recarregar);
+    widget.atualizarQuando?.removeListener(_aoDispararAtualizacao);
     super.dispose();
+  }
+
+  void _aoDispararAtualizacao() {
+    if (!mounted) return;
+    if (_pronto && _erro == null) {
+      _atualizarEmSilencio();
+    } else {
+      _recarregar();
+    }
   }
 
   Future<void> _carregar() async {
@@ -102,7 +130,7 @@ class _CarregadorState<T> extends State<Carregador<T>> {
     }
   }
 
-  /// Mostra o carregando e busca de novo (depois de uma ação ou do "Tentar de novo").
+  /// Mostra o carregando e busca de novo (depois de erro ou "Tentar de novo").
   void _recarregar() {
     if (!mounted) return;
     setState(() {
@@ -112,16 +140,25 @@ class _CarregadorState<T> extends State<Carregador<T>> {
     _carregar();
   }
 
-  /// Busca de novo sem mexer na tela; só troca o dado quando chega. Erro: segue com o que tem.
+  /// Busca de novo sem apagar o conteúdo atual; se falhar em segundo plano, mantém os dados.
   Future<void> _atualizarEmSilencio() async {
-    if (!_pronto) return;
+    if (!_pronto) {
+      await _carregar();
+      return;
+    }
     final minha = ++_geracao;
-    final dado = await widget.carregar();
-    if (!mounted || minha != _geracao) return;
-    setState(() {
-      _dado = dado;
-      _erro = null;
-    });
+    try {
+      final dado = await widget.carregar();
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _dado = dado;
+        _erro = null;
+      });
+    } on Object catch (erro) {
+      if (_erro != null && mounted && minha == _geracao) {
+        setState(() => _erro = erro);
+      }
+    }
   }
 
   @override
@@ -134,17 +171,26 @@ class _CarregadorState<T> extends State<Carregador<T>> {
     }
     if (_erro != null) {
       final erro = _erro;
-      return EstadoTela(
-        titulo: 'Não deu certo',
-        texto: erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo em instantes.',
-        aoTentarNovamente: _recarregar,
+      return RefreshIndicator(
+        onRefresh: _atualizarEmSilencio,
+        child: EstadoTela(
+          titulo: 'Não deu certo',
+          texto: erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo em instantes.',
+          aoTentarNovamente: _recarregar,
+        ),
       );
     }
     final dado = _dado as T;
     if (widget.vazio?.call(dado) ?? false) {
-      return EstadoTela(titulo: widget.tituloVazio, texto: widget.textoVazio);
+      return RefreshIndicator(
+        onRefresh: _atualizarEmSilencio,
+        child: EstadoTela(titulo: widget.tituloVazio, texto: widget.textoVazio),
+      );
     }
-    return widget.construir(context, dado);
+    return AtualizadorTela(
+      recarregar: _atualizarEmSilencio,
+      child: widget.construir(context, dado),
+    );
   }
 }
 
@@ -182,43 +228,51 @@ class EstadoTela extends StatelessWidget {
                   ),
                 ),
               Expanded(
-                child: Center(
-                  child: carregando
-                      ? esqueleto ??
-                          Semantics(
-                            label: 'Carregando',
-                            child: const Align(
-                              alignment: Alignment.topCenter,
-                              child: EsqueletoLista(),
-                            ),
-                          )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              titulo ?? '',
-                              style: TipografiaTrato.tituloCartao,
-                              textAlign: TextAlign.center,
-                            ),
-                            if ((texto ?? '').isNotEmpty) ...[
-                              const SizedBox(height: EspacosTrato.x2),
-                              Text(
-                                texto!,
-                                textAlign: TextAlign.center,
-                                style: TipografiaTrato.corpo.copyWith(
-                                  color: CoresTrato.textoSecundario,
-                                ),
+                child: LayoutBuilder(
+                  builder: (context, limites) => SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: limites.maxHeight),
+                      child: Center(
+                        child: carregando
+                            ? esqueleto ??
+                                Semantics(
+                                  label: 'Carregando',
+                                  child: const Align(
+                                    alignment: Alignment.topCenter,
+                                    child: EsqueletoLista(),
+                                  ),
+                                )
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    titulo ?? '',
+                                    style: TipografiaTrato.tituloCartao,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  if ((texto ?? '').isNotEmpty) ...[
+                                    const SizedBox(height: EspacosTrato.x2),
+                                    Text(
+                                      texto!,
+                                      textAlign: TextAlign.center,
+                                      style: TipografiaTrato.corpo.copyWith(
+                                        color: CoresTrato.textoSecundario,
+                                      ),
+                                    ),
+                                  ],
+                                  if (aoTentarNovamente != null) ...[
+                                    const SizedBox(height: EspacosTrato.x4),
+                                    BotaoSecundario(
+                                      texto: 'Tentar de novo',
+                                      aoTocar: aoTentarNovamente,
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ],
-                            if (aoTentarNovamente != null) ...[
-                              const SizedBox(height: EspacosTrato.x4),
-                              BotaoSecundario(
-                                texto: 'Tentar de novo',
-                                aoTocar: aoTentarNovamente,
-                              ),
-                            ],
-                          ],
-                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],

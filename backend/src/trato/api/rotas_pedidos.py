@@ -349,7 +349,12 @@ def editar_pedido(
     if corpo.urgente is not None:
         mudancas["urgente"] = corpo.urgente
     if corpo.endereco is not None:
-        mudancas["endereco"] = EnderecoPedido(**corpo.endereco.model_dump())
+        dados_end = corpo.endereco.model_dump()
+        if atual.endereco is not None:
+            for opcional in ("cep", "complemento", "referencia", "lat", "lng"):
+                if dados_end.get(opcional) is None:
+                    dados_end[opcional] = getattr(atual.endereco, opcional)
+        mudancas["endereco"] = EnderecoPedido(**dados_end)
         mudancas["bairro"] = corpo.endereco.bairro or atual.bairro
     novos = replace(atual, **mudancas)
     minimo, maximo = novos.faixa_preco_min_centavos, novos.faixa_preco_max_centavos

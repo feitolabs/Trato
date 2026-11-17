@@ -104,6 +104,7 @@ abstract interface class RepositorioPedidos {
     String? descricao,
     int? faixaMinCentavos,
     int? faixaMaxCentavos,
+    String? cep,
     String? logradouro,
     String? numero,
     String? bairro,
@@ -155,16 +156,32 @@ abstract interface class RepositorioOrcamentos {
   /// Só pede ao backend. Taxa e líquido nunca são calculados no app.
   Future<void> aceitar(String pedidoId, String orcamentoId);
 
-  /// Cliente propõe um valor menor (vai para a conversa do profissional). O backend valida.
+  /// Cliente propõe um valor e/ou prazo em dias (vai para a conversa do profissional). O backend valida.
   Future<void> contraproporValor(
     String pedidoId,
     String orcamentoId,
     int valorCentavos, {
+    int? prazoExecucaoDias,
     String? mensagem,
   });
 
-  /// Profissional aceita a contraproposta: o orçamento ganha uma nova versão no valor combinado.
-  Future<void> aceitarContraproposta(String pedidoId, String orcamentoId, int valorCentavos);
+  /// Profissional aceita a contraproposta: o orçamento ganha uma nova versão no valor e prazo combinados.
+  Future<void> aceitarContraproposta(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    int? prazoExecucaoDias,
+  });
+
+  /// Profissional envia uma nova proposta (valor e/ou prazo em dias) diretamente pelo chat.
+  Future<void> proporNovaCondicao(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    int? prazoExecucaoDias,
+    String? mensagem,
+  }) =>
+      throw UnimplementedError();
 }
 
 enum StatusPagamento { aguardando, pago, falhou }

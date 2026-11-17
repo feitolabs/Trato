@@ -96,9 +96,13 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
         final c = await api.listarCidades();
         final k = await api.listarCategorias();
         if (mounted) {
+          final cidadesOrdenadas = [...c]
+            ..sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
+          final categoriasOrdenadas = [...k]
+            ..sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
           setState(() {
-            _cidades = c;
-            _categorias = k;
+            _cidades = cidadesOrdenadas;
+            _categorias = categoriasOrdenadas;
           });
         }
       } catch (_) {

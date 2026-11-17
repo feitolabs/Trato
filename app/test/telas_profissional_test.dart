@@ -129,7 +129,7 @@ void main() {
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));
       await _tocar(t, find.text('Salvar e continuar'));
-      expect(find.textContaining('Cidade não escolhida'), findsOneWidget);
+      expect(find.textContaining('Escolha a cidade onde você atende'), findsOneWidget);
       expect(fake.salvos, isEmpty);
       // A cidade é escolhida na lista (as do banco), nunca digitada.
       expect(find.text('Belo Horizonte'), findsOneWidget);
@@ -161,11 +161,11 @@ void main() {
       );
       await _tocar(t, find.text('Salvar e continuar'));
       expect(
-        find.text('Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'),
+        find.text('Informe seu nome completo (mínimo 3 letras).'),
         findsOneWidget,
       );
       expect(
-        find.text('Nenhuma categoria selecionada. Escolha pelo menos uma área de atuação.'),
+        find.text('Escolha pelo menos uma categoria.'),
         findsOneWidget,
       );
       expect(fake.salvos, isEmpty);
@@ -413,9 +413,7 @@ void main() {
       await _tocar(t, find.text('Enviar aditivo ao cliente'));
       expect(fake.criados, isEmpty);
       expect(
-        find.text(
-          'Valor não informado. Digite um valor em reais maior que zero (ex.: 45,00).',
-        ),
+        find.text('Informe um valor maior que zero.'),
         findsOneWidget,
       );
 
@@ -424,6 +422,21 @@ void main() {
       await t.pumpAndSettle();
       expect(liquido.pedidos, contains(10000));
       expect(find.text('R\$ 92,50'), findsOneWidget); // o profissional recebe 100 menos 7,50
+      final cartaoResumo = find.byType(CartaoTrato);
+      final direitaResumo = t
+          .getTopRight(
+            find.descendant(of: cartaoResumo, matching: find.byType(Column)).first,
+          )
+          .dx;
+      for (final valor in ['R\$ 100,00', '- R\$ 7,50', 'R\$ 92,50']) {
+        expect(
+          t
+              .getTopRight(find.descendant(of: cartaoResumo, matching: find.text(valor)))
+              .dx,
+          closeTo(direitaResumo, 0.5),
+          reason: valor,
+        );
+      }
 
       await _tocar(t, find.text('Enviar aditivo ao cliente'));
       expect(fake.criados.single.valorCentavos, 10000);
@@ -482,9 +495,7 @@ void main() {
       await _tocar(t, find.text('Enviar resposta'));
       expect(fake.respostas, isEmpty);
       expect(
-        find.text(
-          'Resposta muito curta. Escreva pelo menos 5 caracteres explicando sua posição.',
-        ),
+        find.text('Escreva sua resposta (mínimo 5 caracteres).'),
         findsOneWidget,
       );
 

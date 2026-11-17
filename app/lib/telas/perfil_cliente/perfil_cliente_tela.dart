@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import 'modelos.dart';
@@ -87,12 +88,11 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
   @override
   Widget build(BuildContext context) {
     final perfil = widget.perfil;
-    return Scaffold(
-      body: SafeArea(
-        child: ConteudoResponsivo(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x6),
-            children: [
+    final recarregar = AtualizadorTela.de(context);
+    final lista = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x6),
+      children: [
               Row(
                 children: [
                   AvatarIniciais(
@@ -157,7 +157,13 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                 ],
               ),
             ],
-          ),
+          );
+    return Scaffold(
+      body: SafeArea(
+        child: ConteudoResponsivo(
+          child: recarregar == null
+              ? lista
+              : RefreshIndicator(onRefresh: recarregar, child: lista),
         ),
       ),
     );

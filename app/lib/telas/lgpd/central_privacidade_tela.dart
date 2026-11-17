@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
 import 'excluir_conta_tela.dart';
@@ -101,7 +102,7 @@ class _CorpoState extends State<_Corpo> {
                     const SnackBar(content: Text('Cópia dos dados copiada.')),
                   );
                 },
-                child: const Text('Copiar JSON'),
+                child: const Text('Copiar dados'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(d).pop(),
@@ -132,7 +133,9 @@ class _CorpoState extends State<_Corpo> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    final recarregar = AtualizadorTela.de(context);
+    final lista = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
       children: [
         Text(
@@ -187,5 +190,6 @@ class _CorpoState extends State<_Corpo> {
         ),
       ],
     );
+    return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
   }
 }

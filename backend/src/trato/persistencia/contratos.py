@@ -40,7 +40,7 @@ class ContratosPostgres:
         with self._banco.transacao() as con:
             linha = con.execute(
                 "select c.pedido_id, c.orcamento_id, c.profissional_id, c.valor_total_centavos, "
-                "c.aceito_em, c.taxa_bps_aplicada, "
+                "c.aceito_em, c.taxa_bps_aplicada, c.prazo_execucao_dias, "
                 "c.regras_aplicadas -> 'parametros' ->> 'taxa_minima_centavos' as taxa_minima, "
                 "p.categoria_id from public.contratos c "
                 "join public.pedidos p on p.id = c.pedido_id where c.pedido_id = %s",
@@ -57,6 +57,7 @@ class ContratosPostgres:
             aceito_em=linha["aceito_em"],
             taxa_bps_aplicada=int(linha["taxa_bps_aplicada"]),
             taxa_minima_centavos=int(linha["taxa_minima"] or 0),
+            prazo_execucao_dias=linha["prazo_execucao_dias"],
         )
 
     def salvar(self, contrato: Contrato) -> None:

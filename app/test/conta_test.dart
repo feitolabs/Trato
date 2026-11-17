@@ -94,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Preencha apelido'), findsOneWidget);
+    expect(find.text('Informe um apelido (ex.: Casa).'), findsOneWidget);
     expect(await servico.enderecos(), isEmpty);
   });
 

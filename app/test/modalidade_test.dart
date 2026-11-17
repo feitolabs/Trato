@@ -161,7 +161,8 @@ void main() {
       });
       final repo = RepositorioCatalogoApi(api);
       final cats = await repo.categorias();
-      expect(cats.map((c) => c.aceitaRemoto), [false, true]); // padrão: só presencial
+      expect(cats.map((c) => c.nome), ['Design', 'Eletricista']);
+      expect(cats.map((c) => c.aceitaRemoto), [true, false]); // padrão: só presencial
       expect((await repo.formulario('c1')).aceitaRemoto, isFalse);
       expect((await repo.formulario('c2')).aceitaRemoto, isTrue);
     });

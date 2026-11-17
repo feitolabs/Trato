@@ -25,9 +25,9 @@ String textoFaixa(PedidoAberto p) {
   return '${reaisCurto(min)} a ${reaisCurto(max)}';
 }
 
-/// "2,1 km".
+/// "2,1 km" (vazio quando a distância não foi obtida).
 String textoDistancia(double? km) =>
-    km == null ? 'distância indisponível' : '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
+    km == null ? '' : '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
 
 /// "3 de 5 orçaram", "1 de 5 orçou", "Ninguém orçou".
 String textoOrcamentos(PedidoAberto p) {

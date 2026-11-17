@@ -25,6 +25,28 @@ from trato.profissional.repositorio import (
     Regiao,
     ResultadoBusca,
     dia_semana_hoje,
+    normalizar_busca,
+)
+
+_ACENTOS_DE = "áàâãäéèêëíìîïóòôõöúùûüç"
+_ACENTOS_PARA = "aaaaaeeeeiiiiooooouuuuc"
+
+
+def _sem_acento_sql(expr: str) -> str:
+    return (
+        f"regexp_replace(translate(lower({expr}), '{_ACENTOS_DE}', '{_ACENTOS_PARA}'), "
+        "'[^0-9a-z]+', ' ', 'g')"
+    )
+
+
+_NOME_PUBLICO_SQL = (
+    "case "
+    "when array_length(regexp_split_to_array(btrim(coalesce(u.nome, '')), '\\s+'), 1) > 1 then "
+    "(regexp_split_to_array(btrim(u.nome), '\\s+'))[1] || ' ' || "
+    "left((regexp_split_to_array(btrim(u.nome), '\\s+'))"
+    "[array_length(regexp_split_to_array(btrim(u.nome), '\\s+'), 1)], 1) || '.' "
+    "else btrim(coalesce(u.nome, '')) "
+    "end"
 )
 
 
@@ -33,11 +55,12 @@ class CatalogoPostgres:
         self._banco = banco
 
     def categorias_publicas(self) -> list[CategoriaPublica]:
+        sql = (
+            "select id, nome, slug, icone, pai_id, aceita_remoto from public.categorias "  # noqa: S608
+            "where ativa order by " + _sem_acento_sql("nome") + ", lower(nome), id"
+        )
         with self._banco.transacao() as con:
-            linhas = con.execute(
-                "select id, nome, slug, icone, pai_id, aceita_remoto from public.categorias "
-                "where ativa order by ordem, nome, id"
-            ).fetchall()
+            linhas = con.execute(sql).fetchall()
         return [
             CategoriaPublica(
                 str(l["id"]),
@@ -206,18 +229,57 @@ class ProfissionaisPostgres:
                 "and pc.categoria_id = any(%s::uuid[]))"
             )
             params.append(ids)
+        if filtro.atende_remoto is not None:
+            onde.append("p.atende_remoto = %s")
+            params.append(filtro.atende_remoto)
+        tokens = [t for t in normalizar_busca(filtro.texto or "").split() if t]
+        sem_bio = _sem_acento_sql("coalesce(p.bio, '')")
+        sem_cat_nome = _sem_acento_sql("cat.nome")
+        sem_cat_slug = _sem_acento_sql("cat.slug")
+        sem_item_titulo = _sem_acento_sql("coalesce(item->>'titulo', '')")
+        sem_item_desc = _sem_acento_sql("coalesce(item->>'descricao', '')")
+        sem_bairro_co = _sem_acento_sql("coalesce(r.bairro, '')")
+        sem_nome_pub = _sem_acento_sql(_NOME_PUBLICO_SQL)
+        sem_bairro = _sem_acento_sql("r.bairro")
         if filtro.cidade_id is not None or filtro.bairro is not None:
             cidade = como_uuid(filtro.cidade_id) if filtro.cidade_id else None
             if filtro.cidade_id is not None and cidade is None:
                 return [], 0
-            bairro = (filtro.bairro or "").strip().casefold() or None
-            onde.append(
-                "exists (select 1 from public.profissional_regioes r "
+            bairro_norm = normalizar_busca(filtro.bairro or "") or None
+            clausula_regiao = (
+                "exists (select 1 from public.profissional_regioes r "  # noqa: S608
                 "where r.profissional_id = p.usuario_id "
                 "and (%s::uuid is null or r.cidade_id = %s::uuid) "
-                "and (%s::text is null or r.bairro is null or lower(btrim(r.bairro)) = %s::text))"
+                "and (%s::text is null or r.bairro is null or btrim("
+                + sem_bairro
+                + ") = %s::text))"
             )
-            params += [cidade, cidade, bairro, bairro]
+            onde.append(clausula_regiao)
+            params += [cidade, cidade, bairro_norm, bairro_norm]
+        sem_cid_nome = _sem_acento_sql("cid.nome")
+        for tok in tokens:
+            like = f"%{tok}%"
+            clausula_tok = (
+                "("  # noqa: S608
+                + sem_nome_pub
+                + " like %s or "
+                + sem_bio
+                + " like %s "
+                + "or exists (select 1 from public.profissional_categorias pc "
+                "join public.categorias cat on cat.id = pc.categoria_id and cat.ativa "
+                "where pc.profissional_id = p.usuario_id and pc.suspensa_em is null "
+                "and (" + sem_cat_nome + " like %s or " + sem_cat_slug + " like %s)) "
+                "or exists (select 1 from jsonb_array_elements("
+                "coalesce(p.portfolio, '[]'::jsonb)) item "
+                "where " + sem_item_titulo + " like %s or " + sem_item_desc + " like %s) "
+                "or exists (select 1 from public.profissional_regioes r "
+                "join public.cidades cid on cid.id = r.cidade_id and cid.ativa "
+                "where r.profissional_id = p.usuario_id "
+                "and (" + sem_cid_nome + " like %s or " + sem_bairro_co + " like %s))"
+                ")"
+            )
+            onde.append(clausula_tok)
+            params += [like] * 8
         if filtro.nota_minima is not None:
             onde.append("p.nota_publica is not null and p.nota_publica >= %s")
             params.append(filtro.nota_minima)
@@ -231,17 +293,65 @@ class ProfissionaisPostgres:
             "from public.perfis_profissional p join public.usuarios u on u.id = p.usuario_id "
             "where " + " and ".join(onde)
         )
+        ordem_topo: list[str] = []
+        ordem_params: list[Any] = []
+        if tokens:
+            like_primeiro = f"%{tokens[0]}%"
+            sql_ordem_tok = (
+                "case when "  # noqa: S608
+                + sem_nome_pub
+                + " like %s then 0 "
+                "when exists (select 1 from public.profissional_categorias pc "
+                "join public.categorias cat on cat.id = pc.categoria_id "
+                "where pc.profissional_id = p.usuario_id and pc.suspensa_em is null "
+                "and " + sem_cat_nome + " like %s) then 1 else 2 end"
+            )
+            ordem_topo.append(sql_ordem_tok)
+            ordem_params += [like_primeiro, like_primeiro]
+        ordem_desempate: list[str] = []
+        bairro_ord = normalizar_busca(filtro.bairro or "")
+        if bairro_ord:
+            sql_ordem_bairro = (
+                "case when exists (select 1 from public.profissional_regioes r "  # noqa: S608
+                "where r.profissional_id = p.usuario_id "
+                "and r.bairro is not null and btrim(" + sem_bairro + ") = %s) "
+                "then 0 else 1 end"
+            )
+            ordem_desempate.append(sql_ordem_bairro)
+            ordem_params.append(bairro_ord)
+        ordem_sql = ", ".join(
+            [
+                *ordem_topo,
+                "p.nota_publica desc nulls last",
+                "p.servicos_concluidos desc",
+                *ordem_desempate,
+                "case p.nivel_verificacao when 'verificado_plus' then 0 "
+                "when 'verificado' then 1 else 2 end",
+                "case when btrim(coalesce(p.bio, '')) <> '' then 0 else 1 end",
+                "p.usuario_id",
+            ]
+        )
+        cidade_label = "case when c.uf <> '' then c.nome || '/' || c.uf else c.nome end"
         with self._banco.transacao() as con:
             total = con.execute(f"select count(*) as n {base}", params).fetchone()["n"]  # noqa: S608
             linhas = con.execute(
                 "select p.usuario_id, u.nome, p.bio, p.nivel_verificacao, p.nota_publica, "  # noqa: S608
-                "p.servicos_concluidos, coalesce((select array_agg(pc.categoria_id::text "
+                "p.servicos_concluidos, p.atende_remoto, "
+                "coalesce((select array_agg(pc.categoria_id::text "
                 "order by pc.categoria_id) from public.profissional_categorias pc "
                 "where pc.profissional_id = p.usuario_id and pc.suspensa_em is null), '{}') "
-                f"as categorias {base} "
-                "order by p.nota_publica desc nulls last, p.servicos_concluidos desc, "
-                "p.usuario_id limit %s offset %s",
-                [*params, filtro.limite, filtro.deslocamento],
+                "as categorias, "
+                f"coalesce((select array_agg(distinct {cidade_label} order by {cidade_label}) "
+                "from public.profissional_regioes r "
+                "join public.cidades c on c.id = r.cidade_id and c.ativa "
+                "where r.profissional_id = p.usuario_id), '{}') as cidades, "
+                "coalesce((select array_agg(distinct btrim(r.bairro) order by btrim(r.bairro)) "
+                "from public.profissional_regioes r "
+                "where r.profissional_id = p.usuario_id and r.bairro is not null "
+                "and btrim(r.bairro) <> ''), '{}') as bairros "
+                f"{base} "
+                f"order by {ordem_sql} limit %s offset %s",
+                [*params, *ordem_params, filtro.limite, filtro.deslocamento],
             ).fetchall()
         return [
             ResultadoBusca(
@@ -252,6 +362,9 @@ class ProfissionaisPostgres:
                 float(l["nota_publica"]) if l["nota_publica"] is not None else None,
                 int(l["servicos_concluidos"]),
                 tuple(l["categorias"]),
+                cidades=tuple(l["cidades"]),
+                bairros=tuple(l["bairros"]),
+                atende_remoto=bool(l["atende_remoto"]),
             )  # fmt: skip
             for l in linhas  # noqa: E741
         ], int(total)

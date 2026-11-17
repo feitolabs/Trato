@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/modelos.dart';
 import '../comuns/estados.dart';
@@ -75,19 +76,24 @@ class ServicosRecentesTela extends StatelessWidget {
       titulo: 'Serviços recentes',
       child: CarregadorTela<List<ServicoRecente>>(
         carregar: carregar,
-        construir: (context, itens, _) => itens.isEmpty
-            ? const EstadoVazio(
-                icone: Icons.history,
-                titulo: 'Nenhum serviço ainda',
-                texto: 'Os serviços que você contratar aparecem aqui, com a garantia de cada um.',
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-                itemCount: itens.length,
-                separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-                itemBuilder: (_, i) =>
-                    CartaoServicoRecente(servico: itens[i], aoTocar: () => aoAbrir(itens[i])),
-              ),
+        construir: (context, itens, _) {
+          final recarregar = AtualizadorTela.de(context);
+          final Widget corpo = itens.isEmpty
+              ? const EstadoVazio(
+                  icone: Icons.history,
+                  titulo: 'Nenhum serviço ainda',
+                  texto: 'Os serviços que você contratar aparecem aqui, com a garantia de cada um.',
+                )
+              : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+                  itemCount: itens.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+                  itemBuilder: (_, i) =>
+                      CartaoServicoRecente(servico: itens[i], aoTocar: () => aoAbrir(itens[i])),
+                );
+          return recarregar == null ? corpo : RefreshIndicator(onRefresh: recarregar, child: corpo);
+        },
       ),
     );
   }

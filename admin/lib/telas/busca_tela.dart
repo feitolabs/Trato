@@ -709,20 +709,23 @@ class _AbaCategorias extends StatelessWidget {
   Widget build(BuildContext context) {
     return CarregaDados<List<CategoriaAdmin>>(
       carregar: context.api.listarCategorias,
-      construir: (context, lista, recarregar) => ListaPaginada<CategoriaAdmin>(
-        itens: lista,
-        mensagemVazia: 'Nenhuma categoria cadastrada',
-        detalheVazio: 'Crie a primeira categoria para os clientes poderem pedir serviços.',
-        rotuloBusca: 'Buscar categoria',
-        rotuloItens: 'categorias',
-        textoBusca: (c) => c.nome,
-        acoesTopo: [
-          BotaoTrato.primario(
-            'Nova categoria',
-            icone: IconesTrato.adicionar,
-            aoPressionar: () => _criar(context, lista, recarregar),
-          ),
-        ],
+      construir: (context, lista, recarregar) {
+        final ordenadas = [...lista]
+          ..sort((a, b) => normalizarNome(a.nome).compareTo(normalizarNome(b.nome)));
+        return ListaPaginada<CategoriaAdmin>(
+          itens: ordenadas,
+          mensagemVazia: 'Nenhuma categoria cadastrada',
+          detalheVazio: 'Crie a primeira categoria para os clientes poderem pedir serviços.',
+          rotuloBusca: 'Buscar categoria',
+          rotuloItens: 'categorias',
+          textoBusca: (c) => c.nome,
+          acoesTopo: [
+            BotaoTrato.primario(
+              'Nova categoria',
+              icone: IconesTrato.adicionar,
+              aoPressionar: () => _criar(context, ordenadas, recarregar),
+            ),
+          ],
         construirItem: (context, c) => CartaoLista(
           tituloWidget: Row(
             children: [
@@ -749,7 +752,7 @@ class _AbaCategorias extends StatelessWidget {
             BotaoIcone(
               icone: IconesTrato.editar,
               rotulo: 'Editar ${c.nome}',
-              aoPressionar: () => _editar(context, c, lista, recarregar),
+              aoPressionar: () => _editar(context, c, ordenadas, recarregar),
             ),
             BotaoTrato.link(c.ativa ? 'Desativar' : 'Ativar', aoPressionar: () => _alternar(context, c, recarregar)),
             BotaoIcone(
@@ -760,7 +763,8 @@ class _AbaCategorias extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      );
+      },
     );
   }
 }

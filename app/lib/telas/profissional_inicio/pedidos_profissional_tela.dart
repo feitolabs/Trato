@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
 import '../profissional/dinheiro.dart';
@@ -114,134 +115,167 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
   }
 
   Widget _orcamentos() {
+    final recarregar = AtualizadorTela.de(context);
+    Widget lista;
     if (widget.orcamentosEnviados.isEmpty) {
-      return const EstadoVazio(
+      lista = const EstadoVazio(
         icone: Icons.request_quote_outlined,
         titulo: 'Nenhum orçamento enviado',
         texto: 'Os orçamentos que você enviar aparecem aqui, com a resposta do cliente.',
       );
+    } else {
+      lista = ListView.separated(
+        physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+        padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+        itemCount: widget.orcamentosEnviados.length,
+        separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+        itemBuilder: (_, i) {
+          final o = widget.orcamentosEnviados[i];
+          final (rotulo, tipo) = switch (o.situacao) {
+            'aceito' => ('Aceito pelo cliente', TipoStatus.sucesso),
+            'aguardando' => ('Aguardando o cliente', TipoStatus.info),
+            _ => ('Encerrado', TipoStatus.alerta),
+          };
+          final dias = o.prazoExecucaoDias;
+          final prazoStr = dias == null ? '' : ' · $dias ${dias == 1 ? 'dia' : 'dias'}';
+          return CartaoTrato(
+            aoTocar: widget.aoAbrirOrcamentoEnviado == null
+                ? null
+                : () => widget.aoAbrirOrcamentoEnviado!(o),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(o.titulo, style: TipografiaTrato.tituloCartao),
+                const SizedBox(height: EspacosTrato.x1),
+                Text(
+                  '${Dinheiro.formatar(o.valorCentavos)}$prazoStr${o.versao > 1 ? ' · versão ${o.versao}' : ''}',
+                  style: TipografiaTrato.corpoForte,
+                ),
+                const SizedBox(height: EspacosTrato.x2),
+                ChipStatus(texto: rotulo, tipo: tipo),
+              ],
+            ),
+          );
+        },
+      );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-      itemCount: widget.orcamentosEnviados.length,
-      separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-      itemBuilder: (_, i) {
-        final o = widget.orcamentosEnviados[i];
-        final (rotulo, tipo) = switch (o.situacao) {
-          'aceito' => ('Aceito pelo cliente', TipoStatus.sucesso),
-          'aguardando' => ('Aguardando o cliente', TipoStatus.info),
-          _ => ('Encerrado (o cliente escolheu outro ou o pedido acabou)', TipoStatus.alerta),
-        };
-        return CartaoTrato(
-          aoTocar: widget.aoAbrirOrcamentoEnviado == null
-              ? null
-              : () => widget.aoAbrirOrcamentoEnviado!(o),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(o.titulo, style: TipografiaTrato.tituloCartao),
-              const SizedBox(height: EspacosTrato.x1),
-              Text(
-                '${Dinheiro.formatar(o.valorCentavos)}${o.versao > 1 ? ' · versão ${o.versao}' : ''}',
-                style: TipografiaTrato.corpoForte,
-              ),
-              const SizedBox(height: EspacosTrato.x2),
-              ChipStatus(texto: rotulo, tipo: tipo),
-            ],
-          ),
-        );
-      },
-    );
+    return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
   }
 
   Widget _andamento() {
+    final recarregar = AtualizadorTela.de(context);
+    Widget lista;
     if (widget.contratados.isEmpty) {
-      return const EstadoVazio(
+      lista = const EstadoVazio(
         icone: Icons.handyman_outlined,
         titulo: 'Nenhum pedido em andamento',
         texto:
             'Quando um cliente aceitar o seu orçamento, o pedido aparece aqui, do aceite até o fim.',
       );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-      itemCount: widget.contratados.length,
-      separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-      itemBuilder: (_, i) {
-        final c = widget.contratados[i];
-        return CartaoTrato(
-          aoTocar: widget.aoAbrirContratado == null ? null : () => widget.aoAbrirContratado!(c),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(c.titulo, style: TipografiaTrato.tituloCartao),
-              if (c.cliente != null)
-                Text(
-                  'Cliente: ${c.cliente}',
-                  key: const ValueKey('cliente-do-pedido'),
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-                ),
-              const SizedBox(height: EspacosTrato.x1),
-              Text(
-                c.situacao,
-                style: TipografiaTrato.corpoPequeno.copyWith(
-                  color: c.aguardandoPagamento ? CoresTrato.laranja : CoresTrato.textoSecundario,
-                ),
-              ),
-              if (c.quando != null) ...[
+    } else {
+      lista = ListView.separated(
+        physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+        padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+        itemCount: widget.contratados.length,
+        separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+        itemBuilder: (_, i) {
+          final c = widget.contratados[i];
+          return CartaoTrato(
+            aoTocar: widget.aoAbrirContratado == null ? null : () => widget.aoAbrirContratado!(c),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(c.titulo, style: TipografiaTrato.tituloCartao),
+                if (c.cliente != null)
+                  Text(
+                    'Cliente: ${c.cliente}',
+                    key: const ValueKey('cliente-do-pedido'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  ),
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
-                  c.quando!,
-                  style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                  c.situacao,
+                  style: TipografiaTrato.corpoPequeno.copyWith(
+                    color: c.aguardandoPagamento ? CoresTrato.laranja : CoresTrato.textoSecundario,
+                  ),
                 ),
-              ],
-              const SizedBox(height: EspacosTrato.x2),
-              if (c.remoto)
-                Row(
-                  key: const ValueKey('modalidade-remoto'),
-                  children: [
-                    const Icon(Icons.videocam_outlined, size: 18, color: CoresTrato.petroleo),
-                    const SizedBox(width: EspacosTrato.x2),
-                    Text('Atendimento remoto', style: TipografiaTrato.corpoPequeno),
-                  ],
-                )
-              else if (c.endereco != null) ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on_outlined, size: 18, color: CoresTrato.petroleo),
-                    const SizedBox(width: EspacosTrato.x2),
-                    Expanded(
-                      child: Text(
-                        c.endereco!,
-                        key: const ValueKey('endereco-do-pedido'),
-                        style: TipografiaTrato.corpoPequeno,
+                if (c.quando != null) ...[
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    c.quando!,
+                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                  ),
+                ],
+                const SizedBox(height: EspacosTrato.x2),
+                if (c.remoto)
+                  Row(
+                    key: const ValueKey('modalidade-remoto'),
+                    children: [
+                      const Icon(Icons.videocam_outlined, size: 18, color: CoresTrato.petroleo),
+                      const SizedBox(width: EspacosTrato.x2),
+                      Text('Atendimento remoto', style: TipografiaTrato.corpoPequeno),
+                    ],
+                  )
+                else if (c.endereco != null) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 18, color: CoresTrato.petroleo),
+                      const SizedBox(width: EspacosTrato.x2),
+                      Expanded(
+                        child: Text(
+                          c.endereco!,
+                          key: const ValueKey('endereco-do-pedido'),
+                          style: TipografiaTrato.corpoPequeno,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (c.consultaMapa != null && widget.aoAbrirMapa != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: BotaoLink(
+                        texto: 'Abrir no mapa',
+                        aoTocar: () => widget.aoAbrirMapa!(c.consultaMapa!),
                       ),
                     ),
-                  ],
-                ),
-                if (c.consultaMapa != null && widget.aoAbrirMapa != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: BotaoLink(
-                      texto: 'Abrir no mapa',
-                      aoTocar: () => widget.aoAbrirMapa!(c.consultaMapa!),
-                    ),
+                ] else
+                  Text(
+                    'O cliente ainda não informou o endereço: combine pelo chat.',
+                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
                   ),
-              ] else
-                Text(
-                  'O cliente ainda não informou o endereço: combine pelo chat.',
-                  style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
-                ),
-            ],
-          ),
-        );
-      },
-    );
+              ],
+            ),
+          );
+        },
+      );
+    }
+    return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
   }
 
   Widget _abertos() {
     if (widget.carregando) return const EstadoCarregando();
+    final recarregar = AtualizadorTela.de(context);
+    final Widget conteudo = widget.pedidos.isEmpty
+        ? EstadoVazio(
+            icone: Icons.inbox_outlined,
+            titulo: 'Nenhum pedido aberto',
+            texto: widget.filtrosAtivos == 0
+                ? 'Quando chegar um pedido da sua região e categoria, ele aparece aqui.'
+                : 'Nenhum pedido combina com os filtros. Tente mudar ou limpar.',
+          )
+        : ListView.separated(
+            physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+            itemCount: widget.pedidos.length,
+            separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+            itemBuilder: (_, i) => CartaoPedidoAberto(
+              pedido: widget.pedidos[i],
+              aoTocar: widget.aoAbrirPedido == null
+                  ? null
+                  : () => widget.aoAbrirPedido!(widget.pedidos[i]),
+            ),
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -255,25 +289,9 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
         ),
         const SizedBox(height: EspacosTrato.x3),
         Expanded(
-          child: widget.pedidos.isEmpty
-              ? EstadoVazio(
-                  icone: Icons.inbox_outlined,
-                  titulo: 'Nenhum pedido aberto',
-                  texto: widget.filtrosAtivos == 0
-                      ? 'Quando chegar um pedido da sua região e categoria, ele aparece aqui.'
-                      : 'Nenhum pedido combina com os filtros. Tente mudar ou limpar.',
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-                  itemCount: widget.pedidos.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-                  itemBuilder: (_, i) => CartaoPedidoAberto(
-                    pedido: widget.pedidos[i],
-                    aoTocar: widget.aoAbrirPedido == null
-                        ? null
-                        : () => widget.aoAbrirPedido!(widget.pedidos[i]),
-                  ),
-                ),
+          child: recarregar == null
+              ? conteudo
+              : RefreshIndicator(onRefresh: recarregar, child: conteudo),
         ),
       ],
     );

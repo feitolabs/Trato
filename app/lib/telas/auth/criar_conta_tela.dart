@@ -6,6 +6,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../legal/texto_legal_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
+import '../comuns/foco_rolagem.dart';
 import '../fluxo/rotas.dart';
 import 'confirmar_celular_tela.dart';
 import 'confirmar_email_tela.dart';
@@ -35,6 +36,21 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   final _senha = TextEditingController();
   final _confirmarSenha = TextEditingController();
   final _scrollController = ScrollController();
+  final _keyNome = GlobalKey();
+  final _keyCpf = GlobalKey();
+  final _keyNascimento = GlobalKey();
+  final _keyCelular = GlobalKey();
+  final _keyEmail = GlobalKey();
+  final _keySenha = GlobalKey();
+  final _keyConfirmar = GlobalKey();
+  final _keyTermos = GlobalKey();
+  final _focoNome = FocusNode();
+  final _focoCpf = FocusNode();
+  final _focoNascimento = FocusNode();
+  final _focoCelular = FocusNode();
+  final _focoEmail = FocusNode();
+  final _focoSenha = FocusNode();
+  final _focoConfirmar = FocusNode();
   var _mostrarSenha = false;
   var _mostrarConfirmarSenha = false;
   late final _toqueTermos = TapGestureRecognizer()..onTap = () => _abrirTexto(TextoLegal.termos);
@@ -52,20 +68,21 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     for (final c in [_nome, _cpf, _nascimento, _celular, _email, _senha, _confirmarSenha]) {
       c.dispose();
     }
+    for (final f in [
+      _focoNome,
+      _focoCpf,
+      _focoNascimento,
+      _focoCelular,
+      _focoEmail,
+      _focoSenha,
+      _focoConfirmar,
+    ]) {
+      f.dispose();
+    }
     _scrollController.dispose();
     _toqueTermos.dispose();
     _toquePolitica.dispose();
     super.dispose();
-  }
-
-  void _rolarParaInicio() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
   }
 
   void _abrirTexto(TextoLegal texto) => Navigator.of(context).push(
@@ -75,10 +92,12 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   String? _erro(String? Function() validar) => _tentou ? validar() : null;
 
   String? _validarConfirmacaoSenha() {
-    if (_confirmarSenha.text.isEmpty) return null;
+    if (_confirmarSenha.text.isEmpty) {
+      return _tentou ? 'Repita a senha para confirmar.' : null;
+    }
     return _confirmarSenha.text == _senha.text
         ? null
-        : 'As senhas não conferem. Digite exatamente a mesma senha nos dois campos.';
+        : 'As senhas não conferem. Digite a mesma senha.';
   }
 
   bool get _valido =>
@@ -88,14 +107,54 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       ValidacaoAuth.celular(_celular.text) == null &&
       ValidacaoAuth.email(_email.text) == null &&
       ValidacaoAuth.senhaNova(_senha.text) == null &&
-      _validarConfirmacaoSenha() == null &&
+      _confirmarSenha.text == _senha.text &&
       _aceitouTermos;
 
   Future<void> _criar() async {
     if (_carregando) return;
     setState(() => _tentou = true);
     if (!_valido) {
-      _rolarParaInicio();
+      focarPrimeiroErro([
+        EntradaCampoErro(
+          key: _keyNome,
+          focusNode: _focoNome,
+          temErro: () => ValidacaoAuth.nome(_nome.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keyCpf,
+          focusNode: _focoCpf,
+          temErro: () => ValidacaoAuth.cpf(_cpf.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keyNascimento,
+          focusNode: _focoNascimento,
+          temErro: () => ValidacaoAuth.nascimento(_nascimento.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keyCelular,
+          focusNode: _focoCelular,
+          temErro: () => ValidacaoAuth.celular(_celular.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keyEmail,
+          focusNode: _focoEmail,
+          temErro: () => ValidacaoAuth.email(_email.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keySenha,
+          focusNode: _focoSenha,
+          temErro: () => ValidacaoAuth.senhaNova(_senha.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keyConfirmar,
+          focusNode: _focoConfirmar,
+          temErro: () => _confirmarSenha.text != _senha.text,
+        ),
+        EntradaCampoErro(
+          key: _keyTermos,
+          temErro: () => !_aceitouTermos,
+        ),
+      ]);
       return;
     }
     setState(() {
@@ -124,7 +183,13 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       _erroServico = erro;
     });
     if (erro != null) {
-      _rolarParaInicio();
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
       return;
     }
     switch (resultado!) {
@@ -181,94 +246,125 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text('Criar conta', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'Nome completo',
-          controlador: _nome,
-          erro: _erro(() => ValidacaoAuth.nome(_nome.text)),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keyNome,
+          child: CampoTrato(
+            rotulo: 'Nome completo',
+            controlador: _nome,
+            foco: _focoNome,
+            erro: _erro(() => ValidacaoAuth.nome(_nome.text)),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'CPF',
-          controlador: _cpf,
-          dica: '000.000.000-00',
-          teclado: TextInputType.number,
-          formatadores: const [MascaraNumerica.cpf],
-          erro: _erro(() => ValidacaoAuth.cpf(_cpf.text)),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keyCpf,
+          child: CampoTrato(
+            rotulo: 'CPF',
+            controlador: _cpf,
+            foco: _focoCpf,
+            dica: '000.000.000-00',
+            teclado: TextInputType.number,
+            formatadores: const [MascaraNumerica.cpf],
+            erro: _erro(() => ValidacaoAuth.cpf(_cpf.text)),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'Nascimento',
-          controlador: _nascimento,
-          dica: 'dd/mm/aaaa',
-          ajuda: 'O Trato é para maiores de 18 anos.',
-          teclado: TextInputType.number,
-          formatadores: const [MascaraNumerica.data],
-          erro: _erro(() => ValidacaoAuth.nascimento(_nascimento.text)),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keyNascimento,
+          child: CampoTrato(
+            rotulo: 'Nascimento',
+            controlador: _nascimento,
+            foco: _focoNascimento,
+            dica: 'dd/mm/aaaa',
+            ajuda: 'O Trato é para maiores de 18 anos.',
+            teclado: TextInputType.number,
+            formatadores: const [MascaraNumerica.data],
+            erro: _erro(() => ValidacaoAuth.nascimento(_nascimento.text)),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'Celular',
-          controlador: _celular,
-          dica: '(31) 90000-0000',
-          teclado: TextInputType.phone,
-          formatadores: const [MascaraNumerica.celular],
-          erro: _erro(() => ValidacaoAuth.celular(_celular.text)),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keyCelular,
+          child: CampoTrato(
+            rotulo: 'Celular',
+            controlador: _celular,
+            foco: _focoCelular,
+            dica: '(31) 90000-0000',
+            teclado: TextInputType.phone,
+            formatadores: const [MascaraNumerica.celular],
+            erro: _erro(() => ValidacaoAuth.celular(_celular.text)),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'E-mail',
-          controlador: _email,
-          dica: 'voce@email.com',
-          teclado: TextInputType.emailAddress,
-          erro: _erro(() => ValidacaoAuth.email(_email.text)),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keyEmail,
+          child: CampoTrato(
+            rotulo: 'E-mail',
+            controlador: _email,
+            foco: _focoEmail,
+            dica: 'voce@email.com',
+            teclado: TextInputType.emailAddress,
+            erro: _erro(() => ValidacaoAuth.email(_email.text)),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'Senha',
-          controlador: _senha,
-          senha: !_mostrarSenha,
-          textoAcao: _mostrarSenha ? 'Ocultar' : 'Mostrar',
-          aoTocarAcao: () => setState(() => _mostrarSenha = !_mostrarSenha),
-          ajuda: 'Pelo menos 8 caracteres, com letra e número.',
-          erro: _erro(() => ValidacaoAuth.senhaNova(_senha.text)),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keySenha,
+          child: CampoTrato(
+            rotulo: 'Senha',
+            controlador: _senha,
+            foco: _focoSenha,
+            senha: !_mostrarSenha,
+            textoAcao: _mostrarSenha ? 'Ocultar' : 'Mostrar',
+            aoTocarAcao: () => setState(() => _mostrarSenha = !_mostrarSenha),
+            ajuda: 'Pelo menos 8 caracteres, com letra e número.',
+            erro: _erro(() => ValidacaoAuth.senhaNova(_senha.text)),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'Confirmar senha',
-          controlador: _confirmarSenha,
-          senha: !_mostrarConfirmarSenha,
-          textoAcao: _mostrarConfirmarSenha ? 'Ocultar' : 'Mostrar',
-          aoTocarAcao: () => setState(() => _mostrarConfirmarSenha = !_mostrarConfirmarSenha),
-          erro: _validarConfirmacaoSenha(),
-          aoMudar: atualizar,
+        KeyedSubtree(
+          key: _keyConfirmar,
+          child: CampoTrato(
+            rotulo: 'Confirmar senha',
+            controlador: _confirmarSenha,
+            foco: _focoConfirmar,
+            senha: !_mostrarConfirmarSenha,
+            textoAcao: _mostrarConfirmarSenha ? 'Ocultar' : 'Mostrar',
+            aoTocarAcao: () => setState(() => _mostrarConfirmarSenha = !_mostrarConfirmarSenha),
+            erro: _validarConfirmacaoSenha(),
+            aoMudar: atualizar,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        _LinhaMarcar(
-          marcado: _aceitouTermos,
-          aoMudar: (v) => setState(() => _aceitouTermos = v),
-          erro: _tentou && !_aceitouTermos
-              ? 'Termos não aceitos. Marque a caixa para concordar com os Termos de uso e continuar.'
-              : null,
-          texto: Text.rich(
-            TextSpan(
-              style: estiloTexto,
-              children: [
-                const TextSpan(text: 'Li e aceito os '),
-                TextSpan(text: 'Termos de uso', style: estiloLink, recognizer: _toqueTermos),
-                const TextSpan(text: ' e a '),
-                TextSpan(
-                  text: 'Política de privacidade',
-                  style: estiloLink,
-                  recognizer: _toquePolitica,
-                ),
-                const TextSpan(text: '.'),
-              ],
+        KeyedSubtree(
+          key: _keyTermos,
+          child: _LinhaMarcar(
+            marcado: _aceitouTermos,
+            aoMudar: (v) => setState(() => _aceitouTermos = v),
+            erro: _tentou && !_aceitouTermos
+                ? 'Marque para concordar com os Termos de uso e continuar.'
+                : null,
+            texto: Text.rich(
+              TextSpan(
+                style: estiloTexto,
+                children: [
+                  const TextSpan(text: 'Li e aceito os '),
+                  TextSpan(text: 'Termos de uso', style: estiloLink, recognizer: _toqueTermos),
+                  const TextSpan(text: ' e a '),
+                  TextSpan(
+                    text: 'Política de privacidade',
+                    style: estiloLink,
+                    recognizer: _toquePolitica,
+                  ),
+                  const TextSpan(text: '.'),
+                ],
+              ),
             ),
           ),
         ),

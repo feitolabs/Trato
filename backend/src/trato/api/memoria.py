@@ -191,7 +191,13 @@ class OrcamentosEmMemoria:
         ordenados = sorted(ultimos.values(), key=lambda d: (d.enviado_em is None, d.id))
         return tuple(
             OrcamentoDoProfissional(
-                d.id, d.pedido_id, d.versao, d.valor_centavos, d.status, d.enviado_em
+                d.id,
+                d.pedido_id,
+                d.versao,
+                d.valor_centavos,
+                d.status,
+                d.enviado_em,
+                d.prazo_execucao_dias,
             )
             for d in ordenados
         )

@@ -41,6 +41,12 @@ class _CategoriaTelaState extends State<CategoriaTela> {
         _futuro = widget.carregar(_filtro);
       });
 
+  Future<void> _recarregarAssincrono() async {
+    final novo = widget.carregar(_filtro);
+    setState(() => _futuro = novo);
+    await novo;
+  }
+
   Future<void> _filtros() async {
     final novo = await mostrarFiltrosProfissionais(context, atual: _filtro);
     if (novo == null || !mounted) return;
@@ -96,44 +102,54 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                   future: _futuro,
                   builder: (context, snap) {
                     if (snap.hasError) {
-                      return EstadoErro(
-                        mensagem: mensagemErroTrato(snap.error!),
-                        aoTentarNovamente: _recarregar,
+                      return RefreshIndicator(
+                        onRefresh: _recarregarAssincrono,
+                        child: EstadoErro(
+                          mensagem: mensagemErroTrato(snap.error!),
+                          aoTentarNovamente: _recarregar,
+                        ),
                       );
                     }
                     if (!snap.hasData) return const EstadoCarregando();
                     final lista = snap.data!;
                     if (lista.isEmpty) {
-                      return EstadoVazio(
-                        icone: Icons.person_search_outlined,
-                        titulo: 'Nenhum profissional encontrado',
-                        texto: _filtro.vazio
-                            ? 'Ainda não há profissionais em ${c.nome}. '
-                                'Peça um orçamento e avisamos quem atende.'
-                            : 'Nenhum profissional combina com os filtros. Tente mudar ou limpar.',
+                      return RefreshIndicator(
+                        onRefresh: _recarregarAssincrono,
+                        child: EstadoVazio(
+                          icone: Icons.person_search_outlined,
+                          titulo: 'Nenhum profissional encontrado',
+                          texto: _filtro.vazio
+                              ? 'Ainda não há profissionais em ${c.nome}. '
+                                  'Peça um orçamento e avisamos quem atende.'
+                              : 'Nenhum profissional combina com os filtros. Tente mudar ou limpar.',
+                        ),
                       );
                     }
-                    return ListView.separated(
-                      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-                      itemCount: lista.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-                      itemBuilder: (_, i) {
-                        if (i == 0) {
-                          return Text(
-                            '${lista.length} ${lista.length == 1 ? 'profissional' : 'profissionais'}',
-                            style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.textoSecundario),
+                    return RefreshIndicator(
+                      onRefresh: _recarregarAssincrono,
+                      child: ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+                        itemCount: lista.length + 1,
+                        separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+                        itemBuilder: (_, i) {
+                          if (i == 0) {
+                            return Text(
+                              '${lista.length} ${lista.length == 1 ? 'profissional' : 'profissionais'}',
+                              style: TipografiaTrato.corpoPequeno
+                                  .copyWith(color: CoresTrato.textoSecundario),
+                            );
+                          }
+                          final p = lista[i - 1];
+                          return CartaoProfissional(
+                            profissional: p,
+                            aoAbrir: () => widget.aoAbrirProfissional?.call(p),
+                            aoPedirOrcamento: widget.aoPedirOrcamento == null
+                                ? null
+                                : () => widget.aoPedirOrcamento!(p),
                           );
-                        }
-                        final p = lista[i - 1];
-                        return CartaoProfissional(
-                          profissional: p,
-                          aoAbrir: () => widget.aoAbrirProfissional?.call(p),
-                          aoPedirOrcamento: widget.aoPedirOrcamento == null
-                              ? null
-                              : () => widget.aoPedirOrcamento!(p),
-                        );
-                      },
+                        },
+                      ),
                     );
                   },
                 ),

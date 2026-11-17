@@ -140,7 +140,7 @@ class _CartaoOrcamento extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: EspacosTrato.x2),
-              Flexible(
+              Expanded(
                 flex: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,

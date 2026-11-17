@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/campo_longo.dart';
+import '../comuns/foco_rolagem.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional/servico_orcamento.dart';
 import '../profissional_apoio/apoio.dart';
@@ -34,6 +35,10 @@ class CriarAditivoTela extends StatefulWidget {
 }
 
 class _CriarAditivoTelaState extends State<CriarAditivoTela> {
+  final _scroll = ScrollController();
+  final _keyMotivo = GlobalKey();
+  final _keyValor = GlobalKey();
+  final _focoValor = FocusNode();
   final _motivo = TextEditingController();
   final _valor = TextEditingController();
   ResumoOrcamento? _resumo;
@@ -46,6 +51,8 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _focoValor.dispose();
     _motivo.dispose();
     _valor.dispose();
     super.dispose();
@@ -57,14 +64,14 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
   }
 
   String? get _erroMotivo => _motivo.text.trim().length < 5
-      ? 'Motivo muito curto. Explique o motivo do aditivo com pelo menos 5 caracteres.'
+      ? 'Explique o motivo (mínimo 5 caracteres).'
       : null;
   String? get _erroValor {
     if (_centavos == null) {
-      return 'Valor não informado. Digite um valor em reais maior que zero (ex.: 45,00).';
+      return 'Informe um valor maior que zero.';
     }
     if (_centavos! > Dinheiro.limiteAditivoMaximoCentavos) {
-      return 'Valor do aditivo excede o teto permitido de ${Dinheiro.formatar(Dinheiro.limiteAditivoMaximoCentavos)}.';
+      return 'Valor acima do limite permitido de ${Dinheiro.formatar(Dinheiro.limiteAditivoMaximoCentavos)}.';
     }
     return null;
   }
@@ -101,7 +108,17 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
       _tentou = true;
       _erro = null;
     });
-    if (_erroMotivo != null || _erroValor != null) return;
+    if (_erroMotivo != null || _erroValor != null) {
+      focarPrimeiroErro([
+        EntradaCampoErro(key: _keyMotivo, temErro: () => _erroMotivo != null),
+        EntradaCampoErro(
+          key: _keyValor,
+          focusNode: _focoValor,
+          temErro: () => _erroValor != null,
+        ),
+      ]);
+      return;
+    }
     setState(() => _enviando = true);
     try {
       await widget.servico.criar(NovoAditivo(
@@ -128,6 +145,7 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
   Widget build(BuildContext context) {
     return PaginaTrato(
       titulo: 'Novo aditivo',
+      scrollController: _scroll,
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -164,35 +182,47 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
           icone: Icons.info_outline,
         ),
         const SizedBox(height: EspacosTrato.x5),
-        CampoLongo(
-          rotulo: 'Motivo',
-          controlador: _motivo,
-          dica: 'O que apareceu que não estava no orçamento?',
-          aoMudar: (_) => setState(() {}),
-        ),
-        if (_tentou && _erroMotivo != null)
-          Padding(
-            padding: const EdgeInsets.only(top: EspacosTrato.x2),
-            child: Text(
-              _erroMotivo!,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
-            ),
+        KeyedSubtree(
+          key: _keyMotivo,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CampoLongo(
+                rotulo: 'Motivo',
+                controlador: _motivo,
+                dica: 'O que apareceu que não estava no orçamento?',
+                aoMudar: (_) => setState(() {}),
+              ),
+              if (_tentou && _erroMotivo != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: EspacosTrato.x2),
+                  child: Text(
+                    _erroMotivo!,
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                  ),
+                ),
+            ],
           ),
+        ),
         const SizedBox(height: EspacosTrato.x4),
-        CampoTrato(
-          rotulo: 'Valor do aditivo',
-          controlador: _valor,
-          prefixo: 'R\$ ',
-          teclado: const TextInputType.numberWithOptions(decimal: true),
-          formatadores: [
-            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-            LengthLimitingTextInputFormatter(9),
-          ],
-          erro: _tentou ? _erroValor : null,
-          aoMudar: (_) {
-            setState(() {});
-            unawaited(_atualizarResumo());
-          },
+        KeyedSubtree(
+          key: _keyValor,
+          child: CampoTrato(
+            rotulo: 'Valor do aditivo',
+            controlador: _valor,
+            foco: _focoValor,
+            prefixo: 'R\$ ',
+            teclado: const TextInputType.numberWithOptions(decimal: true),
+            formatadores: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+              LengthLimitingTextInputFormatter(9),
+            ],
+            erro: _tentou ? _erroValor : null,
+            aoMudar: (_) {
+              setState(() {});
+              unawaited(_atualizarResumo());
+            },
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
         _CartaoLiquido(resumo: _resumo, falhou: _resumoFalhou, digitou: _centavos != null),
@@ -250,10 +280,12 @@ class _Linha extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x1),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(rotulo, style: estilo)),
+          Flexible(flex: 3, child: Text(rotulo, style: estilo)),
           const SizedBox(width: EspacosTrato.x2),
           Flexible(
+            flex: 2,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,

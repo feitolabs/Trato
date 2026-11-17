@@ -21,6 +21,8 @@ class ChatPedidoTela extends StatefulWidget {
     this.aoEnviarFoto,
     this.aoRecarregar,
     this.aoAceitarContraproposta,
+    this.aoAceitarProposta,
+    this.aoProporNovaCondicao,
     this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
@@ -34,6 +36,12 @@ class ChatPedidoTela extends StatefulWidget {
 
   /// Profissional aceita a contraproposta do cliente (só aparece nas mensagens que ele recebe).
   final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
+
+  /// Cliente aceita a nova proposta do profissional e segue direto para o pagamento.
+  final Future<void> Function(ContrapropostaChat)? aoAceitarProposta;
+
+  /// Profissional abre o modal para propor novo valor/prazo direto pela conversa.
+  final Future<void> Function()? aoProporNovaCondicao;
   final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
@@ -49,6 +57,7 @@ class ChatPedidoTela extends StatefulWidget {
 
 class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   final _controlador = TextEditingController();
+  late ConversaPedido _conversa = widget.conversa;
   late List<MensagemChat> _mensagens = [...widget.conversa.mensagens];
   Timer? _relogio;
 
@@ -56,8 +65,20 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   void initState() {
     super.initState();
     if (widget.aoRecarregar != null) {
+      unawaited(_sincronizar());
       _relogio =
           Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatPedidoTela oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.conversa != widget.conversa) {
+      _conversa = widget.conversa;
+      if (_conversa.mensagens.length >= _mensagens.length) {
+        _mensagens = [..._conversa.mensagens];
+      }
     }
   }
 
@@ -67,9 +88,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     try {
       final atualizada = await recarregar();
       if (!mounted) return;
-      if (atualizada.mensagens.length >= _mensagens.length) {
-        setState(() => _mensagens = [...atualizada.mensagens]);
-      }
+      setState(() {
+        _conversa = atualizada;
+        if (atualizada.mensagens.length >= _mensagens.length) {
+          _mensagens = [...atualizada.mensagens];
+        }
+      });
     } on Object {
       // Silencioso em segundo plano; próxima leitura tenta novamente.
     }
@@ -120,12 +144,23 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
 
   @override
   Widget build(BuildContext context) {
-    final conversa = widget.conversa;
+    final conversa = _conversa;
+    final ultimaPorOrcamento = <String, int>{};
+    for (var i = 0; i < _mensagens.length; i++) {
+      final c = _mensagens[i].contraproposta;
+      if (c != null) ultimaPorOrcamento[c.orcamentoId] = i;
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            _Cabecalho(conversa: conversa),
+            _Cabecalho(
+              conversa: conversa,
+              aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
+              aoProporNovaCondicao:
+                  conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
+            ),
             const _AvisoPrivacidade(),
             Expanded(
               child: ConteudoResponsivo(
@@ -135,17 +170,8 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
                       const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
                   children: [
                     // reverse: a lista começa colada embaixo, perto do campo de envio.
-                    for (final m in _mensagens.reversed)
-                      _LinhaMensagem(
-                        mensagem: m,
-                        aoAceitarContraproposta:
-                            widget.aoAceitarContraproposta == null
-                                ? null
-                                : (c) async {
-                                    await widget.aoAceitarContraproposta!(c);
-                                    await _sincronizar();
-                                  },
-                      ),
+                    for (var i = _mensagens.length - 1; i >= 0; i--)
+                      _buildLinha(i, _mensagens[i], conversa, ultimaPorOrcamento),
                   ],
                 ),
               ),
@@ -162,12 +188,51 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       ),
     );
   }
+
+  Widget _buildLinha(
+    int indice,
+    MensagemChat m,
+    ConversaPedido conversa,
+    Map<String, int> ultimaPorOrcamento,
+  ) {
+    final c = m.contraproposta;
+    final substituida = c != null && ultimaPorOrcamento[c.orcamentoId] != indice;
+    final ativoNoBackend = c == null
+        ? true
+        : (conversa.pedidoAberto &&
+            (conversa.orcamentosAtivos.isEmpty ||
+                conversa.orcamentosAtivos.contains(c.orcamentoId)));
+    final podeAceitar = !substituida && ativoNoBackend;
+
+    return _LinhaMensagem(
+      mensagem: m,
+      podeAceitarProposta: podeAceitar,
+      aoAceitarContraproposta: widget.aoAceitarContraproposta == null
+          ? null
+          : (prop) async {
+              await widget.aoAceitarContraproposta!(prop);
+              await _sincronizar();
+            },
+      aoAceitarProposta: widget.aoAceitarProposta == null
+          ? null
+          : (prop) async {
+              await widget.aoAceitarProposta!(prop);
+              await _sincronizar();
+            },
+    );
+  }
 }
 
 class _Cabecalho extends StatelessWidget {
-  const _Cabecalho({required this.conversa});
+  const _Cabecalho({
+    required this.conversa,
+    this.aoAtualizar,
+    this.aoProporNovaCondicao,
+  });
 
   final ConversaPedido conversa;
+  final Future<void> Function()? aoAtualizar;
+  final Future<void> Function()? aoProporNovaCondicao;
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +274,20 @@ class _Cabecalho extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: EspacosTrato.x4),
+            if (aoProporNovaCondicao != null)
+              TextButton.icon(
+                onPressed: aoProporNovaCondicao,
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('Nova proposta'),
+              ),
+            if (aoAtualizar != null)
+              IconButton(
+                tooltip: 'Atualizar conversa',
+                onPressed: aoAtualizar,
+                icon: const Icon(Icons.refresh, size: 20),
+              ),
+            if (aoAtualizar == null && aoProporNovaCondicao == null)
+              const SizedBox(width: EspacosTrato.x4),
           ],
         ),
       ),
@@ -253,10 +331,17 @@ class _AvisoPrivacidade extends StatelessWidget {
 }
 
 class _LinhaMensagem extends StatelessWidget {
-  const _LinhaMensagem({required this.mensagem, this.aoAceitarContraproposta});
+  const _LinhaMensagem({
+    required this.mensagem,
+    required this.podeAceitarProposta,
+    this.aoAceitarContraproposta,
+    this.aoAceitarProposta,
+  });
 
   final MensagemChat mensagem;
+  final bool podeAceitarProposta;
   final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
+  final Future<void> Function(ContrapropostaChat)? aoAceitarProposta;
 
   @override
   Widget build(BuildContext context) {
@@ -282,6 +367,7 @@ class _LinhaMensagem extends StatelessWidget {
 
     final minha = mensagem.minha;
     final larguraMaxima = MediaQuery.sizeOf(context).width * 0.72;
+    final prop = mensagem.contraproposta;
     final Widget corpo = mensagem.tipo == TipoMensagem.foto
         ? EspacoFoto(
             rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
@@ -299,31 +385,51 @@ class _LinhaMensagem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (mensagem.contraproposta != null) ...[
+                if (prop != null) ...[
                   Text(
-                    'Contraproposta',
+                    prop.ehPropostaDoProfissional ? 'Nova proposta' : 'Contraproposta',
                     style: TipografiaTrato.sobretitulo.copyWith(
                       color:
                           minha ? CoresTrato.creme : CoresTrato.textoSecundario,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    'Valor: ${formatarReais(prop.valorCentavos)}'
+                    '${prop.prazoExecucaoDias == null ? '' : ' · Prazo: ${prop.prazoExecucaoDias} ${prop.prazoExecucaoDias == 1 ? 'dia' : 'dias'}'}',
+                    style: TipografiaTrato.corpoForte.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                    ),
+                  ),
+                  if ((mensagem.texto ?? '').trim().isNotEmpty)
+                    const SizedBox(height: EspacosTrato.x1),
                 ],
-                Text(
-                  mensagem.texto ?? '',
-                  style: TipografiaTrato.corpo.copyWith(
-                    color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                if ((mensagem.texto ?? '').trim().isNotEmpty || prop == null)
+                  Text(
+                    mensagem.texto ?? '',
+                    style: TipografiaTrato.corpo.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                    ),
                   ),
-                ),
-                if (mensagem.contraproposta != null &&
-                    !minha &&
-                    aoAceitarContraproposta != null) ...[
-                  const SizedBox(height: EspacosTrato.x3),
-                  FilledButton(
-                    onPressed: () =>
-                        aoAceitarContraproposta!(mensagem.contraproposta!),
-                    child: const Text('Aceitar e atualizar orçamento'),
-                  ),
+                if (prop != null && !minha) ...[
+                  if (prop.ehPropostaDoProfissional && aoAceitarProposta != null) ...[
+                    const SizedBox(height: EspacosTrato.x3),
+                    _BotaoProposta(
+                      ativo: podeAceitarProposta,
+                      rotuloAtivo: 'Aceitar e pagar',
+                      rotuloInativo: 'Proposta substituída',
+                      aoTocar: () => aoAceitarProposta!(prop),
+                    ),
+                  ] else if (!prop.ehPropostaDoProfissional &&
+                      aoAceitarContraproposta != null) ...[
+                    const SizedBox(height: EspacosTrato.x3),
+                    _BotaoProposta(
+                      ativo: podeAceitarProposta,
+                      rotuloAtivo: 'Aceitar e atualizar orçamento',
+                      rotuloInativo: 'Orçamento atualizado',
+                      aoTocar: () => aoAceitarContraproposta!(prop),
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -477,4 +583,52 @@ class _CampoEnvio extends StatelessWidget {
     borderRadius: BorderRadius.all(Radius.circular(EspacosTrato.raioPilula)),
     borderSide: BorderSide(color: CoresTrato.borda),
   );
+}
+
+class _BotaoProposta extends StatefulWidget {
+  const _BotaoProposta({
+    required this.ativo,
+    required this.rotuloAtivo,
+    required this.rotuloInativo,
+    required this.aoTocar,
+  });
+
+  final bool ativo;
+  final String rotuloAtivo;
+  final String rotuloInativo;
+  final Future<void> Function() aoTocar;
+
+  @override
+  State<_BotaoProposta> createState() => _BotaoPropostaState();
+}
+
+class _BotaoPropostaState extends State<_BotaoProposta> {
+  var _enviando = false;
+  var _concluido = false;
+
+  Future<void> _executar() async {
+    if (_enviando || _concluido || !widget.ativo) return;
+    setState(() => _enviando = true);
+    try {
+      await widget.aoTocar();
+      if (mounted) setState(() => _concluido = true);
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final habilitado = widget.ativo && !_concluido;
+    return FilledButton(
+      onPressed: (habilitado && !_enviando) ? _executar : null,
+      child: _enviando
+          ? const SizedBox(
+              height: 16,
+              width: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(habilitado ? widget.rotuloAtivo : widget.rotuloInativo),
+    );
+  }
 }

@@ -19,7 +19,7 @@ class RelogioDeAtualizacao with WidgetsBindingObserver {
 
   /// Intervalo padrão das listas: curto o bastante para parecer "ao vivo", longo o bastante para
   /// não pesar na bateria nem na API.
-  static const intervaloPadrao = Duration(seconds: 12);
+  static const intervaloPadrao = Duration(seconds: 8);
 
   final Duration intervalo;
   final Future<void> Function() aoAtualizar;

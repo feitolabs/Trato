@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
 import 'modelos.dart';
@@ -37,36 +38,41 @@ class CarteiraTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resumo = dados.resumo;
+    final recarregar = AtualizadorTela.de(context);
+    final corpo = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(top: EspacosTrato.x5, bottom: EspacosTrato.x5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Carteira', style: TipografiaTrato.tituloGrande),
+          const SizedBox(height: EspacosTrato.x5),
+          if (dados.erro != null)
+            _CartaoErro(mensagem: dados.erro!, aoTentarNovamente: aoTentarNovamente)
+          else if (resumo != null || soExtrato) ...[
+            if (!soExtrato && resumo != null) ...[
+              _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),
+              const SizedBox(height: EspacosTrato.x3),
+              _LinhaSaldos(resumo: resumo),
+              const SizedBox(height: EspacosTrato.x6),
+            ],
+            _CabecalhoExtrato(aoVerTudo: dados.extrato.isEmpty ? null : aoVerTudo),
+            const SizedBox(height: EspacosTrato.x3),
+            if (dados.extrato.isEmpty)
+              const _ExtratoVazio()
+            else
+              _Extrato(itens: dados.extrato, aoAbrir: aoAbrirItem),
+          ],
+        ],
+      ),
+    );
     return Scaffold(
       bottomNavigationBar: barraInferior,
       body: SafeArea(
         child: ConteudoResponsivo(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(top: EspacosTrato.x5, bottom: EspacosTrato.x5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Carteira', style: TipografiaTrato.tituloGrande),
-                const SizedBox(height: EspacosTrato.x5),
-                if (dados.erro != null)
-                  _CartaoErro(mensagem: dados.erro!, aoTentarNovamente: aoTentarNovamente)
-                else if (resumo != null || soExtrato) ...[
-                  if (!soExtrato && resumo != null) ...[
-                    _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),
-                    const SizedBox(height: EspacosTrato.x3),
-                    _LinhaSaldos(resumo: resumo),
-                    const SizedBox(height: EspacosTrato.x6),
-                  ],
-                  _CabecalhoExtrato(aoVerTudo: dados.extrato.isEmpty ? null : aoVerTudo),
-                  const SizedBox(height: EspacosTrato.x3),
-                  if (dados.extrato.isEmpty)
-                    const _ExtratoVazio()
-                  else
-                    _Extrato(itens: dados.extrato, aoAbrir: aoAbrirItem),
-                ],
-              ],
-            ),
-          ),
+          child: recarregar == null
+              ? corpo
+              : RefreshIndicator(onRefresh: recarregar, child: corpo),
         ),
       ),
     );

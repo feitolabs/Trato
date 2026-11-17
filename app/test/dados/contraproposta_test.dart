@@ -117,7 +117,7 @@ void main() {
 
     await t.tap(find.text('Enviar contraproposta'));
     await t.pump();
-    expect(find.text('Digite o valor que você propõe.'), findsOneWidget);
+    expect(find.text('Digite um valor maior que zero.'), findsOneWidget);
 
     await t.enterText(find.byType(TextField).first, '300');
     await t.tap(find.text('Enviar contraproposta'));

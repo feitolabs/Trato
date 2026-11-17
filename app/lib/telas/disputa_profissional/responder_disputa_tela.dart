@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto, LinhaValor, formatarReais;
 import '../conclusao/campo_longo.dart';
+import '../comuns/foco_rolagem.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart';
 import 'disputa.dart';
@@ -61,6 +62,11 @@ class _Corpo extends StatefulWidget {
 }
 
 class _CorpoState extends State<_Corpo> {
+  final _scroll = ScrollController();
+  final _keyReembolso = GlobalKey();
+  final _keyMensagem = GlobalKey();
+  final _focoReembolso = FocusNode();
+  final _focoMensagem = FocusNode();
   final _mensagem = TextEditingController();
   final _reembolso = TextEditingController();
   final _evidencias = <String>[];
@@ -72,6 +78,9 @@ class _CorpoState extends State<_Corpo> {
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _focoReembolso.dispose();
+    _focoMensagem.dispose();
     _mensagem.dispose();
     _reembolso.dispose();
     super.dispose();
@@ -83,11 +92,11 @@ class _CorpoState extends State<_Corpo> {
   }
 
   String? get _erroMensagem => _mensagem.text.trim().length < 5
-      ? 'Resposta muito curta. Escreva pelo menos 5 caracteres explicando sua posição.'
+      ? 'Escreva sua resposta (mínimo 5 caracteres).'
       : null;
   String? get _erroReembolso =>
       _tipo == TipoRespostaDisputa.proporReembolsoParcial && _centavos == null
-          ? 'Valor não informado. Digite o valor em reais que você propõe devolver.'
+          ? 'Informe o valor em reais para devolução.'
           : null;
 
   Future<void> _evidencia() async {
@@ -101,7 +110,21 @@ class _CorpoState extends State<_Corpo> {
       _tentou = true;
       _erro = null;
     });
-    if (_erroMensagem != null || _erroReembolso != null) return;
+    if (_erroMensagem != null || _erroReembolso != null) {
+      focarPrimeiroErro([
+        EntradaCampoErro(
+          key: _keyReembolso,
+          focusNode: _focoReembolso,
+          temErro: () => _erroReembolso != null,
+        ),
+        EntradaCampoErro(
+          key: _keyMensagem,
+          focusNode: _focoMensagem,
+          temErro: () => _erroMensagem != null,
+        ),
+      ]);
+      return;
+    }
     setState(() => _enviando = true);
     try {
       await widget.servico.responder(RespostaDisputa(
@@ -162,6 +185,7 @@ class _CorpoState extends State<_Corpo> {
   Widget build(BuildContext context) {
     final d = widget.disputa;
     return CorpoRolavel(
+      scrollController: _scroll,
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -216,30 +240,42 @@ class _CorpoState extends State<_Corpo> {
             'Você conta a sua versão e envia provas. O Trato analisa os dois lados.'),
         if (_tipo == TipoRespostaDisputa.proporReembolsoParcial) ...[
           const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(
-            rotulo: 'Valor que você propõe devolver',
-            controlador: _reembolso,
-            prefixo: 'R\$ ',
-            teclado: const TextInputType.numberWithOptions(decimal: true),
-            erro: _tentou ? _erroReembolso : null,
-            aoMudar: (_) => setState(() {}),
+          KeyedSubtree(
+            key: _keyReembolso,
+            child: CampoTrato(
+              rotulo: 'Valor que você propõe devolver',
+              controlador: _reembolso,
+              foco: _focoReembolso,
+              prefixo: 'R\$ ',
+              teclado: const TextInputType.numberWithOptions(decimal: true),
+              erro: _tentou ? _erroReembolso : null,
+              aoMudar: (_) => setState(() {}),
+            ),
           ),
         ],
         const SizedBox(height: EspacosTrato.x4),
-        CampoLongo(
-          rotulo: 'Sua resposta',
-          controlador: _mensagem,
-          dica: 'Explique o que aconteceu e o que você propõe',
-          aoMudar: (_) => setState(() {}),
-        ),
-        if (_tentou && _erroMensagem != null)
-          Padding(
-            padding: const EdgeInsets.only(top: EspacosTrato.x2),
-            child: Text(
-              _erroMensagem!,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
-            ),
+        KeyedSubtree(
+          key: _keyMensagem,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CampoLongo(
+                rotulo: 'Sua resposta',
+                controlador: _mensagem,
+                dica: 'Explique o que aconteceu e o que você propõe',
+                aoMudar: (_) => setState(() {}),
+              ),
+              if (_tentou && _erroMensagem != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: EspacosTrato.x2),
+                  child: Text(
+                    _erroMensagem!,
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                  ),
+                ),
+            ],
           ),
+        ),
         const SizedBox(height: EspacosTrato.x4),
         Text(
           _evidencias.isEmpty

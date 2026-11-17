@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../fluxo/navegacao_casca.dart';
 import '../fluxo/rotas.dart';
 
 /// Casca do app do cliente: barra inferior com as 5 abas (Início · Buscar · Pedidos ·
-/// Mensagens · Perfil). Cada aba guarda seu estado.
+/// Mensagens · Perfil). Cada aba guarda seu estado e recarrega ao alternar.
 class CascaClienteTela extends StatefulWidget {
   const CascaClienteTela({super.key, this.abaInicial = 0});
 
@@ -18,10 +19,31 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
   late int _aba = widget.abaInicial;
   late final Set<int> _visitadas = {widget.abaInicial};
 
-  void _ir(int indice) => setState(() {
-        _aba = indice;
-        _visitadas.add(indice);
-      });
+  @override
+  void initState() {
+    super.initState();
+    ControladorCasca.registrar(
+      irParaAba: _ir,
+      recarregarCasca: () => RotasTrato.pedidosMudaram.value++,
+    );
+  }
+
+  @override
+  void dispose() {
+    ControladorCasca.desregistrar(_ir);
+    super.dispose();
+  }
+
+  void _ir(int indice) {
+    final jaVisitada = _visitadas.contains(indice);
+    setState(() {
+      _aba = indice;
+      _visitadas.add(indice);
+    });
+    if (jaVisitada) {
+      RotasTrato.pedidosMudaram.value++;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../dados/paralelo.dart';
+import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
+import '../comuns/foco_rolagem.dart';
 import '../profissional_apoio/apoio.dart';
 import 'cadastro.dart';
 
@@ -19,9 +21,11 @@ class CadastroProfissionalTela extends StatelessWidget {
     this.aoConcluir,
     this.nomeInicial = '',
     this.edicao = false,
+    this.servicoCep,
   });
 
   final ServicoCadastroProfissional servico;
+  final ServicoCep? servicoCep;
   final CapturarFoto? aoAdicionarFoto;
   final Future<List<String>> Function()? aoAdicionarFotos;
 
@@ -45,6 +49,7 @@ class CadastroProfissionalTela extends StatelessWidget {
         opcoes: d.$1,
         atual: d.$2,
         servico: servico,
+        servicoCep: servicoCep,
         aoAdicionarFoto: aoAdicionarFoto,
         aoAdicionarFotos: aoAdicionarFotos,
         aoConcluir: aoConcluir,
@@ -60,6 +65,7 @@ class _Formulario extends StatefulWidget {
     required this.opcoes,
     required this.atual,
     required this.servico,
+    this.servicoCep,
     required this.aoAdicionarFoto,
     required this.aoAdicionarFotos,
     required this.aoConcluir,
@@ -70,6 +76,7 @@ class _Formulario extends StatefulWidget {
   final OpcoesCadastro opcoes;
   final DadosCadastroProfissional? atual;
   final ServicoCadastroProfissional servico;
+  final ServicoCep? servicoCep;
   final CapturarFoto? aoAdicionarFoto;
   final Future<List<String>> Function()? aoAdicionarFotos;
   final VoidCallback? aoConcluir;
@@ -88,8 +95,18 @@ class _FormularioState extends State<_Formulario> {
     text: (_atual?.nome.trim().isNotEmpty ?? false) ? _atual!.nome : widget.nomeInicial,
   );
   late final _sobre = TextEditingController(text: _atual?.sobre ?? '');
+  final _cep = TextEditingController();
   late String? _cidade = widget.opcoes.cidades.contains(_atual?.cidade) ? _atual!.cidade : null;
+  String? _avisoCep;
   final _scrollController = ScrollController();
+  final _keyNome = GlobalKey();
+  final _keyCategorias = GlobalKey();
+  final _keyModalidades = GlobalKey();
+  final _keyCidade = GlobalKey();
+  final _keyDias = GlobalKey();
+  final _keyPeriodos = GlobalKey();
+  final _focoNome = FocusNode();
+  final _focoCep = FocusNode();
   late final _categorias = <String>{
     ...?_atual?.categorias.where(widget.opcoes.categorias.contains),
   };
@@ -111,25 +128,40 @@ class _FormularioState extends State<_Formulario> {
   void dispose() {
     _nome.dispose();
     _sobre.dispose();
+    _cep.dispose();
+    _focoNome.dispose();
+    _focoCep.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _rolarParaTopo() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+  void _aplicarCep(EnderecoPorCep end) {
+    final alvo = normalizarTextoBusca(end.cidade);
+    String? combinada;
+    for (final op in widget.opcoes.cidades) {
+      final nomeOp = normalizarTextoBusca(op.split('·').first.split('/').first);
+      if (nomeOp == alvo || (alvo.isNotEmpty && nomeOp.contains(alvo))) {
+        combinada = op;
+        break;
+      }
     }
+    setState(() {
+      if (combinada != null) {
+        _cidade = combinada;
+        _avisoCep = end.bairro.isNotEmpty
+            ? 'Cidade selecionada: $combinada (${end.bairro}).'
+            : 'Cidade selecionada: $combinada.';
+      } else {
+        _avisoCep = 'Ainda não atendemos ${end.cidade}/${end.uf}. Escolha abaixo uma cidade disponível.';
+      }
+    });
   }
 
   String? get _erroNome => _nome.text.trim().length < 3
-      ? 'Nome muito curto. Digite seu nome completo (mínimo de 3 letras).'
+      ? 'Informe seu nome completo (mínimo 3 letras).'
       : null;
   String? get _erroCidade =>
-      _cidade == null ? 'Cidade não escolhida. Escolha a cidade onde você atende.' : null;
+      _cidade == null ? 'Escolha a cidade onde você atende.' : null;
 
   bool get _valido =>
       _erroNome == null &&
@@ -162,7 +194,14 @@ class _FormularioState extends State<_Formulario> {
       _erroEnvio = null;
     });
     if (!_valido) {
-      _rolarParaTopo();
+      focarPrimeiroErro([
+        EntradaCampoErro(key: _keyNome, focusNode: _focoNome, temErro: () => _erroNome != null),
+        EntradaCampoErro(key: _keyCategorias, temErro: () => _categorias.isEmpty),
+        EntradaCampoErro(key: _keyModalidades, temErro: () => _modalidades.isEmpty),
+        EntradaCampoErro(key: _keyCidade, temErro: () => _erroCidade != null),
+        EntradaCampoErro(key: _keyDias, temErro: () => _dias.isEmpty),
+        EntradaCampoErro(key: _keyPeriodos, temErro: () => _periodos.isEmpty),
+      ]);
       return;
     }
     setState(() => _enviando = true);
@@ -194,7 +233,6 @@ class _FormularioState extends State<_Formulario> {
         _erroEnvio =
             motivo ?? 'Não foi possível salvar os dados. Confira sua conexão e tente novamente.';
       });
-      _rolarParaTopo();
     }
   }
 
@@ -206,6 +244,8 @@ class _FormularioState extends State<_Formulario> {
   @override
   Widget build(BuildContext context) {
     final o = widget.opcoes;
+    final categoriasOrdenadas = [...o.categorias]..sort(compararAlfabeticoPtBr);
+    final cidadesOrdenadas = [...o.cidades]..sort(compararAlfabeticoPtBr);
     return CorpoRolavel(
       scrollController: _scrollController,
       rodape: Column(
@@ -230,11 +270,15 @@ class _FormularioState extends State<_Formulario> {
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x5),
-        CampoTrato(
-          rotulo: 'Nome completo',
-          controlador: _nome,
-          erro: _tentou ? _erroNome : null,
-          aoMudar: (_) => setState(() {}),
+        KeyedSubtree(
+          key: _keyNome,
+          child: CampoTrato(
+            rotulo: 'Nome completo',
+            controlador: _nome,
+            foco: _focoNome,
+            erro: _tentou ? _erroNome : null,
+            aoMudar: (_) => setState(() {}),
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
         Text('Sobre você (opcional)', style: TipografiaTrato.corpoForte),
@@ -248,36 +292,74 @@ class _FormularioState extends State<_Formulario> {
           style: TipografiaTrato.corpo,
           decoration: const InputDecoration(hintText: 'Anos de experiência, o que você faz melhor'),
         ),
-        const TituloSecao('Categorias', ajuda: 'Escolha o que você atende.'),
-        OpcoesPilula(
-          opcoes: o.categorias,
-          selecionadas: _categorias,
-          aoAlternar: (v) => _alternar(_categorias, v),
+        KeyedSubtree(
+          key: _keyCategorias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TituloSecao('Categorias', ajuda: 'Escolha o que você atende.'),
+              OpcoesPilula(
+                opcoes: categoriasOrdenadas,
+                selecionadas: _categorias,
+                aoAlternar: (v) => _alternar(_categorias, v),
+              ),
+              if (_tentou && _categorias.isEmpty)
+                _erro('Escolha pelo menos uma categoria.'),
+            ],
+          ),
         ),
-        if (_tentou && _categorias.isEmpty)
-          _erro('Nenhuma categoria selecionada. Escolha pelo menos uma área de atuação.'),
-        const TituloSecao(
-          'Como você atende',
-          ajuda: 'Presencial: você vai até o cliente (só pedidos da sua cidade). Remoto: atende '
-              'à distância, de qualquer cidade, nas categorias em que o Trato liberou o remoto. '
-              'Pode marcar os dois.',
+        KeyedSubtree(
+          key: _keyModalidades,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TituloSecao(
+                'Como você atende',
+                ajuda: 'Presencial: você vai até o cliente. Remoto: atendimento à distância nas '
+                    'categorias liberadas. Pode marcar os dois.',
+              ),
+              OpcoesPilula(
+                opcoes: const ['Presencial', 'Remoto'],
+                selecionadas: _modalidades,
+                aoAlternar: (v) => _alternar(_modalidades, v),
+              ),
+              if (_tentou && _modalidades.isEmpty)
+                _erro('Escolha atender presencial, remoto ou os dois.'),
+            ],
+          ),
         ),
-        OpcoesPilula(
-          opcoes: const ['Presencial', 'Remoto'],
-          selecionadas: _modalidades,
-          aoAlternar: (v) => _alternar(_modalidades, v),
-        ),
-        if (_tentou && _modalidades.isEmpty)
-          _erro('Escolha atender presencial, remoto ou os dois.'),
         const TituloSecao('Área atendida'),
-        Text('Cidade', style: TipografiaTrato.corpoForte),
-        const SizedBox(height: EspacosTrato.x2),
-        OpcoesPilula(
-          opcoes: o.cidades,
-          selecionadas: {if (_cidade != null) _cidade!},
-          aoAlternar: (v) => setState(() => _cidade = v),
+        CampoCepAutoPreenchimento(
+          rotulo: 'CEP da sua região (opcional)',
+          controlador: _cep,
+          servico: widget.servicoCep,
+          foco: _focoCep,
+          aoEncontrar: _aplicarCep,
         ),
-        if (_tentou && _erroCidade != null) _erro(_erroCidade!),
+        if (_avisoCep != null) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          Text(
+            _avisoCep!,
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo),
+          ),
+        ],
+        const SizedBox(height: EspacosTrato.x4),
+        KeyedSubtree(
+          key: _keyCidade,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Cidade', style: TipografiaTrato.corpoForte),
+              const SizedBox(height: EspacosTrato.x2),
+              OpcoesPilula(
+                opcoes: cidadesOrdenadas,
+                selecionadas: {if (_cidade != null) _cidade!},
+                aoAlternar: (v) => setState(() => _cidade = v),
+              ),
+              if (_tentou && _erroCidade != null) _erro(_erroCidade!),
+            ],
+          ),
+        ),
         if (o.raiosKm.isNotEmpty) ...[
           const SizedBox(height: EspacosTrato.x3),
           Text('Até onde você vai', style: TipografiaTrato.corpoForte),
@@ -288,22 +370,36 @@ class _FormularioState extends State<_Formulario> {
             aoAlternar: (v) => setState(() => _raio = int.parse(v.split(' ').first)),
           ),
         ],
-        const TituloSecao('Disponibilidade', ajuda: 'Você pode mudar quando quiser.'),
-        OpcoesPilula(
-          opcoes: o.dias,
-          selecionadas: _dias,
-          aoAlternar: (v) => _alternar(_dias, v),
+        KeyedSubtree(
+          key: _keyDias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TituloSecao('Disponibilidade', ajuda: 'Você pode mudar quando quiser.'),
+              OpcoesPilula(
+                opcoes: o.dias,
+                selecionadas: _dias,
+                aoAlternar: (v) => _alternar(_dias, v),
+              ),
+              if (_tentou && _dias.isEmpty) _erro('Escolha pelo menos um dia.'),
+            ],
+          ),
         ),
-        if (_tentou && _dias.isEmpty)
-          _erro('Nenhum dia selecionado. Escolha pelo menos um dia da semana para atendimento.'),
         const SizedBox(height: EspacosTrato.x3),
-        OpcoesPilula(
-          opcoes: o.periodos,
-          selecionadas: _periodos,
-          aoAlternar: (v) => _alternar(_periodos, v),
+        KeyedSubtree(
+          key: _keyPeriodos,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              OpcoesPilula(
+                opcoes: o.periodos,
+                selecionadas: _periodos,
+                aoAlternar: (v) => _alternar(_periodos, v),
+              ),
+              if (_tentou && _periodos.isEmpty) _erro('Escolha pelo menos um período.'),
+            ],
+          ),
         ),
-        if (_tentou && _periodos.isEmpty)
-          _erro('Nenhum período selecionado. Escolha manhã, tarde ou noite para seus atendimentos.'),
         const TituloSecao('Portfólio', ajuda: 'Fotos de trabalhos que você já fez (opcional).'),
         if (_portfolio.isEmpty)
           Text(

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/carregador.dart';
 import '../../dados/config_publica.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../comuns/foco_rolagem.dart';
 import '../servicos/servicos_recentes_tela.dart';
 import 'modelos.dart';
 
@@ -53,16 +55,19 @@ class InicioTela extends StatelessWidget {
     final grade = dados == null
         ? const <CategoriaServico>[]
         : [
-            ...dados!.categorias.take(7),
+            ...([
+                  for (final c in dados!.categorias)
+                    if (c.nome != 'Ver todas') c,
+                ]..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome)))
+                .take(7),
             if (dados!.categorias.isNotEmpty)
               const CategoriaServico('Ver todas', Icons.grid_view),
           ];
-    return Scaffold(
-      body: SafeArea(
-        child: ConteudoResponsivo(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
-            child: Column(
+    final recarregar = AtualizadorTela.de(context);
+    final conteudo = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
+      child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -114,7 +119,7 @@ class InicioTela extends StatelessWidget {
                       Text(
                         'Receba até ${ConfigPublica.atual.limiteOrcamentos} orçamentos de '
                         'profissionais com identidade verificada. '
-                        'O pagamento é processado por parceiro e acompanhado no app.',
+                        'O pagamento é protegido pelo app até você confirmar o serviço.',
                         style: TipografiaTrato.corpo
                             .copyWith(color: CoresTrato.creme),
                       ),
@@ -190,7 +195,13 @@ class InicioTela extends StatelessWidget {
                 ],
               ],
             ),
-          ),
+          );
+    return Scaffold(
+      body: SafeArea(
+        child: ConteudoResponsivo(
+          child: recarregar == null
+              ? conteudo
+              : RefreshIndicator(onRefresh: recarregar, child: conteudo),
         ),
       ),
     );

@@ -13,6 +13,7 @@ class OrcamentoPronto {
     required this.decimosDeHora,
     required this.valorHoraCentavos,
     required this.garantiaDias,
+    this.prazoExecucaoDias = 3,
     required this.itens,
     required this.materialPorMim,
     required this.pedirSinalMaterial,
@@ -26,6 +27,7 @@ class OrcamentoPronto {
   final int decimosDeHora;
   final int valorHoraCentavos;
   final int garantiaDias;
+  final int prazoExecucaoDias;
   final List<ItemMaterial> itens;
   final bool materialPorMim;
   final bool pedirSinalMaterial;

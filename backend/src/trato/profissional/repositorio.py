@@ -6,6 +6,8 @@ ainda não existe; sem ele ligado, as rotas respondem 503.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,6 +15,21 @@ from typing import TYPE_CHECKING, Protocol
 from zoneinfo import ZoneInfo
 
 _FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
+_SEPARADOR_BUSCA = re.compile(r"[^0-9a-zA-Z]+")
+
+
+def normalizar_busca(texto: str) -> str:
+    """Remove acentos e pontuação, mantendo palavras separadas por espaço único."""
+    sem_acento = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+    return " ".join(_SEPARADOR_BUSCA.sub(" ", sem_acento.casefold()).split())
+
+
+def nome_publico_busca(nome: str | None) -> str:
+    """Forma abreviada visível na busca (primeiro nome + inicial do último)."""
+    partes = (nome or "").split()
+    if not partes:
+        return ""
+    return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
 
 
 def dia_semana_hoje() -> int:
@@ -83,6 +100,11 @@ class FiltroBusca:
     bairro: str | None = None  # quem atende a cidade toda (sem bairro) também entra
     nota_minima: float | None = None
     atende_hoje: bool = False
+    atende_remoto: bool | None = None
+    texto: str | None = None
+    # Preenchidos pela rota quando há `texto` para permitir casar categoria/cidade em memória.
+    categorias_texto: frozenset[str] = field(default_factory=frozenset)
+    cidades_texto: frozenset[str] = field(default_factory=frozenset)
     limite: int = 20
     deslocamento: int = 0
 
@@ -98,6 +120,11 @@ class ResultadoBusca:
     nota_publica: float | None
     servicos_concluidos: int | None
     categorias: tuple[str, ...]
+    cidades: tuple[str, ...] = ()
+    bairros: tuple[str, ...] = ()
+    atende_remoto: bool = False
+    _regioes_ids: tuple[Regiao, ...] = ()
+    _portfolio_texto: str = ""
 
 
 class RepositorioProfissionais(Protocol):
@@ -125,6 +152,60 @@ class CatalogoProfissional(Protocol):
         """Cidades ativas, em ordem alfabética."""
 
 
+_PESO_VERIFICACAO = {
+    "verificado_plus": 0,
+    "verificado": 1,
+    "basico": 2,
+}
+
+
+def _correspondencia_texto(
+    p: PerfilProfissional,
+    nome: str | None,
+    filtro: FiltroBusca,
+) -> int:
+    """Devolve 0 se não há busca textual, >0 para relevância ou -1 se não casa."""
+    tokens = [t for t in normalizar_busca(filtro.texto or "").split() if t]
+    if not tokens:
+        return 0
+    nome_pub = normalizar_busca(nome_publico_busca(nome))
+    bio = normalizar_busca(p.bio or "")
+    portfolio = " ".join(
+        normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio
+    )
+    bairros = " ".join(normalizar_busca(r.bairro or "") for r in p.regioes)
+    cat_casa = bool(filtro.categorias_texto & set(p.categorias))
+    cid_casa = any(r.cidade_id in filtro.cidades_texto for r in p.regioes)
+
+    pontos = 0
+    for tok in tokens:
+        acertou = False
+        if tok in nome_pub:
+            pontos += 3
+            acertou = True
+        if cat_casa or tok in bio or tok in portfolio:
+            pontos += 2
+            acertou = True
+        if cid_casa or (bairros and tok in bairros):
+            pontos += 1
+            acertou = True
+        if not acertou:
+            return -1
+    return pontos
+
+
+def _match_exato_bairro(p: PerfilProfissional, filtro: FiltroBusca) -> bool:
+    bairro = normalizar_busca(filtro.bairro or "")
+    if not bairro:
+        return False
+    return any(
+        (filtro.cidade_id is None or r.cidade_id == filtro.cidade_id)
+        and r.bairro is not None
+        and normalizar_busca(r.bairro) == bairro
+        for r in p.regioes
+    )
+
+
 class ProfissionaisEmMemoria:
     def __init__(self) -> None:
         self._itens: dict[str, PerfilProfissional] = {}
@@ -139,50 +220,65 @@ class ProfissionaisEmMemoria:
         self, filtro: FiltroBusca, detalhe: Callable[[str], PerfilDetalhe | None]
     ) -> tuple[list[ResultadoBusca], int]:
         hoje = dia_semana_hoje() if filtro.atende_hoje else None
-        achados = []
+        ranqueados: list[tuple[tuple[object, ...], ResultadoBusca]] = []
         for p in self._itens.values():
             if p.status != "aprovado":
                 continue
             if filtro.categoria_ids is not None and not filtro.categoria_ids & set(p.categorias):
+                continue
+            if filtro.atende_remoto is not None and p.atende_remoto != filtro.atende_remoto:
                 continue
             if not _atende(p, filtro):
                 continue
             if hoje is not None and not any(j.dia_semana == hoje for j in p.disponibilidade):
                 continue
             d = detalhe(p.usuario_id)
+            nome = d.nome if d else None
+            pontos_texto = _correspondencia_texto(p, nome, filtro)
+            if pontos_texto < 0:
+                continue
             nota = d.nota_publica if d else None
             if filtro.nota_minima is not None and (nota is None or nota < filtro.nota_minima):
                 continue
-            achados.append(
-                ResultadoBusca(
-                    p.usuario_id,
-                    d.nome if d else None,
-                    p.bio,
-                    p.nivel_verificacao,
-                    nota,
-                    d.servicos_concluidos if d else None,
-                    p.categorias,
-                )
+            bairros = tuple(
+                dict.fromkeys(r.bairro.strip() for r in p.regioes if r.bairro and r.bairro.strip())
             )
-        achados.sort(
-            key=lambda r: (
-                r.nota_publica is None,
-                -(r.nota_publica or 0),
-                -(r.servicos_concluidos or 0),
-                r.usuario_id,
+            resultado = ResultadoBusca(
+                p.usuario_id,
+                nome,
+                p.bio,
+                p.nivel_verificacao,
+                nota,
+                d.servicos_concluidos if d else None,
+                p.categorias,
+                bairros=bairros,
+                atende_remoto=p.atende_remoto,
+                _regioes_ids=p.regioes,
             )
-        )
+            chave = (
+                -pontos_texto,
+                nota is None,
+                -(nota or 0),
+                -(d.servicos_concluidos if d and d.servicos_concluidos else 0),
+                not _match_exato_bairro(p, filtro),
+                _PESO_VERIFICACAO.get(p.nivel_verificacao, 9),
+                not bool((p.bio or "").strip()),
+                p.usuario_id,
+            )
+            ranqueados.append((chave, resultado))
+        ranqueados.sort(key=lambda par: par[0])
+        achados = [par[1] for par in ranqueados]
         return achados[filtro.deslocamento : filtro.deslocamento + filtro.limite], len(achados)
 
 
 def _atende(p: PerfilProfissional, filtro: FiltroBusca) -> bool:
     if filtro.cidade_id is None and filtro.bairro is None:
         return True
-    bairro = (filtro.bairro or "").strip().casefold()
+    bairro = normalizar_busca(filtro.bairro or "")
     for r in p.regioes:
         if filtro.cidade_id is not None and r.cidade_id != filtro.cidade_id:
             continue
-        if bairro and r.bairro is not None and r.bairro.strip().casefold() != bairro:
+        if bairro and r.bairro is not None and normalizar_busca(r.bairro) != bairro:
             continue
         return True
     return False
@@ -205,7 +301,10 @@ class CatalogoEmMemoria:
     def categorias_publicas(self) -> list[CategoriaPublica]:
         return [
             CategoriaPublica(i, self.nomes.get(i, slug), slug)
-            for i, slug in sorted(self.categorias.items(), key=lambda kv: kv[1])
+            for i, slug in sorted(
+                self.categorias.items(),
+                key=lambda kv: (normalizar_busca(self.nomes.get(kv[0], kv[1])), kv[0]),
+            )
         ]
 
     def cidades_publicas(self) -> list[CidadePublica]:

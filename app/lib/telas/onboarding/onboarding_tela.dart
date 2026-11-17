@@ -27,8 +27,8 @@ List<_PaginaOnboarding> get _paginas => [
   ),
   const _PaginaOnboarding(
     icone: Icons.lock_outline,
-    titulo: 'Pagamento por parceiro,\nacompanhado no app',
-    texto: 'O pagamento é processado por parceiro e acompanhado no app. Você confirma o serviço ao final.',
+    titulo: 'Pagamento seguro\npelo app',
+    texto: 'O pagamento fica protegido pelo app e só é liberado depois que você confirma o serviço.',
   ),
   const _PaginaOnboarding(
     icone: Icons.verified_user_outlined,

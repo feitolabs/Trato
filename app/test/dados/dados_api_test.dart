@@ -786,7 +786,7 @@ void main() {
       final repo = RepositorioCatalogoApi(api);
       final resultados = await repo.buscar('eletricista');
 
-      expect(chamadas.first.caminho, '/v1/profissionais?servico=eletricista');
+      expect(chamadas.first.caminho, '/v1/profissionais?q=eletricista');
       expect(resultados.length, 1);
       expect(resultados.single.id, 'prof-123');
       expect(resultados.single.nome, 'Carlos Silva');

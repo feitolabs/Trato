@@ -1,21 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
+import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
 import '../auth/validacao.dart';
 import '../comuns/estados.dart';
+import '../comuns/foco_rolagem.dart';
 import 'modelos.dart';
 
 String textoDoErro(Object erro) =>
     erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo.';
 
-/// Dados pessoais: nome, e-mail e CPF (final) só para ver; telefone e nascimento podem mudar.
+/// Dados pessoais e endereço principal com preenchimento automático via CEP.
 class DadosPessoaisTela extends StatelessWidget {
-  const DadosPessoaisTela({super.key, required this.servico});
+  const DadosPessoaisTela({
+    super.key,
+    required this.servico,
+    this.servicoCep,
+  });
 
   final ServicoConta servico;
+  final ServicoCep? servicoCep;
 
   @override
   Widget build(BuildContext context) {
@@ -23,16 +33,25 @@ class DadosPessoaisTela extends StatelessWidget {
       titulo: 'Dados pessoais',
       child: CarregadorTela<DadosPessoaisConta>(
         carregar: servico.dados,
-        construir: (context, dados, _) => _Formulario(servico: servico, dados: dados),
+        construir: (context, dados, _) => _Formulario(
+          servico: servico,
+          servicoCep: servicoCep,
+          dados: dados,
+        ),
       ),
     );
   }
 }
 
 class _Formulario extends StatefulWidget {
-  const _Formulario({required this.servico, required this.dados});
+  const _Formulario({
+    required this.servico,
+    required this.dados,
+    this.servicoCep,
+  });
 
   final ServicoConta servico;
+  final ServicoCep? servicoCep;
   final DadosPessoaisConta dados;
 
   @override
@@ -40,18 +59,103 @@ class _Formulario extends StatefulWidget {
 }
 
 class _FormularioState extends State<_Formulario> {
+  final _scroll = ScrollController();
   late final _telefone = TextEditingController(text: formatarTelefone(widget.dados.telefone));
   late DateTime? _nascimento = widget.dados.dataNascimento;
   final _cpf = TextEditingController();
+
+  final _cep = TextEditingController();
+  final _logradouro = TextEditingController();
+  final _numero = TextEditingController();
+  final _complemento = TextEditingController();
+  final _bairro = TextEditingController();
+  final _cidade = TextEditingController();
+  final _uf = TextEditingController();
+
+  String? _enderecoId;
+  String _apelidoEndereco = 'Principal';
+  bool _enderecoModificado = false;
+
+  final _keyCpf = GlobalKey();
+  final _keyTelefone = GlobalKey();
+  final _keyCep = GlobalKey();
+  final _keyRua = GlobalKey();
+  final _keyNumero = GlobalKey();
+  final _keyBairro = GlobalKey();
+  final _keyCidade = GlobalKey();
+  final _keyUf = GlobalKey();
+
+  final _focoCpf = FocusNode();
+  final _focoTelefone = FocusNode();
+  final _focoCep = FocusNode();
+  final _focoRua = FocusNode();
+  final _focoNumero = FocusNode();
+  final _focoBairro = FocusNode();
+  final _focoCidade = FocusNode();
+  final _focoUf = FocusNode();
+
   String? _erroCpf;
+  String? _erroTelefone;
+  String? _erroEnderecoGeral;
   var _salvando = false;
   String? _erro;
   String? _aviso;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_carregarEnderecoPrincipal());
+  }
+
+  Future<void> _carregarEnderecoPrincipal() async {
+    try {
+      final lista = await widget.servico.enderecos();
+      if (!mounted || lista.isEmpty) return;
+      final principal = lista.where((e) => e.principal).firstOrNull ?? lista.first;
+      setState(() {
+        _enderecoId = principal.id;
+        _apelidoEndereco = principal.apelido.isNotEmpty ? principal.apelido : 'Principal';
+        _cep.text = formatarCep(principal.cep);
+        _logradouro.text = principal.logradouro;
+        _numero.text = principal.numero;
+        _complemento.text = principal.complemento ?? '';
+        _bairro.text = principal.bairro;
+        _cidade.text = principal.cidade;
+        _uf.text = principal.uf;
+      });
+    } on Object {
+      // Cadastro sem endereço salvo ou offline: segue sem bloquear os dados pessoais.
+    }
+  }
+
+  @override
   void dispose() {
-    _telefone.dispose();
-    _cpf.dispose();
+    _scroll.dispose();
+    for (final c in [
+      _telefone,
+      _cpf,
+      _cep,
+      _logradouro,
+      _numero,
+      _complemento,
+      _bairro,
+      _cidade,
+      _uf,
+    ]) {
+      c.dispose();
+    }
+    for (final f in [
+      _focoCpf,
+      _focoTelefone,
+      _focoCep,
+      _focoRua,
+      _focoNumero,
+      _focoBairro,
+      _focoCidade,
+      _focoUf,
+    ]) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -66,27 +170,78 @@ class _FormularioState extends State<_Formulario> {
     if (data != null) setState(() => _nascimento = data);
   }
 
+  bool get _temDadosEndereco =>
+      _cep.text.trim().isNotEmpty ||
+      _logradouro.text.trim().isNotEmpty ||
+      _numero.text.trim().isNotEmpty ||
+      _bairro.text.trim().isNotEmpty ||
+      _cidade.text.trim().isNotEmpty ||
+      _uf.text.trim().isNotEmpty;
+
+  void _aplicarCep(EnderecoPorCep end) {
+    setState(() {
+      _enderecoModificado = true;
+      _erroEnderecoGeral = null;
+      if (end.logradouro.trim().isNotEmpty) _logradouro.text = end.logradouro;
+      if (end.bairro.trim().isNotEmpty) _bairro.text = end.bairro;
+      if (end.cidade.trim().isNotEmpty) _cidade.text = end.cidade;
+      if (end.uf.trim().isNotEmpty) _uf.text = end.uf.toUpperCase();
+    });
+  }
+
   Future<void> _salvar() async {
+    String? errCpf;
+    String? errTel;
     final digitos = _telefone.text.replaceAll(RegExp(r'\D'), '');
     if (digitos.isNotEmpty && digitos.length != 10 && digitos.length != 11) {
-      setState(() => _erro = 'Informe o telefone com DDD.');
-      return;
+      errTel = 'Informe o telefone com DDD.';
     }
     final semCpf = (widget.dados.cpfFinal ?? '').isEmpty;
     final cpfDigitos = _cpf.text.replaceAll(RegExp(r'\D'), '');
     if (semCpf && (cpfDigitos.isNotEmpty || digitos.isNotEmpty)) {
-      final msg = ValidacaoAuth.cpf(_cpf.text);
-      if (msg != null) {
-        setState(() => _erroCpf = msg);
-        return;
-      }
+      errCpf = ValidacaoAuth.cpf(_cpf.text);
     }
+
+    final cepDigitos = _cep.text.replaceAll(RegExp(r'\D'), '');
+    final validarEndereco = _enderecoModificado && _temDadosEndereco;
+    final cepInvalido = validarEndereco && cepDigitos.length != 8;
+    final ruaInvalida = validarEndereco && _logradouro.text.trim().length < 2;
+    final numInvalido = validarEndereco && _numero.text.trim().isEmpty;
+    final bairroInvalido = validarEndereco && _bairro.text.trim().length < 2;
+    final cidadeInvalida = validarEndereco && _cidade.text.trim().length < 2;
+    final ufInvalida = validarEndereco && _uf.text.trim().length != 2;
+    final erroEnd = (cepInvalido ||
+            ruaInvalida ||
+            numInvalido ||
+            bairroInvalido ||
+            cidadeInvalida ||
+            ufInvalida)
+        ? 'Complete todos os campos obrigatórios do endereço.'
+        : null;
+
     setState(() {
-      _salvando = true;
+      _erroCpf = errCpf;
+      _erroTelefone = errTel;
+      _erroEnderecoGeral = erroEnd;
       _erro = null;
-      _erroCpf = null;
       _aviso = null;
     });
+
+    if (errCpf != null || errTel != null || erroEnd != null) {
+      focarPrimeiroErro([
+        EntradaCampoErro(key: _keyCpf, focusNode: _focoCpf, temErro: () => _erroCpf != null),
+        EntradaCampoErro(key: _keyTelefone, focusNode: _focoTelefone, temErro: () => _erroTelefone != null),
+        EntradaCampoErro(key: _keyCep, focusNode: _focoCep, temErro: () => cepInvalido),
+        EntradaCampoErro(key: _keyRua, focusNode: _focoRua, temErro: () => ruaInvalida),
+        EntradaCampoErro(key: _keyNumero, focusNode: _focoNumero, temErro: () => numInvalido),
+        EntradaCampoErro(key: _keyBairro, focusNode: _focoBairro, temErro: () => bairroInvalido),
+        EntradaCampoErro(key: _keyCidade, focusNode: _focoCidade, temErro: () => cidadeInvalida),
+        EntradaCampoErro(key: _keyUf, focusNode: _focoUf, temErro: () => ufInvalida),
+      ]);
+      return;
+    }
+
+    setState(() => _salvando = true);
     try {
       // Conta sem CPF: o telefone só salva depois de vincular o CPF (o servidor guarda os dois juntos).
       if (semCpf && cpfDigitos.isNotEmpty) {
@@ -98,6 +253,21 @@ class _FormularioState extends State<_Formulario> {
         removerTelefone: digitos.isEmpty && (widget.dados.telefone ?? '').isNotEmpty,
         removerNascimento: _nascimento == null && widget.dados.dataNascimento != null,
       );
+      if (validarEndereco) {
+        await widget.servico.salvarEndereco(EnderecoSalvo(
+          id: _enderecoId ?? '',
+          apelido: _apelidoEndereco,
+          cep: cepDigitos,
+          logradouro: _logradouro.text.trim(),
+          numero: _numero.text.trim(),
+          complemento: _complemento.text.trim(),
+          bairro: _bairro.text.trim(),
+          cidade: _cidade.text.trim(),
+          uf: _uf.text.trim().toUpperCase(),
+          principal: true,
+        ));
+        _enderecoModificado = false;
+      }
       if (mounted) setState(() => _aviso = 'Dados salvos.');
     } catch (e) {
       if (mounted) setState(() => _erro = textoDoErro(e));
@@ -112,7 +282,10 @@ class _FormularioState extends State<_Formulario> {
   @override
   Widget build(BuildContext context) {
     final d = widget.dados;
-    return ListView(
+    final recarregar = AtualizadorTela.de(context);
+    final lista = ListView(
+      controller: _scroll,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
       children: [
         CartaoTrato(
@@ -131,13 +304,17 @@ class _FormularioState extends State<_Formulario> {
         ),
         if ((d.cpfFinal ?? '').isEmpty) ...[
           const SizedBox(height: EspacosTrato.x5),
-          CampoTrato(
-            rotulo: 'CPF',
-            controlador: _cpf,
-            dica: '000.000.000-00',
-            teclado: TextInputType.number,
-            formatadores: [MascaraNumerica.cpf],
-            erro: _erroCpf,
+          KeyedSubtree(
+            key: _keyCpf,
+            child: CampoTrato(
+              rotulo: 'CPF',
+              controlador: _cpf,
+              foco: _focoCpf,
+              dica: '000.000.000-00',
+              teclado: TextInputType.number,
+              formatadores: [MascaraNumerica.cpf],
+              erro: _erroCpf,
+            ),
           ),
           const SizedBox(height: EspacosTrato.x1),
           Text(
@@ -146,13 +323,17 @@ class _FormularioState extends State<_Formulario> {
           ),
         ],
         const SizedBox(height: EspacosTrato.x5),
-        CampoTrato(
-          rotulo: 'Telefone',
-          controlador: _telefone,
-          dica: '(11) 98888-7777',
-          teclado: TextInputType.phone,
-          formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9()\- ]'))],
-          erro: _erro,
+        KeyedSubtree(
+          key: _keyTelefone,
+          child: CampoTrato(
+            rotulo: 'Telefone',
+            controlador: _telefone,
+            foco: _focoTelefone,
+            dica: '(11) 98888-7777',
+            teclado: TextInputType.phone,
+            formatadores: [FilteringTextInputFormatter.allow(RegExp(r'[0-9()\- ]'))],
+            erro: _erroTelefone ?? _erro,
+          ),
         ),
         const SizedBox(height: EspacosTrato.x4),
         Text('Data de nascimento', style: TipografiaTrato.corpoPequeno),
@@ -171,6 +352,105 @@ class _FormularioState extends State<_Formulario> {
             ],
           ],
         ),
+        const SizedBox(height: EspacosTrato.x6),
+        Text('ENDEREÇO PRINCIPAL', style: TipografiaTrato.sobretitulo),
+        const SizedBox(height: EspacosTrato.x2),
+        KeyedSubtree(
+          key: _keyCep,
+          child: CampoCepAutoPreenchimento(
+            controlador: _cep,
+            servico: widget.servicoCep,
+            foco: _focoCep,
+            proximoFoco: _focoNumero,
+            aoAlterar: () => _enderecoModificado = true,
+            aoEncontrar: _aplicarCep,
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        KeyedSubtree(
+          key: _keyRua,
+          child: CampoTrato(
+            rotulo: 'Rua',
+            controlador: _logradouro,
+            foco: _focoRua,
+            aoMudar: (_) => _enderecoModificado = true,
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: KeyedSubtree(
+                key: _keyNumero,
+                child: CampoTrato(
+                  rotulo: 'Número',
+                  controlador: _numero,
+                  foco: _focoNumero,
+                  aoMudar: (_) => _enderecoModificado = true,
+                ),
+              ),
+            ),
+            const SizedBox(width: EspacosTrato.x3),
+            Expanded(
+              child: CampoTrato(
+                rotulo: 'Complemento',
+                controlador: _complemento,
+                dica: 'Opcional',
+                aoMudar: (_) => _enderecoModificado = true,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        KeyedSubtree(
+          key: _keyBairro,
+          child: CampoTrato(
+            rotulo: 'Bairro',
+            controlador: _bairro,
+            foco: _focoBairro,
+            aoMudar: (_) => _enderecoModificado = true,
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: KeyedSubtree(
+                key: _keyCidade,
+                child: CampoTrato(
+                  rotulo: 'Cidade',
+                  controlador: _cidade,
+                  foco: _focoCidade,
+                  aoMudar: (_) => _enderecoModificado = true,
+                ),
+              ),
+            ),
+            const SizedBox(width: EspacosTrato.x3),
+            Expanded(
+              child: KeyedSubtree(
+                key: _keyUf,
+                child: CampoTrato(
+                  rotulo: 'UF',
+                  controlador: _uf,
+                  foco: _focoUf,
+                  aoMudar: (_) => _enderecoModificado = true,
+                  formatadores: [
+                    LengthLimitingTextInputFormatter(2),
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z]')),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_erroEnderecoGeral != null) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Text(_erroEnderecoGeral!,
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto)),
+        ],
         if (_aviso != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           Text(_aviso!, style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.verdeTexto)),
@@ -179,6 +459,7 @@ class _FormularioState extends State<_Formulario> {
         BotaoPrimario(texto: 'Salvar', carregando: _salvando, aoTocar: _salvando ? null : _salvar),
       ],
     );
+    return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
   }
 }
 

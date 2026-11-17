@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/repositorios.dart';
+import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
+import '../comuns/foco_rolagem.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
 
@@ -30,10 +32,14 @@ class PedidoAbertoTela extends StatefulWidget {
     required this.aoSalvar,
     required this.aoVerOrcamentos,
     this.aoCancelar,
+    this.servicoCep,
+    this.cepInicial = '',
   });
 
   final String numero;
   final DadosDoPedido dados;
+  final ServicoCep? servicoCep;
+  final String cepInicial;
 
   /// Devolve os dados como ficaram gravados; se falhar, a própria função avisa e devolve nulo.
   final Future<DadosDoPedido?> Function({
@@ -42,6 +48,7 @@ class PedidoAbertoTela extends StatefulWidget {
     required String logradouro,
     required String numero,
     required String bairro,
+    String? cep,
   })
   aoSalvar;
   final VoidCallback aoVerOrcamentos;
@@ -54,21 +61,49 @@ class PedidoAbertoTela extends StatefulWidget {
 }
 
 class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
+  final _scroll = ScrollController();
   late DadosDoPedido _dados = widget.dados;
   var _editando = false;
   var _salvando = false;
+  var _tentou = false;
   String? _erro;
+  String? _erroValor;
 
   late final _descricao = TextEditingController(text: _dados.descricao);
   late final _valor = TextEditingController();
+  late final _cep = TextEditingController(text: widget.cepInicial);
   late final _rua = TextEditingController(text: _dados.logradouro ?? '');
   late final _numero = TextEditingController(text: _dados.numero ?? '');
   late final _bairro = TextEditingController(text: _dados.bairro ?? '');
 
+  final _keyDescricao = GlobalKey();
+  final _keyValor = GlobalKey();
+  final _keyRua = GlobalKey();
+  final _keyNumero = GlobalKey();
+  final _keyBairro = GlobalKey();
+
+  final _focoDescricao = FocusNode();
+  final _focoValor = FocusNode();
+  final _focoCep = FocusNode();
+  final _focoRua = FocusNode();
+  final _focoNumero = FocusNode();
+  final _focoBairro = FocusNode();
+
   @override
   void dispose() {
-    for (final c in [_descricao, _valor, _rua, _numero, _bairro]) {
+    _scroll.dispose();
+    for (final c in [_descricao, _valor, _cep, _rua, _numero, _bairro]) {
       c.dispose();
+    }
+    for (final f in [
+      _focoDescricao,
+      _focoValor,
+      _focoCep,
+      _focoRua,
+      _focoNumero,
+      _focoBairro,
+    ]) {
+      f.dispose();
     }
     super.dispose();
   }
@@ -77,37 +112,56 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
     _descricao.text = _dados.descricao;
     final max = _dados.faixaMaxCentavos;
     _valor.text = max == null ? '' : (max / 100).toStringAsFixed(2).replaceAll('.', ',');
+    _cep.text = widget.cepInicial;
     _rua.text = _dados.logradouro ?? '';
     _numero.text = _dados.numero ?? '';
     _bairro.text = _dados.bairro ?? '';
     setState(() {
       _editando = true;
+      _tentou = false;
       _erro = null;
+      _erroValor = null;
     });
   }
 
   Future<void> _salvar() async {
+    setState(() => _tentou = true);
     final descricao = _descricao.text.trim();
-    if (descricao.isEmpty) {
-      setState(() => _erro = 'Descreva o que precisa ser feito.');
-      return;
-    }
     final textoValor = _valor.text.trim();
     final valor = textoValor.isEmpty ? 0 : centavosDoTexto(textoValor);
-    if (valor == null) {
-      setState(() => _erro = 'Digite o valor em reais. Ex.: 900,00');
+    final erroVal = textoValor.isNotEmpty && valor == null
+        ? 'Informe o valor em reais (ex.: 900,00).'
+        : null;
+    setState(() => _erroValor = erroVal);
+
+    if (descricao.isEmpty || erroVal != null) {
+      focarPrimeiroErro([
+        EntradaCampoErro(
+          key: _keyDescricao,
+          focusNode: _focoDescricao,
+          temErro: () => _descricao.text.trim().isEmpty,
+        ),
+        EntradaCampoErro(
+          key: _keyValor,
+          focusNode: _focoValor,
+          temErro: () => _erroValor != null,
+        ),
+      ]);
       return;
     }
+
     setState(() {
       _salvando = true;
       _erro = null;
     });
+    final cepDigitos = _cep.text.replaceAll(RegExp(r'\D'), '');
     final novos = await widget.aoSalvar(
       descricao: descricao,
-      faixaMaxCentavos: valor,
+      faixaMaxCentavos: valor!,
       logradouro: _rua.text,
       numero: _numero.text,
       bairro: _bairro.text,
+      cep: cepDigitos.length == 8 ? cepDigitos : null,
     );
     if (!mounted) return;
     setState(() {
@@ -115,6 +169,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
       if (novos != null) {
         _dados = novos;
         _editando = false;
+        _tentou = false;
       }
     });
   }
@@ -122,6 +177,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
   @override
   Widget build(BuildContext context) {
     return EstruturaPedido(
+      scrollController: _scroll,
       tituloBarra: 'Pedido #${widget.numero}',
       rodape: _editando
           ? Row(
@@ -194,22 +250,59 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
   }
 
   List<Widget> _formulario() => [
-    CampoTrato(rotulo: 'Descreva o que precisa', controlador: _descricao),
-    const SizedBox(height: EspacosTrato.x4),
-    CampoTrato(
-      rotulo: 'Quanto pretende gastar (no máximo)',
-      controlador: _valor,
-      prefixo: 'R\$ ',
-      dica: '900,00',
-      ajuda: 'Deixe vazio para não limitar.',
-      teclado: const TextInputType.numberWithOptions(decimal: true),
+    KeyedSubtree(
+      key: _keyDescricao,
+      child: CampoTrato(
+        rotulo: 'Descreva o que precisa',
+        controlador: _descricao,
+        foco: _focoDescricao,
+        erro: _tentou && _descricao.text.trim().isEmpty
+            ? 'Descreva o que precisa ser feito.'
+            : null,
+        aoMudar: (_) => setState(() {}),
+      ),
     ),
     const SizedBox(height: EspacosTrato.x4),
-    CampoTrato(rotulo: 'Rua', controlador: _rua),
+    KeyedSubtree(
+      key: _keyValor,
+      child: CampoTrato(
+        rotulo: 'Quanto pretende gastar (no máximo)',
+        controlador: _valor,
+        foco: _focoValor,
+        prefixo: 'R\$ ',
+        dica: '900,00',
+        ajuda: 'Deixe vazio para não limitar.',
+        teclado: const TextInputType.numberWithOptions(decimal: true),
+        erro: _tentou ? _erroValor : null,
+        aoMudar: (_) => setState(() => _erroValor = null),
+      ),
+    ),
     const SizedBox(height: EspacosTrato.x4),
-    CampoTrato(rotulo: 'Número', controlador: _numero),
+    CampoCepAutoPreenchimento(
+      controlador: _cep,
+      servico: widget.servicoCep,
+      foco: _focoCep,
+      proximoFoco: _focoNumero,
+      aoEncontrar: (end) => setState(() {
+        if (end.logradouro.trim().isNotEmpty) _rua.text = end.logradouro;
+        if (end.bairro.trim().isNotEmpty) _bairro.text = end.bairro;
+      }),
+    ),
     const SizedBox(height: EspacosTrato.x4),
-    CampoTrato(rotulo: 'Bairro', controlador: _bairro),
+    KeyedSubtree(
+      key: _keyRua,
+      child: CampoTrato(rotulo: 'Rua', controlador: _rua, foco: _focoRua),
+    ),
+    const SizedBox(height: EspacosTrato.x4),
+    KeyedSubtree(
+      key: _keyNumero,
+      child: CampoTrato(rotulo: 'Número', controlador: _numero, foco: _focoNumero),
+    ),
+    const SizedBox(height: EspacosTrato.x4),
+    KeyedSubtree(
+      key: _keyBairro,
+      child: CampoTrato(rotulo: 'Bairro', controlador: _bairro, foco: _focoBairro),
+    ),
     if (_erro != null) ...[
       const SizedBox(height: EspacosTrato.x3),
       Text(_erro!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.vermelhoTexto)),

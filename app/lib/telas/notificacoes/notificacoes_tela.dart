@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
 import 'modelos.dart';
@@ -13,10 +14,12 @@ class NotificacoesTela extends StatelessWidget {
     this.aoAbrirDestino,
     this.comVoltar = true,
     this.atualizarACada,
+    this.atualizarQuando,
   });
 
   /// Atualiza a lista sozinha neste intervalo (aviso novo aparece sem fechar o app).
   final Duration? atualizarACada;
+  final Listenable? atualizarQuando;
 
   final ServicoNotificacoes servico;
   final ValueChanged<Notificacao>? aoAbrirDestino;
@@ -30,13 +33,21 @@ class NotificacoesTela extends StatelessWidget {
       child: CarregadorTela<List<Notificacao>>(
         carregar: servico.listar,
         atualizarACada: atualizarACada,
-        construir: (context, itens, _) => itens.isEmpty
-            ? const EstadoVazio(
-                icone: Icons.notifications_none,
-                titulo: 'Nada por aqui',
-                texto: 'Quando houver novidades dos seus pedidos, elas aparecem aqui.',
-              )
-            : _ListaNotificacoes(servico: servico, itens: itens, aoAbrirDestino: aoAbrirDestino),
+        atualizarQuando: atualizarQuando,
+        construir: (context, itens, _) {
+          final recarregar = AtualizadorTela.de(context);
+          if (itens.isEmpty) {
+            const vazio = EstadoVazio(
+              icone: Icons.notifications_none,
+              titulo: 'Nada por aqui',
+              texto: 'Quando houver novidades dos seus pedidos, elas aparecem aqui.',
+            );
+            return recarregar == null
+                ? vazio
+                : RefreshIndicator(onRefresh: recarregar, child: vazio);
+          }
+          return _ListaNotificacoes(servico: servico, itens: itens, aoAbrirDestino: aoAbrirDestino);
+        },
       ),
     );
   }
@@ -105,13 +116,20 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
         ),
         const SizedBox(height: EspacosTrato.x2),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
-            itemCount: _itens.length,
-            separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
-            itemBuilder: (_, i) =>
-                _LinhaNotificacao(item: _itens[i], aoTocar: () => _abrir(_itens[i])),
-          ),
+          child: () {
+            final recarregar = AtualizadorTela.de(context);
+            final lista = ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+              itemCount: _itens.length,
+              separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+              itemBuilder: (_, i) =>
+                  _LinhaNotificacao(item: _itens[i], aoTocar: () => _abrir(_itens[i])),
+            );
+            return recarregar == null
+                ? lista
+                : RefreshIndicator(onRefresh: recarregar, child: lista);
+          }(),
         ),
       ],
     );

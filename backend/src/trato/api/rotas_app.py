@@ -400,6 +400,7 @@ class OrcamentoEnviadoOut(BaseModel):
     versao: int
     valor_centavos: int
     enviado_em: datetime | None
+    prazo_execucao_dias: int | None = None
     situacao: Literal["aguardando", "aceito", "encerrado"] = Field(
         description="`aguardando`: o cliente ainda decide. `aceito`: virou contrato. "
         "`encerrado`: o cliente escolheu outro orçamento ou o pedido acabou."
@@ -439,6 +440,7 @@ def meus_orcamentos(
                 versao=o.versao,
                 valor_centavos=o.valor_centavos,
                 enviado_em=o.enviado_em,
+                prazo_execucao_dias=o.prazo_execucao_dias,
                 situacao=situacao,
             )
         )

@@ -22,6 +22,7 @@ import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import 'package:trato/telas/orcamentos/orcamentos_recebidos_tela.dart';
 import 'package:trato/telas/ajuda/ajuda_tela.dart';
+import 'package:trato/telas/comuns/sucesso_acao_tela.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
 import 'package:trato/telas/pagamento/pagamento_tela.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro_profissional_tela.dart';
@@ -277,7 +278,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'A tinta descascou perto do rodapé.');
     await _tocar(tester, 'Enviar');
 
-    expect(find.text('Pedido de retrabalho enviado.'), findsOneWidget);
+    expect(find.byType(SucessoAcaoTela), findsOneWidget);
+    expect(find.text('Pedido de retrabalho enviado!'), findsOneWidget);
   });
 
   testWidgets('chat: persiste mensagens e fotos enviadas e abre pelo profissional', (tester) async {

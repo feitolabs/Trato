@@ -5,6 +5,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../cliente/modelos.dart' show formatarNota;
+import '../comuns/foco_rolagem.dart';
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
 import 'modelos.dart';
@@ -49,15 +50,25 @@ class DetalheOrcamentoTela extends StatefulWidget {
 }
 
 class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
+  final _scroll = ScrollController();
+  final _keyAceite = GlobalKey();
   var _leu = false;
   var _tentou = false;
   var _aceitando = false;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   Future<void> _aceitar() async {
     if (_aceitando) return;
     setState(() => _tentou = true);
     if (!_leu) {
-      // O aviso da caixa fica abaixo da dobra: sem isto o botão parece não responder.
+      focarPrimeiroErro([
+        EntradaCampoErro(key: _keyAceite, temErro: () => !_leu),
+      ]);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -82,6 +93,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
     final secundario = TipografiaTrato.corpoPequeno
         .copyWith(color: CoresTrato.textoSecundario);
     return EstruturaPedido(
+      scrollController: _scroll,
       tituloBarra:
           widget.contrato ? 'Contrato do serviço' : 'Válido até ${d.validoAte}',
       acoesBarra: [
@@ -212,12 +224,14 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
         Card(
           child: Column(
             children: [
-              _BlocoRegra(
-                icone: Icons.calendar_today_outlined,
-                titulo: d.agendaTitulo,
-                texto: d.agendaDetalhe,
-              ),
-              const Divider(height: 1),
+              if (d.agendaTitulo.trim().isNotEmpty) ...[
+                _BlocoRegra(
+                  icone: Icons.calendar_today_outlined,
+                  titulo: d.agendaTitulo,
+                  texto: d.agendaDetalhe,
+                ),
+                const Divider(height: 1),
+              ],
               _BlocoRegra(
                 icone: Icons.verified_user_outlined,
                 titulo: d.garantiaTitulo,
@@ -261,32 +275,45 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
           ),
         ] else ...[
           const SizedBox(height: EspacosTrato.x4),
-          MergeSemantics(
-              child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox(
-                  value: _leu,
-                  onChanged: (v) => setState(() => _leu = v ?? false)),
-              const SizedBox(width: EspacosTrato.x2),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: EspacosTrato.x3),
-                  child: Text(
-                    'Li o escopo, a garantia e as regras de cancelamento. '
-                    'Ao aceitar, este orçamento vira o contrato do serviço.',
-                    style: TipografiaTrato.corpo,
+          KeyedSubtree(
+            key: _keyAceite,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _leu = !_leu),
+                  child: MergeSemantics(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                            value: _leu,
+                            onChanged: (v) => setState(() => _leu = v ?? false)),
+                        const SizedBox(width: EspacosTrato.x2),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: EspacosTrato.x3),
+                            child: Text(
+                              'Li o escopo, a garantia e as regras de cancelamento. '
+                              'Ao aceitar, este orçamento vira o contrato do serviço.',
+                              style: TipografiaTrato.corpo,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          )),
-          if (_tentou && !_leu)
-            Text(
-              'Marque que leu para aceitar o orçamento.',
-              style: TipografiaTrato.legenda
-                  .copyWith(color: CoresTrato.vermelhoTexto),
+                if (_tentou && !_leu)
+                  Text(
+                    'Marque que leu para aceitar o orçamento.',
+                    style: TipografiaTrato.legenda
+                        .copyWith(color: CoresTrato.vermelhoTexto),
+                  ),
+              ],
             ),
+          ),
         ],
       ],
     );
@@ -414,7 +441,7 @@ class _SecoesDoContrato extends StatelessWidget {
           else
             for (final a in dados.aditivos) linha(a.rotulo, a.valor),
           Text(
-            'O valor fica retido pelo parceiro de pagamento e só é liberado ao profissional '
+            'O valor fica retido pelo processamento do app e só é liberado ao profissional '
             'depois que você confirma o serviço.',
             style: secundario,
           ),

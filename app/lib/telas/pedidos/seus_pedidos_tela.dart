@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
+import '../comuns/foco_rolagem.dart';
 import 'modelos.dart';
 
-/// Tela 15 — Seus pedidos, com abas "Em andamento" e "Finalizados".
-/// A barra inferior fica por conta do esqueleto do app (quem liga as telas).
+/// Tela 15 — Seus pedidos, com abas "Em andamento" e "Finalizados", busca e atualização.
 class SeusPedidosTela extends StatefulWidget {
   const SeusPedidosTela({
     super.key,
@@ -24,44 +25,101 @@ class SeusPedidosTela extends StatefulWidget {
 }
 
 class _SeusPedidosTelaState extends State<SeusPedidosTela> {
+  final _busca = TextEditingController();
   bool _verFinalizados = false;
 
   @override
+  void dispose() {
+    _busca.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final pedidos = _verFinalizados ? widget.finalizados : widget.emAndamento;
+    final pedidosDaAba = _verFinalizados ? widget.finalizados : widget.emAndamento;
+    final termo = normalizarTextoBusca(_busca.text);
+    final pedidos = termo.isEmpty
+        ? pedidosDaAba
+        : [
+            for (final p in pedidosDaAba)
+              if (normalizarTextoBusca(p.titulo).contains(termo) ||
+                  normalizarTextoBusca(p.subtitulo).contains(termo) ||
+                  normalizarTextoBusca(p.profissionalNome).contains(termo) ||
+                  normalizarTextoBusca(p.statusTexto).contains(termo))
+                p,
+          ];
+    final recarregar = AtualizadorTela.de(context);
+    final mostrarBusca = widget.emAndamento.isNotEmpty ||
+        widget.finalizados.isNotEmpty ||
+        _busca.text.isNotEmpty;
+
+    final lista = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(top: EspacosTrato.x6, bottom: EspacosTrato.x4),
+      children: [
+        Text('Seus pedidos', style: TipografiaTrato.tituloGrande),
+        const SizedBox(height: EspacosTrato.x4),
+        _Abas(
+          finalizados: _verFinalizados,
+          aoTrocar: (finalizados) => setState(() => _verFinalizados = finalizados),
+        ),
+        if (mostrarBusca) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          TextField(
+            controller: _busca,
+            style: TipografiaTrato.corpo,
+            textInputAction: TextInputAction.search,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Buscar pedido ou profissional',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _busca.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Limpar',
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () {
+                        _busca.clear();
+                        setState(() {});
+                      },
+                    ),
+            ),
+          ),
+        ],
+        const SizedBox(height: EspacosTrato.x4),
+        if (pedidosDaAba.isEmpty)
+          EstadoVazio(
+            icone: _verFinalizados ? Icons.task_alt_outlined : Icons.assignment_outlined,
+            titulo: _verFinalizados
+                ? 'Nenhum serviço finalizado ainda'
+                : 'Nenhum pedido em andamento',
+            texto: _verFinalizados
+                ? 'Os serviços concluídos ou cancelados aparecem aqui.'
+                : 'Toque em "Início" e peça um orçamento para começar.',
+          )
+        else if (pedidos.isEmpty)
+          EstadoVazio(
+            icone: Icons.search_off,
+            titulo: 'Nenhum pedido encontrado',
+            texto: 'Não achamos "${_busca.text.trim()}" nesta aba.',
+          )
+        else
+          for (final pedido in pedidos) ...[
+            _CartaoPedido(
+              pedido: pedido,
+              aoTocar: () => widget.aoAbrirPedido?.call(pedido),
+            ),
+            const SizedBox(height: EspacosTrato.x4),
+          ],
+      ],
+    );
+
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
-          child: ListView(
-            padding: const EdgeInsets.only(top: EspacosTrato.x6, bottom: EspacosTrato.x4),
-            children: [
-              Text('Seus pedidos', style: TipografiaTrato.tituloGrande),
-              const SizedBox(height: EspacosTrato.x4),
-              _Abas(
-                finalizados: _verFinalizados,
-                aoTrocar: (finalizados) => setState(() => _verFinalizados = finalizados),
-              ),
-              const SizedBox(height: EspacosTrato.x4),
-              if (pedidos.isEmpty)
-                EstadoVazio(
-                  icone: _verFinalizados ? Icons.task_alt_outlined : Icons.assignment_outlined,
-                  titulo: _verFinalizados
-                      ? 'Nenhum serviço finalizado ainda'
-                      : 'Nenhum pedido em andamento',
-                  texto: _verFinalizados
-                      ? 'Os serviços concluídos ou cancelados aparecem aqui.'
-                      : 'Toque em "Novo pedido" para pedir orçamentos.',
-                )
-              else
-                for (final pedido in pedidos) ...[
-                  _CartaoPedido(
-                    pedido: pedido,
-                    aoTocar: () => widget.aoAbrirPedido?.call(pedido),
-                  ),
-                  const SizedBox(height: EspacosTrato.x4),
-                ],
-            ],
-          ),
+          child: recarregar == null
+              ? lista
+              : RefreshIndicator(onRefresh: recarregar, child: lista),
         ),
       ),
     );

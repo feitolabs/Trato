@@ -169,17 +169,20 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     String? descricao,
     int? faixaMinCentavos,
     int? faixaMaxCentavos,
+    String? cep,
     String? logradouro,
     String? numero,
     String? bairro,
     String? complemento,
   }) async {
+    final cepLimpo = cep?.replaceAll(RegExp(r'\D'), '');
     final corpo = <String, Object?>{
       if (descricao != null) 'descricao': descricao,
       if (faixaMinCentavos != null) 'faixa_preco_min_centavos': faixaMinCentavos,
       if (faixaMaxCentavos != null) 'faixa_preco_max_centavos': faixaMaxCentavos,
       if (logradouro != null && logradouro.trim().isNotEmpty)
         'endereco': {
+          if (cepLimpo != null && cepLimpo.length == 8) 'cep': cepLimpo,
           'logradouro': logradouro.trim(),
           if (numero != null && numero.trim().isNotEmpty) 'numero': numero.trim(),
           if (bairro != null && bairro.trim().isNotEmpty) 'bairro': bairro.trim(),
@@ -699,30 +702,58 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
 
   final ClienteApi _api;
 
-  /// `POST /v1/pedidos/{id}/orcamentos/{orc}/contraproposta` `{valor_centavos, mensagem?}`.
+  /// `POST /v1/pedidos/{id}/orcamentos/{orc}/contraproposta` `{valor_centavos, prazo_execucao_dias?, mensagem?}`.
   @override
   Future<void> contraproporValor(
     String pedidoId,
     String orcamentoId,
     int valorCentavos, {
+    int? prazoExecucaoDias,
     String? mensagem,
   }) async {
     await _api.post(
       '/v1/pedidos/$pedidoId/orcamentos/$orcamentoId/contraproposta',
       corpo: {
         'valor_centavos': valorCentavos,
+        if (prazoExecucaoDias != null) 'prazo_execucao_dias': prazoExecucaoDias,
         if (mensagem != null && mensagem.trim().isNotEmpty) 'mensagem': mensagem.trim(),
       },
     );
   }
 
-  /// `POST .../contraproposta/aceitar` `{valor_centavos}`: nova versão do orçamento.
+  /// `POST .../contraproposta/aceitar` `{valor_centavos, prazo_execucao_dias?}`: nova versão do orçamento.
   @override
   Future<void> aceitarContraproposta(
-      String pedidoId, String orcamentoId, int valorCentavos) async {
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    int? prazoExecucaoDias,
+  }) async {
     await _api.post(
       '/v1/pedidos/$pedidoId/orcamentos/$orcamentoId/contraproposta/aceitar',
-      corpo: {'valor_centavos': valorCentavos},
+      corpo: {
+        'valor_centavos': valorCentavos,
+        if (prazoExecucaoDias != null) 'prazo_execucao_dias': prazoExecucaoDias,
+      },
+    );
+  }
+
+  /// `POST /v1/pedidos/{id}/orcamentos/{orc}/propor` `{valor_centavos, prazo_execucao_dias?, mensagem?}`.
+  @override
+  Future<void> proporNovaCondicao(
+    String pedidoId,
+    String orcamentoId,
+    int valorCentavos, {
+    int? prazoExecucaoDias,
+    String? mensagem,
+  }) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/orcamentos/$orcamentoId/propor',
+      corpo: {
+        'valor_centavos': valorCentavos,
+        if (prazoExecucaoDias != null) 'prazo_execucao_dias': prazoExecucaoDias,
+        if (mensagem != null && mensagem.trim().isNotEmpty) 'mensagem': mensagem.trim(),
+      },
     );
   }
 
@@ -890,7 +921,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           const OpcaoPagamento(
             metodo: MetodoPagamento.cartao,
             titulo: 'Cartão',
-            descricao: 'Pagamento seguro pelo provedor.',
+            descricao: 'Pagamento seguro processado no app.',
           ),
       ],
     );
@@ -998,38 +1029,43 @@ class RepositorioChatApi implements RepositorioChat {
 
   @override
   Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId}) async {
-    final mensagens = _lista(
-      await _api.get(
-        '/v1/pedidos/$pedidoId/mensagens',
-        consulta: _consulta(profissionalId),
+    final numero = PedidoApi.numeroDe(pedidoId);
+    final ((mensagens, orcamentos), (pedidoObj, interlocutor)) = await emParalelo2(
+      emParalelo2(
+        _api.get('/v1/pedidos/$pedidoId/mensagens', consulta: _consulta(profissionalId))
+            .then(_lista),
+        _api
+            .get('/v1/pedidos/$pedidoId/orcamentos')
+            .then(_lista)
+            .catchError((Object _) => const <Map<String, dynamic>>[]),
+      ),
+      emParalelo2(
+        _api.get('/v1/pedidos/$pedidoId').then<PedidoApi?>((b) => PedidoApi.deJson(_mapa(b))).catchError((Object e) {
+          if (e is ErroTrato && e.tipo != TipoErro.naoEncontrado) throw e;
+          return null;
+        }),
+        _api
+            .get('/v1/pedidos/$pedidoId/interlocutor', consulta: _consulta(profissionalId))
+            .then<Map<String, dynamic>?>((b) => _mapa(b))
+            .catchError((Object _) => null),
       ),
     );
-    // Antes de ser contratado, o profissional conversa mas não é parte do pedido: o backend
-    // responde 404 em `GET /v1/pedidos/{id}`. O chat segue, só sem a situação do pedido.
-    final numero = PedidoApi.numeroDe(pedidoId);
-    var situacao = 'Pedido aberto';
-    try {
-      situacao = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId'))).estadoNome;
-    } on ErroTrato catch (erro) {
-      if (erro.tipo != TipoErro.naoEncontrado) rethrow;
-    }
-    // Quem está do outro lado (nome curto). Se falhar, o chat segue com o número do pedido.
+    final situacao = pedidoObj?.estadoNome ?? 'Pedido aberto';
+    final pedidoAberto = pedidoObj == null || pedidoObj.estado == 'aberto';
+    final orcamentosAtivos = {
+      for (final o in orcamentos)
+        if (o['id'] is String && o['aceito'] != true && pedidoAberto) o['id'] as String,
+    };
     var nome = 'Pedido $numero';
     var iniciais = '#';
     String? outroId;
-    try {
-      final o = _mapa(await _api.get(
-        '/v1/pedidos/$pedidoId/interlocutor',
-        consulta: _consulta(profissionalId),
-      ));
-      final n = ((o['nome'] as String?) ?? '').trim();
+    if (interlocutor != null) {
+      final n = ((interlocutor['nome'] as String?) ?? '').trim();
       if (n.isNotEmpty) {
         nome = n;
         iniciais = _iniciaisDe(n);
-        outroId = o['id'] as String?;
+        outroId = interlocutor['id'] as String?;
       }
-    } on ErroTrato {
-      // mantém o título pelo número do pedido
     }
     return ConversaPedido(
       usuarioId: outroId,
@@ -1041,6 +1077,8 @@ class RepositorioChatApi implements RepositorioChat {
         for (final m in await _comFotos(pedidoId, mensagens)) _mensagem(m),
       ],
       respostasRapidas: textos.respostasRapidas,
+      orcamentosAtivos: orcamentosAtivos,
+      pedidoAberto: pedidoAberto,
     );
   }
 
@@ -1298,14 +1336,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     return [for (final j in itens) _pedidoAberto(j)];
   }
 
-  /// A localização só serve para mostrar a distância dos pedidos. Se o aparelho demorar (permissão
-  /// sem resposta, GPS desligado, emulador), segue sem ela: antes a tela ficava no esqueleto para
-  /// sempre esperando o GPS.
+  /// A localização só serve para mostrar a distância dos pedidos (limite curto de 1,5 s para não
+  /// travar a tela inicial do profissional).
   Future<PosicaoAtual?> _posicaoRapida() async {
     final buscar = posicao;
     if (buscar == null) return null;
     try {
-      return await buscar().timeout(const Duration(seconds: 4));
+      return await buscar().timeout(const Duration(milliseconds: 1500));
     } on Object {
       return null;
     }
@@ -1314,15 +1351,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   PedidoAberto _pedidoAberto(Map<String, dynamic> j) {
     final prazo = j['prazo_desejado'] as String?;
     final urgente = j['urgente'] == true;
+    final textoData = prazo == null ? 'Sem data fixa' : 'Até ${_dia(DateTime.parse(prazo))}';
     return PedidoAberto(
       id: j['id'] as String,
       titulo: j['titulo'] as String,
       bairro: (j['bairro'] as String?) ?? '',
-      prazo: urgente
-          ? 'urgente'
-          : prazo == null
-              ? 'sem data'
-              : 'até ${_dia(DateTime.parse(prazo))}',
+      prazo: urgente ? (prazo == null ? 'Urgente' : 'Urgente · até ${_dia(DateTime.parse(prazo))}') : textoData,
       faixaMinCentavos: j['faixa_preco_min_centavos'] as int?,
       faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
       urgente: urgente,
@@ -1336,8 +1370,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   }
 
   /// Início = nome (`/v1/me`) + pedidos abertos + próximo atendimento (`/v1/pedidos`) + carteira
-  /// (`/v1/profissionais/me/saldo`). Se TUDO falhar, o erro sobe para a tela mostrar "tentar de
-  /// novo"; falha parcial mostra o que deu certo.
+  /// (`/v1/profissionais/me/saldo`), tudo em paralelo.
   @override
   Future<InicioProfissional> inicio() {
     final emVoo = _inicioEmVoo;
@@ -1352,6 +1385,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
   Future<InicioProfissional> _carregarInicio() async {
     unawaited(_reenviarFila());
+    unawaited(ConfigPublica.garantirAtualizada(_api));
     Object? primeiroErro;
     T? tentar<T>(T? Function() ler) {
       try {
@@ -1369,39 +1403,38 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     var enviados = <OrcamentoEnviado>[];
     var carteira = const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0);
     var deuCerto = false;
-    try {
-      me = _mapa(await _api.get('/v1/me'));
+
+    final futMe = _api.get('/v1/me').then((b) {
+      me = _mapa(b);
       deuCerto = true;
-    } catch (e) {
+    }).catchError((Object e) {
       primeiroErro ??= e;
-    }
-    try {
-      abertos = await pedidosAbertos(const FiltroPedidosAbertos(limite: 20));
+    });
+    final futAbertos = pedidosAbertos(const FiltroPedidosAbertos(limite: 20)).then((lista) {
+      abertos = lista;
       deuCerto = true;
-    } catch (e) {
-      // 403: cadastro ainda em análise. A tela mostra o motivo, não uma lista vazia.
-      if (e is ErroTrato && e.codigoHttp == 403) rethrow;
+    }).catchError((Object e) {
+      if (e is ErroTrato && e.codigoHttp == 403) throw e;
       primeiroErro ??= e;
-    }
-    try {
-      final saldo = _mapa(await _api.get('/v1/profissionais/me/saldo'));
+    });
+    final futSaldo = _api.get('/v1/profissionais/me/saldo').then((b) {
+      final saldo = _mapa(b);
       carteira = ResumoCarteira(
         retidoCentavos: (saldo['a_liberar_centavos'] as num?)?.toInt() ?? 0,
         paraSacarCentavos: (saldo['liberado_centavos'] as num?)?.toInt() ?? 0,
       );
       deuCerto = true;
-    } catch (e) {
+    }).catchError((Object e) {
       primeiroErro ??= e;
-    }
-    try {
-      final itensBrutos =
-          _lista(await _api.get('/v1/pedidos', consulta: const {'como': 'profissional'}));
+    });
+    final futPedidos =
+        _api.get('/v1/pedidos', consulta: const {'como': 'profissional'}).then((b) async {
+      final itensBrutos = _lista(b);
       final meus = <PedidoApi>[];
       for (final j in itensBrutos) {
         final p = tentar(() => PedidoApi.deJson(j));
         if (p != null) meus.add(p);
       }
-      // O endereço completo só existe depois da contratação: busca o de cada pedido presencial.
       final enderecos = await _enderecosDosContratados([
         for (final p in meus)
           if (_estadosDoProfissional.contains(p.estado) && !p.remoto) p.id,
@@ -1414,7 +1447,6 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
           proximo = ProximoAtendimento(
             pedidoId: p.id,
-            // Data e hora combinadas; antes de marcar a visita, diz isso em vez do nome do estado.
             quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
             titulo: p.clienteNome == null ? p.rotulo : '${p.rotulo} · ${p.clienteNome}',
             endereco: p.remoto ? 'Atendimento remoto' : (enderecos[p.id]?.enderecoCompleto ?? ''),
@@ -1426,17 +1458,17 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         }
       }
       deuCerto = true;
-    } catch (e) {
+    }).catchError((Object e) {
       primeiroErro ??= e;
-    }
-    try {
+    });
+    final futOrcamentos = _api.get('/v1/profissional/orcamentos').then((b) {
       enviados = [
-        for (final j in _lista(await _api.get('/v1/profissional/orcamentos')))
+        for (final j in _lista(b))
           if (tentar(() => _orcamentoEnviado(j)) case final o?) o,
       ];
-    } on Object {
-      // Backend sem a rota (ainda) ou fora do ar: o resto do Início segue.
-    }
+    }).catchError((Object _) {});
+
+    await Future.wait([futMe, futAbertos, futSaldo, futPedidos, futOrcamentos]);
     if (!deuCerto && primeiroErro != null) throw primeiroErro!;
     final nomeMe = ((me['nome'] as String?) ?? '').trim();
     final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
@@ -1462,6 +1494,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       versao: (j['versao'] as int?) ?? 1,
       situacao: (j['situacao'] as String?) ?? 'aguardando',
       enviadoEm: enviado == null ? null : DateTime.parse(enviado).toLocal(),
+      prazoExecucaoDias: j['prazo_execucao_dias'] as int?,
     );
   }
 
@@ -1561,16 +1594,17 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     ].join(' · ');
     return DetalhePedido(
       pedido: aberto,
-      fechaEm: 'Aberto ${_quandoRelativo(DateTime.parse(j['aberto_em'] as String))}',
+      fechaEm: 'Publicado ${_quandoRelativo(DateTime.parse(j['aberto_em'] as String))}',
       clienteResumo: resumo,
       legendasFotos: const [],
       descricao: (j['descricao'] as String?) ?? '',
       linhas: [
         LinhaDetalhe('Modalidade', aberto.remoto ? 'Remoto' : 'Presencial'),
         if (!aberto.remoto && aberto.bairro.isNotEmpty) LinhaDetalhe('Bairro', aberto.bairro),
-        // O que o cliente respondeu às perguntas da categoria.
+        // O que o cliente respondeu às perguntas da categoria (evita repetir o prazo já resumido acima).
         for (final r in _lista(j['respostas'] ?? const []))
-          LinhaDetalhe('${r['pergunta']}', textoDaResposta(r['resposta'])),
+          if ('${r['pergunta']}'.toLowerCase() != 'prazo')
+            LinhaDetalhe('${r['pergunta']}', textoDaResposta(r['resposta'])),
       ],
     );
   }
@@ -1812,7 +1846,7 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
       '/v1/pedidos/$id/orcamentos',
       corpo: {
         'itens': itens,
-        'prazo_execucao_dias': 3,
+        'prazo_execucao_dias': pronto.prazoExecucaoDias,
         'validade_ate': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
         'sinal_material_centavos': sinal,
         'garantia_dias': pronto.garantiaDias,
