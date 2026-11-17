@@ -130,13 +130,18 @@ class PedidosPostgres:
         achado = como_uuid(usuario_id)
         if achado is None:
             return ()
-        campo = "p.cliente_id" if como_cliente else "c.profissional_id"
         limite_efetivo = max(1, min(limite, 200))
         offset_efetivo = max(0, offset)
+        if como_cliente:
+            filtro = "p.cliente_id = %s"
+            params: tuple[Any, ...] = (achado, limite_efetivo, offset_efetivo)
+        else:
+            filtro = "c.profissional_id = %s and p.cliente_id <> %s"
+            params = (achado, achado, limite_efetivo, offset_efetivo)
         with self._banco.transacao() as con:
             linhas = con.execute(
-                f"{_SELECT_PEDIDO} where {campo} = %s order by p.criado_em desc limit %s offset %s",  # noqa: S608
-                (achado, limite_efetivo, offset_efetivo),
+                f"{_SELECT_PEDIDO} where {filtro} order by p.criado_em desc limit %s offset %s",  # noqa: S608
+                params,
             ).fetchall()
         return tuple(self._montar(linha) for linha in linhas)
 

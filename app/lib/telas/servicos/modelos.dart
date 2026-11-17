@@ -57,12 +57,16 @@ class DetalheServico {
     this.descricao,
     this.remoto = false,
     this.local,
+    this.codigoInicio,
     this.codigoConclusao,
     this.jaAvaliou = false,
   });
 
   /// Já avaliou: a ação "Avaliar o serviço" some.
   final bool jaAvaliou;
+
+  /// Código que o cliente passa ao profissional para começar o atendimento.
+  final String? codigoInicio;
 
   /// Código que o cliente passa ao profissional para encerrar o serviço (só em andamento).
   final String? codigoConclusao;

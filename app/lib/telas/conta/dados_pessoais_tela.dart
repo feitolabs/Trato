@@ -96,6 +96,7 @@ class _FormularioState extends State<_Formulario> {
 
   String? _erroCpf;
   String? _erroTelefone;
+  String? _erroNascimento;
   String? _erroEnderecoGeral;
   var _salvando = false;
   String? _erro;
@@ -161,13 +162,22 @@ class _FormularioState extends State<_Formulario> {
 
   Future<void> _escolherData() async {
     final hoje = DateTime.now();
+    final limite18 = DateTime(hoje.year - 18, hoje.month, hoje.day);
+    final padrao = DateTime(hoje.year - 30, hoje.month, hoje.day);
+    final inicial =
+        _nascimento != null && !_nascimento!.isAfter(limite18) ? _nascimento! : padrao;
     final data = await showDatePicker(
       context: context,
-      initialDate: _nascimento ?? DateTime(hoje.year - 30),
+      initialDate: inicial,
       firstDate: DateTime(1900),
-      lastDate: hoje,
+      lastDate: limite18,
     );
-    if (data != null) setState(() => _nascimento = data);
+    if (data != null) {
+      setState(() {
+        _nascimento = data;
+        _erroNascimento = null;
+      });
+    }
   }
 
   bool get _temDadosEndereco =>
@@ -198,8 +208,20 @@ class _FormularioState extends State<_Formulario> {
     }
     final semCpf = (widget.dados.cpfFinal ?? '').isEmpty;
     final cpfDigitos = _cpf.text.replaceAll(RegExp(r'\D'), '');
-    if (semCpf && (cpfDigitos.isNotEmpty || digitos.isNotEmpty)) {
+    if (semCpf) {
       errCpf = ValidacaoAuth.cpf(_cpf.text);
+    }
+    String? errNasc;
+    if (_nascimento != null) {
+      final hoje = DateTime.now();
+      var idade = hoje.year - _nascimento!.year;
+      if (hoje.month < _nascimento!.month ||
+          (hoje.month == _nascimento!.month && hoje.day < _nascimento!.day)) {
+        idade--;
+      }
+      if (idade < 18) {
+        errNasc = 'O cadastro é exclusivo para maiores de 18 anos.';
+      }
     }
 
     final cepDigitos = _cep.text.replaceAll(RegExp(r'\D'), '');
@@ -222,12 +244,13 @@ class _FormularioState extends State<_Formulario> {
     setState(() {
       _erroCpf = errCpf;
       _erroTelefone = errTel;
+      _erroNascimento = errNasc;
       _erroEnderecoGeral = erroEnd;
       _erro = null;
       _aviso = null;
     });
 
-    if (errCpf != null || errTel != null || erroEnd != null) {
+    if (errCpf != null || errTel != null || errNasc != null || erroEnd != null) {
       focarPrimeiroErro([
         EntradaCampoErro(key: _keyCpf, focusNode: _focoCpf, temErro: () => _erroCpf != null),
         EntradaCampoErro(key: _keyTelefone, focusNode: _focoTelefone, temErro: () => _erroTelefone != null),
@@ -251,7 +274,7 @@ class _FormularioState extends State<_Formulario> {
         telefone: digitos.isEmpty ? null : digitos,
         nascimento: _nascimento,
         removerTelefone: digitos.isEmpty && (widget.dados.telefone ?? '').isNotEmpty,
-        removerNascimento: _nascimento == null && widget.dados.dataNascimento != null,
+        removerNascimento: false,
       );
       if (validarEndereco) {
         await widget.servico.salvarEndereco(EnderecoSalvo(
@@ -338,20 +361,17 @@ class _FormularioState extends State<_Formulario> {
         const SizedBox(height: EspacosTrato.x4),
         Text('Data de nascimento', style: TipografiaTrato.corpoPequeno),
         const SizedBox(height: EspacosTrato.x1),
-        Row(
-          children: [
-            Expanded(
-              child: BotaoSecundario(
-                texto: _nascimento == null ? 'Escolher data' : _data(_nascimento!),
-                aoTocar: _escolherData,
-              ),
-            ),
-            if (_nascimento != null) ...[
-              const SizedBox(width: EspacosTrato.x2),
-              BotaoLink(texto: 'Limpar', aoTocar: () => setState(() => _nascimento = null)),
-            ],
-          ],
+        BotaoSecundario(
+          texto: _nascimento == null ? 'Escolher data' : _data(_nascimento!),
+          aoTocar: _escolherData,
         ),
+        if (_erroNascimento != null) ...[
+          const SizedBox(height: EspacosTrato.x1),
+          Text(
+            _erroNascimento!,
+            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x6),
         Text('ENDEREÇO PRINCIPAL', style: TipografiaTrato.sobretitulo),
         const SizedBox(height: EspacosTrato.x2),

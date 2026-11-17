@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 from admin_ambiente import adm  # noqa: F401
@@ -13,9 +13,11 @@ from test_fluxo_pagamento_e2e import Fluxo, fluxo  # noqa: F401
 
 from trato.api.admin.repositorios import FiltroAuditoria
 from trato.api.auth import PapelUsuario
-from trato.api.repositorios_app import NotaMaterial, PerfilDetalhe
+from trato.api.repositorios import Orcamento
+from trato.api.repositorios_app import DocumentoVerificacao, NotaMaterial, PerfilDetalhe
 from trato.api.rotas_profissional_cadastro import modulo_em_memoria
-from trato.pedidos.estados import Estado
+from trato.pedidos import estados
+from trato.pedidos.estados import Ator, Estado, Papel
 from trato.profissional.repositorio import (
     JanelaSemanal,
     PerfilProfissional,
@@ -158,3 +160,129 @@ def test_pedido_out_inclui_profissional_nome_abreviado_para_o_cliente(amb):
     r = amb.cliente.get("/v1/pedidos/ped-1", headers=cab("t-cliente"))
     assert r.status_code == 200
     assert r.json()["profissional_nome"] == "Carlos S."
+
+
+def test_maioridade_18_anos_no_cadastro_e_dados_pessoais(amb):
+    hoje = date.today()
+    menor = date(hoje.year - 17, hoje.month, hoje.day).isoformat()
+    r_menor = amb.cliente.post(
+        "/v1/cadastro/vincular",
+        json={
+            "usuario_id": "cli-1",
+            "email": "menor@email.com",
+            "nome": "Menor Idade",
+            "cpf": "123.456.789-09",
+            "data_nascimento": menor,
+        },
+    )
+    assert r_menor.status_code == 422
+    r_patch_menor = amb.cliente.patch(
+        "/v1/me/dados-pessoais",
+        json={"data_nascimento": menor},
+        headers=cab("t-cliente"),
+    )
+    assert r_patch_menor.status_code == 422
+    adulto = "1995-05-10"
+    assert (
+        amb.cliente.patch(
+            "/v1/me/dados-pessoais",
+            json={"data_nascimento": adulto},
+            headers=cab("t-cliente"),
+        ).status_code
+        == 200
+    )
+    r_remover = amb.cliente.patch(
+        "/v1/me/dados-pessoais",
+        json={"remover_data_nascimento": True},
+        headers=cab("t-cliente"),
+    )
+    assert r_remover.status_code == 422
+
+
+def test_isolamento_cliente_profissional_na_busca_orcamentos_pedidos_e_chat(amb):
+    mod = modulo_em_memoria(amb.cliente.app)
+    mod.catalogo.categorias["cat-1"] = "eletrica"
+    mod.catalogo.nomes["cat-1"] = "Elétrica"
+    mod.catalogo.cidades.add("bh")
+    mod.repo.salvar(
+        PerfilProfissional(
+            PROFISSIONAL.id,
+            "aprovado",
+            "Eletricista",
+            ("cat-1",),
+            (Regiao("bh"),),
+            (),
+            (),
+            AGORA,
+        )
+    )
+    amb.contexto.usuarios.adicionar(
+        PerfilDetalhe(PROFISSIONAL.id, "Carlos Pro", PapelUsuario.PROFISSIONAL, "ativo", "verificado")
+    )
+    # Outro usuário enxerga na busca; o próprio usuário NÃO se vê na busca.
+    outros = amb.cliente.get("/v1/profissionais", headers=cab("t-cliente")).json()["itens"]
+    proprios = amb.cliente.get("/v1/profissionais", headers=cab("t-prof")).json()["itens"]
+    assert any(i["id"] == PROFISSIONAL.id for i in outros)
+    assert all(i["id"] != PROFISSIONAL.id for i in proprios)
+
+    # Pedido criado pelo próprio usuário (mesmo id como cliente e profissional) não aparece para ele como profissional.
+    amb.contexto.pedidos.salvar(
+        estados.abrir_pedido("ped-auto", Ator(Papel.CLIENTE, PROFISSIONAL.id), AGORA)
+    )
+    amb.contexto.orcamentos.adicionar(Orcamento("orc-auto", "ped-auto", PROFISSIONAL.id, 10000))
+    assert amb.cliente.get("/v1/profissional/orcamentos", headers=cab("t-prof")).json() == []
+    assert amb.cliente.get("/v1/pedidos?como=profissional", headers=cab("t-prof")).json() == []
+
+    # Cliente tentando abrir conversa com o próprio id recebe 403.
+    amb.semear_pedido(Estado.ABERTO)
+    r_chat = amb.cliente.post(
+        f"/v1/pedidos/ped-1/mensagens?profissional_id={CLIENTE.id}",
+        json={"texto": "Oi"},
+        headers=cab("t-cliente"),
+    )
+    assert r_chat.status_code == 403
+
+
+def test_trava_categorias_apos_verificacao_e_aprovacao(amb):
+    mod = modulo_em_memoria(amb.cliente.app)
+    mod.catalogo.categorias.update({"cat-1": "eletrica", "cat-2": "encanador"})
+    mod.catalogo.nomes.update({"cat-1": "Elétrica", "cat-2": "Encanador"})
+    mod.catalogo.cidades.add("bh")
+
+    assert (
+        amb.cliente.post(
+            "/v1/profissional/cadastro",
+            json={"categorias": ["cat-1"], "regioes": [{"cidade_id": "bh"}]},
+            headers=cab("t-prof"),
+        ).status_code
+        == 201
+    )
+    # Ainda em análise e sem verificação: pode editar categorias.
+    ok_antes = amb.cliente.patch(
+        "/v1/profissional/perfil",
+        json={"categorias": ["cat-2"]},
+        headers=cab("t-prof"),
+    )
+    assert ok_antes.status_code == 200 and ok_antes.json()["categorias"] == ["cat-2"]
+
+    # Enviou documentos para verificação: não pode mais trocar categorias, mas pode atualizar bio.
+    amb.contexto.verificacoes.enviar(
+        PROFISSIONAL.id,
+        "verificado",
+        (DocumentoVerificacao("documento_frente", f"verificacao/{PROFISSIONAL.id}/doc.jpg"),),
+        AGORA,
+    )
+    bloqueado = amb.cliente.patch(
+        "/v1/profissional/perfil",
+        json={"categorias": ["cat-1"]},
+        headers=cab("t-prof"),
+    )
+    assert bloqueado.status_code == 409
+    assert (
+        amb.cliente.patch(
+            "/v1/profissional/perfil",
+            json={"bio": "Bio atualizada"},
+            headers=cab("t-prof"),
+        ).status_code
+        == 200
+    )

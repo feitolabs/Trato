@@ -565,7 +565,7 @@ void main() {
       expect(i.carteira.paraSacarCentavos, 6789);
     });
 
-    test('início: cadastro em análise (403) mostra o motivo, não lista vazia', () async {
+    test('início: cadastro em análise (403) devolve emAnalise sem travar a tela', () async {
       final (api, _) = _api({
         'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos', 'papel': 'cliente'}),
         'GET /v1/profissional/pedidos-abertos': (
@@ -574,10 +574,10 @@ void main() {
         ),
       });
 
-      await expectLater(
-        RepositorioProfissionalApi(api).inicio(),
-        throwsA(isA<ErroTrato>().having((e) => e.mensagem, 'mensagem', contains('em análise'))),
-      );
+      final i = await RepositorioProfissionalApi(api).inicio();
+      expect(i.emAnalise, isTrue);
+      expect(i.pedidos, isEmpty);
+      expect(i.nome, 'Carlos');
     });
 
     test('início: se tudo falhar o erro sobe (a tela mostra "tentar de novo")', () async {

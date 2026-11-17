@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
+import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
 import 'pecas_profissional.dart';
 
@@ -69,25 +70,6 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                         ],
                       ),
                     ),
-                    if (widget.aoUsarComoCliente != null) ...[
-                      const SizedBox(width: EspacosTrato.x2),
-                      Semantics(
-                        button: true,
-                        label: 'Trocar para modo cliente',
-                        child: Material(
-                          color: CoresTrato.superficie,
-                          shape: const CircleBorder(side: BorderSide(color: CoresTrato.borda)),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: widget.aoUsarComoCliente,
-                            child: const SizedBox.square(
-                              dimension: 48,
-                              child: Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                     if (widget.aoAbrirNotificacoes != null) ...[
                       const SizedBox(width: EspacosTrato.x2),
                       Semantics(
@@ -109,6 +91,15 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                     ],
                   ],
                 ),
+                if (dados.emAnalise) ...[
+                  const SizedBox(height: EspacosTrato.x4),
+                  const AvisoFaixa(
+                    texto:
+                        'Seu cadastro está em análise. Assim que sua verificação for aprovada, os pedidos da sua região aparecerão aqui.',
+                    tipo: TipoStatus.info,
+                    icone: Icons.hourglass_top_outlined,
+                  ),
+                ],
                 // Só aparece quando alguém grava a escolha: o backend ainda não tem "disponível agora",
                 // e um interruptor que não grava em lugar nenhum engana o profissional.
                 if (widget.aoAlterarDisponivel != null) ...[
@@ -135,15 +126,26 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x2),
-                for (final pedido in dados.pedidos) ...[
-                  CartaoPedidoAberto(
-                    pedido: pedido,
-                    aoTocar: widget.aoAbrirPedido == null
-                        ? null
-                        : () => widget.aoAbrirPedido!(pedido),
-                  ),
-                  const SizedBox(height: EspacosTrato.x3),
-                ],
+                if (dados.pedidos.isEmpty)
+                  CartaoTrato(
+                    child: Text(
+                      dados.emAnalise
+                          ? 'Assim que seu cadastro for aprovado, os pedidos disponíveis aparecerão aqui.'
+                          : 'Nenhum pedido aberto na sua região no momento.',
+                      style: TipografiaTrato.corpoPequeno
+                          .copyWith(color: CoresTrato.textoSecundario),
+                    ),
+                  )
+                else
+                  for (final pedido in dados.pedidos) ...[
+                    CartaoPedidoAberto(
+                      pedido: pedido,
+                      aoTocar: widget.aoAbrirPedido == null
+                          ? null
+                          : () => widget.aoAbrirPedido!(pedido),
+                    ),
+                    const SizedBox(height: EspacosTrato.x3),
+                  ],
               ],
             ),
           );
@@ -240,7 +242,9 @@ class _CartaoProximo extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x4),
           BotaoSecundario(
-            texto: proximo.emAndamento ? 'Gerenciar serviço (check-out)' : 'Fazer check-in',
+            texto: proximo.precisaAgendarVisita
+                ? 'Marcar data da visita'
+                : (proximo.emAndamento ? 'Gerenciar serviço (check-out)' : 'Fazer check-in'),
             aoTocar: aoFazerCheckIn ?? () {},
           ),
         ],

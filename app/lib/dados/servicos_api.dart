@@ -94,11 +94,29 @@ class ServicoAditivoApi implements ServicoAditivo {
     return null;
   }
 
-  /// `GET /v1/contratos/{id}/aditivos`: o aditivo proposto, ou `null` se não há nenhum.
+  /// `GET /v1/contratos/{id}/aditivos`: o aditivo proposto, ou o último decidido (`aprovado`,
+  /// `pago` ou `recusado`). `null` se não houver nenhum.
   @override
   Future<DetalheAditivo?> carregar(String aditivoId) async {
-    final a = await _aberto(aditivoId);
-    if (a == null) return null;
+    final todos = _lista(await _api.get('/v1/contratos/$aditivoId/aditivos'));
+    if (todos.isEmpty) return null;
+    Map<String, dynamic>? escolhido;
+    for (final a in todos) {
+      if (a['estado'] == 'proposto') {
+        escolhido = a;
+        break;
+      }
+    }
+    escolhido ??= todos.reversed.firstWhere(
+      (a) => const {'aprovado', 'pago', 'recusado'}.contains(a['estado']),
+      orElse: () => todos.last,
+    );
+    final a = escolhido;
+    final estado = switch (a['estado']) {
+      'aprovado' || 'pago' => EstadoAditivo.aprovado,
+      'recusado' => EstadoAditivo.recusado,
+      _ => EstadoAditivo.aguardando,
+    };
     // Quem pediu e qual pedido: sem rede para isso, o texto cai no genérico.
     var nome = nomeProfissional;
     if (nome.isEmpty) {
@@ -117,6 +135,7 @@ class ServicoAditivoApi implements ServicoAditivo {
       profissional: nome,
       motivo: a['descricao'] as String,
       valorCentavos: a['valor_centavos'] as int,
+      estado: estado,
     );
   }
 
@@ -482,6 +501,9 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       portfolio: portfolio,
       atendePresencial: p['atende_presencial'] as bool? ?? true,
       atendeRemoto: p['atende_remoto'] as bool? ?? false,
+      categoriasTravadas: (p['status'] as String?) == 'aprovado' ||
+          (p['nivel_verificacao'] as String?) == 'verificado' ||
+          const {'enviada', 'em_analise', 'aprovada'}.contains(p['status_verificacao']),
     );
   }
 

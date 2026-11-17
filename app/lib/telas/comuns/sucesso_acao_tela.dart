@@ -39,6 +39,8 @@ class SucessoAcaoTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sair = aoTocarPrimario ?? aoVoltarInicio;
+    final secundario =
+        aoTocarSecundario ?? (aoTocarPrimario != null ? aoVoltarInicio : null);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -117,11 +119,12 @@ class SucessoAcaoTela extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           BotaoPrimario(texto: textoBotaoPrimario, aoTocar: sair),
-                          if (textoBotaoSecundario != null && aoTocarSecundario != null) ...[
+                          if (textoBotaoSecundario != null &&
+                              secundario != null) ...[
                             const SizedBox(height: EspacosTrato.x2),
                             BotaoSecundario(
                               texto: textoBotaoSecundario!,
-                              aoTocar: aoTocarSecundario,
+                              aoTocar: secundario,
                             ),
                           ],
                         ],

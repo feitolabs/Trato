@@ -306,19 +306,31 @@ def meu_perfil_profissional(
 def editar_perfil(
     corpo: PerfilEditarIn,
     usuario: Usuario = Depends(_pessoa),
+    contexto: Contexto = Depends(obter_contexto),
     modulo: Modulo = Depends(obter_modulo),
 ) -> PerfilProfissionalOut:
     atual = _perfil_do_usuario(modulo, usuario)
     enviados = corpo.model_fields_set
+    categorias = atual.categorias
+    if corpo.categorias is not None:
+        novas = _categorias(modulo, corpo.categorias)
+        travado = atual.status == "aprovado" or any(
+            v.status in ("enviada", "em_analise", "aprovada")
+            for v in contexto.verificacoes.da_pessoa(usuario.id)
+        )
+        if travado and set(novas) != set(atual.categorias):
+            raise HTTPException(
+                409,
+                "Suas categorias estão vinculadas à sua verificação e não podem ser alteradas.",
+            )
+        categorias = novas
     novo = PerfilProfissional(
         usuario_id=atual.usuario_id,
         status=atual.status,
         nivel_verificacao=atual.nivel_verificacao,
         criado_em=atual.criado_em,
         bio=_bio(modulo, corpo.bio) if "bio" in enviados else atual.bio,
-        categorias=_categorias(modulo, corpo.categorias)
-        if corpo.categorias is not None
-        else atual.categorias,
+        categorias=categorias,
         regioes=_regioes(modulo, corpo.regioes) if corpo.regioes is not None else atual.regioes,
         disponibilidade=_disponibilidade(modulo, corpo.disponibilidade)
         if corpo.disponibilidade is not None
@@ -482,7 +494,7 @@ def buscar_profissionais(
     atende_remoto: Annotated[bool | None, Query()] = None,
     pagina: Annotated[int, Query(ge=1, le=1000)] = 1,
     limite: Annotated[int, Query(ge=1, le=50)] = 20,
-    _: Usuario = Depends(_pessoa),
+    usuario: Usuario = Depends(_pessoa),
     contexto: Contexto = Depends(obter_contexto),
     modulo: Modulo = Depends(obter_modulo),
 ) -> BuscaProfissionaisOut:
@@ -505,6 +517,7 @@ def buscar_profissionais(
         texto=q,
         categorias_texto=_categorias_por_tokens(modulo, tokens_texto),
         cidades_texto=_cidades_por_tokens(modulo, tokens_texto),
+        excluir_usuario_id=usuario.id,
         limite=limite,
         deslocamento=(pagina - 1) * limite,
     )

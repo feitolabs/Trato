@@ -127,6 +127,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   late InicioProfissional _inicio = widget.inicio;
   var _filtro = const FiltroPedidosAbertos();
   var _carregandoPedidos = false;
+  DateTime? _ultimaAtualizacaoAba;
   RelogioDeAtualizacao? _relogio;
 
   @override
@@ -191,12 +192,15 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
   }
 
   void _ir(int indice) {
-    final mudou = _aba != indice;
+    if (_aba == indice) return;
     setState(() {
       _aba = indice;
       _visitadas.add(indice);
     });
-    if (mudou) {
+    final agora = DateTime.now();
+    if (_ultimaAtualizacaoAba == null ||
+        agora.difference(_ultimaAtualizacaoAba!) >= const Duration(milliseconds: 1500)) {
+      _ultimaAtualizacaoAba = agora;
       if (widget.recarregarInicio != null) _atualizarEmSilencio();
       RotasTrato.pedidosMudaram.value++;
     }

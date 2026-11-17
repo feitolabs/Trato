@@ -221,6 +221,11 @@ class ProfissionaisPostgres:
     ) -> tuple[list[ResultadoBusca], int]:
         onde = ["p.status = 'aprovado'", "u.status = 'ativo'"]
         params: list[Any] = []
+        if filtro.excluir_usuario_id:
+            excluir_uuid = como_uuid(filtro.excluir_usuario_id)
+            if excluir_uuid is not None:
+                onde.append("p.usuario_id <> %s")
+                params.append(excluir_uuid)
         if filtro.categoria_ids is not None:
             ids = [i for i in map(como_uuid, filtro.categoria_ids) if i]
             onde.append(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../auth/servico_auth.dart';
 import '../componentes/componentes.dart';
 import '../telas/agenda/modelos.dart';
 import '../telas/cliente/modelos.dart';
@@ -72,10 +73,21 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   RepositorioCatalogoApi(this._api);
 
   final ClienteApi _api;
+  Future<List<CategoriaServico>>? _categoriasEmVoo;
 
   /// Só o que está no banco, em ordem alfabética PT-BR. Sem rede, o erro vai para a tela ("Tentar de novo").
   @override
-  Future<List<CategoriaServico>> categorias() async {
+  Future<List<CategoriaServico>> categorias() {
+    final ativo = _categoriasEmVoo;
+    if (ativo != null) return ativo;
+    final busca = _carregarCategorias();
+    _categoriasEmVoo = busca;
+    return busca.whenComplete(() {
+      if (identical(_categoriasEmVoo, busca)) _categoriasEmVoo = null;
+    });
+  }
+
+  Future<List<CategoriaServico>> _carregarCategorias() async {
     final resposta = await _api.get('/v1/catalogo/categorias');
     final itens = (resposta as List? ?? const []).cast<Map<String, dynamic>>();
     _nomesCategorias = {
@@ -178,9 +190,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       _carregarNomesCategorias(),
     );
     final resposta = _mapa(bruto);
+    final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id;
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
-        _converterBusca(item as Map<String, dynamic>),
+        if (item is Map<String, dynamic> && (meuId == null || item['id'] != meuId))
+          _converterBusca(item),
     ];
   }
 
@@ -193,9 +207,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       _carregarNomesCategorias(),
     );
     final resposta = _mapa(bruto);
+    final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id;
     return [
       for (final item in (resposta['itens'] as List? ?? const []))
-        _converterBusca(item as Map<String, dynamic>),
+        if (item is Map<String, dynamic> && (meuId == null || item['id'] != meuId))
+          _converterBusca(item),
     ];
   }
 
@@ -446,15 +462,64 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
     var valores = <LinhaValor>[];
     if (!antesDaContratacao && pedido.estado != 'cancelado') {
       try {
-        final s = SaldoPedidoApi.deJson(
-            _mapa(await _api.get('/v1/pedidos/$pedidoId/saldo')));
+        final (sBruto, aditivosBruto, notasBruto) = await emParalelo3(
+          _api.get('/v1/pedidos/$pedidoId/saldo'),
+          _api
+              .get('/v1/contratos/$pedidoId/aditivos')
+              .then<Object?>((v) => v)
+              .catchError((Object _) => null),
+          _api
+              .get('/v1/contratos/$pedidoId/notas-material')
+              .then<Object?>((v) => v)
+              .catchError((Object _) => null),
+        );
+        final s = SaldoPedidoApi.deJson(_mapa(sBruto));
+        var aditivosPagos = 0;
+        var aditivosAprovados = 0;
+        var aditivosPendentes = 0;
+        if (aditivosBruto is List) {
+          for (final raw in aditivosBruto) {
+            if (raw is! Map) continue;
+            final v = (raw['valor_centavos'] as num?)?.toInt() ?? 0;
+            switch (raw['estado']) {
+              case 'pago':
+                aditivosPagos += v;
+              case 'aprovado':
+                aditivosAprovados += v;
+              case 'proposto':
+                aditivosPendentes += v;
+            }
+          }
+        }
+        var totalNotas = 0;
+        if (notasBruto is List) {
+          for (final raw in notasBruto) {
+            if (raw is! Map) continue;
+            totalNotas += (raw['total_centavos'] as num?)?.toInt() ?? 0;
+          }
+        }
+        final orcamentoInicial = s.clientePagouCentavos >= aditivosPagos
+            ? s.clientePagouCentavos - aditivosPagos
+            : s.clientePagouCentavos;
+        final temExtras = aditivosPagos > 0 ||
+            aditivosAprovados > 0 ||
+            aditivosPendentes > 0 ||
+            totalNotas > 0;
         valores = [
+          if (s.clientePagouCentavos > 0 && temExtras)
+            LinhaValor('Orçamento inicial', orcamentoInicial),
+          if (aditivosPagos + aditivosAprovados > 0)
+            LinhaValor('Aditivos aprovados/pagos', aditivosPagos + aditivosAprovados),
+          if (aditivosPendentes > 0)
+            LinhaValor('Aditivos pendentes', aditivosPendentes),
+          if (totalNotas > 0)
+            LinhaValor('Notas de materiais', totalNotas),
           if (s.clientePagouCentavos > 0)
             LinhaValor('Total pago', s.clientePagouCentavos, destaque: true),
           if (s.liberadoCentavos > 0)
             LinhaValor('Já liberado ao profissional', s.liberadoCentavos),
         ];
-      } on ErroTrato {
+      } on Object {
         // Sem saldo (ainda sem pagamento): mostra o pedido sem valores.
       }
     }
@@ -500,6 +565,9 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
       remoto: pedido.remoto,
       jaAvaliou: pedido.jaAvaliou,
       local: local,
+      codigoInicio: const {'pago_e_retido', 'agendado'}.contains(pedido.estado)
+          ? pedido.codigoInicio
+          : null,
       codigoConclusao: pedido.estado == 'em_andamento' ? pedido.codigoConclusao : null,
       pedidoId: pedido.id,
       numero: pedido.numero,

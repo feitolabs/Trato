@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
 
+import '../auth/servico_auth.dart';
 import '../componentes/componentes.dart';
 import '../dispositivo/servico_camera.dart';
 import '../telas/carteira/modelos.dart' hide ResumoCarteira;
@@ -360,9 +361,27 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<PedidoEmExecucao> acompanhar(String pedidoId) async {
-    // Em paralelo: pedido e histórico não dependem um do outro.
-    final (pedido, eventosBrutos) =
-        await emParalelo2(_pedido(pedidoId), _api.get('/v1/pedidos/$pedidoId/eventos'));
+    // Em paralelo: pedido, eventos, saldo, aditivos e notas de materiais.
+    final ((pedido, eventosBrutos), (saldo, (aditivosBruto, notasBruto))) =
+        await emParalelo2(
+      emParalelo2(
+        _pedido(pedidoId),
+        _api.get('/v1/pedidos/$pedidoId/eventos'),
+      ),
+      emParalelo2(
+        _saldo(pedidoId).then<SaldoPedidoApi?>((v) => v).catchError((Object _) => null),
+        emParalelo2(
+          _api
+              .get('/v1/contratos/$pedidoId/aditivos')
+              .then<Object?>((v) => v)
+              .catchError((Object _) => null),
+          _api
+              .get('/v1/contratos/$pedidoId/notas-material')
+              .then<Object?>((v) => v)
+              .catchError((Object _) => null),
+        ),
+      ),
+    );
     final eventos = [
       for (final j in _lista(eventosBrutos)) EventoApi.deJson(j),
     ];
@@ -425,19 +444,76 @@ class RepositorioPedidosApi implements RepositorioPedidos {
         ),
     ];
     Aditivo? aditivoPendente;
-    try {
-      for (final a in _lista(await _api.get('/v1/contratos/$pedidoId/aditivos'))) {
-        if (a['estado'] == 'proposto') {
+    final aditivos = <ItemResumoAditivo>[];
+    var aditivosPagos = 0;
+    var aditivosAprovados = 0;
+    if (aditivosBruto is List) {
+      for (final a in _lista(aditivosBruto)) {
+        final estado = (a['estado'] as String?) ?? 'proposto';
+        final valor = (a['valor_centavos'] as num?)?.toInt() ?? 0;
+        final desc = (a['descricao'] as String?) ?? '';
+        if (estado == 'proposto' && aditivoPendente == null) {
           aditivoPendente = Aditivo(
             titulo: 'Aditivo proposto',
-            valorCentavos: (a['valor_centavos'] as num).toInt(),
-            descricao: (a['descricao'] as String?) ?? '',
+            valorCentavos: valor,
+            descricao: desc,
+            mostrarFoto: false,
           );
-          break;
         }
+        if (estado == 'pago') aditivosPagos += valor;
+        if (estado == 'aprovado') aditivosAprovados += valor;
+        aditivos.add(
+          ItemResumoAditivo(
+            id: (a['id'] as String?) ?? '',
+            descricao: desc,
+            valorCentavos: valor,
+            estado: estado,
+            estadoTexto: switch (estado) {
+              'aprovado' => 'Aprovado',
+              'pago' => 'Pago',
+              'recusado' => 'Recusado',
+              _ => 'Aguardando aprovação',
+            },
+          ),
+        );
       }
-    } on Object {
-      aditivoPendente = null;
+    }
+    final notas = <ItemResumoNota>[];
+    var totalNotas = 0;
+    if (notasBruto is List) {
+      final notasLista = _lista(notasBruto)
+        ..sort((a, b) => ((a['enviada_em'] as String?) ?? '')
+            .compareTo((b['enviada_em'] as String?) ?? ''));
+      for (var i = 0; i < notasLista.length; i++) {
+        final n = notasLista[i];
+        final valor = (n['total_centavos'] as num?)?.toInt() ?? 0;
+        totalNotas += valor;
+        final itens = [
+          for (final item in (n['itens'] as List? ?? const []))
+            if (item is Map && item['descricao'] is String)
+              (item['descricao'] as String).trim(),
+        ].where((s) => s.isNotEmpty).toList();
+        final enviadaRaw = n['enviada_em'] as String?;
+        notas.add(
+          ItemResumoNota(
+            numero: i + 1,
+            totalCentavos: valor,
+            itensResumo: itens.join(', '),
+            enviadaEm: enviadaRaw == null
+                ? DateTime.now()
+                : DateTime.parse(enviadaRaw).toLocal(),
+          ),
+        );
+      }
+    }
+    int? orcamentoCentavos;
+    int? totalAtualizadoCentavos;
+    if (saldo != null && saldo.clientePagouCentavos > 0) {
+      final base = saldo.clientePagouCentavos >= aditivosPagos
+          ? saldo.clientePagouCentavos - aditivosPagos
+          : saldo.clientePagouCentavos;
+      orcamentoCentavos = base;
+      totalAtualizadoCentavos = base + aditivosPagos + aditivosAprovados;
     }
     return PedidoEmExecucao(
       numero: pedido.numero,
@@ -457,6 +533,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       pagamentoConfirmado: pedido.pagamentoConfirmado,
       etapas: etapas,
       aditivo: aditivoPendente,
+      aditivos: aditivos,
+      notas: notas,
+      orcamentoCentavos: orcamentoCentavos,
+      totalAtualizadoCentavos: totalAtualizadoCentavos,
+      totalNotasCentavos: notas.isEmpty ? null : totalNotas,
       fotos: const [],
       // O código de conclusão é o que o cliente passa ao profissional para encerrar o serviço.
       codigoConclusao: pedido.estado == 'em_andamento' && (pedido.codigoConclusao ?? '').isNotEmpty
@@ -1067,6 +1148,14 @@ class RepositorioChatApi implements RepositorioChat {
         outroId = interlocutor['id'] as String?;
       }
     }
+    final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id;
+    final souCliente = interlocutor?['papel'] == 'cliente'
+        ? false
+        : (interlocutor?['papel'] == 'profissional'
+            ? true
+            : (pedidoObj != null && meuId != null
+                ? pedidoObj.clienteId == meuId
+                : ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional != true));
     return ConversaPedido(
       usuarioId: outroId,
       nome: nome,
@@ -1079,6 +1168,7 @@ class RepositorioChatApi implements RepositorioChat {
       respostasRapidas: textos.respostasRapidas,
       orcamentosAtivos: orcamentosAtivos,
       pedidoAberto: pedidoAberto,
+      souCliente: souCliente,
     );
   }
 
@@ -1197,6 +1287,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
   final ServicoUpload? upload;
   String? _ultimoNome;
   String? _meuId;
+  Future<PerfilCliente>? _carregarEmVoo;
 
   /// URL curta da foto por usuário; vale 45 s (a URL do backend expira em 5). Curto de propósito:
   /// quem troca a foto aparece com a nova na lista de mensagens e no perfil quase na hora.
@@ -1241,7 +1332,17 @@ class RepositorioPerfilApi implements RepositorioPerfil {
   String? get nomeSalvo => _ultimoNome;
 
   @override
-  Future<PerfilCliente> carregar() async {
+  Future<PerfilCliente> carregar() {
+    final ativo = _carregarEmVoo;
+    if (ativo != null) return ativo;
+    final busca = _carregarDoServidor();
+    _carregarEmVoo = busca;
+    return busca.whenComplete(() {
+      if (identical(_carregarEmVoo, busca)) _carregarEmVoo = null;
+    });
+  }
+
+  Future<PerfilCliente> _carregarDoServidor() async {
     final j = _mapa(await _api.get('/v1/me'));
     final nome = (j['nome'] as String?)?.trim();
     if (nome != null && nome.isNotEmpty && nome != 'Sua conta') {
@@ -1333,7 +1434,11 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       if (onde != null) 'lng': '${onde.longitude}',
     };
     final itens = _lista(await _api.get('/v1/profissional/pedidos-abertos', consulta: consulta));
-    return [for (final j in itens) _pedidoAberto(j)];
+    final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id;
+    return [
+      for (final j in itens)
+        if (meuId == null || j['cliente_id'] != meuId) _pedidoAberto(j),
+    ];
   }
 
   /// A localização só serve para mostrar a distância dos pedidos (limite curto de 1,5 s para não
@@ -1398,9 +1503,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
     Map<String, dynamic> me = const {};
     var abertos = <PedidoAberto>[];
+    var emAnalise = false;
     ProximoAtendimento? proximo;
     var contratados = <PedidoContratado>[];
     var enviados = <OrcamentoEnviado>[];
+    var meusPedidos = <PedidoApi>[];
+    Map<String, DadosDoPedido> enderecosMeus = const {};
     var carteira = const ResumoCarteira(retidoCentavos: 0, paraSacarCentavos: 0);
     var deuCerto = false;
 
@@ -1414,7 +1522,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       abertos = lista;
       deuCerto = true;
     }).catchError((Object e) {
-      if (e is ErroTrato && e.codigoHttp == 403) throw e;
+      if (e is ErroTrato && e.codigoHttp == 403) {
+        emAnalise = true;
+        abertos = const [];
+        deuCerto = true;
+        return;
+      }
       primeiroErro ??= e;
     });
     final futSaldo = _api.get('/v1/profissionais/me/saldo').then((b) {
@@ -1427,36 +1540,22 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     }).catchError((Object e) {
       primeiroErro ??= e;
     });
+    final meuIdInicial = ServicoAuthPadrao.atual.sessaoAtual?.id;
     final futPedidos =
         _api.get('/v1/pedidos', consulta: const {'como': 'profissional'}).then((b) async {
       final itensBrutos = _lista(b);
       final meus = <PedidoApi>[];
       for (final j in itensBrutos) {
         final p = tentar(() => PedidoApi.deJson(j));
-        if (p != null) meus.add(p);
+        if (p != null && (meuIdInicial == null || p.clienteId != meuIdInicial)) {
+          meus.add(p);
+        }
       }
-      final enderecos = await _enderecosDosContratados([
+      meusPedidos = meus;
+      enderecosMeus = await _enderecosDosContratados([
         for (final p in meus)
           if (_estadosDoProfissional.contains(p.estado) && !p.remoto) p.id,
       ]);
-      contratados = [
-        for (final p in meus)
-          if (_estadosDoProfissional.contains(p.estado)) _contratado(p, enderecos[p.id]),
-      ];
-      for (final p in meus) {
-        if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
-          proximo = ProximoAtendimento(
-            pedidoId: p.id,
-            quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
-            titulo: p.clienteNome == null ? p.rotulo : '${p.rotulo} · ${p.clienteNome}',
-            endereco: p.remoto ? 'Atendimento remoto' : (enderecos[p.id]?.enderecoCompleto ?? ''),
-            janelaInicio: p.janelaInicio?.toLocal(),
-            emAndamento: p.estado == 'em_andamento',
-            remoto: p.remoto,
-          );
-          break;
-        }
-      }
       deuCerto = true;
     }).catchError((Object e) {
       primeiroErro ??= e;
@@ -1470,6 +1569,30 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
     await Future.wait([futMe, futAbertos, futSaldo, futPedidos, futOrcamentos]);
     if (!deuCerto && primeiroErro != null) throw primeiroErro!;
+    final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id ?? (me['id'] as String?);
+    if (meuId != null) {
+      abertos = abertos.where((p) => p.clienteId != meuId).toList();
+      meusPedidos = meusPedidos.where((p) => p.clienteId != meuId).toList();
+    }
+    contratados = [
+      for (final p in meusPedidos)
+        if (_estadosDoProfissional.contains(p.estado)) _contratado(p, enderecosMeus[p.id]),
+    ];
+    for (final p in meusPedidos) {
+      if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
+        proximo = ProximoAtendimento(
+          pedidoId: p.id,
+          quando: p.janelaRotulo ?? 'Data da visita ainda não marcada',
+          titulo: p.clienteNome == null ? p.rotulo : '${p.rotulo} · ${p.clienteNome}',
+          endereco: p.remoto ? 'Atendimento remoto' : (enderecosMeus[p.id]?.enderecoCompleto ?? ''),
+          janelaInicio: p.janelaInicio?.toLocal(),
+          emAndamento: p.estado == 'em_andamento',
+          remoto: p.remoto,
+          estadoApi: p.estado,
+        );
+        break;
+      }
+    }
     final nomeMe = ((me['nome'] as String?) ?? '').trim();
     final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
     return InicioProfissional(
@@ -1480,6 +1603,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       proximo: proximo,
       contratados: contratados,
       orcamentosEnviados: enviados,
+      emAnalise: emAnalise,
     );
   }
 

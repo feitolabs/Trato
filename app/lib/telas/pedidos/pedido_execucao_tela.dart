@@ -22,6 +22,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoVerContrato,
     this.aoAbrirProblema,
     this.aoCancelarPedido,
+    this.atualizarAditivoLocalmente = true,
   });
 
   final PedidoEmExecucao pedido;
@@ -37,6 +38,7 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoVerContrato;
   final VoidCallback? aoAbrirProblema;
   final VoidCallback? aoCancelarPedido;
+  final bool atualizarAditivoLocalmente;
 
   @override
   State<PedidoExecucaoTela> createState() => _PedidoExecucaoTelaState();
@@ -45,8 +47,18 @@ class PedidoExecucaoTela extends StatefulWidget {
 class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
   late Aditivo? _aditivo = widget.pedido.aditivo;
 
+  @override
+  void didUpdateWidget(covariant PedidoExecucaoTela oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pedido.aditivo != oldWidget.pedido.aditivo) {
+      _aditivo = widget.pedido.aditivo;
+    }
+  }
+
   void _decidir(EstadoAditivo estado, VoidCallback? aviso) {
-    setState(() => _aditivo = _aditivo?.comEstado(estado));
+    if (widget.atualizarAditivoLocalmente) {
+      setState(() => _aditivo = _aditivo?.comEstado(estado));
+    }
     aviso?.call();
   }
 
@@ -155,6 +167,15 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         BotaoLink(texto: 'Relatar problema', aoTocar: widget.aoAbrirProblema!),
                       if (widget.aoCancelarPedido != null)
                         BotaoLink(texto: 'Cancelar pedido', aoTocar: widget.aoCancelarPedido!),
+                    ],
+                    if (pedido.aditivos.isNotEmpty ||
+                        pedido.notas.isNotEmpty ||
+                        pedido.orcamentoCentavos != null) ...[
+                      const SizedBox(height: EspacosTrato.x5),
+                      _CartaoValoresAditivosNotas(
+                        pedido: pedido,
+                        aoAbrirNotas: widget.aoVerNota,
+                      ),
                     ],
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Linha do tempo', style: TipografiaTrato.titulo),
@@ -268,6 +289,155 @@ class _Rodape extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CartaoValoresAditivosNotas extends StatelessWidget {
+  const _CartaoValoresAditivosNotas({
+    required this.pedido,
+    this.aoAbrirNotas,
+  });
+
+  final PedidoEmExecucao pedido;
+  final VoidCallback? aoAbrirNotas;
+
+  @override
+  Widget build(BuildContext context) {
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final aditivosAprovados = pedido.aditivos
+        .where((a) => a.estado == 'aprovado' || a.estado == 'pago')
+        .fold<int>(0, (soma, a) => soma + a.valorCentavos);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Valores, aditivos e notas', style: TipografiaTrato.titulo),
+        const SizedBox(height: EspacosTrato.x3),
+        CartaoTrato(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (pedido.orcamentoCentavos != null) ...[
+                _LinhaValorResumo(
+                  rotulo: 'Orçamento contratado',
+                  valor: formatarReais(pedido.orcamentoCentavos!),
+                ),
+                if (aditivosAprovados > 0) ...[
+                  const SizedBox(height: EspacosTrato.x1),
+                  _LinhaValorResumo(
+                    rotulo: 'Aditivos aprovados',
+                    valor: '+ ${formatarReais(aditivosAprovados)}',
+                  ),
+                ],
+                if (pedido.totalAtualizadoCentavos != null) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  _LinhaValorResumo(
+                    rotulo: 'Total atualizado do pedido',
+                    valor: formatarReais(pedido.totalAtualizadoCentavos!),
+                    destaque: true,
+                  ),
+                ],
+              ],
+              if (pedido.aditivos.isNotEmpty) ...[
+                if (pedido.orcamentoCentavos != null) const Divider(height: EspacosTrato.x5),
+                Text('Aditivos vinculados', style: TipografiaTrato.corpoForte),
+                const SizedBox(height: EspacosTrato.x2),
+                for (final a in pedido.aditivos) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(a.descricao, style: TipografiaTrato.corpo),
+                              const SizedBox(height: EspacosTrato.x1),
+                              ChipStatus(
+                                texto: a.estadoTexto,
+                                tipo: switch (a.estado) {
+                                  'aprovado' || 'pago' => TipoStatus.sucesso,
+                                  'recusado' => TipoStatus.perigo,
+                                  _ => TipoStatus.alerta,
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: EspacosTrato.x3),
+                        Text(formatarReais(a.valorCentavos), style: TipografiaTrato.corpoForte),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+              if (pedido.notas.isNotEmpty) ...[
+                if (pedido.orcamentoCentavos != null || pedido.aditivos.isNotEmpty)
+                  const Divider(height: EspacosTrato.x5),
+                Text('Notas de materiais', style: TipografiaTrato.corpoForte),
+                const SizedBox(height: EspacosTrato.x2),
+                for (final n in pedido.notas) ...[
+                  InkWell(
+                    onTap: aoAbrirNotas,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Nota ${n.numero}', style: TipografiaTrato.corpoForte),
+                                if (n.itensResumo.isNotEmpty)
+                                  Text(n.itensResumo, style: secundario),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: EspacosTrato.x3),
+                          Text(formatarReais(n.totalCentavos), style: TipografiaTrato.corpoForte),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                if (pedido.totalNotasCentavos != null) ...[
+                  const SizedBox(height: EspacosTrato.x1),
+                  _LinhaValorResumo(
+                    rotulo: 'Total em materiais',
+                    valor: formatarReais(pedido.totalNotasCentavos!),
+                    destaque: true,
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LinhaValorResumo extends StatelessWidget {
+  const _LinhaValorResumo({
+    required this.rotulo,
+    required this.valor,
+    this.destaque = false,
+  });
+
+  final String rotulo;
+  final String valor;
+  final bool destaque;
+
+  @override
+  Widget build(BuildContext context) {
+    final estilo = destaque ? TipografiaTrato.corpoForte : TipografiaTrato.corpo;
+    return Row(
+      children: [
+        Expanded(child: Text(rotulo, style: estilo)),
+        Text(valor, style: estilo),
+      ],
     );
   }
 }

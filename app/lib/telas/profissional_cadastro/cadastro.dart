@@ -37,7 +37,27 @@ class DadosCadastroProfissional {
     this.atendePresencial = true,
     this.atendeRemoto = false,
     this.urlsDasFotos = const {},
+    this.categoriasTravadas = false,
   });
+
+  /// Categorias já vinculadas à verificação (não podem ser alteradas sem nova verificação).
+  final bool categoriasTravadas;
+
+  DadosCadastroProfissional comCategoriasTravadas(bool valor) =>
+      DadosCadastroProfissional(
+        nome: nome,
+        sobre: sobre,
+        categorias: categorias,
+        cidade: cidade,
+        raioKm: raioKm,
+        dias: dias,
+        periodos: periodos,
+        portfolio: portfolio,
+        atendePresencial: atendePresencial,
+        atendeRemoto: atendeRemoto,
+        urlsDasFotos: urlsDasFotos,
+        categoriasTravadas: valor,
+      );
 
   /// Para mostrar na edição as fotos já enviadas: `[Foto:id]` → URL assinada da imagem.
   final Map<String, String> urlsDasFotos;

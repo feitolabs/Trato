@@ -39,6 +39,7 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   T? _dado;
   Object? _erro;
   var _pronto = false;
+  var _emVoo = false;
   var _geracao = 0;
   RelogioDeAtualizacao? _relogio;
 
@@ -74,7 +75,7 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   }
 
   void _aoDispararAtualizacao() {
-    if (!mounted) return;
+    if (!mounted || _emVoo) return;
     if (_pronto && _erro == null) {
       _atualizarEmSilencio();
     } else {
@@ -83,6 +84,7 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   }
 
   Future<void> _carregar() async {
+    _emVoo = true;
     final minha = ++_geracao;
     try {
       final dado = await widget.carregar();
@@ -98,6 +100,8 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
         _erro = erro;
         _pronto = true;
       });
+    } finally {
+      _emVoo = false;
     }
   }
 
@@ -113,10 +117,12 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
 
   /// Busca de novo sem mexer na tela; só troca o dado quando chega. Erro: segue com o que tem.
   Future<void> _atualizarEmSilencio() async {
+    if (_emVoo) return;
     if (!_pronto) {
       await _carregar();
       return;
     }
+    _emVoo = true;
     final minha = ++_geracao;
     try {
       final dado = await widget.carregar();
@@ -126,9 +132,11 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
         _erro = null;
       });
     } on Object catch (erro) {
-      if (_erro != null && mounted && minha == _geracao) {
+      if (_dado == null && _erro != null && mounted && minha == _geracao) {
         setState(() => _erro = erro);
       }
+    } finally {
+      _emVoo = false;
     }
   }
 

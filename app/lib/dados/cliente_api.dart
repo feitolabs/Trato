@@ -90,7 +90,18 @@ class ClienteApi {
 
       for (var tentativa = 1; tentativa <= maxTentativas; tentativa++) {
         try {
-          return await tentar();
+          final resposta = await tentar();
+          if (resposta.statusCode == 429 &&
+              permitirRetry &&
+              tentativa < maxTentativas) {
+            if (intervaloBaseRetry > Duration.zero) {
+              final esperaMs = delayMs > 0 ? delayMs * 2 : 500;
+              await Future.delayed(Duration(milliseconds: esperaMs));
+              delayMs = esperaMs;
+            }
+            continue;
+          }
+          return resposta;
         } on TimeoutException {
           if (tentativa == maxTentativas) throw ErroTrato.semInternet;
         } on SocketException {

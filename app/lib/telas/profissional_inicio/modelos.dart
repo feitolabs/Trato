@@ -13,6 +13,7 @@ class ProximoAtendimento {
     this.janelaInicio,
     this.emAndamento = false,
     this.remoto = false,
+    this.estadoApi,
   });
 
   /// Serviço remoto: sem endereço, sem foto e sem localização no check-in.
@@ -20,6 +21,9 @@ class ProximoAtendimento {
 
   /// O serviço já começou (check-in feito).
   final bool emAndamento;
+
+  /// Estado na API (ex.: `pago_e_retido`, `agendado`, `em_andamento`).
+  final String? estadoApi;
 
   /// Id do pedido na API (nulo nos dados de exemplo).
   final String? pedidoId;
@@ -33,6 +37,12 @@ class ProximoAtendimento {
 
   /// Endereço completo: o serviço já foi contratado, então pode aparecer.
   final String endereco;
+
+  bool get precisaAgendarVisita =>
+      estadoApi == 'pago_e_retido' ||
+      (!emAndamento &&
+          janelaInicio == null &&
+          quando.toLowerCase().contains('não marcada'));
 }
 
 /// Pedido que o cliente já aceitou (do orçamento do profissional): do aceite até o fim. É o que o
@@ -181,7 +191,11 @@ class InicioProfissional {
     this.proximo,
     this.contratados = const [],
     this.orcamentosEnviados = const [],
+    this.emAnalise = false,
   });
+
+  /// Cadastro ainda aguardando aprovação de documentos pela equipe.
+  final bool emAnalise;
 
   /// Os orçamentos que o profissional enviou, do mais novo ao mais antigo.
   final List<OrcamentoEnviado> orcamentosEnviados;
@@ -204,6 +218,7 @@ class InicioProfissional {
         pedidos: novos,
         contratados: contratados,
         orcamentosEnviados: orcamentosEnviados,
+        emAnalise: emAnalise,
       );
 }
 

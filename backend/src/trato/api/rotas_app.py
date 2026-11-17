@@ -423,7 +423,7 @@ def meus_orcamentos(
     saida = []
     for o in contexto.orcamentos.do_profissional(usuario.id):
         pedido = contexto.pedidos.obter(o.pedido_id)
-        if pedido is None:
+        if pedido is None or pedido.cliente_id == usuario.id:
             continue
         if pedido.orcamento_id == o.id or o.status == "aceito":
             situacao = "aceito"
@@ -703,6 +703,8 @@ def _profissional_da_conversa(
         alvo = _profissional_mais_recente(contexto, request, pedido, usuario)
     if alvo is None:
         raise HTTPException(422, "Diga com qual profissional você quer conversar.")
+    if alvo == pedido.cliente_id:
+        raise HTTPException(403, "Você não pode conversar consigo mesmo no seu próprio pedido.")
     orcou = any(o.profissional_id == alvo for o in contexto.orcamentos.do_pedido(pedido.id))
     if (
         alvo != pedido.profissional_id

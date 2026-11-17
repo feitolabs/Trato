@@ -25,8 +25,13 @@ class _Entrada(BaseModel):
 
 
 def _validar_nascimento(v: date | None) -> date | None:
-    if v is not None and not (date(1900, 1, 1) <= v < date.today()):
-        raise ValueError("Data de nascimento inválida.")
+    if v is not None:
+        hoje = date.today()
+        if not (date(1900, 1, 1) <= v < hoje):
+            raise ValueError("Data de nascimento inválida.")
+        idade = hoje.year - v.year - ((hoje.month, hoje.day) < (v.month, v.day))
+        if idade < 18:
+            raise ValueError("O cadastro é exclusivo para maiores de 18 anos.")
     return v
 
 
