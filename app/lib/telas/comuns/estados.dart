@@ -263,23 +263,38 @@ class EstadoErro extends StatelessWidget {
 
 /// Moldura padrão das telas comuns: título grande no topo e o corpo abaixo.
 class MolduraTelaComum extends StatelessWidget {
-  const MolduraTelaComum({super.key, required this.titulo, required this.child, this.comVoltar = true});
+  const MolduraTelaComum({
+    super.key,
+    required this.titulo,
+    required this.child,
+    this.comVoltar = true,
+    this.acoes = const [],
+  });
 
   final String titulo;
   final Widget child;
   final bool comVoltar;
+  final List<Widget> acoes;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: comVoltar ? AppBar() : null,
+      appBar: comVoltar ? AppBar(actions: acoes.isEmpty ? null : acoes) : null,
       body: SafeArea(
         child: ConteudoResponsivo(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: EspacosTrato.x4),
-              Text(titulo, style: TipografiaTrato.tituloGrande),
+              if (!comVoltar && acoes.isNotEmpty)
+                Row(
+                  children: [
+                    Expanded(child: Text(titulo, style: TipografiaTrato.tituloGrande)),
+                    ...acoes,
+                  ],
+                )
+              else
+                Text(titulo, style: TipografiaTrato.tituloGrande),
               const SizedBox(height: EspacosTrato.x4),
               Expanded(child: child),
             ],

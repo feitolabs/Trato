@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
@@ -17,6 +17,7 @@ from trato.api.modelos import (
     SaldoProfissionalOut,
 )
 from trato.api.servicos import carregar_pedido
+from trato.financeiro import extrato_profissional, periodo
 from trato.financeiro.ledger import Conta, Lancamento, a_liberar, liberado
 
 router = APIRouter(prefix="/v1", tags=["financeiro"])
@@ -138,3 +139,42 @@ def meu_extrato(
         pedidos = {p.id for p in contexto.pedidos.listar_do_usuario(usuario.id, True)}
         itens = [i for i in contexto.ledger.lancamentos() if i.pedido_id in pedidos]
     return _extrato(itens, limite, deslocamento)
+
+
+@router.get(
+    "/profissionais/me/extrato.pdf",
+    summary="Baixar extrato mensal do profissional em PDF",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def baixar_meu_extrato_pdf(
+    mes: str | None = Query(
+        None, description="Mês no formato AAAA-MM (horário de Brasília). Padrão: mês atual."
+    ),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Response:
+    agora = contexto.agora()
+    if mes is not None:
+        try:
+            ano, numero = periodo.ler_mes(mes.strip())
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from None
+    else:
+        ano, numero = periodo.mes_de(agora)
+    desde, ate = periodo.mes(ano, numero)
+    extrato = extrato_profissional.montar(contexto.ledger.lancamentos(), usuario.id, desde, ate)
+    rotulos: dict[str, tuple[int | None, str]] = {}
+    for lin in extrato.linhas:
+        if lin.pedido_id in rotulos:
+            continue
+        dados = contexto.pedidos.dados_do_pedido(lin.pedido_id)
+        rotulos[lin.pedido_id] = (None, dados.titulo if dados is not None else "")
+    detalhe = contexto.usuarios.detalhe(usuario.id)
+    nome = detalhe.nome if detalhe is not None and detalhe.nome else "Profissional"
+    conteudo = extrato_profissional.pdf(extrato, nome, rotulos, agora)
+    arquivo = f"trato_extrato_{ano:04d}_{numero:02d}.pdf"
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{arquivo}"'},
+    )

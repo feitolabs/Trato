@@ -127,6 +127,7 @@ class DadosPedido:
     respostas: tuple[RespostaPedido, ...] = ()
     endereco: EnderecoPedido | None = None
     modalidade: str = "presencial"  # presencial | remoto
+    profissional_convidado_id: str | None = None
 
 
 @dataclass(frozen=True)

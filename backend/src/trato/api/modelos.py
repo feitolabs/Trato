@@ -18,6 +18,8 @@ from trato.pedidos.estados import (
     ProvaCancelamento,
     ProvaCheckIn,
     ProvaCheckOut,
+    ProvaClienteAusente,
+    ProvaRemarcacao,
 )
 
 
@@ -83,6 +85,10 @@ class AbrirPedidoIn(_Entrada):
         description="`remoto` só em categoria que aceita remoto. Presencial exige endereço "
         "(rua, número, bairro e CEP).",
     )
+    profissional_convidado_id: str | None = Field(
+        default=None,
+        description="Opcional: id do profissional a quem o cliente direciona o pedido.",
+    )
 
     def para_dados(self) -> DadosPedido:
         return DadosPedido(
@@ -100,6 +106,11 @@ class AbrirPedidoIn(_Entrada):
             respostas=tuple(RespostaPedido(r.pergunta_id, r.resposta) for r in self.respostas),
             endereco=EnderecoPedido(**self.endereco.model_dump()) if self.endereco else None,
             modalidade=self.modalidade,
+            profissional_convidado_id=(
+                self.profissional_convidado_id.strip()
+                if self.profissional_convidado_id and self.profissional_convidado_id.strip()
+                else None
+            ),
         )
 
 
@@ -133,6 +144,12 @@ class DadosPedidoOut(BaseModel):
     respostas: list[RespostaPedidoOut] = Field(
         default_factory=list, description="Respostas às perguntas da categoria."
     )
+    fotos_urls: list[str] = Field(
+        default_factory=list, description="URLs assinadas curtas das fotos do pedido."
+    )
+    profissional_convidado_id: str | None = Field(
+        default=None, description="Profissional convidado diretamente na abertura, se houver."
+    )
 
 
 class AceitarOrcamentoIn(_Entrada):
@@ -149,6 +166,15 @@ class ConfirmarAgendaIn(_Entrada):
         return ProvaAgenda(Janela(self.janela.inicio, self.janela.fim))
 
 
+class RemarcarIn(_Entrada):
+    janela: JanelaIn
+    aceito_por: str | None = None
+
+    def para_regra(self, outra_parte: str | None = None) -> ProvaRemarcacao:
+        aceito = self.aceito_por if self.aceito_por is not None else (outra_parte or "")
+        return ProvaRemarcacao(Janela(self.janela.inicio, self.janela.fim), aceito)
+
+
 class CheckInIn(_Entrada):
     # Foto e localização: obrigatórias no presencial (a regra confere), dispensadas no remoto.
     foto: FotoIn | None = None
@@ -162,6 +188,23 @@ class CheckInIn(_Entrada):
             if self.localizacao
             else None,
             codigo_inicio=self.codigo_inicio,
+        )
+
+
+class ClienteAusenteIn(_Entrada):
+    foto: FotoIn | None = None
+    localizacao: LocalizacaoIn | None = None
+    observacao: str | None = Field(None, max_length=400)
+
+    def para_regra(self) -> ProvaClienteAusente:
+        return ProvaClienteAusente(
+            foto=self.foto.para_regra() if self.foto else None,
+            localizacao=Localizacao(self.localizacao.latitude, self.localizacao.longitude)
+            if self.localizacao
+            else None,
+            observacao=self.observacao.strip()
+            if self.observacao and self.observacao.strip()
+            else None,
         )
 
 
@@ -191,7 +234,8 @@ class AcaoPedidoIn(_Entrada):
         description=(
             "aceitar_orcamento: {orcamento_id}. confirmar_agenda: {janela:{inicio,fim}}. "
             "fazer_check_in: {foto:{arquivo_id,tirada_em}, localizacao:{latitude,longitude}, "
-            "codigo_inicio}. fazer_check_out: {foto_final, codigo_conclusao}. "
+            "codigo_inicio}. registrar_cliente_ausente: {foto, localizacao, observacao?}. "
+            "fazer_check_out: {foto_final, codigo_conclusao}. "
             "offline_capturada_em (opcional, só check-in/out): quando o aparelho capturou a "
             "ação reenviada; é evidência, a hora oficial é a do servidor. "
             "cancelar: {motivo}. confirmar_conclusao e encerrar_disputa_por_acordo: sem prova."
@@ -239,6 +283,10 @@ class PedidoOut(BaseModel):
     profissional_id: str | None
     aberto_em: datetime
     janela: JanelaOut | None
+    cliente_ausente_em: datetime | None = Field(
+        None,
+        description="Quando o profissional registrou chegada sem encontrar o cliente.",
+    )
     concluido_em: datetime | None
     acoes_permitidas: list[str]
     pagamento_confirmado: bool = Field(

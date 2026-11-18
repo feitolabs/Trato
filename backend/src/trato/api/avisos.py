@@ -7,10 +7,12 @@ O texto da mensagem nunca vai na notificação (pode ter dado pessoal).
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import Request
 
 from trato.api.contexto import Contexto
+from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
 
 log = logging.getLogger("trato.notificacoes")
@@ -78,3 +80,76 @@ def avisar_orcamento_recebido(
         )
     except Exception:  # noqa: BLE001 - aviso é secundário
         log.exception("Aviso de orçamento recebido falhou")
+
+
+def avisar_pedido_direcionado(
+    request: Request,
+    contexto: Contexto,
+    *,
+    pedido_id: str,
+    profissional_id: str,
+    titulo_pedido: str,
+) -> None:
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        servico.notificar(
+            Evento.PEDIDO_DIRECIONADO,
+            profissional_id,
+            chave=f"{pedido_id}:{profissional_id}",
+            pedido_id=pedido_id,
+            dados={"titulo": titulo_pedido},
+        )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de pedido direcionado falhou")
+
+
+def _eh_uuid(valor: str | None) -> bool:
+    if not valor:
+        return False
+    try:
+        uuid.UUID(valor)
+        return True
+    except ValueError:
+        return False
+
+
+def avisar_pedido_urgente(
+    request: Request,
+    contexto: Contexto,
+    *,
+    pedido_id: str,
+    categoria_id: str | None,
+    cliente_id: str,
+    titulo_pedido: str,
+) -> None:
+    """Notifica profissionais elegíveis com o modo 'Disponível agora' ativo."""
+    try:
+        modulo = getattr(request.app.state, "modulo_profissional", None)
+        if modulo is None or not hasattr(modulo.repo, "listar_disponiveis_agora"):
+            return
+        disponiveis = modulo.repo.listar_disponiveis_agora()
+        if not disponiveis:
+            return
+        servico, _ = servicos_de_notificacao(request, contexto)
+        for perfil in disponiveis:
+            if perfil.usuario_id == cliente_id:
+                continue
+            if categoria_id and categoria_id not in perfil.categorias:
+                # No Postgres `perfil.categorias` guarda UUIDs e `DadosPedido.categoria_id` pode
+                # chegar como slug na API; nesses casos, a visibilidade resolve a elegibilidade.
+                misto_slug_uuid = not _eh_uuid(categoria_id) and any(
+                    _eh_uuid(c) for c in perfil.categorias
+                )
+                if not misto_slug_uuid:
+                    continue
+            if pedido_visivel_ao_profissional(contexto, pedido_id, perfil.usuario_id) is None:
+                continue
+            servico.notificar(
+                Evento.PEDIDO_URGENTE,
+                perfil.usuario_id,
+                chave=f"urgente:{pedido_id}:{perfil.usuario_id}",
+                pedido_id=pedido_id,
+                dados={"titulo": titulo_pedido},
+            )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de pedido urgente falhou")

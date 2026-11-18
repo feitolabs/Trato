@@ -187,9 +187,12 @@ abstract class ServicoAuth {
   /// ouvinte recebe o aviso assim que escutar.
   Stream<void> get recuperacaoDeSenha;
 
-  /// Troca a senha da conta que abriu o link de recuperação. Erros: [TipoErroAuth.senhaFraca],
-  /// [TipoErroAuth.semInternet].
+  /// Troca a senha da conta que abriu o link de recuperação ou está logada. Erros:
+  /// [TipoErroAuth.senhaFraca], [TipoErroAuth.semInternet].
   Future<void> definirNovaSenha(String senha);
+
+  /// Altera o e-mail da conta autenticada atual (envia confirmação quando exigido).
+  Future<void> alterarEmail(String novoEmail);
 
   /// Reenvia o código. Só depois de [LimitesCodigoCelular.segundosParaReenviar] s.
   Future<void> reenviarCodigoCelular(String celular);

@@ -23,6 +23,8 @@ class ChatPedidoTela extends StatefulWidget {
     this.aoAceitarContraproposta,
     this.aoAceitarProposta,
     this.aoProporNovaCondicao,
+    this.aoAceitarAgenda,
+    this.aoSugerirAgenda,
     this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
@@ -42,6 +44,12 @@ class ChatPedidoTela extends StatefulWidget {
 
   /// Profissional abre o modal para propor novo valor/prazo direto pela conversa.
   final Future<void> Function()? aoProporNovaCondicao;
+
+  /// Aceita uma sugestão de dia e horário da visita enviada no chat.
+  final Future<void> Function(MensagemChat)? aoAceitarAgenda;
+
+  /// Abre seletor de data/horário para sugerir ou remarcar visita pelo chat.
+  final Future<void> Function()? aoSugerirAgenda;
   final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
@@ -160,6 +168,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
               aoProporNovaCondicao:
                   conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
+              aoSugerirAgenda: widget.aoSugerirAgenda == null
+                  ? null
+                  : () async {
+                      await widget.aoSugerirAgenda!();
+                      await _sincronizar();
+                    },
             ),
             const _AvisoPrivacidade(),
             Expanded(
@@ -219,6 +233,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               await widget.aoAceitarProposta!(prop);
               await _sincronizar();
             },
+      aoAceitarAgenda: widget.aoAceitarAgenda == null
+          ? null
+          : (msg) async {
+              await widget.aoAceitarAgenda!(msg);
+              await _sincronizar();
+            },
     );
   }
 }
@@ -228,11 +248,13 @@ class _Cabecalho extends StatelessWidget {
     required this.conversa,
     this.aoAtualizar,
     this.aoProporNovaCondicao,
+    this.aoSugerirAgenda,
   });
 
   final ConversaPedido conversa;
   final Future<void> Function()? aoAtualizar;
   final Future<void> Function()? aoProporNovaCondicao;
+  final Future<void> Function()? aoSugerirAgenda;
 
   @override
   Widget build(BuildContext context) {
@@ -280,13 +302,22 @@ class _Cabecalho extends StatelessWidget {
                 icon: const Icon(Icons.tune, size: 18),
                 label: const Text('Nova proposta'),
               ),
+            if (aoSugerirAgenda != null)
+              TextButton.icon(
+                key: const Key('botao-sugerir-agenda'),
+                onPressed: aoSugerirAgenda,
+                icon: const Icon(Icons.event_available_outlined, size: 18),
+                label: const Text('Horário'),
+              ),
             if (aoAtualizar != null)
               IconButton(
                 tooltip: 'Atualizar conversa',
                 onPressed: aoAtualizar,
                 icon: const Icon(Icons.refresh, size: 20),
               ),
-            if (aoAtualizar == null && aoProporNovaCondicao == null)
+            if (aoAtualizar == null &&
+                aoProporNovaCondicao == null &&
+                aoSugerirAgenda == null)
               const SizedBox(width: EspacosTrato.x4),
           ],
         ),
@@ -336,12 +367,14 @@ class _LinhaMensagem extends StatelessWidget {
     required this.podeAceitarProposta,
     this.aoAceitarContraproposta,
     this.aoAceitarProposta,
+    this.aoAceitarAgenda,
   });
 
   final MensagemChat mensagem;
   final bool podeAceitarProposta;
   final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
   final Future<void> Function(ContrapropostaChat)? aoAceitarProposta;
+  final Future<void> Function(MensagemChat)? aoAceitarAgenda;
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +401,7 @@ class _LinhaMensagem extends StatelessWidget {
     final minha = mensagem.minha;
     final larguraMaxima = MediaQuery.sizeOf(context).width * 0.72;
     final prop = mensagem.contraproposta;
+    final agenda = mensagem.propostaAgenda;
     final Widget corpo = mensagem.tipo == TipoMensagem.foto
         ? EspacoFoto(
             rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
@@ -404,13 +438,44 @@ class _LinhaMensagem extends StatelessWidget {
                   if ((mensagem.texto ?? '').trim().isNotEmpty)
                     const SizedBox(height: EspacosTrato.x1),
                 ],
-                if ((mensagem.texto ?? '').trim().isNotEmpty || prop == null)
+                if (agenda != null) ...[
+                  Text(
+                    'Sugestão de visita',
+                    style: TipografiaTrato.sobretitulo.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                    ),
+                  ),
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    '${agenda.inicio.day.toString().padLeft(2, '0')}/'
+                    '${agenda.inicio.month.toString().padLeft(2, '0')} · '
+                    '${agenda.inicio.hour.toString().padLeft(2, '0')}h'
+                    '${agenda.inicio.minute.toString().padLeft(2, '0')} às '
+                    '${agenda.fim.hour.toString().padLeft(2, '0')}h'
+                    '${agenda.fim.minute.toString().padLeft(2, '0')}',
+                    style: TipografiaTrato.corpoForte.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                    ),
+                  ),
+                  if ((mensagem.texto ?? '').trim().isNotEmpty)
+                    const SizedBox(height: EspacosTrato.x1),
+                ],
+                if ((mensagem.texto ?? '').trim().isNotEmpty || (prop == null && agenda == null))
                   Text(
                     mensagem.texto ?? '',
                     style: TipografiaTrato.corpo.copyWith(
                       color: minha ? CoresTrato.creme : CoresTrato.petroleo,
                     ),
                   ),
+                if (agenda != null && !minha && aoAceitarAgenda != null) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  _BotaoProposta(
+                    ativo: true,
+                    rotuloAtivo: 'Confirmar este horário',
+                    rotuloInativo: 'Horário confirmado',
+                    aoTocar: () => aoAceitarAgenda!(mensagem),
+                  ),
+                ],
                 if (prop != null && !minha) ...[
                   if (prop.ehPropostaDoProfissional && aoAceitarProposta != null) ...[
                     const SizedBox(height: EspacosTrato.x3),

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dados/cliente_api.dart';
+import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/modelos_api.dart' show PedidoApi;
 import 'package:trato/dados/repositorios.dart' show Cobranca, StatusPagamento;
 import 'package:trato/dados/repositorios_api.dart';
@@ -469,11 +470,21 @@ void main() {
       expect(chamadas.single.corpo, {'texto': 'Cheguei'});
     });
 
-    test('cliente ausente também avisa pelo chat', () async {
-      final (api, chamadas) = _cliente((_) => _json({'id': 'm1'}, 201));
-      await RepositorioProfissionalApi(api).servicoCheckIn('p1').avisarClienteAusente();
-      expect(chamadas.single.caminho, '/v1/pedidos/p1/mensagens');
-      expect(chamadas.single.corpo!['texto'], contains('não encontrei'));
+    test('cliente ausente registra ação formal no backend', () async {
+      final (api, chamadas) = _cliente((_) => _json({'estado': 'agendado'}, 200));
+      await RepositorioProfissionalApi(api)
+          .servicoCheckIn('p1', remoto: true)
+          .avisarClienteAusente();
+      expect(chamadas.single.caminho, '/v1/pedidos/p1/acoes/registrar_cliente_ausente');
+      expect(chamadas.single.corpo, {'prova': <String, Object?>{}});
+    });
+
+    test('cliente ausente presencial exige foto e localização antes de enviar', () async {
+      final (api, _) = _cliente((_) => _json({'estado': 'agendado'}, 200));
+      await expectLater(
+        () => RepositorioProfissionalApi(api).servicoCheckIn('p1').avisarClienteAusente(),
+        throwsA(isA<ErroTrato>()),
+      );
     });
   });
 

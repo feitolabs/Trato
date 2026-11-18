@@ -32,6 +32,7 @@ from trato.api.repositorios_app import (
 )
 from trato.api.servicos import carregar_pedido, eh_participante
 from trato.api.visibilidade import pedido_visivel_ao_profissional
+from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
 from trato.persistencia.erros import RegraDoBanco
@@ -134,6 +135,8 @@ class PagamentoValoresOut(BaseModel):
     pagamento_confirmado: bool
     meios_disponiveis: list[str]
     cobranca_pendente_id: str | None = None
+    desconto_centavos: int = 0
+    cupom_codigo: str | None = None
 
 
 class MensagemOut(BaseModel):
@@ -199,6 +202,9 @@ class PedidoAbertoOut(BaseModel):
         default=None, description="Primeiro nome e inicial do sobrenome (nunca dado de contato)."
     )
     modalidade: str = Field("presencial", description="`presencial` ou `remoto`.")
+    convidado: bool = Field(
+        default=False, description="Verdadeiro quando o cliente direcionou este pedido a você."
+    )
 
 
 class ResumoOrcamentoOut(BaseModel):
@@ -562,6 +568,7 @@ def enviar_orcamento(
 def valores_do_pagamento(
     pedido_id: str,
     request: Request,
+    cupom: Annotated[str | None, Query(max_length=30)] = None,
     usuario: Usuario = Depends(
         exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL, PapelUsuario.EQUIPE)
     ),
@@ -591,9 +598,20 @@ def valores_do_pagamento(
             None,
         )
     total = None
+    desconto_centavos = 0
+    cupom_codigo: str | None = None
     opcoes: list[OpcaoParcelamentoOut] = []
     if contrato is not None and servico is not None:
-        conta = servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos)
+        base_centavos = contrato.valor_centavos
+        if cupom and cupom.strip():
+            try:
+                aplicado = validar_e_calcular_cupom(contexto, cupom, contrato.valor_centavos)
+            except ValueError as erro:
+                raise HTTPException(422, str(erro)) from None
+            base_centavos = aplicado.servico_com_desconto_centavos
+            desconto_centavos = aplicado.desconto_centavos
+            cupom_codigo = aplicado.codigo
+        conta = servico.total_a_cobrar(contexto, pedido, base_centavos)
         total = conta.cobrado_centavos
         opcoes = [
             OpcaoParcelamentoOut(**vars(o)) for o in servico.config().parcelamento.opcoes(total)
@@ -608,6 +626,8 @@ def valores_do_pagamento(
         pagamento_confirmado=pedido.referencia_pagamento is not None,
         meios_disponiveis=[m.value for m in MeioPagamento],
         cobranca_pendente_id=pendente,
+        desconto_centavos=desconto_centavos,
+        cupom_codigo=cupom_codigo,
     )
 
 

@@ -44,6 +44,14 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
   late bool _disponivel = widget.dados.disponivelAgora;
 
   @override
+  void didUpdateWidget(covariant InicioProfissionalTela oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dados.disponivelAgora != widget.dados.disponivelAgora) {
+      _disponivel = widget.dados.disponivelAgora;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final dados = widget.dados;
     final recarregar = AtualizadorTela.de(context);
@@ -331,6 +339,10 @@ class CartaoPedidoAberto extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: Text(pedido.titulo, style: TipografiaTrato.tituloCartao)),
+                  if (pedido.convidado) ...[
+                    const SizedBox(width: EspacosTrato.x2),
+                    const ChipStatus(texto: 'Para você', tipo: TipoStatus.sucesso),
+                  ],
                   if (pedido.remoto) ...[
                     const SizedBox(width: EspacosTrato.x2),
                     const ChipStatus(texto: 'Remoto', tipo: TipoStatus.info),

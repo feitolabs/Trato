@@ -8,8 +8,9 @@ registra em `midias` ou `verificacao_documentos`. Documento de verificação nã
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from trato.api.auth import PapelUsuario, Usuario
@@ -86,7 +87,26 @@ router_usuarios = APIRouter(prefix="/v1/usuarios", tags=["uploads"])
 # Fotos que mostram o serviço (chegada, saída e as de antes/durante/depois). Foto de disputa,
 # nota de material e anexo de chat têm regras próprias e não entram aqui.
 FINALIDADES_DA_FOTO_DO_SERVICO = ("checkin", "antes", "durante", "depois", "checkout")
+FINALIDADES_DA_FOTO_DO_PEDIDO = ("pedido", "antes")
 URL_LEITURA_SEGUNDOS = 300
+
+
+def urls_fotos_do_pedido(request: Request | None, pedido_id: str) -> list[str]:
+    """URLs assinadas curtas das fotos anexadas na abertura do pedido."""
+    if request is None:
+        return []
+    servico = getattr(request.app.state, "servico_uploads", None)
+    if servico is None:
+        return []
+    urls: list[str] = []
+    for m in servico.repo.midias_do_pedido(pedido_id, FINALIDADES_DA_FOTO_DO_PEDIDO):
+        try:
+            urls.append(
+                servico.armazenamento.url_leitura(m.bucket, m.storage_path, URL_LEITURA_SEGUNDOS)
+            )
+        except Exception:  # noqa: BLE001,S112 - storage fora do ar não derruba a tela do pedido
+            continue
+    return urls
 
 
 class FotoDoPedidoOut(BaseModel):
@@ -100,23 +120,40 @@ class FotoDoPedidoOut(BaseModel):
 @router_fotos.get(
     "/{pedido_id}/fotos",
     response_model=list[FotoDoPedidoOut],
-    summary="Fotos do serviço (chegada, saída, antes e depois) com URL assinada curta",
+    summary="Fotos do serviço (chegada, saída, antes e depois) ou fotos do pedido aberto",
     description=(
-        "Só o cliente e o profissional do pedido veem; quem não é parte recebe 404. O arquivo "
-        "fica em bucket privado: a URL expira em poucos minutos e nunca expõe o caminho."
+        "Sem `finalidade`, só cliente e profissional contratados veem as fotos do serviço. Com "
+        "`finalidade=pedido`, inclui também profissionais elegíveis quando o pedido está aberto."
     ),
 )
 def fotos_do_pedido(
     pedido_id: str,
+    finalidade: Annotated[str | None, Query()] = None,
     usuario: Usuario = Depends(_usuario),
     contexto: Contexto = Depends(obter_contexto),
     servico: ServicoUploads = Depends(obter_servico),
 ) -> list[FotoDoPedidoOut]:
     pedido = contexto.pedidos.obter(pedido_id)
-    if pedido is None or usuario.id not in (pedido.cliente_id, pedido.profissional_id):
+    if pedido is None:
         raise HTTPException(404, "Pedido não encontrado.")
+    eh_parte = usuario.id in (pedido.cliente_id, pedido.profissional_id)
+    if finalidade == "pedido":
+        pode_ver_aberto = (
+            pedido.estado is Estado.ABERTO
+            and usuario.papel is PapelUsuario.PROFISSIONAL
+            and pedido_visivel_ao_profissional(contexto, pedido.id, usuario.id) is not None
+        )
+        if not (eh_parte or pode_ver_aberto):
+            raise HTTPException(404, "Pedido não encontrado.")
+        finalidades = FINALIDADES_DA_FOTO_DO_PEDIDO
+    elif finalidade is None:
+        if not eh_parte:
+            raise HTTPException(404, "Pedido não encontrado.")
+        finalidades = FINALIDADES_DA_FOTO_DO_SERVICO
+    else:
+        raise HTTPException(422, "Finalidade desconhecida.")
     fotos: list[FotoDoPedidoOut] = []
-    for m in servico.repo.midias_do_pedido(pedido.id, FINALIDADES_DA_FOTO_DO_SERVICO):
+    for m in servico.repo.midias_do_pedido(pedido.id, finalidades):
         try:
             url = servico.armazenamento.url_leitura(m.bucket, m.storage_path, URL_LEITURA_SEGUNDOS)
         except Exception:  # noqa: BLE001,S112 - storage fora do ar não derruba a tela do pedido

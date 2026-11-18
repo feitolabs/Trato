@@ -51,9 +51,13 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoAbrirOrcamentoEnviado,
     this.aoAbrirMapa,
     this.recarregarInicio,
+    this.aoAlterarDisponivel,
     this.atualizarACada,
     this.atualizarQuando,
   });
+
+  /// Atualiza "Disponível agora" no backend (prioriza e notifica pedidos urgentes).
+  final Future<bool> Function(bool disponivel)? aoAlterarDisponivel;
 
   /// Toque num pedido que o cliente já aceitou (aba Pedidos > Em andamento).
   final ValueChanged<PedidoContratado>? aoAbrirContratado;
@@ -191,6 +195,33 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     }
   }
 
+  Future<void> _alterarDisponivel(bool disponivel) async {
+    final salvar = widget.aoAlterarDisponivel;
+    if (salvar == null) return;
+    final mensagens = ScaffoldMessenger.of(context);
+    setState(() => _inicio = _inicio.comDisponivel(disponivel));
+    try {
+      final salvo = await salvar(disponivel);
+      if (!mounted) return;
+      setState(() => _inicio = _inicio.comDisponivel(salvo));
+      await _atualizarEmSilencio();
+    } on Object catch (erro) {
+      if (!mounted) return;
+      setState(() => _inicio = _inicio.comDisponivel(!disponivel));
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              erro is ErroTrato
+                  ? erro.mensagem
+                  : 'Não foi possível atualizar sua disponibilidade agora.',
+            ),
+          ),
+        );
+    }
+  }
+
   void _ir(int indice) {
     if (_aba == indice) return;
     setState(() {
@@ -311,6 +342,8 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     final paginas = <Widget>[
       InicioProfissionalTela(
         dados: _inicio,
+        aoAlterarDisponivel:
+            widget.aoAlterarDisponivel == null ? null : _alterarDisponivel,
         aoFazerCheckIn: widget.aoGerenciarProximo != null
             ? () => widget.aoGerenciarProximo!(_inicio.proximo)
             : widget.aoFazerCheckIn,

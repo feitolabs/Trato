@@ -111,7 +111,11 @@ class PedidoEmExecucao {
     this.codigoConclusao,
     this.podeVerConclusao = true,
     this.pagamentoConfirmado = true,
+    this.estadoApi,
   });
+
+  /// Estado atual na API (`pago_e_retido`, `agendado`, ...).
+  final String? estadoApi;
 
   /// O parceiro de pagamento já confirmou? Antes disso o selo diz que aguarda o pagamento.
   final bool pagamentoConfirmado;
@@ -178,19 +182,50 @@ class ContrapropostaChat {
   }
 }
 
+/// Sugestão de janela de visita vinda na conversa (`[agenda:<inicio_iso>|<fim_iso>] texto`).
+class PropostaAgendaChat {
+  const PropostaAgendaChat({
+    required this.inicio,
+    required this.fim,
+  });
+
+  final DateTime inicio;
+  final DateTime fim;
+
+  static (PropostaAgendaChat?, String) ler(String texto) {
+    final m = RegExp(r'^\[agenda:([^|\]]+)\|([^\]]+)\]\s*').firstMatch(texto);
+    if (m == null) return (null, texto);
+    final inicio = DateTime.tryParse(m.group(1)!);
+    final fim = DateTime.tryParse(m.group(2)!);
+    if (inicio == null || fim == null) return (null, texto);
+    return (
+      PropostaAgendaChat(inicio: inicio.toLocal(), fim: fim.toLocal()),
+      texto.substring(m.end),
+    );
+  }
+}
+
 class MensagemChat {
   const MensagemChat({
     required this.tipo,
     required this.hora,
+    this.id,
     this.texto,
     this.minha = false,
     this.lida = false,
     this.recebida = false,
     this.contraproposta,
+    this.propostaAgenda,
   });
+
+  /// Id da mensagem na API (para aceitar proposta de agenda no chat).
+  final int? id;
 
   /// Preenchida quando a mensagem é uma contraproposta de valor.
   final ContrapropostaChat? contraproposta;
+
+  /// Preenchida quando a mensagem é uma sugestão de dia e horário da visita.
+  final PropostaAgendaChat? propostaAgenda;
 
   /// Chegou ao aparelho de quem recebeu (✓✓ cinza). Mensagem lida conta como recebida.
   final bool recebida;

@@ -101,11 +101,44 @@ class DetalheValoresPedido {
   final List<LinhaDeValor> notas;
 }
 
+/// Conta de recebimento (Pix / conta bancária para repasse de valores liberados, D15).
+class ContaRecebimento {
+  const ContaRecebimento({
+    required this.cadastrada,
+    this.tipoPix,
+    this.chavePix,
+    this.chavePixMascarada,
+    this.bancoCodigo,
+    this.bancoNome,
+    this.agencia,
+    this.conta,
+    this.tipoConta,
+    this.resumoExibicao,
+  });
+
+  final bool cadastrada;
+  final String? tipoPix;
+  final String? chavePix;
+  final String? chavePixMascarada;
+  final String? bancoCodigo;
+  final String? bancoNome;
+  final String? agencia;
+  final String? conta;
+  final String? tipoConta;
+  final String? resumoExibicao;
+}
+
 /// Tudo que a tela precisa. [erro] preenchido mostra a mensagem com "Tentar de novo".
 class DadosCarteira {
-  const DadosCarteira({this.resumo, this.extrato = const [], this.erro});
+  const DadosCarteira({
+    this.resumo,
+    this.extrato = const [],
+    this.contaRecebimento,
+    this.erro,
+  });
 
   final ResumoCarteira? resumo;
   final List<ItemExtrato> extrato;
+  final ContaRecebimento? contaRecebimento;
   final String? erro;
 }

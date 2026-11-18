@@ -87,7 +87,12 @@ class _Pagamento extends RepositorioPagamentoFake {
   final _Backend b;
 
   @override
-  Future<Cobranca> criarCobranca(String pedidoId, MetodoPagamento metodo) async {
+  Future<Cobranca> criarCobranca(
+    String pedidoId,
+    MetodoPagamento metodo, {
+    int parcelas = 1,
+    String? cupom,
+  }) async {
     b.chamadas.add('cobranca:${metodo.name}');
     return const Cobranca(id: 'cb1', pixCopiaECola: '00020126-teste');
   }

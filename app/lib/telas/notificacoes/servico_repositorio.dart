@@ -13,7 +13,8 @@ TipoNotificacao tipoDaNotificacao(String? tipo) {
   if (t.startsWith('agenda') ||
       t.startsWith('execucao') ||
       t.startsWith('avaliacao') ||
-      t == 'pedido') {
+      t == 'pedido' ||
+      t.startsWith('pedido.')) {
     return TipoNotificacao.pedido;
   }
   return TipoNotificacao.sistema;

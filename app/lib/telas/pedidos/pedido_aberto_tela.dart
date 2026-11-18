@@ -5,7 +5,7 @@ import '../../dados/repositorios.dart';
 import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
 import '../comuns/foco_rolagem.dart';
-import '../conclusao/apoio_conclusao.dart' show formatarReais;
+import '../conclusao/apoio_conclusao.dart' show EspacoFoto, formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
 
 /// "R$ 1.250,50", "1250,5" ou "1250" viram centavos. Vazio ou inválido: nulo.
@@ -243,6 +243,24 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
             Text('Endereço', style: TipografiaTrato.tituloCartao),
             const SizedBox(height: EspacosTrato.x1),
             Text(_dados.enderecoResumo ?? 'Ainda sem endereço', style: TipografiaTrato.corpo),
+            if (_dados.fotos.isNotEmpty) ...[
+              const SizedBox(height: EspacosTrato.x4),
+              Text('Fotos anexadas', style: TipografiaTrato.tituloCartao),
+              const SizedBox(height: EspacosTrato.x2),
+              Wrap(
+                spacing: EspacosTrato.x2,
+                runSpacing: EspacosTrato.x2,
+                children: [
+                  for (var i = 0; i < _dados.fotos.length; i++)
+                    EspacoFoto(
+                      legenda: 'Foto ${i + 1}',
+                      referencia: _dados.fotos[i],
+                      largura: 92,
+                      altura: 92,
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

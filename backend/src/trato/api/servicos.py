@@ -121,6 +121,7 @@ def pedido_out(pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False) -> Pe
         janela=JanelaOut(inicio=pedido.janela.inicio, fim=pedido.janela.fim)
         if pedido.janela
         else None,
+        cliente_ausente_em=pedido.cliente_ausente_em,
         concluido_em=pedido.concluido_em,
         acoes_permitidas=sorted(a.value for a in acoes_permitidas(pedido, papel_no_pedido)),
         pagamento_confirmado=pedido.referencia_pagamento is not None,

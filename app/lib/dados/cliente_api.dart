@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -27,6 +28,40 @@ class ClienteApi {
   Future<Object?> get(String caminho, {Map<String, String>? consulta}) =>
       _enviar('GET', caminho, consulta: consulta);
 
+  /// Busca bytes brutos (ex.: extrato mensal em PDF). Trata 401 e erros HTTP como [_enviar].
+  Future<Uint8List> getBytes(String caminho, {Map<String, String>? consulta}) async {
+    Future<http.Response> tentar() async {
+      final pedido = http.Request('GET', _uri(caminho, consulta))
+        ..headers['Accept'] = 'application/pdf, */*';
+      final efetivo = sessao.token;
+      if (efetivo != null && efetivo.isNotEmpty) {
+        pedido.headers['Authorization'] = 'Bearer $efetivo';
+      }
+      return await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
+    }
+
+    http.Response resposta;
+    try {
+      resposta = await tentar();
+    } on TimeoutException {
+      throw ErroTrato.semInternet;
+    } on SocketException {
+      throw ErroTrato.semInternet;
+    } on http.ClientException {
+      throw ErroTrato.semInternet;
+    }
+    if (resposta.statusCode == 401 && sessao.logada) {
+      final anterior = sessao.token;
+      final novo = await sessao.renovarToken();
+      if (novo != null && novo != anterior) resposta = await tentar();
+    }
+    if (resposta.statusCode >= 200 && resposta.statusCode < 300) {
+      return resposta.bodyBytes;
+    }
+    _tratar(resposta);
+    throw ErroTrato.servidor;
+  }
+
   Future<Object?> post(
     String caminho, {
     Map<String, String>? consulta,
@@ -48,7 +83,8 @@ class ClienteApi {
 
   Future<Object?> put(String caminho, {Object? corpo}) => _enviar('PUT', caminho, corpo: corpo);
 
-  Future<Object?> delete(String caminho) => _enviar('DELETE', caminho);
+  Future<Object?> delete(String caminho, {Object? corpo}) =>
+      _enviar('DELETE', caminho, corpo: corpo);
 
   Uri _uri(String caminho, Map<String, String>? consulta) {
     final base = urlBase.endsWith('/') ? urlBase.substring(0, urlBase.length - 1) : urlBase;

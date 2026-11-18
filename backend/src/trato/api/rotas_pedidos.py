@@ -6,6 +6,7 @@ identifica quem pede, monta a prova, chama a regra e grava o resultado.
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from dataclasses import asdict, replace
 from datetime import timedelta
@@ -19,6 +20,7 @@ from trato import disputas
 from trato.api import offline
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
+from trato.api.avisos import avisar_pedido_direcionado, avisar_pedido_urgente
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import (
     AbrirDisputaIn,
@@ -29,19 +31,22 @@ from trato.api.modelos import (
     CancelarIn,
     CheckInIn,
     CheckOutIn,
+    ClienteAusenteIn,
     ConfirmarAgendaIn,
     DadosPedidoOut,
-    RespostaPedidoOut,
     DisputaOut,
     EditarPedidoIn,
     EnderecoIn,
     EventoOut,
     PedidoOut,
     PedirRetrabalhoIn,
+    RemarcarIn,
     RespostaDisputaIn,
+    RespostaPedidoOut,
     RetrabalhoOut,
 )
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
+from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out, pedido_out_completo
 from trato.financeiro.ledger import taxa_descontada
 from trato.garantias import (
@@ -80,7 +85,6 @@ _ROTA_DEDICADA = {
 }
 # Pontos de extensão: dependem de fluxos que ainda não existem (ver README da API).
 _NAO_DISPONIVEIS = {
-    Acao.REMARCAR: "A remarcação depende do registro do aceite da outra parte (a definir).",
     Acao.DECIDIR_DISPUTA: "A decisão da disputa depende de definir como ela move o dinheiro "
     "(P4/P8).",
 }
@@ -103,7 +107,11 @@ def _validar(modelo: type[BaseModel], bruto: dict[str, Any] | None) -> Any:
 
 
 def _montar_prova(
-    contexto: Contexto, acao: Acao, bruto: dict[str, Any] | None, pedido: Pedido
+    contexto: Contexto,
+    acao: Acao,
+    bruto: dict[str, Any] | None,
+    pedido: Pedido,
+    usuario: Usuario,
 ) -> Prova | None:
     if acao is Acao.ACEITAR_ORCAMENTO:
         entrada: AceitarOrcamentoIn = _validar(AceitarOrcamentoIn, bruto)
@@ -111,9 +119,16 @@ def _montar_prova(
         if orcamento is None or orcamento.pedido_id != pedido.id:
             raise estados.ProvaInvalida("Esse orçamento não existe neste pedido.")
         return entrada.para_regra(orcamento.profissional_id)
+    if acao is Acao.REMARCAR:
+        entrada_remarcar: RemarcarIn = _validar(RemarcarIn, bruto)
+        outra_parte = (
+            pedido.profissional_id if usuario.id == pedido.cliente_id else pedido.cliente_id
+        )
+        return entrada_remarcar.para_regra(outra_parte)
     por_acao = {
         Acao.CONFIRMAR_AGENDA: ConfirmarAgendaIn,
         Acao.FAZER_CHECK_IN: CheckInIn,
+        Acao.REGISTRAR_CLIENTE_AUSENTE: ClienteAusenteIn,
         Acao.FAZER_CHECK_OUT: CheckOutIn,
         Acao.CANCELAR: CancelarIn,
     }
@@ -217,6 +232,7 @@ def _exigir_modalidade_e_endereco(dados: Any, contexto: Contexto) -> None:
 
 @router.post("", response_model=PedidoOut, status_code=201, summary="Abrir pedido")
 def abrir_pedido(
+    request: Request,
     corpo: AbrirPedidoIn | None = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
@@ -227,6 +243,8 @@ def abrir_pedido(
     )
     dados = corpo.para_dados() if corpo else None
     if dados is not None:
+        if dados.profissional_convidado_id == usuario.id:
+            raise HTTPException(422, "Você não pode direcionar um pedido para si mesmo.")
         _exigir_modalidade_e_endereco(dados, contexto)
         _exigir_respostas(dados, contexto)
         _exigir_dentro_do_teto(dados, contexto)
@@ -250,6 +268,39 @@ def abrir_pedido(
     if dados is not None and not dados.bairro and dados.endereco and dados.endereco.bairro:
         dados = replace(dados, bairro=dados.endereco.bairro)  # o profissional vê o bairro
     gravado = contexto.pedidos.salvar(pedido, None, dados)
+    if dados is not None and dados.profissional_convidado_id:
+        convidado_id = dados.profissional_convidado_id
+        contexto.extras.setdefault("pedidos_convidados", {})[gravado.id] = convidado_id
+        with contextlib.suppress(Exception):  # abertura da conversa é secundária ao pedido
+            contexto.conversas.abrir(gravado.id, convidado_id)
+        avisar_pedido_direcionado(
+            request,
+            contexto,
+            pedido_id=gravado.id,
+            profissional_id=convidado_id,
+            titulo_pedido=dados.titulo,
+        )
+    if dados is not None and dados.urgente:
+        avisar_pedido_urgente(
+            request,
+            contexto,
+            pedido_id=gravado.id,
+            categoria_id=dados.categoria_id,
+            cliente_id=usuario.id,
+            titulo_pedido=dados.titulo,
+        )
+    if dados is not None and dados.profissional_convidado_id:
+        convidado_id = dados.profissional_convidado_id
+        contexto.extras.setdefault("pedidos_convidados", {})[gravado.id] = convidado_id
+        with contextlib.suppress(Exception):  # abertura da conversa é secundária ao pedido
+            contexto.conversas.abrir(gravado.id, convidado_id)
+        avisar_pedido_direcionado(
+            request,
+            contexto,
+            pedido_id=gravado.id,
+            profissional_id=convidado_id,
+            titulo_pedido=dados.titulo,
+        )
     return pedido_out_completo(contexto, gravado, usuario)
 
 
@@ -285,7 +336,12 @@ def ver_pedido(
     return pedido_out_completo(contexto, pedido, usuario, ja_avaliou)
 
 
-def _dados_out(d: DadosPedido) -> DadosPedidoOut:
+def _dados_out(
+    d: DadosPedido,
+    *,
+    fotos_urls: list[str] | None = None,
+    convidado_id: str | None = None,
+) -> DadosPedidoOut:
     return DadosPedidoOut(
         titulo=d.titulo,
         descricao=d.descricao,
@@ -296,6 +352,8 @@ def _dados_out(d: DadosPedido) -> DadosPedidoOut:
         urgente=d.urgente,
         endereco=EnderecoIn(**asdict(d.endereco)) if d.endereco else None,
         modalidade=d.modalidade,
+        fotos_urls=list(fotos_urls or ()),
+        profissional_convidado_id=d.profissional_convidado_id or convidado_id,
     )
 
 
@@ -312,11 +370,18 @@ def ver_dados_do_pedido(
     dados = contexto.pedidos.dados_do_pedido(pedido.id)
     if dados is None:
         raise HTTPException(404, "Este pedido não tem descrição gravada.")
-    return _dados_out(dados).model_copy(update={"respostas": respostas_out(contexto, pedido.id)})
+    convidado_id = contexto.extras.get("pedidos_convidados", {}).get(pedido.id)
+    return _dados_out(
+        dados,
+        fotos_urls=urls_fotos_do_pedido(request, pedido.id),
+        convidado_id=convidado_id,
+    ).model_copy(update={"respostas": respostas_out(contexto, pedido.id)})
 
 
 @router.patch(
-    "/{pedido_id}", response_model=DadosPedidoOut, summary="Editar o pedido (cliente, antes do aceite)"
+    "/{pedido_id}",
+    response_model=DadosPedidoOut,
+    summary="Editar o pedido (cliente, antes do aceite)",
 )
 def editar_pedido(
     pedido_id: str,
@@ -360,7 +425,12 @@ def editar_pedido(
     minimo, maximo = novos.faixa_preco_min_centavos, novos.faixa_preco_max_centavos
     if minimo is not None and maximo is not None and minimo > maximo:
         raise HTTPException(422, "O valor mínimo não pode passar do máximo.")
-    return _dados_out(contexto.pedidos.atualizar_dados(pedido.id, usuario.id, novos))
+    convidado_id = contexto.extras.get("pedidos_convidados", {}).get(pedido.id)
+    return _dados_out(
+        contexto.pedidos.atualizar_dados(pedido.id, usuario.id, novos),
+        fotos_urls=urls_fotos_do_pedido(request, pedido.id),
+        convidado_id=convidado_id,
+    )
 
 
 @router.get("/{pedido_id}/eventos", response_model=list[EventoOut], summary="Histórico do pedido")
@@ -420,7 +490,7 @@ def mudar_estado(
     bruto, offline_em = offline.separar(
         acao, corpo.prova if corpo else None, contexto.agora(), obter_config_uploads()
     )
-    prova = _montar_prova(contexto, acao, bruto, pedido)
+    prova = _montar_prova(contexto, acao, bruto, pedido, usuario)
     servico_uploads = getattr(request.app.state, "servico_uploads", None)
     if servico_uploads is not None:  # foto de check-in/out: mídia do servidor, hora e distância
         prova = validar_prova_midia(servico_uploads, pedido, usuario.id, acao, prova)
@@ -470,6 +540,15 @@ def mudar_estado(
         _concluir_efeitos(contexto, gravado)
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, acao, contexto)
+        if acao is Acao.REGISTRAR_CLIENTE_AUSENTE:
+            with contextlib.suppress(Exception):
+                conversa = contexto.conversas.abrir(gravado.id, usuario.id)
+                contexto.conversas.enviar(
+                    conversa,
+                    usuario.id,
+                    "Cheguei ao local no horário agendado, mas não encontrei o cliente. "
+                    "Registrei a ocorrência com comprovação no aplicativo.",
+                )
         if offline_em is not None:
             offline.registrar(contexto, usuario, pedido, acao, offline_em, contexto.agora())
     return pedido_out(gravado, usuario)
@@ -513,7 +592,9 @@ def abrir_disputa(
         raise HTTPException(403, "Só o cliente do pedido pode abrir disputa.")
     agora = contexto.agora()
     prova = ProvaDisputa(corpo.motivo, corpo.descricao, tuple(f.para_regra() for f in corpo.fotos))
-    transicao = estados.transicionar(pedido, Acao.ABRIR_DISPUTA, ator_de(usuario, pedido), agora, prova)
+    transicao = estados.transicionar(
+        pedido, Acao.ABRIR_DISPUTA, ator_de(usuario, pedido), agora, prova
+    )
 
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
     congelado = saldo.retido + saldo.a_liberar

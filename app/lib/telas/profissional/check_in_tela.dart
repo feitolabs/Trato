@@ -112,8 +112,18 @@ class _CheckInTelaState extends State<CheckInTela> {
   }
 
   Future<void> _clienteAusente() async {
-    await widget.servico.avisarClienteAusente();
-    if (mounted) setState(() => _aviso = 'Avisamos o cliente pelo chat.');
+    setState(() => _erroPasso = null);
+    try {
+      await widget.servico.avisarClienteAusente();
+      if (mounted) {
+        setState(
+          () => _aviso =
+              'Ocorrência de cliente ausente registrada com comprovação e aviso ao cliente.',
+        );
+      }
+    } on ErroTrato catch (erro) {
+      if (mounted) setState(() => _erroPasso = erro.mensagem);
+    }
   }
 
   Future<void> _iniciar() async {

@@ -18,10 +18,18 @@ class CarteiraTela extends StatelessWidget {
     this.barraInferior,
     this.soExtrato = false,
     this.aoAbrirItem,
+    this.aoConfigurarRecebimento,
+    this.aoBaixarExtratoPdf,
   });
 
   /// Toque numa linha do extrato: abre o detalhe dos valores do pedido.
   final ValueChanged<ItemExtrato>? aoAbrirItem;
+
+  /// Abre a tela de cadastro/alteração da conta de recebimento (chave Pix / banco).
+  final VoidCallback? aoConfigurarRecebimento;
+
+  /// Baixa o extrato mensal em PDF diretamente no app.
+  final VoidCallback? aoBaixarExtratoPdf;
 
   /// D15: a Carteira é só extrato (o Trato não guarda saldo nem faz saque). Esconde os
   /// cartões de saldo e o botão de saque e mostra apenas os lançamentos.
@@ -56,7 +64,17 @@ class CarteiraTela extends StatelessWidget {
               _LinhaSaldos(resumo: resumo),
               const SizedBox(height: EspacosTrato.x6),
             ],
-            _CabecalhoExtrato(aoVerTudo: dados.extrato.isEmpty ? null : aoVerTudo),
+            if (aoConfigurarRecebimento != null) ...[
+              _CartaoContaRecebimento(
+                conta: dados.contaRecebimento,
+                aoTocar: aoConfigurarRecebimento!,
+              ),
+              const SizedBox(height: EspacosTrato.x5),
+            ],
+            _CabecalhoExtrato(
+              aoVerTudo: dados.extrato.isEmpty ? null : aoVerTudo,
+              aoBaixarPdf: aoBaixarExtratoPdf,
+            ),
             const SizedBox(height: EspacosTrato.x3),
             if (dados.extrato.isEmpty)
               const _ExtratoVazio()
@@ -206,9 +224,10 @@ class _CartaoSaldo extends StatelessWidget {
 }
 
 class _CabecalhoExtrato extends StatelessWidget {
-  const _CabecalhoExtrato({required this.aoVerTudo});
+  const _CabecalhoExtrato({required this.aoVerTudo, this.aoBaixarPdf});
 
   final VoidCallback? aoVerTudo;
+  final VoidCallback? aoBaixarPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -221,8 +240,55 @@ class _CabecalhoExtrato extends StatelessWidget {
             child: Text('Extrato por serviço', style: TipografiaTrato.titulo, maxLines: 1),
           ),
         ),
+        if (aoBaixarPdf != null)
+          BotaoLink(texto: 'PDF mensal', aoTocar: aoBaixarPdf),
         if (aoVerTudo != null) BotaoLink(texto: 'Ver tudo', aoTocar: aoVerTudo),
       ],
+    );
+  }
+}
+
+class _CartaoContaRecebimento extends StatelessWidget {
+  const _CartaoContaRecebimento({required this.conta, required this.aoTocar});
+
+  final ContaRecebimento? conta;
+  final VoidCallback aoTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final cadastrada = conta?.cadastrada == true;
+    final resumo = conta?.resumoExibicao ?? conta?.chavePixMascarada;
+    return CartaoTrato(
+      child: Row(
+        children: [
+          const Icon(Icons.account_balance_outlined, color: CoresTrato.petroleo),
+          const SizedBox(width: EspacosTrato.x3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cadastrada ? 'Conta de recebimento ativa' : 'Cadastre sua conta Pix',
+                  style: TipografiaTrato.tituloCartao,
+                ),
+                const SizedBox(height: EspacosTrato.x1),
+                Text(
+                  cadastrada && (resumo ?? '').isNotEmpty
+                      ? resumo!
+                      : 'Informe sua chave Pix para receber os repasses liberados.',
+                  style: TipografiaTrato.corpoPequeno
+                      .copyWith(color: CoresTrato.textoSecundario),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: EspacosTrato.x2),
+          BotaoLink(
+            texto: cadastrada ? 'Alterar' : 'Cadastrar',
+            aoTocar: aoTocar,
+          ),
+        ],
+      ),
     );
   }
 }

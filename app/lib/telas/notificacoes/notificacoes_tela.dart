@@ -12,6 +12,7 @@ class NotificacoesTela extends StatelessWidget {
     super.key,
     required this.servico,
     this.aoAbrirDestino,
+    this.aoAbrirPreferencias,
     this.comVoltar = true,
     this.atualizarACada,
     this.atualizarQuando,
@@ -23,6 +24,7 @@ class NotificacoesTela extends StatelessWidget {
 
   final ServicoNotificacoes servico;
   final ValueChanged<Notificacao>? aoAbrirDestino;
+  final VoidCallback? aoAbrirPreferencias;
   final bool comVoltar;
 
   @override
@@ -30,6 +32,15 @@ class NotificacoesTela extends StatelessWidget {
     return MolduraTelaComum(
       titulo: 'Notificações',
       comVoltar: comVoltar,
+      acoes: [
+        if (aoAbrirPreferencias != null)
+          IconButton(
+            key: const Key('botao-preferencias-notificacoes'),
+            tooltip: 'Preferências de notificação',
+            onPressed: aoAbrirPreferencias,
+            icon: const Icon(Icons.tune),
+          ),
+      ],
       child: CarregadorTela<List<Notificacao>>(
         carregar: servico.listar,
         atualizarACada: atualizarACada,

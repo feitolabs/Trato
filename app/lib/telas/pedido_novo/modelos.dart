@@ -246,7 +246,13 @@ class RascunhoPedido {
     this.modalidade = Modalidade.presencial,
     this.endereco,
     this.respostas = const {},
+    this.profissionalConvidadoId,
+    this.profissionalConvidadoNome,
   });
+
+  /// Profissional escolhido diretamente pelo cliente ao tocar "Pedir orçamento" no perfil.
+  final String? profissionalConvidadoId;
+  final String? profissionalConvidadoNome;
 
   /// Respostas às perguntas da categoria: id da pergunta -> resposta (texto, número, bool ou
   /// lista de textos), como o backend grava.

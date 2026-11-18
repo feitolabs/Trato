@@ -3,6 +3,8 @@
 /// Valores em centavos inteiros.
 library;
 
+import '../profissional/servico_orcamento.dart' show ItemMaterial;
+
 /// Atendimento já contratado, mostrado no cartão escuro do Início.
 class ProximoAtendimento {
   const ProximoAtendimento({
@@ -100,6 +102,7 @@ class PedidoContratado {
 /// Orçamento que o profissional enviou (a última versão), para ele acompanhar a resposta do cliente.
 class OrcamentoEnviado {
   const OrcamentoEnviado({
+    this.orcamentoId = '',
     required this.pedidoId,
     required this.titulo,
     required this.valorCentavos,
@@ -109,6 +112,7 @@ class OrcamentoEnviado {
     this.prazoExecucaoDias,
   });
 
+  final String orcamentoId;
   final String pedidoId;
 
   /// Título do pedido, ou "Pedido #AAAA".
@@ -123,6 +127,95 @@ class OrcamentoEnviado {
 
   bool get aguardando => situacao == 'aguardando';
   bool get aceito => situacao == 'aceito';
+}
+
+/// Linha de item de um orçamento já enviado (horas, deslocamento, material, etc.).
+class ItemOrcamentoEnviado {
+  const ItemOrcamentoEnviado({
+    required this.tipo,
+    required this.descricao,
+    required this.quantidade,
+    required this.valorUnitarioCentavos,
+    required this.totalCentavos,
+  });
+
+  final String tipo;
+  final String descricao;
+  final String quantidade;
+  final int valorUnitarioCentavos;
+  final int totalCentavos;
+}
+
+/// Detalhe completo do orçamento enviado pelo profissional.
+class DetalheOrcamentoEnviado {
+  const DetalheOrcamentoEnviado({
+    required this.orcamentoId,
+    required this.pedidoId,
+    required this.tituloPedido,
+    required this.versao,
+    required this.situacao,
+    required this.valorCentavos,
+    this.taxaCentavos,
+    this.liquidoCentavos,
+    this.prazoExecucaoDias,
+    this.garantiaDias,
+    this.foraDoEscopo,
+    this.observacoes,
+    this.validoAte,
+    this.horasDeslocamento,
+    this.horasTrabalhadas,
+    this.itens = const [],
+  });
+
+  final String orcamentoId;
+  final String pedidoId;
+  final String tituloPedido;
+  final int versao;
+  final String situacao;
+  final int valorCentavos;
+  final int? taxaCentavos;
+  final int? liquidoCentavos;
+  final int? prazoExecucaoDias;
+  final int? garantiaDias;
+  final String? foraDoEscopo;
+  final String? observacoes;
+  final DateTime? validoAte;
+  final String? horasDeslocamento;
+  final String? horasTrabalhadas;
+  final List<ItemOrcamentoEnviado> itens;
+
+  bool get podeEditar => situacao == 'aguardando';
+
+  int get valorHoraCentavos {
+    for (final item in itens) {
+      if ((item.tipo == 'horas' || item.tipo == 'deslocamento') && item.valorUnitarioCentavos > 0) {
+        return item.valorUnitarioCentavos;
+      }
+    }
+    return 10000;
+  }
+
+  int get decimosDeslocamento => _decimos(horasDeslocamento, 'deslocamento');
+
+  int get decimosTrabalhadas => _decimos(horasTrabalhadas, 'horas');
+
+  int _decimos(String? resumo, String tipo) {
+    final parsed = resumo == null ? null : double.tryParse(resumo.replaceAll(',', '.'));
+    if (parsed != null) return (parsed * 10).round();
+    var soma = 0.0;
+    for (final item in itens) {
+      if (item.tipo == tipo) {
+        soma += double.tryParse(item.quantidade.replaceAll(',', '.')) ?? 0;
+      }
+    }
+    return (soma * 10).round();
+  }
+
+  List<ItemMaterial> get materiais => [
+        for (final item in itens)
+          if (item.tipo == 'material')
+            ItemMaterial(nome: item.descricao, centavos: item.totalCentavos),
+      ];
 }
 
 class ResumoCarteira {
@@ -150,7 +243,11 @@ class PedidoAberto {
     this.clienteId,
     this.clienteNome,
     this.modalidade = 'presencial',
+    this.convidado = false,
   });
+
+  /// Verdadeiro quando o cliente direcionou este pedido diretamente a este profissional.
+  final bool convidado;
 
   /// `presencial` ou `remoto`.
   final String modalidade;
@@ -216,6 +313,18 @@ class InicioProfissional {
         proximo: proximo,
         carteira: carteira,
         pedidos: novos,
+        contratados: contratados,
+        orcamentosEnviados: orcamentosEnviados,
+        emAnalise: emAnalise,
+      );
+
+  /// Mesmo início com o estado de "Disponível agora" atualizado.
+  InicioProfissional comDisponivel(bool disponivel) => InicioProfissional(
+        nome: nome,
+        disponivelAgora: disponivel,
+        proximo: proximo,
+        carteira: carteira,
+        pedidos: pedidos,
         contratados: contratados,
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,

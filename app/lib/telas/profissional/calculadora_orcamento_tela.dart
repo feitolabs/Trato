@@ -31,6 +31,10 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
     this.faixaRegiaoCentavos,
     this.opcoesGarantiaDias = const [30, 60, 90],
     this.validadeDias = 3,
+    this.mostrarForaDoEscopo = false,
+    this.foraDoEscopoInicial,
+    this.observacoesInicial,
+    this.edicao = false,
   });
 
   final ServicoOrcamento servico;
@@ -42,6 +46,14 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
   final int garantiaInicialDias;
   final int prazoExecucaoInicialDias;
   final List<ItemMaterial> itensIniciais;
+
+  /// Exibe campos de "Fora do escopo" e "Observações" (oculto por padrão nos goldens).
+  final bool mostrarForaDoEscopo;
+  final String? foraDoEscopoInicial;
+  final String? observacoesInicial;
+
+  /// Verdadeiro quando o profissional está editando uma proposta já enviada.
+  final bool edicao;
 
   /// "Serviços parecidos na região" (mínimo, máximo), vindo do backend. Sem dado, a linha some.
   final (int, int)? faixaRegiaoCentavos;
@@ -60,6 +72,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   late final _horas = TextEditingController(text: widget.horasInicial);
   late final _valorHora = TextEditingController(text: widget.valorHoraInicial);
   late final _diasExecucao = TextEditingController(text: '${widget.prazoExecucaoInicialDias}');
+  late final _foraDoEscopo = TextEditingController(text: widget.foraDoEscopoInicial);
+  late final _observacoes = TextEditingController(text: widget.observacoesInicial);
   final _keyDeslocamento = GlobalKey();
   final _keyHoras = GlobalKey();
   final _keyValorHora = GlobalKey();
@@ -108,6 +122,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _horas.dispose();
     _valorHora.dispose();
     _diasExecucao.dispose();
+    _foraDoEscopo.dispose();
+    _observacoes.dispose();
     _focoDeslocamento.dispose();
     _focoHoras.dispose();
     _focoValorHora.dispose();
@@ -254,6 +270,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       materialPorMim: _materialPorMim,
       pedirSinalMaterial: _materialPorMim && _pedirSinal,
       totalCentavos: _total,
+      foraDoEscopo: _foraDoEscopo.text.trim().isEmpty ? null : _foraDoEscopo.text.trim(),
+      observacoes: _observacoes.text.trim().isEmpty ? null : _observacoes.text.trim(),
     );
     if (widget.aoEnviar == null) return;
     setState(() => _enviando = true);
@@ -282,7 +300,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             const SizedBox(height: EspacosTrato.x3),
           ],
           BotaoPrimario(
-            texto: 'Enviar orçamento',
+            texto: widget.edicao ? 'Enviar nova versão' : 'Enviar orçamento',
             carregando: _enviando,
             aoTocar: (_enviando || _erroTotal() != null) ? null : _enviar,
           ),
@@ -295,7 +313,10 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
         ],
       ),
       children: [
-        Text('Seu orçamento', style: TipografiaTrato.tituloGrande),
+        Text(
+          widget.edicao ? 'Editar orçamento' : 'Seu orçamento',
+          style: TipografiaTrato.tituloGrande,
+        ),
         const SizedBox(height: EspacosTrato.x5),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,6 +428,22 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           },
           aoMarcarSinal: (marcado) => setState(() => _pedirSinal = marcado),
         ),
+        if (widget.mostrarForaDoEscopo ||
+            (widget.foraDoEscopoInicial ?? '').isNotEmpty ||
+            (widget.observacoesInicial ?? '').isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          CampoTrato(
+            rotulo: 'Fora do escopo (opcional)',
+            controlador: _foraDoEscopo,
+            dica: 'Ex.: quebra de alvenaria, pintura ou peças extras',
+          ),
+          const SizedBox(height: EspacosTrato.x4),
+          CampoTrato(
+            rotulo: 'Observações (opcional)',
+            controlador: _observacoes,
+            dica: 'Condições de execução, horários ou recomendações',
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         _ResumoEscuro(totalCentavos: _total, resumo: _resumo),
       ],

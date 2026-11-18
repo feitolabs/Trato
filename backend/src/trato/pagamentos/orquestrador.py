@@ -203,13 +203,18 @@ class ServicoPagamento:
             raise ErroFluxo("Só o cartão pode ser parcelado.", 422)
         antigas = [c for c in self.cobrancas.do_pedido(pedido.id) if c.aditivo_id == aditivo_id]
         for antiga in antigas:
-            if antiga.status is EstadoCobranca.AGUARDANDO:
-                if antiga.meio is meio and antiga.parcelas == parcelas:
-                    return antiga
-                self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
-            elif antiga.status is EstadoCobranca.PAGA:
+            if antiga.status is EstadoCobranca.PAGA:
                 raise ErroFluxo("Isto já foi pago.")
         total = self.total_a_cobrar(contexto, pedido, servico_centavos, aditivo_id, parcelas)
+        for antiga in antigas:
+            if antiga.status is EstadoCobranca.AGUARDANDO:
+                if (
+                    antiga.meio is meio
+                    and antiga.parcelas == parcelas
+                    and antiga.valor_centavos == total.cobrado_centavos
+                ):
+                    return antiga
+                self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
         # A chave leva o que define a cobrança (meio, valor, parcelas, cliente): o Stripe recusa a
         # MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be used
         # with the same parameters"). Sem isso, trocar Pix por cartão, ou o valor mudar depois de

@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Directory, File, Platform;
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../agenda/modelos.dart' show EstadoAgendamento;
 import '../../dados/carregador.dart';
@@ -8,6 +11,7 @@ import '../../dados/erros.dart';
 import '../../dados/config_publica.dart';
 import '../../dados/relogio_de_atualizacao.dart';
 import '../../dispositivo/mapa.dart';
+import '../../dispositivo/servico_push.dart';
 import '../../dados/repositorios.dart';
 import '../../dispositivo/folha_cartao.dart';
 import '../orcamentos/folha_contraproposta.dart';
@@ -55,6 +59,7 @@ import '../comuns/sucesso_acao_tela.dart';
 import '../conta/dados_pessoais_tela.dart';
 import '../conta/enderecos_tela.dart';
 import '../conta/favoritos_contatos_telas.dart';
+import '../conta/seguranca_conta_tela.dart';
 import '../conta/modelos.dart' show EnderecoSalvo, ServicoConta;
 import 'navegacao_casca.dart';
 import '../../dados/modelos_api.dart' show PedidoApi;
@@ -70,6 +75,7 @@ import '../verificacao/verificacao.dart'
     show ServicoVerificacao, SituacaoVerificacao, StatusVerificacao;
 import '../verificacao/verificacao_tela.dart';
 import '../carteira/carteira_tela.dart';
+import '../carteira/conta_recebimento_tela.dart';
 import '../carteira/modelos.dart';
 import '../cliente/casca_cliente_tela.dart';
 import '../carteira/avaliar_cliente_tela.dart';
@@ -82,6 +88,7 @@ import '../conclusao/garantia_tela.dart';
 import '../conclusao/relatar_problema_tela.dart';
 import '../notificacoes/modelos.dart';
 import '../notificacoes/notificacoes_tela.dart';
+import '../notificacoes/preferencias_notificacoes_tela.dart';
 import '../notificacoes/servico_repositorio.dart';
 import '../orcamentos/detalhe_orcamento_tela.dart';
 import '../orcamentos/orcamentos_recebidos_tela.dart';
@@ -99,6 +106,7 @@ import '../pedidos/seus_pedidos_tela.dart';
 import '../profissional/calculadora_orcamento_tela.dart';
 import '../profissional/check_in_tela.dart';
 import '../profissional/check_out_tela.dart';
+import '../profissional/detalhe_orcamento_enviado_tela.dart';
 import '../profissional/servico_check_in.dart';
 import '../profissional_inicio/casca_profissional_tela.dart';
 import '../profissional_inicio/modelos.dart';
@@ -113,6 +121,31 @@ abstract final class RotasTrato {
 
   /// Folha de cartão do provedor. O `main` liga a real; nos testes não abre nada.
   static FolhaCartao folhaCartao = FolhaCartaoFake();
+
+  @visibleForTesting
+  static Future<String> Function(List<int> bytes, String arquivo)? salvarPdfParaTeste;
+
+  /// Canal nativo de push (FCM / APNs). Nos testes fica falso/silencioso.
+  static ServicoPush push = ServicoPushNativo();
+  static StreamSubscription<TokenPushDispositivo>? _subPush;
+
+  /// Registra o token de push do aparelho no backend após autenticar.
+  static Future<void> sincronizarPush() async {
+    if (!repos.modoApi || !temSessao) return;
+    _subPush ??= push.aoAtualizarToken.listen((t) {
+      push.ultimoTokenRegistrado = t.token;
+      repos.notificacoes.registrarDispositivo(t.token, t.plataforma).catchError((_) {});
+    });
+    try {
+      final atual = await push.obterToken();
+      if (atual != null) {
+        push.ultimoTokenRegistrado = atual.token;
+        await repos.notificacoes.registrarDispositivo(atual.token, atual.plataforma);
+      }
+    } on Object {
+      // Sem push nativo configurado (ex.: navegador/desktop/teste): segue normalmente.
+    }
+  }
 
   /// Câmera, GPS e envio de arquivos. O `main.dart` liga o real.
   static late DispositivoTrato dispositivo;
@@ -238,9 +271,18 @@ abstract final class RotasTrato {
     }
   }
 
-  /// Sair da conta: encerra o login, limpa o token e volta ao login sem histórico.
+  /// Sair da conta: remove o token de push, encerra o login, limpa o token e volta ao login.
   static Future<void> sair(BuildContext context) async {
     final navegador = Navigator.of(context);
+    final tokenPush = push.ultimoTokenRegistrado;
+    if (tokenPush != null && repos.modoApi && temSessao) {
+      try {
+        await repos.notificacoes.removerDispositivo(tokenPush);
+      } on Object {
+        // Sem rede ou já expirado: segue com o logout local.
+      }
+      push.ultimoTokenRegistrado = null;
+    }
     try {
       await ServicoAuthPadrao.atual.sair();
     } on Object {
@@ -328,32 +370,54 @@ abstract final class RotasTrato {
         ),
       );
 
-  /// "Pedir orçamento" no perfil: abre o Novo pedido na categoria do profissional.
+  /// "Pedir orçamento" no perfil: abre o Novo pedido na categoria do profissional (direcionado a ele).
   static Future<void> _pedirOrcamentoA(
       BuildContext context, Profissional p) async {
     CategoriaServico? categoria;
     final ok = await _tentar(context, () async {
       final todas = await repos.catalogo.categorias();
-      categoria = todas.where((c) => c.id == p.categoriaId).firstOrNull;
+      if (p.categoriaId != null) {
+        categoria = todas.where((c) => c.id == p.categoriaId).firstOrNull;
+      }
+      if (categoria == null && p.especialidade.trim().isNotEmpty) {
+        final esp = p.especialidade.toLowerCase();
+        categoria = todas.where((c) => esp.contains(c.nome.toLowerCase())).firstOrNull;
+      }
     });
     if (!ok || !context.mounted) return;
-    abrirNovoPedido(context, categoria: categoria);
+    abrirNovoPedido(
+      context,
+      categoria: categoria,
+      profissionalConvidado: p,
+    );
   }
 
   // --- Cliente: catálogo, serviços, notificações, termos ------------------------------
 
   /// Novo pedido. Sem [categoria], o cliente escolhe uma antes (passo 1).
-  static void abrirNovoPedido(BuildContext context,
-          {CategoriaServico? categoria}) =>
-      _abrir<void>(context,
-          categoria == null ? _escolherCategoria() : _novoPedido(categoria));
+  static void abrirNovoPedido(
+    BuildContext context, {
+    CategoriaServico? categoria,
+    Profissional? profissionalConvidado,
+  }) =>
+      _abrir<void>(
+        context,
+        categoria == null
+            ? _escolherCategoria(profissionalConvidado: profissionalConvidado)
+            : _novoPedido(categoria, profissionalConvidado: profissionalConvidado),
+      );
 
-  static Widget _escolherCategoria() => Builder(
+  static Widget _escolherCategoria({Profissional? profissionalConvidado}) => Builder(
         builder: (context) => TodasCategoriasTela(
           titulo: 'Que serviço você precisa?',
           carregar: repos.catalogo.categorias,
           aoEscolher: (c) => Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(builder: (_) => _novoPedido(c)),
+            MaterialPageRoute<void>(
+              builder: (_) => _novoPedido(
+                c,
+                profissionalConvidado: profissionalConvidado,
+              ),
+            ),
           ),
         ),
       );
@@ -735,10 +799,8 @@ abstract final class RotasTrato {
           ),
           carregarPedidos: repos.profissional.pedidosAbertos,
           recarregarInicio: repos.profissional.inicio,
-          aoAbrirOrcamentoEnviado: (o) => _abrir<void>(
-            context,
-            _chat(o.pedidoId, comoProfissional: true),
-          ),
+          aoAlterarDisponivel: repos.profissional.alterarDisponivelAgora,
+          aoAbrirOrcamentoEnviado: (o) => _abrirDetalheOrcamentoEnviado(context, o),
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
           aoAbrirMapa: abrirNoMapa,
@@ -862,8 +924,60 @@ abstract final class RotasTrato {
         : ServicoCheckInDispositivo(base: base, dispositivo: dispositivo);
   }
 
+  static String? _textoDecimos(int decimos) {
+    if (decimos <= 0) return null;
+    final intParte = decimos ~/ 10;
+    final resto = decimos % 10;
+    return resto == 0 ? '$intParte' : '$intParte,$resto';
+  }
+
+  static String _textoCentavosCampo(int centavos) {
+    final intParte = centavos ~/ 100;
+    final resto = centavos % 100;
+    return resto == 0 ? '$intParte' : '$intParte,${resto.toString().padLeft(2, '0')}';
+  }
+
+  static void _abrirDetalheOrcamentoEnviado(
+    BuildContext context,
+    OrcamentoEnviado resumo,
+  ) {
+    if (resumo.orcamentoId.isEmpty) {
+      _abrir<void>(context, _chat(resumo.pedidoId, comoProfissional: true));
+      return;
+    }
+    _abrir<void>(
+      context,
+      Carregador<DetalheOrcamentoEnviado>(
+        carregar: () => repos.profissional.meuOrcamento(
+          resumo.orcamentoId,
+          tituloPedido: resumo.titulo,
+          situacao: resumo.situacao,
+        ),
+        construir: (tela, det) => DetalheOrcamentoEnviadoTela(
+          detalhe: det,
+          aoEditar: det.podeEditar
+              ? () => _abrirOrcamento(
+                    tela,
+                    det.pedidoId,
+                    det.tituloPedido,
+                    inicial: det,
+                  )
+              : null,
+          aoAbrirChat: () => _abrir<void>(
+            tela,
+            _chat(det.pedidoId, comoProfissional: true),
+          ),
+        ),
+      ),
+    );
+  }
+
   static void _abrirOrcamento(
-      BuildContext context, String pedidoId, String titulo) {
+    BuildContext context,
+    String pedidoId,
+    String titulo, {
+    DetalheOrcamentoEnviado? inicial,
+  }) {
     final servico = repos.profissional.servicoOrcamento(pedidoId);
     _abrir<void>(
       context,
@@ -871,6 +985,19 @@ abstract final class RotasTrato {
         builder: (tela) => CalculadoraOrcamentoTela(
           servico: servico,
           tituloPedido: titulo,
+          edicao: inicial != null,
+          mostrarForaDoEscopo: true,
+          deslocamentoInicial:
+              inicial == null ? null : _textoDecimos(inicial.decimosDeslocamento),
+          horasInicial:
+              inicial == null ? null : _textoDecimos(inicial.decimosTrabalhadas),
+          valorHoraInicial:
+              inicial == null ? null : _textoCentavosCampo(inicial.valorHoraCentavos),
+          garantiaInicialDias: inicial?.garantiaDias ?? 90,
+          prazoExecucaoInicialDias: inicial?.prazoExecucaoDias ?? 3,
+          itensIniciais: inicial?.materiais ?? const [],
+          foraDoEscopoInicial: inicial?.foraDoEscopo,
+          observacoesInicial: inicial?.observacoes,
           aoEnviar: (pronto) async {
             final ok = await _tentar(tela, () => servico.enviar(pronto));
             if (ok && tela.mounted) {
@@ -878,7 +1005,7 @@ abstract final class RotasTrato {
               await _abrirSucesso<void>(
                 tela,
                 (ctxSucesso) => SucessoAcaoTela(
-                  titulo: 'Orçamento enviado!',
+                  titulo: inicial != null ? 'Orçamento atualizado!' : 'Orçamento enviado!',
                   subtitulo:
                       'O cliente já pode analisar o valor e o prazo combinados.',
                   detalhes: [
@@ -927,41 +1054,57 @@ abstract final class RotasTrato {
         ),
       );
 
-  /// Ações do pedido de hoje: check-in, nota de materiais e aditivo.
-  /// Escolhe dia e hora da visita de um pedido pago. Quem aceita ou recusa é o backend.
-  static Future<void> _marcarVisita(
-      BuildContext context, String pedidoId) async {
+  static Future<DateTime?> _escolherJanelaVisita(
+    BuildContext context, {
+    String tituloDia = 'Dia da visita',
+    String tituloHora = 'Hora da chegada',
+  }) async {
     final hoje = DateTime.now();
     final dia = await showDatePicker(
       context: context,
       firstDate: hoje,
       lastDate: hoje.add(const Duration(days: 90)),
-      helpText: 'Dia da visita',
+      helpText: tituloDia,
     );
-    if (dia == null || !context.mounted) return;
+    if (dia == null || !context.mounted) return null;
     final hora = await showTimePicker(
       context: context,
       initialTime: const TimeOfDay(hour: 9, minute: 0),
-      helpText: 'Hora da chegada',
-      // Relógio no formato brasileiro (24 h), como o Flutter faz em português do Brasil.
+      helpText: tituloHora,
     );
-    if (hora == null || !context.mounted) return;
-    final inicio =
-        DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute);
+    if (hora == null || !context.mounted) return null;
+    return DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute);
+  }
+
+  /// Ações do pedido de hoje: check-in, nota de materiais e aditivo.
+  /// Escolhe dia e hora da visita de um pedido pago ou já agendado (remarcar).
+  static Future<void> _marcarVisita(
+    BuildContext context,
+    String pedidoId, {
+    bool remarcar = false,
+  }) async {
+    final inicio = await _escolherJanelaVisita(
+      context,
+      tituloDia: remarcar ? 'Novo dia da visita' : 'Dia da visita',
+    );
+    if (inicio == null || !context.mounted) return;
+    final fim = inicio.add(const Duration(hours: 2));
     final ok = await _tentar(
       context,
-      () => repos.profissional.confirmarAgenda(
-        pedidoId,
-        inicio,
-        inicio.add(const Duration(hours: 2)),
-      ),
+      () => remarcar
+          ? repos.profissional.remarcarAgenda(pedidoId, inicio, fim)
+          : repos.profissional.confirmarAgenda(pedidoId, inicio, fim),
     );
     if (ok) pedidosMudaram.value++;
     if (ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'Visita marcada. O cliente já pode ver o código de início.')),
+        SnackBar(
+          content: Text(
+            remarcar
+                ? 'Visita remarcada com sucesso.'
+                : 'Visita marcada. O cliente já pode ver o código de início.',
+          ),
+        ),
       );
     }
   }
@@ -1085,13 +1228,22 @@ abstract final class RotasTrato {
                     abrirNoMapa(consultaMapa);
                   },
                 ),
-              if (precisaAgendar || agendado)
+              if (precisaAgendar)
                 ListTile(
                   leading: const Icon(Icons.event_available_outlined),
                   title: const Text('Marcar data da visita'),
                   onTap: () {
                     Navigator.of(folha).pop();
                     _marcarVisita(context, pedidoId);
+                  },
+                ),
+              if (agendado && !precisaAgendar)
+                ListTile(
+                  leading: const Icon(Icons.edit_calendar_outlined),
+                  title: const Text('Remarcar data da visita'),
+                  onTap: () {
+                    Navigator.of(folha).pop();
+                    _marcarVisita(context, pedidoId, remarcar: true);
                   },
                 ),
               if (podeCheckIn)
@@ -1275,15 +1427,137 @@ abstract final class RotasTrato {
       );
 
   /// Carteira do profissional como EXTRATO (D15): sem saldo próprio, sem saque.
-  static Widget _abaCarteira() => Carregador<List<ItemExtrato>>(
-        carregar: repos.profissional.extrato,
+  static Widget _abaCarteira() =>
+      Carregador<(List<ItemExtrato>, ContaRecebimento)>(
+        carregar: () => emParalelo2(
+          repos.profissional.extrato(),
+          repos.profissional.obterContaRecebimento().catchError(
+                (_) => const ContaRecebimento(cadastrada: false),
+              ),
+        ),
         atualizarQuando: pedidosMudaram,
-        construir: (context, itens) => CarteiraTela(
+        construir: (context, par) => CarteiraTela(
           soExtrato: true,
-          dados: DadosCarteira(extrato: itens),
+          dados: DadosCarteira(extrato: par.$1, contaRecebimento: par.$2),
           aoAbrirItem: (item) => _abrirValoresEAvaliar(context, item.pedidoId!),
+          aoConfigurarRecebimento: () => _abrirContaRecebimento(context, par.$2),
+          aoBaixarExtratoPdf: () => _baixarExtratoPdf(context),
         ),
       );
+
+  static Future<void> _abrirContaRecebimento(
+    BuildContext context,
+    ContaRecebimento atual,
+  ) async {
+    final salva = await Navigator.of(context).push<ContaRecebimento>(
+      MaterialPageRoute(
+        builder: (_) => ContaRecebimentoTela(
+          inicial: atual,
+          aoSalvar: repos.profissional.salvarContaRecebimento,
+        ),
+      ),
+    );
+    if (salva != null && context.mounted) {
+      pedidosMudaram.value++;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Conta de recebimento salva com sucesso.')),
+        );
+    }
+  }
+
+  static Future<void> _baixarExtratoPdf(BuildContext context) async {
+    final agora = DateTime.now();
+    final opcoes = <(String, String)>[];
+    for (var i = 0; i < 6; i++) {
+      final ref = DateTime(agora.year, agora.month - i, 1);
+      final iso = '${ref.year}-${ref.month.toString().padLeft(2, '0')}';
+      final rotulo = '${ref.month.toString().padLeft(2, '0')}/${ref.year}';
+      opcoes.add((iso, rotulo));
+    }
+    var selecionado = opcoes.first.$1;
+    final confirmado = await showDialog<String>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setStateDialog) => AlertDialog(
+          title: const Text('Extrato mensal em PDF'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selecionado,
+            isExpanded: true,
+            items: [
+              for (final op in opcoes)
+                DropdownMenuItem(value: op.$1, child: Text('Mês ${op.$2}')),
+            ],
+            onChanged: (v) {
+              if (v != null) setStateDialog(() => selecionado = v);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(d).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(d).pop(selecionado),
+              child: const Text('Baixar PDF'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmado == null || !context.mounted) return;
+    final mensagens = ScaffoldMessenger.of(context);
+    try {
+      final bytes = await repos.profissional.baixarExtratoPdf(mes: confirmado);
+      final arquivo = 'trato_extrato_${confirmado.replaceAll('-', '_')}.pdf';
+      final caminho =
+          await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
+      if (!context.mounted) return;
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Extrato em PDF salvo: $caminho')),
+        );
+    } on ErroTrato catch (e) {
+      if (!context.mounted) return;
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.mensagem)));
+    } on Object {
+      if (!context.mounted) return;
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível baixar o extrato em PDF agora.'),
+          ),
+        );
+    }
+  }
+
+  static Future<String> _salvarPdfNoAparelho(
+    List<int> bytes,
+    String arquivo,
+  ) async {
+    Directory dir;
+    try {
+      dir = await getApplicationDocumentsDirectory();
+    } on Object {
+      dir = Directory.systemTemp;
+    }
+    final destino = File('${dir.path}${Platform.pathSeparator}$arquivo');
+    await destino.writeAsBytes(bytes, flush: true);
+    try {
+      await launchUrl(
+        Uri.file(destino.path),
+        mode: LaunchMode.externalApplication,
+      );
+    } on Object {
+      // Sem visualizador externo ou em ambiente de teste: arquivo já salvo em disco.
+    }
+    return destino.path;
+  }
 
   /// Aba "Perfil" da casca do profissional: perfil público e avaliações recebidas.
   static Widget _abaPerfilProfissional() => Builder(
@@ -1339,7 +1613,14 @@ abstract final class RotasTrato {
                 _abrir<void>(context, _telaAjuda(context));
               case AcaoPerfil.dadosPessoais:
                 _abrir<void>(
-                    context, DadosPessoaisTela(servico: _conta, servicoCep: repos.cep));
+                  context,
+                  DadosPessoaisTela(
+                    servico: _conta,
+                    servicoCep: repos.cep,
+                    aoAlterarCredenciais: () =>
+                        _abrir<void>(context, const SegurancaContaTela()),
+                  ),
+                );
               case AcaoPerfil.enderecos:
                 _abrir<void>(
                     context, EnderecosTela(servico: _conta, servicoCep: repos.cep));
@@ -1451,13 +1732,32 @@ abstract final class RotasTrato {
                     titulo: 'Dados pessoais',
                     aoTocar: () => _abrir<void>(
                       context,
-                      DadosPessoaisTela(servico: _conta, servicoCep: repos.cep),
+                      DadosPessoaisTela(
+                        servico: _conta,
+                        servicoCep: repos.cep,
+                        aoAlterarCredenciais: () =>
+                            _abrir<void>(context, const SegurancaContaTela()),
+                      ),
                     ),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.key_outlined,
+                    titulo: 'E-mail e senha',
+                    aoTocar: () =>
+                        _abrir<void>(context, const SegurancaContaTela()),
                   ),
                   ItemContaPerfil(
                     icone: Icons.notifications_none,
                     titulo: 'Notificações',
                     aoTocar: () => abrirNotificacoes(context, profissional: profissional),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.tune,
+                    titulo: 'Preferências de alertas',
+                    aoTocar: () => _abrir<void>(
+                      context,
+                      PreferenciasNotificacoesTela(repositorio: repos.notificacoes),
+                    ),
                   ),
                   ItemContaPerfil(
                     icone: Icons.shield_outlined,
@@ -1529,6 +1829,10 @@ abstract final class RotasTrato {
           servico: ServicoNotificacoesRepositorio(repos.notificacoes),
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
+          aoAbrirPreferencias: () => _abrir<void>(
+            context,
+            PreferenciasNotificacoesTela(repositorio: repos.notificacoes),
+          ),
           aoAbrirDestino: (n) {
             final id = n.destinoId;
             if (id == null) return;
@@ -1621,7 +1925,10 @@ abstract final class RotasTrato {
             : Future.value(const <EnderecoSalvo>[]),
       );
 
-  static Widget _novoPedido(CategoriaServico categoria) {
+  static Widget _novoPedido(
+    CategoriaServico categoria, {
+    Profissional? profissionalConvidado,
+  }) {
     var enviandoPedido = false;
     return Carregador<(FormularioPedido, List<EnderecoSalvo>)>(
       carregar: () => _carregarNovoPedido(categoria.id),
@@ -1629,9 +1936,15 @@ abstract final class RotasTrato {
         formulario: dados.$1,
         enderecosSalvos: dados.$2,
         servicoCep: repos.cep,
+        profissionalConvidadoId: profissionalConvidado?.id,
+        profissionalConvidadoNome: profissionalConvidado?.nome,
         aoCapturarFoto: _fotografar,
         aoTrocarCategoria: () => Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(builder: (_) => _escolherCategoria()),
+          MaterialPageRoute<void>(
+            builder: (_) => _escolherCategoria(
+              profissionalConvidado: profissionalConvidado,
+            ),
+          ),
         ),
         aoEnviar: (rascunho) async {
           if (enviandoPedido) return;
@@ -1874,15 +2187,20 @@ abstract final class RotasTrato {
       carregar: () => repos.pagamento.dados(pedidoId),
       construir: (context, dados) => PagamentoTela(
         dados: dados,
-        aoPagar: (metodo) async {
+        aoAplicarCupom: (codigo) => repos.pagamento.aplicarCupom(pedidoId, codigo),
+        aoPagarDetalhado: (metodo, parcelas, cupom) async {
           if (iniciandoPagamento) return;
           iniciandoPagamento = true;
           try {
             Cobranca? cobranca;
             final ok = await _tentar(
               context,
-              () async => cobranca =
-                  await repos.pagamento.criarCobranca(pedidoId, metodo),
+              () async => cobranca = await repos.pagamento.criarCobranca(
+                pedidoId,
+                metodo,
+                parcelas: parcelas,
+                cupom: cupom,
+              ),
             );
             if (!ok || !context.mounted) return;
             // Cartão: a folha do provedor lista os cartões salvos e cadastra um novo. O app só
@@ -2031,6 +2349,37 @@ abstract final class RotasTrato {
     }
   }
 
+  static Future<void> _sugerirOuRemarcarVisitaCliente(
+    BuildContext context,
+    String pedidoId, {
+    required bool jaAgendado,
+  }) async {
+    final inicio = await _escolherJanelaVisita(
+      context,
+      tituloDia: jaAgendado ? 'Novo dia da visita' : 'Sugerir dia da visita',
+    );
+    if (inicio == null || !context.mounted) return;
+    final fim = inicio.add(const Duration(hours: 2));
+    final ok = await _tentar(
+      context,
+      () => jaAgendado
+          ? repos.pedidos.remarcarAgenda(pedidoId, inicio, fim)
+          : repos.chat.proporAgenda(pedidoId, inicio, fim),
+    );
+    if (ok) pedidosMudaram.value++;
+    if (ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            jaAgendado
+                ? 'Visita remarcada com sucesso.'
+                : 'Sugestão de horário enviada no chat para confirmação do profissional.',
+          ),
+        ),
+      );
+    }
+  }
+
   static Widget _pedidoEmExecucao(String pedidoId) =>
       Carregador<PedidoEmExecucao>(
         carregar: () => repos.pedidos.acompanhar(pedidoId),
@@ -2044,6 +2393,13 @@ abstract final class RotasTrato {
           aoConversar: () =>
               _abrir<void>(context, _chat(pedidoId, comoProfissional: false)),
           aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
+          aoRemarcarVisita: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
+              ? () => _sugerirOuRemarcarVisitaCliente(
+                    context,
+                    pedidoId,
+                    jaAgendado: pedido.estadoApi == 'agendado',
+                  )
+              : null,
           aoVerNota: () => _abrir<void>(
             context,
             VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
@@ -2080,6 +2436,9 @@ abstract final class RotasTrato {
               (!conversa.souCliente ||
                   (!repos.modoApi &&
                       ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true));
+          final sit = conversa.situacao.toLowerCase();
+          final podeCombinarAgenda = !conversa.pedidoAberto &&
+              (sit.contains('pago') || sit.contains('agend'));
           return ChatPedidoTela(
             conversa: conversa,
             aoCapturarFoto: _fotografar,
@@ -2087,6 +2446,44 @@ abstract final class RotasTrato {
                 ? () =>
                     repos.chat.conversa(pedidoId, profissionalId: profissionalId)
                 : null,
+            aoSugerirAgenda: podeCombinarAgenda
+                ? () async {
+                    final inicio = await _escolherJanelaVisita(
+                      context,
+                      tituloDia: 'Sugerir dia da visita',
+                    );
+                    if (inicio == null || !context.mounted) return;
+                    final ok = await _tentar(
+                      context,
+                      () => repos.chat.proporAgenda(
+                        pedidoId,
+                        inicio,
+                        inicio.add(const Duration(hours: 2)),
+                      ),
+                    );
+                    if (ok && context.mounted) {
+                      pedidosMudaram.value++;
+                      _avisoSimples(context, 'Sugestão de horário enviada no chat.');
+                    }
+                  }
+                : null,
+            aoAceitarAgenda: (msg) async {
+              final prop = msg.propostaAgenda;
+              if (prop == null) return;
+              final ok = await _tentar(
+                context,
+                () => repos.chat.aceitarAgenda(
+                  pedidoId,
+                  mensagemId: msg.id,
+                  inicio: prop.inicio,
+                  fim: prop.fim,
+                ),
+              );
+              if (ok && context.mounted) {
+                pedidosMudaram.value++;
+                _avisoSimples(context, 'Horário confirmado! Visita agendada.');
+              }
+            },
             aoAceitarContraproposta: (c) async {
               final ok = await _tentar(
                 context,

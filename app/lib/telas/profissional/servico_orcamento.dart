@@ -18,6 +18,8 @@ class OrcamentoPronto {
     required this.materialPorMim,
     required this.pedirSinalMaterial,
     required this.totalCentavos,
+    this.foraDoEscopo,
+    this.observacoes,
   });
 
   /// Horas de deslocamento, em décimos de hora (15 = 1,5 h). Cobradas pelo mesmo valor da hora.
@@ -32,6 +34,8 @@ class OrcamentoPronto {
   final bool materialPorMim;
   final bool pedirSinalMaterial;
   final int totalCentavos;
+  final String? foraDoEscopo;
+  final String? observacoes;
 
   /// Total de horas que o cliente vai ver: deslocamento + trabalhadas, em décimos de hora.
   int get totalDecimosDeHora => decimosDeslocamento + decimosDeHora;

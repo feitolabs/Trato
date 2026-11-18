@@ -22,6 +22,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoVerContrato,
     this.aoAbrirProblema,
     this.aoCancelarPedido,
+    this.aoRemarcarVisita,
     this.atualizarAditivoLocalmente = true,
   });
 
@@ -38,6 +39,7 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoVerContrato;
   final VoidCallback? aoAbrirProblema;
   final VoidCallback? aoCancelarPedido;
+  final VoidCallback? aoRemarcarVisita;
   final bool atualizarAditivoLocalmente;
 
   @override
@@ -155,8 +157,16 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         widget.aoVerAditivo != null ||
                         widget.aoVerContrato != null ||
                         widget.aoAbrirProblema != null ||
-                        widget.aoCancelarPedido != null) ...[
+                        widget.aoCancelarPedido != null ||
+                        widget.aoRemarcarVisita != null) ...[
                       const SizedBox(height: EspacosTrato.x3),
+                      if (widget.aoRemarcarVisita != null)
+                        BotaoLink(
+                          texto: pedido.estadoApi == 'agendado'
+                              ? 'Remarcar visita'
+                              : 'Sugerir horário da visita',
+                          aoTocar: widget.aoRemarcarVisita!,
+                        ),
                       if (widget.aoVerContrato != null)
                         BotaoLink(texto: 'Ver contrato do serviço', aoTocar: widget.aoVerContrato!),
                       if (widget.aoVerNota != null)

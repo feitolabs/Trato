@@ -10,7 +10,15 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from trato.pedidos.estados import Acao, Foto, Pedido, ProvaCheckIn, ProvaCheckOut, ProvaInvalida
+from trato.pedidos.estados import (
+    Acao,
+    Foto,
+    Pedido,
+    ProvaCheckIn,
+    ProvaCheckOut,
+    ProvaClienteAusente,
+    ProvaInvalida,
+)
 from trato.uploads.servico import ServicoUploads, distancia_metros
 
 
@@ -31,9 +39,17 @@ def _foto_do_servidor(
 def validar_prova_midia(
     servico: ServicoUploads, pedido: Pedido, usuario_id: str, acao: Acao, prova: object
 ) -> object:
-    if pedido.remoto and acao in (Acao.FAZER_CHECK_IN, Acao.FAZER_CHECK_OUT):
-        return prova  # serviço remoto: sem foto nem distância; vale o código do cliente
-    if acao is Acao.FAZER_CHECK_IN and isinstance(prova, ProvaCheckIn) and prova.foto is not None:
+    if pedido.remoto and acao in (
+        Acao.FAZER_CHECK_IN,
+        Acao.FAZER_CHECK_OUT,
+        Acao.REGISTRAR_CLIENTE_AUSENTE,
+    ):
+        return prova  # serviço remoto: sem foto nem distância
+    if (
+        acao in (Acao.FAZER_CHECK_IN, Acao.REGISTRAR_CLIENTE_AUSENTE)
+        and isinstance(prova, (ProvaCheckIn, ProvaClienteAusente))
+        and prova.foto is not None
+    ):
         foto = _foto_do_servidor(servico, prova.foto, pedido, usuario_id, "checkin")
         alvo = servico.local_do_pedido(pedido.id)
         if alvo is not None and prova.localizacao is not None:

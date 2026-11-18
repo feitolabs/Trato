@@ -31,15 +31,19 @@ MARCADOR_CONTRAPROPOSTA = re.compile(
     r"^\[(?:contraproposta|proposta):[0-9a-zA-Z-]{1,64}:\d{1,12}(?::\d{1,3})?\]"
 )
 
+# Sugestão/remarcação de agenda no chat: `[agenda:<inicio_iso>|<fim_iso>] texto`.
+MARCADOR_AGENDA = re.compile(r"^\[agenda:[^\]]+\]")
+
 
 def mascarar_contatos(texto: str) -> str:
     """Esconde telefone, e-mail, link, perfil e endereço antes da contratação (o original fica em
     `corpo`, só o `corpo_exibido` é mascarado). A regra mora em `trato.seguranca.mascaramento`."""
     if MARCADOR_FOTO.match(texto.strip()):
         return texto
-    marca = MARCADOR_CONTRAPROPOSTA.match(texto)
-    if marca:
-        return marca.group(0) + _mascarar(texto[marca.end() :]).exibido
+    for padrao in (MARCADOR_CONTRAPROPOSTA, MARCADOR_AGENDA):
+        marca = padrao.match(texto)
+        if marca:
+            return marca.group(0) + _mascarar(texto[marca.end() :]).exibido
     return _mascarar(texto).exibido
 
 

@@ -20,7 +20,7 @@ from trato.pedidos.estados import Acao, Pedido
 from trato.uploads.config import ConfigUploads
 
 CAMPO = "offline_capturada_em"
-ACOES = frozenset({Acao.FAZER_CHECK_IN, Acao.FAZER_CHECK_OUT})
+ACOES = frozenset({Acao.FAZER_CHECK_IN, Acao.FAZER_CHECK_OUT, Acao.REGISTRAR_CLIENTE_AUSENTE})
 _DATA = TypeAdapter(AwareDatetime)
 
 

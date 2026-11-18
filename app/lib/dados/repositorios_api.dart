@@ -157,7 +157,26 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       cep: e?['cep'] as String?,
       referencia: e?['referencia'] as String?,
       modalidade: (j['modalidade'] as String?) ?? 'presencial',
+      fotos: [
+        for (final u in (j['fotos_urls'] as List? ?? const []))
+          if (u is String && u.isNotEmpty) u,
+      ],
+      profissionalConvidadoId: j['profissional_convidado_id'] as String?,
     );
+  }
+
+  Future<List<String>> fotosDoPedidoAberto(String pedidoId) async {
+    try {
+      final itens = _lista(
+        await _api.get('/v1/pedidos/$pedidoId/fotos', consulta: const {'finalidade': 'pedido'}),
+      );
+      return [
+        for (final f in itens)
+          if (f['url'] is String && (f['url'] as String).isNotEmpty) f['url'] as String,
+      ];
+    } on Object {
+      return const [];
+    }
   }
 
   @override
@@ -305,6 +324,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       'faixa_preco_min_centavos': rascunho.faixa.minimoCentavos,
       'faixa_preco_max_centavos': rascunho.faixa.maximoCentavos,
       'urgente': rascunho.urgente,
+      if ((rascunho.profissionalConvidadoId ?? '').trim().isNotEmpty)
+        'profissional_convidado_id': rascunho.profissionalConvidadoId!.trim(),
       'respostas': [
         for (final e in rascunho.respostas.entries)
           {'pergunta_id': e.key, 'resposta': e.value},
@@ -531,6 +552,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       },
       podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
       pagamentoConfirmado: pedido.pagamentoConfirmado,
+      estadoApi: pedido.estado,
       etapas: etapas,
       aditivo: aditivoPendente,
       aditivos: aditivos,
@@ -760,6 +782,21 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   }
 
   @override
+  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/acoes/remarcar',
+      corpo: {
+        'prova': {
+          'janela': {
+            'inicio': inicio.toUtc().toIso8601String(),
+            'fim': fim.toUtc().toIso8601String(),
+          },
+        },
+      },
+    );
+  }
+
+  @override
   Future<void> pedirRetrabalho(
     String pedidoId,
     String descricao, {
@@ -970,18 +1007,17 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
 
   final ClienteApi _api;
 
-  /// `GET /v1/pedidos/{id}/pagamento`: valor do contrato e meios disponíveis (`pix`, `cartao`).
-  @override
-  Future<DadosPagamento> dados(String pedidoId) async {
-    final j = _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento'));
+  DadosPagamento _dadosDeMapa(String pedidoId, Map<String, dynamic> j) {
     final valor = j['valor_centavos'] as int?;
     if (valor == null) {
       throw const ErroTrato(TipoErro.recusado, 'Este pedido ainda não tem um valor a pagar.');
     }
-    final meios = [for (final m in (j['meios_disponiveis'] as List)) m as String];
+    final meios = [for (final m in (j['meios_disponiveis'] as List? ?? const [])) m as String];
     return DadosPagamento(
       subtitulo: 'Pedido ${PedidoApi.numeroDe(pedidoId)}',
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
+      descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
+      cupomCodigo: j['cupom_codigo'] as String?,
       parcelamento: [
         for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
           OpcaoParcelamento(
@@ -1008,16 +1044,46 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     );
   }
 
-  /// `POST /v1/contratos/{id}/cobranca` `{meio}`. Repetir devolve a mesma cobrança pendente.
+  /// `GET /v1/pedidos/{id}/pagamento`: valor do contrato e meios disponíveis (`pix`, `cartao`).
+  @override
+  Future<DadosPagamento> dados(String pedidoId) async =>
+      _dadosDeMapa(pedidoId, _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento')));
+
+  /// `POST /v1/contratos/{id}/cupom` `{codigo}`: valida e calcula desconto no servidor.
+  @override
+  Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async {
+    final limpo = codigo.trim();
+    if (limpo.isEmpty) {
+      return dados(pedidoId);
+    }
+    final j = _mapa(
+      await _api.post('/v1/contratos/$pedidoId/cupom', corpo: {'codigo': limpo}),
+    );
+    return _dadosDeMapa(pedidoId, j);
+  }
+
+  /// `POST /v1/contratos/{id}/cobranca` `{meio, parcelas, cupom}`. Repetir devolve a mesma cobrança pendente.
   /// O segredo do cartão (`instrucao`) nunca vai para a tela.
   @override
-  Future<Cobranca> criarCobranca(String pedidoId, MetodoPagamento metodo) async {
+  Future<Cobranca> criarCobranca(
+    String pedidoId,
+    MetodoPagamento metodo, {
+    int parcelas = 1,
+    String? cupom,
+  }) async {
     final meio = metodo == MetodoPagamento.pix ? 'pix' : 'cartao';
+    final cupomLimpo = (cupom ?? '').trim();
+    final sufixoParcela = metodo == MetodoPagamento.cartao && parcelas > 1 ? '-${parcelas}x' : '';
+    final sufixoCupom = cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}';
     final j = _mapa(
       await _api.post(
         '/v1/contratos/$pedidoId/cobranca',
-        corpo: {'meio': meio},
-        chaveIdempotencia: 'cobranca-$pedidoId-$meio',
+        corpo: {
+          'meio': meio,
+          if (metodo == MetodoPagamento.cartao && parcelas > 1) 'parcelas': parcelas,
+          if (cupomLimpo.isNotEmpty) 'cupom': cupomLimpo,
+        },
+        chaveIdempotencia: 'cobranca-$pedidoId-$meio$sufixoParcela$sufixoCupom',
       ),
     );
     return Cobranca(
@@ -1084,15 +1150,60 @@ class RepositorioChatApi implements RepositorioChat {
 
   static MensagemChat _mensagem(Map<String, dynamic> m) {
     final bruto = (m['texto'] as String?) ?? '';
-    final (contra, texto) = ContrapropostaChat.ler(bruto);
+    final (contra, semContra) = ContrapropostaChat.ler(bruto);
+    final (agenda, texto) =
+        contra == null ? PropostaAgendaChat.ler(semContra) : (null, semContra);
     return MensagemChat(
-      tipo: contra == null && ehMensagemFoto(bruto) ? TipoMensagem.foto : TipoMensagem.texto,
+      id: (m['id'] as num?)?.toInt(),
+      tipo: contra == null && agenda == null && ehMensagemFoto(bruto)
+          ? TipoMensagem.foto
+          : TipoMensagem.texto,
       hora: _hora(DateTime.parse(m['enviada_em'] as String).toLocal()),
       texto: texto,
       minha: m['minha'] == true,
       lida: m['lida_em'] != null,
       recebida: m['entregue_em'] != null || m['lida_em'] != null,
       contraproposta: contra,
+      propostaAgenda: agenda,
+    );
+  }
+
+  @override
+  Future<void> proporAgenda(
+    String pedidoId,
+    DateTime inicio,
+    DateTime fim, {
+    String justificativa = '',
+  }) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/agenda/propor',
+      corpo: {
+        'janela': {
+          'inicio': inicio.toUtc().toIso8601String(),
+          'fim': fim.toUtc().toIso8601String(),
+        },
+        if (justificativa.trim().isNotEmpty) 'justificativa': justificativa.trim(),
+      },
+    );
+  }
+
+  @override
+  Future<void> aceitarAgenda(
+    String pedidoId, {
+    int? mensagemId,
+    DateTime? inicio,
+    DateTime? fim,
+  }) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/agenda/aceitar',
+      corpo: {
+        if (mensagemId != null) 'mensagem_id': mensagemId,
+        if (inicio != null && fim != null)
+          'janela': {
+            'inicio': inicio.toUtc().toIso8601String(),
+            'fim': fim.toUtc().toIso8601String(),
+          },
+      },
     );
   }
 
@@ -1276,6 +1387,71 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
     if (dados is! Map) return null;
     final id = dados['disputa_id'] ?? dados['pedido_id'];
     return id is String ? id : null;
+  }
+
+  @override
+  Future<List<PreferenciaNotificacao>> carregarPreferencias() async {
+    final j = _mapa(await _api.get('/v1/notificacoes/preferencias'));
+    final cats = _mapa(j['categorias']);
+    return [
+      for (final e in cats.entries)
+        () {
+          final canais = _mapa(e.value);
+          return PreferenciaNotificacao(
+            categoria: e.key,
+            app: canais['app'] != false,
+            push: canais['push'] != false,
+            email: canais['email'] != false,
+          );
+        }(),
+    ];
+  }
+
+  @override
+  Future<List<PreferenciaNotificacao>> salvarPreferencias(
+    List<PreferenciaNotificacao> itens,
+  ) async {
+    final payload = {
+      'categorias': {
+        for (final item in itens)
+          item.categoria: {
+            'app': item.app,
+            'push': item.push,
+            'email': item.email,
+          },
+      },
+    };
+    final j = _mapa(await _api.put('/v1/notificacoes/preferencias', corpo: payload));
+    final cats = _mapa(j['categorias']);
+    return [
+      for (final e in cats.entries)
+        () {
+          final canais = _mapa(e.value);
+          return PreferenciaNotificacao(
+            categoria: e.key,
+            app: canais['app'] != false,
+            push: canais['push'] != false,
+            email: canais['email'] != false,
+          );
+        }(),
+    ];
+  }
+
+  @override
+  Future<void> registrarDispositivo(String token, String plataforma) async {
+    final limpo = token.trim();
+    if (limpo.length < 8) return;
+    await _api.post(
+      '/v1/dispositivos',
+      corpo: {'token': limpo, 'plataforma': plataforma},
+    );
+  }
+
+  @override
+  Future<void> removerDispositivo(String token) async {
+    final limpo = token.trim();
+    if (limpo.length < 8) return;
+    await _api.delete('/v1/dispositivos', corpo: {'token': limpo});
   }
 }
 
@@ -1471,6 +1647,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       clienteId: j['cliente_id'] as String?,
       clienteNome: j['cliente_nome'] as String?,
       modalidade: (j['modalidade'] as String?) ?? 'presencial',
+      convidado: j['convidado'] == true,
     );
   }
 
@@ -1597,7 +1774,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
     return InicioProfissional(
       nome: primeiroNome.isEmpty ? 'Profissional' : primeiroNome,
-      disponivelAgora: true,
+      disponivelAgora: me['disponivel_agora'] == true,
       carteira: carteira,
       pedidos: abertos,
       proximo: proximo,
@@ -1609,9 +1786,11 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
   OrcamentoEnviado _orcamentoEnviado(Map<String, dynamic> j) {
     final pedidoId = j['pedido_id'] as String;
+    final orcamentoId = (j['orcamento_id'] as String?) ?? (j['id'] as String?) ?? '';
     final titulo = ((j['titulo_pedido'] as String?) ?? '').trim();
     final enviado = j['enviado_em'] as String?;
     return OrcamentoEnviado(
+      orcamentoId: orcamentoId,
       pedidoId: pedidoId,
       titulo: titulo.isEmpty ? 'Pedido ${PedidoApi.numeroDe(pedidoId)}' : titulo,
       valorCentavos: j['valor_centavos'] as int,
@@ -1697,6 +1876,21 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     );
   }
 
+  @override
+  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/acoes/remarcar',
+      corpo: {
+        'prova': {
+          'janela': {
+            'inicio': inicio.toUtc().toIso8601String(),
+            'fim': fim.toUtc().toIso8601String(),
+          },
+        },
+      },
+    );
+  }
+
   /// `GET /v1/profissional/pedidos-abertos/{id}`: pedido que não está mais disponível responde 404.
   @override
   Future<DetalhePedido> detalhe(String pedidoId) async {
@@ -1709,6 +1903,23 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       }
       rethrow;
     }
+    var fotos = [
+      for (final u in (j['fotos_urls'] as List? ?? const []))
+        if (u is String && u.isNotEmpty) u,
+    ];
+    if (fotos.isEmpty) {
+      try {
+        final itens = _lista(
+          await _api.get('/v1/pedidos/$pedidoId/fotos', consulta: const {'finalidade': 'pedido'}),
+        );
+        fotos = [
+          for (final f in itens)
+            if (f['url'] is String && (f['url'] as String).isNotEmpty) f['url'] as String,
+        ];
+      } on Object {
+        fotos = const [];
+      }
+    }
     final aberto = _pedidoAberto(j);
     // Resumo do que o cliente pediu de prazo (o nome já aparece em cima, com o avatar).
     final prazo = DateTime.tryParse('${j['prazo_desejado']}');
@@ -1720,7 +1931,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       pedido: aberto,
       fechaEm: 'Publicado ${_quandoRelativo(DateTime.parse(j['aberto_em'] as String))}',
       clienteResumo: resumo,
-      legendasFotos: const [],
+      legendasFotos: fotos,
       descricao: (j['descricao'] as String?) ?? '',
       linhas: [
         LinhaDetalhe('Modalidade', aberto.remoto ? 'Remoto' : 'Presencial'),
@@ -1887,6 +2098,105 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     );
     return ServicoCheckOutApi(checkIn, captura);
   }
+
+  ContaRecebimento _contaRecebimentoDeJson(Map<String, dynamic> j) => ContaRecebimento(
+        cadastrada: j['cadastrada'] == true,
+        tipoPix: j['tipo_pix'] as String?,
+        chavePix: j['chave_pix'] as String?,
+        chavePixMascarada: j['chave_pix_mascarada'] as String?,
+        bancoCodigo: j['banco_codigo'] as String?,
+        bancoNome: j['banco_nome'] as String?,
+        agencia: j['agencia'] as String?,
+        conta: j['conta'] as String?,
+        tipoConta: j['tipo_conta'] as String?,
+        resumoExibicao: j['resumo_exibicao'] as String?,
+      );
+
+  @override
+  Future<ContaRecebimento> obterContaRecebimento() async {
+    final j = _mapa(await _api.get('/v1/profissional/conta-recebimento'));
+    return _contaRecebimentoDeJson(j);
+  }
+
+  @override
+  Future<ContaRecebimento> salvarContaRecebimento({
+    required String tipoPix,
+    required String chavePix,
+    String? bancoCodigo,
+    String? bancoNome,
+    String? agencia,
+    String? conta,
+    String? tipoConta,
+  }) async {
+    final corpo = <String, Object?>{
+      'tipo_pix': tipoPix,
+      'chave_pix': chavePix.trim(),
+      if (bancoCodigo != null && bancoCodigo.trim().isNotEmpty)
+        'banco_codigo': bancoCodigo.trim(),
+      if (bancoNome != null && bancoNome.trim().isNotEmpty) 'banco_nome': bancoNome.trim(),
+      if (agencia != null && agencia.trim().isNotEmpty) 'agencia': agencia.trim(),
+      if (conta != null && conta.trim().isNotEmpty) 'conta': conta.trim(),
+      if (tipoConta != null && tipoConta.trim().isNotEmpty) 'tipo_conta': tipoConta.trim(),
+    };
+    final j = _mapa(await _api.put('/v1/profissional/conta-recebimento', corpo: corpo));
+    return _contaRecebimentoDeJson(j);
+  }
+
+  @override
+  Future<List<int>> baixarExtratoPdf({String? mes}) => _api.getBytes(
+        '/v1/profissionais/me/extrato.pdf',
+        consulta: mes != null && mes.trim().isNotEmpty ? {'mes': mes.trim()} : null,
+      );
+
+  @override
+  Future<bool> alterarDisponivelAgora(bool disponivel) async {
+    final j = _mapa(
+      await _api.patch('/v1/profissional/perfil', corpo: {'disponivel_agora': disponivel}),
+    );
+    return j['disponivel_agora'] == true;
+  }
+
+  @override
+  Future<DetalheOrcamentoEnviado> meuOrcamento(
+    String orcamentoId, {
+    String? tituloPedido,
+    String? situacao,
+  }) async {
+    final j = _mapa(await _api.get('/v1/orcamentos/$orcamentoId'));
+    final valido = j['validade_ate'] as String?;
+    final itens = [
+      for (final raw in _lista(j['itens'] ?? const []))
+        ItemOrcamentoEnviado(
+          tipo: (raw['tipo'] as String?) ?? 'outro',
+          descricao: (raw['descricao'] as String?) ?? '',
+          quantidade: '${raw['quantidade'] ?? '1'}',
+          valorUnitarioCentavos: (raw['valor_unitario_centavos'] as num?)?.toInt() ?? 0,
+          totalCentavos: (raw['total_centavos'] as num?)?.toInt() ?? 0,
+        ),
+    ];
+    final statusApi = (j['status'] as String?) ?? 'enviado';
+    final sit = situacao ?? (j['aceito'] == true ? 'aceito' : (statusApi == 'enviado' ? 'aguardando' : 'encerrado'));
+    return DetalheOrcamentoEnviado(
+      orcamentoId: (j['id'] as String?) ?? orcamentoId,
+      pedidoId: (j['pedido_id'] as String?) ?? '',
+      tituloPedido: (tituloPedido != null && tituloPedido.isNotEmpty)
+          ? tituloPedido
+          : 'Pedido ${PedidoApi.numeroDe((j['pedido_id'] as String?) ?? orcamentoId)}',
+      versao: (j['versao'] as num?)?.toInt() ?? 1,
+      situacao: sit,
+      valorCentavos: (j['valor_centavos'] as num?)?.toInt() ?? 0,
+      taxaCentavos: (j['taxa_centavos'] as num?)?.toInt(),
+      liquidoCentavos: (j['liquido_centavos'] as num?)?.toInt(),
+      prazoExecucaoDias: (j['prazo_execucao_dias'] as num?)?.toInt(),
+      garantiaDias: (j['garantia_dias'] as num?)?.toInt(),
+      foraDoEscopo: j['fora_do_escopo'] as String?,
+      observacoes: j['observacoes'] as String?,
+      validoAte: valido == null ? null : DateTime.tryParse(valido)?.toLocal(),
+      horasDeslocamento: j['horas_deslocamento'] as String?,
+      horasTrabalhadas: j['horas_trabalhadas'] as String?,
+      itens: itens,
+    );
+  }
 }
 
 /// `POST /v1/orcamentos/resumo` `{valor_centavos}` e `POST /v1/pedidos/{pedido_id}/orcamentos`.
@@ -1974,6 +2284,10 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
         'validade_ate': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
         'sinal_material_centavos': sinal,
         'garantia_dias': pronto.garantiaDias,
+        if (pronto.foraDoEscopo != null && pronto.foraDoEscopo!.trim().isNotEmpty)
+          'fora_do_escopo': pronto.foraDoEscopo!.trim(),
+        if (pronto.observacoes != null && pronto.observacoes!.trim().isNotEmpty)
+          'observacoes': pronto.observacoes!.trim(),
       },
     );
   }
@@ -2073,9 +2387,33 @@ class ServicoCheckInApi implements ServicoCheckIn {
   }
 
   @override
-  Future<void> avisarClienteAusente() => enviarMensagemRapida(
-        'Cheguei ao local, mas não encontrei você. Pode me responder por aqui?',
+  Future<void> avisarClienteAusente() async {
+    if (remoto) {
+      await _api.post(
+        '/v1/pedidos/$pedidoId/acoes/registrar_cliente_ausente',
+        corpo: {'prova': <String, Object?>{}},
       );
+      return;
+    }
+    final foto = _foto;
+    final posicao = _posicao;
+    if (foto == null || posicao == null) {
+      throw const ErroTrato(
+        TipoErro.recusado,
+        'Tire a foto do local e registre a localização antes de informar cliente ausente.',
+      );
+    }
+    final enviada = await _enviada(foto, FinalidadeArquivo.checkIn);
+    await _api.post(
+      '/v1/pedidos/$pedidoId/acoes/registrar_cliente_ausente',
+      corpo: {
+        'prova': {
+          'foto': _fotoJson(enviada),
+          'localizacao': {'latitude': posicao.latitude, 'longitude': posicao.longitude},
+        },
+      },
+    );
+  }
 
   Map<String, Object?> _fotoJson(FotoCapturada f) =>
       {'arquivo_id': f.arquivoId, 'tirada_em': f.tiradaEm.toUtc().toIso8601String()};

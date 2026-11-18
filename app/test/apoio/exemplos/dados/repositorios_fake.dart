@@ -119,9 +119,14 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   Future<DadosGarantia> garantia(String pedidoId) async => dadosGarantiaExemplo;
 
   final List<String> cancelados = [];
+  final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
   @override
   Future<void> cancelar(String pedidoId, String motivo) async => cancelados.add(pedidoId);
+
+  @override
+  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async =>
+      agendasRemarcadas.add((pedidoId, inicio, fim));
 
   @override
   Future<void> pedirRetrabalho(String pedidoId, String descricao,
@@ -183,13 +188,46 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
   final int consultasAteConfirmar;
   int _consultas = 0;
   final List<MetodoPagamento> cobrancas = [];
+  final List<(MetodoPagamento, int, String?)> cobrancasDetalhadas = [];
 
   @override
   Future<DadosPagamento> dados(String pedidoId) async => pag.DadosExemplo.pagamento;
 
   @override
-  Future<Cobranca> criarCobranca(String pedidoId, MetodoPagamento metodo) async {
+  Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async {
+    final limpo = codigo.trim().toUpperCase();
+    final base = pag.DadosExemplo.pagamento;
+    if (limpo.isEmpty) return base;
+    if (limpo == 'TRATO10') {
+      final desconto = (base.valorAgoraCentavos * 0.1).round();
+      final finalValor = base.valorAgoraCentavos - desconto;
+      return base.copiarCom(
+        valorAgoraCentavos: finalValor,
+        descontoCentavos: desconto,
+        cupomCodigo: 'TRATO10',
+        parcelamento: [
+          for (final p in base.parcelamento)
+            OpcaoParcelamento(
+              parcelas: p.parcelas,
+              custoCentavos: p.custoCentavos,
+              totalCentavos: finalValor + p.custoCentavos,
+              valorParcelaCentavos: ((finalValor + p.custoCentavos) / p.parcelas).round(),
+            ),
+        ],
+      );
+    }
+    throw Exception('Cupom inválido ou expirado.');
+  }
+
+  @override
+  Future<Cobranca> criarCobranca(
+    String pedidoId,
+    MetodoPagamento metodo, {
+    int parcelas = 1,
+    String? cupom,
+  }) async {
     cobrancas.add(metodo);
+    cobrancasDetalhadas.add((metodo, parcelas, cupom));
     _consultas = 0;
     return const Cobranca(id: 'cobranca-demo', pixCopiaECola: '00020126-DEMONSTRACAO');
   }
@@ -398,13 +436,89 @@ class RepositorioChatFake implements RepositorioChat {
       ],
     );
   }
+
+  final List<(String, DateTime, DateTime)> agendasPropostas = [];
+  final List<String> agendasAceitas = [];
+
+  @override
+  Future<void> proporAgenda(
+    String pedidoId,
+    DateTime inicio,
+    DateTime fim, {
+    String justificativa = '',
+  }) async {
+    agendasPropostas.add((pedidoId, inicio, fim));
+    final chave = _normalizarId(pedidoId);
+    final atual = _obter(chave);
+    _conversas[chave] = ConversaPedido(
+      nome: atual.nome,
+      iniciais: atual.iniciais,
+      numeroPedido: atual.numeroPedido,
+      situacao: atual.situacao,
+      respostasRapidas: atual.respostasRapidas,
+      orcamentosAtivos: atual.orcamentosAtivos,
+      pedidoAberto: atual.pedidoAberto,
+      souCliente: atual.souCliente,
+      usuarioId: atual.usuarioId,
+      mensagens: [
+        ...atual.mensagens,
+        MensagemChat(
+          id: atual.mensagens.length + 1,
+          tipo: TipoMensagem.texto,
+          texto: 'Sugestão de visita enviada.${justificativa.isEmpty ? '' : ' $justificativa'}',
+          hora: _horaAtual(),
+          minha: true,
+          propostaAgenda: PropostaAgendaChat(inicio: inicio, fim: fim),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> aceitarAgenda(
+    String pedidoId, {
+    int? mensagemId,
+    DateTime? inicio,
+    DateTime? fim,
+  }) async {
+    agendasAceitas.add(pedidoId);
+  }
 }
 
 class RepositorioNotificacoesFake implements RepositorioNotificacoes {
   final List<String> lidas = [];
+  final List<String> dispositivosRegistrados = [];
+  List<PreferenciaNotificacao> preferenciasSalvas = const [
+    PreferenciaNotificacao(categoria: 'orcamentos'),
+    PreferenciaNotificacao(categoria: 'pagamentos'),
+    PreferenciaNotificacao(categoria: 'agenda'),
+    PreferenciaNotificacao(categoria: 'execucao'),
+    PreferenciaNotificacao(categoria: 'disputas'),
+    PreferenciaNotificacao(categoria: 'avaliacoes'),
+    PreferenciaNotificacao(categoria: 'mensagens'),
+  ];
 
   @override
   Future<void> marcarLida(String id) async => lidas.add(id);
+
+  @override
+  Future<List<PreferenciaNotificacao>> carregarPreferencias() async => preferenciasSalvas;
+
+  @override
+  Future<List<PreferenciaNotificacao>> salvarPreferencias(
+    List<PreferenciaNotificacao> itens,
+  ) async {
+    preferenciasSalvas = List.of(itens);
+    return preferenciasSalvas;
+  }
+
+  @override
+  Future<void> registrarDispositivo(String token, String plataforma) async =>
+      dispositivosRegistrados.add('$plataforma:$token');
+
+  @override
+  Future<void> removerDispositivo(String token) async =>
+      dispositivosRegistrados.removeWhere((item) => item.endsWith(':$token'));
 
   @override
   Future<List<Notificacao>> listar() async => const [
@@ -504,9 +618,14 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   static const taxaDemonstracaoBps = 750;
 
   final List<MotivoRecusa> recusas = [];
+  final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
   @override
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
+
+  @override
+  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async =>
+      agendasRemarcadas.add((pedidoId, inicio, fim));
 
   @override
   Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro) async =>
@@ -561,4 +680,86 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
 
   @override
   ServicoCheckOut servicoCheckOut(String pedidoId, {bool remoto = false}) => ServicoCheckOutFake();
+
+  ContaRecebimento _contaRecebimento = const ContaRecebimento(cadastrada: false);
+  bool _disponivelAgora = inicioProfissionalExemplo.disponivelAgora;
+
+  @override
+  Future<ContaRecebimento> obterContaRecebimento() async => _contaRecebimento;
+
+  @override
+  Future<ContaRecebimento> salvarContaRecebimento({
+    required String tipoPix,
+    required String chavePix,
+    String? bancoCodigo,
+    String? bancoNome,
+    String? agencia,
+    String? conta,
+    String? tipoConta,
+  }) async {
+    final limpa = chavePix.trim();
+    _contaRecebimento = ContaRecebimento(
+      cadastrada: true,
+      tipoPix: tipoPix,
+      chavePix: limpa,
+      chavePixMascarada: limpa,
+      bancoCodigo: bancoCodigo,
+      bancoNome: bancoNome,
+      agencia: agencia,
+      conta: conta,
+      tipoConta: tipoConta,
+      resumoExibicao: 'Pix (${tipoPix.toUpperCase()}): $limpa'
+          '${bancoNome != null && bancoNome.isNotEmpty ? ' · $bancoNome' : ''}',
+    );
+    return _contaRecebimento;
+  }
+
+  @override
+  Future<List<int>> baixarExtratoPdf({String? mes}) async =>
+      '%PDF-1.4\n%Trato extrato fake\n%%EOF'.codeUnits;
+
+  @override
+  Future<bool> alterarDisponivelAgora(bool disponivel) async {
+    _disponivelAgora = disponivel;
+    return _disponivelAgora;
+  }
+
+  @override
+  Future<DetalheOrcamentoEnviado> meuOrcamento(
+    String orcamentoId, {
+    String? tituloPedido,
+    String? situacao,
+  }) async =>
+      DetalheOrcamentoEnviado(
+        orcamentoId: orcamentoId.isEmpty ? 'orc-exemplo' : orcamentoId,
+        pedidoId: 'ped-tomadas',
+        tituloPedido: tituloPedido ?? 'Troca de tomadas e chuveiro',
+        versao: 1,
+        situacao: situacao ?? 'aguardando',
+        valorCentavos: 35000,
+        taxaCentavos: 2625,
+        liquidoCentavos: 32375,
+        prazoExecucaoDias: 2,
+        garantiaDias: 90,
+        foraDoEscopo: 'Fornecimento de disjuntor geral',
+        observacoes: 'Atendimento em horário comercial.',
+        horasDeslocamento: '1.0',
+        horasTrabalhadas: '2.5',
+        itens: const [
+          ItemOrcamentoEnviado(
+            tipo: 'deslocamento',
+            descricao: 'Horas de deslocamento',
+            quantidade: '1.0',
+            valorUnitarioCentavos: 10000,
+            totalCentavos: 10000,
+          ),
+          ItemOrcamentoEnviado(
+            tipo: 'horas',
+            descricao: 'Horas trabalhadas',
+            quantidade: '2.5',
+            valorUnitarioCentavos: 10000,
+            totalCentavos: 25000,
+          ),
+        ],
+      );
 }
