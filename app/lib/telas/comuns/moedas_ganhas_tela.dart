@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../tema/tema.dart';
+import 'moeda_trato.dart';
 
 /// Recompensa depois de avaliar: moeda que salta, número que sobe e confete.
 /// Só mostra o que o backend já creditou (`moedas`); nenhuma conta roda aqui.
@@ -112,6 +113,7 @@ class _Conteudo extends StatelessWidget {
   Widget build(BuildContext context) {
     // 0–35%: a moeda salta; 20–65%: o número sobe; 55–100%: textos aparecem.
     final moeda = Curves.elasticOut.transform((progresso / 0.35).clamp(0.0, 1.0));
+    final giro = Curves.easeOutCubic.transform((progresso / 0.5).clamp(0.0, 1.0));
     final contagem = Curves.easeOutCubic.transform(
       ((progresso - 0.2) / 0.45).clamp(0.0, 1.0),
     );
@@ -123,25 +125,28 @@ class _Conteudo extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Transform.scale(
-          scale: moeda,
-          child: Transform.rotate(
-            angle: (1 - moeda) * -0.6,
-            child: Container(
-              width: 132,
-              height: 132,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: CoresTrato.ambarSuave,
-                border: Border.all(color: CoresTrato.laranja, width: 7),
-                boxShadow: [
-                  BoxShadow(
-                    color: CoresTrato.laranja.withValues(alpha: 0.25 + 0.3 * brilho),
-                    blurRadius: 28 + 22 * brilho,
-                    spreadRadius: 4 + 6 * brilho,
-                  ),
-                ],
+          scale: 0.4 + 0.6 * moeda,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: CoresTrato.moedaOuro.withValues(alpha: 0.25 + 0.3 * brilho),
+                  blurRadius: 30 + 24 * brilho,
+                  spreadRadius: 4 + 6 * brilho,
+                ),
+              ],
+            ),
+            // Giro de moeda de verdade (2 voltas) que termina de frente.
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateY((1 - giro) * math.pi * 4),
+              child: MoedaTrato(
+                tamanho: 156,
+                brilho: ((progresso - 0.45) / 0.35).clamp(0.0, 1.0),
               ),
-              child: const Icon(Icons.star_rounded, size: 72, color: CoresTrato.laranja),
             ),
           ),
         ),

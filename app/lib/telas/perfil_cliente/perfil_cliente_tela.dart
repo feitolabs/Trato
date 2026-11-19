@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
+import '../comuns/moeda_trato.dart';
 import 'modelos.dart';
 
 /// Tela 22 — Perfil do cliente. Cada item avisa [aoTocarItem]; "Usar como profissional"
@@ -130,7 +131,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                 Card(
                   margin: EdgeInsets.zero,
                   child: ListTile(
-                    leading: const Icon(Icons.stars_rounded, color: CoresTrato.petroleo),
+                    leading: const MoedaTrato(tamanho: 32),
                     title: const Text('Suas moedas do Trato'),
                     trailing: Text('${perfil.moedas}', style: TipografiaTrato.tituloGrande),
                   ),

@@ -40,4 +40,10 @@ abstract final class CoresTrato {
   static const fundoFotoPreto = Color(0xFF000000);
   static const overlayFoto = Color(0x8A000000);
   static const textoSobreFoto = Color(0xFFFFFFFF);
+
+  /// Moeda do Trato (gamificação): ouro da borda, da face e do relevo.
+  static const moedaOuroClaro = Color(0xFFFFE9A6);
+  static const moedaOuro = Color(0xFFF2B632);
+  static const moedaOuroEscuro = Color(0xFFB87408);
+  static const moedaOuroProfundo = Color(0xFF7A4A00);
 }
