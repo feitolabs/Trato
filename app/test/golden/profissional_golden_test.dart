@@ -22,7 +22,7 @@ void main() {
   };
   final telas = <String, Widget>{
     'calculadora': CalculadoraOrcamentoTela(
-      servico: ServicoOrcamentoFake(taxaBps: 500),
+      servico: ServicoOrcamentoFake(),
       tituloPedido: 'Troca de tomadas e chuveiro',
       deslocamentoInicial: '0,5',
       horasInicial: '2,5',

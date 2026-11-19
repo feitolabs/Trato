@@ -352,7 +352,6 @@ class SaldoPedidoOut(BaseModel):
     retido_centavos: int
     a_liberar_centavos: int
     liberado_centavos: int
-    taxa_trato_centavos: int
 
 
 class SaldoProfissionalOut(BaseModel):

@@ -215,16 +215,12 @@ class PagamentoOut(BaseModel):
     referencia_provedor: str | None = None
     divergente: bool = False
     pedido_numero: int | None = None
-    # Taxa retida pelo Trato e líquido do profissional neste pedido (RF-PAG-05).
-    taxa_trato_centavos: int | None = None
-    liquido_profissional_centavos: int | None = None
 
 
 class ResumoConciliacaoOut(BaseModel):
     confirmado_centavos: int
     estornado_centavos: int
     retido_centavos: int
-    taxa_trato_centavos: int
     divergencias: int
     atualizado_em: datetime
     cobrancas: int = 0
@@ -249,7 +245,6 @@ class SaldoContratoOut(BaseModel):
     retido_centavos: int
     a_liberar_centavos: int
     liberado_centavos: int
-    taxa_trato_centavos: int
 
 
 class ExtratoContratoOut(BaseModel):
@@ -375,15 +370,6 @@ class ParametroIO(Entrada):
     escopo_texto: str | None = None
 
 
-class FaixaIO(Entrada):
-    de_centavos: int = Field(ge=0)
-    ate_centavos: int | None = Field(default=None, ge=1)
-    taxa_bps: int = Field(ge=0, le=10_000)
-    escopo_tipo: str = "global"
-    escopo_id: str | None = None
-    escopo_texto: str | None = None
-
-
 class VersaoConfigOut(BaseModel):
     id: str
     numero: int
@@ -397,13 +383,11 @@ class VersaoConfigOut(BaseModel):
     revertida_de: str | None = None
     criado_em: datetime | None = None
     parametros: list[ParametroIO] = []
-    faixas: list[FaixaIO] = []
 
 
 class RascunhoIn(Entrada):
     motivo: Motivo
     parametros: list[ParametroIO] = []
-    faixas: list[FaixaIO] = []
     # Quando a versão passa a valer (vazio = no momento da aprovação). Agendar é permitido.
     vigente_desde: datetime | None = None
     # True: parte da versão vigente e só troca o que veio no corpo.

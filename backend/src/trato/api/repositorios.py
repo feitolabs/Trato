@@ -73,10 +73,6 @@ class Contrato:
     aceito_em: datetime | None = None
     aceite_ip: str | None = None
     aceite_dispositivo: str | None = None
-    # Taxa congelada no aceite (versão de regras do contrato). Toda conta de taxa depois do aceite
-    # (disputa, liquidação) usa estes dois números, nunca a configuração vigente (A3).
-    taxa_bps_aplicada: int | None = None
-    taxa_minima_centavos: int = 0
     prazo_execucao_dias: int | None = None
 
 

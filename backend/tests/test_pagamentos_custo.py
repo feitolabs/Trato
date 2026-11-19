@@ -5,7 +5,6 @@ from trato.pagamentos.custo import (
     MeioPagamento,
     TaxaMeio,
     calcular_custo_stripe,
-    calcular_margem,
 )
 
 # Taxas de exemplo SÓ para teste (as reais vêm da configuração).
@@ -75,30 +74,6 @@ def test_recusa_float_texto_e_bool(valor):
 def test_parcelas_menor_que_um_e_recusada():
     with pytest.raises(ValueError):
         calcular_custo_stripe(10_000, MeioPagamento.CARTAO, CONFIG, parcelas=0)
-
-
-def test_margem_pix():
-    r = calcular_margem(10_000, MeioPagamento.PIX, taxa_trato_centavos=750, config=CONFIG)
-    assert r.custo_stripe_centavos == 100
-    assert r.liquido_profissional_centavos == 9_250
-    assert r.margem_trato_centavos == 650
-    assert r.liquido_profissional_centavos + r.taxa_trato_centavos == r.valor_centavos
-
-
-def test_margem_cartao_parcelado_pode_ficar_negativa():
-    # D4: cartão parcelado pode comer a margem do Trato.
-    r = calcular_margem(
-        10_000, MeioPagamento.CARTAO, taxa_trato_centavos=750, config=CONFIG, parcelas=12
-    )
-    assert r.custo_stripe_centavos == 1_038
-    assert r.margem_trato_centavos == 750 - 1_038 < 0
-
-
-def test_taxa_do_trato_fora_do_intervalo_e_recusada():
-    with pytest.raises(ValueError):
-        calcular_margem(10_000, MeioPagamento.PIX, taxa_trato_centavos=10_001, config=CONFIG)
-    with pytest.raises(ValueError):
-        calcular_margem(10_000, MeioPagamento.PIX, taxa_trato_centavos=-1, config=CONFIG)
 
 
 def test_config_recusa_taxa_negativa_e_parcelamento_invalido():

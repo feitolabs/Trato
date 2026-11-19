@@ -37,7 +37,7 @@ from trato.api.rotas_pagamento import instalar_pagamento
 from trato.config import Config, obter_config
 from trato.pagamentos.montagem import escolher_provedor
 from trato.pagamentos.orquestrador import ServicoPagamento
-from trato.persistencia.app_extras import TaxaPostgres, VerificacoesPostgres
+from trato.persistencia.app_extras import VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
@@ -62,7 +62,6 @@ from trato.persistencia.pagamentos import (
     CobrancasPostgres,
     ConfigPagamentoPostgres,
     OrdensEstornoPostgres,
-    TermosPostgres,
 )
 from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
@@ -136,7 +135,6 @@ def criar_contexto_postgres(
         notificacoes=notificacoes,
         usuarios=usuarios,
         verificacoes=VerificacoesPostgres(banco),
-        taxa=TaxaPostgres(banco),
         avaliacoes=AvaliacoesPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),
@@ -167,7 +165,6 @@ def montar_servico_pagamento(banco: Banco, config: Config) -> ServicoPagamento:
         ConfigPagamentoPostgres(banco),
         CobrancasPostgres(banco),
         AditivosPostgres(banco),
-        TermosPostgres(),
         OrdensEstornoPostgres(banco),
     )
 

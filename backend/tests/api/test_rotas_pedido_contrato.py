@@ -13,7 +13,6 @@ from test_fluxo_pagamento_e2e import Fluxo, fluxo  # noqa: F401, F811  (fixture)
 
 from trato.api.repositorios_app import PerfilDetalhe
 from trato.pagamentos.provedor import TipoEvento
-from trato.pagamentos.taxa import ConfigTaxa
 from trato.pedidos.estados import Estado
 
 
@@ -39,19 +38,12 @@ def test_detalhe_do_orcamento_so_para_cliente_dono_e_autor(amb):
     assert amb.cliente.get("/v1/orcamentos/orc-1").status_code == 401
 
 
-def test_resumo_traz_taxa_liquido_e_custo_estimado_do_provedor(amb):
-    from trato.api.memoria_app import TaxaEmMemoria
-
-    amb.contexto.taxa = TaxaEmMemoria(ConfigTaxa(750, 500))
+def test_resumo_traz_valor_e_custo_estimado_do_provedor_sem_taxa(amb):
     r = chamar(amb, "POST", "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 100_000})
     assert r.status_code == 200, r.text
     corpo = r.json()
-    assert corpo["taxa_centavos"] == 7_500 and corpo["liquido_centavos"] == 92_500
-    assert corpo["total_cliente_centavos"] == 100_000
-    assert corpo["taxa_bps"] == 750 and corpo["taxa_percentual"] == 7.5
-    # mínimo configurável: 7,5% de R$ 10,00 = 75 centavos, mas o mínimo é 500 (50%)
-    pequeno = chamar(amb, "POST", "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
-    assert pequeno.json()["taxa_centavos"] == 500 and pequeno.json()["taxa_percentual"] == 50.0
+    assert corpo["valor_centavos"] == 100_000
+    assert not any("taxa" in chave or "liquido" in chave for chave in corpo)
     assert corpo["custo_provedor_estimado_centavos"] > 0
     assert corpo["custo_provedor_estimativa"] is True
     assert (

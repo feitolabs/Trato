@@ -1,7 +1,7 @@
 """Rotas que o app pede: orçamentos do pedido, valores do pagamento, mensagens, notificações,
 perfil, pedidos abertos, resumo de orçamento, verificação do profissional e avaliação.
 
-Nenhuma regra de dinheiro mora aqui: a taxa vem do `ProvedorTaxa` (configuração) e o app só
+Nenhuma regra de dinheiro mora aqui: o app só
 pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 """
 
@@ -210,27 +210,12 @@ class PedidoAbertoOut(BaseModel):
 
 class ResumoOrcamentoOut(BaseModel):
     valor_centavos: int = Field(
-        description="O valor do orçamento (serviço). É o que o cliente paga."
-    )
-    taxa_centavos: int = Field(
-        description="Taxa do Trato (configuração vigente), descontada do profissional."
-    )
-    total_cliente_centavos: int = Field(
-        description="O que o cliente paga à vista: o valor do orçamento."
-    )
-    receita_trato_centavos: int = Field(description="A taxa é a receita do Trato.")
-    taxa_bps: int = Field(
-        description="Taxa EFETIVA em pontos-base (taxa ÷ valor): já considera o mínimo e as faixas."
-    )
-    taxa_percentual: float = Field(
-        description="A mesma taxa efetiva em %, com 2 casas (ex.: 7.5). Para o app só mostrar."
-    )
-    liquido_centavos: int = Field(
-        description="O que o profissional recebe: o orçamento menos a taxa."
+        description="O valor do orçamento (serviço). O cliente paga e o profissional recebe isso: "
+        "o Trato não cobra taxa."
     )
     custo_provedor_estimado_centavos: int = Field(
         description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
-        "Pix e cartão à vista: o Trato absorve, sai da taxa. Não reduz o líquido do profissional."
+        "Pix e cartão à vista: o Trato absorve. Não reduz o que o profissional recebe."
     )
     custo_provedor_estimativa: bool = True
 
@@ -343,9 +328,9 @@ def _pedido_visivel(
 
 def _custo_provedor_estimado() -> ConfigCustoPagamento:
     """Custos do provedor ainda são ESTIMATIVAS até haver proposta comercial (P7)."""
-    from trato.margem.relatorio import CUSTO_PROVEDOR
+    from trato.pagamentos.custo import CUSTO_PROVEDOR_ESTIMADO
 
-    return CUSTO_PROVEDOR
+    return CUSTO_PROVEDOR_ESTIMADO
 
 
 # --- Orçamentos e pagamento -------------------------------------------------------------
@@ -637,26 +622,17 @@ def valores_do_pagamento(
 @router.post(
     "/orcamentos/resumo",
     response_model=ResumoOrcamentoOut,
-    summary="Taxa e líquido de um valor (calculadora do profissional)",
-    description="Só o backend calcula a taxa, pela configuração vigente. Nada é gravado.",
+    summary="Resumo de um valor (calculadora do profissional)",
+    description="Sem taxa: devolve o valor e a estimativa do custo do provedor. Nada é gravado.",
 )
 def resumo_do_orcamento(
     corpo: ResumoOrcamentoIn,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> ResumoOrcamentoOut:
-    if contexto.taxa is None:
-        raise HTTPException(503, "A taxa ainda não foi configurada.")
-    taxa = min(contexto.taxa.calcular(corpo.valor_centavos), corpo.valor_centavos)
     custo = contexto.extras.get("custo_provedor") or _custo_provedor_estimado()
     return ResumoOrcamentoOut(
         valor_centavos=corpo.valor_centavos,
-        taxa_centavos=taxa,
-        taxa_bps=(taxa * 10_000 + corpo.valor_centavos // 2) // corpo.valor_centavos,
-        taxa_percentual=round(taxa * 100 / corpo.valor_centavos, 2),
-        liquido_centavos=corpo.valor_centavos - taxa,
-        total_cliente_centavos=corpo.valor_centavos,
-        receita_trato_centavos=taxa,
         custo_provedor_estimado_centavos=max(
             calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento
         ),

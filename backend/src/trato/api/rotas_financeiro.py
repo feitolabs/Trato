@@ -52,7 +52,7 @@ def _extrato(itens: Sequence[Lancamento], limite: int, deslocamento: int) -> Ext
 @router.get(
     "/pedidos/{pedido_id}/saldo",
     response_model=SaldoPedidoOut,
-    summary="Saldo do pedido (retido, a liberar, liberado, taxa)",
+    summary="Saldo do pedido (retido, a liberar, liberado)",
 )
 def saldo_do_pedido(
     pedido_id: str,
@@ -75,7 +75,6 @@ def saldo_do_pedido(
         retido_centavos=saldo.retido,
         a_liberar_centavos=saldo.a_liberar,
         liberado_centavos=saldo.liberado,
-        taxa_trato_centavos=saldo.taxa_trato,
     )
 
 

@@ -204,7 +204,7 @@ class _AbaContestacoesState extends State<AbaContestacoes> {
                     padding: EdgeInsets.only(bottom: EspacosTrato.x4),
                     child: BannerInfo(
                       'As provas são enviadas no painel do provedor de pagamento, antes do prazo. '
-                      'Se a contestação for perdida, o valor volta ao cliente e sai do Trato; a taxa não volta.',
+                      'Se a contestação for perdida, o valor volta ao cliente e sai do Trato.',
                       titulo: 'Contestação de cartão.',
                     ),
                   ),
@@ -473,7 +473,7 @@ const rotulosFechamento = [
   ('cobrado_centavos', 'Recebido de clientes (bruto)', true),
   ('devolvido_centavos', 'Devolvido a clientes', true),
   ('entrada_liquida_centavos', 'Entrada líquida de clientes', true),
-  ('receita_taxas_centavos', 'Receita do Trato (taxas)', true),
+  ('receita_taxas_centavos', 'Receita do Trato (taxas, até 18/11/2026)', true),
   ('liberado_profissionais_centavos', 'Liberado aos profissionais', true),
   ('retido_fim_centavos', 'Retido ao fim do mês', true),
   ('a_liberar_fim_centavos', 'A liberar ao fim do mês', true),

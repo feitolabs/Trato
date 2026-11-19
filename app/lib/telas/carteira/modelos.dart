@@ -73,7 +73,6 @@ class DetalheValoresPedido {
   const DetalheValoresPedido({
     required this.pedidoNumero,
     required this.pagoPeloClienteCentavos,
-    required this.taxaCentavos,
     required this.voceRecebeCentavos,
     required this.situacao,
     this.aditivos = const [],
@@ -86,13 +85,10 @@ class DetalheValoresPedido {
   /// Pedido concluído que o profissional ainda não avaliou.
   final bool podeAvaliarCliente;
 
-  /// O valor inteiro que o cliente pagou (antes da taxa).
+  /// O valor inteiro que o cliente pagou.
   final int pagoPeloClienteCentavos;
 
-  /// Taxa do Trato descontada.
-  final int taxaCentavos;
-
-  /// O que fica para o profissional (já sem a taxa).
+  /// O que fica para o profissional (o Trato não cobra taxa).
   final int voceRecebeCentavos;
 
   /// Ex.: "Retido até o serviço ser confirmado".

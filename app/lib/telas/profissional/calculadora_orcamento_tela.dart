@@ -650,7 +650,6 @@ class _ResumoEscuro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final claro = TipografiaTrato.corpo.copyWith(color: CoresTrato.creme);
     final claroForte = TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
     final r = resumo;
     return CartaoTrato(
@@ -658,15 +657,6 @@ class _ResumoEscuro extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _LinhaResumo(
-            rotulo: 'Cliente paga',
-            valor: r != null ? Dinheiro.formatar(r.clientePagaCentavos) : '—',
-            estiloRotulo: claro,
-            estiloValor: claroForte,
-          ),
-          const SizedBox(height: EspacosTrato.x3),
-          const Divider(color: CoresTrato.pontoSobrePetroleo, height: 1),
-          const SizedBox(height: EspacosTrato.x3),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -677,7 +667,7 @@ class _ResumoEscuro extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
                   child: Text(
-                    r == null ? '—' : Dinheiro.formatar(r.liquidoCentavos),
+                    r == null ? '—' : Dinheiro.formatar(r.totalCentavos),
                     style: TipografiaTrato.tituloGrande.copyWith(
                       color: CoresTrato.creme,
                       fontSize: 34,
@@ -695,31 +685,6 @@ class _ResumoEscuro extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _LinhaResumo extends StatelessWidget {
-  const _LinhaResumo({
-    required this.rotulo,
-    required this.valor,
-    required this.estiloRotulo,
-    required this.estiloValor,
-  });
-
-  final String rotulo;
-  final String valor;
-  final TextStyle estiloRotulo;
-  final TextStyle estiloValor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(rotulo, style: estiloRotulo)),
-        const SizedBox(width: EspacosTrato.x3),
-        Text(valor, style: estiloValor),
-      ],
     );
   }
 }

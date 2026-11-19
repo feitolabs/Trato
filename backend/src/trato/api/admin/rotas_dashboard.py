@@ -1,8 +1,7 @@
 """Rotas administrativas do Painel executivo (RF-DAS-01 a RF-DAS-04).
 
 Quatro indicadores com comparação ao período anterior de mesma duração, série diária de
-pedidos e funil de conversão. Nenhum percentual é inventado aqui: a receita vem das taxas que o
-contrato registrou (`contratos.taxa_trato_centavos`), nunca de uma conta em cima do GMV.
+pedidos e funil de conversão. Sem receita de taxa (app gratuito).
 """
 
 from __future__ import annotations
@@ -42,9 +41,6 @@ _FECHADOS = (
 
 class ResumoMetricas(BaseModel):
     gmv_centavos: int = Field(..., description="Soma dos pedidos pagos no período")
-    receita_taxa_centavos: int = Field(
-        ..., description="Soma das taxas retidas em serviços concluídos"
-    )
     pedidos_total: int
     pedidos_concluidos: int
     pedidos_em_andamento: int
@@ -57,7 +53,6 @@ class ResumoMetricas(BaseModel):
     categorias_ativas: int
     # Comparação com o período anterior de mesma duração.
     gmv_anterior_centavos: int = 0
-    receita_taxa_anterior_centavos: int = 0
     pedidos_ativos: int = 0
     pedidos_ativos_anterior: int = 0
     base_usuarios: int = 0
@@ -118,19 +113,6 @@ def _gmv(con: Any, de: datetime, ate: datetime) -> int:
         "select coalesce(sum(valor_centavos), 0) as n from public.pagamentos "
         "where status = 'confirmado' and coalesce(confirmado_em, criado_em) >= %s "
         "and coalesce(confirmado_em, criado_em) < %s",
-        (de, ate),
-    )
-
-
-def _receita(con: Any, de: datetime, ate: datetime) -> int:
-    """Taxas retidas em serviços concluídos dentro do período (data da conclusão)."""
-    return _uma(
-        con,
-        "select coalesce(sum(c.taxa_trato_centavos), 0) as n from public.contratos c "
-        "join public.pedidos p on p.id = c.pedido_id and p.status = 'concluido' "
-        "join lateral (select max(h.ocorrida_em) as em from public.pedido_historico h "
-        "              where h.pedido_id = p.id and h.para_status = 'concluido') h on true "
-        "where h.em >= %s and h.em < %s",
         (de, ate),
     )
 
@@ -201,7 +183,6 @@ def obter_metricas(
         base_agora = _base(con, fim_aberto)
         return ResumoMetricas(
             gmv_centavos=_gmv(con, comeco, fim_aberto),
-            receita_taxa_centavos=_receita(con, comeco, fim_aberto),
             pedidos_total=int(lin_ped.get("total") or 0),
             pedidos_concluidos=int(lin_ped.get("concluidos") or 0),
             pedidos_em_andamento=int(lin_ped.get("em_andamento") or 0),
@@ -219,7 +200,6 @@ def obter_metricas(
                 con, "select count(*) as n from public.categorias where ativa = true"
             ),
             gmv_anterior_centavos=_gmv(con, anterior, comeco),
-            receita_taxa_anterior_centavos=_receita(con, anterior, comeco),
             pedidos_ativos=_ativos(con, comeco, fim_aberto),
             pedidos_ativos_anterior=_ativos(con, anterior, comeco),
             base_usuarios=base_agora,

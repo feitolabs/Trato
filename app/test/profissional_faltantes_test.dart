@@ -267,8 +267,6 @@ void main() {
             'versao': 1,
             'status': 'enviado',
             'valor_centavos': 60000,
-            'taxa_centavos': 4500,
-            'liquido_centavos': 55500,
             'prazo_execucao_dias': 2,
             'garantia_dias': 90,
             'fora_do_escopo': 'Massa corrida',
@@ -309,8 +307,6 @@ void main() {
 
       final det = await RepositorioProfissionalApi(api).meuOrcamento('orc-1');
       expect(det.valorCentavos, 60000);
-      expect(det.taxaCentavos, 4500);
-      expect(det.liquidoCentavos, 55500);
       expect(det.foraDoEscopo, 'Massa corrida');
       expect(det.decimosDeslocamento, 10);
       expect(det.decimosTrabalhadas, 30);
@@ -352,7 +348,7 @@ void main() {
               Navigator.of(ctx).push(
                 MaterialPageRoute<void>(
                   builder: (_) => CalculadoraOrcamentoTela(
-                    servico: ServicoOrcamentoFake(taxaBps: 750),
+                    servico: ServicoOrcamentoFake(),
                     tituloPedido: det.tituloPedido,
                     edicao: true,
                     mostrarForaDoEscopo: true,

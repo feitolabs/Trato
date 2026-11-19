@@ -389,8 +389,9 @@ def repartir_custodia(
 ) -> tuple[Lancamento, ...]:
     """Ao concluir: divide a custódia entre taxa do Trato e parte do profissional.
 
-    `taxa` já vem calculada (F4.2). `valor` é a parte da custódia a repartir (uma etapa,
-    por exemplo); sem ele, reparte toda a custódia do pedido.
+    `taxa` é sempre 0 nos pedidos novos (o app é gratuito desde 18/11/2026); o parâmetro existe
+    para o histórico e para os testes do estorno de pedidos antigos. `valor` é a parte da custódia
+    a repartir (uma etapa, por exemplo); sem ele, reparte toda a custódia do pedido.
     """
     base = livro.saldo(CUSTODIA, pedido_id) if valor is None else valor
     if base <= 0:

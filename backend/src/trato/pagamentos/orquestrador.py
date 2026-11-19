@@ -6,8 +6,7 @@ Regras que valem aqui:
 - O ledger só espelha o que o provedor confirmou (caminho A, D15).
 - Cada operação financeira tem chave de idempotência determinística (de dado estável, nunca
   de contagem).
-- Taxa e prazos vêm da configuração; o contrato congela a taxa no aceite e é a taxa CONGELADA
-  (termos ou contrato) que vale depois (A3), nunca a configuração de hoje.
+- Não há taxa do Trato (app 100% gratuito, 18/11/2026); prazos vêm da configuração.
 - Estorno: a intenção vai para o ledger e para a fila de ordens ANTES de o provedor ser chamado;
   o provedor só é chamado depois do commit, com a chave da ordem, e a reconciliação reenvia o que
   ficou pendente (A7). Nunca dinheiro que saiu sem registro.
@@ -57,8 +56,6 @@ from trato.pagamentos.modelos import (
     RepositorioAditivos,
     RepositorioCobrancas,
     RepositorioOrdensEstorno,
-    RepositorioTermos,
-    TermosContrato,
 )
 from trato.pagamentos.parcelamento import ParcelamentoIndisponivel
 from trato.pagamentos.provedor.base import (
@@ -68,14 +65,7 @@ from trato.pagamentos.provedor.base import (
     TipoEvento,
 )
 from trato.pagamentos.provedor.stripe_formato import TIPOS_STRIPE
-from trato.pagamentos.taxa import (
-    ConfigTaxa,
-    TaxaNaoCongelada,
-    TotalPedido,
-    calcular_taxa,
-    montar_total,
-    taxa_congelada,
-)
+from trato.pagamentos.taxa import TotalPedido, montar_total
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Estado, Papel, Pedido, ProvaPagamento
 
@@ -104,14 +94,12 @@ class ServicoPagamento:
         config: Callable[[], ConfigPagamento],
         cobrancas: RepositorioCobrancas,
         aditivos: RepositorioAditivos,
-        termos: RepositorioTermos,
         ordens: RepositorioOrdensEstorno | None = None,
     ) -> None:
         self.provedor = provedor
         self.config = config
         self.cobrancas = cobrancas
         self.aditivos = aditivos
-        self.termos = termos
         self.ordens = ordens if ordens is not None else OrdensEstornoEmMemoria()
 
     # --- ligação ao contexto da API ------------------------------------------------------
@@ -151,26 +139,9 @@ class ServicoPagamento:
     ) -> TotalPedido:
         """Quanto cobrar do cliente por `servico_centavos`: o serviço (+ custo do parcelado).
 
-        A taxa não entra na cobrança: é descontada do profissional na conclusão. Pedido principal:
-        a taxa é a do contrato (congelada no aceite). Aditivo: a taxa é só o que a taxa total
-        cresce por causa dele, para o mínimo não contar duas vezes.
+        Não há taxa do Trato: o profissional recebe o serviço inteiro.
         """
-        taxa_cfg = self._taxa_congelada(contexto, pedido.id)
-        if aditivo_id is None:
-            total = montar_total(servico_centavos, taxa_cfg)
-        else:
-            contrato = contexto.contratos.obter_do_pedido(pedido.id)
-            antes = (contrato.valor_centavos if contrato else 0) + sum(
-                a.valor_centavos
-                for a in self.aditivos.do_pedido(pedido.id)
-                if a.estado is EstadoAditivo.PAGO and a.id != aditivo_id
-            )
-            taxa = calcular_taxa(antes + servico_centavos, taxa_cfg) - (
-                calcular_taxa(antes, taxa_cfg) if antes > 0 else 0
-            )
-            total = TotalPedido(
-                servico_centavos, taxa, 0, servico_centavos, servico_centavos - taxa, taxa
-            )
+        total = montar_total(servico_centavos)
         if parcelas == 1:
             return total
         try:
@@ -626,9 +597,7 @@ class ServicoPagamento:
     def _apos_transicao(
         self, antes: Pedido, depois: Pedido, acao: Acao, contexto: Contexto
     ) -> None:
-        if acao is Acao.ACEITAR_ORCAMENTO:
-            self.termos.salvar(TermosContrato(depois.id, self.config().taxa, contexto.agora()))
-        elif depois.estado is Estado.CONCLUIDO and acao in (
+        if depois.estado is Estado.CONCLUIDO and acao in (
             Acao.CONFIRMAR_CONCLUSAO,
             Acao.ENCERRAR_DISPUTA_POR_ACORDO,
         ):
@@ -656,17 +625,6 @@ class ServicoPagamento:
                 )
 
     # --- dinheiro ------------------------------------------------------------------------------
-
-    def _taxa_congelada(self, contexto: Contexto, pedido_id: str) -> ConfigTaxa:
-        """A taxa do aceite: os termos do contrato ou a taxa que o próprio contrato guardou.
-        Nunca a configuração de hoje (A3)."""
-        termos = self.termos.obter(pedido_id)
-        if termos is not None:
-            return termos.taxa
-        try:
-            return taxa_congelada(contexto.contratos.obter_do_pedido(pedido_id))
-        except TaxaNaoCongelada as erro:
-            raise ErroFluxo(str(erro)) from erro
 
     def _servico_da_cobranca(self, contexto: Contexto, cobranca: CobrancaLocal) -> int:
         """O valor do serviço dentro da cobrança: o guardado nela, ou o do contrato/aditivo.
@@ -728,10 +686,7 @@ class ServicoPagamento:
                 estornar_pedido(livro, pedido.id, devolver_ao_cliente, f"{chave}/est", agora)
             restante = livro.saldo(CUSTODIA, pedido.id)
             if repartir and restante > 0:
-                # A taxa (a congelada no aceite) incide sobre o que fica para o profissional e é
-                # descontada aqui, antes de o valor chegar à carteira dele.
-                taxa = calcular_taxa(restante, self._taxa_congelada(contexto, pedido.id))
-                repartir_custodia(livro, pedido.id, profissional, taxa, f"{chave}/rep", agora)
+                repartir_custodia(livro, pedido.id, profissional, 0, f"{chave}/rep", agora)
 
         novos = self._planejar(contexto, pedido.id, operacao)
         ordens = self._ordens_de_estorno(pedido.id, devolver_ao_cliente, chave, agora)

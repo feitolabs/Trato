@@ -444,7 +444,7 @@ class ConfigAdminEmMemoria:
 
     def versoes(self) -> Sequence[VersaoConfig]:
         todas = sorted(self._versoes.values(), key=lambda v: v.numero, reverse=True)
-        return tuple(replace(v, parametros=(), faixas=()) for v in todas)
+        return tuple(replace(v, parametros=()) for v in todas)
 
     def versao(self, versao_id: str) -> VersaoConfig | None:
         return self._versoes.get(versao_id)
@@ -469,8 +469,8 @@ class ConfigAdminEmMemoria:
             motivo=motivo,
         )
 
-    def _nova(self, autor, motivo, parametros, faixas, vigente_desde, revertida_de, status):
-        regras.validar_itens(self._definicoes, parametros, faixas)
+    def _nova(self, autor, motivo, parametros, vigente_desde, revertida_de, status):
+        regras.validar_itens(self._definicoes, parametros)
         numero = next(self._contador)
         versao = VersaoConfig(
             id=f"cfg-{numero}",
@@ -482,17 +482,16 @@ class ConfigAdminEmMemoria:
             revertida_de=revertida_de,
             criado_em=self._agora(),
             parametros=tuple(parametros),
-            faixas=tuple(faixas),
         )
         self._versoes[versao.id] = versao
         return versao
 
     def criar_rascunho(
-        self, autor_id, motivo, parametros, faixas, vigente_desde, partir_da_vigente
+        self, autor_id, motivo, parametros, vigente_desde, partir_da_vigente
     ) -> VersaoConfig:
         if partir_da_vigente and (base := self.vigente()) is not None:
-            parametros, faixas = regras.mesclar(base.parametros, base.faixas, parametros, faixas)
-        versao = self._nova(autor_id, motivo, parametros, faixas, vigente_desde, None, "rascunho")
+            parametros = regras.mesclar(base.parametros, parametros)
+        versao = self._nova(autor_id, motivo, parametros, vigente_desde, None, "rascunho")
         self._registrar(autor_id, "config.rascunho_criado", None, versao, motivo)
         return versao
 
@@ -538,7 +537,7 @@ class ConfigAdminEmMemoria:
         if alvo.status not in ("vigente", "substituida", "revertida"):
             raise RegraDoBanco("Só dá para reverter para uma versão que já valeu.")
         versao = self._nova(
-            autor_id, motivo, alvo.parametros, alvo.faixas, None, alvo.id, "aguardando_aprovacao"
+            autor_id, motivo, alvo.parametros, None, alvo.id, "aguardando_aprovacao"
         )
         self._registrar(autor_id, "config.reversao_proposta", None, versao, motivo)
         return versao

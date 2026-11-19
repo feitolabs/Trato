@@ -271,7 +271,6 @@ void main() {
           'confirmado_centavos': 100000,
           'estornado_centavos': 5000,
           'retido_centavos': 20000,
-          'taxa_trato_centavos': 7500,
           'divergencias': 2,
           'atualizado_em': '2026-10-29T12:00:00Z',
         },

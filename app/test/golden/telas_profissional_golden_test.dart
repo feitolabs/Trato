@@ -61,7 +61,7 @@ void main() {
     'ver_nota_vazia': () => VerNotaTela(servico: ServicoNotaMaterialFake(), pedidoId: 'p1'),
     'criar_aditivo': () => CriarAditivoTela(
           servico: ServicoAditivoFake(),
-          servicoLiquido: ServicoOrcamentoFake(taxaBps: 750),
+          servicoLiquido: ServicoOrcamentoFake(),
           pedidoId: 'p1',
           tituloPedido: 'Troca de tomadas e chuveiro',
         ),

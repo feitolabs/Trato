@@ -1036,3 +1036,13 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - **Testes:** `tests/conftest.py` liga a cobrança nos testes antigos de fórmula/ledger; `tests/test_app_gratuito.py` (marker `app_gratuito`) garante taxa 0 por padrão. Goldens da carteira e da calculadora regenerados.
 - **Não feito (precisa de OK):** zerar `taxa_bps`/`taxa_minima_centavos` na configuração do Supabase (nova versão, dupla aprovação). Painel admin mantém colunas/relatórios de taxa (histórico).
 - **Custos:** o Trato absorve o custo do Stripe no Pix e no cartão à vista; o custo de parcelamento continua repassado ao cliente.
+
+## 2026-11-18 — Taxa removida de vez (limpeza total do código)
+
+- **Decisão do João:** gratuito de vez. Branch `feature/remover-taxa`.
+- **Backend:** `pagamentos/taxa.py` agora só tem `montar_total` (serviço + custo de parcelamento). Removidos `ConfigTaxa`, `calcular_taxa`, taxa congelada, `TermosContrato`, `ProvedorTaxa`/`TaxaPostgres`, faixas de taxa (config e painel) e o pacote `margem/`. Contrato não guarda mais a taxa no domínio; as colunas legadas (`taxa_bps_aplicada`, `taxa_trato_centavos`, `liquido_profissional_centavos`) seguem no banco e são gravadas com 0 / valor inteiro. Parâmetros `taxa_*` ficam no banco, escondidos do painel.
+- **API (quebra para apps antigos):** removidos `taxa_*`/`liquido_*` de `/orcamentos/resumo`, detalhe do orçamento, saldo do pedido e painel admin (pagamentos, dashboard). Backend e apps novos precisam subir juntos.
+- **Ledger:** mantido como estava (pedidos antigos têm lançamentos de taxa; o custo de parcelamento usa a conta TAXA_TRATO). Fechamento mensal e relatórios continuam mostrando a receita de taxas do histórico.
+- **App e painel:** sem linhas de taxa; dashboard troca "Receita Trato" por "Serviços concluídos".
+- **Testes:** backend, app (989) e admin (177) ajustados e verdes.
+- **Pendente (precisa de OK):** migration que remova as colunas/tabelas de taxa do banco (`config_faixas_taxa`, colunas de `contratos`/`repasses`) e os parâmetros `taxa_*`. Não aplicada; o código já funciona sem ela.

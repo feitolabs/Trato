@@ -159,13 +159,7 @@ def test_2_detalhe_pedido_aberto_inclui_fotos_urls_do_cliente(amb):
     assert len(fotos) == 1 and "ped-foto" in fotos[0]
 
 
-class _TaxaFixa:
-    def calcular(self, valor_centavos: int) -> int:
-        return (valor_centavos * 750) // 10_000
-
-
 def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
-    amb.contexto.taxa = _TaxaFixa()
     amb.contexto.pedidos.salvar(
         Pedido("ped-orc", CLIENTE.id, AGORA),
         None,
@@ -213,10 +207,7 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
     assert j1["horas_trabalhadas"] == "3"
     assert j1["fora_do_escopo"] == "Massa corrida"
     assert j1["observacoes"] == "Inclui proteção do piso"
-    assert j1["taxa_centavos"] == 4_500
-    assert j1["liquido_centavos"] == 55_500
-    j1_cli = amb.cliente.get(f"/v1/orcamentos/{orc_v1}", headers=cab("t-cliente")).json()
-    assert j1_cli["taxa_centavos"] is None and j1_cli["liquido_centavos"] is None
+    assert "taxa_centavos" not in j1 and "liquido_centavos" not in j1
 
     # Envia edição (v2) antes de qualquer contraproposta
     r2 = amb.cliente.post(

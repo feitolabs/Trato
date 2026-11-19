@@ -11,7 +11,7 @@ import pytest
 from trato.api.repositorios import Contrato
 from trato.pedidos import estados
 from trato.pedidos.estados import Ator, Papel, ProvaPagamento
-from trato.persistencia.erros import ConfigNaoPublicada, Duplicado, RegraDoBanco
+from trato.persistencia.erros import Duplicado, RegraDoBanco
 from trato.persistencia.orcamentos import EtapaProposta, ItemOrcamento
 
 pytestmark = pytest.mark.integracao
@@ -118,7 +118,7 @@ def test_fluxo_completo(cenario):
             "from public.contratos where pedido_id = %s",
             (pedido_id,),
         ).fetchone()
-        assert ctr[0:5] == (90_000, 750, 6_750, 83_250, 27_000)  # líquido = orçamento - taxa
+        assert ctr[0:5] == (90_000, 0, 0, 90_000, 27_000)  # sem taxa: líquido = orçamento
         assert ctr[5]["adiantamento_bps"] == 3000
         # as etapas propostas foram vinculadas ao contrato
         assert (
@@ -480,33 +480,3 @@ def test_backend_so_tem_os_privilegios_do_service_role(cenario):
     # mídia é imutável: nem o service_role atualiza
     with pytest.raises(Exception, match="permission|permiss"), c.banco.transacao() as con:
         con.execute("update public.midias set mime = 'x'")
-
-
-def test_config_sem_faixa_nao_aceita_orcamento(cenario):
-    """Sem faixa de taxa para o valor, o aceite responde 503 e o pedido continua aberto."""
-    c = cenario
-    pedido_id = abrir_pedido(c)
-    orc = enviar_orcamento(c, pedido_id)
-    with c.local.admin() as con:
-        con.execute("alter table public.config_faixas_taxa disable trigger all")
-        faixas = con.execute(
-            "select id, de_centavos, ate_centavos, taxa_bps, versao_id from "
-            "public.config_faixas_taxa"
-        ).fetchall()
-        con.execute("delete from public.config_faixas_taxa")
-    try:
-        r = acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc})
-        assert r.status_code == 503
-        assert c.contexto.pedidos.obter(pedido_id).estado is estados.Estado.ABERTO
-        with pytest.raises(ConfigNaoPublicada):
-            c.contexto.contratos.salvar(Contrato(pedido_id, orc, c.ids["profissional"], 90_000))
-    finally:
-        with c.local.admin() as con:
-            for f in faixas:
-                con.execute(
-                    "insert into public.config_faixas_taxa "
-                    "(id, de_centavos, ate_centavos, taxa_bps, versao_id) "
-                    "values (%s, %s, %s, %s, %s)",
-                    f,
-                )
-            con.execute("alter table public.config_faixas_taxa enable trigger all")

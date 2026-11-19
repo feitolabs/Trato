@@ -41,7 +41,6 @@ from trato.api.admin.repositorios import (  # noqa: E402
     DadosPessoaisAdmin,
     DefinicaoConfig,
     DocumentoAdmin,
-    FaixaTaxa,
     MembroEquipe,
     ParametroConfig,
     UsuarioAdmin,
@@ -93,12 +92,6 @@ BASE_PARAMETROS = (
     ParametroConfig("prazo_decisao_disputa_dias_uteis", 5),
     ParametroConfig("prazo_congelar_disputa_horas", 72),
 )
-BASE_FAIXAS = (FaixaTaxa(0, 100_000, 750), FaixaTaxa(100_000, None, 600))  # valores de TESTE
-
-
-class TaxaFalsa:
-    def calcular(self, valor_centavos: int) -> int:
-        return valor_centavos * 750 // 10_000
 
 
 class AssinadorFalso:
@@ -149,7 +142,7 @@ def _semear_disputa(ctx: Contexto, pedido_id: str, valor: int, cliente: Usuario,
     )  # fmt: skip
     ctx.pedidos.salvar(pedido, evento)
     ctx.contratos.salvar(
-        Contrato(pedido_id, f"orc-{pedido_id}", prof.id, valor, "pintura", taxa_bps_aplicada=750)
+        Contrato(pedido_id, f"orc-{pedido_id}", prof.id, valor, "pintura")
     )
     registrar_cobranca(ctx.ledger.livro, pedido_id, valor, f"cob-{pedido_id}", AGORA)
     ctx.eventos_webhook.registrar(
@@ -214,7 +207,6 @@ def montar() -> Ambiente:
         eventos_webhook=EventosWebhookEmMemoria(),
         config=ConfigEmMemoria(config),
         agora=relogio,
-        taxa=TaxaFalsa(),
     )
     auditoria = AuditoriaEmMemoria(relogio)
     usuarios = UsuariosAdminEmMemoria(auditoria)
@@ -238,7 +230,7 @@ def montar() -> Ambiente:
             {f"{vid}-d1": f"bucket-privado/{vid}/frente.jpg", f"{vid}-d2": f"bucket-privado/{vid}/selfie.jpg"},
         )
     config_admin = ConfigAdminEmMemoria(auditoria, DEFINICOES, relogio)
-    base = config_admin.criar_rascunho("eq-financeiro", "Versão inicial de exemplo", BASE_PARAMETROS, BASE_FAIXAS, None, False)
+    base = config_admin.criar_rascunho("eq-financeiro", "Versão inicial de exemplo", BASE_PARAMETROS, None, False)
     config_admin.enviar_para_aprovacao(base.id, "eq-financeiro", "Pronta")
     config_admin.aprovar(base.id, "eq-administrador", "Conferi")
     config_admin.publicar(base.id, "eq-administrador", "No ar", AGORA)
@@ -246,7 +238,7 @@ def montar() -> Ambiente:
         ParametroConfig(p.chave, 24 if p.chave == "prazo_resposta_disputa_horas" else p.valor)
         for p in BASE_PARAMETROS
     )
-    config_admin.criar_rascunho("eq-financeiro", "Rascunho: prazo de resposta menor", proposta, BASE_FAIXAS, None, False)
+    config_admin.criar_rascunho("eq-financeiro", "Rascunho: prazo de resposta menor", proposta, None, False)
     assinador = AssinadorFalso()
     admin = AdminContexto(
         equipe=EquipeEmMemoria(membros),

@@ -311,16 +311,6 @@ class ParametroConfig:
 
 
 @dataclass(frozen=True)
-class FaixaTaxa:
-    de_centavos: int
-    ate_centavos: int | None
-    taxa_bps: int
-    escopo_tipo: str = "global"
-    escopo_id: str | None = None
-    escopo_texto: str | None = None
-
-
-@dataclass(frozen=True)
 class VersaoConfig:
     id: str
     numero: int
@@ -332,7 +322,6 @@ class VersaoConfig:
     revertida_de: str | None = None
     criado_em: datetime | None = None
     parametros: tuple[ParametroConfig, ...] = field(default=())
-    faixas: tuple[FaixaTaxa, ...] = field(default=())
 
 
 class RepositorioConfigAdmin(Protocol):
@@ -341,7 +330,7 @@ class RepositorioConfigAdmin(Protocol):
     def definicoes(self) -> Sequence[DefinicaoConfig]: ...
 
     def versoes(self) -> Sequence[VersaoConfig]:
-        """Sem parâmetros nem faixas (use `versao`). A mais nova primeiro."""
+        """Sem parâmetros (use `versao`). A mais nova primeiro."""
 
     def versao(self, versao_id: str) -> VersaoConfig | None: ...
 
@@ -352,7 +341,6 @@ class RepositorioConfigAdmin(Protocol):
         autor_id: str,
         motivo: str,
         parametros: Sequence[ParametroConfig],
-        faixas: Sequence[FaixaTaxa],
         vigente_desde: datetime | None,
         partir_da_vigente: bool,
     ) -> VersaoConfig: ...

@@ -26,7 +26,7 @@ from trato.api.admin.modelos import (
 from trato.api.admin.papeis import Permissao
 from trato.api.admin.repositorios import FiltroAuditoria
 from trato.api.contexto import Contexto, obter_contexto
-from trato.financeiro.ledger import CUSTODIA, TAXA_TRATO, Lancamento, TipoLancamento
+from trato.financeiro.ledger import CUSTODIA, Lancamento, TipoLancamento
 
 router = APIRouter(prefix="/v1/admin", tags=["admin: pagamentos (leitura)"])
 
@@ -84,17 +84,6 @@ def _estornado(lancamentos: Sequence[Lancamento]) -> dict[str, int]:
     return soma
 
 
-def _taxas_por_pedido(lancamentos: Sequence[Lancamento]) -> dict[str, int]:
-    """Saldo da conta de taxa do Trato por pedido, somado do que já foi lido (sem ir ao banco)."""
-    taxa: dict[str, int] = {}
-    for item in lancamentos:
-        if item.credito == TAXA_TRATO:
-            taxa[item.pedido_id] = taxa.get(item.pedido_id, 0) + item.valor
-        if item.debito == TAXA_TRATO:
-            taxa[item.pedido_id] = taxa.get(item.pedido_id, 0) - item.valor
-    return taxa
-
-
 def _pagamentos(
     contexto: Contexto,
     admin: AdminContexto,
@@ -110,7 +99,6 @@ def _pagamentos(
     if pedido_id is not None:
         todos = tuple(i for i in todos if i.pedido_id == pedido_id)
     estornos = _estornado(todos)
-    taxas = _taxas_por_pedido(todos)
     limite = contexto.agora() - timedelta(days=dias) if dias is not None else None
     cobrancas = [
         i
@@ -130,11 +118,8 @@ def _pagamentos(
         divergente = _id_normal(item.id) not in ja and (
             item.pedido_id not in pedidos or referencia is None or not tem_contrato
         )
-        taxa = taxas.get(item.pedido_id, 0) if item.pedido_id in pedidos else None
         saida.append(
             PagamentoOut(
-                taxa_trato_centavos=taxa,
-                liquido_profissional_centavos=None if taxa is None else max(item.valor - taxa, 0),
                 lancamento_id=item.id,
                 pedido_id=item.pedido_id,
                 valor_centavos=item.valor,
@@ -195,7 +180,6 @@ def resumo(
         confirmado_centavos=sum(p.valor_centavos for p in pagamentos),
         estornado_centavos=sum(p.estornado_centavos for p in pagamentos),
         retido_centavos=contexto.ledger.saldo_da_conta(CUSTODIA),
-        taxa_trato_centavos=contexto.ledger.saldo_da_conta(TAXA_TRATO),
         divergencias=sum(1 for p in pagamentos if p.divergente),
         atualizado_em=contexto.agora(),
     )
@@ -287,7 +271,6 @@ def extrato_do_contrato(
             retido_centavos=saldo.retido,
             a_liberar_centavos=saldo.a_liberar,
             liberado_centavos=saldo.liberado,
-            taxa_trato_centavos=saldo.taxa_trato,
         ),
         lancamentos=[lancamento_admin_out(i) for i in itens],
     )

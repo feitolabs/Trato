@@ -499,8 +499,6 @@ class ApiAdminHttp implements ApiAdmin {
           pedido: _codigoPedido(p['pedido_id'] as String?, p['pedido_numero']),
           refProvedor: (p['referencia_provedor'] as String?) ?? '—',
           divergente: p['divergente'] == true,
-          taxaCentavos: (p['taxa_trato_centavos'] as num?)?.toInt(),
-          liquidoCentavos: (p['liquido_profissional_centavos'] as num?)?.toInt(),
         ),
     ];
   }
@@ -969,7 +967,6 @@ class ApiAdminHttp implements ApiAdmin {
     final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/metricas', consulta: _periodo(dias, inicio, fim)));
     return MetricasDashboard(
       gmvCentavos: _int(m['gmv_centavos']),
-      receitaTaxaCentavos: _int(m['receita_taxa_centavos']),
       pedidosTotal: _int(m['pedidos_total']),
       pedidosConcluidos: _int(m['pedidos_concluidos']),
       pedidosEmAndamento: _int(m['pedidos_em_andamento']),
@@ -981,7 +978,6 @@ class ApiAdminHttp implements ApiAdmin {
       cidadesAtivas: _int(m['cidades_ativas']),
       categoriasAtivas: _int(m['categorias_ativas']),
       gmvAnteriorCentavos: _int(m['gmv_anterior_centavos']),
-      receitaTaxaAnteriorCentavos: _int(m['receita_taxa_anterior_centavos']),
       pedidosAtivos: _int(m['pedidos_ativos']),
       pedidosAtivosAnterior: _int(m['pedidos_ativos_anterior']),
       baseUsuarios: _int(m['base_usuarios']),

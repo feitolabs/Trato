@@ -442,7 +442,6 @@ void main() {
                 'retido_centavos': 12000,
                 'a_liberar_centavos': 8000,
                 'liberado_centavos': 0,
-                'taxa_trato_centavos': 0,
               })
             : _json(_pedidoJson),
       );
@@ -575,14 +574,10 @@ void main() {
   });
 
   group('ServicoOrcamentoApi', () {
-    test('resumir pede a taxa e o total ao backend', () async {
+    test('resumir pede o total ao backend', () async {
       final (api, chamadas) = _cliente(
         (_) => _json({
           'valor_centavos': 30000,
-          'taxa_centavos': 2250,
-          'taxa_bps': 750,
-          'liquido_centavos': 30000,
-          'total_cliente_centavos': 32250,
         }),
       );
 
@@ -592,10 +587,6 @@ void main() {
       expect(chamadas.single.caminho, '/v1/orcamentos/resumo');
       expect(chamadas.single.corpo, {'valor_centavos': 30000});
       expect(resumo.totalCentavos, 30000);
-      expect(resumo.taxaCentavos, 2250);
-      expect(resumo.taxaBps, 750);
-      expect(resumo.liquidoCentavos, 30000);
-      expect(resumo.clientePagaCentavos, 32250);
     });
 
     test('enviar serializa itens e chama POST /v1/pedidos/{id}/orcamentos', () async {

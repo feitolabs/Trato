@@ -34,7 +34,6 @@ where = ["src"]
 testpaths = ["tests"]
 markers = [
   "integracao: usa Postgres local descartável (pgserver); pulado se ele faltar",
-  "app_gratuito: roda com o padrão de produção (taxa 0), sem religar a cobrança",
 ]
 pythonpath = ["src"]
 

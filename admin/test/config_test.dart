@@ -11,13 +11,13 @@ Future<void> rolarAte(WidgetTester tester, Finder alvo) => rolarListaAte(tester,
 void main() {
   testWidgets('parâmetros têm nome legível, valor em % e R\$, unidade e faixa', (tester) async {
     await abrirPainel(tester, papel: 'juridico', secao: 'config');
-    expect(find.text('Taxa do Trato por serviço'), findsOneWidget);
-    expect(find.text('Percentual retido sobre o valor do serviço concluído'), findsOneWidget);
-    expect(find.text('0% a 20%'), findsOneWidget);
-    expect(find.text('7,50%'), findsOneWidget);
-    expect(find.text('Taxa mínima por pedido'), findsOneWidget);
-    expect(find.text('R\$ 3,00'), findsOneWidget);
-    expect(find.text('R\$ 0,00 a R\$ 50,00'), findsOneWidget);
+    expect(find.text('Adiantamento ao iniciar o serviço'), findsOneWidget);
+    expect(find.text('Parte do valor paga quando o serviço começa'), findsOneWidget);
+    expect(find.text('0% a 100%'), findsOneWidget);
+    expect(find.text('Prazo para liberar o repasse ao profissional'), findsOneWidget);
+    expect(find.text('0 a 30 dias'), findsOneWidget);
+    // sem taxa do Trato
+    expect(find.textContaining('Taxa'), findsNothing);
     // nada de nome técnico, prefixo "teste_" nem unidade interna
     expect(find.textContaining('teste_'), findsNothing);
     expect(find.textContaining('bps'), findsNothing);
@@ -33,7 +33,7 @@ void main() {
     expect(find.text('1 a 720 horas'), findsWidgets);
     expect(find.text('Prazo de decisão da disputa'), findsOneWidget);
     expect(find.text('5 dias úteis'), findsOneWidget);
-    expect(find.text('Taxa do Trato por serviço'), findsNothing);
+    expect(find.text('Adiantamento ao iniciar o serviço'), findsNothing);
   });
 
   testWidgets('mostra a proposta pendente e o histórico de versões', (tester) async {
@@ -50,9 +50,9 @@ void main() {
 
   testWidgets('validação de faixa mostra a faixa permitida', (tester) async {
     await abrirPainel(tester, papel: 'financeiro', secao: 'config');
-    await tester.enterText(campo('taxa_bps'), '50');
+    await tester.enterText(campo('adiantamento_bps'), '150');
     await tester.pump();
-    expect(find.text('Fora da faixa: 0% a 20%'), findsOneWidget);
+    expect(find.text('Fora da faixa: 0% a 100%'), findsOneWidget);
     expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Propor').first).onPressed, isNull);
   });
 
@@ -67,7 +67,7 @@ void main() {
 
   testWidgets('financeiro propõe, vê valor atual e proposto e não aprova', (tester) async {
     await abrirPainel(tester, papel: 'financeiro', secao: 'config');
-    await tester.enterText(campo('taxa_bps'), '8');
+    await tester.enterText(campo('adiantamento_bps'), '8');
     await tester.pump();
     await tester.tap(find.widgetWithText(OutlinedButton, 'Propor').first);
     await tester.pumpAndSettle();
