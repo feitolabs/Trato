@@ -12,7 +12,6 @@ import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
-import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/nota_material/nota_material.dart';
 import 'package:trato/telas/pagamento/modelos.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';

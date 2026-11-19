@@ -92,6 +92,7 @@ class BancoLocal:
                 "*financeiro_contestacoes_fechamento.sql",
                 "*disputas_responsavel.sql",
                 "*profissional_recebimento_disponivel_ausencia.sql",
+                "*cupons_usos_desconto_pagamento.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     con.execute(arquivo.read_text(encoding="utf-8"))

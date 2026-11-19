@@ -289,18 +289,6 @@ def abrir_pedido(
             cliente_id=usuario.id,
             titulo_pedido=dados.titulo,
         )
-    if dados is not None and dados.profissional_convidado_id:
-        convidado_id = dados.profissional_convidado_id
-        contexto.extras.setdefault("pedidos_convidados", {})[gravado.id] = convidado_id
-        with contextlib.suppress(Exception):  # abertura da conversa é secundária ao pedido
-            contexto.conversas.abrir(gravado.id, convidado_id)
-        avisar_pedido_direcionado(
-            request,
-            contexto,
-            pedido_id=gravado.id,
-            profissional_id=convidado_id,
-            titulo_pedido=dados.titulo,
-        )
     return pedido_out_completo(contexto, gravado, usuario)
 
 

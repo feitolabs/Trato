@@ -81,7 +81,8 @@ def _contrato_do_pedido(con: psycopg.Connection[Any], pedido_id: str) -> dict[st
 
 _SELECT_COBRANCA = (
     "select p.stripe_payment_intent_id, c.pedido_id, p.aditivo_id, p.valor_centavos, p.meio, "
-    "p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos "
+    "p.parcelas, p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos, "
+    "p.cupom_codigo, p.desconto_centavos "
     "from public.pagamentos p join public.contratos c on c.id = p.contrato_id "
 )
 
@@ -99,6 +100,9 @@ def _cobranca(linha: dict[str, Any]) -> CobrancaLocal:
         instrucao=linha["instrucao"],
         pago_em=None if devolvida else linha["confirmado_em"],
         estornado_centavos=int(linha["estornado_centavos"]),
+        parcelas=int(linha.get("parcelas") or 1),
+        cupom_codigo=linha.get("cupom_codigo"),
+        desconto_centavos=int(linha.get("desconto_centavos") or 0),
     )
 
 
@@ -126,6 +130,8 @@ class CobrancasPostgres:
             estornado_centavos=base.estornado_centavos,
             parcelas=parcelas,
             servico_centavos=servico_centavos,
+            cupom_codigo=base.cupom_codigo,
+            desconto_centavos=base.desconto_centavos,
         )
 
     def obter(self, cobranca_id: str) -> CobrancaLocal | None:
@@ -184,15 +190,17 @@ class CobrancasPostgres:
             aditivo = como_uuid(cobranca.aditivo_id) if cobranca.aditivo_id else None
             con.execute(
                 "insert into public.pagamentos (contrato_id, pagador_id, tipo, aditivo_id, meio, "
-                "valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
-                "confirmado_em, estornado_centavos, instrucao, criado_em) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "parcelas, valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
+                "confirmado_em, estornado_centavos, instrucao, cupom_codigo, desconto_centavos, "
+                "criado_em) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     contrato["id"],
                     contrato["cliente_id"],
                     "aditivo" if aditivo else "saldo",
                     aditivo,
                     _MEIO_PARA_BANCO[cobranca.meio],
+                    cobranca.parcelas,
                     cobranca.valor_centavos,
                     status,
                     cobranca.id,
@@ -200,6 +208,8 @@ class CobrancasPostgres:
                     confirmado_em,
                     cobranca.estornado_centavos,
                     cobranca.instrucao,
+                    cobranca.cupom_codigo,
+                    cobranca.desconto_centavos,
                     cobranca.criada_em,
                 ),
             )

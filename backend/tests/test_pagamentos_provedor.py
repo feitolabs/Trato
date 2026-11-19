@@ -156,8 +156,12 @@ def test_stripe_cartao_acha_ou_cria_cliente_e_gera_chave_efemera():
         if caminho == "/v1/ephemeral_keys":
             return 200, {"secret": "ek_test_abc"}
         if caminho == "/v1/payment_intents":
-            return 200, {"id": "pi_9", "amount": 100, "status": "requires_payment_method",
-                         "client_secret": "pi_9_secret"}
+            return 200, {
+                "id": "pi_9",
+                "amount": 100,
+                "status": "requires_payment_method",
+                "client_secret": "pi_9_secret",
+            }
         return 404, {}
 
     stripe = ProvedorStripeTeste(CHAVE_TESTE, "segredo-do-webhook", transporte)

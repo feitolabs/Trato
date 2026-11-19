@@ -31,7 +31,7 @@ from trato.api.rotas_pedidos import respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.api.visibilidade import pedido_visivel_ao_profissional
-from trato.pagamentos.cupons import registrar_uso_cupom, validar_e_calcular_cupom
+from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
@@ -379,7 +379,9 @@ def aplicar_cupom_contrato(
         raise HTTPException(403, "Só o cliente do contrato pode aplicar cupom.")
     servico = _servico(request)
     try:
-        aplicado = validar_e_calcular_cupom(contexto, corpo.codigo, contrato.valor_centavos)
+        aplicado = validar_e_calcular_cupom(
+            contexto, corpo.codigo, contrato.valor_centavos, usuario_id=usuario.id
+        )
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from None
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
@@ -435,7 +437,9 @@ def criar_cobranca(
     aplicado = None
     if corpo.cupom and corpo.cupom.strip():
         try:
-            aplicado = validar_e_calcular_cupom(contexto, corpo.cupom, contrato.valor_centavos)
+            aplicado = validar_e_calcular_cupom(
+                contexto, corpo.cupom, contrato.valor_centavos, usuario_id=usuario.id
+            )
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from None
         valor_servico = aplicado.servico_com_desconto_centavos
@@ -447,7 +451,6 @@ def criar_cobranca(
             raise HTTPException(
                 502, "O parceiro de pagamento não respondeu. Tente de novo."
             ) from erro
-    existentes = {c.id for c in servico.cobrancas.do_pedido(pedido.id)}
     cobranca = servico.cobrar(
         contexto,
         pedido,
@@ -455,9 +458,9 @@ def criar_cobranca(
         corpo.meio,
         parcelas=corpo.parcelas,
         cliente_externo=preparo.cliente_id if preparo else None,
+        cupom_codigo=aplicado.codigo if aplicado else None,
+        desconto_centavos=aplicado.desconto_centavos if aplicado else 0,
     )
-    if aplicado is not None and cobranca.id not in existentes:
-        registrar_uso_cupom(contexto, aplicado.codigo)
     saida = _cobranca_out(pedido.id, cobranca)
     if preparo is not None:
         saida.cliente_externo_id = preparo.cliente_id
@@ -496,13 +499,19 @@ def estado_do_pagamento(
         estado = "cancelada"
     else:
         estado = "aguardando_confirmacao"
+    servico_a_cobrar = contrato.valor_centavos
+    if principal is not None:
+        if principal.servico_centavos is not None:
+            servico_a_cobrar = principal.servico_centavos
+        elif principal.desconto_centavos > 0:
+            servico_a_cobrar = max(0, contrato.valor_centavos - principal.desconto_centavos)
     return PagamentoContratoOut(
         contrato_id=pedido.id,
         estado_pagamento=estado,
         pago=pago,
         valor_centavos=contrato.valor_centavos,
         total_a_pagar_centavos=(
-            servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos).cobrado_centavos
+            servico.total_a_cobrar(contexto, pedido, servico_a_cobrar).cobrado_centavos
             if servico is not None
             else None
         ),

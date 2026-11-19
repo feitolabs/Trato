@@ -234,7 +234,7 @@ def test_me_do_cliente_e_do_profissional(cenario):
     # nada de dado pessoal na resposta
     assert set(pro) == {
         "id", "nome", "papel", "status", "nivel_verificacao", "nota_publica", "servicos_concluidos",
-        "papeis", "tem_perfil_profissional", "status_verificacao",
+        "papeis", "tem_perfil_profissional", "status_verificacao", "disponivel_agora",
     }  # fmt: skip
 
 

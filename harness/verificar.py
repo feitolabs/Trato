@@ -1,6 +1,6 @@
 """Verificação automática do Trato: segredos, backend (lint + testes) e app Flutter.
 
-Uso: python harness/verificar.py [--etapa segredos|backend|app]   (ou harness/verificar.ps1 / harness/verificar.sh)
+Uso: python harness/verificar.py [--etapa segredos|backend|app|admin]   (ou harness/verificar.ps1 / harness/verificar.sh)
 Sai com código 1 se qualquer etapa falhar.
 """
 
@@ -33,7 +33,10 @@ PADROES_SEGREDO = {
         r"(?i)\b(password|senha|secret|api_key|apikey|token)\b\s*[:=]\s*['\"][^'\"\s]{6,}['\"]"
     ),
 }
-EXTENSOES_BINARIAS = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".ttf", ".otf", ".woff", ".woff2"}
+EXTENSOES_BINARIAS = {
+    ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".ttf", ".otf", ".woff", ".woff2",
+    ".apk", ".aab", ".ipa", ".so", ".jar", ".zip", ".gz", ".wasm", ".symbols",
+}
 
 
 def titulo(texto: str) -> None:
@@ -273,7 +276,8 @@ def checar_admin() -> bool:
 ETAPAS = {
     "segredos": [checar_segredos, checar_env_ignorado, checar_defines],
     "backend": [checar_backend],
-    "app": [checar_cores_soltas, checar_textos_proibidos, checar_app, checar_admin],
+    "app": [checar_cores_soltas, checar_textos_proibidos, checar_app],
+    "admin": [checar_cores_soltas, checar_textos_proibidos, checar_admin],
 }
 
 

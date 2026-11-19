@@ -289,10 +289,12 @@ class InicioProfissional {
     this.contratados = const [],
     this.orcamentosEnviados = const [],
     this.emAnalise = false,
+    this.notificacoesNaoLidas = 0,
   });
 
   /// Cadastro ainda aguardando aprovação de documentos pela equipe.
   final bool emAnalise;
+  final int notificacoesNaoLidas;
 
   /// Os orçamentos que o profissional enviou, do mais novo ao mais antigo.
   final List<OrcamentoEnviado> orcamentosEnviados;
@@ -316,6 +318,7 @@ class InicioProfissional {
         contratados: contratados,
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
+        notificacoesNaoLidas: notificacoesNaoLidas,
       );
 
   /// Mesmo início com o estado de "Disponível agora" atualizado.
@@ -328,6 +331,19 @@ class InicioProfissional {
         contratados: contratados,
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
+        notificacoesNaoLidas: notificacoesNaoLidas,
+      );
+
+  InicioProfissional comNotificacoesNaoLidas(int naoLidas) => InicioProfissional(
+        nome: nome,
+        disponivelAgora: disponivelAgora,
+        proximo: proximo,
+        carteira: carteira,
+        pedidos: pedidos,
+        contratados: contratados,
+        orcamentosEnviados: orcamentosEnviados,
+        emAnalise: emAnalise,
+        notificacoesNaoLidas: naoLidas,
       );
 }
 

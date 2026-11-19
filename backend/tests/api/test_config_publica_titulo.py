@@ -13,7 +13,9 @@ def test_config_publica_devolve_os_prazos_da_configuracao(amb):
     assert r.status_code == 200, r.text
     j = r.json()
     cfg = amb.contexto.config.carregar()
-    assert j["validade_pedido_horas"] == cfg.prazos_pedido.receber_orcamentos.total_seconds() // 3600
+    assert (
+        j["validade_pedido_horas"] == cfg.prazos_pedido.receber_orcamentos.total_seconds() // 3600
+    )
     assert j["prazo_confirmacao_cliente_horas"] == (
         cfg.prazos_pedido.confirmacao_cliente.total_seconds() // 3600
     )

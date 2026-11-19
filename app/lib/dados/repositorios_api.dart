@@ -1950,33 +1950,34 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     await _api.post('/v1/pedidos/$pedidoId/recusar', corpo: {'motivo': motivo.texto});
   }
 
-  /// Extrato do ledger (D15). Cada lançamento vira uma linha; o app não soma nada.
+  /// Extrato do ledger (D15). Cada lançamento vira uma linha; propaga erro real da API.
   @override
-  Future<List<ItemExtrato>> extrato() async {
-    try {
-      final json = _mapa(await _api.get('/v1/extrato', consulta: {'limite': '50'}));
-      return [
-        for (final l in ExtratoApi.deJson(json).itens)
-          ItemExtrato(
-            titulo: 'Pedido ${_curto(l.pedidoId)} · ${switch (l.tipo) {
-              'retencao' => 'valor retido',
-              'repasse' => 'valor liberado',
-              'cobranca' => 'pagamento',
-              'taxa' => 'taxa do Trato',
-              'estorno' => 'estorno',
-              _ => l.tipo.replaceAll('_', ' '),
-            }}',
-            detalheData: _dia(l.data.toLocal()),
-            brutoCentavos: l.valorCentavos,
-            pedidoId: l.pedidoId,
-            textoTaxa: l.estornoDe != null ? 'Estorno' : 'Toque para ver os valores',
-            liquidoCentavos: l.valorCentavos,
-            status: StatusExtrato.liberado,
-          ),
-      ];
-    } catch (_) {
-      return const [];
-    }
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0}) async {
+    final json = _mapa(
+      await _api.get(
+        '/v1/extrato',
+        consulta: {'limite': '$limite', 'deslocamento': '$deslocamento'},
+      ),
+    );
+    return [
+      for (final l in ExtratoApi.deJson(json).itens)
+        ItemExtrato(
+          titulo: 'Pedido ${_curto(l.pedidoId)} · ${switch (l.tipo) {
+            'retencao' => 'valor retido',
+            'repasse' => 'valor liberado',
+            'cobranca' => 'pagamento',
+            'taxa' => 'custo do parcelamento',
+            'estorno' => 'estorno',
+            _ => l.tipo.replaceAll('_', ' '),
+          }}',
+          detalheData: _dia(l.data.toLocal()),
+          brutoCentavos: l.valorCentavos,
+          pedidoId: l.pedidoId,
+          textoTaxa: l.estornoDe != null ? 'Estorno' : 'Toque para ver os valores',
+          liquidoCentavos: l.valorCentavos,
+          status: StatusExtrato.liberado,
+        ),
+    ];
   }
 
   /// `GET /v1/pedidos/{id}/saldo` (ledger), `GET /v1/contratos/{id}/aditivos` e `.../notas-material`.

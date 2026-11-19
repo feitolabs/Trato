@@ -16,6 +16,13 @@ from dataclasses import dataclass
 
 BPS_TOTAL = 10_000
 
+# App 100% gratuito (decisão do João, 18/11/2026): o Trato não cobra taxa de ninguém. Esta é a chave
+# única: com ela ligada, `calcular_taxa` devolve 0 para qualquer valor, inclusive para contratos que
+# já tinham a taxa congelada no aceite. O livro-razão e a configuração continuam como estavam (taxa
+# 0 não gera lançamento), então religar a cobrança é só desligar esta chave. O custo do provedor
+# (Stripe) passa a ser absorvido pelo Trato.
+APP_GRATUITO = True
+
 
 @dataclass(frozen=True)
 class ConfigTaxa:
@@ -57,6 +64,8 @@ def calcular_taxa(valor_centavos: int, config: ConfigTaxa) -> int:
         raise TypeError("valor_centavos deve ser int (centavos), sem float")
     if valor_centavos <= 0:
         raise ValueError("valor deve ser maior que zero")
+    if APP_GRATUITO:
+        return 0
     if config.tabela_progressiva_ligada:
         raise TabelaProgressivaNaoImplementada("A tabela progressiva espera a decisão P2.")
     percentual = (valor_centavos * config.taxa_bps + BPS_TOTAL // 2) // BPS_TOTAL

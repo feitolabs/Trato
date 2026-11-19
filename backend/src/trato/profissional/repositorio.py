@@ -35,6 +35,7 @@ def nome_publico_busca(nome: str | None) -> str:
 def dia_semana_hoje() -> int:
     return datetime.now(_FUSO_BRASILIA).weekday()
 
+
 if TYPE_CHECKING:
     from trato.api.repositorios_app import PerfilDetalhe
 
@@ -187,9 +188,7 @@ def _correspondencia_texto(
         return 0
     nome_pub = normalizar_busca(nome_publico_busca(nome))
     bio = normalizar_busca(p.bio or "")
-    portfolio = " ".join(
-        normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio
-    )
+    portfolio = " ".join(normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio)
     bairros = " ".join(normalizar_busca(r.bairro or "") for r in p.regioes)
     cat_casa = bool(filtro.categorias_texto & set(p.categorias))
     cid_casa = any(r.cidade_id in filtro.cidades_texto for r in p.regioes)
@@ -235,9 +234,7 @@ class ProfissionaisEmMemoria:
 
     def listar_disponiveis_agora(self) -> list[PerfilProfissional]:
         """Profissionais aprovados com o modo 'Disponível agora' ativo."""
-        return [
-            p for p in self._itens.values() if p.status == "aprovado" and p.disponivel_agora
-        ]
+        return [p for p in self._itens.values() if p.status == "aprovado" and p.disponivel_agora]
 
     def buscar(
         self, filtro: FiltroBusca, detalhe: Callable[[str], PerfilDetalhe | None]

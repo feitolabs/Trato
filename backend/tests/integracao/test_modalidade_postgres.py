@@ -127,7 +127,7 @@ def test_banco_nao_deixa_profissional_sem_nenhuma_modalidade(cenario):
 def test_modalidade_do_pedido_nao_muda_depois_de_criado(cenario):
     import psycopg
 
-    pid = corpo = None
+    pid = None
     r = cenario.cliente.post(
         "/v1/pedidos", json=corpo_pedido(cenario), headers=cenario.token("cliente")
     )
@@ -145,7 +145,7 @@ def test_perguntas_da_categoria_no_postgres(cenario):
         qid = con.execute(
             "insert into public.categoria_perguntas (categoria_id, texto, tipo, opcoes, "
             "obrigatoria, ordem) values (%s, 'Qual é o tipo de imóvel?', 'escolha_unica', "
-            "'[\"Apartamento\", \"Casa\"]'::jsonb, true, 1) returning id",
+            '\'["Apartamento", "Casa"]\'::jsonb, true, 1) returning id',
             (c.categoria_id,),
         ).fetchone()[0]
     try:
@@ -162,7 +162,9 @@ def test_perguntas_da_categoria_no_postgres(cenario):
         ok = c.cliente.post("/v1/pedidos", json=corpo, headers=c.token("cliente"))
         assert ok.status_code == 201, ok.text
         dados = c.cliente.get(f"/v1/pedidos/{ok.json()['id']}/dados", headers=c.token("cliente"))
-        assert {"pergunta": "Qual é o tipo de imóvel?", "resposta": "Casa"} in dados.json()["respostas"]
+        assert {"pergunta": "Qual é o tipo de imóvel?", "resposta": "Casa"} in dados.json()[
+            "respostas"
+        ]
     finally:
         with c.local.admin() as con:
             con.execute("update public.categoria_perguntas set ativa = false where id = %s", (qid,))

@@ -217,7 +217,9 @@ def test_isolamento_cliente_profissional_na_busca_orcamentos_pedidos_e_chat(amb)
         )
     )
     amb.contexto.usuarios.adicionar(
-        PerfilDetalhe(PROFISSIONAL.id, "Carlos Pro", PapelUsuario.PROFISSIONAL, "ativo", "verificado")
+        PerfilDetalhe(
+            PROFISSIONAL.id, "Carlos Pro", PapelUsuario.PROFISSIONAL, "ativo", "verificado"
+        )
     )
     # Outro usuário enxerga na busca; o próprio usuário NÃO se vê na busca.
     outros = amb.cliente.get("/v1/profissionais", headers=cab("t-cliente")).json()["itens"]

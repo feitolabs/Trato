@@ -378,7 +378,7 @@ abstract interface class RepositorioProfissional {
   Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
 
   /// Carteira como EXTRATO (D15): sem saldo próprio, sem saque.
-  Future<List<ItemExtrato>> extrato();
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0});
 
   /// Valor inteiro, taxa, líquido, aditivos e notas de um pedido (detalhe de uma linha do extrato).
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId);

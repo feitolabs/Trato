@@ -34,23 +34,31 @@ class ChipStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
+    final (fundo, corTexto) = switch (tipo) {
+      TipoStatus.info => (c.azulSuave, c.azulTexto),
+      TipoStatus.alerta => (c.ambarSuave, c.ambarTexto),
+      TipoStatus.sucesso => (c.verdeSuave, c.verdeTexto),
+      TipoStatus.perigo => (c.vermelhoSuave, c.vermelhoTexto),
+      TipoStatus.destaque => (c.laranja, CoresTrato.petroleo),
+    };
     final estilo = TipografiaTrato.corpoPequeno.copyWith(
       fontSize: 13,
-      color: tipo.texto,
+      color: corTexto,
       fontWeight: FontWeight.w700,
       fontVariations: const [FontVariation('wght', 700)],
     );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x2, vertical: EspacosTrato.x1),
       decoration: BoxDecoration(
-        color: tipo.fundo,
+        color: fundo,
         borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icone != null) ...[
-            Icon(icone, size: EspacosTrato.x4, color: tipo.texto),
+            Icon(icone, size: EspacosTrato.x4, color: corTexto),
             const SizedBox(width: EspacosTrato.x1),
           ],
           Flexible(child: Text(texto, style: estilo)),

@@ -654,7 +654,11 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   Future<void> recusar(String pedidoId, MotivoRecusa motivo) async => recusas.add(motivo);
 
   @override
-  Future<List<ItemExtrato>> extrato() async => DadosExemploCarteira.completo.extrato;
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0}) async {
+    final todos = DadosExemploCarteira.completo.extrato;
+    if (deslocamento >= todos.length) return const [];
+    return todos.skip(deslocamento).take(limite).toList();
+  }
 
   final List<int> notasDoCliente = [];
 

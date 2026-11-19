@@ -60,6 +60,7 @@ class CampoTrato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -69,7 +70,11 @@ class CampoTrato extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(rotulo, style: TipografiaTrato.corpoForte, maxLines: 1),
+            child: Text(
+              rotulo,
+              style: TipografiaTrato.corpoForte.copyWith(color: c.texto),
+              maxLines: 1,
+            ),
           ),
           const SizedBox(height: EspacosTrato.x2),
         ],
@@ -82,7 +87,7 @@ class CampoTrato extends StatelessWidget {
           keyboardType: teclado,
           inputFormatters: formatadores,
           onChanged: aoMudar,
-          style: estilo ?? TipografiaTrato.corpo,
+          style: estilo ?? TipografiaTrato.corpo.copyWith(color: c.texto),
           textAlign: centralizado ? TextAlign.center : TextAlign.start,
           decoration: InputDecoration(
             hintText: dica,
@@ -101,7 +106,7 @@ class CampoTrato extends StatelessWidget {
                         child: Icon(
                           iconeInicio,
                           size: 22,
-                          color: CoresTrato.petroleo,
+                          color: c.petroleo,
                         ),
                       )),
             prefixIconConstraints: prefixo != null
@@ -117,7 +122,7 @@ class CampoTrato extends StatelessWidget {
         ),
         if (ajuda != null && erro == null) ...[
           const SizedBox(height: EspacosTrato.x2),
-          Text(ajuda!, style: TipografiaTrato.legenda),
+          Text(ajuda!, style: TipografiaTrato.legenda.copyWith(color: c.textoSecundario)),
         ],
       ],
     );
@@ -132,12 +137,13 @@ class _TextoFixo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Padding(
       padding: EdgeInsets.only(
         left: inicio ? EspacosTrato.x4 : 0,
         right: inicio ? EspacosTrato.x1 : EspacosTrato.x4,
       ),
-      child: Text(texto, style: TipografiaTrato.corpo),
+      child: Text(texto, style: TipografiaTrato.corpo.copyWith(color: c.texto)),
     );
   }
 }
@@ -150,12 +156,13 @@ class _Acao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return InkWell(
       onTap: aoTocar,
       borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4, vertical: EspacosTrato.x3),
-        child: Text(texto, style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.azulTexto)),
+        child: Text(texto, style: TipografiaTrato.corpoForte.copyWith(color: c.azulTexto)),
       ),
     );
   }

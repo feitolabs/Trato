@@ -44,6 +44,7 @@ from trato.financeiro.ledger import (
     separar_custo_parcelamento,
 )
 from trato.financeiro.repasses import repasse_dos_lancamentos
+from trato.pagamentos.cupons import confirmar_uso_cupom
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.memoria import OrdensEstornoEmMemoria
 from trato.pagamentos.modelos import (
@@ -191,6 +192,8 @@ class ServicoPagamento:
         aditivo_id: str | None = None,
         parcelas: int = 1,
         cliente_externo: str | None = None,
+        cupom_codigo: str | None = None,
+        desconto_centavos: int = 0,
     ) -> CobrancaLocal:
         """Cria (ou devolve a pendente) a cobrança do pedido ou de um aditivo.
 
@@ -201,6 +204,8 @@ class ServicoPagamento:
             raise ErroFluxo("Número de parcelas inválido.", 422)
         if parcelas > 1 and meio is not MeioPagamento.CARTAO:
             raise ErroFluxo("Só o cartão pode ser parcelado.", 422)
+        cupom_norm = cupom_codigo.strip().upper() if cupom_codigo and cupom_codigo.strip() else None
+        desconto = max(0, int(desconto_centavos)) if cupom_norm else 0
         antigas = [c for c in self.cobrancas.do_pedido(pedido.id) if c.aditivo_id == aditivo_id]
         for antiga in antigas:
             if antiga.status is EstadoCobranca.PAGA:
@@ -212,21 +217,23 @@ class ServicoPagamento:
                     antiga.meio is meio
                     and antiga.parcelas == parcelas
                     and antiga.valor_centavos == total.cobrado_centavos
+                    and (antiga.cupom_codigo or None) == cupom_norm
                 ):
                     return antiga
                 self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
-        # A chave leva o que define a cobrança (meio, valor, parcelas, cliente): o Stripe recusa a
-        # MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be used
-        # with the same parameters"). Sem isso, trocar Pix por cartão, ou o valor mudar depois de
-        # uma contraproposta, dava erro 500 na tela de pagamento. Mesmos parâmetros = mesma chave,
-        # então repetir o pedido continua idempotente.
+        # A chave leva o que define a cobrança (meio, valor, parcelas, cliente, cupom): o Stripe
+        # recusa a MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be
+        # used with the same parameters").
         assinatura = hashlib.sha256(
-            f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}".encode()
+            f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}|"
+            f"{cupom_norm or ''}".encode()
         ).hexdigest()[:10]
         chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}/{assinatura}"
         metadados = {"pedido_id": pedido.id}
         if aditivo_id:
             metadados["aditivo_id"] = aditivo_id
+        if cupom_norm:
+            metadados["cupom"] = cupom_norm
         criada = self.provedor.criar_cobranca(
             valor_centavos=total.cobrado_centavos,
             meio=meio,
@@ -246,6 +253,8 @@ class ServicoPagamento:
             criada.instrucao,
             parcelas=parcelas,
             servico_centavos=servico_centavos,
+            cupom_codigo=cupom_norm,
+            desconto_centavos=desconto,
         )
         self.cobrancas.salvar(local)
         return local
@@ -383,6 +392,16 @@ class ServicoPagamento:
         if novos:
             contexto.ledger.lancar_varios(novos)
         self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.PAGA, pago_em=agora))
+        if cobranca.cupom_codigo:
+            confirmar_uso_cupom(
+                contexto,
+                cobranca.cupom_codigo,
+                usuario_id=pedido.cliente_id if pedido is not None else None,
+                cobranca_id=cobranca.id,
+                pedido_id=cobranca.pedido_id,
+                desconto_centavos=cobranca.desconto_centavos,
+                confirmado_em=agora,
+            )
 
     def _pagamento_falhou(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook

@@ -11,6 +11,7 @@ const definesPublicos = <String>{
   'SUPABASE_ANON_KEY',
   'GOOGLE_WEB_CLIENT_ID',
   'GOOGLE_IOS_CLIENT_ID',
+  'STRIPE_PUBLISHABLE_KEY',
   'GALERIA',
 };
 

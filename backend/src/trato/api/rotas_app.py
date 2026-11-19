@@ -175,6 +175,7 @@ class PerfilOut(BaseModel):
     status_verificacao: str | None = Field(
         None, description="Verificação mais recente: enviada, em_analise, aprovada ou recusada."
     )
+    disponivel_agora: bool = False
 
 
 class PedidoAbertoOut(BaseModel):
@@ -605,7 +606,9 @@ def valores_do_pagamento(
         base_centavos = contrato.valor_centavos
         if cupom and cupom.strip():
             try:
-                aplicado = validar_e_calcular_cupom(contexto, cupom, contrato.valor_centavos)
+                aplicado = validar_e_calcular_cupom(
+                    contexto, cupom, contrato.valor_centavos, usuario_id=usuario.id
+                )
             except ValueError as erro:
                 raise HTTPException(422, str(erro)) from None
             base_centavos = aplicado.servico_com_desconto_centavos

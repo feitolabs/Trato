@@ -61,4 +61,7 @@ void ligarDemoNosTestes() {
   ServicoAuthPadrao.atual = ServicoAuthFake();
   RotasTrato.repos = repositoriosDemo();
   RotasTrato.dispositivo = dispositivoDemo();
+  RotasTrato.permissao = ServicoPermissaoFake();
+  RotasTrato.mensagensNaoLidas.value = 0;
+  RotasTrato.notificacoesNaoLidas.value = 0;
 }

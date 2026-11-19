@@ -80,21 +80,40 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                     ),
                     if (widget.aoAbrirNotificacoes != null) ...[
                       const SizedBox(width: EspacosTrato.x2),
-                      Semantics(
-                        button: true,
-                        label: 'Notificações',
-                        child: Material(
-                          color: CoresTrato.superficie,
-                          shape: const CircleBorder(side: BorderSide(color: CoresTrato.borda)),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: widget.aoAbrirNotificacoes,
-                            child: const SizedBox.square(
-                              dimension: 48,
-                              child: Icon(Icons.notifications_none, color: CoresTrato.petroleo),
+                      Builder(
+                        builder: (context) {
+                          final c = context.cores;
+                          final naoLidas = dados.notificacoesNaoLidas;
+                          final icone = Icon(Icons.notifications_none, color: c.texto);
+                          return Semantics(
+                            button: true,
+                            label: 'Notificações',
+                            value: naoLidas > 0 ? '$naoLidas não lidas' : null,
+                            excludeSemantics: true,
+                            child: Material(
+                              color: c.superficie,
+                              shape: CircleBorder(side: BorderSide(color: c.borda)),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: widget.aoAbrirNotificacoes,
+                                child: SizedBox.square(
+                                  dimension: 48,
+                                  child: Center(
+                                    child: naoLidas > 0
+                                        ? Badge.count(
+                                            count: naoLidas,
+                                            maxCount: 99,
+                                            backgroundColor: c.laranja,
+                                            textColor: CoresTrato.petroleo,
+                                            child: icone,
+                                          )
+                                        : icone,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ],
                   ],

@@ -7,8 +7,8 @@ fechamento grava esse retrato com um hash; depois dele:
   como estorno no mês corrente, que é como o ledger já funciona;
 - a tela recalcula o mês e compara com o retrato: se algo diferente aparecer, ela avisa.
 
-O custo de cupom ainda não entra: o pedido não guarda desconto (decisão "quem paga o cupom" foi
-tomada, falta a coluna). Centavos inteiros.
+O custo de cupons (descontos concedidos em pagamentos confirmados no período) entra em
+`custo_cupons_centavos`. Centavos inteiros.
 """
 
 from __future__ import annotations
@@ -41,6 +41,7 @@ class TotaisMes:
     contestacoes_perdidas: int
     contestacoes_perdidas_centavos: int
     lancamentos: int
+    custo_cupons_centavos: int = 0
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,11 @@ def _movimento(itens: Iterable[Lancamento], tipo: TipoConta) -> int:
 
 
 def calcular(
-    lancamentos: Sequence[Lancamento], contestacoes: Sequence[Contestacao], ano: int, mes: int
+    lancamentos: Sequence[Lancamento],
+    contestacoes: Sequence[Contestacao],
+    ano: int,
+    mes: int,
+    custo_cupons_centavos: int = 0,
 ) -> TotaisMes:
     inicio, fim = periodo.mes(ano, mes)
     do_mes = [i for i in lancamentos if inicio <= i.data < fim]
@@ -110,6 +115,7 @@ def calcular(
         contestacoes_perdidas=len(perdidas),
         contestacoes_perdidas_centavos=sum(c.valor_centavos for c in perdidas),
         lancamentos=len(do_mes),
+        custo_cupons_centavos=max(0, int(custo_cupons_centavos)),
     )
 
 

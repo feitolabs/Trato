@@ -651,6 +651,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                     child: _FotoReservada(
                       '[Foto ${f.fotos.length + i + 1}]',
                       referencia: _fotosNovas[i],
+                      aoRemover: () => setState(() => _fotosNovas.removeAt(i)),
                     ),
                   ),
                 if (f.fotos.length + _fotosNovas.length < _maxFotos && _podeAdicionarFoto)
@@ -1089,15 +1090,16 @@ class _OpcaoRadio extends StatelessWidget {
 }
 
 class _FotoReservada extends StatelessWidget {
-  const _FotoReservada(this.rotulo, {this.referencia});
+  const _FotoReservada(this.rotulo, {this.referencia, this.aoRemover});
 
   final String rotulo;
   final String? referencia;
+  final VoidCallback? aoRemover;
 
   @override
   Widget build(BuildContext context) {
     final imagemReal = construirImagemReal(referencia);
-    return ToquePreviewImagem(
+    final cartao = ToquePreviewImagem(
       referencia: referencia ?? rotulo,
       legenda: rotulo,
       child: AspectRatio(
@@ -1150,6 +1152,31 @@ class _FotoReservada extends StatelessWidget {
                 ),
         ),
       ),
+    );
+    if (aoRemover == null) return cartao;
+    return Stack(
+      children: [
+        Positioned.fill(child: cartao),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Material(
+            color: CoresTrato.overlayFoto,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: aoRemover,
+              child: const Tooltip(
+                message: 'Remover foto',
+                child: Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close, size: 14, color: CoresTrato.textoSobreFoto),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

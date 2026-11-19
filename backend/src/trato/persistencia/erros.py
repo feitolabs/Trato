@@ -80,5 +80,10 @@ def traduzir(erro: psycopg.Error) -> ErroPersistencia:
         return ConflitoDeEstado("Outra ação mexeu nisso ao mesmo tempo. Tente de novo.")
     if isinstance(erro, psycopg.OperationalError | psycopg.InterfaceError):
         return BancoIndisponivel("Banco de dados indisponível.")
-    _log.error("Erro no Postgres não tratado especificamente (%s): %s", type(erro).__name__, erro, exc_info=True)
+    _log.error(
+        "Erro no Postgres não tratado especificamente (%s): %s",
+        type(erro).__name__,
+        erro,
+        exc_info=True,
+    )
     return ErroPersistencia("Erro ao acessar o banco de dados.")

@@ -131,7 +131,7 @@ class AuditoriaAdminPostgres:
             "(%(acao)s::text is null or acao like %(acao_like)s escape '\\') "
             "and (%(ator)s::uuid is null or ator_id = %(ator)s::uuid) "
             "and (%(ator_busca)s::text is null or ator_id in "
-            "     (select id from public.usuarios where nome ilike %(ator_like)s escape '\')) "
+            "     (select id from public.usuarios where nome ilike %(ator_like)s escape '')) "
             "and (%(entidade)s::text is null or entidade = %(entidade)s) "
             "and (%(entidade_id)s::uuid is null or entidade_id = %(entidade_id)s::uuid) "
             "and (%(desde)s::timestamptz is null or ocorrida_em >= %(desde)s::timestamptz) "

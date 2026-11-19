@@ -16,6 +16,7 @@ class MensagensTela extends StatelessWidget {
     this.comVoltar = false,
     this.atualizarACada,
     this.atualizarQuando,
+    this.aoContarNaoLidas,
   });
 
   final ServicoMensagens servico;
@@ -26,6 +27,7 @@ class MensagensTela extends StatelessWidget {
 
   /// Recarrega na hora quando dispara (ex.: ao voltar do chat).
   final Listenable? atualizarQuando;
+  final ValueChanged<int>? aoContarNaoLidas;
 
   /// Falso por padrão: a tela é uma aba da casca do cliente.
   final bool comVoltar;
@@ -40,6 +42,7 @@ class MensagensTela extends StatelessWidget {
         aoAbrirConversa: aoAbrirConversa,
         atualizarACada: atualizarACada,
         atualizarQuando: atualizarQuando,
+        aoContarNaoLidas: aoContarNaoLidas,
       ),
     );
   }
@@ -54,9 +57,11 @@ class ListaConversas extends StatelessWidget {
     this.textoVazio = 'Ao pedir um serviço, a conversa com o profissional aparece aqui.',
     this.atualizarACada,
     this.atualizarQuando,
+    this.aoContarNaoLidas,
   });
 
   final Listenable? atualizarQuando;
+  final ValueChanged<int>? aoContarNaoLidas;
 
   final ServicoMensagens servico;
   final ValueChanged<ConversaResumo>? aoAbrirConversa;
@@ -66,7 +71,11 @@ class ListaConversas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CarregadorTela<List<ConversaResumo>>(
-      carregar: servico.listar,
+      carregar: () async {
+        final lista = await servico.listar();
+        aoContarNaoLidas?.call(lista.fold<int>(0, (soma, item) => soma + item.naoLidas));
+        return lista;
+      },
       atualizarACada: atualizarACada,
       atualizarQuando: atualizarQuando,
       construir: (context, itens, _) {

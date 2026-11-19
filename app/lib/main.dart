@@ -138,7 +138,9 @@ void _abrirNovaSenha([int tentativa = 0]) {
 }
 
 class TratoApp extends StatelessWidget {
-  const TratoApp({super.key});
+  const TratoApp({super.key, this.themeMode = ThemeMode.light});
+
+  final ThemeMode themeMode;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +153,8 @@ class TratoApp extends StatelessWidget {
       navigatorKey: navegadorTrato,
       debugShowCheckedModeBanner: false,
       theme: TemaTrato.claro,
+      darkTheme: TemaTrato.escuro,
+      themeMode: themeMode,
       builder: (context, filho) => EscalaFonteLimitada(child: filho!),
       home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
     );

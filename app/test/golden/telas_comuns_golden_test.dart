@@ -41,8 +41,8 @@ void main() {
           aoFalarComSuporte: () {},
           aoRelatarProblema: () {},
         ),
-    'busca': () =>
-        BuscaProfissionaisTela(servico: const ServicoBuscaFake(), sugestoes: excli.categorias),
+    'busca': () => const BuscaProfissionaisTela(
+        servico: ServicoBuscaFake(), sugestoes: excli.categorias),
     'busca_resultados': () =>
         const BuscaProfissionaisTela(servico: ServicoBuscaFake(), termoInicial: 'elétrica'),
     'busca_vazio': () =>

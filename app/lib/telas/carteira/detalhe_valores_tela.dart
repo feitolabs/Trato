@@ -40,11 +40,6 @@ class DetalheValoresTela extends StatelessWidget {
               child: Column(
                 children: [
                   _Linha('Valor pago pelo cliente', Dinheiro.formatar(d.pagoPeloClienteCentavos)),
-                  _Linha(
-                    'Taxa do Trato',
-                    '- ${Dinheiro.formatar(d.taxaCentavos)}',
-                    cor: CoresTrato.textoSecundario,
-                  ),
                   const Divider(),
                   _Linha('Você recebe', Dinheiro.formatar(d.voceRecebeCentavos), forte: true),
                 ],
@@ -102,13 +97,12 @@ class DetalheValoresTela extends StatelessWidget {
 }
 
 class _Linha extends StatelessWidget {
-  const _Linha(this.rotulo, this.valor, {this.nota, this.forte = false, this.cor});
+  const _Linha(this.rotulo, this.valor, {this.nota, this.forte = false});
 
   final String rotulo;
   final String valor;
   final String? nota;
   final bool forte;
-  final Color? cor;
 
   @override
   Widget build(BuildContext context) {
@@ -120,9 +114,9 @@ class _Linha extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(rotulo, style: estilo.copyWith(color: cor))),
+              Expanded(child: Text(rotulo, style: estilo)),
               const SizedBox(width: EspacosTrato.x3),
-              Text(valor, style: estilo.copyWith(color: cor)),
+              Text(valor, style: estilo),
             ],
           ),
           if (nota != null)

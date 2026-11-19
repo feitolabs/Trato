@@ -3,17 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/dados/erros.dart';
-import 'package:trato/telas/aditivo/aditivo.dart';
 import 'package:trato/telas/aditivo/criar_aditivo_tela.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
 import 'package:trato/telas/disputa_profissional/atender_retrabalho_tela.dart';
 import 'package:trato/telas/disputa_profissional/disputa.dart';
 import 'package:trato/telas/disputa_profissional/responder_disputa_tela.dart';
 import 'package:trato/telas/nota_material/enviar_nota_tela.dart';
-import 'package:trato/telas/nota_material/nota_material.dart';
 import 'package:trato/telas/nota_material/ver_nota_tela.dart';
 import 'package:trato/telas/perfil_publico/avaliacoes_recebidas_tela.dart';
-import 'package:trato/telas/perfil_publico/perfil_publico.dart';
 import 'package:trato/telas/perfil_publico/perfil_publico_tela.dart';
 import 'apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro.dart';
@@ -428,7 +425,7 @@ void main() {
             find.descendant(of: cartaoResumo, matching: find.byType(Column)).first,
           )
           .dx;
-      for (final valor in ['R\$ 100,00', '- R\$ 7,50', 'R\$ 92,50']) {
+      for (final valor in ['R\$ 100,00', 'R\$ 92,50']) {
         expect(
           t
               .getTopRight(find.descendant(of: cartaoResumo, matching: find.text(valor)))

@@ -526,6 +526,8 @@ void main() {
       );
       await tester.tap(find.text('Cliente não está no local'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar ausência'));
+      await tester.pumpAndSettle();
       expect(
         find.text('O registro de cliente ausente precisa de foto do local e localização.'),
         findsOneWidget,
@@ -540,6 +542,14 @@ void main() {
         ),
       );
       await tester.tap(find.text('Cliente não está no local'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+      expect(fake.clienteAusenteAvisado, isFalse);
+
+      await tester.tap(find.text('Cliente não está no local'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar ausência'));
       await tester.pumpAndSettle();
       expect(fake.clienteAusenteAvisado, isTrue);
       expect(

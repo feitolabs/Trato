@@ -1027,3 +1027,12 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
   - Ordenação alfabética A–Z PT-BR das categorias no backend, app e painel admin; busca unificada `?q=`, debounce 320 ms, recentes, filtros rápidos e busca inline em Ajuda e Seus pedidos.
   - Tela dedicada `SucessoAcaoTela` e retorno limpo à aba inicial (`ControladorCasca`).
   - API de CEP (`GET /v1/cep/{cep}`, ViaCEP + fallback BrasilAPI + cache) integrada ao autopreenchimento no pedido, endereços, dados pessoais e cadastro profissional.
+
+## 2026-11-18 — App 100% gratuito (sem taxa do Trato)
+
+- **Decisão do João:** o Trato não cobra taxa de ninguém. Substitui a taxa progressiva (base 7,5%) e a taxa descontada do profissional.
+- **Backend:** chave única `APP_GRATUITO = True` em `pagamentos/taxa.py`; `calcular_taxa` devolve 0 (inclusive para contratos com taxa já congelada). Ledger não lança taxa 0. Religar = desligar a chave. Termos de uso (`rotas_legal.py`) sem taxa.
+- **App:** removida a linha de taxa da calculadora, aditivo, orçamento enviado e valores do pedido; calculadora diz "O Trato é grátis". Extrato: lançamento `taxa` agora rotulado "custo do parcelamento".
+- **Testes:** `tests/conftest.py` liga a cobrança nos testes antigos de fórmula/ledger; `tests/test_app_gratuito.py` (marker `app_gratuito`) garante taxa 0 por padrão. Goldens da carteira e da calculadora regenerados.
+- **Não feito (precisa de OK):** zerar `taxa_bps`/`taxa_minima_centavos` na configuração do Supabase (nova versão, dupla aprovação). Painel admin mantém colunas/relatórios de taxa (histórico).
+- **Custos:** o Trato absorve o custo do Stripe no Pix e no cartão à vista; o custo de parcelamento continua repassado ao cliente.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -137,3 +138,13 @@ def test_pdf_com_muitas_linhas_abre_novas_paginas():
 def test_reais_no_formato_brasileiro():
     assert extrato_profissional.reais(1_234_567) == "R$ 12.345,67"
     assert extrato_profissional.reais(-50) == "-R$ 0,50"
+
+
+def test_totais_do_mes_incluem_custo_de_cupons():
+    sem_cupom = fechamento.calcular([], [], 2026, 10)
+    com_cupom = fechamento.calcular([], [], 2026, 10, custo_cupons_centavos=3500)
+    assert sem_cupom.custo_cupons_centavos == 0
+    assert com_cupom.custo_cupons_centavos == 3500
+    assert fechamento.hash_dos_totais(asdict(sem_cupom)) != fechamento.hash_dos_totais(
+        asdict(com_cupom)
+    )

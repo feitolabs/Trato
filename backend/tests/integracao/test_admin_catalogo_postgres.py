@@ -42,7 +42,11 @@ def test_categoria_ciclo_completo_criar_editar_desativar_excluir(amb):  # noqa: 
 
     r = amb.cliente.put(
         f"{BASE}/categorias/{cid}",
-        json={"nome": "Limpeza geral", "garantia_retrabalho_dias": 30, "motivo": "Renomear a categoria"},
+        json={
+            "nome": "Limpeza geral",
+            "garantia_retrabalho_dias": 30,
+            "motivo": "Renomear a categoria",
+        },
         headers=adm,
     )
     assert r.status_code == 200 and r.json()["nome"] == "Limpeza geral"
@@ -72,11 +76,15 @@ def test_categoria_ciclo_completo_criar_editar_desativar_excluir(amb):  # noqa: 
 def test_categoria_duplicada_motivo_obrigatorio_e_id_ruim(amb):  # noqa: F811
     adm = amb.h("administrador")
     ok = amb.cliente.post(
-        f"{BASE}/categorias", json={"nome": "Montagem de móveis", "motivo": "Categoria do piloto"}, headers=adm
+        f"{BASE}/categorias",
+        json={"nome": "Montagem de móveis", "motivo": "Categoria do piloto"},
+        headers=adm,
     )
     assert ok.status_code == 201
     repetida = amb.cliente.post(
-        f"{BASE}/categorias", json={"nome": "Montagem de móveis", "motivo": "Categoria do piloto"}, headers=adm
+        f"{BASE}/categorias",
+        json={"nome": "Montagem de móveis", "motivo": "Categoria do piloto"},
+        headers=adm,
     )
     assert repetida.status_code == 409
     sem_motivo = amb.cliente.post(f"{BASE}/categorias", json={"nome": "Sem motivo"}, headers=adm)
@@ -87,7 +95,9 @@ def test_categoria_duplicada_motivo_obrigatorio_e_id_ruim(amb):  # noqa: F811
     assert curto.status_code == 422
     assert (
         amb.cliente.patch(
-            f"{BASE}/categorias/nao-e-uuid", json={"ativa": False, "motivo": "teste de id inválido"}, headers=adm
+            f"{BASE}/categorias/nao-e-uuid",
+            json={"ativa": False, "motivo": "teste de id inválido"},
+            headers=adm,
         ).status_code
         == 404
     )
@@ -149,7 +159,9 @@ def test_cidade_criar_duplicada_e_desativar(amb):  # noqa: F811
     assert amb.sql("select ativa from public.cidades where id = %s", cidade["id"]) == [(False,)]
     assert (
         amb.cliente.patch(
-            f"{BASE}/cidades/nao-e-uuid", json={"ativa": True, "motivo": "teste de id inválido"}, headers=adm
+            f"{BASE}/cidades/nao-e-uuid",
+            json={"ativa": True, "motivo": "teste de id inválido"},
+            headers=adm,
         ).status_code
         == 404
     )

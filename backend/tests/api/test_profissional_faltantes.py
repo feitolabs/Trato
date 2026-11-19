@@ -175,9 +175,24 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
         "/v1/pedidos/ped-orc/orcamentos",
         json={
             "itens": [
-                {"tipo": "deslocamento", "descricao": "Deslocamento", "quantidade": "1", "valor_unitario_centavos": 10_000},
-                {"tipo": "horas", "descricao": "Mão de obra", "quantidade": "3", "valor_unitario_centavos": 10_000},
-                {"tipo": "material", "descricao": "Tinta 18L", "quantidade": "1", "valor_unitario_centavos": 20_000},
+                {
+                    "tipo": "deslocamento",
+                    "descricao": "Deslocamento",
+                    "quantidade": "1",
+                    "valor_unitario_centavos": 10_000,
+                },
+                {
+                    "tipo": "horas",
+                    "descricao": "Mão de obra",
+                    "quantidade": "3",
+                    "valor_unitario_centavos": 10_000,
+                },
+                {
+                    "tipo": "material",
+                    "descricao": "Tinta 18L",
+                    "quantidade": "1",
+                    "valor_unitario_centavos": 20_000,
+                },
             ],
             "prazo_execucao_dias": 2,
             "garantia_dias": 90,
@@ -208,7 +223,12 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
         "/v1/pedidos/ped-orc/orcamentos",
         json={
             "itens": [
-                {"tipo": "horas", "descricao": "Mão de obra revisada", "quantidade": "4", "valor_unitario_centavos": 12_000},
+                {
+                    "tipo": "horas",
+                    "descricao": "Mão de obra revisada",
+                    "quantidade": "4",
+                    "valor_unitario_centavos": 12_000,
+                },
             ],
             "prazo_execucao_dias": 3,
             "garantia_dias": 120,
@@ -233,9 +253,7 @@ def test_4_baixar_extrato_mensal_em_pdf_pelo_profissional(amb):
     amb.semear_pedido(Estado.CONCLUIDO)
     amb.semear_dinheiro(cobrado=100_000, taxa=7_500)
     liberar(amb.contexto.ledger.livro, "ped-1", PROFISSIONAL.id, "lib-1", AGORA)
-    assert any(
-        item.tipo is TipoLancamento.REPASSE for item in amb.contexto.ledger.lancamentos()
-    )
+    assert any(item.tipo is TipoLancamento.REPASSE for item in amb.contexto.ledger.lancamentos())
 
     ok = amb.cliente.get("/v1/profissionais/me/extrato.pdf?mes=2026-10", headers=cab("t-prof"))
     assert ok.status_code == 200, ok.text
@@ -243,7 +261,9 @@ def test_4_baixar_extrato_mensal_em_pdf_pelo_profissional(amb):
     assert "trato_extrato_2026_10.pdf" in ok.headers.get("content-disposition", "")
     assert ok.content.startswith(b"%PDF-")
 
-    invalido = amb.cliente.get("/v1/profissionais/me/extrato.pdf?mes=2026-13", headers=cab("t-prof"))
+    invalido = amb.cliente.get(
+        "/v1/profissionais/me/extrato.pdf?mes=2026-13", headers=cab("t-prof")
+    )
     assert invalido.status_code == 422
 
     proibido_cliente = amb.cliente.get(
@@ -287,7 +307,9 @@ def test_5_disponivel_agora_prioriza_e_notifica_pedidos_urgentes(amb):
     amb.contexto.pedidos.salvar(
         Pedido("ped-normal-novo", CLIENTE.id, AGORA - timedelta(minutes=10)),
         None,
-        DadosPedido("pintura", "bh", "Pintura sem pressa", "Normal", bairro="Centro", urgente=False),
+        DadosPedido(
+            "pintura", "bh", "Pintura sem pressa", "Normal", bairro="Centro", urgente=False
+        ),
     )
 
     lista_ativo = amb.cliente.get("/v1/profissional/pedidos-abertos", headers=cab("t-prof")).json()
@@ -358,7 +380,9 @@ def test_6_cliente_ausente_exige_prova_notifica_envia_chat_e_bloqueia_ausencia_a
 
     # Muito antes da janela (> 15 min) -> 422
     inicio_longe = AGORA + timedelta(hours=4)
-    amb.semear_pedido(Estado.AGENDADO, janela=Janela(inicio_longe, inicio_longe + timedelta(hours=2)))
+    amb.semear_pedido(
+        Estado.AGENDADO, janela=Janela(inicio_longe, inicio_longe + timedelta(hours=2))
+    )
     cedo = amb.cliente.post(
         "/v1/pedidos/ped-1/acoes/registrar_cliente_ausente",
         json={

@@ -73,22 +73,6 @@ class DetalheOrcamentoEnviadoTela extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Taxa do Trato',
-                                  style: TipografiaTrato.corpoPequeno
-                                      .copyWith(color: CoresTrato.creme),
-                                ),
-                                Text(
-                                  '- ${formatarReais(detalhe.taxaCentavos!)}',
-                                  style: TipografiaTrato.corpoPequeno
-                                      .copyWith(color: CoresTrato.creme),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: EspacosTrato.x1),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
                                   'Você recebe',
                                   style: TipografiaTrato.corpoForte
                                       .copyWith(color: CoresTrato.creme),

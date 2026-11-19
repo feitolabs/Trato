@@ -406,5 +406,7 @@ def test_garantia_aditivo_e_nota_de_material(cenario):
     assert 0 <= perfil.json()["taxa_conclusao"] <= 100  # concluídos entre os encerrados
     assert len(perfil.json()["avaliacoes"]) >= 1
     primeira = perfil.json()["avaliacoes"][0]
-    assert primeira["cliente_nome"] and primeira["cliente_nome"] != "cliente2"  # nome abreviado de quem avaliou
+    assert (
+        primeira["cliente_nome"] and primeira["cliente_nome"] != "cliente2"
+    )  # nome abreviado de quem avaliou
     assert primeira["categoria"]  # categoria do serviço

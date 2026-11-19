@@ -413,7 +413,7 @@ void main() {
       await tester.pumpWidget(
         _app(
           DetalheServicoTela(
-            dados: DetalheServico(
+            dados: const DetalheServico(
               pedidoId: 'p1',
               numero: 'AAAA',
               titulo: 'Pedido #AAAA',
@@ -421,7 +421,7 @@ void main() {
               statusTexto: 'Em execução',
               statusTipo: TipoStatus.info,
               abertoEm: 'Aberto em 07/11',
-              etapas: const [],
+              etapas: [],
               codigoConclusao: '4821',
             ),
             aoAcao: (_) {},

@@ -71,8 +71,10 @@ Saída: `app/build/app/outputs/flutter-apk/app-debug.apk`. Instalar no aparelho 
 Sem keystore o release é assinado com a chave **debug** (o `build.gradle.kts` faz isso sozinho). Serve só para testar localmente, **não** serve para a Play Store.
 
 ```bash
-flutter build apk --release --dart-define-from-file=dart-defines.json
+flutter build apk --release --split-per-abi --dart-define-from-file=dart-defines.json
 ```
+
+*(Observação: gerar APK único universal inclui todas as ABIs e chega a ~75 MB; `--split-per-abi` gera APKs menores por arquitetura para distribuição direta e `flutter build appbundle --release` gera o `.aab` otimizado para a Play Store.)*
 
 ### Release assinado (APK ou AAB para a Play Store)
 
