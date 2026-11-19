@@ -23,6 +23,7 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.moedas import conceder_bonus_avaliacao
 from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
@@ -249,6 +250,20 @@ class AvaliacaoOut(BaseModel):
     comentario: str | None
     etiquetas: list[str]
     criada_em: datetime
+    moedas_ganhas: int = Field(0, description="Moedas de bônus por esta avaliação (0 se nenhuma).")
+
+
+class MoedaLancamentoOut(BaseModel):
+    tipo: str
+    quantidade: int
+    criada_em: datetime
+    expira_em: datetime | None
+
+
+class MoedasOut(BaseModel):
+    saldo: int
+    valor_moeda_centavos: int
+    extrato: list[MoedaLancamentoOut]
 
 
 # --- Entradas ---------------------------------------------------------------------------
@@ -997,6 +1012,31 @@ def minhas_verificacoes(
     return [_verificacao_out(v) for v in contexto.verificacoes.da_pessoa(usuario.id)]
 
 
+# --- Moedas ----------------------------------------------------------------------------
+
+
+@router.get(
+    "/me/moedas",
+    response_model=MoedasOut,
+    summary="Saldo e extrato de moedas do Trato",
+)
+def minhas_moedas(
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> MoedasOut:
+    agora = contexto.agora()
+    return MoedasOut(
+        saldo=contexto.moedas.saldo(usuario.id, agora),
+        valor_moeda_centavos=contexto.moedas.config().valor_moeda_centavos,
+        extrato=[
+            MoedaLancamentoOut(
+                tipo=i.tipo, quantidade=i.quantidade, criada_em=i.criada_em, expira_em=i.expira_em
+            )
+            for i in contexto.moedas.extrato(usuario.id)
+        ],
+    )
+
+
 # --- Avaliação --------------------------------------------------------------------------
 
 
@@ -1042,7 +1082,22 @@ def avaliar(
         criada_em=contexto.agora(),
     )
     contexto.avaliacoes.salvar(nova)
+    ganhas = 0
+    if direcao == "cliente_para_profissional":
+        try:
+            contrato = contexto.contratos.obter_do_pedido(pedido.id)
+            ganhas = conceder_bonus_avaliacao(
+                contexto.moedas,
+                cliente_id=usuario.id,
+                pedido_id=pedido.id,
+                agora=contexto.agora(),
+                profissional_id=avaliado,
+                valor_servico_centavos=contrato.valor_centavos if contrato else 0,
+            )
+        except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
+            ganhas = 0
     return AvaliacaoOut(
+        moedas_ganhas=ganhas,
         pedido_id=nova.pedido_id,
         direcao=nova.direcao,
         nota_geral=nova.nota_geral,

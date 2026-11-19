@@ -100,6 +100,9 @@ def _repasses_em_memoria() -> RepositorioRepasses:
     return RepassesEmMemoria()
 
 
+from trato.api.moedas import MoedasEmMemoria  # noqa: E402
+
+
 @dataclass
 class Contexto:
     auth: ProvedorAuth
@@ -123,6 +126,8 @@ class Contexto:
     usuarios: RepositorioUsuarios = field(default_factory=UsuariosEmMemoria)
     verificacoes: RepositorioVerificacoes = field(default_factory=VerificacoesEmMemoria)
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
+    # Moedas do Trato (gamificação). Em memória por padrão; a fábrica Postgres troca.
+    moedas: Any = field(default_factory=lambda: MoedasEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
     notas_material: RepositorioNotasMaterial = field(default_factory=NotasMaterialEmMemoria)
     # Dados pessoais, endereços, favoritos e contatos de confiança (`api/conta.py`).

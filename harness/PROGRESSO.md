@@ -1027,3 +1027,10 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
   - Ordenação alfabética A–Z PT-BR das categorias no backend, app e painel admin; busca unificada `?q=`, debounce 320 ms, recentes, filtros rápidos e busca inline em Ajuda e Seus pedidos.
   - Tela dedicada `SucessoAcaoTela` e retorno limpo à aba inicial (`ControladorCasca`).
   - API de CEP (`GET /v1/cep/{cep}`, ViaCEP + fallback BrasilAPI + cache) integrada ao autopreenchimento no pedido, endereços, dados pessoais e cadastro profissional.
+
+## 2026-11-18 — Gamificação, fase 1: moedas por avaliar (branch `feature/gamificacao-moedas`, worktree `../Trato-moedas`)
+
+- **Decisão do João:** moeda própria (não cupom), livro separado do ledger de dinheiro. Sem taxa no app, o bônus é custo do Trato.
+- **Backend:** `api/moedas.py` (config, lançamentos imutáveis, saldo, idempotência `avaliacao:<pedido>`, teto mensal, validade opcional). `POST /v1/pedidos/{id}/avaliacao` devolve `moedas_ganhas` (só cliente avaliando o profissional; falha de moeda nunca derruba a avaliação). `GET /v1/me/moedas` devolve saldo, valor da moeda e extrato. Desligado por padrão (`moedas_config.ativo = false`).
+- **Migration APLICADA no Supabase em 2026-11-18 (OK do João), ativo=false:** `supabase/migrations/20261118150000_moedas_gamificacao.sql` (+ rollback). Falta ligar `ativo` na configuração.
+- **Testes:** `tests/api/test_moedas.py` (6). Falta: app (tela de avaliação "+X moedas" e saldo na carteira), painel admin (configurar valores), usar moedas como desconto, indicação e conquistas.

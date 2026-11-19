@@ -33,6 +33,7 @@ from trato.api.memoria import (
     RepassesEmMemoria,
 )
 from trato.api.memoria_app import AvaliacoesEmMemoria
+from trato.api.moedas import MoedasPostgres
 from trato.api.rotas_pagamento import instalar_pagamento
 from trato.config import Config, obter_config
 from trato.pagamentos.montagem import escolher_provedor
@@ -138,6 +139,7 @@ def criar_contexto_postgres(
         verificacoes=VerificacoesPostgres(banco),
         taxa=TaxaPostgres(banco),
         avaliacoes=AvaliacoesPostgres(banco),
+        moedas=MoedasPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),
         fechamentos=FechamentosPostgres(banco),
