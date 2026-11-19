@@ -1201,9 +1201,6 @@ class ConfigAdminPostgres:
                 con.execute(
                     "delete from public.config_parametros where versao_id = %s", (versao.id,)
                 )
-                con.execute(
-                    "delete from public.config_faixas_taxa where versao_id = %s", (versao.id,)
-                )
                 con.execute("delete from public.config_versoes where id = %s", (versao.id,))
                 self._auditar(
                     con, autor_id, "config.rascunho_descartado", versao.status, versao, motivo
