@@ -619,7 +619,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   /// `POST /v1/contratos/{id}/avaliacao`. A nota geral é a média das notas dadas por critério
   /// (arredondada, de 1 a 5). Gorjeta não tem rota: em vez de sumir em silêncio, recusa.
   @override
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
     if (avaliacao.gorjetaCentavos > 0) {
       throw const ErroTrato(
         TipoErro.recusado,
@@ -632,10 +632,14 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     }
     final media = (dadas.reduce((a, b) => a + b) / dadas.length).round().clamp(1, 5);
     final comentario = avaliacao.comentario.trim();
-    await _api.post(
+    final resposta = await _api.post(
       '/v1/contratos/$pedidoId/avaliacao',
       corpo: {'nota_geral': media, if (comentario.isNotEmpty) 'comentario': comentario},
     );
+    if (resposta is Map && resposta['moedas_ganhas'] is int) {
+      return resposta['moedas_ganhas'] as int;
+    }
+    return 0;
   }
 
   @override
@@ -1356,7 +1360,15 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       if (nota != null) 'Nota ${nota.toStringAsFixed(1).replaceAll('.', ',')}',
       if (concluidos != null) '$concluidos ${concluidos == 1 ? 'serviço' : 'serviços'}',
     ];
+    int? moedas;
+    try {
+      final m = _mapa(await _api.get('/v1/me/moedas'));
+      moedas = m['saldo'] as int?;
+    } on Object {
+      moedas = null; // moedas são extra: falha aqui não derruba o perfil
+    }
     return PerfilCliente(
+      moedas: moedas,
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),

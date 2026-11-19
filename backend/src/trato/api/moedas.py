@@ -39,6 +39,8 @@ class LancamentoMoeda:
 class RepositorioMoedas(Protocol):
     def config(self) -> ConfigMoedas: ...
 
+    def salvar_config(self, config: ConfigMoedas) -> None: ...
+
     def lancar(self, lancamento: LancamentoMoeda) -> bool:
         """Grava o lançamento. False se a chave já existia (nada muda)."""
         ...
@@ -59,6 +61,9 @@ class MoedasEmMemoria:
 
     def config(self) -> ConfigMoedas:
         return self._config
+
+    def salvar_config(self, config: ConfigMoedas) -> None:
+        self._config = config
 
     def lancar(self, lancamento: LancamentoMoeda) -> bool:
         if lancamento.chave_idempotencia in self._itens:
@@ -117,6 +122,24 @@ class MoedasPostgres:
             max_bonus_por_profissional_mes=int(l["max_bonus_por_profissional_mes"]),
             validade_dias=l["validade_dias"],
         )
+
+    def salvar_config(self, config: ConfigMoedas) -> None:
+        with self._banco.transacao() as con:
+            con.execute(
+                "update public.moedas_config set ativo = %s, bonus_avaliacao_moedas = %s, "
+                "valor_moeda_centavos = %s, teto_mensal_moedas = %s, min_servico_centavos = %s, "
+                "max_bonus_por_profissional_mes = %s, validade_dias = %s, atualizado_em = now() "
+                "where id",
+                (
+                    config.ativo,
+                    config.bonus_avaliacao_moedas,
+                    config.valor_moeda_centavos,
+                    config.teto_mensal_moedas,
+                    config.min_servico_centavos,
+                    config.max_bonus_por_profissional_mes,
+                    config.validade_dias,
+                ),
+            )
 
     def lancar(self, lancamento: LancamentoMoeda) -> bool:
         uid = como_uuid(lancamento.usuario_id)

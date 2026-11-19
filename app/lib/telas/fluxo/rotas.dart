@@ -1431,6 +1431,7 @@ abstract final class RotasTrato {
       iniciais: p.iniciais,
       resumo: p.resumo,
       fotoReferencia: p.fotoReferencia,
+      moedas: p.moedas,
       grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
     );
   }
@@ -2176,15 +2177,19 @@ abstract final class RotasTrato {
         construir: (context, dados) => AvaliacaoTela(
           dados: dados,
           aoEnviar: (envio) async {
-            final ok = await _tentar(
-                context, () => repos.pedidos.avaliar(pedidoId, envio));
+            var moedas = 0;
+            final ok = await _tentar(context, () async {
+              moedas = await repos.pedidos.avaliar(pedidoId, envio);
+            });
             if (ok && context.mounted) {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 context,
                 (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Avaliação enviada!',
-                  subtitulo: 'Obrigado por avaliar o profissional.',
+                  subtitulo: moedas > 0
+                      ? 'Obrigado por avaliar. Você ganhou $moedas moedas do Trato!'
+                      : 'Obrigado por avaliar o profissional.',
                   aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,

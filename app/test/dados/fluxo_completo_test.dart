@@ -63,9 +63,10 @@ class _Pedidos extends RepositorioPedidosFake {
   }
 
   @override
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
     b.chamadas.add('avaliar');
     b.avaliacao = avaliacao;
+    return 0;
   }
 }
 

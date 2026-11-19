@@ -125,6 +125,17 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                     ),
                 ],
               ),
+              if ((perfil.moedas ?? 0) > 0) ...[
+                const SizedBox(height: EspacosTrato.x5),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: const Icon(Icons.stars_rounded, color: CoresTrato.petroleo),
+                    title: const Text('Suas moedas do Trato'),
+                    trailing: Text('${perfil.moedas}', style: TipografiaTrato.tituloGrande),
+                  ),
+                ),
+              ],
               for (final grupo in perfil.grupos) ...[
                 const SizedBox(height: EspacosTrato.x5),
                 Text(grupo.titulo, style: TipografiaTrato.sobretitulo),

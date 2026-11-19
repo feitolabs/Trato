@@ -338,16 +338,18 @@ void main() {
             'comentario': 'Ótimo',
             'etiquetas': <String>[],
             'criada_em': '2026-10-29T12:00:00Z',
+            'moedas_ganhas': 50,
           },
         ),
       });
 
-      await RepositorioPedidosApi(api).avaliar(
+      final moedas = await RepositorioPedidosApi(api).avaliar(
         'ab12cd34',
         const EnvioAvaliacao(notas: [5, 5, 4, 5, 5], comentario: 'Ótimo', gorjetaCentavos: 0),
       );
 
       expect(chamadas.single.corpo, {'nota_geral': 5, 'comentario': 'Ótimo'});
+      expect(moedas, 50);
     });
 
     test('gorjeta não tem rota: recusa em vez de sumir em silêncio', () async {
@@ -488,7 +490,7 @@ void main() {
       final p = await RepositorioPerfilApi(api).carregar();
 
       expect(chamadas.first.autorizacao, 'Bearer valor-de-teste');
-      expect(chamadas.map((c) => c.caminho), ['/v1/me', '/v1/usuarios/c1/foto']);
+      expect(chamadas.map((c) => c.caminho), ['/v1/me', '/v1/usuarios/c1/foto', '/v1/me/moedas']);
       expect(p.fotoReferencia, 'https://fotos.teste/c1.jpg');
       expect(p.nome, 'Mariana Alves');
       expect(p.iniciais, 'MA');

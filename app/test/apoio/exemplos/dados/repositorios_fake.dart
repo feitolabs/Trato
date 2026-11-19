@@ -110,7 +110,7 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   Future<void> relatarProblema(String pedidoId, EnvioRelato relato) async => relatos.add(relato);
 
   @override
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {}
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async => 0;
 
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async => dadosAvaliacaoExemplo;

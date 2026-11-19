@@ -127,7 +127,8 @@ abstract interface class RepositorioPedidos {
   /// "Relatar problema": abre a disputa; o valor congelado é do backend.
   Future<void> relatarProblema(String pedidoId, EnvioRelato relato);
 
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao);
+  /// Devolve as moedas de bônus ganhas pela avaliação (0 se nenhuma). O backend decide.
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao);
 
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId);
 
