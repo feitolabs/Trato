@@ -595,7 +595,6 @@ void main() {
             'retido_centavos': 65212,
             'a_liberar_centavos': 0,
             'liberado_centavos': 0,
-            'taxa_trato_centavos': 5288,
           });
         case '/v1/contratos/ped-1/aditivos':
           return _json([
@@ -610,11 +609,10 @@ void main() {
       return _json({'detail': 'não'}, 404);
     }
 
-    test('mostra o valor inteiro, a taxa, o líquido, os aditivos e as notas', () async {
+    test('mostra o valor inteiro, o que recebe, os aditivos e as notas', () async {
       final (api, _) = _cliente(responder);
       final d = await RepositorioProfissionalApi(api).valoresDoPedido('ped-1');
       expect(d.pagoPeloClienteCentavos, 70500);
-      expect(d.taxaCentavos, 5288);
       expect(d.voceRecebeCentavos, 65212);
       expect(d.situacao, contains('Retido'));
       expect(d.aditivos.single.centavos, 45000);

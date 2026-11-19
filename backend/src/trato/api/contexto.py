@@ -35,7 +35,6 @@ from trato.api.repositorios import (
     RepositorioRepasses,
 )
 from trato.api.repositorios_app import (
-    ProvedorTaxa,
     RepositorioAvaliacoes,
     RepositorioConversas,
     RepositorioNotasMaterial,
@@ -127,8 +126,6 @@ class Contexto:
     notas_material: RepositorioNotasMaterial = field(default_factory=NotasMaterialEmMemoria)
     # Dados pessoais, endereços, favoritos e contatos de confiança (`api/conta.py`).
     conta: Any = field(default_factory=lambda: _conta_em_memoria())
-    # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
-    taxa: ProvedorTaxa | None = None
     repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)
     # Contestações de cartão (chargeback) avisadas pelo provedor (`financeiro/contestacoes.py`).
     contestacoes: Any = field(default_factory=lambda: _contestacoes_em_memoria())

@@ -262,7 +262,7 @@ void main() {
     await tester.pumpWidget(
       _app(
         CalculadoraOrcamentoTela(
-          servico: ServicoOrcamentoFake(taxaBps: 800),
+          servico: ServicoOrcamentoFake(),
           tituloPedido: 'Trocar disjuntor',
         ),
         tamanho: const Size(390, 1400),

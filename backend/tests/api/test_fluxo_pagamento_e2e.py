@@ -11,18 +11,20 @@ from fastapi.testclient import TestClient
 from trato.api.repositorios import Orcamento
 from trato.api.rotas_pagamento import instalar_pagamento
 from trato.financeiro.ledger import CUSTODIA, TAXA_TRATO, TipoLancamento, liberado
-from trato.pagamentos.memoria import AditivosEmMemoria, CobrancasEmMemoria, TermosEmMemoria
+from trato.pagamentos.memoria import AditivosEmMemoria, CobrancasEmMemoria
 from trato.pagamentos.modelos import ConfigPagamento
 from trato.pagamentos.orquestrador import ServicoPagamento
 from trato.pagamentos.provedor import ProvedorFake, TipoEvento
-from trato.pagamentos.taxa import ConfigTaxa
 
 VALOR = 100_000
-TAXA_BPS = 750  # só nos testes; no sistema vem da configuração
-TAXA_MINIMA = 500
-TAXA_ESPERADA = 7_500  # descontada do profissional na conclusão (João, 10/11/2026)
+TAXA_ESPERADA = 0  # o app é gratuito (João, 18/11/2026): nada é descontado do profissional
 COBRADO = VALOR  # o cliente paga só o orçamento
 LIQUIDO = VALOR - TAXA_ESPERADA
+
+
+def _taxa_trato(fluxo, pid) -> int:
+    """Saldo da conta do Trato no pedido: sem taxa, só o custo de parcelamento repassado."""
+    return fluxo.ctx.ledger.saldo_da_conta(TAXA_TRATO, pid)
 
 
 @dataclass
@@ -132,10 +134,9 @@ def fluxo(amb: Ambiente) -> Fluxo:
     fake = ProvedorFake()
     servico = ServicoPagamento(
         fake,
-        lambda: ConfigPagamento(ConfigTaxa(TAXA_BPS, TAXA_MINIMA), alcada_disputa_centavos=10**9),
+        lambda: ConfigPagamento(alcada_disputa_centavos=10**9),
         CobrancasEmMemoria(),
         AditivosEmMemoria(),
-        TermosEmMemoria(),
     )
     instalar_pagamento(amb.cliente.app, amb.contexto, servico)
     return Fluxo(amb, fake, servico, amb.cliente)
@@ -147,7 +148,6 @@ def fluxo(amb: Ambiente) -> Fluxo:
 def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     pid = fluxo.aceitar()
     assert fluxo.ctx.contratos.obter_do_pedido(pid).valor_centavos == VALOR
-    assert fluxo.servico.termos.obter(pid).taxa == ConfigTaxa(TAXA_BPS, TAXA_MINIMA)
 
     cobranca = fluxo.cobrar(pid)
     assert cobranca["status"] == "aguardando" and cobranca["valor_centavos"] == COBRADO
@@ -165,7 +165,7 @@ def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     assert fluxo.tipos(pid) == [TipoLancamento.COBRANCA]
     assert fluxo.saldo(pid)["retido_centavos"] == VALOR
     assert fluxo.saldo(pid)["cliente_pagou_centavos"] == COBRADO
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == 0
+    assert _taxa_trato(fluxo, pid) == 0
 
     fluxo.agendar(pid)
     assert fluxo.pedido(pid)["estado"] == "agendado"
@@ -176,7 +176,7 @@ def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     fluxo.concluir(pid)
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == 0
-    assert saldo["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert _taxa_trato(fluxo, pid) == TAXA_ESPERADA
     assert saldo["a_liberar_centavos"] == LIQUIDO  # a taxa sai antes de chegar à carteira
     assert fluxo.ctx.garantias.obter_garantia(pid) is not None
 
@@ -199,15 +199,15 @@ def test_pedido_de_ponta_a_ponta(fluxo: Fluxo):
     ]
 
 
-def test_taxa_congelada_no_aceite_nao_muda_com_a_configuracao(fluxo: Fluxo):
+def test_mudar_a_configuracao_nao_cria_taxa(fluxo: Fluxo):
     pid = fluxo.aceitar()
-    fluxo.servico.config = lambda: ConfigPagamento(ConfigTaxa(2_000, 0), 10**9)
+    fluxo.servico.config = lambda: ConfigPagamento(10**9)
     fluxo.pagar(pid)
     fluxo.agendar(pid)
     fluxo.iniciar(pid)
     fluxo.encerrar_execucao(pid)
     fluxo.concluir(pid)
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert _taxa_trato(fluxo, pid) == TAXA_ESPERADA
 
 
 def test_so_o_cliente_cria_cobranca_e_so_com_orcamento_aceito(fluxo: Fluxo):
@@ -441,7 +441,7 @@ def test_cancelamento_depois_de_pagar_devolve_tudo_ao_cliente(fluxo: Fluxo):
     saldo = fluxo.saldo(pid)
     # Nenhuma taxa foi descontada ainda: o cliente recebe 100% de volta.
     assert saldo["retido_centavos"] == 0 and saldo["cliente_pagou_centavos"] == 0
-    assert saldo["taxa_trato_centavos"] == 0
+    assert _taxa_trato(fluxo, pid) == 0
     assert [c for c in fluxo.fake.chamadas if c[0] == "estornar"] == [
         ("estornar", f"din/{pid}/cancelamento/{cobranca['id']}")
     ]
@@ -467,9 +467,7 @@ def test_parcelado_repassa_o_custo_do_provedor_e_ele_nao_volta(fluxo: Fluxo):
     """Com a tabela preenchida (valores de TESTE, não do provedor), o custo é repassado ao cliente."""
     from trato.pagamentos.parcelamento import ConfigParcelamento
 
-    fluxo.servico.config = lambda: ConfigPagamento(
-        ConfigTaxa(TAXA_BPS, TAXA_MINIMA), 10**9, parcelamento=ConfigParcelamento({3: 200})
-    )
+    fluxo.servico.config = lambda: ConfigPagamento(10**9, parcelamento=ConfigParcelamento({3: 200}))
     pid = fluxo.aceitar()
     r = fluxo.chamar(
         "POST", f"/v1/pedidos/{pid}/cobranca", "t-cliente", {"meio": "cartao", "parcelas": 3}
@@ -480,7 +478,7 @@ def test_parcelado_repassa_o_custo_do_provedor_e_ele_nao_volta(fluxo: Fluxo):
     assert fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, r.json()["id"]).status_code == 200
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == VALOR
-    assert saldo["taxa_trato_centavos"] == 2_000  # só o custo repassado; a taxa sai na conclusão
+    assert _taxa_trato(fluxo, pid) == 2_000  # só o custo repassado; a taxa sai na conclusão
     fluxo.agendar(pid)
     assert fluxo.acao(pid, "cancelar", "t-cliente", {"motivo": "x"}).status_code == 200
     saldo = fluxo.saldo(pid)
@@ -525,8 +523,8 @@ def test_disputa_congela_e_reembolso_parcial_divide_o_valor(fluxo: Fluxo):
     assert fluxo.pedido(pid)["estado"] == "concluido"
 
     saldo = fluxo.saldo(pid)
-    assert saldo["taxa_trato_centavos"] == 5_625  # 7,5% do que ficou para o profissional
-    assert saldo["a_liberar_centavos"] == 69_375  # 75.000 menos a taxa
+    assert _taxa_trato(fluxo, pid) == 0  # sem taxa
+    assert saldo["a_liberar_centavos"] == 75_000  # tudo o que ficou vai para o profissional
     assert saldo["retido_centavos"] == 0
     assert [c[0] for c in fluxo.fake.chamadas].count("estornar") == 1
     fluxo.ctx.ledger.livro.verificar_partidas()
@@ -540,16 +538,16 @@ def test_disputa_reembolso_total_cancela_e_devolve(fluxo: Fluxo):
     assert r.status_code == 200 and r.json()["estado_pedido"] == "cancelado"
     saldo = fluxo.saldo(pid)
     # Reembolso total devolve 100%: o Trato não fica com taxa.
-    assert saldo["retido_centavos"] == 0 and saldo["taxa_trato_centavos"] == 0
+    assert saldo["retido_centavos"] == 0 and _taxa_trato(fluxo, pid) == 0
     assert fluxo.ctx.ledger.saldo_da_conta(CUSTODIA, pid) == 0
     assert fluxo.ctx.ledger.saldo_da_conta(TAXA_TRATO, pid) == 0
     assert saldo["cliente_pagou_centavos"] == 0
 
 
-def test_disputa_depois_de_concluir_devolve_tambem_a_taxa_descontada(fluxo: Fluxo):
+def test_disputa_depois_de_concluir_devolve_o_valor_inteiro(fluxo: Fluxo):
     pid = fluxo.ate_em_confirmacao()
     fluxo.concluir(pid)
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert _taxa_trato(fluxo, pid) == TAXA_ESPERADA
     r = fluxo.chamar(
         "POST",
         f"/v1/pedidos/{pid}/retrabalho",
@@ -567,7 +565,7 @@ def test_disputa_depois_de_concluir_devolve_tambem_a_taxa_descontada(fluxo: Flux
     assert r.status_code == 200, r.text
     assert r.json()["para_cliente_centavos"] == VALOR
     saldo = fluxo.saldo(pid)
-    assert saldo["cliente_pagou_centavos"] == 0 and saldo["taxa_trato_centavos"] == 0
+    assert saldo["cliente_pagou_centavos"] == 0 and _taxa_trato(fluxo, pid) == 0
     assert saldo["a_liberar_centavos"] == 0
     fluxo.ctx.ledger.livro.verificar_partidas()
 
@@ -575,9 +573,7 @@ def test_disputa_depois_de_concluir_devolve_tambem_a_taxa_descontada(fluxo: Flux
 def test_parcelado_com_reembolso_parcial_nao_mistura_o_custo_no_repasse(fluxo: Fluxo):
     from trato.pagamentos.parcelamento import ConfigParcelamento
 
-    fluxo.servico.config = lambda: ConfigPagamento(
-        ConfigTaxa(TAXA_BPS, TAXA_MINIMA), 10**9, parcelamento=ConfigParcelamento({3: 200})
-    )
+    fluxo.servico.config = lambda: ConfigPagamento(10**9, parcelamento=ConfigParcelamento({3: 200}))
     pid = fluxo.aceitar()
     r = fluxo.chamar(
         "POST", f"/v1/pedidos/{pid}/cobranca", "t-cliente", {"meio": "cartao", "parcelas": 3}
@@ -597,21 +593,21 @@ def test_parcelado_com_reembolso_parcial_nao_mistura_o_custo_no_repasse(fluxo: F
     r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     assert r.status_code == 200, r.text
     saldo = fluxo.saldo(pid)
-    assert saldo["a_liberar_centavos"] == 69_375
-    assert saldo["taxa_trato_centavos"] == 5_625 + 2_000  # taxa + custo do parcelado
+    assert saldo["a_liberar_centavos"] == 75_000
+    assert _taxa_trato(fluxo, pid) == 2_000  # só o custo do parcelado
     repasse = fluxo.repasse(pid)
-    assert (repasse.valor_bruto_centavos, repasse.taxa_centavos) == (75_000, 5_625)
-    assert repasse.valor_liquido_centavos == 69_375
+    assert (repasse.valor_bruto_centavos, repasse.taxa_centavos) == (75_000, 0)
+    assert repasse.valor_liquido_centavos == 75_000
     fluxo.ctx.ledger.livro.verificar_partidas()
 
 
-def test_disputa_liberar_tudo_conclui_com_taxa_cheia(fluxo: Fluxo):
+def test_disputa_liberar_tudo_conclui_sem_taxa(fluxo: Fluxo):
     pid = fluxo.ate_em_confirmacao()
     _abrir_e_responder_disputa(fluxo, pid)
     decisao = {"resultado": "liberar_tudo", "justificativa": "Serviço conforme combinado."}
     r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/disputa/decisao", "t-mediador", decisao)
     assert r.json()["estado_pedido"] == "concluido"
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert _taxa_trato(fluxo, pid) == TAXA_ESPERADA
     assert [c[0] for c in fluxo.fake.chamadas].count("estornar") == 0
 
 
@@ -620,7 +616,7 @@ def test_disputa_encerrada_por_acordo_reparte_normalmente(fluxo: Fluxo):
     _abrir_e_responder_disputa(fluxo, pid)
     r = fluxo.acao(pid, "encerrar_disputa_por_acordo", "t-cliente")
     assert r.status_code == 200 and r.json()["estado"] == "concluido"
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert _taxa_trato(fluxo, pid) == TAXA_ESPERADA
 
 
 # --- retrabalho ---------------------------------------------------------------------------------
@@ -645,7 +641,7 @@ def test_retrabalho_nao_mexe_no_dinheiro(fluxo: Fluxo):
     fluxo.encerrar_execucao(pid)
     fluxo.concluir(pid)
     assert list(fluxo.ctx.ledger.lancamentos(pid)) == antes
-    assert fluxo.saldo(pid)["taxa_trato_centavos"] == TAXA_ESPERADA
+    assert _taxa_trato(fluxo, pid) == TAXA_ESPERADA
 
 
 # --- aditivo -------------------------------------------------------------------------------------
@@ -690,10 +686,9 @@ def test_aditivo_so_cobra_depois_da_aprovacao_do_cliente(fluxo: Fluxo):
 
     fluxo.encerrar_execucao(pid)
     fluxo.concluir(pid)
-    taxa = 9_000  # 7,5% de 120.000
     saldo = fluxo.saldo(pid)
-    assert saldo["taxa_trato_centavos"] == taxa
-    assert saldo["a_liberar_centavos"] == 111_000  # 120.000 menos a taxa
+    assert _taxa_trato(fluxo, pid) == 0
+    assert saldo["a_liberar_centavos"] == 120_000  # orçamento + aditivo, sem taxa
 
 
 def test_aditivo_so_com_servico_em_andamento(fluxo: Fluxo):

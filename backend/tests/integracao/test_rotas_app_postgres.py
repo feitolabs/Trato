@@ -65,18 +65,12 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     ]
     assert get(c, "/v1/profissional/pedidos-abertos", "cliente").status_code == 403
 
-    # resumo: a taxa vem da faixa vigente do banco (750 bps para 90.000), nunca do app
+    # resumo: sem taxa (app gratuito)
     r = post(c, "/v1/orcamentos/resumo", "profissional", {"valor_centavos": 90_000})
     corpo = r.json()
-    assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
-        "valor_centavos": 90_000,
-        "taxa_centavos": 6_750,
-        "liquido_centavos": 83_250,  # a taxa é descontada do profissional
-    }
-    assert corpo["total_cliente_centavos"] == 90_000
+    assert corpo["valor_centavos"] == 90_000
+    assert not any("taxa" in chave or "liquido" in chave for chave in corpo)
     assert corpo["custo_provedor_estimado_centavos"] > 0
-    r = post(c, "/v1/orcamentos/resumo", "profissional", {"valor_centavos": 200_000})
-    assert r.json()["taxa_centavos"] == 12_000  # faixa de 600 bps acima de 100.000
 
     # sem orçamento ainda
     assert get(c, f"/v1/pedidos/{pedido_id}/orcamentos", "cliente").json() == []

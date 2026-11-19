@@ -2023,7 +2023,6 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     return DetalheValoresPedido(
       pedidoNumero: _curto(pedidoId),
       pagoPeloClienteCentavos: cent(saldo['cliente_pagou_centavos']),
-      taxaCentavos: cent(saldo['taxa_trato_centavos']),
       voceRecebeCentavos: retido + aLiberar + liberado,
       situacao: situacao,
       podeAvaliarCliente: concluidoSemAvaliar,
@@ -2186,8 +2185,6 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       versao: (j['versao'] as num?)?.toInt() ?? 1,
       situacao: sit,
       valorCentavos: (j['valor_centavos'] as num?)?.toInt() ?? 0,
-      taxaCentavos: (j['taxa_centavos'] as num?)?.toInt(),
-      liquidoCentavos: (j['liquido_centavos'] as num?)?.toInt(),
       prazoExecucaoDias: (j['prazo_execucao_dias'] as num?)?.toInt(),
       garantiaDias: (j['garantia_dias'] as num?)?.toInt(),
       foraDoEscopo: j['fora_do_escopo'] as String?,
@@ -2201,7 +2198,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 }
 
 /// `POST /v1/orcamentos/resumo` `{valor_centavos}` e `POST /v1/pedidos/{pedido_id}/orcamentos`.
-/// Taxa e líquido vêm do backend; o app não calcula nada.
+/// O Trato não cobra taxa: o profissional recebe o valor inteiro do orçamento.
 class ServicoOrcamentoApi implements ServicoOrcamento {
   ServicoOrcamentoApi(this._api, {this.pedidoId});
 
@@ -2213,13 +2210,7 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     final j = _mapa(
       await _api.post('/v1/orcamentos/resumo', corpo: {'valor_centavos': totalCentavos}),
     );
-    return ResumoOrcamento(
-      totalCentavos: j['valor_centavos'] as int,
-      taxaCentavos: j['taxa_centavos'] as int,
-      taxaBps: j['taxa_bps'] as int?,
-      liquidoCentavos: j['liquido_centavos'] as int,
-      clientePagaCentavos: j['total_cliente_centavos'] as int?,
-    );
+    return ResumoOrcamento(totalCentavos: j['valor_centavos'] as int);
   }
 
   @override

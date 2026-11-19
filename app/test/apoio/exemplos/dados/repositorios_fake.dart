@@ -615,7 +615,6 @@ class RepositorioPerfilFake implements RepositorioPerfil {
 
 class RepositorioProfissionalFake implements RepositorioProfissional {
   /// Taxa só de demonstração; a real é decidida pelo backend (progressiva, base 7,5%).
-  static const taxaDemonstracaoBps = 750;
 
   final List<MotivoRecusa> recusas = [];
   final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
@@ -670,14 +669,13 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async => const DetalheValoresPedido(
         pedidoNumero: '#AAAA',
         pagoPeloClienteCentavos: 70500,
-        taxaCentavos: 5288,
-        voceRecebeCentavos: 65212,
+        voceRecebeCentavos: 70500,
         situacao: 'Retido até o cliente confirmar o serviço.',
       );
 
   @override
   ServicoOrcamento servicoOrcamento(String pedidoId) =>
-      ServicoOrcamentoFake(taxaBps: taxaDemonstracaoBps);
+      ServicoOrcamentoFake();
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) => ServicoCheckInFake();
@@ -741,8 +739,6 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
         versao: 1,
         situacao: situacao ?? 'aguardando',
         valorCentavos: 35000,
-        taxaCentavos: 2625,
-        liquidoCentavos: 32375,
         prazoExecucaoDias: 2,
         garantiaDias: 90,
         foraDoEscopo: 'Fornecimento de disjuntor geral',

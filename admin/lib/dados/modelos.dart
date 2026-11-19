@@ -280,17 +280,12 @@ class LancamentoEspelho {
     required this.refProvedor,
     this.divergente = false,
     this.tipo = 'Cobrança',
-    this.taxaCentavos,
-    this.liquidoCentavos,
     this.conciliado = false,
   });
 
   /// Cobrança, repasse, reembolso ou taxa (RF-PAG-03).
   final String tipo;
 
-  /// Taxa retida pelo Trato e líquido do profissional neste pedido (RF-PAG-05). Nulo = sem dado.
-  final int? taxaCentavos;
-  final int? liquidoCentavos;
   final bool conciliado;
 
   final String id;
@@ -651,7 +646,6 @@ class ErroApi implements Exception {
 class MetricasDashboard {
   const MetricasDashboard({
     required this.gmvCentavos,
-    required this.receitaTaxaCentavos,
     required this.pedidosTotal,
     required this.pedidosConcluidos,
     required this.pedidosEmAndamento,
@@ -663,7 +657,6 @@ class MetricasDashboard {
     required this.cidadesAtivas,
     required this.categoriasAtivas,
     this.gmvAnteriorCentavos = 0,
-    this.receitaTaxaAnteriorCentavos = 0,
     this.pedidosAtivos = 0,
     this.pedidosAtivosAnterior = 0,
     this.baseUsuarios = 0,
@@ -674,7 +667,6 @@ class MetricasDashboard {
 
   /// Valores do período anterior de mesma duração (comparação dos quatro cards).
   final int gmvAnteriorCentavos;
-  final int receitaTaxaAnteriorCentavos;
   final int pedidosAtivos;
   final int pedidosAtivosAnterior;
   final int baseUsuarios;
@@ -683,7 +675,6 @@ class MetricasDashboard {
   final int alertasRiscoAbertos;
 
   final int gmvCentavos;
-  final int receitaTaxaCentavos;
   final int pedidosTotal;
   final int pedidosConcluidos;
   final int pedidosEmAndamento;

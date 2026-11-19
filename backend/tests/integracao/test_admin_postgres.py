@@ -44,10 +44,6 @@ PARAMETROS = [
     {"chave": "prazo_decisao_disputa_dias_uteis", "valor": 5},
     {"chave": "prazo_congelar_disputa_horas", "valor": 72},
 ]
-FAIXAS = [
-    {"de_centavos": 0, "ate_centavos": 100_000, "taxa_bps": 750},
-    {"de_centavos": 100_000, "ate_centavos": None, "taxa_bps": 600},
-]  # valores de TESTE
 PAPEIS = ("administrador", "financeiro", "cadastro", "dpo", "seguranca", "mediador", "atendente_n1")
 
 
@@ -416,7 +412,6 @@ def criar(amb, quem="financeiro", **corpo):
     base = {
         "motivo": "Versão inicial",
         "parametros": PARAMETROS,
-        "faixas": FAIXAS,
         "partir_da_vigente": False,
     }
     return amb.cliente.post(f"{BASE}/config/versoes", json=base | corpo, headers=amb.h(quem))
@@ -428,22 +423,17 @@ def test_config_ciclo_completo_e_regras_do_banco(amb):
     # 5 do teste + 2 do painel v2 + o prazo do alerta de pagamento parado (financeiro, 08/11).
     assert len(amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()) == 8
 
-    # Valores fora dos limites do catálogo e faixas sobrepostas são recusados, sem deixar lixo.
+    # Valores fora dos limites do catálogo são recusados, sem deixar lixo.
     assert (
         criar(
             amb, parametros=[{"chave": "prazo_resposta_disputa_horas", "valor": 9999}]
         ).status_code
         == 422
     )
-    sobrepostas = [
-        {"de_centavos": 0, "ate_centavos": 200, "taxa_bps": 750},
-        {"de_centavos": 100, "ate_centavos": None, "taxa_bps": 600},
-    ]
-    assert criar(amb, faixas=sobrepostas).status_code == 422
     assert amb.sql("select count(*) from public.config_versoes")[0][0] == 0
 
     v1 = criar(amb).json()
-    assert v1["status"] == "rascunho" and len(v1["parametros"]) == 4 and len(v1["faixas"]) == 2
+    assert v1["status"] == "rascunho" and len(v1["parametros"]) == 4
     assert passo(amb, v1["id"], "aprovar", "administrador").status_code == 409  # ainda é rascunho
     assert passo(amb, v1["id"], "enviar", "financeiro").json()["status"] == "aguardando_aprovacao"
     assert passo(amb, v1["id"], "aprovar", "financeiro").status_code == 403  # sem o papel
@@ -475,9 +465,9 @@ def test_config_ciclo_completo_e_regras_do_banco(amb):
     assert descartar.status_code == 409
 
     # Nova versão a partir da vigente: quem propõe não aprova (nem o administrador).
-    v2 = criar(amb, quem="administrador", partir_da_vigente=True, motivo="Resposta mais rápida", faixas=[],
+    v2 = criar(amb, quem="administrador", partir_da_vigente=True, motivo="Resposta mais rápida",
                parametros=[{"chave": "prazo_resposta_disputa_horas", "valor": 24}]).json()  # fmt: skip
-    assert len(v2["parametros"]) == 4 and len(v2["faixas"]) == 2
+    assert len(v2["parametros"]) == 4
     passo(amb, v2["id"], "enviar", "administrador")
     assert passo(amb, v2["id"], "aprovar", "administrador").status_code == 403
     assert passo(amb, v2["id"], "aprovar", "administrador2").status_code == 200
@@ -504,7 +494,6 @@ def test_config_ciclo_completo_e_regras_do_banco(amb):
     assert {p["chave"]: p["valor"] for p in vigente["parametros"]}[
         "prazo_resposta_disputa_horas"
     ] == 48
-    assert [f["taxa_bps"] for f in vigente["faixas"]] == [750, 600]
     assert amb.cliente.get(f"{BASE}/config/versoes/nao-uuid", headers=fin).status_code == 404
 
     acoes = [
@@ -523,12 +512,6 @@ def test_config_incompleta_e_agendada_nao_publica(amb):
     incompleta = criar(amb, parametros=sem_chave).json()
     r = passo(amb, incompleta["id"], "enviar", "financeiro")
     assert r.status_code == 422 and "prazo_congelar_disputa_horas" in r.text
-    buraco = [
-        {"de_centavos": 0, "ate_centavos": 100, "taxa_bps": 750},
-        {"de_centavos": 200, "ate_centavos": None, "taxa_bps": 600},
-    ]
-    com_buraco = criar(amb, faixas=buraco).json()
-    assert passo(amb, com_buraco["id"], "enviar", "financeiro").status_code == 422
 
     futuro = (datetime.now(UTC) + timedelta(days=2)).isoformat()
     agendada = criar(amb, vigente_desde=futuro, motivo="Mudança agendada").json()
@@ -536,7 +519,7 @@ def test_config_incompleta_e_agendada_nao_publica(amb):
     passo(amb, agendada["id"], "aprovar", "administrador")
     assert passo(amb, agendada["id"], "publicar", "administrador").status_code == 409
 
-    for sobra in (incompleta, com_buraco, agendada):
+    for sobra in (incompleta, agendada):
         corpo = {"motivo": "Limpando as sobras"}
         r = amb.cliente.request(
             "DELETE", f"{BASE}/config/versoes/{sobra['id']}", json=corpo, headers=fin

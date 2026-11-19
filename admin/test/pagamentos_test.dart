@@ -12,8 +12,8 @@ void main() {
     }
     expect(find.text('R\$ 12.845,00'), findsOneWidget);
     expect(find.text('412 cobranças'), findsOneWidget);
-    // colunas do extrato (RF-PAG-03 e RF-PAG-05)
-    for (final coluna in ['Data', 'Tipo', 'Pedido', 'ID no provedor', 'Status', 'Valor', 'Taxa Trato', 'Líquido profissional']) {
+    // colunas do extrato (RF-PAG-03)
+    for (final coluna in ['Data', 'Tipo', 'Pedido', 'ID no provedor', 'Status', 'Valor']) {
       expect(find.text(coluna), findsWidgets, reason: coluna);
     }
     expect(find.text('PED-10490'), findsOneWidget);

@@ -257,8 +257,3 @@ class RepositorioNotasMaterial(Protocol):
     def registrar(self, nota: NotaMaterial) -> NotaMaterial: ...
 
     def do_pedido(self, pedido_id: str) -> Sequence[NotaMaterial]: ...
-
-
-class ProvedorTaxa(Protocol):
-    def calcular(self, valor_centavos: int) -> int:
-        """Taxa do Trato, em centavos, para o valor. Vem da configuração, nunca do app."""

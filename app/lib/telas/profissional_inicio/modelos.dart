@@ -155,8 +155,6 @@ class DetalheOrcamentoEnviado {
     required this.versao,
     required this.situacao,
     required this.valorCentavos,
-    this.taxaCentavos,
-    this.liquidoCentavos,
     this.prazoExecucaoDias,
     this.garantiaDias,
     this.foraDoEscopo,
@@ -173,8 +171,6 @@ class DetalheOrcamentoEnviado {
   final int versao;
   final String situacao;
   final int valorCentavos;
-  final int? taxaCentavos;
-  final int? liquidoCentavos;
   final int? prazoExecucaoDias;
   final int? garantiaDias;
   final String? foraDoEscopo;

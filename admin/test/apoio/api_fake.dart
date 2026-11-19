@@ -308,8 +308,6 @@ class ApiFake implements ApiAdmin {
             status: StatusProvedor.confirmado,
             pedido: 'PED-10490',
             refProvedor: 'pay_8f21...c3a',
-            taxaCentavos: 2700,
-            liquidoCentavos: 33300,
           ),
           LancamentoEspelho(
             id: 'l-2',
@@ -654,9 +652,6 @@ class ApiFake implements ApiAdmin {
       );
 
   static final _definicoes = [
-    _def('taxa_bps', 'Taxa do Trato por serviço', UnidadeConfig.bps, 0, 2000, dupla: true),
-    _def('taxa_minima_centavos', 'Taxa mínima por pedido', UnidadeConfig.centavos, 0, 5000, dupla: true),
-    _def('taxa_progressiva_ativa', 'Tabela progressiva de taxa', UnidadeConfig.quantidade, 0, 1, dupla: true),
     _def('adiantamento_bps', 'Adiantamento ao iniciar o serviço', UnidadeConfig.bps, 0, 10000),
     _def('prazo_liberacao_dias', 'Prazo para liberar o repasse ao profissional', UnidadeConfig.dias, 0, 30, dupla: true),
     _def('janela_chargeback_dias', 'Janela de reclamação do cliente', UnidadeConfig.dias, 1, 30, dupla: true),
@@ -677,9 +672,6 @@ class ApiFake implements ApiAdmin {
 
   List<ConfigVersao> _versoesIniciais() {
     const vigente = {
-      'taxa_bps': 750,
-      'taxa_minima_centavos': 300,
-      'taxa_progressiva_ativa': 0,
       'adiantamento_bps': 0,
       'prazo_liberacao_dias': 0,
       'janela_chargeback_dias': 7,
@@ -730,7 +722,7 @@ class ApiFake implements ApiAdmin {
         aprovadaPor: 'eq-administrador',
         aprovadaPorNome: 'Emanuel Cabral',
         criadaEm: _base.subtract(const Duration(days: 20)),
-        valores: {...vigente, 'taxa_bps': 800, 'valor_minimo_servico_centavos': 2000},
+        valores: {...vigente, 'adiantamento_bps': 3000, 'valor_minimo_servico_centavos': 2000},
       ),
     ];
   }
@@ -986,7 +978,6 @@ class ApiFake implements ApiAdmin {
   Future<MetricasDashboard> metricasDashboard({int dias = 30, DateTime? inicio, DateTime? fim}) => _ler(
         () => const MetricasDashboard(
           gmvCentavos: 12540000,
-          receitaTaxaCentavos: 1504800,
           pedidosTotal: 142,
           pedidosConcluidos: 98,
           pedidosEmAndamento: 24,
@@ -998,7 +989,6 @@ class ApiFake implements ApiAdmin {
           cidadesAtivas: 2,
           categoriasAtivas: 12,
           gmvAnteriorCentavos: 11160000,
-          receitaTaxaAnteriorCentavos: 1370000,
           pedidosAtivos: 214,
           pedidosAtivosAnterior: 221,
           baseUsuarios: 3902,
@@ -1008,7 +998,6 @@ class ApiFake implements ApiAdmin {
         ),
         const MetricasDashboard(
           gmvCentavos: 0,
-          receitaTaxaCentavos: 0,
           pedidosTotal: 0,
           pedidosConcluidos: 0,
           pedidosEmAndamento: 0,

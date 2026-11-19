@@ -626,14 +626,12 @@ void main() {
       expect(chamadas.single.corpo, {'motivo': 'Sem agenda'});
     });
 
-    test('calculadora: taxa e líquido vêm de POST /v1/orcamentos/resumo', () async {
+    test('calculadora: o valor vem de POST /v1/orcamentos/resumo (sem taxa)', () async {
       final (api, chamadas) = _api({
         'POST /v1/orcamentos/resumo': (
           200,
           {
             'valor_centavos': 100000,
-            'taxa_centavos': 7000,
-            'liquido_centavos': 93000,
             'custo_provedor_estimado_centavos': 500,
             'custo_provedor_estimativa': true,
           },
@@ -643,9 +641,7 @@ void main() {
       final r = await ServicoOrcamentoApi(api).resumir(100000);
 
       expect(chamadas.single.corpo, {'valor_centavos': 100000});
-      expect(r.taxaCentavos, 7000, reason: 'valor do backend, não calculado no app');
-      expect(r.liquidoCentavos, 93000);
-      expect(r.taxaBps, isNull);
+      expect(r.totalCentavos, 100000);
     });
 
     test('calculadora sem taxa configurada (503) vira erro de servidor', () async {

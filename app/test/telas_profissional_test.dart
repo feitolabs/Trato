@@ -396,7 +396,7 @@ void main() {
   group('Aditivo', () {
     testWidgets('profissional: líquido vem do serviço e envia em centavos', (t) async {
       final fake = ServicoAditivoFake();
-      final liquido = ServicoOrcamentoFake(taxaBps: 750);
+      final liquido = ServicoOrcamentoFake();
       await _abrir(
         t,
         CriarAditivoTela(
@@ -418,14 +418,14 @@ void main() {
       await t.enterText(find.byType(TextField).at(1), '100');
       await t.pumpAndSettle();
       expect(liquido.pedidos, contains(10000));
-      expect(find.text('R\$ 92,50'), findsOneWidget); // o profissional recebe 100 menos 7,50
+      expect(find.text('R\$ 100,00'), findsWidgets); // sem taxa: recebe o valor inteiro
       final cartaoResumo = find.byType(CartaoTrato);
       final direitaResumo = t
           .getTopRight(
             find.descendant(of: cartaoResumo, matching: find.byType(Column)).first,
           )
           .dx;
-      for (final valor in ['R\$ 100,00', 'R\$ 92,50']) {
+      for (final valor in ['R\$ 100,00']) {
         expect(
           t
               .getTopRight(find.descendant(of: cartaoResumo, matching: find.text(valor)))
@@ -556,7 +556,7 @@ void main() {
           servico: ServicoNotaMaterialFake(nota: notaMaterialExemplo), pedidoId: 'p'),
       'criar aditivo': () => CriarAditivoTela(
             servico: ServicoAditivoFake(),
-            servicoLiquido: ServicoOrcamentoFake(taxaBps: 750),
+            servicoLiquido: ServicoOrcamentoFake(),
             pedidoId: 'p',
             tituloPedido: 'Troca de tomadas e chuveiro',
           ),

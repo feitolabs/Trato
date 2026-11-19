@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from admin_ambiente import AGORA, BASE_FAIXAS, BASE_PARAMETROS, adm, cab  # noqa: F401
+from admin_ambiente import AGORA, BASE_PARAMETROS, adm, cab  # noqa: F401
 
 BASE = "/v1/admin/config"
 MOTIVO = {"motivo": "Conferi a proposta e os números"}
@@ -13,17 +13,10 @@ def parametros(**trocas):
     return [{"chave": k, "valor": v} for k, v in itens.items()]
 
 
-FAIXAS = [
-    {"de_centavos": f.de_centavos, "ate_centavos": f.ate_centavos, "taxa_bps": f.taxa_bps}
-    for f in BASE_FAIXAS
-]
-
-
 def criar(adm, quem="t-financeiro", **corpo):
     base = {
         "motivo": "Versão inicial",
         "parametros": parametros(),
-        "faixas": FAIXAS,
         "partir_da_vigente": False,
     }
     return adm.cliente.post(f"{BASE}/versoes", json=base | corpo, headers=cab(quem))
@@ -63,7 +56,7 @@ def test_ciclo_completo_proposta_aprovacao_publicacao(adm):
     assert publicada["status"] == "vigente"
 
     vigente = adm.cliente.get(f"{BASE}/vigente", headers=cab("t-juridico")).json()
-    assert vigente["id"] == vid and len(vigente["parametros"]) == 4 and len(vigente["faixas"]) == 2
+    assert vigente["id"] == vid and len(vigente["parametros"]) == 4
     acoes = [
         i["acao"]
         for i in adm.cliente.get(
@@ -106,13 +99,13 @@ def test_nova_versao_substitui_a_vigente_e_o_historico_fica(adm):
     primeira = subir_ate_vigente(adm)
     segunda = subir_ate_vigente(
         adm, motivo="Resposta mais rápida", partir_da_vigente=True,
-        parametros=[{"chave": "prazo_resposta_disputa_horas", "valor": 24}], faixas=[],
+        parametros=[{"chave": "prazo_resposta_disputa_horas", "valor": 24}]
     )  # fmt: skip
 
     vigente = adm.cliente.get(f"{BASE}/vigente", headers=cab("t-financeiro")).json()
     valores = {p["chave"]: p["valor"] for p in vigente["parametros"]}
     assert vigente["id"] == segunda["id"] and valores["prazo_resposta_disputa_horas"] == 24
-    assert valores["adiantamento_bps"] == 3000 and len(vigente["faixas"]) == 2  # herdou da vigente
+    assert valores["adiantamento_bps"] == 3000  # herdou da vigente
     historico = adm.cliente.get(f"{BASE}/versoes", headers=cab("t-financeiro")).json()
     assert [(v["numero"], v["status"]) for v in historico] == [(2, "vigente"), (1, "substituida")]
     antiga = adm.cliente.get(f"{BASE}/versoes/{primeira['id']}", headers=cab("t-financeiro")).json()
@@ -127,7 +120,6 @@ def test_reverter_cria_nova_versao_que_tambem_precisa_de_aprovacao(adm):
         adm,
         partir_da_vigente=True,
         parametros=[{"chave": "prazo_resposta_disputa_horas", "valor": 24}],
-        faixas=[],
     )
 
     r = passo(
@@ -209,32 +201,11 @@ def test_valores_fora_dos_limites_do_catalogo_sao_recusados(adm):
     assert adm.admin.config.versoes() == ()
 
 
-def test_faixas_com_buraco_sobreposicao_ou_sem_fim_nao_passam(adm):
-    buraco = [
-        {"de_centavos": 0, "ate_centavos": 100, "taxa_bps": 750},
-        {"de_centavos": 200, "ate_centavos": None, "taxa_bps": 600},
-    ]
-    sobreposta = [
-        {"de_centavos": 0, "ate_centavos": 200, "taxa_bps": 750},
-        {"de_centavos": 100, "ate_centavos": None, "taxa_bps": 600},
-    ]
-    assert criar(adm, faixas=sobreposta).status_code == 422
-    vid = criar(adm, faixas=buraco).json()["id"]  # rascunho aceita incompleto...
-    assert passo(adm, vid, "enviar", "t-financeiro").status_code == 422  # ...mas não sai dele
-    sem_fim = [{"de_centavos": 0, "ate_centavos": 100_000, "taxa_bps": 750}]
-    vid = criar(adm, faixas=sem_fim).json()["id"]
-    assert passo(adm, vid, "enviar", "t-financeiro").status_code == 422
-    fora = [{"de_centavos": 0, "ate_centavos": None, "taxa_bps": 10_001}]
-    assert criar(adm, faixas=fora).status_code == 422
-
-
 def test_versao_sem_o_que_o_backend_exige_nao_vira_vigente(adm):
     incompleta = [p for p in parametros() if p["chave"] != "prazo_congelar_disputa_horas"]
     vid = criar(adm, parametros=incompleta).json()["id"]
     r = passo(adm, vid, "enviar", "t-financeiro")
     assert r.status_code == 422 and "prazo_congelar_disputa_horas" in r.text
-    sem_faixas = criar(adm, faixas=[]).json()["id"]
-    assert passo(adm, sem_faixas, "enviar", "t-financeiro").status_code == 422
 
 
 def test_vigencia_agendada_so_publica_quando_chega_a_hora(adm):

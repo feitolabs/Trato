@@ -2,7 +2,7 @@
 estado do pagamento, garantia, aditivos, nota de material, avaliação, perfil e pedidos abertos.
 
 `{contrato_id}` nas rotas é o **id do pedido**: o contrato é um por pedido e não tem outro id.
-Nenhuma regra de dinheiro mora aqui: a taxa vem do `ProvedorTaxa`, a cobrança do
+Nenhuma regra de dinheiro mora aqui: a cobrança do
 `ServicoPagamento` e o app só pede e mostra. "Pago" só aparece depois do webhook assinado (D13).
 Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 """
@@ -98,12 +98,6 @@ class OrcamentoDetalheOut(BaseModel):
     )
     total_horas: str | None = Field(
         None, description="Deslocamento + trabalhadas: o total de horas que o cliente vê."
-    )
-    taxa_centavos: int | None = Field(
-        None, description="Taxa do Trato descontada deste orçamento (só para o autor)."
-    )
-    liquido_centavos: int | None = Field(
-        None, description="Valor líquido estimado do profissional (só para o autor)."
     )
 
 
@@ -343,10 +337,6 @@ def detalhe_do_orcamento(
     desloc = somar_horas(orc.itens, "deslocamento")
     trab = somar_horas(orc.itens, "horas")
     total = None if desloc is None and trab is None else (desloc or Decimal(0)) + (trab or 0)
-    taxa_centavos = liquido_centavos = None
-    if autor and contexto.taxa is not None and orc.valor_centavos > 0:
-        taxa_centavos = min(contexto.taxa.calcular(orc.valor_centavos), orc.valor_centavos)
-        liquido_centavos = orc.valor_centavos - taxa_centavos
     return OrcamentoDetalheOut(
         **campos,
         aceito=orc.id == pedido.orcamento_id,
@@ -354,8 +344,6 @@ def detalhe_do_orcamento(
         horas_deslocamento=_texto_horas(desloc),
         horas_trabalhadas=_texto_horas(trab),
         total_horas=_texto_horas(total),
-        taxa_centavos=taxa_centavos,
-        liquido_centavos=liquido_centavos,
     )
 
 

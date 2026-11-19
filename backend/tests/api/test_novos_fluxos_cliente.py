@@ -14,7 +14,6 @@ from trato.api.repositorios import DadosPedido, Orcamento
 from trato.pagamentos.modelos import ConfigPagamento
 from trato.pagamentos.parcelamento import ConfigParcelamento
 from trato.pagamentos.provedor import TipoEvento
-from trato.pagamentos.taxa import ConfigTaxa
 from trato.pedidos.estados import Estado, Pedido
 
 
@@ -50,7 +49,6 @@ def test_fotos_do_pedido_aberto_para_cliente_e_profissional(e2, amb):
 
 def test_cupom_no_checkout_e_parcelamento(fluxo: Fluxo):
     fluxo.servico.config = lambda: ConfigPagamento(
-        ConfigTaxa(750, 500),
         50_000,
         parcelamento=ConfigParcelamento({2: 300, 3: 450}),
     )

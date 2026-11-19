@@ -1,4 +1,4 @@
-"""Custo do meio de pagamento (Stripe) e margem do Trato (decisão D4, tarefa F4.3).
+"""Custo do meio de pagamento (Stripe) (decisão D4, tarefa F4.3).
 
 Regras:
 - Tudo em ``int`` de centavos. Percentuais em pontos-base (bps): 3,99% = 399. Sem ``float``.
@@ -8,10 +8,7 @@ Regras:
   ``custo_percentual = (valor * bps + 5000) // 10000``. A parte fixa em centavos é somada depois.
   O adicional de parcelamento (bps) soma ao percentual do cartão *antes* de arredondar.
 - O custo é calculado sobre o valor cobrado do cliente.
-- A taxa do Trato entra já calculada (a progressiva depende de P2).
-- Premissa (a confirmar em P3): o profissional recebe ``valor - taxa_trato`` e o custo do
-  Stripe sai da taxa do Trato. Logo, ``margem_trato = taxa_trato - custo_stripe`` e pode ser
-  negativa (é exatamente o alerta de margem que a decisão D4 pede).
+- O Trato é gratuito (sem taxa): o custo do Pix e do cartão à vista é do Trato.
 """
 
 from __future__ import annotations
@@ -58,15 +55,6 @@ class ConfigCustoPagamento:
         object.__setattr__(self, "adicional_parcelamento_bps", MappingProxyType(adicional))
 
 
-@dataclass(frozen=True)
-class ResultadoCusto:
-    valor_centavos: int
-    custo_stripe_centavos: int
-    taxa_trato_centavos: int
-    liquido_profissional_centavos: int
-    margem_trato_centavos: int
-
-
 def _percentual_half_up(valor_centavos: int, bps: int) -> int:
     return (valor_centavos * bps + BPS_TOTAL // 2) // BPS_TOTAL
 
@@ -106,22 +94,10 @@ def calcular_custo_stripe(
     return _percentual_half_up(valor_centavos, bps) + taxa.fixo_centavos
 
 
-def calcular_margem(
-    valor_centavos: int,
-    meio: MeioPagamento,
-    taxa_trato_centavos: int,
-    config: ConfigCustoPagamento,
-    parcelas: int = 1,
-) -> ResultadoCusto:
-    """Custo do Stripe, líquido do profissional e quanto sobra para o Trato."""
-    custo = calcular_custo_stripe(valor_centavos, meio, config, parcelas)
-    _exigir_inteiro(taxa_trato_centavos, "taxa_trato_centavos")
-    if not 0 <= taxa_trato_centavos <= valor_centavos:
-        raise ValueError("taxa do Trato deve estar entre 0 e o valor")
-    return ResultadoCusto(
-        valor_centavos=valor_centavos,
-        custo_stripe_centavos=custo,
-        taxa_trato_centavos=taxa_trato_centavos,
-        liquido_profissional_centavos=valor_centavos - taxa_trato_centavos,
-        margem_trato_centavos=taxa_trato_centavos - custo,
-    )
+# ESTIMATIVAS (P7), até haver proposta comercial: Pix 1,19%; cartão 3,99% + R$ 0,39; adicional de
+# parcelamento chutado. Só alimentam a estimativa de custo mostrada ao profissional.
+CUSTO_PROVEDOR_ESTIMADO = ConfigCustoPagamento(
+    pix=TaxaMeio(percentual_bps=119),
+    cartao=TaxaMeio(percentual_bps=399, fixo_centavos=39),
+    adicional_parcelamento_bps={3: 150, 6: 300},
+)

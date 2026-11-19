@@ -32,14 +32,12 @@ from trato.pagamentos.modelos import (
     EstadoAditivo,
     EstadoCobranca,
     OrdemEstorno,
-    TermosContrato,
 )
 from trato.pagamentos.parcelamento import ConfigParcelamento
-from trato.pagamentos.taxa import ConfigTaxa
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import parametros_globais, versao_vigente
-from trato.persistencia.erros import ConfigNaoPublicada, NaoEncontrado
+from trato.persistencia.erros import NaoEncontrado
 
 _MEIO_PARA_BANCO = {MeioPagamento.PIX: "pix", MeioPagamento.CARTAO: "cartao_credito"}
 _STATUS_PARA_BANCO = {
@@ -386,24 +384,11 @@ class OrdensEstornoPostgres:
         return [self._ordem(linha) for linha in linhas]
 
 
-class TermosPostgres:
-    """Os termos do contrato JÁ moram no contrato (`taxa_bps_aplicada` e `regras_aplicadas`,
-    gravados no aceite com a configuração do momento). Por isso `salvar` não escreve nada e `obter`
-    devolve None: o serviço cai na taxa congelada do contrato (`taxa_congelada`), mesma fonte."""
-
-    def obter(self, pedido_id: str) -> TermosContrato | None:
-        return None
-
-    def salvar(self, termos: TermosContrato) -> None:
-        return None
-
-
 class ConfigPagamentoPostgres:
     """`ConfigPagamento` lida da versão VIGENTE da configuração, a cada chamada.
 
-    A taxa do ACEITE já fica congelada no contrato; esta só vale como referência (menor faixa e
-    o mínimo). `alcada_disputa_centavos` vem do parâmetro de mesmo nome; sem ele, 0 (toda decisão
-    de disputa pede segunda pessoa: o lado seguro)."""
+    `alcada_disputa_centavos` vem do parâmetro de mesmo nome; sem ele, 0 (toda decisão de disputa
+    pede segunda pessoa: o lado seguro)."""
 
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
@@ -412,14 +397,6 @@ class ConfigPagamentoPostgres:
         with self._banco.transacao() as con:
             versao = versao_vigente(con)
             parametros = parametros_globais(con, versao)
-            faixa = con.execute(
-                "select taxa_bps from public.config_faixas_taxa where versao_id = %s "
-                "and escopo_tipo = 'global' order by de_centavos limit 1",
-                (versao,),
-            ).fetchone()
-        if faixa is None:
-            raise ConfigNaoPublicada("As faixas de taxa (P2) ainda não foram publicadas.")
-        taxa = ConfigTaxa(int(faixa["taxa_bps"]), parametros.get("taxa_minima_centavos", 0))
         # Custo do parcelado repassado ao cliente: parâmetros opcionais
         # `custo_parcelamento_<N>x_bps` (N de 2 a 12), do provedor. Nenhum cadastrado = parcelado
         # desligado (João, 31/10/2026).
@@ -429,7 +406,6 @@ class ConfigPagamentoPostgres:
             if (chave := f"custo_parcelamento_{n}x_bps") in parametros
         }
         return ConfigPagamento(
-            taxa,
             parametros.get("alcada_disputa_centavos", 0),
             parcelamento=ConfigParcelamento(custos),
         )
@@ -440,5 +416,4 @@ __all__ = [
     "CobrancasPostgres",
     "ConfigPagamentoPostgres",
     "OrdensEstornoPostgres",
-    "TermosPostgres",
 ]
