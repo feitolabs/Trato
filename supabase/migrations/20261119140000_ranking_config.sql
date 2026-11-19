@@ -1,7 +1,7 @@
 -- Ranking de profissionais na busca: pesos da nota composta e da média ponderada.
 -- Linha única. Só o backend (service_role) lê e escreve; RLS ligada e sem policy para o app.
 -- A conta fica em backend/src/trato/profissional/ranking.py; aqui só os números.
--- NÃO APLICADA: precisa do OK do João. Rollback em supabase/rollback/.
+-- APLICADA no Supabase Trato em 2026-11-19 com o OK do João. Rollback em supabase/rollback/.
 
 begin;
 
