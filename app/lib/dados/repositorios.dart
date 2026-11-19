@@ -227,6 +227,15 @@ abstract interface class RepositorioPagamento {
   Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async =>
       throw UnimplementedError();
 
+  /// Recalcula o resumo com cupom e/ou moedas (`GET /v1/pedidos/{id}/pagamento`). Quem decide
+  /// quantas moedas entram é o backend.
+  Future<DadosPagamento> recalcular(
+    String pedidoId, {
+    String? cupom,
+    bool usarMoedas = false,
+  }) async =>
+      throw UnimplementedError();
+
   /// Cria a cobrança (modo teste). O app NUNCA marca como pago: só o backend, depois do
   /// webhook assinado do provedor (D14/D15).
   Future<Cobranca> criarCobranca(
@@ -234,6 +243,7 @@ abstract interface class RepositorioPagamento {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   });
 
   Future<StatusPagamento> status(String pedidoId);

@@ -24,6 +24,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
+from trato.api.moedas import calcular_uso_moedas
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
@@ -218,6 +219,10 @@ class CobrarContratoIn(_Entrada):
     )
     cupom: str | None = Field(
         default=None, max_length=30, description="Código de cupom de desconto opcional."
+    )
+    usar_moedas: bool = Field(
+        default=False,
+        description="Usa moedas do Trato como desconto. O backend escolhe quantas (nunca o app).",
     )
 
 
@@ -431,6 +436,18 @@ def criar_cobranca(
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from None
         valor_servico = aplicado.servico_com_desconto_centavos
+    desconto_total = aplicado.desconto_centavos if aplicado else 0
+    moedas_usadas = 0
+    if corpo.usar_moedas:
+        uso = calcular_uso_moedas(
+            contexto.moedas,
+            usuario_id=usuario.id,
+            servico_centavos=valor_servico,
+            agora=contexto.agora(),
+        )
+        moedas_usadas = uso.moedas
+        valor_servico -= uso.desconto_centavos
+        desconto_total += uso.desconto_centavos
     preparo = None
     if corpo.meio is MeioPagamento.CARTAO and hasattr(servico.provedor, "preparar_cartao"):
         try:
@@ -447,7 +464,8 @@ def criar_cobranca(
         parcelas=corpo.parcelas,
         cliente_externo=preparo.cliente_id if preparo else None,
         cupom_codigo=aplicado.codigo if aplicado else None,
-        desconto_centavos=aplicado.desconto_centavos if aplicado else 0,
+        desconto_centavos=desconto_total,
+        moedas_usadas=moedas_usadas,
     )
     saida = _cobranca_out(pedido.id, cobranca)
     if preparo is not None:

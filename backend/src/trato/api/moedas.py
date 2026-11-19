@@ -21,6 +21,7 @@ class ConfigMoedas:
     teto_mensal_moedas: int = 500
     min_servico_centavos: int = 5000
     max_bonus_por_profissional_mes: int = 1
+    max_desconto_percentual: int = 20
     validade_dias: int | None = None
 
 
@@ -48,6 +49,8 @@ class RepositorioMoedas(Protocol):
     def saldo(self, usuario_id: str, agora: datetime) -> int: ...
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int: ...
+
+    def existe(self, chave_idempotencia: str) -> bool: ...
 
     def bonus_do_par(self, usuario_id: str, parceiro_id: str, desde: datetime) -> int: ...
 
@@ -85,6 +88,9 @@ class MoedasEmMemoria:
             if i.usuario_id == usuario_id and i.tipo == tipo and i.criada_em >= desde
         )
 
+    def existe(self, chave_idempotencia: str) -> bool:
+        return chave_idempotencia in self._itens
+
     def bonus_do_par(self, usuario_id: str, parceiro_id: str, desde: datetime) -> int:
         return sum(
             1
@@ -109,7 +115,7 @@ class MoedasPostgres:
             l = con.execute(  # noqa: E741
                 "select ativo, bonus_avaliacao_moedas, valor_moeda_centavos, "
                 "teto_mensal_moedas, min_servico_centavos, max_bonus_por_profissional_mes, "
-                "validade_dias from public.moedas_config where id"
+                "max_desconto_percentual, validade_dias from public.moedas_config where id"
             ).fetchone()
         if l is None:
             return ConfigMoedas()
@@ -120,6 +126,7 @@ class MoedasPostgres:
             teto_mensal_moedas=int(l["teto_mensal_moedas"]),
             min_servico_centavos=int(l["min_servico_centavos"]),
             max_bonus_por_profissional_mes=int(l["max_bonus_por_profissional_mes"]),
+            max_desconto_percentual=int(l["max_desconto_percentual"]),
             validade_dias=l["validade_dias"],
         )
 
@@ -128,7 +135,8 @@ class MoedasPostgres:
             con.execute(
                 "update public.moedas_config set ativo = %s, bonus_avaliacao_moedas = %s, "
                 "valor_moeda_centavos = %s, teto_mensal_moedas = %s, min_servico_centavos = %s, "
-                "max_bonus_por_profissional_mes = %s, validade_dias = %s, atualizado_em = now() "
+                "max_bonus_por_profissional_mes = %s, max_desconto_percentual = %s, "
+                "validade_dias = %s, atualizado_em = now() "
                 "where id",
                 (
                     config.ativo,
@@ -137,6 +145,7 @@ class MoedasPostgres:
                     config.teto_mensal_moedas,
                     config.min_servico_centavos,
                     config.max_bonus_por_profissional_mes,
+                    config.max_desconto_percentual,
                     config.validade_dias,
                 ),
             )
@@ -187,6 +196,14 @@ class MoedasPostgres:
                 (uid, tipo, desde),
             ).fetchone()
         return int(l["total"])
+
+    def existe(self, chave_idempotencia: str) -> bool:
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select 1 from public.moedas_lancamentos where chave_idempotencia = %s",
+                (chave_idempotencia,),
+            ).fetchone()
+        return l is not None
 
     def bonus_do_par(self, usuario_id: str, parceiro_id: str, desde: datetime) -> int:
         uid, pid = como_uuid(usuario_id), como_uuid(parceiro_id)
@@ -269,3 +286,87 @@ def conceder_bonus_avaliacao(
         )
     )
     return quantidade if gravou else 0
+
+
+@dataclass(frozen=True)
+class UsoMoedas:
+    moedas: int
+    desconto_centavos: int
+
+
+def calcular_uso_moedas(
+    repo: RepositorioMoedas, *, usuario_id: str, servico_centavos: int, agora: datetime
+) -> UsoMoedas:
+    """Quantas moedas o cliente pode usar neste serviço e o desconto que isso dá.
+
+    Usa o que for MENOR entre o saldo e o teto por serviço (percentual do valor, em tabela). O
+    desconto nunca zera o serviço (sobra pelo menos R$ 1,00). Sem moedas ou recurso desligado:
+    `UsoMoedas(0, 0)`.
+    """
+    nada = UsoMoedas(0, 0)
+    cfg = repo.config()
+    if not cfg.ativo or cfg.valor_moeda_centavos <= 0 or servico_centavos <= 100:
+        return nada
+    saldo = repo.saldo(usuario_id, agora)
+    if saldo <= 0:
+        return nada
+    teto_centavos = min(
+        servico_centavos * cfg.max_desconto_percentual // 100, servico_centavos - 100
+    )
+    por_servico = teto_centavos // cfg.valor_moeda_centavos
+    moedas = min(saldo, por_servico)
+    if moedas <= 0:
+        return nada
+    return UsoMoedas(moedas, moedas * cfg.valor_moeda_centavos)
+
+
+def debitar_uso_moedas(
+    repo: RepositorioMoedas,
+    *,
+    usuario_id: str,
+    cobranca_id: str,
+    pedido_id: str,
+    moedas: int,
+    agora: datetime,
+) -> bool:
+    """Debita as moedas de uma cobrança paga. Idempotente por cobrança (`uso:<cobrança>`)."""
+    if moedas <= 0:
+        return False
+    return repo.lancar(
+        LancamentoMoeda(
+            usuario_id=usuario_id,
+            tipo="uso",
+            quantidade=-moedas,
+            chave_idempotencia=f"uso:{cobranca_id}",
+            criada_em=agora,
+            referencia_id=pedido_id,
+        )
+    )
+
+
+def devolver_uso_moedas(
+    repo: RepositorioMoedas,
+    *,
+    usuario_id: str,
+    cobranca_id: str,
+    pedido_id: str,
+    moedas: int,
+    agora: datetime,
+) -> bool:
+    """Devolve as moedas de uma cobrança estornada por inteiro. Idempotente por cobrança.
+
+    Só devolve se o débito (`uso:<cobrança>`) existiu: sem débito não há o que devolver.
+    """
+    if moedas <= 0 or not repo.existe(f"uso:{cobranca_id}"):
+        return False
+    return repo.lancar(
+        LancamentoMoeda(
+            usuario_id=usuario_id,
+            tipo="estorno",
+            quantidade=moedas,
+            chave_idempotencia=f"estorno-uso:{cobranca_id}",
+            criada_em=agora,
+            referencia_id=pedido_id,
+        )
+    )
+

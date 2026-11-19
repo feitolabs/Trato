@@ -23,7 +23,7 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
-from trato.api.moedas import conceder_bonus_avaliacao
+from trato.api.moedas import calcular_uso_moedas, conceder_bonus_avaliacao
 from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
@@ -138,6 +138,9 @@ class PagamentoValoresOut(BaseModel):
     cobranca_pendente_id: str | None = None
     desconto_centavos: int = 0
     cupom_codigo: str | None = None
+    moedas_usadas: int = Field(0, description="Moedas que serão usadas (já no desconto).")
+    moedas_saldo: int = Field(0, description="Saldo de moedas do cliente.")
+    moedas_desconto_centavos: int = Field(0, description="Parte do desconto que vem das moedas.")
 
 
 class MensagemOut(BaseModel):
@@ -570,6 +573,7 @@ def valores_do_pagamento(
     pedido_id: str,
     request: Request,
     cupom: Annotated[str | None, Query(max_length=30)] = None,
+    usar_moedas: bool = False,
     usuario: Usuario = Depends(
         exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL, PapelUsuario.EQUIPE)
     ),
@@ -601,6 +605,8 @@ def valores_do_pagamento(
     total = None
     desconto_centavos = 0
     cupom_codigo: str | None = None
+    moedas_usadas = 0
+    moedas_desconto = 0
     opcoes: list[OpcaoParcelamentoOut] = []
     if contrato is not None and servico is not None:
         base_centavos = contrato.valor_centavos
@@ -614,6 +620,17 @@ def valores_do_pagamento(
             base_centavos = aplicado.servico_com_desconto_centavos
             desconto_centavos = aplicado.desconto_centavos
             cupom_codigo = aplicado.codigo
+        if usar_moedas and pedido.cliente_id == usuario.id:
+            uso = calcular_uso_moedas(
+                contexto.moedas,
+                usuario_id=usuario.id,
+                servico_centavos=base_centavos,
+                agora=contexto.agora(),
+            )
+            moedas_usadas = uso.moedas
+            moedas_desconto = uso.desconto_centavos
+            base_centavos -= uso.desconto_centavos
+            desconto_centavos += uso.desconto_centavos
         conta = servico.total_a_cobrar(contexto, pedido, base_centavos)
         total = conta.cobrado_centavos
         opcoes = [
@@ -631,6 +648,13 @@ def valores_do_pagamento(
         cobranca_pendente_id=pendente,
         desconto_centavos=desconto_centavos,
         cupom_codigo=cupom_codigo,
+        moedas_usadas=moedas_usadas,
+        moedas_desconto_centavos=moedas_desconto,
+        moedas_saldo=(
+            contexto.moedas.saldo(usuario.id, contexto.agora())
+            if pedido.cliente_id == usuario.id
+            else 0
+        ),
     )
 
 

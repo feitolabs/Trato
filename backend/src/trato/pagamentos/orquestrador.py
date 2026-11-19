@@ -24,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from trato.api.contexto import Contexto
+from trato.api.moedas import debitar_uso_moedas, devolver_uso_moedas
 from trato.api.repositorios import EventoWebhook
 from trato.api.webhook_pagamento import EventoForaDeOrdem  # a rota do webhook responde 409
 from trato.financeiro.contestacoes import (
@@ -165,6 +166,7 @@ class ServicoPagamento:
         cliente_externo: str | None = None,
         cupom_codigo: str | None = None,
         desconto_centavos: int = 0,
+        moedas_usadas: int = 0,
     ) -> CobrancaLocal:
         """Cria (ou devolve a pendente) a cobrança do pedido ou de um aditivo.
 
@@ -176,7 +178,8 @@ class ServicoPagamento:
         if parcelas > 1 and meio is not MeioPagamento.CARTAO:
             raise ErroFluxo("Só o cartão pode ser parcelado.", 422)
         cupom_norm = cupom_codigo.strip().upper() if cupom_codigo and cupom_codigo.strip() else None
-        desconto = max(0, int(desconto_centavos)) if cupom_norm else 0
+        moedas = max(0, int(moedas_usadas))
+        desconto = max(0, int(desconto_centavos)) if (cupom_norm or moedas) else 0
         antigas = [c for c in self.cobrancas.do_pedido(pedido.id) if c.aditivo_id == aditivo_id]
         for antiga in antigas:
             if antiga.status is EstadoCobranca.PAGA:
@@ -189,6 +192,7 @@ class ServicoPagamento:
                     and antiga.parcelas == parcelas
                     and antiga.valor_centavos == total.cobrado_centavos
                     and (antiga.cupom_codigo or None) == cupom_norm
+                    and antiga.moedas_usadas == moedas
                 ):
                     return antiga
                 self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
@@ -197,7 +201,7 @@ class ServicoPagamento:
         # used with the same parameters").
         assinatura = hashlib.sha256(
             f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}|"
-            f"{cupom_norm or ''}".encode()
+            f"{cupom_norm or ''}|{moedas}".encode()
         ).hexdigest()[:10]
         chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}/{assinatura}"
         metadados = {"pedido_id": pedido.id}
@@ -205,6 +209,8 @@ class ServicoPagamento:
             metadados["aditivo_id"] = aditivo_id
         if cupom_norm:
             metadados["cupom"] = cupom_norm
+        if moedas:
+            metadados["moedas"] = str(moedas)
         criada = self.provedor.criar_cobranca(
             valor_centavos=total.cobrado_centavos,
             meio=meio,
@@ -226,6 +232,7 @@ class ServicoPagamento:
             servico_centavos=servico_centavos,
             cupom_codigo=cupom_norm,
             desconto_centavos=desconto,
+            moedas_usadas=moedas,
         )
         self.cobrancas.salvar(local)
         return local
@@ -363,6 +370,15 @@ class ServicoPagamento:
         if novos:
             contexto.ledger.lancar_varios(novos)
         self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.PAGA, pago_em=agora))
+        if cobranca.moedas_usadas > 0 and pedido is not None:
+            debitar_uso_moedas(
+                contexto.moedas,
+                usuario_id=pedido.cliente_id,
+                cobranca_id=cobranca.id,
+                pedido_id=cobranca.pedido_id,
+                moedas=cobranca.moedas_usadas,
+                agora=agora,
+            )
         if cobranca.cupom_codigo:
             confirmar_uso_cupom(
                 contexto,
@@ -430,7 +446,9 @@ class ServicoPagamento:
         situacao = (
             EstadoCobranca.DEVOLVIDA if devolvido >= cobranca.valor_centavos else cobranca.status
         )
-        self.cobrancas.salvar(replace(cobranca, estornado_centavos=devolvido, status=situacao))
+        depois = replace(cobranca, estornado_centavos=devolvido, status=situacao)
+        self.cobrancas.salvar(depois)
+        self._devolver_moedas(contexto, depois)
         contexto.eventos_webhook.marcar_revisao(bruto, f"{motivo}; conciliado no ledger")
 
     def _liquidacao(self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook) -> None:
@@ -559,7 +577,9 @@ class ServicoPagamento:
         situacao = (
             EstadoCobranca.DEVOLVIDA if devolvido >= cobranca.valor_centavos else cobranca.status
         )
-        self.cobrancas.salvar(replace(cobranca, estornado_centavos=devolvido, status=situacao))
+        depois = replace(cobranca, estornado_centavos=devolvido, status=situacao)
+        self.cobrancas.salvar(depois)
+        self._devolver_moedas(contexto, depois)
 
     def _repasse_falhou(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
@@ -696,12 +716,29 @@ class ServicoPagamento:
             for cobranca, ordem in ordens:
                 self.cobrancas.salvar(cobranca)
                 self.ordens.salvar(ordem)
+                self._devolver_moedas(contexto, cobranca)
             if repartir:
                 repasse = repasse_dos_lancamentos(
                     pedido.id, profissional, novos, gatilho, f"{chave}/repasse"
                 )
                 if repasse is not None:
                     contexto.repasses.criar(repasse)
+
+    def _devolver_moedas(self, contexto: Contexto, cobranca: CobrancaLocal) -> None:
+        """Estorno TOTAL da cobrança devolve as moedas que ela usou (parcial não devolve)."""
+        if cobranca.moedas_usadas <= 0 or cobranca.estornado_centavos < cobranca.valor_centavos:
+            return
+        pedido = contexto.pedidos.obter(cobranca.pedido_id)
+        if pedido is None:
+            return
+        devolver_uso_moedas(
+            contexto.moedas,
+            usuario_id=pedido.cliente_id,
+            cobranca_id=cobranca.id,
+            pedido_id=cobranca.pedido_id,
+            moedas=cobranca.moedas_usadas,
+            agora=contexto.agora(),
+        )
 
     def _ordens_de_estorno(
         self, pedido_id: str, valor: int, chave: str, agora

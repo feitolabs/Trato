@@ -80,7 +80,7 @@ def _contrato_do_pedido(con: psycopg.Connection[Any], pedido_id: str) -> dict[st
 _SELECT_COBRANCA = (
     "select p.stripe_payment_intent_id, c.pedido_id, p.aditivo_id, p.valor_centavos, p.meio, "
     "p.parcelas, p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos, "
-    "p.cupom_codigo, p.desconto_centavos "
+    "p.cupom_codigo, p.desconto_centavos, p.moedas_usadas "
     "from public.pagamentos p join public.contratos c on c.id = p.contrato_id "
 )
 
@@ -101,6 +101,7 @@ def _cobranca(linha: dict[str, Any]) -> CobrancaLocal:
         parcelas=int(linha.get("parcelas") or 1),
         cupom_codigo=linha.get("cupom_codigo"),
         desconto_centavos=int(linha.get("desconto_centavos") or 0),
+        moedas_usadas=int(linha.get("moedas_usadas") or 0),
     )
 
 
@@ -130,6 +131,7 @@ class CobrancasPostgres:
             servico_centavos=servico_centavos,
             cupom_codigo=base.cupom_codigo,
             desconto_centavos=base.desconto_centavos,
+            moedas_usadas=base.moedas_usadas,
         )
 
     def obter(self, cobranca_id: str) -> CobrancaLocal | None:
@@ -190,8 +192,8 @@ class CobrancasPostgres:
                 "insert into public.pagamentos (contrato_id, pagador_id, tipo, aditivo_id, meio, "
                 "parcelas, valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
                 "confirmado_em, estornado_centavos, instrucao, cupom_codigo, desconto_centavos, "
-                "criado_em) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "moedas_usadas, criado_em) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     contrato["id"],
                     contrato["cliente_id"],
@@ -208,6 +210,7 @@ class CobrancasPostgres:
                     cobranca.instrucao,
                     cobranca.cupom_codigo,
                     cobranca.desconto_centavos,
+                    cobranca.moedas_usadas,
                     cobranca.criada_em,
                 ),
             )

@@ -24,6 +24,7 @@ class ConfigMoedasOut(BaseModel):
     teto_mensal_moedas: int
     min_servico_centavos: int
     max_bonus_por_profissional_mes: int
+    max_desconto_percentual: int
     validade_dias: int | None
 
 
@@ -36,6 +37,7 @@ class ConfigMoedasIn(BaseModel):
     teto_mensal_moedas: int = Field(ge=0, le=1_000_000)
     min_servico_centavos: int = Field(ge=0, le=100_000_000)
     max_bonus_por_profissional_mes: int = Field(ge=0, le=100)
+    max_desconto_percentual: int = Field(ge=0, le=100)
     validade_dias: int | None = Field(default=None, gt=0, le=3650)
     motivo: str = Field(min_length=10, max_length=500)
 

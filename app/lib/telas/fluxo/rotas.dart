@@ -2237,11 +2237,18 @@ abstract final class RotasTrato {
 
   static Widget _pagamento(String pedidoId) {
     var iniciandoPagamento = false;
+    var usarMoedas = false; // o que o cliente escolheu; quantas moedas entram, o backend decide
     return Carregador<DadosPagamento>(
       carregar: () => repos.pagamento.dados(pedidoId),
       construir: (context, dados) => PagamentoTela(
         dados: dados,
-        aoAplicarCupom: (codigo) => repos.pagamento.aplicarCupom(pedidoId, codigo),
+        aoAplicarCupom: (codigo) => usarMoedas
+            ? repos.pagamento.recalcular(pedidoId, cupom: codigo, usarMoedas: true)
+            : repos.pagamento.aplicarCupom(pedidoId, codigo),
+        aoAlternarMoedas: (usar, cupom) {
+          usarMoedas = usar;
+          return repos.pagamento.recalcular(pedidoId, cupom: cupom, usarMoedas: usar);
+        },
         aoPagarDetalhado: (metodo, parcelas, cupom) async {
           if (iniciandoPagamento) return;
           iniciandoPagamento = true;
@@ -2254,6 +2261,7 @@ abstract final class RotasTrato {
                 metodo,
                 parcelas: parcelas,
                 cupom: cupom,
+                usarMoedas: usarMoedas,
               ),
             );
             if (!ok || !context.mounted) return;
