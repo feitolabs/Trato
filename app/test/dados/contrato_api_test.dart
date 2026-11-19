@@ -221,6 +221,30 @@ void main() {
       expect(c.pixCopiaECola, '00020126-codigo');
     });
 
+    test('com moedas: manda usar_moedas e a chave de idempotência muda', () async {
+      final (api, chamadas) = _api({
+        'POST /v1/contratos/ab12cd34/cobranca': (
+          201,
+          {
+            'contrato_id': 'ab12cd34',
+            'cobranca_id': 'cb9',
+            'estado_pagamento': 'aguardando_confirmacao',
+            'meio': 'pix',
+            'valor_centavos': 41000,
+            'tipo_instrucao': 'pix_copia_e_cola',
+            'instrucao': '00020126-codigo',
+            'criada_em': '2026-10-29T12:00:00Z',
+          },
+        ),
+      });
+
+      await RepositorioPagamentoApi(api)
+          .criarCobranca('ab12cd34', MetodoPagamento.pix, usarMoedas: true);
+
+      expect(chamadas.single.corpo, {'meio': 'pix', 'usar_moedas': true});
+      expect(chamadas.single.idem, 'cobranca-ab12cd34-pix-moedas');
+    });
+
     test('cartão: o segredo do SDK nunca vira texto de tela', () async {
       final (api, _) = _api({
         'POST /v1/contratos/ab12cd34/cobranca': (

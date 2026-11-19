@@ -50,6 +50,8 @@ class CobrancaLocal:
     servico_centavos: int | None = None
     cupom_codigo: str | None = None
     desconto_centavos: int = 0
+    # Moedas do Trato usadas nesta cobrança (o desconto delas já está em `desconto_centavos`).
+    moedas_usadas: int = 0
 
 
 @dataclass(frozen=True)

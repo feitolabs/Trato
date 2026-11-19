@@ -93,6 +93,7 @@ def test_moedas_config_ver_e_alterar(painel):
         "teto_mensal_moedas": 300,
         "min_servico_centavos": 8000,
         "max_bonus_por_profissional_mes": 1,
+        "max_desconto_percentual": 20,
         "validade_dias": None,
         "motivo": "Teste de ligar as moedas",
     }

@@ -1022,6 +1022,9 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
       descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
       cupomCodigo: j['cupom_codigo'] as String?,
+      moedasSaldo: (j['moedas_saldo'] as num?)?.toInt() ?? 0,
+      moedasUsadas: (j['moedas_usadas'] as num?)?.toInt() ?? 0,
+      moedasDescontoCentavos: (j['moedas_desconto_centavos'] as num?)?.toInt() ?? 0,
       parcelamento: [
         for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
           OpcaoParcelamento(
@@ -1053,6 +1056,25 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
   Future<DadosPagamento> dados(String pedidoId) async =>
       _dadosDeMapa(pedidoId, _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento')));
 
+  @override
+  Future<DadosPagamento> recalcular(
+    String pedidoId, {
+    String? cupom,
+    bool usarMoedas = false,
+  }) async {
+    final limpo = (cupom ?? '').trim();
+    return _dadosDeMapa(
+      pedidoId,
+      _mapa(await _api.get(
+        '/v1/pedidos/$pedidoId/pagamento',
+        consulta: {
+          if (limpo.isNotEmpty) 'cupom': limpo,
+          if (usarMoedas) 'usar_moedas': 'true',
+        },
+      )),
+    );
+  }
+
   /// `POST /v1/contratos/{id}/cupom` `{codigo}`: valida e calcula desconto no servidor.
   @override
   Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async {
@@ -1074,11 +1096,13 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   }) async {
     final meio = metodo == MetodoPagamento.pix ? 'pix' : 'cartao';
     final cupomLimpo = (cupom ?? '').trim();
     final sufixoParcela = metodo == MetodoPagamento.cartao && parcelas > 1 ? '-${parcelas}x' : '';
-    final sufixoCupom = cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}';
+    final sufixoCupom = (cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}') +
+        (usarMoedas ? '-moedas' : '');
     final j = _mapa(
       await _api.post(
         '/v1/contratos/$pedidoId/cobranca',
@@ -1086,6 +1110,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           'meio': meio,
           if (metodo == MetodoPagamento.cartao && parcelas > 1) 'parcelas': parcelas,
           if (cupomLimpo.isNotEmpty) 'cupom': cupomLimpo,
+          if (usarMoedas) 'usar_moedas': true,
         },
         chaveIdempotencia: 'cobranca-$pedidoId-$meio$sufixoParcela$sufixoCupom',
       ),

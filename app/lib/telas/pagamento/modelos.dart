@@ -36,6 +36,9 @@ class DadosPagamento {
     this.parcelamento = const [],
     this.descontoCentavos = 0,
     this.cupomCodigo,
+    this.moedasSaldo = 0,
+    this.moedasUsadas = 0,
+    this.moedasDescontoCentavos = 0,
   });
 
   /// Total por número de parcelas no cartão. Vazio enquanto o parcelado estiver desligado.
@@ -53,6 +56,12 @@ class DadosPagamento {
   /// Código de cupom aceito e aplicado neste cálculo.
   final String? cupomCodigo;
 
+  /// Moedas do Trato: saldo do cliente, quantas entram neste cálculo e o desconto delas. Tudo
+  /// vem pronto do backend; o app só mostra.
+  final int moedasSaldo;
+  final int moedasUsadas;
+  final int moedasDescontoCentavos;
+
   /// Texto opcional sob o valor, ex.: "Adiantamento de 30%". Null = não mostra.
   final String? rotuloValor;
   final List<OpcaoPagamento> opcoes;
@@ -63,6 +72,9 @@ class DadosPagamento {
     List<OpcaoParcelamento>? parcelamento,
     int? descontoCentavos,
     String? cupomCodigo,
+    int? moedasSaldo,
+    int? moedasUsadas,
+    int? moedasDescontoCentavos,
     String? rotuloValor,
     List<OpcaoPagamento>? opcoes,
   }) =>
@@ -72,6 +84,9 @@ class DadosPagamento {
         parcelamento: parcelamento ?? this.parcelamento,
         descontoCentavos: descontoCentavos ?? this.descontoCentavos,
         cupomCodigo: cupomCodigo ?? this.cupomCodigo,
+        moedasSaldo: moedasSaldo ?? this.moedasSaldo,
+        moedasUsadas: moedasUsadas ?? this.moedasUsadas,
+        moedasDescontoCentavos: moedasDescontoCentavos ?? this.moedasDescontoCentavos,
         rotuloValor: rotuloValor ?? this.rotuloValor,
         opcoes: opcoes ?? this.opcoes,
       );

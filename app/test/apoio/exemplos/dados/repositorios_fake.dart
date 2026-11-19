@@ -193,6 +193,24 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
   @override
   Future<DadosPagamento> dados(String pedidoId) async => pag.DadosExemplo.pagamento;
 
+  /// Simula o backend: com moedas, 5.000 centavos de desconto (limite do exemplo).
+  @override
+  Future<DadosPagamento> recalcular(
+    String pedidoId, {
+    String? cupom,
+    bool usarMoedas = false,
+  }) async {
+    final base = (cupom ?? '').isEmpty ? pag.DadosExemplo.pagamento : await aplicarCupom(pedidoId, cupom!);
+    if (!usarMoedas) return base.copiarCom(moedasSaldo: 5000);
+    return base.copiarCom(
+      valorAgoraCentavos: base.valorAgoraCentavos - 5000,
+      descontoCentavos: base.descontoCentavos + 5000,
+      moedasSaldo: 5000,
+      moedasUsadas: 5000,
+      moedasDescontoCentavos: 5000,
+    );
+  }
+
   @override
   Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async {
     final limpo = codigo.trim().toUpperCase();
@@ -225,6 +243,7 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   }) async {
     cobrancas.add(metodo);
     cobrancasDetalhadas.add((metodo, parcelas, cupom));

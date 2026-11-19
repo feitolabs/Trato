@@ -1057,3 +1057,13 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - **Backend:** `api/moedas.py` (config, lançamentos imutáveis, saldo, idempotência `avaliacao:<pedido>`, teto mensal, validade opcional). `POST /v1/pedidos/{id}/avaliacao` devolve `moedas_ganhas` (só cliente avaliando o profissional; falha de moeda nunca derruba a avaliação). `GET /v1/me/moedas` devolve saldo, valor da moeda e extrato. Desligado por padrão (`moedas_config.ativo = false`).
 - **Migration APLICADA no Supabase em 2026-11-18 (OK do João), ativo=false:** `supabase/migrations/20261118150000_moedas_gamificacao.sql` (+ rollback). Falta ligar `ativo` na configuração.
 - **Testes:** `tests/api/test_moedas.py` (6). Falta: app (tela de avaliação "+X moedas" e saldo na carteira), painel admin (configurar valores), usar moedas como desconto, indicação e conquistas.
+
+## 2026-11-19 — Gamificação, fase 2: usar moedas como desconto (branch `feature/moedas-desconto`)
+
+- **Regra (backend, `api/moedas.py`):** `calcular_uso_moedas` usa o MENOR entre o saldo e o teto por serviço (`max_desconto_percentual`, padrão 20%); nunca zera o serviço (sobra R$ 1,00). O cliente só liga/desliga; quantas moedas entram o backend decide.
+- **Pagamento:** o desconto das moedas entra em `desconto_centavos` (mesmo campo do cupom) e `moedas_usadas` guarda quantas foram. `GET /v1/pedidos/{id}/pagamento?usar_moedas=true` simula; `POST /v1/contratos/{id}/cobranca {usar_moedas}` cobra com desconto.
+- **Débito e estorno:** debita SÓ na confirmação do pagamento (webhook), idempotente `uso:<cobrança>`. Estorno TOTAL devolve (`estorno-uso:<cobrança>`); parcial não devolve.
+- **Limite conhecido:** o saldo é checado ao criar a cobrança e debitado na confirmação. Dois pagamentos pendentes ao mesmo tempo podem deixar o saldo negativo; o saldo negativo bloqueia novos usos e é abatido pelos próximos bônus.
+- **Migration escrita, NÃO aplicada:** `20261119120000_moedas_desconto.sql` (+ rollback): `moedas_config.max_desconto_percentual` e `pagamentos.moedas_usadas`. **O backend desta branch exige essa migration antes do deploy.**
+- **App:** interruptor "Usar minhas moedas" na tela de pagamento (mostra o desconto que o backend calculou).
+- **Testes:** `tests/api/test_moedas_desconto.py` (8), `test/pagamento_moedas_test.dart` e teste de API do app.

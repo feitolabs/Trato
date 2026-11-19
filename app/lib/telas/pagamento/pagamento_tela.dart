@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
+import '../comuns/moeda_trato.dart';
 import 'modelos.dart';
 
 /// Tela 14 — Pagamento. Sem regra de dinheiro: mostra o valor que vem em [dados] e,
@@ -15,6 +16,7 @@ class PagamentoTela extends StatefulWidget {
     this.aoPagar,
     this.aoPagarDetalhado,
     this.aoAplicarCupom,
+    this.aoAlternarMoedas,
     this.aoVoltar,
   });
 
@@ -22,6 +24,9 @@ class PagamentoTela extends StatefulWidget {
   final dynamic Function(MetodoPagamento)? aoPagar;
   final dynamic Function(MetodoPagamento metodo, int parcelas, String? cupom)? aoPagarDetalhado;
   final Future<DadosPagamento> Function(String codigo)? aoAplicarCupom;
+
+  /// Liga/desliga o uso de moedas e devolve o resumo recalculado pelo backend.
+  final Future<DadosPagamento> Function(bool usar, String? cupom)? aoAlternarMoedas;
 
   /// Padrão: `Navigator.maybePop`.
   final VoidCallback? aoVoltar;
@@ -37,6 +42,8 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   final _cupomCtrl = TextEditingController();
   var _pagando = false;
   var _aplicandoCupom = false;
+  var _usarMoedas = false;
+  var _trocandoMoedas = false;
   String? _erroCupom;
 
   @override
@@ -97,6 +104,27 @@ class _PagamentoTelaState extends State<PagamentoTela> {
       if (mounted) setState(() => _erroCupom = 'Não foi possível validar o cupom.');
     } finally {
       if (mounted) setState(() => _aplicandoCupom = false);
+    }
+  }
+
+  Future<void> _alternarMoedas(bool usar) async {
+    final cb = widget.aoAlternarMoedas;
+    if (cb == null || _trocandoMoedas) return;
+    setState(() => _trocandoMoedas = true);
+    try {
+      final atualizado = await cb(usar, _dados.cupomCodigo);
+      if (!mounted) return;
+      setState(() {
+        _dados = atualizado;
+        _usarMoedas = usar;
+        if (_parcelas > 1 && !_dados.parcelamento.any((p) => p.parcelas == _parcelas)) {
+          _parcelas = 1;
+        }
+      });
+    } on Object {
+      if (mounted) setState(() => _erroCupom = 'Não foi possível usar as moedas agora.');
+    } finally {
+      if (mounted) setState(() => _trocandoMoedas = false);
     }
   }
 
@@ -198,14 +226,25 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         ),
                       ),
                     ],
-                    if (dados.descontoCentavos > 0) ...[
+                    if (dados.descontoCentavos - dados.moedasDescontoCentavos > 0) ...[
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
-                        'Cupom ${dados.cupomCodigo ?? ''} aplicado · desconto de ${Dinheiro.formatar(dados.descontoCentavos)}',
+                        'Cupom ${dados.cupomCodigo ?? ''} aplicado · desconto de ${Dinheiro.formatar(dados.descontoCentavos - dados.moedasDescontoCentavos)}',
                         style: TipografiaTrato.corpoPequeno.copyWith(
                           color: CoresTrato.verdeTexto,
                           fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    ],
+                    if (widget.aoAlternarMoedas != null && (dados.moedasSaldo > 0 || _usarMoedas)) ...[
+                      const SizedBox(height: EspacosTrato.x4),
+                      _CartaoMoedas(
+                        saldo: dados.moedasSaldo,
+                        usadas: dados.moedasUsadas,
+                        descontoCentavos: dados.moedasDescontoCentavos,
+                        ligado: _usarMoedas,
+                        ocupado: _trocandoMoedas,
+                        aoAlternar: _alternarMoedas,
                       ),
                     ],
                     const SizedBox(height: EspacosTrato.x6),
@@ -508,6 +547,49 @@ class _Passo extends StatelessWidget {
         const SizedBox(width: EspacosTrato.x3),
         Expanded(child: Text(texto, style: TipografiaTrato.corpo)),
       ],
+    );
+  }
+}
+
+/// "Usar minhas moedas": o app só liga o interruptor; quantas moedas entram e o desconto vêm
+/// do backend (limite por serviço em tabela).
+class _CartaoMoedas extends StatelessWidget {
+  const _CartaoMoedas({
+    required this.saldo,
+    required this.usadas,
+    required this.descontoCentavos,
+    required this.ligado,
+    required this.ocupado,
+    required this.aoAlternar,
+  });
+
+  final int saldo;
+  final int usadas;
+  final int descontoCentavos;
+  final bool ligado;
+  final bool ocupado;
+  final ValueChanged<bool> aoAlternar;
+
+  @override
+  Widget build(BuildContext context) {
+    final detalhe = ligado && usadas > 0
+        ? 'Usando $usadas moedas · desconto de ${Dinheiro.formatar(descontoCentavos)}'
+        : 'Você tem $saldo moedas do Trato';
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SwitchListTile(
+        key: const Key('interruptor-moedas'),
+        secondary: const MoedaTrato(tamanho: 36),
+        title: Text('Usar minhas moedas', style: TipografiaTrato.corpoForte),
+        subtitle: Text(
+          detalhe,
+          style: TipografiaTrato.corpoPequeno.copyWith(
+            color: ligado && usadas > 0 ? CoresTrato.verdeTexto : CoresTrato.textoSecundario,
+          ),
+        ),
+        value: ligado,
+        onChanged: ocupado ? null : aoAlternar,
+      ),
     );
   }
 }
