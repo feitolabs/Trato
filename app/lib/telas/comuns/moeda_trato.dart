@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
 
-/// A moeda do Trato: ouro com borda serrilhada, o "T" em relevo e um brilho que passa.
-/// `brilho` vai de 0 a 1 e move a faixa de luz; use 0.5 para uma moeda parada.
+/// A moeda do Trato, no estilo de ilustração: cores chapadas, "espessura" em bloco, traços de
+/// brilho à mão e o "T" carimbado, um pouco fora do registro. Nada de degradê de vidro.
+/// `brilho` (0 a 1) só faz as faíscas pulsarem; a moeda parada usa 0.5.
 class MoedaTrato extends StatelessWidget {
   const MoedaTrato({super.key, this.tamanho = 120, this.brilho = 0.5});
 
@@ -15,7 +16,10 @@ class MoedaTrato extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox.square(
         dimension: tamanho,
-        child: CustomPaint(painter: _PinturaMoeda(brilho)),
+        child: Transform.rotate(
+          angle: -0.14, // levemente torta, como desenhada
+          child: CustomPaint(painter: _PinturaMoeda(brilho)),
+        ),
       );
 }
 
@@ -26,63 +30,41 @@ class _PinturaMoeda extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final r = size.width / 2;
-    final c = Offset(r, r);
-    final borda = Rect.fromCircle(center: c, radius: r);
+    final r = size.width * 0.44; // sobra espaço para a espessura e as faíscas
+    final c = Offset(size.width / 2 - r * 0.04, size.height / 2 - r * 0.05);
+    final espessura = Offset(r * 0.09, r * 0.12);
 
-    // Aro: ouro com degradê diagonal.
+    // Espessura da moeda: o mesmo círculo, deslocado, em ouro escuro.
+    canvas.drawCircle(c + espessura, r, Paint()..color = CoresTrato.moedaOuroEscuro);
+    // Contorno grosso, que dá o ar de desenho.
     canvas.drawCircle(
       c,
       r,
       Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [CoresTrato.moedaOuroClaro, CoresTrato.moedaOuro, CoresTrato.moedaOuroEscuro],
-          stops: [0, 0.45, 1],
-        ).createShader(borda),
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.12
+        ..color = CoresTrato.moedaOuroProfundo,
     );
+    // Face chapada.
+    canvas.drawCircle(c, r * 0.97, Paint()..color = CoresTrato.moedaOuro);
 
-    // Serrilha: marcas curtas no aro.
-    final serrilha = Paint()
-      ..color = CoresTrato.moedaOuroEscuro.withValues(alpha: 0.55)
-      ..strokeWidth = r * 0.028
-      ..strokeCap = StrokeCap.round;
-    const marcas = 56;
-    for (var i = 0; i < marcas; i++) {
-      final a = i * 2 * math.pi / marcas;
-      canvas.drawLine(
-        c + Offset(math.cos(a), math.sin(a)) * (r * 0.93),
-        c + Offset(math.cos(a), math.sin(a)) * (r * 0.985),
-        serrilha,
+    // Anel interno pontilhado, com falhas irregulares (a mão não é perfeita).
+    final ponto = Paint()
+      ..color = CoresTrato.moedaOuroEscuro
+      ..style = PaintingStyle.fill;
+    const pontos = 22;
+    for (var i = 0; i < pontos; i++) {
+      if (i == 5 || i == 13) continue; // falhas
+      final a = i * 2 * math.pi / pontos + 0.1;
+      final raio = r * (0.76 + (i.isEven ? 0.008 : -0.008));
+      canvas.drawCircle(
+        c + Offset(math.cos(a), math.sin(a)) * raio,
+        r * (i % 3 == 0 ? 0.045 : 0.035),
+        ponto,
       );
     }
 
-    // Sulco entre o aro e a face.
-    canvas.drawCircle(
-      c,
-      r * 0.84,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.035
-        ..color = CoresTrato.moedaOuroProfundo.withValues(alpha: 0.5),
-    );
-
-    // Face: degradê radial, mais clara no canto de cima.
-    final face = Rect.fromCircle(center: c, radius: r * 0.8);
-    canvas.drawCircle(
-      c,
-      r * 0.8,
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.35, -0.4),
-          radius: 1.0,
-          colors: [CoresTrato.moedaOuroClaro, CoresTrato.moedaOuro, CoresTrato.moedaOuroEscuro],
-          stops: [0, 0.55, 1],
-        ).createShader(face),
-    );
-
-    // "T" em relevo: sombra embaixo, luz em cima, ouro escuro no meio.
+    // "T" carimbado: a tinta clara vem levemente deslocada da escura.
     void letra(Offset desloc, Color cor) {
       final tp = TextPainter(
         text: TextSpan(
@@ -90,7 +72,7 @@ class _PinturaMoeda extends CustomPainter {
           style: TextStyle(
             fontFamily: TipografiaTrato.fonteTitulos,
             fontWeight: FontWeight.w900,
-            fontSize: r * 1.15,
+            fontSize: r * 1.12,
             height: 1,
             color: cor,
           ),
@@ -100,28 +82,34 @@ class _PinturaMoeda extends CustomPainter {
       tp.paint(canvas, c - Offset(tp.width / 2, tp.height / 2) + desloc);
     }
 
-    letra(Offset(0, r * 0.035), CoresTrato.moedaOuroClaro.withValues(alpha: 0.9));
-    letra(Offset(0, -r * 0.02), CoresTrato.moedaOuroProfundo);
-    letra(Offset.zero, CoresTrato.moedaOuroEscuro);
+    letra(Offset(-r * 0.045, -r * 0.04), CoresTrato.moedaOuroClaro);
+    letra(Offset(r * 0.012, r * 0.02), CoresTrato.moedaOuroProfundo);
 
-    // Brilho: faixa diagonal de luz que atravessa a moeda.
-    canvas.save();
-    canvas.clipPath(Path()..addOval(borda));
-    final x = -r * 1.6 + brilho * size.width * 2.4;
-    canvas.translate(x, 0);
-    canvas.rotate(0.5);
-    canvas.drawRect(
-      Rect.fromLTWH(-r * 0.12, -size.height, r * 0.34, size.height * 3),
-      Paint()
-        ..shader = LinearGradient(
-          colors: [
-            CoresTrato.textoSobreFoto.withValues(alpha: 0),
-            CoresTrato.textoSobreFoto.withValues(alpha: 0.55),
-            CoresTrato.textoSobreFoto.withValues(alpha: 0),
-          ],
-        ).createShader(Rect.fromLTWH(-r * 0.12, 0, r * 0.34, 1)),
-    );
-    canvas.restore();
+    // Dois riscos de brilho no canto de cima: curtos, grossos, pontas redondas.
+    final risco = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..color = CoresTrato.moedaOuroClaro;
+    final arco = Rect.fromCircle(center: c, radius: r * 0.86);
+    canvas.drawArc(arco, math.pi * 1.12, 0.62, false, risco..strokeWidth = r * 0.085);
+    canvas.drawArc(arco, math.pi * 1.12 + 0.82, 0.14, false, risco..strokeWidth = r * 0.085);
+
+    // Faíscas de quatro pontas, em tamanhos e posições diferentes.
+    final t = 0.75 + 0.25 * math.sin(brilho * math.pi * 2);
+    _faisca(canvas, c + Offset(r * 1.08, -r * 0.82), r * 0.2 * t, CoresTrato.moedaOuroClaro);
+    _faisca(canvas, c + Offset(-r * 1.02, r * 0.58), r * 0.12 * (1.9 - t), CoresTrato.moedaOuroClaro);
+    _faisca(canvas, c + Offset(r * 0.88, r * 0.98), r * 0.09 * t, CoresTrato.moedaOuro);
+  }
+
+  void _faisca(Canvas canvas, Offset p, double tam, Color cor) {
+    final caminho = Path()
+      ..moveTo(p.dx, p.dy - tam)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx + tam, p.dy)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx, p.dy + tam)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx - tam, p.dy)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx, p.dy - tam)
+      ..close();
+    canvas.drawPath(caminho, Paint()..color = cor);
   }
 
   @override

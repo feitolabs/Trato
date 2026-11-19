@@ -118,7 +118,6 @@ class _Conteudo extends StatelessWidget {
       ((progresso - 0.2) / 0.45).clamp(0.0, 1.0),
     );
     final textos = Curves.easeOut.transform(((progresso - 0.55) / 0.3).clamp(0.0, 1.0));
-    final brilho = 0.5 + 0.5 * math.sin(progresso * math.pi * 6);
     final valor = (moedas * contagem).round();
 
     return Column(
@@ -126,28 +125,13 @@ class _Conteudo extends StatelessWidget {
       children: [
         Transform.scale(
           scale: 0.4 + 0.6 * moeda,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: CoresTrato.moedaOuro.withValues(alpha: 0.25 + 0.3 * brilho),
-                  blurRadius: 30 + 24 * brilho,
-                  spreadRadius: 4 + 6 * brilho,
-                ),
-              ],
-            ),
-            // Giro de moeda de verdade (2 voltas) que termina de frente.
-            child: Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, 0.0012)
-                ..rotateY((1 - giro) * math.pi * 4),
-              child: MoedaTrato(
-                tamanho: 156,
-                brilho: ((progresso - 0.45) / 0.35).clamp(0.0, 1.0),
-              ),
-            ),
+          // Giro de moeda de verdade (2 voltas) que termina de frente.
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0012)
+              ..rotateY((1 - giro) * math.pi * 4),
+            child: MoedaTrato(tamanho: 156, brilho: progresso),
           ),
         ),
         const SizedBox(height: EspacosTrato.x6),
@@ -167,7 +151,7 @@ class _Conteudo extends StatelessWidget {
                 ),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(
-                  'Obrigado por avaliar!',
+                  'Valeu pela avaliação!',
                   style: TipografiaTrato.tituloGrande.copyWith(color: CoresTrato.creme),
                   textAlign: TextAlign.center,
                 ),
@@ -175,7 +159,7 @@ class _Conteudo extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x5),
                   child: Text(
-                    'Sua avaliação ajuda outras pessoas a escolher bem. As moedas já estão na sua conta.',
+                    'Quem vem depois vai escolher com mais segurança por causa de você. As moedas já estão na sua conta.',
                     style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
                     textAlign: TextAlign.center,
                   ),
