@@ -1051,3 +1051,9 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 
 - `supabase/migrations/20261118150000_remove_faixas_taxa.sql` (+ rollback): remove `config_faixas_taxa`, o trigger e a função. Validada só no Postgres local descartável (138 testes de integração verdes). Backend, seeds e scripts de teste já não usam a tabela.
 - **Não aplicada no Supabase:** destrutiva (apaga as faixas gravadas), precisa do OK do João. Ordem segura: aplicar DEPOIS de o backend novo estar no ar. Colunas legadas de taxa em `contratos`/`aditivos`/`repasses` e parâmetros `taxa_*` ficam (histórico e repasses antigos).
+## 2026-11-18 — Gamificação, fase 1: moedas por avaliar (branch `feature/gamificacao-moedas`, worktree `../Trato-moedas`)
+
+- **Decisão do João:** moeda própria (não cupom), livro separado do ledger de dinheiro. Sem taxa no app, o bônus é custo do Trato.
+- **Backend:** `api/moedas.py` (config, lançamentos imutáveis, saldo, idempotência `avaliacao:<pedido>`, teto mensal, validade opcional). `POST /v1/pedidos/{id}/avaliacao` devolve `moedas_ganhas` (só cliente avaliando o profissional; falha de moeda nunca derruba a avaliação). `GET /v1/me/moedas` devolve saldo, valor da moeda e extrato. Desligado por padrão (`moedas_config.ativo = false`).
+- **Migration APLICADA no Supabase em 2026-11-18 (OK do João), ativo=false:** `supabase/migrations/20261118150000_moedas_gamificacao.sql` (+ rollback). Falta ligar `ativo` na configuração.
+- **Testes:** `tests/api/test_moedas.py` (6). Falta: app (tela de avaliação "+X moedas" e saldo na carteira), painel admin (configurar valores), usar moedas como desconto, indicação e conquistas.

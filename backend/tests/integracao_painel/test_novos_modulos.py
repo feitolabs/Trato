@@ -80,3 +80,24 @@ def test_token_na_url_nao_autentica(painel):
     corpo = {"motivo": "Fechamento contábil do mês"}
     r = painel.http.post(f"/v1/admin/relatorios/financeiro?token={token}", json=corpo)
     assert r.status_code == 401
+
+
+def test_moedas_config_ver_e_alterar(painel):
+    assert painel.chamar(None, "GET", "/v1/admin/moedas/config").status_code == 401
+    r = painel.chamar("administrador", "GET", "/v1/admin/moedas/config")
+    assert r.status_code == 200 and r.json()["ativo"] is False
+    corpo = {
+        "ativo": True,
+        "bonus_avaliacao_moedas": 30,
+        "valor_moeda_centavos": 1,
+        "teto_mensal_moedas": 300,
+        "min_servico_centavos": 8000,
+        "max_bonus_por_profissional_mes": 1,
+        "validade_dias": None,
+        "motivo": "Teste de ligar as moedas",
+    }
+    assert painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=corpo).status_code == 200
+    r = painel.chamar("administrador", "GET", "/v1/admin/moedas/config")
+    assert r.json()["bonus_avaliacao_moedas"] == 30 and r.json()["ativo"] is True
+    sem_motivo = {**corpo, "motivo": "curto"}
+    assert painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=sem_motivo).status_code == 422
