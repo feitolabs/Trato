@@ -135,9 +135,10 @@ def test_filtros_de_bairro_cidade_ordem_e_suspensao(mundo):
     aprovar(c, "bia_pro", nota=4.9, servicos=3)
     aprovar(c, "caio_pro", nota=None, servicos=0)
     base = f"/v1/profissionais?categoria_id={c.cat_eletrica}"
-    assert nomes_de(get(c, base)) == ["Bia C.", "Ana F.", "Caio N."]  # sem nota por último
+    # ranking ponderado (c4df85b): Ana (4,8 com 12 serviços) passa Bia (4,9 com 3); sem nota por último
+    assert nomes_de(get(c, base)) == ["Ana F.", "Bia C.", "Caio N."]
     # bairro: Bia atende a cidade toda, Ana só o Centro, Caio só o Icaivera
-    assert nomes_de(get(c, base + "&bairro=centro")) == ["Bia C.", "Ana F."]
+    assert nomes_de(get(c, base + "&bairro=centro")) == ["Ana F.", "Bia C."]
     assert nomes_de(get(c, base + "&bairro=Icaivera")) == ["Bia C.", "Caio N."]
     assert nomes_de(get(c, base + "&bairro=Outro")) == ["Bia C."]
     assert get(c, base + f"&cidade_id={c.cidade_inativa}").json()["itens"] == []
