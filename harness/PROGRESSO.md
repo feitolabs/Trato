@@ -1046,3 +1046,8 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - **App e painel:** sem linhas de taxa; dashboard troca "Receita Trato" por "Serviços concluídos".
 - **Testes:** backend, app (989) e admin (177) ajustados e verdes.
 - **Pendente (precisa de OK):** migration que remova as colunas/tabelas de taxa do banco (`config_faixas_taxa`, colunas de `contratos`/`repasses`) e os parâmetros `taxa_*`. Não aplicada; o código já funciona sem ela.
+
+## 2026-11-18 — Migration que remove as faixas de taxa (preparada, NÃO aplicada)
+
+- `supabase/migrations/20261118150000_remove_faixas_taxa.sql` (+ rollback): remove `config_faixas_taxa`, o trigger e a função. Validada só no Postgres local descartável (138 testes de integração verdes). Backend, seeds e scripts de teste já não usam a tabela.
+- **Não aplicada no Supabase:** destrutiva (apaga as faixas gravadas), precisa do OK do João. Ordem segura: aplicar DEPOIS de o backend novo estar no ar. Colunas legadas de taxa em `contratos`/`aditivos`/`repasses` e parâmetros `taxa_*` ficam (histórico e repasses antigos).

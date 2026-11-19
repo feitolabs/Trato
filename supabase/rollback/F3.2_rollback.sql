@@ -2,7 +2,7 @@
 -- ATENÇÃO: apaga as tabelas e todos os dados delas. Só rodar com OK do João.
 -- Ordem inversa das dependências.
 
-drop table if exists public.config_faixas_taxa;
+drop table if exists public.config_faixas_taxa; -- (já removida pela migration 20261118150000 em bancos atualizados)
 drop table if exists public.config_parametros;
 drop table if exists public.config_versoes;
 drop table if exists public.config_definicoes;

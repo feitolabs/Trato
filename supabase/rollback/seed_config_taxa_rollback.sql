@@ -13,7 +13,6 @@ begin
     if v_status not in ('rascunho', 'aguardando_aprovacao') then
       raise exception 'A versão do seed está "%": versão aprovada não se apaga. Publique uma nova versão.', v_status;
     end if;
-    delete from public.config_faixas_taxa where versao_id = v_versao;
     delete from public.config_parametros where versao_id = v_versao;
     delete from public.config_versoes where id = v_versao;
   end if;

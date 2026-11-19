@@ -94,11 +94,10 @@ A publicação (aprovada → vigente) é do backend. Taxa e prazos financeiros t
 | `limite_orcamentos_por_pedido` | Máximo de orçamentos por pedido | 5 (escopo 4) |
 | `minimo`/`maximo` de cada chave | Trava de segurança; os já preenchidos são **sugestão do agente** | ver arquivo |
 | `taxa_progressiva_ativa` | **Deve ficar 0**: o seed recusa outro valor (D2 em espera até a simulação de margem) | 0 |
-| `seed_faixa` (3 linhas) | Faixas da tabela progressiva. Opcional; entram, mas a tabela continua desligada | vazias |
 
 Fora desta versão, de propósito: `adiantamento_bps` (D5 em espera), `parcelas_max_cartao` (P3), `limite_valor_72h` (P1).
 
-Limite do teste local: o Postgres embutido não tem `btree_gist`, então o EXCLUDE de faixas sobrepostas não é exercitado (só roda no Supabase).
+Nota (18/11/2026): a tabela `config_faixas_taxa` foi removida (app gratuito); o seed não cria mais faixas.
 
 ---
 

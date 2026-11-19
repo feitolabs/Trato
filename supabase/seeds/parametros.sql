@@ -19,7 +19,6 @@
 
 drop table if exists pg_temp.seed_param;
 drop table if exists pg_temp.seed_config;
-drop table if exists pg_temp.seed_faixa;
 
 create temp table seed_param (chave text primary key, valor text);
 -- valor/minimo/maximo na unidade da definição (centavos, bps, horas, dias…).
@@ -29,12 +28,6 @@ create temp table seed_config (
   minimo      bigint,
   maximo      bigint,
   obrigatorio boolean not null
-);
-create temp table seed_faixa (
-  ordem        integer primary key,
-  de_centavos  bigint,
-  ate_centavos bigint,  -- exclusivo; NULL = sem teto
-  taxa_bps     integer
 );
 
 -- ---------------------------------------------------------------------------
@@ -98,9 +91,3 @@ insert into seed_config (chave, valor, minimo, maximo, obrigatorio) values
   ('valor_minimo_servico_centavos',     3000, 1000, 100000, true),
   ('limite_orcamentos_por_pedido',      5,    1,    20,   true);
 
--- Faixas da tabela progressiva (D2). Ficam vazias: só entram se o João preencher as três colunas
--- de uma linha. Mesmo preenchidas, a tabela continua DESLIGADA (taxa_progressiva_ativa = 0).
-insert into seed_faixa (ordem, de_centavos, ate_centavos, taxa_bps) values
-  (1, null, null, null),  -- A DEFINIR PELO JOÃO (D2 em espera)
-  (2, null, null, null),
-  (3, null, null, null);
