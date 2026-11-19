@@ -714,6 +714,7 @@ def buscar_profissionais(
         excluir_usuario_id=usuario.id,
         limite=limite,
         deslocamento=(pagina - 1) * limite,
+        ranking=contexto.ranking.config(),
     )
     achados, total = modulo.repo.buscar(filtro, contexto.usuarios.detalhe)
     mapa_cidades = _cidades_nomes_map(modulo)

@@ -1067,3 +1067,13 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - **Migration APLICADA em 2026-11-19 (OK do João):** `20261119120000_moedas_desconto.sql` (+ rollback): `moedas_config.max_desconto_percentual` e `pagamentos.moedas_usadas`. O backend desta branch exige essa migration (já aplicada).
 - **App:** interruptor "Usar minhas moedas" na tela de pagamento (mostra o desconto que o backend calculou).
 - **Testes:** `tests/api/test_moedas_desconto.py` (8), `test/pagamento_moedas_test.dart` e teste de API do app.
+
+## 2026-11-19 — Ranking de profissionais: média ponderada e nota composta (branch `feature/ranking-profissionais`)
+
+- **Passo 1, média ponderada (bayesiana):** `(n·nota + m·prior)/(n + m)`. Uma avaliação 5,0 não passa quem tem 200 avaliações 4,8; sem avaliação vale a nota-prior (profissional novo não fica no fim). A nota que o app MOSTRA continua sendo a média real.
+- **Passo 2, nota composta (0 a 1):** média ponderada + serviços concluídos (satura em `volume_referencia`) + nível de verificação + disponível agora. Pesos e priors em tabela de configuração (`ranking_config`). Texto da busca continua mandando primeiro; a nota composta desempata.
+- **Ficaram de fora (sem dado confiável hoje):** pontualidade (`avaliacao_criterios` está vazia), taxa de aceite de orçamento, tempo de resposta e distância (não guardamos lat/lng). Taxa de conclusão também ficou de fora: o cancelamento pode ser do cliente.
+- **Onde:** conta em `profissional/ranking.py` (uma fonte só). Busca em memória e Postgres usam a mesma função; no Postgres a ordenação é feita em duas fases (candidatos leves, ordena em Python, detalhes só da página). Rota do painel `GET/PUT /v1/admin/ranking/config` (`config_ver` / `config_aprovar`, com auditoria e motivo).
+- **Validado no Supabase real (só SELECT):** as duas fases da consulta, com e sem texto/bairro.
+- **Migration escrita, NÃO aplicada:** `20261119140000_ranking_config.sql` (+ rollback). Sem a tabela, a leitura dos pesos cai nos valores padrão (a busca não quebra), então o deploy não exige a migration, mas os pesos ficam fixos até aplicar.
+- **Limite conhecido:** no Postgres a busca traz todos os candidatos que casam com os filtros antes de paginar. Com milhares de profissionais, vale mover o cálculo para uma coluna/visão.

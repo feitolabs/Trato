@@ -100,6 +100,7 @@ def _repasses_em_memoria() -> RepositorioRepasses:
 
 
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
+from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
 
 
 @dataclass
@@ -127,6 +128,8 @@ class Contexto:
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
     # Moedas do Trato (gamificação). Em memória por padrão; a fábrica Postgres troca.
     moedas: Any = field(default_factory=lambda: MoedasEmMemoria())
+    # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
+    ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
     notas_material: RepositorioNotasMaterial = field(default_factory=NotasMaterialEmMemoria)
     # Dados pessoais, endereços, favoritos e contatos de confiança (`api/conta.py`).
