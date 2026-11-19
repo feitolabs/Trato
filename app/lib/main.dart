@@ -86,7 +86,10 @@ Future<void> main() async {
     // Primeiro login: GET /v1/me cria o usuário no backend (idempotente).
     // Só no modo api; em demo não chama nada.
     aoEntrar: () async {
-      if (config.usaApi) await RotasTrato.repos.perfil.carregar();
+      if (config.usaApi) {
+        await RotasTrato.repos.perfil.carregar();
+        await RotasTrato.sincronizarPush();
+      }
     },
   );
   // Link do e-mail de recuperação: o app abre direto na tela de senha nova.
@@ -135,7 +138,9 @@ void _abrirNovaSenha([int tentativa = 0]) {
 }
 
 class TratoApp extends StatelessWidget {
-  const TratoApp({super.key});
+  const TratoApp({super.key, this.themeMode = ThemeMode.light});
+
+  final ThemeMode themeMode;
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +153,8 @@ class TratoApp extends StatelessWidget {
       navigatorKey: navegadorTrato,
       debugShowCheckedModeBanner: false,
       theme: TemaTrato.claro,
+      darkTheme: TemaTrato.escuro,
+      themeMode: themeMode,
       builder: (context, filho) => EscalaFonteLimitada(child: filho!),
       home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
     );

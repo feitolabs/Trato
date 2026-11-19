@@ -8,8 +8,9 @@ endereço; o nome sai abreviado). O texto livre passa pelo mascaramento de conta
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +22,7 @@ from trato.profissional.config import ConfigProfissional, obter_config_profissio
 from trato.profissional.repositorio import (
     CatalogoEmMemoria,
     CatalogoProfissional,
+    ContaRecebimento,
     FiltroBusca,
     ItemPortfolio,
     JanelaSemanal,
@@ -32,6 +34,7 @@ from trato.profissional.repositorio import (
     slugs,
 )
 from trato.seguranca.config import obter_config_seguranca
+from trato.seguranca.cpf import cpf_valido, normalizar_cpf
 from trato.seguranca.texto_livre import limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["profissional"])
@@ -72,9 +75,34 @@ class CadastroIn(_Entrada):
     portfolio: list[PortfolioIO] = Field(default_factory=list, max_length=100)
 
 
+class ContaRecebimentoIn(_Entrada):
+    tipo_pix: Literal["cpf", "cnpj", "email", "telefone", "aleatoria"]
+    chave_pix: str = Field(min_length=1, max_length=140)
+    banco_codigo: str | None = Field(None, max_length=10)
+    banco_nome: str | None = Field(None, max_length=80)
+    agencia: str | None = Field(None, max_length=12)
+    conta: str | None = Field(None, max_length=24)
+    tipo_conta: Literal["corrente", "poupanca"] | None = None
+
+
+class ContaRecebimentoOut(BaseModel):
+    cadastrada: bool
+    tipo_pix: str | None = None
+    chave_pix: str | None = None
+    chave_pix_mascarada: str | None = None
+    banco_codigo: str | None = None
+    banco_nome: str | None = None
+    agencia: str | None = None
+    conta: str | None = None
+    tipo_conta: str | None = None
+    resumo_exibicao: str | None = None
+    atualizada_em: datetime | None = None
+
+
 class PerfilEditarIn(_Entrada):
     atende_presencial: bool | None = None
     atende_remoto: bool | None = None
+    disponivel_agora: bool | None = None
     categorias: list[str] | None = Field(None, min_length=1, max_length=100)
     regioes: list[RegiaoIO] | None = Field(None, min_length=1, max_length=200)
     disponibilidade: list[JanelaIO] | None = Field(None, max_length=100)
@@ -89,6 +117,8 @@ class PerfilProfissionalOut(BaseModel):
     nivel_verificacao_exigido: str = Field(description="Mínimo para as suas categorias.")
     atende_presencial: bool = True
     atende_remoto: bool = False
+    disponivel_agora: bool = False
+    conta_recebimento: ContaRecebimentoOut | None = None
     bio: str | None
     categorias: list[str]
     regioes: list[RegiaoIO]
@@ -224,6 +254,125 @@ def _bio(modulo: Modulo, bio: str | None) -> str | None:
     return _texto(bio, "bio", modulo.config.bio_max_chars)
 
 
+_ROTULOS_PIX = {
+    "cpf": "CPF",
+    "cnpj": "CNPJ",
+    "email": "E-mail",
+    "telefone": "Celular",
+    "aleatoria": "Chave aleatória",
+}
+
+
+def _mascarar_chave_pix(tipo_pix: str, chave_pix: str) -> str:
+    if tipo_pix == "cpf" and len(chave_pix) == 11:
+        return f"***.{chave_pix[3:6]}.{chave_pix[6:9]}-**"
+    if tipo_pix == "cnpj" and len(chave_pix) == 14:
+        return f"**.{chave_pix[2:5]}.{chave_pix[5:8]}/****-{chave_pix[-2:]}"
+    if tipo_pix == "telefone" and len(chave_pix) >= 10:
+        return f"({chave_pix[:2]}) *****-{chave_pix[-4:]}"
+    if tipo_pix == "email" and "@" in chave_pix:
+        parte, dom = chave_pix.split("@", 1)
+        return f"{parte[:2]}***@{dom}"
+    if len(chave_pix) > 10:
+        return f"{chave_pix[:6]}...{chave_pix[-4:]}"
+    return chave_pix
+
+
+def _conta_recebimento_out(conta: ContaRecebimento | None) -> ContaRecebimentoOut:
+    if conta is None:
+        return ContaRecebimentoOut(cadastrada=False)
+    mascarada = _mascarar_chave_pix(conta.tipo_pix, conta.chave_pix)
+    rotulo = _ROTULOS_PIX.get(conta.tipo_pix, "Pix")
+    resumo = f"Pix ({rotulo}): {mascarada}"
+    if (conta.banco_nome or conta.banco_codigo) and conta.agencia and conta.conta:
+        banco = conta.banco_nome or f"Banco {conta.banco_codigo}"
+        resumo = f"{resumo} · {banco} · Ag. {conta.agencia} · Conta {conta.conta}"
+    return ContaRecebimentoOut(
+        cadastrada=True,
+        tipo_pix=conta.tipo_pix,
+        chave_pix=conta.chave_pix,
+        chave_pix_mascarada=mascarada,
+        banco_codigo=conta.banco_codigo,
+        banco_nome=conta.banco_nome,
+        agencia=conta.agencia,
+        conta=conta.conta,
+        tipo_conta=conta.tipo_conta,
+        resumo_exibicao=resumo,
+        atualizada_em=conta.atualizada_em,
+    )
+
+
+def _limpar_opcional(valor: str | None, maximo: int) -> str | None:
+    if valor is None:
+        return None
+    limpo = " ".join(valor.strip().split())
+    return limpo[:maximo] if limpo else None
+
+
+def _normalizar_conta_recebimento(
+    corpo: ContaRecebimentoIn, usuario_id: str, contexto: Contexto
+) -> ContaRecebimento:
+    bruta = corpo.chave_pix.strip()
+    if corpo.tipo_pix == "cpf":
+        chave = normalizar_cpf(bruta)
+        if not cpf_valido(chave):
+            raise HTTPException(422, "Informe um CPF válido (11 dígitos) para a chave Pix.")
+        try:
+            dados_conta = contexto.conta.dados(usuario_id)
+        except Exception:  # noqa: BLE001
+            dados_conta = None
+        if dados_conta and dados_conta.cpf_final and chave[-2:] != dados_conta.cpf_final:
+            raise HTTPException(422, "A chave Pix de CPF precisa ser do próprio titular da conta.")
+        cpfs_memoria = getattr(contexto.usuarios, "_cpfs", None)
+        if isinstance(cpfs_memoria, dict):
+            cpf_conta = next((c for c, uid in cpfs_memoria.items() if uid == usuario_id), None)
+            if cpf_conta and chave != cpf_conta:
+                raise HTTPException(
+                    422, "A chave Pix de CPF precisa ser do próprio titular da conta."
+                )
+    elif corpo.tipo_pix == "cnpj":
+        chave = re.sub(r"\D", "", bruta)
+        if len(chave) != 14 or len(set(chave)) == 1:
+            raise HTTPException(422, "Informe um CNPJ válido (14 dígitos) para a chave Pix.")
+    elif corpo.tipo_pix == "telefone":
+        chave = re.sub(r"\D", "", bruta)
+        if chave.startswith("55") and len(chave) in (12, 13):
+            chave = chave[2:]
+        if len(chave) not in (10, 11):
+            raise HTTPException(
+                422, "Informe o celular com DDD (10 ou 11 dígitos) para a chave Pix."
+            )
+    elif corpo.tipo_pix == "email":
+        chave = bruta.lower()
+        if " " in chave or "@" not in chave or "." not in chave.split("@", 1)[1]:
+            raise HTTPException(422, "Informe um e-mail válido para a chave Pix.")
+    else:
+        chave = bruta
+        if " " in chave or len(chave) < 8:
+            raise HTTPException(422, "Informe uma chave aleatória válida.")
+
+    banco_codigo = _limpar_opcional(corpo.banco_codigo, 10)
+    banco_nome = _limpar_opcional(corpo.banco_nome, 80)
+    agencia = _limpar_opcional(corpo.agencia, 12)
+    conta = _limpar_opcional(corpo.conta, 24)
+    tipo_conta = corpo.tipo_conta
+    algum_bancario = any((banco_codigo, banco_nome, agencia, conta, tipo_conta))
+    if algum_bancario and not ((banco_nome or banco_codigo) and agencia and conta and tipo_conta):
+        raise HTTPException(
+            422, "Para salvar dados bancários, informe banco, agência, conta e tipo da conta."
+        )
+    return ContaRecebimento(
+        tipo_pix=corpo.tipo_pix,
+        chave_pix=chave,
+        banco_codigo=banco_codigo,
+        banco_nome=banco_nome,
+        agencia=agencia,
+        conta=conta,
+        tipo_conta=tipo_conta,
+        atualizada_em=contexto.agora(),
+    )
+
+
 def _perfil_out(modulo: Modulo, p: PerfilProfissional) -> PerfilProfissionalOut:
     return PerfilProfissionalOut(
         usuario_id=p.usuario_id,
@@ -233,6 +382,8 @@ def _perfil_out(modulo: Modulo, p: PerfilProfissional) -> PerfilProfissionalOut:
         bio=p.bio,
         atende_presencial=p.atende_presencial,
         atende_remoto=p.atende_remoto,
+        disponivel_agora=p.disponivel_agora,
+        conta_recebimento=_conta_recebimento_out(p.conta_recebimento),
         categorias=list(p.categorias),
         regioes=[RegiaoIO(cidade_id=r.cidade_id, bairro=r.bairro) for r in p.regioes],
         disponibilidade=[JanelaIO(**vars(j)) for j in p.disponibilidade],
@@ -324,11 +475,8 @@ def editar_perfil(
                 "Suas categorias estão vinculadas à sua verificação e não podem ser alteradas.",
             )
         categorias = novas
-    novo = PerfilProfissional(
-        usuario_id=atual.usuario_id,
-        status=atual.status,
-        nivel_verificacao=atual.nivel_verificacao,
-        criado_em=atual.criado_em,
+    novo = replace(
+        atual,
         bio=_bio(modulo, corpo.bio) if "bio" in enviados else atual.bio,
         categorias=categorias,
         regioes=_regioes(modulo, corpo.regioes) if corpo.regioes is not None else atual.regioes,
@@ -342,10 +490,56 @@ def editar_perfil(
         if corpo.atende_presencial is None
         else corpo.atende_presencial,
         atende_remoto=atual.atende_remoto if corpo.atende_remoto is None else corpo.atende_remoto,
+        disponivel_agora=atual.disponivel_agora
+        if corpo.disponivel_agora is None
+        else corpo.disponivel_agora,
     )
     _exigir_alguma_modalidade(novo)
     modulo.repo.salvar(novo)
     return _perfil_out(modulo, novo)
+
+
+@router.get(
+    "/profissional/conta-recebimento",
+    response_model=ContaRecebimentoOut,
+    summary="Minha conta de recebimento (Pix e dados bancários)",
+)
+def obter_conta_recebimento(
+    usuario: Usuario = Depends(_pessoa),
+    modulo: Modulo = Depends(obter_modulo),
+) -> ContaRecebimentoOut:
+    perfil = _perfil_do_usuario(modulo, usuario)
+    return _conta_recebimento_out(perfil.conta_recebimento)
+
+
+@router.put(
+    "/profissional/conta-recebimento",
+    response_model=ContaRecebimentoOut,
+    summary="Cadastrar ou atualizar conta de recebimento (Pix / banco para repasse)",
+)
+def salvar_conta_recebimento(
+    corpo: ContaRecebimentoIn,
+    usuario: Usuario = Depends(_pessoa),
+    contexto: Contexto = Depends(obter_contexto),
+    modulo: Modulo = Depends(obter_modulo),
+) -> ContaRecebimentoOut:
+    atual = _perfil_do_usuario(modulo, usuario)
+    nova = _normalizar_conta_recebimento(corpo, usuario.id, contexto)
+    modulo.repo.salvar(replace(atual, conta_recebimento=nova))
+    auditoria = contexto.extras.get("auditoria")
+    if auditoria is not None:
+        auditoria.registrar(
+            ator_id=usuario.id,
+            ator_tipo="profissional",
+            acao="profissional.conta_recebimento_atualizada",
+            entidade="perfis_profissional",
+            entidade_id=usuario.id,
+            depois={
+                "tipo_pix": nova.tipo_pix,
+                "tem_dados_bancarios": bool(nova.conta),
+            },
+        )
+    return _conta_recebimento_out(nova)
 
 
 def _nome_abreviado(nome: str | None) -> str | None:
@@ -612,5 +806,7 @@ def perfil_publico(
         regioes=base.regioes,
         disponibilidade=base.disponibilidade,
         portfolio=base.portfolio,
-        avaliacoes=[_avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"],
+        avaliacoes=[
+            _avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"
+        ],
     )

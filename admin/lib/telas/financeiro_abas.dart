@@ -478,6 +478,7 @@ const rotulosFechamento = [
   ('retido_fim_centavos', 'Retido ao fim do mês', true),
   ('a_liberar_fim_centavos', 'A liberar ao fim do mês', true),
   ('contestacoes_perdidas_centavos', 'Contestações perdidas', true),
+  ('custo_cupons_centavos', 'Custo de cupons (descontos)', true),
   ('lancamentos', 'Lançamentos no mês', false),
 ];
 
@@ -527,11 +528,12 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
     if (motivo == null || !mounted) return;
     final ok = await executar(context, () => api.fecharMes(f.mes, motivo: motivo), sucesso: 'Mês fechado.');
     // Fica no mês que acabou de fechar (sem isso, a escolha automática pularia para outro).
-    if (ok)
+    if (ok) {
       setState(() {
         _mes = f.mes;
         _versao++;
       });
+    }
   }
 
   Future<void> _exportar(String mes) async {
@@ -641,7 +643,7 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
                   ),
                   const SizedBox(height: EspacosTrato.x3),
                   Text(
-                    'O custo dos cupons ainda não entra: o pedido não guarda o desconto.',
+                    'O custo de cupons considera descontos de pagamentos confirmados no mês.',
                     style: TipografiaTrato.legenda,
                   ),
                 ],

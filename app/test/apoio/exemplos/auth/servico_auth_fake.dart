@@ -193,6 +193,9 @@ class ServicoAuthFake implements ServicoAuth {
   /// Senhas novas gravadas por [definirNovaSenha], na ordem (para os testes).
   final List<String> senhasDefinidas = [];
 
+  /// E-mails alterados por [alterarEmail], na ordem (para os testes).
+  final List<String> emailsAlterados = [];
+
   final _recuperacao = StreamController<void>.broadcast();
   String? _emailRecuperando;
 
@@ -210,8 +213,27 @@ class ServicoAuthFake implements ServicoAuth {
     _checarFalha();
     if (senha.length < 8) throw const ErroAuth(TipoErroAuth.senhaFraca);
     senhasDefinidas.add(senha);
-    final email = _emailRecuperando;
+    final email = _emailRecuperando ?? _sessao?.email;
     if (email != null) _contas[email] = senha;
+  }
+
+  @override
+  Future<void> alterarEmail(String novoEmail) async {
+    _checarFalha();
+    final atual = _sessao;
+    if (atual == null) throw const ErroAuth(TipoErroAuth.desconhecido);
+    final limpo = _normalizar(novoEmail);
+    if (!limpo.contains('@') || !limpo.contains('.')) {
+      throw const ErroAuth(TipoErroAuth.dadosInvalidos, 'Informe um e-mail válido.');
+    }
+    emailsAlterados.add(limpo);
+    _entrou(SessaoAuth(
+      id: atual.id,
+      email: limpo,
+      nome: atual.nome,
+      celularConfirmado: atual.celularConfirmado,
+      perfil: atual.perfil,
+    ));
   }
 
   @override

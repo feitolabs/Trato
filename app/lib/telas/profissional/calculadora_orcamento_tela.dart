@@ -31,6 +31,10 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
     this.faixaRegiaoCentavos,
     this.opcoesGarantiaDias = const [30, 60, 90],
     this.validadeDias = 3,
+    this.mostrarForaDoEscopo = false,
+    this.foraDoEscopoInicial,
+    this.observacoesInicial,
+    this.edicao = false,
   });
 
   final ServicoOrcamento servico;
@@ -42,6 +46,14 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
   final int garantiaInicialDias;
   final int prazoExecucaoInicialDias;
   final List<ItemMaterial> itensIniciais;
+
+  /// Exibe campos de "Fora do escopo" e "Observações" (oculto por padrão nos goldens).
+  final bool mostrarForaDoEscopo;
+  final String? foraDoEscopoInicial;
+  final String? observacoesInicial;
+
+  /// Verdadeiro quando o profissional está editando uma proposta já enviada.
+  final bool edicao;
 
   /// "Serviços parecidos na região" (mínimo, máximo), vindo do backend. Sem dado, a linha some.
   final (int, int)? faixaRegiaoCentavos;
@@ -60,6 +72,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   late final _horas = TextEditingController(text: widget.horasInicial);
   late final _valorHora = TextEditingController(text: widget.valorHoraInicial);
   late final _diasExecucao = TextEditingController(text: '${widget.prazoExecucaoInicialDias}');
+  late final _foraDoEscopo = TextEditingController(text: widget.foraDoEscopoInicial);
+  late final _observacoes = TextEditingController(text: widget.observacoesInicial);
   final _keyDeslocamento = GlobalKey();
   final _keyHoras = GlobalKey();
   final _keyValorHora = GlobalKey();
@@ -108,6 +122,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _horas.dispose();
     _valorHora.dispose();
     _diasExecucao.dispose();
+    _foraDoEscopo.dispose();
+    _observacoes.dispose();
     _focoDeslocamento.dispose();
     _focoHoras.dispose();
     _focoValorHora.dispose();
@@ -212,6 +228,24 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _mudou();
   }
 
+  Future<void> _editarItem(int indice) async {
+    final atual = _itens[indice];
+    final atualizado = await showModalBottomSheet<ItemMaterial>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: CoresTrato.creme,
+      builder: (_) => _NovoItemMaterial(inicial: atual),
+    );
+    if (atualizado == null) return;
+    _itens[indice] = atualizado;
+    _mudou();
+  }
+
+  void _removerItem(int indice) {
+    _itens.removeAt(indice);
+    _mudou();
+  }
+
   Future<void> _enviar() async {
     if (_enviando) return;
     setState(() => _mostrarErros = true);
@@ -254,6 +288,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       materialPorMim: _materialPorMim,
       pedirSinalMaterial: _materialPorMim && _pedirSinal,
       totalCentavos: _total,
+      foraDoEscopo: _foraDoEscopo.text.trim().isEmpty ? null : _foraDoEscopo.text.trim(),
+      observacoes: _observacoes.text.trim().isEmpty ? null : _observacoes.text.trim(),
     );
     if (widget.aoEnviar == null) return;
     setState(() => _enviando = true);
@@ -282,7 +318,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             const SizedBox(height: EspacosTrato.x3),
           ],
           BotaoPrimario(
-            texto: 'Enviar orçamento',
+            texto: widget.edicao ? 'Enviar nova versão' : 'Enviar orçamento',
             carregando: _enviando,
             aoTocar: (_enviando || _erroTotal() != null) ? null : _enviar,
           ),
@@ -295,7 +331,10 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
         ],
       ),
       children: [
-        Text('Seu orçamento', style: TipografiaTrato.tituloGrande),
+        Text(
+          widget.edicao ? 'Editar orçamento' : 'Seu orçamento',
+          style: TipografiaTrato.tituloGrande,
+        ),
         const SizedBox(height: EspacosTrato.x5),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +347,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                   controlador: _deslocamento,
                   foco: _focoDeslocamento,
                   sufixo: 'h',
-                  teclado: TextInputType.number,
+                  teclado: const TextInputType.numberWithOptions(decimal: true),
                   formatadores: _formatadoresDeslocamento,
                   aoMudar: (_) => _mudou(),
                   erro: _mostrarErros ? _erroDeslocamento() : null,
@@ -324,7 +363,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                   controlador: _horas,
                   foco: _focoHoras,
                   sufixo: 'h',
-                  teclado: TextInputType.number,
+                  teclado: const TextInputType.numberWithOptions(decimal: true),
                   formatadores: _formatadoresHoras,
                   aoMudar: (_) => _mudou(),
                   erro: _mostrarErros ? _erroHoras() : null,
@@ -345,7 +384,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                   controlador: _valorHora,
                   foco: _focoValorHora,
                   prefixo: 'R\$ ',
-                  teclado: TextInputType.number,
+                  teclado: const TextInputType.numberWithOptions(decimal: true),
                   formatadores: _formatadoresValorHora,
                   aoMudar: (_) => _mudou(),
                   erro: _mostrarErros ? _erroValorHora() : null,
@@ -398,6 +437,8 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           materialPorMim: _materialPorMim,
           pedirSinal: _pedirSinal,
           aoAdicionar: _adicionarItem,
+          aoEditar: _editarItem,
+          aoRemover: _removerItem,
           aoEscolherQuemFornece: (eu) {
             setState(() {
               _materialPorMim = eu;
@@ -407,6 +448,22 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           },
           aoMarcarSinal: (marcado) => setState(() => _pedirSinal = marcado),
         ),
+        if (widget.mostrarForaDoEscopo ||
+            (widget.foraDoEscopoInicial ?? '').isNotEmpty ||
+            (widget.observacoesInicial ?? '').isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          CampoTrato(
+            rotulo: 'Fora do escopo (opcional)',
+            controlador: _foraDoEscopo,
+            dica: 'Ex.: quebra de alvenaria, pintura ou peças extras',
+          ),
+          const SizedBox(height: EspacosTrato.x4),
+          CampoTrato(
+            rotulo: 'Observações (opcional)',
+            controlador: _observacoes,
+            dica: 'Condições de execução, horários ou recomendações',
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         _ResumoEscuro(totalCentavos: _total, resumo: _resumo),
       ],
@@ -457,6 +514,8 @@ class _CartaoMaterial extends StatelessWidget {
     required this.materialPorMim,
     required this.pedirSinal,
     required this.aoAdicionar,
+    required this.aoEditar,
+    required this.aoRemover,
     required this.aoEscolherQuemFornece,
     required this.aoMarcarSinal,
   });
@@ -465,6 +524,8 @@ class _CartaoMaterial extends StatelessWidget {
   final bool materialPorMim;
   final bool pedirSinal;
   final VoidCallback aoAdicionar;
+  final ValueChanged<int> aoEditar;
+  final ValueChanged<int> aoRemover;
   final ValueChanged<bool> aoEscolherQuemFornece;
   final ValueChanged<bool> aoMarcarSinal;
 
@@ -486,17 +547,47 @@ class _CartaoMaterial extends StatelessWidget {
               ),
             ],
           ),
-          for (final item in itens)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x2),
-              child: Row(
-                children: [
-                  Expanded(child: Text(item.nome, style: TipografiaTrato.corpo)),
-                  const SizedBox(width: EspacosTrato.x3),
-                  Text(Dinheiro.formatar(item.centavos), style: TipografiaTrato.corpoForte),
-                ],
-              ),
+          if (materialPorMim)
+            for (var i = 0; i < itens.length; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x1),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => aoEditar(i),
+                        borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x1),
+                          child: Row(
+                            children: [
+                              Expanded(child: Text(itens[i].nome, style: TipografiaTrato.corpo)),
+                              const SizedBox(width: EspacosTrato.x2),
+                              Text(
+                                Dinheiro.formatar(itens[i].centavos),
+                                style: TipografiaTrato.corpoForte,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Remover item',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => aoRemover(i),
+                      icon: const Icon(Icons.close, size: 18, color: CoresTrato.textoSecundario),
+                    ),
+                  ],
+                ),
+              )
+          else if (itens.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'O cliente fornece o material (${itens.length} ${itens.length == 1 ? 'item listado não entra' : 'itens listados não entram'} no total).',
+              style: TipografiaTrato.legenda,
             ),
+          ],
           const SizedBox(height: EspacosTrato.x3),
           Row(
             children: [
@@ -562,10 +653,6 @@ class _ResumoEscuro extends StatelessWidget {
     final claro = TipografiaTrato.corpo.copyWith(color: CoresTrato.creme);
     final claroForte = TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
     final r = resumo;
-    // O rótulo com a porcentagem vem do dado do backend, nunca de um texto fixo.
-    final rotuloTaxa = r == null || r.taxaBps == null
-        ? 'Taxa Trato'
-        : 'Taxa Trato (${Dinheiro.formatarBps(r.taxaBps!)})';
     return CartaoTrato(
       escuro: true,
       child: Column(
@@ -576,13 +663,6 @@ class _ResumoEscuro extends StatelessWidget {
             valor: r != null ? Dinheiro.formatar(r.clientePagaCentavos) : '—',
             estiloRotulo: claro,
             estiloValor: claroForte,
-          ),
-          const SizedBox(height: EspacosTrato.x2),
-          _LinhaResumo(
-            rotulo: rotuloTaxa,
-            valor: r == null ? '—' : '– ${Dinheiro.formatar(r.taxaCentavos)}',
-            estiloRotulo: claro,
-            estiloValor: claro,
           ),
           const SizedBox(height: EspacosTrato.x3),
           const Divider(color: CoresTrato.pontoSobrePetroleo, height: 1),
@@ -610,8 +690,7 @@ class _ResumoEscuro extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
-            'A taxa do Trato é descontada do seu orçamento quando o serviço é concluído. '
-            'Pedido cancelado não paga taxa.',
+            'O Trato é grátis: não cobramos taxa sobre o seu serviço.',
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
           ),
         ],
@@ -646,15 +725,21 @@ class _LinhaResumo extends StatelessWidget {
 }
 
 class _NovoItemMaterial extends StatefulWidget {
-  const _NovoItemMaterial();
+  const _NovoItemMaterial({this.inicial});
+
+  final ItemMaterial? inicial;
 
   @override
   State<_NovoItemMaterial> createState() => _NovoItemMaterialState();
 }
 
 class _NovoItemMaterialState extends State<_NovoItemMaterial> {
-  final _nome = TextEditingController();
-  final _valor = TextEditingController();
+  late final _nome = TextEditingController(text: widget.inicial?.nome ?? '');
+  late final _valor = TextEditingController(
+    text: widget.inicial == null
+        ? ''
+        : '${widget.inicial!.centavos ~/ 100},${(widget.inicial!.centavos % 100).toString().padLeft(2, '0')}',
+  );
   bool _tentou = false;
 
   @override
@@ -701,7 +786,10 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Adicionar item', style: TipografiaTrato.titulo),
+            Text(
+              widget.inicial == null ? 'Adicionar item' : 'Editar item',
+              style: TipografiaTrato.titulo,
+            ),
             const SizedBox(height: EspacosTrato.x4),
             CampoTrato(
               rotulo: 'Item',
@@ -716,7 +804,7 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               rotulo: 'Valor',
               controlador: _valor,
               prefixo: 'R\$ ',
-              teclado: TextInputType.number,
+              teclado: const TextInputType.numberWithOptions(decimal: true),
               formatadores: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 LengthLimitingTextInputFormatter(9),
@@ -724,7 +812,10 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
               erro: erroValor,
             ),
             const SizedBox(height: EspacosTrato.x5),
-            BotaoPrimario(texto: 'Adicionar', aoTocar: _confirmar),
+            BotaoPrimario(
+              texto: widget.inicial == null ? 'Adicionar' : 'Salvar item',
+              aoTocar: _confirmar,
+            ),
           ],
         ),
       ),

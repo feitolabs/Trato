@@ -34,6 +34,8 @@ class DadosPagamento {
     required this.opcoes,
     this.rotuloValor,
     this.parcelamento = const [],
+    this.descontoCentavos = 0,
+    this.cupomCodigo,
   });
 
   /// Total por número de parcelas no cartão. Vazio enquanto o parcelado estiver desligado.
@@ -45,7 +47,32 @@ class DadosPagamento {
   /// Valor a pagar agora, em centavos (int). Vem pronto do backend.
   final int valorAgoraCentavos;
 
+  /// Desconto aplicado pelo cupom (em centavos). Zero quando não há cupom.
+  final int descontoCentavos;
+
+  /// Código de cupom aceito e aplicado neste cálculo.
+  final String? cupomCodigo;
+
   /// Texto opcional sob o valor, ex.: "Adiantamento de 30%". Null = não mostra.
   final String? rotuloValor;
   final List<OpcaoPagamento> opcoes;
+
+  DadosPagamento copiarCom({
+    String? subtitulo,
+    int? valorAgoraCentavos,
+    List<OpcaoParcelamento>? parcelamento,
+    int? descontoCentavos,
+    String? cupomCodigo,
+    String? rotuloValor,
+    List<OpcaoPagamento>? opcoes,
+  }) =>
+      DadosPagamento(
+        subtitulo: subtitulo ?? this.subtitulo,
+        valorAgoraCentavos: valorAgoraCentavos ?? this.valorAgoraCentavos,
+        parcelamento: parcelamento ?? this.parcelamento,
+        descontoCentavos: descontoCentavos ?? this.descontoCentavos,
+        cupomCodigo: cupomCodigo ?? this.cupomCodigo,
+        rotuloValor: rotuloValor ?? this.rotuloValor,
+        opcoes: opcoes ?? this.opcoes,
+      );
 }

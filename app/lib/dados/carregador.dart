@@ -70,6 +70,7 @@ class _CarregadorState<T> extends State<Carregador<T>> {
   var _pronto = false;
   var _emVoo = false;
   var _geracao = 0;
+  var _visivel = true;
   RelogioDeAtualizacao? _relogio;
 
   @override
@@ -81,10 +82,23 @@ class _CarregadorState<T> extends State<Carregador<T>> {
       _relogio = RelogioDeAtualizacao(
         intervalo: intervalo,
         aoAtualizar: _atualizarEmSilencio,
-        deveAtualizar: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+        deveAtualizar: () =>
+            mounted &&
+            TickerMode.valuesOf(context).enabled &&
+            (ModalRoute.of(context)?.isCurrent ?? true),
       );
     }
     _carregar();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ativo = TickerMode.valuesOf(context).enabled;
+    if (ativo && !_visivel && _pronto) {
+      _atualizarEmSilencio();
+    }
+    _visivel = ativo;
   }
 
   @override

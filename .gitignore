@@ -51,3 +51,10 @@ key.properties
 *.mobileprovision
 # Valores de --dart-define por ambiente (ver docs/BUILD.md)
 dart-defines*.json
+
+# Artefatos locais de build (APKs, AABs, web build e símbolos de debug)
+builds/*.apk
+builds/*.aab
+builds/debug-info-*/
+builds/painel-admin-web/
+app/test/golden/failures/

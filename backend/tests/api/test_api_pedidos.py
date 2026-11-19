@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from conftest import AGORA, CLIENTE, PROFISSIONAL, cab, janela_futura
 
@@ -202,8 +202,45 @@ def test_acoes_com_rota_propria_ou_em_aberto(amb):
 
     assert acao(amb, "t-cliente", "abrir_disputa").status_code == 400
     assert acao(amb, "t-cliente", "pedir_retrabalho").status_code == 400
-    assert acao(amb, "t-cliente", "remarcar").status_code == 501
     assert acao(amb, "t-mediador", "decidir_disputa").status_code == 403
+
+
+def test_remarcar_visita_no_pedido_agendado(amb):
+    amb.semear_pedido(Estado.AGENDADO, codigo_inicio="1234")
+    nova_janela = janela_futura()
+
+    r_cli = acao(amb, "t-cliente", "remarcar", {"janela": nova_janela})
+    assert r_cli.status_code == 200, r_cli.text
+    assert r_cli.json()["estado"] == "agendado"
+    assert datetime.fromisoformat(r_cli.json()["janela"]["inicio"]) == datetime.fromisoformat(
+        nova_janela["inicio"]
+    )
+
+    inicio_prof = AGORA + timedelta(days=3)
+    outra_janela = {
+        "inicio": inicio_prof.isoformat(),
+        "fim": (inicio_prof + timedelta(hours=3)).isoformat(),
+    }
+    r_prof = acao(amb, "t-prof", "remarcar", {"janela": outra_janela})
+    assert r_prof.status_code == 200, r_prof.text
+    assert r_prof.json()["estado"] == "agendado"
+    assert datetime.fromisoformat(r_prof.json()["janela"]["inicio"]) == inicio_prof
+
+    # Recusa se informar aceito_por com o próprio id
+    inicio_ruim = AGORA + timedelta(days=4)
+    ruim = acao(
+        amb,
+        "t-cliente",
+        "remarcar",
+        {
+            "janela": {
+                "inicio": inicio_ruim.isoformat(),
+                "fim": (inicio_ruim + timedelta(hours=3)).isoformat(),
+            },
+            "aceito_por": CLIENTE.id,
+        },
+    )
+    assert ruim.status_code == 422
 
 
 def test_acao_desconhecida_da_422(amb):

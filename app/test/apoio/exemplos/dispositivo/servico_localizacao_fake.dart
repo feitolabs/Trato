@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:trato/dispositivo/servico_localizacao.dart';
 
 class ServicoLocalizacaoFake implements ServicoLocalizacao {

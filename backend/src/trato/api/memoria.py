@@ -17,8 +17,8 @@ from trato.api.repositorios import (
     EventoWebhook,
     ItemOrcamento,
     Orcamento,
-    Repasse,
     PerguntaCategoria,
+    Repasse,
 )
 from trato.api.repositorios_app import (
     ItemDoOrcamento,
@@ -95,7 +95,9 @@ class PedidosEmMemoria:
         if dados is None:
             return []
         textos = {q.id: q.texto for q in self.perguntas.get(dados.categoria_id, [])}
-        return [(textos[r.pergunta_id], r.resposta) for r in dados.respostas if r.pergunta_id in textos]
+        return [
+            (textos[r.pergunta_id], r.resposta) for r in dados.respostas if r.pergunta_id in textos
+        ]
 
     def categoria_aceita_remoto(self, categoria_id: str) -> bool:
         return categoria_id in self.categorias_remotas
@@ -411,8 +413,13 @@ class DisputasEmMemoria:
     ) -> None:
         for tipo, texto, midia in itens:
             self._evidencias.setdefault(pedido_id, []).append(
-                {"tipo": tipo, "texto": texto, "midia_id": midia, "autor_id": autor_id,
-                 "em": datetime.now(UTC)}
+                {
+                    "tipo": tipo,
+                    "texto": texto,
+                    "midia_id": midia,
+                    "autor_id": autor_id,
+                    "em": datetime.now(UTC),
+                }
             )
 
     def evidencias(self, pedido_id: str) -> list[dict[str, Any]]:

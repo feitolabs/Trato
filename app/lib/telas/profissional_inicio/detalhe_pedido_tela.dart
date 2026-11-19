@@ -16,6 +16,15 @@ String _iniciais(String nome) {
   return partes.length == 1 ? a : '$a${partes.last[0].toUpperCase()}';
 }
 
+Widget _fotoPedido(int indice, String item) {
+  final ehImagemReal = item.startsWith('http://') ||
+      item.startsWith('https://') ||
+      item.startsWith('/');
+  return ehImagemReal
+      ? EspacoFoto(legenda: 'Foto ${indice + 1}', referencia: item)
+      : EspacoFoto(legenda: item);
+}
+
 /// Tela 24 do protótipo: detalhe de um pedido aberto, visto pelo profissional.
 /// Mostra só bairro e distância: o endereço completo aparece depois da contratação.
 class DetalhePedidoTela extends StatelessWidget {
@@ -94,19 +103,24 @@ class DetalhePedidoTela extends StatelessWidget {
                             .copyWith(color: CoresTrato.textoSecundario),
                       ),
                     ],
-                    const SizedBox(height: EspacosTrato.x5),
-                    Row(
-                      children: [
-                        for (var i = 0;
-                            i < dados.legendasFotos.length;
-                            i++) ...[
-                          if (i > 0) const SizedBox(width: EspacosTrato.x2),
-                          Expanded(
-                              child:
-                                  EspacoFoto(legenda: dados.legendasFotos[i])),
-                        ],
+                    if (dados.legendasFotos.isNotEmpty) ...[
+                      const SizedBox(height: EspacosTrato.x5),
+                      for (var inicio = 0;
+                          inicio < dados.legendasFotos.length;
+                          inicio += 3) ...[
+                        if (inicio > 0) const SizedBox(height: EspacosTrato.x2),
+                        Row(
+                          children: [
+                            for (var i = inicio;
+                                i < inicio + 3 && i < dados.legendasFotos.length;
+                                i++) ...[
+                              if (i > inicio) const SizedBox(width: EspacosTrato.x2),
+                              Expanded(child: _fotoPedido(i, dados.legendasFotos[i])),
+                            ],
+                          ],
+                        ),
                       ],
-                    ),
+                    ],
                     const SizedBox(height: EspacosTrato.x5),
                     Text(dados.descricao, style: TipografiaTrato.corpo),
                     const SizedBox(height: EspacosTrato.x5),

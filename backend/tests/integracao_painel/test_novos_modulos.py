@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_dashboard_metricas_e_series(painel):
     # Sem auth -> 401
@@ -17,7 +15,9 @@ def test_dashboard_metricas_e_series(painel):
         assert "receita_taxa_centavos" in dados_met
         assert "pedidos_total" in dados_met
 
-    r_ser = painel.chamar("administrador", "GET", "/v1/admin/dashboard/series", params={"dias": "7"})
+    r_ser = painel.chamar(
+        "administrador", "GET", "/v1/admin/dashboard/series", params={"dias": "7"}
+    )
     assert r_ser.status_code in (200, 503)
     if r_ser.status_code == 200:
         dados_ser = r_ser.json()
@@ -59,7 +59,10 @@ def test_notificacoes_campanhas(painel):
 
 def test_relatorios_csv(painel):
     corpo = {"formato": "excel_br", "motivo": "Fechamento contábil do mês"}
-    assert painel.chamar(None, "POST", "/v1/admin/relatorios/financeiro", json=corpo).status_code == 401
+    assert (
+        painel.chamar(None, "POST", "/v1/admin/relatorios/financeiro", json=corpo).status_code
+        == 401
+    )
     r = painel.chamar("administrador", "POST", "/v1/admin/relatorios/financeiro", json=corpo)
     assert r.status_code in (201, 503)
     if r.status_code == 201:

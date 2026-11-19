@@ -27,6 +27,8 @@ class NovoPedidoTela extends StatefulWidget {
     this.agora,
     this.servicoCep,
     this.enderecosSalvos = const [],
+    this.profissionalConvidadoId,
+    this.profissionalConvidadoNome,
   });
 
   final FormularioPedido formulario;
@@ -49,6 +51,10 @@ class NovoPedidoTela extends StatefulWidget {
 
   /// Endereços salvos na conta para preenchimento rápido com 1 toque.
   final List<EnderecoSalvo> enderecosSalvos;
+
+  /// Quando o cliente toca em "Pedir orçamento ao [Nome]" no perfil do profissional.
+  final String? profissionalConvidadoId;
+  final String? profissionalConvidadoNome;
 
   @override
   State<NovoPedidoTela> createState() => _NovoPedidoTelaState();
@@ -439,6 +445,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       // Sem cidade carregada o pedido não abre (o repositório avisa); nada de cidade inventada.
       cidadeId: _cidade?.id ?? widget.formulario.cidades.firstOrNull?.id,
       modalidade: _presencial ? Modalidade.presencial : Modalidade.remoto,
+      profissionalConvidadoId: widget.profissionalConvidadoId,
+      profissionalConvidadoNome: widget.profissionalConvidadoNome,
       endereco: _presencial
           ? EnderecoRascunho(
               logradouro: _rua.text,
@@ -480,6 +488,32 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       children: [
         const SizedBox(height: EspacosTrato.x2),
         Text('Conte o que precisa', style: TipografiaTrato.tituloGrande),
+        if ((widget.profissionalConvidadoNome ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Container(
+            key: const Key('banner-profissional-convidado'),
+            padding: const EdgeInsets.all(EspacosTrato.x3),
+            decoration: BoxDecoration(
+              color: CoresTrato.azulSuave,
+              borderRadius: BorderRadius.circular(EspacosTrato.raio),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.person_pin_outlined, size: 20, color: CoresTrato.azulTexto),
+                const SizedBox(width: EspacosTrato.x2),
+                Expanded(
+                  child: Text(
+                    'Pedido direcionado para ${widget.profissionalConvidadoNome!.trim()}',
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.azulTexto,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x2),
         Row(
           children: [
@@ -617,6 +651,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                     child: _FotoReservada(
                       '[Foto ${f.fotos.length + i + 1}]',
                       referencia: _fotosNovas[i],
+                      aoRemover: () => setState(() => _fotosNovas.removeAt(i)),
                     ),
                   ),
                 if (f.fotos.length + _fotosNovas.length < _maxFotos && _podeAdicionarFoto)
@@ -1055,15 +1090,16 @@ class _OpcaoRadio extends StatelessWidget {
 }
 
 class _FotoReservada extends StatelessWidget {
-  const _FotoReservada(this.rotulo, {this.referencia});
+  const _FotoReservada(this.rotulo, {this.referencia, this.aoRemover});
 
   final String rotulo;
   final String? referencia;
+  final VoidCallback? aoRemover;
 
   @override
   Widget build(BuildContext context) {
     final imagemReal = construirImagemReal(referencia);
-    return ToquePreviewImagem(
+    final cartao = ToquePreviewImagem(
       referencia: referencia ?? rotulo,
       legenda: rotulo,
       child: AspectRatio(
@@ -1116,6 +1152,31 @@ class _FotoReservada extends StatelessWidget {
                 ),
         ),
       ),
+    );
+    if (aoRemover == null) return cartao;
+    return Stack(
+      children: [
+        Positioned.fill(child: cartao),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Material(
+            color: CoresTrato.overlayFoto,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: aoRemover,
+              child: const Tooltip(
+                message: 'Remover foto',
+                child: Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close, size: 14, color: CoresTrato.textoSobreFoto),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -142,16 +142,19 @@ class NotificacoesServicoPostgres:
             )
 
     def tokens(self, usuario_id: str) -> Sequence[str]:
+        return tuple(token for token, _ in self.dispositivos_ativos(usuario_id))
+
+    def dispositivos_ativos(self, usuario_id: str) -> Sequence[tuple[str, str]]:
         usuario = como_uuid(usuario_id)
         if usuario is None:
             return ()
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select token from public.dispositivos_push where usuario_id = %s and ativo "
-                "order by criado_em, id",
+                "select token, plataforma from public.dispositivos_push "
+                "where usuario_id = %s and ativo order by criado_em, id",
                 (usuario,),
             ).fetchall()
-        return tuple(l["token"] for l in linhas)  # noqa: E741
+        return tuple((l["token"], l["plataforma"]) for l in linhas)  # noqa: E741
 
     def desativar_dispositivo(self, token: str, usuario_id: str | None = None) -> None:
         dono = como_uuid(usuario_id) if usuario_id is not None else None

@@ -36,7 +36,12 @@ class DadosDoPedido {
     this.cep,
     this.referencia,
     this.modalidade = 'presencial',
+    this.fotos = const [],
+    this.profissionalConvidadoId,
   });
+
+  final List<String> fotos;
+  final String? profissionalConvidadoId;
 
   final String titulo;
   final String descricao;
@@ -141,6 +146,9 @@ abstract interface class RepositorioPedidos {
   /// Cancela o pedido (cliente ou profissional contratado). O servidor diz se o estado permite e
   /// devolve o dinheiro quando já houve pagamento.
   Future<void> cancelar(String pedidoId, String motivo);
+
+  /// Remarca a janela de visita de um pedido agendado (`POST /v1/pedidos/{id}/acoes/remarcar`).
+  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
 }
 
 class OrcamentosDoPedido {
@@ -214,9 +222,18 @@ class Cobranca {
 abstract interface class RepositorioPagamento {
   Future<DadosPagamento> dados(String pedidoId);
 
+  /// Valida e aplica um cupom no resumo de pagamento (`POST /v1/contratos/{id}/cupom`).
+  Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async =>
+      throw UnimplementedError();
+
   /// Cria a cobrança (modo teste). O app NUNCA marca como pago: só o backend, depois do
   /// webhook assinado do provedor (D14/D15).
-  Future<Cobranca> criarCobranca(String pedidoId, MetodoPagamento metodo);
+  Future<Cobranca> criarCobranca(
+    String pedidoId,
+    MetodoPagamento metodo, {
+    int parcelas = 1,
+    String? cupom,
+  });
 
   Future<StatusPagamento> status(String pedidoId);
 }
@@ -225,6 +242,18 @@ abstract interface class RepositorioChat {
   Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId});
   Future<void> enviar(String pedidoId, String texto, {String? profissionalId});
   Future<void> enviarFoto(String pedidoId, String referencia, {String? profissionalId});
+  Future<void> proporAgenda(
+    String pedidoId,
+    DateTime inicio,
+    DateTime fim, {
+    String justificativa = '',
+  }) async {}
+  Future<void> aceitarAgenda(
+    String pedidoId, {
+    int? mensagemId,
+    DateTime? inicio,
+    DateTime? fim,
+  }) async {}
 }
 
 class Notificacao {
@@ -253,11 +282,44 @@ class Notificacao {
   final bool lida;
 }
 
+class PreferenciaNotificacao {
+  const PreferenciaNotificacao({
+    required this.categoria,
+    this.app = true,
+    this.push = true,
+    this.email = true,
+  });
+
+  final String categoria;
+  final bool app;
+  final bool push;
+  final bool email;
+
+  PreferenciaNotificacao copiarCom({bool? app, bool? push, bool? email}) =>
+      PreferenciaNotificacao(
+        categoria: categoria,
+        app: app ?? this.app,
+        push: push ?? this.push,
+        email: email ?? this.email,
+      );
+}
+
 abstract interface class RepositorioNotificacoes {
   Future<List<Notificacao>> listar();
 
   /// Grava no servidor que a notificação foi lida (o contador não volta depois).
   Future<void> marcarLida(String id);
+
+  Future<List<PreferenciaNotificacao>> carregarPreferencias() async => const [];
+
+  Future<List<PreferenciaNotificacao>> salvarPreferencias(
+    List<PreferenciaNotificacao> itens,
+  ) async =>
+      itens;
+
+  Future<void> registrarDispositivo(String token, String plataforma) async {}
+
+  Future<void> removerDispositivo(String token) async {}
 }
 
 abstract interface class RepositorioPerfil {
@@ -312,8 +374,11 @@ abstract interface class RepositorioProfissional {
   /// Marca a visita de um pedido já pago. Sem isso o check-in não é liberado.
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim);
 
+  /// Remarca a visita de um pedido já agendado (`POST /v1/pedidos/{id}/acoes/remarcar`).
+  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
+
   /// Carteira como EXTRATO (D15): sem saldo próprio, sem saque.
-  Future<List<ItemExtrato>> extrato();
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0});
 
   /// Valor inteiro, taxa, líquido, aditivos e notas de um pedido (detalhe de uma linha do extrato).
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId);
@@ -330,4 +395,31 @@ abstract interface class RepositorioProfissional {
   /// Check-out do pedido: foto final e código de conclusão que o cliente informa. Remoto: só o
   /// código.
   ServicoCheckOut servicoCheckOut(String pedidoId, {bool remoto = false});
+
+  /// Conta bancária / chave Pix cadastrada para recebimento dos repasses (D15).
+  Future<ContaRecebimento> obterContaRecebimento();
+
+  /// Cadastra ou atualiza a chave Pix / conta de recebimento.
+  Future<ContaRecebimento> salvarContaRecebimento({
+    required String tipoPix,
+    required String chavePix,
+    String? bancoCodigo,
+    String? bancoNome,
+    String? agencia,
+    String? conta,
+    String? tipoConta,
+  });
+
+  /// Baixa os bytes do extrato mensal em PDF (`AAAA-MM`; padrão = mês atual).
+  Future<List<int>> baixarExtratoPdf({String? mes});
+
+  /// Atualiza o switch "Disponível agora" no backend para priorizar/notificar pedidos urgentes.
+  Future<bool> alterarDisponivelAgora(bool disponivel);
+
+  /// Detalhe completo de um orçamento enviado pelo profissional (antes ou após aceite).
+  Future<DetalheOrcamentoEnviado> meuOrcamento(
+    String orcamentoId, {
+    String? tituloPedido,
+    String? situacao,
+  });
 }

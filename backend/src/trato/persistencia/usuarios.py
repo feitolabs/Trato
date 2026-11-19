@@ -219,7 +219,9 @@ class UsuariosPostgres:
                 nota = float(linha["nota_publica"]) if linha["nota_publica"] is not None else None
                 servicos = int(linha["servicos_concluidos"])
                 taxa = self._taxa_conclusao(base.id)
-        return PerfilDetalhe(base.id, base.nome, base.papel, base.status, nivel, nota, servicos, taxa)
+        return PerfilDetalhe(
+            base.id, base.nome, base.papel, base.status, nivel, nota, servicos, taxa
+        )
 
     def _taxa_conclusao(self, profissional_id: str) -> int | None:
         """Concluídos / (concluídos + cancelados) dos contratos do profissional, em %."""

@@ -1747,6 +1747,7 @@ class ApiFake implements ApiAdmin {
     'liberado_fim_centavos': 1080000,
     'contestacoes_perdidas': 1,
     'contestacoes_perdidas_centavos': 18000,
+    'custo_cupons_centavos': 4500,
     'lancamentos': 131,
   };
 

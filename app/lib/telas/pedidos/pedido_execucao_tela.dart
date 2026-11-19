@@ -22,6 +22,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoVerContrato,
     this.aoAbrirProblema,
     this.aoCancelarPedido,
+    this.aoRemarcarVisita,
     this.atualizarAditivoLocalmente = true,
   });
 
@@ -38,6 +39,7 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoVerContrato;
   final VoidCallback? aoAbrirProblema;
   final VoidCallback? aoCancelarPedido;
+  final VoidCallback? aoRemarcarVisita;
   final bool atualizarAditivoLocalmente;
 
   @override
@@ -151,22 +153,39 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                         aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
                       ),
                     ],
-                    if (widget.aoVerNota != null ||
-                        widget.aoVerAditivo != null ||
+                    if (widget.aoRemarcarVisita != null ||
                         widget.aoVerContrato != null ||
-                        widget.aoAbrirProblema != null ||
-                        widget.aoCancelarPedido != null) ...[
+                        widget.aoVerNota != null ||
+                        widget.aoVerAditivo != null) ...[
                       const SizedBox(height: EspacosTrato.x3),
-                      if (widget.aoVerContrato != null)
-                        BotaoLink(texto: 'Ver contrato do serviço', aoTocar: widget.aoVerContrato!),
-                      if (widget.aoVerNota != null)
-                        BotaoLink(texto: 'Ver nota de materiais', aoTocar: widget.aoVerNota!),
-                      if (widget.aoVerAditivo != null)
-                        BotaoLink(texto: 'Ver aditivo do serviço', aoTocar: widget.aoVerAditivo!),
-                      if (widget.aoAbrirProblema != null)
-                        BotaoLink(texto: 'Relatar problema', aoTocar: widget.aoAbrirProblema!),
-                      if (widget.aoCancelarPedido != null)
-                        BotaoLink(texto: 'Cancelar pedido', aoTocar: widget.aoCancelarPedido!),
+                      Wrap(
+                        spacing: EspacosTrato.x3,
+                        runSpacing: EspacosTrato.x1,
+                        children: [
+                          if (widget.aoRemarcarVisita != null)
+                            BotaoLink(
+                              texto: pedido.estadoApi == 'agendado'
+                                  ? 'Remarcar visita'
+                                  : 'Sugerir horário da visita',
+                              aoTocar: widget.aoRemarcarVisita!,
+                            ),
+                          if (widget.aoVerContrato != null)
+                            BotaoLink(
+                              texto: 'Ver contrato do serviço',
+                              aoTocar: widget.aoVerContrato!,
+                            ),
+                          if (widget.aoVerNota != null)
+                            BotaoLink(
+                              texto: 'Ver nota de materiais',
+                              aoTocar: widget.aoVerNota!,
+                            ),
+                          if (widget.aoVerAditivo != null)
+                            BotaoLink(
+                              texto: 'Ver aditivo do serviço',
+                              aoTocar: widget.aoVerAditivo!,
+                            ),
+                        ],
+                      ),
                     ],
                     if (pedido.aditivos.isNotEmpty ||
                         pedido.notas.isNotEmpty ||
@@ -181,15 +200,39 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                     Text('Linha do tempo', style: TipografiaTrato.titulo),
                     const SizedBox(height: EspacosTrato.x4),
                     LinhaDoTempo(etapas: pedido.etapas),
-                    const SizedBox(height: EspacosTrato.x6),
-                    Row(
-                      children: [
-                        for (var i = 0; i < pedido.fotos.length; i++) ...[
-                          if (i > 0) const SizedBox(width: EspacosTrato.x3),
-                          Expanded(child: EspacoFoto(rotulo: pedido.fotos[i], altura: 100)),
+                    if (pedido.fotos.isNotEmpty) ...[
+                      const SizedBox(height: EspacosTrato.x6),
+                      Row(
+                        children: [
+                          for (var i = 0; i < pedido.fotos.length; i++) ...[
+                            if (i > 0) const SizedBox(width: EspacosTrato.x3),
+                            Expanded(child: EspacoFoto(rotulo: pedido.fotos[i], altura: 100)),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
+                    if (widget.aoAbrirProblema != null || widget.aoCancelarPedido != null) ...[
+                      const SizedBox(height: EspacosTrato.x5),
+                      const Divider(),
+                      Wrap(
+                        spacing: EspacosTrato.x4,
+                        runSpacing: EspacosTrato.x1,
+                        children: [
+                          if (widget.aoAbrirProblema != null)
+                            BotaoLink(
+                              texto: 'Relatar problema',
+                              destrutivo: true,
+                              aoTocar: widget.aoAbrirProblema!,
+                            ),
+                          if (widget.aoCancelarPedido != null)
+                            BotaoLink(
+                              texto: 'Cancelar pedido',
+                              destrutivo: true,
+                              aoTocar: widget.aoCancelarPedido!,
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 );
     return Scaffold(

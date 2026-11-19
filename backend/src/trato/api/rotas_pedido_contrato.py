@@ -10,6 +10,7 @@ Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 from __future__ import annotations
 
 import math
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
@@ -22,18 +23,30 @@ from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
-from trato.api.modelos import RespostaPedidoOut
+from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.rotas_pedidos import respostas_out
-from trato.api.servicos import carregar_pedido
+from trato.api.rotas_upload import urls_fotos_do_pedido
+from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.api.visibilidade import pedido_visivel_ao_profissional
+from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
 from trato.pagamentos.provedor.base import ErroProvedor
-from trato.pedidos.estados import Estado, Pedido
+from trato.pedidos import estados as pedidos_estados
+from trato.pedidos.estados import (
+    Acao,
+    Ator,
+    Estado,
+    Janela,
+    Papel,
+    Pedido,
+    ProvaAgenda,
+    ProvaRemarcacao,
+)
 from trato.persistencia.erros import NaoEncontrado
 from trato.persistencia.usuarios import nome_de_exibicao
 from trato.seguranca.config import obter_config_seguranca
@@ -85,6 +98,12 @@ class OrcamentoDetalheOut(BaseModel):
     )
     total_horas: str | None = Field(
         None, description="Deslocamento + trabalhadas: o total de horas que o cliente vê."
+    )
+    taxa_centavos: int | None = Field(
+        None, description="Taxa do Trato descontada deste orçamento (só para o autor)."
+    )
+    liquido_centavos: int | None = Field(
+        None, description="Valor líquido estimado do profissional (só para o autor)."
     )
 
 
@@ -203,6 +222,13 @@ class CobrarContratoIn(_Entrada):
         le=12,
         description="Só cartão; parcelado desligado até o custo do provedor estar configurado.",
     )
+    cupom: str | None = Field(
+        default=None, max_length=30, description="Código de cupom de desconto opcional."
+    )
+
+
+class AplicarCupomIn(_Entrada):
+    codigo: str = Field(min_length=1, max_length=30)
 
 
 TETO_ADITIVO_CENTAVOS = 10_000_000  # R$ 100.000,00
@@ -317,6 +343,10 @@ def detalhe_do_orcamento(
     desloc = somar_horas(orc.itens, "deslocamento")
     trab = somar_horas(orc.itens, "horas")
     total = None if desloc is None and trab is None else (desloc or Decimal(0)) + (trab or 0)
+    taxa_centavos = liquido_centavos = None
+    if autor and contexto.taxa is not None and orc.valor_centavos > 0:
+        taxa_centavos = min(contexto.taxa.calcular(orc.valor_centavos), orc.valor_centavos)
+        liquido_centavos = orc.valor_centavos - taxa_centavos
     return OrcamentoDetalheOut(
         **campos,
         aceito=orc.id == pedido.orcamento_id,
@@ -324,10 +354,59 @@ def detalhe_do_orcamento(
         horas_deslocamento=_texto_horas(desloc),
         horas_trabalhadas=_texto_horas(trab),
         total_horas=_texto_horas(total),
+        taxa_centavos=taxa_centavos,
+        liquido_centavos=liquido_centavos,
     )
 
 
 # --- Cobrança e estado do pagamento -----------------------------------------------------
+
+
+@router.post(
+    "/contratos/{contrato_id}/cupom",
+    response_model=rotas_app.PagamentoValoresOut,
+    summary="Validar e simular cupom de desconto para o contrato",
+)
+def aplicar_cupom_contrato(
+    contrato_id: str,
+    corpo: AplicarCupomIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> rotas_app.PagamentoValoresOut:
+    pedido, contrato = _contrato_do_usuario(contexto, contrato_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do contrato pode aplicar cupom.")
+    servico = _servico(request)
+    try:
+        aplicado = validar_e_calcular_cupom(
+            contexto, corpo.codigo, contrato.valor_centavos, usuario_id=usuario.id
+        )
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from None
+    saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
+    pendente = next(
+        (c.id for c in servico.cobrancas.do_pedido(pedido.id) if c.status.value == "aguardando"),
+        None,
+    )
+    conta = servico.total_a_cobrar(contexto, pedido, aplicado.servico_com_desconto_centavos)
+    opcoes = [
+        rotas_app.OpcaoParcelamentoOut(**vars(o))
+        for o in servico.config().parcelamento.opcoes(conta.cobrado_centavos)
+    ]
+    return rotas_app.PagamentoValoresOut(
+        pedido_id=pedido.id,
+        estado=pedido.estado.value,
+        valor_centavos=contrato.valor_centavos,
+        total_a_pagar_centavos=conta.cobrado_centavos,
+        opcoes_parcelamento=opcoes,
+        pago_centavos=saldo.cliente_pagou,
+        pagamento_confirmado=pedido.referencia_pagamento is not None,
+        meios_disponiveis=[m.value for m in MeioPagamento],
+        cobranca_pendente_id=pendente,
+        desconto_centavos=aplicado.desconto_centavos,
+        cupom_codigo=aplicado.codigo,
+    )
 
 
 @router.post(
@@ -354,6 +433,16 @@ def criar_cobranca(
         raise HTTPException(403, "Só o cliente do contrato pode pagar.")
     if pedido.estado not in ESTADOS_COBRAVEIS or pedido.referencia_pagamento is not None:
         raise HTTPException(409, "O pedido não está esperando pagamento.")
+    valor_servico = contrato.valor_centavos
+    aplicado = None
+    if corpo.cupom and corpo.cupom.strip():
+        try:
+            aplicado = validar_e_calcular_cupom(
+                contexto, corpo.cupom, contrato.valor_centavos, usuario_id=usuario.id
+            )
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from None
+        valor_servico = aplicado.servico_com_desconto_centavos
     preparo = None
     if corpo.meio is MeioPagamento.CARTAO and hasattr(servico.provedor, "preparar_cartao"):
         try:
@@ -365,10 +454,12 @@ def criar_cobranca(
     cobranca = servico.cobrar(
         contexto,
         pedido,
-        contrato.valor_centavos,
+        valor_servico,
         corpo.meio,
         parcelas=corpo.parcelas,
         cliente_externo=preparo.cliente_id if preparo else None,
+        cupom_codigo=aplicado.codigo if aplicado else None,
+        desconto_centavos=aplicado.desconto_centavos if aplicado else 0,
     )
     saida = _cobranca_out(pedido.id, cobranca)
     if preparo is not None:
@@ -408,13 +499,19 @@ def estado_do_pagamento(
         estado = "cancelada"
     else:
         estado = "aguardando_confirmacao"
+    servico_a_cobrar = contrato.valor_centavos
+    if principal is not None:
+        if principal.servico_centavos is not None:
+            servico_a_cobrar = principal.servico_centavos
+        elif principal.desconto_centavos > 0:
+            servico_a_cobrar = max(0, contrato.valor_centavos - principal.desconto_centavos)
     return PagamentoContratoOut(
         contrato_id=pedido.id,
         estado_pagamento=estado,
         pago=pago,
         valor_centavos=contrato.valor_centavos,
         total_a_pagar_centavos=(
-            servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos).cobrado_centavos
+            servico.total_a_cobrar(contexto, pedido, servico_a_cobrar).cobrado_centavos
             if servico is not None
             else None
         ),
@@ -561,7 +658,7 @@ def _decidir_aditivo(
     if servico is not None:
         try:
             if aprovar:
-                # Cartão: a folha do provedor precisa do cliente e da chave efêmera (como no pedido).
+                # Cartão: a folha do provedor precisa do cliente e da chave efêmera.
                 preparo = None
                 if meio is MeioPagamento.CARTAO and hasattr(servico.provedor, "preparar_cartao"):
                     try:
@@ -1134,9 +1231,7 @@ def propor_nova_condicao(
         profissional_id=usuario.id,
         valor_centavos=corpo.valor_centavos,
         prazo_execucao_dias=prazo_final,
-        texto_aviso=(
-            f"Nova proposta de {_reais(corpo.valor_centavos)}{prazo_txt}.{extra}"
-        ),
+        texto_aviso=(f"Nova proposta de {_reais(corpo.valor_centavos)}{prazo_txt}.{extra}"),
     )
 
 
@@ -1162,8 +1257,27 @@ def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * 6371.0 * math.asin(math.sqrt(a))
 
 
+def _eh_convidado_do_pedido(
+    contexto: Contexto | None, p: PedidoAberto, usuario_id: str | None
+) -> bool:
+    if p.convidado:
+        return True
+    if contexto is None or not usuario_id:
+        return False
+    convidados = contexto.extras.get("pedidos_convidados", {})
+    if isinstance(convidados, dict) and convidados.get(p.id) == usuario_id:
+        return True
+    dados = contexto.pedidos.dados_do_pedido(p.id)
+    return bool(dados is not None and dados.profissional_convidado_id == usuario_id)
+
+
 def _saida_aberto(
-    p: PedidoAberto, lat: float | None, lng: float | None, contexto: Contexto | None = None
+    p: PedidoAberto,
+    lat: float | None,
+    lng: float | None,
+    contexto: Contexto | None = None,
+    *,
+    usuario_id: str | None = None,
 ) -> PedidoAbertoOut:
     km = None
     if (
@@ -1179,11 +1293,30 @@ def _saida_aberto(
         partes = (detalhe.nome or "").split() if detalhe else []
         if partes:
             nome = partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
-    return PedidoAbertoOut(**vars(p), distancia_km=km, cliente_nome=nome)
+    campos = {k: v for k, v in vars(p).items() if k != "convidado"}
+    return PedidoAbertoOut(
+        **campos,
+        distancia_km=km,
+        cliente_nome=nome,
+        convidado=_eh_convidado_do_pedido(contexto, p, usuario_id),
+    )
 
 
 def _teto_da_faixa(p: PedidoAberto) -> int:
     return p.faixa_preco_max_centavos if p.faixa_preco_max_centavos is not None else -1
+
+
+def _profissional_disponivel_agora(request: Request | None, profissional_id: str) -> bool:
+    if request is None:
+        return False
+    modulo = getattr(request.app.state, "modulo_profissional", None)
+    if modulo is None:
+        return False
+    try:
+        perfil = modulo.repo.obter(profissional_id)
+    except Exception:  # noqa: BLE001 - estado secundário não bloqueia a rota
+        return False
+    return bool(perfil and perfil.disponivel_agora)
 
 
 @router.get(
@@ -1198,6 +1331,7 @@ def _teto_da_faixa(p: PedidoAberto) -> int:
     ),
 )
 def pedidos_abertos(
+    request: Request,
     categoria_id: Annotated[str | None, Query()] = None,
     bairro: Annotated[str | None, Query(max_length=120)] = None,
     preco_min_centavos: Annotated[int | None, Query(ge=0, le=TETO_CENTAVOS)] = None,
@@ -1250,12 +1384,16 @@ def pedidos_abertos(
             )
         )
     elif ordenar is OrdemPedidos.PROXIMOS and lat is not None and lng is not None:
-        saida = [_saida_aberto(p, lat, lng, contexto) for p in itens]
-        saida.sort(key=lambda o: (o.distancia_km is None, o.distancia_km or 0.0))
+        saida = [_saida_aberto(p, lat, lng, contexto, usuario_id=usuario.id) for p in itens]
+        saida.sort(key=lambda o: (not o.convidado, o.distancia_km is None, o.distancia_km or 0.0))
         return saida[:limite]
+    elif _profissional_disponivel_agora(request, usuario.id):
+        itens.sort(key=lambda p: (not p.urgente, -p.aberto_em.timestamp()))
     else:
         itens.sort(key=lambda p: p.aberto_em, reverse=True)
-    return [_saida_aberto(p, lat, lng, contexto) for p in itens[:limite]]
+    saida = [_saida_aberto(p, lat, lng, contexto, usuario_id=usuario.id) for p in itens]
+    saida.sort(key=lambda o: not o.convidado)
+    return saida[:limite]
 
 
 class PedidoAbertoDetalheOut(PedidoAbertoOut):
@@ -1263,6 +1401,9 @@ class PedidoAbertoDetalheOut(PedidoAbertoOut):
     ja_orcou: bool = Field(description="Se este profissional já enviou orçamento.")
     respostas: list[RespostaPedidoOut] = Field(
         default_factory=list, description="Respostas do cliente às perguntas da categoria."
+    )
+    fotos_urls: list[str] = Field(
+        default_factory=list, description="URLs assinadas curtas das fotos do pedido."
     )
 
 
@@ -1275,6 +1416,7 @@ class PedidoAbertoDetalheOut(PedidoAbertoOut):
 )
 def pedido_aberto(
     pedido_id: str,
+    request: Request,
     lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
     lng: Annotated[float | None, Query(ge=-180, le=180)] = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
@@ -1290,11 +1432,175 @@ def pedido_aberto(
         raise HTTPException(404, "Pedido não encontrado.")
     orcamentos = contexto.orcamentos.do_pedido(achado.id)
     return PedidoAbertoDetalheOut(
-        **_saida_aberto(achado, lat, lng, contexto).model_dump(),
+        **_saida_aberto(achado, lat, lng, contexto, usuario_id=usuario.id).model_dump(),
         orcamentos_recebidos=len(orcamentos),
         ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
         respostas=respostas_out(contexto, achado.id),
+        fotos_urls=urls_fotos_do_pedido(request, achado.id),
     )
+
+
+# --- Proposta e aceite de horário de visita no chat --------------------------------------
+
+_REGEX_AGENDA = re.compile(r"^\[agenda:([^|\]]+)\|([^\]]+)\]")
+
+
+class ProporAgendaIn(_Entrada):
+    janela: JanelaIn
+    justificativa: str = Field(default="", max_length=240)
+
+
+class AceitarAgendaIn(_Entrada):
+    mensagem_id: int | None = None
+    janela: JanelaIn | None = None
+
+
+def _formatar_janela_br(inicio: datetime, fim: datetime) -> str:
+    return (
+        f"{inicio.day:02d}/{inicio.month:02d} das "
+        f"{inicio.hour:02d}:{inicio.minute:02d} às {fim.hour:02d}:{fim.minute:02d}"
+    )
+
+
+@router.post(
+    "/pedidos/{pedido_id}/agenda/propor",
+    response_model=rotas_app.MensagemOut,
+    status_code=201,
+    summary="Cliente ou profissional sugere um horário de visita no chat",
+)
+def propor_agenda(
+    pedido_id: str,
+    corpo: ProporAgendaIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> rotas_app.MensagemOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.estado not in (Estado.PAGO_E_RETIDO, Estado.AGENDADO):
+        raise HTTPException(409, "Só dá para combinar ou remarcar a visita após o pagamento.")
+    agora = contexto.agora()
+    if corpo.janela.fim <= corpo.janela.inicio:
+        raise HTTPException(422, "A janela de atendimento precisa terminar depois de começar.")
+    if corpo.janela.inicio < agora:
+        raise HTTPException(422, "A janela de atendimento não pode começar no passado.")
+    profissional_id = pedido.profissional_id
+    if not profissional_id:
+        raise HTTPException(409, "Pedido sem profissional contratado.")
+    conversa = contexto.conversas.abrir(pedido.id, profissional_id)
+    resumo = _formatar_janela_br(corpo.janela.inicio, corpo.janela.fim)
+    extra = ""
+    if corpo.justificativa.strip():
+        limpa = limpar_texto(corpo.justificativa, "justificativa", 240, obter_config_seguranca())
+        extra = f" — {limpa}"
+    texto = (
+        f"[agenda:{corpo.janela.inicio.isoformat()}|{corpo.janela.fim.isoformat()}] "
+        f"Sugestão de visita para {resumo}.{extra}"
+    )
+    nova = contexto.conversas.enviar(conversa, usuario.id, texto)
+    destinatario = pedido.profissional_id if usuario.id == pedido.cliente_id else pedido.cliente_id
+    avisar_mensagem_nova(
+        request,
+        contexto,
+        conversa_id=conversa,
+        pedido_id=pedido.id,
+        autor_id=usuario.id,
+        destinatario_id=destinatario,
+        mensagem_id=nova,
+    )
+    msg = next(m for m in contexto.conversas.listar(conversa) if m.id == nova)
+    return rotas_app.MensagemOut(
+        id=msg.id,
+        autor_id=msg.autor_id,
+        minha=msg.autor_id == usuario.id,
+        texto=msg.texto,
+        mascarada=msg.mascarada,
+        enviada_em=msg.enviada_em,
+        lida_em=msg.lida_em,
+        entregue_em=msg.entregue_em or msg.lida_em,
+    )
+
+
+@router.post(
+    "/pedidos/{pedido_id}/agenda/aceitar",
+    response_model=PedidoOut,
+    summary="Aceitar sugestão de visita (confirma agenda ou remarca)",
+)
+def aceitar_agenda(
+    pedido_id: str,
+    corpo: AceitarAgendaIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PedidoOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.estado not in (Estado.PAGO_E_RETIDO, Estado.AGENDADO):
+        raise HTTPException(409, "O pedido não está pronto para agendamento ou remarcação.")
+    profissional_id = pedido.profissional_id
+    if not profissional_id:
+        raise HTTPException(409, "Pedido sem profissional contratado.")
+    conversa = contexto.conversas.abrir(pedido.id, profissional_id)
+
+    inicio: datetime | None = None
+    fim: datetime | None = None
+    if corpo.mensagem_id is not None:
+        mensagens = contexto.conversas.listar(conversa)
+        msg = next((m for m in mensagens if m.id == corpo.mensagem_id), None)
+        if msg is None:
+            raise HTTPException(404, "Sugestão de horário não encontrada nesta conversa.")
+        if msg.autor_id == usuario.id:
+            raise HTTPException(422, "Aguarde a outra parte confirmar o horário sugerido.")
+        match = _REGEX_AGENDA.match(msg.texto)
+        if match is None:
+            raise HTTPException(422, "Esta mensagem não contém uma sugestão de horário.")
+        inicio = datetime.fromisoformat(match.group(1).replace("Z", "+00:00"))
+        fim = datetime.fromisoformat(match.group(2).replace("Z", "+00:00"))
+    elif corpo.janela is not None:
+        inicio = corpo.janela.inicio
+        fim = corpo.janela.fim
+    else:
+        raise HTTPException(422, "Informe a mensagem ou a janela de horário.")
+
+    janela = Janela(inicio, fim)
+    agora = contexto.agora()
+    prazos = contexto.config.carregar().prazos_pedido
+    outra_parte = profissional_id if usuario.id == pedido.cliente_id else pedido.cliente_id
+    if pedido.estado is Estado.PAGO_E_RETIDO:
+        ator_agendar = Ator(Papel.PROFISSIONAL, profissional_id)
+        transicao = pedidos_estados.transicionar(
+            pedido,
+            Acao.CONFIRMAR_AGENDA,
+            ator_agendar,
+            agora,
+            ProvaAgenda(janela),
+            prazos,
+        )
+    else:
+        transicao = pedidos_estados.transicionar(
+            pedido,
+            Acao.REMARCAR,
+            ator_de(usuario, pedido),
+            agora,
+            ProvaRemarcacao(janela, outra_parte),
+            prazos,
+        )
+
+    with contexto.transacao():
+        gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        for gancho in contexto.apos_transicao:
+            gancho(pedido, gravado, transicao.evento.acao, contexto)
+
+    msg_conf = f"Visita confirmada para {_formatar_janela_br(inicio, fim)}."
+    aviso_id = contexto.conversas.enviar(conversa, usuario.id, msg_conf)
+    avisar_mensagem_nova(
+        request,
+        contexto,
+        conversa_id=conversa,
+        pedido_id=pedido.id,
+        autor_id=usuario.id,
+        destinatario_id=outra_parte,
+        mensagem_id=aviso_id,
+    )
+    return pedido_out(gravado, usuario)
 
 
 @router.post(
@@ -1322,7 +1628,7 @@ def recusar_pedido(
 # --- Perfil -----------------------------------------------------------------------------
 
 
-def _perfil_out(contexto: Contexto, usuario: Usuario) -> PerfilOut:
+def _perfil_out(contexto: Contexto, usuario: Usuario, request: Request | None = None) -> PerfilOut:
     detalhe = contexto.usuarios.detalhe(usuario.id)
     if detalhe is None:
         contexto.usuarios.garantir(usuario.id)  # idempotente
@@ -1338,6 +1644,7 @@ def _perfil_out(contexto: Contexto, usuario: Usuario) -> PerfilOut:
         papeis.append("profissional")
     if usuario.papel is PapelUsuario.PROFISSIONAL and "cliente" not in papeis:
         papeis.insert(0, "cliente")  # quem é profissional também pode pedir serviço
+    disponivel_agora = _profissional_disponivel_agora(request, usuario.id) if tem_perfil else False
     return PerfilOut(
         id=detalhe.id,
         nome=detalhe.nome,
@@ -1348,28 +1655,31 @@ def _perfil_out(contexto: Contexto, usuario: Usuario) -> PerfilOut:
         servicos_concluidos=detalhe.servicos_concluidos,
         papeis=papeis,
         tem_perfil_profissional=tem_perfil,
+        disponivel_agora=disponivel_agora,
         status_verificacao=contexto.usuarios.status_verificacao(usuario.id) if tem_perfil else None,
     )
 
 
 @router.get("/me", response_model=PerfilOut, summary="Meu perfil")
 def meu_perfil(
+    request: Request,
     usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PerfilOut:
-    return _perfil_out(contexto, usuario)
+    return _perfil_out(contexto, usuario, request)
 
 
 @router.patch("/me", response_model=PerfilOut, summary="Atualizar meu perfil (nome)")
 def atualizar_perfil(
     corpo: AtualizarPerfilIn,
+    request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PerfilOut:
     nome = nome_de_exibicao(corpo.nome)
     contexto.usuarios.garantir(usuario.id, nome)
     contexto.usuarios.atualizar_nome(usuario.id, nome)
-    return _perfil_out(contexto, usuario)
+    return _perfil_out(contexto, usuario, request)
 
 
 def registrar_rotas(app: FastAPI) -> FastAPI:

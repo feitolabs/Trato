@@ -25,10 +25,13 @@ class Categoria(StrEnum):
 
 class Evento(StrEnum):
     ORCAMENTO_RECEBIDO = "orcamento.recebido"
+    PEDIDO_DIRECIONADO = "pedido.direcionado"
+    PEDIDO_URGENTE = "pedido.urgente"
     ORCAMENTO_ACEITO = "orcamento.aceito"
     PAGAMENTO_CONFIRMADO = "pagamento.confirmado"
     LEMBRETE_AGENDAMENTO = "agenda.lembrete"
     CODIGO_INICIO = "agenda.codigo_inicio"
+    CLIENTE_AUSENTE = "agenda.cliente_ausente"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
     ADITIVO_PENDENTE = "execucao.aditivo_pendente"
     DISPUTA_ABERTA = "disputa.aberta"
@@ -56,6 +59,19 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Você recebeu um orçamento para o seu pedido.",
         "orcamentos",
     ),
+    Evento.PEDIDO_DIRECIONADO: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Pedido de orçamento direto para você",
+        "Um cliente pediu um orçamento diretamente para você.",
+        "pedido_aberto",
+    ),
+    Evento.PEDIDO_URGENTE: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Pedido urgente disponível",
+        "Um cliente precisa de atendimento rápido. Veja se pode atender agora.",
+        "pedido_aberto",
+        essencial=True,
+    ),
     Evento.ORCAMENTO_ACEITO: ModeloEvento(
         Categoria.ORCAMENTOS,
         "Orçamento aceito",
@@ -80,6 +96,13 @@ MODELOS: dict[Evento, ModeloEvento] = {
         Categoria.AGENDA,
         "Código de início disponível",
         "Abra o pedido para ver o código que o profissional vai pedir na chegada.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.CLIENTE_AUSENTE: ModeloEvento(
+        Categoria.AGENDA,
+        "Profissional no local",
+        "O profissional registrou chegada no endereço e aguarda seu retorno.",
         "pedido",
         essencial=True,
     ),

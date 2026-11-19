@@ -158,10 +158,10 @@ class UploadsEmMemoria:
         return next((d for d in self.documentos.values() if d.storage_path == caminho), None)
 
     def definir_foto_perfil(self, usuario_id: str, caminho: str) -> None:
-        self.fotos_de_perfil[str(usuario_id).replace('-', '')] = caminho
+        self.fotos_de_perfil[str(usuario_id).replace("-", "")] = caminho
 
     def foto_perfil(self, usuario_id: str) -> str | None:
-        return self.fotos_de_perfil.get(str(usuario_id).replace('-', ''))
+        return self.fotos_de_perfil.get(str(usuario_id).replace("-", ""))
 
 
 def distancia_metros(lat1: float, lng1: float, lat2: float, lng2: float) -> float:

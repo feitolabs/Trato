@@ -75,6 +75,7 @@ class Acao(StrEnum):
     CONFIRMAR_AGENDA = "confirmar_agenda"
     REMARCAR = "remarcar"
     FAZER_CHECK_IN = "fazer_check_in"
+    REGISTRAR_CLIENTE_AUSENTE = "registrar_cliente_ausente"
     REGISTRAR_AUSENCIA = "registrar_ausencia"
     FAZER_CHECK_OUT = "fazer_check_out"
     CONFIRMAR_CONCLUSAO = "confirmar_conclusao"
@@ -190,6 +191,13 @@ class ProvaCheckIn:
 
 
 @dataclass(frozen=True)
+class ProvaClienteAusente:
+    foto: Foto | None = None  # obrigatória no presencial
+    localizacao: Localizacao | None = None  # obrigatória no presencial
+    observacao: str | None = None
+
+
+@dataclass(frozen=True)
 class ProvaCheckOut:
     foto_final: Foto | None = None  # obrigatória no presencial
     codigo_conclusao: str = ""
@@ -225,6 +233,7 @@ Prova = (
     | ProvaAgenda
     | ProvaRemarcacao
     | ProvaCheckIn
+    | ProvaClienteAusente
     | ProvaCheckOut
     | ProvaCancelamento
     | ProvaDisputa
@@ -258,6 +267,7 @@ class Pedido:
     codigo_inicio: str | None = None
     codigo_conclusao: str | None = None
     check_in_em: datetime | None = None
+    cliente_ausente_em: datetime | None = None
     check_out_em: datetime | None = None
     concluido_em: datetime | None = None
     estado_antes_da_disputa: Estado | None = None
@@ -328,6 +338,11 @@ REGRAS: dict[Acao, _Regra] = {
     ),
     Acao.FAZER_CHECK_IN: _Regra(
         "fazer check-in", {Papel.PROFISSIONAL: _de(E.AGENDADO)}, ProvaCheckIn
+    ),
+    Acao.REGISTRAR_CLIENTE_AUSENTE: _Regra(
+        "registrar cliente ausente",
+        {Papel.PROFISSIONAL: _de(E.AGENDADO)},
+        ProvaClienteAusente,
     ),
     Acao.REGISTRAR_AUSENCIA: _Regra(
         "registrar ausência do profissional", {Papel.SISTEMA: _de(E.AGENDADO)}, None
@@ -561,7 +576,7 @@ def _remarcar(pedido, ator, agora, prova: ProvaRemarcacao, prazos, gerar):
     if prova.aceito_por != outra_parte:
         raise ProvaInvalida("Remarcação exige o aceite da outra parte.")
     _exigir_janela(prova.janela, agora)
-    return replace(pedido, janela=prova.janela)
+    return replace(pedido, janela=prova.janela, cliente_ausente_em=None)
 
 
 def _fazer_check_in(pedido, ator, agora, prova: ProvaCheckIn, prazos, gerar):
@@ -574,7 +589,31 @@ def _fazer_check_in(pedido, ator, agora, prova: ProvaCheckIn, prazos, gerar):
     return replace(pedido, estado=Estado.EM_ANDAMENTO, check_in_em=agora, codigo_conclusao=gerar())
 
 
+def _registrar_cliente_ausente(pedido, ator, agora, prova: ProvaClienteAusente, prazos, gerar):
+    if pedido.cliente_ausente_em is not None:
+        raise EstadoInvalido("A ausência do cliente já foi registrada neste agendamento.")
+    if pedido.janela is None:
+        raise EstadoInvalido("Este pedido não tem janela agendada.")
+    if agora < pedido.janela.inicio - timedelta(minutes=15):
+        raise ForaDoPrazo(
+            "Só é possível registrar cliente ausente a partir de 15 minutos antes "
+            "da janela agendada."
+        )
+    if not pedido.remoto:
+        if prova.foto is None or prova.localizacao is None:
+            raise ProvaInvalida(
+                "O registro de cliente ausente precisa de foto do local e localização."
+            )
+        _exigir_foto(prova.foto, agora, "foto do local")
+        _exigir_localizacao(prova.localizacao)
+    return replace(pedido, cliente_ausente_em=agora)
+
+
 def _registrar_ausencia(pedido, ator, agora, prova, prazos, gerar):
+    if pedido.cliente_ausente_em is not None:
+        raise ForaDoPrazo(
+            "O profissional registrou chegada no local; a ausência automática está bloqueada."
+        )
     prazo = _prazo(prazos, "tolerancia_comparecimento", "tolerância de comparecimento")
     fim = pedido.janela.fim if pedido.janela else None
     _exigir_vencido(fim, prazo, agora, "tolerância de comparecimento")
@@ -666,6 +705,7 @@ _APLICAR = {
     Acao.CONFIRMAR_AGENDA: _confirmar_agenda,
     Acao.REMARCAR: _remarcar,
     Acao.FAZER_CHECK_IN: _fazer_check_in,
+    Acao.REGISTRAR_CLIENTE_AUSENTE: _registrar_cliente_ausente,
     Acao.REGISTRAR_AUSENCIA: _registrar_ausencia,
     Acao.FAZER_CHECK_OUT: _fazer_check_out,
     Acao.CONFIRMAR_CONCLUSAO: _confirmar_conclusao,

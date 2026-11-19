@@ -22,10 +22,12 @@ class DadosPessoaisTela extends StatelessWidget {
     super.key,
     required this.servico,
     this.servicoCep,
+    this.aoAlterarCredenciais,
   });
 
   final ServicoConta servico;
   final ServicoCep? servicoCep;
+  final VoidCallback? aoAlterarCredenciais;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +39,7 @@ class DadosPessoaisTela extends StatelessWidget {
           servico: servico,
           servicoCep: servicoCep,
           dados: dados,
+          aoAlterarCredenciais: aoAlterarCredenciais,
         ),
       ),
     );
@@ -48,11 +51,13 @@ class _Formulario extends StatefulWidget {
     required this.servico,
     required this.dados,
     this.servicoCep,
+    this.aoAlterarCredenciais,
   });
 
   final ServicoConta servico;
   final ServicoCep? servicoCep;
   final DadosPessoaisConta dados;
+  final VoidCallback? aoAlterarCredenciais;
 
   @override
   State<_Formulario> createState() => _FormularioState();
@@ -476,6 +481,15 @@ class _FormularioState extends State<_Formulario> {
           Text(_aviso!, style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.verdeTexto)),
         ],
         const SizedBox(height: EspacosTrato.x5),
+        if (widget.aoAlterarCredenciais != null) ...[
+          BotaoSecundario(
+            key: const Key('botao-alterar-credenciais'),
+            texto: 'Alterar e-mail ou senha',
+            icone: Icons.lock_outline,
+            aoTocar: widget.aoAlterarCredenciais,
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
         BotaoPrimario(texto: 'Salvar', carregando: _salvando, aoTocar: _salvando ? null : _salvar),
       ],
     );

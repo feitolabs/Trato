@@ -105,9 +105,8 @@ void main() {
       // (0,5 h de deslocamento + 2,5 h trabalhadas) x 90 + 46 + 64 = R$ 380,00
       expect(servico.pedidos, [38000]);
       expect(find.text('R\$ 380,00'), findsWidgets);
-      // Taxa descontada: o cliente paga 380; o profissional recebe 380 menos 28,50.
-      expect(find.text('Taxa Trato (7,5%)'), findsOneWidget);
-      expect(find.text('– R\$ 28,50'), findsOneWidget);
+      // App gratuito: nenhuma linha de taxa; o app só mostra o líquido que o backend devolve.
+      expect(find.textContaining('Taxa Trato'), findsNothing);
       expect(find.text('R\$ 351,50'), findsOneWidget);
       expect(find.text('Serviços parecidos na região: R\$ 300,00 a R\$ 450,00.'), findsOneWidget);
     });
@@ -122,12 +121,12 @@ void main() {
       expect(find.textContaining('Total de horas: 4 h'), findsOneWidget);
     });
 
-    testWidgets('rótulo da taxa acompanha o percentual devolvido', (tester) async {
+    testWidgets('não mostra taxa e avisa que o Trato é grátis', (tester) async {
       final servico = ServicoOrcamentoFake(taxaBps: 500);
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
-      expect(find.text('Taxa Trato (5%)'), findsOneWidget);
-      expect(find.text('– R\$ 19,00'), findsOneWidget);
+      expect(find.textContaining('Taxa'), findsNothing);
+      expect(find.textContaining('O Trato é grátis'), findsOneWidget);
       expect(find.text('R\$ 361,00'), findsOneWidget);
     });
 
@@ -362,7 +361,15 @@ void main() {
       final link = find.text('Cliente não está no local');
       await tester.ensureVisible(link);
       await tester.tap(link);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+      expect(servico.clienteAusenteAvisado, isFalse);
+
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar ausência'));
+      await tester.pumpAndSettle();
       expect(servico.clienteAusenteAvisado, isTrue);
     });
   });

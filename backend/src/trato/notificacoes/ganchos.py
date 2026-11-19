@@ -21,6 +21,7 @@ MAPA: dict[Acao, tuple[Evento, str]] = {
     Acao.ACEITAR_ORCAMENTO: (Evento.ORCAMENTO_ACEITO, "profissional"),
     Acao.CONFIRMAR_PAGAMENTO: (Evento.PAGAMENTO_CONFIRMADO, "ambos"),
     Acao.CONFIRMAR_AGENDA: (Evento.CODIGO_INICIO, "cliente"),
+    Acao.REGISTRAR_CLIENTE_AUSENTE: (Evento.CLIENTE_AUSENTE, "cliente"),
     Acao.FAZER_CHECK_OUT: (Evento.CONCLUSAO_PARA_CONFIRMAR, "cliente"),
     Acao.ABRIR_DISPUTA: (Evento.DISPUTA_ABERTA, "ambos"),
     Acao.ENCERRAR_DISPUTA_POR_ACORDO: (Evento.DISPUTA_DECIDIDA, "ambos"),

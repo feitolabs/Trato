@@ -81,7 +81,8 @@ def _contrato_do_pedido(con: psycopg.Connection[Any], pedido_id: str) -> dict[st
 
 _SELECT_COBRANCA = (
     "select p.stripe_payment_intent_id, c.pedido_id, p.aditivo_id, p.valor_centavos, p.meio, "
-    "p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos "
+    "p.parcelas, p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos, "
+    "p.cupom_codigo, p.desconto_centavos "
     "from public.pagamentos p join public.contratos c on c.id = p.contrato_id "
 )
 
@@ -99,12 +100,39 @@ def _cobranca(linha: dict[str, Any]) -> CobrancaLocal:
         instrucao=linha["instrucao"],
         pago_em=None if devolvida else linha["confirmado_em"],
         estornado_centavos=int(linha["estornado_centavos"]),
+        parcelas=int(linha.get("parcelas") or 1),
+        cupom_codigo=linha.get("cupom_codigo"),
+        desconto_centavos=int(linha.get("desconto_centavos") or 0),
     )
 
 
 class CobrancasPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
+        self._termos_por_pi: dict[str, tuple[int | None, int]] = {}
+
+    def _montar_cobranca(self, linha: dict[str, Any]) -> CobrancaLocal:
+        base = _cobranca(linha)
+        termos = self._termos_por_pi.get(base.id)
+        if termos is None:
+            return base
+        servico_centavos, parcelas = termos
+        return CobrancaLocal(
+            id=base.id,
+            pedido_id=base.pedido_id,
+            valor_centavos=base.valor_centavos,
+            meio=base.meio,
+            status=base.status,
+            criada_em=base.criada_em,
+            aditivo_id=base.aditivo_id,
+            instrucao=base.instrucao,
+            pago_em=base.pago_em,
+            estornado_centavos=base.estornado_centavos,
+            parcelas=parcelas,
+            servico_centavos=servico_centavos,
+            cupom_codigo=base.cupom_codigo,
+            desconto_centavos=base.desconto_centavos,
+        )
 
     def obter(self, cobranca_id: str) -> CobrancaLocal | None:
         if not cobranca_id:
@@ -113,7 +141,7 @@ class CobrancasPostgres:
             linha = con.execute(
                 _SELECT_COBRANCA + "where p.stripe_payment_intent_id = %s", (cobranca_id,)
             ).fetchone()
-        return _cobranca(linha) if linha else None
+        return self._montar_cobranca(linha) if linha else None
 
     def do_pedido(self, pedido_id: str) -> Sequence[CobrancaLocal]:
         pedido = como_uuid(pedido_id)
@@ -125,7 +153,7 @@ class CobrancasPostgres:
                 "is not null order by p.criado_em, p.id",
                 (pedido,),
             ).fetchall()
-        return [_cobranca(linha) for linha in linhas]
+        return [self._montar_cobranca(linha) for linha in linhas]
 
     def aguardando_desde_antes(self, limite: datetime) -> Sequence[CobrancaLocal]:
         with self._banco.transacao() as con:
@@ -134,10 +162,12 @@ class CobrancasPostgres:
                 "is not null and p.criado_em <= %s order by p.criado_em, p.id",
                 (limite,),
             ).fetchall()
-        return [_cobranca(linha) for linha in linhas]
+        return [self._montar_cobranca(linha) for linha in linhas]
 
     def salvar(self, cobranca: CobrancaLocal) -> None:
         """Cria a cobrança ou atualiza só o que muda depois (estado, confirmação, devolução)."""
+        if cobranca.servico_centavos is not None or cobranca.parcelas != 1:
+            self._termos_por_pi[cobranca.id] = (cobranca.servico_centavos, cobranca.parcelas)
         status = _STATUS_PARA_BANCO[cobranca.status]
         if cobranca.status is EstadoCobranca.PAGA and cobranca.estornado_centavos > 0:
             status = "reembolsado_parcial"
@@ -160,15 +190,17 @@ class CobrancasPostgres:
             aditivo = como_uuid(cobranca.aditivo_id) if cobranca.aditivo_id else None
             con.execute(
                 "insert into public.pagamentos (contrato_id, pagador_id, tipo, aditivo_id, meio, "
-                "valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
-                "confirmado_em, estornado_centavos, instrucao, criado_em) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "parcelas, valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
+                "confirmado_em, estornado_centavos, instrucao, cupom_codigo, desconto_centavos, "
+                "criado_em) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     contrato["id"],
                     contrato["cliente_id"],
                     "aditivo" if aditivo else "saldo",
                     aditivo,
                     _MEIO_PARA_BANCO[cobranca.meio],
+                    cobranca.parcelas,
                     cobranca.valor_centavos,
                     status,
                     cobranca.id,
@@ -176,6 +208,8 @@ class CobrancasPostgres:
                     confirmado_em,
                     cobranca.estornado_centavos,
                     cobranca.instrucao,
+                    cobranca.cupom_codigo,
+                    cobranca.desconto_centavos,
                     cobranca.criada_em,
                 ),
             )

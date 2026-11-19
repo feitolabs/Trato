@@ -35,6 +35,7 @@ def nome_publico_busca(nome: str | None) -> str:
 def dia_semana_hoje() -> int:
     return datetime.now(_FUSO_BRASILIA).weekday()
 
+
 if TYPE_CHECKING:
     from trato.api.repositorios_app import PerfilDetalhe
 
@@ -59,6 +60,20 @@ class ItemPortfolio:
 
 
 @dataclass(frozen=True)
+class ContaRecebimento:
+    """Conta de liquidação / chave Pix do profissional para recebimento de repasses (D15)."""
+
+    tipo_pix: str  # cpf | cnpj | email | telefone | aleatoria
+    chave_pix: str
+    banco_codigo: str | None = None
+    banco_nome: str | None = None
+    agencia: str | None = None
+    conta: str | None = None
+    tipo_conta: str | None = None  # corrente | poupanca
+    atualizada_em: datetime | None = None
+
+
+@dataclass(frozen=True)
 class PerfilProfissional:
     usuario_id: str
     status: str  # em_analise | aprovado | recusado | suspenso
@@ -72,6 +87,8 @@ class PerfilProfissional:
     # O que o profissional atende. Padrão = só presencial (como os cadastros anteriores).
     atende_presencial: bool = True
     atende_remoto: bool = False
+    disponivel_agora: bool = False
+    conta_recebimento: ContaRecebimento | None = None
 
 
 @dataclass(frozen=True)
@@ -171,9 +188,7 @@ def _correspondencia_texto(
         return 0
     nome_pub = normalizar_busca(nome_publico_busca(nome))
     bio = normalizar_busca(p.bio or "")
-    portfolio = " ".join(
-        normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio
-    )
+    portfolio = " ".join(normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio)
     bairros = " ".join(normalizar_busca(r.bairro or "") for r in p.regioes)
     cat_casa = bool(filtro.categorias_texto & set(p.categorias))
     cid_casa = any(r.cidade_id in filtro.cidades_texto for r in p.regioes)
@@ -216,6 +231,10 @@ class ProfissionaisEmMemoria:
 
     def salvar(self, perfil: PerfilProfissional) -> None:
         self._itens[perfil.usuario_id] = perfil
+
+    def listar_disponiveis_agora(self) -> list[PerfilProfissional]:
+        """Profissionais aprovados com o modo 'Disponível agora' ativo."""
+        return [p for p in self._itens.values() if p.status == "aprovado" and p.disponivel_agora]
 
     def buscar(
         self, filtro: FiltroBusca, detalhe: Callable[[str], PerfilDetalhe | None]

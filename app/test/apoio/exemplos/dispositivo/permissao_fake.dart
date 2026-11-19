@@ -1,4 +1,3 @@
-import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:trato/dispositivo/permissao.dart';
 
 /// Para teste e demonstração: o estado é definido por quem monta.

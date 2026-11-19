@@ -51,9 +51,13 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoAbrirOrcamentoEnviado,
     this.aoAbrirMapa,
     this.recarregarInicio,
+    this.aoAlterarDisponivel,
     this.atualizarACada,
     this.atualizarQuando,
   });
+
+  /// Atualiza "Disponível agora" no backend (prioriza e notifica pedidos urgentes).
+  final Future<bool> Function(bool disponivel)? aoAlterarDisponivel;
 
   /// Toque num pedido que o cliente já aceitou (aba Pedidos > Em andamento).
   final ValueChanged<PedidoContratado>? aoAbrirContratado;
@@ -143,9 +147,12 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       _relogio = RelogioDeAtualizacao(
         intervalo: intervalo,
         aoAtualizar: _atualizarEmSilencio,
-        // Com outra tela aberta por cima (detalhe, chat), espera: a lista volta ao fechar.
+        // Só atualiza quando o Início ou Pedidos estão visíveis (pausa nas demais abas).
         deveAtualizar: () =>
-            mounted && !_carregandoPedidos && (ModalRoute.of(context)?.isCurrent ?? true),
+            mounted &&
+            (_aba == 0 || _aba == 1) &&
+            !_carregandoPedidos &&
+            (ModalRoute.of(context)?.isCurrent ?? true),
       );
     }
   }
@@ -188,6 +195,33 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       setState(() => _inicio = novo.comPedidos(pedidos));
     } on Object {
       // Falha em segundo plano mantém o que já está visível.
+    }
+  }
+
+  Future<void> _alterarDisponivel(bool disponivel) async {
+    final salvar = widget.aoAlterarDisponivel;
+    if (salvar == null) return;
+    final mensagens = ScaffoldMessenger.of(context);
+    setState(() => _inicio = _inicio.comDisponivel(disponivel));
+    try {
+      final salvo = await salvar(disponivel);
+      if (!mounted) return;
+      setState(() => _inicio = _inicio.comDisponivel(salvo));
+      await _atualizarEmSilencio();
+    } on Object catch (erro) {
+      if (!mounted) return;
+      setState(() => _inicio = _inicio.comDisponivel(!disponivel));
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              erro is ErroTrato
+                  ? erro.mensagem
+                  : 'Não foi possível atualizar sua disponibilidade agora.',
+            ),
+          ),
+        );
     }
   }
 
@@ -311,6 +345,8 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     final paginas = <Widget>[
       InicioProfissionalTela(
         dados: _inicio,
+        aoAlterarDisponivel:
+            widget.aoAlterarDisponivel == null ? null : _alterarDisponivel,
         aoFazerCheckIn: widget.aoGerenciarProximo != null
             ? () => widget.aoGerenciarProximo!(_inicio.proximo)
             : widget.aoFazerCheckIn,
@@ -359,11 +395,28 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       child: AtualizadorTela(
         recarregar: _atualizarEmSilencio,
         child: Scaffold(
-          body: IndexedStack(index: _aba, children: paginas),
-          bottomNavigationBar: BarraAbasTrato(
-            abas: abasProfissional,
-            indiceAtual: _aba,
-            aoSelecionar: _ir,
+          body: IndexedStack(
+            index: _aba,
+            children: [
+              for (var i = 0; i < paginas.length; i++)
+                TickerMode(enabled: _aba == i, child: paginas[i]),
+            ],
+          ),
+          bottomNavigationBar: ValueListenableBuilder<int>(
+            valueListenable: RotasTrato.mensagensNaoLidas,
+            builder: (context, naoLidas, _) {
+              final abas = naoLidas > 0
+                  ? [
+                      for (var i = 0; i < abasProfissional.length; i++)
+                        i == 1 ? abasProfissional[i].comBadge(naoLidas) : abasProfissional[i],
+                    ]
+                  : abasProfissional;
+              return BarraAbasTrato(
+                abas: abas,
+                indiceAtual: _aba,
+                aoSelecionar: _ir,
+              );
+            },
           ),
         ),
       ),

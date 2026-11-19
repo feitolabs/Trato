@@ -162,6 +162,8 @@ def transicoes_por_prazo(
             continue
         if pedido.estado is Estado.ABERTO and item.orcamentos_recebidos > 0:
             continue  # recebeu orçamento: o cliente decide, o pedido não expira
+        if pedido.estado is Estado.AGENDADO and pedido.cliente_ausente_em is not None:
+            continue  # profissional registrou chegada no local; ausência automática suspensa
         if pedido.estado is Estado.EM_CONFIRMACAO and item.disputa_aberta:
             continue
         try:

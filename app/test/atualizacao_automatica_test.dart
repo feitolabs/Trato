@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/dados/carregador.dart';
-import 'package:trato/telas/comuns/estados.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
 import 'package:trato/telas/mensagens/modelos.dart';
 import 'package:trato/telas/notificacoes/modelos.dart';
@@ -220,7 +219,7 @@ void main() {
 
   testWidgets('sem pedido aceito, a aba explica quando ele aparece', (tester) async {
     await tester.pumpWidget(
-      _app(PedidosProfissionalTela(pedidos: const [], conversas: const SizedBox.shrink())),
+      _app(const PedidosProfissionalTela(pedidos: [], conversas: SizedBox.shrink())),
     );
     await tester.tap(find.text('Em andamento'));
     await tester.pumpAndSettle();

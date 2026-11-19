@@ -31,6 +31,7 @@ from trato.pedidos.estados import (
     Pedido,
     ProvaCheckIn,
     ProvaCheckOut,
+    ProvaClienteAusente,
 )
 from trato.persistencia.auditoria import registrar_na_transacao
 from trato.persistencia.codigos import codigo_do_agendamento, hash_do_codigo
@@ -54,6 +55,7 @@ select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
        c.profissional_id, c.orcamento_id, c.aceito_em, c.id as contrato_id,
        ag.id as ag_id, ag.janela_inicio, ag.janela_fim,
        ci.registrada_em as check_in_em, co.registrada_em as check_out_em,
+       ca.registrada_em as cliente_ausente_em,
        (select h.ocorrida_em from public.pedido_historico h
          where h.pedido_id = p.id and h.para_status = 'concluido'
          order by h.id desc limit 1) as concluido_em,
@@ -71,6 +73,7 @@ select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
        order by a.criado_em desc, a.id limit 1) ag on true
   left join public.presencas ci on ci.agendamento_id = ag.id and ci.tipo = 'check_in'
   left join public.presencas co on co.agendamento_id = ag.id and co.tipo = 'check_out'
+  left join public.presencas ca on ca.agendamento_id = ag.id and ca.tipo = 'cliente_ausente'
 """
 
 
@@ -433,6 +436,7 @@ class PedidosPostgres:
             codigo_inicio=codigo_inicio,
             codigo_conclusao=codigo_conclusao,
             check_in_em=linha["check_in_em"],
+            cliente_ausente_em=linha["cliente_ausente_em"],
             check_out_em=linha["check_out_em"],
             concluido_em=linha["concluido_em"],
             estado_antes_da_disputa=_estado(linha["antes_da_disputa"]) if em_disputa else None,
@@ -635,6 +639,22 @@ class PedidosPostgres:
                 "update public.agendamentos set codigo_conclusao_hash = %s where id = %s",
                 (hash_do_codigo(segredo, ag, "conclusao", conclusao), ag),
             )
+        if (
+            ev is not None
+            and ev.acao is Acao.REGISTRAR_CLIENTE_AUSENTE
+            and pedido.cliente_ausente_em
+            and isinstance(ev.prova, ProvaClienteAusente)
+        ):
+            self._presenca(
+                con,
+                pid,
+                ag,
+                "cliente_ausente",
+                ev,
+                ev.prova.foto,
+                ev.prova.localizacao,
+                codigo_validado=False,
+            )
         if ev is not None and pedido.check_out_em and isinstance(ev.prova, ProvaCheckOut):
             self._presenca(con, pid, ag, "check_out", ev, ev.prova.foto_final, None)
 
@@ -658,26 +678,40 @@ class PedidosPostgres:
         ev: Evento,
         foto: Any,
         local: Any,
+        *,
+        codigo_validado: bool = True,
     ) -> None:
         # A hora da presença é a do servidor (gatilho); a do aparelho fica só como referência.
         ator = exigir_uuid(ev.ator.id, "ator")
         lat = local.latitude if local else None
         lng = local.longitude if local else None
-        midia = con.execute(
-            "insert into public.midias (pedido_id, enviada_por, finalidade, storage_path, "
-            "capturada_em, lat, lng) values (%s, %s, %s, %s, %s, %s, %s) returning id",
-            (
-                pid,
-                ator,
-                "checkin" if tipo == "check_in" else "checkout",
-                foto.arquivo_id,
-                foto.tirada_em,
-                lat,
-                lng,
-            ),
-        ).fetchone()
+        midia_id: Any = None
+        if foto is not None:
+            midia_uuid = como_uuid(foto.arquivo_id)
+            if midia_uuid is not None:
+                existente = con.execute(
+                    "select id from public.midias where id = %s and pedido_id = %s",
+                    (midia_uuid, pid),
+                ).fetchone()
+                if existente is not None:
+                    midia_id = existente["id"]
+            if midia_id is None:
+                midia = con.execute(
+                    "insert into public.midias (pedido_id, enviada_por, finalidade, storage_path, "
+                    "capturada_em, lat, lng) values (%s, %s, %s, %s, %s, %s, %s) returning id",
+                    (
+                        pid,
+                        ator,
+                        "checkout" if tipo == "check_out" else "checkin",
+                        foto.arquivo_id,
+                        foto.tirada_em,
+                        lat,
+                        lng,
+                    ),
+                ).fetchone()
+                midia_id = midia["id"]
         con.execute(
             "insert into public.presencas (agendamento_id, tipo, registrada_por, lat, lng, "
-            "foto_midia_id, codigo_validado) values (%s, %s, %s, %s, %s, %s, true)",
-            (ag, tipo, ator, lat, lng, midia["id"]),
+            "foto_midia_id, codigo_validado) values (%s, %s, %s, %s, %s, %s, %s)",
+            (ag, tipo, ator, lat, lng, midia_id, codigo_validado),
         )

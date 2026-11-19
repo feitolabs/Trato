@@ -45,10 +45,11 @@ class BotaoSecundario extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final estilo = selecionado
         ? OutlinedButton.styleFrom(
-            backgroundColor: CoresTrato.azulSuave,
-            side: const BorderSide(color: CoresTrato.petroleo, width: 1.5),
+            backgroundColor: c.azulSuave,
+            side: BorderSide(color: c.petroleo, width: 1.5),
           )
         : null;
     return OutlinedButton(
@@ -61,14 +62,25 @@ class BotaoSecundario extends StatelessWidget {
 
 /// Link sublinhado. Ex.: "Pular", "Já tenho conta", "Adicionar item".
 class BotaoLink extends StatelessWidget {
-  const BotaoLink({super.key, required this.texto, required this.aoTocar});
+  const BotaoLink({
+    super.key,
+    required this.texto,
+    required this.aoTocar,
+    this.destrutivo = false,
+  });
 
   final String texto;
   final VoidCallback? aoTocar;
+  final bool destrutivo;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(onPressed: aoTocar, child: Text(texto));
+    final c = context.cores;
+    return TextButton(
+      onPressed: aoTocar,
+      style: destrutivo ? TextButton.styleFrom(foregroundColor: c.vermelhoTexto) : null,
+      child: Text(texto),
+    );
   }
 }
 

@@ -122,7 +122,12 @@ def test_so_cadastro_decide_e_abre_documento(painel, papel):
 def test_administrador_tem_autonomia_total_verificacao(painel):
     v = painel.chamar("cadastro", "GET", "/v1/admin/verificacoes").json()["itens"][0]
     caminho = f"/v1/admin/verificacoes/{v['id']}/documentos/{v['documentos'][0]['id']}/url"
-    assert painel.chamar("administrador", "POST", caminho, json={"motivo": "Acesso fundador"}).status_code == 200
+    assert (
+        painel.chamar(
+            "administrador", "POST", caminho, json={"motivo": "Acesso fundador"}
+        ).status_code
+        == 200
+    )
     r = painel.chamar(
         "administrador",
         "POST",

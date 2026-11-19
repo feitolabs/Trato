@@ -61,11 +61,14 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
     }
   }
 
+  static const _maxFotos = 4;
+
   Future<void> _adicionarMidia() async {
+    if (_fotos.length >= _maxFotos) return;
     widget.aoAdicionarMidia?.call();
     if (widget.aoCapturarFoto != null) {
       final ref = await widget.aoCapturarFoto!();
-      if (ref != null && mounted) {
+      if (ref != null && mounted && _fotos.length < _maxFotos) {
         setState(() => _fotos.add(ref));
       }
     }
@@ -111,13 +114,36 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
           runSpacing: EspacosTrato.x2,
           children: [
             for (var i = 0; i < _fotos.length; i++)
-              EspacoFoto(
-                legenda: '[Foto ${i + 1}]',
-                referencia: _fotos[i],
-                altura: 100,
-                largura: 100,
+              Stack(
+                children: [
+                  EspacoFoto(
+                    legenda: '[Foto ${i + 1}]',
+                    referencia: _fotos[i],
+                    altura: 100,
+                    largura: 100,
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Material(
+                      color: CoresTrato.overlayFoto,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => setState(() => _fotos.removeAt(i)),
+                        child: const Tooltip(
+                          message: 'Remover foto',
+                          child: Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.close, size: 14, color: CoresTrato.textoSobreFoto),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            _AdicionarMidia(aoTocar: _adicionarMidia),
+            if (_fotos.length < _maxFotos) _AdicionarMidia(aoTocar: _adicionarMidia),
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),

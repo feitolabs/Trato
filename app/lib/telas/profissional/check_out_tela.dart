@@ -129,21 +129,55 @@ class _CheckOutTelaState extends State<CheckOutTela> {
           CartaoTrato(
             child: Row(
               children: [
+                if (foto != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(EspacosTrato.raio),
+                    child: SizedBox.square(
+                      dimension: EspacosTrato.x12 + EspacosTrato.x2,
+                      child: ToquePreviewImagem(
+                        referencia: foto.referencia ?? 'Foto final · ${foto.hora}',
+                        legenda: 'Foto final · ${foto.hora}',
+                        child: construirImagemReal(foto.referencia) ??
+                            const ColoredBox(
+                              color: CoresTrato.azulClaro,
+                              child: Center(
+                                child: Icon(Icons.zoom_in, size: 20, color: CoresTrato.petroleo),
+                              ),
+                            ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: EspacosTrato.x3),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Foto final', style: TipografiaTrato.tituloCartao),
-                      Text(foto?.hora ?? 'Mostre o serviço pronto',
-                          style: TipografiaTrato.legenda),
+                      Text(
+                        foto == null
+                            ? 'Mostre o serviço pronto'
+                            : '${foto.hora} · toque na foto para ver',
+                        style: TipografiaTrato.legenda,
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(width: EspacosTrato.x2),
                 foto != null
-                    ? const ChipStatus(
-                        texto: 'Feito',
-                        tipo: TipoStatus.sucesso,
-                        icone: Icons.check)
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const ChipStatus(
+                            texto: 'Feito',
+                            tipo: TipoStatus.sucesso,
+                            icone: Icons.check,
+                          ),
+                          const SizedBox(height: EspacosTrato.x1),
+                          BotaoLink(texto: 'Refazer', aoTocar: _tirarFoto),
+                        ],
+                      )
                     : BotaoLink(texto: 'Tirar foto', aoTocar: _tirarFoto),
               ],
             ),

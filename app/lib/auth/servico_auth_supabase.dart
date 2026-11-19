@@ -126,6 +126,18 @@ class ServicoAuthSupabase implements ServicoAuth {
       _proteger(() => _auth.updateUser(sb.UserAttributes(password: senha)));
 
   @override
+  Future<void> alterarEmail(String novoEmail) => _proteger(() async {
+        final limpo = novoEmail.trim().toLowerCase();
+        if (!limpo.contains('@') || !limpo.contains('.')) {
+          throw const ErroAuth(TipoErroAuth.dadosInvalidos, 'Informe um e-mail válido.');
+        }
+        await _auth.updateUser(
+          sb.UserAttributes(email: limpo),
+          emailRedirectTo: kUrlRetornoEmail,
+        );
+      });
+
+  @override
   bool provedorHabilitado(ProvedorAuth provedor) {
     final ativos = _provedoresAtivos;
     if (ativos != null && !ativos.contains(provedor)) return false;

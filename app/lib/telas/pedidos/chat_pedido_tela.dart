@@ -23,15 +23,17 @@ class ChatPedidoTela extends StatefulWidget {
     this.aoAceitarContraproposta,
     this.aoAceitarProposta,
     this.aoProporNovaCondicao,
+    this.aoAceitarAgenda,
+    this.aoSugerirAgenda,
     this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
 
   final ConversaPedido conversa;
-  final ValueChanged<String>? aoEnviar;
+  final FutureOr<void> Function(String)? aoEnviar;
   final VoidCallback? aoTocarCamera;
   final Future<String?> Function()? aoCapturarFoto;
-  final ValueChanged<String>? aoEnviarFoto;
+  final FutureOr<void> Function(String)? aoEnviarFoto;
   final Future<ConversaPedido> Function()? aoRecarregar;
 
   /// Profissional aceita a contraproposta do cliente (só aparece nas mensagens que ele recebe).
@@ -42,6 +44,12 @@ class ChatPedidoTela extends StatefulWidget {
 
   /// Profissional abre o modal para propor novo valor/prazo direto pela conversa.
   final Future<void> Function()? aoProporNovaCondicao;
+
+  /// Aceita uma sugestão de dia e horário da visita enviada no chat.
+  final Future<void> Function(MensagemChat)? aoAceitarAgenda;
+
+  /// Abre seletor de data/horário para sugerir ou remarcar visita pelo chat.
+  final Future<void> Function()? aoSugerirAgenda;
   final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
@@ -59,6 +67,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   final _controlador = TextEditingController();
   late ConversaPedido _conversa = widget.conversa;
   late List<MensagemChat> _mensagens = [...widget.conversa.mensagens];
+  int _enviosPendentes = 0;
   Timer? _relogio;
 
   @override
@@ -76,7 +85,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.conversa != widget.conversa) {
       _conversa = widget.conversa;
-      if (_conversa.mensagens.length >= _mensagens.length) {
+      if (_conversa.mensagens.length >= _mensagens.length - _enviosPendentes) {
         _mensagens = [..._conversa.mensagens];
       }
     }
@@ -90,7 +99,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       if (!mounted) return;
       setState(() {
         _conversa = atualizada;
-        if (atualizada.mensagens.length >= _mensagens.length) {
+        if (atualizada.mensagens.length >= _mensagens.length - _enviosPendentes) {
           _mensagens = [...atualizada.mensagens];
         }
       });
@@ -106,20 +115,35 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     super.dispose();
   }
 
-  void _enviar([String? texto]) {
+  Future<void> _enviar([String? texto]) async {
     final conteudo = (texto ?? _controlador.text).trim();
     if (conteudo.isEmpty) return;
+    final digitada = texto == null;
+    final otimista = MensagemChat(
+      tipo: TipoMensagem.texto,
+      texto: conteudo,
+      hora: widget.horaAgora(),
+      minha: true,
+    );
     setState(() {
-      _mensagens.add(
-        MensagemChat(
-            tipo: TipoMensagem.texto,
-            texto: conteudo,
-            hora: widget.horaAgora(),
-            minha: true),
-      );
-      _controlador.clear();
+      _mensagens.add(otimista);
+      _enviosPendentes++;
+      if (digitada) _controlador.clear();
     });
-    widget.aoEnviar?.call(conteudo);
+    try {
+      await widget.aoEnviar?.call(conteudo);
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _mensagens.remove(otimista);
+          if (digitada && _controlador.text.isEmpty) {
+            _controlador.text = conteudo;
+          }
+        });
+      }
+    } finally {
+      _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+    }
   }
 
   Future<void> _tocarCamera() async {
@@ -127,17 +151,25 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     if (widget.aoCapturarFoto != null) {
       final ref = await widget.aoCapturarFoto!();
       if (ref != null && mounted) {
+        final otimista = MensagemChat(
+          tipo: TipoMensagem.foto,
+          texto: ref,
+          hora: widget.horaAgora(),
+          minha: true,
+        );
         setState(() {
-          _mensagens.add(
-            MensagemChat(
-              tipo: TipoMensagem.foto,
-              texto: ref,
-              hora: widget.horaAgora(),
-              minha: true,
-            ),
-          );
+          _mensagens.add(otimista);
+          _enviosPendentes++;
         });
-        widget.aoEnviarFoto?.call(ref);
+        try {
+          await widget.aoEnviarFoto?.call(ref);
+        } on Object {
+          if (mounted) {
+            setState(() => _mensagens.remove(otimista));
+          }
+        } finally {
+          _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+        }
       }
     }
   }
@@ -160,6 +192,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
               aoProporNovaCondicao:
                   conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
+              aoSugerirAgenda: widget.aoSugerirAgenda == null
+                  ? null
+                  : () async {
+                      await widget.aoSugerirAgenda!();
+                      await _sincronizar();
+                    },
             ),
             const _AvisoPrivacidade(),
             Expanded(
@@ -219,6 +257,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               await widget.aoAceitarProposta!(prop);
               await _sincronizar();
             },
+      aoAceitarAgenda: widget.aoAceitarAgenda == null
+          ? null
+          : (msg) async {
+              await widget.aoAceitarAgenda!(msg);
+              await _sincronizar();
+            },
     );
   }
 }
@@ -228,68 +272,100 @@ class _Cabecalho extends StatelessWidget {
     required this.conversa,
     this.aoAtualizar,
     this.aoProporNovaCondicao,
+    this.aoSugerirAgenda,
   });
 
   final ConversaPedido conversa;
   final Future<void> Function()? aoAtualizar;
   final Future<void> Function()? aoProporNovaCondicao;
+  final Future<void> Function()? aoSugerirAgenda;
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
+    final temAcoesSecundarias = aoProporNovaCondicao != null || aoSugerirAgenda != null;
     return ConteudoResponsivo(
       comMargem: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x2),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Voltar',
-              onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x2),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Voltar',
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                ),
+                AvatarDeUsuario(
+                  iniciais: conversa.iniciais,
+                  usuarioId: conversa.usuarioId,
+                  tamanho: 48,
+                ),
+                const SizedBox(width: EspacosTrato.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        conversa.nome,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TipografiaTrato.tituloCartao.copyWith(color: c.texto),
+                      ),
+                      Text(
+                        'Pedido ${conversa.numeroPedido} · ${conversa.situacao}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: c.textoSecundario,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (aoAtualizar != null)
+                  IconButton(
+                    tooltip: 'Atualizar conversa',
+                    onPressed: aoAtualizar,
+                    icon: const Icon(Icons.refresh, size: 20),
+                  )
+                else
+                  const SizedBox(width: EspacosTrato.x4),
+              ],
             ),
-            AvatarDeUsuario(
-              iniciais: conversa.iniciais,
-              usuarioId: conversa.usuarioId,
-              tamanho: 48,
-            ),
-            const SizedBox(width: EspacosTrato.x3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          if (temAcoesSecundarias)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                EspacosTrato.x4,
+                0,
+                EspacosTrato.x4,
+                EspacosTrato.x2,
+              ),
+              child: Wrap(
+                spacing: EspacosTrato.x2,
+                runSpacing: EspacosTrato.x1,
                 children: [
-                  Text(
-                    conversa.nome,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TipografiaTrato.tituloCartao,
-                  ),
-                  Text(
-                    'Pedido ${conversa.numeroPedido} · ${conversa.situacao}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
+                  if (aoProporNovaCondicao != null)
+                    TextButton.icon(
+                      onPressed: aoProporNovaCondicao,
+                      icon: const Icon(Icons.tune, size: 18),
+                      label: const Text('Nova proposta'),
                     ),
-                  ),
+                  if (aoSugerirAgenda != null)
+                    TextButton.icon(
+                      key: const Key('botao-sugerir-agenda'),
+                      onPressed: aoSugerirAgenda,
+                      icon: const Icon(Icons.event_available_outlined, size: 18),
+                      label: const Text('Horário'),
+                    ),
                 ],
               ),
             ),
-            if (aoProporNovaCondicao != null)
-              TextButton.icon(
-                onPressed: aoProporNovaCondicao,
-                icon: const Icon(Icons.tune, size: 18),
-                label: const Text('Nova proposta'),
-              ),
-            if (aoAtualizar != null)
-              IconButton(
-                tooltip: 'Atualizar conversa',
-                onPressed: aoAtualizar,
-                icon: const Icon(Icons.refresh, size: 20),
-              ),
-            if (aoAtualizar == null && aoProporNovaCondicao == null)
-              const SizedBox(width: EspacosTrato.x4),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -336,12 +412,14 @@ class _LinhaMensagem extends StatelessWidget {
     required this.podeAceitarProposta,
     this.aoAceitarContraproposta,
     this.aoAceitarProposta,
+    this.aoAceitarAgenda,
   });
 
   final MensagemChat mensagem;
   final bool podeAceitarProposta;
   final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
   final Future<void> Function(ContrapropostaChat)? aoAceitarProposta;
+  final Future<void> Function(MensagemChat)? aoAceitarAgenda;
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +446,7 @@ class _LinhaMensagem extends StatelessWidget {
     final minha = mensagem.minha;
     final larguraMaxima = MediaQuery.sizeOf(context).width * 0.72;
     final prop = mensagem.contraproposta;
+    final agenda = mensagem.propostaAgenda;
     final Widget corpo = mensagem.tipo == TipoMensagem.foto
         ? EspacoFoto(
             rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
@@ -404,13 +483,44 @@ class _LinhaMensagem extends StatelessWidget {
                   if ((mensagem.texto ?? '').trim().isNotEmpty)
                     const SizedBox(height: EspacosTrato.x1),
                 ],
-                if ((mensagem.texto ?? '').trim().isNotEmpty || prop == null)
+                if (agenda != null) ...[
+                  Text(
+                    'Sugestão de visita',
+                    style: TipografiaTrato.sobretitulo.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                    ),
+                  ),
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    '${agenda.inicio.day.toString().padLeft(2, '0')}/'
+                    '${agenda.inicio.month.toString().padLeft(2, '0')} · '
+                    '${agenda.inicio.hour.toString().padLeft(2, '0')}h'
+                    '${agenda.inicio.minute.toString().padLeft(2, '0')} às '
+                    '${agenda.fim.hour.toString().padLeft(2, '0')}h'
+                    '${agenda.fim.minute.toString().padLeft(2, '0')}',
+                    style: TipografiaTrato.corpoForte.copyWith(
+                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                    ),
+                  ),
+                  if ((mensagem.texto ?? '').trim().isNotEmpty)
+                    const SizedBox(height: EspacosTrato.x1),
+                ],
+                if ((mensagem.texto ?? '').trim().isNotEmpty || (prop == null && agenda == null))
                   Text(
                     mensagem.texto ?? '',
                     style: TipografiaTrato.corpo.copyWith(
                       color: minha ? CoresTrato.creme : CoresTrato.petroleo,
                     ),
                   ),
+                if (agenda != null && !minha && aoAceitarAgenda != null) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  _BotaoProposta(
+                    ativo: true,
+                    rotuloAtivo: 'Confirmar este horário',
+                    rotuloInativo: 'Horário confirmado',
+                    aoTocar: () => aoAceitarAgenda!(mensagem),
+                  ),
+                ],
                 if (prop != null && !minha) ...[
                   if (prop.ehPropostaDoProfissional && aoAceitarProposta != null) ...[
                     const SizedBox(height: EspacosTrato.x3),

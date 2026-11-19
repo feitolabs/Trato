@@ -1,7 +1,6 @@
 export 'package:trato/telas/pedidos/modelos.dart' show EstadoAditivo;
 import 'package:trato/dados/repositorios.dart' show Cobranca, StatusPagamento;
 import 'package:trato/telas/aditivo/aditivo.dart';
-import 'package:trato/telas/pedidos/modelos.dart' show EstadoAditivo;
 
 /// PROVISÓRIO — só para teste e demonstração.
 class ServicoAditivoFake implements ServicoAditivo {

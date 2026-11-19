@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import '../tema/tema.dart';
 
 class AbaTrato {
-  const AbaTrato({required this.rotulo, required this.icone});
+  const AbaTrato({required this.rotulo, required this.icone, this.badge = 0});
 
   final String rotulo;
   final IconData icone;
+  final int badge;
+
+  AbaTrato comBadge(int valor) => AbaTrato(rotulo: rotulo, icone: icone, badge: valor);
 }
 
 /// Abas do cliente: Início · Buscar · Pedidos · Mensagens · Perfil.
@@ -43,15 +46,16 @@ class BarraAbasTrato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     // Cinco abas dividem a largura: a barra ignora escala de fonte acima de 1,0
     // (como as barras nativas de iOS e Android) e o rótulo encolhe se ainda faltar espaço.
     final midia = MediaQuery.of(context);
     return MediaQuery(
       data: midia.copyWith(textScaler: midia.textScaler.clamp(maxScaleFactor: 1)),
       child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: CoresTrato.superficie,
-          border: Border(top: BorderSide(color: CoresTrato.borda)),
+        decoration: BoxDecoration(
+          color: c.superficie,
+          border: Border(top: BorderSide(color: c.borda)),
         ),
         child: SafeArea(
           top: false,
@@ -85,15 +89,28 @@ class _ItemAba extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
+    final baseEstilo = TipografiaTrato.corpoPequeno.copyWith(color: c.texto);
     final estilo = selecionada
-        ? TipografiaTrato.corpoPequeno.copyWith(
+        ? baseEstilo.copyWith(
             fontWeight: FontWeight.w700,
             fontVariations: const [FontVariation('wght', 700)],
           )
-        : TipografiaTrato.corpoPequeno;
+        : baseEstilo;
+    final icone = Icon(aba.icone, color: c.texto);
+    final widgetIcone = aba.badge > 0
+        ? Badge.count(
+            count: aba.badge,
+            maxCount: 99,
+            backgroundColor: c.laranja,
+            textColor: CoresTrato.petroleo,
+            child: icone,
+          )
+        : icone;
     return Semantics(
       selected: selecionada,
       button: true,
+      label: aba.badge > 0 ? '${aba.rotulo}, ${aba.badge} não lidas' : aba.rotulo,
       child: InkResponse(
         onTap: aoTocar,
         radius: 32,
@@ -105,10 +122,10 @@ class _ItemAba extends StatelessWidget {
               width: 56,
               height: 32,
               decoration: BoxDecoration(
-                color: selecionada ? CoresTrato.azulSuave : CoresTrato.superficie,
+                color: selecionada ? c.azulSuave : c.superficie,
                 borderRadius: BorderRadius.circular(EspacosTrato.raioPilula),
               ),
-              child: Icon(aba.icone, color: CoresTrato.petroleo),
+              child: Center(child: widgetIcone),
             ),
             const SizedBox(height: EspacosTrato.x1),
             Padding(

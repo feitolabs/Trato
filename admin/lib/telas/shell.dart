@@ -424,7 +424,7 @@ class _ItemMenu extends StatelessWidget {
                   style: TipografiaTrato.corpoForte.copyWith(color: cor),
                 ),
               ),
-              if (contador != null) contador,
+              ?contador,
             ],
           );
 

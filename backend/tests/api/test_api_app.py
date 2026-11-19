@@ -279,6 +279,7 @@ def test_me_devolve_o_perfil_sem_dados_pessoais(amb):
     assert corpo.pop("papeis") == ["cliente", "profissional"]
     assert corpo.pop("tem_perfil_profissional") is True
     assert corpo.pop("status_verificacao") is None
+    assert corpo.pop("disponivel_agora") is False
     assert corpo == {
         "id": "pro-1", "nome": "Ana", "papel": "profissional", "status": "ativo",
         "nivel_verificacao": "verificado", "nota_publica": 4.8, "servicos_concluidos": 12,

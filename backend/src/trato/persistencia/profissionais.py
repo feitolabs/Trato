@@ -9,6 +9,7 @@ profissionais APROVADOS (e usuário ativo) e nada de dado pessoal sensível.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 from psycopg.types.json import Jsonb
@@ -18,6 +19,7 @@ from trato.persistencia.conexao import Banco
 from trato.profissional.repositorio import (
     CategoriaPublica,
     CidadePublica,
+    ContaRecebimento,
     FiltroBusca,
     ItemPortfolio,
     JanelaSemanal,
@@ -87,6 +89,46 @@ class CatalogoPostgres:
         return {c.id for c in self.cidades_publicas()}
 
 
+def _conta_do_json(bruto: Any) -> ContaRecebimento | None:
+    if not isinstance(bruto, dict) or not bruto.get("tipo_pix") or not bruto.get("chave_pix"):
+        return None
+    atualizada_raw = bruto.get("atualizada_em")
+    atualizada = (
+        datetime.fromisoformat(atualizada_raw.replace("Z", "+00:00"))
+        if isinstance(atualizada_raw, str) and atualizada_raw
+        else None
+    )
+    return ContaRecebimento(
+        tipo_pix=str(bruto["tipo_pix"]),
+        chave_pix=str(bruto["chave_pix"]),
+        banco_codigo=bruto.get("banco_codigo"),
+        banco_nome=bruto.get("banco_nome"),
+        agencia=bruto.get("agencia"),
+        conta=bruto.get("conta"),
+        tipo_conta=bruto.get("tipo_conta"),
+        atualizada_em=atualizada,
+    )
+
+
+def _conta_para_json(conta: ContaRecebimento | None) -> Jsonb | None:
+    if conta is None:
+        return None
+    return Jsonb(
+        para_json(
+            {
+                "tipo_pix": conta.tipo_pix,
+                "chave_pix": conta.chave_pix,
+                "banco_codigo": conta.banco_codigo,
+                "banco_nome": conta.banco_nome,
+                "agencia": conta.agencia,
+                "conta": conta.conta,
+                "tipo_conta": conta.tipo_conta,
+                "atualizada_em": conta.atualizada_em,
+            }
+        )
+    )
+
+
 class ProfissionaisPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
@@ -98,7 +140,7 @@ class ProfissionaisPostgres:
         with self._banco.transacao() as con:
             p = con.execute(
                 "select usuario_id, status, nivel_verificacao, bio, disponibilidade, portfolio, "
-                "criado_em, atende_presencial, atende_remoto "
+                "criado_em, atende_presencial, atende_remoto, disponivel_agora, conta_recebimento "
                 "from public.perfis_profissional where usuario_id = %s",
                 (achado,),
             ).fetchone()
@@ -131,7 +173,22 @@ class ProfissionaisPostgres:
             nivel_verificacao=p["nivel_verificacao"],
             atende_presencial=bool(p["atende_presencial"]),
             atende_remoto=bool(p["atende_remoto"]),
+            disponivel_agora=bool(p["disponivel_agora"]),
+            conta_recebimento=_conta_do_json(p["conta_recebimento"]),
         )
+
+    def listar_disponiveis_agora(self) -> list[PerfilProfissional]:
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select usuario_id from public.perfis_profissional "
+                "where status = 'aprovado' and disponivel_agora = true"
+            ).fetchall()
+        saida: list[PerfilProfissional] = []
+        for l in linhas:  # noqa: E741
+            perfil = self.obter(str(l["usuario_id"]))
+            if perfil is not None:
+                saida.append(perfil)
+        return saida
 
     def salvar(self, perfil: PerfilProfissional) -> None:
         usuario = exigir_uuid(perfil.usuario_id, "profissional")
@@ -166,15 +223,19 @@ class ProfissionaisPostgres:
             # Status e nível só a equipe muda: o conflito não os toca.
             con.execute(
                 "insert into public.perfis_profissional (usuario_id, status, nivel_verificacao, "
-                "bio, disponibilidade, portfolio, atende_presencial, atende_remoto) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s) "
+                "bio, disponibilidade, portfolio, atende_presencial, atende_remoto, "
+                "disponivel_agora, conta_recebimento) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
                 "on conflict (usuario_id) do update set bio = excluded.bio, "
                 "disponibilidade = excluded.disponibilidade, portfolio = excluded.portfolio, "
                 "atende_presencial = excluded.atende_presencial, "
-                "atende_remoto = excluded.atende_remoto",
+                "atende_remoto = excluded.atende_remoto, "
+                "disponivel_agora = excluded.disponivel_agora, "
+                "conta_recebimento = excluded.conta_recebimento",
                 (usuario, perfil.status, perfil.nivel_verificacao, perfil.bio,
                  Jsonb(para_json(disponibilidade)), Jsonb(para_json(portfolio)),
-                 perfil.atende_presencial, perfil.atende_remoto),
+                 perfil.atende_presencial, perfil.atende_remoto,
+                 perfil.disponivel_agora, _conta_para_json(perfil.conta_recebimento)),
             )  # fmt: skip
             con.execute(
                 "delete from public.profissional_categorias "

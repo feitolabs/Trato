@@ -71,11 +71,28 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
         if (!didPop && _aba != 0) _ir(0);
       },
       child: Scaffold(
-        body: IndexedStack(index: _aba, children: paginas),
-        bottomNavigationBar: BarraAbasTrato(
-          abas: abasCliente,
-          indiceAtual: _aba,
-          aoSelecionar: _ir,
+        body: IndexedStack(
+          index: _aba,
+          children: [
+            for (var i = 0; i < paginas.length; i++)
+              TickerMode(enabled: _aba == i, child: paginas[i]),
+          ],
+        ),
+        bottomNavigationBar: ValueListenableBuilder<int>(
+          valueListenable: RotasTrato.mensagensNaoLidas,
+          builder: (context, naoLidas, _) {
+            final abas = naoLidas > 0
+                ? [
+                    for (var i = 0; i < abasCliente.length; i++)
+                      i == 3 ? abasCliente[i].comBadge(naoLidas) : abasCliente[i],
+                  ]
+                : abasCliente;
+            return BarraAbasTrato(
+              abas: abas,
+              indiceAtual: _aba,
+              aoSelecionar: _ir,
+            );
+          },
         ),
       ),
     );

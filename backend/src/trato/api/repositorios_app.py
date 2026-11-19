@@ -122,6 +122,7 @@ class PedidoAberto:
     local_aprox_lng: float | None = None
     cliente_id: str | None = None
     modalidade: str = "presencial"
+    convidado: bool = False
 
 
 @dataclass(frozen=True)

@@ -129,8 +129,8 @@ void main() {
             iniciais: 'AS',
             numeroPedido: '#AAAA',
             situacao: 'Pedido aberto',
-            respostasRapidas: const [],
-            mensagens: const [
+            respostasRapidas: [],
+            mensagens: [
               MensagemChat(tipo: TipoMensagem.texto, texto: 'um', hora: '10:00', minha: true),
               MensagemChat(
                 tipo: TipoMensagem.texto,

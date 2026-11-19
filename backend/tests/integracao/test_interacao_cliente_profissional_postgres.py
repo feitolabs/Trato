@@ -91,7 +91,9 @@ def test_aceitar_dois_orcamentos_do_mesmo_pedido_so_vale_o_primeiro(atuacao):  #
     pedido_id = abrir_pedido(c)
     o1 = enviar_orcamento(c, pedido_id, "profissional")
     o2 = enviar_orcamento(c, pedido_id, "profissional2")
-    assert acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": o1}).status_code == 200
+    assert (
+        acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": o1}).status_code == 200
+    )
     r = acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": o2})
     assert r.status_code in (409, 422), r.text
     assert contratos_do_pedido(c, pedido_id) == 1
@@ -161,7 +163,9 @@ def test_orcamento_em_pedido_ja_contratado_e_recusado(atuacao):  # noqa: F811
     vincular(c, "profissional2")
     pedido_id = abrir_pedido(c)
     o1 = enviar_orcamento(c, pedido_id, "profissional")
-    assert acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": o1}).status_code == 200
+    assert (
+        acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": o1}).status_code == 200
+    )
     r = post(c, f"/v1/pedidos/{pedido_id}/orcamentos", "profissional2", corpo_orcamento())
     assert r.status_code in (403, 404, 409, 422), r.text
 
@@ -217,7 +221,9 @@ def test_terceiros_nao_leem_nem_escrevem_na_conversa(atuacao):  # noqa: F811
     c = atuacao
     pedido_id = abrir_pedido(c)
     orc = enviar_orcamento(c, pedido_id)
-    assert acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    assert (
+        acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    )
     url = f"/v1/pedidos/{pedido_id}/mensagens"
     post(c, url, "profissional", {"texto": "Olá"})
     for quem in ("cliente2", "profissional2"):
@@ -243,7 +249,9 @@ def test_avaliar_antes_de_concluir_e_recusado(atuacao):  # noqa: F811
     c = atuacao
     pedido_id = abrir_pedido(c)
     orc = enviar_orcamento(c, pedido_id)
-    assert acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    assert (
+        acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    )
     r = post(
         c,
         f"/v1/pedidos/{pedido_id}/avaliacao",
@@ -257,7 +265,9 @@ def test_cliente_nem_profissional_confirmam_pagamento(atuacao):  # noqa: F811
     c = atuacao
     pedido_id = abrir_pedido(c)
     orc = enviar_orcamento(c, pedido_id)
-    assert acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    assert (
+        acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    )
     for quem in ("cliente", "profissional", "cliente2", "profissional2"):
         r = acao(c, quem, pedido_id, "confirmar_pagamento")
         assert r.status_code in (403, 404), (quem, r.text)
@@ -267,7 +277,9 @@ def test_profissional_nao_confirma_conclusao_nem_check_in_sem_pagamento(atuacao)
     c = atuacao
     pedido_id = abrir_pedido(c)
     orc = enviar_orcamento(c, pedido_id)
-    assert acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    assert (
+        acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orc}).status_code == 200
+    )
     for nome in ("fazer_check_in", "fazer_check_out", "confirmar_conclusao"):
         r = acao(c, "profissional", pedido_id, nome)
         assert r.status_code >= 400, (nome, r.text)

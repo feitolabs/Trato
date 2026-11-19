@@ -49,6 +49,8 @@ class CobrancaLocal:
     # Parte da cobrança que é o SERVIÇO; o resto é taxa do Trato + custo de parcelamento. Não vem
     # do banco (sem coluna): na releitura, o orquestrador usa o valor do contrato ou do aditivo.
     servico_centavos: int | None = None
+    cupom_codigo: str | None = None
+    desconto_centavos: int = 0
 
 
 @dataclass(frozen=True)

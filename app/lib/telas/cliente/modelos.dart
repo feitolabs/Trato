@@ -182,6 +182,7 @@ class DadosInicio {
     required this.categorias,
     this.emAndamento,
     this.recentes = const [],
+    this.notificacoesNaoLidas = 0,
   });
 
   /// Primeiro nome do cliente.
@@ -191,4 +192,5 @@ class DadosInicio {
   final List<CategoriaServico> categorias;
   final PedidoEmAndamento? emAndamento;
   final List<ServicoRecente> recentes;
+  final int notificacoesNaoLidas;
 }

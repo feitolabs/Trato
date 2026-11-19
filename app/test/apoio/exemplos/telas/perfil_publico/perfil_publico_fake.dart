@@ -1,6 +1,5 @@
 export 'package:trato/telas/cliente/modelos.dart' show Avaliacao;
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/telas/cliente/modelos.dart' show Avaliacao;
 import 'package:trato/telas/perfil_publico/perfil_publico.dart';
 
 /// PROVISÓRIO — só para teste e demonstração.
