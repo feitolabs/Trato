@@ -51,6 +51,7 @@ import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
 import '../comuns/foco_rolagem.dart';
+import '../comuns/moedas_ganhas_tela.dart';
 import '../comuns/sucesso_acao_tela.dart';
 import '../conta/dados_pessoais_tela.dart';
 import '../conta/enderecos_tela.dart';
@@ -2185,13 +2186,16 @@ abstract final class RotasTrato {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 context,
-                (ctxSucesso) => SucessoAcaoTela(
-                  titulo: 'Avaliação enviada!',
-                  subtitulo: moedas > 0
-                      ? 'Obrigado por avaliar. Você ganhou $moedas moedas do Trato!'
-                      : 'Obrigado por avaliar o profissional.',
-                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
-                ),
+                (ctxSucesso) => moedas > 0
+                    ? MoedasGanhasTela(
+                        moedas: moedas,
+                        aoContinuar: () => _voltarAoInicio(ctxSucesso),
+                      )
+                    : SucessoAcaoTela(
+                        titulo: 'Avaliação enviada!',
+                        subtitulo: 'Obrigado por avaliar o profissional.',
+                        aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+                      ),
                 substituirAtual: true,
               );
             }
