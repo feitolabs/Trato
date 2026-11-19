@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 
 from trato.persistencia.comum import como_uuid, exigir_uuid, para_json
 from trato.persistencia.conexao import Banco
+from trato.profissional.ranking import pontuacao
 from trato.profissional.repositorio import (
     CategoriaPublica,
     CidadePublica,
@@ -385,21 +386,56 @@ class ProfissionaisPostgres:
             )
             ordem_desempate.append(sql_ordem_bairro)
             ordem_params.append(bairro_ord)
-        ordem_sql = ", ".join(
-            [
-                *ordem_topo,
-                "p.nota_publica desc nulls last",
-                "p.servicos_concluidos desc",
-                *ordem_desempate,
-                "case p.nivel_verificacao when 'verificado_plus' then 0 "
-                "when 'verificado' then 1 else 2 end",
-                "case when btrim(coalesce(p.bio, '')) <> '' then 0 else 1 end",
-                "p.usuario_id",
-            ]
-        )
+        # Fase 1: só o que o ranking precisa, para TODOS os que casam com os filtros. A nota
+        # composta é calculada em Python (`profissional/ranking.py`): uma única fonte da regra.
+        # Os parâmetros do SELECT (ordem_params) vêm antes dos do WHERE.
+        sel_texto = ordem_topo[0] if ordem_topo else "0"
+        sel_bairro = ordem_desempate[0] if ordem_desempate else "1"
+        with self._banco.transacao() as con:
+            candidatos = con.execute(
+                "select p.usuario_id, p.nota_publica, p.servicos_concluidos, "  # noqa: S608
+                "p.nivel_verificacao, p.disponivel_agora, "
+                "(select count(*) from public.avaliacoes a where a.avaliado_id = p.usuario_id "
+                "and a.direcao = 'cliente_para_profissional') as n_avaliacoes, "
+                "case when btrim(coalesce(p.bio, '')) <> '' then 0 else 1 end as sem_bio, "
+                f"{sel_texto} as ordem_texto, {sel_bairro} as ordem_bairro "
+                f"{base}",
+                [*ordem_params, *params],
+            ).fetchall()
+        peso_nivel = {"verificado_plus": 0, "verificado": 1}
+        ordenados: list[tuple[tuple[Any, ...], str]] = []
+        for c in candidatos:
+            nota = float(c["nota_publica"]) if c["nota_publica"] is not None else None
+            concluidos = int(c["servicos_concluidos"])
+            nota_composta = pontuacao(
+                nota=nota,
+                avaliacoes=int(c["n_avaliacoes"]),
+                concluidos=concluidos,
+                nivel_verificacao=c["nivel_verificacao"],
+                disponivel_agora=bool(c["disponivel_agora"]),
+                cfg=filtro.ranking,
+            )
+            uid = str(c["usuario_id"])
+            chave = (
+                int(c["ordem_texto"]),
+                -nota_composta,
+                -concluidos,
+                int(c["ordem_bairro"]),
+                peso_nivel.get(c["nivel_verificacao"], 2),
+                int(c["sem_bio"]),
+                uid,
+            )
+            ordenados.append((chave, uid))
+        ordenados.sort(key=lambda par: par[0])
+        total = len(ordenados)
+        pagina = [
+            uid for _, uid in ordenados[filtro.deslocamento : filtro.deslocamento + filtro.limite]
+        ]
+        if not pagina:
+            return [], total
+        # Fase 2: os detalhes só de quem aparece nesta página.
         cidade_label = "case when c.uf <> '' then c.nome || '/' || c.uf else c.nome end"
         with self._banco.transacao() as con:
-            total = con.execute(f"select count(*) as n {base}", params).fetchone()["n"]  # noqa: S608
             linhas = con.execute(
                 "select p.usuario_id, u.nome, p.bio, p.nivel_verificacao, p.nota_publica, "  # noqa: S608
                 "p.servicos_concluidos, p.atende_remoto, "
@@ -415,22 +451,26 @@ class ProfissionaisPostgres:
                 "from public.profissional_regioes r "
                 "where r.profissional_id = p.usuario_id and r.bairro is not null "
                 "and btrim(r.bairro) <> ''), '{}') as bairros "
-                f"{base} "
-                f"order by {ordem_sql} limit %s offset %s",
-                [*params, *ordem_params, filtro.limite, filtro.deslocamento],
+                "from public.perfis_profissional p join public.usuarios u on u.id = p.usuario_id "
+                "where p.usuario_id = any(%s::uuid[])",
+                [pagina],
             ).fetchall()
+        por_id = {str(linha["usuario_id"]): linha for linha in linhas}
         return [
             ResultadoBusca(
-                str(l["usuario_id"]),
-                l["nome"],
-                l["bio"],
-                l["nivel_verificacao"],
-                float(l["nota_publica"]) if l["nota_publica"] is not None else None,
-                int(l["servicos_concluidos"]),
-                tuple(l["categorias"]),
-                cidades=tuple(l["cidades"]),
-                bairros=tuple(l["bairros"]),
-                atende_remoto=bool(l["atende_remoto"]),
-            )  # fmt: skip
-            for l in linhas  # noqa: E741
-        ], int(total)
+                uid,
+                por_id[uid]["nome"],
+                por_id[uid]["bio"],
+                por_id[uid]["nivel_verificacao"],
+                float(por_id[uid]["nota_publica"])
+                if por_id[uid]["nota_publica"] is not None
+                else None,
+                int(por_id[uid]["servicos_concluidos"]),
+                tuple(por_id[uid]["categorias"]),
+                cidades=tuple(por_id[uid]["cidades"]),
+                bairros=tuple(por_id[uid]["bairros"]),
+                atende_remoto=bool(por_id[uid]["atende_remoto"]),
+            )
+            for uid in pagina
+            if uid in por_id
+        ], total

@@ -102,3 +102,28 @@ def test_moedas_config_ver_e_alterar(painel):
     assert r.json()["bonus_avaliacao_moedas"] == 30 and r.json()["ativo"] is True
     sem_motivo = {**corpo, "motivo": "curto"}
     assert painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=sem_motivo).status_code == 422
+
+
+def test_painel_le_e_altera_os_pesos_com_motivo(painel):
+    url = "/v1/admin/ranking/config"
+    assert painel.chamar(None, "GET", url).status_code == 401
+    r = painel.chamar("administrador", "GET", url)
+    assert r.status_code == 200 and r.json()["peso_nota"] == 60
+    corpo = {
+        "nota_prior": 4.2,
+        "prior_avaliacoes": 8,
+        "volume_referencia": 30,
+        "peso_nota": 50,
+        "peso_volume": 30,
+        "peso_verificacao": 10,
+        "peso_disponivel": 10,
+        "motivo": "Dar mais peso ao volume de serviços",
+    }
+    assert painel.chamar("administrador", "PUT", url, json=corpo).status_code == 200
+    assert painel.chamar("administrador", "GET", url).json()["peso_volume"] == 30
+    curto = {**corpo, "motivo": "curto"}
+    assert painel.chamar("administrador", "PUT", url, json=curto).status_code == 422
+    zerado = {**corpo, "peso_nota": 0, "peso_volume": 0, "peso_verificacao": 0, "peso_disponivel": 0}
+    assert painel.chamar("administrador", "PUT", url, json=zerado).status_code == 422
+    fora = {**corpo, "nota_prior": 7}
+    assert painel.chamar("administrador", "PUT", url, json=fora).status_code == 422

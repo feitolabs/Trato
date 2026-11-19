@@ -137,6 +137,8 @@ class PerfilDetalhe:
     # Percentual (0 a 100) dos serviços encerrados que foram concluídos (e não cancelados).
     # `None` enquanto não há serviço encerrado.
     taxa_conclusao: int | None = None
+    # Quantas avaliações de clientes o profissional recebeu (base da média ponderada do ranking).
+    avaliacoes_total: int = 0
 
 
 @dataclass(frozen=True)

@@ -67,6 +67,7 @@ from trato.persistencia.pagamentos import (
 from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
+from trato.profissional.ranking import RankingPostgres
 from trato.seguranca.config import parametros_docs
 
 PERSISTENCIAS = ("memoria", "postgres")
@@ -138,6 +139,7 @@ def criar_contexto_postgres(
         verificacoes=VerificacoesPostgres(banco),
         avaliacoes=AvaliacoesPostgres(banco),
         moedas=MoedasPostgres(banco),
+        ranking=RankingPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),
         fechamentos=FechamentosPostgres(banco),
