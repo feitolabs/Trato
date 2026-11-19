@@ -1064,6 +1064,6 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - **Pagamento:** o desconto das moedas entra em `desconto_centavos` (mesmo campo do cupom) e `moedas_usadas` guarda quantas foram. `GET /v1/pedidos/{id}/pagamento?usar_moedas=true` simula; `POST /v1/contratos/{id}/cobranca {usar_moedas}` cobra com desconto.
 - **Débito e estorno:** debita SÓ na confirmação do pagamento (webhook), idempotente `uso:<cobrança>`. Estorno TOTAL devolve (`estorno-uso:<cobrança>`); parcial não devolve.
 - **Limite conhecido:** o saldo é checado ao criar a cobrança e debitado na confirmação. Dois pagamentos pendentes ao mesmo tempo podem deixar o saldo negativo; o saldo negativo bloqueia novos usos e é abatido pelos próximos bônus.
-- **Migration escrita, NÃO aplicada:** `20261119120000_moedas_desconto.sql` (+ rollback): `moedas_config.max_desconto_percentual` e `pagamentos.moedas_usadas`. **O backend desta branch exige essa migration antes do deploy.**
+- **Migration APLICADA em 2026-11-19 (OK do João):** `20261119120000_moedas_desconto.sql` (+ rollback): `moedas_config.max_desconto_percentual` e `pagamentos.moedas_usadas`. O backend desta branch exige essa migration (já aplicada).
 - **App:** interruptor "Usar minhas moedas" na tela de pagamento (mostra o desconto que o backend calculou).
 - **Testes:** `tests/api/test_moedas_desconto.py` (8), `test/pagamento_moedas_test.dart` e teste de API do app.

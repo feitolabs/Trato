@@ -2,7 +2,7 @@
 -- 1) moedas_config: teto do desconto por serviço (percentual do valor).
 -- 2) pagamentos: quantas moedas a cobrança usou (para debitar na confirmação e devolver no estorno).
 -- O desconto em reais continua em pagamentos.desconto_centavos (mesmo campo do cupom).
--- NÃO APLICADA: precisa do OK do João. Rollback em supabase/rollback/.
+-- APLICADA no Supabase Trato em 2026-11-19 com o OK do João. Rollback em supabase/rollback/.
 
 begin;
 
