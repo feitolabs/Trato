@@ -8,7 +8,6 @@
 --   * config_definicoes: o catálogo de chaves, com minimo/maximo vindos de parametros.sql;
 --   * UMA config_versoes em status 'rascunho' (motivo fixo abaixo, é a marca de idempotência);
 --   * config_parametros dessa versão (taxa única em bps + mínimo em centavos, prazos e limites);
---   * config_faixas_taxa (tabela progressiva) só se o João preencher; a tabela fica DESLIGADA
 --     (taxa_progressiva_ativa = 0) porque a D2 está em espera até a simulação de margem (P2).
 --
 -- QUEM APROVA (aprovação dupla, "exige_dupla_aprovacao = true" em taxa e prazos financeiros):
@@ -92,7 +91,7 @@ begin
   -- Versão em rascunho ---------------------------------------------------------
   select id into v_versao from public.config_versoes where motivo = v_motivo;
   if v_versao is not null then
-    raise notice 'Versão do seed já existe: nada alterado (parâmetros e faixas ficam como estão)';
+    raise notice 'Versão do seed já existe: nada alterado (parâmetros ficam como estão)';
     return;
   end if;
 
@@ -104,12 +103,6 @@ begin
   insert into public.config_parametros (versao_id, chave, valor)
   select v_versao, chave, valor from pg_temp.seed_config where valor is not null;
   get diagnostics v_n = row_count;
-
-  insert into public.config_faixas_taxa (versao_id, de_centavos, ate_centavos, taxa_bps)
-  select v_versao, de_centavos, ate_centavos, taxa_bps
-    from pg_temp.seed_faixa
-   where taxa_bps is not null and de_centavos is not null
-   order by ordem;
 
   raise notice 'seed_config_taxa: versão em rascunho criada com % parâmetro(s). Falta aprovar (outra pessoa) e publicar (backend).', v_n;
 end

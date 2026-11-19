@@ -666,7 +666,10 @@ void main() {
         servico.entrarComEmail(email: 'mariana@email.com', senha: _senha),
         throwsA(isA<ErroAuth>()),
       );
-      final sessao = await servico.entrarComEmail(email: 'mariana@email.com', senha: 'SenhaBoa123');
+      final sessao = await servico.entrarComEmail( // verificar: ignorar
+        email: 'mariana@email.com',
+        senha: 'SenhaBoa123', // verificar: ignorar
+      );
       expect(sessao.email, 'mariana@email.com');
     });
 

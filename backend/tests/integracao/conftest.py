@@ -40,7 +40,6 @@ PARAMETROS = (
     ("garantia_retrabalho_dias_padrao", "dias", 30),
     ("prazo_retrabalho_atendimento_dias", "dias", 7),
 )
-FAIXAS = ((0, 100_000, 750), (100_000, None, 600))  # (de, até, bps) - valores de TESTE
 
 
 @dataclass
@@ -98,23 +97,14 @@ def _semear(con, ids: dict[str, str]) -> tuple[str, str, str]:
         "insert into public.config_versoes (criada_por, motivo) values (%s, 'teste') returning id",
         (ids["equipe1"],),
     ).fetchone()[0]
-    for chave, unidade, valor in (*PARAMETROS, ("taxa_faixa_teste", "bps", 0)):
+    for chave, unidade, valor in PARAMETROS:
         con.execute(
             "insert into public.config_definicoes (chave, descricao, unidade) values (%s, %s, %s)",
             (chave, chave, unidade),
         )
-        if chave != "taxa_faixa_teste":
-            con.execute(
-                "insert into public.config_parametros (versao_id, chave, valor) "
-                "values (%s, %s, %s)",
-                (versao, chave, valor),
-            )
-    for de, ate, bps in FAIXAS:
         con.execute(
-            "insert into public.config_faixas_taxa "
-            "(versao_id, de_centavos, ate_centavos, taxa_bps) "
-            "values (%s, %s, %s, %s)",
-            (versao, de, ate, bps),
+            "insert into public.config_parametros (versao_id, chave, valor) values (%s, %s, %s)",
+            (versao, chave, valor),
         )
     con.execute(
         "update public.config_versoes set status = 'aprovada', aprovada_por = %s where id = %s",

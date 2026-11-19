@@ -145,20 +145,56 @@ class CapturaFotoCamera implements CapturaFoto {
   }
 }
 
-/// GPS pelo `geolocator`. Pede a permissão ao usar; sem permissão ou GPS desligado, null.
+/// GPS pelo `geolocator`. Pede a permissão ao usar; sem permissão ou GPS desligado, orienta e devolve null.
 class LocalizadorGps implements Localizador {
-  const LocalizadorGps();
+  const LocalizadorGps({this.navegador});
+
+  final GlobalKey<NavigatorState>? navegador;
+
+  void _avisar(String mensagem, {required Future<bool> Function() abrirAjustes}) {
+    final c = navegador?.currentContext;
+    if (c == null || !c.mounted) return;
+    ScaffoldMessenger.of(c)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(mensagem),
+          action: SnackBarAction(
+            label: 'Ajustes',
+            onPressed: () {
+              abrirAjustes();
+            },
+          ),
+        ),
+      );
+  }
 
   @override
   Future<PosicaoGps?> posicaoAtual() async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _avisar(
+          'Ative a localização do aparelho para confirmar sua chegada.',
+          abrirAjustes: Geolocator.openLocationSettings,
+        );
+        return null;
+      }
       var permissao = await Geolocator.checkPermission();
       if (permissao == LocationPermission.denied) {
         permissao = await Geolocator.requestPermission();
       }
-      if (permissao == LocationPermission.denied ||
-          permissao == LocationPermission.deniedForever) {
+      if (permissao == LocationPermission.denied) {
+        _avisar(
+          'Permissão de localização necessária para confirmar sua chegada.',
+          abrirAjustes: ph.openAppSettings,
+        );
+        return null;
+      }
+      if (permissao == LocationPermission.deniedForever) {
+        _avisar(
+          'Permissão de localização bloqueada nos ajustes do aparelho.',
+          abrirAjustes: ph.openAppSettings,
+        );
         return null;
       }
       final p = await Geolocator.getCurrentPosition(
@@ -177,5 +213,5 @@ class LocalizadorGps implements Localizador {
 DispositivoTrato dispositivoReal({GlobalKey<NavigatorState>? navegador}) =>
     DispositivoTrato(
       camera: CapturaFotoCamera(navegador: navegador),
-      localizador: const LocalizadorGps(),
+      localizador: LocalizadorGps(navegador: navegador),
     );

@@ -519,7 +519,7 @@ class AvaliacoesPostgres:
         )
 
     def recebidas(self, avaliado_id: str) -> list[Avaliacao]:
-        """Avaliações recebidas por uma pessoa, da mais recente para a mais antiga (perfil público)."""
+        """Avaliações recebidas por uma pessoa, da mais recente à mais antiga (perfil)."""
         uid = como_uuid(avaliado_id)
         if uid is None:
             return []

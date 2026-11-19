@@ -10,7 +10,6 @@ from trato.pagamentos.modelos import (
     CobrancaLocal,
     EstadoCobranca,
     OrdemEstorno,
-    TermosContrato,
 )
 
 
@@ -68,14 +67,3 @@ class OrdensEstornoEmMemoria:
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrdemEstorno]:
         return [o for o in self._itens.values() if o.pedido_id == pedido_id]
-
-
-class TermosEmMemoria:
-    def __init__(self) -> None:
-        self._itens: dict[str, TermosContrato] = {}
-
-    def obter(self, pedido_id: str) -> TermosContrato | None:
-        return self._itens.get(pedido_id)
-
-    def salvar(self, termos: TermosContrato) -> None:
-        self._itens[termos.pedido_id] = termos

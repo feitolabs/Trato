@@ -84,7 +84,7 @@ def estado(b):
         n(b, "select count(*) from cidades"), n(b, "select count(*) from categorias"),
         n(b, "select count(*) from categoria_perguntas"), n(b, "select count(*) from config_definicoes"),
         n(b, "select count(*) from config_versoes"), n(b, "select count(*) from config_parametros"),
-        n(b, "select count(*) from config_faixas_taxa"), n(b, "select count(*) from contas_ledger"),
+        n(b, "select count(*) from contas_ledger"),
     )
 
 
@@ -128,9 +128,8 @@ def main():
                  n(b, "select count(*) from categoria_perguntas where tipo in ('escolha_unica','multipla') and jsonb_typeof(opcoes)='array'") == 3)
         verifica("versão de configuração nasce em rascunho, criada pelo admin",
                  b.exec("select status, criada_por::text, aprovada_por from config_versoes") == [("rascunho", adm, None)])
-        verifica("tabela progressiva DESLIGADA e sem faixas",
-                 n(b, "select valor from config_parametros where chave='taxa_progressiva_ativa'") == 0
-                 and n(b, "select count(*) from config_faixas_taxa") == 0)
+        verifica("tabela progressiva DESLIGADA",
+                 n(b, "select valor from config_parametros where chave='taxa_progressiva_ativa'") == 0)
         verifica("taxa única e mínimo vêm do parâmetro",
                  b.exec("select chave, valor from config_parametros where chave in ('taxa_bps','taxa_minima_centavos') order by chave")
                  == [("taxa_bps", 750), ("taxa_minima_centavos", 500)])
@@ -199,20 +198,15 @@ def main():
         verifica("reaplicar depois do rollback funciona", msg is None, msg)
         verifica("versão nova recebe novo número (identity não volta)", n(b, "select numero from config_versoes") > 1)
 
-        # faixas progressivas: entram, mas a tabela continua desligada
-        b_faixa = ("update seed_faixa set de_centavos=0, ate_centavos=50000, taxa_bps=750 where ordem=1;"
-                   "update seed_faixa set de_centavos=50000, ate_centavos=null, taxa_bps=500 where ordem=2;")
         roda(b, RB["seed_config_taxa"], admin=adm)
-        msg = b.falha(PARAMETROS + preenche(adm) + b_faixa + SEED["seed_config_taxa"])
-        verifica("faixas preenchidas entram no rascunho", msg is None and n(b, "select count(*) from config_faixas_taxa") == 2, msg)
-        verifica("com faixas, a tabela segue desligada", n(b, "select valor from config_parametros where chave='taxa_progressiva_ativa'") == 0)
+        msg = b.falha(PARAMETROS + preenche(adm) + SEED["seed_config_taxa"])
+        verifica("reaplicar o seed recria o rascunho", msg is None, msg)
 
         # aprovação e imutabilidade
         v = b.exec("select id from config_versoes")[0][0]
         verifica("aprovar com OUTRA pessoa passa",
                  b.falha("update config_versoes set status='aprovada', aprovada_por=%s where id=%s", (fin, v)) is None)
         verifica("aprovada: parâmetro não muda", tem(b.falha("update config_parametros set valor=1 where versao_id=%s and chave='taxa_bps'", (v,)), "aprovada"))
-        verifica("aprovada: faixa não muda", tem(b.falha("delete from config_faixas_taxa where versao_id=%s", (v,)), "aprovada"))
         verifica("aprovada: motivo não muda", tem(b.falha("update config_versoes set motivo='outro' where id=%s", (v,)), "aprovada"))
         verifica("aprovada: não se apaga", tem(b.falha("delete from config_versoes where id=%s", (v,)), "aprovada"))
         e2 = estado(b)

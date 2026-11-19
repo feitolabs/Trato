@@ -113,13 +113,11 @@ class _Indicadores extends StatelessWidget {
         rotuloComparacao: rotulo,
       ),
       CartaoMetrica(
-        titulo: 'Receita Trato',
-        valor: formatarReais(m.receitaTaxaCentavos),
-        icone: Icons.trending_up,
-        ajuda: 'Soma das taxas retidas em serviços concluídos.',
-        subtitulo: 'Soma das taxas retidas em serviços concluídos',
-        variacaoPct: variacaoPct(m.receitaTaxaCentavos, m.receitaTaxaAnteriorCentavos),
-        rotuloComparacao: rotulo,
+        titulo: 'Serviços concluídos',
+        valor: formatarMilhar(m.pedidosConcluidos),
+        icone: Icons.task_alt,
+        ajuda: 'Pedidos concluídos no período.',
+        subtitulo: 'Pedidos concluídos no período',
       ),
       CartaoMetrica(
         titulo: 'Pedidos ativos',

@@ -36,7 +36,11 @@ class PerfilCliente {
     required this.resumo,
     required this.grupos,
     this.fotoReferencia,
+    this.moedas,
   });
+
+  /// Saldo de moedas do Trato (calculado pelo backend). Nulo ou 0: não mostra o cartão.
+  final int? moedas;
 
   final String nome;
   final String iniciais;

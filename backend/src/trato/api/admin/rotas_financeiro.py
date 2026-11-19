@@ -23,6 +23,7 @@ from trato.api.contexto import Contexto, obter_contexto
 from trato.financeiro import extrato_profissional, fechamento, periodo
 from trato.financeiro.conciliacao import conciliar
 from trato.financeiro.contestacoes import Contestacao, StatusContestacao
+from trato.pagamentos.cupons import custo_cupons_do_mes
 from trato.pedidos.estados import Estado
 
 router = APIRouter(prefix="/v1/admin/financeiro", tags=["admin: financeiro"])
@@ -415,9 +416,15 @@ def _mes_ou_422(mes: str) -> tuple[int, int]:
 
 def _fechamento_out(mes: str, contexto: Contexto, admin: AdminContexto) -> FechamentoOut:
     ano, numero = _mes_ou_422(mes)
+    inicio, fim = periodo.mes(ano, numero)
+    custo_cupons = custo_cupons_do_mes(contexto, inicio, fim)
     atuais = asdict(
         fechamento.calcular(
-            contexto.ledger.lancamentos(), contexto.contestacoes.listar(), ano, numero
+            contexto.ledger.lancamentos(),
+            contexto.contestacoes.listar(),
+            ano,
+            numero,
+            custo_cupons_centavos=custo_cupons,
         )
     )
     gravado = contexto.fechamentos.obter(f"{ano:04d}-{numero:02d}")
@@ -496,8 +503,13 @@ def fechar_mes(
     ano, numero = _mes_ou_422(mes)
     if not fechamento.pode_fechar(ano, numero, contexto.agora()):
         raise HTTPException(422, "Só dá para fechar um mês que já terminou.")
+    inicio, fim = periodo.mes(ano, numero)
     totais = fechamento.calcular(
-        contexto.ledger.lancamentos(), contexto.contestacoes.listar(), ano, numero
+        contexto.ledger.lancamentos(),
+        contexto.contestacoes.listar(),
+        ano,
+        numero,
+        custo_cupons_centavos=custo_cupons_do_mes(contexto, inicio, fim),
     )
     novo = fechamento.montar(totais, operador.id, contexto.agora(), corpo.motivo)
     try:
@@ -527,6 +539,7 @@ _ROTULOS_FECHAMENTO = (
     ("liberado_fim_centavos", "Liberado e não pago ao fim do mês", True),
     ("contestacoes_perdidas", "Contestações perdidas (quantidade)", False),
     ("contestacoes_perdidas_centavos", "Contestações perdidas (valor)", True),
+    ("custo_cupons_centavos", "Custo de cupons (descontos concedidos)", True),
     ("lancamentos", "Lançamentos no ledger (quantidade)", False),
 )
 

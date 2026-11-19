@@ -307,7 +307,7 @@ class CartaoSecao extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(child: Text(titulo!, style: TipografiaTrato.secao)),
-                  if (acao != null) acao!,
+                  ?acao,
                 ],
               ),
             ),

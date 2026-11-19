@@ -15,6 +15,7 @@ class CartaoTrato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final raio = BorderRadius.circular(EspacosTrato.raioGrande);
     final conteudo = Padding(
       padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
@@ -24,7 +25,7 @@ class CartaoTrato extends StatelessWidget {
               children: [
                 Expanded(child: child),
                 const SizedBox(width: EspacosTrato.x3),
-                const Icon(Icons.chevron_right, color: CoresTrato.petroleo),
+                Icon(Icons.chevron_right, color: escuro ? CoresTrato.creme : c.texto),
               ],
             ),
     );
@@ -60,9 +61,10 @@ class LinhaDetalheCartao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final estiloR = estiloRotulo ??
-        TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario);
-    final estiloV = estiloValor ?? TipografiaTrato.corpoForte;
+        TipografiaTrato.corpo.copyWith(color: c.textoSecundario);
+    final estiloV = estiloValor ?? TipografiaTrato.corpoForte.copyWith(color: c.texto);
     return LayoutBuilder(
       builder: (context, constraints) {
         if (!constraints.hasBoundedWidth) {

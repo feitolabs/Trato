@@ -47,7 +47,7 @@ O PDF do escopo ainda fala "WorkNet" e "taxa de 5%". Isso está **velho**. Vale 
 
 ## 2. Decisões novas (das observações extras)
 
-1. **Taxa do Trato:** usar **tabela progressiva**. A **taxa base é 7,5%**. A **taxa mínima deve ser configurável** (fica em tabela no banco, nunca fixa no código).
+1. **Taxa do Trato: NÃO EXISTE.** O app é **100% gratuito** (decisão do João, 18/11/2026). Substitui a tabela progressiva, a base de 7,5% e a taxa descontada do profissional. O custo do Stripe no Pix e no cartão à vista é do Trato; o custo de parcelamento continua repassado ao cliente.
 2. **Risco de chargeback:** o **cliente tem até 7 dias para reclamar** (ou ir à Justiça). Não é o Trato que cobre sozinho.
 3. **Calcular a porcentagem do Stripe** e mostrar quanto sobra para o Trato em cada serviço (Pix e cartão).
 4. **Orçamento é grátis.** Depois de aceito, o cliente paga **30% adiantado** do valor combinado para o profissional começar. Ao encerrar, paga o restante.

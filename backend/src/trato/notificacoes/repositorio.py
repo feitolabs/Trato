@@ -160,6 +160,9 @@ class RepositorioEmMemoria:
     def tokens(self, usuario_id: str) -> Sequence[str]:
         return tuple(t for t, (u, _) in self._dispositivos.items() if u == usuario_id)
 
+    def dispositivos_ativos(self, usuario_id: str) -> Sequence[tuple[str, str]]:
+        return tuple((t, plat) for t, (u, plat) in self._dispositivos.items() if u == usuario_id)
+
     def desativar_dispositivo(self, token: str, usuario_id: str | None = None) -> None:
         dono = self._dispositivos.get(token)
         if dono is not None and usuario_id in (None, dono[0]):

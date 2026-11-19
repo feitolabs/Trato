@@ -17,8 +17,10 @@ from trato.notificacoes.canais import (
     Mensagem,
     PushApns,
     PushFcm,
+    PushPorPlataforma,
     ServicoSmsConfirmacao,
     SmsFake,
+    _ProvedorTokenFcm,
     canais_da_config,
 )
 from trato.notificacoes.config import ConfigNotificacoes
@@ -307,3 +309,63 @@ def test_sms_so_para_confirmar_celular_e_com_limite():
     assert len(fake.enviados) == 3 and "123456" in fake.enviados[0][1]
     # SMS e WhatsApp não são canais de notificação comum.
     assert Canais().por_nome("sms") is None and Canais().por_nome("whatsapp") is None
+
+
+def test_push_por_plataforma_separa_android_e_ios_e_cacheia_oauth(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    chave = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = chave.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode("ascii")
+    trocas = []
+
+    def oauth(uri, form):
+        trocas.append((uri, form["grant_type"]))
+        return {"access_token": "tok-fcm", "expires_in": 3600}
+
+    provedor = _ProvedorTokenFcm("bot@proj.iam.gserviceaccount.com", pem, cliente_oauth=oauth)
+    assert provedor() == "tok-fcm"
+    assert provedor() == "tok-fcm"  # cacheado
+    assert len(trocas) == 1
+
+    enviados_fcm, enviados_apns = [], []
+    fcm = PushFcm(
+        cfg(push_ativo=True, fcm_projeto_id="proj"),
+        lambda u, h, b: enviados_fcm.append((u, b["message"]["token"])) or 200,
+        provedor,
+    )
+    apns = PushApns(
+        cfg(apns_ativo=True, apns_bundle_id="br.com.trato", apns_chave_id="K1"),
+        lambda u, h, b: enviados_apns.append(u) or 200,
+        lambda: "jwt-apns",
+    )
+    roteado = PushPorPlataforma(fcm, apns)
+    assert roteado.disponivel
+    roteado.enviar(
+        Mensagem(
+            ANA,
+            "Oi",
+            "Corpo",
+            {},
+            destinos=("tk-and", "tk-ios"),
+            destinos_plataforma=(("tk-and", "android"), ("tk-ios", "ios")),
+        )
+    )
+    assert len(enviados_fcm) == 1 and enviados_fcm[0][1] == "tk-and"
+    assert len(enviados_apns) == 1 and enviados_apns[0].endswith("/3/device/tk-ios")
+
+    import json
+
+    arq = tmp_path / "fcm.json"
+    arq.write_text(
+        json.dumps({"client_email": "bot@proj.iam.gserviceaccount.com", "private_key": pem}),
+        encoding="utf-8",
+    )
+    c_ativo = canais_da_config(
+        cfg(push_ativo=True, fcm_projeto_id="proj", fcm_credenciais_arquivo=str(arq))
+    )
+    assert c_ativo.push is not None and c_ativo.push.disponivel

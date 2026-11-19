@@ -6,8 +6,7 @@ Regras que valem aqui:
 - O ledger só espelha o que o provedor confirmou (caminho A, D15).
 - Cada operação financeira tem chave de idempotência determinística (de dado estável, nunca
   de contagem).
-- Taxa e prazos vêm da configuração; o contrato congela a taxa no aceite e é a taxa CONGELADA
-  (termos ou contrato) que vale depois (A3), nunca a configuração de hoje.
+- Não há taxa do Trato (app 100% gratuito, 18/11/2026); prazos vêm da configuração.
 - Estorno: a intenção vai para o ledger e para a fila de ordens ANTES de o provedor ser chamado;
   o provedor só é chamado depois do commit, com a chave da ordem, e a reconciliação reenvia o que
   ficou pendente (A7). Nunca dinheiro que saiu sem registro.
@@ -25,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from trato.api.contexto import Contexto
+from trato.api.moedas import debitar_uso_moedas, devolver_uso_moedas
 from trato.api.repositorios import EventoWebhook
 from trato.api.webhook_pagamento import EventoForaDeOrdem  # a rota do webhook responde 409
 from trato.financeiro.contestacoes import (
@@ -44,6 +44,7 @@ from trato.financeiro.ledger import (
     separar_custo_parcelamento,
 )
 from trato.financeiro.repasses import repasse_dos_lancamentos
+from trato.pagamentos.cupons import confirmar_uso_cupom
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.memoria import OrdensEstornoEmMemoria
 from trato.pagamentos.modelos import (
@@ -56,8 +57,6 @@ from trato.pagamentos.modelos import (
     RepositorioAditivos,
     RepositorioCobrancas,
     RepositorioOrdensEstorno,
-    RepositorioTermos,
-    TermosContrato,
 )
 from trato.pagamentos.parcelamento import ParcelamentoIndisponivel
 from trato.pagamentos.provedor.base import (
@@ -67,14 +66,7 @@ from trato.pagamentos.provedor.base import (
     TipoEvento,
 )
 from trato.pagamentos.provedor.stripe_formato import TIPOS_STRIPE
-from trato.pagamentos.taxa import (
-    ConfigTaxa,
-    TaxaNaoCongelada,
-    TotalPedido,
-    calcular_taxa,
-    montar_total,
-    taxa_congelada,
-)
+from trato.pagamentos.taxa import TotalPedido, montar_total
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Estado, Papel, Pedido, ProvaPagamento
 
@@ -103,14 +95,12 @@ class ServicoPagamento:
         config: Callable[[], ConfigPagamento],
         cobrancas: RepositorioCobrancas,
         aditivos: RepositorioAditivos,
-        termos: RepositorioTermos,
         ordens: RepositorioOrdensEstorno | None = None,
     ) -> None:
         self.provedor = provedor
         self.config = config
         self.cobrancas = cobrancas
         self.aditivos = aditivos
-        self.termos = termos
         self.ordens = ordens if ordens is not None else OrdensEstornoEmMemoria()
 
     # --- ligação ao contexto da API ------------------------------------------------------
@@ -150,26 +140,9 @@ class ServicoPagamento:
     ) -> TotalPedido:
         """Quanto cobrar do cliente por `servico_centavos`: o serviço (+ custo do parcelado).
 
-        A taxa não entra na cobrança: é descontada do profissional na conclusão. Pedido principal:
-        a taxa é a do contrato (congelada no aceite). Aditivo: a taxa é só o que a taxa total
-        cresce por causa dele, para o mínimo não contar duas vezes.
+        Não há taxa do Trato: o profissional recebe o serviço inteiro.
         """
-        taxa_cfg = self._taxa_congelada(contexto, pedido.id)
-        if aditivo_id is None:
-            total = montar_total(servico_centavos, taxa_cfg)
-        else:
-            contrato = contexto.contratos.obter_do_pedido(pedido.id)
-            antes = (contrato.valor_centavos if contrato else 0) + sum(
-                a.valor_centavos
-                for a in self.aditivos.do_pedido(pedido.id)
-                if a.estado is EstadoAditivo.PAGO and a.id != aditivo_id
-            )
-            taxa = calcular_taxa(antes + servico_centavos, taxa_cfg) - (
-                calcular_taxa(antes, taxa_cfg) if antes > 0 else 0
-            )
-            total = TotalPedido(
-                servico_centavos, taxa, 0, servico_centavos, servico_centavos - taxa, taxa
-            )
+        total = montar_total(servico_centavos)
         if parcelas == 1:
             return total
         try:
@@ -191,6 +164,9 @@ class ServicoPagamento:
         aditivo_id: str | None = None,
         parcelas: int = 1,
         cliente_externo: str | None = None,
+        cupom_codigo: str | None = None,
+        desconto_centavos: int = 0,
+        moedas_usadas: int = 0,
     ) -> CobrancaLocal:
         """Cria (ou devolve a pendente) a cobrança do pedido ou de um aditivo.
 
@@ -201,6 +177,9 @@ class ServicoPagamento:
             raise ErroFluxo("Número de parcelas inválido.", 422)
         if parcelas > 1 and meio is not MeioPagamento.CARTAO:
             raise ErroFluxo("Só o cartão pode ser parcelado.", 422)
+        cupom_norm = cupom_codigo.strip().upper() if cupom_codigo and cupom_codigo.strip() else None
+        moedas = max(0, int(moedas_usadas))
+        desconto = max(0, int(desconto_centavos)) if (cupom_norm or moedas) else 0
         antigas = [c for c in self.cobrancas.do_pedido(pedido.id) if c.aditivo_id == aditivo_id]
         for antiga in antigas:
             if antiga.status is EstadoCobranca.PAGA:
@@ -212,21 +191,26 @@ class ServicoPagamento:
                     antiga.meio is meio
                     and antiga.parcelas == parcelas
                     and antiga.valor_centavos == total.cobrado_centavos
+                    and (antiga.cupom_codigo or None) == cupom_norm
+                    and antiga.moedas_usadas == moedas
                 ):
                     return antiga
                 self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
-        # A chave leva o que define a cobrança (meio, valor, parcelas, cliente): o Stripe recusa a
-        # MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be used
-        # with the same parameters"). Sem isso, trocar Pix por cartão, ou o valor mudar depois de
-        # uma contraproposta, dava erro 500 na tela de pagamento. Mesmos parâmetros = mesma chave,
-        # então repetir o pedido continua idempotente.
+        # A chave leva o que define a cobrança (meio, valor, parcelas, cliente, cupom): o Stripe
+        # recusa a MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be
+        # used with the same parameters").
         assinatura = hashlib.sha256(
-            f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}".encode()
+            f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}|"
+            f"{cupom_norm or ''}|{moedas}".encode()
         ).hexdigest()[:10]
         chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}/{assinatura}"
         metadados = {"pedido_id": pedido.id}
         if aditivo_id:
             metadados["aditivo_id"] = aditivo_id
+        if cupom_norm:
+            metadados["cupom"] = cupom_norm
+        if moedas:
+            metadados["moedas"] = str(moedas)
         criada = self.provedor.criar_cobranca(
             valor_centavos=total.cobrado_centavos,
             meio=meio,
@@ -246,6 +230,9 @@ class ServicoPagamento:
             criada.instrucao,
             parcelas=parcelas,
             servico_centavos=servico_centavos,
+            cupom_codigo=cupom_norm,
+            desconto_centavos=desconto,
+            moedas_usadas=moedas,
         )
         self.cobrancas.salvar(local)
         return local
@@ -383,6 +370,25 @@ class ServicoPagamento:
         if novos:
             contexto.ledger.lancar_varios(novos)
         self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.PAGA, pago_em=agora))
+        if cobranca.moedas_usadas > 0 and pedido is not None:
+            debitar_uso_moedas(
+                contexto.moedas,
+                usuario_id=pedido.cliente_id,
+                cobranca_id=cobranca.id,
+                pedido_id=cobranca.pedido_id,
+                moedas=cobranca.moedas_usadas,
+                agora=agora,
+            )
+        if cobranca.cupom_codigo:
+            confirmar_uso_cupom(
+                contexto,
+                cobranca.cupom_codigo,
+                usuario_id=pedido.cliente_id if pedido is not None else None,
+                cobranca_id=cobranca.id,
+                pedido_id=cobranca.pedido_id,
+                desconto_centavos=cobranca.desconto_centavos,
+                confirmado_em=agora,
+            )
 
     def _pagamento_falhou(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
@@ -440,7 +446,9 @@ class ServicoPagamento:
         situacao = (
             EstadoCobranca.DEVOLVIDA if devolvido >= cobranca.valor_centavos else cobranca.status
         )
-        self.cobrancas.salvar(replace(cobranca, estornado_centavos=devolvido, status=situacao))
+        depois = replace(cobranca, estornado_centavos=devolvido, status=situacao)
+        self.cobrancas.salvar(depois)
+        self._devolver_moedas(contexto, depois)
         contexto.eventos_webhook.marcar_revisao(bruto, f"{motivo}; conciliado no ledger")
 
     def _liquidacao(self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook) -> None:
@@ -569,7 +577,9 @@ class ServicoPagamento:
         situacao = (
             EstadoCobranca.DEVOLVIDA if devolvido >= cobranca.valor_centavos else cobranca.status
         )
-        self.cobrancas.salvar(replace(cobranca, estornado_centavos=devolvido, status=situacao))
+        depois = replace(cobranca, estornado_centavos=devolvido, status=situacao)
+        self.cobrancas.salvar(depois)
+        self._devolver_moedas(contexto, depois)
 
     def _repasse_falhou(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
@@ -607,9 +617,7 @@ class ServicoPagamento:
     def _apos_transicao(
         self, antes: Pedido, depois: Pedido, acao: Acao, contexto: Contexto
     ) -> None:
-        if acao is Acao.ACEITAR_ORCAMENTO:
-            self.termos.salvar(TermosContrato(depois.id, self.config().taxa, contexto.agora()))
-        elif depois.estado is Estado.CONCLUIDO and acao in (
+        if depois.estado is Estado.CONCLUIDO and acao in (
             Acao.CONFIRMAR_CONCLUSAO,
             Acao.ENCERRAR_DISPUTA_POR_ACORDO,
         ):
@@ -637,17 +645,6 @@ class ServicoPagamento:
                 )
 
     # --- dinheiro ------------------------------------------------------------------------------
-
-    def _taxa_congelada(self, contexto: Contexto, pedido_id: str) -> ConfigTaxa:
-        """A taxa do aceite: os termos do contrato ou a taxa que o próprio contrato guardou.
-        Nunca a configuração de hoje (A3)."""
-        termos = self.termos.obter(pedido_id)
-        if termos is not None:
-            return termos.taxa
-        try:
-            return taxa_congelada(contexto.contratos.obter_do_pedido(pedido_id))
-        except TaxaNaoCongelada as erro:
-            raise ErroFluxo(str(erro)) from erro
 
     def _servico_da_cobranca(self, contexto: Contexto, cobranca: CobrancaLocal) -> int:
         """O valor do serviço dentro da cobrança: o guardado nela, ou o do contrato/aditivo.
@@ -709,10 +706,7 @@ class ServicoPagamento:
                 estornar_pedido(livro, pedido.id, devolver_ao_cliente, f"{chave}/est", agora)
             restante = livro.saldo(CUSTODIA, pedido.id)
             if repartir and restante > 0:
-                # A taxa (a congelada no aceite) incide sobre o que fica para o profissional e é
-                # descontada aqui, antes de o valor chegar à carteira dele.
-                taxa = calcular_taxa(restante, self._taxa_congelada(contexto, pedido.id))
-                repartir_custodia(livro, pedido.id, profissional, taxa, f"{chave}/rep", agora)
+                repartir_custodia(livro, pedido.id, profissional, 0, f"{chave}/rep", agora)
 
         novos = self._planejar(contexto, pedido.id, operacao)
         ordens = self._ordens_de_estorno(pedido.id, devolver_ao_cliente, chave, agora)
@@ -722,12 +716,29 @@ class ServicoPagamento:
             for cobranca, ordem in ordens:
                 self.cobrancas.salvar(cobranca)
                 self.ordens.salvar(ordem)
+                self._devolver_moedas(contexto, cobranca)
             if repartir:
                 repasse = repasse_dos_lancamentos(
                     pedido.id, profissional, novos, gatilho, f"{chave}/repasse"
                 )
                 if repasse is not None:
                     contexto.repasses.criar(repasse)
+
+    def _devolver_moedas(self, contexto: Contexto, cobranca: CobrancaLocal) -> None:
+        """Estorno TOTAL da cobrança devolve as moedas que ela usou (parcial não devolve)."""
+        if cobranca.moedas_usadas <= 0 or cobranca.estornado_centavos < cobranca.valor_centavos:
+            return
+        pedido = contexto.pedidos.obter(cobranca.pedido_id)
+        if pedido is None:
+            return
+        devolver_uso_moedas(
+            contexto.moedas,
+            usuario_id=pedido.cliente_id,
+            cobranca_id=cobranca.id,
+            pedido_id=cobranca.pedido_id,
+            moedas=cobranca.moedas_usadas,
+            agora=contexto.agora(),
+        )
 
     def _ordens_de_estorno(
         self, pedido_id: str, valor: int, chave: str, agora

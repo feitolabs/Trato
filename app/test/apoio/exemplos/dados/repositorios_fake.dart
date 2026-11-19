@@ -110,7 +110,7 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   Future<void> relatarProblema(String pedidoId, EnvioRelato relato) async => relatos.add(relato);
 
   @override
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {}
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async => 0;
 
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async => dadosAvaliacaoExemplo;
@@ -193,6 +193,24 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
   @override
   Future<DadosPagamento> dados(String pedidoId) async => pag.DadosExemplo.pagamento;
 
+  /// Simula o backend: com moedas, 5.000 centavos de desconto (limite do exemplo).
+  @override
+  Future<DadosPagamento> recalcular(
+    String pedidoId, {
+    String? cupom,
+    bool usarMoedas = false,
+  }) async {
+    final base = (cupom ?? '').isEmpty ? pag.DadosExemplo.pagamento : await aplicarCupom(pedidoId, cupom!);
+    if (!usarMoedas) return base.copiarCom(moedasSaldo: 5000);
+    return base.copiarCom(
+      valorAgoraCentavos: base.valorAgoraCentavos - 5000,
+      descontoCentavos: base.descontoCentavos + 5000,
+      moedasSaldo: 5000,
+      moedasUsadas: 5000,
+      moedasDescontoCentavos: 5000,
+    );
+  }
+
   @override
   Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async {
     final limpo = codigo.trim().toUpperCase();
@@ -225,6 +243,7 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   }) async {
     cobrancas.add(metodo);
     cobrancasDetalhadas.add((metodo, parcelas, cupom));
@@ -615,7 +634,6 @@ class RepositorioPerfilFake implements RepositorioPerfil {
 
 class RepositorioProfissionalFake implements RepositorioProfissional {
   /// Taxa só de demonstração; a real é decidida pelo backend (progressiva, base 7,5%).
-  static const taxaDemonstracaoBps = 750;
 
   final List<MotivoRecusa> recusas = [];
   final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
@@ -654,7 +672,11 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   Future<void> recusar(String pedidoId, MotivoRecusa motivo) async => recusas.add(motivo);
 
   @override
-  Future<List<ItemExtrato>> extrato() async => DadosExemploCarteira.completo.extrato;
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0}) async {
+    final todos = DadosExemploCarteira.completo.extrato;
+    if (deslocamento >= todos.length) return const [];
+    return todos.skip(deslocamento).take(limite).toList();
+  }
 
   final List<int> notasDoCliente = [];
 
@@ -666,14 +688,13 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async => const DetalheValoresPedido(
         pedidoNumero: '#AAAA',
         pagoPeloClienteCentavos: 70500,
-        taxaCentavos: 5288,
-        voceRecebeCentavos: 65212,
+        voceRecebeCentavos: 70500,
         situacao: 'Retido até o cliente confirmar o serviço.',
       );
 
   @override
   ServicoOrcamento servicoOrcamento(String pedidoId) =>
-      ServicoOrcamentoFake(taxaBps: taxaDemonstracaoBps);
+      ServicoOrcamentoFake();
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) => ServicoCheckInFake();
@@ -737,8 +758,6 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
         versao: 1,
         situacao: situacao ?? 'aguardando',
         valorCentavos: 35000,
-        taxaCentavos: 2625,
-        liquidoCentavos: 32375,
         prazoExecucaoDias: 2,
         garantiaDias: 90,
         foraDoEscopo: 'Fornecimento de disjuntor geral',

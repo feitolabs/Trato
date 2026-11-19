@@ -248,10 +248,7 @@ class _CartaoLiquido extends StatelessWidget {
           Text('Quanto você recebe', style: TipografiaTrato.corpoForte),
           const SizedBox(height: EspacosTrato.x2),
           if (r != null) ...[
-            _Linha('Valor do aditivo', Dinheiro.formatar(r.totalCentavos)),
-            _Linha(r.taxaBps == null ? 'Taxa do Trato' : 'Taxa do Trato (${Dinheiro.formatarBps(r.taxaBps!)})', '- ${Dinheiro.formatar(r.taxaCentavos)}'),
-            const Divider(),
-            _Linha('Você recebe', Dinheiro.formatar(r.liquidoCentavos), forte: true),
+            _Linha('Você recebe', Dinheiro.formatar(r.totalCentavos), forte: true),
           ] else
             Text(
               falhou

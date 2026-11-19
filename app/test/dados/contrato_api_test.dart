@@ -12,7 +12,6 @@ import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
-import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/nota_material/nota_material.dart';
 import 'package:trato/telas/pagamento/modelos.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';
@@ -222,6 +221,30 @@ void main() {
       expect(c.pixCopiaECola, '00020126-codigo');
     });
 
+    test('com moedas: manda usar_moedas e a chave de idempotência muda', () async {
+      final (api, chamadas) = _api({
+        'POST /v1/contratos/ab12cd34/cobranca': (
+          201,
+          {
+            'contrato_id': 'ab12cd34',
+            'cobranca_id': 'cb9',
+            'estado_pagamento': 'aguardando_confirmacao',
+            'meio': 'pix',
+            'valor_centavos': 41000,
+            'tipo_instrucao': 'pix_copia_e_cola',
+            'instrucao': '00020126-codigo',
+            'criada_em': '2026-10-29T12:00:00Z',
+          },
+        ),
+      });
+
+      await RepositorioPagamentoApi(api)
+          .criarCobranca('ab12cd34', MetodoPagamento.pix, usarMoedas: true);
+
+      expect(chamadas.single.corpo, {'meio': 'pix', 'usar_moedas': true});
+      expect(chamadas.single.idem, 'cobranca-ab12cd34-pix-moedas');
+    });
+
     test('cartão: o segredo do SDK nunca vira texto de tela', () async {
       final (api, _) = _api({
         'POST /v1/contratos/ab12cd34/cobranca': (
@@ -338,16 +361,18 @@ void main() {
             'comentario': 'Ótimo',
             'etiquetas': <String>[],
             'criada_em': '2026-10-29T12:00:00Z',
+            'moedas_ganhas': 50,
           },
         ),
       });
 
-      await RepositorioPedidosApi(api).avaliar(
+      final moedas = await RepositorioPedidosApi(api).avaliar(
         'ab12cd34',
         const EnvioAvaliacao(notas: [5, 5, 4, 5, 5], comentario: 'Ótimo', gorjetaCentavos: 0),
       );
 
       expect(chamadas.single.corpo, {'nota_geral': 5, 'comentario': 'Ótimo'});
+      expect(moedas, 50);
     });
 
     test('gorjeta não tem rota: recusa em vez de sumir em silêncio', () async {
@@ -488,7 +513,7 @@ void main() {
       final p = await RepositorioPerfilApi(api).carregar();
 
       expect(chamadas.first.autorizacao, 'Bearer valor-de-teste');
-      expect(chamadas.map((c) => c.caminho), ['/v1/me', '/v1/usuarios/c1/foto']);
+      expect(chamadas.map((c) => c.caminho), ['/v1/me', '/v1/usuarios/c1/foto', '/v1/me/moedas']);
       expect(p.fotoReferencia, 'https://fotos.teste/c1.jpg');
       expect(p.nome, 'Mariana Alves');
       expect(p.iniciais, 'MA');
@@ -627,14 +652,12 @@ void main() {
       expect(chamadas.single.corpo, {'motivo': 'Sem agenda'});
     });
 
-    test('calculadora: taxa e líquido vêm de POST /v1/orcamentos/resumo', () async {
+    test('calculadora: o valor vem de POST /v1/orcamentos/resumo (sem taxa)', () async {
       final (api, chamadas) = _api({
         'POST /v1/orcamentos/resumo': (
           200,
           {
             'valor_centavos': 100000,
-            'taxa_centavos': 7000,
-            'liquido_centavos': 93000,
             'custo_provedor_estimado_centavos': 500,
             'custo_provedor_estimativa': true,
           },
@@ -644,9 +667,7 @@ void main() {
       final r = await ServicoOrcamentoApi(api).resumir(100000);
 
       expect(chamadas.single.corpo, {'valor_centavos': 100000});
-      expect(r.taxaCentavos, 7000, reason: 'valor do backend, não calculado no app');
-      expect(r.liquidoCentavos, 93000);
-      expect(r.taxaBps, isNull);
+      expect(r.totalCentavos, 100000);
     });
 
     test('calculadora sem taxa configurada (503) vira erro de servidor', () async {

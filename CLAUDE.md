@@ -6,7 +6,7 @@ e pegue a próxima tarefa em `harness/TAREFAS.md`.
 ## Ordem de prioridade dos documentos
 
 `regras.txt` > `observações extras` > `Trato — Telas do app.pdf` (design) > `Escopo` (PDF).
-O escopo fala "WorkNet" e "5%": está velho. O nome é **Trato**; a taxa é **progressiva, base 7,5%, mínima configurável**.
+O escopo fala "WorkNet" e "5%": está velho. O nome é **Trato**; **não há taxa**: o app é 100% gratuito (decisão do João, 18/11/2026).
 
 ## Regras obrigatórias
 
@@ -22,7 +22,7 @@ O escopo fala "WorkNet" e "5%": está velho. O nome é **Trato**; a taxa é **pr
 ## Regras de dinheiro (do escopo)
 
 - Nenhuma regra de dinheiro roda no app. O app só pede e mostra; o backend decide.
-- Valores em **centavos inteiros**. Taxa, prazos e limites em **tabela de configuração**.
+- Valores em **centavos inteiros**. Prazos e limites em **tabela de configuração**.
 - Ledger imutável (partidas dobradas). Correção só por estorno.
 - Toda operação financeira com chave de idempotência; webhooks assinados.
 

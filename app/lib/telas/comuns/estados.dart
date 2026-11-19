@@ -41,6 +41,7 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
   var _pronto = false;
   var _emVoo = false;
   var _geracao = 0;
+  var _visivel = true;
   RelogioDeAtualizacao? _relogio;
 
   @override
@@ -52,10 +53,23 @@ class _CarregadorTelaState<T> extends State<CarregadorTela<T>> {
       _relogio = RelogioDeAtualizacao(
         intervalo: intervalo,
         aoAtualizar: _atualizarEmSilencio,
-        deveAtualizar: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+        deveAtualizar: () =>
+            mounted &&
+            TickerMode.valuesOf(context).enabled &&
+            (ModalRoute.of(context)?.isCurrent ?? true),
       );
     }
     _carregar();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ativo = TickerMode.valuesOf(context).enabled;
+    if (ativo && !_visivel && _pronto) {
+      _atualizarEmSilencio();
+    }
+    _visivel = ativo;
   }
 
   @override
@@ -201,14 +215,18 @@ class EstadoVazio extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icone, size: 48, color: CoresTrato.petroleo),
+                  Icon(icone, size: 48, color: context.cores.petroleo),
                   const SizedBox(height: EspacosTrato.x4),
-                  Text(titulo, textAlign: TextAlign.center, style: TipografiaTrato.titulo),
+                  Text(
+                    titulo,
+                    textAlign: TextAlign.center,
+                    style: TipografiaTrato.titulo.copyWith(color: context.cores.texto),
+                  ),
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
                     texto,
                     textAlign: TextAlign.center,
-                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                   ),
                 ],
               ),
@@ -246,9 +264,13 @@ class EstadoErro extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: CoresTrato.vermelhoTexto),
+                  Icon(Icons.error_outline, size: 48, color: context.cores.vermelhoTexto),
                   const SizedBox(height: EspacosTrato.x4),
-                  Text(mensagem, textAlign: TextAlign.center, style: TipografiaTrato.corpo),
+                  Text(
+                    mensagem,
+                    textAlign: TextAlign.center,
+                    style: TipografiaTrato.corpo.copyWith(color: context.cores.texto),
+                  ),
                   const SizedBox(height: EspacosTrato.x5),
                   BotaoSecundario(texto: 'Tentar de novo', aoTocar: aoTentarNovamente),
                 ],
@@ -289,12 +311,20 @@ class MolduraTelaComum extends StatelessWidget {
               if (!comVoltar && acoes.isNotEmpty)
                 Row(
                   children: [
-                    Expanded(child: Text(titulo, style: TipografiaTrato.tituloGrande)),
+                    Expanded(
+                      child: Text(
+                        titulo,
+                        style: TipografiaTrato.tituloGrande.copyWith(color: context.cores.texto),
+                      ),
+                    ),
                     ...acoes,
                   ],
                 )
               else
-                Text(titulo, style: TipografiaTrato.tituloGrande),
+                Text(
+                  titulo,
+                  style: TipografiaTrato.tituloGrande.copyWith(color: context.cores.texto),
+                ),
               const SizedBox(height: EspacosTrato.x4),
               Expanded(child: child),
             ],

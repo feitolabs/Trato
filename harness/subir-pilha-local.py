@@ -198,11 +198,6 @@ def semear(banco_local) -> None:
                 (versao, chave, valor),
             )
         con.execute(
-            "insert into public.config_faixas_taxa (versao_id, de_centavos, ate_centavos, taxa_bps) "
-            "values (%s, 0, null, 750)",
-            (versao,),
-        )
-        con.execute(
             "update public.config_versoes set status='aprovada', aprovada_por=%s where id=%s",
             (ids["financeiro"], versao),
         )

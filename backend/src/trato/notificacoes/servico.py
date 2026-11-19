@@ -132,8 +132,16 @@ class ServicoNotificacoes:
         if not destinos:
             self.repo.marcar_enviada(registro.id, self.agora())  # ninguém para receber
             return True
+        pares: tuple[tuple[str, str], ...] = ()
+        if registro.canal == "push" and hasattr(self.repo, "dispositivos_ativos"):
+            pares = tuple(self.repo.dispositivos_ativos(registro.usuario_id))
         mensagem = Mensagem(
-            registro.usuario_id, registro.titulo, registro.corpo, registro.dados, destinos
+            registro.usuario_id,
+            registro.titulo,
+            registro.corpo,
+            registro.dados,
+            destinos,
+            destinos_plataforma=pares,
         )
         try:
             canal.enviar(mensagem)

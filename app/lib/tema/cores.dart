@@ -40,4 +40,38 @@ abstract final class CoresTrato {
   static const fundoFotoPreto = Color(0xFF000000);
   static const overlayFoto = Color(0x8A000000);
   static const textoSobreFoto = Color(0xFFFFFFFF);
+
+  /// Moeda do Trato (gamificação): ouro da borda, da face e do relevo.
+  static const moedaOuroClaro = Color(0xFFFFE9A6);
+  static const moedaOuro = Color(0xFFF2B632);
+  static const moedaOuroEscuro = Color(0xFFB87408);
+  static const moedaOuroProfundo = Color(0xFF7A4A00);
+}
+
+/// Paleta semântica usada em runtime pelos temas claro e escuro.
+abstract final class CoresTratoEscuro {
+  static const petroleo = Color(0xFF8FC1C8);
+  static const sobrePetroleo = Color(0xFF0A1B20);
+  static const fundo = Color(0xFF0A1B20);
+  static const superficie = Color(0xFF12272D);
+  static const borda = Color(0xFF23424A);
+  static const bordaControle = Color(0xFF395E67);
+
+  static const azulSuave = Color(0xFF173A42);
+  static const azulTexto = Color(0xFF8FC1C8);
+
+  static const laranja = Color(0xFFFF8A4C);
+
+  static const ambarSuave = Color(0xFF352811);
+  static const ambarTexto = Color(0xFFF3C66F);
+
+  static const verdeSuave = Color(0xFF163222);
+  static const verdeTexto = Color(0xFF7FD49B);
+
+  static const vermelhoSuave = Color(0xFF3B1A19);
+  static const vermelhoTexto = Color(0xFFF28B82);
+
+  static const texto = Color(0xFFF4EEE2);
+  static const textoSecundario = Color(0xFFB3C7C6);
+  static const textoDica = Color(0xFF839C9B);
 }

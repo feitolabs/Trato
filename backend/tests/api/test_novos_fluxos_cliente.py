@@ -13,7 +13,7 @@ from test_profissional_upload import JPEG_COM_EXIF, e2  # noqa: F401
 from trato.api.repositorios import DadosPedido, Orcamento
 from trato.pagamentos.modelos import ConfigPagamento
 from trato.pagamentos.parcelamento import ConfigParcelamento
-from trato.pagamentos.taxa import ConfigTaxa
+from trato.pagamentos.provedor import TipoEvento
 from trato.pedidos.estados import Estado, Pedido
 
 
@@ -49,7 +49,6 @@ def test_fotos_do_pedido_aberto_para_cliente_e_profissional(e2, amb):
 
 def test_cupom_no_checkout_e_parcelamento(fluxo: Fluxo):
     fluxo.servico.config = lambda: ConfigPagamento(
-        ConfigTaxa(750, 500),
         50_000,
         parcelamento=ConfigParcelamento({2: 300, 3: 450}),
     )
@@ -60,6 +59,7 @@ def test_cupom_no_checkout_e_parcelamento(fluxo: Fluxo):
             "valor": 10,
             "valor_minimo_centavos": 50_000,
             "limite_usos": 5,
+            "limite_por_usuario": 1,
             "usos_atuais": 0,
             "ativo": True,
         },
@@ -68,6 +68,14 @@ def test_cupom_no_checkout_e_parcelamento(fluxo: Fluxo):
             "tipo": "fixo",
             "valor": 1_000,
             "valido_ate": (AGORA - timedelta(days=1)).isoformat(),
+            "ativo": True,
+        },
+        "UNICO": {
+            "codigo": "UNICO",
+            "tipo": "fixo",
+            "valor": 5_000,
+            "limite_usos": 1,
+            "usos_atuais": 0,
             "ativo": True,
         },
     }
@@ -106,9 +114,14 @@ def test_cupom_no_checkout_e_parcelamento(fluxo: Fluxo):
     cob = r_cob.json()
     assert cob["parcelas"] == 2
     assert cob["valor_centavos"] == 92_700
-    assert fluxo.ctx.extras["cupons"]["TRATO10"]["usos_atuais"] == 1
+    # Ainda não queimou vaga antes do pagamento confirmado via webhook
+    assert fluxo.ctx.extras["cupons"]["TRATO10"]["usos_atuais"] == 0
 
-    # Repetir chamada idempotente não incrementa duas vezes o uso do cupom
+    # Estado do pagamento já reflete o valor com desconto (90_000 à vista)
+    est = fluxo.chamar("GET", f"/v1/contratos/{pid}/pagamento", "t-cliente").json()
+    assert est["total_a_pagar_centavos"] == 90_000
+
+    # Repetir chamada idempotente não cria nova cobrança
     r_rep = fluxo.chamar(
         "POST",
         f"/v1/contratos/{pid}/cobranca",
@@ -116,7 +129,50 @@ def test_cupom_no_checkout_e_parcelamento(fluxo: Fluxo):
         {"meio": "cartao", "parcelas": 2, "cupom": "TRATO10"},
     )
     assert r_rep.status_code == 201 and r_rep.json()["cobranca_id"] == cob["cobranca_id"]
+
+    # Trocar cupom antes de pagar cancela a pendente e não queima TRATO10
+    r_troca = fluxo.chamar(
+        "POST",
+        f"/v1/contratos/{pid}/cobranca",
+        "t-cliente",
+        {"meio": "pix", "parcelas": 1, "cupom": "UNICO"},
+    )
+    assert r_troca.status_code == 201
+    cob_unico = r_troca.json()
+    assert cob_unico["valor_centavos"] == 95_000
+    assert fluxo.ctx.extras["cupons"]["TRATO10"]["usos_atuais"] == 0
+
+    # Reaplica TRATO10 e confirma no webhook: só agora contabiliza uso e custo do cupom
+    r_final = fluxo.chamar(
+        "POST",
+        f"/v1/contratos/{pid}/cobranca",
+        "t-cliente",
+        {"meio": "pix", "parcelas": 1, "cupom": "TRATO10"},
+    )
+    assert r_final.status_code == 201
+    cob_final = r_final.json()
+    assert cob_final["valor_centavos"] == 90_000
+
+    fluxo.fake.marcar_paga(cob_final["cobranca_id"])
+    w = fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, cob_final["cobranca_id"])
+    assert w.status_code == 200, w.text
     assert fluxo.ctx.extras["cupons"]["TRATO10"]["usos_atuais"] == 1
+
+    # Reentrega do webhook não duplica contagem
+    w2 = fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, cob_final["cobranca_id"])
+    assert w2.status_code == 200
+    assert fluxo.ctx.extras["cupons"]["TRATO10"]["usos_atuais"] == 1
+
+    # Novo pedido do mesmo cliente com TRATO10 bate no limite_por_usuario = 1
+    pid2 = fluxo.aceitar()
+    bloq = fluxo.chamar(
+        "POST",
+        f"/v1/contratos/{pid2}/cobranca",
+        "t-cliente",
+        {"meio": "pix", "parcelas": 1, "cupom": "TRATO10"},
+    )
+    assert bloq.status_code == 422
+    assert "limite de usos" in bloq.json()["detail"].lower()
 
 
 def test_pedido_direcionado_notifica_e_prioriza_profissional(amb):
@@ -147,9 +203,9 @@ def test_pedido_direcionado_notifica_e_prioriza_profissional(amb):
     dados = amb.cliente.get(f"/v1/pedidos/{novo_id}/dados", headers=cab("t-cliente")).json()
     assert dados["profissional_convidado_id"] == PROFISSIONAL.id
 
-    # Profissional convidado recebe notificação e vê o pedido com convidado=True no topo
+    # Profissional convidado recebe exatamente uma notificação e vê o pedido com convidado=True no topo
     notas = amb.cliente.get("/v1/notificacoes", headers=cab("t-prof")).json()
-    assert any(n["tipo"] == "pedido.direcionado" for n in notas)
+    assert sum(1 for n in notas if n["tipo"] == "pedido.direcionado") == 1
 
     abertos = amb.cliente.get("/v1/profissional/pedidos-abertos", headers=cab("t-prof")).json()
     assert abertos[0]["id"] == novo_id and abertos[0]["convidado"] is True
@@ -222,3 +278,62 @@ def test_negociacao_e_remarcacao_de_agenda_no_chat(amb):
     assert datetime.fromisoformat(r_ok2.json()["janela"]["inicio"]) == datetime.fromisoformat(
         j2["inicio"]
     )
+
+
+def test_cupom_limite_por_usuario_e_concorrencia_atomica(fluxo: Fluxo):
+    from trato.pagamentos.cupons import confirmar_uso_cupom, registrar_uso_cupom
+
+    cupom = {
+        "codigo": "UNICO1",
+        "tipo": "valor_fixo",
+        "valor": 2000,
+        "ativo": True,
+        "limite_usos": 2,
+        "limite_por_usuario": 1,
+        "usos_atuais": 0,
+    }
+    fluxo.ctx.extras["cupons"] = {"UNICO1": cupom}
+
+    # Primeiro pedido usa e confirma o cupom: conta 1 uso para o usuário
+    p1 = fluxo.aceitar()
+    r1 = fluxo.chamar(
+        "POST",
+        f"/v1/contratos/{p1}/cobranca",
+        "t-cliente",
+        {"meio": "pix", "parcelas": 1, "cupom": "UNICO1"},
+    )
+    assert r1.status_code == 201, r1.text
+    cob1 = r1.json()["cobranca_id"]
+    fluxo.fake.marcar_paga(cob1)
+    fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, cob1)
+    assert cupom["usos_atuais"] == 1
+
+    # Mesmo cliente em segundo pedido é barrado por limite_por_usuario=1
+    p2 = fluxo.aceitar()
+    r2 = fluxo.chamar(
+        "POST",
+        f"/v1/contratos/{p2}/cobranca",
+        "t-cliente",
+        {"meio": "pix", "parcelas": 1, "cupom": "UNICO1"},
+    )
+    assert r2.status_code == 422
+    assert "limite de uso" in r2.json()["detail"].lower()
+
+    # Reentrega de webhook para a mesma cobrança não incrementa novamente (idempotência)
+    assert (
+        confirmar_uso_cupom(
+            fluxo.ctx,
+            "UNICO1",
+            usuario_id=CLIENTE.id,
+            cobranca_id=cob1,
+            pedido_id=p1,
+            desconto_centavos=2000,
+        )
+        is False
+    )
+    assert cupom["usos_atuais"] == 1
+
+    # Chegando ao limite_usos=2, incremento concorrente retorna False
+    assert registrar_uso_cupom(fluxo.ctx, "UNICO1") is True
+    assert registrar_uso_cupom(fluxo.ctx, "UNICO1") is False
+    assert cupom["usos_atuais"] == 2

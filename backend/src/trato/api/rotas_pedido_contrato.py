@@ -2,7 +2,7 @@
 estado do pagamento, garantia, aditivos, nota de material, avaliação, perfil e pedidos abertos.
 
 `{contrato_id}` nas rotas é o **id do pedido**: o contrato é um por pedido e não tem outro id.
-Nenhuma regra de dinheiro mora aqui: a taxa vem do `ProvedorTaxa`, a cobrança do
+Nenhuma regra de dinheiro mora aqui: a cobrança do
 `ServicoPagamento` e o app só pede e mostra. "Pago" só aparece depois do webhook assinado (D13).
 Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 """
@@ -24,6 +24,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
+from trato.api.moedas import calcular_uso_moedas
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
@@ -31,7 +32,7 @@ from trato.api.rotas_pedidos import respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.api.visibilidade import pedido_visivel_ao_profissional
-from trato.pagamentos.cupons import registrar_uso_cupom, validar_e_calcular_cupom
+from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
@@ -98,12 +99,6 @@ class OrcamentoDetalheOut(BaseModel):
     )
     total_horas: str | None = Field(
         None, description="Deslocamento + trabalhadas: o total de horas que o cliente vê."
-    )
-    taxa_centavos: int | None = Field(
-        None, description="Taxa do Trato descontada deste orçamento (só para o autor)."
-    )
-    liquido_centavos: int | None = Field(
-        None, description="Valor líquido estimado do profissional (só para o autor)."
     )
 
 
@@ -225,6 +220,10 @@ class CobrarContratoIn(_Entrada):
     cupom: str | None = Field(
         default=None, max_length=30, description="Código de cupom de desconto opcional."
     )
+    usar_moedas: bool = Field(
+        default=False,
+        description="Usa moedas do Trato como desconto. O backend escolhe quantas (nunca o app).",
+    )
 
 
 class AplicarCupomIn(_Entrada):
@@ -343,10 +342,6 @@ def detalhe_do_orcamento(
     desloc = somar_horas(orc.itens, "deslocamento")
     trab = somar_horas(orc.itens, "horas")
     total = None if desloc is None and trab is None else (desloc or Decimal(0)) + (trab or 0)
-    taxa_centavos = liquido_centavos = None
-    if autor and contexto.taxa is not None and orc.valor_centavos > 0:
-        taxa_centavos = min(contexto.taxa.calcular(orc.valor_centavos), orc.valor_centavos)
-        liquido_centavos = orc.valor_centavos - taxa_centavos
     return OrcamentoDetalheOut(
         **campos,
         aceito=orc.id == pedido.orcamento_id,
@@ -354,8 +349,6 @@ def detalhe_do_orcamento(
         horas_deslocamento=_texto_horas(desloc),
         horas_trabalhadas=_texto_horas(trab),
         total_horas=_texto_horas(total),
-        taxa_centavos=taxa_centavos,
-        liquido_centavos=liquido_centavos,
     )
 
 
@@ -379,7 +372,9 @@ def aplicar_cupom_contrato(
         raise HTTPException(403, "Só o cliente do contrato pode aplicar cupom.")
     servico = _servico(request)
     try:
-        aplicado = validar_e_calcular_cupom(contexto, corpo.codigo, contrato.valor_centavos)
+        aplicado = validar_e_calcular_cupom(
+            contexto, corpo.codigo, contrato.valor_centavos, usuario_id=usuario.id
+        )
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from None
     saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
@@ -435,10 +430,24 @@ def criar_cobranca(
     aplicado = None
     if corpo.cupom and corpo.cupom.strip():
         try:
-            aplicado = validar_e_calcular_cupom(contexto, corpo.cupom, contrato.valor_centavos)
+            aplicado = validar_e_calcular_cupom(
+                contexto, corpo.cupom, contrato.valor_centavos, usuario_id=usuario.id
+            )
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from None
         valor_servico = aplicado.servico_com_desconto_centavos
+    desconto_total = aplicado.desconto_centavos if aplicado else 0
+    moedas_usadas = 0
+    if corpo.usar_moedas:
+        uso = calcular_uso_moedas(
+            contexto.moedas,
+            usuario_id=usuario.id,
+            servico_centavos=valor_servico,
+            agora=contexto.agora(),
+        )
+        moedas_usadas = uso.moedas
+        valor_servico -= uso.desconto_centavos
+        desconto_total += uso.desconto_centavos
     preparo = None
     if corpo.meio is MeioPagamento.CARTAO and hasattr(servico.provedor, "preparar_cartao"):
         try:
@@ -447,7 +456,6 @@ def criar_cobranca(
             raise HTTPException(
                 502, "O parceiro de pagamento não respondeu. Tente de novo."
             ) from erro
-    existentes = {c.id for c in servico.cobrancas.do_pedido(pedido.id)}
     cobranca = servico.cobrar(
         contexto,
         pedido,
@@ -455,9 +463,10 @@ def criar_cobranca(
         corpo.meio,
         parcelas=corpo.parcelas,
         cliente_externo=preparo.cliente_id if preparo else None,
+        cupom_codigo=aplicado.codigo if aplicado else None,
+        desconto_centavos=desconto_total,
+        moedas_usadas=moedas_usadas,
     )
-    if aplicado is not None and cobranca.id not in existentes:
-        registrar_uso_cupom(contexto, aplicado.codigo)
     saida = _cobranca_out(pedido.id, cobranca)
     if preparo is not None:
         saida.cliente_externo_id = preparo.cliente_id
@@ -496,13 +505,19 @@ def estado_do_pagamento(
         estado = "cancelada"
     else:
         estado = "aguardando_confirmacao"
+    servico_a_cobrar = contrato.valor_centavos
+    if principal is not None:
+        if principal.servico_centavos is not None:
+            servico_a_cobrar = principal.servico_centavos
+        elif principal.desconto_centavos > 0:
+            servico_a_cobrar = max(0, contrato.valor_centavos - principal.desconto_centavos)
     return PagamentoContratoOut(
         contrato_id=pedido.id,
         estado_pagamento=estado,
         pago=pago,
         valor_centavos=contrato.valor_centavos,
         total_a_pagar_centavos=(
-            servico.total_a_cobrar(contexto, pedido, contrato.valor_centavos).cobrado_centavos
+            servico.total_a_cobrar(contexto, pedido, servico_a_cobrar).cobrado_centavos
             if servico is not None
             else None
         ),

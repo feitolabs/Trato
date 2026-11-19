@@ -33,7 +33,7 @@ def _do_pedido(c, pedido_id: str) -> dict:
     return next(i for i in itens["itens"] if i["pedido_id"] == pedido_id)
 
 
-def test_pagamento_pelo_webhook_aparece_conferido_com_taxa(cenario):
+def test_pagamento_pelo_webhook_aparece_conferido(cenario):
     pedido_id = contratar(cenario)
     assert pagar_pelo_webhook(cenario, pedido_id).status_code == 200
 
@@ -42,7 +42,7 @@ def test_pagamento_pelo_webhook_aparece_conferido_com_taxa(cenario):
     assert item["valor_centavos"] == VALOR
     assert item["divergente"] is False
     assert item["referencia_provedor"] == f"pi_{pedido_id[:8]}"
-    assert item["taxa_trato_centavos"] == 0  # o webhook antigo não separa a taxa na cobrança
+    assert "taxa_trato_centavos" not in item  # sem taxa do Trato
 
 
 def test_conciliar_no_banco_tira_a_divergencia_de_vez(cenario):

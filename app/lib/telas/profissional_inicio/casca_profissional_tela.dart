@@ -147,9 +147,12 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       _relogio = RelogioDeAtualizacao(
         intervalo: intervalo,
         aoAtualizar: _atualizarEmSilencio,
-        // Com outra tela aberta por cima (detalhe, chat), espera: a lista volta ao fechar.
+        // Só atualiza quando o Início ou Pedidos estão visíveis (pausa nas demais abas).
         deveAtualizar: () =>
-            mounted && !_carregandoPedidos && (ModalRoute.of(context)?.isCurrent ?? true),
+            mounted &&
+            (_aba == 0 || _aba == 1) &&
+            !_carregandoPedidos &&
+            (ModalRoute.of(context)?.isCurrent ?? true),
       );
     }
   }
@@ -392,11 +395,28 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       child: AtualizadorTela(
         recarregar: _atualizarEmSilencio,
         child: Scaffold(
-          body: IndexedStack(index: _aba, children: paginas),
-          bottomNavigationBar: BarraAbasTrato(
-            abas: abasProfissional,
-            indiceAtual: _aba,
-            aoSelecionar: _ir,
+          body: IndexedStack(
+            index: _aba,
+            children: [
+              for (var i = 0; i < paginas.length; i++)
+                TickerMode(enabled: _aba == i, child: paginas[i]),
+            ],
+          ),
+          bottomNavigationBar: ValueListenableBuilder<int>(
+            valueListenable: RotasTrato.mensagensNaoLidas,
+            builder: (context, naoLidas, _) {
+              final abas = naoLidas > 0
+                  ? [
+                      for (var i = 0; i < abasProfissional.length; i++)
+                        i == 1 ? abasProfissional[i].comBadge(naoLidas) : abasProfissional[i],
+                    ]
+                  : abasProfissional;
+              return BarraAbasTrato(
+                abas: abas,
+                indiceAtual: _aba,
+                aoSelecionar: _ir,
+              );
+            },
           ),
         ),
       ),

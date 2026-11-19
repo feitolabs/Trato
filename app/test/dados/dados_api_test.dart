@@ -14,7 +14,6 @@ import 'package:trato/dados/repositorios_catalogo_api.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/carteira/modelos.dart';
-import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/disputa_profissional/disputa.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro.dart';
@@ -443,7 +442,6 @@ void main() {
                 'retido_centavos': 12000,
                 'a_liberar_centavos': 8000,
                 'liberado_centavos': 0,
-                'taxa_trato_centavos': 0,
               })
             : _json(_pedidoJson),
       );
@@ -495,6 +493,26 @@ void main() {
       expect(itens.single.brutoCentavos, 46250);
       expect(itens.single.titulo, contains('#ABCD'));
       expect(itens.single.status, StatusExtrato.liberado);
+    });
+
+    test('extrato envia paginação e propaga falha da API em vez de mascarar como vazio', () async {
+      final (apiPag, chamadas) = _cliente(
+        (_) => _json({'itens': const [], 'total': 0, 'limite': 20, 'deslocamento': 40}),
+      );
+      final itens = await RepositorioProfissionalApi(apiPag).extrato(
+        limite: 20,
+        deslocamento: 40,
+      );
+      expect(itens, isEmpty);
+      expect(chamadas.single.caminho, '/v1/extrato?limite=20&deslocamento=40');
+
+      final (apiErro, _) = _cliente(
+        (_) => _json({'detail': 'Serviço indisponível'}, 500),
+      );
+      expect(
+        () => RepositorioProfissionalApi(apiErro).extrato(),
+        throwsA(isA<ErroTrato>()),
+      );
     });
   });
 
@@ -556,14 +574,10 @@ void main() {
   });
 
   group('ServicoOrcamentoApi', () {
-    test('resumir pede a taxa e o total ao backend', () async {
+    test('resumir pede o total ao backend', () async {
       final (api, chamadas) = _cliente(
         (_) => _json({
           'valor_centavos': 30000,
-          'taxa_centavos': 2250,
-          'taxa_bps': 750,
-          'liquido_centavos': 30000,
-          'total_cliente_centavos': 32250,
         }),
       );
 
@@ -573,10 +587,6 @@ void main() {
       expect(chamadas.single.caminho, '/v1/orcamentos/resumo');
       expect(chamadas.single.corpo, {'valor_centavos': 30000});
       expect(resumo.totalCentavos, 30000);
-      expect(resumo.taxaCentavos, 2250);
-      expect(resumo.taxaBps, 750);
-      expect(resumo.liquidoCentavos, 30000);
-      expect(resumo.clientePagaCentavos, 32250);
     });
 
     test('enviar serializa itens e chama POST /v1/pedidos/{id}/orcamentos', () async {

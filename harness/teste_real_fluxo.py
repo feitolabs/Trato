@@ -56,7 +56,6 @@ PARAMETROS = (  # valores de TESTE (não são decisão do João)
     ("garantia_retrabalho_dias_padrao", "dias", 30),
     ("prazo_retrabalho_atendimento_dias", "dias", 7),
 )
-FAIXAS = ((0, None, 750),)  # TESTE: 7,5% para qualquer valor
 
 resultados: list[tuple[str, bool, str]] = []
 
@@ -110,8 +109,6 @@ def setup() -> None:
         for chave, unidade, valor in PARAMETROS:
             con.execute("insert into public.config_definicoes (chave, descricao, unidade) values (%s,%s,%s) on conflict (chave) do nothing", (chave, f"teste_ {chave}", unidade))
             con.execute("insert into public.config_parametros (versao_id, chave, valor) values (%s,%s,%s)", (versao, chave, valor))
-        for de, ate, bps in FAIXAS:
-            con.execute("insert into public.config_faixas_taxa (versao_id, de_centavos, ate_centavos, taxa_bps) values (%s,%s,%s,%s)", (versao, de, ate, bps))
         con.execute("update public.config_versoes set status='aprovada', aprovada_por=%s where id=%s", (ids["financeiro"], versao))
         con.execute("update public.config_versoes set status='vigente' where id=%s", (versao,))
     estado |= {"cidade": str(cidade), "categoria": str(cat), "pergunta": str(perg), "versao": str(versao)}
@@ -163,7 +160,7 @@ def fluxo() -> None:
     r = c.get(f"/v1/pedidos/{pedido}/orcamentos", headers=cliente)
     ok("cliente vê o orçamento (valor 10000 centavos)", r.status_code == 200 and r.json()[0]["valor_centavos"] == 10_000, f"status {r.status_code}")
     r = c.post("/v1/orcamentos/resumo", headers=prof, json={"valor_centavos": 10_000})
-    ok("resumo de taxa vem do backend (7,5% = 750)", r.status_code == 200 and r.json().get("taxa_centavos") == 750, r.text[:120])
+    ok("resumo sem taxa (app gratuito)", r.status_code == 200 and r.json().get("valor_centavos") == 10_000 and "taxa_centavos" not in r.json(), r.text[:120])
     r = c.post(f"/v1/pedidos/{pedido}/acoes/aceitar_orcamento", headers=cliente, json={"prova": {"orcamento_id": orc}})
     ok("cliente aceita o orçamento", r.status_code == 200, f"status {r.status_code} {'' if r.status_code == 200 else r.text[:200]}")
     r = c.post(f"/v1/contratos/{pedido}/cobranca", headers=cliente, json={"meio": "cartao"})

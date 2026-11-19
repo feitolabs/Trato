@@ -1,7 +1,7 @@
 """Rotas que o app pede: orçamentos do pedido, valores do pagamento, mensagens, notificações,
 perfil, pedidos abertos, resumo de orçamento, verificação do profissional e avaliação.
 
-Nenhuma regra de dinheiro mora aqui: a taxa vem do `ProvedorTaxa` (configuração) e o app só
+Nenhuma regra de dinheiro mora aqui: o app só
 pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 """
 
@@ -23,6 +23,7 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.moedas import calcular_uso_moedas, conceder_bonus_avaliacao
 from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
@@ -137,6 +138,9 @@ class PagamentoValoresOut(BaseModel):
     cobranca_pendente_id: str | None = None
     desconto_centavos: int = 0
     cupom_codigo: str | None = None
+    moedas_usadas: int = Field(0, description="Moedas que serão usadas (já no desconto).")
+    moedas_saldo: int = Field(0, description="Saldo de moedas do cliente.")
+    moedas_desconto_centavos: int = Field(0, description="Parte do desconto que vem das moedas.")
 
 
 class MensagemOut(BaseModel):
@@ -175,6 +179,7 @@ class PerfilOut(BaseModel):
     status_verificacao: str | None = Field(
         None, description="Verificação mais recente: enviada, em_analise, aprovada ou recusada."
     )
+    disponivel_agora: bool = False
 
 
 class PedidoAbertoOut(BaseModel):
@@ -209,27 +214,12 @@ class PedidoAbertoOut(BaseModel):
 
 class ResumoOrcamentoOut(BaseModel):
     valor_centavos: int = Field(
-        description="O valor do orçamento (serviço). É o que o cliente paga."
-    )
-    taxa_centavos: int = Field(
-        description="Taxa do Trato (configuração vigente), descontada do profissional."
-    )
-    total_cliente_centavos: int = Field(
-        description="O que o cliente paga à vista: o valor do orçamento."
-    )
-    receita_trato_centavos: int = Field(description="A taxa é a receita do Trato.")
-    taxa_bps: int = Field(
-        description="Taxa EFETIVA em pontos-base (taxa ÷ valor): já considera o mínimo e as faixas."
-    )
-    taxa_percentual: float = Field(
-        description="A mesma taxa efetiva em %, com 2 casas (ex.: 7.5). Para o app só mostrar."
-    )
-    liquido_centavos: int = Field(
-        description="O que o profissional recebe: o orçamento menos a taxa."
+        description="O valor do orçamento (serviço). O cliente paga e o profissional recebe isso: "
+        "o Trato não cobra taxa."
     )
     custo_provedor_estimado_centavos: int = Field(
         description="ESTIMATIVA do custo do meio de pagamento (o maior entre Pix e cartão). "
-        "Pix e cartão à vista: o Trato absorve, sai da taxa. Não reduz o líquido do profissional."
+        "Pix e cartão à vista: o Trato absorve. Não reduz o que o profissional recebe."
     )
     custo_provedor_estimativa: bool = True
 
@@ -255,6 +245,20 @@ class AvaliacaoOut(BaseModel):
     comentario: str | None
     etiquetas: list[str]
     criada_em: datetime
+    moedas_ganhas: int = Field(0, description="Moedas de bônus por esta avaliação (0 se nenhuma).")
+
+
+class MoedaLancamentoOut(BaseModel):
+    tipo: str
+    quantidade: int
+    criada_em: datetime
+    expira_em: datetime | None
+
+
+class MoedasOut(BaseModel):
+    saldo: int
+    valor_moeda_centavos: int
+    extrato: list[MoedaLancamentoOut]
 
 
 # --- Entradas ---------------------------------------------------------------------------
@@ -342,9 +346,9 @@ def _pedido_visivel(
 
 def _custo_provedor_estimado() -> ConfigCustoPagamento:
     """Custos do provedor ainda são ESTIMATIVAS até haver proposta comercial (P7)."""
-    from trato.margem.relatorio import CUSTO_PROVEDOR
+    from trato.pagamentos.custo import CUSTO_PROVEDOR_ESTIMADO
 
-    return CUSTO_PROVEDOR
+    return CUSTO_PROVEDOR_ESTIMADO
 
 
 # --- Orçamentos e pagamento -------------------------------------------------------------
@@ -569,6 +573,7 @@ def valores_do_pagamento(
     pedido_id: str,
     request: Request,
     cupom: Annotated[str | None, Query(max_length=30)] = None,
+    usar_moedas: bool = False,
     usuario: Usuario = Depends(
         exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL, PapelUsuario.EQUIPE)
     ),
@@ -600,17 +605,32 @@ def valores_do_pagamento(
     total = None
     desconto_centavos = 0
     cupom_codigo: str | None = None
+    moedas_usadas = 0
+    moedas_desconto = 0
     opcoes: list[OpcaoParcelamentoOut] = []
     if contrato is not None and servico is not None:
         base_centavos = contrato.valor_centavos
         if cupom and cupom.strip():
             try:
-                aplicado = validar_e_calcular_cupom(contexto, cupom, contrato.valor_centavos)
+                aplicado = validar_e_calcular_cupom(
+                    contexto, cupom, contrato.valor_centavos, usuario_id=usuario.id
+                )
             except ValueError as erro:
                 raise HTTPException(422, str(erro)) from None
             base_centavos = aplicado.servico_com_desconto_centavos
             desconto_centavos = aplicado.desconto_centavos
             cupom_codigo = aplicado.codigo
+        if usar_moedas and pedido.cliente_id == usuario.id:
+            uso = calcular_uso_moedas(
+                contexto.moedas,
+                usuario_id=usuario.id,
+                servico_centavos=base_centavos,
+                agora=contexto.agora(),
+            )
+            moedas_usadas = uso.moedas
+            moedas_desconto = uso.desconto_centavos
+            base_centavos -= uso.desconto_centavos
+            desconto_centavos += uso.desconto_centavos
         conta = servico.total_a_cobrar(contexto, pedido, base_centavos)
         total = conta.cobrado_centavos
         opcoes = [
@@ -628,32 +648,30 @@ def valores_do_pagamento(
         cobranca_pendente_id=pendente,
         desconto_centavos=desconto_centavos,
         cupom_codigo=cupom_codigo,
+        moedas_usadas=moedas_usadas,
+        moedas_desconto_centavos=moedas_desconto,
+        moedas_saldo=(
+            contexto.moedas.saldo(usuario.id, contexto.agora())
+            if pedido.cliente_id == usuario.id
+            else 0
+        ),
     )
 
 
 @router.post(
     "/orcamentos/resumo",
     response_model=ResumoOrcamentoOut,
-    summary="Taxa e líquido de um valor (calculadora do profissional)",
-    description="Só o backend calcula a taxa, pela configuração vigente. Nada é gravado.",
+    summary="Resumo de um valor (calculadora do profissional)",
+    description="Sem taxa: devolve o valor e a estimativa do custo do provedor. Nada é gravado.",
 )
 def resumo_do_orcamento(
     corpo: ResumoOrcamentoIn,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> ResumoOrcamentoOut:
-    if contexto.taxa is None:
-        raise HTTPException(503, "A taxa ainda não foi configurada.")
-    taxa = min(contexto.taxa.calcular(corpo.valor_centavos), corpo.valor_centavos)
     custo = contexto.extras.get("custo_provedor") or _custo_provedor_estimado()
     return ResumoOrcamentoOut(
         valor_centavos=corpo.valor_centavos,
-        taxa_centavos=taxa,
-        taxa_bps=(taxa * 10_000 + corpo.valor_centavos // 2) // corpo.valor_centavos,
-        taxa_percentual=round(taxa * 100 / corpo.valor_centavos, 2),
-        liquido_centavos=corpo.valor_centavos - taxa,
-        total_cliente_centavos=corpo.valor_centavos,
-        receita_trato_centavos=taxa,
         custo_provedor_estimado_centavos=max(
             calcular_custo_stripe(corpo.valor_centavos, meio, custo) for meio in MeioPagamento
         ),
@@ -1017,6 +1035,31 @@ def minhas_verificacoes(
     return [_verificacao_out(v) for v in contexto.verificacoes.da_pessoa(usuario.id)]
 
 
+# --- Moedas ----------------------------------------------------------------------------
+
+
+@router.get(
+    "/me/moedas",
+    response_model=MoedasOut,
+    summary="Saldo e extrato de moedas do Trato",
+)
+def minhas_moedas(
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> MoedasOut:
+    agora = contexto.agora()
+    return MoedasOut(
+        saldo=contexto.moedas.saldo(usuario.id, agora),
+        valor_moeda_centavos=contexto.moedas.config().valor_moeda_centavos,
+        extrato=[
+            MoedaLancamentoOut(
+                tipo=i.tipo, quantidade=i.quantidade, criada_em=i.criada_em, expira_em=i.expira_em
+            )
+            for i in contexto.moedas.extrato(usuario.id)
+        ],
+    )
+
+
 # --- Avaliação --------------------------------------------------------------------------
 
 
@@ -1062,7 +1105,22 @@ def avaliar(
         criada_em=contexto.agora(),
     )
     contexto.avaliacoes.salvar(nova)
+    ganhas = 0
+    if direcao == "cliente_para_profissional":
+        try:
+            contrato = contexto.contratos.obter_do_pedido(pedido.id)
+            ganhas = conceder_bonus_avaliacao(
+                contexto.moedas,
+                cliente_id=usuario.id,
+                pedido_id=pedido.id,
+                agora=contexto.agora(),
+                profissional_id=avaliado,
+                valor_servico_centavos=contrato.valor_centavos if contrato else 0,
+            )
+        except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
+            ganhas = 0
     return AvaliacaoOut(
+        moedas_ganhas=ganhas,
         pedido_id=nova.pedido_id,
         direcao=nova.direcao,
         nota_geral=nova.nota_geral,

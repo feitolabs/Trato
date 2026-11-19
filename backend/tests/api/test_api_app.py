@@ -6,10 +6,8 @@ from __future__ import annotations
 from conftest import AGORA, CLIENTE, OUTRO_CLIENTE, PROFISSIONAL, cab
 
 from trato.api.auth import PapelUsuario
-from trato.api.memoria_app import TaxaEmMemoria
 from trato.api.repositorios import DadosPedido, Orcamento
 from trato.api.repositorios_app import PerfilDetalhe
-from trato.pagamentos.taxa import ConfigTaxa
 from trato.pedidos.estados import Estado
 
 
@@ -155,7 +153,7 @@ def test_valores_do_pagamento_antes_e_depois_de_pagar(amb):
     assert corpo["valor_centavos"] == 100_000
     assert corpo["pago_centavos"] == 0 and corpo["pagamento_confirmado"] is False
     assert corpo["meios_disponiveis"] == ["pix", "cartao"]
-    # a taxa é do profissional: o cliente não a recebe nos valores do pagamento
+    # sem taxa do Trato: nada de taxa nos valores do pagamento
     assert "taxa_centavos" not in corpo and corpo["opcoes_parcelamento"] == []
 
     amb.semear_dinheiro()
@@ -168,31 +166,19 @@ def test_valores_do_pagamento_so_do_cliente_dono(amb):
     assert get(amb, "/v1/pedidos/ped-1/pagamento", "t-outro-cliente").status_code == 404
 
 
-# --- resumo (taxa só no backend) --------------------------------------------------------
+# --- resumo (sem taxa) -------------------------------------------------------------------
 
 
-def test_resumo_calcula_taxa_e_liquido_no_backend(amb):
-    amb.contexto.taxa = TaxaEmMemoria(ConfigTaxa(750, 500))
+def test_resumo_nao_tem_taxa_e_traz_a_estimativa_do_provedor(amb):
     r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 100_000})
     assert r.status_code == 200
     corpo = r.json()
-    assert {k: corpo[k] for k in ("valor_centavos", "taxa_centavos", "liquido_centavos")} == {
-        "valor_centavos": 100_000,
-        "taxa_centavos": 7_500,
-        "liquido_centavos": 92_500,  # a taxa é descontada do profissional
-    }
-    assert corpo["total_cliente_centavos"] == 100_000 and corpo["receita_trato_centavos"] == 7_500
+    assert corpo["valor_centavos"] == 100_000
+    assert not any("taxa" in chave or "liquido" in chave for chave in corpo)
     assert corpo["custo_provedor_estimado_centavos"] > 0
-    # abaixo do mínimo cobra o mínimo; nunca mais que o valor
-    r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 1_000})
-    assert r.json()["taxa_centavos"] == 500 and r.json()["liquido_centavos"] == 500
 
 
-def test_resumo_recusa_valor_ruim_papel_errado_e_taxa_nao_configurada(amb):
-    assert (
-        post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": 5_000}).status_code == 503
-    )
-    amb.contexto.taxa = TaxaEmMemoria(ConfigTaxa(750, 500))
+def test_resumo_recusa_valor_ruim_e_papel_errado(amb):
     for valor in (0, -1, 1.5, "10"):
         r = post(amb, "/v1/orcamentos/resumo", "t-prof", {"valor_centavos": valor})
         assert r.status_code == 422, valor
@@ -279,6 +265,7 @@ def test_me_devolve_o_perfil_sem_dados_pessoais(amb):
     assert corpo.pop("papeis") == ["cliente", "profissional"]
     assert corpo.pop("tem_perfil_profissional") is True
     assert corpo.pop("status_verificacao") is None
+    assert corpo.pop("disponivel_agora") is False
     assert corpo == {
         "id": "pro-1", "nome": "Ana", "papel": "profissional", "status": "ativo",
         "nivel_verificacao": "verificado", "nota_publica": 4.8, "servicos_concluidos": 12,

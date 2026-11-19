@@ -1,3 +1,5 @@
+> **SUPERADO em 18/11/2026:** o app é 100% gratuito, sem taxa. Este documento fica só como histórico dos pedidos antigos.
+
 # Taxa descontada do profissional (decisão do João, 10/11/2026)
 
 Substitui a decisão de 31/10/2026 (`docs/taxa-somada-parcelado.md`) no que diz respeito a quem paga a taxa e ao reembolso.

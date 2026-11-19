@@ -12,13 +12,12 @@ from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admi
 from trato.api.admin.modelos import (
     ComMotivo,
     DefinicaoOut,
-    FaixaIO,
     ParametroIO,
     RascunhoIn,
     VersaoConfigOut,
 )
 from trato.api.admin.papeis import Permissao
-from trato.api.admin.repositorios import FaixaTaxa, ParametroConfig, VersaoConfig
+from trato.api.admin.repositorios import ParametroConfig, VersaoConfig
 from trato.api.contexto import Contexto, obter_contexto
 
 router = APIRouter(prefix="/v1/admin/config", tags=["admin: configuração"])
@@ -39,7 +38,6 @@ def _saida(v: VersaoConfig, nomes: dict[str, str] | None = None) -> VersaoConfig
         revertida_de=v.revertida_de,
         criado_em=v.criado_em,
         parametros=[ParametroIO(**vars(p)) for p in v.parametros],
-        faixas=[FaixaIO(**vars(f)) for f in v.faixas],
     )
 
 
@@ -58,9 +56,7 @@ def definicoes(
     return [DefinicaoOut.model_validate(d, from_attributes=True) for d in admin.config.definicoes()]
 
 
-@router.get(
-    "/vigente", response_model=VersaoConfigOut, summary="Versão vigente (parâmetros e faixas)"
-)
+@router.get("/vigente", response_model=VersaoConfigOut, summary="Versão vigente (parâmetros)")
 def vigente(
     _: Operador = Depends(exigir(Permissao.CONFIG_VER)),
     admin: AdminContexto = Depends(obter_admin),
@@ -107,7 +103,6 @@ def criar_rascunho(
         operador.id,
         corpo.motivo,
         [ParametroConfig(**p.model_dump()) for p in corpo.parametros],
-        [FaixaTaxa(**f.model_dump()) for f in corpo.faixas],
         corpo.vigente_desde,
         corpo.partir_da_vigente,
     )

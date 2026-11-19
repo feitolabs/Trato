@@ -1027,3 +1027,53 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
   - Ordenação alfabética A–Z PT-BR das categorias no backend, app e painel admin; busca unificada `?q=`, debounce 320 ms, recentes, filtros rápidos e busca inline em Ajuda e Seus pedidos.
   - Tela dedicada `SucessoAcaoTela` e retorno limpo à aba inicial (`ControladorCasca`).
   - API de CEP (`GET /v1/cep/{cep}`, ViaCEP + fallback BrasilAPI + cache) integrada ao autopreenchimento no pedido, endereços, dados pessoais e cadastro profissional.
+
+## 2026-11-18 — App 100% gratuito (sem taxa do Trato)
+
+- **Decisão do João:** o Trato não cobra taxa de ninguém. Substitui a taxa progressiva (base 7,5%) e a taxa descontada do profissional.
+- **Backend:** chave única `APP_GRATUITO = True` em `pagamentos/taxa.py`; `calcular_taxa` devolve 0 (inclusive para contratos com taxa já congelada). Ledger não lança taxa 0. Religar = desligar a chave. Termos de uso (`rotas_legal.py`) sem taxa.
+- **App:** removida a linha de taxa da calculadora, aditivo, orçamento enviado e valores do pedido; calculadora diz "O Trato é grátis". Extrato: lançamento `taxa` agora rotulado "custo do parcelamento".
+- **Testes:** `tests/conftest.py` liga a cobrança nos testes antigos de fórmula/ledger; `tests/test_app_gratuito.py` (marker `app_gratuito`) garante taxa 0 por padrão. Goldens da carteira e da calculadora regenerados.
+- **Não feito (precisa de OK):** zerar `taxa_bps`/`taxa_minima_centavos` na configuração do Supabase (nova versão, dupla aprovação). Painel admin mantém colunas/relatórios de taxa (histórico).
+- **Custos:** o Trato absorve o custo do Stripe no Pix e no cartão à vista; o custo de parcelamento continua repassado ao cliente.
+
+## 2026-11-18 — Taxa removida de vez (limpeza total do código)
+
+- **Decisão do João:** gratuito de vez. Branch `feature/remover-taxa`.
+- **Backend:** `pagamentos/taxa.py` agora só tem `montar_total` (serviço + custo de parcelamento). Removidos `ConfigTaxa`, `calcular_taxa`, taxa congelada, `TermosContrato`, `ProvedorTaxa`/`TaxaPostgres`, faixas de taxa (config e painel) e o pacote `margem/`. Contrato não guarda mais a taxa no domínio; as colunas legadas (`taxa_bps_aplicada`, `taxa_trato_centavos`, `liquido_profissional_centavos`) seguem no banco e são gravadas com 0 / valor inteiro. Parâmetros `taxa_*` ficam no banco, escondidos do painel.
+- **API (quebra para apps antigos):** removidos `taxa_*`/`liquido_*` de `/orcamentos/resumo`, detalhe do orçamento, saldo do pedido e painel admin (pagamentos, dashboard). Backend e apps novos precisam subir juntos.
+- **Ledger:** mantido como estava (pedidos antigos têm lançamentos de taxa; o custo de parcelamento usa a conta TAXA_TRATO). Fechamento mensal e relatórios continuam mostrando a receita de taxas do histórico.
+- **App e painel:** sem linhas de taxa; dashboard troca "Receita Trato" por "Serviços concluídos".
+- **Testes:** backend, app (989) e admin (177) ajustados e verdes.
+- **Pendente (precisa de OK):** migration que remova as colunas/tabelas de taxa do banco (`config_faixas_taxa`, colunas de `contratos`/`repasses`) e os parâmetros `taxa_*`. Não aplicada; o código já funciona sem ela.
+
+## 2026-11-18 — Migration que remove as faixas de taxa (preparada, NÃO aplicada)
+
+- `supabase/migrations/20261118150000_remove_faixas_taxa.sql` (+ rollback): remove `config_faixas_taxa`, o trigger e a função. Validada só no Postgres local descartável (138 testes de integração verdes). Backend, seeds e scripts de teste já não usam a tabela.
+- **Não aplicada no Supabase:** destrutiva (apaga as faixas gravadas), precisa do OK do João. Ordem segura: aplicar DEPOIS de o backend novo estar no ar. Colunas legadas de taxa em `contratos`/`aditivos`/`repasses` e parâmetros `taxa_*` ficam (histórico e repasses antigos).
+## 2026-11-18 — Gamificação, fase 1: moedas por avaliar (branch `feature/gamificacao-moedas`, worktree `../Trato-moedas`)
+
+- **Decisão do João:** moeda própria (não cupom), livro separado do ledger de dinheiro. Sem taxa no app, o bônus é custo do Trato.
+- **Backend:** `api/moedas.py` (config, lançamentos imutáveis, saldo, idempotência `avaliacao:<pedido>`, teto mensal, validade opcional). `POST /v1/pedidos/{id}/avaliacao` devolve `moedas_ganhas` (só cliente avaliando o profissional; falha de moeda nunca derruba a avaliação). `GET /v1/me/moedas` devolve saldo, valor da moeda e extrato. Desligado por padrão (`moedas_config.ativo = false`).
+- **Migration APLICADA no Supabase em 2026-11-18 (OK do João), ativo=false:** `supabase/migrations/20261118150000_moedas_gamificacao.sql` (+ rollback). Falta ligar `ativo` na configuração.
+- **Testes:** `tests/api/test_moedas.py` (6). Falta: app (tela de avaliação "+X moedas" e saldo na carteira), painel admin (configurar valores), usar moedas como desconto, indicação e conquistas.
+
+## 2026-11-19 — Gamificação, fase 2: usar moedas como desconto (branch `feature/moedas-desconto`)
+
+- **Regra (backend, `api/moedas.py`):** `calcular_uso_moedas` usa o MENOR entre o saldo e o teto por serviço (`max_desconto_percentual`, padrão 20%); nunca zera o serviço (sobra R$ 1,00). O cliente só liga/desliga; quantas moedas entram o backend decide.
+- **Pagamento:** o desconto das moedas entra em `desconto_centavos` (mesmo campo do cupom) e `moedas_usadas` guarda quantas foram. `GET /v1/pedidos/{id}/pagamento?usar_moedas=true` simula; `POST /v1/contratos/{id}/cobranca {usar_moedas}` cobra com desconto.
+- **Débito e estorno:** debita SÓ na confirmação do pagamento (webhook), idempotente `uso:<cobrança>`. Estorno TOTAL devolve (`estorno-uso:<cobrança>`); parcial não devolve.
+- **Limite conhecido:** o saldo é checado ao criar a cobrança e debitado na confirmação. Dois pagamentos pendentes ao mesmo tempo podem deixar o saldo negativo; o saldo negativo bloqueia novos usos e é abatido pelos próximos bônus.
+- **Migration APLICADA em 2026-11-19 (OK do João):** `20261119120000_moedas_desconto.sql` (+ rollback): `moedas_config.max_desconto_percentual` e `pagamentos.moedas_usadas`. O backend desta branch exige essa migration (já aplicada).
+- **App:** interruptor "Usar minhas moedas" na tela de pagamento (mostra o desconto que o backend calculou).
+- **Testes:** `tests/api/test_moedas_desconto.py` (8), `test/pagamento_moedas_test.dart` e teste de API do app.
+
+## 2026-11-19 — Ranking de profissionais: média ponderada e nota composta (branch `feature/ranking-profissionais`)
+
+- **Passo 1, média ponderada (bayesiana):** `(n·nota + m·prior)/(n + m)`. Uma avaliação 5,0 não passa quem tem 200 avaliações 4,8; sem avaliação vale a nota-prior (profissional novo não fica no fim). A nota que o app MOSTRA continua sendo a média real.
+- **Passo 2, nota composta (0 a 1):** média ponderada + serviços concluídos (satura em `volume_referencia`) + nível de verificação + disponível agora. Pesos e priors em tabela de configuração (`ranking_config`). Texto da busca continua mandando primeiro; a nota composta desempata.
+- **Ficaram de fora (sem dado confiável hoje):** pontualidade (`avaliacao_criterios` está vazia), taxa de aceite de orçamento, tempo de resposta e distância (não guardamos lat/lng). Taxa de conclusão também ficou de fora: o cancelamento pode ser do cliente.
+- **Onde:** conta em `profissional/ranking.py` (uma fonte só). Busca em memória e Postgres usam a mesma função; no Postgres a ordenação é feita em duas fases (candidatos leves, ordena em Python, detalhes só da página). Rota do painel `GET/PUT /v1/admin/ranking/config` (`config_ver` / `config_aprovar`, com auditoria e motivo).
+- **Validado no Supabase real (só SELECT):** as duas fases da consulta, com e sem texto/bairro.
+- **Migration APLICADA em 2026-11-19 (OK do João):** `20261119140000_ranking_config.sql` (+ rollback). Sem a tabela, a leitura dos pesos cai nos valores padrão (a busca não quebra), então o deploy não exige a migration, mas os pesos ficam fixos até aplicar.
+- **Limite conhecido:** no Postgres a busca traz todos os candidatos que casam com os filtros antes de paginar. Com milhares de profissionais, vale mover o cálculo para uma coluna/visão.

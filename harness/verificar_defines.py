@@ -22,7 +22,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 # Mantenha igual a app/lib/dados/defines_publicos.dart e admin/lib/dados/defines_publicos.dart.
 PERMITIDAS = {
     "TRATO_MODO", "TRATO_API_URL", "SUPABASE_URL", "SUPABASE_ANON_KEY",
-    "GOOGLE_WEB_CLIENT_ID", "GOOGLE_IOS_CLIENT_ID", "GALERIA",
+    "GOOGLE_WEB_CLIENT_ID", "GOOGLE_IOS_CLIENT_ID", "STRIPE_PUBLISHABLE_KEY", "GALERIA",
     "ADMIN_MODO", "ADMIN_API_URL", "ADMIN_SUPABASE_URL", "ADMIN_SUPABASE_ANON_KEY", "ADMIN_AMBIENTE",
     "ADMIN_ATUALIZAR_SEGUNDOS",
 }

@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:trato/auth/servico_auth.dart';
 import 'apoio/exemplos/auth/servico_auth_fake.dart';
-import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/fluxo/rotas.dart';

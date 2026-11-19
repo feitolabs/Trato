@@ -107,8 +107,42 @@ class _CheckInTelaState extends State<CheckInTela> {
   }
 
   Future<void> _enviarMensagem(String mensagem) async {
-    await widget.servico.enviarMensagemRapida(mensagem);
-    if (mounted) setState(() => _aviso = 'Mensagem enviada: $mensagem');
+    setState(() => _erroPasso = null);
+    try {
+      await widget.servico.enviarMensagemRapida(mensagem);
+      if (mounted) setState(() => _aviso = 'Mensagem enviada: $mensagem');
+    } on ErroTrato catch (erro) {
+      if (mounted) setState(() => _erroPasso = erro.mensagem);
+    } on Object {
+      if (mounted) {
+        setState(() => _erroPasso = 'Não foi possível enviar a mensagem agora.');
+      }
+    }
+  }
+
+  Future<void> _confirmarClienteAusente() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        title: const Text('Registrar cliente ausente?'),
+        content: const Text(
+          'Isso registra formalmente sua chegada no local e envia um aviso ao cliente no chat do pedido.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogo).pop(true),
+            child: const Text('Confirmar ausência'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar == true && mounted) {
+      await _clienteAusente();
+    }
   }
 
   Future<void> _clienteAusente() async {
@@ -269,7 +303,8 @@ class _CheckInTelaState extends State<CheckInTela> {
         const SizedBox(height: EspacosTrato.x5),
         Center(
             child: BotaoLink(
-                texto: 'Cliente não está no local', aoTocar: _clienteAusente)),
+                texto: 'Cliente não está no local',
+                aoTocar: _confirmarClienteAusente)),
       ],
     );
   }
@@ -320,10 +355,19 @@ class _CartaoPasso extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: feito
-                  ? const ChipStatus(
-                      texto: 'Feito',
-                      tipo: TipoStatus.sucesso,
-                      icone: Icons.check)
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const ChipStatus(
+                          texto: 'Feito',
+                          tipo: TipoStatus.sucesso,
+                          icone: Icons.check,
+                        ),
+                        const SizedBox(height: EspacosTrato.x1),
+                        BotaoLink(texto: 'Refazer', aoTocar: aoTocarAcao),
+                      ],
+                    )
                   : BotaoLink(texto: textoAcao, aoTocar: aoTocarAcao),
             ),
           ),

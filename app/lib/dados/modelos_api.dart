@@ -131,7 +131,6 @@ class SaldoPedidoApi {
     required this.retidoCentavos,
     required this.aLiberarCentavos,
     required this.liberadoCentavos,
-    required this.taxaTratoCentavos,
   });
 
   factory SaldoPedidoApi.deJson(Map<String, dynamic> j) => SaldoPedidoApi(
@@ -139,14 +138,12 @@ class SaldoPedidoApi {
         retidoCentavos: j['retido_centavos'] as int,
         aLiberarCentavos: j['a_liberar_centavos'] as int,
         liberadoCentavos: j['liberado_centavos'] as int,
-        taxaTratoCentavos: j['taxa_trato_centavos'] as int,
       );
 
   final int clientePagouCentavos;
   final int retidoCentavos;
   final int aLiberarCentavos;
   final int liberadoCentavos;
-  final int taxaTratoCentavos;
 }
 
 class LancamentoApi {

@@ -2,7 +2,7 @@ import '../dados/modelos.dart';
 import 'formato.dart';
 
 /// Temas de Configurações (RF-CFG-01), na ordem em que aparecem.
-const gruposConfig = ['Taxas', 'Pagamento', 'Garantia', 'Disputas', 'Pedidos e propostas', 'Risco'];
+const gruposConfig = ['Pagamento', 'Garantia', 'Disputas', 'Pedidos e propostas', 'Risco'];
 
 /// O que a tela sabe de cada parâmetro além do que o banco guarda: o tema e uma frase de ajuda.
 /// Nome, unidade e faixa vêm do banco (`config_definicoes`); aqui não há nenhum valor de regra.
@@ -13,9 +13,6 @@ class InfoParametro {
 }
 
 const _info = <String, InfoParametro>{
-  'taxa_bps': InfoParametro('Taxas', 'Percentual retido sobre o valor do serviço concluído'),
-  'taxa_minima_centavos': InfoParametro('Taxas', 'Cobrada quando o percentual der menos que isso'),
-  'taxa_progressiva_ativa': InfoParametro('Taxas', 'Liga a tabela progressiva de taxa'),
   'adiantamento_bps': InfoParametro('Pagamento', 'Parte do valor paga quando o serviço começa'),
   'prazo_liberacao_dias': InfoParametro('Pagamento', 'Tempo entre o encerramento e o repasse'),
   'janela_chargeback_dias': InfoParametro('Pagamento', 'Quanto tempo o cliente tem para reclamar'),
@@ -86,7 +83,7 @@ int? campoParaValor(String texto, ConfigDefinicao d) {
   }
 }
 
-/// Diferenças entre duas versões, uma frase por parâmetro: "Taxa mínima por pedido: R$ 3,00 → R$ 4,00".
+/// Diferenças entre duas versões, uma frase por parâmetro: "Prazo de resposta da disputa: 48 h → 24 h".
 List<String> diferencas(ConfigVersao nova, ConfigVersao base, List<ConfigDefinicao> definicoes) {
   final linhas = <String>[];
   for (final d in definicoes) {

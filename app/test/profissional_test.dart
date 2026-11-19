@@ -98,22 +98,21 @@ void main() {
 
   group('Calculadora de orçamento', () {
     testWidgets('soma exibida e interface chamada com o total certo', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
 
       // (0,5 h de deslocamento + 2,5 h trabalhadas) x 90 + 46 + 64 = R$ 380,00
       expect(servico.pedidos, [38000]);
       expect(find.text('R\$ 380,00'), findsWidgets);
-      // Taxa descontada: o cliente paga 380; o profissional recebe 380 menos 28,50.
-      expect(find.text('Taxa Trato (7,5%)'), findsOneWidget);
-      expect(find.text('– R\$ 28,50'), findsOneWidget);
-      expect(find.text('R\$ 351,50'), findsOneWidget);
+      // App gratuito: nenhuma linha de taxa; o profissional recebe o total.
+      expect(find.textContaining('Taxa Trato'), findsNothing);
+      expect(find.text('Você recebe'), findsOneWidget);
       expect(find.text('Serviços parecidos na região: R\$ 300,00 a R\$ 450,00.'), findsOneWidget);
     });
 
     testWidgets('mostra o total de horas (deslocamento + trabalhadas) ao profissional', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
       expect(find.textContaining('Total de horas: 3 h'), findsOneWidget);
@@ -122,17 +121,17 @@ void main() {
       expect(find.textContaining('Total de horas: 4 h'), findsOneWidget);
     });
 
-    testWidgets('rótulo da taxa acompanha o percentual devolvido', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 500);
+    testWidgets('não mostra taxa e avisa que o Trato é grátis', (tester) async {
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
-      expect(find.text('Taxa Trato (5%)'), findsOneWidget);
-      expect(find.text('– R\$ 19,00'), findsOneWidget);
-      expect(find.text('R\$ 361,00'), findsOneWidget);
+      expect(find.textContaining('Taxa'), findsNothing);
+      expect(find.textContaining('O Trato é grátis'), findsOneWidget);
+      expect(find.text('R\$ 380,00'), findsWidgets);
     });
 
     testWidgets('mudar um campo refaz o pedido com o novo total', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
 
@@ -145,7 +144,7 @@ void main() {
     });
 
     testWidgets('Cliente fornece tira o material do total', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
 
@@ -158,7 +157,7 @@ void main() {
     });
 
     testWidgets('sem horas e valor não há total nem chamada', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico, itens: [], desloc: '', horas: '', valorHora: ''));
       await tester.pump();
       expect(servico.pedidos, isEmpty);
@@ -166,7 +165,7 @@ void main() {
     });
 
     testWidgets('validação: campos obrigatórios bloqueiam o envio', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       OrcamentoPronto? enviado;
       await _abrir(
         tester,
@@ -190,7 +189,7 @@ void main() {
     });
 
     testWidgets('validação: deslocamento inválido', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       OrcamentoPronto? enviado;
       await _abrir(tester, _calculadora(servico, aoEnviar: (o) => enviado = o, desloc: '1,2,3'));
       await tester.tap(find.text('Enviar orçamento'));
@@ -203,7 +202,7 @@ void main() {
     });
 
     testWidgets('enviar entrega o orçamento em centavos inteiros', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       OrcamentoPronto? enviado;
       await _abrir(tester, _calculadora(servico, aoEnviar: (o) => enviado = o));
       await tester.tap(find.text('Pedir sinal para o material'));
@@ -228,7 +227,7 @@ void main() {
     });
 
     testWidgets('enviar assíncrono exibe indicador de carregamento no botão', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       final completer = Completer<void>();
       await _abrir(tester, _calculadora(servico, aoEnviar: (o) => completer.future));
 
@@ -244,7 +243,7 @@ void main() {
     });
 
     testWidgets('adicionar item soma ao total', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.pump();
 
@@ -260,7 +259,7 @@ void main() {
     });
 
     testWidgets('adicionar item sem valor mostra erro e não fecha', (tester) async {
-      final servico = ServicoOrcamentoFake(taxaBps: 750);
+      final servico = ServicoOrcamentoFake();
       await _abrir(tester, _calculadora(servico));
       await tester.tap(find.text('Adicionar item'));
       await tester.pumpAndSettle();
@@ -362,7 +361,15 @@ void main() {
       final link = find.text('Cliente não está no local');
       await tester.ensureVisible(link);
       await tester.tap(link);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+      expect(servico.clienteAusenteAvisado, isFalse);
+
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar ausência'));
+      await tester.pumpAndSettle();
       expect(servico.clienteAusenteAvisado, isTrue);
     });
   });
@@ -379,7 +386,7 @@ void main() {
         tester.platformDispatcher.textScaleFactorTestValue = escala;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
-        await _abrir(tester, _calculadora(ServicoOrcamentoFake(taxaBps: 750)), tamanho: tamanho);
+        await _abrir(tester, _calculadora(ServicoOrcamentoFake()), tamanho: tamanho);
         await tester.pump();
         expect(tester.takeException(), isNull);
         await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -3000));

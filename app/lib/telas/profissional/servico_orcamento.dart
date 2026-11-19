@@ -41,28 +41,12 @@ class OrcamentoPronto {
   int get totalDecimosDeHora => decimosDeslocamento + decimosDeHora;
 }
 
-/// O que o backend devolve para um total. Tudo já calculado lá (escopo 11.1).
+/// O que o backend devolve para um total. Sem taxa: o cliente paga e o profissional recebe o mesmo valor.
 class ResumoOrcamento {
-  const ResumoOrcamento({
-    required this.totalCentavos,
-    required this.taxaCentavos,
-    this.taxaBps,
-    required this.liquidoCentavos,
-    int? clientePagaCentavos,
-  }) : clientePagaCentavos = clientePagaCentavos ?? totalCentavos;
+  const ResumoOrcamento({required this.totalCentavos});
 
-  /// O valor do orçamento (serviço). [liquidoCentavos] é esse valor menos [taxaCentavos].
+  /// O valor do orçamento (serviço).
   final int totalCentavos;
-
-  /// Taxa do Trato. É descontada do profissional; o cliente não paga por cima.
-  final int taxaCentavos;
-
-  /// O que o cliente paga à vista: o valor do orçamento. Vem do backend.
-  final int clientePagaCentavos;
-
-  /// Percentual da taxa em pontos-base (750 = 7,5%). A tela só exibe.
-  final int? taxaBps;
-  final int liquidoCentavos;
 }
 
 /// Porta entre a tela e o backend de orçamentos.

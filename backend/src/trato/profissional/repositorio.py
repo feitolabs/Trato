@@ -14,6 +14,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 from zoneinfo import ZoneInfo
 
+from trato.profissional.ranking import ConfigRanking, pontuacao
+
 _FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
 _SEPARADOR_BUSCA = re.compile(r"[^0-9a-zA-Z]+")
 
@@ -34,6 +36,7 @@ def nome_publico_busca(nome: str | None) -> str:
 
 def dia_semana_hoje() -> int:
     return datetime.now(_FUSO_BRASILIA).weekday()
+
 
 if TYPE_CHECKING:
     from trato.api.repositorios_app import PerfilDetalhe
@@ -124,6 +127,8 @@ class FiltroBusca:
     excluir_usuario_id: str | None = None
     limite: int = 20
     deslocamento: int = 0
+    # Pesos do ranking (vêm da tabela `ranking_config`, lida pela rota).
+    ranking: ConfigRanking = field(default_factory=ConfigRanking)
 
 
 @dataclass(frozen=True)
@@ -187,9 +192,7 @@ def _correspondencia_texto(
         return 0
     nome_pub = normalizar_busca(nome_publico_busca(nome))
     bio = normalizar_busca(p.bio or "")
-    portfolio = " ".join(
-        normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio
-    )
+    portfolio = " ".join(normalizar_busca(f"{i.titulo} {i.descricao or ''}") for i in p.portfolio)
     bairros = " ".join(normalizar_busca(r.bairro or "") for r in p.regioes)
     cat_casa = bool(filtro.categorias_texto & set(p.categorias))
     cid_casa = any(r.cidade_id in filtro.cidades_texto for r in p.regioes)
@@ -235,9 +238,7 @@ class ProfissionaisEmMemoria:
 
     def listar_disponiveis_agora(self) -> list[PerfilProfissional]:
         """Profissionais aprovados com o modo 'Disponível agora' ativo."""
-        return [
-            p for p in self._itens.values() if p.status == "aprovado" and p.disponivel_agora
-        ]
+        return [p for p in self._itens.values() if p.status == "aprovado" and p.disponivel_agora]
 
     def buscar(
         self, filtro: FiltroBusca, detalhe: Callable[[str], PerfilDetalhe | None]
@@ -280,11 +281,19 @@ class ProfissionaisEmMemoria:
                 atende_remoto=p.atende_remoto,
                 _regioes_ids=p.regioes,
             )
+            concluidos = d.servicos_concluidos if d and d.servicos_concluidos else 0
+            nota_composta = pontuacao(
+                nota=nota,
+                avaliacoes=d.avaliacoes_total if d else 0,
+                concluidos=concluidos,
+                nivel_verificacao=p.nivel_verificacao,
+                disponivel_agora=p.disponivel_agora,
+                cfg=filtro.ranking,
+            )
             chave = (
                 -pontos_texto,
-                nota is None,
-                -(nota or 0),
-                -(d.servicos_concluidos if d and d.servicos_concluidos else 0),
+                -nota_composta,
+                -concluidos,
                 not _match_exato_bairro(p, filtro),
                 _PESO_VERIFICACAO.get(p.nivel_verificacao, 9),
                 not bool((p.bio or "").strip()),

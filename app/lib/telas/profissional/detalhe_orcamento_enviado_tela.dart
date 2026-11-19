@@ -66,41 +66,6 @@ class DetalheOrcamentoEnviadoTela extends StatelessWidget {
                             style: TipografiaTrato.tituloGrande
                                 .copyWith(color: CoresTrato.creme),
                           ),
-                          if (detalhe.taxaCentavos != null &&
-                              detalhe.liquidoCentavos != null) ...[
-                            const Divider(color: CoresTrato.pontoSobrePetroleo),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Taxa do Trato',
-                                  style: TipografiaTrato.corpoPequeno
-                                      .copyWith(color: CoresTrato.creme),
-                                ),
-                                Text(
-                                  '- ${formatarReais(detalhe.taxaCentavos!)}',
-                                  style: TipografiaTrato.corpoPequeno
-                                      .copyWith(color: CoresTrato.creme),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: EspacosTrato.x1),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Você recebe',
-                                  style: TipografiaTrato.corpoForte
-                                      .copyWith(color: CoresTrato.creme),
-                                ),
-                                Text(
-                                  formatarReais(detalhe.liquidoCentavos!),
-                                  style: TipografiaTrato.tituloCartao
-                                      .copyWith(color: CoresTrato.creme),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
                       ),
                     ),

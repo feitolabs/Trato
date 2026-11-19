@@ -90,7 +90,7 @@ class _RelatoriosTelaState extends State<RelatoriosTela> {
       (
         'financeiro',
         'Extrato Financeiro e Fiscal',
-        'Cobranças, taxas retidas, reembolsos e repasses do período, por pedido.',
+        'Cobranças, reembolsos e repasses do período, por pedido.',
         podePessoais ? 'Inclui CPF para papéis autorizados' : 'Sem CPF: seu papel não revela dados pessoais',
       ),
       (

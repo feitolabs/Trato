@@ -30,6 +30,7 @@ def slugificar(texto: str) -> str:
 # MODELOS DE CATEGORIAS
 # =============================================================================
 
+
 class CategoriaAdminOut(BaseModel):
     id: str
     nome: str
@@ -77,6 +78,7 @@ class ExcluirComMotivoIn(BaseModel):
 # MODELOS DE CIDADES
 # =============================================================================
 
+
 class CidadeAdminOut(BaseModel):
     id: str
     nome: str
@@ -99,6 +101,7 @@ class CriarCidadeIn(BaseModel):
 # MODELOS DE SUPORTE
 # =============================================================================
 
+
 class ChamadoOut(BaseModel):
     id: str
     assunto: str
@@ -111,7 +114,12 @@ class ChamadoOut(BaseModel):
 # ROTAS: CATEGORIAS (CRUD COMPLETO)
 # =============================================================================
 
-@router.get("/categorias", response_model=list[CategoriaAdminOut], summary="Listar categorias para administração")
+
+@router.get(
+    "/categorias",
+    response_model=list[CategoriaAdminOut],
+    summary="Listar categorias para administração",
+)
 def listar_categorias(
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
     contexto: Contexto = Depends(obter_contexto),
@@ -138,7 +146,9 @@ def listar_categorias(
                 nome=str(r["nome"]),
                 slug=str(r["slug"]),
                 icone=str(r["icone"]) if r["icone"] else None,
-                garantia_retrabalho_dias=int(r["garantia_retrabalho_dias"]) if r["garantia_retrabalho_dias"] else None,
+                garantia_retrabalho_dias=(
+                    int(r["garantia_retrabalho_dias"]) if r["garantia_retrabalho_dias"] else None
+                ),
                 ordem=int(r["ordem"] or 0),
                 ativa=bool(r["ativa"]),
                 profissionais=int(r["profissionais"] or 0),
@@ -148,7 +158,12 @@ def listar_categorias(
         ]
 
 
-@router.post("/categorias", response_model=CategoriaAdminOut, status_code=201, summary="Criar nova categoria")
+@router.post(
+    "/categorias",
+    response_model=CategoriaAdminOut,
+    status_code=201,
+    summary="Criar nova categoria",
+)
 def criar_categoria(
     corpo: CriarCategoriaIn,
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
@@ -164,7 +179,9 @@ def criar_categoria(
     with banco.transacao() as con:
         existe = con.execute("SELECT id FROM public.categorias WHERE slug = %s", (slug,)).fetchone()
         if existe:
-            raise HTTPException(409, f"Já existe uma categoria com o identificador (slug) '{slug}'.")
+            raise HTTPException(
+                409, f"Já existe uma categoria com o identificador (slug) '{slug}'."
+            )
         linha = con.execute(
             """
             INSERT INTO public.categorias
@@ -172,8 +189,15 @@ def criar_categoria(
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id, nome, slug, icone, garantia_retrabalho_dias, ordem, ativa, aceita_remoto
             """,
-            (corpo.nome.strip(), slug, corpo.icone, corpo.garantia_retrabalho_dias, corpo.ordem,
-             corpo.ativa, corpo.aceita_remoto),
+            (
+                corpo.nome.strip(),
+                slug,
+                corpo.icone,
+                corpo.garantia_retrabalho_dias,
+                corpo.ordem,
+                corpo.ativa,
+                corpo.aceita_remoto,
+            ),
         ).fetchone()
         admin.auditoria.registrar(
             ator_id=operador.id,
@@ -201,7 +225,11 @@ def criar_categoria(
         )
 
 
-@router.put("/categorias/{categoria_id}", response_model=CategoriaAdminOut, summary="Editar categoria existente")
+@router.put(
+    "/categorias/{categoria_id}",
+    response_model=CategoriaAdminOut,
+    summary="Editar categoria existente",
+)
 def editar_categoria(
     categoria_id: str,
     corpo: EditarCategoriaIn,
@@ -222,11 +250,20 @@ def editar_categoria(
         novo_nome = corpo.nome.strip() if corpo.nome is not None else atual["nome"]
         novo_slug = corpo.slug.strip() if corpo.slug is not None else atual["slug"]
         if novo_slug != atual["slug"]:
-            existe = con.execute("SELECT id FROM public.categorias WHERE slug = %s AND id != %s", (novo_slug, uid)).fetchone()
+            existe = con.execute(
+                "SELECT id FROM public.categorias WHERE slug = %s AND id != %s",
+                (novo_slug, uid),
+            ).fetchone()
             if existe:
-                raise HTTPException(409, f"O slug '{novo_slug}' já está em uso por outra categoria.")
+                raise HTTPException(
+                    409, f"O slug '{novo_slug}' já está em uso por outra categoria."
+                )
         novo_icone = corpo.icone if corpo.icone is not None else atual["icone"]
-        nova_garantia = corpo.garantia_retrabalho_dias if corpo.garantia_retrabalho_dias is not None else atual["garantia_retrabalho_dias"]
+        nova_garantia = (
+            corpo.garantia_retrabalho_dias
+            if corpo.garantia_retrabalho_dias is not None
+            else atual["garantia_retrabalho_dias"]
+        )
         nova_ordem = corpo.ordem if corpo.ordem is not None else atual["ordem"]
         nova_ativa = corpo.ativa if corpo.ativa is not None else atual["ativa"]
         novo_remoto = (
@@ -252,8 +289,16 @@ def editar_categoria(
                 ativa = %s, aceita_remoto = %s, atualizado_em = now()
             WHERE id = %s
             """,
-            (novo_nome, novo_slug, novo_icone, nova_garantia, nova_ordem, nova_ativa,
-             novo_remoto, uid),
+            (
+                novo_nome,
+                novo_slug,
+                novo_icone,
+                nova_garantia,
+                nova_ordem,
+                nova_ativa,
+                novo_remoto,
+                uid,
+            ),
         )
         admin.auditoria.registrar(
             ator_id=operador.id,
@@ -269,7 +314,8 @@ def editar_categoria(
             motivo=corpo.motivo,
         )
         contagem = con.execute(
-            "SELECT count(*) as total FROM public.profissional_categorias WHERE categoria_id = %s", (uid,)
+            "SELECT count(*) as total FROM public.profissional_categorias WHERE categoria_id = %s",
+            (uid,),
         ).fetchone()
         return CategoriaAdminOut(
             id=str(uid),
@@ -284,7 +330,11 @@ def editar_categoria(
         )
 
 
-@router.patch("/categorias/{categoria_id}", response_model=CategoriaAdminOut, summary="Ativar ou desativar categoria")
+@router.patch(
+    "/categorias/{categoria_id}",
+    response_model=CategoriaAdminOut,
+    summary="Ativar ou desativar categoria",
+)
 def alterar_status_categoria(
     categoria_id: str,
     corpo: AlterarStatusIn,
@@ -299,10 +349,17 @@ def alterar_status_categoria(
     if uid is None:
         raise HTTPException(404, "Categoria não encontrada.")
     with banco.transacao() as con:
-        cat = con.execute("SELECT id, nome, slug, icone, garantia_retrabalho_dias, ordem, ativa FROM public.categorias WHERE id = %s", (uid,)).fetchone()
+        cat = con.execute(
+            "SELECT id, nome, slug, icone, garantia_retrabalho_dias, ordem, ativa "
+            "FROM public.categorias WHERE id = %s",
+            (uid,),
+        ).fetchone()
         if cat is None:
             raise HTTPException(404, "Categoria não encontrada.")
-        con.execute("UPDATE public.categorias SET ativa = %s, atualizado_em = now() WHERE id = %s", (corpo.ativa, uid))
+        con.execute(
+            "UPDATE public.categorias SET ativa = %s, atualizado_em = now() WHERE id = %s",
+            (corpo.ativa, uid),
+        )
         admin.auditoria.registrar(
             ator_id=operador.id,
             acao="categoria.ativada" if corpo.ativa else "categoria.desativada",
@@ -312,7 +369,8 @@ def alterar_status_categoria(
             motivo=corpo.motivo,
         )
         contagem = con.execute(
-            "SELECT count(*) as total FROM public.profissional_categorias WHERE categoria_id = %s", (uid,)
+            "SELECT count(*) as total FROM public.profissional_categorias WHERE categoria_id = %s",
+            (uid,),
         ).fetchone()
         return CategoriaAdminOut(
             id=str(uid),
@@ -326,7 +384,11 @@ def alterar_status_categoria(
         )
 
 
-@router.delete("/categorias/{categoria_id}", status_code=204, summary="Excluir categoria sem dependências")
+@router.delete(
+    "/categorias/{categoria_id}",
+    status_code=204,
+    summary="Excluir categoria sem dependências",
+)
 def excluir_categoria(
     categoria_id: str,
     motivo: str = Query(..., min_length=10, max_length=500),
@@ -344,17 +406,25 @@ def excluir_categoria(
         cat = con.execute("SELECT id, nome FROM public.categorias WHERE id = %s", (uid,)).fetchone()
         if cat is None:
             raise HTTPException(404, "Categoria não encontrada.")
-        pedidos_vinculados = con.execute("SELECT count(*) as total FROM public.pedidos WHERE categoria_id = %s", (uid,)).fetchone()["total"]
+        pedidos_vinculados = con.execute(
+            "SELECT count(*) as total FROM public.pedidos WHERE categoria_id = %s",
+            (uid,),
+        ).fetchone()["total"]
         if pedidos_vinculados > 0:
             raise HTTPException(
                 409,
-                f"Esta categoria não pode ser excluída porque possui {pedidos_vinculados} pedido(s) histórico(s). Você pode desativá-la.",
+                f"Esta categoria não pode ser excluída porque possui {pedidos_vinculados} "
+                "pedido(s) histórico(s). Você pode desativá-la.",
             )
-        prof_vinculados = con.execute("SELECT count(*) as total FROM public.profissional_categorias WHERE categoria_id = %s", (uid,)).fetchone()["total"]
+        prof_vinculados = con.execute(
+            "SELECT count(*) as total FROM public.profissional_categorias WHERE categoria_id = %s",
+            (uid,),
+        ).fetchone()["total"]
         if prof_vinculados > 0:
             raise HTTPException(
                 409,
-                f"Esta categoria possui {prof_vinculados} profissional(is) vinculado(s). Remova os vínculos ou desative a categoria.",
+                f"Esta categoria possui {prof_vinculados} profissional(is) vinculado(s). "
+                "Remova os vínculos ou desative a categoria.",
             )
         con.execute("DELETE FROM public.categoria_perguntas WHERE categoria_id = %s", (uid,))
         con.execute("DELETE FROM public.categorias WHERE id = %s", (uid,))
@@ -372,6 +442,7 @@ def excluir_categoria(
 # ROTAS: CIDADES (EXPANSÃO REGIONAL DO APP)
 # =============================================================================
 
+
 @router.get("/cidades", response_model=list[CidadeAdminOut], summary="Listar cidades de atuação")
 def listar_cidades(
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
@@ -382,7 +453,8 @@ def listar_cidades(
         return []
     with banco.transacao() as con:
         linhas = con.execute(
-            "SELECT id, nome, uf, ativa, centro_lat, centro_lng FROM public.cidades ORDER BY uf, nome"
+            "SELECT id, nome, uf, ativa, centro_lat, centro_lng "
+            "FROM public.cidades ORDER BY uf, nome"
         ).fetchall()
         return [
             CidadeAdminOut(
@@ -397,7 +469,12 @@ def listar_cidades(
         ]
 
 
-@router.post("/cidades", response_model=CidadeAdminOut, status_code=201, summary="Cadastrar nova cidade de atuação")
+@router.post(
+    "/cidades",
+    response_model=CidadeAdminOut,
+    status_code=201,
+    summary="Cadastrar nova cidade de atuação",
+)
 def criar_cidade(
     corpo: CriarCidadeIn,
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
@@ -410,7 +487,10 @@ def criar_cidade(
     uf = corpo.uf.strip().upper()
     nome = corpo.nome.strip()
     with banco.transacao() as con:
-        existe = con.execute("SELECT id FROM public.cidades WHERE lower(nome) = lower(%s) AND uf = %s", (nome, uf)).fetchone()
+        existe = con.execute(
+            "SELECT id FROM public.cidades WHERE lower(nome) = lower(%s) AND uf = %s",
+            (nome, uf),
+        ).fetchone()
         if existe:
             raise HTTPException(409, f"A cidade {nome} - {uf} já está cadastrada.")
         linha = con.execute(
@@ -439,7 +519,11 @@ def criar_cidade(
         )
 
 
-@router.patch("/cidades/{cidade_id}", response_model=CidadeAdminOut, summary="Ativar ou desativar cidade")
+@router.patch(
+    "/cidades/{cidade_id}",
+    response_model=CidadeAdminOut,
+    summary="Ativar ou desativar cidade",
+)
 def alterar_status_cidade(
     cidade_id: str,
     corpo: AlterarStatusIn,
@@ -454,10 +538,16 @@ def alterar_status_cidade(
     if uid is None:
         raise HTTPException(404, "Cidade não encontrada.")
     with banco.transacao() as con:
-        cid = con.execute("SELECT id, nome, uf, ativa, centro_lat, centro_lng FROM public.cidades WHERE id = %s", (uid,)).fetchone()
+        cid = con.execute(
+            "SELECT id, nome, uf, ativa, centro_lat, centro_lng FROM public.cidades WHERE id = %s",
+            (uid,),
+        ).fetchone()
         if cid is None:
             raise HTTPException(404, "Cidade não encontrada.")
-        con.execute("UPDATE public.cidades SET ativa = %s, atualizado_em = now() WHERE id = %s", (corpo.ativa, uid))
+        con.execute(
+            "UPDATE public.cidades SET ativa = %s, atualizado_em = now() WHERE id = %s",
+            (corpo.ativa, uid),
+        )
         admin.auditoria.registrar(
             ator_id=operador.id,
             acao="cidade.ativada" if corpo.ativa else "cidade.desativada",
@@ -479,6 +569,7 @@ def alterar_status_cidade(
 # =============================================================================
 # MODELOS DE PERGUNTAS DINÂMICAS DE CATEGORIA
 # =============================================================================
+
 
 class PerguntaAdminOut(BaseModel):
     id: str
@@ -502,7 +593,10 @@ class CriarPerguntaIn(BaseModel):
 
 class EditarPerguntaIn(BaseModel):
     texto: str | None = Field(default=None, min_length=3, max_length=300)
-    tipo: str | None = Field(default=None, pattern="^(texto|numero|escolha_unica|multipla|sim_nao)$")
+    tipo: str | None = Field(
+        default=None,
+        pattern="^(texto|numero|escolha_unica|multipla|sim_nao)$",
+    )
     opcoes: list[str] | None = None
     obrigatoria: bool | None = None
     ordem: int | None = None
@@ -514,7 +608,12 @@ class EditarPerguntaIn(BaseModel):
 # ROTAS: SUPORTE
 # =============================================================================
 
-@router.get("/chamados", response_model=list[ChamadoOut], summary="Listar chamados de suporte abertos")
+
+@router.get(
+    "/chamados",
+    response_model=list[ChamadoOut],
+    summary="Listar chamados de suporte abertos",
+)
 def listar_chamados(
     operador: Operador = Depends(exigir(Permissao.SUPORTE_VER)),
     contexto: Contexto = Depends(obter_contexto),
@@ -526,7 +625,12 @@ def listar_chamados(
 # ROTAS: PERGUNTAS DINÂMICAS DA CATEGORIA
 # =============================================================================
 
-@router.get("/categorias/{categoria_id}/perguntas", response_model=list[PerguntaAdminOut], summary="Listar perguntas dinâmicas da categoria")
+
+@router.get(
+    "/categorias/{categoria_id}/perguntas",
+    response_model=list[PerguntaAdminOut],
+    summary="Listar perguntas dinâmicas da categoria",
+)
 def listar_perguntas_categoria(
     categoria_id: str,
     operador: Operador = Depends(exigir(Permissao.CATEGORIAS_EDITAR)),
@@ -563,7 +667,12 @@ def listar_perguntas_categoria(
         ]
 
 
-@router.post("/categorias/{categoria_id}/perguntas", response_model=PerguntaAdminOut, status_code=201, summary="Criar nova pergunta dinâmica")
+@router.post(
+    "/categorias/{categoria_id}/perguntas",
+    response_model=PerguntaAdminOut,
+    status_code=201,
+    summary="Criar nova pergunta dinâmica",
+)
 def criar_pergunta_categoria(
     categoria_id: str,
     corpo: CriarPerguntaIn,
@@ -582,10 +691,12 @@ def criar_pergunta_categoria(
         if cat is None:
             raise HTTPException(404, "Categoria não encontrada.")
         import json
+
         opcoes_json = json.dumps(corpo.opcoes) if corpo.opcoes else None
         res = con.execute(
             """
-            INSERT INTO public.categoria_perguntas (categoria_id, texto, tipo, opcoes, obrigatoria, ordem, ativa)
+            INSERT INTO public.categoria_perguntas
+                (categoria_id, texto, tipo, opcoes, obrigatoria, ordem, ativa)
             VALUES (%s, %s, %s, %s, %s, %s, true)
             RETURNING id, categoria_id, texto, tipo, opcoes, obrigatoria, ordem, ativa
             """,
@@ -611,7 +722,11 @@ def criar_pergunta_categoria(
         )
 
 
-@router.put("/categorias/{categoria_id}/perguntas/{pergunta_id}", response_model=PerguntaAdminOut, summary="Editar pergunta dinâmica")
+@router.put(
+    "/categorias/{categoria_id}/perguntas/{pergunta_id}",
+    response_model=PerguntaAdminOut,
+    summary="Editar pergunta dinâmica",
+)
 def editar_pergunta_categoria(
     categoria_id: str,
     pergunta_id: str,
@@ -636,16 +751,24 @@ def editar_pergunta_categoria(
             raise HTTPException(404, "Pergunta não encontrada.")
         texto = corpo.texto if corpo.texto is not None else p_antiga["texto"]
         tipo = corpo.tipo if corpo.tipo is not None else p_antiga["tipo"]
-        obrigatoria = corpo.obrigatoria if corpo.obrigatoria is not None else p_antiga["obrigatoria"]
+        obrigatoria = (
+            corpo.obrigatoria if corpo.obrigatoria is not None else p_antiga["obrigatoria"]
+        )
         ordem = corpo.ordem if corpo.ordem is not None else p_antiga["ordem"]
         ativa = corpo.ativa if corpo.ativa is not None else p_antiga["ativa"]
         import json
-        opcoes_json = json.dumps(corpo.opcoes) if corpo.opcoes is not None else (json.dumps(p_antiga["opcoes"]) if p_antiga["opcoes"] else None)
+
+        opcoes_json = (
+            json.dumps(corpo.opcoes)
+            if corpo.opcoes is not None
+            else (json.dumps(p_antiga["opcoes"]) if p_antiga["opcoes"] else None)
+        )
 
         con.execute(
             """
             UPDATE public.categoria_perguntas
-            SET texto = %s, tipo = %s, opcoes = %s, obrigatoria = %s, ordem = %s, ativa = %s, atualizado_em = now()
+            SET texto = %s, tipo = %s, opcoes = %s, obrigatoria = %s, ordem = %s,
+                ativa = %s, atualizado_em = now()
             WHERE id = %s
             """,
             (texto, tipo, opcoes_json, obrigatoria, ordem, ativa, pid),
@@ -658,19 +781,23 @@ def editar_pergunta_categoria(
             depois={"texto": texto, "tipo": tipo, "ativa": ativa},
             motivo=corpo.motivo,
         )
+        opcoes_antigas = p_antiga["opcoes"] if isinstance(p_antiga["opcoes"], list) else None
         return PerguntaAdminOut(
             id=str(pid),
             categoria_id=str(uid),
             texto=texto,
             tipo=tipo,
-            opcoes=corpo.opcoes if corpo.opcoes is not None else (p_antiga["opcoes"] if isinstance(p_antiga["opcoes"], list) else None),
+            opcoes=corpo.opcoes if corpo.opcoes is not None else opcoes_antigas,
             obrigatoria=obrigatoria,
             ordem=ordem,
             ativa=ativa,
         )
 
 
-@router.delete("/categorias/{categoria_id}/perguntas/{pergunta_id}", summary="Desativar pergunta da categoria")
+@router.delete(
+    "/categorias/{categoria_id}/perguntas/{pergunta_id}",
+    summary="Desativar pergunta da categoria",
+)
 def desativar_pergunta_categoria(
     categoria_id: str,
     pergunta_id: str,
@@ -688,7 +815,8 @@ def desativar_pergunta_categoria(
         raise HTTPException(404, "Pergunta ou categoria não encontrada.")
     with banco.transacao() as con:
         con.execute(
-            "UPDATE public.categoria_perguntas SET ativa = false, atualizado_em = now() WHERE id = %s AND categoria_id = %s",
+            "UPDATE public.categoria_perguntas "
+            "SET ativa = false, atualizado_em = now() WHERE id = %s AND categoria_id = %s",
             (pid, uid),
         )
         admin.auditoria.registrar(

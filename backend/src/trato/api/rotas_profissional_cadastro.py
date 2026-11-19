@@ -357,9 +357,7 @@ def _normalizar_conta_recebimento(
     conta = _limpar_opcional(corpo.conta, 24)
     tipo_conta = corpo.tipo_conta
     algum_bancario = any((banco_codigo, banco_nome, agencia, conta, tipo_conta))
-    if algum_bancario and not (
-        (banco_nome or banco_codigo) and agencia and conta and tipo_conta
-    ):
+    if algum_bancario and not ((banco_nome or banco_codigo) and agencia and conta and tipo_conta):
         raise HTTPException(
             422, "Para salvar dados bancários, informe banco, agência, conta e tipo da conta."
         )
@@ -716,6 +714,7 @@ def buscar_profissionais(
         excluir_usuario_id=usuario.id,
         limite=limite,
         deslocamento=(pagina - 1) * limite,
+        ranking=contexto.ranking.config(),
     )
     achados, total = modulo.repo.buscar(filtro, contexto.usuarios.detalhe)
     mapa_cidades = _cidades_nomes_map(modulo)
@@ -808,5 +807,7 @@ def perfil_publico(
         regioes=base.regioes,
         disponibilidade=base.disponibilidade,
         portfolio=base.portfolio,
-        avaliacoes=[_avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"],
+        avaliacoes=[
+            _avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"
+        ],
     )

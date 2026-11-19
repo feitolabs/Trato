@@ -132,7 +132,8 @@ abstract interface class RepositorioPedidos {
   /// "Relatar problema": abre a disputa; o valor congelado é do backend.
   Future<void> relatarProblema(String pedidoId, EnvioRelato relato);
 
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao);
+  /// Devolve as moedas de bônus ganhas pela avaliação (0 se nenhuma). O backend decide.
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao);
 
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId);
 
@@ -226,6 +227,15 @@ abstract interface class RepositorioPagamento {
   Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async =>
       throw UnimplementedError();
 
+  /// Recalcula o resumo com cupom e/ou moedas (`GET /v1/pedidos/{id}/pagamento`). Quem decide
+  /// quantas moedas entram é o backend.
+  Future<DadosPagamento> recalcular(
+    String pedidoId, {
+    String? cupom,
+    bool usarMoedas = false,
+  }) async =>
+      throw UnimplementedError();
+
   /// Cria a cobrança (modo teste). O app NUNCA marca como pago: só o backend, depois do
   /// webhook assinado do provedor (D14/D15).
   Future<Cobranca> criarCobranca(
@@ -233,6 +243,7 @@ abstract interface class RepositorioPagamento {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   });
 
   Future<StatusPagamento> status(String pedidoId);
@@ -378,7 +389,7 @@ abstract interface class RepositorioProfissional {
   Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
 
   /// Carteira como EXTRATO (D15): sem saldo próprio, sem saque.
-  Future<List<ItemExtrato>> extrato();
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0});
 
   /// Valor inteiro, taxa, líquido, aditivos e notas de um pedido (detalhe de uma linha do extrato).
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId);

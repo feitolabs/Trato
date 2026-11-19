@@ -123,4 +123,7 @@ def test_so_o_papel_cadastro_abre_documento(adm):
         assert r.status_code == 403
     assert adm.cliente.post(caminho, json=corpo, headers=cab("t-cadastro")).status_code == 200
     # Administrador tem todas as permissões por decisão do João (autonomia total)
-    assert adm.cliente.post(caminho, json=corpo, headers=cab(token_de("administrador"))).status_code == 200
+    assert (
+        adm.cliente.post(caminho, json=corpo, headers=cab(token_de("administrador"))).status_code
+        == 200
+    )

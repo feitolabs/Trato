@@ -10,11 +10,18 @@ D14: SMS só para confirmar o celular (`ServicoSmsConfirmacao`). WhatsApp fica p
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import smtplib
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Any, Protocol
+
+import httpx
+import jwt
 
 from trato.notificacoes.config import ConfigNotificacoes
 
@@ -41,6 +48,7 @@ class Mensagem:
     corpo: str | None
     dados: dict[str, Any]
     destinos: tuple[str, ...] = ()  # tokens (push) ou endereços (e-mail)
+    destinos_plataforma: tuple[tuple[str, str], ...] = ()  # (token, plataforma)
 
 
 class Canal(Protocol):
@@ -282,6 +290,197 @@ class Canais:
         return getattr(self, nome, None) if nome in CANAIS_DE_NOTIFICACAO else None
 
 
+class PushPorPlataforma:
+    """Roteia tokens iOS para APNs (quando ativo) e demais tokens para FCM."""
+
+    nome = "push"
+
+    def __init__(self, fcm: PushFcm, apns: PushApns) -> None:
+        self.fcm = fcm
+        self.apns = apns
+
+    @property
+    def disponivel(self) -> bool:
+        return self.fcm.disponivel or self.apns.disponivel
+
+    def enviar(self, mensagem: Mensagem) -> None:
+        pares = mensagem.destinos_plataforma or tuple((t, "android") for t in mensagem.destinos)
+        tokens_ios = tuple(t for t, plat in pares if plat == "ios")
+        tokens_outros = tuple(t for t, plat in pares if plat != "ios")
+        if self.apns.disponivel and tokens_ios:
+            self.apns.enviar(
+                Mensagem(
+                    mensagem.usuario_id,
+                    mensagem.titulo,
+                    mensagem.corpo,
+                    mensagem.dados,
+                    destinos=tokens_ios,
+                )
+            )
+        elif tokens_ios:
+            tokens_outros = (*tokens_outros, *tokens_ios)
+        if self.fcm.disponivel and tokens_outros:
+            self.fcm.enviar(
+                Mensagem(
+                    mensagem.usuario_id,
+                    mensagem.titulo,
+                    mensagem.corpo,
+                    mensagem.dados,
+                    destinos=tokens_outros,
+                )
+            )
+
+
+def _transporte_httpx(url: str, cabecalhos: dict[str, str], corpo: dict[str, Any]) -> int:
+    try:
+        with httpx.Client(timeout=10.0) as cliente:
+            return cliente.post(url, headers=cabecalhos, json=corpo).status_code
+    except httpx.HTTPError as erro:
+        raise FalhaEnvio("Falha de rede ao enviar push.") from erro
+
+
+def _transporte_apns_http2(url: str, cabecalhos: dict[str, str], corpo: dict[str, Any]) -> int:
+    try:
+        with httpx.Client(http2=True, timeout=10.0) as cliente:
+            return cliente.post(url, headers=cabecalhos, json=corpo).status_code
+    except httpx.HTTPError as erro:
+        raise FalhaEnvio("Falha de rede ao enviar APNs.") from erro
+
+
+class _ProvedorTokenFcm:
+    """Troca JWT RS256 da conta de serviço Firebase por token OAuth2 em cache."""
+
+    _ESCOPO = "https://www.googleapis.com/auth/firebase.messaging"
+
+    def __init__(
+        self,
+        email_conta: str,
+        chave_privada: str,
+        token_uri: str = "https://oauth2.googleapis.com/token",  # noqa: S107
+        cliente_oauth: Callable[[str, dict[str, str]], dict[str, Any]] | None = None,
+    ) -> None:
+        self._email = email_conta
+        self._chave = chave_privada
+        self._token_uri = token_uri
+        self._cliente_oauth = cliente_oauth or self._trocar_token
+        self._token = ""
+        self._expira_em = 0.0
+
+    @staticmethod
+    def _trocar_token(uri: str, form: dict[str, str]) -> dict[str, Any]:
+        try:
+            with httpx.Client(timeout=10.0) as cliente:
+                resp = cliente.post(uri, data=form)
+            if resp.status_code >= 300:
+                raise FalhaEnvio("Falha ao autenticar conta FCM.")
+            dados = resp.json()
+            return dados if isinstance(dados, dict) else {}
+        except (httpx.HTTPError, ValueError) as erro:
+            raise FalhaEnvio("Falha de rede ao autenticar FCM.") from erro
+
+    def __call__(self) -> str:
+        agora = time.time()
+        if self._token and agora < self._expira_em - 60:
+            return self._token
+        asserto = jwt.encode(
+            {
+                "iss": self._email,
+                "scope": self._ESCOPO,
+                "aud": self._token_uri,
+                "iat": int(agora),
+                "exp": int(agora) + 3600,
+            },
+            self._chave,
+            algorithm="RS256",
+        )
+        dados = self._cliente_oauth(
+            self._token_uri,
+            {
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                "assertion": asserto,
+            },
+        )
+        token = str(dados.get("access_token") or "")
+        if not token:
+            raise FalhaEnvio("Token OAuth2 FCM ausente.")
+        expira = int(dados.get("expires_in") or 3600)
+        self._token = token
+        self._expira_em = agora + max(60, expira)
+        return self._token
+
+
+class _ProvedorJwtApns:
+    """Gera e guarda em cache (45 min) o JWT ES256 exigido pela API APNs."""
+
+    def __init__(self, chave_privada: str, chave_id: str, time_id: str) -> None:
+        self._chave = chave_privada
+        self._chave_id = chave_id
+        self._time_id = time_id
+        self._jwt = ""
+        self._emitido_em = 0.0
+
+    def __call__(self) -> str:
+        agora = time.time()
+        if self._jwt and agora - self._emitido_em < 45 * 60:
+            return self._jwt
+        token = jwt.encode(
+            {"iss": self._time_id, "iat": int(agora)},
+            self._chave,
+            algorithm="ES256",
+            headers={"kid": self._chave_id},
+        )
+        self._jwt = token
+        self._emitido_em = agora
+        return token
+
+
+def _montar_fcm(config: ConfigNotificacoes) -> PushFcm:
+    if not (config.push_ativo and config.fcm_projeto_id and config.fcm_credenciais_arquivo):
+        return PushFcm(config)
+    caminho = Path(config.fcm_credenciais_arquivo)
+    if not caminho.is_file():
+        return PushFcm(config)
+    try:
+        bruto = json.loads(caminho.read_text(encoding="utf-8"))
+        email = str(bruto.get("client_email") or "").strip()
+        chave = str(bruto.get("private_key") or "").strip()
+        uri = str(bruto.get("token_uri") or "https://oauth2.googleapis.com/token").strip()
+    except (OSError, ValueError):
+        return PushFcm(config)
+    if not email or not chave:
+        return PushFcm(config)
+    return PushFcm(config, _transporte_httpx, _ProvedorTokenFcm(email, chave, uri))
+
+
+def _montar_apns(config: ConfigNotificacoes) -> PushApns | None:
+    if not (
+        config.apns_ativo
+        and config.apns_bundle_id
+        and config.apns_chave_id
+        and config.apns_time_id
+        and config.apns_chave_arquivo
+        and importlib.util.find_spec("h2") is not None
+    ):
+        return None
+    caminho = Path(config.apns_chave_arquivo)
+    if not caminho.is_file():
+        return None
+    try:
+        chave = caminho.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not chave:
+        return None
+    return PushApns(
+        config,
+        _transporte_apns_http2,
+        _ProvedorJwtApns(chave, config.apns_chave_id, config.apns_time_id),
+    )
+
+
 def canais_da_config(config: ConfigNotificacoes) -> Canais:
-    """Canais reais conforme o `.env`. Sem transporte injetado, o push fica indisponível."""
-    return Canais(push=PushFcm(config), email=EmailSmtp(config))
+    """Monta os canais reais conforme o `.env`; sem credenciais válidas, ficam desligados."""
+    fcm = _montar_fcm(config)
+    apns = _montar_apns(config)
+    push: Canal = PushPorPlataforma(fcm, apns) if apns is not None and apns.disponivel else fcm
+    return Canais(push=push, email=EmailSmtp(config))

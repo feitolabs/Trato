@@ -641,7 +641,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   /// `POST /v1/contratos/{id}/avaliacao`. A nota geral é a média das notas dadas por critério
   /// (arredondada, de 1 a 5). Gorjeta não tem rota: em vez de sumir em silêncio, recusa.
   @override
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
     if (avaliacao.gorjetaCentavos > 0) {
       throw const ErroTrato(
         TipoErro.recusado,
@@ -654,10 +654,14 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     }
     final media = (dadas.reduce((a, b) => a + b) / dadas.length).round().clamp(1, 5);
     final comentario = avaliacao.comentario.trim();
-    await _api.post(
+    final resposta = await _api.post(
       '/v1/contratos/$pedidoId/avaliacao',
       corpo: {'nota_geral': media, if (comentario.isNotEmpty) 'comentario': comentario},
     );
+    if (resposta is Map && resposta['moedas_ganhas'] is int) {
+      return resposta['moedas_ganhas'] as int;
+    }
+    return 0;
   }
 
   @override
@@ -1018,6 +1022,9 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
       descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
       cupomCodigo: j['cupom_codigo'] as String?,
+      moedasSaldo: (j['moedas_saldo'] as num?)?.toInt() ?? 0,
+      moedasUsadas: (j['moedas_usadas'] as num?)?.toInt() ?? 0,
+      moedasDescontoCentavos: (j['moedas_desconto_centavos'] as num?)?.toInt() ?? 0,
       parcelamento: [
         for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
           OpcaoParcelamento(
@@ -1049,6 +1056,25 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
   Future<DadosPagamento> dados(String pedidoId) async =>
       _dadosDeMapa(pedidoId, _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento')));
 
+  @override
+  Future<DadosPagamento> recalcular(
+    String pedidoId, {
+    String? cupom,
+    bool usarMoedas = false,
+  }) async {
+    final limpo = (cupom ?? '').trim();
+    return _dadosDeMapa(
+      pedidoId,
+      _mapa(await _api.get(
+        '/v1/pedidos/$pedidoId/pagamento',
+        consulta: {
+          if (limpo.isNotEmpty) 'cupom': limpo,
+          if (usarMoedas) 'usar_moedas': 'true',
+        },
+      )),
+    );
+  }
+
   /// `POST /v1/contratos/{id}/cupom` `{codigo}`: valida e calcula desconto no servidor.
   @override
   Future<DadosPagamento> aplicarCupom(String pedidoId, String codigo) async {
@@ -1070,11 +1096,13 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   }) async {
     final meio = metodo == MetodoPagamento.pix ? 'pix' : 'cartao';
     final cupomLimpo = (cupom ?? '').trim();
     final sufixoParcela = metodo == MetodoPagamento.cartao && parcelas > 1 ? '-${parcelas}x' : '';
-    final sufixoCupom = cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}';
+    final sufixoCupom = (cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}') +
+        (usarMoedas ? '-moedas' : '');
     final j = _mapa(
       await _api.post(
         '/v1/contratos/$pedidoId/cobranca',
@@ -1082,6 +1110,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           'meio': meio,
           if (metodo == MetodoPagamento.cartao && parcelas > 1) 'parcelas': parcelas,
           if (cupomLimpo.isNotEmpty) 'cupom': cupomLimpo,
+          if (usarMoedas) 'usar_moedas': true,
         },
         chaveIdempotencia: 'cobranca-$pedidoId-$meio$sufixoParcela$sufixoCupom',
       ),
@@ -1532,7 +1561,15 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       if (nota != null) 'Nota ${nota.toStringAsFixed(1).replaceAll('.', ',')}',
       if (concluidos != null) '$concluidos ${concluidos == 1 ? 'serviço' : 'serviços'}',
     ];
+    int? moedas;
+    try {
+      final m = _mapa(await _api.get('/v1/me/moedas'));
+      moedas = m['saldo'] as int?;
+    } on Object {
+      moedas = null; // moedas são extra: falha aqui não derruba o perfil
+    }
     return PerfilCliente(
+      moedas: moedas,
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),
@@ -1950,33 +1987,34 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     await _api.post('/v1/pedidos/$pedidoId/recusar', corpo: {'motivo': motivo.texto});
   }
 
-  /// Extrato do ledger (D15). Cada lançamento vira uma linha; o app não soma nada.
+  /// Extrato do ledger (D15). Cada lançamento vira uma linha; propaga erro real da API.
   @override
-  Future<List<ItemExtrato>> extrato() async {
-    try {
-      final json = _mapa(await _api.get('/v1/extrato', consulta: {'limite': '50'}));
-      return [
-        for (final l in ExtratoApi.deJson(json).itens)
-          ItemExtrato(
-            titulo: 'Pedido ${_curto(l.pedidoId)} · ${switch (l.tipo) {
-              'retencao' => 'valor retido',
-              'repasse' => 'valor liberado',
-              'cobranca' => 'pagamento',
-              'taxa' => 'taxa do Trato',
-              'estorno' => 'estorno',
-              _ => l.tipo.replaceAll('_', ' '),
-            }}',
-            detalheData: _dia(l.data.toLocal()),
-            brutoCentavos: l.valorCentavos,
-            pedidoId: l.pedidoId,
-            textoTaxa: l.estornoDe != null ? 'Estorno' : 'Toque para ver os valores',
-            liquidoCentavos: l.valorCentavos,
-            status: StatusExtrato.liberado,
-          ),
-      ];
-    } catch (_) {
-      return const [];
-    }
+  Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0}) async {
+    final json = _mapa(
+      await _api.get(
+        '/v1/extrato',
+        consulta: {'limite': '$limite', 'deslocamento': '$deslocamento'},
+      ),
+    );
+    return [
+      for (final l in ExtratoApi.deJson(json).itens)
+        ItemExtrato(
+          titulo: 'Pedido ${_curto(l.pedidoId)} · ${switch (l.tipo) {
+            'retencao' => 'valor retido',
+            'repasse' => 'valor liberado',
+            'cobranca' => 'pagamento',
+            'taxa' => 'custo do parcelamento',
+            'estorno' => 'estorno',
+            _ => l.tipo.replaceAll('_', ' '),
+          }}',
+          detalheData: _dia(l.data.toLocal()),
+          brutoCentavos: l.valorCentavos,
+          pedidoId: l.pedidoId,
+          textoTaxa: l.estornoDe != null ? 'Estorno' : 'Toque para ver os valores',
+          liquidoCentavos: l.valorCentavos,
+          status: StatusExtrato.liberado,
+        ),
+    ];
   }
 
   /// `GET /v1/pedidos/{id}/saldo` (ledger), `GET /v1/contratos/{id}/aditivos` e `.../notas-material`.
@@ -2022,7 +2060,6 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     return DetalheValoresPedido(
       pedidoNumero: _curto(pedidoId),
       pagoPeloClienteCentavos: cent(saldo['cliente_pagou_centavos']),
-      taxaCentavos: cent(saldo['taxa_trato_centavos']),
       voceRecebeCentavos: retido + aLiberar + liberado,
       situacao: situacao,
       podeAvaliarCliente: concluidoSemAvaliar,
@@ -2185,8 +2222,6 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       versao: (j['versao'] as num?)?.toInt() ?? 1,
       situacao: sit,
       valorCentavos: (j['valor_centavos'] as num?)?.toInt() ?? 0,
-      taxaCentavos: (j['taxa_centavos'] as num?)?.toInt(),
-      liquidoCentavos: (j['liquido_centavos'] as num?)?.toInt(),
       prazoExecucaoDias: (j['prazo_execucao_dias'] as num?)?.toInt(),
       garantiaDias: (j['garantia_dias'] as num?)?.toInt(),
       foraDoEscopo: j['fora_do_escopo'] as String?,
@@ -2200,7 +2235,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 }
 
 /// `POST /v1/orcamentos/resumo` `{valor_centavos}` e `POST /v1/pedidos/{pedido_id}/orcamentos`.
-/// Taxa e líquido vêm do backend; o app não calcula nada.
+/// O Trato não cobra taxa: o profissional recebe o valor inteiro do orçamento.
 class ServicoOrcamentoApi implements ServicoOrcamento {
   ServicoOrcamentoApi(this._api, {this.pedidoId});
 
@@ -2212,13 +2247,7 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     final j = _mapa(
       await _api.post('/v1/orcamentos/resumo', corpo: {'valor_centavos': totalCentavos}),
     );
-    return ResumoOrcamento(
-      totalCentavos: j['valor_centavos'] as int,
-      taxaCentavos: j['taxa_centavos'] as int,
-      taxaBps: j['taxa_bps'] as int?,
-      liquidoCentavos: j['liquido_centavos'] as int,
-      clientePagaCentavos: j['total_cliente_centavos'] as int?,
-    );
+    return ResumoOrcamento(totalCentavos: j['valor_centavos'] as int);
   }
 
   @override

@@ -23,10 +23,8 @@ from trato.financeiro.ledger import (
     repartir_custodia,
 )
 from trato.pagamentos.provedor import ProvedorFake
-from trato.pagamentos.taxa import ConfigTaxa, calcular_taxa
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Papel
-from trato.persistencia.config import parametros_globais, taxa_da_versao, versao_vigente
 from trato.persistencia.erros import ConflitoDeEstado, RegraDoBanco
 
 from .test_fluxo_postgres import abrir_pedido, acao, enviar_orcamento, foto
@@ -34,7 +32,7 @@ from .test_fluxo_postgres import abrir_pedido, acao, enviar_orcamento, foto
 pytestmark = pytest.mark.integracao
 
 VALOR = 90_000  # o orçamento de teste: 80.000 + 2,5 x 4.000
-TAXA = 6_750  # 7,5% (faixa de teste), congelada no contrato
+TAXA = 0  # o app é gratuito: nada é descontado do profissional
 
 
 def agora() -> datetime:
@@ -42,7 +40,7 @@ def agora() -> datetime:
 
 
 def contratar(c) -> str:
-    """Pedido aberto -> orçamento -> aceite (nasce o contrato com a taxa congelada)."""
+    """Pedido aberto -> orçamento -> aceite (nasce o contrato)."""
     pedido_id = abrir_pedido(c)
     orcamento_id = enviar_orcamento(c, pedido_id)
     r = acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orcamento_id})
@@ -352,7 +350,7 @@ def _mediador(c) -> None:
         )
 
 
-def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):
+def test_disputa_persiste_e_a_decisao_nao_cobra_taxa(cenario):
     c = cenario
     _mediador(c)
     pedido_id = ate_em_confirmacao(c)
@@ -385,8 +383,6 @@ def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):
             "select descricao, status from public.disputas where pedido_id = %s", (pedido_id,)
         ).fetchone() == ("Parede com mancha.", "em_analise")
 
-    # A3: a configuração muda DEPOIS do aceite; a disputa usa a taxa congelada do contrato (7,5%).
-    # (A taxa vigente é lida do banco; aqui basta conferir que o contrato guardou a dele.)
     corpo = {
         "resultado": "reembolso_parcial",
         "justificativa": "Parte do serviço não foi feita.",
@@ -400,10 +396,9 @@ def test_disputa_persiste_e_a_decisao_usa_a_taxa_congelada(cenario):
     saldo = ledger.saldos_pedido(pedido_id, c.ids["profissional"])
     parte_mantida = VALOR - VALOR * 2_500 // 10_000
     assert saldo.cliente_pagou == parte_mantida
-    # A taxa congelada (7,5%) incide sobre o que ficou para o profissional e sai antes da carteira.
-    taxa_esperada = (parte_mantida * 750 + 5_000) // 10_000
-    assert saldo.taxa_trato == taxa_esperada
-    assert saldo.a_liberar == parte_mantida - taxa_esperada
+    # Sem taxa: tudo o que ficou vai para a carteira do profissional.
+    assert saldo.taxa_trato == 0
+    assert saldo.a_liberar == parte_mantida
     assert saldo.retido == 0
     assert c.contexto.pedidos.obter(pedido_id).estado is estados.Estado.CONCLUIDO
     with c.local.admin() as con:
@@ -482,23 +477,6 @@ def test_avaliacao_e_retrabalho_persistem(cenario):
     c.contexto.garantias.salvar_retrabalho(pedido_id, retrabalho)
     (lido,) = c.contexto.garantias.retrabalhos(pedido_id)
     assert lido.descricao == "Mancha voltou" and lido.estado.value == "aberto"
-
-
-# --- M4: uma fonte da taxa, com o mínimo ----------------------------------------------------------
-
-
-def test_taxa_do_postgres_respeita_o_minimo_como_a_calculadora(cenario):
-    c = cenario
-    with c.banco.transacao() as con:
-        versao = versao_vigente(con)
-        base = parametros_globais(con, versao)
-        com_minimo = {**base, "taxa_minima_centavos": 500}
-        config = taxa_da_versao(con, versao, 1_000, com_minimo)
-    assert config == ConfigTaxa(taxa_bps=750, taxa_minima_centavos=500)
-    # 7,5% de 1.000 = 75, abaixo do mínimo: vale o mínimo (mesma conta do Python em todo lugar)
-    assert calcular_taxa(1_000, config) == 500
-    # a calculadora do app (TaxaPostgres) e o contrato usam a mesma função
-    assert c.contexto.taxa.calcular(50_000) == calcular_taxa(50_000, ConfigTaxa(750, 0))
 
 
 # --- Migration NOVA (não aplicada no Supabase): ordens de estorno --------------------------------

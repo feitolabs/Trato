@@ -146,7 +146,6 @@ class _ConteudoState extends State<_Conteudo> {
                 (_status == 'divergencia' ? l.divergente : PagamentosStatus.codigo(l.status) == _status)))
           l,
     ];
-    final temTaxa = widget.extrato.any((l) => l.taxaCentavos != null);
     final podeConciliar = context.pode(Permissao.pagamentosConciliar);
 
     return ListView(
@@ -218,7 +217,6 @@ class _ConteudoState extends State<_Conteudo> {
                   DropdownMenuItem(value: 'Cobrança', child: Text('Cobrança')),
                   DropdownMenuItem(value: 'Repasse', child: Text('Repasse')),
                   DropdownMenuItem(value: 'Reembolso', child: Text('Reembolso')),
-                  DropdownMenuItem(value: 'Taxa', child: Text('Taxa')),
                 ],
                 onChanged: (v) => setState(() => _tipo = v),
               ),
@@ -260,11 +258,10 @@ class _ConteudoState extends State<_Conteudo> {
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    _CabecalhoTabela(temTaxa: temTaxa),
+                    const _CabecalhoTabela(),
                     for (final l in linhas)
                       _LinhaTabela(
                         l,
-                        temTaxa: temTaxa,
                         podeConciliar: podeConciliar,
                         aoConciliar: () => _conciliar(l),
                       ),
@@ -275,7 +272,7 @@ class _ConteudoState extends State<_Conteudo> {
           ),
         const SizedBox(height: EspacosTrato.x3),
         Text(
-          'Uma divergência só fica conciliada com motivo registrado. Taxa e líquido aparecem em cada pedido.',
+          'Uma divergência só fica conciliada com motivo registrado.',
           style: TipografiaTrato.legenda,
         ),
       ],
@@ -293,11 +290,10 @@ abstract final class PagamentosStatus {
       };
 }
 
-const _flex = [13, 11, 13, 15, 14, 12, 11, 14, 10];
+const _flex = [13, 11, 13, 15, 14, 12, 10];
 
 class _CabecalhoTabela extends StatelessWidget {
-  const _CabecalhoTabela({required this.temTaxa});
-  final bool temTaxa;
+  const _CabecalhoTabela();
 
   @override
   Widget build(BuildContext context) {
@@ -316,9 +312,7 @@ class _CabecalhoTabela extends StatelessWidget {
           c('ID no provedor', 3),
           c('Status', 4),
           c('Valor', 5, direita: true),
-          if (temTaxa) c('Taxa Trato', 6, direita: true),
-          if (temTaxa) c('Líquido profissional', 7, direita: true),
-          c('Ações', 8, direita: true),
+          c('Ações', 6, direita: true),
         ],
       ),
     );
@@ -326,9 +320,8 @@ class _CabecalhoTabela extends StatelessWidget {
 }
 
 class _LinhaTabela extends StatelessWidget {
-  const _LinhaTabela(this.l, {required this.temTaxa, required this.podeConciliar, required this.aoConciliar});
+  const _LinhaTabela(this.l, {required this.podeConciliar, required this.aoConciliar});
   final LancamentoEspelho l;
-  final bool temTaxa;
   final bool podeConciliar;
   final VoidCallback aoConciliar;
 
@@ -359,8 +352,6 @@ class _LinhaTabela extends StatelessWidget {
             4,
           ),
           num(formatarReais(l.valorCentavos), 5),
-          if (temTaxa) num(l.taxaCentavos == null ? '—' : formatarReais(l.taxaCentavos!), 6),
-          if (temTaxa) num(l.liquidoCentavos == null ? '—' : formatarReais(l.liquidoCentavos!), 7),
           c(
             Align(
               alignment: Alignment.centerRight,
@@ -368,7 +359,7 @@ class _LinhaTabela extends StatelessWidget {
                   ? BotaoTrato.link('Conciliar', aoPressionar: aoConciliar)
                   : const SizedBox.shrink(),
             ),
-            8,
+            6,
           ),
         ],
       ),
@@ -390,8 +381,6 @@ class _CartaoLancamento extends StatelessWidget {
       linhas: [
         formatarData(l.data),
         l.refProvedor,
-        if (l.taxaCentavos != null) 'Taxa Trato ${formatarReais(l.taxaCentavos!)}',
-        if (l.liquidoCentavos != null) 'Líquido profissional ${formatarReais(l.liquidoCentavos!)}',
       ],
       chips: [
         l.divergente ? const ChipEstado('Divergência', tom: Tom.erro) : ChipEstado(texto, tom: tom),

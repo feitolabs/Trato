@@ -7,7 +7,6 @@ import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/conclusao/avaliacao_tela.dart';
 import 'package:trato/telas/conclusao/conclusao_tela.dart';
-import '../apoio/exemplos/telas/conclusao/dados_exemplo.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
 import 'package:trato/telas/orcamentos/detalhe_orcamento_tela.dart';
 import '../apoio/exemplos/telas/orcamentos/dados_exemplo.dart';
@@ -63,9 +62,10 @@ class _Pedidos extends RepositorioPedidosFake {
   }
 
   @override
-  Future<void> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
+  Future<int> avaliar(String pedidoId, EnvioAvaliacao avaliacao) async {
     b.chamadas.add('avaliar');
     b.avaliacao = avaliacao;
+    return 0;
   }
 }
 
@@ -92,6 +92,7 @@ class _Pagamento extends RepositorioPagamentoFake {
     MetodoPagamento metodo, {
     int parcelas = 1,
     String? cupom,
+    bool usarMoedas = false,
   }) async {
     b.chamadas.add('cobranca:${metodo.name}');
     return const Cobranca(id: 'cb1', pixCopiaECola: '00020126-teste');

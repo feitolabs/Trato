@@ -39,9 +39,6 @@ class _ServicoOrcamentoFake implements ServicoOrcamento {
   @override
   Future<ResumoOrcamento> resumir(int totalCentavos) async => ResumoOrcamento(
         totalCentavos: totalCentavos,
-        taxaCentavos: (totalCentavos * 0.08).round(),
-        taxaBps: 800,
-        liquidoCentavos: totalCentavos - (totalCentavos * 0.08).round(),
       );
 
   @override

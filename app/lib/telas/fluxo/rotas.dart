@@ -23,6 +23,7 @@ import '../onboarding/escolha_perfil_tela.dart' show PerfilUso;
 import '../../tema/tema.dart';
 import '../../dispositivo/check_in_dispositivo.dart';
 import '../../dispositivo/dispositivo.dart';
+import '../../dispositivo/permissao.dart';
 import '../aditivo/aditivo.dart';
 import '../aditivo/criar_aditivo_tela.dart';
 import '../aditivo/responder_aditivo_tela.dart';
@@ -55,6 +56,7 @@ import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
 import '../comuns/foco_rolagem.dart';
+import '../comuns/moedas_ganhas_tela.dart';
 import '../comuns/sucesso_acao_tela.dart';
 import '../conta/dados_pessoais_tela.dart';
 import '../conta/enderecos_tela.dart';
@@ -145,6 +147,43 @@ abstract final class RotasTrato {
     } on Object {
       // Sem push nativo configurado (ex.: navegador/desktop/teste): segue normalmente.
     }
+  }
+
+  /// Permissões de câmera e GPS (usadas no check-in e check-out).
+  static ServicoPermissao permissao = const ServicoPermissaoReal();
+
+  /// Contadores de não lidas exibidos nos badges das abas e do sino.
+  static final ValueNotifier<int> mensagensNaoLidas = ValueNotifier<int>(0);
+  static final ValueNotifier<int> notificacoesNaoLidas = ValueNotifier<int>(0);
+
+  static Future<int> _contarNotificacoesNaoLidas() async {
+    try {
+      final lista = await repos.notificacoes.listar();
+      final total = lista.where((n) => !n.lida).length;
+      notificacoesNaoLidas.value = total;
+      return total;
+    } on Object {
+      return notificacoesNaoLidas.value;
+    }
+  }
+
+  static void _atualizarMensagensNaoLidasEmSegundoPlano({
+    required bool profissional,
+  }) {
+    final servico = profissional
+        ? (repos.mensagensProfissional ??
+            ServicoMensagensDoProfissional(repos.profissional,
+                chat: repos.chat))
+        : _servicoMensagens;
+    unawaited(() async {
+      try {
+        final lista = await servico.listar();
+        mensagensNaoLidas.value =
+            lista.fold<int>(0, (soma, item) => soma + item.naoLidas);
+      } on Object {
+        // Atualização de badge em segundo plano não bloqueia a tela.
+      }
+    }());
   }
 
   /// Câmera, GPS e envio de arquivos. O `main.dart` liga o real.
@@ -560,9 +599,11 @@ abstract final class RotasTrato {
 
   /// Notificações. [profissional] muda para onde o toque leva (disputa e retrabalho abrem as
   /// telas do profissional; o cliente vê o serviço).
-  static void abrirNotificacoes(BuildContext context,
-          {bool profissional = false}) =>
-      _abrir<void>(context, _notificacoes(profissional: profissional));
+  static Future<void> abrirNotificacoes(BuildContext context,
+      {bool profissional = false}) async {
+    await _abrir<void>(context, _notificacoes(profissional: profissional));
+    pedidosMudaram.value++;
+  }
 
   /// Termos de uso e política de privacidade (rascunhos; a tela avisa que serão revisados).
   static void abrirTermos(BuildContext context) => _abrir<void>(
@@ -597,10 +638,15 @@ abstract final class RotasTrato {
       );
 
   static Future<DadosInicio> _carregarInicio() async {
-    // As quatro em paralelo: a tela espera a mais lenta, não a soma das quatro.
-    final ((perfil, categorias), (andamento, recentes)) = await emParalelo2(
+    // Em paralelo: a tela espera a mais lenta, não a soma das chamadas.
+    _atualizarMensagensNaoLidasEmSegundoPlano(profissional: false);
+    final ((perfil, categorias), (andamento, (recentes, naoLidas))) =
+        await emParalelo2(
       emParalelo2(repos.perfil.carregar(), repos.catalogo.categorias()),
-      emParalelo2(repos.servicos.emAndamento(), repos.servicos.recentes()),
+      emParalelo2(
+        repos.servicos.emAndamento(),
+        emParalelo2(repos.servicos.recentes(), _contarNotificacoesNaoLidas()),
+      ),
     );
     final recentesFiltrados = [
       for (final r in recentes)
@@ -616,6 +662,7 @@ abstract final class RotasTrato {
       categorias: categorias,
       emAndamento: andamento,
       recentes: recentesFiltrados,
+      notificacoesNaoLidas: naoLidas,
     );
   }
 
@@ -766,9 +813,18 @@ abstract final class RotasTrato {
   static Widget cascaProfissionalParaTeste({int abaInicial = 0}) =>
       _cascaProfissional(abaInicial: abaInicial);
 
+  static Future<InicioProfissional> _carregarInicioProfissional() async {
+    _atualizarMensagensNaoLidasEmSegundoPlano(profissional: true);
+    final (inicio, naoLidas) = await emParalelo2(
+      repos.profissional.inicio(),
+      _contarNotificacoesNaoLidas(),
+    );
+    return inicio.comNotificacoesNaoLidas(naoLidas);
+  }
+
   static Widget _cascaProfissional({int abaInicial = 0}) =>
       Carregador<InicioProfissional>(
-        carregar: repos.profissional.inicio,
+        carregar: _carregarInicioProfissional,
         construir: (context, inicio) => CascaProfissionalTela(
           abaInicial: abaInicial,
           inicio: inicio,
@@ -789,6 +845,7 @@ abstract final class RotasTrato {
                   'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
               atualizarACada: _intervalo,
               atualizarQuando: pedidosMudaram,
+              aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
               aoAbrirConversa: (c) => _abrirConversa(
                 context,
                 c,
@@ -798,7 +855,7 @@ abstract final class RotasTrato {
             ),
           ),
           carregarPedidos: repos.profissional.pedidosAbertos,
-          recarregarInicio: repos.profissional.inicio,
+          recarregarInicio: _carregarInicioProfissional,
           aoAlterarDisponivel: repos.profissional.alterarDisponivelAgora,
           aoAbrirOrcamentoEnviado: (o) => _abrirDetalheOrcamentoEnviado(context, o),
           atualizarACada: _intervalo,
@@ -822,6 +879,7 @@ abstract final class RotasTrato {
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
                 servico: _servicoCheckIn(c.pedidoId, remoto: c.remoto),
+                permissao: permissao,
                 remoto: c.remoto,
                 tituloBarra: c.titulo,
               ),
@@ -857,6 +915,7 @@ abstract final class RotasTrato {
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
+                permissao: permissao,
                 remoto: proximo?.remoto ?? false,
                 servico: _servicoCheckIn(
                   proximo?.pedidoId ?? _semId,
@@ -881,6 +940,7 @@ abstract final class RotasTrato {
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
+                permissao: permissao,
                 remoto: inicio.proximo?.remoto ?? false,
                 servico: _servicoCheckIn(
                   inicio.proximo?.pedidoId ?? _semId,
@@ -1045,6 +1105,7 @@ abstract final class RotasTrato {
               context,
               CheckInTela(
                 aoIniciar: () => _aoIniciarServico(context),
+                permissao: permissao,
                 remoto: a.remoto,
                 servico: _servicoCheckIn(a.pedidoId, remoto: a.remoto),
                 tituloBarra: '${a.titulo} · ${a.horario}',
@@ -1136,6 +1197,7 @@ abstract final class RotasTrato {
       Builder(
         builder: (tela) => CheckOutTela(
           servico: repos.profissional.servicoCheckOut(pedidoId, remoto: remoto),
+          permissao: permissao,
           remoto: remoto,
           tituloBarra: titulo,
           aoConcluir: () {
@@ -1427,22 +1489,11 @@ abstract final class RotasTrato {
       );
 
   /// Carteira do profissional como EXTRATO (D15): sem saldo próprio, sem saque.
-  static Widget _abaCarteira() =>
-      Carregador<(List<ItemExtrato>, ContaRecebimento)>(
-        carregar: () => emParalelo2(
-          repos.profissional.extrato(),
-          repos.profissional.obterContaRecebimento().catchError(
-                (_) => const ContaRecebimento(cadastrada: false),
-              ),
-        ),
-        atualizarQuando: pedidosMudaram,
-        construir: (context, par) => CarteiraTela(
-          soExtrato: true,
-          dados: DadosCarteira(extrato: par.$1, contaRecebimento: par.$2),
-          aoAbrirItem: (item) => _abrirValoresEAvaliar(context, item.pedidoId!),
-          aoConfigurarRecebimento: () => _abrirContaRecebimento(context, par.$2),
-          aoBaixarExtratoPdf: () => _baixarExtratoPdf(context),
-        ),
+  static Widget _abaCarteira() => _AbaCarteiraPaginada(
+        aoAbrirItem: (context, pedidoId) =>
+            _abrirValoresEAvaliar(context, pedidoId),
+        aoConfigurarRecebimento: _abrirContaRecebimento,
+        aoBaixarExtratoPdf: _baixarExtratoPdf,
       );
 
   static Future<void> _abrirContaRecebimento(
@@ -1712,6 +1763,7 @@ abstract final class RotasTrato {
       iniciais: p.iniciais,
       resumo: p.resumo,
       fotoReferencia: p.fotoReferencia,
+      moedas: p.moedas,
       grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
     );
   }
@@ -1800,6 +1852,7 @@ abstract final class RotasTrato {
           servico: _servicoMensagens,
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
+          aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
           aoAbrirConversa: (conversa) => _abrirConversa(context, conversa, _servicoMensagens),
         ),
       );
@@ -1829,6 +1882,7 @@ abstract final class RotasTrato {
           servico: ServicoNotificacoesRepositorio(repos.notificacoes),
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
+          aoContarNaoLidas: (n) => notificacoesNaoLidas.value = n,
           aoAbrirPreferencias: () => _abrir<void>(
             context,
             PreferenciasNotificacoesTela(repositorio: repos.notificacoes),
@@ -2183,11 +2237,18 @@ abstract final class RotasTrato {
 
   static Widget _pagamento(String pedidoId) {
     var iniciandoPagamento = false;
+    var usarMoedas = false; // o que o cliente escolheu; quantas moedas entram, o backend decide
     return Carregador<DadosPagamento>(
       carregar: () => repos.pagamento.dados(pedidoId),
       construir: (context, dados) => PagamentoTela(
         dados: dados,
-        aoAplicarCupom: (codigo) => repos.pagamento.aplicarCupom(pedidoId, codigo),
+        aoAplicarCupom: (codigo) => usarMoedas
+            ? repos.pagamento.recalcular(pedidoId, cupom: codigo, usarMoedas: true)
+            : repos.pagamento.aplicarCupom(pedidoId, codigo),
+        aoAlternarMoedas: (usar, cupom) {
+          usarMoedas = usar;
+          return repos.pagamento.recalcular(pedidoId, cupom: cupom, usarMoedas: usar);
+        },
         aoPagarDetalhado: (metodo, parcelas, cupom) async {
           if (iniciandoPagamento) return;
           iniciandoPagamento = true;
@@ -2200,6 +2261,7 @@ abstract final class RotasTrato {
                 metodo,
                 parcelas: parcelas,
                 cupom: cupom,
+                usarMoedas: usarMoedas,
               ),
             );
             if (!ok || !context.mounted) return;
@@ -2536,16 +2598,22 @@ abstract final class RotasTrato {
                     }
                   }
                 : null,
-            aoEnviar: (texto) => _tentar(
-              context,
-              () => repos.chat
-                  .enviar(pedidoId, texto, profissionalId: profissionalId),
-            ),
-            aoEnviarFoto: (ref) => _tentar(
-              context,
-              () => repos.chat
-                  .enviarFoto(pedidoId, ref, profissionalId: profissionalId),
-            ),
+            aoEnviar: (texto) async {
+              final ok = await _tentar(
+                context,
+                () => repos.chat
+                    .enviar(pedidoId, texto, profissionalId: profissionalId),
+              );
+              if (!ok) throw StateError('Falha ao enviar mensagem');
+            },
+            aoEnviarFoto: (ref) async {
+              final ok = await _tentar(
+                context,
+                () => repos.chat
+                    .enviarFoto(pedidoId, ref, profissionalId: profissionalId),
+              );
+              if (!ok) throw StateError('Falha ao enviar foto');
+            },
           );
         },
       );
@@ -2573,17 +2641,24 @@ abstract final class RotasTrato {
         construir: (context, dados) => AvaliacaoTela(
           dados: dados,
           aoEnviar: (envio) async {
-            final ok = await _tentar(
-                context, () => repos.pedidos.avaliar(pedidoId, envio));
+            var moedas = 0;
+            final ok = await _tentar(context, () async {
+              moedas = await repos.pedidos.avaliar(pedidoId, envio);
+            });
             if (ok && context.mounted) {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
                 context,
-                (ctxSucesso) => SucessoAcaoTela(
-                  titulo: 'Avaliação enviada!',
-                  subtitulo: 'Obrigado por avaliar o profissional.',
-                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
-                ),
+                (ctxSucesso) => moedas > 0
+                    ? MoedasGanhasTela(
+                        moedas: moedas,
+                        aoContinuar: () => _voltarAoInicio(ctxSucesso),
+                      )
+                    : SucessoAcaoTela(
+                        titulo: 'Avaliação enviada!',
+                        subtitulo: 'Obrigado por avaliar o profissional.',
+                        aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+                      ),
                 substituirAtual: true,
               );
             }
@@ -2890,4 +2965,171 @@ class _ServicoCadastroEdicao implements ServicoCadastroProfissional {
 
   @override
   Future<void> salvar(DadosCadastroProfissional dados) => _base.salvar(dados);
+}
+
+class _AbaCarteiraPaginada extends StatefulWidget {
+  const _AbaCarteiraPaginada({
+    required this.aoAbrirItem,
+    required this.aoConfigurarRecebimento,
+    required this.aoBaixarExtratoPdf,
+  });
+
+  final void Function(BuildContext context, String pedidoId) aoAbrirItem;
+  final Future<void> Function(BuildContext context, ContaRecebimento atual)
+      aoConfigurarRecebimento;
+  final Future<void> Function(BuildContext context) aoBaixarExtratoPdf;
+
+  @override
+  State<_AbaCarteiraPaginada> createState() => _AbaCarteiraPaginadaState();
+}
+
+class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
+  static const int _tamanhoPagina = 50;
+
+  List<ItemExtrato> _itens = const [];
+  ContaRecebimento _conta = const ContaRecebimento(cadastrada: false);
+  Object? _erro;
+  bool _iniciado = false;
+  bool _carregando = false;
+  bool _carregado = false;
+  bool _carregandoMais = false;
+  bool _temMais = false;
+  bool _sujo = false;
+  bool _visivel = true;
+  int _geracao = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    RotasTrato.pedidosMudaram.addListener(_aoMudarPedidos);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _visivel = TickerMode.valuesOf(context).enabled;
+    if (!_iniciado && _visivel) {
+      _iniciado = true;
+      _carregarInicial();
+    } else if (_visivel && _sujo && !_carregando) {
+      _sujo = false;
+      _carregarInicial(silencioso: _carregado);
+    }
+  }
+
+  @override
+  void dispose() {
+    RotasTrato.pedidosMudaram.removeListener(_aoMudarPedidos);
+    super.dispose();
+  }
+
+  void _aoMudarPedidos() {
+    _sujo = true;
+    if (_visivel && !_carregando) {
+      _sujo = false;
+      _carregarInicial(silencioso: _carregado);
+    }
+  }
+
+  Future<void> _carregarInicial({bool silencioso = false}) async {
+    final minha = ++_geracao;
+    if (!silencioso) {
+      setState(() {
+        _carregando = true;
+        _erro = null;
+      });
+    } else {
+      _carregando = true;
+    }
+    try {
+      final (itens, conta) = await emParalelo2(
+        RotasTrato.repos.profissional.extrato(
+          limite: _tamanhoPagina,
+          deslocamento: 0,
+        ),
+        RotasTrato.repos.profissional.obterContaRecebimento().catchError(
+              (_) => const ContaRecebimento(cadastrada: false),
+            ),
+      );
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _itens = itens;
+        _conta = conta;
+        _erro = null;
+        _temMais = itens.length >= _tamanhoPagina;
+        _carregado = true;
+        _carregando = false;
+        _carregandoMais = false;
+      });
+    } on Object catch (erro) {
+      if (!mounted || minha != _geracao) return;
+      if (!_carregado || !silencioso) {
+        setState(() {
+          _erro = erro;
+          _carregando = false;
+        });
+      } else {
+        _carregando = false;
+      }
+    }
+  }
+
+  Future<void> _carregarMais() async {
+    if (_carregandoMais || !_temMais) return;
+    final minha = _geracao;
+    setState(() => _carregandoMais = true);
+    try {
+      final novos = await RotasTrato.repos.profissional.extrato(
+        limite: _tamanhoPagina,
+        deslocamento: _itens.length,
+      );
+      if (!mounted || minha != _geracao) return;
+      setState(() {
+        _itens = [..._itens, ...novos];
+        _temMais = novos.length >= _tamanhoPagina;
+        _carregandoMais = false;
+      });
+    } on Object {
+      if (!mounted || minha != _geracao) return;
+      setState(() => _carregandoMais = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível carregar mais lançamentos.'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_carregado && _erro == null) {
+      return const EstadoTela(carregando: true);
+    }
+    if (_erro != null && !_carregado) {
+      final erro = _erro;
+      return RefreshIndicator(
+        onRefresh: _carregarInicial,
+        child: EstadoTela(
+          texto: erro is ErroTrato
+              ? erro.mensagem
+              : 'Algo deu errado. Tente de novo em instantes.',
+          aoTentarNovamente: _carregarInicial,
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () => _carregarInicial(silencioso: true),
+      child: CarteiraTela(
+        soExtrato: true,
+        dados: DadosCarteira(extrato: _itens, contaRecebimento: _conta),
+        aoAbrirItem: (item) => widget.aoAbrirItem(context, item.pedidoId!),
+        aoConfigurarRecebimento: () =>
+            widget.aoConfigurarRecebimento(context, _conta),
+        aoBaixarExtratoPdf: () => widget.aoBaixarExtratoPdf(context),
+        aoCarregarMais: _carregarMais,
+        temMaisExtrato: _temMais,
+        carregandoMais: _carregandoMais,
+      ),
+    );
+  }
 }

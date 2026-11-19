@@ -28,7 +28,6 @@ from trato.api.admin.repositorios import (
     DadosPessoaisAdmin,
     DefinicaoConfig,
     DocumentoAdmin,
-    FaixaTaxa,
     MembroEquipe,
     ParametroConfig,
     UsuarioAdmin,
@@ -82,7 +81,6 @@ BASE_PARAMETROS = (
     ParametroConfig("prazo_decisao_disputa_dias_uteis", 5),
     ParametroConfig("prazo_congelar_disputa_horas", 72),
 )
-BASE_FAIXAS = (FaixaTaxa(0, 100_000, 750), FaixaTaxa(100_000, None, 600))  # valores de TESTE
 
 
 class Relogio:
@@ -94,11 +92,6 @@ class Relogio:
 
     def avancar(self, **kwargs: int) -> None:
         self.agora += timedelta(**kwargs)
-
-
-class TaxaFalsa:
-    def calcular(self, valor_centavos: int) -> int:
-        return valor_centavos * 750 // 10_000
 
 
 class AssinadorFalso:
@@ -145,9 +138,7 @@ class AmbienteAdmin:
             Ator(PapelPedido.CLIENTE, CLIENTE.id), AGORA - timedelta(hours=2), prova,
         )  # fmt: skip
         self.contexto.pedidos.salvar(pedido, evento)
-        self.contexto.contratos.salvar(
-            Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, valor, "pintura", taxa_bps_aplicada=750)
-        )
+        self.contexto.contratos.salvar(Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, valor, "pintura"))
         registrar_cobranca(self.contexto.ledger.livro, PEDIDO, valor, "cob-ped-1", AGORA)
         cfg = self.contexto.config.carregar().disputas
         d = disputas.abrir(
@@ -217,7 +208,6 @@ def adm() -> AmbienteAdmin:
         eventos_webhook=EventosWebhookEmMemoria(),
         config=ConfigEmMemoria(config),
         agora=relogio,
-        taxa=TaxaFalsa(),
     )
     auditoria = AuditoriaEmMemoria(relogio)
     usuarios = UsuariosAdminEmMemoria(auditoria)
@@ -268,7 +258,7 @@ def publicar_versao_base(adm: AmbienteAdmin) -> str:
     """Deixa uma versão vigente (proposta por 'financeiro', aprovada pelo administrador)."""
     cfg = adm.admin.config
     versao = cfg.criar_rascunho(
-        "eq-financeiro", "Versão inicial de teste", BASE_PARAMETROS, BASE_FAIXAS, None, False
+        "eq-financeiro", "Versão inicial de teste", BASE_PARAMETROS, None, False
     )
     cfg.enviar_para_aprovacao(versao.id, "eq-financeiro", "Pronta")
     cfg.aprovar(versao.id, "eq-administrador", "Conferi")

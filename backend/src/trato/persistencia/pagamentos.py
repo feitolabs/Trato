@@ -32,14 +32,12 @@ from trato.pagamentos.modelos import (
     EstadoAditivo,
     EstadoCobranca,
     OrdemEstorno,
-    TermosContrato,
 )
 from trato.pagamentos.parcelamento import ConfigParcelamento
-from trato.pagamentos.taxa import ConfigTaxa
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import parametros_globais, versao_vigente
-from trato.persistencia.erros import ConfigNaoPublicada, NaoEncontrado
+from trato.persistencia.erros import NaoEncontrado
 
 _MEIO_PARA_BANCO = {MeioPagamento.PIX: "pix", MeioPagamento.CARTAO: "cartao_credito"}
 _STATUS_PARA_BANCO = {
@@ -81,7 +79,8 @@ def _contrato_do_pedido(con: psycopg.Connection[Any], pedido_id: str) -> dict[st
 
 _SELECT_COBRANCA = (
     "select p.stripe_payment_intent_id, c.pedido_id, p.aditivo_id, p.valor_centavos, p.meio, "
-    "p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos "
+    "p.parcelas, p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos, "
+    "p.cupom_codigo, p.desconto_centavos, p.moedas_usadas "
     "from public.pagamentos p join public.contratos c on c.id = p.contrato_id "
 )
 
@@ -99,6 +98,10 @@ def _cobranca(linha: dict[str, Any]) -> CobrancaLocal:
         instrucao=linha["instrucao"],
         pago_em=None if devolvida else linha["confirmado_em"],
         estornado_centavos=int(linha["estornado_centavos"]),
+        parcelas=int(linha.get("parcelas") or 1),
+        cupom_codigo=linha.get("cupom_codigo"),
+        desconto_centavos=int(linha.get("desconto_centavos") or 0),
+        moedas_usadas=int(linha.get("moedas_usadas") or 0),
     )
 
 
@@ -126,6 +129,9 @@ class CobrancasPostgres:
             estornado_centavos=base.estornado_centavos,
             parcelas=parcelas,
             servico_centavos=servico_centavos,
+            cupom_codigo=base.cupom_codigo,
+            desconto_centavos=base.desconto_centavos,
+            moedas_usadas=base.moedas_usadas,
         )
 
     def obter(self, cobranca_id: str) -> CobrancaLocal | None:
@@ -184,15 +190,17 @@ class CobrancasPostgres:
             aditivo = como_uuid(cobranca.aditivo_id) if cobranca.aditivo_id else None
             con.execute(
                 "insert into public.pagamentos (contrato_id, pagador_id, tipo, aditivo_id, meio, "
-                "valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
-                "confirmado_em, estornado_centavos, instrucao, criado_em) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "parcelas, valor_centavos, status, stripe_payment_intent_id, chave_idempotencia, "
+                "confirmado_em, estornado_centavos, instrucao, cupom_codigo, desconto_centavos, "
+                "moedas_usadas, criado_em) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     contrato["id"],
                     contrato["cliente_id"],
                     "aditivo" if aditivo else "saldo",
                     aditivo,
                     _MEIO_PARA_BANCO[cobranca.meio],
+                    cobranca.parcelas,
                     cobranca.valor_centavos,
                     status,
                     cobranca.id,
@@ -200,6 +208,9 @@ class CobrancasPostgres:
                     confirmado_em,
                     cobranca.estornado_centavos,
                     cobranca.instrucao,
+                    cobranca.cupom_codigo,
+                    cobranca.desconto_centavos,
+                    cobranca.moedas_usadas,
                     cobranca.criada_em,
                 ),
             )
@@ -376,24 +387,11 @@ class OrdensEstornoPostgres:
         return [self._ordem(linha) for linha in linhas]
 
 
-class TermosPostgres:
-    """Os termos do contrato JÁ moram no contrato (`taxa_bps_aplicada` e `regras_aplicadas`,
-    gravados no aceite com a configuração do momento). Por isso `salvar` não escreve nada e `obter`
-    devolve None: o serviço cai na taxa congelada do contrato (`taxa_congelada`), mesma fonte."""
-
-    def obter(self, pedido_id: str) -> TermosContrato | None:
-        return None
-
-    def salvar(self, termos: TermosContrato) -> None:
-        return None
-
-
 class ConfigPagamentoPostgres:
     """`ConfigPagamento` lida da versão VIGENTE da configuração, a cada chamada.
 
-    A taxa do ACEITE já fica congelada no contrato; esta só vale como referência (menor faixa e
-    o mínimo). `alcada_disputa_centavos` vem do parâmetro de mesmo nome; sem ele, 0 (toda decisão
-    de disputa pede segunda pessoa: o lado seguro)."""
+    `alcada_disputa_centavos` vem do parâmetro de mesmo nome; sem ele, 0 (toda decisão de disputa
+    pede segunda pessoa: o lado seguro)."""
 
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
@@ -402,14 +400,6 @@ class ConfigPagamentoPostgres:
         with self._banco.transacao() as con:
             versao = versao_vigente(con)
             parametros = parametros_globais(con, versao)
-            faixa = con.execute(
-                "select taxa_bps from public.config_faixas_taxa where versao_id = %s "
-                "and escopo_tipo = 'global' order by de_centavos limit 1",
-                (versao,),
-            ).fetchone()
-        if faixa is None:
-            raise ConfigNaoPublicada("As faixas de taxa (P2) ainda não foram publicadas.")
-        taxa = ConfigTaxa(int(faixa["taxa_bps"]), parametros.get("taxa_minima_centavos", 0))
         # Custo do parcelado repassado ao cliente: parâmetros opcionais
         # `custo_parcelamento_<N>x_bps` (N de 2 a 12), do provedor. Nenhum cadastrado = parcelado
         # desligado (João, 31/10/2026).
@@ -419,7 +409,6 @@ class ConfigPagamentoPostgres:
             if (chave := f"custo_parcelamento_{n}x_bps") in parametros
         }
         return ConfigPagamento(
-            taxa,
             parametros.get("alcada_disputa_centavos", 0),
             parcelamento=ConfigParcelamento(custos),
         )
@@ -430,5 +419,4 @@ __all__ = [
     "CobrancasPostgres",
     "ConfigPagamentoPostgres",
     "OrdensEstornoPostgres",
-    "TermosPostgres",
 ]

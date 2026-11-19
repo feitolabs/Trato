@@ -212,7 +212,6 @@ void main() {
               'retido_centavos': 0,
               'a_liberar_centavos': 0,
               'liberado_centavos': 0,
-              'taxa_trato_centavos': 0,
             });
           case '/v1/contratos/p1/aditivos':
             return _json([

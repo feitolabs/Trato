@@ -104,41 +104,6 @@ def test_a2_equipe_sem_permissao_nao_le_chat(amb):
     assert r.status_code == 403
 
 
-# --- A3 (alto): taxa recalculada na decisão, fora da versão congelada do contrato ------------
-
-
-class _TaxaMutavel:
-    """Simula a configuração vigente mudando DEPOIS do aceite do contrato."""
-
-    def __init__(self, bps: int) -> None:
-        self.bps = bps
-
-    def calcular(self, valor: int) -> int:
-        return (valor * self.bps + 5_000) // 10_000
-
-
-def test_a3_taxa_da_disputa_nao_muda_se_a_config_mudar_depois_do_aceite(amb):
-    pedido = amb.semear_pedido(Estado.EM_DISPUTA, estado_antes_da_disputa=Estado.EM_CONFIRMACAO)
-    livro = amb.contexto.ledger.livro
-    registrar_cobranca(livro, "ped-1", 100_000, "cob-ped-1", AGORA)
-    config = amb.contexto.config.carregar().disputas
-    aberta = disputas.abrir(
-        disputas.Ator.CLIENTE, 100_000, disputas.Motivo.MAL_FEITO, AGORA, AGORA, config
-    )
-    em_analise = replace(aberta, estado=disputas.Estado.EM_ANALISE)
-    decidida = em_analise.decidir(
-        disputas.Ator.ANALISTA, "eq-1", Decisao(Resultado.LIBERAR_TUDO), AGORA, 10**9
-    )
-
-    def taxa_lancada(bps: int) -> int:
-        amb.contexto.taxa = _TaxaMutavel(bps)
-        novos = _planejar_dinheiro(amb.contexto, pedido, decidida)
-        return sum(n.valor for n in novos if n.tipo is TipoLancamento.TAXA)
-
-    # Contrato aceito com 10%. Depois a configuração vira 25%: o contrato NÃO pode mudar.
-    assert taxa_lancada(1_000) == taxa_lancada(2_500)
-
-
 # --- A4 (alto): ledger Python x ledger do banco --------------------------------------------
 
 
@@ -172,7 +137,6 @@ def test_a4_estorno_parcial_do_python_cabe_no_banco():
 def test_a5_refazer_a_decisao_nao_planeja_dinheiro_de_novo(amb):
     pedido = amb.semear_pedido(Estado.EM_DISPUTA, estado_antes_da_disputa=Estado.EM_CONFIRMACAO)
     registrar_cobranca(amb.contexto.ledger.livro, "ped-1", 100_000, "cob-ped-1", AGORA)
-    amb.contexto.taxa = _TaxaMutavel(1_000)
     config = amb.contexto.config.carregar().disputas
     aberta = disputas.abrir(
         disputas.Ator.CLIENTE, 100_000, disputas.Motivo.MAL_FEITO, AGORA, AGORA, config

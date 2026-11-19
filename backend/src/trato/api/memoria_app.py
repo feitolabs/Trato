@@ -17,7 +17,6 @@ from trato.api.repositorios_app import (
     RecusaPedido,
     Verificacao,
 )
-from trato.pagamentos.taxa import ConfigTaxa, calcular_taxa
 from trato.persistencia.conversas import Mensagem, Notificacao, mascarar_contatos
 from trato.persistencia.erros import Duplicado, NaoEncontrado
 
@@ -201,14 +200,6 @@ class AvaliacoesEmMemoria:
     def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
         achadas = [a for a in self._itens.values() if a.avaliado_id == avaliado_id]
         return tuple(sorted(achadas, key=lambda a: a.criada_em, reverse=True))
-
-
-class TaxaEmMemoria:
-    def __init__(self, config: ConfigTaxa) -> None:
-        self._config = config
-
-    def calcular(self, valor_centavos: int) -> int:
-        return calcular_taxa(valor_centavos, self._config)
 
 
 class RecusasEmMemoria:

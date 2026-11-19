@@ -15,7 +15,6 @@ from typing import Protocol
 
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.parcelamento import ConfigParcelamento
-from trato.pagamentos.taxa import ConfigTaxa
 
 
 class EstadoCobranca(StrEnum):
@@ -49,6 +48,10 @@ class CobrancaLocal:
     # Parte da cobrança que é o SERVIÇO; o resto é taxa do Trato + custo de parcelamento. Não vem
     # do banco (sem coluna): na releitura, o orquestrador usa o valor do contrato ou do aditivo.
     servico_centavos: int | None = None
+    cupom_codigo: str | None = None
+    desconto_centavos: int = 0
+    # Moedas do Trato usadas nesta cobrança (o desconto delas já está em `desconto_centavos`).
+    moedas_usadas: int = 0
 
 
 @dataclass(frozen=True)
@@ -60,15 +63,6 @@ class Aditivo:
     estado: EstadoAditivo
     criado_em: datetime
     aprovado_em: datetime | None = None
-
-
-@dataclass(frozen=True)
-class TermosContrato:
-    """Regras congeladas no aceite: mudar a configuração depois não muda este pedido."""
-
-    pedido_id: str
-    taxa: ConfigTaxa
-    congelado_em: datetime
 
 
 @dataclass(frozen=True)
@@ -92,7 +86,6 @@ class OrdemEstorno:
 class ConfigPagamento:
     """Parte da tabela de configuração que o fluxo de pagamento lê."""
 
-    taxa: ConfigTaxa
     alcada_disputa_centavos: int  # acima disso a decisão da disputa pede segunda pessoa
     # Custo do parcelado repassado ao cliente. Vazio = parcelado desligado (João, 31/10/2026).
     parcelamento: ConfigParcelamento = field(default_factory=ConfigParcelamento)
@@ -123,9 +116,3 @@ class RepositorioOrdensEstorno(Protocol):
     def pendentes(self, pedido_id: str | None = None) -> Sequence[OrdemEstorno]: ...
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrdemEstorno]: ...
-
-
-class RepositorioTermos(Protocol):
-    def obter(self, pedido_id: str) -> TermosContrato | None: ...
-
-    def salvar(self, termos: TermosContrato) -> None: ...

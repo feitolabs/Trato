@@ -28,7 +28,6 @@ from trato.api.admin.repositorios import (
     EntradaAuditoria,
     EnvioAnteriorAdmin,
     EventoUsuarioAdmin,
-    FaixaTaxa,
     FiltroAuditoria,
     ItemDiagnostico,
     MembroEquipe,
@@ -131,7 +130,7 @@ class AuditoriaAdminPostgres:
             "(%(acao)s::text is null or acao like %(acao_like)s escape '\\') "
             "and (%(ator)s::uuid is null or ator_id = %(ator)s::uuid) "
             "and (%(ator_busca)s::text is null or ator_id in "
-            "     (select id from public.usuarios where nome ilike %(ator_like)s escape '\')) "
+            "     (select id from public.usuarios where nome ilike %(ator_like)s escape '')) "
             "and (%(entidade)s::text is null or entidade = %(entidade)s) "
             "and (%(entidade_id)s::uuid is null or entidade_id = %(entidade_id)s::uuid) "
             "and (%(desde)s::timestamptz is null or ocorrida_em >= %(desde)s::timestamptz) "
@@ -977,7 +976,8 @@ class ConfigAdminPostgres:
     def _definicoes(con: psycopg.Connection[Any]) -> tuple[DefinicaoConfig, ...]:
         linhas = con.execute(
             "select chave, descricao, unidade, minimo, maximo, escopos_permitidos, "
-            "exige_dupla_aprovacao from public.config_definicoes order by chave"
+            "exige_dupla_aprovacao from public.config_definicoes "
+            "where left(chave, 5) <> 'taxa_' order by chave"
         ).fetchall()
         return tuple(
             DefinicaoConfig(
@@ -995,7 +995,6 @@ class ConfigAdminPostgres:
     @staticmethod
     def _versao_de_linha(l: dict[str, Any], con=None, completa: bool = False) -> VersaoConfig:  # noqa: E741
         parametros: tuple[ParametroConfig, ...] = ()
-        faixas: tuple[FaixaTaxa, ...] = ()
         if completa and con is not None:
             parametros = tuple(
                 ParametroConfig(
@@ -1008,23 +1007,8 @@ class ConfigAdminPostgres:
                 for p in con.execute(
                     "select chave, valor, escopo_tipo, escopo_id, escopo_texto "
                     "from public.config_parametros where versao_id = %s "
+                    "and left(chave, 5) <> 'taxa_' "
                     "order by chave, escopo_tipo, escopo_id, escopo_texto",
-                    (l["id"],),
-                ).fetchall()
-            )
-            faixas = tuple(
-                FaixaTaxa(
-                    int(f["de_centavos"]),
-                    None if f["ate_centavos"] is None else int(f["ate_centavos"]),
-                    int(f["taxa_bps"]),
-                    f["escopo_tipo"],
-                    _txt(f["escopo_id"]),
-                    f["escopo_texto"],
-                )  # fmt: skip
-                for f in con.execute(
-                    "select de_centavos, ate_centavos, taxa_bps, escopo_tipo, escopo_id, "
-                    "escopo_texto from public.config_faixas_taxa where versao_id = %s "
-                    "order by escopo_tipo, escopo_id, escopo_texto, de_centavos",
                     (l["id"],),
                 ).fetchall()
             )
@@ -1039,7 +1023,6 @@ class ConfigAdminPostgres:
             revertida_de=_txt(l["revertida_de"]),
             criado_em=l["criado_em"],
             parametros=parametros,
-            faixas=faixas,
         )
 
     def versoes(self) -> Sequence[VersaoConfig]:
@@ -1085,12 +1068,11 @@ class ConfigAdminPostgres:
         autor_id: str,
         motivo: str,
         parametros: Sequence[ParametroConfig],
-        faixas: Sequence[FaixaTaxa],
         vigente_desde: datetime | None,
         revertida_de: str | None,
         status: str,
     ) -> VersaoConfig:
-        regras.validar_itens(self._definicoes(con), parametros, faixas)
+        regras.validar_itens(self._definicoes(con), parametros)
         linha = con.execute(
             "insert into public.config_versoes (status, criada_por, motivo, vigente_desde, "
             f"revertida_de) values (%s, %s, %s, %s, %s) returning {_COLUNAS_VERSAO}",
@@ -1102,16 +1084,6 @@ class ConfigAdminPostgres:
                 "escopo_id, escopo_texto) values (%s, %s, %s, %s, %s, %s)",
                 (linha["id"], p.chave, p.valor, p.escopo_tipo, p.escopo_id, p.escopo_texto),
             )
-        for f in faixas:
-            con.execute(
-                "insert into public.config_faixas_taxa (versao_id, de_centavos, ate_centavos, "
-                "taxa_bps, escopo_tipo, escopo_id, escopo_texto) "
-                "values (%s, %s, %s, %s, %s, %s, %s)",
-                (
-                    linha["id"], f.de_centavos, f.ate_centavos, f.taxa_bps, f.escopo_tipo,
-                    f.escopo_id, f.escopo_texto,
-                ),
-            )  # fmt: skip
         return self._versao_de_linha(linha, con, completa=True)
 
     @staticmethod
@@ -1128,7 +1100,7 @@ class ConfigAdminPostgres:
         )
 
     def criar_rascunho(
-        self, autor_id, motivo, parametros, faixas, vigente_desde, partir_da_vigente
+        self, autor_id, motivo, parametros, vigente_desde, partir_da_vigente
     ) -> VersaoConfig:
         try:
             with self._banco.transacao() as con:
@@ -1138,11 +1110,9 @@ class ConfigAdminPostgres:
                     ).fetchone()
                     if linha is not None:
                         base = self._ler(con, str(linha["id"]))
-                        parametros, faixas = regras.mesclar(
-                            base.parametros, base.faixas, parametros, faixas
-                        )
+                        parametros = regras.mesclar(base.parametros, parametros)
                 versao = self._inserir(
-                    con, autor_id, motivo, parametros, faixas, vigente_desde, None, "rascunho"
+                    con, autor_id, motivo, parametros, vigente_desde, None, "rascunho"
                 )
                 self._auditar(con, autor_id, "config.rascunho_criado", None, versao, motivo)
                 return versao
@@ -1215,7 +1185,7 @@ class ConfigAdminPostgres:
                 if alvo.status not in ("vigente", "substituida", "revertida"):
                     raise RegraDoBanco("Só dá para reverter para uma versão que já valeu.")
                 versao = self._inserir(
-                    con, autor_id, motivo, alvo.parametros, alvo.faixas, None, alvo.id,
+                    con, autor_id, motivo, alvo.parametros, None, alvo.id,
                     "aguardando_aprovacao",
                 )  # fmt: skip
                 self._auditar(con, autor_id, "config.reversao_proposta", None, versao, motivo)
@@ -1230,9 +1200,6 @@ class ConfigAdminPostgres:
                 regras.exigir_status(versao, "rascunho", "aguardando_aprovacao")
                 con.execute(
                     "delete from public.config_parametros where versao_id = %s", (versao.id,)
-                )
-                con.execute(
-                    "delete from public.config_faixas_taxa where versao_id = %s", (versao.id,)
                 )
                 con.execute("delete from public.config_versoes where id = %s", (versao.id,))
                 self._auditar(

@@ -16,11 +16,13 @@ class NotificacoesTela extends StatelessWidget {
     this.comVoltar = true,
     this.atualizarACada,
     this.atualizarQuando,
+    this.aoContarNaoLidas,
   });
 
   /// Atualiza a lista sozinha neste intervalo (aviso novo aparece sem fechar o app).
   final Duration? atualizarACada;
   final Listenable? atualizarQuando;
+  final ValueChanged<int>? aoContarNaoLidas;
 
   final ServicoNotificacoes servico;
   final ValueChanged<Notificacao>? aoAbrirDestino;
@@ -42,7 +44,11 @@ class NotificacoesTela extends StatelessWidget {
           ),
       ],
       child: CarregadorTela<List<Notificacao>>(
-        carregar: servico.listar,
+        carregar: () async {
+          final lista = await servico.listar();
+          aoContarNaoLidas?.call(lista.where((n) => !n.lida).length);
+          return lista;
+        },
         atualizarACada: atualizarACada,
         atualizarQuando: atualizarQuando,
         construir: (context, itens, _) {
@@ -57,7 +63,12 @@ class NotificacoesTela extends StatelessWidget {
                 ? vazio
                 : RefreshIndicator(onRefresh: recarregar, child: vazio);
           }
-          return _ListaNotificacoes(servico: servico, itens: itens, aoAbrirDestino: aoAbrirDestino);
+          return _ListaNotificacoes(
+            servico: servico,
+            itens: itens,
+            aoAbrirDestino: aoAbrirDestino,
+            aoContarNaoLidas: aoContarNaoLidas,
+          );
         },
       ),
     );
@@ -65,11 +76,17 @@ class NotificacoesTela extends StatelessWidget {
 }
 
 class _ListaNotificacoes extends StatefulWidget {
-  const _ListaNotificacoes({required this.servico, required this.itens, this.aoAbrirDestino});
+  const _ListaNotificacoes({
+    required this.servico,
+    required this.itens,
+    this.aoAbrirDestino,
+    this.aoContarNaoLidas,
+  });
 
   final ServicoNotificacoes servico;
   final List<Notificacao> itens;
   final ValueChanged<Notificacao>? aoAbrirDestino;
+  final ValueChanged<int>? aoContarNaoLidas;
 
   @override
   State<_ListaNotificacoes> createState() => _ListaNotificacoesState();
@@ -93,6 +110,7 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
     if (!n.lida) {
       widget.servico.marcarLida(n.id);
       setState(() => _itens = [for (final i in _itens) i.id == n.id ? i.comoLida() : i]);
+      widget.aoContarNaoLidas?.call(_naoLidas);
     }
     widget.aoAbrirDestino?.call(n);
   }
@@ -100,6 +118,7 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
   void _marcarTodas() {
     widget.servico.marcarTodasLidas();
     setState(() => _itens = [for (final i in _itens) i.comoLida()]);
+    widget.aoContarNaoLidas?.call(0);
   }
 
   @override

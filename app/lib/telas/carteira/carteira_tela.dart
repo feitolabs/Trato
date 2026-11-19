@@ -20,6 +20,9 @@ class CarteiraTela extends StatelessWidget {
     this.aoAbrirItem,
     this.aoConfigurarRecebimento,
     this.aoBaixarExtratoPdf,
+    this.aoCarregarMais,
+    this.temMaisExtrato = false,
+    this.carregandoMais = false,
   });
 
   /// Toque numa linha do extrato: abre o detalhe dos valores do pedido.
@@ -30,6 +33,9 @@ class CarteiraTela extends StatelessWidget {
 
   /// Baixa o extrato mensal em PDF diretamente no app.
   final VoidCallback? aoBaixarExtratoPdf;
+  final VoidCallback? aoCarregarMais;
+  final bool temMaisExtrato;
+  final bool carregandoMais;
 
   /// D15: a Carteira é só extrato (o Trato não guarda saldo nem faz saque). Esconde os
   /// cartões de saldo e o botão de saque e mostra apenas os lançamentos.
@@ -78,8 +84,23 @@ class CarteiraTela extends StatelessWidget {
             const SizedBox(height: EspacosTrato.x3),
             if (dados.extrato.isEmpty)
               const _ExtratoVazio()
-            else
+            else ...[
               _Extrato(itens: dados.extrato, aoAbrir: aoAbrirItem),
+              if (temMaisExtrato && aoCarregarMais != null) ...[
+                const SizedBox(height: EspacosTrato.x3),
+                Center(
+                  child: carregandoMais
+                      ? const Padding(
+                          padding: EdgeInsets.all(EspacosTrato.x2),
+                          child: SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : BotaoLink(texto: 'Carregar mais', aoTocar: aoCarregarMais),
+                ),
+              ],
+            ],
           ],
         ],
       ),
@@ -378,7 +399,7 @@ class _ExtratoVazio extends StatelessWidget {
           Text('Nenhum serviço ainda', style: TipografiaTrato.tituloCartao),
           const SizedBox(height: EspacosTrato.x1),
           Text(
-            'Quando você concluir um serviço, ele aparece aqui com o valor, a taxa e o líquido.',
+            'Quando você concluir um serviço, ele aparece aqui com o valor que você recebe, sem taxa.',
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
           ),
         ],

@@ -207,6 +207,7 @@ class UsuariosPostgres:
         if base is None:
             return None
         nivel = nota = servicos = taxa = None
+        avaliacoes = 0
         if base.papel is PapelUsuario.PROFISSIONAL:
             with self._banco.transacao() as con:
                 linha = con.execute(
@@ -219,7 +220,20 @@ class UsuariosPostgres:
                 nota = float(linha["nota_publica"]) if linha["nota_publica"] is not None else None
                 servicos = int(linha["servicos_concluidos"])
                 taxa = self._taxa_conclusao(base.id)
-        return PerfilDetalhe(base.id, base.nome, base.papel, base.status, nivel, nota, servicos, taxa)
+                avaliacoes = self._total_avaliacoes(base.id)
+        return PerfilDetalhe(
+            base.id, base.nome, base.papel, base.status, nivel, nota, servicos, taxa, avaliacoes
+        )
+
+    def _total_avaliacoes(self, profissional_id: str) -> int:
+        """Avaliações de clientes que entram na nota pública (mesmo filtro de `nota_publica`)."""
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select count(*) as n from public.avaliacoes "
+                "where avaliado_id = %s and direcao = 'cliente_para_profissional'",
+                (profissional_id,),
+            ).fetchone()
+        return int(linha["n"])
 
     def _taxa_conclusao(self, profissional_id: str) -> int | None:
         """Concluídos / (concluídos + cancelados) dos contratos do profissional, em %."""

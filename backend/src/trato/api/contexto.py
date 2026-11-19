@@ -35,7 +35,6 @@ from trato.api.repositorios import (
     RepositorioRepasses,
 )
 from trato.api.repositorios_app import (
-    ProvedorTaxa,
     RepositorioAvaliacoes,
     RepositorioConversas,
     RepositorioNotasMaterial,
@@ -100,6 +99,10 @@ def _repasses_em_memoria() -> RepositorioRepasses:
     return RepassesEmMemoria()
 
 
+from trato.api.moedas import MoedasEmMemoria  # noqa: E402
+from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
+
+
 @dataclass
 class Contexto:
     auth: ProvedorAuth
@@ -123,12 +126,14 @@ class Contexto:
     usuarios: RepositorioUsuarios = field(default_factory=UsuariosEmMemoria)
     verificacoes: RepositorioVerificacoes = field(default_factory=VerificacoesEmMemoria)
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
+    # Moedas do Trato (gamificação). Em memória por padrão; a fábrica Postgres troca.
+    moedas: Any = field(default_factory=lambda: MoedasEmMemoria())
+    # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
+    ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
     notas_material: RepositorioNotasMaterial = field(default_factory=NotasMaterialEmMemoria)
     # Dados pessoais, endereços, favoritos e contatos de confiança (`api/conta.py`).
     conta: Any = field(default_factory=lambda: _conta_em_memoria())
-    # Sem `taxa` ligada, o resumo do orçamento responde 503 (a taxa nunca vem do app).
-    taxa: ProvedorTaxa | None = None
     repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)
     # Contestações de cartão (chargeback) avisadas pelo provedor (`financeiro/contestacoes.py`).
     contestacoes: Any = field(default_factory=lambda: _contestacoes_em_memoria())

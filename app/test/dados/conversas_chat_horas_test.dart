@@ -119,7 +119,6 @@ void main() {
     });
 
     test('para o profissional, o outro lado é o cliente e não manda profissional_id', () async {
-      final (api, _) = _cliente((_) => _json(corpo));
       final (api2, chamadas2) = _cliente((_) => _json(corpo));
       final lista = await ServicoConversasApi(api2, comoProfissional: true).listar();
 

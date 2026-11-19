@@ -57,7 +57,6 @@ def test_contestacao_perdida_devolve_o_servico_no_ledger_uma_vez_so(fluxo: Fluxo
     assert c.status is StatusContestacao.PERDIDA and c.encerrada_em is not None
     saldo = fluxo.saldo(pid)
     assert saldo["retido_centavos"] == 0
-    assert saldo["taxa_trato_centavos"] == 0  # nenhuma taxa foi descontada antes de concluir
     assert fluxo.servico.cobrancas.obter(cobranca["id"]).estornado_centavos == VALOR
     fluxo.ctx.ledger.livro.verificar_partidas()
 

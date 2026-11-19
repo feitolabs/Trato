@@ -159,13 +159,7 @@ def test_2_detalhe_pedido_aberto_inclui_fotos_urls_do_cliente(amb):
     assert len(fotos) == 1 and "ped-foto" in fotos[0]
 
 
-class _TaxaFixa:
-    def calcular(self, valor_centavos: int) -> int:
-        return (valor_centavos * 750) // 10_000
-
-
 def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
-    amb.contexto.taxa = _TaxaFixa()
     amb.contexto.pedidos.salvar(
         Pedido("ped-orc", CLIENTE.id, AGORA),
         None,
@@ -175,9 +169,24 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
         "/v1/pedidos/ped-orc/orcamentos",
         json={
             "itens": [
-                {"tipo": "deslocamento", "descricao": "Deslocamento", "quantidade": "1", "valor_unitario_centavos": 10_000},
-                {"tipo": "horas", "descricao": "Mão de obra", "quantidade": "3", "valor_unitario_centavos": 10_000},
-                {"tipo": "material", "descricao": "Tinta 18L", "quantidade": "1", "valor_unitario_centavos": 20_000},
+                {
+                    "tipo": "deslocamento",
+                    "descricao": "Deslocamento",
+                    "quantidade": "1",
+                    "valor_unitario_centavos": 10_000,
+                },
+                {
+                    "tipo": "horas",
+                    "descricao": "Mão de obra",
+                    "quantidade": "3",
+                    "valor_unitario_centavos": 10_000,
+                },
+                {
+                    "tipo": "material",
+                    "descricao": "Tinta 18L",
+                    "quantidade": "1",
+                    "valor_unitario_centavos": 20_000,
+                },
             ],
             "prazo_execucao_dias": 2,
             "garantia_dias": 90,
@@ -198,17 +207,19 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
     assert j1["horas_trabalhadas"] == "3"
     assert j1["fora_do_escopo"] == "Massa corrida"
     assert j1["observacoes"] == "Inclui proteção do piso"
-    assert j1["taxa_centavos"] == 4_500
-    assert j1["liquido_centavos"] == 55_500
-    j1_cli = amb.cliente.get(f"/v1/orcamentos/{orc_v1}", headers=cab("t-cliente")).json()
-    assert j1_cli["taxa_centavos"] is None and j1_cli["liquido_centavos"] is None
+    assert "taxa_centavos" not in j1 and "liquido_centavos" not in j1
 
     # Envia edição (v2) antes de qualquer contraproposta
     r2 = amb.cliente.post(
         "/v1/pedidos/ped-orc/orcamentos",
         json={
             "itens": [
-                {"tipo": "horas", "descricao": "Mão de obra revisada", "quantidade": "4", "valor_unitario_centavos": 12_000},
+                {
+                    "tipo": "horas",
+                    "descricao": "Mão de obra revisada",
+                    "quantidade": "4",
+                    "valor_unitario_centavos": 12_000,
+                },
             ],
             "prazo_execucao_dias": 3,
             "garantia_dias": 120,
@@ -233,9 +244,7 @@ def test_4_baixar_extrato_mensal_em_pdf_pelo_profissional(amb):
     amb.semear_pedido(Estado.CONCLUIDO)
     amb.semear_dinheiro(cobrado=100_000, taxa=7_500)
     liberar(amb.contexto.ledger.livro, "ped-1", PROFISSIONAL.id, "lib-1", AGORA)
-    assert any(
-        item.tipo is TipoLancamento.REPASSE for item in amb.contexto.ledger.lancamentos()
-    )
+    assert any(item.tipo is TipoLancamento.REPASSE for item in amb.contexto.ledger.lancamentos())
 
     ok = amb.cliente.get("/v1/profissionais/me/extrato.pdf?mes=2026-10", headers=cab("t-prof"))
     assert ok.status_code == 200, ok.text
@@ -243,7 +252,9 @@ def test_4_baixar_extrato_mensal_em_pdf_pelo_profissional(amb):
     assert "trato_extrato_2026_10.pdf" in ok.headers.get("content-disposition", "")
     assert ok.content.startswith(b"%PDF-")
 
-    invalido = amb.cliente.get("/v1/profissionais/me/extrato.pdf?mes=2026-13", headers=cab("t-prof"))
+    invalido = amb.cliente.get(
+        "/v1/profissionais/me/extrato.pdf?mes=2026-13", headers=cab("t-prof")
+    )
     assert invalido.status_code == 422
 
     proibido_cliente = amb.cliente.get(
@@ -287,7 +298,9 @@ def test_5_disponivel_agora_prioriza_e_notifica_pedidos_urgentes(amb):
     amb.contexto.pedidos.salvar(
         Pedido("ped-normal-novo", CLIENTE.id, AGORA - timedelta(minutes=10)),
         None,
-        DadosPedido("pintura", "bh", "Pintura sem pressa", "Normal", bairro="Centro", urgente=False),
+        DadosPedido(
+            "pintura", "bh", "Pintura sem pressa", "Normal", bairro="Centro", urgente=False
+        ),
     )
 
     lista_ativo = amb.cliente.get("/v1/profissional/pedidos-abertos", headers=cab("t-prof")).json()
@@ -358,7 +371,9 @@ def test_6_cliente_ausente_exige_prova_notifica_envia_chat_e_bloqueia_ausencia_a
 
     # Muito antes da janela (> 15 min) -> 422
     inicio_longe = AGORA + timedelta(hours=4)
-    amb.semear_pedido(Estado.AGENDADO, janela=Janela(inicio_longe, inicio_longe + timedelta(hours=2)))
+    amb.semear_pedido(
+        Estado.AGENDADO, janela=Janela(inicio_longe, inicio_longe + timedelta(hours=2))
+    )
     cedo = amb.cliente.post(
         "/v1/pedidos/ped-1/acoes/registrar_cliente_ausente",
         json={

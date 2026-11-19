@@ -499,8 +499,6 @@ class ApiAdminHttp implements ApiAdmin {
           pedido: _codigoPedido(p['pedido_id'] as String?, p['pedido_numero']),
           refProvedor: (p['referencia_provedor'] as String?) ?? '—',
           divergente: p['divergente'] == true,
-          taxaCentavos: (p['taxa_trato_centavos'] as num?)?.toInt(),
-          liquidoCentavos: (p['liquido_profissional_centavos'] as num?)?.toInt(),
         ),
     ];
   }
@@ -734,13 +732,13 @@ class ApiAdminHttp implements ApiAdmin {
       'PUT',
       '/v1/admin/categorias/$id',
       corpo: {
-        if (nome != null) 'nome': nome,
-        if (slug != null) 'slug': slug,
-        if (icone != null) 'icone': icone,
-        if (garantiaDias != null) 'garantia_retrabalho_dias': garantiaDias,
-        if (ordem != null) 'ordem': ordem,
-        if (ativa != null) 'ativa': ativa,
-        if (aceitaRemoto != null) 'aceita_remoto': aceitaRemoto,
+        'nome': ?nome,
+        'slug': ?slug,
+        'icone': ?icone,
+        'garantia_retrabalho_dias': ?garantiaDias,
+        'ordem': ?ordem,
+        'ativa': ?ativa,
+        'aceita_remoto': ?aceitaRemoto,
         'motivo': motivo,
       },
     ));
@@ -969,7 +967,6 @@ class ApiAdminHttp implements ApiAdmin {
     final m = _mapa(await _chamar('GET', '/v1/admin/dashboard/metricas', consulta: _periodo(dias, inicio, fim)));
     return MetricasDashboard(
       gmvCentavos: _int(m['gmv_centavos']),
-      receitaTaxaCentavos: _int(m['receita_taxa_centavos']),
       pedidosTotal: _int(m['pedidos_total']),
       pedidosConcluidos: _int(m['pedidos_concluidos']),
       pedidosEmAndamento: _int(m['pedidos_em_andamento']),
@@ -981,7 +978,6 @@ class ApiAdminHttp implements ApiAdmin {
       cidadesAtivas: _int(m['cidades_ativas']),
       categoriasAtivas: _int(m['categorias_ativas']),
       gmvAnteriorCentavos: _int(m['gmv_anterior_centavos']),
-      receitaTaxaAnteriorCentavos: _int(m['receita_taxa_anterior_centavos']),
       pedidosAtivos: _int(m['pedidos_ativos']),
       pedidosAtivosAnterior: _int(m['pedidos_ativos_anterior']),
       baseUsuarios: _int(m['base_usuarios']),
@@ -1059,7 +1055,7 @@ class ApiAdminHttp implements ApiAdmin {
       corpo: {
         'texto': texto,
         'tipo': tipo,
-        if (opcoes != null) 'opcoes': opcoes,
+        'opcoes': ?opcoes,
         'obrigatoria': obrigatoria,
         'ordem': ordem,
         'motivo': motivo,
@@ -1093,12 +1089,12 @@ class ApiAdminHttp implements ApiAdmin {
       'PUT',
       '/v1/admin/categorias/$categoriaId/perguntas/$perguntaId',
       corpo: {
-        if (texto != null) 'texto': texto,
-        if (tipo != null) 'tipo': tipo,
-        if (opcoes != null) 'opcoes': opcoes,
-        if (obrigatoria != null) 'obrigatoria': obrigatoria,
-        if (ordem != null) 'ordem': ordem,
-        if (ativa != null) 'ativa': ativa,
+        'texto': ?texto,
+        'tipo': ?tipo,
+        'opcoes': ?opcoes,
+        'obrigatoria': ?obrigatoria,
+        'ordem': ?ordem,
+        'ativa': ?ativa,
         'motivo': motivo,
       },
     ));
@@ -1239,8 +1235,8 @@ class ApiAdminHttp implements ApiAdmin {
         'mensagem': mensagem,
         'segmento': segmento,
         'tipo': tipo,
-        if (categoriaId != null) 'categoria_id': categoriaId,
-        if (cidadeId != null) 'cidade_id': cidadeId,
+        'categoria_id': ?categoriaId,
+        'cidade_id': ?cidadeId,
         'motivo': motivo,
       },
     ));
@@ -1292,10 +1288,10 @@ class ApiAdminHttp implements ApiAdmin {
         'tipo': tipo,
         'valor': valor,
         'valor_minimo_centavos': valorMinimoCentavos,
-        if (limiteUsos != null) 'limite_usos': limiteUsos,
-        if (limitePorUsuario != null) 'limite_por_usuario': limitePorUsuario,
-        if (validoDesde != null) 'valido_desde': validoDesde,
-        if (validoAte != null) 'valido_ate': validoAte,
+        'limite_usos': ?limiteUsos,
+        'limite_por_usuario': ?limitePorUsuario,
+        'valido_desde': ?validoDesde,
+        'valido_ate': ?validoAte,
         if (campanha != null && campanha.isNotEmpty) 'campanha': campanha,
         'motivo': motivo,
       },
@@ -1379,9 +1375,9 @@ class ApiAdminHttp implements ApiAdmin {
       'PATCH',
       '/v1/admin/equipe/$usuarioId',
       corpo: {
-        if (papel != null) 'papel': papel,
-        if (alcadaCentavos != null) 'alcada_centavos': alcadaCentavos,
-        if (ativo != null) 'ativo': ativo,
+        'papel': ?papel,
+        'alcada_centavos': ?alcadaCentavos,
+        'ativo': ?ativo,
         'motivo': motivo,
       },
     ));
@@ -1602,7 +1598,7 @@ class ApiAdminHttp implements ApiAdmin {
     final r = _mapa(await _chamar('POST', '/v1/admin/relatorios/$tipo', corpo: {
       if (inicio != null) 'inicio': dia(inicio),
       if (fim != null) 'fim': dia(fim),
-      if (cidadeId != null) 'cidade_id': cidadeId,
+      'cidade_id': ?cidadeId,
       'formato': formato,
       'motivo': motivo,
     }));

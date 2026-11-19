@@ -89,7 +89,10 @@ class InicioTela extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: EspacosTrato.x3),
-                    _BotaoSino(aoTocar: aoAbrirNotificacoes),
+                    _BotaoSino(
+                      aoTocar: aoAbrirNotificacoes,
+                      naoLidas: dados?.notificacoesNaoLidas ?? 0,
+                    ),
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x6),
@@ -209,24 +212,39 @@ class InicioTela extends StatelessWidget {
 }
 
 class _BotaoSino extends StatelessWidget {
-  const _BotaoSino({required this.aoTocar});
+  const _BotaoSino({required this.aoTocar, this.naoLidas = 0});
 
   final VoidCallback? aoTocar;
+  final int naoLidas;
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
+    final icone = Icon(Icons.notifications_none, color: c.texto);
     return Semantics(
       button: true,
       label: 'Notificações',
+      value: naoLidas > 0 ? '$naoLidas não lidas' : null,
+      excludeSemantics: true,
       child: Material(
-        color: CoresTrato.superficie,
-        shape: const CircleBorder(side: BorderSide(color: CoresTrato.borda)),
+        color: c.superficie,
+        shape: CircleBorder(side: BorderSide(color: c.borda)),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: aoTocar,
-          child: const SizedBox.square(
+          child: SizedBox.square(
             dimension: 48,
-            child: Icon(Icons.notifications_none, color: CoresTrato.petroleo),
+            child: Center(
+              child: naoLidas > 0
+                  ? Badge.count(
+                      count: naoLidas,
+                      maxCount: 99,
+                      backgroundColor: c.laranja,
+                      textColor: CoresTrato.petroleo,
+                      child: icone,
+                    )
+                  : icone,
+            ),
           ),
         ),
       ),

@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'package:http/http.dart' as http;
-import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/servico_upload.dart';
-import 'package:trato/dispositivo/preparador_imagem.dart';
 import 'package:trato/dispositivo/servico_camera.dart';
 
 /// Para teste e demonstração: guarda o que "enviou" e devolve ids sequenciais.
