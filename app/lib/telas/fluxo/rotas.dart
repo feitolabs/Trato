@@ -1831,6 +1831,12 @@ abstract final class RotasTrato {
                     context,
                     FavoritosTela(
                       servico: _conta,
+                      aoBuscar: () => Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const CascaClienteTela(abaInicial: 1),
+                        ),
+                        (rota) => false,
+                      ),
                       aoAbrir: (f) => abrirPerfil(
                         context,
                         Profissional(
