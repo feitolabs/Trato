@@ -73,3 +73,9 @@ Regras já decididas antes:
 - Spam de exclusividade (custo de 100 Tratinhos, máximo de 3 ao mesmo tempo, só com pedido aberto elegível).
 - A Seguranca revisa o dinheiro, as permissões e o abuso antes de a Etapa A ser fechada.
 - Termos de cobrança, desconto e validade de moeda: vale uma revisão jurídica antes do lançamento.
+
+## Prazo de repasse e janela de disputa (decisão do João, 20/11/2026)
+- Repasse e janela de disputa em até 48 h após a conclusão. Os Tratinhos seguem em 7 dias sem disputa (prazo separado, rótulo separado no app).
+- Valores em produção antes da decisão (config v2): `prazo_congelar_disputa_horas` = 72; `prazo_liberacao_dias` = 0 (sem espera extra além da janela de disputa).
+- Mudança aprovada: `prazo_congelar_disputa_horas` 72 -> 48; `prazo_liberacao_dias` continua 0. Feita por versão nova de config (rascunho -> publicação), nunca por UPDATE em versão aprovada. Registro técnico, SQL e como desfazer: `supabase/registro-config-prazo-disputa-48h.md` (Banco).
+- O app mostra "Repasse do dinheiro: dd/mm" a partir de `proxima_liberacao_em` (B6/F12); sem a data, mantém o texto do backend.
