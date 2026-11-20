@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'apoio_conclusao.dart';
 import 'modelos.dart';
 
@@ -25,7 +26,12 @@ class ConclusaoTela extends StatelessWidget {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          BotaoPrimario(texto: 'Confirmar serviço', aoTocar: aoConfirmar ?? () {}),
+          BotaoPrimario(
+            texto: resumo.checkOutSemCodigo
+                ? 'Confirmar conclusão e liberar pagamento'
+                : 'Confirmar serviço',
+            aoTocar: aoConfirmar ?? () {},
+          ),
           const SizedBox(height: EspacosTrato.x2),
           BotaoSecundario(texto: 'Relatar problema', aoTocar: aoRelatarProblema ?? () {}),
         ],
@@ -37,9 +43,20 @@ class ConclusaoTela extends StatelessWidget {
         ),
         const SizedBox(height: EspacosTrato.x2),
         Text(
-          'Confira as fotos e o resultado antes de confirmar.',
+          resumo.checkOutSemCodigo
+              ? 'O profissional encerrou sem o código de conclusão e enviou a foto final. '
+                  'Confira antes de liberar o pagamento.'
+              : 'Confira as fotos e o resultado antes de confirmar.',
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
+        if (resumo.checkOutSemCodigo) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          const AvisoFaixa(
+            texto: 'Encerramento sem código: o pagamento só é liberado depois da sua confirmação.',
+            tipo: TipoStatus.alerta,
+            icone: Icons.info_outline,
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,22 +96,25 @@ class ConclusaoTela extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: EspacosTrato.x4),
-        CartaoTrato(
-          child: Column(
-            children: [
-              Text('Código de conclusão (libera o pagamento)', style: TipografiaTrato.tituloCartao),
-              const SizedBox(height: EspacosTrato.x4),
-              _CodigoConclusao(codigo: resumo.codigo),
-              const SizedBox(height: EspacosTrato.x4),
-              Text(
-                'Passe ao profissional só se o serviço estiver pronto, ou confirme aqui.',
-                textAlign: TextAlign.center,
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-              ),
-            ],
+        if (!resumo.checkOutSemCodigo) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          CartaoTrato(
+            child: Column(
+              children: [
+                Text('Código de conclusão (libera o pagamento)',
+                    style: TipografiaTrato.tituloCartao),
+                const SizedBox(height: EspacosTrato.x4),
+                _CodigoConclusao(codigo: resumo.codigo),
+                const SizedBox(height: EspacosTrato.x4),
+                Text(
+                  'Passe ao profissional só se o serviço estiver pronto, ou confirme aqui.',
+                  textAlign: TextAlign.center,
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: EspacosTrato.x4),
         _AvisoRelogio(texto: resumo.avisoLiberacao),
       ],

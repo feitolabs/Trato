@@ -8,6 +8,7 @@ class ServicoCheckInFake implements ServicoCheckIn {
   final String codigoCerto;
   final List<String> mensagens = [];
   final List<String> codigosEnviados = [];
+  final List<String> justificativasSemCodigo = [];
   bool clienteAusenteAvisado = false;
 
   @override
@@ -23,7 +24,15 @@ class ServicoCheckInFake implements ServicoCheckIn {
   Future<void> avisarClienteAusente() async => clienteAusenteAvisado = true;
 
   @override
-  Future<ResultadoInicio> iniciarServico(String codigo) async {
+  Future<ResultadoInicio> iniciarServico(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async {
+    if (semCodigo) {
+      justificativasSemCodigo.add(justificativa ?? '');
+      return ResultadoInicio.iniciado;
+    }
     codigosEnviados.add(codigo);
     return codigo == codigoCerto ? ResultadoInicio.iniciado : ResultadoInicio.codigoIncorreto;
   }

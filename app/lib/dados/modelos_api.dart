@@ -28,7 +28,11 @@ class PedidoApi {
     this.profissionalNome,
     this.pagamentoConfirmado = false,
     this.contratadoEm,
+    this.checkOutSemCodigo = false,
   });
+
+  /// Verdadeiro quando o profissional concluiu o check-out sem código (Plano B).
+  final bool checkOutSemCodigo;
 
   /// Quando o cliente aceitou o orçamento.
   final DateTime? contratadoEm;
@@ -79,6 +83,7 @@ class PedidoApi {
         acoesPermitidas: [for (final a in (j['acoes_permitidas'] as List)) a as String],
         codigoInicio: j['codigo_inicio'] as String?,
         codigoConclusao: j['codigo_conclusao'] as String?,
+        checkOutSemCodigo: j['check_out_sem_codigo'] == true,
       );
 
   final String id;

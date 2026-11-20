@@ -80,7 +80,8 @@ class _ServicoCheckInAusenteErro extends ServicoCheckInFake {
   }
 }
 
-Future<void> _bombearTela(WidgetTester tester, Widget widget, {Size tamanho = const Size(390, 900)}) async {
+Future<void> _bombearTela(WidgetTester tester, Widget widget,
+    {Size tamanho = const Size(390, 900)}) async {
   tester.view.physicalSize = tamanho;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -256,7 +257,8 @@ void main() {
   });
 
   group('3. Ver e editar próprio orçamento enviado antes do aceite', () {
-    test('meuOrcamento e ServicoOrcamentoApi.enviar incluem fora_do_escopo e observacoes', () async {
+    test('meuOrcamento e ServicoOrcamentoApi.enviar incluem fora_do_escopo e observacoes',
+        () async {
       final log = <(String, String, Object?, Map<String, String>)>[];
       final api = _apiFake((req) async {
         if (req.method == 'GET' && req.url.path == '/v1/orcamentos/orc-1') {
@@ -537,12 +539,14 @@ void main() {
           tituloBarra: 'Mariana · hoje, 14h',
         ),
       );
+      await tester.ensureVisible(find.text('Cliente não está no local'));
       await tester.tap(find.text('Cliente não está no local'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Voltar'));
       await tester.pumpAndSettle();
       expect(fake.clienteAusenteAvisado, isFalse);
 
+      await tester.ensureVisible(find.text('Cliente não está no local'));
       await tester.tap(find.text('Cliente não está no local'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar ausência'));

@@ -34,5 +34,9 @@ abstract interface class ServicoCheckIn {
 
   Future<void> avisarClienteAusente();
 
-  Future<ResultadoInicio> iniciarServico(String codigo);
+  Future<ResultadoInicio> iniciarServico(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  });
 }

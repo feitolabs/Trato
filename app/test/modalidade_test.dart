@@ -812,7 +812,15 @@ class _CheckOutFake implements ServicoCheckOut {
   Future<FotoChegada?> tirarFotoFinal() async => const FotoChegada(hora: '10:00');
 
   @override
-  Future<ResultadoFim> finalizar(String codigo) async => ResultadoFim.concluido;
+  Future<int?> localizar() async => 20;
+
+  @override
+  Future<ResultadoFim> finalizar(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async =>
+      ResultadoFim.concluido;
 }
 
 class _UploadFake implements ServicoUpload {

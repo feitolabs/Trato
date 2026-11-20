@@ -8,12 +8,28 @@ class ServicoCheckOutFake implements ServicoCheckOut {
   final String codigoCerto;
   final bool offline;
   final List<String> codigosEnviados = [];
+  final List<String> justificativasSemCodigo = [];
+  bool localizou = false;
 
   @override
   Future<FotoChegada?> tirarFotoFinal() async => const FotoChegada(hora: '16h40');
 
   @override
-  Future<ResultadoFim> finalizar(String codigo) async {
+  Future<int?> localizar() async {
+    localizou = true;
+    return 20;
+  }
+
+  @override
+  Future<ResultadoFim> finalizar(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async {
+    if (semCodigo) {
+      justificativasSemCodigo.add(justificativa ?? '');
+      return offline ? ResultadoFim.guardadoOffline : ResultadoFim.concluido;
+    }
     codigosEnviados.add(codigo);
     if (offline) return ResultadoFim.guardadoOffline;
     return codigo == codigoCerto ? ResultadoFim.concluido : ResultadoFim.codigoIncorreto;

@@ -52,7 +52,11 @@ class _CheckInControlado implements ServicoCheckIn {
   Future<void> avisarClienteAusente() async {}
 
   @override
-  Future<ResultadoInicio> iniciarServico(String codigo) async =>
+  Future<ResultadoInicio> iniciarServico(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async =>
       resultado ?? ResultadoInicio.iniciado;
 }
 
@@ -414,7 +418,10 @@ void main() {
   group('Novo pedido', () {
     testWidgets('foto capturada aparece como anexo', (tester) async {
       var chamadas = 0;
-      await _abrir(tester, NovoPedidoTela(formulario: formularioExemplo, aoCapturarFoto: () async => 'arq-${++chamadas}'));
+      await _abrir(
+          tester,
+          NovoPedidoTela(
+              formulario: formularioExemplo, aoCapturarFoto: () async => 'arq-${++chamadas}'));
 
       await tester.ensureVisible(find.text('Adicionar'));
       await tester.tap(find.text('Adicionar'));
