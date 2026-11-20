@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from trato.api import rotas_app
@@ -437,13 +438,21 @@ def criar_cobranca(
     request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
-) -> CobrancaContratoOut:
+) -> CobrancaContratoOut | JSONResponse:
     servico = _servico(request)
     pedido, contrato = _contrato_do_usuario(contexto, contrato_id, usuario)
     if pedido.cliente_id != usuario.id:
         raise HTTPException(403, "Só o cliente do contrato pode pagar.")
     if pedido.estado not in ESTADOS_COBRAVEIS or pedido.referencia_pagamento is not None:
         raise HTTPException(409, "O pedido não está esperando pagamento.")
+    if not contexto.usuarios.tem_cpf(usuario.id):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "Informe seu CPF para concluir o pagamento.",
+                "codigo": "cpf_obrigatorio",
+            },
+        )
     valor_servico = contrato.valor_centavos
     aplicado = None
     if corpo.cupom and corpo.cupom.strip():
@@ -1700,6 +1709,7 @@ def _perfil_out(contexto: Contexto, usuario: Usuario, request: Request | None = 
         tem_perfil_profissional=tem_perfil,
         disponivel_agora=disponivel_agora,
         status_verificacao=contexto.usuarios.status_verificacao(usuario.id) if tem_perfil else None,
+        cpf_cadastrado=contexto.usuarios.tem_cpf(usuario.id),
     )
 
 

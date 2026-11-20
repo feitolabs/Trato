@@ -123,26 +123,31 @@ class UsuariosEmMemoria:
     def cpf_disponivel(self, cpf: str) -> bool:
         return cpf not in self._cpfs
 
+    def tem_cpf(self, usuario_id: str) -> bool:
+        return usuario_id in self._cpfs.values()
+
     def registrar_dados_privados(
         self,
         usuario_id: str,
-        cpf: str,
+        cpf: str | None = None,
         telefone: str | None = None,
         data_nascimento: object | None = None,
     ) -> bool:
-        dono = self._cpfs.get(cpf)
-        if dono is not None and dono != usuario_id:
-            raise Duplicado("Este CPF já está cadastrado em outra conta.")
-        if dono == usuario_id:
-            return False
-        self._cpfs[cpf] = usuario_id
+        novo = False
+        if cpf is not None:
+            dono = self._cpfs.get(cpf)
+            if dono is not None and dono != usuario_id:
+                raise Duplicado("Este CPF já está cadastrado em outra conta.")
+            if dono != usuario_id and usuario_id not in self._cpfs.values():
+                self._cpfs[cpf] = usuario_id
+                novo = True
         if telefone:
             digitos_tel = "".join(c for c in telefone if c.isdigit())
             if digitos_tel.startswith("55") and len(digitos_tel) in (12, 13):
                 digitos_tel = digitos_tel[2:]
             if digitos_tel:
                 self._telefones[digitos_tel] = usuario_id
-        return True
+        return novo
 
     def email_por_identificador(self, digitos: str) -> str | None:
         uid = self._cpfs.get(digitos)
@@ -156,7 +161,7 @@ class UsuariosEmMemoria:
         usuario_id: str,
         email: str,
         nome: str,
-        cpf: str,
+        cpf: str | None = None,
         telefone: str | None = None,
         data_nascimento: object | None = None,
     ) -> bool:

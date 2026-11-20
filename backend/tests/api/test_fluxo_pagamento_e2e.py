@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
-from conftest import AGORA, PROFISSIONAL, Ambiente, cab, janela_futura
+from conftest import AGORA, CLIENTE, PROFISSIONAL, Ambiente, cab, janela_futura
 from fastapi.testclient import TestClient
 
 from trato.api.repositorios import Orcamento
@@ -131,6 +131,7 @@ class Fluxo:
 
 @pytest.fixture
 def fluxo(amb: Ambiente) -> Fluxo:
+    amb.contexto.usuarios.registrar_dados_privados(CLIENTE.id, "12345678909")
     fake = ProvedorFake()
     servico = ServicoPagamento(
         fake,
