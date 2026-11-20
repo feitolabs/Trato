@@ -299,6 +299,11 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
                         icone: Icons.filter_alt_off_outlined,
                         titulo: 'Nenhum resultado com esses filtros',
                         texto: 'Limpe os filtros acima para ver todos os resultados de "$_termo".',
+                        textoAcao: 'Limpar filtros',
+                        aoAcao: () => setState(() {
+                          _soHoje = false;
+                          _notaAlta = false;
+                        }),
                       ),
                     )
                   : RefreshIndicator(

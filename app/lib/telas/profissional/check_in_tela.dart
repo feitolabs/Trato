@@ -414,7 +414,7 @@ class _CartaoCodigo extends StatelessWidget {
           children: [
             Text('Código de início', style: TipografiaTrato.tituloCartao),
             const SizedBox(height: EspacosTrato.x1),
-            Text('Peça os 4 números para a cliente.', style: TipografiaTrato.legenda),
+            Text('Peça os 4 números ao cliente.', style: TipografiaTrato.legenda),
             const SizedBox(height: EspacosTrato.x4),
             TextField(
               controller: controlador,

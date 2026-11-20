@@ -14,11 +14,15 @@ class SeusPedidosTela extends StatefulWidget {
     required this.emAndamento,
     required this.finalizados,
     this.aoAbrirPedido,
+    this.aoFazerPedido,
   });
 
   final List<PedidoResumo> emAndamento;
   final List<PedidoResumo> finalizados;
   final ValueChanged<PedidoResumo>? aoAbrirPedido;
+
+  /// Ação do estado vazio de "Em andamento" (abre o novo pedido).
+  final VoidCallback? aoFazerPedido;
 
   @override
   State<SeusPedidosTela> createState() => _SeusPedidosTelaState();
@@ -96,6 +100,8 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
             texto: _verFinalizados
                 ? 'Os serviços concluídos ou cancelados aparecem aqui.'
                 : 'Toque em "Início" e peça um orçamento para começar.',
+            textoAcao: _verFinalizados || widget.aoFazerPedido == null ? null : 'Fazer um pedido',
+            aoAcao: widget.aoFazerPedido,
           )
         else if (pedidos.isEmpty)
           EstadoVazio(

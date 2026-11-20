@@ -1882,6 +1882,16 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         retidoCentavos: (saldo['a_liberar_centavos'] as num?)?.toInt() ?? 0,
         paraSacarCentavos: (saldo['liberado_centavos'] as num?)?.toInt() ?? 0,
         proximaLiberacao: DateTime.tryParse('${saldo['proxima_liberacao_em'] ?? ''}')?.toLocal(),
+        liberacoesPrevistas: [
+          for (final l in (saldo['liberacoes_previstas'] as List? ?? const []))
+            if (l is Map && l['valor_centavos'] is num)
+              LiberacaoPrevista(
+                pedidoNumero: _curto('${l['pedido_id'] ?? ''}'),
+                valorCentavos: (l['valor_centavos'] as num).toInt(),
+                liberacaoPrevistaEm:
+                    DateTime.tryParse('${l['liberacao_prevista_em'] ?? ''}')?.toLocal(),
+              ),
+        ],
       );
       deuCerto = true;
     }).catchError((Object e) {

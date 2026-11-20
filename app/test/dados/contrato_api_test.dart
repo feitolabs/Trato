@@ -591,6 +591,39 @@ void main() {
       expect(i.carteira.paraSacarCentavos, 6789);
     });
 
+    test('início lê liberacoes_previstas e proxima_liberacao_em; sem eles, vazio', () async {
+      final (api, _) = _api({
+        'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos Mendes', 'papel': 'profissional'}),
+        'GET /v1/profissional/pedidos-abertos': (200, abertos),
+        'GET /v1/profissionais/me/saldo': (
+          200,
+          {
+            'a_liberar_centavos': 1000,
+            'liberado_centavos': 0,
+            'proxima_liberacao_em': '2026-12-03T12:00:00Z',
+            'liberacoes_previstas': [
+              {'pedido_id': 'abcdef123456', 'valor_centavos': 1000, 'liberacao_prevista_em': null},
+            ],
+          },
+        ),
+        'GET /v1/pedidos': (200, <Map<String, dynamic>>[]),
+      });
+      final i = await RepositorioProfissionalApi(api).inicio();
+      expect(i.carteira.proximaLiberacao, isNotNull);
+      expect(i.carteira.liberacoesPrevistas.single.valorCentavos, 1000);
+      expect(i.carteira.liberacoesPrevistas.single.liberacaoPrevistaEm, isNull);
+
+      final (api2, _) = _api({
+        'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos Mendes', 'papel': 'profissional'}),
+        'GET /v1/profissional/pedidos-abertos': (200, abertos),
+        'GET /v1/profissionais/me/saldo': (200, {'a_liberar_centavos': 1, 'liberado_centavos': 2}),
+        'GET /v1/pedidos': (200, <Map<String, dynamic>>[]),
+      });
+      final j = await RepositorioProfissionalApi(api2).inicio();
+      expect(j.carteira.proximaLiberacao, isNull);
+      expect(j.carteira.liberacoesPrevistas, isEmpty);
+    });
+
     test('início: cadastro em análise (403) devolve emAnalise sem travar a tela', () async {
       final (api, _) = _api({
         'GET /v1/me': (200, {'id': 'p1', 'nome': 'Carlos', 'papel': 'cliente'}),

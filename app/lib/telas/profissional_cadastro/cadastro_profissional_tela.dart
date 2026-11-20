@@ -314,7 +314,7 @@ class _FormularioState extends State<_Formulario> {
                 const SizedBox(height: EspacosTrato.x2),
                 const AvisoFaixa(
                   texto:
-                      'Categorias vinculadas à sua verificação. Para atuar em novas áreas, é necessário passar por nova verificação.',
+                      'Categorias vinculadas à sua verificação. Para atuar em novas áreas, é necessário passar por nova verificação. Sem custo.',
                   tipo: TipoStatus.info,
                   icone: Icons.lock_outline,
                 ),

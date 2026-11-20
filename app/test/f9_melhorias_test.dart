@@ -175,7 +175,7 @@ void main() {
       expect(textoFaqs, contains('0% de taxa'));
       expect(textoFaqs, contains('disputa'));
 
-      expect(avisoRascunhoLegal, contains('piloto vigente'));
+      expect(avisoRascunhoLegal, equals('Documento oficial em vigor durante o piloto. Dúvidas ou exercício de direitos LGPD: privacidade@trato.app.br.'));
       expect(avisoRascunhoLegal, isNot(contains('Belo Horizonte/MG')));
     });
   });
