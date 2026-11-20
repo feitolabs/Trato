@@ -23,6 +23,30 @@ Future<void> _abrir(
 }
 
 void main() {
+  testWidgets('taxa zero: mostra só "Sem taxa", sem "bruto – taxa"', (tester) async {
+    await _abrir(
+      tester,
+      const CarteiraTela(
+        dados: DadosCarteira(
+          resumo: null,
+          extrato: [
+            ItemExtrato(
+              titulo: 'Pintura',
+              detalheData: '26/10/2026',
+              brutoCentavos: 40000,
+              textoTaxa: 'Toque para ver os valores',
+              liquidoCentavos: 40000,
+              status: StatusExtrato.liberado,
+            ),
+          ],
+        ),
+        soExtrato: true,
+      ),
+    );
+    expect(find.text('Sem taxa'), findsOneWidget);
+    expect(find.textContaining('–'), findsNothing);
+  });
+
   testWidgets('mostra saldos e extrato exatamente como vieram do dado', (tester) async {
     await _abrir(
         tester, const CarteiraTela(dados: DadosExemploCarteira.completo, soExtrato: false));
@@ -32,7 +56,7 @@ void main() {
     expect(find.text('R\$ 190,00'), findsNWidgets(3)); // a liberar + 2 líquidos
     expect(find.text('Pix na chave CPF ***.482.***-12 · cai em até 1 dia útil'), findsOneWidget);
     expect(find.text('Serviço em andamento'), findsOneWidget);
-    expect(find.text('Automático em até 48 h'), findsOneWidget);
+    expect(find.text('Repasse do dinheiro: Automático em até 48 h'), findsOneWidget);
 
     expect(find.text('Instalar 4 luminárias'), findsOneWidget);
     expect(find.text('R\$ 200,00 – R\$ 10,00 de taxa'), findsNWidgets(2));
@@ -66,7 +90,7 @@ void main() {
 
     expect(find.text('R\$ 1.000,00 – R\$ 7,00 de taxa'), findsOneWidget);
     expect(find.text('R\$ 123,45'), findsOneWidget);
-    expect(find.text('Automático em até 7 dias'), findsOneWidget);
+    expect(find.text('Repasse do dinheiro: Automático em até 7 dias'), findsOneWidget);
     expect(find.textContaining('5%'), findsNothing);
   });
 

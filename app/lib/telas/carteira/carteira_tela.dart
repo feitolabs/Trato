@@ -189,7 +189,7 @@ class _LinhaSaldos extends StatelessWidget {
               rotulo: 'A confirmar',
               cor: CoresTrato.ambarTexto,
               centavos: resumo.aLiberarCentavos,
-              texto: resumo.textoALiberar,
+              texto: 'Repasse do dinheiro: ${resumo.textoALiberar}',
             ),
           ),
         ],
@@ -373,7 +373,9 @@ class _LinhaExtrato extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                '${Dinheiro.formatar(item.brutoCentavos)} – ${item.textoTaxa}',
+                item.brutoCentavos == item.liquidoCentavos && item.textoTaxa != 'Estorno'
+                    ? 'Sem taxa'
+                    : '${Dinheiro.formatar(item.brutoCentavos)} – ${item.textoTaxa}',
                 style: secundario,
               ),
             ),

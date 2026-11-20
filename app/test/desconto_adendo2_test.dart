@@ -161,7 +161,7 @@ void main() {
       expect(find.byKey(const Key('campo-cupom')), findsNothing); // cupom oculto
       await tester.tap(find.byKey(const Key('interruptor-moedas')));
       await tester.pumpAndSettle();
-      expect(find.text('Não foi possível usar os Tratinhos agora.'), findsOneWidget);
+      expect(find.text('Sem conexão. Tente de novo.'), findsOneWidget);
       expect(find.byKey(const Key('erro-moedas')), findsOneWidget);
     });
 

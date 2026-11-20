@@ -209,6 +209,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Informe seu CPF para pagar'), findsOneWidget);
+      expect(
+        find.textContaining('Pedimos só uma vez, para emitir o recibo e proteger seu pagamento'),
+        findsOneWidget,
+      );
       await tester.enterText(find.byType(TextField).at(0), '12345678909');
       await tester.enterText(find.byType(TextField).at(1), '15031990');
       await tester.tap(find.text('Continuar pagamento'));

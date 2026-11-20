@@ -136,8 +136,9 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
               ),
               const SizedBox(height: EspacosTrato.x2),
               Text(
-                '4. Se não enviar o orçamento em até 48h, os 100 Tratinhos não voltam.',
-                style: TipografiaTrato.corpo,
+                '4. Atenção: se não enviar o orçamento em até 48h, os 100 Tratinhos NÃO voltam. '
+                'Conta como enviado quando você manda o orçamento ao cliente pelo app.',
+                style: TipografiaTrato.corpo.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: EspacosTrato.x5),
               BotaoPrimario(

@@ -97,7 +97,7 @@ void main() {
           findsOneWidget);
       expect(find.textContaining('48 horas e precisa enviar o orçamento'), findsOneWidget);
       expect(
-          find.textContaining('Se não enviar o orçamento em até 48h, os 100 Tratinhos não voltam'),
+          find.textContaining('se não enviar o orçamento em até 48h, os 100 Tratinhos NÃO voltam'),
           findsOneWidget);
 
       await tester.tap(find.text('Confirmar por 100 Tratinhos'));
@@ -329,17 +329,16 @@ void main() {
         ),
       );
 
-      expect(
-          find.text(
-              'Avaliar o cliente vale +50 Tratinhos (liberam em 7 dias se não houver disputa; 1 por cliente).'),
+      expect(find.textContaining('Avaliar o cliente vale +50 Tratinhos (1 por cliente)'),
           findsOneWidget);
+      expect(find.textContaining('Tratinhos liberados: '), findsOneWidget);
       await tester.tap(find.byIcon(Icons.star_border).last);
       await tester.pump();
       await tester.tap(find.text('Enviar avaliação'));
       await tester.pumpAndSettle();
 
       expect(
-        find.text('+50 Tratinhos a liberar em 7 dias (se não houver disputa)'),
+        find.textContaining('+50 Tratinhos a liberar em 7 dias (se não houver disputa)'),
         findsOneWidget,
       );
       expect(find.text('Continuar'), findsOneWidget);

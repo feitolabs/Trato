@@ -46,7 +46,26 @@ class ConfiguracoesTela extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x5),
         ],
         if (aoSair != null)
-          _Cartao(itens: [_Linha(icone: Icons.logout, titulo: 'Sair', aoTocar: aoSair!)]),
+          _Cartao(itens: [_Linha(icone: Icons.logout, titulo: 'Sair',
+              aoTocar: () async {
+                final sair = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Sair da conta?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Sair'),
+                      ),
+                    ],
+                  ),
+                );
+                if (sair == true) aoSair!();
+              })]),
       ],
     );
   }

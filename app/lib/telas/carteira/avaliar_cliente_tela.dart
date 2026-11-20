@@ -22,6 +22,12 @@ class AvaliarClienteTela extends StatefulWidget {
 }
 
 class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
+  /// Data (dd/mm) 7 dias depois de hoje, o prazo que o app já informa para os Tratinhos.
+  String _dataLiberacao() {
+    final d = DateTime.now().add(const Duration(days: 7));
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  }
+
   final _comentario = TextEditingController();
   var _nota = 0;
   var _enviando = false;
@@ -78,7 +84,8 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
             )
           else ...[
             Text(
-              'Avaliar o cliente vale +50 Tratinhos (liberam em 7 dias se não houver disputa; 1 por cliente).',
+              'Avaliar o cliente vale +50 Tratinhos (1 por cliente). '
+              'Tratinhos liberados: ${_dataLiberacao()} (7 dias, se não houver disputa).',
               textAlign: TextAlign.center,
               style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
@@ -114,7 +121,8 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
         if (_moedasGanhas != null && _moedasGanhas! > 0) ...[
           const SizedBox(height: EspacosTrato.x4),
           AvisoFaixa(
-            texto: '+$_moedasGanhas Tratinhos a liberar em 7 dias (se não houver disputa)',
+            texto: '+$_moedasGanhas Tratinhos a liberar em 7 dias (se não houver disputa). '
+                'Tratinhos liberados: ${_dataLiberacao()}',
             tipo: TipoStatus.sucesso,
             icone: Icons.stars_outlined,
           ),

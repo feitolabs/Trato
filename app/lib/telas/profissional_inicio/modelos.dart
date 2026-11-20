@@ -256,7 +256,7 @@ class ExclusividadeProfissional {
         'aguardando_cliente' => 'Aguardando o cliente',
         'ativa' => 'Ativa (48h)',
         'recusada' => 'Recusada',
-        'expirada_sem_resposta' => 'Sem resposta (estornada)',
+        'expirada_sem_resposta' => 'Tratinhos devolvidos',
         'concluida' => 'Concluída',
         'expirada_sem_atendimento' => 'Expirada sem orçamento',
         'cancelada' => 'Cancelada (estornada)',
