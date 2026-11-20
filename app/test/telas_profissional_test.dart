@@ -95,15 +95,18 @@ void main() {
     });
 
     testWidgets('vazio: avaliações, nota, aditivo, disputa e retrabalho', (t) async {
-      await _abrir(t, AvaliacoesRecebidasTela(servico: ServicoPerfilPublicoFake(avaliacoes: const [])));
+      await _abrir(
+          t, AvaliacoesRecebidasTela(servico: ServicoPerfilPublicoFake(avaliacoes: const [])));
       expect(find.text('Nenhuma avaliação ainda'), findsOneWidget);
       await _abrir(t, VerNotaTela(servico: ServicoNotaMaterialFake(), pedidoId: 'p'));
       expect(find.text('Nenhuma nota enviada'), findsOneWidget);
       await _abrir(t, ResponderAditivoTela(servico: ServicoAditivoFake(), aditivoId: 'a'));
       expect(find.text('Nenhum aditivo'), findsOneWidget);
-      await _abrir(t, ResponderDisputaTela(servico: ServicoDisputaProfissionalFake(), disputaId: 'd'));
+      await _abrir(
+          t, ResponderDisputaTela(servico: ServicoDisputaProfissionalFake(), disputaId: 'd'));
       expect(find.text('Nenhum problema aberto'), findsOneWidget);
-      await _abrir(t, AtenderRetrabalhoTela(servico: ServicoDisputaProfissionalFake(), disputaId: 'd'));
+      await _abrir(
+          t, AtenderRetrabalhoTela(servico: ServicoDisputaProfissionalFake(), disputaId: 'd'));
       expect(find.text('Sem retrabalho para agendar'), findsOneWidget);
       await _abrir(
         t,
@@ -293,10 +296,11 @@ void main() {
       expect(find.text('Para que usamos'), findsOneWidget);
       expect(find.text('Por quanto tempo guardamos'), findsOneWidget);
       expect(find.textContaining('Não é garantia'), findsNothing);
-      expect(find.textContaining('não garante'), findsOneWidget);
+      expect(find.textContaining('pagamento protegido no app'), findsOneWidget);
       expect(find.textContaining('seguro'), findsNothing);
 
-      FilledButton botao() => t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Enviar para análise'));
+      FilledButton botao() =>
+          t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Enviar para análise'));
       expect(botao().onPressed, isNull);
       await _tocar(t, find.text('Foto do documento'));
       await _tocar(t, find.text('Selfie segurando o documento'));
@@ -361,7 +365,8 @@ void main() {
           aoCapturarFoto: () async => 'nota-1',
         ),
       );
-      FilledButton botao() => t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Enviar nota ao cliente'));
+      FilledButton botao() =>
+          t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Enviar nota ao cliente'));
       expect(botao().onPressed, isNull);
 
       await _tocar(t, find.text('Adicionar item'));
@@ -427,9 +432,7 @@ void main() {
           .dx;
       for (final valor in ['R\$ 100,00']) {
         expect(
-          t
-              .getTopRight(find.descendant(of: cartaoResumo, matching: find.text(valor)))
-              .dx,
+          t.getTopRight(find.descendant(of: cartaoResumo, matching: find.text(valor))).dx,
           closeTo(direitaResumo, 0.5),
           reason: valor,
         );
@@ -514,7 +517,8 @@ void main() {
         t,
         AtenderRetrabalhoTela(servico: fake, disputaId: 'disp-1', aoAgendado: (h) => agendado = h),
       );
-      FilledButton botao() => t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Confirmar horário'));
+      FilledButton botao() =>
+          t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Confirmar horário'));
       expect(botao().onPressed, isNull);
       await _tocar(t, find.text('Sex, 06/11 · manhã'));
       await _tocar(t, find.text('Confirmar horário'));
@@ -551,17 +555,19 @@ void main() {
       'cadastro': () => CadastroProfissionalTela(servico: ServicoCadastroProfissionalFake()),
       'verificacao': () => VerificacaoTela(servico: ServicoVerificacaoFake()),
       'enviar nota': () => EnviarNotaTela(
-          servico: ServicoNotaMaterialFake(), pedidoId: 'p', tituloPedido: 'Troca de tomadas e chuveiro'),
-      'ver nota': () => VerNotaTela(
-          servico: ServicoNotaMaterialFake(nota: notaMaterialExemplo), pedidoId: 'p'),
+          servico: ServicoNotaMaterialFake(),
+          pedidoId: 'p',
+          tituloPedido: 'Troca de tomadas e chuveiro'),
+      'ver nota': () =>
+          VerNotaTela(servico: ServicoNotaMaterialFake(nota: notaMaterialExemplo), pedidoId: 'p'),
       'criar aditivo': () => CriarAditivoTela(
             servico: ServicoAditivoFake(),
             servicoLiquido: ServicoOrcamentoFake(),
             pedidoId: 'p',
             tituloPedido: 'Troca de tomadas e chuveiro',
           ),
-      'responder aditivo': () =>
-          ResponderAditivoTela(servico: ServicoAditivoFake(detalhe: aditivoExemplo), aditivoId: 'a'),
+      'responder aditivo': () => ResponderAditivoTela(
+          servico: ServicoAditivoFake(detalhe: aditivoExemplo), aditivoId: 'a'),
       'responder disputa': () => ResponderDisputaTela(
           servico: ServicoDisputaProfissionalFake(disputa: disputaExemplo), disputaId: 'd'),
       'retrabalho': () => AtenderRetrabalhoTela(

@@ -83,7 +83,7 @@ class ConclusaoTela extends StatelessWidget {
         CartaoTrato(
           child: Column(
             children: [
-              Text('Código de conclusão', style: TipografiaTrato.tituloCartao),
+              Text('Código de conclusão (libera o pagamento)', style: TipografiaTrato.tituloCartao),
               const SizedBox(height: EspacosTrato.x4),
               _CodigoConclusao(codigo: resumo.codigo),
               const SizedBox(height: EspacosTrato.x4),

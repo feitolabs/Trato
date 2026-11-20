@@ -47,12 +47,16 @@ void main() {
     var relatou = false;
     await _abrir(
       tester,
-      ConclusaoTela(resumo: resumoConclusaoExemplo, aoConfirmar: () => confirmou = true, aoRelatarProblema: () => relatou = true),
+      ConclusaoTela(
+          resumo: resumoConclusaoExemplo,
+          aoConfirmar: () => confirmou = true,
+          aoRelatarProblema: () => relatou = true),
     );
     expect(find.text('R\$ 425,00'), findsOneWidget);
     for (final d in '7305'.split('')) {
       expect(find.text(d), findsOneWidget);
     }
+    expect(find.text('Código de conclusão (libera o pagamento)'), findsOneWidget);
     expect(find.textContaining('Confirmação automática em 48 horas'), findsOneWidget);
     await tester.tap(find.text('Confirmar serviço'));
     await tester.tap(find.text('Relatar problema'));
@@ -90,7 +94,8 @@ void main() {
     });
 
     testWidgets('notas iniciais aparecem com estrelas cheias', (tester) async {
-      await _abrir(tester, const AvaliacaoTela(dados: dadosAvaliacaoExemplo, notasIniciais: [5, 5, 4, 5, 0]));
+      await _abrir(tester,
+          const AvaliacaoTela(dados: dadosAvaliacaoExemplo, notasIniciais: [5, 5, 4, 5, 0]));
       expect(find.byIcon(Icons.star), findsNWidgets(19));
       expect(find.byIcon(Icons.star_border), findsNWidgets(6));
     });
@@ -151,7 +156,12 @@ void main() {
     });
 
     testWidgets('mostra valor congelado e prazo recebidos', (tester) async {
-      await _abrir(tester, const RelatarProblemaTela(dados: dadosRelatoExemplo, ), tamanho: const Size(390, 2400));
+      await _abrir(
+          tester,
+          const RelatarProblemaTela(
+            dados: dadosRelatoExemplo,
+          ),
+          tamanho: const Size(390, 2400));
       expect(find.textContaining('R\$ 220,00'), findsOneWidget);
       expect(find.textContaining('48 horas para responder'), findsOneWidget);
     });
@@ -203,9 +213,12 @@ void main() {
     'tablet 768x1024': Size(768, 1024),
   };
   final telas = <String, Widget>{
-    'conclusão': const ConclusaoTela(resumo: resumoConclusaoExemplo, ),
+    'conclusão': const ConclusaoTela(
+      resumo: resumoConclusaoExemplo,
+    ),
     'avaliação': const AvaliacaoTela(dados: dadosAvaliacaoExemplo, notasIniciais: [5, 5, 4, 5, 0]),
-    'relatar problema': const RelatarProblemaTela(dados: dadosRelatoExemplo, motivoInicial: 'Dano no local'),
+    'relatar problema':
+        const RelatarProblemaTela(dados: dadosRelatoExemplo, motivoInicial: 'Dano no local'),
     'garantia': GarantiaTela(dados: dadosGarantiaExemplo),
   };
   for (final MapEntry(key: nomeTela, value: tela) in telas.entries) {
