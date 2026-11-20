@@ -60,6 +60,8 @@ class NovoPedidoTela extends StatefulWidget {
   State<NovoPedidoTela> createState() => _NovoPedidoTelaState();
 }
 
+enum _ModoPrazo { flexivel, dataLimite, urgente }
+
 class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late final Set<String> _servicos = {...widget.formulario.servicosIniciais};
 
@@ -85,29 +87,23 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   }
 
   String? _erroPergunta(PerguntaPedido q) =>
-      _tentou && q.obrigatoria && !_respondida(q)
-          ? 'Responda esta pergunta.'
-          : null;
+      _tentou && q.obrigatoria && !_respondida(q) ? 'Responda esta pergunta.' : null;
 
-  bool get _perguntasOk => widget.formulario.perguntas
-      .every((q) => !q.obrigatoria || _respondida(q));
+  bool get _perguntasOk =>
+      widget.formulario.perguntas.every((q) => !q.obrigatoria || _respondida(q));
 
   Map<String, Object> get _respostasParaEnviar => {
         for (final q in widget.formulario.perguntas)
           if (_respondida(q))
-            q.id: q.tipo == 'texto'
-                ? _textos[q.id]!.text.trim()
-                : _respostas[q.id]!,
+            q.id: q.tipo == 'texto' ? _textos[q.id]!.text.trim() : _respostas[q.id]!,
       };
   late int _quantidade = widget.formulario.quantidadeInicial;
   late String _voltagem = widget.formulario.voltagemInicial;
 
-  /// `false` = prazo flexível (padrão); `true` = data limite específica.
-  bool _comPressa = false;
+  _ModoPrazo _modoPrazo = _ModoPrazo.flexivel;
   late DateTime _dataPrazo = _agora().add(const Duration(days: 7));
   late FaixaPreco _faixa = widget.formulario.faixas.first;
-  late final _descricao =
-      TextEditingController(text: widget.formulario.descricaoInicial);
+  late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
   final _controladorValorProprio = TextEditingController();
   bool _informarValorProprio = false;
   String? _erroValor;
@@ -145,8 +141,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   final _cep = TextEditingController();
   final _referencia = TextEditingController();
 
-  bool get _presencial =>
-      !widget.formulario.aceitaRemoto || _modalidade == Modalidade.presencial;
+  bool get _presencial => !widget.formulario.aceitaRemoto || _modalidade == Modalidade.presencial;
 
   /// Rua, número, bairro e CEP são obrigatórios no presencial: sem eles o profissional contratado
   /// não sabe aonde ir.
@@ -183,9 +178,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   void _aplicarEnderecoSalvo(EnderecoSalvo end, {bool atualizarEstado = true}) {
     void preencher() {
       final digitos = end.cep.replaceAll(RegExp(r'\D'), '');
-      _cep.text = digitos.length == 8
-          ? '${digitos.substring(0, 5)}-${digitos.substring(5)}'
-          : end.cep;
+      _cep.text =
+          digitos.length == 8 ? '${digitos.substring(0, 5)}-${digitos.substring(5)}' : end.cep;
       _rua.text = end.logradouro;
       _numero.text = end.numero;
       _complemento.text = end.complemento ?? '';
@@ -219,11 +213,15 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     });
   }
 
-  void _selecionarPressa(bool comPressa) {
+  void _selecionarModoPrazo(_ModoPrazo modo) {
     setState(() {
-      _comPressa = comPressa;
+      _modoPrazo = modo;
       final hoje = _agora();
-      _dataPrazo = hoje.add(Duration(days: comPressa ? 2 : 7));
+      _dataPrazo = switch (modo) {
+        _ModoPrazo.flexivel => hoje.add(const Duration(days: 7)),
+        _ModoPrazo.dataLimite => hoje.add(const Duration(days: 2)),
+        _ModoPrazo.urgente => hoje,
+      };
     });
   }
 
@@ -240,7 +238,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       initialDate: _dataPrazo,
       firstDate: inicio,
       lastDate: inicio.add(const Duration(days: 365)),
-      helpText: _comPressa
+      helpText: _modoPrazo == _ModoPrazo.dataLimite
           ? 'Escolha a data limite'
           : 'Sugira uma data aproximada',
     );
@@ -249,9 +247,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
 
   bool get _exigeCidade => widget.formulario.cidades.isNotEmpty;
 
-  String? get _erroCidade => _tentou && _exigeCidade && _cidade == null
-      ? 'Escolha a cidade onde será o serviço.'
-      : null;
+  String? get _erroCidade =>
+      _tentou && _exigeCidade && _cidade == null ? 'Escolha a cidade onde será o serviço.' : null;
 
   Future<void> _escolherCidade() async {
     final escolhida = await showModalBottomSheet<CidadeOpcao>(
@@ -268,15 +265,12 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 EspacosTrato.x4,
                 EspacosTrato.x2,
               ),
-              child:
-                  Text('Onde será o serviço?', style: TipografiaTrato.titulo),
+              child: Text('Onde será o serviço?', style: TipografiaTrato.titulo),
             ),
             for (final c in widget.formulario.cidades)
               ListTile(
                 leading: Icon(
-                  c.id == _cidade?.id
-                      ? Icons.check_circle
-                      : Icons.location_city_outlined,
+                  c.id == _cidade?.id ? Icons.check_circle : Icons.location_city_outlined,
                   color: CoresTrato.petroleo,
                 ),
                 title: Text(c.rotulo),
@@ -328,8 +322,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     super.dispose();
   }
 
-  bool get _podeAdicionarFoto =>
-      widget.aoCapturarFoto != null || widget.aoAdicionarFoto != null;
+  bool get _podeAdicionarFoto => widget.aoCapturarFoto != null || widget.aoAdicionarFoto != null;
 
   Future<void> _adicionarFoto() async {
     final captura = widget.aoCapturarFoto;
@@ -341,9 +334,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   String? get _erroServicos =>
       _tentou && _servicos.isEmpty ? 'Escolha pelo menos um serviço.' : null;
 
-  String? get _erroDescricao => _tentou && _descricao.text.trim().isEmpty
-      ? 'Descreva o que precisa ser feito.'
-      : null;
+  String? get _erroDescricao =>
+      _tentou && _descricao.text.trim().isEmpty ? 'Descreva o que precisa ser feito.' : null;
 
   Future<void> _enviar() async {
     if (_enviando) return;
@@ -383,8 +375,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 key: _keyPerguntas[q.id]!,
                 temErro: () => !_respondida(q),
               ),
-        if (!_temPerguntas)
-          EntradaCampoErro(key: _keyServicos, temErro: () => _servicos.isEmpty),
+        if (!_temPerguntas) EntradaCampoErro(key: _keyServicos, temErro: () => _servicos.isEmpty),
         EntradaCampoErro(
           key: _keyDescricao,
           focusNode: _focoDescricao,
@@ -396,8 +387,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             focusNode: _focoValorProprio,
             temErro: () => _erroValor != null,
           ),
-        if (_exigeCidade)
-          EntradaCampoErro(key: _keyCidade, temErro: () => _cidade == null),
+        if (_exigeCidade) EntradaCampoErro(key: _keyCidade, temErro: () => _cidade == null),
         if (_presencial) ...[
           EntradaCampoErro(
             key: _keyCep,
@@ -436,9 +426,13 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       quantidade: _quantidade,
       voltagem: _voltagem,
       descricao: _descricao.text.trim(),
-      prazo: '${_comPressa ? 'Urgente' : 'Flexível'} · ${_formatarData(_dataPrazo)}',
+      prazo: switch (_modoPrazo) {
+        _ModoPrazo.flexivel => 'Flexível · ${_formatarData(_dataPrazo)}',
+        _ModoPrazo.dataLimite => 'Data limite · ${_formatarData(_dataPrazo)}',
+        _ModoPrazo.urgente => 'Urgente · ${_formatarData(_dataPrazo)}',
+      },
       prazoDesejado: _dataPrazo,
-      urgente: _comPressa,
+      urgente: _modoPrazo == _ModoPrazo.urgente,
       faixa: _faixa,
       fotos: List.of(_fotosNovas),
       categoriaId: widget.formulario.categoriaId,
@@ -466,17 +460,15 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     }
   }
 
-  static String _rotuloFaixa(FaixaPreco f) =>
-      f.minimoCentavos == f.maximoCentavos
-          ? formatarReais(f.minimoCentavos)
-          : '${formatarReais(f.minimoCentavos).replaceAll(',00', '')} a '
-              '${formatarReais(f.maximoCentavos).replaceAll(',00', '')}';
+  static String _rotuloFaixa(FaixaPreco f) => f.minimoCentavos == f.maximoCentavos
+      ? formatarReais(f.minimoCentavos)
+      : '${formatarReais(f.minimoCentavos).replaceAll(',00', '')} a '
+          '${formatarReais(f.maximoCentavos).replaceAll(',00', '')}';
 
   @override
   Widget build(BuildContext context) {
     final f = widget.formulario;
-    final secundario = TipografiaTrato.corpoPequeno
-        .copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     return EstruturaPedido(
       scrollController: _scroll,
       tituloBarra: 'Novo pedido',
@@ -563,9 +555,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                       ChipOpcao(
                         texto: s,
                         marcado: _servicos.contains(s),
-                        aoTocar: () => setState(() => _servicos.contains(s)
-                            ? _servicos.remove(s)
-                            : _servicos.add(s)),
+                        aoTocar: () => setState(
+                            () => _servicos.contains(s) ? _servicos.remove(s) : _servicos.add(s)),
                       ),
                   ],
                 ),
@@ -580,16 +571,13 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(f.perguntaQuantidade,
-                        style: TipografiaTrato.corpoForte),
+                    Text(f.perguntaQuantidade, style: TipografiaTrato.corpoForte),
                     Text(f.dicaQuantidade, style: secundario),
                   ],
                 ),
               ),
               const SizedBox(width: EspacosTrato.x3),
-              _Contador(
-                  valor: _quantidade,
-                  aoMudar: (v) => setState(() => _quantidade = v)),
+              _Contador(valor: _quantidade, aoMudar: (v) => setState(() => _quantidade = v)),
             ],
           ),
         ],
@@ -671,32 +659,45 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             Expanded(
               child: _OpcaoRadio(
                 texto: 'Flexível (sem data fixa)',
-                marcada: _comPressa == false,
-                aoTocar: () => _selecionarPressa(false),
+                marcada: _modoPrazo == _ModoPrazo.flexivel,
+                aoTocar: () => _selecionarModoPrazo(_ModoPrazo.flexivel),
               ),
             ),
             const SizedBox(width: EspacosTrato.x2),
             Expanded(
               child: _OpcaoRadio(
                 texto: 'Tenho data limite',
-                marcada: _comPressa == true,
-                aoTocar: () => _selecionarPressa(true),
+                marcada: _modoPrazo == _ModoPrazo.dataLimite,
+                aoTocar: () => _selecionarModoPrazo(_ModoPrazo.dataLimite),
               ),
             ),
           ],
         ),
-        const SizedBox(height: EspacosTrato.x3),
-        Text(
-          _comPressa
-              ? 'Escolha a data máxima para o serviço:'
-              : 'Se quiser, sugira uma data aproximada:',
-          style: secundario,
-        ),
         const SizedBox(height: EspacosTrato.x2),
-        BotaoSecundario(
-          texto: _formatarData(_dataPrazo),
-          aoTocar: _escolherDataPrazo,
+        _OpcaoRadio(
+          texto: 'É urgente (para hoje)',
+          marcada: _modoPrazo == _ModoPrazo.urgente,
+          aoTocar: () => _selecionarModoPrazo(_ModoPrazo.urgente),
         ),
+        const SizedBox(height: EspacosTrato.x3),
+        if (_modoPrazo == _ModoPrazo.urgente)
+          Text(
+            'Pedidos urgentes vão direto para atendimento rápido e não usam reserva de 48h.',
+            style: secundario,
+          )
+        else ...[
+          Text(
+            _modoPrazo == _ModoPrazo.dataLimite
+                ? 'Escolha a data máxima para o serviço:'
+                : 'Se quiser, sugira uma data aproximada:',
+            style: secundario,
+          ),
+          const SizedBox(height: EspacosTrato.x2),
+          BotaoSecundario(
+            texto: _formatarData(_dataPrazo),
+            aoTocar: _escolherDataPrazo,
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         const RotuloSecao('Quanto pensa gastar?'),
         const SizedBox(height: EspacosTrato.x3),
@@ -710,8 +711,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                   setState(() {
                     _informarValorProprio = false;
                     _erroValor = null;
-                    if (_faixa.minimoCentavos == _faixa.maximoCentavos &&
-                        f.faixas.isNotEmpty) {
+                    if (_faixa.minimoCentavos == _faixa.maximoCentavos && f.faixas.isNotEmpty) {
                       _faixa = f.faixas.first;
                     }
                   });
@@ -729,8 +729,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                     if (_controladorValorProprio.text.trim().isNotEmpty) {
                       final c = _lerCentavos(_controladorValorProprio.text);
                       if (c != null && c > 0) {
-                        _faixa =
-                            FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+                        _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
                       }
                     }
                   });
@@ -762,8 +761,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
               ],
               erro: _tentou ? _erroValor : null,
-              ajuda:
-                  'Os profissionais receberão o seu valor como estimativa inicial.',
+              ajuda: 'Os profissionais receberão o seu valor como estimativa inicial.',
               aoMudar: (v) {
                 final c = _lerCentavos(v);
                 setState(() {
@@ -816,8 +814,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.location_on_outlined,
-                        color: CoresTrato.petroleo),
+                    const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
                     const SizedBox(width: EspacosTrato.x3),
                     Expanded(
                       child: Column(
@@ -832,8 +829,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down,
-                        color: CoresTrato.petroleo),
+                    const Icon(Icons.keyboard_arrow_down, color: CoresTrato.petroleo),
                   ],
                 ),
               ),
@@ -844,8 +840,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.location_on_outlined,
-                    color: CoresTrato.petroleo),
+                const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
                   child: Column(
@@ -853,13 +848,9 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                     children: [
                       Row(
                         children: [
-                          Expanded(
-                              child: Text(f.endereco,
-                                  style: TipografiaTrato.corpoForte)),
+                          Expanded(child: Text(f.endereco, style: TipografiaTrato.corpoForte)),
                           if (widget.aoMudarEndereco != null)
-                            BotaoLink(
-                                texto: 'Mudar',
-                                aoTocar: widget.aoMudarEndereco),
+                            BotaoLink(texto: 'Mudar', aoTocar: widget.aoMudarEndereco),
                         ],
                       ),
                       Text(f.avisoEndereco, style: secundario),
@@ -983,9 +974,8 @@ class _MensagemErro extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: EspacosTrato.x2),
-        child: Text(texto,
-            style: TipografiaTrato.legenda
-                .copyWith(color: CoresTrato.vermelhoTexto)),
+        child:
+            Text(texto, style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto)),
       );
 }
 
@@ -1014,8 +1004,7 @@ class _Contador extends StatelessWidget {
           ),
           SizedBox(
             width: EspacosTrato.x6,
-            child: Text('$valor',
-                textAlign: TextAlign.center, style: TipografiaTrato.corpoForte),
+            child: Text('$valor', textAlign: TextAlign.center, style: TipografiaTrato.corpoForte),
           ),
           IconButton(
             tooltip: 'Aumentar',
@@ -1029,8 +1018,7 @@ class _Contador extends StatelessWidget {
 }
 
 class _OpcaoRadio extends StatelessWidget {
-  const _OpcaoRadio(
-      {required this.texto, required this.marcada, required this.aoTocar});
+  const _OpcaoRadio({required this.texto, required this.marcada, required this.aoTocar});
 
   final String texto;
   final bool marcada;
@@ -1065,9 +1053,7 @@ class _OpcaoRadio extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    marcada
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
+                    marcada ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                     size: EspacosTrato.x4,
                     color: CoresTrato.petroleo,
                   ),
@@ -1106,9 +1092,7 @@ class _FotoReservada extends StatelessWidget {
         aspectRatio: 1,
         child: Container(
           clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
-          padding: imagemReal != null
-              ? EdgeInsets.zero
-              : const EdgeInsets.all(EspacosTrato.x2),
+          padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
           alignment: Alignment.bottomLeft,
           decoration: BoxDecoration(
             color: CoresTrato.azulClaro,
@@ -1123,8 +1107,7 @@ class _FotoReservada extends StatelessWidget {
                       left: 6,
                       bottom: 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: CoresTrato.overlayFoto,
                           borderRadius: BorderRadius.circular(4),
@@ -1204,8 +1187,7 @@ class _AdicionarFoto extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.photo_camera_outlined,
-                        color: CoresTrato.petroleo),
+                    const Icon(Icons.photo_camera_outlined, color: CoresTrato.petroleo),
                     const SizedBox(height: EspacosTrato.x2),
                     Text('Adicionar', style: TipografiaTrato.corpoForte),
                   ],
@@ -1224,8 +1206,7 @@ class _BordaTracejada extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final caminho = Path()
       ..addRRect(
-        RRect.fromRectAndRadius(
-            Offset.zero & size, const Radius.circular(EspacosTrato.raio)),
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(EspacosTrato.raio)),
       );
     final pintura = Paint()
       ..color = CoresTrato.borda
@@ -1271,14 +1252,12 @@ class _CampoLista<T> extends StatelessWidget {
         DropdownButtonFormField<T>(
           initialValue: valor,
           isExpanded: true,
-          style:
-              TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo),
           items: [
             for (final o in opcoes)
               DropdownMenuItem<T>(
                 value: o,
-                child: Text(texto(o),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                child: Text(texto(o), maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
           ],
           onChanged: (v) {
@@ -1337,9 +1316,7 @@ class _PerguntaCategoria extends StatelessWidget {
                 texto: o,
                 marcado: resposta is List && (resposta! as List).contains(o),
                 aoTocar: () {
-                  final atual = [
-                    ...(resposta is List ? resposta! as List : const [])
-                  ];
+                  final atual = [...(resposta is List ? resposta! as List : const [])];
                   atual.contains(o) ? atual.remove(o) : atual.add(o);
                   aoMudar(atual.isEmpty
                       ? null

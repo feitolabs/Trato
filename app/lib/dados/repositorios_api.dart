@@ -663,6 +663,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       aditivoCentavos: aditivosPagos,
       codigo: pedido.codigoConclusao ?? '',
       avisoLiberacao: ConfigPublica.atual.textoLiberacao,
+      checkOutSemCodigo: pedido.checkOutSemCodigo,
     );
   }
 
@@ -2712,13 +2713,27 @@ class ServicoCheckInApi implements ServicoCheckIn {
         a.tipo == TipoAcaoOffline.checkIn ? FinalidadeArquivo.checkIn : FinalidadeArquivo.checkOut;
     final foto = await _enviada(a.foto, fin);
     final posicao = a.posicao;
+    final justificativaLimpa = a.justificativa?.trim() ?? '';
     final Map<String, Object?> prova = a.tipo == TipoAcaoOffline.checkIn
         ? {
             'foto': _fotoJson(foto),
             'localizacao': {'latitude': posicao!.latitude, 'longitude': posicao.longitude},
-            'codigo_inicio': a.codigo,
+            if (a.semCodigo) ...{
+              'sem_codigo': true,
+              if (justificativaLimpa.isNotEmpty) 'justificativa': justificativaLimpa,
+            } else
+              'codigo_inicio': a.codigo,
           }
-        : {'foto_final': _fotoJson(foto), 'codigo_conclusao': a.codigo};
+        : {
+            'foto_final': _fotoJson(foto),
+            if (posicao != null)
+              'localizacao': {'latitude': posicao.latitude, 'longitude': posicao.longitude},
+            if (a.semCodigo) ...{
+              'sem_codigo': true,
+              if (justificativaLimpa.isNotEmpty) 'justificativa': justificativaLimpa,
+            } else
+              'codigo_conclusao': a.codigo,
+          };
     // Quando a prova foi feita sem internet, o servidor recebe a hora do aparelho como dica
     // (`offline_capturada_em`). A hora que vale é sempre a do servidor.
     if (tardio || a.foto.pendente) {
@@ -2745,10 +2760,24 @@ class ServicoCheckInApi implements ServicoCheckIn {
   }
 
   @override
-  Future<ResultadoInicio> iniciarServico(String codigo) async {
+  Future<ResultadoInicio> iniciarServico(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async {
     if (remoto) {
       try {
-        await _postarSoComCodigo('fazer_check_in', 'codigo_inicio', codigo);
+        if (semCodigo) {
+          final motivo = justificativa?.trim() ?? '';
+          await _api.post('/v1/pedidos/$pedidoId/acoes/fazer_check_in', corpo: {
+            'prova': {
+              'sem_codigo': true,
+              if (motivo.isNotEmpty) 'justificativa': motivo,
+            },
+          });
+        } else {
+          await _postarSoComCodigo('fazer_check_in', 'codigo_inicio', codigo);
+        }
         return ResultadoInicio.iniciado;
       } on ErroTrato catch (erro) {
         if (erro.tipo == TipoErro.recusado) return ResultadoInicio.codigoIncorreto;
@@ -2769,6 +2798,8 @@ class ServicoCheckInApi implements ServicoCheckIn {
       codigo: codigo,
       foto: foto,
       posicao: posicao,
+      semCodigo: semCodigo,
+      justificativa: justificativa,
     );
     try {
       await _postar(acao, tardio: false);
@@ -2788,15 +2819,39 @@ class ServicoCheckInApi implements ServicoCheckIn {
   /// Check-out: foto final e código de conclusão que o cliente informa. Devolve `false` se
   /// ficou guardado para enviar quando a internet voltar.
   /// Check-out remoto: só o código de conclusão. Devolve sempre `true` (sem fila offline).
-  Future<bool> fazerCheckOutRemoto(String codigo) =>
-      _postarSoComCodigo('fazer_check_out', 'codigo_conclusao', codigo);
+  Future<bool> fazerCheckOutRemoto(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async {
+    if (!semCodigo) {
+      return _postarSoComCodigo('fazer_check_out', 'codigo_conclusao', codigo);
+    }
+    final motivo = justificativa?.trim() ?? '';
+    await _api.post('/v1/pedidos/$pedidoId/acoes/fazer_check_out', corpo: {
+      'prova': {
+        'sem_codigo': true,
+        if (motivo.isNotEmpty) 'justificativa': motivo,
+      },
+    });
+    return true;
+  }
 
-  Future<bool> fazerCheckOut({required FotoCapturada fotoFinal, required String codigo}) async {
+  Future<bool> fazerCheckOut({
+    required FotoCapturada fotoFinal,
+    required String codigo,
+    PosicaoCapturada? posicao,
+    bool semCodigo = false,
+    String? justificativa,
+  }) async {
     final acao = AcaoOffline(
       pedidoId: pedidoId,
       tipo: TipoAcaoOffline.checkOut,
       codigo: codigo,
       foto: fotoFinal,
+      posicao: posicao,
+      semCodigo: semCodigo,
+      justificativa: justificativa,
     );
     try {
       await _postar(acao, tardio: false);
@@ -2848,10 +2903,21 @@ class ServicoCheckOutApi implements ServicoCheckOut {
   }
 
   @override
-  Future<ResultadoFim> finalizar(String codigo) async {
+  Future<int?> localizar() => _checkIn.localizar();
+
+  @override
+  Future<ResultadoFim> finalizar(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) async {
     if (_checkIn.remoto) {
       try {
-        await _checkIn.fazerCheckOutRemoto(codigo);
+        await _checkIn.fazerCheckOutRemoto(
+          codigo,
+          semCodigo: semCodigo,
+          justificativa: justificativa,
+        );
         return ResultadoFim.concluido;
       } on ErroTrato catch (erro) {
         if (erro.tipo == TipoErro.recusado) return ResultadoFim.codigoIncorreto;
@@ -2862,8 +2928,21 @@ class ServicoCheckOutApi implements ServicoCheckOut {
     if (foto == null) {
       throw const ErroTrato(TipoErro.recusado, 'Tire a foto final antes de concluir.');
     }
+    final posicao = _checkIn._posicao;
+    if (semCodigo && posicao == null) {
+      throw const ErroTrato(
+        TipoErro.recusado,
+        'Registre a localização antes de encerrar sem código.',
+      );
+    }
     try {
-      final enviado = await _checkIn.fazerCheckOut(fotoFinal: foto, codigo: codigo);
+      final enviado = await _checkIn.fazerCheckOut(
+        fotoFinal: foto,
+        codigo: codigo,
+        posicao: semCodigo ? posicao : null,
+        semCodigo: semCodigo,
+        justificativa: justificativa,
+      );
       return enviado ? ResultadoFim.concluido : ResultadoFim.guardadoOffline;
     } on ErroTrato catch (erro) {
       if (erro.tipo == TipoErro.recusado) return ResultadoFim.codigoIncorreto;

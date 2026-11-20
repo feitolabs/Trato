@@ -41,5 +41,10 @@ class ServicoCheckInDispositivo implements ServicoCheckIn {
   Future<void> avisarClienteAusente() => base.avisarClienteAusente();
 
   @override
-  Future<ResultadoInicio> iniciarServico(String codigo) => base.iniciarServico(codigo);
+  Future<ResultadoInicio> iniciarServico(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  }) =>
+      base.iniciarServico(codigo, semCodigo: semCodigo, justificativa: justificativa);
 }

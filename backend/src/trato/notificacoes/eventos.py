@@ -31,6 +31,7 @@ class Evento(StrEnum):
     PAGAMENTO_CONFIRMADO = "pagamento.confirmado"
     LEMBRETE_AGENDAMENTO = "agenda.lembrete"
     CODIGO_INICIO = "agenda.codigo_inicio"
+    CHECK_IN_SEM_CODIGO = "agenda.check_in_sem_codigo"
     CLIENTE_AUSENTE = "agenda.cliente_ausente"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
     ADITIVO_PENDENTE = "execucao.aditivo_pendente"
@@ -103,6 +104,14 @@ MODELOS: dict[Evento, ModeloEvento] = {
         Categoria.AGENDA,
         "Código de início disponível",
         "Abra o pedido para ver o código que o profissional vai pedir na chegada.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.CHECK_IN_SEM_CODIGO: ModeloEvento(
+        Categoria.AGENDA,
+        "Serviço iniciado sem código",
+        "O profissional iniciou o serviço sem o código e registrou foto, localização e "
+        "justificativa.",
         "pedido",
         essencial=True,
     ),

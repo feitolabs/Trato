@@ -159,6 +159,26 @@ def avisar_pedido_urgente(
         log.exception("Aviso de pedido urgente falhou")
 
 
+def avisar_check_in_sem_codigo(
+    request: Request,
+    contexto: Contexto,
+    *,
+    pedido_id: str,
+    cliente_id: str,
+) -> None:
+    """Avisa o cliente que o profissional iniciou o serviço usando o Plano B (sem código)."""
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        servico.notificar(
+            Evento.CHECK_IN_SEM_CODIGO,
+            cliente_id,
+            chave=f"check-in-sem-codigo:{pedido_id}",
+            pedido_id=pedido_id,
+        )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de check-in sem código falhou")
+
+
 def _hora_local(instante: datetime | None) -> str:
     if instante is None:
         return "o fim do prazo"

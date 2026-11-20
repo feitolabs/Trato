@@ -11,6 +11,8 @@ class AcaoOffline {
     required this.codigo,
     required this.foto,
     this.posicao,
+    this.semCodigo = false,
+    this.justificativa,
   });
 
   final String pedidoId;
@@ -18,6 +20,8 @@ class AcaoOffline {
   final String codigo;
   final FotoCapturada foto;
   final PosicaoCapturada? posicao;
+  final bool semCodigo;
+  final String? justificativa;
 }
 
 /// Fila de ações para enviar quando a internet voltar.

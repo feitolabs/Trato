@@ -41,7 +41,10 @@ class CheckOutTela extends StatefulWidget {
 
 class _CheckOutTelaState extends State<CheckOutTela> {
   final _codigo = TextEditingController();
+  final _justificativa = TextEditingController();
   FotoChegada? _foto;
+  int? _distancia;
+  bool _semCodigo = false;
   bool _enviando = false;
   String? _erroCodigo;
   String? _erro;
@@ -50,18 +53,39 @@ class _CheckOutTelaState extends State<CheckOutTela> {
   @override
   void dispose() {
     _codigo.dispose();
+    _justificativa.dispose();
     super.dispose();
   }
 
-  bool get _podeConcluir =>
-      _codigo.text.length == 4 && (widget.remoto || _foto != null);
+  bool get _podeConcluir {
+    if (_semCodigo) {
+      final provaOk = widget.remoto || (_foto != null && _distancia != null);
+      return provaOk && _justificativa.text.trim().isNotEmpty;
+    }
+    return _codigo.text.length == 4 && (widget.remoto || _foto != null);
+  }
+
+  Future<void> _localizar() async {
+    setState(() => _erro = null);
+    final p = widget.permissao;
+    if (p != null &&
+        !await garantirPermissao(
+            context, p, TipoPermissao.localizacao, TextoPermissao.localizacao)) {
+      return;
+    }
+    try {
+      final metros = await widget.servico.localizar();
+      if (mounted && metros != null) setState(() => _distancia = metros);
+    } on ErroTrato catch (e) {
+      if (mounted) setState(() => _erro = e.mensagem);
+    }
+  }
 
   Future<void> _tirarFoto() async {
     setState(() => _erro = null);
     final p = widget.permissao;
     if (p != null &&
-        !await garantirPermissao(
-            context, p, TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {
+        !await garantirPermissao(context, p, TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {
       return;
     }
     try {
@@ -80,7 +104,11 @@ class _CheckOutTelaState extends State<CheckOutTela> {
     });
     final ResultadoFim r;
     try {
-      r = await widget.servico.finalizar(_codigo.text);
+      r = await widget.servico.finalizar(
+        _semCodigo ? '' : _codigo.text,
+        semCodigo: _semCodigo,
+        justificativa: _semCodigo ? _justificativa.text.trim() : null,
+      );
     } on ErroTrato catch (e) {
       if (mounted) {
         setState(() {
@@ -97,8 +125,7 @@ class _CheckOutTelaState extends State<CheckOutTela> {
         _erroCodigo = 'Código incorreto. Peça de novo ao cliente.';
       }
       if (r == ResultadoFim.guardadoOffline) {
-        _aviso =
-            'Sem internet. Guardamos a conclusão e enviamos assim que o sinal voltar. '
+        _aviso = 'Sem internet. Guardamos a conclusão e enviamos assim que o sinal voltar. '
             'O Trato ainda vai confirmar.';
       }
     });
@@ -183,27 +210,93 @@ class _CheckOutTelaState extends State<CheckOutTela> {
             ),
           ),
         if (!widget.remoto) const SizedBox(height: EspacosTrato.x3),
-        TextField(
-          controller: _codigo,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          maxLength: 4,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) => setState(() => _erroCodigo = null),
-          style: TipografiaTrato.tituloGrande.copyWith(letterSpacing: 12),
-          decoration: InputDecoration(
-            counterText: '',
-            errorText: _erroCodigo,
-            hintText: '— — — —',
-            labelText: 'Código de conclusão',
+        if (_semCodigo && !widget.remoto) ...[
+          CartaoTrato(
+            child: Row(
+              children: [
+                const ClipRRect(
+                  borderRadius: BorderRadius.all(Radius.circular(EspacosTrato.raio)),
+                  child: SizedBox.square(
+                    dimension: EspacosTrato.x12 + EspacosTrato.x2,
+                    child: ColoredBox(
+                      color: CoresTrato.azulSuave,
+                      child: Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: EspacosTrato.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Localização', style: TipografiaTrato.tituloCartao),
+                      Text(
+                        _distancia == null
+                            ? 'Confirme sua localização no encerramento'
+                            : 'Localização registrada',
+                        style: TipografiaTrato.legenda,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: EspacosTrato.x2),
+                _distancia != null
+                    ? const ChipStatus(
+                        texto: 'Feito',
+                        tipo: TipoStatus.sucesso,
+                        icone: Icons.check,
+                      )
+                    : BotaoLink(texto: 'Localizar', aoTocar: _localizar),
+              ],
+            ),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
+        if (_semCodigo) ...[
+          TextField(
+            controller: _justificativa,
+            maxLines: 2,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Justificativa',
+              hintText: 'Ex.: Cliente sem bateria ou sinal na saída',
+            ),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+          const AvisoFaixa(
+            texto: 'O pagamento só será liberado após o cliente confirmar no app.',
+            tipo: TipoStatus.alerta,
+            icone: Icons.info_outline,
+          ),
+        ] else
+          TextField(
+            controller: _codigo,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            maxLength: 4,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() => _erroCodigo = null),
+            style: TipografiaTrato.tituloGrande.copyWith(letterSpacing: 12),
+            decoration: InputDecoration(
+              counterText: '',
+              errorText: _erroCodigo,
+              hintText: '— — — —',
+              labelText: 'Código de conclusão',
+            ),
+          ),
+        const SizedBox(height: EspacosTrato.x2),
+        Center(
+          child: BotaoLink(
+            texto: _semCodigo ? 'Voltar para código de 4 dígitos' : 'Cliente sem bateria ou sinal?',
+            aoTocar: () => setState(() {
+              _semCodigo = !_semCodigo;
+              _erroCodigo = null;
+            }),
           ),
         ),
         if (_erro != null) ...[
           const SizedBox(height: EspacosTrato.x3),
-          AvisoFaixa(
-              texto: _erro!,
-              tipo: TipoStatus.perigo,
-              icone: Icons.error_outline),
+          AvisoFaixa(texto: _erro!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
         ],
         if (_aviso != null) ...[
           const SizedBox(height: EspacosTrato.x3),

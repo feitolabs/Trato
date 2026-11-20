@@ -19,11 +19,7 @@ class CheckInTela extends StatefulWidget {
     required this.tituloBarra,
     this.fotoInicial,
     this.distanciaInicialMetros,
-    this.mensagensRapidas = const [
-      'Cheguei',
-      'Estou na portaria',
-      'Preciso de 15 minutos'
-    ],
+    this.mensagensRapidas = const ['Cheguei', 'Estou na portaria', 'Preciso de 15 minutos'],
     this.aoIniciar,
     this.permissao,
     this.avisoDistanciaMetros = 300,
@@ -58,8 +54,10 @@ class CheckInTela extends StatefulWidget {
 
 class _CheckInTelaState extends State<CheckInTela> {
   final _codigo = TextEditingController();
+  final _justificativa = TextEditingController();
   late FotoChegada? _foto = widget.fotoInicial;
   late int? _distancia = widget.distanciaInicialMetros;
+  bool _semCodigo = false;
   bool _iniciando = false;
   String? _erroCodigo;
   String? _aviso;
@@ -68,12 +66,15 @@ class _CheckInTelaState extends State<CheckInTela> {
   @override
   void dispose() {
     _codigo.dispose();
+    _justificativa.dispose();
     super.dispose();
   }
 
-  bool get _podeIniciar =>
-      _codigo.text.length == 4 &&
-      (widget.remoto || (_foto != null && _distancia != null));
+  bool get _podeIniciar {
+    final provaOk = widget.remoto || (_foto != null && _distancia != null);
+    if (!provaOk) return false;
+    return _semCodigo ? _justificativa.text.trim().isNotEmpty : _codigo.text.length == 4;
+  }
 
   Future<bool> _permitido(TipoPermissao tipo, TextoPermissao texto) async {
     final p = widget.permissao;
@@ -167,7 +168,11 @@ class _CheckInTelaState extends State<CheckInTela> {
     });
     final ResultadoInicio resultado;
     try {
-      resultado = await widget.servico.iniciarServico(_codigo.text);
+      resultado = await widget.servico.iniciarServico(
+        _semCodigo ? '' : _codigo.text,
+        semCodigo: _semCodigo,
+        justificativa: _semCodigo ? _justificativa.text.trim() : null,
+      );
     } on ErroTrato catch (erro) {
       if (mounted) {
         setState(() {
@@ -184,8 +189,7 @@ class _CheckInTelaState extends State<CheckInTela> {
         _erroCodigo = 'Código incorreto. Peça de novo ao cliente.';
       }
       if (resultado == ResultadoInicio.guardadoOffline) {
-        _aviso =
-            'Sem internet. Guardamos sua chegada e enviamos assim que o sinal voltar. '
+        _aviso = 'Sem internet. Guardamos sua chegada e enviamos assim que o sinal voltar. '
             'O serviço só começa quando o Trato confirmar.';
       }
     });
@@ -220,22 +224,19 @@ class _CheckInTelaState extends State<CheckInTela> {
             miniatura: foto == null
                 ? const ColoredBox(color: CoresTrato.azulClaro)
                 : ToquePreviewImagem(
-                    referencia:
-                        foto.referencia ?? 'Foto de chegada · ${foto.hora}',
+                    referencia: foto.referencia ?? 'Foto de chegada · ${foto.hora}',
                     legenda: 'Foto de chegada · ${foto.hora}',
                     child: construirImagemReal(foto.referencia) ??
                         const ColoredBox(
                           color: CoresTrato.azulClaro,
                           child: Center(
-                            child: Icon(Icons.zoom_in,
-                                size: 20, color: CoresTrato.petroleo),
+                            child: Icon(Icons.zoom_in, size: 20, color: CoresTrato.petroleo),
                           ),
                         ),
                   ),
             titulo: 'Foto de chegada',
-            detalhe: foto == null
-                ? 'Tire uma foto do local'
-                : '${foto.hora} · toque na foto para ver',
+            detalhe:
+                foto == null ? 'Tire uma foto do local' : '${foto.hora} · toque na foto para ver',
             feito: foto != null,
             textoAcao: 'Tirar foto',
             aoTocarAcao: _tirarFoto,
@@ -244,8 +245,7 @@ class _CheckInTelaState extends State<CheckInTela> {
           _CartaoPasso(
             miniatura: const ColoredBox(
               color: CoresTrato.azulSuave,
-              child:
-                  Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
+              child: Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
             ),
             titulo: 'Localização',
             detalhe: distancia == null
@@ -264,8 +264,7 @@ class _CheckInTelaState extends State<CheckInTela> {
             distancia > widget.avisoDistanciaMetros) ...[
           const SizedBox(height: EspacosTrato.x3),
           const AvisoFaixa(
-            texto:
-                'Você parece estar longe do endereço. Confira se está no lugar certo; '
+            texto: 'Você parece estar longe do endereço. Confira se está no lugar certo; '
                 'o Trato confere de novo ao iniciar.',
             tipo: TipoStatus.alerta,
             icone: Icons.location_off_outlined,
@@ -273,18 +272,31 @@ class _CheckInTelaState extends State<CheckInTela> {
         ],
         if (_erroPasso != null) ...[
           const SizedBox(height: EspacosTrato.x3),
-          AvisoFaixa(
-              texto: _erroPasso!,
-              tipo: TipoStatus.perigo,
-              icone: Icons.error_outline),
+          AvisoFaixa(texto: _erroPasso!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
         ],
         const SizedBox(height: EspacosTrato.x3),
-        _CartaoCodigo(
-          controlador: _codigo,
-          erro: _erroCodigo,
-          aoMudar: () => setState(() => _erroCodigo = null),
-        ),
-        const SizedBox(height: EspacosTrato.x5),
+        if (_semCodigo)
+          _CartaoSemCodigo(
+            titulo: 'Iniciar sem código',
+            subtitulo: 'Use apenas se o cliente estiver sem bateria ou sinal na porta.',
+            controlador: _justificativa,
+            aoMudar: () => setState(() {}),
+            aoVoltarCodigo: () => setState(() {
+              _semCodigo = false;
+              _erroCodigo = null;
+            }),
+          )
+        else
+          _CartaoCodigo(
+            controlador: _codigo,
+            erro: _erroCodigo,
+            aoMudar: () => setState(() => _erroCodigo = null),
+            aoSemCodigo: () => setState(() {
+              _semCodigo = true;
+              _erroCodigo = null;
+            }),
+          ),
+        const SizedBox(height: EspacosTrato.x4),
         Text('Mensagem rápida', style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x3),
         Wrap(
@@ -292,8 +304,7 @@ class _CheckInTelaState extends State<CheckInTela> {
           runSpacing: EspacosTrato.x2,
           children: [
             for (final mensagem in widget.mensagensRapidas)
-              _ChipMensagem(
-                  texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
+              _ChipMensagem(texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
           ],
         ),
         if (_aviso != null) ...[
@@ -302,9 +313,8 @@ class _CheckInTelaState extends State<CheckInTela> {
         ],
         const SizedBox(height: EspacosTrato.x5),
         Center(
-            child: BotaoLink(
-                texto: 'Cliente não está no local',
-                aoTocar: _confirmarClienteAusente)),
+            child:
+                BotaoLink(texto: 'Cliente não está no local', aoTocar: _confirmarClienteAusente)),
       ],
     );
   }
@@ -334,9 +344,7 @@ class _CartaoPasso extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
-            child: SizedBox.square(
-                dimension: EspacosTrato.x12 + EspacosTrato.x2,
-                child: miniatura),
+            child: SizedBox.square(dimension: EspacosTrato.x12 + EspacosTrato.x2, child: miniatura),
           ),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
@@ -379,11 +387,16 @@ class _CartaoPasso extends StatelessWidget {
 
 /// Cartão com contorno petróleo: é o passo em destaque do protótipo.
 class _CartaoCodigo extends StatelessWidget {
-  const _CartaoCodigo(
-      {required this.controlador, required this.aoMudar, this.erro});
+  const _CartaoCodigo({
+    required this.controlador,
+    required this.aoMudar,
+    required this.aoSemCodigo,
+    this.erro,
+  });
 
   final TextEditingController controlador;
   final VoidCallback aoMudar;
+  final VoidCallback aoSemCodigo;
   final String? erro;
 
   @override
@@ -401,8 +414,7 @@ class _CartaoCodigo extends StatelessWidget {
           children: [
             Text('Código de início', style: TipografiaTrato.tituloCartao),
             const SizedBox(height: EspacosTrato.x1),
-            Text('Peça os 4 números para a cliente.',
-                style: TipografiaTrato.legenda),
+            Text('Peça os 4 números para a cliente.', style: TipografiaTrato.legenda),
             const SizedBox(height: EspacosTrato.x4),
             TextField(
               controller: controlador,
@@ -412,8 +424,71 @@ class _CartaoCodigo extends StatelessWidget {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (_) => aoMudar(),
               style: TipografiaTrato.tituloGrande.copyWith(letterSpacing: 12),
-              decoration: InputDecoration(
-                  counterText: '', errorText: erro, hintText: '— — — —'),
+              decoration: InputDecoration(counterText: '', errorText: erro, hintText: '— — — —'),
+            ),
+            const SizedBox(height: EspacosTrato.x1),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BotaoLink(
+                texto: 'Cliente sem bateria ou sinal?',
+                aoTocar: aoSemCodigo,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CartaoSemCodigo extends StatelessWidget {
+  const _CartaoSemCodigo({
+    required this.titulo,
+    required this.subtitulo,
+    required this.controlador,
+    required this.aoMudar,
+    required this.aoVoltarCodigo,
+  });
+
+  final String titulo;
+  final String subtitulo;
+  final TextEditingController controlador;
+  final VoidCallback aoMudar;
+  final VoidCallback aoVoltarCodigo;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: CoresTrato.superficie,
+        borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+        border: Border.all(color: CoresTrato.petroleo, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(EspacosTrato.x5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(titulo, style: TipografiaTrato.tituloCartao),
+            const SizedBox(height: EspacosTrato.x1),
+            Text(subtitulo, style: TipografiaTrato.legenda),
+            const SizedBox(height: EspacosTrato.x4),
+            TextField(
+              controller: controlador,
+              maxLines: 2,
+              onChanged: (_) => aoMudar(),
+              decoration: const InputDecoration(
+                labelText: 'Justificativa',
+                hintText: 'Ex.: Cliente sem bateria ou sinal na porta',
+              ),
+            ),
+            const SizedBox(height: EspacosTrato.x1),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BotaoLink(
+                texto: 'Voltar para código de 4 dígitos',
+                aoTocar: aoVoltarCodigo,
+              ),
             ),
           ],
         ),

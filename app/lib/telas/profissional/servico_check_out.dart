@@ -13,6 +13,10 @@ enum ResultadoFim {
 /// Porta entre a tela de check-out (foto final + código de conclusão) e o backend.
 abstract interface class ServicoCheckOut {
   Future<FotoChegada?> tirarFotoFinal();
-  Future<ResultadoFim> finalizar(String codigo);
+  Future<int?> localizar();
+  Future<ResultadoFim> finalizar(
+    String codigo, {
+    bool semCodigo = false,
+    String? justificativa,
+  });
 }
-

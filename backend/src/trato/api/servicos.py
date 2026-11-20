@@ -129,4 +129,5 @@ def pedido_out(pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False) -> Pe
         codigo_conclusao=pedido.codigo_conclusao if eh_cliente else None,
         modalidade="remoto" if pedido.remoto else "presencial",
         ja_avaliou=ja_avaliou,
+        check_out_sem_codigo=pedido.check_out_sem_codigo,
     )

@@ -20,7 +20,11 @@ class ResumoConclusao {
     this.fotoAntes,
     this.fotoDepois,
     this.fotosCarregadas = false,
+    this.checkOutSemCodigo = false,
   });
+
+  /// Verdadeiro quando o profissional encerrou sem código de conclusão.
+  final bool checkOutSemCodigo;
 
   final String numeroPedido;
   final String nomeProfissional;
@@ -163,4 +167,3 @@ class DadosGarantia {
 // ---------------------------------------------------------------------------
 // Dados de exemplo (PROVISÓRIOS, copiados do protótipo)
 // ---------------------------------------------------------------------------
-

@@ -64,7 +64,11 @@ select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
          order by h.id desc limit 1) as antes_da_disputa,
        (select h.prova -> 'dados' ->> 'referencia_pagamento' from public.pedido_historico h
          where h.pedido_id = p.id and h.para_status = 'pago_retido'
-         order by h.id desc limit 1) as referencia_pagamento
+         order by h.id desc limit 1) as referencia_pagamento,
+       coalesce((select (h.prova -> 'dados' ->> 'sem_codigo') = 'true'
+         from public.pedido_historico h
+         where h.pedido_id = p.id and h.prova ->> 'acao' = 'fazer_check_out'
+         order by h.id desc limit 1), false) as check_out_sem_codigo
   from public.pedidos p
   left join public.contratos c on c.pedido_id = p.id
   left join lateral (
@@ -444,6 +448,7 @@ class PedidosPostgres:
             concluido_em=linha["concluido_em"],
             estado_antes_da_disputa=_estado(linha["antes_da_disputa"]) if em_disputa else None,
             remoto=linha["modalidade"] == "remoto",
+            check_out_sem_codigo=bool(linha.get("check_out_sem_codigo")),
         )
 
     def _inserir(
