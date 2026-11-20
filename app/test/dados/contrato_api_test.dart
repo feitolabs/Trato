@@ -191,7 +191,8 @@ void main() {
 
       final d = await RepositorioPagamentoApi(api).dados('ab12cd34');
 
-      expect(chamadas.single.metodo, 'GET');
+      // 1ª: /pedidos/{id}/pagamento; 2ª (tolerante a falha): /me, para saber se há CPF.
+      expect(chamadas.map((c) => c.metodo), ['GET', 'GET']);
       expect(d.valorAgoraCentavos, 46000);
       expect(d.opcoes.map((o) => o.metodo), [MetodoPagamento.pix, MetodoPagamento.cartao]);
     });

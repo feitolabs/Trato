@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/componentes/componentes.dart';
 import '../apoio/endereco_pedido.dart';
 import 'package:trato/dados/carregador.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
+import '../apoio/exemplos/auth/servico_auth_fake.dart';
 import '../apoio/exemplos/dados/repositorios_fake.dart';
 import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/telas/carteira/carteira_tela.dart';
@@ -85,7 +87,10 @@ RepositoriosTrato _repos({
 
 void main() {
   setUpAll(carregarFontesTrato);
-  tearDown(() => RotasTrato.repos = repositoriosDemo());
+  tearDown(() {
+    RotasTrato.repos = repositoriosDemo();
+    ServicoAuthPadrao.atual = ServicoAuthFake();
+  });
 
   group('Carregador', () {
     testWidgets('mostra carregando e depois o conteúdo', (tester) async {
@@ -160,6 +165,10 @@ void main() {
     });
 
     testWidgets('Novo pedido preenche, envia ao repositório e avisa', (tester) async {
+      // Enviar pedido exige sessão (sem ela o app pede para criar conta; ver F6).
+      final auth = ServicoAuthFake();
+      await auth.entrarComEmail(email: 'ana@teste.com', senha: 'senha-forte-1');
+      ServicoAuthPadrao.atual = auth;
       final pedidos = RepositorioPedidosFake();
       RotasTrato.repos = _repos(pedidos: pedidos);
       await _abrir(tester, const CascaClienteTela(abaInicial: 2));
