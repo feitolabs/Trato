@@ -133,6 +133,10 @@ def liberado(profissional_id: str) -> Conta:
     return Conta(TipoConta.LIBERADO, profissional_id)
 
 
+# Teto de um lançamento: cabe com folga no bigint do Postgres (9,22e18) mesmo somando saldos.
+VALOR_MAXIMO_CENTAVOS = 9_000_000_000_000_000
+
+
 @dataclass(frozen=True)
 class Lancamento:
     chave: str  # chave de idempotência
@@ -153,6 +157,10 @@ class Lancamento:
             raise LancamentoInvalido("O valor deve ser inteiro, em centavos.")
         if self.valor <= 0:
             raise LancamentoInvalido("O valor deve ser maior que zero.")
+        if self.valor > VALOR_MAXIMO_CENTAVOS:
+            raise LancamentoInvalido(
+                f"O valor passa do máximo de {VALOR_MAXIMO_CENTAVOS} centavos por lançamento."
+            )
         if not self.chave.strip() or not self.pedido_id.strip():
             raise LancamentoInvalido("Chave e pedido são obrigatórios.")
         if self.data.tzinfo is None:
@@ -281,6 +289,10 @@ class Livro:
     def saldo(self, conta: Conta, pedido_id: str | None = None) -> int:
         return _saldo(self._itens, conta, pedido_id)
 
+    def da_chave(self, chave: str) -> Lancamento | None:
+        """O lançamento já gravado com esta chave de idempotência, se houver."""
+        return self._por_chave.get(chave)
+
     def saldos_pedido(self, pedido_id: str, profissional_id: str | None = None) -> SaldoPedido:
         """Saldos do pedido. As contas do profissional só entram se ele for informado."""
         prof = profissional_id
@@ -393,7 +405,15 @@ def repartir_custodia(
     para o histórico e para os testes do estorno de pedidos antigos. `valor` é a parte da custódia
     a repartir (uma etapa, por exemplo); sem ele, reparte toda a custódia do pedido.
     """
-    base = livro.saldo(CUSTODIA, pedido_id) if valor is None else valor
+    if valor is None:
+        # Reenvio da mesma operação (a custódia já zerou): a base é o que ela repartiu da
+        # primeira vez. Confere a chave ANTES de olhar o saldo; parâmetros diferentes seguem
+        # sendo erro (`ChaveReutilizada`, na hora de lançar).
+        antes = [livro.da_chave(f"{chave}/retencao"), livro.da_chave(f"{chave}/taxa")]
+        gravados = [i for i in antes if i is not None]
+        base = sum(i.valor for i in gravados) if gravados else livro.saldo(CUSTODIA, pedido_id)
+    else:
+        base = valor
     if base <= 0:
         raise LancamentoInvalido("Não há valor retido para repartir.")
     if isinstance(taxa, bool) or not isinstance(taxa, int) or not 0 <= taxa <= base:
@@ -431,7 +451,12 @@ def liberar(
 ) -> Lancamento:
     """Passa o valor de 'a liberar' para 'liberado'. Quando liberar é decisão da rotina."""
     conta = a_liberar(profissional_id)
-    montante = livro.saldo(conta, pedido_id) if valor is None else valor
+    if valor is not None:
+        montante = valor
+    elif (anterior := livro.da_chave(chave)) is not None:
+        montante = anterior.valor  # reenvio: o saldo já zerou, vale o que foi liberado antes
+    else:
+        montante = livro.saldo(conta, pedido_id)
     return livro.lancar(
         Lancamento(
             chave, pedido_id, TipoLancamento.REPASSE, conta, liberado(profissional_id),
