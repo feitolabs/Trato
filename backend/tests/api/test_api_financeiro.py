@@ -1,4 +1,6 @@
-from conftest import cab
+from datetime import timedelta
+
+from conftest import AGORA, cab
 
 from trato.pedidos.estados import Estado
 
@@ -44,11 +46,25 @@ def test_carteira_do_profissional(amb):
 
     r = amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-prof"))
 
-    assert r.json() == {"a_liberar_centavos": 92_500, "liberado_centavos": 0}
-    assert amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-outro-prof")).json() == {
-        "a_liberar_centavos": 0,
-        "liberado_centavos": 0,
-    }
+    corpo = r.json()
+    assert (corpo["a_liberar_centavos"], corpo["liberado_centavos"]) == (92_500, 0)
+    outro = amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-outro-prof")).json()
+    assert (outro["a_liberar_centavos"], outro["liberado_centavos"]) == (0, 0)
+    assert outro["liberacoes_previstas"] == [] and outro["proxima_liberacao_em"] is None
+
+
+def test_carteira_traz_a_data_prevista_de_repasse_pelo_prazo_da_configuracao(amb):
+    # Concluído em AGORA; a janela de congelamento da configuração de teste é 72 h.
+    amb.semear_pedido(Estado.CONCLUIDO, concluido_em=AGORA)
+    amb.semear_dinheiro(100_000, taxa=7_500)
+
+    corpo = amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-prof")).json()
+
+    previsto = (AGORA + timedelta(hours=72)).isoformat().replace("+00:00", "Z")
+    assert corpo["liberacoes_previstas"] == [
+        {"pedido_id": "ped-1", "valor_centavos": 92_500, "liberacao_prevista_em": previsto}
+    ]
+    assert corpo["proxima_liberacao_em"] == previsto
 
 
 def test_carteira_so_para_profissional(amb):

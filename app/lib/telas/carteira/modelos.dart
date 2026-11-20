@@ -8,6 +8,7 @@ class ResumoCarteira {
     required this.textoRetido,
     required this.aLiberarCentavos,
     required this.textoALiberar,
+    this.proximaLiberacao,
   });
 
   final int disponivelCentavos;
@@ -25,6 +26,9 @@ class ResumoCarteira {
 
   /// Ex.: "Automático em até 48 h". O prazo depende de P1 (48 h x 7 dias): vem do dado.
   final String textoALiberar;
+
+  /// Data do próximo repasse (API). Com data, ela substitui o texto de prazo.
+  final DateTime? proximaLiberacao;
 }
 
 enum StatusExtrato { liberado, aLiberar }

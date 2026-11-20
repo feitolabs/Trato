@@ -37,6 +37,22 @@ def test_cliente_ganha_bonus_ao_avaliar_e_ve_saldo(amb):
     assert m["extrato"][0]["tipo"] == "bonus_avaliacao"
 
 
+def test_moedas_traz_vencimento_do_saldo_e_teto_mensal_de_desconto(amb):
+    ligar(amb, bonus_avaliacao_moedas=50, valor_moeda_centavos=2, validade_dias=90)
+    amb.semear_pedido(Estado.CONCLUIDO, concluido_em=AGORA)
+    post(amb, "/v1/pedidos/ped-1/avaliacao", "t-cliente", {"nota_geral": 5})
+    m = amb.cliente.get("/v1/me/moedas", headers=cab("t-cliente")).json()
+    assert m["saldo_vence_em"].startswith((AGORA + timedelta(days=90)).strftime("%Y-%m-%dT%H:%M"))
+    assert m["teto_desconto_mes_centavos"] == 500
+    assert m["desconto_usado_mes_centavos"] == 0
+
+
+def test_moedas_sem_saldo_nao_tem_vencimento(amb):
+    ligar(amb)
+    m = amb.cliente.get("/v1/me/moedas", headers=cab("t-cliente")).json()
+    assert m["saldo_vence_em"] is None and m["desconto_usado_mes_centavos"] == 0
+
+
 def test_profissional_avaliando_ganha_so_na_carteira_dele_nunca_no_desconto(amb):
     ligar(amb)
     amb.semear_pedido(Estado.CONCLUIDO, concluido_em=AGORA)

@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhos;
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
@@ -292,11 +293,24 @@ class _CartaoCarteira extends StatelessWidget {
   Widget build(BuildContext context) {
     return CartaoTrato(
       aoTocar: aoTocar ?? () {},
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _Valor(rotulo: 'Em andamento', centavos: carteira.retidoCentavos)),
-          const SizedBox(width: EspacosTrato.x3),
-          Expanded(child: _Valor(rotulo: 'Liberado', centavos: carteira.paraSacarCentavos)),
+          Row(
+            children: [
+              Expanded(child: _Valor(rotulo: 'Em andamento', centavos: carteira.retidoCentavos)),
+              const SizedBox(width: EspacosTrato.x3),
+              Expanded(child: _Valor(rotulo: 'Liberado', centavos: carteira.paraSacarCentavos)),
+            ],
+          ),
+          if (carteira.proximaLiberacao != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'Repasse do dinheiro: ${diaMesDoAparelho(carteira.proximaLiberacao!)}',
+              key: const Key('repasse-previsto'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ],
         ],
       ),
     );

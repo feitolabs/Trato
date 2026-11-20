@@ -76,7 +76,9 @@ void main() {
     test('dados lê GET /dados', () async {
       final (repo, pedidas) = montar();
       final d = await repo.dados('abcd1234');
-      expect(pedidas.single.url.path, '/v1/pedidos/abcd1234/dados');
+      // 1ª chamada: /dados; 2ª (tolerante a falha): /exclusividade, a oferta ao cliente.
+      expect(pedidas.map((r) => r.url.path),
+          ['/v1/pedidos/abcd1234/dados', '/v1/pedidos/abcd1234/exclusividade']);
       expect(d.descricao, 'Sala de 35 m2');
     });
   });

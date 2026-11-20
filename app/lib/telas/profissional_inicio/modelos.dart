@@ -213,10 +213,17 @@ class DetalheOrcamentoEnviado {
 }
 
 class ResumoCarteira {
-  const ResumoCarteira({required this.retidoCentavos, required this.paraSacarCentavos});
+  const ResumoCarteira({
+    required this.retidoCentavos,
+    required this.paraSacarCentavos,
+    this.proximaLiberacao,
+  });
 
   final int retidoCentavos;
   final int paraSacarCentavos;
+
+  /// Próxima liberação do repasse (`proxima_liberacao_em`); nulo = sem data.
+  final DateTime? proximaLiberacao;
 }
 
 /// Oferta de exclusividade de 48h vista pelo profissional.
@@ -232,6 +239,7 @@ class ExclusividadeProfissional {
     this.saldoRestante,
     this.tituloPedido,
     this.bloqueadoRecusa = false,
+    this.bloqueadoAte,
   });
 
   final String id;
@@ -247,6 +255,9 @@ class ExclusividadeProfissional {
   final int? saldoRestante;
   final String? tituloPedido;
   final bool bloqueadoRecusa;
+
+  /// Fim do bloqueio depois de recusa (API). Nulo ou no passado: sem bloqueio.
+  final DateTime? bloqueadoAte;
 
   bool get aguardandoCliente => status == 'aguardando_cliente';
   bool get ativa => status == 'ativa';
@@ -464,6 +475,7 @@ class DetalhePedido {
     this.exclusividade,
     this.exclusividades,
     this.bloqueadoRecusa = false,
+    this.bloqueadoAte,
   });
 
   /// Dados da lista (título, bairro, distância, faixa, vagas).
@@ -488,6 +500,9 @@ class DetalhePedido {
 
   /// Verdadeiro se este profissional foi recusado por este cliente dentro do prazo de bloqueio.
   final bool bloqueadoRecusa;
+
+  /// Quando o bloqueio termina (só preenchido com bloqueio ativo).
+  final DateTime? bloqueadoAte;
 }
 
 /// Motivos para recusar um pedido (escopo 6.2).

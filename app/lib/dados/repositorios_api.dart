@@ -1669,8 +1669,14 @@ class RepositorioPerfilApi implements RepositorioPerfil {
     DateTime? liberacao;
     DateTime? voltaEm;
     int? valorMoeda;
+    DateTime? venceEm;
+    int? tetoMes;
+    int? usadoMes;
     try {
       final m = _mapa(await _api.get('/v1/me/moedas'));
+      venceEm = DateTime.tryParse('${m['saldo_vence_em'] ?? ''}')?.toLocal();
+      tetoMes = (m['teto_desconto_mes_centavos'] as num?)?.toInt();
+      usadoMes = (m['desconto_usado_mes_centavos'] as num?)?.toInt();
       moedas = m['saldo'] as int?;
       pendentes = (m['moedas_pendentes'] as num?)?.toInt() ?? 0; // ausente = 0
       liberacao = lerDataIso(m['proxima_liberacao']);
@@ -1689,6 +1695,9 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       moedasPendentes: pendentes,
       moedasProximaLiberacao: liberacao,
       moedasValorCentavos: valorMoeda,
+      moedasVenceEm: venceEm,
+      tetoDescontoMesCentavos: tetoMes,
+      descontoUsadoMesCentavos: usadoMes,
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),
@@ -1872,6 +1881,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       carteira = ResumoCarteira(
         retidoCentavos: (saldo['a_liberar_centavos'] as num?)?.toInt() ?? 0,
         paraSacarCentavos: (saldo['liberado_centavos'] as num?)?.toInt() ?? 0,
+        proximaLiberacao: DateTime.tryParse('${saldo['proxima_liberacao_em'] ?? ''}')?.toLocal(),
       );
       deuCerto = true;
     }).catchError((Object e) {
@@ -2134,6 +2144,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     ResumoExclusividades? exclusividades;
     ExclusividadeProfissional? exclusividadeDoPedido;
     var bloqueadoRecusa = false;
+    DateTime? bloqueadoAte;
     try {
       exclusividades = await minhasExclusividades();
       for (final ex in exclusividades.itens) {
@@ -2143,9 +2154,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         }
       }
       if (exclusividadeDoPedido == null && aberto.clienteId != null) {
-        bloqueadoRecusa = exclusividades.itens.any(
-          (ex) => ex.clienteId == aberto.clienteId && ex.status == 'recusada',
-        );
+        final agora = DateTime.now();
+        for (final ex in exclusividades.itens) {
+          final fim = ex.bloqueadoAte;
+          if (ex.clienteId == aberto.clienteId &&
+              ex.status == 'recusada' &&
+              fim != null &&
+              fim.isAfter(agora) &&
+              (bloqueadoAte == null || fim.isAfter(bloqueadoAte))) {
+            bloqueadoAte = fim;
+          }
+        }
+        bloqueadoRecusa = bloqueadoAte != null;
       }
     } on Object {
       // Backend antigo sem rota de exclusividades: segue sem quebrar.
@@ -2173,6 +2193,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       exclusividade: exclusividadeDoPedido,
       exclusividades: exclusividades,
       bloqueadoRecusa: bloqueadoRecusa,
+      bloqueadoAte: bloqueadoAte,
     );
   }
 
@@ -2315,6 +2336,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         responderAte: ex.responderAte,
         expiraEm: ex.expiraEm,
         saldoRestante: ex.saldoRestante,
+        bloqueadoAte: ex.bloqueadoAte?.toLocal(),
       );
 
   @override

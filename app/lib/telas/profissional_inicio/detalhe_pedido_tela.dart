@@ -74,6 +74,10 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
   String? _motivoDesabilitado(PedidoAberto pedido, ResumoExclusividades resumo) {
     if (pedido.urgente) return 'Pedidos urgentes não têm exclusividade.';
     if (!pedido.permiteExclusividade) return 'Esta categoria não permite exclusividade.';
+    final fimBloqueio = widget.dados.bloqueadoAte;
+    if (fimBloqueio != null && fimBloqueio.isAfter(DateTime.now())) {
+      return 'Você poderá tentar de novo em ${diaMesDoAparelho(fimBloqueio)} às ${horaDoAparelho(fimBloqueio)}';
+    }
     if (widget.dados.bloqueadoRecusa || _exclusividade?.status == 'recusada') {
       return 'Você já teve uma oferta recusada por este cliente recentemente.';
     }

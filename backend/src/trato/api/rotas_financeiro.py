@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
@@ -13,12 +14,14 @@ from trato.api.modelos import (
     ContaOut,
     ExtratoOut,
     LancamentoOut,
+    LiberacaoPrevistaOut,
     SaldoPedidoOut,
     SaldoProfissionalOut,
 )
 from trato.api.servicos import carregar_pedido
 from trato.financeiro import extrato_profissional, periodo
 from trato.financeiro.ledger import Conta, Lancamento, a_liberar, liberado
+from trato.rotinas.regras import ConfigRotinas, instante_liberacao
 
 router = APIRouter(prefix="/v1", tags=["financeiro"])
 
@@ -109,10 +112,65 @@ def saldo_do_profissional(
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> SaldoProfissionalOut:
+    previstas = _liberacoes_previstas(contexto, usuario.id)
+    datas = [p.liberacao_prevista_em for p in previstas if p.liberacao_prevista_em is not None]
     return SaldoProfissionalOut(
         a_liberar_centavos=contexto.ledger.saldo_da_conta(a_liberar(usuario.id)),
         liberado_centavos=contexto.ledger.saldo_da_conta(liberado(usuario.id)),
+        proxima_liberacao_em=min(datas) if datas else None,
+        liberacoes_previstas=previstas,
     )
+
+
+def _liberacoes_previstas(contexto: Contexto, profissional_id: str) -> list[LiberacaoPrevistaOut]:
+    """Um item por pedido com valor 'a liberar'. Só leitura: nunca falha a carteira.
+
+    Data = `instante_liberacao` (a mesma regra da rotina de liberação): conclusão + o prazo da
+    configuração (`prazo_liberacao_dias`; sem ele, a janela de congelamento da disputa), e nunca
+    antes da janela de congelamento. Pedido ainda não concluído: data `None`.
+    """
+    try:
+        cfg = contexto.config.carregar()
+        congelamento = timedelta(hours=cfg.disputas.prazo_congelar_repasse_horas)
+        prazo = (
+            timedelta(days=cfg.prazo_liberacao_dias)
+            if cfg.prazo_liberacao_dias is not None
+            else congelamento
+        )
+        regra = ConfigRotinas(
+            prazo_liberacao=prazo,
+            janela_congelamento_repasse=congelamento,
+            liberacao_espera_congelamento=True,
+        )
+        conta = a_liberar(profissional_id)
+        por_pedido: dict[str, int] = {}
+        for item in contexto.ledger.lancamentos():
+            if item.credito == conta:
+                por_pedido[item.pedido_id] = por_pedido.get(item.pedido_id, 0) + item.valor
+            if item.debito == conta:
+                por_pedido[item.pedido_id] = por_pedido.get(item.pedido_id, 0) - item.valor
+        saida = []
+        for pedido_id, valor in por_pedido.items():
+            if valor <= 0:
+                continue
+            pedido = contexto.pedidos.obter(pedido_id)
+            quando = (
+                instante_liberacao(pedido.concluido_em, regra)
+                if pedido is not None and pedido.concluido_em is not None
+                else None
+            )
+            saida.append(
+                LiberacaoPrevistaOut(
+                    pedido_id=pedido_id, valor_centavos=valor, liberacao_prevista_em=quando
+                )
+            )
+        com_data = sorted(
+            (p for p in saida if p.liberacao_prevista_em is not None),
+            key=lambda p: p.liberacao_prevista_em,  # type: ignore[arg-type,return-value]
+        )
+        return com_data + [p for p in saida if p.liberacao_prevista_em is None]
+    except Exception:  # noqa: BLE001 - campo opcional: a carteira não pode quebrar por ele
+        return []
 
 
 @router.get(

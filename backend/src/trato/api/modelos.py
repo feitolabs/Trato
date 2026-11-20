@@ -377,9 +377,18 @@ class SaldoPedidoOut(BaseModel):
     liberado_centavos: int
 
 
+class LiberacaoPrevistaOut(BaseModel):
+    pedido_id: str
+    valor_centavos: int
+    liberacao_prevista_em: datetime | None = None
+
+
 class SaldoProfissionalOut(BaseModel):
     a_liberar_centavos: int
     liberado_centavos: int
+    # Só leitura: quando cada valor "a liberar" passa a liberado (null se o prazo não existe).
+    proxima_liberacao_em: datetime | None = None
+    liberacoes_previstas: list[LiberacaoPrevistaOut] = Field(default_factory=list)
 
 
 class DisputaOut(BaseModel):

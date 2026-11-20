@@ -6,6 +6,7 @@ import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../comuns/desconto_moedas.dart';
 import '../comuns/moeda_trato.dart';
+import '../profissional/dinheiro.dart';
 import 'modelos.dart';
 
 /// Tela 22 — Perfil do cliente. Cada item avisa [aoTocarItem]; "Usar como profissional"
@@ -155,6 +156,28 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                       perfil.moedasValorCentavos,
                     )!,
                     key: const Key('moedas-pendentes'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.textoSecundario,
+                    ),
+                  ),
+                ],
+                if (perfil.moedasVenceEm != null) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    'Tratinhos vencem em ${formatarDiaMes(perfil.moedasVenceEm!)}',
+                    key: const Key('moedas-vencem'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.textoSecundario,
+                    ),
+                  ),
+                ],
+                if (perfil.descontoUsadoMesCentavos != null &&
+                    perfil.tetoDescontoMesCentavos != null) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    'Desconto usado no mês: ${Dinheiro.formatar(perfil.descontoUsadoMesCentavos!)} '
+                    'de ${Dinheiro.formatar(perfil.tetoDescontoMesCentavos!)}',
+                    key: const Key('moedas-desconto-mes'),
                     style: TipografiaTrato.corpoPequeno.copyWith(
                       color: CoresTrato.textoSecundario,
                     ),
