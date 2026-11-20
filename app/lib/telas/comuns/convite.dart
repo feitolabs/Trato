@@ -4,8 +4,8 @@ import 'package:share_plus/share_plus.dart';
 
 /// Mensagem pronta do convite. Sem Tratinhos nem promessa. O app ainda não tem um link
 /// de loja publicado: por isso a mensagem cita só o nome (acrescentar o link aqui quando existir).
-const textoConvite = 'Uso o Trato para contratar profissionais verificados, '
-    'com pagamento protegido e sem taxa. Conheça o Trato.';
+const textoConvite = 'Contrato profissionais verificados pelo Trato: pagamento protegido, '
+    'sem taxa e orçamento grátis. Vale conhecer.';
 
 /// Abre o compartilhamento do aparelho com o [texto]. Lança erro se não for possível.
 typedef CompartilharTexto = Future<void> Function(String texto);

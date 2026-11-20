@@ -495,7 +495,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 const SizedBox(width: EspacosTrato.x2),
                 Expanded(
                   child: Text(
-                    'Pedido direto para ${widget.profissionalConvidadoNome!.trim()}',
+                    'Pedido direto para ${widget.profissionalConvidadoNome!.trim()}. Ele será avisado primeiro.',
                     style: TipografiaTrato.corpoPequeno.copyWith(
                       color: CoresTrato.azulTexto,
                       fontWeight: FontWeight.w600,

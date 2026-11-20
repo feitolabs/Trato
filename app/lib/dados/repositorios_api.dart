@@ -1709,7 +1709,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
           itens: [
             ItemPerfil(acao: AcaoPerfil.dadosPessoais, titulo: 'Dados pessoais'),
             ItemPerfil(acao: AcaoPerfil.enderecos, titulo: 'Endereços salvos'),
-            ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais favoritos'),
+            ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais de confiança'),
           ],
         ),
         GrupoPerfil(

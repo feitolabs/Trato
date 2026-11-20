@@ -17,7 +17,7 @@ abstract final class DadosExemplo {
             titulo: 'Formas de pagamento',
             valor: 'Pix, Visa',
           ),
-          ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais favoritos', valor: '3'),
+          ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais de confiança', valor: '3'),
         ],
       ),
       GrupoPerfil(

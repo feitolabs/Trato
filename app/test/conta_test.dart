@@ -105,9 +105,9 @@ void main() {
     await _abrir(tester, FavoritosTela(servico: servico));
     expect(find.text('Carlos Pintor'), findsOneWidget);
     expect(find.text('Nota 4,8 · 12 serviços'), findsOneWidget);
-    await tester.tap(find.byTooltip('Tirar dos favoritos'));
+    await tester.tap(find.byTooltip('Remover dos profissionais de confiança'));
     await tester.pumpAndSettle();
-    expect(find.text('Nenhum favorito ainda'), findsOneWidget);
+    expect(find.text('Nenhum profissional de confiança ainda'), findsOneWidget);
   });
 
   testWidgets('contatos: adiciona e remove com confirmação', (tester) async {

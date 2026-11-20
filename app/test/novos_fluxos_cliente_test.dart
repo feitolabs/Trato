@@ -299,7 +299,7 @@ void main() {
       );
 
       expect(find.byKey(const Key('banner-profissional-convidado')), findsOneWidget);
-      expect(find.text('Pedido direto para Carlos Mendes'), findsOneWidget);
+      expect(find.text('Pedido direto para Carlos Mendes. Ele será avisado primeiro.'), findsOneWidget);
 
       await t.ensureVisible(find.text(Modalidade.remoto.rotulo));
       await t.tap(find.text(Modalidade.remoto.rotulo));
