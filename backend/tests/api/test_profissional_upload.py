@@ -550,3 +550,98 @@ def test_trocar_a_foto_de_perfil_apaga_a_anterior(e2):
     with pytest.raises(ArquivoNaoEncontrado):
         e2.armazenamento.ler("avatar", antes)  # a antiga saiu do bucket
     assert e2.armazenamento.ler("avatar", depois)
+
+
+# --- perfil público SEM login (página web "Cliente fixo") -----------------------------------
+
+URL_PUBLICA = "/v1/publico/profissionais/{}"
+
+
+def _aprovar(e2, status_usuario="ativo", status_perfil="aprovado"):
+    cadastrar(e2)
+    perfil = e2.modulo.repo.obter("pro-1")
+    e2.modulo.repo.salvar(
+        PerfilProfissional(
+            **{
+                **vars(perfil),
+                "status": status_perfil,
+                "nivel_verificacao": "verificado",
+                "bio": "Pintor há 10 anos.",
+            }
+        )
+    )
+    e2.amb.contexto.usuarios.adicionar(
+        PerfilDetalhe(
+            "pro-1",
+            "João Vitor Cardoso",
+            PapelUsuario.PROFISSIONAL,
+            status=status_usuario,
+            nota_publica=4.8,
+            servicos_concluidos=12,
+            avaliacoes_total=7,
+        )
+    )
+
+
+def test_perfil_publico_sem_token_devolve_so_o_que_e_seguro(e2):
+    _aprovar(e2)
+    _, concluir = e2.enviar("t-prof", "avatar", JPEG_COM_EXIF)
+    assert concluir.status_code == 200
+
+    r = e2.amb.cliente.get(URL_PUBLICA.format("pro-1"))  # sem Authorization
+
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert set(corpo) == {
+        "id", "nome", "foto_url", "categorias", "nota_media", "avaliacoes_total",
+        "servicos_concluidos", "identidade_verificada", "cidades", "sobre",
+    }  # fmt: skip
+    assert corpo["id"] == "pro-1" and corpo["nome"] == "João C."
+    assert corpo["nota_media"] == 4.8 and corpo["avaliacoes_total"] == 7
+    assert corpo["servicos_concluidos"] == 12 and corpo["identidade_verificada"] is True
+    assert corpo["sobre"] == "Pintor há 10 anos." and corpo["foto_url"]
+    assert corpo["categorias"] and corpo["cidades"]
+    assert r.headers["cache-control"] == "public, max-age=60"
+    assert "set-cookie" not in r.headers
+
+
+def test_perfil_publico_nao_traz_campo_proibido_nem_id_interno(e2):
+    _aprovar(e2)
+    texto = e2.amb.cliente.get(URL_PUBLICA.format("pro-1")).text
+    for proibido in (
+        "cpf", "cnpj", "telefone", "email", "endereco", "bairro", "Savassi", "documento",
+        "conta_recebimento", "pix", "banco", "latitude", "longitude", "usuario_id",
+        "Cardoso", "nivel_verificacao",
+    ):  # fmt: skip
+        assert proibido not in texto, proibido
+
+
+def test_perfil_publico_404_igual_para_inexistente_nao_aprovado_suspenso_e_bloqueado(e2):
+    url = URL_PUBLICA.format
+    inexistente = e2.amb.cliente.get(url("nao-existe"))
+    _aprovar(e2, status_perfil="em_analise")
+    em_analise = e2.amb.cliente.get(url("pro-1"))
+    _aprovar(e2, status_perfil="suspenso")
+    suspenso_perfil = e2.amb.cliente.get(url("pro-1"))
+    _aprovar(e2, status_usuario="bloqueado")
+    bloqueado = e2.amb.cliente.get(url("pro-1"))
+    _aprovar(e2, status_usuario="restrito")
+    restrito = e2.amb.cliente.get(url("pro-1"))
+    for r in (inexistente, em_analise, suspenso_perfil, bloqueado, restrito):
+        assert r.status_code == 404
+        assert r.json() == {"detail": "Profissional não encontrado."}
+    _aprovar(e2)
+    assert e2.amb.cliente.get(url("pro-1")).status_code == 200
+
+
+def test_rota_logada_do_perfil_continua_exigindo_login(e2):
+    _aprovar(e2)
+    assert e2.amb.cliente.get("/v1/profissionais/pro-1").status_code == 401
+    assert e2.get("/v1/profissionais/pro-1", "t-cliente").status_code == 200
+
+
+def test_perfil_publico_tem_limite_de_taxa_por_ip(e2):
+    from trato.seguranca.config import _limites_padrao
+
+    regra = next(r for r in _limites_padrao() if r.nome == "publico_perfil")
+    assert (regra.prefixo, regra.escopo, regra.metodos) == ("/v1/publico", "ip", ["GET"])

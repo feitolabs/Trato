@@ -302,3 +302,15 @@ def test_idempotencia_em_metodos_mutantes():
     assert r2.status_code == r1.status_code
     assert r2.headers.get("x-idempotent-replay") == "true"
     assert r2.json() == r1.json()
+
+
+def test_perfil_publico_sem_login_tem_limite_por_ip_com_a_regra_padrao():
+    from trato.seguranca.config import _limites_padrao
+
+    regra = next(r for r in _limites_padrao() if r.nome == "publico_perfil")
+    amb = montar(limites=[regra.model_dump()])
+    url = "/v1/publico/profissionais/qualquer"
+    for _ in range(regra.maximo):
+        assert amb.cliente.get(url).status_code != 429  # sem token
+    r = amb.cliente.get(url)
+    assert r.status_code == 429 and int(r.headers["retry-after"]) > 0

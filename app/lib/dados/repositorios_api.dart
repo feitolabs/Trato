@@ -2092,6 +2092,21 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
 
   /// `POST /v1/pedidos/{id}/acoes/confirmar_agenda`: tira o pedido pago de `pago_e_retido` e
   /// libera o check-in. O backend confere a janela e gera o código de início do cliente.
+  /// `POST /v1/profissional/pedidos/{id}/a-caminho` `{eta_minutos?}`. 409 = pedido não agendado.
+  @override
+  Future<AvisoACaminho> avisarACaminho(String pedidoId, {int? etaMinutos}) async {
+    final r = _mapa(
+      await _api.post(
+        '/v1/profissional/pedidos/$pedidoId/a-caminho',
+        corpo: {if (etaMinutos != null) 'eta_minutos': etaMinutos},
+      ),
+    );
+    return AvisoACaminho(
+      enviado: r['enviado'] == true,
+      etaMinutos: (r['eta_minutos'] as num?)?.toInt(),
+    );
+  }
+
   @override
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
     await _api.post(

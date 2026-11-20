@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from trato.financeiro import periodo
-from trato.financeiro.ledger import Lancamento, TipoConta, TipoLancamento
+from trato.financeiro.ledger import Lancamento, TipoConta, TipoLancamento, taxa_descontada
 from trato.financeiro.pdf import LARGURA, PdfSimples
 
 
@@ -38,6 +38,14 @@ class ExtratoProfissional:
     recebido_centavos: int
     estornado_centavos: int
     a_liberar_fim_centavos: int
+    # Resumo do mês (recibo de ganhos). Opcionais: quem monta sem eles vê zeros.
+    servicos_concluidos: int = 0
+    taxa_trato_centavos: int = 0
+
+    @property
+    def bruto_centavos(self) -> int:
+        """O que os serviços pagos no período valeram antes da taxa (líquido recebido + taxa)."""
+        return self.recebido_centavos + self.taxa_trato_centavos
 
     @property
     def liquido_centavos(self) -> int:
@@ -67,6 +75,8 @@ def montar(
         elif item.tipo is TipoLancamento.COBRANCA and dele(TipoConta.LIBERADO, item.credito):
             linhas.append(LinhaExtrato(item.data, item.pedido_id, "Gorjeta", item.valor))
     linhas.sort(key=lambda lin: lin.data)
+    pedidos_pagos = {lin.pedido_id for lin in linhas if lin.descricao == "Recebido"}
+    taxa = sum(taxa_descontada(lancamentos, pid) for pid in pedidos_pagos)
     return ExtratoProfissional(
         profissional_id=profissional_id,
         desde=desde,
@@ -75,6 +85,8 @@ def montar(
         recebido_centavos=sum(lin.valor_centavos for lin in linhas if lin.valor_centavos > 0),
         estornado_centavos=-sum(lin.valor_centavos for lin in linhas if lin.valor_centavos < 0),
         a_liberar_fim_centavos=a_liberar_fim,
+        servicos_concluidos=len(pedidos_pagos),
+        taxa_trato_centavos=taxa,
     )
 
 
@@ -108,6 +120,20 @@ def pdf(
         return 160
 
     y = cabecalho()
+    doc.texto(margem, y, "Resumo do mês", 11, negrito=True)
+    y += 20
+    ganhos = (
+        ("Serviços concluídos", str(extrato.servicos_concluidos)),
+        ("Total bruto", reais(extrato.bruto_centavos)),
+        ("Taxa do Trato", reais(extrato.taxa_trato_centavos)),
+        ("Total líquido recebido", reais(extrato.recebido_centavos)),
+    )
+    for rotulo, texto in ganhos:
+        negrito = rotulo.startswith("Total líquido")
+        doc.texto(margem, y, rotulo, 10.5, negrito=negrito)
+        doc.texto(direita, y, texto, 10.5, negrito=negrito, direita=True)
+        y += 18
+    y += 10
     resumo = (
         ("Recebido no período", extrato.recebido_centavos),
         ("Estornos no período", -extrato.estornado_centavos),
