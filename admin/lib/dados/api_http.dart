@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../nucleo/papeis.dart';
+import '../nucleo/navegador.dart';
 import 'api_admin.dart';
 import 'modelos.dart';
 
@@ -20,6 +21,7 @@ class ApiAdminHttp implements ApiAdmin {
     required String chaveAnonSupabase,
     http.Client? cliente,
     this.tempoLimite = const Duration(seconds: 20),
+    this._urlPublica,
   })  : _api = _semBarraFinal(urlApi),
         _supabase = _semBarraFinal(urlSupabase),
         _chaveAnon = chaveAnonSupabase,
@@ -28,6 +30,10 @@ class ApiAdminHttp implements ApiAdmin {
   final String _api;
   final String _supabase;
   final String _chaveAnon;
+
+  /// URL do próprio painel, para onde o link do e-mail de senha volta. Vazio = a origem em que o
+  /// painel foi aberto (nunca um endereço fixo no código).
+  final String? _urlPublica;
   final http.Client _cliente;
   final Duration tempoLimite;
 
@@ -184,6 +190,50 @@ class ApiAdminHttp implements ApiAdmin {
       _token = null;
       rethrow;
     }
+  }
+
+  String get _urlRetornoPainel {
+    final configurada = (_urlPublica ?? '').trim();
+    if (configurada.isNotEmpty) return configurada;
+    final u = urlAtual();
+    return u.hasAuthority ? u.origin : '';
+  }
+
+  @override
+  Future<void> pedirRecuperacaoSenha(String email) async {
+    final retorno = _urlRetornoPainel;
+    final r = await _enviar(
+      'POST',
+      Uri.parse('$_supabase/auth/v1/recover').replace(queryParameters: {if (retorno.isNotEmpty) 'redirect_to': retorno}),
+      corpo: {'email': email.trim()},
+      cabecalhos: {'apikey': _chaveAnon},
+    );
+    // Sem pistas sobre a conta: só falha de verdade (limite de envios, servidor fora) vira erro.
+    if (r.status == 429) throw const ErroApi('Muitos pedidos seguidos. Espere alguns minutos e tente de novo.');
+    if (r.status >= 500) throw const ErroApi('Não foi possível enviar agora. Tente de novo em instantes.');
+  }
+
+  @override
+  Future<void> definirNovaSenha(String token, String novaSenha) async {
+    final r = await _enviar(
+      'PUT',
+      Uri.parse('$_supabase/auth/v1/user'),
+      corpo: {'password': novaSenha},
+      cabecalhos: {'apikey': _chaveAnon, 'Authorization': 'Bearer $token'},
+    );
+    if (r.ok) return;
+    final json = r.json is Map ? (r.json as Map) : const {};
+    final codigo = '${json['error_code'] ?? json['code'] ?? ''}';
+    if (r.status == 401 || r.status == 403 && codigo != 'same_password') {
+      throw const ErroApi('Este link expirou ou já foi usado. Volte ao login e use "Esqueci a senha" para receber outro.');
+    }
+    if (codigo == 'same_password') {
+      throw const ErroApi('A nova senha precisa ser diferente da senha atual.');
+    }
+    if (r.status == 422 || codigo == 'weak_password') {
+      throw const ErroApi('Senha fraca ou recusada. Use pelo menos 8 caracteres, misturando letras e números.');
+    }
+    throw ErroApi('Não foi possível definir a senha agora (${r.status}). Tente de novo.');
   }
 
   @override

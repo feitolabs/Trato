@@ -76,6 +76,35 @@ class ApiFake implements ApiAdmin {
     ));
   }
 
+  /// E-mails para os quais houve pedido de recuperação (os testes conferem).
+  final recuperacoesPedidas = <String>[];
+
+  /// Última senha definida pelo link (dado de teste) e o token usado.
+  String? ultimaSenhaDefinida;
+  String? ultimoTokenUsado;
+
+  /// Token que o fake aceita; qualquer outro vale como link vencido.
+  static const tokenValidoDeTeste = 'token-recovery-de-teste';
+
+  @override
+  Future<void> pedirRecuperacaoSenha(String email) async {
+    await Future<void>.delayed(atraso);
+    recuperacoesPedidas.add(email.trim());
+  }
+
+  @override
+  Future<void> definirNovaSenha(String token, String novaSenha) async {
+    await Future<void>.delayed(atraso);
+    if (token != tokenValidoDeTeste) {
+      throw const ErroApi('Este link expirou ou já foi usado. Volte ao login e use "Esqueci a senha" para receber outro.');
+    }
+    if (novaSenha.length < 8) {
+      throw const ErroApi('Senha fraca ou recusada. Use pelo menos 8 caracteres, misturando letras e números.');
+    }
+    ultimoTokenUsado = token;
+    ultimaSenhaDefinida = novaSenha;
+  }
+
   @override
   Future<UsuarioEquipe> entrar(String email, String senha) async {
     await Future<void>.delayed(atraso);
