@@ -2,13 +2,16 @@
 enum TipoErro { semInternet, sessaoExpirada, servidor, recusado, naoEncontrado, indisponivel }
 
 class ErroTrato implements Exception {
-  const ErroTrato(this.tipo, this.mensagem, {this.codigoHttp});
+  const ErroTrato(this.tipo, this.mensagem, {this.codigoHttp, this.codigo});
 
   final TipoErro tipo;
   final String mensagem;
 
   /// Código HTTP quando o erro veio da API (ex.: 409 de CPF repetido).
   final int? codigoHttp;
+
+  /// Código estável retornado pela API (ex.: `saldo_insuficiente`, `limite_simultaneas`).
+  final String? codigo;
 
   static const semInternet = ErroTrato(
     TipoErro.semInternet,

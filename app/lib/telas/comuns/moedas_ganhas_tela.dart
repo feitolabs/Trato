@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../tema/tema.dart';
+import 'desconto_moedas.dart';
 import 'moeda_trato.dart';
 
-/// Recompensa depois de avaliar: moeda que salta, número que sobe e confete.
+/// Recompensa depois de avaliar: Tratinho que salta, número que sobe e confete.
 /// Só mostra o que o backend já creditou (`moedas`); nenhuma conta roda aqui.
 /// Respeita "reduzir animações": nesse caso já abre no estado final.
 class MoedasGanhasTela extends StatefulWidget {
@@ -14,9 +15,17 @@ class MoedasGanhasTela extends StatefulWidget {
     super.key,
     required this.moedas,
     required this.aoContinuar,
+    this.pendentes = 0,
+    this.proximaLiberacao,
+    this.valorMoedaCentavos,
   });
 
   final int moedas;
+
+  /// Tratinhos de avaliação ainda em espera, quando houver (backend antigo: 0, sem linha).
+  final int pendentes;
+  final DateTime? proximaLiberacao;
+  final int? valorMoedaCentavos;
   final VoidCallback aoContinuar;
 
   @override
@@ -71,7 +80,13 @@ class _MoedasGanhasTelaState extends State<MoedasGanhasTela>
                       Positioned.fill(
                         child: CustomPaint(painter: _Confete(_ctl.value)),
                       ),
-                      _Conteudo(progresso: _ctl.value, moedas: widget.moedas),
+                      _Conteudo(
+                        progresso: _ctl.value,
+                        moedas: widget.moedas,
+                        pendentes: widget.pendentes,
+                        proximaLiberacao: widget.proximaLiberacao,
+                        valorMoedaCentavos: widget.valorMoedaCentavos,
+                      ),
                     ],
                   ),
                 ),
@@ -104,10 +119,19 @@ class _MoedasGanhasTelaState extends State<MoedasGanhasTela>
 }
 
 class _Conteudo extends StatelessWidget {
-  const _Conteudo({required this.progresso, required this.moedas});
+  const _Conteudo({
+    required this.progresso,
+    required this.moedas,
+    required this.pendentes,
+    required this.proximaLiberacao,
+    required this.valorMoedaCentavos,
+  });
 
   final double progresso;
   final int moedas;
+  final int pendentes;
+  final DateTime? proximaLiberacao;
+  final int? valorMoedaCentavos;
 
   @override
   Widget build(BuildContext context) {
@@ -146,7 +170,7 @@ class _Conteudo extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  moedas == 1 ? 'moeda do Trato' : 'moedas do Trato',
+                  moedas == 1 ? 'Tratinho' : 'Tratinhos',
                   style: TipografiaTrato.titulo.copyWith(color: CoresTrato.azulClaro),
                 ),
                 const SizedBox(height: EspacosTrato.x4),
@@ -159,11 +183,29 @@ class _Conteudo extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x5),
                   child: Text(
-                    'Quem vem depois vai escolher com mais segurança por causa de você. As moedas já estão na sua conta.',
+                    'Quem vem depois vai escolher com mais segurança por causa de você. '
+                    '${pendentes > 0 ? 'Seus Tratinhos ficam guardados até a liberação.' : 'Os Tratinhos já estão na sua conta.'}',
                     style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
                     textAlign: TextAlign.center,
                   ),
                 ),
+                if (valorMoedaCentavos != null) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    textoTratinhosEmReais(moedas, valorMoedaCentavos),
+                    key: const Key('tratinhos-em-reais'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulClaro),
+                  ),
+                ],
+                if (pendentes > 0) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    textoTratinhosPendentes(pendentes, proximaLiberacao, valorMoedaCentavos)!,
+                    key: const Key('tratinhos-pendentes'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulClaro),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
             ),
           ),

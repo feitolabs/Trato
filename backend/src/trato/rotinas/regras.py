@@ -118,6 +118,31 @@ class AcaoRotina:
     profissional_id: str | None = None
 
 
+class DecisaoBonus(StrEnum):
+    LIBERAR = "liberar"  # vira lançamento imutável em moedas_lancamentos
+    CANCELAR = "cancelar"  # disputa perdida pelo autor: o bônus não existe
+    AGUARDAR = "aguardar"  # prazo não venceu, ou disputa ainda sem decisão
+
+
+def decidir_liberacao_bonus(
+    agora: datetime, liberar_em: datetime, situacao_disputa: str
+) -> DecisaoBonus:
+    """Bônus de moedas pendente: libera só depois do prazo e sem disputa contra quem avaliou.
+
+    `situacao_disputa`: `nenhuma` | `aberta` (sem decisão ainda) | `perdida` (decidida contra o
+    autor da avaliação) | `estornado` (pedido estornado ou cancelado antes do prazo: nada a
+    liberar). Disputa aberta segura o bônus: cancelar antes da decisão seria injusto se o cliente
+    ganhar. Função pura: o prazo (`liberar_em`) vem da tabela de configuração.
+    """
+    if agora < liberar_em:
+        return DecisaoBonus.AGUARDAR
+    if situacao_disputa in ("perdida", "estornado"):
+        return DecisaoBonus.CANCELAR
+    if situacao_disputa == "aberta":
+        return DecisaoBonus.AGUARDAR
+    return DecisaoBonus.LIBERAR
+
+
 def prazo_confirmacao(valor_centavos: int, config: ConfigRotinas) -> timedelta | None:
     """Prazo do cliente para confirmar: o maior só vale acima do limite de valor (escopo 4, P1)."""
     limite = config.limite_valor_prazo_maior_centavos
@@ -331,3 +356,40 @@ def rotinas_do_instante(
             vistas.add(acao.chave)
             saida.append(acao)
     return saida
+
+
+@dataclass(frozen=True)
+class AvisoExpiracaoExclusividade:
+    """Notificação planejada para uma exclusividade recém-expirada (regra pura)."""
+
+    evento: str
+    destinatario_id: str
+    chave: str
+    pedido_id: str
+
+
+def planejar_avisos_expiracao(
+    exclusividade_id: str,
+    motivo: str,
+    profissional_id: str,
+    cliente_id: str,
+    pedido_id: str,
+) -> tuple[AvisoExpiracaoExclusividade, ...]:
+    """Define quem é avisado e com qual chave idempotente para cada motivo de expiração."""
+    chave = f"{exclusividade_id}:{motivo}"
+    if motivo == "sem_resposta":
+        return (
+            AvisoExpiracaoExclusividade(
+                "exclusividade.expirada_sem_resposta", profissional_id, chave, pedido_id
+            ),
+        )
+    if motivo == "sem_atendimento":
+        return (
+            AvisoExpiracaoExclusividade(
+                "exclusividade.expirada_sem_atendimento", profissional_id, chave, pedido_id
+            ),
+            AvisoExpiracaoExclusividade(
+                "exclusividade.pedido_reaberto", cliente_id, chave, pedido_id
+            ),
+        )
+    return ()

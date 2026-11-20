@@ -41,6 +41,13 @@ class Evento(StrEnum):
     RETRABALHO = "garantia.retrabalho"
     AVALIACAO = "avaliacao.recebida"
     MENSAGEM_NOVA = "mensagem.nova"
+    EXCLUSIVIDADE_OFERTA = "exclusividade.oferta"
+    EXCLUSIVIDADE_ACEITA = "exclusividade.aceita"
+    EXCLUSIVIDADE_RECUSADA = "exclusividade.recusada"
+    EXCLUSIVIDADE_EXPIRADA_SEM_RESPOSTA = "exclusividade.expirada_sem_resposta"
+    EXCLUSIVIDADE_EXPIRADA_48H_PROFISSIONAL = "exclusividade.expirada_sem_atendimento"
+    EXCLUSIVIDADE_EXPIRADA_48H_CLIENTE = "exclusividade.pedido_reaberto"
+    EXCLUSIVIDADE_CANCELADA = "exclusividade.cancelada"
 
 
 @dataclass(frozen=True)
@@ -164,6 +171,58 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Nova mensagem",
         "Você recebeu uma mensagem. Abra a conversa para ler.",
         "mensagens",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_OFERTA: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Pedido de prioridade no seu serviço",
+        "Um profissional quer fazer seu serviço com prioridade. Sem compromisso.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_ACEITA: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Prioridade aceita",
+        "O cliente aceitou a prioridade que você ganhou avaliando. "
+        "Você tem 48h para enviar seu orçamento.",
+        "pedido_aberto",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_RECUSADA: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Prioridade recusada",
+        "O cliente preferiu ver outros orçamentos. Seus 100 Tratinhos voltaram.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_EXPIRADA_SEM_RESPOSTA: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Oferta de prioridade expirada",
+        "O prazo de resposta acabou e a prioridade que você ganhou avaliando expirou. "
+        "Seus 100 Tratinhos voltaram.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_EXPIRADA_48H_PROFISSIONAL: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Prioridade de 48h encerrada",
+        "As 48h da prioridade que você ganhou avaliando terminaram sem envio de orçamento.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_EXPIRADA_48H_CLIENTE: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Pedido aberto para outros profissionais",
+        "Seu pedido voltou a receber orçamentos de outros profissionais.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.EXCLUSIVIDADE_CANCELADA: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Prioridade cancelada",
+        "O pedido mudou antes do fim da prioridade que você ganhou avaliando. "
+        "Seus 100 Tratinhos voltaram.",
+        "pedido",
         essencial=True,
     ),
 }

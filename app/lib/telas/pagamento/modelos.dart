@@ -1,6 +1,8 @@
 // Modelos da tela de pagamento. O app só exibe o que vier daqui:
 // quanto pagar agora e em que condição são decididos pelo backend.
 
+import '../comuns/desconto_moedas.dart';
+
 enum MetodoPagamento { pix, cartao }
 
 class OpcaoPagamento {
@@ -39,7 +41,25 @@ class DadosPagamento {
     this.moedasSaldo = 0,
     this.moedasUsadas = 0,
     this.moedasDescontoCentavos = 0,
+    this.descontoDisponivel = true,
+    this.descontoIndisponivelMotivo,
+    this.moedaValorCentavos,
+    this.descontoPossivelCentavos,
+    this.descontoVoltaEm,
   });
+
+  /// Quanto o cliente pode abater neste serviço, em centavos (decidido pelo backend). Null: sem linha.
+  final int? descontoPossivelCentavos;
+
+  /// Quando o desconto volta (`desconto_volta_em`). Null: texto sem data.
+  final DateTime? descontoVoltaEm;
+
+  /// Valor de 1 Tratinho em centavos, só para exibir "N Tratinhos = R$ X". Null: mostra a quantidade.
+  final int? moedaValorCentavos;
+
+  /// Backend diz se o desconto das moedas pode ser usado agora. Campo ausente = true.
+  final bool descontoDisponivel;
+  final MotivoDescontoIndisponivel? descontoIndisponivelMotivo;
 
   /// Total por número de parcelas no cartão. Vazio enquanto o parcelado estiver desligado.
   final List<OpcaoParcelamento> parcelamento;
@@ -75,6 +95,11 @@ class DadosPagamento {
     int? moedasSaldo,
     int? moedasUsadas,
     int? moedasDescontoCentavos,
+    bool? descontoDisponivel,
+    MotivoDescontoIndisponivel? descontoIndisponivelMotivo,
+    int? moedaValorCentavos,
+    int? descontoPossivelCentavos,
+    DateTime? descontoVoltaEm,
     String? rotuloValor,
     List<OpcaoPagamento>? opcoes,
   }) =>
@@ -87,6 +112,11 @@ class DadosPagamento {
         moedasSaldo: moedasSaldo ?? this.moedasSaldo,
         moedasUsadas: moedasUsadas ?? this.moedasUsadas,
         moedasDescontoCentavos: moedasDescontoCentavos ?? this.moedasDescontoCentavos,
+        descontoDisponivel: descontoDisponivel ?? this.descontoDisponivel,
+        descontoIndisponivelMotivo: descontoIndisponivelMotivo ?? this.descontoIndisponivelMotivo,
+        moedaValorCentavos: moedaValorCentavos ?? this.moedaValorCentavos,
+        descontoPossivelCentavos: descontoPossivelCentavos ?? this.descontoPossivelCentavos,
+        descontoVoltaEm: descontoVoltaEm ?? this.descontoVoltaEm,
         rotuloValor: rotuloValor ?? this.rotuloValor,
         opcoes: opcoes ?? this.opcoes,
       );

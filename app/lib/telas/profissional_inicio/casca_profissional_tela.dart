@@ -42,6 +42,7 @@ class CascaProfissionalTela extends StatefulWidget {
     this.abaConversas,
     this.carregarDetalhe,
     this.recusarPedido,
+    this.pedirExclusividade,
     this.carregarPedidos,
     this.carregarCategorias,
     this.aoAbrirNotificacoes,
@@ -83,6 +84,12 @@ class CascaProfissionalTela extends StatefulWidget {
 
   /// Recusa o pedido tocado. Sem isso, usa [aoRecusar].
   final Future<void> Function(PedidoAberto pedido, MotivoRecusa motivo)? recusarPedido;
+
+  /// Pede exclusividade de 48h no pedido tocado.
+  final Future<ExclusividadeProfissional> Function(
+    PedidoAberto pedido,
+    String chaveIdempotencia,
+  )? pedirExclusividade;
 
   /// Pede ao backend os pedidos abertos com o filtro escolhido. Sem isso, o filtro não muda a lista.
   final Future<List<PedidoAberto>> Function(FiltroPedidosAbertos filtro)? carregarPedidos;
@@ -256,6 +263,13 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
           aoPerguntar: widget.aoPerguntarDoPedido != null
               ? () => widget.aoPerguntarDoPedido!(pedido)
               : widget.aoPerguntar,
+          aoPedirExclusividade: widget.pedirExclusividade == null
+              ? null
+              : (chave) async {
+                  final nova = await widget.pedirExclusividade!(pedido, chave);
+                  await _atualizarEmSilencio();
+                  return nova;
+                },
           aoRecusar: (motivo) async {
             final navegador = Navigator.of(context);
             final mensagens = ScaffoldMessenger.of(context);
@@ -333,7 +347,9 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         ..showSnackBar(
           SnackBar(
             content: Text(
-              erro is ErroTrato ? erro.mensagem : 'Não foi possível aplicar os filtros. Tente de novo.',
+              erro is ErroTrato
+                  ? erro.mensagem
+                  : 'Não foi possível aplicar os filtros. Tente de novo.',
             ),
           ),
         );
@@ -345,8 +361,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     final paginas = <Widget>[
       InicioProfissionalTela(
         dados: _inicio,
-        aoAlterarDisponivel:
-            widget.aoAlterarDisponivel == null ? null : _alterarDisponivel,
+        aoAlterarDisponivel: widget.aoAlterarDisponivel == null ? null : _alterarDisponivel,
         aoFazerCheckIn: widget.aoGerenciarProximo != null
             ? () => widget.aoGerenciarProximo!(_inicio.proximo)
             : widget.aoFazerCheckIn,

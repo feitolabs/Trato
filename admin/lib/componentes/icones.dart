@@ -30,6 +30,7 @@ abstract final class IconesTrato {
   static const painel = Icons.space_dashboard_outlined;
   static const notificacoes = Icons.campaign_outlined;
   static const cupons = Icons.local_offer_outlined;
+  static const moedas = Icons.toll_outlined;
   static const equipe = Icons.badge_outlined;
   static const configuracoes = Icons.tune;
   static const registroAuditoria = Icons.fact_check_outlined;

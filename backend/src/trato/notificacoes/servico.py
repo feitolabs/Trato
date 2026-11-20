@@ -82,9 +82,11 @@ class ServicoNotificacoes:
         chave: str,
         pedido_id: str | None = None,
         dados: dict[str, Any] | None = None,
+        corpo: str | None = None,
     ) -> list[Registro]:
         """Cria (uma vez) a notificação do evento nos canais ligados. Devolve as linhas novas."""
         modelo = MODELOS[evento]
+        texto_corpo = corpo if corpo is not None else modelo.corpo
         agora = self.agora()
         prefs = self.repo.preferencias(usuario_id)
         conteudo = {
@@ -105,7 +107,7 @@ class ServicoNotificacoes:
             if not ligado or (nome != "app" and not self._destinos(nome, usuario_id)):
                 continue
             registro, criada = self.repo.criar(
-                usuario_id, evento.value, nome, modelo.titulo, modelo.corpo, conteudo,
+                usuario_id, evento.value, nome, modelo.titulo, texto_corpo, conteudo,
                 f"{evento.value}:{chave}", agora, nome == "app",
             )  # fmt: skip
             if criada:

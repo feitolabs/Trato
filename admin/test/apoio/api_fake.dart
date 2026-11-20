@@ -7,7 +7,28 @@ import 'package:trato_admin/dados/modelos.dart';
 /// Login: o papel vem do começo do e-mail (`financeiro@teste.local` -> papel `financeiro`) e a senha
 /// só precisa ter 8 caracteres ou mais. Não há senha real em lugar nenhum do painel.
 class ApiFake implements ApiAdmin {
-  ApiFake({this.atraso = Duration.zero, this.erro = false, this.vazio = false, this.cadeiaQuebradaEm});
+  ApiFake({
+    this.atraso = Duration.zero,
+    this.erro = false,
+    this.vazio = false,
+    this.cadeiaQuebradaEm,
+    this.moedasUsadoCentavos = 4200000,
+    this.moedasUsadoDiaCentavos = 100000,
+    this.moedasSemExtras = false,
+    this.moedasSemChaves = const {},
+  });
+
+  /// Simula backend antigo: a config vem sem os 6 campos de exclusividade.
+  final bool moedasSemExtras;
+
+  /// Chaves específicas que faltam na resposta.
+  final Set<String> moedasSemChaves;
+
+  /// Quanto do teto diário já foi usado hoje (dado de teste).
+  final int moedasUsadoDiaCentavos;
+
+  /// Quanto do orçamento de moedas já foi usado no mês (dado de teste).
+  final int moedasUsadoCentavos;
 
   final Duration atraso;
 
@@ -1417,6 +1438,84 @@ class ApiFake implements ApiAdmin {
   Future<void> excluirCupom(String cupomId, {required String motivo}) async {
     _cupons.removeWhere((c) => c.id == cupomId);
     _registrar('cupom.excluido', 'cupons', motivo);
+  }
+
+  MoedasConfig _moedas = const MoedasConfig(
+    ativo: true,
+    bonusAvaliacaoMoedas: 5,
+    valorMoedaCentavos: 10,
+    tetoMensalMoedas: 200,
+    minServicoCentavos: 5000,
+    maxBonusPorProfissionalMes: 100,
+    maxDescontoPercentual: 20,
+    validadeDias: 90,
+    orcamentoMensalDescontoCentavos: 5000000,
+    avisoPercentual: 80,
+    tetoDescontoClienteMesCentavos: 20000,
+    tetoDiarioDescontoCentavos: 200000,
+    diasLiberacaoBonus: 7,
+    extras: {
+      'bonus_avaliacao_profissional_moedas': 50,
+      'exclusividade_custo_moedas': 100,
+      'exclusividade_duracao_horas': 48,
+      'exclusividade_max_simultaneas': 3,
+      'exclusividade_prazo_resposta_horas': 6,
+      'exclusividade_bloqueio_recusa_dias': 30,
+    },
+  );
+
+  /// Última configuração gravada (para os testes conferirem o que foi ao backend).
+  MoedasConfig get moedasConfigAtual => _moedas;
+
+  @override
+  Future<MoedasOrcamento> orcamentoMoedas() => _ler(() {
+        final total = _moedas.orcamentoMensalDescontoCentavos;
+        final pct = total == 0 ? 0.0 : moedasUsadoCentavos * 100 / total;
+        return MoedasOrcamento(
+          mesRef: '2026-11',
+          orcamentoCentavos: total,
+          usadoCentavos: moedasUsadoCentavos,
+          percentualUsado: pct,
+          aviso: pct >= _moedas.avisoPercentual,
+          diaRef: '2026-11-20',
+          usadoDiaCentavos: moedasUsadoDiaCentavos,
+          tetoDiaCentavos: _moedas.tetoDiarioDescontoCentavos,
+        );
+      }, const MoedasOrcamento(mesRef: '2026-11', orcamentoCentavos: 0, usadoCentavos: 0, percentualUsado: 0, aviso: false));
+
+  @override
+  Future<MoedasConfig> carregarMoedasConfig() => _ler(() => _moedasVisivel, _moedasVisivel);
+
+  MoedasConfig get _moedasVisivel {
+    final m = _moedas;
+    if (!moedasSemExtras && moedasSemChaves.isEmpty) return m;
+    return MoedasConfig(
+      ativo: m.ativo,
+      bonusAvaliacaoMoedas: m.bonusAvaliacaoMoedas,
+      valorMoedaCentavos: m.valorMoedaCentavos,
+      tetoMensalMoedas: m.tetoMensalMoedas,
+      minServicoCentavos: m.minServicoCentavos,
+      maxBonusPorProfissionalMes: m.maxBonusPorProfissionalMes,
+      maxDescontoPercentual: m.maxDescontoPercentual,
+      validadeDias: m.validadeDias,
+      orcamentoMensalDescontoCentavos: m.orcamentoMensalDescontoCentavos,
+      avisoPercentual: m.avisoPercentual,
+      tetoDescontoClienteMesCentavos: m.tetoDescontoClienteMesCentavos,
+      tetoDiarioDescontoCentavos: m.tetoDiarioDescontoCentavos,
+      diasLiberacaoBonus: m.diasLiberacaoBonus,
+      extras: {
+        for (final e in m.extras.entries)
+          if (!moedasSemExtras && !moedasSemChaves.contains(e.key)) e.key: e.value,
+      },
+    );
+  }
+
+  @override
+  Future<MoedasConfig> salvarMoedasConfig(MoedasConfig config, {required String motivo}) async {
+    await Future<void>.delayed(atraso);
+    _moedas = config;
+    _registrar('moedas.config_alterada', 'moedas_config', motivo);
+    return _moedas;
   }
 
   static const _tetos = {

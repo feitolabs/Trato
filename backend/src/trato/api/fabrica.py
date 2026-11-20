@@ -53,6 +53,7 @@ from trato.persistencia.dinheiro import (
     GarantiasPostgres,
     RepassesPostgres,
 )
+from trato.persistencia.exclusividades import ExclusividadesPostgres
 from trato.persistencia.execucao import ExecucaoPostgres
 from trato.persistencia.fechamentos import FechamentosPostgres
 from trato.persistencia.ledger import LedgerPostgres
@@ -139,6 +140,7 @@ def criar_contexto_postgres(
         verificacoes=VerificacoesPostgres(banco),
         avaliacoes=AvaliacoesPostgres(banco),
         moedas=MoedasPostgres(banco),
+        exclusividades=ExclusividadesPostgres(banco),
         ranking=RankingPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),

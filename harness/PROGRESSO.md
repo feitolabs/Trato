@@ -1077,3 +1077,13 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - **Validado no Supabase real (só SELECT):** as duas fases da consulta, com e sem texto/bairro.
 - **Migration APLICADA em 2026-11-19 (OK do João):** `20261119140000_ranking_config.sql` (+ rollback). Sem a tabela, a leitura dos pesos cai nos valores padrão (a busca não quebra), então o deploy não exige a migration, mas os pesos ficam fixos até aplicar.
 - **Limite conhecido:** no Postgres a busca traz todos os candidatos que casam com os filtros antes de paginar. Com milhares de profissionais, vale mover o cálculo para uma coluna/visão.
+
+## 2026-11-20 — Orçamento de desconto de Tratinhos, reservas e Pix com validade (branch `feature/moedas-orcamento`)
+
+- **Regras (OK do João):** orçamento de desconto R$ 300/mês, R$ 10/dia e R$ 5 por cliente/mês, tudo em tabela de configuração; moeda se chama Tratinho (1 = 1 centavo); bônus do cliente liberado 7 dias depois, se não houver disputa; só o cliente usa Tratinhos como desconto, pago pela empresa. Decisões em `docs/decisoes-moedas-e-exclusividade.md`.
+- **Banco:** migrations `20261120100000_moedas_orcamento.sql` e `20261120200000_moedas_reservas.sql` (+ rollbacks) APLICADAS no Supabase em 2026-11-20 (OK do João), conferidas com SELECT. `moedas_config.ativo` já estava `true` antes; `moedas_lancamentos` e `moedas_pendentes` tinham 0 linhas.
+- **Backend:** reserva atômica (mês, dia, teto do cliente, saldo e reservas abertas) por cobrança; devolução idempotente com o valor gravado; Pix com validade igual à reserva (Stripe `expires_after_seconds`); rotina de expiração; webhook tardio vai para revisão sem debitar em silêncio. Testes: 95 de moedas/Pix passando (rodados pelo Mestre); 205 relevantes (DevOps).
+- **App e painel:** "Desconto indisponível agora" com data de volta, Tratinhos em reais, frase "Sem taxa para você", tela de Tratinhos no admin e alerta de 80%.
+- **Deploy no Fly (OK do João):** app `trato`, release v29 → v30, 2 máquinas saudáveis, `/saude` 200. Só `GET /saude` foi chamado em produção; os endpoints novos não foram testados lá.
+- **Revisão da Seguranca:** rodada 1 e R2 revisadas. A **R3** (Pix com validade, webhook tardio) NÃO teve revisão da Seguranca (decisão do João de seguir).
+- **Pendente:** agendador desligado no Fly (`TRATO_AGENDADOR_EMBUTIDO=false`): reservas não expiram e bônus não são liberados; contabilidade do desconto (próxima rodada); fallback do bônus com `Exception` genérica; permissão própria do admin para a config de moedas; bônus em pedido estornado; fuso do mês no bônus; teste de concorrência num Postgres real; UPDATE da validade de 90 dias; Etapa B (exclusividade 48h).

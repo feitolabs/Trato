@@ -19,6 +19,7 @@ from enum import StrEnum
 
 class Estado(StrEnum):
     ABERTO = "aberto"
+    RESERVADO = "reservado"  # exclusividade ativa: só o profissional dela pode orçar
     ORCAMENTO_ACEITO = "orcamento_aceito"
     AGUARDANDO_CONFIRMACAO = "aguardando_confirmacao"  # cliente pagou; falta o parceiro confirmar
     PAGO_E_RETIDO = "pago_e_retido"
@@ -37,6 +38,7 @@ class Estado(StrEnum):
 
 _NOMES_ESTADO = {
     Estado.ABERTO: "Aberto",
+    Estado.RESERVADO: "Reservado",
     Estado.ORCAMENTO_ACEITO: "Orçamento aceito",
     Estado.AGUARDANDO_CONFIRMACAO: "Aguardando confirmação do pagamento",
     Estado.PAGO_E_RETIDO: "Pago e retido",
@@ -85,6 +87,8 @@ class Acao(StrEnum):
     ENCERRAR_DISPUTA_POR_ACORDO = "encerrar_disputa_por_acordo"
     DECIDIR_DISPUTA = "decidir_disputa"
     PEDIR_RETRABALHO = "pedir_retrabalho"
+    RESERVAR_EXCLUSIVIDADE = "reservar_exclusividade"  # cliente aceita a exclusividade
+    EXPIRAR_EXCLUSIVIDADE = "expirar_exclusividade"  # 48h sem atender: o pedido reabre
 
 
 class MotivoDisputa(StrEnum):
@@ -309,7 +313,7 @@ def _de(*estados: Estado) -> frozenset[Estado]:
 E = Estado
 REGRAS: dict[Acao, _Regra] = {
     Acao.ACEITAR_ORCAMENTO: _Regra(
-        "aceitar o orçamento", {Papel.CLIENTE: _de(E.ABERTO)}, ProvaAceite
+        "aceitar o orçamento", {Papel.CLIENTE: _de(E.ABERTO, E.RESERVADO)}, ProvaAceite
     ),
     Acao.EXPIRAR_PEDIDO: _Regra("expirar o pedido", {Papel.SISTEMA: _de(E.ABERTO)}, None),
     Acao.EXPIRAR_PAGAMENTO: _Regra(
@@ -361,7 +365,9 @@ REGRAS: dict[Acao, _Regra] = {
     Acao.CANCELAR: _Regra(
         "cancelar",
         {
-            Papel.CLIENTE: _de(E.ABERTO, E.ORCAMENTO_ACEITO, E.PAGO_E_RETIDO, E.AGENDADO),
+            Papel.CLIENTE: _de(
+                E.ABERTO, E.RESERVADO, E.ORCAMENTO_ACEITO, E.PAGO_E_RETIDO, E.AGENDADO
+            ),
             Papel.PROFISSIONAL: _de(E.PAGO_E_RETIDO, E.AGENDADO),
         },
         ProvaCancelamento,
@@ -379,6 +385,12 @@ REGRAS: dict[Acao, _Regra] = {
     ),
     Acao.PEDIR_RETRABALHO: _Regra(
         "pedir retrabalho", {Papel.CLIENTE: _de(E.CONCLUIDO)}, ProvaRetrabalho
+    ),
+    Acao.RESERVAR_EXCLUSIVIDADE: _Regra(
+        "aceitar a exclusividade", {Papel.CLIENTE: _de(E.ABERTO)}, None
+    ),
+    Acao.EXPIRAR_EXCLUSIVIDADE: _Regra(
+        "expirar a exclusividade", {Papel.SISTEMA: _de(E.RESERVADO)}, None
     ),
 }
 del E
@@ -407,10 +419,17 @@ def abrir_pedido(pedido_id: str, ator: Ator, agora: datetime) -> Pedido:
     return Pedido(id=pedido_id, cliente_id=ator.id, aberto_em=agora)
 
 
+# O aceite da exclusividade tem rota própria (`.../exclusividade/{id}/responder`): não aparece
+# na lista de botões do pedido.
+_SO_POR_ROTA_PROPRIA = frozenset({Acao.RESERVAR_EXCLUSIVIDADE})
+
+
 def acoes_permitidas(pedido: Pedido, papel: Papel) -> frozenset[Acao]:
     """Ações que o papel pode tentar no estado atual (sem checar prova nem prazo)."""
     return frozenset(
-        acao for acao, regra in REGRAS.items() if pedido.estado in regra.quem.get(papel, ())
+        acao
+        for acao, regra in REGRAS.items()
+        if pedido.estado in regra.quem.get(papel, ()) and acao not in _SO_POR_ROTA_PROPRIA
     )
 
 
@@ -536,6 +555,14 @@ def _expirar_pedido(pedido, ator, agora, prova, prazos, gerar):
     prazo = _prazo(prazos, "receber_orcamentos", "receber orçamentos")
     _exigir_vencido(pedido.aberto_em, prazo, agora, "receber orçamentos")
     return replace(pedido, estado=Estado.CANCELADO)
+
+
+def _reservar_exclusividade(pedido, ator, agora, prova, prazos, gerar):
+    return replace(pedido, estado=Estado.RESERVADO)
+
+
+def _expirar_exclusividade(pedido, ator, agora, prova, prazos, gerar):
+    return replace(pedido, estado=Estado.ABERTO)
 
 
 def _expirar_pagamento(pedido, ator, agora, prova, prazos, gerar):
@@ -715,4 +742,6 @@ _APLICAR = {
     Acao.ENCERRAR_DISPUTA_POR_ACORDO: _encerrar_disputa_por_acordo,
     Acao.DECIDIR_DISPUTA: _decidir_disputa,
     Acao.PEDIR_RETRABALHO: _pedir_retrabalho,
+    Acao.RESERVAR_EXCLUSIVIDADE: _reservar_exclusividade,
+    Acao.EXPIRAR_EXCLUSIVIDADE: _expirar_exclusividade,
 }

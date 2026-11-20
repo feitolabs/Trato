@@ -38,10 +38,14 @@ class DadosDoPedido {
     this.modalidade = 'presencial',
     this.fotos = const [],
     this.profissionalConvidadoId,
+    this.estado = 'aberto',
+    this.ofertaExclusividade,
   });
 
   final List<String> fotos;
   final String? profissionalConvidadoId;
+  final String estado;
+  final OfertaExclusividadeCliente? ofertaExclusividade;
 
   final String titulo;
   final String descricao;
@@ -150,6 +154,17 @@ abstract interface class RepositorioPedidos {
 
   /// Remarca a janela de visita de um pedido agendado (`POST /v1/pedidos/{id}/acoes/remarcar`).
   Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
+
+  /// Oferta de exclusividade em andamento para o pedido (`GET /v1/pedidos/{id}/exclusividade`).
+  Future<OfertaExclusividadeCliente?> ofertaExclusividade(String pedidoId) async => null;
+
+  /// Aceita ou recusa uma oferta de exclusividade (`POST /v1/pedidos/{id}/exclusividade/{eid}/responder`).
+  Future<OfertaExclusividadeCliente> responderExclusividade(
+    String pedidoId,
+    String exclusividadeId,
+    String decisao,
+  ) =>
+      throw UnimplementedError();
 }
 
 class OrcamentosDoPedido {
@@ -306,8 +321,7 @@ class PreferenciaNotificacao {
   final bool push;
   final bool email;
 
-  PreferenciaNotificacao copiarCom({bool? app, bool? push, bool? email}) =>
-      PreferenciaNotificacao(
+  PreferenciaNotificacao copiarCom({bool? app, bool? push, bool? email}) => PreferenciaNotificacao(
         categoria: categoria,
         app: app ?? this.app,
         push: push ?? this.push,
@@ -394,8 +408,8 @@ abstract interface class RepositorioProfissional {
   /// Valor inteiro, taxa, líquido, aditivos e notas de um pedido (detalhe de uma linha do extrato).
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId);
 
-  /// O profissional avalia o cliente de um pedido concluído (uma vez).
-  Future<void> avaliarCliente(String pedidoId, int nota, String comentario);
+  /// O profissional avalia o cliente de um pedido concluído (uma vez). Devolve Tratinhos ganhos (0 se nenhum).
+  Future<int> avaliarCliente(String pedidoId, int nota, String comentario);
 
   /// Calculadora: taxa e líquido vêm do backend.
   ServicoOrcamento servicoOrcamento(String pedidoId);
@@ -433,4 +447,14 @@ abstract interface class RepositorioProfissional {
     String? tituloPedido,
     String? situacao,
   });
+
+  /// Exclusividades de 48h e saldo de Tratinhos do profissional (`GET /v1/profissional/exclusividades`).
+  Future<ResumoExclusividades> minhasExclusividades() async => const ResumoExclusividades();
+
+  /// Pede exclusividade de 48h num pedido aberto (`POST /v1/profissional/exclusividades`).
+  Future<ExclusividadeProfissional> solicitarExclusividade(
+    String pedidoId,
+    String chaveIdempotencia,
+  ) =>
+      throw UnimplementedError();
 }

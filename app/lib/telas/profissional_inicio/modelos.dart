@@ -42,9 +42,7 @@ class ProximoAtendimento {
 
   bool get precisaAgendarVisita =>
       estadoApi == 'pago_e_retido' ||
-      (!emAndamento &&
-          janelaInicio == null &&
-          quando.toLowerCase().contains('não marcada'));
+      (!emAndamento && janelaInicio == null && quando.toLowerCase().contains('não marcada'));
 }
 
 /// Pedido que o cliente já aceitou (do orçamento do profissional): do aceite até o fim. É o que o
@@ -221,6 +219,91 @@ class ResumoCarteira {
   final int paraSacarCentavos;
 }
 
+/// Oferta de exclusividade de 48h vista pelo profissional.
+class ExclusividadeProfissional {
+  const ExclusividadeProfissional({
+    required this.id,
+    required this.pedidoId,
+    required this.status,
+    this.clienteId = '',
+    this.moedasCobradas = 100,
+    this.responderAte,
+    this.expiraEm,
+    this.saldoRestante,
+    this.tituloPedido,
+    this.bloqueadoRecusa = false,
+  });
+
+  final String id;
+  final String pedidoId;
+  final String clienteId;
+
+  /// `aguardando_cliente`, `ativa`, `recusada`, `expirada_sem_resposta`,
+  /// `concluida`, `expirada_sem_atendimento` ou `cancelada`.
+  final String status;
+  final int moedasCobradas;
+  final DateTime? responderAte;
+  final DateTime? expiraEm;
+  final int? saldoRestante;
+  final String? tituloPedido;
+  final bool bloqueadoRecusa;
+
+  bool get aguardandoCliente => status == 'aguardando_cliente';
+  bool get ativa => status == 'ativa';
+  bool get emAndamento => aguardandoCliente || ativa;
+
+  String get rotuloStatus => switch (status) {
+        'aguardando_cliente' => 'Aguardando o cliente',
+        'ativa' => 'Ativa (48h)',
+        'recusada' => 'Recusada',
+        'expirada_sem_resposta' => 'Sem resposta (estornada)',
+        'concluida' => 'Concluída',
+        'expirada_sem_atendimento' => 'Expirada sem orçamento',
+        'cancelada' => 'Cancelada (estornada)',
+        _ => status,
+      };
+}
+
+/// Resumo da carteira de Tratinhos do profissional e suas exclusividades.
+/// Moeda de profissional não tem valor em dinheiro (nunca converter em reais).
+class ResumoExclusividades {
+  const ResumoExclusividades({
+    this.itens = const [],
+    this.ativasOuPendentes = 0,
+    this.limiteMaximo = 3,
+    this.saldoProfissional = 0,
+    this.moedasPendentesProfissional = 0,
+  });
+
+  final List<ExclusividadeProfissional> itens;
+  final int ativasOuPendentes;
+  final int limiteMaximo;
+  final int saldoProfissional;
+  final int moedasPendentesProfissional;
+
+  ResumoExclusividades comPendentes(int pendentes) => ResumoExclusividades(
+        itens: itens,
+        ativasOuPendentes: ativasOuPendentes,
+        limiteMaximo: limiteMaximo,
+        saldoProfissional: saldoProfissional,
+        moedasPendentesProfissional: pendentes,
+      );
+
+  ResumoExclusividades comNovaOferta(ExclusividadeProfissional oferta) {
+    final jaExiste = itens.any((i) => i.id == oferta.id);
+    final novaLista =
+        jaExiste ? [for (final i in itens) i.id == oferta.id ? oferta : i] : [oferta, ...itens];
+    final emAndamento = novaLista.where((i) => i.emAndamento).length;
+    return ResumoExclusividades(
+      itens: novaLista,
+      ativasOuPendentes: emAndamento,
+      limiteMaximo: limiteMaximo,
+      saldoProfissional: oferta.saldoRestante ?? saldoProfissional,
+      moedasPendentesProfissional: moedasPendentesProfissional,
+    );
+  }
+}
+
 /// Pedido aberto (ainda sem contratação): só bairro e distância, nunca o endereço completo.
 class PedidoAberto {
   const PedidoAberto({
@@ -240,10 +323,24 @@ class PedidoAberto {
     this.clienteNome,
     this.modalidade = 'presencial',
     this.convidado = false,
+    this.estado = 'aberto',
+    this.permiteExclusividade = true,
+    this.exclusividade,
   });
 
   /// Verdadeiro quando o cliente direcionou este pedido diretamente a este profissional.
   final bool convidado;
+
+  /// Estado do pedido (`aberto`, `reservado`, ...). Backend antigo = `aberto`.
+  final String estado;
+
+  /// Se a categoria do pedido permite exclusividade. Backend antigo = `true`.
+  final bool permiteExclusividade;
+
+  /// Oferta de exclusividade deste profissional para este pedido, se houver.
+  final ExclusividadeProfissional? exclusividade;
+
+  bool get reservado => estado == 'reservado' || (exclusividade?.ativa ?? false);
 
   /// `presencial` ou `remoto`.
   final String modalidade;
@@ -286,11 +383,13 @@ class InicioProfissional {
     this.orcamentosEnviados = const [],
     this.emAnalise = false,
     this.notificacoesNaoLidas = 0,
+    this.exclusividades,
   });
 
   /// Cadastro ainda aguardando aprovação de documentos pela equipe.
   final bool emAnalise;
   final int notificacoesNaoLidas;
+  final ResumoExclusividades? exclusividades;
 
   /// Os orçamentos que o profissional enviou, do mais novo ao mais antigo.
   final List<OrcamentoEnviado> orcamentosEnviados;
@@ -315,6 +414,7 @@ class InicioProfissional {
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
         notificacoesNaoLidas: notificacoesNaoLidas,
+        exclusividades: exclusividades,
       );
 
   /// Mesmo início com o estado de "Disponível agora" atualizado.
@@ -328,6 +428,7 @@ class InicioProfissional {
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
         notificacoesNaoLidas: notificacoesNaoLidas,
+        exclusividades: exclusividades,
       );
 
   InicioProfissional comNotificacoesNaoLidas(int naoLidas) => InicioProfissional(
@@ -340,6 +441,7 @@ class InicioProfissional {
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
         notificacoesNaoLidas: naoLidas,
+        exclusividades: exclusividades,
       );
 }
 
@@ -359,6 +461,9 @@ class DetalhePedido {
     required this.legendasFotos,
     required this.descricao,
     required this.linhas,
+    this.exclusividade,
+    this.exclusividades,
+    this.bloqueadoRecusa = false,
   });
 
   /// Dados da lista (título, bairro, distância, faixa, vagas).
@@ -374,6 +479,15 @@ class DetalhePedido {
 
   /// Detalhes do pedido, na ordem. A faixa e o prazo vêm de [pedido].
   final List<LinhaDetalhe> linhas;
+
+  /// Oferta de exclusividade em andamento (ou última oferta) para este pedido.
+  final ExclusividadeProfissional? exclusividade;
+
+  /// Saldo e contador do profissional (X de 3), quando carregados.
+  final ResumoExclusividades? exclusividades;
+
+  /// Verdadeiro se este profissional foi recusado por este cliente dentro do prazo de bloqueio.
+  final bool bloqueadoRecusa;
 }
 
 /// Motivos para recusar um pedido (escopo 6.2).

@@ -6,6 +6,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../legal/texto_legal_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart';
+import '../comuns/desconto_moedas.dart';
 import '../comuns/foco_rolagem.dart';
 import '../fluxo/rotas.dart';
 import 'confirmar_celular_tela.dart';
@@ -245,6 +246,12 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       children: [
         const SizedBox(height: EspacosTrato.x2),
         Text('Criar conta', style: TipografiaTrato.tituloGrande),
+        const SizedBox(height: EspacosTrato.x2),
+        Text(
+          fraseSemTaxa,
+          key: const Key('frase-sem-taxa'),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+        ),
         const SizedBox(height: EspacosTrato.x4),
         KeyedSubtree(
           key: _keyNome,

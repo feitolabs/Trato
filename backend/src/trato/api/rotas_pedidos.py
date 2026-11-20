@@ -20,8 +20,13 @@ from trato import disputas
 from trato.api import offline
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
-from trato.api.avisos import avisar_pedido_direcionado, avisar_pedido_urgente
+from trato.api.avisos import (
+    avisar_exclusividade_encerrada,
+    avisar_pedido_direcionado,
+    avisar_pedido_urgente,
+)
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.exclusividades import encerrar_exclusividade_do_pedido
 from trato.api.modelos import (
     AbrirDisputaIn,
     AbrirPedidoIn,
@@ -82,6 +87,7 @@ router = APIRouter(prefix="/v1/pedidos", tags=["pedidos"])
 _ROTA_DEDICADA = {
     Acao.ABRIR_DISPUTA: "POST /v1/pedidos/{id}/disputa",
     Acao.PEDIR_RETRABALHO: "POST /v1/pedidos/{id}/retrabalho",
+    Acao.RESERVAR_EXCLUSIVIDADE: "POST /v1/pedidos/{id}/exclusividade/{eid}/responder",
 }
 # Pontos de extensão: dependem de fluxos que ainda não existem (ver README da API).
 _NAO_DISPONIVEIS = {
@@ -506,7 +512,19 @@ def mudar_estado(
     if com_codigo:
         contexto.limite_codigo.acertou(pedido.id)
     # Uma transação só: contrato + pedido + garantia + efeitos no dinheiro (tudo ou nada).
+    encerramentos = []
     with contexto.transacao():
+        if acao in (Acao.ACEITAR_ORCAMENTO, Acao.CANCELAR) and pedido.estado in (
+            Estado.ABERTO,
+            Estado.RESERVADO,
+        ):
+            # Encerra a exclusividade do pedido: concluída se o orçamento aceito é do profissional
+            # dela; senão cancelada com estorno integral. Depois vem a transição normal.
+            encerramentos = encerrar_exclusividade_do_pedido(
+                contexto,
+                pedido.id,
+                transicao.pedido.profissional_id if acao is Acao.ACEITAR_ORCAMENTO else None,
+            )
         if acao is Acao.ACEITAR_ORCAMENTO:
             # Contrato antes do pedido: se o contrato falhar (ex.: taxa não publicada), o pedido
             # continua aberto. Gravar o contrato de novo com os mesmos dados não duplica.
@@ -539,6 +557,16 @@ def mudar_estado(
                 )
         if offline_em is not None:
             offline.registrar(contexto, usuario, pedido, acao, offline_em, contexto.agora())
+    for enc in encerramentos:
+        if enc.resultado == "cancelada":
+            moedas = 100
+            with contextlib.suppress(Exception):
+                excl = contexto.exclusividades.obter(enc.exclusividade_id)
+                if excl is not None:
+                    moedas = excl.moedas_cobradas
+            avisar_exclusividade_encerrada(
+                request, contexto, encerramento=enc, pedido_id=pedido.id, moedas_cobradas=moedas
+            )
     return pedido_out(gravado, usuario)
 
 

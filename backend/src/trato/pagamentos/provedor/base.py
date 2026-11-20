@@ -120,13 +120,20 @@ class ProvedorPagamento(Protocol):
         metadados: Mapping[str, str],
         parcelas: int = 1,
         cliente_externo: str | None = None,
+        expira_em_segundos: int | None = None,
     ) -> CobrancaProvedor:
-        """Cria a cobrança. A mesma `chave_idempotencia` devolve a mesma cobrança."""
+        """Cria a cobrança. A mesma `chave_idempotencia` devolve a mesma cobrança.
+
+        `expira_em_segundos`: só o Pix usa (validade do QR code; sem ele vale o padrão do
+        provedor). Cartão ignora."""
 
     def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
         """Cliente do provedor (uma vez por usuário) + chave efêmera da folha de cartão."""
 
     def consultar_cobranca(self, cobranca_id: str) -> CobrancaProvedor: ...
+
+    def cancelar_cobranca(self, cobranca_id: str) -> None:
+        """Cancela uma cobrança que ainda não foi paga (o Pix deixa de poder ser pago)."""
 
     def estornar(
         self, cobranca_id: str, valor_centavos: int | None, chave_idempotencia: str

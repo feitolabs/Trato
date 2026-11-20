@@ -1,3 +1,5 @@
+import '../comuns/desconto_moedas.dart';
+
 /// Ações dos itens do perfil do cliente. A tela só avisa qual foi tocado.
 enum AcaoPerfil {
   dadosPessoais,
@@ -37,7 +39,24 @@ class PerfilCliente {
     required this.grupos,
     this.fotoReferencia,
     this.moedas,
+    this.moedasDescontoDisponivel = true,
+    this.moedasDescontoMotivo,
+    this.moedasDescontoVoltaEm,
+    this.moedasPendentes = 0,
+    this.moedasProximaLiberacao,
+    this.moedasValorCentavos,
   });
+
+  /// Tratinhos de avaliação ainda em espera (valem 7 dias depois, sem disputa) e a data em que
+  /// liberam. Ausente = 0. O valor em reais de cada um vem do backend; sem ele, só a quantidade.
+  final int moedasPendentes;
+  final DateTime? moedasProximaLiberacao;
+  final int? moedasValorCentavos;
+
+  /// O backend diz se o desconto das moedas está disponível. Ausente = true.
+  final bool moedasDescontoDisponivel;
+  final MotivoDescontoIndisponivel? moedasDescontoMotivo;
+  final DateTime? moedasDescontoVoltaEm;
 
   /// Saldo de moedas do Trato (calculado pelo backend). Nulo ou 0: não mostra o cartão.
   final int? moedas;

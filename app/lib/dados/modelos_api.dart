@@ -173,6 +173,138 @@ class LancamentoApi {
   final String? estornoDe;
 }
 
+class ExclusividadeApi {
+  const ExclusividadeApi({
+    required this.id,
+    required this.pedidoId,
+    required this.clienteId,
+    required this.status,
+    required this.moedasCobradas,
+    required this.criadaEm,
+    this.responderAte,
+    this.respondidaEm,
+    this.expiraEm,
+    this.encerradaEm,
+    this.saldoRestante,
+  });
+
+  factory ExclusividadeApi.deJson(Map<String, dynamic> j) => ExclusividadeApi(
+        id: j['id'] as String,
+        pedidoId: j['pedido_id'] as String,
+        clienteId: (j['cliente_id'] as String?) ?? '',
+        status: (j['status'] as String?) ?? 'aguardando_cliente',
+        moedasCobradas: (j['moedas_cobradas'] as num?)?.toInt() ?? 100,
+        criadaEm: _data(j['criada_em']),
+        responderAte: _dataOuNulo(j['responder_ate']),
+        respondidaEm: _dataOuNulo(j['respondida_em']),
+        expiraEm: _dataOuNulo(j['expira_em']),
+        encerradaEm: _dataOuNulo(j['encerrada_em']),
+        saldoRestante: (j['saldo_restante'] as num?)?.toInt(),
+      );
+
+  final String id;
+  final String pedidoId;
+  final String clienteId;
+  final String status;
+  final int moedasCobradas;
+  final DateTime criadaEm;
+  final DateTime? responderAte;
+  final DateTime? respondidaEm;
+  final DateTime? expiraEm;
+  final DateTime? encerradaEm;
+  final int? saldoRestante;
+}
+
+class ListaExclusividadesApi {
+  const ListaExclusividadesApi({
+    required this.itens,
+    required this.ativasOuPendentes,
+    required this.limiteMaximo,
+    required this.saldoProfissional,
+  });
+
+  factory ListaExclusividadesApi.deJson(Map<String, dynamic> j) => ListaExclusividadesApi(
+        itens: [
+          for (final item in (j['itens'] as List? ?? const []))
+            if (item is Map<String, dynamic>)
+              ExclusividadeApi.deJson(item)
+            else if (item is Map)
+              ExclusividadeApi.deJson(Map<String, dynamic>.from(item)),
+        ],
+        ativasOuPendentes: (j['ativas_ou_pendentes'] as num?)?.toInt() ?? 0,
+        limiteMaximo: (j['limite_maximo'] as num?)?.toInt() ?? 3,
+        saldoProfissional: (j['saldo_profissional'] as num?)?.toInt() ?? 0,
+      );
+
+  final List<ExclusividadeApi> itens;
+  final int ativasOuPendentes;
+  final int limiteMaximo;
+  final int saldoProfissional;
+}
+
+class OfertaExclusividadeApi {
+  const OfertaExclusividadeApi({
+    required this.id,
+    required this.pedidoId,
+    required this.profissionalId,
+    required this.status,
+    this.profissionalNome,
+    this.notaPublica,
+    this.responderAte,
+    this.expiraEm,
+    this.texto = 'Sem compromisso',
+  });
+
+  factory OfertaExclusividadeApi.deJson(Map<String, dynamic> j) => OfertaExclusividadeApi(
+        id: j['id'] as String,
+        pedidoId: j['pedido_id'] as String,
+        profissionalId: (j['profissional_id'] as String?) ?? '',
+        profissionalNome: j['profissional_nome'] as String?,
+        notaPublica: (j['nota_publica'] as num?)?.toDouble(),
+        status: (j['status'] as String?) ?? 'aguardando_cliente',
+        responderAte: _dataOuNulo(j['responder_ate']),
+        expiraEm: _dataOuNulo(j['expira_em']),
+        texto: (j['texto'] as String?) ?? 'Sem compromisso',
+      );
+
+  final String id;
+  final String pedidoId;
+  final String profissionalId;
+  final String? profissionalNome;
+  final double? notaPublica;
+  final String status;
+  final DateTime? responderAte;
+  final DateTime? expiraEm;
+  final String texto;
+}
+
+class RespostaExclusividadeApi {
+  const RespostaExclusividadeApi({
+    required this.id,
+    required this.pedidoId,
+    required this.status,
+    required this.pedidoEstado,
+    this.expiraEm,
+    this.outrosOrcamentosContinuamVisiveis = true,
+  });
+
+  factory RespostaExclusividadeApi.deJson(Map<String, dynamic> j) => RespostaExclusividadeApi(
+        id: j['id'] as String,
+        pedidoId: j['pedido_id'] as String,
+        status: (j['status'] as String?) ?? 'recusada',
+        expiraEm: _dataOuNulo(j['expira_em']),
+        pedidoEstado: (j['pedido_estado'] as String?) ?? 'aberto',
+        outrosOrcamentosContinuamVisiveis: j['outros_orcamentos_continuam_visiveis'] != false,
+      );
+
+  final String id;
+  final String pedidoId;
+  final String status;
+  final DateTime? expiraEm;
+  final String pedidoEstado;
+  final bool outrosOrcamentosContinuamVisiveis;
+}
+
 class ExtratoApi {
   const ExtratoApi({required this.itens, required this.total});
 

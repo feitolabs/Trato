@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
+import '../comuns/desconto_moedas.dart' show textoTratinhos;
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
@@ -61,121 +62,122 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Olá, ${dados.nome}',
-                            style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.textoSecundario),
-                          ),
-                          const SizedBox(height: EspacosTrato.x1),
-                          Text('Pedidos perto de você', style: TipografiaTrato.tituloGrande),
-                        ],
-                      ),
+                    Text(
+                      'Olá, ${dados.nome}',
+                      style:
+                          TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                     ),
-                    if (widget.aoAbrirNotificacoes != null) ...[
-                      const SizedBox(width: EspacosTrato.x2),
-                      Builder(
-                        builder: (context) {
-                          final c = context.cores;
-                          final naoLidas = dados.notificacoesNaoLidas;
-                          final icone = Icon(Icons.notifications_none, color: c.texto);
-                          return Semantics(
-                            button: true,
-                            label: 'Notificações',
-                            value: naoLidas > 0 ? '$naoLidas não lidas' : null,
-                            excludeSemantics: true,
-                            child: Material(
-                              color: c.superficie,
-                              shape: CircleBorder(side: BorderSide(color: c.borda)),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: widget.aoAbrirNotificacoes,
-                                child: SizedBox.square(
-                                  dimension: 48,
-                                  child: Center(
-                                    child: naoLidas > 0
-                                        ? Badge.count(
-                                            count: naoLidas,
-                                            maxCount: 99,
-                                            backgroundColor: c.laranja,
-                                            textColor: CoresTrato.petroleo,
-                                            child: icone,
-                                          )
-                                        : icone,
-                                  ),
-                                ),
-                              ),
+                    const SizedBox(height: EspacosTrato.x1),
+                    Text('Pedidos perto de você', style: TipografiaTrato.tituloGrande),
+                  ],
+                ),
+              ),
+              if (widget.aoAbrirNotificacoes != null) ...[
+                const SizedBox(width: EspacosTrato.x2),
+                Builder(
+                  builder: (context) {
+                    final c = context.cores;
+                    final naoLidas = dados.notificacoesNaoLidas;
+                    final icone = Icon(Icons.notifications_none, color: c.texto);
+                    return Semantics(
+                      button: true,
+                      label: 'Notificações',
+                      value: naoLidas > 0 ? '$naoLidas não lidas' : null,
+                      excludeSemantics: true,
+                      child: Material(
+                        color: c.superficie,
+                        shape: CircleBorder(side: BorderSide(color: c.borda)),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: widget.aoAbrirNotificacoes,
+                          child: SizedBox.square(
+                            dimension: 48,
+                            child: Center(
+                              child: naoLidas > 0
+                                  ? Badge.count(
+                                      count: naoLidas,
+                                      maxCount: 99,
+                                      backgroundColor: c.laranja,
+                                      textColor: CoresTrato.petroleo,
+                                      child: icone,
+                                    )
+                                  : icone,
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ],
-                  ],
+                    );
+                  },
                 ),
-                if (dados.emAnalise) ...[
-                  const SizedBox(height: EspacosTrato.x4),
-                  const AvisoFaixa(
-                    texto:
-                        'Seu cadastro está em análise. Assim que sua verificação for aprovada, os pedidos da sua região aparecerão aqui.',
-                    tipo: TipoStatus.info,
-                    icone: Icons.hourglass_top_outlined,
-                  ),
-                ],
-                // Só aparece quando alguém grava a escolha: o backend ainda não tem "disponível agora",
-                // e um interruptor que não grava em lugar nenhum engana o profissional.
-                if (widget.aoAlterarDisponivel != null) ...[
-                  const SizedBox(height: EspacosTrato.x4),
-                  _CartaoDisponivel(
-                    ligado: _disponivel,
-                    aoMudar: (v) {
-                      setState(() => _disponivel = v);
-                      widget.aoAlterarDisponivel?.call(v);
-                    },
-                  ),
-                ],
-                if (dados.proximo != null) ...[
-                  const SizedBox(height: EspacosTrato.x4),
-                  _CartaoProximo(proximo: dados.proximo!, aoFazerCheckIn: widget.aoFazerCheckIn),
-                ],
-                const SizedBox(height: EspacosTrato.x4),
-                _CartaoCarteira(carteira: dados.carteira, aoTocar: widget.aoAbrirCarteira),
-                const SizedBox(height: EspacosTrato.x5),
-                Row(
-                  children: [
-                    Expanded(child: Text('Pedidos abertos', style: TipografiaTrato.titulo)),
-                    BotaoLink(texto: 'Filtros', aoTocar: widget.aoAbrirFiltros ?? () {}),
-                  ],
-                ),
-                const SizedBox(height: EspacosTrato.x2),
-                if (dados.pedidos.isEmpty)
-                  CartaoTrato(
-                    child: Text(
-                      dados.emAnalise
-                          ? 'Assim que seu cadastro for aprovado, os pedidos disponíveis aparecerão aqui.'
-                          : 'Nenhum pedido aberto na sua região no momento.',
-                      style: TipografiaTrato.corpoPequeno
-                          .copyWith(color: CoresTrato.textoSecundario),
-                    ),
-                  )
-                else
-                  for (final pedido in dados.pedidos) ...[
-                    CartaoPedidoAberto(
-                      pedido: pedido,
-                      aoTocar: widget.aoAbrirPedido == null
-                          ? null
-                          : () => widget.aoAbrirPedido!(pedido),
-                    ),
-                    const SizedBox(height: EspacosTrato.x3),
-                  ],
               ],
+            ],
+          ),
+          if (dados.emAnalise) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            const AvisoFaixa(
+              texto:
+                  'Seu cadastro está em análise. Assim que sua verificação for aprovada, os pedidos da sua região aparecerão aqui.',
+              tipo: TipoStatus.info,
+              icone: Icons.hourglass_top_outlined,
             ),
-          );
+          ],
+          // Só aparece quando alguém grava a escolha: o backend ainda não tem "disponível agora",
+          // e um interruptor que não grava em lugar nenhum engana o profissional.
+          if (widget.aoAlterarDisponivel != null) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            _CartaoDisponivel(
+              ligado: _disponivel,
+              aoMudar: (v) {
+                setState(() => _disponivel = v);
+                widget.aoAlterarDisponivel?.call(v);
+              },
+            ),
+          ],
+          if (dados.proximo != null) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            _CartaoProximo(proximo: dados.proximo!, aoFazerCheckIn: widget.aoFazerCheckIn),
+          ],
+          const SizedBox(height: EspacosTrato.x4),
+          _CartaoCarteira(carteira: dados.carteira, aoTocar: widget.aoAbrirCarteira),
+          if (dados.exclusividades != null) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            _CartaoExclusividades(resumo: dados.exclusividades!),
+          ],
+          const SizedBox(height: EspacosTrato.x5),
+          Row(
+            children: [
+              Expanded(child: Text('Pedidos abertos', style: TipografiaTrato.titulo)),
+              BotaoLink(texto: 'Filtros', aoTocar: widget.aoAbrirFiltros ?? () {}),
+            ],
+          ),
+          const SizedBox(height: EspacosTrato.x2),
+          if (dados.pedidos.isEmpty)
+            CartaoTrato(
+              child: Text(
+                dados.emAnalise
+                    ? 'Assim que seu cadastro for aprovado, os pedidos disponíveis aparecerão aqui.'
+                    : 'Nenhum pedido aberto na sua região no momento.',
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              ),
+            )
+          else
+            for (final pedido in dados.pedidos) ...[
+              CartaoPedidoAberto(
+                pedido: pedido,
+                aoTocar: widget.aoAbrirPedido == null ? null : () => widget.aoAbrirPedido!(pedido),
+              ),
+              const SizedBox(height: EspacosTrato.x3),
+            ],
+        ],
+      ),
+    );
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
@@ -326,6 +328,69 @@ class _Valor extends StatelessWidget {
   }
 }
 
+class _CartaoExclusividades extends StatelessWidget {
+  const _CartaoExclusividades({required this.resumo});
+
+  final ResumoExclusividades resumo;
+
+  @override
+  Widget build(BuildContext context) {
+    final recentes = resumo.itens.take(3).toList();
+    return CartaoTrato(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Exclusividades: ${resumo.ativasOuPendentes} de ${resumo.limiteMaximo}',
+                  style: TipografiaTrato.tituloCartao,
+                ),
+              ),
+              Text(
+                textoTratinhos(resumo.saldoProfissional),
+                style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.petroleo),
+              ),
+            ],
+          ),
+          if (resumo.moedasPendentesProfissional > 0) ...[
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              '${textoTratinhos(resumo.moedasPendentesProfissional)} a liberar',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ],
+          if (recentes.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            for (final item in recentes)
+              Padding(
+                padding: const EdgeInsets.only(top: EspacosTrato.x1),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.tituloPedido ?? 'Pedido ${item.pedidoId}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TipografiaTrato.corpoPequeno,
+                      ),
+                    ),
+                    const SizedBox(width: EspacosTrato.x2),
+                    Text(
+                      item.rotuloStatus,
+                      style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class CartaoPedidoAberto extends StatelessWidget {
   const CartaoPedidoAberto({super.key, required this.pedido, required this.aoTocar});
 
@@ -372,6 +437,22 @@ class CartaoPedidoAberto extends StatelessWidget {
                   ],
                 ],
               ),
+              if (pedido.reservado || (pedido.exclusividade?.aguardandoCliente ?? false)) ...[
+                const SizedBox(height: EspacosTrato.x2),
+                Wrap(
+                  spacing: EspacosTrato.x2,
+                  runSpacing: EspacosTrato.x1,
+                  children: [
+                    if (pedido.reservado)
+                      const ChipStatus(texto: 'Reservado para você', tipo: TipoStatus.sucesso)
+                    else
+                      const ChipStatus(
+                        texto: 'Oferta enviada, aguardando o cliente',
+                        tipo: TipoStatus.info,
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: EspacosTrato.x2),
               Text(
                 partesSub.join(' · '),

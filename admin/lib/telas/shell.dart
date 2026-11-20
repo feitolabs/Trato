@@ -14,6 +14,7 @@ import 'cupons_tela.dart';
 import 'dashboard_tela.dart';
 import 'disputas_tela.dart';
 import 'equipe_tela.dart';
+import 'moedas_tela.dart';
 import 'notificacoes_tela.dart';
 import 'pagamentos_tela.dart';
 import 'relatorios_tela.dart';
@@ -71,6 +72,8 @@ final List<Secao> todasSecoes = [
       [Permissao.notificacoesEnviar], () => const NotificacoesTela()),
   Secao('cupons', 'Cupons e promoções', IconesTrato.cupons, GrupoMenu.crescimento, [Permissao.cuponsGerenciar],
       () => const CuponsTela()),
+  Secao('moedas', 'Tratinhos', IconesTrato.moedas, GrupoMenu.crescimento, [Permissao.cuponsGerenciar],
+      () => const MoedasTela()),
   Secao('equipe', 'Gestão da equipe', IconesTrato.equipe, GrupoMenu.administracao, [Permissao.equipeGerenciar],
       () => const EquipeTela()),
   Secao('config', 'Configurações', IconesTrato.configuracoes, GrupoMenu.administracao, [Permissao.configVer],

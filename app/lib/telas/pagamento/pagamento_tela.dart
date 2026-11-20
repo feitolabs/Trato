@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
+import '../comuns/desconto_moedas.dart';
 import '../comuns/moeda_trato.dart';
 import 'modelos.dart';
 
@@ -45,6 +46,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   var _usarMoedas = false;
   var _trocandoMoedas = false;
   String? _erroCupom;
+  String? _erroMoedas;
 
   @override
   void didUpdateWidget(covariant PagamentoTela oldWidget) {
@@ -110,7 +112,10 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   Future<void> _alternarMoedas(bool usar) async {
     final cb = widget.aoAlternarMoedas;
     if (cb == null || _trocandoMoedas) return;
-    setState(() => _trocandoMoedas = true);
+    setState(() {
+      _trocandoMoedas = true;
+      _erroMoedas = null;
+    });
     try {
       final atualizado = await cb(usar, _dados.cupomCodigo);
       if (!mounted) return;
@@ -122,7 +127,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
         }
       });
     } on Object {
-      if (mounted) setState(() => _erroCupom = 'Não foi possível usar as moedas agora.');
+      if (mounted) setState(() => _erroMoedas = 'Não foi possível usar os Tratinhos agora.');
     } finally {
       if (mounted) setState(() => _trocandoMoedas = false);
     }
@@ -236,17 +241,56 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         ),
                       ),
                     ],
-                    if (widget.aoAlternarMoedas != null && (dados.moedasSaldo > 0 || _usarMoedas)) ...[
+                    if (widget.aoAlternarMoedas != null &&
+                        (dados.moedasSaldo > 0 || _usarMoedas)) ...[
                       const SizedBox(height: EspacosTrato.x4),
-                      _CartaoMoedas(
-                        saldo: dados.moedasSaldo,
-                        usadas: dados.moedasUsadas,
-                        descontoCentavos: dados.moedasDescontoCentavos,
-                        ligado: _usarMoedas,
-                        ocupado: _trocandoMoedas,
-                        aoAlternar: _alternarMoedas,
-                      ),
+                      if (!dados.descontoDisponivel && !_usarMoedas)
+                        _CartaoMoedasIndisponivel(
+                          mensagem: mensagemDescontoIndisponivel(
+                            dados.descontoIndisponivelMotivo,
+                            voltaEm: dados.descontoVoltaEm,
+                          ),
+                        )
+                      else
+                        _CartaoMoedas(
+                          saldo: dados.moedasSaldo,
+                          usadas: dados.moedasUsadas,
+                          descontoCentavos: dados.moedasDescontoCentavos,
+                          valorMoedaCentavos: dados.moedaValorCentavos,
+                          ligado: _usarMoedas,
+                          ocupado: _trocandoMoedas,
+                          aoAlternar: _alternarMoedas,
+                        ),
+                      if (dados.descontoDisponivel && dados.descontoPossivelCentavos != null) ...[
+                        const SizedBox(height: EspacosTrato.x2),
+                        Text(
+                          'Você pode abater até ${Dinheiro.formatar(dados.descontoPossivelCentavos!)} '
+                          'neste serviço',
+                          key: const Key('desconto-possivel'),
+                          style: TipografiaTrato.corpoPequeno.copyWith(
+                            color: CoresTrato.textoSecundario,
+                          ),
+                        ),
+                      ],
+                      if (_erroMoedas != null) ...[
+                        const SizedBox(height: EspacosTrato.x2),
+                        Text(
+                          _erroMoedas!,
+                          key: const Key('erro-moedas'),
+                          style: TipografiaTrato.corpoPequeno.copyWith(
+                            color: CoresTrato.vermelhoTexto,
+                          ),
+                        ),
+                      ],
                     ],
+                    const SizedBox(height: EspacosTrato.x3),
+                    Text(
+                      fraseSemTaxa,
+                      key: const Key('frase-sem-taxa'),
+                      style: TipografiaTrato.corpoPequeno.copyWith(
+                        color: CoresTrato.textoSecundario,
+                      ),
+                    ),
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Como você quer pagar?', style: TipografiaTrato.corpoForte),
                     const SizedBox(height: EspacosTrato.x3),
@@ -551,13 +595,37 @@ class _Passo extends StatelessWidget {
   }
 }
 
-/// "Usar minhas moedas": o app só liga o interruptor; quantas moedas entram e o desconto vêm
+/// Desconto das moedas indisponível (orçamento do mês acabou ou teto do cliente): sem interruptor.
+class _CartaoMoedasIndisponivel extends StatelessWidget {
+  const _CartaoMoedasIndisponivel({required this.mensagem});
+
+  final String mensagem;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('moedas-indisponivel'),
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: const MoedaTrato(tamanho: 36),
+        title: Text('Desconto indisponível agora', style: TipografiaTrato.corpoForte),
+        subtitle: Text(
+          mensagem,
+          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Usar meus Tratinhos": o app só liga o interruptor; quantos entram e o desconto vêm
 /// do backend (limite por serviço em tabela).
 class _CartaoMoedas extends StatelessWidget {
   const _CartaoMoedas({
     required this.saldo,
     required this.usadas,
     required this.descontoCentavos,
+    required this.valorMoedaCentavos,
     required this.ligado,
     required this.ocupado,
     required this.aoAlternar,
@@ -566,6 +634,7 @@ class _CartaoMoedas extends StatelessWidget {
   final int saldo;
   final int usadas;
   final int descontoCentavos;
+  final int? valorMoedaCentavos;
   final bool ligado;
   final bool ocupado;
   final ValueChanged<bool> aoAlternar;
@@ -573,14 +642,14 @@ class _CartaoMoedas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final detalhe = ligado && usadas > 0
-        ? 'Usando $usadas moedas · desconto de ${Dinheiro.formatar(descontoCentavos)}'
-        : 'Você tem $saldo moedas do Trato';
+        ? 'Usando ${textoTratinhos(usadas)} · desconto de ${Dinheiro.formatar(descontoCentavos)}'
+        : 'Você tem ${textoTratinhosEmReais(saldo, valorMoedaCentavos)}';
     return Card(
       margin: EdgeInsets.zero,
       child: SwitchListTile(
         key: const Key('interruptor-moedas'),
         secondary: const MoedaTrato(tamanho: 36),
-        title: Text('Usar minhas moedas', style: TipografiaTrato.corpoForte),
+        title: Text('Usar meus Tratinhos', style: TipografiaTrato.corpoForte),
         subtitle: Text(
           detalhe,
           style: TipografiaTrato.corpoPequeno.copyWith(

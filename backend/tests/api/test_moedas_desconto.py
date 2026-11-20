@@ -19,6 +19,15 @@ from trato.api.moedas import (
 )
 from trato.pagamentos.provedor import TipoEvento
 
+# Orçamento e teto do cliente folgados: estes testes são do desconto em si (o orçamento tem
+# os seus em test_moedas_orcamento.py).
+_GRANDE = {
+    "orcamento_mensal_desconto_centavos": 100_000_000,
+    "teto_desconto_cliente_mes_centavos": 100_000_000,
+    "teto_diario_desconto_centavos": 100_000_000,
+    "dias_liberacao_bonus": 0,
+}
+
 
 def _dar_saldo(repo, moedas, usuario=CLIENTE.id, chave="bonus:teste"):
     repo.lancar(LancamentoMoeda(usuario, "bonus_avaliacao", moedas, chave, AGORA))
@@ -26,7 +35,7 @@ def _dar_saldo(repo, moedas, usuario=CLIENTE.id, chave="bonus:teste"):
 
 def test_uso_respeita_saldo_e_teto_por_servico():
     repo = MoedasEmMemoria(
-        ConfigMoedas(ativo=True, valor_moeda_centavos=1, max_desconto_percentual=20)
+        ConfigMoedas(ativo=True, **_GRANDE, valor_moeda_centavos=1, max_desconto_percentual=20)
     )
     _dar_saldo(repo, 5_000)
     uso = calcular_uso_moedas(repo, usuario_id=CLIENTE.id, servico_centavos=100_000, agora=AGORA)
@@ -41,21 +50,21 @@ def test_uso_zero_quando_desligado_sem_saldo_ou_servico_minusculo():
     _dar_saldo(repo, 1_000)
     args = {"usuario_id": CLIENTE.id, "agora": AGORA}
     assert calcular_uso_moedas(repo, servico_centavos=100_000, **args).moedas == 0
-    ligado = MoedasEmMemoria(ConfigMoedas(ativo=True))
+    ligado = MoedasEmMemoria(ConfigMoedas(ativo=True, **_GRANDE))
     assert calcular_uso_moedas(ligado, servico_centavos=100_000, **args).moedas == 0  # sem saldo
     _dar_saldo(ligado, 1_000)
     assert calcular_uso_moedas(ligado, servico_centavos=100, **args).moedas == 0  # sobra < R$ 1
 
 
 def test_desconto_nunca_zera_o_servico():
-    repo = MoedasEmMemoria(ConfigMoedas(ativo=True, max_desconto_percentual=100))
+    repo = MoedasEmMemoria(ConfigMoedas(ativo=True, **_GRANDE, max_desconto_percentual=100))
     _dar_saldo(repo, 1_000_000)
     uso = calcular_uso_moedas(repo, usuario_id=CLIENTE.id, servico_centavos=5_000, agora=AGORA)
     assert uso.desconto_centavos == 4_900  # sobra R$ 1,00
 
 
 def test_debito_e_devolucao_sao_idempotentes():
-    repo = MoedasEmMemoria(ConfigMoedas(ativo=True))
+    repo = MoedasEmMemoria(ConfigMoedas(ativo=True, **_GRANDE))
     _dar_saldo(repo, 1_000)
     kw = {
         "usuario_id": CLIENTE.id,
@@ -74,7 +83,7 @@ def test_debito_e_devolucao_sao_idempotentes():
 
 
 def _ligar(fluxo: Fluxo, saldo: int):
-    fluxo.ctx.moedas = MoedasEmMemoria(ConfigMoedas(ativo=True, valor_moeda_centavos=1))
+    fluxo.ctx.moedas = MoedasEmMemoria(ConfigMoedas(ativo=True, **_GRANDE, valor_moeda_centavos=1))
     _dar_saldo(fluxo.ctx.moedas, saldo)
 
 

@@ -180,7 +180,16 @@ class OrcamentosPostgres:
             ).fetchone()
             if pedido_linha is None:
                 raise DadosInvalidos("Pedido não encontrado.")
-            if pedido_linha["status"] != "aberto":
+            if pedido_linha["status"] == "reservado":
+                # Só o profissional da exclusividade ativa orça um pedido reservado.
+                exclusivo = con.execute(
+                    "select 1 from public.exclusividades where pedido_id = %s "
+                    "and profissional_id = %s and status = 'ativa'",
+                    (pedido, profissional),
+                ).fetchone()
+                if exclusivo is None:
+                    raise RegraDoBanco("Este pedido está reservado para outro profissional.")
+            elif pedido_linha["status"] != "aberto":
                 raise RegraDoBanco("Este pedido não recebe mais orçamentos.")
             versao = con.execute(
                 "select coalesce(max(versao), 0) + 1 as v from public.orcamentos "

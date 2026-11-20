@@ -6,17 +6,20 @@ em si estão em `trato.rotinas.regras` e não são reescritas aqui.
 
 from __future__ import annotations
 
+import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import fields, replace
 from datetime import date, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from trato.api.contexto import Contexto
 from trato.disputas import Estado as EstadoDisputa
 from trato.financeiro.ledger import Lancamento, TipoLancamento, a_liberar, liberado
 from trato.notificacoes.eventos import Evento
 from trato.notificacoes.servico import ServicoNotificacoes
-from trato.pedidos.estados import Pedido, TransicaoInvalida, transicionar
+from trato.pagamentos.modelos import EstadoCobranca
+from trato.pedidos.estados import Estado, Pedido, TransicaoInvalida, transicionar
 from trato.persistencia.conexao import Banco
 from trato.rotinas.regras import (
     SISTEMA,
@@ -26,7 +29,10 @@ from trato.rotinas.regras import (
     Lembrete,
     PedidoMonitorado,
     TipoAcaoRotina,
+    planejar_avisos_expiracao,
 )
+
+log = logging.getLogger("trato.agendador")
 
 Carga = tuple[list[PedidoMonitorado], ConfigRotinas, frozenset[date]]
 
@@ -144,9 +150,113 @@ _LEMBRETE_PARA_EVENTO = {
 
 
 class ExecutorContexto:
-    def __init__(self, contexto: Contexto, notificacoes: ServicoNotificacoes | None = None) -> None:
+    def __init__(
+        self,
+        contexto: Contexto,
+        notificacoes: ServicoNotificacoes | None = None,
+        cobrancas: Any = None,
+        provedor: Any = None,
+    ) -> None:
         self._c = contexto
         self._notif = notificacoes
+        self._cobrancas = cobrancas  # repositório de cobranças (expiração de reservas)
+        self._provedor = provedor  # para cancelar no provedor a cobrança expirada
+
+    def _pedido_estornado_ou_cancelado(self, pedido_id: str) -> bool:
+        """Pedido cancelado, ou com cobrança devolvida por inteiro (estorno total)."""
+        pedido = self._c.pedidos.obter(pedido_id)
+        if pedido is not None and pedido.estado is Estado.CANCELADO:
+            return True
+        if self._cobrancas is None:
+            return False
+        return any(
+            c.status is EstadoCobranca.DEVOLVIDA for c in self._cobrancas.do_pedido(pedido_id)
+        )
+
+    def expirar_reservas_moedas(self, agora: datetime) -> int:
+        """Expira as reservas de desconto vencidas e cancela as cobranças pendentes delas.
+
+        Devolve quantas cobranças foram canceladas. Sem repositório de cobranças, não faz nada.
+        """
+        if self._cobrancas is None:
+            return 0
+        from trato.api.moedas import expirar_reservas_moedas
+
+        return expirar_reservas_moedas(self._c.moedas, self._cobrancas, agora, self._provedor)
+
+    def expirar_exclusividades(self, agora: datetime) -> int:
+        """Expira ofertas sem resposta (estorna) e exclusividades de 48h vencidas (reabre).
+
+        Idempotente: só as linhas recém-expiradas pela função SQL/memória geram avisos, cada
+        um com chave única por `(exclusividade_id, motivo)`. Falha ao notificar é logada e
+        nunca desfaz o estorno nem impede os demais avisos.
+        """
+        expiradas = self._c.exclusividades.expirar(agora)
+        if self._notif is not None:
+            for item in expiradas:
+                avisos = planejar_avisos_expiracao(
+                    item.exclusividade_id,
+                    item.motivo,
+                    item.profissional_id,
+                    item.cliente_id,
+                    item.pedido_id,
+                )
+                for aviso in avisos:
+                    try:
+                        self._notif.notificar(
+                            Evento(aviso.evento),
+                            aviso.destinatario_id,
+                            chave=aviso.chave,
+                            pedido_id=aviso.pedido_id,
+                            dados={"exclusividade_id": item.exclusividade_id},
+                        )
+                    except Exception:  # noqa: BLE001 - aviso é secundário ao estorno/reabertura
+                        log.exception(
+                            "Aviso de expiração de exclusividade falhou (%s)",
+                            item.exclusividade_id,
+                        )
+        return len(expiradas)
+
+    def liberar_bonus_moedas(self, agora: datetime) -> int:
+        """Libera (ou cancela) os bônus de moedas pendentes vencidos. Devolve quantos liberou.
+
+        A disputa do pedido decide: aberta segura o bônus; decidida sem nada para o cliente
+        (perdida) cancela; sem disputa ou ganha libera. Idempotente pela chave do lançamento.
+        """
+        from trato.api.moedas import (
+            TIPO_BONUS_PROFISSIONAL,
+            PendenteMoeda,
+            liberar_bonus_pendentes,
+        )
+
+        def situacao(pend: PendenteMoeda) -> str:
+            if not pend.pedido_id:
+                return "nenhuma"
+            try:
+                chave = uuid.UUID(pend.pedido_id).hex  # o pedido é guardado como hex
+            except ValueError:
+                chave = pend.pedido_id
+            do_profissional = pend.tipo_lancamento == TIPO_BONUS_PROFISSIONAL
+            if do_profissional and self._pedido_estornado_ou_cancelado(chave):
+                return "estornado"  # nada a liberar: o serviço foi desfeito
+            disputa = self._c.disputas.obter(chave)
+            if disputa is None:
+                return "nenhuma"
+            if disputa.estado is not EstadoDisputa.DECIDIDA:
+                return "aberta"
+            divisao = disputa.divisao
+            if divisao is None or divisao.retido != 0:
+                return "nenhuma"
+            # Perdeu quem avaliou: o cliente não recebeu nada (bônus do cliente) ou o
+            # profissional não recebeu nada, p.ex. reembolso total (bônus do profissional).
+            perdeu = (
+                divisao.para_profissional == 0 if do_profissional else divisao.para_cliente == 0
+            )
+            return "perdida" if perdeu else "nenhuma"
+
+        return liberar_bonus_pendentes(
+            self._c.moedas, agora=agora, situacao_disputa=situacao
+        ).liberados
 
     def executar(self, acao: AcaoRotina, agora: datetime) -> None:
         if acao.tipo is TipoAcaoRotina.TRANSICIONAR:

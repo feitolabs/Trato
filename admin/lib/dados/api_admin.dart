@@ -219,6 +219,13 @@ abstract interface class ApiAdmin {
   Future<CupomAdmin> alterarStatusCupom(String cupomId, {required bool ativo, required String motivo});
   Future<void> excluirCupom(String cupomId, {required String motivo});
 
+  // Moedas: orçamento do mês e configuração do programa.
+  Future<MoedasOrcamento> orcamentoMoedas();
+  Future<MoedasConfig> carregarMoedasConfig();
+
+  /// Grava a configuração. O backend valida, decide e audita; [motivo] é obrigatório.
+  Future<MoedasConfig> salvarMoedasConfig(MoedasConfig config, {required String motivo});
+
   // Módulo 6: Equipe Interna
   Future<List<MembroEquipeAdmin>> listarEquipe();
 

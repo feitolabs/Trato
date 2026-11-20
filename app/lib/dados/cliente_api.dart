@@ -78,8 +78,7 @@ class ClienteApi {
         token: token,
       );
 
-  Future<Object?> patch(String caminho, {Object? corpo}) =>
-      _enviar('PATCH', caminho, corpo: corpo);
+  Future<Object?> patch(String caminho, {Object? corpo}) => _enviar('PATCH', caminho, corpo: corpo);
 
   Future<Object?> put(String caminho, {Object? corpo}) => _enviar('PUT', caminho, corpo: corpo);
 
@@ -127,9 +126,7 @@ class ClienteApi {
       for (var tentativa = 1; tentativa <= maxTentativas; tentativa++) {
         try {
           final resposta = await tentar();
-          if (resposta.statusCode == 429 &&
-              permitirRetry &&
-              tentativa < maxTentativas) {
+          if (resposta.statusCode == 429 && permitirRetry && tentativa < maxTentativas) {
             if (intervaloBaseRetry > Duration.zero) {
               final esperaMs = delayMs > 0 ? delayMs * 2 : 500;
               await Future.delayed(Duration(milliseconds: esperaMs));
@@ -183,16 +180,42 @@ class ClienteApi {
         TipoErro.naoEncontrado,
         _detalhe(resposta) ?? 'Não encontramos isso.',
         codigoHttp: codigo,
+        codigo: _codigoErro(resposta),
       );
     }
     if (codigo == 501) throw ErroTrato.indisponivel;
-    if (codigo >= 500) throw ErroTrato.servidor;
-    // 400, 403, 409, 422...: o backend explica o motivo em `detail`.
+    if (codigo >= 500) {
+      final cod = _codigoErro(resposta);
+      if (cod != null) {
+        throw ErroTrato(
+          TipoErro.servidor,
+          _detalhe(resposta) ?? ErroTrato.servidor.mensagem,
+          codigoHttp: codigo,
+          codigo: cod,
+        );
+      }
+      throw ErroTrato.servidor;
+    }
+    // 400, 403, 409, 422...: o backend explica o motivo em `detail` e opcionalmente em `codigo`.
     throw ErroTrato(
       TipoErro.recusado,
       _detalhe(resposta) ?? 'Não foi possível concluir. Confira os dados e tente de novo.',
       codigoHttp: codigo,
+      codigo: _codigoErro(resposta),
     );
+  }
+
+  String? _codigoErro(http.Response resposta) {
+    try {
+      final json = jsonDecode(utf8.decode(resposta.bodyBytes));
+      if (json is Map && json['codigo'] is String) {
+        final c = (json['codigo'] as String).trim();
+        if (c.isNotEmpty) return c;
+      }
+    } on FormatException {
+      // corpo que não é JSON
+    }
+    return null;
   }
 
   /// `detail` do FastAPI: texto (regras de negócio) ou lista (validação).

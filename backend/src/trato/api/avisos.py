@@ -8,14 +8,18 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import Request
 
 from trato.api.contexto import Contexto
+from trato.api.exclusividades import Encerramento, Exclusividade
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
 
 log = logging.getLogger("trato.notificacoes")
+_FUSO_BR = ZoneInfo("America/Sao_Paulo")
 
 
 def servicos_de_notificacao(request: Request, contexto: Contexto):  # type: ignore[no-untyped-def]
@@ -153,3 +157,97 @@ def avisar_pedido_urgente(
             )
     except Exception:  # noqa: BLE001 - aviso é secundário
         log.exception("Aviso de pedido urgente falhou")
+
+
+def _hora_local(instante: datetime | None) -> str:
+    if instante is None:
+        return "o fim do prazo"
+    com_fuso = instante if instante.tzinfo is not None else instante.replace(tzinfo=UTC)
+    return com_fuso.astimezone(_FUSO_BR).strftime("%H:%M")
+
+
+def avisar_exclusividade_oferta(
+    request: Request,
+    contexto: Contexto,
+    *,
+    exclusividade: Exclusividade,
+) -> None:
+    """Avisa o cliente sobre a oferta de prioridade (sem compromisso)."""
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        hora = _hora_local(exclusividade.responder_ate)
+        servico.notificar(
+            Evento.EXCLUSIVIDADE_OFERTA,
+            exclusividade.cliente_id,
+            chave=exclusividade.id,
+            pedido_id=exclusividade.pedido_id,
+            corpo=(
+                "Um profissional quer fazer seu serviço com prioridade. "
+                f"Sem compromisso. Você tem até {hora} para responder."
+            ),
+            dados={"exclusividade_id": exclusividade.id},
+        )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de oferta de exclusividade falhou")
+
+
+def avisar_exclusividade_resposta(
+    request: Request,
+    contexto: Contexto,
+    *,
+    exclusividade: Exclusividade,
+    decisao: str,
+) -> None:
+    """Avisa o profissional que o cliente aceitou ou recusou a prioridade."""
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        if decisao == "aceitar":
+            servico.notificar(
+                Evento.EXCLUSIVIDADE_ACEITA,
+                exclusividade.profissional_id,
+                chave=exclusividade.id,
+                pedido_id=exclusividade.pedido_id,
+                dados={"exclusividade_id": exclusividade.id},
+            )
+            return
+        servico.notificar(
+            Evento.EXCLUSIVIDADE_RECUSADA,
+            exclusividade.profissional_id,
+            chave=exclusividade.id,
+            pedido_id=exclusividade.pedido_id,
+            corpo=(
+                "O cliente preferiu ver outros orçamentos. "
+                f"Seus {exclusividade.moedas_cobradas} Tratinhos voltaram."
+            ),
+            dados={"exclusividade_id": exclusividade.id},
+        )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de resposta da exclusividade falhou")
+
+
+def avisar_exclusividade_encerrada(
+    request: Request,
+    contexto: Contexto,
+    *,
+    encerramento: Encerramento,
+    pedido_id: str,
+    moedas_cobradas: int = 100,
+) -> None:
+    """Avisa o profissional quando a prioridade é cancelada com estorno por mudança no pedido."""
+    if encerramento.resultado != "cancelada":
+        return
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        servico.notificar(
+            Evento.EXCLUSIVIDADE_CANCELADA,
+            encerramento.profissional_id,
+            chave=encerramento.exclusividade_id,
+            pedido_id=pedido_id,
+            corpo=(
+                "O pedido mudou antes do fim da prioridade que você ganhou avaliando. "
+                f"Seus {moedas_cobradas} Tratinhos voltaram."
+            ),
+            dados={"exclusividade_id": encerramento.exclusividade_id},
+        )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de encerramento da exclusividade falhou")

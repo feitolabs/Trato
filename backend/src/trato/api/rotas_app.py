@@ -23,7 +23,16 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
-from trato.api.moedas import calcular_uso_moedas, conceder_bonus_avaliacao
+from trato.api.exclusividades import profissional_exclusivo
+from trato.api.moedas import (
+    TIPO_BONUS_PROFISSIONAL,
+    calcular_uso_moedas,
+    conceder_bonus_avaliacao,
+    conceder_bonus_profissional,
+    disponibilidade_desconto,
+    resumo_pendentes,
+    saldo_profissional,
+)
 from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
@@ -141,6 +150,23 @@ class PagamentoValoresOut(BaseModel):
     moedas_usadas: int = Field(0, description="Moedas que serão usadas (já no desconto).")
     moedas_saldo: int = Field(0, description="Saldo de moedas do cliente.")
     moedas_desconto_centavos: int = Field(0, description="Parte do desconto que vem das moedas.")
+    desconto_disponivel: bool = Field(
+        True, description="Se o desconto de moedas pode ser dado (orçamento e teto do cliente)."
+    )
+    desconto_indisponivel_motivo: str | None = Field(
+        None,
+        description="`orcamento_esgotado`, `limite_diario` ou `teto_cliente` quando indisponível.",
+    )
+    desconto_volta_em: date | None = Field(
+        None,
+        description="Quando o desconto volta (Brasília): `limite_diario` amanhã; "
+        "`orcamento_esgotado` e `teto_cliente` dia 1º do próximo mês; disponível: null.",
+    )
+    desconto_possivel_centavos: int = Field(
+        0,
+        description="Quanto de desconto de moedas SERIA aplicado neste pedido se o cliente "
+        "ligasse o interruptor agora (saldo, % máximo, tetos e orçamento; nada é reservado).",
+    )
 
 
 class MensagemOut(BaseModel):
@@ -256,9 +282,28 @@ class MoedaLancamentoOut(BaseModel):
 
 
 class MoedasOut(BaseModel):
-    saldo: int
+    saldo: int = Field(description="Tratinhos da carteira do CLIENTE (a do desconto).")
+    saldo_profissional: int = Field(
+        0, description="Tratinhos da carteira do PROFISSIONAL (nunca viram desconto)."
+    )
+    moedas_pendentes_profissional: int = Field(
+        0, description="Bônus do profissional ainda aguardando a liberação (não é saldo)."
+    )
     valor_moeda_centavos: int
     extrato: list[MoedaLancamentoOut]
+    desconto_disponivel: bool = True
+    desconto_indisponivel_motivo: str | None = Field(
+        None, description="`orcamento_esgotado`, `limite_diario` ou `teto_cliente`."
+    )
+    desconto_volta_em: date | None = Field(
+        None, description="Quando o desconto volta (Brasília); null se disponível."
+    )
+    moedas_pendentes: int = Field(
+        0, description="Bônus de avaliação ainda aguardando a liberação (não é saldo)."
+    )
+    proxima_liberacao: date | None = Field(
+        None, description="Data (Brasília) da próxima liberação de bônus pendente."
+    )
 
 
 # --- Entradas ---------------------------------------------------------------------------
@@ -340,6 +385,12 @@ def _pedido_visivel(
     if eh_participante(pedido, usuario):
         return pedido
     if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.estado is Estado.ABERTO:
+        return pedido
+    if (
+        usuario.papel is PapelUsuario.PROFISSIONAL
+        and pedido.estado is Estado.RESERVADO
+        and profissional_exclusivo(contexto, pedido.id) == usuario.id
+    ):
         return pedido
     raise HTTPException(404, "Pedido não encontrado.")
 
@@ -474,7 +525,11 @@ def enviar_orcamento(
     pedido = contexto.pedidos.obter(pedido_id)
     if pedido is None:
         raise HTTPException(404, "Pedido não encontrado.")
-    if pedido.estado is not Estado.ABERTO:
+    if pedido.estado is Estado.RESERVADO:
+        # Exclusividade ativa: só o profissional dela envia orçamento (os outros esperam as 48h).
+        if profissional_exclusivo(contexto, pedido.id) != usuario.id:
+            raise HTTPException(409, "Este pedido está reservado para outro profissional.")
+    elif pedido.estado is not Estado.ABERTO:
         raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
     if pedido.cliente_id == usuario.id:
         raise HTTPException(403, "Você não pode orçar o seu próprio pedido.")
@@ -607,6 +662,16 @@ def valores_do_pagamento(
     cupom_codigo: str | None = None
     moedas_usadas = 0
     moedas_desconto = 0
+    ignorar = servico.reservas_pendentes_do_pedido(pedido.id) if servico is not None else set()
+    disp = disponibilidade_desconto(
+        contexto.moedas, usuario_id=usuario.id, agora=contexto.agora(), ignorar=ignorar
+    )
+    desconto_disponivel, desconto_motivo, desconto_volta = (
+        disp.disponivel,
+        disp.motivo,
+        disp.volta_em,
+    )
+    desconto_possivel = 0
     opcoes: list[OpcaoParcelamentoOut] = []
     if contrato is not None and servico is not None:
         base_centavos = contrato.valor_centavos
@@ -620,17 +685,27 @@ def valores_do_pagamento(
             base_centavos = aplicado.servico_com_desconto_centavos
             desconto_centavos = aplicado.desconto_centavos
             cupom_codigo = aplicado.codigo
-        if usar_moedas and pedido.cliente_id == usuario.id:
+        if pedido.cliente_id == usuario.id:
+            # Sempre calcula (sem reservar): o app mostra "você pode abater até R$ X" mesmo com o
+            # interruptor desligado. Só aplica se `usar_moedas`.
             uso = calcular_uso_moedas(
                 contexto.moedas,
                 usuario_id=usuario.id,
                 servico_centavos=base_centavos,
                 agora=contexto.agora(),
+                ignorar=ignorar,
             )
-            moedas_usadas = uso.moedas
-            moedas_desconto = uso.desconto_centavos
-            base_centavos -= uso.desconto_centavos
-            desconto_centavos += uso.desconto_centavos
+            desconto_possivel = uso.desconto_centavos
+            desconto_disponivel, desconto_motivo, desconto_volta = (
+                uso.disponivel,
+                uso.motivo,
+                uso.volta_em,
+            )
+            if usar_moedas:
+                moedas_usadas = uso.moedas
+                moedas_desconto = uso.desconto_centavos
+                base_centavos -= uso.desconto_centavos
+                desconto_centavos += uso.desconto_centavos
         conta = servico.total_a_cobrar(contexto, pedido, base_centavos)
         total = conta.cobrado_centavos
         opcoes = [
@@ -650,6 +725,10 @@ def valores_do_pagamento(
         cupom_codigo=cupom_codigo,
         moedas_usadas=moedas_usadas,
         moedas_desconto_centavos=moedas_desconto,
+        desconto_disponivel=desconto_disponivel,
+        desconto_indisponivel_motivo=desconto_motivo,
+        desconto_volta_em=desconto_volta,
+        desconto_possivel_centavos=desconto_possivel,
         moedas_saldo=(
             contexto.moedas.saldo(usuario.id, contexto.agora())
             if pedido.cliente_id == usuario.id
@@ -1048,9 +1127,19 @@ def minhas_moedas(
     contexto: Contexto = Depends(obter_contexto),
 ) -> MoedasOut:
     agora = contexto.agora()
+    disp = disponibilidade_desconto(contexto.moedas, usuario_id=usuario.id, agora=agora)
+    pendentes, proxima = resumo_pendentes(contexto.moedas, usuario.id)
+    pendentes_prof, _ = resumo_pendentes(contexto.moedas, usuario.id, TIPO_BONUS_PROFISSIONAL)
     return MoedasOut(
         saldo=contexto.moedas.saldo(usuario.id, agora),
+        saldo_profissional=saldo_profissional(contexto.moedas, usuario.id, agora),
+        moedas_pendentes_profissional=pendentes_prof,
         valor_moeda_centavos=contexto.moedas.config().valor_moeda_centavos,
+        desconto_disponivel=disp.disponivel,
+        desconto_indisponivel_motivo=disp.motivo,
+        desconto_volta_em=disp.volta_em,
+        moedas_pendentes=pendentes,
+        proxima_liberacao=proxima,
         extrato=[
             MoedaLancamentoOut(
                 tipo=i.tipo, quantidade=i.quantidade, criada_em=i.criada_em, expira_em=i.expira_em
@@ -1116,6 +1205,18 @@ def avaliar(
                 agora=contexto.agora(),
                 profissional_id=avaliado,
                 valor_servico_centavos=contrato.valor_centavos if contrato else 0,
+            )
+        except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
+            ganhas = 0
+    else:
+        # Profissional avaliando o cliente: bônus pendente, 1 por cliente para sempre.
+        try:
+            ganhas = conceder_bonus_profissional(
+                contexto.moedas,
+                profissional_id=usuario.id,
+                cliente_id=avaliado,
+                pedido_id=pedido.id,
+                agora=contexto.agora(),
             )
         except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
             ganhas = 0

@@ -58,6 +58,7 @@ class ProvedorFake:
         self.clientes_das_cobrancas: dict[str, str] = {}
         self.chamadas: list[tuple[str, str]] = []  # (operação, chave) para os testes olharem
         self._movimentos: list[MovimentoProvedor] = []
+        self.expiracoes: dict[str, int] = {}  # chave de idempotência -> validade pedida (s)
 
     # --- interface ---------------------------------------------------------------------
 
@@ -70,8 +71,11 @@ class ProvedorFake:
         metadados: Mapping[str, str],
         parcelas: int = 1,
         cliente_externo: str | None = None,
+        expira_em_segundos: int | None = None,
     ) -> CobrancaProvedor:
         self.chamadas.append(("criar_cobranca", chave_idempotencia))
+        if expira_em_segundos is not None:
+            self.expiracoes[chave_idempotencia] = expira_em_segundos
         if cliente_externo:
             self.clientes_das_cobrancas[chave_idempotencia] = cliente_externo
         if chave_idempotencia in self._por_chave:
@@ -92,6 +96,10 @@ class ProvedorFake:
         self._cobrancas[cobranca_id] = cobranca
         self._por_chave[chave_idempotencia] = cobranca_id
         return cobranca
+
+    def cancelar_cobranca(self, cobranca_id: str) -> None:
+        """Só registra a chamada (o fake não muda o estado da cobrança)."""
+        self.chamadas.append(("cancelar_cobranca", cobranca_id))
 
     def consultar_cobranca(self, cobranca_id: str) -> CobrancaProvedor:
         try:
