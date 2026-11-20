@@ -125,6 +125,25 @@ def test_extrato_vira_pdf_valido_com_acentos():
     assert b"Per\xedodo: 01/10/2026 a 31/10/2026" in conteudo
 
 
+def test_pdf_traz_o_resumo_do_mes_com_a_taxa_real():
+    livro = Livro()
+    _pedido_concluido(livro, "p1", OUTUBRO)
+    liberar(livro, "p1", "pro-1", "liq/p1", OUTUBRO + timedelta(days=1))
+    desde, ate = periodo.mes(2026, 10)
+    e = extrato_profissional.montar(livro.lancamentos, "pro-1", desde, ate)
+
+    assert e.servicos_concluidos == 1
+    assert e.taxa_trato_centavos > 0  # taxa real do ledger, nunca zero escrito à mão
+    assert e.bruto_centavos == e.recebido_centavos + e.taxa_trato_centavos
+    conteudo = extrato_profissional.pdf(e, "João Pintor", {}, OUTUBRO)
+    reais = extrato_profissional.reais
+    assert "Resumo do mês".encode("cp1252") in conteudo
+    assert "Serviços concluídos".encode("cp1252") in conteudo
+    assert b"Taxa do Trato" in conteudo
+    assert reais(e.taxa_trato_centavos).encode() in conteudo
+    assert reais(e.bruto_centavos).encode() in conteudo
+
+
 def test_pdf_com_muitas_linhas_abre_novas_paginas():
     doc = PdfSimples()
     for _ in range(3):

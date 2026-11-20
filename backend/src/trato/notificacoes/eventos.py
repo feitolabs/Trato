@@ -33,6 +33,7 @@ class Evento(StrEnum):
     CODIGO_INICIO = "agenda.codigo_inicio"
     CHECK_IN_SEM_CODIGO = "agenda.check_in_sem_codigo"
     CLIENTE_AUSENTE = "agenda.cliente_ausente"
+    A_CAMINHO = "agenda.a_caminho"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
     ADITIVO_PENDENTE = "execucao.aditivo_pendente"
     DISPUTA_ABERTA = "disputa.aberta"
@@ -112,6 +113,13 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Serviço iniciado sem código",
         "O profissional iniciou o serviço sem o código e registrou foto, localização e "
         "justificativa.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.A_CAMINHO: ModeloEvento(
+        Categoria.AGENDA,
+        "Seu profissional está a caminho",
+        "Seu profissional está a caminho.",
         "pedido",
         essencial=True,
     ),

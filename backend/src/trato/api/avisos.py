@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import Request
@@ -20,6 +20,7 @@ from trato.notificacoes.eventos import Evento
 
 log = logging.getLogger("trato.notificacoes")
 _FUSO_BR = ZoneInfo("America/Sao_Paulo")
+JANELA_A_CAMINHO_MINUTOS = 10  # não repete o aviso "a caminho" do mesmo pedido nesse intervalo
 
 
 def servicos_de_notificacao(request: Request, contexto: Contexto):  # type: ignore[no-untyped-def]
@@ -177,6 +178,47 @@ def avisar_check_in_sem_codigo(
         )
     except Exception:  # noqa: BLE001 - aviso é secundário
         log.exception("Aviso de check-in sem código falhou")
+
+
+def avisar_a_caminho(
+    request: Request,
+    contexto: Contexto,
+    *,
+    pedido_id: str,
+    cliente_id: str,
+    eta_minutos: int | None,
+    agora: datetime,
+) -> bool:
+    """Avisa o cliente que o profissional saiu. Uma vez por pedido a cada 10 minutos.
+
+    Devolve `True` se enviou agora; `False` se já houve aviso nos últimos 10 minutos (ou se o
+    envio falhou: aviso é secundário e não derruba a rota).
+    """
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        recentes = servico.repo.listar(cliente_id, False, 200)
+        limite = agora - timedelta(minutes=JANELA_A_CAMINHO_MINUTOS)
+        if any(
+            n.tipo == Evento.A_CAMINHO.value
+            and n.dados.get("pedido_id") == pedido_id
+            and n.criada_em > limite
+            for n in recentes
+        ):
+            return False
+        corpo = "Seu profissional está a caminho."
+        if eta_minutos is not None:
+            corpo = f"{corpo} Chega em ~{eta_minutos} min."
+        servico.notificar(
+            Evento.A_CAMINHO,
+            cliente_id,
+            chave=f"a-caminho:{pedido_id}:{int(agora.timestamp())}",
+            pedido_id=pedido_id,
+            corpo=corpo,
+        )
+        return True
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso de a caminho falhou")
+        return False
 
 
 def _hora_local(instante: datetime | None) -> str:
