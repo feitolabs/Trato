@@ -1314,6 +1314,68 @@ class ApiAdminHttp implements ApiAdmin {
     await _chamar('DELETE', '/v1/admin/cupons/$cupomId', consulta: {'motivo': motivo});
   }
 
+  // ---------- Moedas ----------
+
+  static MoedasConfig _moedasConfig(Map<String, dynamic> c) => MoedasConfig(
+        ativo: c['ativo'] as bool? ?? false,
+        bonusAvaliacaoMoedas: _int(c['bonus_avaliacao_moedas']),
+        valorMoedaCentavos: _int(c['valor_moeda_centavos']),
+        tetoMensalMoedas: _int(c['teto_mensal_moedas']),
+        minServicoCentavos: _int(c['min_servico_centavos']),
+        maxBonusPorProfissionalMes: _int(c['max_bonus_por_profissional_mes']),
+        maxDescontoPercentual: _int(c['max_desconto_percentual']),
+        validadeDias: _int(c['validade_dias']),
+        orcamentoMensalDescontoCentavos: _int(c['orcamento_mensal_desconto_centavos']),
+        avisoPercentual: _int(c['aviso_percentual']),
+        tetoDescontoClienteMesCentavos: _int(c['teto_desconto_cliente_mes_centavos']),
+        tetoDiarioDescontoCentavos: _int(c['teto_diario_desconto_centavos']),
+        diasLiberacaoBonus: _int(c['dias_liberacao_bonus']),
+      );
+
+  @override
+  Future<MoedasOrcamento> orcamentoMoedas() async {
+    final o = _mapa(await _chamar('GET', '/v1/admin/moedas/orcamento'));
+    return MoedasOrcamento(
+      mesRef: o['mes_ref'] as String? ?? '',
+      orcamentoCentavos: _int(o['orcamento_centavos']),
+      usadoCentavos: _int(o['usado_centavos']),
+      percentualUsado: (o['percentual_usado'] as num?)?.toDouble() ?? 0,
+      aviso: o['aviso'] as bool? ?? false,
+      diaRef: o['dia_ref'] as String? ?? '',
+      usadoDiaCentavos: _int(o['usado_dia_centavos']),
+      tetoDiaCentavos: _int(o['teto_dia_centavos']),
+    );
+  }
+
+  @override
+  Future<MoedasConfig> carregarMoedasConfig() async =>
+      _moedasConfig(_mapa(await _chamar('GET', '/v1/admin/moedas/config')));
+
+  @override
+  Future<MoedasConfig> salvarMoedasConfig(MoedasConfig config, {required String motivo}) async {
+    final r = _mapa(await _chamar(
+      'PUT',
+      '/v1/admin/moedas/config',
+      corpo: {
+        'ativo': config.ativo,
+        'bonus_avaliacao_moedas': config.bonusAvaliacaoMoedas,
+        'valor_moeda_centavos': config.valorMoedaCentavos,
+        'teto_mensal_moedas': config.tetoMensalMoedas,
+        'min_servico_centavos': config.minServicoCentavos,
+        'max_bonus_por_profissional_mes': config.maxBonusPorProfissionalMes,
+        'max_desconto_percentual': config.maxDescontoPercentual,
+        'validade_dias': config.validadeDias,
+        'orcamento_mensal_desconto_centavos': config.orcamentoMensalDescontoCentavos,
+        'aviso_percentual': config.avisoPercentual,
+        'teto_desconto_cliente_mes_centavos': config.tetoDescontoClienteMesCentavos,
+        'teto_diario_desconto_centavos': config.tetoDiarioDescontoCentavos,
+        'dias_liberacao_bonus': config.diasLiberacaoBonus,
+        'motivo': motivo,
+      },
+    ));
+    return _moedasConfig(r);
+  }
+
   // ---------- Módulo 6: Equipe Interna ----------
 
   static MembroEquipeAdmin _membro(Map<String, dynamic> m) => MembroEquipeAdmin(

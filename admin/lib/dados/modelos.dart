@@ -920,6 +920,80 @@ class CupomAdmin {
 }
 
 // =============================================================================
+// MOEDAS: orçamento mensal de desconto e configuração do programa
+// =============================================================================
+
+/// Quanto do orçamento de desconto em moedas já foi usado no mês. Tudo vem pronto do backend:
+/// o painel só mostra (valores em centavos inteiros).
+class MoedasOrcamento {
+  const MoedasOrcamento({
+    required this.mesRef,
+    required this.orcamentoCentavos,
+    required this.usadoCentavos,
+    required this.percentualUsado,
+    required this.aviso,
+    this.diaRef = '',
+    this.usadoDiaCentavos = 0,
+    this.tetoDiaCentavos = 0,
+  });
+
+  /// Dia de referência do teto diário ("2026-11-20"), como o backend mandou.
+  final String diaRef;
+  final int usadoDiaCentavos;
+  final int tetoDiaCentavos;
+
+  /// Limite de hoje atingido (usado do dia >= teto do dia). Só exibição: o backend é quem barra.
+  bool get limiteDiaAtingido => tetoDiaCentavos > 0 && usadoDiaCentavos >= tetoDiaCentavos;
+
+  /// Mês de referência, como o backend mandou ("2026-11" ou "2026-11-01").
+  final String mesRef;
+  final int orcamentoCentavos;
+  final int usadoCentavos;
+
+  /// Percentual já calculado pelo backend (pode ter casas decimais).
+  final double percentualUsado;
+
+  /// O backend liga o aviso quando o uso chegou ao percentual de aviso da configuração.
+  final bool aviso;
+
+  /// Desconto fechado: o orçamento acabou (usado >= orçamento). Só exibição.
+  bool get fechado => usadoCentavos >= orcamentoCentavos;
+}
+
+/// Configuração do programa de moedas. Valores em centavos ou unidades inteiras, como no backend.
+class MoedasConfig {
+  const MoedasConfig({
+    required this.ativo,
+    required this.bonusAvaliacaoMoedas,
+    required this.valorMoedaCentavos,
+    required this.tetoMensalMoedas,
+    required this.minServicoCentavos,
+    required this.maxBonusPorProfissionalMes,
+    required this.maxDescontoPercentual,
+    required this.validadeDias,
+    required this.orcamentoMensalDescontoCentavos,
+    required this.avisoPercentual,
+    required this.tetoDescontoClienteMesCentavos,
+    required this.tetoDiarioDescontoCentavos,
+    required this.diasLiberacaoBonus,
+  });
+
+  final bool ativo;
+  final int bonusAvaliacaoMoedas;
+  final int valorMoedaCentavos;
+  final int tetoMensalMoedas;
+  final int minServicoCentavos;
+  final int maxBonusPorProfissionalMes;
+  final int maxDescontoPercentual;
+  final int validadeDias;
+  final int orcamentoMensalDescontoCentavos;
+  final int avisoPercentual;
+  final int tetoDescontoClienteMesCentavos;
+  final int tetoDiarioDescontoCentavos;
+  final int diasLiberacaoBonus;
+}
+
+// =============================================================================
 // MÓDULO 6: GESTÃO DE EQUIPE INTERNA
 // =============================================================================
 

@@ -41,6 +41,9 @@ class _DashboardTelaState extends State<DashboardTela> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (context.pode(Permissao.cuponsGerenciar)) ...[
+                  AlertaOrcamentoMoedas(aoAbrirSecao: widget.aoAbrirSecao),
+                ],
                 CarregaDados<MetricasDashboard>(
                   key: ValueKey('metricas-${p.hashCode}'),
                   carregar: () => api.metricasDashboard(dias: dias, inicio: p.inicio, fim: p.fim),
@@ -88,6 +91,82 @@ class _DashboardTelaState extends State<DashboardTela> {
       ],
     );
   }
+}
+
+/// Alerta do orçamento de moedas: só aparece quando o backend manda `aviso = true`.
+/// É um aviso a mais: se a consulta falhar ou ainda carregar, o painel segue sem ele.
+class AlertaOrcamentoMoedas extends StatefulWidget {
+  const AlertaOrcamentoMoedas({super.key, this.aoAbrirSecao});
+  final ValueChanged<String>? aoAbrirSecao;
+
+  @override
+  State<AlertaOrcamentoMoedas> createState() => _AlertaOrcamentoMoedasState();
+}
+
+class _AlertaOrcamentoMoedasState extends State<AlertaOrcamentoMoedas> {
+  Future<MoedasOrcamento>? _futuro;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _futuro ??= context.api.orcamentoMoedas();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<MoedasOrcamento>(
+      future: _futuro,
+      builder: (context, snap) {
+        final o = snap.data;
+        if (o == null || !o.aviso) return const SizedBox.shrink();
+        final abrir = widget.aoAbrirSecao;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
+          child: Container(
+            key: const ValueKey('alerta-moedas'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
+            decoration: BoxDecoration(
+              color: CoresTrato.avisoFundo,
+              borderRadius: BorderRadius.circular(EspacosTrato.raio),
+              border: Border.all(color: CoresTrato.avisoTexto),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 20, color: CoresTrato.avisoTexto),
+                const SizedBox(width: EspacosTrato.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        o.fechado ? 'Desconto de Tratinhos fechado neste mês' : 'Orçamento de Tratinhos quase no fim',
+                        style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.avisoTexto),
+                      ),
+                      const SizedBox(height: EspacosTrato.x1),
+                      Text(
+                        'Já foram usados ${formatarReais(o.usadoCentavos)} de ${formatarReais(o.orcamentoCentavos)} '
+                        '(${_pct(o.percentualUsado)}) do orçamento de desconto do mês.',
+                        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.avisoTexto),
+                      ),
+                      if (abrir != null) ...[
+                        const SizedBox(height: EspacosTrato.x2),
+                        BotaoTrato.link('Ver Tratinhos', aoPressionar: () => abrir('moedas')),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static String _pct(double p) =>
+      p == p.roundToDouble() ? '${p.round()}%' : '${p.toStringAsFixed(1).replaceAll('.', ',')}%';
 }
 
 /// Variação percentual sobre o período anterior. Nulo quando não há base de comparação.
