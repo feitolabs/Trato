@@ -68,6 +68,7 @@ void main() {
       expect(find.text('Adicionar'), findsOneWidget);
       expect(find.text('Flexível (sem data fixa)'), findsOneWidget);
       expect(find.text('Tenho data limite'), findsOneWidget);
+      expect(find.text('É urgente (para hoje)'), findsOneWidget);
       expect(find.text('R\$ 200 a R\$ 500'), findsOneWidget);
       expect(
           find.textContaining('até 5 orçamentos em 48 horas', findRichText: true), findsOneWidget);
@@ -144,6 +145,54 @@ void main() {
       expect(recebido!.voltagem, '127 V');
       expect(recebido!.faixa.minimoCentavos, 20000);
       expect(recebido!.faixa.maximoCentavos, 50000);
+      expect(recebido!.urgente, isFalse);
+    });
+
+    testWidgets('É urgente (para hoje) fixa prazo de hoje e envia urgente true', (tester) async {
+      RascunhoPedido? recebido;
+      final agoraFixo = DateTime(2026, 11, 20, 16, 10);
+      await _abrir(
+        tester,
+        NovoPedidoTela(
+          formulario: formularioExemplo,
+          agora: () => agoraFixo,
+          aoEnviar: (r) => recebido = r,
+        ),
+      );
+
+      await _tocar(tester, find.text('É urgente (para hoje)'));
+      expect(
+        find.textContaining('atendimento rápido'),
+        findsOneWidget,
+      );
+
+      await preencherEnderecoDoPedido(tester);
+      await _tocar(tester, find.text('Enviar pedido'));
+
+      expect(recebido, isNotNull);
+      expect(recebido!.urgente, isTrue);
+      expect(recebido!.prazoDesejado, agoraFixo);
+    });
+
+    testWidgets('Tenho data limite envia urgente false', (tester) async {
+      RascunhoPedido? recebido;
+      final agoraFixo = DateTime(2026, 11, 20, 16, 10);
+      await _abrir(
+        tester,
+        NovoPedidoTela(
+          formulario: formularioExemplo,
+          agora: () => agoraFixo,
+          aoEnviar: (r) => recebido = r,
+        ),
+      );
+
+      await _tocar(tester, find.text('Tenho data limite'));
+      await preencherEnderecoDoPedido(tester);
+      await _tocar(tester, find.text('Enviar pedido'));
+
+      expect(recebido, isNotNull);
+      expect(recebido!.urgente, isFalse);
+      expect(recebido!.prazoDesejado, agoraFixo.add(const Duration(days: 2)));
     });
 
     testWidgets('informar meu valor preenche faixa exata com centavos informados', (tester) async {
