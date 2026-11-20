@@ -119,7 +119,7 @@ MODELOS: dict[Evento, ModeloEvento] = {
     Evento.A_CAMINHO: ModeloEvento(
         Categoria.AGENDA,
         "Seu profissional está a caminho",
-        "Seu profissional está a caminho.",
+        "Seu profissional avisou que está a caminho.",
         "pedido",
         essencial=True,
     ),

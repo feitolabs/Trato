@@ -41,14 +41,18 @@ def test_a_caminho_avisa_o_cliente_com_a_estimativa(amb):
     assert r.json() == {"pedido_id": "ped-1", "enviado": True, "eta_minutos": 20}
     [aviso] = _avisos(notif)
     assert aviso.titulo == "Seu profissional está a caminho"
-    assert "~20 min" in aviso.corpo and aviso.dados["pedido_id"] == "ped-1"
+    # AGORA = 12:00 UTC = 09:00 em Brasília; sem falsa precisão ("chega em X min").
+    assert aviso.corpo == (
+        "Seu profissional avisou que está a caminho às 09:00 (previsão informada: cerca de 20 min)."
+    )
+    assert aviso.dados["pedido_id"] == "ped-1"
 
 
 def test_a_caminho_sem_corpo_funciona_e_nao_cita_estimativa(amb):
     notif = _montar(amb)
     r = amb.cliente.post(URL, headers=cab("t-prof"))
     assert r.status_code == 200 and r.json()["enviado"] is True
-    assert "Chega em" not in _avisos(notif)[0].corpo
+    assert _avisos(notif)[0].corpo == "Seu profissional avisou que está a caminho."
 
 
 def test_a_caminho_so_o_profissional_dono_do_pedido(amb):

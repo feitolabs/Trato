@@ -144,6 +144,57 @@ def test_pdf_traz_o_resumo_do_mes_com_a_taxa_real():
     assert reais(e.bruto_centavos).encode() in conteudo
 
 
+def test_pdf_diz_sem_taxa_quando_a_taxa_do_mes_e_zero_e_mantem_o_valor_quando_ha():
+    desde, ate = periodo.mes(2026, 10)
+    sem = Livro()
+    _pedido_concluido(sem, "p1", OUTUBRO, valor=10_000, taxa=0)
+    liberar(sem, "p1", "pro-1", "liq/p1", OUTUBRO + timedelta(days=1))
+    e0 = extrato_profissional.montar(sem.lancamentos, "pro-1", desde, ate)
+    assert e0.taxa_trato_centavos == 0
+    pdf0 = extrato_profissional.pdf(e0, "João Pintor", {}, OUTUBRO)
+    assert b"Sem taxa" in pdf0 and b"Taxa do Trato" in pdf0
+
+    com = Livro()
+    _pedido_concluido(com, "p1", OUTUBRO)  # taxa de R$ 7,50
+    liberar(com, "p1", "pro-1", "liq/p1", OUTUBRO + timedelta(days=1))
+    e1 = extrato_profissional.montar(com.lancamentos, "pro-1", desde, ate)
+    pdf1 = extrato_profissional.pdf(e1, "João Pintor", {}, OUTUBRO)
+    assert b"Sem taxa" not in pdf1 and b"R$ 7,50" in pdf1
+
+
+def test_pdf_comprovante_com_documento_e_servicos_sem_dado_do_cliente():
+    livro = Livro()
+    _pedido_concluido(livro, "p1", OUTUBRO)
+    liberar(livro, "p1", "pro-1", "liq/p1", OUTUBRO + timedelta(days=1))
+    _pedido_concluido(livro, "p2", OUTUBRO + timedelta(days=2), valor=20_000, taxa=0)
+    liberar(livro, "p2", "pro-1", "liq/p2", OUTUBRO + timedelta(days=3))
+    desde, ate = periodo.mes(2026, 10)
+    e = extrato_profissional.montar(livro.lancamentos, "pro-1", desde, ate)
+
+    conteudo = extrato_profissional.pdf(
+        e,
+        "João Pintor",
+        {"p1": (10482, "Pintura da sala"), "p2": (10490, "Reparo")},
+        OUTUBRO,
+        documento="12345678909",
+        categorias={"p1": "Pintura", "p2": "Elétrica"},
+    )
+
+    assert b"CPF 123.456.789-09" in conteudo
+    assert "Serviços do período".encode("cp1252") in conteudo
+    assert b"PED-10482" in conteudo and b"PED-10490" in conteudo
+    assert b"Pintura" in conteudo and "Elétrica".encode("cp1252") in conteudo
+    assert b"R$ 100,00" in conteudo and b"R$ 200,00" in conteudo
+    assert b"cliente" not in conteudo.lower()  # nenhuma linha de dado do cliente
+
+    sem_doc = extrato_profissional.pdf(e, "João Pintor", {}, OUTUBRO)  # opcionais: omite a linha
+    assert b"CPF" not in sem_doc and b"CNPJ" not in sem_doc
+    assert extrato_profissional.formatar_documento("12.345.678/0001-95") == (
+        "CNPJ 12.345.678/0001-95"
+    )
+    assert extrato_profissional.formatar_documento("123") is None
+
+
 def test_pdf_com_muitas_linhas_abre_novas_paginas():
     doc = PdfSimples()
     for _ in range(3):

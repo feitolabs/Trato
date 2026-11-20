@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import replace
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -822,6 +823,16 @@ NAO_ENCONTRADO_PUBLICO = "Profissional não encontrado."
 CACHE_PUBLICO = "public, max-age=60"
 
 
+class AvaliacaoAnonimaOut(BaseModel):
+    nota: int
+    comentario: str | None = None
+    data: date
+
+
+MAX_PORTFOLIO_PUBLICO = 6
+MAX_AVALIACOES_PUBLICAS = 5
+
+
 class PerfilSitePublicoOut(BaseModel):
     """Só o que qualquer pessoa pode ver. Sem telefone, e-mail, documento, endereço nem banco."""
 
@@ -835,6 +846,13 @@ class PerfilSitePublicoOut(BaseModel):
     identidade_verificada: bool = Field(description='Selo "Identidade verificada".')
     cidades: list[str] = Field(description='Cidades que atende ("Belo Horizonte/MG").')
     sobre: str | None = Field(description='Texto "Sobre", se existir.')
+    portfolio: list[str] = Field(
+        default_factory=list,
+        description="Até 6 URLs assinadas curtas das fotos do portfólio (vazio sem fotos).",
+    )
+    avaliacoes_recentes: list[AvaliacaoAnonimaOut] = Field(
+        default_factory=list, description="Até 5 avaliações recentes de clientes, sem identificar."
+    )
 
 
 def _foto_publica(request: Request, profissional_id: str) -> str | None:
@@ -848,6 +866,48 @@ def _foto_publica(request: Request, profissional_id: str) -> str | None:
         return servico.armazenamento.url_leitura("avatar", caminho, 300)
     except Exception:  # noqa: BLE001 - sem foto o site mostra as iniciais
         return None
+
+
+def _portfolio_publico(request: Request, profissional_id: str) -> list[str]:
+    """URLs curtas das fotos que o profissional já enviou ao portfólio (mais novas primeiro)."""
+    servico = getattr(request.app.state, "servico_uploads", None)
+    listar = getattr(getattr(servico, "repo", None), "portfolio_do_dono", None)
+    if servico is None or listar is None:
+        return []
+
+    def url_ou_none(sol) -> str | None:  # type: ignore[no-untyped-def]
+        try:
+            return servico.armazenamento.url_leitura(sol.bucket, sol.caminho, 300)
+        except Exception:  # noqa: BLE001 - uma foto fora do ar não derruba o perfil
+            return None
+
+    try:
+        urls = [url_ou_none(sol) for sol in listar(profissional_id, MAX_PORTFOLIO_PUBLICO)]
+    except Exception:  # noqa: BLE001 - sem portfólio, o site mostra só o resto
+        return []
+    return [u for u in urls if u][:MAX_PORTFOLIO_PUBLICO]
+
+
+def _avaliacoes_publicas(contexto: Contexto, profissional_id: str) -> list[AvaliacaoAnonimaOut]:
+    """O que o app já mostra no perfil: avaliações de clientes, da mais nova à mais antiga.
+
+    Sem nome, id de pedido ou de cliente nem etiquetas."""
+    recebidas = getattr(contexto.avaliacoes, "recebidas", None)
+    if recebidas is None:
+        return []
+    try:
+        itens = [a for a in recebidas(profissional_id) if a.direcao == "cliente_para_profissional"]
+    except Exception:  # noqa: BLE001 - sem avaliações, o site mostra só o resto
+        return []
+    itens.sort(key=lambda a: a.criada_em, reverse=True)
+    return [
+        AvaliacaoAnonimaOut(
+            nota=a.nota_geral,
+            comentario=a.comentario or None,
+            data=a.criada_em.astimezone(ZoneInfo("America/Sao_Paulo")).date(),
+        )
+        for a in itens[:MAX_AVALIACOES_PUBLICAS]
+    ]
 
 
 @router_publico.get(
@@ -896,4 +956,6 @@ def perfil_publico_site(
             )
         ),
         sobre=perfil.bio or None,
+        portfolio=_portfolio_publico(request, profissional_id),
+        avaliacoes_recentes=_avaliacoes_publicas(contexto, profissional_id),
     )
