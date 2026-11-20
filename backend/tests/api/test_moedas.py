@@ -37,11 +37,13 @@ def test_cliente_ganha_bonus_ao_avaliar_e_ve_saldo(amb):
     assert m["extrato"][0]["tipo"] == "bonus_avaliacao"
 
 
-def test_profissional_avaliando_nao_ganha(amb):
+def test_profissional_avaliando_ganha_so_na_carteira_dele_nunca_no_desconto(amb):
     ligar(amb)
     amb.semear_pedido(Estado.CONCLUIDO, concluido_em=AGORA)
     r = post(amb, "/v1/pedidos/ped-1/avaliacao", "t-prof", {"nota_geral": 4})
-    assert r.status_code == 201 and r.json()["moedas_ganhas"] == 0
+    assert r.status_code == 201 and r.json()["moedas_ganhas"] == 50  # pendente (carteira dele)
+    m = amb.cliente.get("/v1/me/moedas", headers=cab("t-prof")).json()
+    assert m["saldo"] == 0 and m["moedas_pendentes_profissional"] == 50  # não é saldo de desconto
 
 
 def test_bonus_e_idempotente_por_pedido():

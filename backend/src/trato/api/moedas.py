@@ -22,6 +22,10 @@ MOTIVO_TETO_CLIENTE = "teto_cliente"
 MOTIVO_LIMITE_DIARIO = "limite_diario"
 MOTIVO_SALDO_INSUFICIENTE = "saldo_insuficiente"
 MOTIVO_RESERVAS_ABERTAS = "reservas_abertas"
+CARTEIRA_CLIENTE = "cliente"
+CARTEIRA_PROFISSIONAL = "profissional"
+TIPO_BONUS_CLIENTE = "bonus_avaliacao"
+TIPO_BONUS_PROFISSIONAL = "bonus_avaliacao_profissional"
 MARGEM_RESERVA_MINUTOS = 2  # a reserva dura um pouco mais que o Pix (que vence em reserva_minutos)
 _NS_RESERVA = uuid.UUID("6f1c2a52-7d0e-4f0b-9a57-3c6c1f4d2a10")
 
@@ -46,6 +50,13 @@ class ConfigMoedas:
     dias_liberacao_bonus: int = 7  # o bônus de avaliação só vira saldo depois disto sem disputa
     max_reservas_abertas: int = 2  # cobranças com moedas ainda sem pagar, por cliente
     reserva_minutos: int = 30  # quanto tempo a reserva de uma cobrança pendente vale
+    # Etapa B (Tratinhos do profissional e exclusividade). Só o bônus é usado nesta rodada.
+    bonus_avaliacao_profissional_moedas: int = 50
+    exclusividade_custo_moedas: int = 100
+    exclusividade_duracao_horas: int = 48
+    exclusividade_max_simultaneas: int = 3
+    exclusividade_prazo_resposta_horas: int = 6
+    exclusividade_bloqueio_recusa_dias: int = 30
 
 
 def chave_reserva(cobranca_id: str) -> str:
@@ -93,6 +104,8 @@ class PendenteMoeda:
     criada_em: datetime
     parceiro_id: str | None = None
     status: str = "pendente"  # pendente | liberado | cancelado
+    # bonus_avaliacao (cliente) | bonus_avaliacao_profissional (carteira do profissional)
+    tipo_lancamento: str = "bonus_avaliacao"
 
 
 @dataclass(frozen=True)
@@ -105,6 +118,7 @@ class LancamentoMoeda:
     referencia_id: str | None = None
     parceiro_id: str | None = None
     expira_em: datetime | None = None
+    carteira: str = "cliente"  # 'cliente' (desconto) | 'profissional' (nunca vira desconto)
 
 
 class RepositorioMoedas(Protocol):
@@ -116,7 +130,9 @@ class RepositorioMoedas(Protocol):
         """Grava o lançamento. False se a chave já existia (nada muda)."""
         ...
 
-    def saldo(self, usuario_id: str, agora: datetime) -> int: ...
+    def saldo(self, usuario_id: str, agora: datetime, carteira: str = "cliente") -> int:
+        """Saldo da carteira (padrão: cliente, a única que vira desconto)."""
+        ...
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int: ...
 
@@ -124,7 +140,9 @@ class RepositorioMoedas(Protocol):
 
     def bonus_do_par(self, usuario_id: str, parceiro_id: str, desde: datetime) -> int: ...
 
-    def extrato(self, usuario_id: str, limite: int = 50) -> list[LancamentoMoeda]: ...
+    def extrato(
+        self, usuario_id: str, limite: int = 50, carteira: str = "cliente"
+    ) -> list[LancamentoMoeda]: ...
 
     def uso_liquido_no_mes(self, usuario_id: str, inicio: datetime, fim: datetime) -> int:
         """Moedas usadas no período: lançamentos 'uso' menos 'estorno' (valor positivo)."""
@@ -199,8 +217,10 @@ class RepositorioMoedas(Protocol):
         """False se a chave já existia (nada muda)."""
         ...
 
-    def pendentes_do_usuario(self, usuario_id: str) -> list[PendenteMoeda]:
-        """Só os de status 'pendente'."""
+    def pendentes_do_usuario(
+        self, usuario_id: str, tipo: str = "bonus_avaliacao"
+    ) -> list[PendenteMoeda]:
+        """Só os de status 'pendente' do tipo pedido (padrão: bônus do cliente)."""
         ...
 
     def pendentes_vencidos(self, agora: datetime) -> list[PendenteMoeda]:
@@ -234,11 +254,13 @@ class MoedasEmMemoria:
         self._itens[lancamento.chave_idempotencia] = lancamento
         return True
 
-    def saldo(self, usuario_id: str, agora: datetime) -> int:
+    def saldo(self, usuario_id: str, agora: datetime, carteira: str = "cliente") -> int:
         return sum(
             i.quantidade
             for i in self._itens.values()
-            if i.usuario_id == usuario_id and (i.expira_em is None or i.expira_em > agora)
+            if i.usuario_id == usuario_id
+            and i.carteira == carteira
+            and (i.expira_em is None or i.expira_em > agora)
         )
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int:
@@ -261,8 +283,12 @@ class MoedasEmMemoria:
             and i.criada_em >= desde
         )
 
-    def extrato(self, usuario_id: str, limite: int = 50) -> list[LancamentoMoeda]:
-        meus = [i for i in self._itens.values() if i.usuario_id == usuario_id]
+    def extrato(
+        self, usuario_id: str, limite: int = 50, carteira: str = "cliente"
+    ) -> list[LancamentoMoeda]:
+        meus = [
+            i for i in self._itens.values() if i.usuario_id == usuario_id and i.carteira == carteira
+        ]
         return sorted(meus, key=lambda i: i.criada_em, reverse=True)[:limite]
 
     def uso_liquido_no_mes(self, usuario_id: str, inicio: datetime, fim: datetime) -> int:
@@ -410,16 +436,19 @@ class MoedasEmMemoria:
         ]
 
     def criar_pendente(self, pendente: PendenteMoeda) -> bool:
-        if pendente.chave_idempotencia in self._pendentes:
-            return False
-        self._pendentes[pendente.chave_idempotencia] = pendente
-        return True
+        with self._trava:  # duas avaliações ao mesmo tempo: só uma cria
+            if pendente.chave_idempotencia in self._pendentes:
+                return False
+            self._pendentes[pendente.chave_idempotencia] = pendente
+            return True
 
-    def pendentes_do_usuario(self, usuario_id: str) -> list[PendenteMoeda]:
+    def pendentes_do_usuario(
+        self, usuario_id: str, tipo: str = "bonus_avaliacao"
+    ) -> list[PendenteMoeda]:
         return [
             p
             for p in self._pendentes.values()
-            if p.usuario_id == usuario_id and p.status == "pendente"
+            if p.usuario_id == usuario_id and p.status == "pendente" and p.tipo_lancamento == tipo
         ]
 
     def pendentes_vencidos(self, agora: datetime) -> list[PendenteMoeda]:
@@ -453,7 +482,17 @@ class MoedasPostgres:
         "dias_liberacao_bonus",
     )  # fmt: skip
     _RESERVAS = ("max_reservas_abertas", "reserva_minutos")
-    _NIVEIS = (_BASE + _ORCAMENTO + _RESERVAS, _BASE + _ORCAMENTO, _BASE)
+    _EXCLUSIVIDADE = (
+        "bonus_avaliacao_profissional_moedas", "exclusividade_custo_moedas",
+        "exclusividade_duracao_horas", "exclusividade_max_simultaneas",
+        "exclusividade_prazo_resposta_horas", "exclusividade_bloqueio_recusa_dias",
+    )  # fmt: skip
+    _NIVEIS = (
+        _BASE + _ORCAMENTO + _RESERVAS + _EXCLUSIVIDADE,
+        _BASE + _ORCAMENTO + _RESERVAS,
+        _BASE + _ORCAMENTO,
+        _BASE,
+    )
 
     def config(self) -> ConfigMoedas:
         linha = None
@@ -472,7 +511,11 @@ class MoedasPostgres:
             raise ultimo  # type: ignore[misc]  # nem as colunas base existem: erro de verdade
         if linha is None:
             return ConfigMoedas()
-        extras = {c: int(linha[c]) for c in (*self._ORCAMENTO, *self._RESERVAS) if c in linha}
+        extras = {
+            c: int(linha[c])
+            for c in (*self._ORCAMENTO, *self._RESERVAS, *self._EXCLUSIVIDADE)
+            if c in linha
+        }
         return ConfigMoedas(
             ativo=bool(linha["ativo"]),
             bonus_avaliacao_moedas=int(linha["bonus_avaliacao_moedas"]),
@@ -486,8 +529,11 @@ class MoedasPostgres:
         )
 
     def salvar_config(self, config: ConfigMoedas) -> None:
-        valores = {c: getattr(config, c) for c in (*self._BASE, *self._ORCAMENTO, *self._RESERVAS)}
-        for colunas in self._NIVEIS[:2]:
+        valores = {
+            c: getattr(config, c)
+            for c in (*self._BASE, *self._ORCAMENTO, *self._RESERVAS, *self._EXCLUSIVIDADE)
+        }
+        for colunas in self._NIVEIS[:3]:
             try:
                 with self._banco.transacao() as con:
                     con.execute(
@@ -511,35 +557,61 @@ class MoedasPostgres:
         uid = como_uuid(lancamento.usuario_id)
         if uid is None:
             return False
+        valores = (
+            uid,
+            lancamento.tipo,
+            lancamento.quantidade,
+            lancamento.chave_idempotencia,
+            como_uuid(lancamento.referencia_id),
+            como_uuid(lancamento.parceiro_id),
+            lancamento.expira_em,
+            lancamento.criada_em,
+        )
         with self._banco.transacao() as con:
-            linha = con.execute(
-                "insert into public.moedas_lancamentos (usuario_id, tipo, quantidade, "
-                "chave_idempotencia, referencia_id, parceiro_id, expira_em, criada_em) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s) "
-                "on conflict (chave_idempotencia) do nothing returning id",
-                (
-                    uid,
-                    lancamento.tipo,
-                    lancamento.quantidade,
-                    lancamento.chave_idempotencia,
-                    como_uuid(lancamento.referencia_id),
-                    como_uuid(lancamento.parceiro_id),
-                    lancamento.expira_em,
-                    lancamento.criada_em,
-                ),
-            ).fetchone()
+            if lancamento.carteira == CARTEIRA_CLIENTE:
+                # A carteira 'cliente' é o padrão da coluna: o insert não depende dela existir.
+                linha = con.execute(
+                    "insert into public.moedas_lancamentos (usuario_id, tipo, quantidade, "
+                    "chave_idempotencia, referencia_id, parceiro_id, expira_em, criada_em) "
+                    "values (%s, %s, %s, %s, %s, %s, %s, %s) "
+                    "on conflict (chave_idempotencia) do nothing returning id",
+                    valores,
+                ).fetchone()
+            else:
+                # Carteira do profissional: precisa da coluna nova (sem ela o insert falha e
+                # quem chamou trata como "não creditou": fail-closed).
+                linha = con.execute(
+                    "insert into public.moedas_lancamentos (usuario_id, tipo, quantidade, "
+                    "chave_idempotencia, referencia_id, parceiro_id, expira_em, criada_em, "
+                    "carteira) values (%s, %s, %s, %s, %s, %s, %s, %s, %s) "
+                    "on conflict (chave_idempotencia) do nothing returning id",
+                    (*valores, lancamento.carteira),
+                ).fetchone()
         return linha is not None
 
-    def saldo(self, usuario_id: str, agora: datetime) -> int:
+    def saldo(self, usuario_id: str, agora: datetime, carteira: str = "cliente") -> int:
         uid = como_uuid(usuario_id)
         if uid is None:
             return 0
-        with self._banco.transacao() as con:
-            l = con.execute(  # noqa: E741
-                "select coalesce(sum(quantidade), 0) as total from public.moedas_lancamentos "
-                "where usuario_id = %s and (expira_em is null or expira_em > %s)",
-                (uid, agora),
-            ).fetchone()
+        try:
+            with self._banco.transacao() as con:
+                l = con.execute(  # noqa: E741
+                    "select coalesce(sum(quantidade), 0) as total "
+                    "from public.moedas_lancamentos "
+                    "where usuario_id = %s and carteira = %s "
+                    "and (expira_em is null or expira_em > %s)",
+                    (uid, carteira, agora),
+                ).fetchone()
+        except Exception:  # noqa: BLE001 - coluna `carteira` ainda não existe: tudo é do cliente
+            if carteira != CARTEIRA_CLIENTE:
+                return 0
+            with self._banco.transacao() as con:
+                l = con.execute(  # noqa: E741
+                    "select coalesce(sum(quantidade), 0) as total "
+                    "from public.moedas_lancamentos "
+                    "where usuario_id = %s and (expira_em is null or expira_em > %s)",
+                    (uid, agora),
+                ).fetchone()
         return int(l["total"])
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int:
@@ -575,17 +647,30 @@ class MoedasPostgres:
             ).fetchone()
         return int(l["total"])
 
-    def extrato(self, usuario_id: str, limite: int = 50) -> list[LancamentoMoeda]:
+    def extrato(
+        self, usuario_id: str, limite: int = 50, carteira: str = "cliente"
+    ) -> list[LancamentoMoeda]:
         uid = como_uuid(usuario_id)
         if uid is None:
             return []
-        with self._banco.transacao() as con:
-            linhas = con.execute(
-                "select usuario_id, tipo, quantidade, chave_idempotencia, referencia_id, "
-                "expira_em, criada_em from public.moedas_lancamentos "
-                "where usuario_id = %s order by criada_em desc limit %s",
-                (uid, limite),
-            ).fetchall()
+        try:
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select usuario_id, tipo, quantidade, chave_idempotencia, referencia_id, "
+                    "expira_em, criada_em from public.moedas_lancamentos "
+                    "where usuario_id = %s and carteira = %s order by criada_em desc limit %s",
+                    (uid, carteira, limite),
+                ).fetchall()
+        except Exception:  # noqa: BLE001 - coluna `carteira` ainda não existe: tudo é do cliente
+            if carteira != CARTEIRA_CLIENTE:
+                return []
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select usuario_id, tipo, quantidade, chave_idempotencia, referencia_id, "
+                    "expira_em, criada_em from public.moedas_lancamentos "
+                    "where usuario_id = %s order by criada_em desc limit %s",
+                    (uid, limite),
+                ).fetchall()
         return [
             LancamentoMoeda(
                 usuario_id=str(l["usuario_id"]),
@@ -755,22 +840,34 @@ class MoedasPostgres:
         uid = como_uuid(pendente.usuario_id)
         if uid is None:
             return False
+        valores = (
+            uid,
+            como_uuid(pendente.pedido_id),
+            pendente.quantidade,
+            pendente.liberar_em,
+            pendente.chave_idempotencia,
+            como_uuid(pendente.parceiro_id),
+            pendente.criada_em,
+        )
         with self._banco.transacao() as con:
-            l = con.execute(  # noqa: E741
-                "insert into public.moedas_pendentes (usuario_id, pedido_id, quantidade, "
-                "liberar_em, status, chave_idempotencia, parceiro_id, criada_em) "
-                "values (%s, %s, %s, %s, 'pendente', %s, %s, %s) "
-                "on conflict (chave_idempotencia) do nothing returning id",
-                (
-                    uid,
-                    como_uuid(pendente.pedido_id),
-                    pendente.quantidade,
-                    pendente.liberar_em,
-                    pendente.chave_idempotencia,
-                    como_uuid(pendente.parceiro_id),
-                    pendente.criada_em,
-                ),
-            ).fetchone()
+            if pendente.tipo_lancamento == TIPO_BONUS_CLIENTE:
+                # O tipo do cliente é o padrão da coluna: o insert não depende dela existir.
+                l = con.execute(  # noqa: E741
+                    "insert into public.moedas_pendentes (usuario_id, pedido_id, quantidade, "
+                    "liberar_em, status, chave_idempotencia, parceiro_id, criada_em) "
+                    "values (%s, %s, %s, %s, 'pendente', %s, %s, %s) "
+                    "on conflict (chave_idempotencia) do nothing returning id",
+                    valores,
+                ).fetchone()
+            else:
+                # Bônus do profissional: precisa da coluna nova (sem ela falha: fail-closed).
+                l = con.execute(  # noqa: E741
+                    "insert into public.moedas_pendentes (usuario_id, pedido_id, quantidade, "
+                    "liberar_em, status, chave_idempotencia, parceiro_id, criada_em, "
+                    "tipo_lancamento) values (%s, %s, %s, %s, 'pendente', %s, %s, %s, %s) "
+                    "on conflict do nothing returning id",
+                    (*valores, pendente.tipo_lancamento),
+                ).fetchone()
         return l is not None
 
     @staticmethod
@@ -784,29 +881,53 @@ class MoedasPostgres:
             criada_em=l["criada_em"],
             parceiro_id=str(l["parceiro_id"]) if l["parceiro_id"] else None,
             status=l["status"],
+            tipo_lancamento=l.get("tipo_lancamento") or TIPO_BONUS_CLIENTE,
         )
 
-    def pendentes_do_usuario(self, usuario_id: str) -> list[PendenteMoeda]:
+    def pendentes_do_usuario(
+        self, usuario_id: str, tipo: str = "bonus_avaliacao"
+    ) -> list[PendenteMoeda]:
         uid = como_uuid(usuario_id)
         if uid is None:
             return []
-        with self._banco.transacao() as con:
-            linhas = con.execute(
-                "select usuario_id, pedido_id, quantidade, liberar_em, chave_idempotencia, "
-                "criada_em, parceiro_id, status from public.moedas_pendentes "
-                "where usuario_id = %s and status = 'pendente' order by liberar_em",
-                (uid,),
-            ).fetchall()
+        try:
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select usuario_id, pedido_id, quantidade, liberar_em, chave_idempotencia, "
+                    "criada_em, parceiro_id, status, tipo_lancamento from public.moedas_pendentes "
+                    "where usuario_id = %s and status = 'pendente' and tipo_lancamento = %s "
+                    "order by liberar_em",
+                    (uid, tipo),
+                ).fetchall()
+        except Exception:  # noqa: BLE001 - coluna `tipo_lancamento` ainda não existe
+            if tipo != TIPO_BONUS_CLIENTE:
+                return []
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select usuario_id, pedido_id, quantidade, liberar_em, chave_idempotencia, "
+                    "criada_em, parceiro_id, status from public.moedas_pendentes "
+                    "where usuario_id = %s and status = 'pendente' order by liberar_em",
+                    (uid,),
+                ).fetchall()
         return [self._pendente(l) for l in linhas]  # noqa: E741
 
     def pendentes_vencidos(self, agora: datetime) -> list[PendenteMoeda]:
-        with self._banco.transacao() as con:
-            linhas = con.execute(
-                "select usuario_id, pedido_id, quantidade, liberar_em, chave_idempotencia, "
-                "criada_em, parceiro_id, status from public.moedas_pendentes "
-                "where status = 'pendente' and liberar_em <= %s order by liberar_em limit 500",
-                (agora,),
-            ).fetchall()
+        try:
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select usuario_id, pedido_id, quantidade, liberar_em, chave_idempotencia, "
+                    "criada_em, parceiro_id, status, tipo_lancamento from public.moedas_pendentes "
+                    "where status = 'pendente' and liberar_em <= %s order by liberar_em limit 500",
+                    (agora,),
+                ).fetchall()
+        except Exception:  # noqa: BLE001 - coluna `tipo_lancamento` ainda não existe
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select usuario_id, pedido_id, quantidade, liberar_em, chave_idempotencia, "
+                    "criada_em, parceiro_id, status from public.moedas_pendentes "
+                    "where status = 'pendente' and liberar_em <= %s order by liberar_em limit 500",
+                    (agora,),
+                ).fetchall()
         return [self._pendente(l) for l in linhas]  # noqa: E741
 
     def marcar_pendente(self, chave_idempotencia: str, status: str) -> bool:
@@ -900,6 +1021,57 @@ def conceder_bonus_avaliacao(
     return quantidade if gravou else 0
 
 
+def saldo_profissional(repo: RepositorioMoedas, usuario_id: str, agora: datetime) -> int:
+    """Tratinhos da carteira do profissional (nunca viram desconto). Sem a coluna nova: 0."""
+    try:
+        return int(repo.saldo(usuario_id, agora, CARTEIRA_PROFISSIONAL))
+    except Exception:  # noqa: BLE001 - carteira ainda não existe no banco
+        return 0
+
+
+def conceder_bonus_profissional(
+    repo: RepositorioMoedas,
+    *,
+    profissional_id: str,
+    cliente_id: str,
+    pedido_id: str,
+    agora: datetime,
+) -> int:
+    """Bônus do profissional por avaliar um cliente: pendente de `dias_liberacao_bonus` dias.
+
+    Vale 1 vez por par (profissional, cliente), para sempre: a chave é determinística
+    (`avaliacao-prof:<profissional>:<cliente>`), então o 2º contrato do mesmo cliente, ou duas
+    chamadas ao mesmo tempo, não criam outro. NÃO consome o orçamento de desconto da empresa
+    (moeda de profissional não vira dinheiro). Devolve as moedas dadas (0 se já houve, se a
+    gamificação está desligada ou se faltam as colunas novas no banco: fail-closed, nunca credita
+    direto). Nunca levanta erro: falha aqui não pode atrapalhar a avaliação.
+    """
+    try:
+        cfg = repo.config()
+        quantidade = cfg.bonus_avaliacao_profissional_moedas
+        if not cfg.ativo or quantidade <= 0:
+            return 0
+        chave = f"avaliacao-prof:{profissional_id}:{cliente_id}"
+        if repo.existe(chave):  # já liberado antes
+            return 0
+        gravou = repo.criar_pendente(
+            PendenteMoeda(
+                usuario_id=profissional_id,
+                pedido_id=pedido_id,
+                quantidade=quantidade,
+                liberar_em=agora + timedelta(days=cfg.dias_liberacao_bonus),
+                chave_idempotencia=chave,
+                criada_em=agora,
+                parceiro_id=cliente_id,
+                tipo_lancamento=TIPO_BONUS_PROFISSIONAL,
+            )
+        )
+    except Exception:  # noqa: BLE001 - sem as colunas novas (ou banco fora): não credita
+        log.warning("bônus do profissional indisponível: não creditado", exc_info=True)
+        return 0
+    return quantidade if gravou else 0
+
+
 @dataclass(frozen=True)
 class ResultadoLiberacao:
     liberados: int = 0
@@ -932,10 +1104,12 @@ def liberar_bonus_pendentes(
             cancelados += int(repo.marcar_pendente(pend.chave_idempotencia, "cancelado"))
         else:
             expira = agora + timedelta(days=cfg.validade_dias) if cfg.validade_dias else None
+            do_profissional = pend.tipo_lancamento == TIPO_BONUS_PROFISSIONAL
             repo.lancar(  # idempotente pela chave: se o ciclo caiu no meio, só falta marcar
                 LancamentoMoeda(
                     usuario_id=pend.usuario_id,
-                    tipo="bonus_avaliacao",
+                    tipo=TIPO_BONUS_PROFISSIONAL if do_profissional else TIPO_BONUS_CLIENTE,
+                    carteira=CARTEIRA_PROFISSIONAL if do_profissional else CARTEIRA_CLIENTE,
                     quantidade=pend.quantidade,
                     chave_idempotencia=pend.chave_idempotencia,
                     criada_em=agora,
@@ -948,10 +1122,14 @@ def liberar_bonus_pendentes(
     return ResultadoLiberacao(liberados, cancelados, aguardando)
 
 
-def resumo_pendentes(repo: RepositorioMoedas, usuario_id: str) -> tuple[int, date | None]:
-    """(soma dos bônus pendentes, data da próxima liberação em Brasília). Sem tabela: (0, None)."""
+def resumo_pendentes(
+    repo: RepositorioMoedas, usuario_id: str, tipo: str = TIPO_BONUS_CLIENTE
+) -> tuple[int, date | None]:
+    """(soma dos bônus pendentes do tipo, data da próxima liberação em Brasília).
+
+    Sem tabela/coluna: (0, None)."""
     try:
-        itens = repo.pendentes_do_usuario(usuario_id)
+        itens = repo.pendentes_do_usuario(usuario_id, tipo)
     except Exception:  # noqa: BLE001 - tabela ainda não existe: não há pendente
         return 0, None
     if not itens:

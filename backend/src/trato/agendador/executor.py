@@ -17,7 +17,8 @@ from trato.disputas import Estado as EstadoDisputa
 from trato.financeiro.ledger import Lancamento, TipoLancamento, a_liberar, liberado
 from trato.notificacoes.eventos import Evento
 from trato.notificacoes.servico import ServicoNotificacoes
-from trato.pedidos.estados import Pedido, TransicaoInvalida, transicionar
+from trato.pagamentos.modelos import EstadoCobranca
+from trato.pedidos.estados import Estado, Pedido, TransicaoInvalida, transicionar
 from trato.persistencia.conexao import Banco
 from trato.rotinas.regras import (
     SISTEMA,
@@ -157,6 +158,17 @@ class ExecutorContexto:
         self._cobrancas = cobrancas  # repositório de cobranças (expiração de reservas)
         self._provedor = provedor  # para cancelar no provedor a cobrança expirada
 
+    def _pedido_estornado_ou_cancelado(self, pedido_id: str) -> bool:
+        """Pedido cancelado, ou com cobrança devolvida por inteiro (estorno total)."""
+        pedido = self._c.pedidos.obter(pedido_id)
+        if pedido is not None and pedido.estado is Estado.CANCELADO:
+            return True
+        if self._cobrancas is None:
+            return False
+        return any(
+            c.status is EstadoCobranca.DEVOLVIDA for c in self._cobrancas.do_pedido(pedido_id)
+        )
+
     def expirar_reservas_moedas(self, agora: datetime) -> int:
         """Expira as reservas de desconto vencidas e cancela as cobranças pendentes delas.
 
@@ -174,7 +186,11 @@ class ExecutorContexto:
         A disputa do pedido decide: aberta segura o bônus; decidida sem nada para o cliente
         (perdida) cancela; sem disputa ou ganha libera. Idempotente pela chave do lançamento.
         """
-        from trato.api.moedas import PendenteMoeda, liberar_bonus_pendentes
+        from trato.api.moedas import (
+            TIPO_BONUS_PROFISSIONAL,
+            PendenteMoeda,
+            liberar_bonus_pendentes,
+        )
 
         def situacao(pend: PendenteMoeda) -> str:
             if not pend.pedido_id:
@@ -183,15 +199,23 @@ class ExecutorContexto:
                 chave = uuid.UUID(pend.pedido_id).hex  # o pedido é guardado como hex
             except ValueError:
                 chave = pend.pedido_id
+            do_profissional = pend.tipo_lancamento == TIPO_BONUS_PROFISSIONAL
+            if do_profissional and self._pedido_estornado_ou_cancelado(chave):
+                return "estornado"  # nada a liberar: o serviço foi desfeito
             disputa = self._c.disputas.obter(chave)
             if disputa is None:
                 return "nenhuma"
             if disputa.estado is not EstadoDisputa.DECIDIDA:
                 return "aberta"
             divisao = disputa.divisao
-            if divisao is not None and divisao.para_cliente == 0 and divisao.retido == 0:
-                return "perdida"
-            return "nenhuma"
+            if divisao is None or divisao.retido != 0:
+                return "nenhuma"
+            # Perdeu quem avaliou: o cliente não recebeu nada (bônus do cliente) ou o
+            # profissional não recebeu nada, p.ex. reembolso total (bônus do profissional).
+            perdeu = (
+                divisao.para_profissional == 0 if do_profissional else divisao.para_cliente == 0
+            )
+            return "perdida" if perdeu else "nenhuma"
 
         return liberar_bonus_pendentes(
             self._c.moedas, agora=agora, situacao_disputa=situacao

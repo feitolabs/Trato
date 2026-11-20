@@ -111,3 +111,75 @@ def test_config_traz_os_campos_novos_e_put_audita(painel):
         ).status_code
         == 422
     )
+
+
+SEIS = {
+    "bonus_avaliacao_profissional_moedas": 50,
+    "exclusividade_custo_moedas": 100,
+    "exclusividade_duracao_horas": 48,
+    "exclusividade_max_simultaneas": 3,
+    "exclusividade_prazo_resposta_horas": 6,
+    "exclusividade_bloqueio_recusa_dias": 30,
+}
+
+
+def _corpo_base() -> dict:
+    return {
+        "ativo": True,
+        "bonus_avaliacao_moedas": 50,
+        "valor_moeda_centavos": 1,
+        "teto_mensal_moedas": 500,
+        "min_servico_centavos": 5000,
+        "max_bonus_por_profissional_mes": 1,
+        "max_desconto_percentual": 20,
+        "validade_dias": None,
+        "motivo": "Ajuste da etapa B",
+    }
+
+
+def test_config_traz_os_6_campos_da_etapa_b_e_put_altera_com_auditoria(painel):
+    _preparar(painel)
+    url = "/v1/admin/moedas/config"
+    r = painel.chamar("administrador", "GET", url).json()
+    assert {k: r[k] for k in SEIS} == SEIS  # padrões
+
+    novos = {
+        "bonus_avaliacao_profissional_moedas": 60,
+        "exclusividade_custo_moedas": 120,
+        "exclusividade_duracao_horas": 72,
+        "exclusividade_max_simultaneas": 5,
+        "exclusividade_prazo_resposta_horas": 12,
+        "exclusividade_bloqueio_recusa_dias": 0,
+    }
+    r = painel.chamar("administrador", "PUT", url, json={**_corpo_base(), **novos})
+    assert r.status_code == 200, r.text
+    assert {k: r.json()[k] for k in SEIS} == novos
+    assert painel.ambiente.contexto.moedas.config().exclusividade_custo_moedas == 120
+
+    # Sem os campos no PUT: mantém o valor atual, não volta ao padrão.
+    r = painel.chamar("administrador", "PUT", url, json=_corpo_base())
+    assert r.status_code == 200, r.text
+    assert {k: r.json()[k] for k in SEIS} == novos
+
+
+def test_config_etapa_b_recusa_valores_fora_da_faixa(painel):
+    _preparar(painel)
+    url = "/v1/admin/moedas/config"
+    for campo, ruim in [
+        ("bonus_avaliacao_profissional_moedas", 0),
+        ("exclusividade_custo_moedas", 0),
+        ("exclusividade_duracao_horas", 169),
+        ("exclusividade_duracao_horas", 0),
+        ("exclusividade_max_simultaneas", 11),
+        ("exclusividade_max_simultaneas", 0),
+        ("exclusividade_prazo_resposta_horas", 169),
+        ("exclusividade_bloqueio_recusa_dias", 366),
+        ("exclusividade_bloqueio_recusa_dias", -1),
+    ]:
+        corpo = {**_corpo_base(), campo: ruim}
+        assert painel.chamar("administrador", "PUT", url, json=corpo).status_code == 422, (
+            campo,
+            ruim,
+        )
+    ok = {**_corpo_base(), "exclusividade_max_simultaneas": 10, "exclusividade_duracao_horas": 168}
+    assert painel.chamar("administrador", "PUT", url, json=ok).status_code == 200

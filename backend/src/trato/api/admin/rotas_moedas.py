@@ -34,6 +34,12 @@ class ConfigMoedasOut(BaseModel):
     dias_liberacao_bonus: int
     max_reservas_abertas: int
     reserva_minutos: int
+    bonus_avaliacao_profissional_moedas: int
+    exclusividade_custo_moedas: int
+    exclusividade_duracao_horas: int
+    exclusividade_max_simultaneas: int
+    exclusividade_prazo_resposta_horas: int
+    exclusividade_bloqueio_recusa_dias: int
 
 
 class ConfigMoedasIn(BaseModel):
@@ -54,6 +60,12 @@ class ConfigMoedasIn(BaseModel):
     dias_liberacao_bonus: int | None = Field(default=None, ge=0, le=365)
     max_reservas_abertas: int | None = Field(default=None, ge=1, le=20)
     reserva_minutos: int | None = Field(default=None, ge=1, le=1440)
+    bonus_avaliacao_profissional_moedas: int | None = Field(default=None, ge=1, le=100_000)
+    exclusividade_custo_moedas: int | None = Field(default=None, ge=1, le=100_000)
+    exclusividade_duracao_horas: int | None = Field(default=None, ge=1, le=168)
+    exclusividade_max_simultaneas: int | None = Field(default=None, ge=1, le=10)
+    exclusividade_prazo_resposta_horas: int | None = Field(default=None, ge=1, le=168)
+    exclusividade_bloqueio_recusa_dias: int | None = Field(default=None, ge=0, le=365)
     motivo: str = Field(min_length=10, max_length=500)
 
 
@@ -117,6 +129,12 @@ def alterar_config(
         "dias_liberacao_bonus",
         "max_reservas_abertas",
         "reserva_minutos",
+        "bonus_avaliacao_profissional_moedas",
+        "exclusividade_custo_moedas",
+        "exclusividade_duracao_horas",
+        "exclusividade_max_simultaneas",
+        "exclusividade_prazo_resposta_horas",
+        "exclusividade_bloqueio_recusa_dias",
     ):
         if dados[campo] is None:  # não enviado: mantém o valor atual (não volta ao padrão)
             del dados[campo]

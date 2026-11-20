@@ -24,10 +24,13 @@ from trato.api.avisos import (
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.moedas import (
+    TIPO_BONUS_PROFISSIONAL,
     calcular_uso_moedas,
     conceder_bonus_avaliacao,
+    conceder_bonus_profissional,
     disponibilidade_desconto,
     resumo_pendentes,
+    saldo_profissional,
 )
 from trato.api.repositorios import EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
@@ -278,7 +281,13 @@ class MoedaLancamentoOut(BaseModel):
 
 
 class MoedasOut(BaseModel):
-    saldo: int
+    saldo: int = Field(description="Tratinhos da carteira do CLIENTE (a do desconto).")
+    saldo_profissional: int = Field(
+        0, description="Tratinhos da carteira do PROFISSIONAL (nunca viram desconto)."
+    )
+    moedas_pendentes_profissional: int = Field(
+        0, description="Bônus do profissional ainda aguardando a liberação (não é saldo)."
+    )
     valor_moeda_centavos: int
     extrato: list[MoedaLancamentoOut]
     desconto_disponivel: bool = True
@@ -1109,8 +1118,11 @@ def minhas_moedas(
     agora = contexto.agora()
     disp = disponibilidade_desconto(contexto.moedas, usuario_id=usuario.id, agora=agora)
     pendentes, proxima = resumo_pendentes(contexto.moedas, usuario.id)
+    pendentes_prof, _ = resumo_pendentes(contexto.moedas, usuario.id, TIPO_BONUS_PROFISSIONAL)
     return MoedasOut(
         saldo=contexto.moedas.saldo(usuario.id, agora),
+        saldo_profissional=saldo_profissional(contexto.moedas, usuario.id, agora),
+        moedas_pendentes_profissional=pendentes_prof,
         valor_moeda_centavos=contexto.moedas.config().valor_moeda_centavos,
         desconto_disponivel=disp.disponivel,
         desconto_indisponivel_motivo=disp.motivo,
@@ -1182,6 +1194,18 @@ def avaliar(
                 agora=contexto.agora(),
                 profissional_id=avaliado,
                 valor_servico_centavos=contrato.valor_centavos if contrato else 0,
+            )
+        except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
+            ganhas = 0
+    else:
+        # Profissional avaliando o cliente: bônus pendente, 1 por cliente para sempre.
+        try:
+            ganhas = conceder_bonus_profissional(
+                contexto.moedas,
+                profissional_id=usuario.id,
+                cliente_id=avaliado,
+                pedido_id=pedido.id,
+                agora=contexto.agora(),
             )
         except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
             ganhas = 0

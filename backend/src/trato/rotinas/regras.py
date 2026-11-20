@@ -130,12 +130,13 @@ def decidir_liberacao_bonus(
     """Bônus de moedas pendente: libera só depois do prazo e sem disputa contra quem avaliou.
 
     `situacao_disputa`: `nenhuma` | `aberta` (sem decisão ainda) | `perdida` (decidida contra o
-    autor da avaliação). Disputa aberta segura o bônus: cancelar antes da decisão seria injusto
-    se o cliente ganhar. Função pura: o prazo (`liberar_em`) vem da tabela de configuração.
+    autor da avaliação) | `estornado` (pedido estornado ou cancelado antes do prazo: nada a
+    liberar). Disputa aberta segura o bônus: cancelar antes da decisão seria injusto se o cliente
+    ganhar. Função pura: o prazo (`liberar_em`) vem da tabela de configuração.
     """
     if agora < liberar_em:
         return DecisaoBonus.AGUARDAR
-    if situacao_disputa == "perdida":
+    if situacao_disputa in ("perdida", "estornado"):
         return DecisaoBonus.CANCELAR
     if situacao_disputa == "aberta":
         return DecisaoBonus.AGUARDAR
