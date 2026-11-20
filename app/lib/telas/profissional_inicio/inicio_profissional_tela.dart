@@ -354,6 +354,11 @@ class _CartaoExclusividades extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: EspacosTrato.x1),
+          Text(
+            'Ganhe Tratinhos avaliando clientes e use 100 para pedir 48h de exclusividade.',
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          ),
           if (resumo.moedasPendentesProfissional > 0) ...[
             const SizedBox(height: EspacosTrato.x1),
             Text(

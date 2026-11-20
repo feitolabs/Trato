@@ -366,6 +366,11 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
             ],
             const SizedBox(height: EspacosTrato.x2),
             Text(
+              'Aceitar é sem compromisso de contratar.',
+              style: TipografiaTrato.corpoForte,
+            ),
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
               'Se você aceitar, este profissional terá 48 horas exclusivas para enviar o '
               'orçamento. Se ele não enviar, o pedido volta para outros profissionais. '
               'Outros orçamentos já recebidos continuam visíveis.',

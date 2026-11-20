@@ -6,7 +6,7 @@ import '../../dispositivo/abrir_mapa.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_de_usuario.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhos;
-import '../comuns/formato_aparelho.dart' show horaDoAparelho;
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho, horaDoAparelho;
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
@@ -136,7 +136,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
               ),
               const SizedBox(height: EspacosTrato.x2),
               Text(
-                '4. Se não atender, os 100 não voltam.',
+                '4. Se não enviar o orçamento em até 48h, os 100 Tratinhos não voltam.',
                 style: TipografiaTrato.corpo,
               ),
               const SizedBox(height: EspacosTrato.x5),
@@ -185,8 +185,10 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
   Widget _secaoExclusividade(PedidoAberto pedido) {
     final ex = _exclusividade;
     if (pedido.reservado || (ex?.ativa ?? false)) {
-      final expira = ex?.expiraEm;
-      final ate = expira == null ? '' : ' · termina às ${horaDoAparelho(expira.toLocal())}';
+      final expira = ex?.expiraEm?.toLocal();
+      final ate = expira == null
+          ? ''
+          : ' · termina em ${diaMesDoAparelho(expira)} às ${horaDoAparelho(expira)}';
       return AvisoFaixa(
         texto: 'Reservado para você$ate',
         tipo: TipoStatus.sucesso,
@@ -194,8 +196,11 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
       );
     }
     if (ex?.aguardandoCliente ?? false) {
-      return const AvisoFaixa(
-        texto: 'Oferta enviada, aguardando o cliente',
+      final ate = ex?.responderAte?.toLocal();
+      final prazo =
+          ate == null ? ' (prazo de 6h)' : ' (responde em até 6h · até ${horaDoAparelho(ate)})';
+      return AvisoFaixa(
+        texto: 'Oferta enviada, aguardando o cliente$prazo',
         tipo: TipoStatus.info,
         icone: Icons.hourglass_top_outlined,
       );

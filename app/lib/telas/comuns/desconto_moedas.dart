@@ -40,6 +40,10 @@ const _explicacaoLimite =
 /// Frase fixa aprovada pelo João. Não prometer mais nada além disso.
 const fraseSemTaxa = 'Sem taxa para você. O Trato é gratuito enquanto crescemos.';
 
+/// Esclarece que o desconto vale tanto no Pix quanto no cartão.
+const fraseDescontoMetodos =
+    'O desconto com Tratinhos vale no Pix e no cartão (à vista ou parcelado).';
+
 /// 27/11 (dia e mês com 2 dígitos).
 String formatarDiaMes(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';

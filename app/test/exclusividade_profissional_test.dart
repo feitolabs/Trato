@@ -96,13 +96,15 @@ void main() {
       expect(find.textContaining('Se ele recusar ou não responder, os 100 Tratinhos voltam'),
           findsOneWidget);
       expect(find.textContaining('48 horas e precisa enviar o orçamento'), findsOneWidget);
-      expect(find.textContaining('Se não atender, os 100 não voltam'), findsOneWidget);
+      expect(
+          find.textContaining('Se não enviar o orçamento em até 48h, os 100 Tratinhos não voltam'),
+          findsOneWidget);
 
       await tester.tap(find.text('Confirmar por 100 Tratinhos'));
       await tester.pumpAndSettle();
 
       expect(chaveRecebida, isNotNull);
-      expect(find.text('Oferta enviada, aguardando o cliente'), findsOneWidget);
+      expect(find.text('Oferta enviada, aguardando o cliente (prazo de 6h)'), findsOneWidget);
     });
 
     testWidgets('botão desabilitado por saldo menor que 100', (tester) async {
@@ -243,7 +245,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Reservado para você · termina às 14:30'), findsOneWidget);
+      expect(find.text('Reservado para você · termina em 22/11 às 14:30'), findsOneWidget);
     });
   });
 
@@ -304,6 +306,10 @@ void main() {
       expect(find.text('Exclusividades: 2 de 3'), findsOneWidget);
       expect(find.text('150 Tratinhos'), findsOneWidget);
       expect(find.text('50 Tratinhos a liberar'), findsOneWidget);
+      expect(
+        find.text('Ganhe Tratinhos avaliando clientes e use 100 para pedir 48h de exclusividade.'),
+        findsOneWidget,
+      );
       expect(find.text('Ativa (48h)'), findsOneWidget);
       expect(find.text('Aguardando o cliente'), findsOneWidget);
       expect(find.text('Reservado para você'), findsOneWidget);
@@ -323,6 +329,10 @@ void main() {
         ),
       );
 
+      expect(
+          find.text(
+              'Avaliar o cliente vale +50 Tratinhos (liberam em 7 dias se não houver disputa; 1 por cliente).'),
+          findsOneWidget);
       await tester.tap(find.byIcon(Icons.star_border).last);
       await tester.pump();
       await tester.tap(find.text('Enviar avaliação'));

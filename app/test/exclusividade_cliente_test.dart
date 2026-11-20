@@ -77,6 +77,8 @@ void main() {
       );
 
       expect(find.text('Sem compromisso'), findsOneWidget);
+      expect(find.text('Aceitar é sem compromisso de contratar.'), findsOneWidget);
+      expect(find.textContaining('cancelar a reserva'), findsNothing);
       expect(find.text('Carlos M. · nota 4,9'), findsOneWidget);
       expect(find.text('Responda até 20/11 às 20:30'), findsOneWidget);
       expect(find.textContaining('48 horas exclusivas'), findsOneWidget);
