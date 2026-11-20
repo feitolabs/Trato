@@ -46,6 +46,7 @@ class DadosPagamento {
     this.moedaValorCentavos,
     this.descontoPossivelCentavos,
     this.descontoVoltaEm,
+    this.cpfCadastrado = true,
   });
 
   /// Quanto o cliente pode abater neste serviço, em centavos (decidido pelo backend). Null: sem linha.
@@ -53,6 +54,9 @@ class DadosPagamento {
 
   /// Quando o desconto volta (`desconto_volta_em`). Null: texto sem data.
   final DateTime? descontoVoltaEm;
+
+  /// Se o cliente já informou CPF no perfil. Ausente (backend antigo) = true.
+  final bool cpfCadastrado;
 
   /// Valor de 1 Tratinho em centavos, só para exibir "N Tratinhos = R$ X". Null: mostra a quantidade.
   final int? moedaValorCentavos;
@@ -98,6 +102,7 @@ class DadosPagamento {
     bool? descontoDisponivel,
     MotivoDescontoIndisponivel? descontoIndisponivelMotivo,
     int? moedaValorCentavos,
+    bool? cpfCadastrado,
     int? descontoPossivelCentavos,
     DateTime? descontoVoltaEm,
     String? rotuloValor,
@@ -117,6 +122,7 @@ class DadosPagamento {
         moedaValorCentavos: moedaValorCentavos ?? this.moedaValorCentavos,
         descontoPossivelCentavos: descontoPossivelCentavos ?? this.descontoPossivelCentavos,
         descontoVoltaEm: descontoVoltaEm ?? this.descontoVoltaEm,
+        cpfCadastrado: cpfCadastrado ?? this.cpfCadastrado,
         rotuloValor: rotuloValor ?? this.rotuloValor,
         opcoes: opcoes ?? this.opcoes,
       );

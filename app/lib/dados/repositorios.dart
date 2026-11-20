@@ -262,6 +262,9 @@ abstract interface class RepositorioPagamento {
   });
 
   Future<StatusPagamento> status(String pedidoId);
+
+  /// Grava CPF e data de nascimento no perfil do cliente (`POST /v1/me/cpf`).
+  Future<void> cadastrarCpf(String cpf, String nascimentoIso) async {}
 }
 
 abstract interface class RepositorioChat {

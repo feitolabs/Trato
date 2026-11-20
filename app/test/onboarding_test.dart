@@ -4,6 +4,7 @@ import 'package:trato/main.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
+import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/onboarding/onboarding_tela.dart';
 
 void main() {
@@ -50,13 +51,13 @@ void main() {
       expect(find.text('2 DE 3'), findsOneWidget);
     });
 
-    testWidgets('Pular vai direto para a escolha de perfil', (tester) async {
+    testWidgets('Pular vai direto para o início do cliente sem exigir login', (tester) async {
       await abrir(tester);
 
       await tester.tap(find.text('Pular'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(EscolhaPerfilTela), findsOneWidget);
+      expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
     testWidgets('Já tenho conta abre o login', (tester) async {

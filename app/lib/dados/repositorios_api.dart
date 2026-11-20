@@ -1128,8 +1128,30 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
 
   /// `GET /v1/pedidos/{id}/pagamento`: valor do contrato e meios disponíveis (`pix`, `cartao`).
   @override
-  Future<DadosPagamento> dados(String pedidoId) async =>
-      _dadosDeMapa(pedidoId, _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento')));
+  Future<DadosPagamento> dados(String pedidoId) async {
+    final mapa = _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento'));
+    var cpfCadastrado = true;
+    try {
+      final me = _mapa(await _api.get('/v1/me'));
+      if (me.containsKey('cpf_cadastrado')) {
+        cpfCadastrado = me['cpf_cadastrado'] != false;
+      }
+    } on Object {
+      cpfCadastrado = true;
+    }
+    return _dadosDeMapa(pedidoId, mapa).copiarCom(cpfCadastrado: cpfCadastrado);
+  }
+
+  @override
+  Future<void> cadastrarCpf(String cpf, String nascimentoIso) async {
+    await _api.post(
+      '/v1/me/cpf',
+      corpo: {
+        'cpf': cpf.replaceAll(RegExp(r'\D'), ''),
+        'data_nascimento': nascimentoIso,
+      },
+    );
+  }
 
   @override
   Future<DadosPagamento> recalcular(

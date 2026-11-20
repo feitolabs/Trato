@@ -30,24 +30,18 @@ class CriarContaTela extends StatefulWidget {
 
 class _CriarContaTelaState extends State<CriarContaTela> {
   final _nome = TextEditingController();
-  final _cpf = TextEditingController();
-  final _nascimento = TextEditingController();
   final _celular = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
   final _confirmarSenha = TextEditingController();
   final _scrollController = ScrollController();
   final _keyNome = GlobalKey();
-  final _keyCpf = GlobalKey();
-  final _keyNascimento = GlobalKey();
   final _keyCelular = GlobalKey();
   final _keyEmail = GlobalKey();
   final _keySenha = GlobalKey();
   final _keyConfirmar = GlobalKey();
   final _keyTermos = GlobalKey();
   final _focoNome = FocusNode();
-  final _focoCpf = FocusNode();
-  final _focoNascimento = FocusNode();
   final _focoCelular = FocusNode();
   final _focoEmail = FocusNode();
   final _focoSenha = FocusNode();
@@ -66,13 +60,11 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   @override
   void dispose() {
-    for (final c in [_nome, _cpf, _nascimento, _celular, _email, _senha, _confirmarSenha]) {
+    for (final c in [_nome, _celular, _email, _senha, _confirmarSenha]) {
       c.dispose();
     }
     for (final f in [
       _focoNome,
-      _focoCpf,
-      _focoNascimento,
       _focoCelular,
       _focoEmail,
       _focoSenha,
@@ -103,8 +95,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   bool get _valido =>
       ValidacaoAuth.nome(_nome.text) == null &&
-      ValidacaoAuth.cpf(_cpf.text) == null &&
-      ValidacaoAuth.nascimento(_nascimento.text) == null &&
       ValidacaoAuth.celular(_celular.text) == null &&
       ValidacaoAuth.email(_email.text) == null &&
       ValidacaoAuth.senhaNova(_senha.text) == null &&
@@ -120,16 +110,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
           key: _keyNome,
           focusNode: _focoNome,
           temErro: () => ValidacaoAuth.nome(_nome.text) != null,
-        ),
-        EntradaCampoErro(
-          key: _keyCpf,
-          focusNode: _focoCpf,
-          temErro: () => ValidacaoAuth.cpf(_cpf.text) != null,
-        ),
-        EntradaCampoErro(
-          key: _keyNascimento,
-          focusNode: _focoNascimento,
-          temErro: () => ValidacaoAuth.nascimento(_nascimento.text) != null,
         ),
         EntradaCampoErro(
           key: _keyCelular,
@@ -170,8 +150,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         email: _email.text.trim(),
         senha: _senha.text,
         celular: _celular.text,
-        cpf: _cpf.text,
-        nascimento: _nascimento.text.trim(),
         perfil: widget.perfil.name,
         termosAceitos: _aceitouTermos,
       ));
@@ -200,7 +178,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
             builder: (_) => ConfirmarEmailTela(
               email: email,
               senha: _senha.text,
-              cpf: _cpf.text,
+              cpf: '',
               perfil: widget.perfil,
               servico: widget.servico,
             ),
@@ -260,35 +238,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
             controlador: _nome,
             foco: _focoNome,
             erro: _erro(() => ValidacaoAuth.nome(_nome.text)),
-            aoMudar: atualizar,
-          ),
-        ),
-        const SizedBox(height: EspacosTrato.x4),
-        KeyedSubtree(
-          key: _keyCpf,
-          child: CampoTrato(
-            rotulo: 'CPF',
-            controlador: _cpf,
-            foco: _focoCpf,
-            dica: '000.000.000-00',
-            teclado: TextInputType.number,
-            formatadores: const [MascaraNumerica.cpf],
-            erro: _erro(() => ValidacaoAuth.cpf(_cpf.text)),
-            aoMudar: atualizar,
-          ),
-        ),
-        const SizedBox(height: EspacosTrato.x4),
-        KeyedSubtree(
-          key: _keyNascimento,
-          child: CampoTrato(
-            rotulo: 'Nascimento',
-            controlador: _nascimento,
-            foco: _focoNascimento,
-            dica: 'dd/mm/aaaa',
-            ajuda: 'O Trato é para maiores de 18 anos.',
-            teclado: TextInputType.number,
-            formatadores: const [MascaraNumerica.data],
-            erro: _erro(() => ValidacaoAuth.nascimento(_nascimento.text)),
             aoMudar: atualizar,
           ),
         ),
@@ -398,7 +347,8 @@ class _LinhaMarcar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        MergeSemantics(child: Row(
+        MergeSemantics(
+            child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(value: marcado, onChanged: (v) => aoMudar(v ?? false)),
