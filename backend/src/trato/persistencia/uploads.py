@@ -115,6 +115,42 @@ class UploadsPostgres:
 
         return self._memoria.solicitacao(solicitacao_id)
 
+    def portfolio_do_dono(self, dono_id: str, limite: int) -> list[Solicitacao]:
+        achado = como_uuid(dono_id)
+        memoria = self._memoria.portfolio_do_dono(dono_id, limite)
+        if not achado:
+            return memoria
+        try:
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select id, dono_id, destino, pedido_id, tipo_documento, bucket, caminho, "
+                    "content_type, tamanho_bytes, status, registro_id, criada_em "
+                    "from public.upload_solicitacoes "
+                    "where dono_id = %s and destino = 'portfolio' and status = 'concluida' "
+                    "order by criada_em desc limit %s",
+                    (achado, limite),
+                ).fetchall()
+        except Exception as err:  # noqa: BLE001 - sem a tabela, o perfil sai sem fotos
+            logger.debug("Falha ao listar portfólio no banco: %s", err)
+            return memoria
+        return [
+            Solicitacao(
+                id=_para_hex(r["id"]),
+                dono_id=str(r["dono_id"]),
+                destino=r["destino"],
+                bucket=r["bucket"],
+                caminho=r["caminho"],
+                content_type=r["content_type"],
+                tamanho_bytes=r["tamanho_bytes"],
+                criada_em=r["criada_em"],
+                pedido_id=str(r["pedido_id"]) if r["pedido_id"] else None,
+                tipo_documento=r["tipo_documento"],
+                status=r["status"],
+                registro_id=_para_hex(r["registro_id"]) if r["registro_id"] else None,
+            )
+            for r in linhas
+        ]
+
     def salvar_midia(self, m: Midia) -> None:
         midia_id = como_uuid(m.id)
         pedido_id = como_uuid(m.pedido_id)

@@ -101,7 +101,7 @@ void main() {
         tester,
         FavoritosTela(servico: ServicoContaFake(favoritos: const []), aoBuscar: () => foi++),
       );
-      expect(find.text('Nenhum favorito ainda'), findsOneWidget);
+      expect(find.text('Nenhum profissional de confiança ainda'), findsOneWidget);
       await tester.tap(find.text('Buscar profissionais'));
       expect(foi, 1);
     });

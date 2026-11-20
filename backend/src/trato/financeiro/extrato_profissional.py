@@ -97,6 +97,16 @@ def reais(centavos: int) -> str:
     return f"{sinal}R$ {milhares},{resto:02d}"
 
 
+def formatar_documento(documento: str | None) -> str | None:
+    """CPF (11 dígitos) ou CNPJ (14) formatado; outro tamanho = sem linha no PDF."""
+    digitos = "".join(c for c in (documento or "") if c.isdigit())
+    if len(digitos) == 11:
+        return f"CPF {digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+    if len(digitos) == 14:
+        return f"CNPJ {digitos[:2]}.{digitos[2:5]}.{digitos[5:8]}/{digitos[8:12]}-{digitos[12:]}"
+    return None
+
+
 def _data(instante: datetime) -> str:
     return instante.astimezone(periodo.BRASILIA).strftime("%d/%m/%Y")
 
@@ -106,8 +116,14 @@ def pdf(
     nome: str,
     rotulos: Mapping[str, tuple[int | None, str]],
     emitido_em: datetime,
+    documento: str | None = None,
+    categorias: Mapping[str, str] | None = None,
 ) -> bytes:
-    """O extrato em PDF A4. `rotulos` = pedido -> (número curto, título)."""
+    """O extrato em PDF A4. `rotulos` = pedido -> (número curto, título).
+
+    Opcionais (só do PRÓPRIO profissional): `documento` (CPF/CNPJ, aparece ao lado do nome) e
+    `categorias` (pedido -> nome da categoria, para a tabela "Serviços do período"). Nenhum
+    dado do cliente entra no documento."""
     doc = PdfSimples()
     margem, direita = 50, LARGURA - 50
     fim_inclusivo = _data(extrato.ate - timedelta(days=1))  # o fim do intervalo é exclusivo
@@ -116,6 +132,9 @@ def pdf(
         doc.texto(margem, 60, "Trato", 20, negrito=True)
         doc.texto(margem, 80, "Extrato de recebimentos do profissional", 11, cinza=True)
         doc.texto(margem, 112, nome, 13, negrito=True)
+        texto_doc = formatar_documento(documento)
+        if texto_doc:
+            doc.texto(direita, 112, texto_doc, 10.5, direita=True)
         doc.texto(margem, 130, f"Período: {_data(extrato.desde)} a {fim_inclusivo}", 10, cinza=True)
         return 160
 
@@ -125,7 +144,10 @@ def pdf(
     ganhos = (
         ("Serviços concluídos", str(extrato.servicos_concluidos)),
         ("Total bruto", reais(extrato.bruto_centavos)),
-        ("Taxa do Trato", reais(extrato.taxa_trato_centavos)),
+        (
+            "Taxa do Trato",
+            reais(extrato.taxa_trato_centavos) if extrato.taxa_trato_centavos > 0 else "Sem taxa",
+        ),
         ("Total líquido recebido", reais(extrato.recebido_centavos)),
     )
     for rotulo, texto in ganhos:
@@ -146,6 +168,37 @@ def pdf(
         doc.texto(direita, y, reais(valor), 10.5, negrito=negrito, direita=True)
         y += 18
     y += 14
+
+    def pedido_curto(pedido_id: str) -> str:
+        numero, _ = rotulos.get(pedido_id, (None, ""))
+        return f"PED-{numero}" if numero is not None else pedido_id[:8]
+
+    servicos = [lin for lin in extrato.linhas if lin.descricao == "Recebido"]
+    if servicos:
+        doc.texto(margem, y, "Serviços do período", 11, negrito=True)
+        y += 18
+
+        def cabecalho_servicos(y: float) -> float:
+            doc.faixa(margem, y - 12, direita - margem, 18)
+            doc.texto(margem + 6, y, "Data", 9, negrito=True)
+            doc.texto(margem + 90, y, "Pedido", 9, negrito=True)
+            doc.texto(margem + 190, y, "Categoria", 9, negrito=True)
+            doc.texto(direita - 6, y, "Valor líquido", 9, negrito=True, direita=True)
+            return y + 20
+
+        y = cabecalho_servicos(y)
+        for lin in servicos:
+            if y > 780:
+                doc.nova_pagina()
+                y = cabecalho_servicos(cabecalho())
+            categoria = (categorias or {}).get(lin.pedido_id, "")
+            doc.texto(margem + 6, y, _data(lin.data), 9.5)
+            doc.texto(margem + 90, y, pedido_curto(lin.pedido_id), 9.5)
+            doc.texto(margem + 190, y, categoria[:40], 9.5)
+            doc.texto(direita - 6, y, reais(lin.valor_centavos), 9.5, direita=True)
+            doc.linha(margem, y + 6, direita, y + 6, 0.3)
+            y += 18
+        y += 14
 
     def cabecalho_tabela(y: float) -> float:
         doc.faixa(margem, y - 12, direita - margem, 18)

@@ -120,6 +120,9 @@ class RepositorioUploads(Protocol):
     def documento_por_caminho(self, caminho: str) -> DocumentoGuardado | None: ...
     def definir_foto_perfil(self, usuario_id: str, caminho: str) -> None: ...
     def foto_perfil(self, usuario_id: str) -> str | None: ...
+    def portfolio_do_dono(self, dono_id: str, limite: int) -> list[Solicitacao]:
+        """Fotos de portfólio já concluídas do dono, das mais novas às mais antigas."""
+        ...
 
 
 class UploadsEmMemoria:
@@ -162,6 +165,17 @@ class UploadsEmMemoria:
 
     def foto_perfil(self, usuario_id: str) -> str | None:
         return self.fotos_de_perfil.get(str(usuario_id).replace("-", ""))
+
+    def portfolio_do_dono(self, dono_id: str, limite: int) -> list[Solicitacao]:
+        chave = str(dono_id).replace("-", "")
+        achadas = [
+            s
+            for s in self.solicitacoes.values()
+            if s.destino == "portfolio"
+            and s.status == "concluida"
+            and str(s.dono_id).replace("-", "") == chave
+        ]
+        return sorted(achadas, key=lambda s: s.criada_em, reverse=True)[:limite]
 
 
 def distancia_metros(lat1: float, lng1: float, lat2: float, lng2: float) -> float:

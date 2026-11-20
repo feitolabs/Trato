@@ -126,6 +126,9 @@ class UsuariosEmMemoria:
     def tem_cpf(self, usuario_id: str) -> bool:
         return usuario_id in self._cpfs.values()
 
+    def cpf_do_usuario(self, usuario_id: str) -> str | None:
+        return next((cpf for cpf, dono in self._cpfs.items() if dono == usuario_id), None)
+
     def registrar_dados_privados(
         self,
         usuario_id: str,

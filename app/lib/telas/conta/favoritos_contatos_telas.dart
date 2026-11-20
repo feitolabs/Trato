@@ -56,7 +56,7 @@ class _FavoritosTelaState extends State<FavoritosTela> {
   @override
   Widget build(BuildContext context) {
     return MolduraTelaComum(
-      titulo: 'Profissionais favoritos',
+      titulo: 'Profissionais de confiança',
       child: CarregadorTela<List<FavoritoConta>>(
         carregar: widget.servico.favoritos,
         atualizarQuando: _mudou,
@@ -66,8 +66,8 @@ class _FavoritosTelaState extends State<FavoritosTela> {
           if (itens.isEmpty) {
             body = EstadoVazio(
               icone: Icons.favorite_border,
-              titulo: 'Nenhum favorito ainda',
-              texto: 'Toque no coração no perfil de um profissional para guardá-lo aqui.',
+              titulo: 'Nenhum profissional de confiança ainda',
+              texto: 'Toque no coração no perfil de um profissional para salvá-lo como profissional de confiança.',
               textoAcao: widget.aoBuscar == null ? null : 'Buscar profissionais',
               aoAcao: widget.aoBuscar,
             );
@@ -103,7 +103,7 @@ class _FavoritosTelaState extends State<FavoritosTela> {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Tirar dos favoritos',
+                            tooltip: 'Remover dos profissionais de confiança',
                             onPressed: () => _tirar(f),
                             icon: const Icon(Icons.favorite, color: CoresTrato.petroleo),
                           ),

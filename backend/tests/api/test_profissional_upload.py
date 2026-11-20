@@ -595,7 +595,9 @@ def test_perfil_publico_sem_token_devolve_so_o_que_e_seguro(e2):
     assert set(corpo) == {
         "id", "nome", "foto_url", "categorias", "nota_media", "avaliacoes_total",
         "servicos_concluidos", "identidade_verificada", "cidades", "sobre",
+        "portfolio", "avaliacoes_recentes",
     }  # fmt: skip
+    assert corpo["portfolio"] == [] and corpo["avaliacoes_recentes"] == []  # opcionais, vazios
     assert corpo["id"] == "pro-1" and corpo["nome"] == "João C."
     assert corpo["nota_media"] == 4.8 and corpo["avaliacoes_total"] == 7
     assert corpo["servicos_concluidos"] == 12 and corpo["identidade_verificada"] is True
@@ -645,3 +647,40 @@ def test_perfil_publico_tem_limite_de_taxa_por_ip(e2):
 
     regra = next(r for r in _limites_padrao() if r.nome == "publico_perfil")
     assert (regra.prefixo, regra.escopo, regra.metodos) == ("/v1/publico", "ip", ["GET"])
+
+
+def test_perfil_publico_traz_portfolio_e_avaliacoes_anonimas(e2):
+    _aprovar(e2)
+    for _ in range(7):  # mais que o teto de 6
+        _, concluir = e2.enviar("t-prof", "portfolio", JPEG_COM_EXIF)
+        assert concluir.status_code == 200
+    av = e2.amb.contexto.avaliacoes
+    for i in range(7):
+        av.salvar(
+            Avaliacao(
+                f"ped-{i}", "cliente_para_profissional", "cli-secreto", "pro-1", 5 - i % 3,
+                f"Comentário {i}", ("pontual",), AGORA + timedelta(days=i),
+            )
+        )  # fmt: skip
+    av.salvar(
+        Avaliacao("ped-x", "profissional_para_cliente", "pro-1", "cli-secreto", 1, "do outro lado", (), AGORA)
+    )  # fmt: skip
+
+    r = e2.amb.cliente.get(URL_PUBLICA.format("pro-1"))
+
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert len(corpo["portfolio"]) == 6 and all(
+        u.startswith("https://") for u in corpo["portfolio"]
+    )
+    recentes = corpo["avaliacoes_recentes"]
+    assert len(recentes) == 5
+    assert set(recentes[0]) == {"nota", "comentario", "data"}
+    assert recentes[0]["data"] == "2026-11-04"  # a mais nova primeiro
+    # Sem moderação ainda: o comentário fica null mesmo quando a avaliação tem texto.
+    assert all(a["comentario"] is None for a in recentes)
+    assert "Comentário" not in r.text
+    assert recentes[0]["data"] == "2026-11-04"
+    assert "do outro lado" not in r.text  # só avaliações de clientes sobre o profissional
+    for proibido in ("cli-secreto", "ped-", "pontual", "telefone", "email", "cpf", "endereco"):
+        assert proibido not in r.text, proibido

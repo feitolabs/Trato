@@ -21,6 +21,7 @@ from trato.api.modelos import (
 from trato.api.servicos import carregar_pedido
 from trato.financeiro import extrato_profissional, periodo
 from trato.financeiro.ledger import Conta, Lancamento, a_liberar, liberado
+from trato.persistencia.comum import como_uuid
 from trato.rotinas.regras import ConfigRotinas, instante_liberacao
 
 router = APIRouter(prefix="/v1", tags=["financeiro"])
@@ -198,12 +199,39 @@ def meu_extrato(
     return _extrato(itens, limite, deslocamento)
 
 
+def _numeros_dos_pedidos(contexto: Contexto, ids: Sequence[str]) -> dict[str, int]:
+    """Número curto do pedido (o mesmo `PED-<número>` do painel). Só leitura; sem banco, vazio."""
+    banco = contexto.extras.get("banco")
+    if banco is None or not ids:
+        return {}
+    try:
+        validos = [u for u in (como_uuid(i) for i in ids) if u is not None]
+        with banco.transacao() as con:
+            linhas = con.execute(
+                "select id, numero from public.pedidos where id = any(%s)", (validos,)
+            ).fetchall()
+        return {str(linha["id"]): int(linha["numero"]) for linha in linhas if linha["numero"]}
+    except Exception:  # noqa: BLE001 - sem o número, o PDF usa o início do id
+        return {}
+
+
+def _nomes_das_categorias(request: Request) -> dict[str, str]:
+    modulo = getattr(request.app.state, "modulo_profissional", None)
+    if modulo is None:
+        return {}
+    try:
+        return {c.id: c.nome for c in modulo.catalogo.categorias_publicas()}
+    except Exception:  # noqa: BLE001 - sem catálogo, a coluna fica vazia
+        return {}
+
+
 @router.get(
     "/profissionais/me/extrato.pdf",
     summary="Baixar extrato mensal do profissional em PDF",
     responses={200: {"content": {"application/pdf": {}}}},
 )
 def baixar_meu_extrato_pdf(
+    request: Request,
     mes: str | None = Query(
         None, description="Mês no formato AAAA-MM (horário de Brasília). Padrão: mês atual."
     ),
@@ -220,15 +248,28 @@ def baixar_meu_extrato_pdf(
         ano, numero = periodo.mes_de(agora)
     desde, ate = periodo.mes(ano, numero)
     extrato = extrato_profissional.montar(contexto.ledger.lancamentos(), usuario.id, desde, ate)
+    ids = list(dict.fromkeys(lin.pedido_id for lin in extrato.linhas))
+    numeros = _numeros_dos_pedidos(contexto, ids)
+    nomes_categorias = _nomes_das_categorias(request)
     rotulos: dict[str, tuple[int | None, str]] = {}
-    for lin in extrato.linhas:
-        if lin.pedido_id in rotulos:
-            continue
-        dados = contexto.pedidos.dados_do_pedido(lin.pedido_id)
-        rotulos[lin.pedido_id] = (None, dados.titulo if dados is not None else "")
+    categorias: dict[str, str] = {}
+    for pedido_id in ids:
+        dados = contexto.pedidos.dados_do_pedido(pedido_id)
+        rotulos[pedido_id] = (numeros.get(pedido_id), dados.titulo if dados is not None else "")
+        if dados is not None and dados.categoria_id in nomes_categorias:
+            categorias[pedido_id] = nomes_categorias[dados.categoria_id]
     detalhe = contexto.usuarios.detalhe(usuario.id)
     nome = detalhe.nome if detalhe is not None and detalhe.nome else "Profissional"
-    conteudo = extrato_profissional.pdf(extrato, nome, rotulos, agora)
+    # Documento do PRÓPRIO profissional (comprovante de ganhos); sem cadastro, sem a linha.
+    buscar_cpf = getattr(contexto.usuarios, "cpf_do_usuario", None)
+    conteudo = extrato_profissional.pdf(
+        extrato,
+        nome,
+        rotulos,
+        agora,
+        documento=buscar_cpf(usuario.id) if buscar_cpf else None,
+        categorias=categorias,
+    )
     arquivo = f"trato_extrato_{ano:04d}_{numero:02d}.pdf"
     return Response(
         content=conteudo,

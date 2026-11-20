@@ -76,7 +76,7 @@ class _BotaoDeConfiancaState extends State<BotaoDeConfianca> {
           children: [
             Icon(Icons.favorite, size: 18, color: cor),
             const SizedBox(width: 6),
-            Text('Já é de confiança',
+            Text('Profissional de confiança',
                 key: const Key('ja-de-confianca'),
                 style: TextStyle(color: cor)),
           ],
@@ -88,12 +88,12 @@ class _BotaoDeConfiancaState extends State<BotaoDeConfianca> {
         key: const Key('salvar-de-confianca'),
         style: TextButton.styleFrom(foregroundColor: CoresTrato.creme),
         onPressed: _salvar,
-        child: const Text('Salvar como de confiança'),
+        child: const Text('Salvar como profissional de confiança'),
       );
     }
     return BotaoLink(
       key: const Key('salvar-de-confianca'),
-      texto: 'Salvar como de confiança',
+      texto: 'Salvar como profissional de confiança',
       aoTocar: _salvar,
     );
   }

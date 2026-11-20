@@ -205,9 +205,13 @@ def avisar_a_caminho(
             for n in recentes
         ):
             return False
-        corpo = "Seu profissional está a caminho."
+        corpo = "Seu profissional avisou que está a caminho."
         if eta_minutos is not None:
-            corpo = f"{corpo} Chega em ~{eta_minutos} min."
+            hora = agora.astimezone(_FUSO_BR).strftime("%H:%M")
+            corpo = (
+                f"Seu profissional avisou que está a caminho às {hora} "
+                f"(previsão informada: cerca de {eta_minutos} min)."
+            )
         servico.notificar(
             Evento.A_CAMINHO,
             cliente_id,

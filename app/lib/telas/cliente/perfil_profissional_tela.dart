@@ -278,7 +278,9 @@ class _BotaoFavoritoState extends State<_BotaoFavorito> {
   Widget build(BuildContext context) {
     if (_favorito == null) return const SizedBox.shrink();
     return IconButton(
-      tooltip: _favorito! ? 'Tirar dos favoritos' : 'Favoritar',
+      tooltip: _favorito!
+          ? 'Remover dos profissionais de confiança'
+          : 'Salvar como profissional de confiança',
       onPressed: _alternar,
       icon: Icon(
         _favorito! ? Icons.favorite : Icons.favorite_border,

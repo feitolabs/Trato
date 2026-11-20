@@ -62,6 +62,17 @@ class UsuariosPostgres:
             ).fetchone()
         return achado is None
 
+    def cpf_do_usuario(self, usuario_id: str) -> str | None:
+        """CPF (11 dígitos) da própria conta, só para documento emitido ao dono (extrato)."""
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return None
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select cpf from public.usuarios_privados where usuario_id = %s", (achado,)
+            ).fetchone()
+        return linha["cpf"] if linha and linha["cpf"] else None
+
     def tem_cpf(self, usuario_id: str) -> bool:
         """Verdadeiro se a conta já tem CPF gravado."""
         achado = como_uuid(usuario_id)

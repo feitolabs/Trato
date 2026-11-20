@@ -41,8 +41,8 @@ void main() {
     });
   });
 
-  group('2. Salvar como de confiança', () {
-    testWidgets('salva uma vez e passa a mostrar "Já é de confiança"', (tester) async {
+  group('2. Salvar como profissional de confiança', () {
+    testWidgets('salva uma vez e passa a mostrar "Profissional de confiança"', (tester) async {
       var salvou = 0;
       await _abrir(
         tester,
@@ -53,14 +53,14 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text('Salvar como de confiança'));
+      await tester.tap(find.text('Salvar como profissional de confiança'));
       await tester.pumpAndSettle();
       expect(salvou, 1);
-      expect(find.text('Já é de confiança'), findsOneWidget);
-      expect(find.text('Salvar como de confiança'), findsNothing); // não duplica
+      expect(find.text('Profissional de confiança'), findsOneWidget);
+      expect(find.text('Salvar como profissional de confiança'), findsNothing); // não duplica
     });
 
-    testWidgets('já favorito: mostra "Já é de confiança" e não chama o PUT', (tester) async {
+    testWidgets('já favorito: mostra "Profissional de confiança" e não chama o PUT', (tester) async {
       var salvou = 0;
       await _abrir(
         tester,
@@ -71,7 +71,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Já é de confiança'), findsOneWidget);
+      expect(find.text('Profissional de confiança'), findsOneWidget);
       expect(salvou, 0);
     });
 
@@ -85,10 +85,10 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text('Salvar como de confiança'));
+      await tester.tap(find.text('Salvar como profissional de confiança'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Não deu para salvar agora'), findsOneWidget);
-      expect(find.text('Salvar como de confiança'), findsOneWidget); // pode tentar de novo
+      expect(find.text('Salvar como profissional de confiança'), findsOneWidget); // pode tentar de novo
     });
   });
 
@@ -107,7 +107,7 @@ void main() {
       await tester.tap(find.text('Indicar o Trato'));
       await tester.pumpAndSettle();
       expect(enviado, textoConvite);
-      expect(textoConvite, startsWith('Uso o Trato para contratar profissionais verificados'));
+      expect(textoConvite, startsWith('Contrato profissionais verificados pelo Trato'));
       expect(textoConvite.toLowerCase(), isNot(contains('tratinho')));
       expect(find.text('Convite copiado!'), findsNothing);
     });

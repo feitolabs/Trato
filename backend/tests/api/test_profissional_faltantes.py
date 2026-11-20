@@ -429,3 +429,21 @@ def test_6_cliente_ausente_exige_prova_notifica_envia_chat_e_bloqueia_ausencia_a
         raise AssertionError("REGISTRAR_AUSENCIA deveria estar bloqueada após cliente_ausente")
     except estados.ForaDoPrazo:
         pass
+
+
+def test_extrato_pdf_traz_o_cpf_do_proprio_profissional_e_os_servicos(amb):
+    amb.semear_pedido(Estado.CONCLUIDO)
+    amb.semear_dinheiro(cobrado=100_000, taxa=7_500)
+    liberar(amb.contexto.ledger.livro, "ped-1", PROFISSIONAL.id, "lib-1", AGORA)
+    url = "/v1/profissionais/me/extrato.pdf?mes=2026-10"
+
+    sem = amb.cliente.get(url, headers=cab("t-prof"))
+    assert b"CPF" not in sem.content  # sem cadastro de CPF, sem a linha
+
+    amb.contexto.usuarios._cpfs["12345678909"] = PROFISSIONAL.id
+    com = amb.cliente.get(url, headers=cab("t-prof"))
+
+    assert com.status_code == 200
+    assert b"CPF 123.456.789-09" in com.content
+    assert "Serviços do período".encode("cp1252") in com.content
+    assert b"R$ 925,00" in com.content  # líquido recebido do serviço
