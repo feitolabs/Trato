@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'componentes/atualizacao.dart';
 import 'dados/config_painel.dart';
+import 'nucleo/navegador.dart';
+import 'nucleo/recuperacao_senha.dart';
 
 void main() {
   final ambiente = ConfigPainel.doAmbiente();
@@ -16,5 +18,9 @@ void main() {
           chaveAnon: 'sb_publishable_GwIISqsEKuOu6iK4IBlRvQ__TVCCgj8',
         );
   intervaloAtualizacao = ambiente.intervaloAtualizacao;
-  runApp(PainelApp(api: criarApi(config), ambienteTeste: !config.ehProducao));
+  // Link de redefinição de senha: lê o token do fragmento e o apaga da barra de endereço antes de
+  // iniciar (o token fica só em memória, não no histórico do navegador).
+  final link = LinkRecuperacao.deUri(urlAtual());
+  if (link != null) limparHash();
+  runApp(PainelApp(api: criarApi(config), ambienteTeste: !config.ehProducao, linkRecuperacao: link));
 }

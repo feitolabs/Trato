@@ -11,6 +11,14 @@ abstract interface class ApiAdmin {
   Future<UsuarioEquipe> entrar(String email, String senha);
   Future<void> sair();
 
+  /// Pede o e-mail de redefinição de senha. Não diz se o e-mail existe (a tela mostra mensagem neutra).
+  /// O link do e-mail volta para o próprio painel.
+  Future<void> pedirRecuperacaoSenha(String email);
+
+  /// Define a senha nova com o token do link de recuperação. O token só vive em memória.
+  /// Link vencido ou senha recusada viram [ErroApi] com texto claro.
+  Future<void> definirNovaSenha(String token, String novaSenha);
+
   // F7.1 verificação
   /// Uma página da fila, filtrada no servidor. [status] vazio = todos; [busca] casa o nome ou o
   /// id curto (PRO-XXXX). Ordem: envio mais antigo primeiro.
