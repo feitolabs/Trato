@@ -174,7 +174,10 @@ class PedidosPostgres:
                 "p.faixa_preco_min_centavos, p.faixa_preco_max_centavos, p.urgente, "
                 "p.prazo_desejado, p.criado_em, p.local_aprox_lat, p.local_aprox_lng, "
                 "p.cliente_id, p.modalidade from public.pedidos p "
-                "where p.status = 'aberto' and p.cliente_id <> %s "
+                "where (p.status = 'aberto' or (p.status = 'reservado' and exists "
+                "       (select 1 from public.exclusividades e where e.pedido_id = p.id "
+                "          and e.profissional_id = %s and e.status = 'ativa'))) "
+                "and p.cliente_id <> %s "
                 "and exists (select 1 from public.profissional_categorias pc "
                 "            where pc.profissional_id = %s and pc.categoria_id = p.categoria_id "
                 "              and pc.suspensa_em is null) "
@@ -190,7 +193,7 @@ class PedidosPostgres:
                 "      and exists (select 1 from public.perfis_profissional pf "
                 "                  where pf.usuario_id = %s and pf.atende_remoto))) "
                 "order by p.criado_em desc limit %s offset %s",
-                (achado, achado, achado, achado, achado, limite_efetivo, offset_efetivo),
+                (achado, achado, achado, achado, achado, achado, limite_efetivo, offset_efetivo),
             ).fetchall()
         return tuple(
             PedidoAberto(

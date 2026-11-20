@@ -99,6 +99,7 @@ def _repasses_em_memoria() -> RepositorioRepasses:
     return RepassesEmMemoria()
 
 
+from trato.api.exclusividades import ExclusividadesEmMemoria  # noqa: E402
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
 from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
 
@@ -128,6 +129,8 @@ class Contexto:
     avaliacoes: RepositorioAvaliacoes = field(default_factory=AvaliacoesEmMemoria)
     # Moedas do Trato (gamificação). Em memória por padrão; a fábrica Postgres troca.
     moedas: Any = field(default_factory=lambda: MoedasEmMemoria())
+    # Exclusividade de 48h (funções SQL no Postgres; memória com a mesma semântica).
+    exclusividades: Any = field(default_factory=lambda: ExclusividadesEmMemoria())
     # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
     ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
@@ -178,6 +181,13 @@ class Contexto:
             pendentes.append(funcao)
 
     def __post_init__(self) -> None:
+        # A versão em memória das exclusividades usa o livro de moedas e os pedidos daqui.
+        vincular = getattr(self.exclusividades, "vincular", None)
+        if vincular is not None:
+            vincular(self)
+        ligar = getattr(self.pedidos, "vincular_exclusividades", None)
+        if ligar is not None:
+            ligar(lambda pid: self.exclusividades.profissional_ativo_do_pedido(pid))
         if self.limite_codigo is None:
             from trato.seguranca.config import obter_config_seguranca
             from trato.seguranca.contadores import Contadores

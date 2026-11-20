@@ -23,6 +23,7 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.exclusividades import profissional_exclusivo
 from trato.api.moedas import (
     TIPO_BONUS_PROFISSIONAL,
     calcular_uso_moedas,
@@ -385,6 +386,12 @@ def _pedido_visivel(
         return pedido
     if usuario.papel is PapelUsuario.PROFISSIONAL and pedido.estado is Estado.ABERTO:
         return pedido
+    if (
+        usuario.papel is PapelUsuario.PROFISSIONAL
+        and pedido.estado is Estado.RESERVADO
+        and profissional_exclusivo(contexto, pedido.id) == usuario.id
+    ):
+        return pedido
     raise HTTPException(404, "Pedido não encontrado.")
 
 
@@ -518,7 +525,11 @@ def enviar_orcamento(
     pedido = contexto.pedidos.obter(pedido_id)
     if pedido is None:
         raise HTTPException(404, "Pedido não encontrado.")
-    if pedido.estado is not Estado.ABERTO:
+    if pedido.estado is Estado.RESERVADO:
+        # Exclusividade ativa: só o profissional dela envia orçamento (os outros esperam as 48h).
+        if profissional_exclusivo(contexto, pedido.id) != usuario.id:
+            raise HTTPException(409, "Este pedido está reservado para outro profissional.")
+    elif pedido.estado is not Estado.ABERTO:
         raise HTTPException(409, "Este pedido não recebe mais orçamentos.")
     if pedido.cliente_id == usuario.id:
         raise HTTPException(403, "Você não pode orçar o seu próprio pedido.")

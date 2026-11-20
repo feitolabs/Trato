@@ -6,6 +6,7 @@ em si estão em `trato.rotinas.regras` e não são reescritas aqui.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import fields, replace
@@ -28,7 +29,10 @@ from trato.rotinas.regras import (
     Lembrete,
     PedidoMonitorado,
     TipoAcaoRotina,
+    planejar_avisos_expiracao,
 )
+
+log = logging.getLogger("trato.agendador")
 
 Carga = tuple[list[PedidoMonitorado], ConfigRotinas, frozenset[date]]
 
@@ -179,6 +183,39 @@ class ExecutorContexto:
         from trato.api.moedas import expirar_reservas_moedas
 
         return expirar_reservas_moedas(self._c.moedas, self._cobrancas, agora, self._provedor)
+
+    def expirar_exclusividades(self, agora: datetime) -> int:
+        """Expira ofertas sem resposta (estorna) e exclusividades de 48h vencidas (reabre).
+
+        Idempotente: só as linhas recém-expiradas pela função SQL/memória geram avisos, cada
+        um com chave única por `(exclusividade_id, motivo)`. Falha ao notificar é logada e
+        nunca desfaz o estorno nem impede os demais avisos.
+        """
+        expiradas = self._c.exclusividades.expirar(agora)
+        if self._notif is not None:
+            for item in expiradas:
+                avisos = planejar_avisos_expiracao(
+                    item.exclusividade_id,
+                    item.motivo,
+                    item.profissional_id,
+                    item.cliente_id,
+                    item.pedido_id,
+                )
+                for aviso in avisos:
+                    try:
+                        self._notif.notificar(
+                            Evento(aviso.evento),
+                            aviso.destinatario_id,
+                            chave=aviso.chave,
+                            pedido_id=aviso.pedido_id,
+                            dados={"exclusividade_id": item.exclusividade_id},
+                        )
+                    except Exception:  # noqa: BLE001 - aviso é secundário ao estorno/reabertura
+                        log.exception(
+                            "Aviso de expiração de exclusividade falhou (%s)",
+                            item.exclusividade_id,
+                        )
+        return len(expiradas)
 
     def liberar_bonus_moedas(self, agora: datetime) -> int:
         """Libera (ou cancela) os bônus de moedas pendentes vencidos. Devolve quantos liberou.

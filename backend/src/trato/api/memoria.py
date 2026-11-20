@@ -40,6 +40,11 @@ class PedidosEmMemoria:
         self._pedidos: dict[str, Pedido] = {}
         self._eventos: dict[str, list[Evento]] = {}
         self._dados: dict[str, DadosPedido] = {}
+        # Quem tem a exclusividade ativa do pedido (ligado pelo Contexto).
+        self._exclusivo_de = lambda _pedido_id: None
+
+    def vincular_exclusividades(self, quem: Any) -> None:
+        self._exclusivo_de = quem
 
     def obter(self, pedido_id: str) -> Pedido | None:
         return self._pedidos.get(pedido_id)
@@ -108,7 +113,11 @@ class PedidosEmMemoria:
         abertos = [
             p
             for p in self._pedidos.values()
-            if p.estado is Estado.ABERTO and p.cliente_id != profissional_id
+            if p.cliente_id != profissional_id
+            and (
+                p.estado is Estado.ABERTO
+                or (p.estado is Estado.RESERVADO and self._exclusivo_de(p.id) == profissional_id)
+            )
         ]
         abertos.sort(key=lambda p: p.aberto_em, reverse=True)
         saida = []

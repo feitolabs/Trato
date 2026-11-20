@@ -1116,7 +1116,7 @@ def contraproposta(
     pedido = contexto.pedidos.obter(pedido_id)
     if pedido is None or pedido.cliente_id != usuario.id:
         raise HTTPException(404, "Pedido não encontrado.")
-    if pedido.estado is not Estado.ABERTO:
+    if pedido.estado not in (Estado.ABERTO, Estado.RESERVADO):
         raise HTTPException(409, "Este pedido já não aceita contraproposta.")
     detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
     valor = corpo.valor_centavos if corpo.valor_centavos is not None else detalhe.valor_centavos

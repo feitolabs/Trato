@@ -58,6 +58,7 @@ def montar() -> tuple[Agendador, Banco, float]:
         timedelta(hours=cfg.lembrete_agenda_horas) if cfg.lembrete_agenda_horas else None,
         executor.liberar_bonus_moedas,
         executor.expirar_reservas_moedas,
+        executor.expirar_exclusividades,
     )
     return agendador, banco, cfg.intervalo_segundos
 

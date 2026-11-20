@@ -36,6 +36,7 @@ class ResultadoCiclo:
     lembretes_agenda: int = 0
     bonus_liberados: int = 0  # bônus de moedas que saíram de pendente para saldo
     reservas_expiradas: int = 0  # cobranças com moedas canceladas por reserva vencida
+    exclusividades_expiradas: int = 0  # ofertas sem resposta ou reservas de 48h expiradas
 
 
 class Agendador:
@@ -50,6 +51,7 @@ class Agendador:
         antecedencia_lembrete_agenda: timedelta | None = None,
         rotina_moedas: Callable[[datetime], int] | None = None,
         rotina_reservas: Callable[[datetime], int] | None = None,
+        rotina_exclusividades: Callable[[datetime], int] | None = None,
     ) -> None:
         self._fonte = fonte
         self._executor = executor
@@ -60,6 +62,7 @@ class Agendador:
         self._antecedencia = antecedencia_lembrete_agenda  # None = sem lembrete de agenda
         self._rotina_moedas = rotina_moedas  # None = sem liberação de bônus de moedas
         self._rotina_reservas = rotina_reservas  # None = sem expiração de reservas
+        self._rotina_exclusividades = rotina_exclusividades  # None = sem expirar exclusividades
 
     def rodar_uma_vez(self) -> ResultadoCiclo:
         with self._trava.adquirir(NOME_DA_TRAVA) as livre:
@@ -97,8 +100,14 @@ class Agendador:
                 expiradas = self._rotina_reservas(agora)
             except Exception:  # sem a tabela ou banco fora: o resto do ciclo segue
                 log.exception("Expiração de reservas de moedas falhou")
+        exclusividades = 0
+        if self._rotina_exclusividades is not None:
+            try:
+                exclusividades = self._rotina_exclusividades(agora)
+            except Exception:  # sem a tabela/função ou banco fora: o resto do ciclo segue
+                log.exception("Expiração de exclusividades falhou")
         return ResultadoCiclo(
-            False, feitas, repetidas, falhas, reenviadas, agenda, bonus, expiradas
+            False, feitas, repetidas, falhas, reenviadas, agenda, bonus, expiradas, exclusividades
         )
 
     def _lembretes_de_agenda(self, itens: list[PedidoMonitorado], agora: datetime) -> int:
