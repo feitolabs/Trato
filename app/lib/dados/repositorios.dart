@@ -40,12 +40,14 @@ class DadosDoPedido {
     this.profissionalConvidadoId,
     this.estado = 'aberto',
     this.ofertaExclusividade,
+    this.orcamentosRecebidos = 0,
   });
 
   final List<String> fotos;
   final String? profissionalConvidadoId;
   final String estado;
   final OfertaExclusividadeCliente? ofertaExclusividade;
+  final int orcamentosRecebidos;
 
   final String titulo;
   final String descricao;

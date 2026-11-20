@@ -24,6 +24,26 @@ class ServicoAjudaLocal implements ServicoAjuda {
       pergunta: 'Como altero ou cancelo um pedido?',
       resposta: 'Abra o pedido em "Seus pedidos" e veja as opções disponíveis para o momento dele.',
     ),
+    PerguntaFrequente(
+      pergunta: 'O que são Tratinhos?',
+      resposta:
+          'São a moeda de desconto do Trato: 50 Tratinhos = R\$ 0,50. Você ganha ao avaliar serviços e usa no próximo pedido.',
+    ),
+    PerguntaFrequente(
+      pergunta: 'Como funciona a exclusividade de 48h?',
+      resposta:
+          'Quando um profissional pede exclusividade de 48h, você decide sem compromisso se quer reservar o horário dele.',
+    ),
+    PerguntaFrequente(
+      pergunta: 'O Trato cobra alguma taxa?',
+      resposta:
+          'Não. Pedir orçamento é grátis e o app opera com 0% de taxa para clientes e profissionais.',
+    ),
+    PerguntaFrequente(
+      pergunta: 'O que é uma disputa?',
+      resposta:
+          'Se algo der errado no serviço, você abre uma disputa para nossa equipe analisar o caso enquanto o pagamento fica protegido.',
+    ),
   ];
 
   @override

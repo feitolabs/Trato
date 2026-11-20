@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
@@ -23,6 +24,7 @@ class SucessoAcaoTela extends StatelessWidget {
     this.aoTocarPrimario,
     this.textoBotaoSecundario,
     this.aoTocarSecundario,
+    this.aoIndicar,
     this.icone = Icons.check_circle_rounded,
   });
 
@@ -34,13 +36,13 @@ class SucessoAcaoTela extends StatelessWidget {
   final VoidCallback? aoTocarPrimario;
   final String? textoBotaoSecundario;
   final VoidCallback? aoTocarSecundario;
+  final VoidCallback? aoIndicar;
   final IconData icone;
 
   @override
   Widget build(BuildContext context) {
     final sair = aoTocarPrimario ?? aoVoltarInicio;
-    final secundario =
-        aoTocarSecundario ?? (aoTocarPrimario != null ? aoVoltarInicio : null);
+    final secundario = aoTocarSecundario ?? (aoTocarPrimario != null ? aoVoltarInicio : null);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -119,14 +121,35 @@ class SucessoAcaoTela extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           BotaoPrimario(texto: textoBotaoPrimario, aoTocar: sair),
-                          if (textoBotaoSecundario != null &&
-                              secundario != null) ...[
+                          if (textoBotaoSecundario != null && secundario != null) ...[
                             const SizedBox(height: EspacosTrato.x2),
                             BotaoSecundario(
                               texto: textoBotaoSecundario!,
                               aoTocar: secundario,
                             ),
                           ],
+                          const SizedBox(height: EspacosTrato.x1),
+                          BotaoLink(
+                            texto: 'Indicar o Trato',
+                            aoTocar: () async {
+                              if (aoIndicar != null) {
+                                aoIndicar!();
+                                return;
+                              }
+                              await Clipboard.setData(
+                                const ClipboardData(
+                                  text:
+                                      'Conheça o Trato: peça orçamentos grátis de profissionais verificados com pagamento protegido pelo app.',
+                                ),
+                              );
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  const SnackBar(content: Text('Convite copiado!')),
+                                );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -140,4 +163,3 @@ class SucessoAcaoTela extends StatelessWidget {
     );
   }
 }
-

@@ -33,21 +33,17 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   final _celular = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
-  final _confirmarSenha = TextEditingController();
   final _scrollController = ScrollController();
   final _keyNome = GlobalKey();
   final _keyCelular = GlobalKey();
   final _keyEmail = GlobalKey();
   final _keySenha = GlobalKey();
-  final _keyConfirmar = GlobalKey();
   final _keyTermos = GlobalKey();
   final _focoNome = FocusNode();
   final _focoCelular = FocusNode();
   final _focoEmail = FocusNode();
   final _focoSenha = FocusNode();
-  final _focoConfirmar = FocusNode();
   var _mostrarSenha = false;
-  var _mostrarConfirmarSenha = false;
   late final _toqueTermos = TapGestureRecognizer()..onTap = () => _abrirTexto(TextoLegal.termos);
   late final _toquePolitica = TapGestureRecognizer()
     ..onTap = () => _abrirTexto(TextoLegal.privacidade);
@@ -60,7 +56,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   @override
   void dispose() {
-    for (final c in [_nome, _celular, _email, _senha, _confirmarSenha]) {
+    for (final c in [_nome, _celular, _email, _senha]) {
       c.dispose();
     }
     for (final f in [
@@ -68,7 +64,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       _focoCelular,
       _focoEmail,
       _focoSenha,
-      _focoConfirmar,
     ]) {
       f.dispose();
     }
@@ -84,21 +79,11 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   String? _erro(String? Function() validar) => _tentou ? validar() : null;
 
-  String? _validarConfirmacaoSenha() {
-    if (_confirmarSenha.text.isEmpty) {
-      return _tentou ? 'Repita a senha para confirmar.' : null;
-    }
-    return _confirmarSenha.text == _senha.text
-        ? null
-        : 'As senhas não conferem. Digite a mesma senha.';
-  }
-
   bool get _valido =>
       ValidacaoAuth.nome(_nome.text) == null &&
       ValidacaoAuth.celular(_celular.text) == null &&
       ValidacaoAuth.email(_email.text) == null &&
       ValidacaoAuth.senhaNova(_senha.text) == null &&
-      _confirmarSenha.text == _senha.text &&
       _aceitouTermos;
 
   Future<void> _criar() async {
@@ -125,11 +110,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
           key: _keySenha,
           focusNode: _focoSenha,
           temErro: () => ValidacaoAuth.senhaNova(_senha.text) != null,
-        ),
-        EntradaCampoErro(
-          key: _keyConfirmar,
-          focusNode: _focoConfirmar,
-          temErro: () => _confirmarSenha.text != _senha.text,
         ),
         EntradaCampoErro(
           key: _keyTermos,
@@ -211,7 +191,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       decoration: TextDecoration.underline,
     );
     return EstruturaAuth(
-      tituloBarra: 'Passo 1 de 2',
+      tituloBarra: '',
       scrollController: _scrollController,
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
@@ -280,20 +260,6 @@ class _CriarContaTelaState extends State<CriarContaTela> {
             aoTocarAcao: () => setState(() => _mostrarSenha = !_mostrarSenha),
             ajuda: 'Pelo menos 8 caracteres, com letra e número.',
             erro: _erro(() => ValidacaoAuth.senhaNova(_senha.text)),
-            aoMudar: atualizar,
-          ),
-        ),
-        const SizedBox(height: EspacosTrato.x4),
-        KeyedSubtree(
-          key: _keyConfirmar,
-          child: CampoTrato(
-            rotulo: 'Confirmar senha',
-            controlador: _confirmarSenha,
-            foco: _focoConfirmar,
-            senha: !_mostrarConfirmarSenha,
-            textoAcao: _mostrarConfirmarSenha ? 'Ocultar' : 'Mostrar',
-            aoTocarAcao: () => setState(() => _mostrarConfirmarSenha = !_mostrarConfirmarSenha),
-            erro: _validarConfirmacaoSenha(),
             aoMudar: atualizar,
           ),
         ),

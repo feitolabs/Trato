@@ -114,7 +114,6 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), '31999998888');
       await tester.enterText(find.byType(TextField).at(2), 'ana@teste.com');
       await tester.enterText(find.byType(TextField).at(3), 'segredo123');
-      await tester.enterText(find.byType(TextField).at(4), 'segredo123');
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
 

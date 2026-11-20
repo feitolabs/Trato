@@ -279,12 +279,12 @@ void main() {
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
-      await _digitar(tester, 'Confirmar senha', 'segredo123');
     }
 
-    testWidgets('mostra "Passo 1 de 2" e valida tudo ao tentar criar', (tester) async {
+    testWidgets('valida tudo ao tentar criar sem exibir "Passo 1 de 2"', (tester) async {
       await _abrir(tester, const CriarContaTela());
-      expect(find.text('Passo 1 de 2'), findsOneWidget);
+      expect(find.text('Passo 1 de 2'), findsNothing);
+      expect(find.text('Confirmar senha'), findsNothing);
 
       await _tocar(tester, 'Criar conta');
 
@@ -396,7 +396,6 @@ void main() {
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
-      await _digitar(tester, 'Confirmar senha', 'segredo123');
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
       await _tocar(tester, 'Criar conta');

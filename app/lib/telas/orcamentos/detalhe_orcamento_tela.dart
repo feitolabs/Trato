@@ -144,18 +144,28 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                 children: [
                   Text(o.profissional, style: TipografiaTrato.tituloGrande),
                   const SizedBox(height: EspacosTrato.x1),
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (o.verificacao.isNotEmpty) SeloVerificacao(o.verificacao),
-                      Text(
-                        '${o.verificacao.isNotEmpty ? ' · ' : ''}'
-                        '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
-                        ' · ${o.servicosConcluidos} '
-                        '${o.servicosConcluidos == 1 ? 'serviço' : 'serviços'}',
-                        style: secundario,
-                      ),
-                    ],
+                  Builder(
+                    builder: (_) {
+                      final iniciante = o.servicosConcluidos == 0 && o.notaResumo == semAvaliacoes;
+                      final selo = o.verificacao.isNotEmpty
+                          ? o.verificacao
+                          : (iniciante ? 'Identidade verificada' : '');
+                      return Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (selo.isNotEmpty) SeloVerificacao(selo),
+                          Text(
+                            iniciante
+                                ? '${selo.isNotEmpty ? ' · ' : ''}Novo no Trato'
+                                : '${selo.isNotEmpty ? ' · ' : ''}'
+                                    '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
+                                    ' · ${o.servicosConcluidos} '
+                                    '${o.servicosConcluidos == 1 ? 'serviço' : 'serviços'}',
+                            style: secundario,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

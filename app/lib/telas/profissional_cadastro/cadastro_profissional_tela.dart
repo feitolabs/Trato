@@ -152,16 +152,15 @@ class _FormularioState extends State<_Formulario> {
             ? 'Cidade selecionada: $combinada (${end.bairro}).'
             : 'Cidade selecionada: $combinada.';
       } else {
-        _avisoCep = 'Ainda não atendemos ${end.cidade}/${end.uf}. Escolha abaixo uma cidade disponível.';
+        _avisoCep =
+            'Ainda não atendemos ${end.cidade}/${end.uf}. Escolha abaixo uma cidade disponível.';
       }
     });
   }
 
-  String? get _erroNome => _nome.text.trim().length < 3
-      ? 'Informe seu nome completo (mínimo 3 letras).'
-      : null;
-  String? get _erroCidade =>
-      _cidade == null ? 'Escolha a cidade onde você atende.' : null;
+  String? get _erroNome =>
+      _nome.text.trim().length < 3 ? 'Informe seu nome completo (mínimo 3 letras).' : null;
+  String? get _erroCidade => _cidade == null ? 'Escolha a cidade onde você atende.' : null;
 
   bool get _valido =>
       _erroNome == null &&
@@ -238,7 +237,8 @@ class _FormularioState extends State<_Formulario> {
 
   Widget _erro(String texto) => Padding(
         padding: const EdgeInsets.only(top: EspacosTrato.x2),
-        child: Text(texto, style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto)),
+        child: Text(texto,
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto)),
       );
 
   @override
@@ -264,6 +264,11 @@ class _FormularioState extends State<_Formulario> {
       ),
       children: [
         Text('Conte quem você é', style: TipografiaTrato.tituloGrande),
+        const SizedBox(height: EspacosTrato.x2),
+        Text(
+          '0% de taxa enquanto crescemos — receba pedidos direto no celular.',
+          style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.petroleo),
+        ),
         const SizedBox(height: EspacosTrato.x2),
         Text(
           'Essas informações aparecem no seu perfil para os clientes.',
@@ -320,8 +325,7 @@ class _FormularioState extends State<_Formulario> {
                   selecionadas: _categorias,
                   aoAlternar: (v) => _alternar(_categorias, v),
                 ),
-                if (_tentou && _categorias.isEmpty)
-                  _erro('Escolha pelo menos uma categoria.'),
+                if (_tentou && _categorias.isEmpty) _erro('Escolha pelo menos uma categoria.'),
               ],
             ],
           ),
