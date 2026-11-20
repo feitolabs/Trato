@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
+import 'package:trato/telas/conta/favoritos_contatos_telas.dart';
+import 'package:trato/telas/conta/servico_fake.dart';
 import 'package:trato/telas/busca/modelos.dart';
 import 'package:trato/telas/carteira/conta_recebimento_tela.dart';
 import 'package:trato/telas/carteira/modelos.dart';
@@ -90,6 +92,24 @@ void main() {
     await tester.tap(find.text('Limpar filtros'));
     await tester.pumpAndSettle();
     expect(find.text('Bruno K.'), findsOneWidget);
+  });
+
+  group('F16. favoritos vazios', () {
+    testWidgets('mostra "Buscar profissionais" e o toque chama a navegação', (tester) async {
+      var foi = 0;
+      await _abrir(
+        tester,
+        FavoritosTela(servico: ServicoContaFake(favoritos: const []), aoBuscar: () => foi++),
+      );
+      expect(find.text('Nenhum favorito ainda'), findsOneWidget);
+      await tester.tap(find.text('Buscar profissionais'));
+      expect(foi, 1);
+    });
+
+    testWidgets('sem aoBuscar, sem o botão', (tester) async {
+      await _abrir(tester, FavoritosTela(servico: ServicoContaFake(favoritos: const [])));
+      expect(find.text('Buscar profissionais'), findsNothing);
+    });
   });
 
   group('2. conta de recebimento', () {

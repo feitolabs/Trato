@@ -11,10 +11,13 @@ import 'modelos.dart';
 
 /// Profissionais favoritos. Tocar abre o perfil ([aoAbrir]); o coração tira da lista.
 class FavoritosTela extends StatefulWidget {
-  const FavoritosTela({super.key, required this.servico, this.aoAbrir});
+  const FavoritosTela({super.key, required this.servico, this.aoAbrir, this.aoBuscar});
 
   final ServicoConta servico;
   final ValueChanged<FavoritoConta>? aoAbrir;
+
+  /// Ação do estado vazio: leva à busca de profissionais. Sem ela, o botão não aparece.
+  final VoidCallback? aoBuscar;
 
   @override
   State<FavoritosTela> createState() => _FavoritosTelaState();
@@ -52,10 +55,12 @@ class _FavoritosTelaState extends State<FavoritosTela> {
           final recarregar = AtualizadorTela.de(context);
           final Widget body;
           if (itens.isEmpty) {
-            body = const EstadoVazio(
+            body = EstadoVazio(
               icone: Icons.favorite_border,
               titulo: 'Nenhum favorito ainda',
               texto: 'Toque no coração no perfil de um profissional para guardá-lo aqui.',
+              textoAcao: widget.aoBuscar == null ? null : 'Buscar profissionais',
+              aoAcao: widget.aoBuscar,
             );
           } else {
             body = ListView.separated(
