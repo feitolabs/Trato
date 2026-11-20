@@ -272,6 +272,16 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                           ),
                         ),
                       ],
+                      if (dados.descontoDisponivel) ...[
+                        const SizedBox(height: EspacosTrato.x1),
+                        Text(
+                          fraseDescontoMetodos,
+                          key: const Key('desconto-metodos'),
+                          style: TipografiaTrato.corpoPequeno.copyWith(
+                            color: CoresTrato.textoSecundario,
+                          ),
+                        ),
+                      ],
                       if (_erroMoedas != null) ...[
                         const SizedBox(height: EspacosTrato.x2),
                         Text(

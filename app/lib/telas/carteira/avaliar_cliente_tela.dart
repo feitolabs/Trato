@@ -76,12 +76,19 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
               texto: 'Continuar',
               aoTocar: () => Navigator.of(context).pop(true),
             )
-          else
+          else ...[
+            Text(
+              'Avaliar o cliente vale +50 Tratinhos (liberam em 7 dias se não houver disputa; 1 por cliente).',
+              textAlign: TextAlign.center,
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+            const SizedBox(height: EspacosTrato.x3),
             BotaoPrimario(
               texto: 'Enviar avaliação',
               carregando: _enviando,
               aoTocar: _nota == 0 ? null : _enviar,
             ),
+          ],
         ],
       ),
       children: [

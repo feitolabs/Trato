@@ -32,8 +32,7 @@ class MoedasGanhasTela extends StatefulWidget {
   State<MoedasGanhasTela> createState() => _MoedasGanhasTelaState();
 }
 
-class _MoedasGanhasTelaState extends State<MoedasGanhasTela>
-    with SingleTickerProviderStateMixin {
+class _MoedasGanhasTelaState extends State<MoedasGanhasTela> with SingleTickerProviderStateMixin {
   late final AnimationController _ctl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
@@ -170,8 +169,13 @@ class _Conteudo extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  moedas == 1 ? 'Tratinho' : 'Tratinhos',
+                  pendentes > 0
+                      ? (proximaLiberacao != null
+                          ? '${moedas == 1 ? 'Tratinho reservado' : 'Tratinhos reservados'} — liberam em ${formatarDiaMes(proximaLiberacao!)}'
+                          : (moedas == 1 ? 'Tratinho reservado' : 'Tratinhos reservados'))
+                      : (moedas == 1 ? 'Tratinho' : 'Tratinhos'),
                   style: TipografiaTrato.titulo.copyWith(color: CoresTrato.azulClaro),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(

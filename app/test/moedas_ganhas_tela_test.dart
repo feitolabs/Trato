@@ -27,4 +27,20 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     expect(find.text('Tratinho'), findsOneWidget);
   });
+
+  testWidgets('destaca prazo de liberação junto do +50 quando há pendentes', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: TemaTrato.claro,
+      home: MoedasGanhasTela(
+        moedas: 50,
+        pendentes: 50,
+        proximaLiberacao: DateTime(2026, 11, 27),
+        aoContinuar: () {},
+      ),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('+50'), findsOneWidget);
+    expect(find.text('Tratinhos reservados — liberam em 27/11'), findsOneWidget);
+  });
 }
