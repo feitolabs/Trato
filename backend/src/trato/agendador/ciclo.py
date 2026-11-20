@@ -34,6 +34,8 @@ class ResultadoCiclo:
     falhas: int = 0
     reenviadas: int = 0  # notificações que estavam pendentes e saíram agora
     lembretes_agenda: int = 0
+    bonus_liberados: int = 0  # bônus de moedas que saíram de pendente para saldo
+    reservas_expiradas: int = 0  # cobranças com moedas canceladas por reserva vencida
 
 
 class Agendador:
@@ -46,6 +48,8 @@ class Agendador:
         relogio: Callable[[], datetime] = lambda: datetime.now(UTC),
         notificacoes: ServicoNotificacoes | None = None,
         antecedencia_lembrete_agenda: timedelta | None = None,
+        rotina_moedas: Callable[[datetime], int] | None = None,
+        rotina_reservas: Callable[[datetime], int] | None = None,
     ) -> None:
         self._fonte = fonte
         self._executor = executor
@@ -54,6 +58,8 @@ class Agendador:
         self._relogio = relogio
         self._notif = notificacoes
         self._antecedencia = antecedencia_lembrete_agenda  # None = sem lembrete de agenda
+        self._rotina_moedas = rotina_moedas  # None = sem liberação de bônus de moedas
+        self._rotina_reservas = rotina_reservas  # None = sem expiração de reservas
 
     def rodar_uma_vez(self) -> ResultadoCiclo:
         with self._trava.adquirir(NOME_DA_TRAVA) as livre:
@@ -79,7 +85,21 @@ class Agendador:
                 repetidas += 1
         agenda = self._lembretes_de_agenda(itens, agora)
         reenviadas = self._notif.reenviar_pendentes() if self._notif else 0
-        return ResultadoCiclo(False, feitas, repetidas, falhas, reenviadas, agenda)
+        bonus = 0
+        if self._rotina_moedas is not None:
+            try:
+                bonus = self._rotina_moedas(agora)
+            except Exception:  # sem a tabela ou banco fora: o resto do ciclo segue
+                log.exception("Liberação de bônus de moedas falhou")
+        expiradas = 0
+        if self._rotina_reservas is not None:
+            try:
+                expiradas = self._rotina_reservas(agora)
+            except Exception:  # sem a tabela ou banco fora: o resto do ciclo segue
+                log.exception("Expiração de reservas de moedas falhou")
+        return ResultadoCiclo(
+            False, feitas, repetidas, falhas, reenviadas, agenda, bonus, expiradas
+        )
 
     def _lembretes_de_agenda(self, itens: list[PedidoMonitorado], agora: datetime) -> int:
         """Avisa quem tem serviço agendado quando falta menos que a antecedência configurada."""

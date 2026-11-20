@@ -135,6 +135,7 @@ class ProvedorStripeTeste:
         metadados: Mapping[str, str],
         parcelas: int = 1,
         cliente_externo: str | None = None,
+        expira_em_segundos: int | None = None,
     ) -> CobrancaProvedor:
         if parcelas != 1:
             raise ErroProvedor("Parcelamento ainda não está ligado nesta integração.")
@@ -150,6 +151,12 @@ class ProvedorStripeTeste:
                 "payment_method_data[type]": "pix",
                 "confirm": "true",
             }
+            if expira_em_segundos is not None:
+                # Doc do Stripe: payment_method_options[pix][expires_after_seconds], em
+                # segundos, de 60 a 1.209.600 (padrão 4 h). Fora da faixa: o Stripe recusa.
+                campos["payment_method_options[pix][expires_after_seconds]"] = str(
+                    max(60, int(expira_em_segundos))
+                )
         else:
             # Captura e 3DS explícitos (B7): o Stripe pede autenticação quando o banco exige.
             campos |= {
@@ -165,6 +172,10 @@ class ProvedorStripeTeste:
         campos |= {f"metadata[{k}]": v for k, v in metadados.items()}
         corpo = self._chamar("POST", "/v1/payment_intents", campos, chave_idempotencia)
         return self._cobranca(corpo, meio)
+
+    def cancelar_cobranca(self, cobranca_id: str) -> None:
+        """POST /v1/payment_intents/{id}/cancel (Pix aguardando pagamento pode ser cancelado)."""
+        self._chamar("POST", f"/v1/payment_intents/{cobranca_id}/cancel", {})
 
     def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
         """Acha (ou cria) o cliente deste usuário no Stripe e gera a chave efêmera dele."""

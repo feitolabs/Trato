@@ -22,9 +22,19 @@ import hashlib
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
+from datetime import datetime
 
 from trato.api.contexto import Contexto
-from trato.api.moedas import debitar_uso_moedas, devolver_uso_moedas
+from trato.api.moedas import (
+    chave_reserva,
+    confirmar_reserva_desconto,
+    debitar_uso_moedas,
+    devolver_reserva_desconto,
+    devolver_uso_moedas,
+    reabrir_reserva_desconto,
+    reservar_desconto,
+    situacao_reserva,
+)
 from trato.api.repositorios import EventoWebhook
 from trato.api.webhook_pagamento import EventoForaDeOrdem  # a rota do webhook responde 409
 from trato.financeiro.contestacoes import (
@@ -196,12 +206,20 @@ class ServicoPagamento:
                 ):
                     return antiga
                 self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
+                self._liberar_reserva(contexto, antiga)
         # A chave leva o que define a cobrança (meio, valor, parcelas, cliente, cupom): o Stripe
         # recusa a MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be
         # used with the same parameters").
+        # Só o Pix COM moedas reservadas vence junto com a reserva (reserva_minutos); sem moedas
+        # nada muda (vale o padrão do provedor).
+        expira_pix = (
+            contexto.moedas.config().reserva_minutos * 60
+            if moedas > 0 and meio is MeioPagamento.PIX
+            else None
+        )
         assinatura = hashlib.sha256(
             f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}|"
-            f"{cupom_norm or ''}|{moedas}".encode()
+            f"{cupom_norm or ''}|{moedas}|{expira_pix or ''}".encode()
         ).hexdigest()[:10]
         chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}/{assinatura}"
         metadados = {"pedido_id": pedido.id}
@@ -218,7 +236,20 @@ class ServicoPagamento:
             metadados=metadados,
             parcelas=parcelas,
             cliente_externo=cliente_externo,
+            **({"expira_em_segundos": expira_pix} if expira_pix is not None else {}),
         )
+        # Reserva ATÔMICA (orçamento do mês e do dia, teto do cliente e saldo livre) com a cobrança
+        # como chave. Só agora o id dela existe. Se negar, levanta `DescontoMoedasIndisponivel`:
+        # quem chama refaz a cobrança sem moedas (a cobrança criada aqui nunca foi salva nem
+        # entregue ao cliente: fica sem pagar no provedor e expira lá).
+        if moedas > 0:
+            reservar_desconto(
+                contexto.moedas,
+                cobranca_id=criada.id,
+                moedas=moedas,
+                usuario_id=pedido.cliente_id,
+                agora=contexto.agora(),
+            )
         local = CobrancaLocal(
             criada.id,
             pedido.id,
@@ -234,8 +265,24 @@ class ServicoPagamento:
             desconto_centavos=desconto,
             moedas_usadas=moedas,
         )
-        self.cobrancas.salvar(local)
+        try:
+            self.cobrancas.salvar(local)
+        except Exception:
+            if moedas > 0:  # a cobrança não foi gravada: a reserva volta
+                devolver_reserva_desconto(contexto.moedas, cobranca_id=criada.id)
+            raise
         return local
+
+    def reservas_pendentes_do_pedido(self, pedido_id: str) -> set[str]:
+        """Chaves de reserva das cobranças com moedas ainda sem pagar deste pedido.
+
+        A simulação e a nova cobrança não as contam contra o cliente: elas serão
+        reaproveitadas ou trocadas (e a troca devolve a reserva antes de reservar de novo)."""
+        return {
+            chave_reserva(c.id)
+            for c in self.cobrancas.do_pedido(pedido_id)
+            if c.status is EstadoCobranca.AGUARDANDO and c.moedas_usadas > 0
+        }
 
     # --- aditivo -----------------------------------------------------------------------------
 
@@ -371,14 +418,7 @@ class ServicoPagamento:
             contexto.ledger.lancar_varios(novos)
         self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.PAGA, pago_em=agora))
         if cobranca.moedas_usadas > 0 and pedido is not None:
-            debitar_uso_moedas(
-                contexto.moedas,
-                usuario_id=pedido.cliente_id,
-                cobranca_id=cobranca.id,
-                pedido_id=cobranca.pedido_id,
-                moedas=cobranca.moedas_usadas,
-                agora=agora,
-            )
+            self._moedas_do_pagamento(contexto, cobranca, pedido, agora, bruto)
         if cobranca.cupom_codigo:
             confirmar_uso_cupom(
                 contexto,
@@ -390,6 +430,50 @@ class ServicoPagamento:
                 confirmado_em=agora,
             )
 
+    def _moedas_do_pagamento(
+        self,
+        contexto: Contexto,
+        cobranca: CobrancaLocal,
+        pedido: Pedido,
+        agora: datetime,
+        bruto: EventoWebhook,
+    ) -> None:
+        """Pagamento confirmado com moedas: debita o 'uso' e só DEPOIS confirma a reserva.
+
+        Ordem: débito primeiro (idempotente por `uso:<cobrança>`), confirmação depois. Se a
+        confirmação falhar no meio, a reserva continua 'reservada' e a expiração a recolhe; as
+        moedas já saíram, então nunca há moeda de graça. Rede de segurança (webhook tardio): se a
+        reserva não está 'reservada'/'confirmada' (expirou ou nunca existiu), tenta reservar de novo
+        a mesma cobrança; se não couber (a função do banco não reabre reserva 'devolvida'), NÃO
+        debita em silêncio: o evento vai para revisão com alerta e o pagamento segue normal (o
+        cliente pagou o valor com desconto; o financeiro decide).
+        """
+        situacao = situacao_reserva(contexto.moedas, cobranca_id=cobranca.id)
+        if situacao not in ("reservada", "confirmada"):
+            reaberta = situacao != "indisponivel" and reabrir_reserva_desconto(
+                contexto.moedas,
+                cobranca_id=cobranca.id,
+                moedas=cobranca.moedas_usadas,
+                usuario_id=pedido.cliente_id,
+                agora=agora,
+            )
+            if not reaberta:
+                contexto.eventos_webhook.marcar_revisao(
+                    bruto,
+                    f"pagamento com desconto de {cobranca.moedas_usadas} moedas sem reserva válida "
+                    f"({cobranca.id}; reserva: {situacao or 'inexistente'}): moedas NÃO debitadas",
+                )
+                return
+        debitar_uso_moedas(
+            contexto.moedas,
+            usuario_id=pedido.cliente_id,
+            cobranca_id=cobranca.id,
+            pedido_id=cobranca.pedido_id,
+            moedas=cobranca.moedas_usadas,
+            agora=agora,
+        )
+        confirmar_reserva_desconto(contexto.moedas, cobranca_id=cobranca.id)
+
     def _pagamento_falhou(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
     ) -> None:
@@ -397,6 +481,7 @@ class ServicoPagamento:
         # Falha que chega depois do pagamento (fora de ordem) não desfaz nada.
         if cobranca is not None and cobranca.status is EstadoCobranca.AGUARDANDO:
             self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.FALHOU))
+            self._liberar_reserva(contexto, cobranca)  # só na 1ª vez: depois ela já não aguarda
 
     def _estorno_confirmado(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
@@ -633,6 +718,7 @@ class ServicoPagamento:
             for c in self.cobrancas.do_pedido(depois.id):
                 if c.status in (EstadoCobranca.AGUARDANDO, EstadoCobranca.FALHOU):
                     self.cobrancas.salvar(replace(c, status=EstadoCobranca.CANCELADA))
+                    self._liberar_reserva(contexto, c)  # idempotente: FALHOU já devolveu
             retido = contexto.ledger.saldo_da_conta(CUSTODIA, depois.id)
             if retido > 0:
                 self.aplicar_dinheiro(
@@ -739,6 +825,15 @@ class ServicoPagamento:
             moedas=cobranca.moedas_usadas,
             agora=contexto.agora(),
         )
+        self._liberar_reserva(contexto, cobranca)  # idempotente por status da reserva
+
+    def _liberar_reserva(self, contexto: Contexto, cobranca: CobrancaLocal) -> None:
+        """Devolve a reserva de moedas desta cobrança (mês, dia e saldo) pelo valor GRAVADO nela.
+
+        Estorno total, falha, cancelamento e troca de cobrança passam por aqui; a segunda chamada
+        não faz nada."""
+        if cobranca.moedas_usadas > 0:
+            devolver_reserva_desconto(contexto.moedas, cobranca_id=cobranca.id)
 
     def _ordens_de_estorno(
         self, pedido_id: str, valor: int, chave: str, agora

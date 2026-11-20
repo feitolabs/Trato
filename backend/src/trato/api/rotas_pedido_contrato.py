@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Annotated
@@ -24,7 +24,12 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
-from trato.api.moedas import calcular_uso_moedas
+from trato.api.moedas import (
+    MOTIVO_ORCAMENTO_ESGOTADO,
+    DescontoMoedasIndisponivel,
+    calcular_uso_moedas,
+    volta_em,
+)
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
@@ -133,6 +138,19 @@ class CobrancaContratoOut(BaseModel):
         None, description="Cartão: chave de vida curta da folha de cartão do provedor."
     )
     criada_em: datetime
+    desconto_disponivel: bool = Field(
+        True, description="Se o desconto de moedas pode ser dado (orçamento e teto do cliente)."
+    )
+    desconto_indisponivel_motivo: str | None = Field(
+        None,
+        description="`orcamento_esgotado`, `limite_diario` ou `teto_cliente` quando indisponível.",
+    )
+    desconto_volta_em: date | None = Field(
+        None, description="Quando o desconto volta (Brasília); null se disponível."
+    )
+    desconto_possivel_centavos: int = Field(
+        0, description="Desconto de moedas que seria aplicado neste pedido (sem reservar)."
+    )
 
 
 class PagamentoContratoOut(BaseModel):
@@ -438,13 +456,17 @@ def criar_cobranca(
         valor_servico = aplicado.servico_com_desconto_centavos
     desconto_total = aplicado.desconto_centavos if aplicado else 0
     moedas_usadas = 0
+    valor_sem_moedas, desconto_sem_moedas = valor_servico, desconto_total
+    uso = calcular_uso_moedas(
+        contexto.moedas,
+        usuario_id=usuario.id,
+        servico_centavos=valor_servico,
+        agora=contexto.agora(),
+        ignorar=servico.reservas_pendentes_do_pedido(pedido.id),
+    )
+    possivel = uso.desconto_centavos
+    disponivel, motivo, volta = uso.disponivel, uso.motivo, uso.volta_em
     if corpo.usar_moedas:
-        uso = calcular_uso_moedas(
-            contexto.moedas,
-            usuario_id=usuario.id,
-            servico_centavos=valor_servico,
-            agora=contexto.agora(),
-        )
         moedas_usadas = uso.moedas
         valor_servico -= uso.desconto_centavos
         desconto_total += uso.desconto_centavos
@@ -456,18 +478,33 @@ def criar_cobranca(
             raise HTTPException(
                 502, "O parceiro de pagamento não respondeu. Tente de novo."
             ) from erro
-    cobranca = servico.cobrar(
-        contexto,
-        pedido,
-        valor_servico,
-        corpo.meio,
-        parcelas=corpo.parcelas,
-        cliente_externo=preparo.cliente_id if preparo else None,
-        cupom_codigo=aplicado.codigo if aplicado else None,
-        desconto_centavos=desconto_total,
-        moedas_usadas=moedas_usadas,
-    )
+
+    def _cobrar(valor: int, desconto: int, moedas: int):
+        return servico.cobrar(
+            contexto,
+            pedido,
+            valor,
+            corpo.meio,
+            parcelas=corpo.parcelas,
+            cliente_externo=preparo.cliente_id if preparo else None,
+            cupom_codigo=aplicado.codigo if aplicado else None,
+            desconto_centavos=desconto,
+            moedas_usadas=moedas,
+        )
+
+    try:
+        cobranca = _cobrar(valor_servico, desconto_total, moedas_usadas)
+    except DescontoMoedasIndisponivel as indisponivel:
+        # Corrida entre pagamentos: o orçamento acabou entre a conta e a reserva. Não é erro: a
+        # cobrança sai sem o desconto de moedas, que continuam guardadas.
+        cobranca = _cobrar(valor_sem_moedas, desconto_sem_moedas, 0)
+        motivo = indisponivel.motivo or MOTIVO_ORCAMENTO_ESGOTADO
+        disponivel, volta, possivel = False, volta_em(motivo, contexto.agora()), 0
     saida = _cobranca_out(pedido.id, cobranca)
+    saida.desconto_disponivel = disponivel
+    saida.desconto_indisponivel_motivo = motivo
+    saida.desconto_volta_em = volta
+    saida.desconto_possivel_centavos = possivel
     if preparo is not None:
         saida.cliente_externo_id = preparo.cliente_id
         saida.chave_efemera = preparo.chave_efemera

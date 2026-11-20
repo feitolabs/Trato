@@ -118,6 +118,30 @@ class AcaoRotina:
     profissional_id: str | None = None
 
 
+class DecisaoBonus(StrEnum):
+    LIBERAR = "liberar"  # vira lançamento imutável em moedas_lancamentos
+    CANCELAR = "cancelar"  # disputa perdida pelo autor: o bônus não existe
+    AGUARDAR = "aguardar"  # prazo não venceu, ou disputa ainda sem decisão
+
+
+def decidir_liberacao_bonus(
+    agora: datetime, liberar_em: datetime, situacao_disputa: str
+) -> DecisaoBonus:
+    """Bônus de moedas pendente: libera só depois do prazo e sem disputa contra quem avaliou.
+
+    `situacao_disputa`: `nenhuma` | `aberta` (sem decisão ainda) | `perdida` (decidida contra o
+    autor da avaliação). Disputa aberta segura o bônus: cancelar antes da decisão seria injusto
+    se o cliente ganhar. Função pura: o prazo (`liberar_em`) vem da tabela de configuração.
+    """
+    if agora < liberar_em:
+        return DecisaoBonus.AGUARDAR
+    if situacao_disputa == "perdida":
+        return DecisaoBonus.CANCELAR
+    if situacao_disputa == "aberta":
+        return DecisaoBonus.AGUARDAR
+    return DecisaoBonus.LIBERAR
+
+
 def prazo_confirmacao(valor_centavos: int, config: ConfigRotinas) -> timedelta | None:
     """Prazo do cliente para confirmar: o maior só vale acima do limite de valor (escopo 4, P1)."""
     limite = config.limite_valor_prazo_maior_centavos

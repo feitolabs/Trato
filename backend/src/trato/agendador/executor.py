@@ -6,10 +6,11 @@ em si estão em `trato.rotinas.regras` e não são reescritas aqui.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from dataclasses import fields, replace
 from datetime import date, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from trato.api.contexto import Contexto
 from trato.disputas import Estado as EstadoDisputa
@@ -144,9 +145,57 @@ _LEMBRETE_PARA_EVENTO = {
 
 
 class ExecutorContexto:
-    def __init__(self, contexto: Contexto, notificacoes: ServicoNotificacoes | None = None) -> None:
+    def __init__(
+        self,
+        contexto: Contexto,
+        notificacoes: ServicoNotificacoes | None = None,
+        cobrancas: Any = None,
+        provedor: Any = None,
+    ) -> None:
         self._c = contexto
         self._notif = notificacoes
+        self._cobrancas = cobrancas  # repositório de cobranças (expiração de reservas)
+        self._provedor = provedor  # para cancelar no provedor a cobrança expirada
+
+    def expirar_reservas_moedas(self, agora: datetime) -> int:
+        """Expira as reservas de desconto vencidas e cancela as cobranças pendentes delas.
+
+        Devolve quantas cobranças foram canceladas. Sem repositório de cobranças, não faz nada.
+        """
+        if self._cobrancas is None:
+            return 0
+        from trato.api.moedas import expirar_reservas_moedas
+
+        return expirar_reservas_moedas(self._c.moedas, self._cobrancas, agora, self._provedor)
+
+    def liberar_bonus_moedas(self, agora: datetime) -> int:
+        """Libera (ou cancela) os bônus de moedas pendentes vencidos. Devolve quantos liberou.
+
+        A disputa do pedido decide: aberta segura o bônus; decidida sem nada para o cliente
+        (perdida) cancela; sem disputa ou ganha libera. Idempotente pela chave do lançamento.
+        """
+        from trato.api.moedas import PendenteMoeda, liberar_bonus_pendentes
+
+        def situacao(pend: PendenteMoeda) -> str:
+            if not pend.pedido_id:
+                return "nenhuma"
+            try:
+                chave = uuid.UUID(pend.pedido_id).hex  # o pedido é guardado como hex
+            except ValueError:
+                chave = pend.pedido_id
+            disputa = self._c.disputas.obter(chave)
+            if disputa is None:
+                return "nenhuma"
+            if disputa.estado is not EstadoDisputa.DECIDIDA:
+                return "aberta"
+            divisao = disputa.divisao
+            if divisao is not None and divisao.para_cliente == 0 and divisao.retido == 0:
+                return "perdida"
+            return "nenhuma"
+
+        return liberar_bonus_pendentes(
+            self._c.moedas, agora=agora, situacao_disputa=situacao
+        ).liberados
 
     def executar(self, acao: AcaoRotina, agora: datetime) -> None:
         if acao.tipo is TipoAcaoRotina.TRANSICIONAR:

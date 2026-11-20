@@ -26,7 +26,9 @@ from trato.notificacoes.canais import canais_da_config
 from trato.notificacoes.config import obter_config_notificacoes
 from trato.notificacoes.postgres import NotificacoesServicoPostgres
 from trato.notificacoes.servico import ServicoNotificacoes
+from trato.pagamentos.montagem import escolher_provedor
 from trato.persistencia.conexao import Banco
+from trato.persistencia.pagamentos import CobrancasPostgres
 
 
 def montar() -> tuple[Agendador, Banco, float]:
@@ -43,14 +45,19 @@ def montar() -> tuple[Agendador, Banco, float]:
     notif = ServicoNotificacoes(
         NotificacoesServicoPostgres(banco), canais_da_config(cn), cn, contexto.agora
     )
+    executor = ExecutorContexto(
+        contexto, notif, CobrancasPostgres(banco), escolher_provedor(config)
+    )
     agendador = Agendador(
         FonteContexto(contexto, ids_ativos_postgres(banco, cfg.dias_concluidos_monitorados)),
-        ExecutorContexto(contexto, notif),
+        executor,
         RegistroPostgres(banco),
         TravaAdvisoryPostgres(dsn),
         contexto.agora,
         notif,
         timedelta(hours=cfg.lembrete_agenda_horas) if cfg.lembrete_agenda_horas else None,
+        executor.liberar_bonus_moedas,
+        executor.expirar_reservas_moedas,
     )
     return agendador, banco, cfg.intervalo_segundos
 
