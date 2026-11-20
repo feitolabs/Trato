@@ -59,7 +59,14 @@ O PDF do escopo ainda fala "WorkNet" e "taxa de 5%". Isso está **velho**. Vale 
 7. **Nota dos materiais:** o profissional precisa **enviar a notinha** ao cliente, para o cliente ver quanto custou cada material.
 8. **Aditivo:** se algo não estava previsto (troca de peça, material extra), o profissional cria um **aditivo com preço**. Só vale se o cliente aprovar no app.
 
-> Onde o escopo diz "5%", troque por "taxa progressiva, base 7,5%, configurável".
+### Modelo atual (20/11/2026)
+
+- **App gratuito:** sem taxa nem comissão; o profissional recebe o valor cheio do serviço. (No futuro, assinaturas e taxas poderão vir depois, com aviso.)
+- **Tratinhos (1 Tratinho = 1 centavo):**
+  - **Cliente:** ganha **50** ao avaliar o profissional (liberados **7 dias depois**, se não houver disputa) e usa como desconto pago pela empresa, com orçamento de **R$ 300/mês**, **R$ 10/dia** e **R$ 5 por cliente/mês**; validade de **90 dias**.
+  - **Profissional:** ganha **50** ao avaliar um cliente que atendeu (**1 por cliente**) e gasta **100** para ter **48h de exclusividade** de atendimento com um cliente (**máx. 3 ao mesmo tempo**).
+
+> Onde o escopo diz "5%", considere **sem taxa** (app 100% gratuito, decisão do João em 18/11/2026).
 > Onde o escopo diz "WorkNet", troque por "Trato".
 
 ---
@@ -198,7 +205,7 @@ Faça uma fase por vez. **Só avance quando a fase atual passar na verificação
 **Regra de ouro do escopo:** nenhuma regra de dinheiro roda no app. O app só pede e mostra.
 
 1. **Máquina de estados do pedido** (10 estados): Aberto → Orçamento aceito → Pago e retido → Agendado → Em andamento → Em confirmação → Concluído. Saídas: Cancelado, Em disputa, Retrabalho. Cada mudança valida **quem pode, quando e com qual prova**.
-2. **Cálculo da taxa:** tabela progressiva, base 7,5%, mínima configurável (R$ 3,00 decidido). **A taxa é DESCONTADA do profissional** (decisão do João, 10/11/2026, substitui a de 31/10/2026): o cliente paga o valor do orçamento; a taxa é calculada sobre o orçamento, congelada no aceite e descontada na conclusão, antes de creditar a carteira; o profissional recebe orçamento − taxa; a taxa é a receita do Trato. Mostrar ao profissional o que o cliente paga, a taxa e o que ele recebe; o cliente não vê taxa. O custo do Stripe no Pix e no cartão à vista sai da taxa (o Trato absorve). No cartão **parcelado** o cliente paga o custo de parcelamento REAL do provedor, repassado (tabela configurável por nº de parcelas, vazia = parcelado desligado). Reembolso devolve 100% do serviço, inclusive a taxa já descontada; só o custo do parcelado não volta. Detalhes: `docs/taxa-descontada-profissional.md`.
+2. **Sem taxa do Trato (app 100% gratuito, decisão do João em 18/11/2026):** substitui a tabela progressiva, a base de 7,5%, a mínima de R$ 3,00 e a taxa descontada do profissional. O cliente paga o valor do orçamento e o profissional recebe o **valor cheio** do serviço (sem desconto de taxa ou comissão). O custo do Stripe no Pix e no cartão à vista é absorvido pelo Trato. No cartão **parcelado** o cliente paga o custo de parcelamento REAL do provedor, repassado (tabela configurável por nº de parcelas, vazia = parcelado desligado). Reembolso devolve 100% do serviço; só o custo do parcelado não volta. (No futuro, assinaturas e taxas poderão vir depois, com aviso.)
 3. **Cálculo do Stripe** (decisão 3): custo no Pix e no cartão, e quanto sobra para o Trato.
 4. **Pagamento (Stripe):** 30% adiantado, resto no fim, valor retido, liberação só ao encerrar ou após 7 dias sem problema, pagamento por etapas, aditivo com pagamento próprio.
 5. **Idempotência e webhooks assinados:** reenvio não cobra duas vezes.
@@ -232,7 +239,7 @@ Seção 6 do escopo.
 
 1. Cadastro, **verificação** (documento e selfie), status em análise/aprovado/recusado.
 2. Pedidos abertos com filtros, alertas por categoria e região, recusar com motivo.
-3. **Calculadora de orçamento:** deslocamento, horas, material, total, **taxa** (descontada do profissional), o que o cliente paga (= o total do orçamento) e o que o profissional recebe (= orçamento − taxa). Etapas, sinal de material, validade e garantia.
+3. **Calculadora de orçamento:** deslocamento, horas, material, total, o que o cliente paga (= o total do orçamento) e o que o profissional recebe (= **valor cheio do orçamento, sem taxa**). Etapas, sinal de material, validade e garantia.
 4. Agenda, navegação até o cliente, **check-in** (foto, local, código) e **check-out** (foto final, código).
 5. **Enviar a notinha dos materiais** ao cliente e criar **aditivo com preço**.
 6. Carteira: retido, a liberar, liberado, extrato, saque por Pix só para chave do mesmo CPF/CNPJ.
@@ -294,7 +301,7 @@ O escopo diz que **sem painel a garantia não funciona**. Seção 7 e seções 2
 
 ## 8. Riscos que você deve sempre lembrar o João
 
-1. **Taxa baixa com cartão parcelado:** o custo do meio de pagamento pode comer a margem. Por isso a taxa base é 7,5% e o cálculo do Stripe é obrigatório.
+1. **Custo do meio de pagamento sem taxa:** como o app é 100% gratuito (sem taxa, decisão de 18/11/2026, que substituiu a taxa base de 7,5%), o Trato absorve o custo do Stripe no Pix e no cartão à vista; o cálculo do Stripe continua obrigatório e o custo do cartão parcelado é repassado ao cliente.
 2. **Guardar dinheiro de terceiros** pode exigir parceiro regulado (o Stripe cobre isso, mas **confirmar com advogado**).
 3. **Escopo grande:** o escopo tem 88 páginas. Por isso o plano é por fases, começando pelo **MVP**.
 4. **Fundo de garantia** ainda não tem origem do dinheiro definida. Não prometa cobertura no app até isso fechar.
