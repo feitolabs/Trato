@@ -6,6 +6,15 @@ library;
 import '../profissional/servico_orcamento.dart' show ItemMaterial;
 
 /// Atendimento já contratado, mostrado no cartão escuro do Início.
+/// Resposta de `POST /v1/profissional/pedidos/{id}/a-caminho`.
+class AvisoACaminho {
+  const AvisoACaminho({required this.enviado, this.etaMinutos});
+
+  /// Falso quando o profissional já avisou há pouco (o servidor não repete o aviso).
+  final bool enviado;
+  final int? etaMinutos;
+}
+
 class ProximoAtendimento {
   const ProximoAtendimento({
     required this.quando,
@@ -39,6 +48,9 @@ class ProximoAtendimento {
 
   /// Endereço completo: o serviço já foi contratado, então pode aparecer.
   final String endereco;
+
+  /// Visita marcada e serviço ainda não começou: só aí vale o aviso "Estou a caminho".
+  bool get agendado => estadoApi == 'agendado' && !emAndamento && pedidoId != null;
 
   bool get precisaAgendarVisita =>
       estadoApi == 'pago_e_retido' ||

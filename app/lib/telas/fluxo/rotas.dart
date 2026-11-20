@@ -59,6 +59,7 @@ import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
 import '../comuns/botao_de_confianca.dart';
+import '../comuns/convite.dart';
 import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
 import '../comuns/sucesso_acao_tela.dart';
@@ -131,6 +132,10 @@ abstract final class RotasTrato {
   @visibleForTesting
   static Future<String> Function(List<int> bytes, String arquivo)?
       salvarPdfParaTeste;
+
+  /// Compartilhamento do arquivo salvo (os testes trocam pelo falso).
+  @visibleForTesting
+  static CompartilharArquivo compartilharArquivo = compartilharArquivoNoAparelho;
 
   /// Canal nativo de push (FCM / APNs). Nos testes fica falso/silencioso.
   static ServicoPush push = ServicoPushNativo();
@@ -1012,6 +1017,8 @@ abstract final class RotasTrato {
               ),
             ),
           ),
+          aoAvisarACaminho: (pedidoId, eta) =>
+              repos.profissional.avisarACaminho(pedidoId, etaMinutos: eta),
           aoFazerCheckIn: () => _acoesPedidoProfissional(
             context,
             pedidoId: inicio.proximo?.pedidoId ?? _semId,
@@ -1666,12 +1673,30 @@ abstract final class RotasTrato {
     try {
       final bytes = await repos.profissional.baixarExtratoPdf(mes: confirmado);
       final arquivo = 'trato_extrato_${confirmado.replaceAll('-', '_')}.pdf';
-      await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
+      final caminho =
+          await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
       if (!context.mounted) return;
       mensagens
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Extrato em PDF salvo.')),
+          SnackBar(
+            content: const Text('Extrato em PDF salvo.'),
+            action: SnackBarAction(
+              label: 'Compartilhar',
+              onPressed: () async {
+                try {
+                  await compartilharArquivo(caminho);
+                } on Object {
+                  // Sem compartilhamento: fica só o aviso "Extrato em PDF salvo."
+                  mensagens
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      const SnackBar(content: Text('Extrato em PDF salvo.')),
+                    );
+                }
+              },
+            ),
+          ),
         );
     } on ErroTrato catch (e) {
       if (!context.mounted) return;

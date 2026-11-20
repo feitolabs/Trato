@@ -401,6 +401,9 @@ abstract interface class RepositorioProfissional {
   Future<DetalhePedido> detalhe(String pedidoId);
   Future<void> recusar(String pedidoId, MotivoRecusa motivo);
 
+  /// Avisa o cliente que o profissional está a caminho (serviço agendado). [etaMinutos] opcional (5 a 180).
+  Future<AvisoACaminho> avisarACaminho(String pedidoId, {int? etaMinutos});
+
   /// Marca a visita de um pedido já pago. Sem isso o check-in não é liberado.
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim);
 

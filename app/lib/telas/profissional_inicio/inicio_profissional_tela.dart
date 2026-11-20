@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhos;
 import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
@@ -23,7 +24,11 @@ class InicioProfissionalTela extends StatefulWidget {
     this.aoAbrirPedido,
     this.aoAbrirNotificacoes,
     this.aoUsarComoCliente,
+    this.aoAvisarACaminho,
   });
+
+  /// Avisa o cliente que o profissional está a caminho. Sem isso, o botão não aparece.
+  final Future<AvisoACaminho> Function(String pedidoId, int? etaMinutos)? aoAvisarACaminho;
 
   /// Abre as notificações. Sem isso, o sino não aparece.
   final VoidCallback? aoAbrirNotificacoes;
@@ -143,7 +148,11 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
           ],
           if (dados.proximo != null) ...[
             const SizedBox(height: EspacosTrato.x4),
-            _CartaoProximo(proximo: dados.proximo!, aoFazerCheckIn: widget.aoFazerCheckIn),
+            _CartaoProximo(
+              proximo: dados.proximo!,
+              aoFazerCheckIn: widget.aoFazerCheckIn,
+              aoAvisarACaminho: widget.aoAvisarACaminho,
+            ),
           ],
           const SizedBox(height: EspacosTrato.x4),
           _CartaoCarteira(carteira: dados.carteira, aoTocar: widget.aoAbrirCarteira),
@@ -235,10 +244,15 @@ class _CartaoDisponivel extends StatelessWidget {
 }
 
 class _CartaoProximo extends StatelessWidget {
-  const _CartaoProximo({required this.proximo, required this.aoFazerCheckIn});
+  const _CartaoProximo({
+    required this.proximo,
+    required this.aoFazerCheckIn,
+    this.aoAvisarACaminho,
+  });
 
   final ProximoAtendimento proximo;
   final VoidCallback? aoFazerCheckIn;
+  final Future<AvisoACaminho> Function(String pedidoId, int? etaMinutos)? aoAvisarACaminho;
 
   @override
   Widget build(BuildContext context) {
@@ -277,8 +291,99 @@ class _CartaoProximo extends StatelessWidget {
                 : (proximo.emAndamento ? 'Gerenciar serviço (check-out)' : 'Fazer check-in'),
             aoTocar: aoFazerCheckIn ?? () {},
           ),
+          if (proximo.agendado && aoAvisarACaminho != null) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            _AvisoACaminho(pedidoId: proximo.pedidoId!, enviar: aoAvisarACaminho!),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// "Estou a caminho": chips opcionais de tempo (15, 30, 45 min) e o botão. Erro nunca trava a tela.
+class _AvisoACaminho extends StatefulWidget {
+  const _AvisoACaminho({required this.pedidoId, required this.enviar});
+
+  final String pedidoId;
+  final Future<AvisoACaminho> Function(String pedidoId, int? etaMinutos) enviar;
+
+  @override
+  State<_AvisoACaminho> createState() => _AvisoACaminhoState();
+}
+
+class _AvisoACaminhoState extends State<_AvisoACaminho> {
+  int? _eta;
+  var _enviando = false;
+  String? _mensagem;
+
+  Future<void> _avisar() async {
+    if (_enviando) return;
+    setState(() {
+      _enviando = true;
+      _mensagem = null;
+    });
+    String texto;
+    try {
+      final r = await widget.enviar(widget.pedidoId, _eta);
+      texto = r.enviado ? 'Aviso enviado ao cliente' : 'Você já avisou há pouco';
+    } on ErroTrato catch (e) {
+      texto = switch (e.codigoHttp) {
+        409 => 'Só dá para avisar em serviço agendado',
+        403 || 404 => 'Não encontramos este pedido para avisar.',
+        _ => 'Não deu para avisar agora. Tente de novo.',
+      };
+    } on Object {
+      texto = 'Não deu para avisar agora. Tente de novo.';
+    }
+    if (mounted) {
+      setState(() {
+        _enviando = false;
+        _mensagem = texto;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: EspacosTrato.x2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Chego em:',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
+            ),
+            for (final min in const [15, 30, 45])
+              ChoiceChip(
+                key: Key('eta-$min'),
+                label: Text('$min min'),
+                selected: _eta == min,
+                onSelected: (sel) => setState(() => _eta = sel ? min : null),
+              ),
+          ],
+        ),
+        const SizedBox(height: EspacosTrato.x2),
+        BotaoSecundario(
+          texto: _enviando ? 'Avisando...' : 'Estou a caminho',
+          aoTocar: _avisar,
+        ),
+        if (_mensagem != null)
+          Padding(
+            padding: const EdgeInsets.only(top: EspacosTrato.x2),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                _mensagem!,
+                key: const Key('mensagem-a-caminho'),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

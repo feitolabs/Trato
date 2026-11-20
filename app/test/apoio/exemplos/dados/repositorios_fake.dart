@@ -669,6 +669,14 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   final List<MotivoRecusa> recusas = [];
   final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
+  final List<(String, int?)> avisosACaminho = [];
+
+  @override
+  Future<AvisoACaminho> avisarACaminho(String pedidoId, {int? etaMinutos}) async {
+    avisosACaminho.add((pedidoId, etaMinutos));
+    return AvisoACaminho(enviado: true, etaMinutos: etaMinutos);
+  }
+
   @override
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
 

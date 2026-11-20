@@ -31,6 +31,7 @@ class CascaProfissionalTela extends StatefulWidget {
     required this.inicio,
     this.detalhe,
     this.aoFazerCheckIn,
+    this.aoAvisarACaminho,
     this.aoFazerOrcamento,
     this.aoFazerOrcamentoDoPedido,
     this.aoPerguntar,
@@ -118,6 +119,9 @@ class CascaProfissionalTela extends StatefulWidget {
   /// Detalhe mostrado ao tocar num pedido aberto (provisório: o backend entrega o do pedido tocado).
   final DetalhePedido? detalhe;
   final VoidCallback? aoFazerCheckIn;
+
+  /// "Estou a caminho" no cartão do pedido agendado.
+  final Future<AvisoACaminho> Function(String pedidoId, int? etaMinutos)? aoAvisarACaminho;
   final VoidCallback? aoFazerOrcamento;
 
   /// Chamado para fazer orçamento do pedido aberto tocado.
@@ -365,6 +369,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         aoFazerCheckIn: widget.aoGerenciarProximo != null
             ? () => widget.aoGerenciarProximo!(_inicio.proximo)
             : widget.aoFazerCheckIn,
+        aoAvisarACaminho: widget.aoAvisarACaminho,
         aoAbrirCarteira: () => _ir(3),
         aoAbrirFiltros: _filtros,
         aoAbrirPedido: _abrirDetalhe,

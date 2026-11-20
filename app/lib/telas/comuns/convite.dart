@@ -17,6 +17,16 @@ Future<void> compartilharNoAparelho(String texto) async {
   }
 }
 
+/// Compartilha um arquivo já salvo (ex.: o extrato em PDF). Lança erro se não for possível.
+typedef CompartilharArquivo = Future<void> Function(String caminho);
+
+Future<void> compartilharArquivoNoAparelho(String caminho) async {
+  final r = await SharePlus.instance.share(ShareParams(files: [XFile(caminho)]));
+  if (r.status == ShareResultStatus.unavailable) {
+    throw StateError('compartilhamento indisponível');
+  }
+}
+
 /// Compartilha o convite; se o compartilhamento falhar ou não existir (teste, desktop),
 /// copia o texto e avisa com "Convite copiado!".
 Future<void> indicarOTrato(
