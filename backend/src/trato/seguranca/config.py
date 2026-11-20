@@ -99,6 +99,16 @@ def _limites_padrao() -> list[RegraLimite]:
             janela_s=60,
             bloqueio_s=600,
         ),
+        # Perfil público sem login: limita a varredura de ids de profissionais.
+        RegraLimite(
+            nome="publico_perfil",
+            prefixo="/v1/publico",
+            metodos=["GET"],
+            escopo="ip",
+            maximo=60,
+            janela_s=60,
+            bloqueio_s=300,
+        ),
         # Rotas sensíveis (M12/A8): escrita que gera custo, dado pessoal ou dinheiro.
         RegraLimite(
             nome="verificacao_envio",

@@ -12,12 +12,12 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
-from trato.api.repositorios_app import PerfilDetalhe
+from trato.api.repositorios_app import NIVEIS_VERIFICACAO, PerfilDetalhe
 from trato.profissional.config import ConfigProfissional, obter_config_profissional
 from trato.profissional.repositorio import (
     CatalogoEmMemoria,
@@ -189,6 +189,7 @@ def registrar_rotas(
 ) -> None:
     """Liga as rotas. Sem adaptador Postgres, passe `repo`/`catalogo` (ou use os de memória)."""
     app.include_router(router)
+    app.include_router(router_publico)
     if repo is not None and catalogo is not None:
         app.state.modulo_profissional = Modulo(repo, catalogo, obter_config_profissional())
 
@@ -810,4 +811,89 @@ def perfil_publico(
         avaliacoes=[
             _avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"
         ],
+    )
+
+
+# --- Perfil público SEM login (página web "Cliente fixo") --------------------------------------
+
+router_publico = APIRouter(prefix="/v1/publico", tags=["público"])
+
+NAO_ENCONTRADO_PUBLICO = "Profissional não encontrado."
+CACHE_PUBLICO = "public, max-age=60"
+
+
+class PerfilSitePublicoOut(BaseModel):
+    """Só o que qualquer pessoa pode ver. Sem telefone, e-mail, documento, endereço nem banco."""
+
+    id: str = Field(description="O mesmo id da URL.")
+    nome: str | None = Field(description='Primeiro nome e inicial do sobrenome ("João C.").')
+    foto_url: str | None = Field(None, description="URL curta da foto de perfil; null sem foto.")
+    categorias: list[str] = Field(description="Nomes dos serviços oferecidos.")
+    nota_media: float | None = Field(description="Nota média (null sem avaliações).")
+    avaliacoes_total: int
+    servicos_concluidos: int
+    identidade_verificada: bool = Field(description='Selo "Identidade verificada".')
+    cidades: list[str] = Field(description='Cidades que atende ("Belo Horizonte/MG").')
+    sobre: str | None = Field(description='Texto "Sobre", se existir.')
+
+
+def _foto_publica(request: Request, profissional_id: str) -> str | None:
+    servico = getattr(request.app.state, "servico_uploads", None)
+    if servico is None:
+        return None
+    try:
+        caminho = servico.repo.foto_perfil(profissional_id)
+        if not caminho:
+            return None
+        return servico.armazenamento.url_leitura("avatar", caminho, 300)
+    except Exception:  # noqa: BLE001 - sem foto o site mostra as iniciais
+        return None
+
+
+@router_publico.get(
+    "/profissionais/{profissional_id}",
+    response_model=PerfilSitePublicoOut,
+    summary="Perfil público do profissional (sem login)",
+    description=(
+        "Só profissional aprovado e com conta ativa. Qualquer outro caso (não existe, em análise, "
+        "suspenso, bloqueado) responde 404 com a mesma mensagem. Cache de 60 s; sem cookies."
+    ),
+)
+def perfil_publico_site(
+    profissional_id: str,
+    request: Request,
+    resposta: Response,
+    contexto: Contexto = Depends(obter_contexto),
+    modulo: Modulo = Depends(obter_modulo),
+) -> PerfilSitePublicoOut:
+    perfil = modulo.repo.obter(profissional_id)
+    detalhe = contexto.usuarios.detalhe(profissional_id) if perfil is not None else None
+    if (
+        perfil is None
+        or perfil.status != "aprovado"
+        or detalhe is None
+        or detalhe.status != "ativo"
+        or detalhe.papel is not PapelUsuario.PROFISSIONAL
+    ):
+        raise HTTPException(404, NAO_ENCONTRADO_PUBLICO)
+    nomes_cidades = {
+        c.id: f"{c.nome}/{c.uf}" if c.uf else c.nome for c in modulo.catalogo.cidades_publicas()
+    }
+    nomes_categorias = {c.id: c.nome for c in modulo.catalogo.categorias_publicas()}
+    resposta.headers["Cache-Control"] = CACHE_PUBLICO
+    return PerfilSitePublicoOut(
+        id=profissional_id,
+        nome=_nome_abreviado(detalhe.nome),
+        foto_url=_foto_publica(request, profissional_id),
+        categorias=[nomes_categorias[c] for c in perfil.categorias if c in nomes_categorias],
+        nota_media=detalhe.nota_publica,
+        avaliacoes_total=detalhe.avaliacoes_total,
+        servicos_concluidos=detalhe.servicos_concluidos or 0,
+        identidade_verificada=perfil.nivel_verificacao in NIVEIS_VERIFICACAO,
+        cidades=list(
+            dict.fromkeys(
+                nomes_cidades[r.cidade_id] for r in perfil.regioes if r.cidade_id in nomes_cidades
+            )
+        ),
+        sobre=perfil.bio or None,
     )
