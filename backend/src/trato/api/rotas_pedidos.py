@@ -21,6 +21,7 @@ from trato.api import offline
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import (
+    avisar_check_in_sem_codigo,
     avisar_exclusividade_encerrada,
     avisar_pedido_direcionado,
     avisar_pedido_urgente,
@@ -490,7 +491,7 @@ def mudar_estado(
         prova = validar_prova_midia(servico_uploads, pedido, usuario.id, acao, prova)
     cfg = contexto.config.carregar()
     ip, dispositivo = ip_do_cliente(request), dispositivo_do_cliente(request)
-    com_codigo = acao in _ACOES_COM_CODIGO
+    com_codigo = acao in _ACOES_COM_CODIGO and not getattr(prova, "sem_codigo", False)
     if com_codigo:  # A1: o código de 4 dígitos tem limite de tentativas
         try:
             contexto.limite_codigo.checar(pedido.id, ip)
@@ -557,6 +558,10 @@ def mudar_estado(
                 )
         if offline_em is not None:
             offline.registrar(contexto, usuario, pedido, acao, offline_em, contexto.agora())
+    if acao is Acao.FAZER_CHECK_IN and getattr(prova, "sem_codigo", False):
+        avisar_check_in_sem_codigo(
+            request, contexto, pedido_id=gravado.id, cliente_id=gravado.cliente_id
+        )
     for enc in encerramentos:
         if enc.resultado == "cancelada":
             moedas = 100

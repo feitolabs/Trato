@@ -179,7 +179,9 @@ class CheckInIn(_Entrada):
     # Foto e localização: obrigatórias no presencial (a regra confere), dispensadas no remoto.
     foto: FotoIn | None = None
     localizacao: LocalizacaoIn | None = None
-    codigo_inicio: str
+    codigo_inicio: str = ""
+    sem_codigo: bool = False
+    justificativa: str | None = Field(None, max_length=500)
 
     def para_regra(self) -> ProvaCheckIn:
         return ProvaCheckIn(
@@ -188,6 +190,10 @@ class CheckInIn(_Entrada):
             if self.localizacao
             else None,
             codigo_inicio=self.codigo_inicio,
+            sem_codigo=self.sem_codigo,
+            justificativa=self.justificativa.strip()
+            if self.justificativa and self.justificativa.strip()
+            else None,
         )
 
 
@@ -210,12 +216,22 @@ class ClienteAusenteIn(_Entrada):
 
 class CheckOutIn(_Entrada):
     foto_final: FotoIn | None = None
-    codigo_conclusao: str
+    localizacao: LocalizacaoIn | None = None
+    codigo_conclusao: str = ""
+    sem_codigo: bool = False
+    justificativa: str | None = Field(None, max_length=500)
 
     def para_regra(self) -> ProvaCheckOut:
         return ProvaCheckOut(
             foto_final=self.foto_final.para_regra() if self.foto_final else None,
+            localizacao=Localizacao(self.localizacao.latitude, self.localizacao.longitude)
+            if self.localizacao
+            else None,
             codigo_conclusao=self.codigo_conclusao,
+            sem_codigo=self.sem_codigo,
+            justificativa=self.justificativa.strip()
+            if self.justificativa and self.justificativa.strip()
+            else None,
         )
 
 
@@ -311,6 +327,13 @@ class PedidoOut(BaseModel):
     )
     contratado_em: datetime | None = Field(
         None, description="Quando o cliente aceitou o orçamento (o contrato nasceu)."
+    )
+    check_out_sem_codigo: bool = Field(
+        False,
+        description=(
+            "Verdadeiro quando o check-out foi feito sem código do cliente e exige confirmação "
+            "explícita para liberar o pagamento."
+        ),
     )
 
 

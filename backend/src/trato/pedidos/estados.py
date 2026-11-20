@@ -191,7 +191,9 @@ class ProvaRemarcacao:
 class ProvaCheckIn:
     foto: Foto | None = None  # obrigatória no presencial
     localizacao: Localizacao | None = None  # obrigatória no presencial
-    codigo_inicio: str = ""  # sempre conferido: vazio nunca bate com o código
+    codigo_inicio: str = ""  # conferido quando sem_codigo=False
+    sem_codigo: bool = False
+    justificativa: str | None = None
 
 
 @dataclass(frozen=True)
@@ -205,6 +207,9 @@ class ProvaClienteAusente:
 class ProvaCheckOut:
     foto_final: Foto | None = None  # obrigatória no presencial
     codigo_conclusao: str = ""
+    localizacao: Localizacao | None = None  # obrigatória no presencial quando sem_codigo=True
+    sem_codigo: bool = False
+    justificativa: str | None = None
 
 
 @dataclass(frozen=True)
@@ -278,6 +283,7 @@ class Pedido:
     # Serviço remoto: sem foto nem localização no início e no fim (o código e a confirmação do
     # cliente seguem valendo).
     remoto: bool = False
+    check_out_sem_codigo: bool = False
 
 
 @dataclass(frozen=True)
@@ -612,7 +618,10 @@ def _fazer_check_in(pedido, ator, agora, prova: ProvaCheckIn, prazos, gerar):
             raise ProvaInvalida("O check-in precisa de foto e localização.")
         _exigir_foto(prova.foto, agora, "foto do check-in")
         _exigir_localizacao(prova.localizacao)
-    _exigir_codigo(prova.codigo_inicio, pedido.codigo_inicio, "início")
+    if prova.sem_codigo:
+        _exigir_texto(prova.justificativa or "", "a justificativa do check-in sem código")
+    else:
+        _exigir_codigo(prova.codigo_inicio, pedido.codigo_inicio, "início")
     return replace(pedido, estado=Estado.EM_ANDAMENTO, check_in_em=agora, codigo_conclusao=gerar())
 
 
@@ -652,8 +661,20 @@ def _fazer_check_out(pedido, ator, agora, prova: ProvaCheckOut, prazos, gerar):
         if prova.foto_final is None:
             raise ProvaInvalida("O check-out precisa da foto final.")
         _exigir_foto(prova.foto_final, agora, "foto final")
-    _exigir_codigo(prova.codigo_conclusao, pedido.codigo_conclusao, "conclusão")
-    return replace(pedido, estado=Estado.EM_CONFIRMACAO, check_out_em=agora)
+    if prova.sem_codigo:
+        _exigir_texto(prova.justificativa or "", "a justificativa do check-out sem código")
+        if not pedido.remoto:
+            if prova.localizacao is None:
+                raise ProvaInvalida("O check-out sem código precisa da localização.")
+            _exigir_localizacao(prova.localizacao)
+    else:
+        _exigir_codigo(prova.codigo_conclusao, pedido.codigo_conclusao, "conclusão")
+    return replace(
+        pedido,
+        estado=Estado.EM_CONFIRMACAO,
+        check_out_em=agora,
+        check_out_sem_codigo=prova.sem_codigo,
+    )
 
 
 def _concluir(pedido: Pedido, agora: datetime) -> Pedido:
@@ -671,6 +692,8 @@ def _confirmar_conclusao(pedido, ator, agora, prova, prazos, gerar):
 
 
 def _concluir_por_prazo(pedido, ator, agora, prova, prazos, gerar):
+    if pedido.check_out_sem_codigo:
+        raise EstadoInvalido("Check-out sem código exige confirmação explícita do cliente.")
     prazo = _prazo(prazos, "confirmacao_cliente", "confirmação do cliente")
     _exigir_vencido(pedido.check_out_em, prazo, agora, "confirmação do cliente")
     return _concluir(pedido, agora)

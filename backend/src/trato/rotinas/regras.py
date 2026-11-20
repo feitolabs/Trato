@@ -189,7 +189,9 @@ def transicoes_por_prazo(
             continue  # recebeu orçamento: o cliente decide, o pedido não expira
         if pedido.estado is Estado.AGENDADO and pedido.cliente_ausente_em is not None:
             continue  # profissional registrou chegada no local; ausência automática suspensa
-        if pedido.estado is Estado.EM_CONFIRMACAO and item.disputa_aberta:
+        if pedido.estado is Estado.EM_CONFIRMACAO and (
+            item.disputa_aberta or pedido.check_out_sem_codigo
+        ):
             continue
         try:
             transicionar(pedido, acao, SISTEMA, agora, prazos=_prazos_do_pedido(item, config))
