@@ -2483,6 +2483,14 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     }
 
     final itens = <Map<String, dynamic>>[];
+    if (pronto.valorFechadoCentavos != null && pronto.valorFechadoCentavos! > 0) {
+      itens.add({
+        'tipo': 'outro',
+        'descricao': 'Serviço (valor fechado / diária)',
+        'quantidade': 1,
+        'valor_unitario_centavos': pronto.valorFechadoCentavos!,
+      });
+    }
     // Por hora: a quantidade é o número de horas e o valor unitário é o valor da hora. Assim o
     // cliente vê as horas (deslocamento e trabalhadas) e o backend soma o total.
     if (pronto.decimosDeslocamento > 0 && pronto.valorHoraCentavos > 0) {

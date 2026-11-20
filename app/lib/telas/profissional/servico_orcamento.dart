@@ -18,6 +18,7 @@ class OrcamentoPronto {
     required this.materialPorMim,
     required this.pedirSinalMaterial,
     required this.totalCentavos,
+    this.valorFechadoCentavos,
     this.foraDoEscopo,
     this.observacoes,
   });
@@ -34,6 +35,9 @@ class OrcamentoPronto {
   final bool materialPorMim;
   final bool pedirSinalMaterial;
   final int totalCentavos;
+
+  /// Preenchido quando o profissional escolheu o modo "Valor fechado / diária".
+  final int? valorFechadoCentavos;
   final String? foraDoEscopo;
   final String? observacoes;
 
