@@ -206,6 +206,7 @@ class PerfilOut(BaseModel):
         None, description="Verificação mais recente: enviada, em_analise, aprovada ou recusada."
     )
     disponivel_agora: bool = False
+    cpf_cadastrado: bool = False
 
 
 class PedidoAbertoOut(BaseModel):

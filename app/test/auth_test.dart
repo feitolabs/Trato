@@ -276,8 +276,6 @@ void main() {
   group('criar conta', () {
     Future<void> preencher(WidgetTester tester) async {
       await _digitar(tester, 'Nome completo', 'Mariana Alves');
-      await _digitar(tester, 'CPF', '12345678909');
-      await _digitar(tester, 'Nascimento', '15031990');
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
@@ -295,7 +293,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('CPF incompleto. Digite os 11 números.'),
+        find.text('Celular incompleto. Digite DDD + 9 dígitos.'),
         findsOneWidget,
       );
       expect(
@@ -368,24 +366,6 @@ void main() {
       expect(find.byType(ConfirmarCelularTela), findsNothing);
     });
 
-    testWidgets('CPF já usado mostra o erro e fica no passo 1', (tester) async {
-      final servico = ServicoAuthFake();
-      await servico.criarConta(const DadosCadastro(
-        nome: 'Outra Pessoa',
-        email: 'outra@email.com',
-        senha: _senha,
-        celular: '(11) 91234-5678',
-        cpf: '123.456.789-09',
-      ));
-      await servico.sair();
-      await _abrir(tester, CriarContaTela(servico: servico));
-
-      await aceitarETocar(tester);
-
-      expect(find.text('Este CPF já está cadastrado em outra conta.'), findsOneWidget);
-      expect(find.byType(CascaClienteTela), findsNothing);
-    });
-
     testWidgets('sem internet mostra o erro e fica no passo 1', (tester) async {
       final servico = ServicoAuthFake()..falharNaProxima = const ErroAuth(TipoErroAuth.semInternet);
       await _abrir(tester, CriarContaTela(servico: servico));
@@ -413,8 +393,6 @@ void main() {
       final servico = ServicoAuthFake(exigeConfirmacaoEmail: true);
       await _abrir(tester, CriarContaTela(servico: servico));
       await _digitar(tester, 'Nome completo', 'Mariana Alves');
-      await _digitar(tester, 'CPF', '12345678909');
-      await _digitar(tester, 'Nascimento', '15031990');
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
@@ -637,7 +615,8 @@ void main() {
       await _digitar(tester, 'Senha nova', 'curta');
       await _digitar(tester, 'Repita a senha nova', 'curta');
       await _tocar(tester, 'Salvar senha');
-      expect(find.textContaining('Use pelo menos 8 caracteres, com letra e número.'), findsOneWidget);
+      expect(
+          find.textContaining('Use pelo menos 8 caracteres, com letra e número.'), findsOneWidget);
 
       await _digitar(tester, 'Senha nova', 'SenhaBoa123');
       await _digitar(tester, 'Repita a senha nova', 'SenhaBoa124');
@@ -648,7 +627,8 @@ void main() {
     });
 
     testWidgets('senha boa: troca, encerra a sessão do link e vai para o login', (tester) async {
-      final servico = ServicoAuthFake(contas: {'mariana@email.com': _senha}, aceitaQualquerLogin: false);
+      final servico =
+          ServicoAuthFake(contas: {'mariana@email.com': _senha}, aceitaQualquerLogin: false);
       await servico.entrarComEmail(email: 'mariana@email.com', senha: _senha);
       servico.simularLinkDeRecuperacao('mariana@email.com');
       await _abrir(tester, NovaSenhaTela(servico: servico));
@@ -666,7 +646,8 @@ void main() {
         servico.entrarComEmail(email: 'mariana@email.com', senha: _senha),
         throwsA(isA<ErroAuth>()),
       );
-      final sessao = await servico.entrarComEmail( // verificar: ignorar
+      final sessao = await servico.entrarComEmail(
+        // verificar: ignorar
         email: 'mariana@email.com',
         senha: 'SenhaBoa123', // verificar: ignorar
       );

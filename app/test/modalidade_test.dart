@@ -208,7 +208,8 @@ void main() {
       return _json({'detail': 'não'}, 404);
     }
 
-    test('presencial traz o endereço completo e o texto do mapa; remoto não busca endereço', () async {
+    test('presencial traz o endereço completo e o texto do mapa; remoto não busca endereço',
+        () async {
       final (api, chamadas) = _cliente(responder);
       final inicio = await RepositorioProfissionalApi(api).inicio();
 
@@ -266,7 +267,9 @@ void main() {
 
     test('concluir só com o código de conclusão', () async {
       final (api, chamadas) = _cliente((_) => _json({'id': 'p'}));
-      final fim = await RepositorioProfissionalApi(api).servicoCheckOut('p1', remoto: true).finalizar('9876');
+      final fim = await RepositorioProfissionalApi(api)
+          .servicoCheckOut('p1', remoto: true)
+          .finalizar('9876');
       expect(fim.name, 'concluido');
       expect(chamadas.single.caminho, '/v1/pedidos/p1/acoes/fazer_check_out');
       expect(chamadas.single.corpo, {
@@ -290,7 +293,8 @@ void main() {
       expect(servico.codigosEnviados, ['4821']);
     });
 
-    testWidgets('a tela de check-in presencial continua pedindo foto e localização', (tester) async {
+    testWidgets('a tela de check-in presencial continua pedindo foto e localização',
+        (tester) async {
       await tester.pumpWidget(
         _app(CheckInTela(servico: ServicoCheckInFake(), tituloBarra: 'Pedido #AAAA')),
       );
@@ -300,7 +304,8 @@ void main() {
   });
 
   group('Telas do profissional', () {
-    testWidgets('cartão de pedido aberto remoto tem o selo Remoto e não mostra bairro', (tester) async {
+    testWidgets('cartão de pedido aberto remoto tem o selo Remoto e não mostra bairro',
+        (tester) async {
       await tester.pumpWidget(
         _app(
           Scaffold(
@@ -396,13 +401,15 @@ void main() {
 
     testWidgets('presencial mostra o endereço; remoto diz que é à distância', (tester) async {
       await tester.pumpWidget(
-        _app(DetalheServicoTela(dados: detalhe(local: 'Rua das Flores, 10 · Centro'), aoAcao: (_) {})),
+        _app(DetalheServicoTela(
+            dados: detalhe(local: 'Rua das Flores, 10 · Centro'), aoAcao: (_) {})),
       );
       expect(find.text('Local do serviço'), findsOneWidget);
       expect(find.text('Atendimento presencial'), findsOneWidget);
       expect(find.text('Rua das Flores, 10 · Centro'), findsOneWidget);
 
-      await tester.pumpWidget(_app(DetalheServicoTela(dados: detalhe(remoto: true), aoAcao: (_) {})));
+      await tester
+          .pumpWidget(_app(DetalheServicoTela(dados: detalhe(remoto: true), aoAcao: (_) {})));
       await tester.pumpAndSettle();
       expect(find.text('Atendimento remoto'), findsOneWidget);
       expect(find.textContaining('combina tudo'), findsOneWidget);
@@ -492,7 +499,12 @@ void main() {
     http.Response responder(http.Request r) {
       if (r.method == 'GET' && r.url.path == '/v1/contratos/ped-1/aditivos') {
         return _json([
-          {'id': 'adit-9', 'descricao': 'Horas extras', 'valor_centavos': 45000, 'estado': 'proposto'},
+          {
+            'id': 'adit-9',
+            'descricao': 'Horas extras',
+            'valor_centavos': 45000,
+            'estado': 'proposto'
+          },
         ]);
       }
       if (r.url.path == '/v1/pedidos/ped-1/interlocutor') {
@@ -525,7 +537,8 @@ void main() {
       expect(d.pedidoTitulo, startsWith('Pedido #'));
     });
 
-    testWidgets('aprovar responde com o id do pedido (não o do aditivo) e cobra no cartão', (t) async {
+    testWidgets('aprovar responde com o id do pedido (não o do aditivo) e cobra no cartão',
+        (t) async {
       final (api, chamadas) = _cliente(responder);
       bool? aprovou;
       Cobranca? cobrancaAditivo;
@@ -675,7 +688,8 @@ void main() {
       return _json({'detail': 'não'}, 404);
     }
 
-    test('carrega todas as notas, da mais antiga para a mais nova, com o nome de quem enviou', () async {
+    test('carrega todas as notas, da mais antiga para a mais nova, com o nome de quem enviou',
+        () async {
       final (api, _) = _cliente(responder);
       final todas = await ServicoNotaMaterialApi(api).carregarTodas('ped-1');
       expect(todas.map((n) => n.itens.single.descricao), ['Tomadas', 'Cabo']);
@@ -685,7 +699,8 @@ void main() {
 
     testWidgets('a tela mostra cada nota e a soma delas', (t) async {
       final (api, _) = _cliente(responder);
-      await t.pumpWidget(_app(VerNotaTela(servico: ServicoNotaMaterialApi(api), pedidoId: 'ped-1')));
+      await t
+          .pumpWidget(_app(VerNotaTela(servico: ServicoNotaMaterialApi(api), pedidoId: 'ped-1')));
       await t.pumpAndSettle();
       expect(find.textContaining('Nota 1'), findsWidgets);
       expect(find.textContaining('Nota 2'), findsWidgets);

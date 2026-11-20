@@ -219,6 +219,9 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
   @override
   Future<DadosPagamento> dados(String pedidoId) async => pag.DadosExemplo.pagamento;
 
+  @override
+  Future<void> cadastrarCpf(String cpf, String nascimentoIso) async {}
+
   /// Simula o backend: com moedas, 5.000 centavos de desconto (limite do exemplo).
   @override
   Future<DadosPagamento> recalcular(

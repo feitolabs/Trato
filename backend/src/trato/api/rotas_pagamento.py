@@ -129,6 +129,18 @@ def _aditivo_out(a: Aditivo) -> AditivoOut:
     )
 
 
+def _exigir_cpf(contexto: Contexto, usuario_id: str) -> JSONResponse | None:
+    if not contexto.usuarios.tem_cpf(usuario_id):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "Informe seu CPF para concluir o pagamento.",
+                "codigo": "cpf_obrigatorio",
+            },
+        )
+    return None
+
+
 @router.post(
     "/{pedido_id}/cobranca",
     response_model=CobrancaOut,
@@ -141,12 +153,14 @@ def criar_cobranca(
     servico: Servico,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
-) -> CobrancaOut:
+) -> CobrancaOut | JSONResponse:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.cliente_id != usuario.id:
         raise HTTPException(403, "Só o cliente do pedido pode pagar.")
     if pedido.estado is not Estado.ORCAMENTO_ACEITO:
         raise ErroFluxo("O pedido não está esperando pagamento.")
+    if erro_cpf := _exigir_cpf(contexto, usuario.id):
+        return erro_cpf
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     if contrato is None:
         raise ErroFluxo("Pedido sem contrato.", 409)
@@ -210,10 +224,12 @@ def aprovar_aditivo(
     servico: Servico,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
-) -> AditivoAprovadoOut:
+) -> AditivoAprovadoOut | JSONResponse:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.cliente_id != usuario.id:
         raise HTTPException(403, "Só o cliente do pedido pode aprovar aditivo.")
+    if erro_cpf := _exigir_cpf(contexto, usuario.id):
+        return erro_cpf
     aditivo, cobranca = servico.aprovar_aditivo(contexto, pedido, aditivo_id, corpo.meio)
     return AditivoAprovadoOut(aditivo=_aditivo_out(aditivo), cobranca=_cobranca_out(cobranca))
 

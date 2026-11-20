@@ -200,10 +200,13 @@ class RepositorioUsuarios(Protocol):
     def cpf_disponivel(self, cpf: str) -> bool:
         """Verdadeiro se nenhuma conta tem esse CPF (já normalizado em 11 dígitos)."""
 
+    def tem_cpf(self, usuario_id: str) -> bool:
+        """Verdadeiro se a conta já tem CPF gravado."""
+
     def registrar_dados_privados(
         self,
         usuario_id: str,
-        cpf: str,
+        cpf: str | None = None,
         telefone: str | None = None,
         data_nascimento: object | None = None,
     ) -> bool:
@@ -217,7 +220,7 @@ class RepositorioUsuarios(Protocol):
         usuario_id: str,
         email: str,
         nome: str,
-        cpf: str,
+        cpf: str | None = None,
         telefone: str | None = None,
         data_nascimento: object | None = None,
     ) -> bool:

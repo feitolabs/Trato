@@ -62,16 +62,29 @@ class UsuariosPostgres:
             ).fetchone()
         return achado is None
 
+    def tem_cpf(self, usuario_id: str) -> bool:
+        """Verdadeiro se a conta já tem CPF gravado."""
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return False
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select 1 from public.usuarios_privados "
+                "where usuario_id = %s and cpf is not null limit 1",
+                (achado,),
+            ).fetchone()
+        return linha is not None
+
     def registrar_dados_privados(
         self,
         usuario_id: str,
-        cpf: str,
+        cpf: str | None = None,
         telefone: str | None = None,
         data_nascimento: object | None = None,
     ) -> bool:
         """Cria `usuarios_privados` (CPF, telefone e nascimento) uma única vez. Verdadeiro se
-        criou, falso se a pessoa já tinha a linha (só preenche campos nulos). CPF de outra pessoa:
-        `Duplicado`."""
+        criou ou gravou o CPF pela primeira vez, falso se a pessoa já tinha CPF. CPF de outra
+        pessoa: `Duplicado`."""
         achado = como_uuid(usuario_id)
         if achado is None:
             raise DadosInvalidos("Usuário inválido.")
@@ -83,6 +96,14 @@ class UsuariosPostgres:
                 "returning usuario_id",
                 (achado, cpf, telefone, data_nascimento),
             ).fetchone()
+            gravou_cpf = criada is not None and cpf is not None
+            if criada is None and cpf is not None:
+                atualizado = con.execute(
+                    "update public.usuarios_privados set cpf = %s "
+                    "where usuario_id = %s and cpf is null returning usuario_id",
+                    (cpf, achado),
+                ).fetchone()
+                gravou_cpf = atualizado is not None
             if criada is None and telefone:
                 con.execute(
                     "update public.usuarios_privados set telefone = %s "
@@ -95,7 +116,7 @@ class UsuariosPostgres:
                     "where usuario_id = %s and data_nascimento is null",
                     (data_nascimento, achado),
                 )
-        return criada is not None
+        return criada is not None or gravou_cpf
 
     def email_por_identificador(self, digitos: str) -> str | None:
         """Resolve o e-mail de login pelo CPF (11 dígitos) ou telefone (10 a 13 dígitos)."""
@@ -119,7 +140,7 @@ class UsuariosPostgres:
         usuario_id: str,
         email: str,
         nome: str,
-        cpf: str,
+        cpf: str | None = None,
         telefone: str | None = None,
         data_nascimento: object | None = None,
     ) -> bool:

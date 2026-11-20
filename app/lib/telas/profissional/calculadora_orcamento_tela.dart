@@ -13,6 +13,8 @@ import 'servico_orcamento.dart';
 
 export 'servico_orcamento.dart' show ItemMaterial, OrcamentoPronto;
 
+enum ModoOrcamento { porHora, valorFechado }
+
 /// Tela 25: "Seu orçamento". Soma (horas de deslocamento + horas trabalhadas) x valor da hora +
 /// material (só para exibir). O cliente vê o total de horas.
 /// Taxa e líquido NÃO são calculados aqui: vêm de [servico] (regra de dinheiro é do backend).
@@ -35,6 +37,8 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
     this.foraDoEscopoInicial,
     this.observacoesInicial,
     this.edicao = false,
+    this.modoInicial = ModoOrcamento.porHora,
+    this.valorFechadoInicial,
   });
 
   final ServicoOrcamento servico;
@@ -54,6 +58,8 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
 
   /// Verdadeiro quando o profissional está editando uma proposta já enviada.
   final bool edicao;
+  final ModoOrcamento modoInicial;
+  final String? valorFechadoInicial;
 
   /// "Serviços parecidos na região" (mínimo, máximo), vindo do backend. Sem dado, a linha some.
   final (int, int)? faixaRegiaoCentavos;
@@ -71,17 +77,21 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   late final _deslocamento = TextEditingController(text: widget.deslocamentoInicial);
   late final _horas = TextEditingController(text: widget.horasInicial);
   late final _valorHora = TextEditingController(text: widget.valorHoraInicial);
+  late final _valorFechado = TextEditingController(text: widget.valorFechadoInicial);
   late final _diasExecucao = TextEditingController(text: '${widget.prazoExecucaoInicialDias}');
   late final _foraDoEscopo = TextEditingController(text: widget.foraDoEscopoInicial);
   late final _observacoes = TextEditingController(text: widget.observacoesInicial);
   final _keyDeslocamento = GlobalKey();
   final _keyHoras = GlobalKey();
   final _keyValorHora = GlobalKey();
+  final _keyValorFechado = GlobalKey();
   final _keyDias = GlobalKey();
   final _focoDeslocamento = FocusNode();
   final _focoHoras = FocusNode();
   final _focoValorHora = FocusNode();
+  final _focoValorFechado = FocusNode();
   final _focoDias = FocusNode();
+  late ModoOrcamento _modo = widget.modoInicial;
   late int _garantia = widget.garantiaInicialDias;
   late final List<ItemMaterial> _itens = [...widget.itensIniciais];
   bool _materialPorMim = true;
@@ -121,12 +131,14 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _deslocamento.dispose();
     _horas.dispose();
     _valorHora.dispose();
+    _valorFechado.dispose();
     _diasExecucao.dispose();
     _foraDoEscopo.dispose();
     _observacoes.dispose();
     _focoDeslocamento.dispose();
     _focoHoras.dispose();
     _focoValorHora.dispose();
+    _focoValorFechado.dispose();
     _focoDias.dispose();
     super.dispose();
   }
@@ -141,6 +153,10 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   int get _decimosTrabalhadas => Dinheiro.lerDecimosDeHora(_horas.text) ?? 0;
 
   int get _total {
+    if (_modo == ModoOrcamento.valorFechado) {
+      final fechado = Dinheiro.lerCentavos(_valorFechado.text) ?? 0;
+      return fechado + _materialCentavos;
+    }
     final valorHora = Dinheiro.lerCentavos(_valorHora.text) ?? 0;
     return Dinheiro.valorDasHoras(valorHora, _decimosDeslocamento + _decimosTrabalhadas) +
         _materialCentavos;
@@ -200,6 +216,17 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     return null;
   }
 
+  String? _erroValorFechado() {
+    final valor = Dinheiro.lerCentavos(_valorFechado.text);
+    if (valor == null || valor <= 0) {
+      return 'Informe o valor do serviço ou da diária (ex.: 250,00).';
+    }
+    if (valor > Dinheiro.limiteOrcamentoMaximoCentavos) {
+      return 'O valor máximo permitido é ${Dinheiro.formatar(Dinheiro.limiteOrcamentoMaximoCentavos)}.';
+    }
+    return null;
+  }
+
   String? _erroTotal() {
     if (_total > Dinheiro.limiteOrcamentoMaximoCentavos) {
       return 'O total (${Dinheiro.formatar(_total)}) excede o teto permitido de ${Dinheiro.formatar(Dinheiro.limiteOrcamentoMaximoCentavos)}.';
@@ -249,27 +276,39 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   Future<void> _enviar() async {
     if (_enviando) return;
     setState(() => _mostrarErros = true);
-    if (_erroDeslocamento() != null ||
-        _erroHoras() != null ||
-        _erroValorHora() != null ||
-        _erroDiasExecucao() != null ||
-        _erroTotal() != null) {
+    final fechado = _modo == ModoOrcamento.valorFechado;
+    final temErro = fechado
+        ? (_erroValorFechado() != null || _erroDiasExecucao() != null || _erroTotal() != null)
+        : (_erroDeslocamento() != null ||
+            _erroHoras() != null ||
+            _erroValorHora() != null ||
+            _erroDiasExecucao() != null ||
+            _erroTotal() != null);
+    if (temErro) {
       focarPrimeiroErro([
-        EntradaCampoErro(
-          key: _keyDeslocamento,
-          focusNode: _focoDeslocamento,
-          temErro: () => _erroDeslocamento() != null,
-        ),
-        EntradaCampoErro(
-          key: _keyHoras,
-          focusNode: _focoHoras,
-          temErro: () => _erroHoras() != null,
-        ),
-        EntradaCampoErro(
-          key: _keyValorHora,
-          focusNode: _focoValorHora,
-          temErro: () => _erroValorHora() != null,
-        ),
+        if (fechado)
+          EntradaCampoErro(
+            key: _keyValorFechado,
+            focusNode: _focoValorFechado,
+            temErro: () => _erroValorFechado() != null,
+          )
+        else ...[
+          EntradaCampoErro(
+            key: _keyDeslocamento,
+            focusNode: _focoDeslocamento,
+            temErro: () => _erroDeslocamento() != null,
+          ),
+          EntradaCampoErro(
+            key: _keyHoras,
+            focusNode: _focoHoras,
+            temErro: () => _erroHoras() != null,
+          ),
+          EntradaCampoErro(
+            key: _keyValorHora,
+            focusNode: _focoValorHora,
+            temErro: () => _erroValorHora() != null,
+          ),
+        ],
         EntradaCampoErro(
           key: _keyDias,
           focusNode: _focoDias,
@@ -279,15 +318,16 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       return;
     }
     final pronto = OrcamentoPronto(
-      decimosDeslocamento: _decimosDeslocamento,
-      decimosDeHora: Dinheiro.lerDecimosDeHora(_horas.text)!,
-      valorHoraCentavos: Dinheiro.lerCentavos(_valorHora.text)!,
+      decimosDeslocamento: fechado ? 0 : _decimosDeslocamento,
+      decimosDeHora: fechado ? 0 : Dinheiro.lerDecimosDeHora(_horas.text)!,
+      valorHoraCentavos: fechado ? 0 : Dinheiro.lerCentavos(_valorHora.text)!,
       garantiaDias: _garantia,
       prazoExecucaoDias: int.parse(_diasExecucao.text.trim()),
       itens: List.unmodifiable(_itens),
       materialPorMim: _materialPorMim,
       pedirSinalMaterial: _materialPorMim && _pedirSinal,
       totalCentavos: _total,
+      valorFechadoCentavos: fechado ? Dinheiro.lerCentavos(_valorFechado.text)! : null,
       foraDoEscopo: _foraDoEscopo.text.trim().isEmpty ? null : _foraDoEscopo.text.trim(),
       observacoes: _observacoes.text.trim().isEmpty ? null : _observacoes.text.trim(),
     );
@@ -335,71 +375,117 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           widget.edicao ? 'Editar orçamento' : 'Seu orçamento',
           style: TipografiaTrato.tituloGrande,
         ),
-        const SizedBox(height: EspacosTrato.x5),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: EspacosTrato.x4),
+        Wrap(
+          spacing: EspacosTrato.x2,
+          runSpacing: EspacosTrato.x2,
           children: [
-            Expanded(
-              child: KeyedSubtree(
-                key: _keyDeslocamento,
-                child: CampoTrato(
-                  rotulo: 'Horas de deslocamento',
-                  controlador: _deslocamento,
-                  foco: _focoDeslocamento,
-                  sufixo: 'h',
-                  teclado: const TextInputType.numberWithOptions(decimal: true),
-                  formatadores: _formatadoresDeslocamento,
-                  aoMudar: (_) => _mudou(),
-                  erro: _mostrarErros ? _erroDeslocamento() : null,
-                ),
-              ),
+            ChoiceChip(
+              label: const Text('Valor fechado / diária'),
+              selected: _modo == ModoOrcamento.valorFechado,
+              onSelected: (_) {
+                setState(() => _modo = ModoOrcamento.valorFechado);
+                _atualizarResumo();
+              },
             ),
-            const SizedBox(width: EspacosTrato.x4),
-            Expanded(
-              child: KeyedSubtree(
-                key: _keyHoras,
-                child: CampoTrato(
-                  rotulo: 'Horas trabalhadas',
-                  controlador: _horas,
-                  foco: _focoHoras,
-                  sufixo: 'h',
-                  teclado: const TextInputType.numberWithOptions(decimal: true),
-                  formatadores: _formatadoresHoras,
-                  aoMudar: (_) => _mudou(),
-                  erro: _mostrarErros ? _erroHoras() : null,
-                ),
-              ),
+            ChoiceChip(
+              label: const Text('Por hora + deslocamento'),
+              selected: _modo == ModoOrcamento.porHora,
+              onSelected: (_) {
+                setState(() => _modo = ModoOrcamento.porHora);
+                _atualizarResumo();
+              },
             ),
           ],
         ),
         const SizedBox(height: EspacosTrato.x4),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: KeyedSubtree(
-                key: _keyValorHora,
-                child: CampoTrato(
-                  rotulo: 'Valor da hora',
-                  controlador: _valorHora,
-                  foco: _focoValorHora,
-                  prefixo: 'R\$ ',
-                  teclado: const TextInputType.numberWithOptions(decimal: true),
-                  formatadores: _formatadoresValorHora,
-                  aoMudar: (_) => _mudou(),
-                  erro: _mostrarErros ? _erroValorHora() : null,
+        if (_modo == ModoOrcamento.valorFechado) ...[
+          KeyedSubtree(
+            key: _keyValorFechado,
+            child: CampoTrato(
+              rotulo: 'Valor do serviço (ou diária)',
+              controlador: _valorFechado,
+              foco: _focoValorFechado,
+              prefixo: 'R\$ ',
+              dica: '250,00',
+              teclado: const TextInputType.numberWithOptions(decimal: true),
+              formatadores: _formatadoresValorHora,
+              aoMudar: (_) => _mudou(),
+              erro: _mostrarErros ? _erroValorFechado() : null,
+            ),
+          ),
+          const SizedBox(height: EspacosTrato.x4),
+          _CampoGarantia(
+            valor: _garantia,
+            opcoes: widget.opcoesGarantiaDias,
+            aoMudar: (dias) => setState(() => _garantia = dias),
+          ),
+        ] else ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: KeyedSubtree(
+                  key: _keyDeslocamento,
+                  child: CampoTrato(
+                    rotulo: 'Horas de deslocamento',
+                    controlador: _deslocamento,
+                    foco: _focoDeslocamento,
+                    sufixo: 'h',
+                    teclado: const TextInputType.numberWithOptions(decimal: true),
+                    formatadores: _formatadoresDeslocamento,
+                    aoMudar: (_) => _mudou(),
+                    erro: _mostrarErros ? _erroDeslocamento() : null,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: EspacosTrato.x4),
-            Expanded(
-                child: _CampoGarantia(
-              valor: _garantia,
-              opcoes: widget.opcoesGarantiaDias,
-              aoMudar: (dias) => setState(() => _garantia = dias),
-            )),
-          ],
-        ),
+              const SizedBox(width: EspacosTrato.x4),
+              Expanded(
+                child: KeyedSubtree(
+                  key: _keyHoras,
+                  child: CampoTrato(
+                    rotulo: 'Horas trabalhadas',
+                    controlador: _horas,
+                    foco: _focoHoras,
+                    sufixo: 'h',
+                    teclado: const TextInputType.numberWithOptions(decimal: true),
+                    formatadores: _formatadoresHoras,
+                    aoMudar: (_) => _mudou(),
+                    erro: _mostrarErros ? _erroHoras() : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: EspacosTrato.x4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: KeyedSubtree(
+                  key: _keyValorHora,
+                  child: CampoTrato(
+                    rotulo: 'Valor da hora',
+                    controlador: _valorHora,
+                    foco: _focoValorHora,
+                    prefixo: 'R\$ ',
+                    teclado: const TextInputType.numberWithOptions(decimal: true),
+                    formatadores: _formatadoresValorHora,
+                    aoMudar: (_) => _mudou(),
+                    erro: _mostrarErros ? _erroValorHora() : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: EspacosTrato.x4),
+              Expanded(
+                  child: _CampoGarantia(
+                valor: _garantia,
+                opcoes: widget.opcoesGarantiaDias,
+                aoMudar: (dias) => setState(() => _garantia = dias),
+              )),
+            ],
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x4),
         KeyedSubtree(
           key: _keyDias,
@@ -417,13 +503,15 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             erro: _mostrarErros ? _erroDiasExecucao() : null,
           ),
         ),
-        const SizedBox(height: EspacosTrato.x3),
-        Text(
-          'Total de horas: ${Dinheiro.formatarHoras(_decimosDeslocamento + _decimosTrabalhadas)} '
-          '(o cliente vê esse total). O deslocamento é cobrado pelo mesmo valor da hora.',
-          key: const ValueKey('total-horas'),
-          style: TipografiaTrato.legenda,
-        ),
+        if (_modo == ModoOrcamento.porHora) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Text(
+            'Total de horas: ${Dinheiro.formatarHoras(_decimosDeslocamento + _decimosTrabalhadas)} '
+            '(o cliente vê esse total). O deslocamento é cobrado pelo mesmo valor da hora.',
+            key: const ValueKey('total-horas'),
+            style: TipografiaTrato.legenda,
+          ),
+        ],
         if (faixa != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           Text(
@@ -613,7 +701,8 @@ class _CartaoMaterial extends StatelessWidget {
             InkWell(
               onTap: () => aoMarcarSinal(!pedirSinal),
               borderRadius: BorderRadius.circular(EspacosTrato.raioPequeno),
-              child: MergeSemantics(child: Row(
+              child: MergeSemantics(
+                  child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Checkbox(value: pedirSinal, onChanged: (v) => aoMarcarSinal(v ?? false)),

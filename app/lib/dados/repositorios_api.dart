@@ -1128,8 +1128,30 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
 
   /// `GET /v1/pedidos/{id}/pagamento`: valor do contrato e meios disponíveis (`pix`, `cartao`).
   @override
-  Future<DadosPagamento> dados(String pedidoId) async =>
-      _dadosDeMapa(pedidoId, _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento')));
+  Future<DadosPagamento> dados(String pedidoId) async {
+    final mapa = _mapa(await _api.get('/v1/pedidos/$pedidoId/pagamento'));
+    var cpfCadastrado = true;
+    try {
+      final me = _mapa(await _api.get('/v1/me'));
+      if (me.containsKey('cpf_cadastrado')) {
+        cpfCadastrado = me['cpf_cadastrado'] != false;
+      }
+    } on Object {
+      cpfCadastrado = true;
+    }
+    return _dadosDeMapa(pedidoId, mapa).copiarCom(cpfCadastrado: cpfCadastrado);
+  }
+
+  @override
+  Future<void> cadastrarCpf(String cpf, String nascimentoIso) async {
+    await _api.post(
+      '/v1/me/cpf',
+      corpo: {
+        'cpf': cpf.replaceAll(RegExp(r'\D'), ''),
+        'data_nascimento': nascimentoIso,
+      },
+    );
+  }
 
   @override
   Future<DadosPagamento> recalcular(
@@ -2483,6 +2505,14 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
     }
 
     final itens = <Map<String, dynamic>>[];
+    if (pronto.valorFechadoCentavos != null && pronto.valorFechadoCentavos! > 0) {
+      itens.add({
+        'tipo': 'outro',
+        'descricao': 'Serviço (valor fechado / diária)',
+        'quantidade': 1,
+        'valor_unitario_centavos': pronto.valorFechadoCentavos!,
+      });
+    }
     // Por hora: a quantidade é o número de horas e o valor unitário é o valor da hora. Assim o
     // cliente vê as horas (deslocamento e trabalhadas) e o backend soma o total.
     if (pronto.decimosDeslocamento > 0 && pronto.valorHoraCentavos > 0) {

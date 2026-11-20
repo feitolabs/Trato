@@ -6,7 +6,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../agenda/modelos.dart' show EstadoAgendamento;
+import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
+import '../auth/criar_conta_tela.dart';
+import '../pedido_novo/modelos.dart' show RascunhoPedido;
 import '../../dados/erros.dart';
 import '../../dados/config_publica.dart';
 import '../../dados/relogio_de_atualizacao.dart';
@@ -186,6 +189,14 @@ abstract final class RotasTrato {
   /// Câmera, GPS e envio de arquivos. O `main.dart` liga o real.
   static late DispositivoTrato dispositivo;
 
+  /// Rascunho preenchido antes do login/cadastro, concluído logo após autenticar.
+  static RascunhoPedido? rascunhoPendente;
+
+  /// Verdadeiro quando o usuário pulou o onboarding sem entrar, ou em modo API sem sessão.
+  static bool modoVisitante = false;
+
+  static bool get emModoVisitante => modoVisitante || (repos.modoApi && !temSessao);
+
   /// Nota de materiais, aditivo e disputa vêm sempre da API (`repos`).
   static ServicoNotaMaterial get servicoNota => repos.notaMaterial!;
   static ServicoAditivo get servicoAditivo => repos.aditivo!;
@@ -273,14 +284,59 @@ abstract final class RotasTrato {
 
   /// Depois do login ou do cadastro de cliente: casca do cliente, sem voltar às telas de acesso.
   static void irParaCliente(BuildContext context) {
+    final pendente = rascunhoPendente;
+    if (pendente != null) {
+      rascunhoPendente = null;
+      unawaited(_enviarRascunhoPendente(context, pendente));
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
       (rota) => false,
     );
   }
 
+  static Future<void> _enviarRascunhoPendente(
+    BuildContext context,
+    RascunhoPedido rascunho,
+  ) async {
+    try {
+      await repos.pedidos.criar(rascunho);
+      pedidosMudaram.value++;
+      if (!context.mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (ctxSucesso) => SucessoAcaoTela(
+            titulo: 'Pedido enviado!',
+            subtitulo:
+                'Os profissionais da sua região foram notificados e você já pode acompanhar os orçamentos.',
+            textoBotaoPrimario: 'Ver pedidos',
+            aoTocarPrimario: () => Navigator.of(ctxSucesso).pushAndRemoveUntil(
+              MaterialPageRoute<void>(builder: (_) => const CascaClienteTela(abaInicial: 2)),
+              (rota) => false,
+            ),
+            textoBotaoSecundario: 'Voltar ao início',
+            aoVoltarInicio: () => Navigator.of(ctxSucesso).pushAndRemoveUntil(
+              MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
+              (rota) => false,
+            ),
+          ),
+        ),
+        (rota) => false,
+      );
+    } on Object catch (erro) {
+      if (!context.mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
+        (rota) => false,
+      );
+      _aviso(context, erro);
+    }
+  }
+
   /// Depois do cadastro (com sessão aberta): cliente vai à casca; profissional ao cadastro dele.
   static void irParaDepoisDoCadastro(BuildContext context, PerfilUso perfil) {
+    modoVisitante = false;
     if (perfil == PerfilUso.cliente) {
       irParaCliente(context);
     } else {
@@ -290,6 +346,7 @@ abstract final class RotasTrato {
 
   /// Entra na casca certa para o perfil do usuário: profissional ou cliente (padrão).
   static void irParaInicio(BuildContext context, [SessaoAuth? quem]) {
+    modoVisitante = false;
     final s = quem ?? ServicoAuthPadrao.atual.sessaoAtual;
     if (s != null && s.ehProfissional) {
       if (repos.modoApi) {
@@ -599,7 +656,9 @@ abstract final class RotasTrato {
         construir: (context, dados) => InicioTela(
           aoBuscar: aoBuscar,
           dados: dados,
-          aoAbrirNotificacoes: () => abrirNotificacoes(context),
+          aoAbrirNotificacoes: temSessao
+              ? () => abrirNotificacoes(context)
+              : () => _abrir<void>(context, const LoginTela()),
           aoNovoPedido: () => abrirNovoPedido(context),
           aoAbrirPedidoEmAndamento: (p) => abrirServico(context, p.pedidoId ?? _semId),
           aoAbrirCategoria: (c) => abrirCategoria(context, c),
@@ -610,6 +669,10 @@ abstract final class RotasTrato {
       );
 
   static Future<DadosInicio> _carregarInicio() async {
+    if (emModoVisitante) {
+      final categorias = await repos.catalogo.categorias();
+      return DadosInicio(nome: '', categorias: categorias);
+    }
     // Em paralelo: a tela espera a mais lenta, não a soma das chamadas.
     _atualizarMensagensNaoLidasEmSegundoPlano(profissional: false);
     final ((perfil, categorias), (andamento, (recentes, naoLidas))) = await emParalelo2(
@@ -1582,65 +1645,107 @@ abstract final class RotasTrato {
 
   // --- Cliente: abas -----------------------------------------------------------------
 
-  /// Aba "Perfil" da casca do cliente.
-  static Widget abaPerfil() => Carregador<PerfilCliente>(
-        carregar: repos.perfil.carregar,
-        atualizarQuando: pedidosMudaram,
-        construir: (context, perfil) => PerfilClienteTela(
-          perfil: _soNoPerfil(perfil),
-          aoCapturarFotoPerfil: _fotografarPerfil,
-          aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: false),
-          aoTocarItem: (acao) {
-            switch (acao) {
-              case AcaoPerfil.usarComoProfissional:
-                irParaProfissional(context);
-              case AcaoPerfil.notificacoes:
-                abrirNotificacoes(context);
-              case AcaoPerfil.termos:
-                abrirTermos(context);
-              case AcaoPerfil.meusDados:
-                _abrirPrivacidade(context);
-              case AcaoPerfil.centralAjuda:
-                _abrir<void>(context, _telaAjuda(context));
-              case AcaoPerfil.dadosPessoais:
-                _abrir<void>(
-                  context,
-                  DadosPessoaisTela(
-                    servico: _conta,
-                    servicoCep: repos.cep,
-                    aoAlterarCredenciais: () => _abrir<void>(context, const SegurancaContaTela()),
-                  ),
-                );
-              case AcaoPerfil.enderecos:
-                _abrir<void>(context, EnderecosTela(servico: _conta, servicoCep: repos.cep));
-              case AcaoPerfil.favoritos:
-                _abrir<void>(
-                  context,
-                  FavoritosTela(
-                    servico: _conta,
-                    aoAbrir: (f) => abrirPerfil(
-                      context,
-                      Profissional(
-                        id: f.profissionalId,
-                        nome: f.nome ?? 'Profissional',
-                        iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
-                        verificacao: '',
-                        especialidade: '',
-                        servicosConcluidos: f.servicos ?? 0,
-                        nota: f.nota ?? 0,
-                        distanciaKm: 0,
-                      ),
+  static Widget _telaVisitante({
+    required String titulo,
+    required String texto,
+  }) =>
+      Builder(
+        builder: (context) => Scaffold(
+          body: SafeArea(
+            child: ConteudoResponsivo(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(titulo, style: TipografiaTrato.titulo, textAlign: TextAlign.center),
+                    const SizedBox(height: EspacosTrato.x2),
+                    Text(
+                      texto,
+                      textAlign: TextAlign.center,
+                      style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
                     ),
-                  ),
-                );
-              case AcaoPerfil.contatosConfianca:
-                _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
-              default:
-                break;
-            }
-          },
+                    const SizedBox(height: EspacosTrato.x5),
+                    BotaoPrimario(
+                      texto: 'Criar conta',
+                      aoTocar: () => _abrir<void>(context, const CriarContaTela()),
+                    ),
+                    const SizedBox(height: EspacosTrato.x2),
+                    BotaoSecundario(
+                      texto: 'Já tenho conta',
+                      aoTocar: () => _abrir<void>(context, const LoginTela()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       );
+
+  /// Aba "Perfil" da casca do cliente.
+  static Widget abaPerfil() => emModoVisitante
+      ? _telaVisitante(
+          titulo: 'Entre na sua conta',
+          texto: 'Crie uma conta ou entre para gerenciar seus dados e endereços.',
+        )
+      : Carregador<PerfilCliente>(
+          carregar: repos.perfil.carregar,
+          atualizarQuando: pedidosMudaram,
+          construir: (context, perfil) => PerfilClienteTela(
+            perfil: _soNoPerfil(perfil),
+            aoCapturarFotoPerfil: _fotografarPerfil,
+            aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: false),
+            aoTocarItem: (acao) {
+              switch (acao) {
+                case AcaoPerfil.usarComoProfissional:
+                  irParaProfissional(context);
+                case AcaoPerfil.notificacoes:
+                  abrirNotificacoes(context);
+                case AcaoPerfil.termos:
+                  abrirTermos(context);
+                case AcaoPerfil.meusDados:
+                  _abrirPrivacidade(context);
+                case AcaoPerfil.centralAjuda:
+                  _abrir<void>(context, _telaAjuda(context));
+                case AcaoPerfil.dadosPessoais:
+                  _abrir<void>(
+                    context,
+                    DadosPessoaisTela(
+                      servico: _conta,
+                      servicoCep: repos.cep,
+                      aoAlterarCredenciais: () => _abrir<void>(context, const SegurancaContaTela()),
+                    ),
+                  );
+                case AcaoPerfil.enderecos:
+                  _abrir<void>(context, EnderecosTela(servico: _conta, servicoCep: repos.cep));
+                case AcaoPerfil.favoritos:
+                  _abrir<void>(
+                    context,
+                    FavoritosTela(
+                      servico: _conta,
+                      aoAbrir: (f) => abrirPerfil(
+                        context,
+                        Profissional(
+                          id: f.profissionalId,
+                          nome: f.nome ?? 'Profissional',
+                          iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
+                          verificacao: '',
+                          especialidade: '',
+                          servicosConcluidos: f.servicos ?? 0,
+                          nota: f.nota ?? 0,
+                          distanciaKm: 0,
+                        ),
+                      ),
+                    ),
+                  );
+                case AcaoPerfil.contatosConfianca:
+                  _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
+                default:
+                  break;
+              }
+            },
+          ),
+        );
 
   /// Central de privacidade (LGPD): exportar e excluir a conta. Igual para cliente e profissional,
   /// porque a conta é uma só.
@@ -1789,15 +1894,20 @@ abstract final class RotasTrato {
       );
 
   /// Aba "Mensagens" da casca do cliente: lista de conversas, cada uma abre o chat do pedido.
-  static Widget abaMensagens() => Builder(
-        builder: (context) => MensagensTela(
-          servico: _servicoMensagens,
-          atualizarACada: _intervalo,
-          atualizarQuando: pedidosMudaram,
-          aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
-          aoAbrirConversa: (conversa) => _abrirConversa(context, conversa, _servicoMensagens),
-        ),
-      );
+  static Widget abaMensagens() => emModoVisitante
+      ? _telaVisitante(
+          titulo: 'Suas conversas',
+          texto: 'Entre ou crie uma conta para conversar com os profissionais.',
+        )
+      : Builder(
+          builder: (context) => MensagensTela(
+            servico: _servicoMensagens,
+            atualizarACada: _intervalo,
+            atualizarQuando: pedidosMudaram,
+            aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
+            aoAbrirConversa: (conversa) => _abrirConversa(context, conversa, _servicoMensagens),
+          ),
+        );
 
   /// Abre o chat e, ao voltar, marca a conversa como lida e atualiza a lista na hora (o contador
   /// de não lidas não pode ficar parado depois de ler).
@@ -1873,30 +1983,35 @@ abstract final class RotasTrato {
       );
 
   /// Aba "Pedidos" da casca do cliente.
-  static Widget abaPedidos() => Builder(
-        builder: (context) => Scaffold(
-          body: Carregador<PedidosDoCliente>(
-            carregar: repos.pedidos.listar,
-            atualizarQuando: pedidosMudaram,
-            atualizarACada: _intervalo,
-            vazio: (p) => p.vazio,
-            tituloVazio: 'Você ainda não fez pedidos',
-            textoVazio: 'Toque em "Novo pedido" para pedir um serviço.',
-            construir: (_, p) => SeusPedidosTela(
-              emAndamento: p.emAndamento,
-              finalizados: p.finalizados,
-              aoAbrirPedido: (pedido) => abrirPedido(context, pedido),
+  static Widget abaPedidos() => emModoVisitante
+      ? _telaVisitante(
+          titulo: 'Seus pedidos',
+          texto: 'Entre ou crie uma conta para acompanhar seus pedidos e orçamentos.',
+        )
+      : Builder(
+          builder: (context) => Scaffold(
+            body: Carregador<PedidosDoCliente>(
+              carregar: repos.pedidos.listar,
+              atualizarQuando: pedidosMudaram,
+              atualizarACada: _intervalo,
+              vazio: (p) => p.vazio,
+              tituloVazio: 'Você ainda não fez pedidos',
+              textoVazio: 'Toque em "Novo pedido" para pedir um serviço.',
+              construir: (_, p) => SeusPedidosTela(
+                emAndamento: p.emAndamento,
+                finalizados: p.finalizados,
+                aoAbrirPedido: (pedido) => abrirPedido(context, pedido),
+              ),
+            ),
+            floatingActionButton: FloatingActionButton.extended(
+              backgroundColor: CoresTrato.petroleo,
+              foregroundColor: CoresTrato.creme,
+              icon: const Icon(Icons.add),
+              label: const Text('Novo pedido'),
+              onPressed: () => abrirNovoPedido(context),
             ),
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            backgroundColor: CoresTrato.petroleo,
-            foregroundColor: CoresTrato.creme,
-            icon: const Icon(Icons.add),
-            label: const Text('Novo pedido'),
-            onPressed: () => abrirNovoPedido(context),
-          ),
-        ),
-      );
+        );
 
   // --- Cliente: pedido ---------------------------------------------------------------
 
@@ -1905,7 +2020,7 @@ abstract final class RotasTrato {
   ) =>
       emParalelo2(
         repos.catalogo.formulario(categoriaId),
-        repos.conta != null
+        (temSessao && repos.conta != null)
             ? repos.conta!.enderecos().catchError((Object _) => <EnderecoSalvo>[])
             : Future.value(const <EnderecoSalvo>[]),
       );
@@ -1932,6 +2047,47 @@ abstract final class RotasTrato {
           ),
         ),
         aoEnviar: (rascunho) async {
+          if (emModoVisitante || !temSessao) {
+            rascunhoPendente = rascunho;
+            showModalBottomSheet<void>(
+              context: context,
+              builder: (ctx) => SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(EspacosTrato.x5),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Falta pouco para enviar seu pedido', style: TipografiaTrato.titulo),
+                      const SizedBox(height: EspacosTrato.x2),
+                      Text(
+                        'Crie sua conta ou entre para receber orçamentos dos profissionais.',
+                        style: TipografiaTrato.corpoPequeno
+                            .copyWith(color: CoresTrato.textoSecundario),
+                      ),
+                      const SizedBox(height: EspacosTrato.x4),
+                      BotaoPrimario(
+                        texto: 'Criar conta',
+                        aoTocar: () {
+                          Navigator.of(ctx).pop();
+                          _abrir<void>(context, const CriarContaTela());
+                        },
+                      ),
+                      const SizedBox(height: EspacosTrato.x2),
+                      BotaoSecundario(
+                        texto: 'Já tenho conta',
+                        aoTocar: () {
+                          Navigator.of(ctx).pop();
+                          _abrir<void>(context, const LoginTela());
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+            return;
+          }
           if (enviandoPedido) return;
           enviandoPedido = true;
           try {
@@ -2176,21 +2332,28 @@ abstract final class RotasTrato {
           usarMoedas = usar;
           return repos.pagamento.recalcular(pedidoId, cupom: cupom, usarMoedas: usar);
         },
+        aoCadastrarCpf: repos.pagamento.cadastrarCpf,
         aoPagarDetalhado: (metodo, parcelas, cupom) async {
           if (iniciandoPagamento) return;
           iniciandoPagamento = true;
           try {
             Cobranca? cobranca;
-            final ok = await _tentar(
-              context,
-              () async => cobranca = await repos.pagamento.criarCobranca(
+            var ok = false;
+            try {
+              cobranca = await repos.pagamento.criarCobranca(
                 pedidoId,
                 metodo,
                 parcelas: parcelas,
                 cupom: cupom,
                 usarMoedas: usarMoedas,
-              ),
-            );
+              );
+              ok = true;
+            } on ErroTrato catch (erro) {
+              if (erro.codigo == 'cpf_obrigatorio') rethrow;
+              if (context.mounted) _aviso(context, erro);
+            } on Object catch (erro) {
+              if (context.mounted) _aviso(context, erro);
+            }
             if (!ok || !context.mounted) return;
             // Cartão: a folha do provedor lista os cartões salvos e cadastra um novo. O app só
             // abre a folha; quem diz "pago" continua sendo o backend.

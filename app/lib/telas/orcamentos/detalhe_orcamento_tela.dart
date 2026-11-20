@@ -73,8 +73,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-              content: Text(
-                  'Marque "Li o escopo, a garantia e as regras" para aceitar.')),
+              content: Text('Marque "Li o escopo, a garantia e as regras" para aceitar.')),
         );
       return;
     }
@@ -90,12 +89,10 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   Widget build(BuildContext context) {
     final o = widget.orcamento;
     final d = o.detalhe!; // a tela só abre para orçamento com detalhe
-    final secundario = TipografiaTrato.corpoPequeno
-        .copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     return EstruturaPedido(
       scrollController: _scroll,
-      tituloBarra:
-          widget.contrato ? 'Contrato do serviço' : 'Válido até ${d.validoAte}',
+      tituloBarra: widget.contrato ? 'Contrato do serviço' : 'Válido até ${d.validoAte}',
       acoesBarra: [
         if (widget.aoConversar != null) ...[
           TextButton.icon(
@@ -103,8 +100,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             icon: const Icon(Icons.chat_bubble_outline, size: EspacosTrato.x5),
             label: const Text('Conversar'),
             style: TextButton.styleFrom(
-              textStyle: TipografiaTrato.corpoForte
-                  .copyWith(decoration: TextDecoration.none),
+              textStyle: TipografiaTrato.corpoForte.copyWith(decoration: TextDecoration.none),
             ),
           ),
           const SizedBox(width: EspacosTrato.x2),
@@ -116,8 +112,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 BotaoPrimario(
-                  texto:
-                      'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
+                  texto: 'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
                   carregando: _aceitando,
                   aoTocar: _aceitando ? null : _aceitar,
                 ),
@@ -141,8 +136,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            AvatarDeUsuario(
-                iniciais: o.iniciais, usuarioId: o.profissionalId, tamanho: 64),
+            AvatarDeUsuario(iniciais: o.iniciais, usuarioId: o.profissionalId, tamanho: 64),
             const SizedBox(width: EspacosTrato.x4),
             Expanded(
               child: Column(
@@ -153,8 +147,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (o.verificacao.isNotEmpty)
-                        SeloVerificacao(o.verificacao),
+                      if (o.verificacao.isNotEmpty) SeloVerificacao(o.verificacao),
                       Text(
                         '${o.verificacao.isNotEmpty ? ' · ' : ''}'
                         '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
@@ -182,9 +175,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               Text('O que está incluso', style: TipografiaTrato.tituloOpcao),
               const SizedBox(height: EspacosTrato.x4),
               for (final item in d.itens) ...[
-                LinhaValor(
-                    rotulo: item.descricao,
-                    valor: formatarReais(item.centavos)),
+                LinhaValor(rotulo: item.descricao, valor: formatarReais(item.centavos)),
                 if (contaDoItem(item) case final conta?)
                   Padding(
                     padding: const EdgeInsets.only(top: EspacosTrato.x1),
@@ -198,8 +189,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   rotulo: 'Total de horas',
                   valor: d.totalHoras,
                 ),
-                if (d.horasDeslocamento.isNotEmpty &&
-                    d.horasTrabalhadas.isNotEmpty)
+                if (d.horasDeslocamento.isNotEmpty && d.horasTrabalhadas.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: EspacosTrato.x1),
                     child: Text(
@@ -211,10 +201,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               ],
               const Divider(),
               const SizedBox(height: EspacosTrato.x3),
-              LinhaValor(
-                  rotulo: 'Total',
-                  valor: formatarReais(o.totalCentavos),
-                  destaque: true),
+              LinhaValor(rotulo: 'Total', valor: formatarReais(o.totalCentavos), destaque: true),
               const SizedBox(height: EspacosTrato.x3),
               Text(d.notaMaterial, style: secundario),
             ],
@@ -287,9 +274,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Checkbox(
-                            value: _leu,
-                            onChanged: (v) => setState(() => _leu = v ?? false)),
+                        Checkbox(value: _leu, onChanged: (v) => setState(() => _leu = v ?? false)),
                         const SizedBox(width: EspacosTrato.x2),
                         Expanded(
                           child: Padding(
@@ -305,11 +290,17 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                     ),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(left: EspacosTrato.x3, top: EspacosTrato.x1),
+                  child: Text(
+                    'Cancelar antes de o serviço começar não gera cobrança do profissional.',
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  ),
+                ),
                 if (_tentou && !_leu)
                   Text(
                     'Marque que leu para aceitar o orçamento.',
-                    style: TipografiaTrato.legenda
-                        .copyWith(color: CoresTrato.vermelhoTexto),
+                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
                   ),
               ],
             ),
@@ -321,8 +312,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
 }
 
 class _BlocoRegra extends StatelessWidget {
-  const _BlocoRegra(
-      {required this.icone, required this.titulo, required this.texto});
+  const _BlocoRegra({required this.icone, required this.titulo, required this.texto});
 
   final IconData icone;
   final String titulo;
@@ -345,8 +335,7 @@ class _BlocoRegra extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   texto,
-                  style: TipografiaTrato.corpoPequeno
-                      .copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                 ),
               ],
             ),
@@ -363,9 +352,7 @@ String? contaDoItem(ItemOrcamento item) {
   final q = item.quantidade;
   final u = item.unitarioCentavos;
   if (q == null || u == null || q <= 0) return null;
-  final qtd = q == q.roundToDouble()
-      ? q.toInt().toString()
-      : q.toString().replaceAll('.', ',');
+  final qtd = q == q.roundToDouble() ? q.toInt().toString() : q.toString().replaceAll('.', ',');
   if (item.porHora) return '$qtd h × ${formatarReais(u)} por hora';
   if (q == 1) return null;
   return '$qtd × ${formatarReais(u)}';
@@ -373,8 +360,7 @@ String? contaDoItem(ItemOrcamento item) {
 
 /// O contrato além do orçamento: o que foi pedido, as partes, quando e onde, pagamento e regras.
 class _SecoesDoContrato extends StatelessWidget {
-  const _SecoesDoContrato(
-      {required this.dados, required this.profissional, this.aoVerTermos});
+  const _SecoesDoContrato({required this.dados, required this.profissional, this.aoVerTermos});
 
   final DadosContrato dados;
   final String profissional;
@@ -382,8 +368,7 @@ class _SecoesDoContrato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno
-        .copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     Widget secao(String titulo, List<Widget> filhos, {Key? key}) => Padding(
           padding: const EdgeInsets.only(top: EspacosTrato.x4),
           child: CartaoTrato(
@@ -417,8 +402,7 @@ class _SecoesDoContrato extends StatelessWidget {
             const SizedBox(height: EspacosTrato.x1),
             Text(dados.descricao, style: TipografiaTrato.corpo),
           ],
-          if (dados.respostas.isNotEmpty)
-            const SizedBox(height: EspacosTrato.x3),
+          if (dados.respostas.isNotEmpty) const SizedBox(height: EspacosTrato.x3),
           for (final r in dados.respostas) linha(r.rotulo, r.valor),
         ]),
         secao('Partes', key: const ValueKey('contrato-partes'), [
@@ -459,8 +443,7 @@ class _SecoesDoContrato extends StatelessWidget {
             'Cancelamento e demais regras seguem os Termos de uso do Trato.',
             style: TipografiaTrato.corpo,
           ),
-          if (aoVerTermos != null)
-            BotaoLink(texto: 'Ver termos de uso', aoTocar: aoVerTermos!),
+          if (aoVerTermos != null) BotaoLink(texto: 'Ver termos de uso', aoTocar: aoVerTermos!),
         ]),
       ],
     );

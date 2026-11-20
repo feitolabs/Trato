@@ -2,7 +2,20 @@
 
 from __future__ import annotations
 
-from conftest import cab
+from contextlib import contextmanager
+from datetime import date, timedelta
+from uuid import uuid4
+
+from conftest import AGORA, CLIENTE, PROFISSIONAL, cab
+
+from trato.api.repositorios import Orcamento
+from trato.api.rotas_pagamento import instalar_pagamento
+from trato.pagamentos.memoria import AditivosEmMemoria, CobrancasEmMemoria
+from trato.pagamentos.modelos import ConfigPagamento
+from trato.pagamentos.orquestrador import ServicoPagamento
+from trato.pagamentos.provedor import ProvedorFake
+from trato.pedidos.estados import Estado as E
+from trato.persistencia.usuarios import UsuariosPostgres
 
 CPF = "123.456.789-09"
 CPF_DIGITOS = "12345678909"
@@ -81,3 +94,133 @@ def test_vincular_e_resolver_identificador_por_cpf_e_telefone(amb):
     )
     assert r_inexistente.status_code == 200
     assert r_inexistente.json() == {"email": None}
+
+
+def test_vincular_sem_cpf_e_perfil_expoe_cpf_cadastrado(amb):
+    r_vinc = amb.cliente.post(
+        "/v1/cadastro/vincular",
+        json={
+            "usuario_id": "cli-sem-cpf",
+            "email": "semcpf@email.com",
+            "nome": "Joana",
+            "telefone": "+5531987650000",
+        },
+    )
+    assert r_vinc.status_code == 204
+    assert amb.contexto.usuarios.tem_cpf("cli-sem-cpf") is False
+
+    # Perfil /v1/me mostra cpf_cadastrado=False sem vazar CPF, e vira True após POST /v1/me/cpf.
+    me_antes = amb.cliente.get("/v1/me", headers=cab("t-cliente"))
+    assert me_antes.status_code == 200
+    assert me_antes.json()["cpf_cadastrado"] is False
+    assert "cpf" not in me_antes.json()
+
+    nasc_ok = (date.today() - timedelta(days=365 * 25)).isoformat()
+    menor = (date.today() - timedelta(days=365 * 17)).isoformat()
+    assert (
+        amb.cliente.post(
+            "/v1/me/cpf",
+            json={"cpf": CPF, "data_nascimento": menor},
+            headers=cab("t-cliente"),
+        ).status_code
+        == 422
+    )
+    r_ok = amb.cliente.post(
+        "/v1/me/cpf",
+        json={"cpf": CPF, "data_nascimento": nasc_ok},
+        headers=cab("t-cliente"),
+    )
+    assert r_ok.status_code == 204
+
+    me_depois = amb.cliente.get("/v1/me", headers=cab("t-cliente"))
+    assert me_depois.status_code == 200
+    assert me_depois.json()["cpf_cadastrado"] is True
+    assert "cpf" not in me_depois.json()
+
+    # 1 CPF por conta: outra conta recebe 409.
+    r_dup = amb.cliente.post(
+        "/v1/me/cpf",
+        json={"cpf": CPF, "data_nascimento": nasc_ok},
+        headers=cab("t-outro-cliente"),
+    )
+    assert r_dup.status_code == 409
+
+
+def test_pagamento_bloqueado_sem_cpf_e_liberado_apos_post_me_cpf(amb):
+    fake = ProvedorFake()
+    servico = ServicoPagamento(
+        fake,
+        lambda: ConfigPagamento(),
+        CobrancasEmMemoria(),
+        AditivosEmMemoria(),
+    )
+    instalar_pagamento(amb.cliente.app, amb.contexto, servico)
+
+    amb.semear_pedido(E.ORCAMENTO_ACEITO, id="ped-sem-cpf", cliente_id=CLIENTE.id)
+    amb.contexto.orcamentos.adicionar(
+        Orcamento("orc-1", "ped-sem-cpf", PROFISSIONAL.id, 100_000, "pintura")
+    )
+
+    # Sem CPF, as duas rotas de cobrança devolvem 422 cpf_obrigatorio.
+    r1 = amb.cliente.post(
+        "/v1/pedidos/ped-sem-cpf/cobranca", json={"meio": "pix"}, headers=cab("t-cliente")
+    )
+    assert r1.status_code == 422
+    assert r1.json() == {
+        "detail": "Informe seu CPF para concluir o pagamento.",
+        "codigo": "cpf_obrigatorio",
+    }
+    r2 = amb.cliente.post(
+        "/v1/contratos/ped-sem-cpf/cobranca", json={"meio": "pix"}, headers=cab("t-cliente")
+    )
+    assert r2.status_code == 422
+    assert r2.json() == {
+        "detail": "Informe seu CPF para concluir o pagamento.",
+        "codigo": "cpf_obrigatorio",
+    }
+
+    # Cadastra CPF via POST /v1/me/cpf e tenta pagar de novo.
+    nasc_ok = (date.today() - timedelta(days=365 * 20)).isoformat()
+    assert (
+        amb.cliente.post(
+            "/v1/me/cpf",
+            json={"cpf": CPF, "data_nascimento": nasc_ok},
+            headers=cab("t-cliente"),
+        ).status_code
+        == 204
+    )
+    ok_ped = amb.cliente.post(
+        "/v1/pedidos/ped-sem-cpf/cobranca", json={"meio": "pix"}, headers=cab("t-cliente")
+    )
+    assert ok_ped.status_code == 201, ok_ped.text
+
+
+def test_postgres_usuarios_tem_cpf_e_preenche_cpf_nulo_depois():
+    uid = str(uuid4())
+    executadas = []
+
+    class Con:
+        def __init__(self, row):
+            self._row = row
+
+        def execute(self, sql, params=()):
+            executadas.append((sql, params))
+            return self
+
+        def fetchone(self):
+            return self._row
+
+    class Banco:
+        def __init__(self, row=None):
+            self._row = row
+
+        @contextmanager
+        def transacao(self):
+            yield Con(self._row)
+
+    assert UsuariosPostgres(Banco(row=None)).tem_cpf(uid) is False
+    assert UsuariosPostgres(Banco(row={"?column?": 1})).tem_cpf(uid) is True
+    assert UsuariosPostgres(Banco(row=None)).registrar_dados_privados(uid, CPF_DIGITOS) is False
+    assert any("set cpf = %s" in sql and "cpf is null" in sql for sql, _ in executadas)
+    # _unused evita lint de AGORA
+    assert AGORA is not None

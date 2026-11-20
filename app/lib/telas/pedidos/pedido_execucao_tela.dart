@@ -72,169 +72,168 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
       children: [
-                    _Topo(numero: pedido.numero, aoTocarSos: widget.aoTocarSos),
-                    const SizedBox(height: EspacosTrato.x3),
-                    Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
-                    const SizedBox(height: EspacosTrato.x3),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: pedido.pagamentoConfirmado
-                          ? const ChipStatus(
-                              texto: 'Pagamento acompanhado no app',
-                              tipo: TipoStatus.info,
-                              icone: Icons.lock_outline,
-                            )
-                          : const ChipStatus(
-                              texto: 'Aguardando o pagamento',
-                              tipo: TipoStatus.alerta,
-                              icone: Icons.schedule,
-                            ),
-                    ),
-                    if (pedido.codigoInicio != null) ...[
-                      const SizedBox(height: EspacosTrato.x4),
-                      CartaoTrato(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Código de início', style: TipografiaTrato.tituloCartao),
-                            const SizedBox(height: EspacosTrato.x2),
-                            Semantics(
-                              label: 'Código de início ${pedido.codigoInicio!.split('').join(' ')}',
-                              child: ExcludeSemantics(
-                                child:
-                                    Text(pedido.codigoInicio!, style: TipografiaTrato.tituloGrande),
-                              ),
-                            ),
-                            const SizedBox(height: EspacosTrato.x1),
-                            Text(
-                              'Passe este código ao profissional quando ele chegar.',
-                              style: TipografiaTrato.corpoPequeno.copyWith(
-                                color: CoresTrato.textoSecundario,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (pedido.codigoConclusao != null) ...[
-                      const SizedBox(height: EspacosTrato.x4),
-                      CartaoTrato(
-                        key: const ValueKey('codigo-de-conclusao'),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Código de conclusão', style: TipografiaTrato.tituloCartao),
-                            const SizedBox(height: EspacosTrato.x2),
-                            Semantics(
-                              label:
-                                  'Código de conclusão ${pedido.codigoConclusao!.split('').join(' ')}',
-                              child: ExcludeSemantics(
-                                child: Text(pedido.codigoConclusao!,
-                                    style: TipografiaTrato.tituloGrande),
-                              ),
-                            ),
-                            const SizedBox(height: EspacosTrato.x1),
-                            Text(
-                              'Quando o serviço estiver pronto, passe este código ao profissional '
-                              'para ele concluir.',
-                              style: TipografiaTrato.corpoPequeno.copyWith(
-                                color: CoresTrato.textoSecundario,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (_aditivo != null) ...[
-                      const SizedBox(height: EspacosTrato.x4),
-                      CartaoAditivo(
-                        aditivo: _aditivo!,
-                        aoRecusar: () => _decidir(EstadoAditivo.recusado, widget.aoRecusarAditivo),
-                        aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
-                      ),
-                    ],
-                    if (widget.aoRemarcarVisita != null ||
-                        widget.aoVerContrato != null ||
-                        widget.aoVerNota != null ||
-                        widget.aoVerAditivo != null) ...[
-                      const SizedBox(height: EspacosTrato.x3),
-                      Wrap(
-                        spacing: EspacosTrato.x3,
-                        runSpacing: EspacosTrato.x1,
-                        children: [
-                          if (widget.aoRemarcarVisita != null)
-                            BotaoLink(
-                              texto: pedido.estadoApi == 'agendado'
-                                  ? 'Remarcar visita'
-                                  : 'Sugerir horário da visita',
-                              aoTocar: widget.aoRemarcarVisita!,
-                            ),
-                          if (widget.aoVerContrato != null)
-                            BotaoLink(
-                              texto: 'Ver contrato do serviço',
-                              aoTocar: widget.aoVerContrato!,
-                            ),
-                          if (widget.aoVerNota != null)
-                            BotaoLink(
-                              texto: 'Ver nota de materiais',
-                              aoTocar: widget.aoVerNota!,
-                            ),
-                          if (widget.aoVerAditivo != null)
-                            BotaoLink(
-                              texto: 'Ver aditivo do serviço',
-                              aoTocar: widget.aoVerAditivo!,
-                            ),
-                        ],
-                      ),
-                    ],
-                    if (pedido.aditivos.isNotEmpty ||
-                        pedido.notas.isNotEmpty ||
-                        pedido.orcamentoCentavos != null) ...[
-                      const SizedBox(height: EspacosTrato.x5),
-                      _CartaoValoresAditivosNotas(
-                        pedido: pedido,
-                        aoAbrirNotas: widget.aoVerNota,
-                      ),
-                    ],
-                    const SizedBox(height: EspacosTrato.x6),
-                    Text('Linha do tempo', style: TipografiaTrato.titulo),
-                    const SizedBox(height: EspacosTrato.x4),
-                    LinhaDoTempo(etapas: pedido.etapas),
-                    if (pedido.fotos.isNotEmpty) ...[
-                      const SizedBox(height: EspacosTrato.x6),
-                      Row(
-                        children: [
-                          for (var i = 0; i < pedido.fotos.length; i++) ...[
-                            if (i > 0) const SizedBox(width: EspacosTrato.x3),
-                            Expanded(child: EspacoFoto(rotulo: pedido.fotos[i], altura: 100)),
-                          ],
-                        ],
-                      ),
-                    ],
-                    if (widget.aoAbrirProblema != null || widget.aoCancelarPedido != null) ...[
-                      const SizedBox(height: EspacosTrato.x5),
-                      const Divider(),
-                      Wrap(
-                        spacing: EspacosTrato.x4,
-                        runSpacing: EspacosTrato.x1,
-                        children: [
-                          if (widget.aoAbrirProblema != null)
-                            BotaoLink(
-                              texto: 'Relatar problema',
-                              destrutivo: true,
-                              aoTocar: widget.aoAbrirProblema!,
-                            ),
-                          if (widget.aoCancelarPedido != null)
-                            BotaoLink(
-                              texto: 'Cancelar pedido',
-                              destrutivo: true,
-                              aoTocar: widget.aoCancelarPedido!,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ],
-                );
+        _Topo(numero: pedido.numero, aoTocarSos: widget.aoTocarSos),
+        const SizedBox(height: EspacosTrato.x3),
+        Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
+        const SizedBox(height: EspacosTrato.x3),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: pedido.pagamentoConfirmado
+              ? const ChipStatus(
+                  texto: 'Pagamento acompanhado no app',
+                  tipo: TipoStatus.info,
+                  icone: Icons.lock_outline,
+                )
+              : const ChipStatus(
+                  texto: 'Aguardando o pagamento',
+                  tipo: TipoStatus.alerta,
+                  icone: Icons.schedule,
+                ),
+        ),
+        if (pedido.codigoInicio != null) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          CartaoTrato(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Código de chegada (não libera dinheiro)',
+                    style: TipografiaTrato.tituloCartao),
+                const SizedBox(height: EspacosTrato.x2),
+                Semantics(
+                  label: 'Código de início ${pedido.codigoInicio!.split('').join(' ')}',
+                  child: ExcludeSemantics(
+                    child: Text(pedido.codigoInicio!, style: TipografiaTrato.tituloGrande),
+                  ),
+                ),
+                const SizedBox(height: EspacosTrato.x1),
+                Text(
+                  'Passe este código ao profissional quando ele chegar.',
+                  style: TipografiaTrato.corpoPequeno.copyWith(
+                    color: CoresTrato.textoSecundario,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (pedido.codigoConclusao != null) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          CartaoTrato(
+            key: const ValueKey('codigo-de-conclusao'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Código de conclusão (libera o pagamento)',
+                    style: TipografiaTrato.tituloCartao),
+                const SizedBox(height: EspacosTrato.x2),
+                Semantics(
+                  label: 'Código de conclusão ${pedido.codigoConclusao!.split('').join(' ')}',
+                  child: ExcludeSemantics(
+                    child: Text(pedido.codigoConclusao!, style: TipografiaTrato.tituloGrande),
+                  ),
+                ),
+                const SizedBox(height: EspacosTrato.x1),
+                Text(
+                  'Quando o serviço estiver pronto, passe este código ao profissional '
+                  'para ele concluir.',
+                  style: TipografiaTrato.corpoPequeno.copyWith(
+                    color: CoresTrato.textoSecundario,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_aditivo != null) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          CartaoAditivo(
+            aditivo: _aditivo!,
+            aoRecusar: () => _decidir(EstadoAditivo.recusado, widget.aoRecusarAditivo),
+            aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
+          ),
+        ],
+        if (widget.aoRemarcarVisita != null ||
+            widget.aoVerContrato != null ||
+            widget.aoVerNota != null ||
+            widget.aoVerAditivo != null) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Wrap(
+            spacing: EspacosTrato.x3,
+            runSpacing: EspacosTrato.x1,
+            children: [
+              if (widget.aoRemarcarVisita != null)
+                BotaoLink(
+                  texto: pedido.estadoApi == 'agendado'
+                      ? 'Remarcar visita'
+                      : 'Sugerir horário da visita',
+                  aoTocar: widget.aoRemarcarVisita!,
+                ),
+              if (widget.aoVerContrato != null)
+                BotaoLink(
+                  texto: 'Ver contrato do serviço',
+                  aoTocar: widget.aoVerContrato!,
+                ),
+              if (widget.aoVerNota != null)
+                BotaoLink(
+                  texto: 'Ver nota de materiais',
+                  aoTocar: widget.aoVerNota!,
+                ),
+              if (widget.aoVerAditivo != null)
+                BotaoLink(
+                  texto: 'Ver aditivo do serviço',
+                  aoTocar: widget.aoVerAditivo!,
+                ),
+            ],
+          ),
+        ],
+        if (pedido.aditivos.isNotEmpty ||
+            pedido.notas.isNotEmpty ||
+            pedido.orcamentoCentavos != null) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          _CartaoValoresAditivosNotas(
+            pedido: pedido,
+            aoAbrirNotas: widget.aoVerNota,
+          ),
+        ],
+        const SizedBox(height: EspacosTrato.x6),
+        Text('Linha do tempo', style: TipografiaTrato.titulo),
+        const SizedBox(height: EspacosTrato.x4),
+        LinhaDoTempo(etapas: pedido.etapas),
+        if (pedido.fotos.isNotEmpty) ...[
+          const SizedBox(height: EspacosTrato.x6),
+          Row(
+            children: [
+              for (var i = 0; i < pedido.fotos.length; i++) ...[
+                if (i > 0) const SizedBox(width: EspacosTrato.x3),
+                Expanded(child: EspacoFoto(rotulo: pedido.fotos[i], altura: 100)),
+              ],
+            ],
+          ),
+        ],
+        if (widget.aoAbrirProblema != null || widget.aoCancelarPedido != null) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          const Divider(),
+          Wrap(
+            spacing: EspacosTrato.x4,
+            runSpacing: EspacosTrato.x1,
+            children: [
+              if (widget.aoAbrirProblema != null)
+                BotaoLink(
+                  texto: 'Relatar problema',
+                  destrutivo: true,
+                  aoTocar: widget.aoAbrirProblema!,
+                ),
+              if (widget.aoCancelarPedido != null)
+                BotaoLink(
+                  texto: 'Cancelar pedido',
+                  destrutivo: true,
+                  aoTocar: widget.aoCancelarPedido!,
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
     return Scaffold(
       body: SafeArea(
         child: Column(

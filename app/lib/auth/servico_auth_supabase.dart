@@ -65,12 +65,10 @@ class ServicoAuthSupabase implements ServicoAuth {
   }) async {
     final c = cliente ?? http.Client();
     try {
-      final r = await c
-          .get(
-            Uri.parse('${config.supabaseUrl}/auth/v1/settings'),
-            headers: {'apikey': config.supabaseAnonKey},
-          )
-          .timeout(const Duration(seconds: 4));
+      final r = await c.get(
+        Uri.parse('${config.supabaseUrl}/auth/v1/settings'),
+        headers: {'apikey': config.supabaseAnonKey},
+      ).timeout(const Duration(seconds: 4));
       if (r.statusCode != 200) return null;
       final externos = (jsonDecode(r.body) as Map)['external'];
       if (externos is! Map) return null;
@@ -306,7 +304,8 @@ class ServicoAuthSupabase implements ServicoAuth {
       return const ErroAuth(TipoErroAuth.semInternet);
     }
     // Só tipo e código, nunca a mensagem (pode ter e-mail ou telefone).
-    debugPrint('Auth: erro não mapeado (${e.runtimeType}, código ${e is sb.AuthException ? e.code : '-'})');
+    debugPrint(
+        'Auth: erro não mapeado (${e.runtimeType}, código ${e is sb.AuthException ? e.code : '-'})');
     return const ErroAuth(TipoErroAuth.desconhecido);
   }
 
@@ -355,8 +354,8 @@ class ServicoAuthSupabase implements ServicoAuth {
   Future<ResultadoCadastro> criarConta(DadosCadastro dados) => _proteger(() async {
         final cpf = _digitos(dados.cpf);
         final nascIso = isoDataNascimento(dados.nascimento);
-        // Um CPF, uma conta: confere antes de criar a conta no Auth.
-        await _exigirCpfLivre(cpf);
+        // Cadastro leve: só confere CPF antes quando informado.
+        if (cpf.isNotEmpty) await _exigirCpfLivre(cpf);
         final r = await _auth.signUp(
           email: dados.email.trim(),
           password: dados.senha,
@@ -384,7 +383,7 @@ class ServicoAuthSupabase implements ServicoAuth {
                 'usuario_id': r.user!.id,
                 'email': dados.email.trim(),
                 'nome': dados.nome,
-                'cpf': cpf,
+                if (cpf.isNotEmpty) 'cpf': cpf,
                 'telefone': celularE164(dados.celular),
                 if (nascIso != null) 'data_nascimento': nascIso,
               },
@@ -395,10 +394,12 @@ class ServicoAuthSupabase implements ServicoAuth {
         }
         final sessao = r.session == null ? null : _paraSessao(r.user);
         if (sessao != null) {
-          await _gravarCpf(cpf, token: r.session!.accessToken, nascimentoIso: nascIso);
+          if (cpf.isNotEmpty) {
+            await _gravarCpf(cpf, token: r.session!.accessToken, nascimentoIso: nascIso);
+          }
           return CadastroComSessao(sessao);
         }
-        _cpfPendente = cpf;
+        _cpfPendente = cpf.isEmpty ? null : cpf;
         _nascimentoPendente = nascIso;
         return CadastroAguardandoEmail(dados.email.trim());
       });
@@ -425,12 +426,11 @@ class ServicoAuthSupabase implements ServicoAuth {
       });
 
   @override
-  Future<void> reenviarEmailConfirmacao(String email) =>
-      _proteger(() => _auth.resend(
-            type: sb.OtpType.signup,
-            email: email.trim(),
-            emailRedirectTo: kUrlRetornoEmail,
-          ));
+  Future<void> reenviarEmailConfirmacao(String email) => _proteger(() => _auth.resend(
+        type: sb.OtpType.signup,
+        email: email.trim(),
+        emailRedirectTo: kUrlRetornoEmail,
+      ));
 
   @override
   Future<SessaoAuth> entrarComProvedor(ProvedorAuth provedor) => _proteger(() async {
@@ -454,7 +454,9 @@ class ServicoAuthSupabase implements ServicoAuth {
       conta = await google.signIn();
     } on Object catch (e) {
       final msg = e.toString().toLowerCase();
-      if (msg.contains('canceled') || msg.contains('cancelled') || msg.contains('sign_in_canceled')) {
+      if (msg.contains('canceled') ||
+          msg.contains('cancelled') ||
+          msg.contains('sign_in_canceled')) {
         throw const ErroAuth(TipoErroAuth.cancelado);
       }
       throw const ErroAuth(TipoErroAuth.provedorIndisponivel);

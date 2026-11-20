@@ -102,7 +102,8 @@ class _CorpoState extends State<_Corpo> {
     });
   }
 
-  bool get _podeEnviar => _status == StatusVerificacao.naoEnviada || _status == StatusVerificacao.pendente;
+  bool get _podeEnviar =>
+      _status == StatusVerificacao.naoEnviada || _status == StatusVerificacao.pendente;
   bool get _completo => _documento != null && _selfie != null && _ciente;
 
   Future<void> _capturar(CapturarFoto? captura, void Function(String) guardar) async {
@@ -113,7 +114,9 @@ class _CorpoState extends State<_Corpo> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _erro = e is ErroTrato ? e.mensagem : 'Não foi possível capturar ou enviar a imagem. Tente novamente.';
+        _erro = e is ErroTrato
+            ? e.mensagem
+            : 'Não foi possível capturar ou enviar a imagem. Tente novamente.';
       });
       _rolarParaErro();
     }
@@ -180,100 +183,100 @@ class _CorpoState extends State<_Corpo> {
                 ? BotaoPrimario(texto: 'Continuar', aoTocar: widget.aoConcluir)
                 : null,
         children: [
-        Text('Confirme sua identidade', style: TipografiaTrato.tituloGrande),
-        const SizedBox(height: EspacosTrato.x3),
-        _CartaoStatus(status: _status, motivo: widget.situacao.motivo),
-        const SizedBox(height: EspacosTrato.x3),
-        Text(
-          'A verificação confere se o documento é seu. Ela não garante a qualidade '
-          'de nenhum serviço.',
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-        ),
-        if (_podeEnviar) ...[
-          const SizedBox(height: EspacosTrato.x4),
+          Text('Confirme sua identidade', style: TipografiaTrato.tituloGrande),
+          const SizedBox(height: EspacosTrato.x3),
+          _CartaoStatus(status: _status, motivo: widget.situacao.motivo),
+          const SizedBox(height: EspacosTrato.x3),
+          Text(
+            'A verificação confere sua identidade para dar mais segurança a quem contrata, '
+            'junto com avaliações reais de clientes e pagamento protegido no app.',
+            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          ),
+          if (_podeEnviar) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            CartaoTrato(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.badge_outlined, color: CoresTrato.petroleo, size: 20),
+                      const SizedBox(width: EspacosTrato.x2),
+                      Expanded(
+                        child: Text('Documentos e orientações', style: TipografiaTrato.corpoForte),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: EspacosTrato.x3),
+                  Text(
+                    '• Documentos aceitos: CNH ou RG original (físico ou digital emitido pelo gov.br), legível e dentro da validade.',
+                    style: TipografiaTrato.corpoPequeno,
+                  ),
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    '• Como mandar o documento: Retire do plástico protetor. Posicione sobre uma superfície plana, em ambiente bem iluminado. Enquadre a CNH aberta ou frente e verso do RG sem cortar bordas e sem reflexos.',
+                    style: TipografiaTrato.corpoPequeno,
+                  ),
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    '• Como tirar a selfie: Segure o mesmo documento ao lado do seu rosto, olhando para a câmera em local iluminado. Não cubra o rosto nem os dados do documento. Não use óculos escuros, boné ou máscara.',
+                    style: TipografiaTrato.corpoPequeno,
+                  ),
+                ],
+              ),
+            ),
+            const TituloSecao('Envie duas fotos'),
+            CampoFoto(
+              rotulo: 'Foto do documento',
+              dica: 'CNH aberta ou RG (frente e verso), fora do plástico e legível',
+              referencia: _documento,
+              aoTocar: () => _capturar(widget.aoCapturarDocumento, (r) => _documento = r),
+            ),
+            const SizedBox(height: EspacosTrato.x3),
+            CampoFoto(
+              rotulo: 'Selfie segurando o documento',
+              dica: 'Segure o documento ao lado do rosto, bem iluminado e nítido',
+              referencia: _selfie,
+              aoTocar: () => _capturar(widget.aoCapturarSelfie, (r) => _selfie = r),
+            ),
+          ],
+          const TituloSecao('Seus dados, em linguagem simples'),
           CartaoTrato(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.badge_outlined, color: CoresTrato.petroleo, size: 20),
-                    const SizedBox(width: EspacosTrato.x2),
-                    Expanded(
-                      child: Text('Documentos e orientações', style: TipografiaTrato.corpoForte),
-                    ),
-                  ],
-                ),
+                _BlocoLgpd(titulo: 'Para que usamos', texto: l.finalidade),
                 const SizedBox(height: EspacosTrato.x3),
-                Text(
-                  '• Documentos aceitos: CNH ou RG original (físico ou digital emitido pelo gov.br), legível e dentro da validade.',
-                  style: TipografiaTrato.corpoPequeno,
-                ),
-                const SizedBox(height: EspacosTrato.x2),
-                Text(
-                  '• Como mandar o documento: Retire do plástico protetor. Posicione sobre uma superfície plana, em ambiente bem iluminado. Enquadre a CNH aberta ou frente e verso do RG sem cortar bordas e sem reflexos.',
-                  style: TipografiaTrato.corpoPequeno,
-                ),
-                const SizedBox(height: EspacosTrato.x2),
-                Text(
-                  '• Como tirar a selfie: Segure o mesmo documento ao lado do seu rosto, olhando para a câmera em local iluminado. Não cubra o rosto nem os dados do documento. Não use óculos escuros, boné ou máscara.',
-                  style: TipografiaTrato.corpoPequeno,
-                ),
+                _BlocoLgpd(titulo: 'Por quanto tempo guardamos', texto: l.retencao),
+                const SizedBox(height: EspacosTrato.x3),
+                _BlocoLgpd(titulo: 'Quem pode ver', texto: l.quemVe),
               ],
             ),
           ),
-          const TituloSecao('Envie duas fotos'),
-          CampoFoto(
-            rotulo: 'Foto do documento',
-            dica: 'CNH aberta ou RG (frente e verso), fora do plástico e legível',
-            referencia: _documento,
-            aoTocar: () => _capturar(widget.aoCapturarDocumento, (r) => _documento = r),
-          ),
-          const SizedBox(height: EspacosTrato.x3),
-          CampoFoto(
-            rotulo: 'Selfie segurando o documento',
-            dica: 'Segure o documento ao lado do rosto, bem iluminado e nítido',
-            referencia: _selfie,
-            aoTocar: () => _capturar(widget.aoCapturarSelfie, (r) => _selfie = r),
-          ),
-        ],
-        const TituloSecao('Seus dados, em linguagem simples'),
-        CartaoTrato(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _BlocoLgpd(titulo: 'Para que usamos', texto: l.finalidade),
-              const SizedBox(height: EspacosTrato.x3),
-              _BlocoLgpd(titulo: 'Por quanto tempo guardamos', texto: l.retencao),
-              const SizedBox(height: EspacosTrato.x3),
-              _BlocoLgpd(titulo: 'Quem pode ver', texto: l.quemVe),
-            ],
-          ),
-        ),
-        if (_podeEnviar) ...[
-          const SizedBox(height: EspacosTrato.x3),
-          CheckboxListTile(
-            key: const Key('ciente_lgpd'),
-            value: _ciente,
-            onChanged: (v) => setState(() => _ciente = v ?? false),
-            controlAffinity: ListTileControlAffinity.leading,
-            contentPadding: EdgeInsets.zero,
-            activeColor: CoresTrato.petroleo,
-            title: Text(
-              'Li como meus dados serão usados e quero enviar.',
-              style: TipografiaTrato.corpo,
+          if (_podeEnviar) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            CheckboxListTile(
+              key: const Key('ciente_lgpd'),
+              value: _ciente,
+              onChanged: (v) => setState(() => _ciente = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              activeColor: CoresTrato.petroleo,
+              title: Text(
+                'Li como meus dados serão usados e quero enviar.',
+                style: TipografiaTrato.corpo,
+              ),
             ),
-          ),
+          ],
+          if (_enviado) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            const AvisoFaixa(
+              texto: 'Recebemos suas fotos. Avisaremos quando a análise terminar.',
+              tipo: TipoStatus.info,
+              icone: Icons.info_outline,
+            ),
+          ],
         ],
-        if (_enviado) ...[
-          const SizedBox(height: EspacosTrato.x3),
-          const AvisoFaixa(
-            texto: 'Recebemos suas fotos. Avisaremos quando a análise terminar.',
-            tipo: TipoStatus.info,
-            icone: Icons.info_outline,
-          ),
-        ],
-      ],
       ),
     );
   }

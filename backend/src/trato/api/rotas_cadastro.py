@@ -59,7 +59,7 @@ class VincularCadastroIn(_Entrada):
     usuario_id: str = Field(min_length=1, max_length=64)
     email: str = Field(min_length=3, max_length=254)
     nome: str = Field(default="", max_length=120)
-    cpf: str = Field(min_length=11, max_length=14)
+    cpf: str | None = Field(default=None, min_length=11, max_length=14)
     telefone: str | None = Field(default=None, max_length=24)
     data_nascimento: date | None = None
 
@@ -99,14 +99,16 @@ def resolver_identificador(
 @router.post(
     "/cadastro/vincular",
     status_code=204,
-    summary="Vincula CPF e telefone à conta recém-criada no Auth",
+    summary="Vincula dados iniciais à conta recém-criada no Auth",
 )
 def vincular_cadastro(
     corpo: VincularCadastroIn, contexto: Contexto = Depends(obter_contexto)
 ) -> Response:
-    cpf = normalizar_cpf(corpo.cpf)
-    if not cpf_valido(cpf):
-        raise DadosInvalidos("CPF inválido.")
+    cpf: str | None = None
+    if corpo.cpf is not None:
+        cpf = normalizar_cpf(corpo.cpf)
+        if not cpf_valido(cpf):
+            raise DadosInvalidos("CPF inválido.")
     contexto.usuarios.vincular_cadastro(
         corpo.usuario_id,
         corpo.email,
@@ -118,6 +120,15 @@ def vincular_cadastro(
     return Response(status_code=204)
 
 
+@router.post(
+    "/me/cpf",
+    status_code=204,
+    summary="Gravar o meu CPF (uma vez)",
+    description=(
+        "Grava CPF e data de nascimento após o cadastro. O CPF é gravado só uma vez; repetir com "
+        "o mesmo CPF não muda nada. CPF de outra conta responde 409."
+    ),
+)
 @router.post(
     "/me/dados-pessoais",
     status_code=204,

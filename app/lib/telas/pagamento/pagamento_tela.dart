@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
+import '../auth/validacao.dart';
 import '../profissional/dinheiro.dart';
 import '../comuns/desconto_moedas.dart';
 import '../comuns/moeda_trato.dart';
@@ -19,6 +20,7 @@ class PagamentoTela extends StatefulWidget {
     this.aoAplicarCupom,
     this.aoAlternarMoedas,
     this.aoVoltar,
+    this.aoCadastrarCpf,
   });
 
   final DadosPagamento dados;
@@ -31,6 +33,9 @@ class PagamentoTela extends StatefulWidget {
 
   /// Padrão: `Navigator.maybePop`.
   final VoidCallback? aoVoltar;
+
+  /// Cadastra CPF e data de nascimento (aaaa-mm-dd) antes do primeiro pagamento.
+  final Future<void> Function(String cpf, String nascimentoIso)? aoCadastrarCpf;
 
   @override
   State<PagamentoTela> createState() => _PagamentoTelaState();
@@ -45,6 +50,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   var _aplicandoCupom = false;
   var _usarMoedas = false;
   var _trocandoMoedas = false;
+  late var _cpfCadastrado = widget.dados.cpfCadastrado;
   String? _erroCupom;
   String? _erroMoedas;
 
@@ -164,13 +170,44 @@ class _PagamentoTelaState extends State<PagamentoTela> {
     }
   }
 
+  Future<bool> _pedirCpf() async {
+    final cadastrar = widget.aoCadastrarCpf;
+    if (cadastrar == null) return false;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _FolhaCpfPagamento(aoSalvar: cadastrar),
+    );
+    if (ok == true && mounted) {
+      setState(() => _cpfCadastrado = true);
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _pagar() async {
     if (_pagando) return;
+    if (!_cpfCadastrado && widget.aoCadastrarCpf != null) {
+      final cadastrou = await _pedirCpf();
+      if (!cadastrou || !mounted) return;
+    }
     setState(() => _pagando = true);
     try {
       final parcelasEnvio = _metodo == MetodoPagamento.cartao ? _parcelas : 1;
       if (widget.aoPagarDetalhado != null) {
-        await widget.aoPagarDetalhado!.call(_metodo, parcelasEnvio, _dados.cupomCodigo);
+        try {
+          await widget.aoPagarDetalhado!.call(_metodo, parcelasEnvio, _dados.cupomCodigo);
+        } on ErroTrato catch (e) {
+          if (e.codigo == 'cpf_obrigatorio' && widget.aoCadastrarCpf != null && mounted) {
+            setState(() => _pagando = false);
+            final cadastrou = await _pedirCpf();
+            if (!cadastrou || !mounted) return;
+            setState(() => _pagando = true);
+            await widget.aoPagarDetalhado!.call(_metodo, parcelasEnvio, _dados.cupomCodigo);
+          } else {
+            rethrow;
+          }
+        }
       } else {
         await widget.aoPagar?.call(_metodo);
       }
@@ -622,6 +659,122 @@ class _CartaoMoedasIndisponivel extends StatelessWidget {
         subtitle: Text(
           mensagem,
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+        ),
+      ),
+    );
+  }
+}
+
+class _FolhaCpfPagamento extends StatefulWidget {
+  const _FolhaCpfPagamento({required this.aoSalvar});
+
+  final Future<void> Function(String cpf, String nascimentoIso) aoSalvar;
+
+  @override
+  State<_FolhaCpfPagamento> createState() => _FolhaCpfPagamentoState();
+}
+
+class _FolhaCpfPagamentoState extends State<_FolhaCpfPagamento> {
+  final _cpf = TextEditingController();
+  final _nascimento = TextEditingController();
+  var _tentou = false;
+  var _salvando = false;
+  String? _erro;
+
+  @override
+  void dispose() {
+    _cpf.dispose();
+    _nascimento.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirmar() async {
+    if (_salvando) return;
+    setState(() {
+      _tentou = true;
+      _erro = null;
+    });
+    if (ValidacaoAuth.cpf(_cpf.text) != null ||
+        ValidacaoAuth.nascimento(_nascimento.text) != null) {
+      return;
+    }
+    final partes = _nascimento.text.trim().split('/');
+    final iso = '${partes[2]}-${partes[1]}-${partes[0]}';
+    setState(() => _salvando = true);
+    try {
+      await widget.aoSalvar(ValidacaoAuth.somenteDigitos(_cpf.text), iso);
+      if (mounted) Navigator.of(context).pop(true);
+    } on ErroTrato catch (e) {
+      if (mounted) {
+        setState(() {
+          _salvando = false;
+          _erro = e.mensagem;
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _salvando = false;
+          _erro = 'Não foi possível salvar seu CPF agora. Tente de novo.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          EspacosTrato.x5,
+          EspacosTrato.x5,
+          EspacosTrato.x5,
+          EspacosTrato.x5 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Informe seu CPF para pagar', style: TipografiaTrato.titulo),
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'O provedor de pagamento pede CPF e data de nascimento apenas na primeira cobrança.',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+            const SizedBox(height: EspacosTrato.x4),
+            CampoTrato(
+              rotulo: 'CPF',
+              controlador: _cpf,
+              dica: '000.000.000-00',
+              teclado: TextInputType.number,
+              formatadores: const [MascaraNumerica.cpf],
+              erro: _tentou ? ValidacaoAuth.cpf(_cpf.text) : null,
+              aoMudar: (_) => setState(() {}),
+            ),
+            const SizedBox(height: EspacosTrato.x3),
+            CampoTrato(
+              rotulo: 'Nascimento',
+              controlador: _nascimento,
+              dica: 'dd/mm/aaaa',
+              teclado: TextInputType.number,
+              formatadores: const [MascaraNumerica.data],
+              erro: _tentou ? ValidacaoAuth.nascimento(_nascimento.text) : null,
+              aoMudar: (_) => setState(() {}),
+            ),
+            if (_erro != null) ...[
+              const SizedBox(height: EspacosTrato.x3),
+              Text(
+                _erro!,
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+              ),
+            ],
+            const SizedBox(height: EspacosTrato.x4),
+            BotaoPrimario(
+              texto: 'Continuar pagamento',
+              carregando: _salvando,
+              aoTocar: _confirmar,
+            ),
+          ],
         ),
       ),
     );

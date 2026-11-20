@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
+import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
 
 /// Tela 27 — Carteira do profissional. Só exibe o que o backend devolveu em [dados]:
@@ -16,7 +17,7 @@ class CarteiraTela extends StatelessWidget {
     this.aoVerTudo,
     this.aoTentarNovamente,
     this.barraInferior,
-    this.soExtrato = false,
+    this.soExtrato = true,
     this.aoAbrirItem,
     this.aoConfigurarRecebimento,
     this.aoBaixarExtratoPdf,
@@ -64,6 +65,13 @@ class CarteiraTela extends StatelessWidget {
           if (dados.erro != null)
             _CartaoErro(mensagem: dados.erro!, aoTentarNovamente: aoTentarNovamente)
           else if (resumo != null || soExtrato) ...[
+            const AvisoFaixa(
+              texto:
+                  'Repasse automático: após a liberação, o valor cai automaticamente na sua conta cadastrada.',
+              tipo: TipoStatus.info,
+              icone: Icons.autorenew,
+            ),
+            const SizedBox(height: EspacosTrato.x4),
             if (!soExtrato && resumo != null) ...[
               _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),
               const SizedBox(height: EspacosTrato.x3),
@@ -109,9 +117,7 @@ class CarteiraTela extends StatelessWidget {
       bottomNavigationBar: barraInferior,
       body: SafeArea(
         child: ConteudoResponsivo(
-          child: recarregar == null
-              ? corpo
-              : RefreshIndicator(onRefresh: recarregar, child: corpo),
+          child: recarregar == null ? corpo : RefreshIndicator(onRefresh: recarregar, child: corpo),
         ),
       ),
     );
@@ -261,8 +267,7 @@ class _CabecalhoExtrato extends StatelessWidget {
             child: Text('Extrato por serviço', style: TipografiaTrato.titulo, maxLines: 1),
           ),
         ),
-        if (aoBaixarPdf != null)
-          BotaoLink(texto: 'PDF mensal', aoTocar: aoBaixarPdf),
+        if (aoBaixarPdf != null) BotaoLink(texto: 'PDF mensal', aoTocar: aoBaixarPdf),
         if (aoVerTudo != null) BotaoLink(texto: 'Ver tudo', aoTocar: aoVerTudo),
       ],
     );
@@ -297,8 +302,7 @@ class _CartaoContaRecebimento extends StatelessWidget {
                   cadastrada && (resumo ?? '').isNotEmpty
                       ? resumo!
                       : 'Informe sua chave Pix para receber os repasses liberados.',
-                  style: TipografiaTrato.corpoPequeno
-                      .copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                 ),
               ],
             ),
@@ -332,9 +336,7 @@ class _Extrato extends StatelessWidget {
                 child: Divider(),
               ),
             InkWell(
-              onTap: aoAbrir == null || itens[i].pedidoId == null
-                  ? null
-                  : () => aoAbrir!(itens[i]),
+              onTap: aoAbrir == null || itens[i].pedidoId == null ? null : () => aoAbrir!(itens[i]),
               child: _LinhaExtrato(item: itens[i]),
             ),
           ],
