@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import 'convite.dart';
 
 class ItemResumoSucesso {
   const ItemResumoSucesso(this.rotulo, this.valor);
@@ -25,6 +24,8 @@ class SucessoAcaoTela extends StatelessWidget {
     this.textoBotaoSecundario,
     this.aoTocarSecundario,
     this.aoIndicar,
+    this.acaoExtra,
+    this.compartilhar = compartilharNoAparelho,
     this.icone = Icons.check_circle_rounded,
   });
 
@@ -37,6 +38,12 @@ class SucessoAcaoTela extends StatelessWidget {
   final String? textoBotaoSecundario;
   final VoidCallback? aoTocarSecundario;
   final VoidCallback? aoIndicar;
+
+  /// Botão extra opcional acima de "Indicar o Trato" (ex.: "Salvar como de confiança").
+  final Widget? acaoExtra;
+
+  /// Compartilhamento do convite (troca nos testes).
+  final CompartilharTexto compartilhar;
   final IconData icone;
 
   @override
@@ -129,6 +136,7 @@ class SucessoAcaoTela extends StatelessWidget {
                             ),
                           ],
                           const SizedBox(height: EspacosTrato.x1),
+                          if (acaoExtra != null) acaoExtra!,
                           BotaoLink(
                             texto: 'Indicar o Trato',
                             aoTocar: () async {
@@ -136,18 +144,7 @@ class SucessoAcaoTela extends StatelessWidget {
                                 aoIndicar!();
                                 return;
                               }
-                              await Clipboard.setData(
-                                const ClipboardData(
-                                  text:
-                                      'Conheça o Trato: peça orçamentos grátis de profissionais verificados com pagamento protegido pelo app.',
-                                ),
-                              );
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  const SnackBar(content: Text('Convite copiado!')),
-                                );
+                              await indicarOTrato(context, compartilhar: compartilhar);
                             },
                           ),
                         ],

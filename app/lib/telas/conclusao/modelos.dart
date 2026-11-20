@@ -61,7 +61,11 @@ class DadosAvaliacao {
     required this.criterios,
     required this.gorjetasCentavos,
     this.gorjetaDisponivel = true,
+    this.profissionalId,
   });
+
+  /// Id do profissional avaliado (para "Salvar como de confiança"); nulo = sem o botão.
+  final String? profissionalId;
 
   /// Falso enquanto o servidor não recebe gorjeta: a seção some da tela.
   final bool gorjetaDisponivel;

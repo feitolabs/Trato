@@ -11,10 +11,19 @@ import 'modelos.dart';
 
 /// Profissionais favoritos. Tocar abre o perfil ([aoAbrir]); o coração tira da lista.
 class FavoritosTela extends StatefulWidget {
-  const FavoritosTela({super.key, required this.servico, this.aoAbrir, this.aoBuscar});
+  const FavoritosTela({
+    super.key,
+    required this.servico,
+    this.aoAbrir,
+    this.aoBuscar,
+    this.aoChamarDeNovo,
+  });
 
   final ServicoConta servico;
   final ValueChanged<FavoritoConta>? aoAbrir;
+
+  /// "Chamar de novo": abre o novo pedido já direcionado a este profissional.
+  final ValueChanged<FavoritoConta>? aoChamarDeNovo;
 
   /// Ação do estado vazio: leva à busca de profissionais. Sem ela, o botão não aparece.
   final VoidCallback? aoBuscar;
@@ -76,25 +85,37 @@ class _FavoritosTelaState extends State<FavoritosTela> {
                 ].join(' · ');
                 return CartaoTrato(
                   aoTocar: widget.aoAbrir == null ? null : () => widget.aoAbrir!(f),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(f.nome ?? 'Profissional', style: TipografiaTrato.corpo),
-                            if (detalhe.isNotEmpty)
-                              Text(detalhe,
-                                  style: TipografiaTrato.corpoPequeno
-                                      .copyWith(color: CoresTrato.textoSecundario)),
-                          ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(f.nome ?? 'Profissional', style: TipografiaTrato.corpo),
+                                if (detalhe.isNotEmpty)
+                                  Text(detalhe,
+                                      style: TipografiaTrato.corpoPequeno
+                                          .copyWith(color: CoresTrato.textoSecundario)),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Tirar dos favoritos',
+                            onPressed: () => _tirar(f),
+                            icon: const Icon(Icons.favorite, color: CoresTrato.petroleo),
+                          ),
+                        ],
+                      ),
+                      if (widget.aoChamarDeNovo != null) ...[
+                        const SizedBox(height: EspacosTrato.x2),
+                        BotaoSecundario(
+                          texto: 'Chamar de novo',
+                          aoTocar: () => widget.aoChamarDeNovo!(f),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Tirar dos favoritos',
-                        onPressed: () => _tirar(f),
-                        icon: const Icon(Icons.favorite, color: CoresTrato.petroleo),
-                      ),
+                      ],
                     ],
                   ),
                 );

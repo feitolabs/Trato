@@ -18,7 +18,11 @@ class MoedasGanhasTela extends StatefulWidget {
     this.pendentes = 0,
     this.proximaLiberacao,
     this.valorMoedaCentavos,
+    this.acaoExtra,
   });
+
+  /// Botão opcional acima de "Continuar" (ex.: "Salvar como de confiança").
+  final Widget? acaoExtra;
 
   final int moedas;
 
@@ -32,7 +36,8 @@ class MoedasGanhasTela extends StatefulWidget {
   State<MoedasGanhasTela> createState() => _MoedasGanhasTelaState();
 }
 
-class _MoedasGanhasTelaState extends State<MoedasGanhasTela> with SingleTickerProviderStateMixin {
+class _MoedasGanhasTelaState extends State<MoedasGanhasTela>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
@@ -94,18 +99,24 @@ class _MoedasGanhasTelaState extends State<MoedasGanhasTela> with SingleTickerPr
                 padding: const EdgeInsets.all(EspacosTrato.x4),
                 child: ConteudoResponsivo(
                   // Botão claro: o primário do tema é petróleo e sumiria neste fundo.
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: widget.aoContinuar,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: CoresTrato.creme,
-                        foregroundColor: CoresTrato.petroleo,
-                        minimumSize: const Size.fromHeight(52),
-                        textStyle: TipografiaTrato.corpoForte,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.acaoExtra != null) widget.acaoExtra!,
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: widget.aoContinuar,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: CoresTrato.creme,
+                            foregroundColor: CoresTrato.petroleo,
+                            minimumSize: const Size.fromHeight(52),
+                            textStyle: TipografiaTrato.corpoForte,
+                          ),
+                          child: const Text('Continuar'),
+                        ),
                       ),
-                      child: const Text('Continuar'),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -135,12 +146,15 @@ class _Conteudo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 0–35%: a moeda salta; 20–65%: o número sobe; 55–100%: textos aparecem.
-    final moeda = Curves.elasticOut.transform((progresso / 0.35).clamp(0.0, 1.0));
-    final giro = Curves.easeOutCubic.transform((progresso / 0.5).clamp(0.0, 1.0));
+    final moeda =
+        Curves.elasticOut.transform((progresso / 0.35).clamp(0.0, 1.0));
+    final giro =
+        Curves.easeOutCubic.transform((progresso / 0.5).clamp(0.0, 1.0));
     final contagem = Curves.easeOutCubic.transform(
       ((progresso - 0.2) / 0.45).clamp(0.0, 1.0),
     );
-    final textos = Curves.easeOut.transform(((progresso - 0.55) / 0.3).clamp(0.0, 1.0));
+    final textos =
+        Curves.easeOut.transform(((progresso - 0.55) / 0.3).clamp(0.0, 1.0));
     final valor = (moedas * contagem).round();
 
     return Column(
@@ -160,7 +174,8 @@ class _Conteudo extends StatelessWidget {
         const SizedBox(height: EspacosTrato.x6),
         Text(
           '+$valor',
-          style: TipografiaTrato.marca.copyWith(color: CoresTrato.creme, fontSize: 80),
+          style: TipografiaTrato.marca
+              .copyWith(color: CoresTrato.creme, fontSize: 80),
         ),
         Opacity(
           opacity: textos,
@@ -172,24 +187,30 @@ class _Conteudo extends StatelessWidget {
                   pendentes > 0
                       ? (proximaLiberacao != null
                           ? '${moedas == 1 ? 'Tratinho reservado' : 'Tratinhos reservados'} — liberam em ${formatarDiaMes(proximaLiberacao!)}'
-                          : (moedas == 1 ? 'Tratinho reservado' : 'Tratinhos reservados'))
+                          : (moedas == 1
+                              ? 'Tratinho reservado'
+                              : 'Tratinhos reservados'))
                       : (moedas == 1 ? 'Tratinho' : 'Tratinhos'),
-                  style: TipografiaTrato.titulo.copyWith(color: CoresTrato.azulClaro),
+                  style: TipografiaTrato.titulo
+                      .copyWith(color: CoresTrato.azulClaro),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(
                   'Valeu pela avaliação!',
-                  style: TipografiaTrato.tituloGrande.copyWith(color: CoresTrato.creme),
+                  style: TipografiaTrato.tituloGrande
+                      .copyWith(color: CoresTrato.creme),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: EspacosTrato.x2),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: EspacosTrato.x5),
                   child: Text(
                     'Quem vem depois vai escolher com mais segurança por causa de você. '
                     '${pendentes > 0 ? 'Seus Tratinhos ficam guardados até a liberação.' : 'Os Tratinhos já estão na sua conta.'}',
-                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
+                    style:
+                        TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -198,15 +219,18 @@ class _Conteudo extends StatelessWidget {
                   Text(
                     textoTratinhosEmReais(moedas, valorMoedaCentavos),
                     key: const Key('tratinhos-em-reais'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulClaro),
+                    style: TipografiaTrato.corpoPequeno
+                        .copyWith(color: CoresTrato.azulClaro),
                   ),
                 ],
                 if (pendentes > 0) ...[
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
-                    textoTratinhosPendentes(pendentes, proximaLiberacao, valorMoedaCentavos)!,
+                    textoTratinhosPendentes(
+                        pendentes, proximaLiberacao, valorMoedaCentavos)!,
                     key: const Key('tratinhos-pendentes'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulClaro),
+                    style: TipografiaTrato.corpoPequeno
+                        .copyWith(color: CoresTrato.azulClaro),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -246,7 +270,8 @@ class _Confete extends CustomPainter {
       final sobe = Curves.easeOutCubic.transform(fase);
       final cai = fase * fase * 90;
       final pos = centro +
-          Offset(math.cos(angulo) * alcance * sobe, math.sin(angulo) * alcance * sobe + cai);
+          Offset(math.cos(angulo) * alcance * sobe,
+              math.sin(angulo) * alcance * sobe + cai);
       final alfa = (1 - ((fase - 0.6) / 0.4).clamp(0.0, 1.0));
       final pincel = Paint()..color = cor.withValues(alpha: alfa);
       canvas.save();
@@ -255,7 +280,8 @@ class _Confete extends CustomPainter {
       if (i.isEven) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset.zero, width: tamanho * 1.8, height: tamanho),
+            Rect.fromCenter(
+                center: Offset.zero, width: tamanho * 1.8, height: tamanho),
             const Radius.circular(2),
           ),
           pincel,

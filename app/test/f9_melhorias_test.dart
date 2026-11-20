@@ -107,11 +107,13 @@ void main() {
           titulo: 'Pedido enviado!',
           subtitulo: 'Tudo certo.',
           aoVoltarInicio: () {},
+          // Sem plugin de compartilhamento (teste/desktop): cai no copiar.
+          compartilhar: (_) async => throw StateError('sem plugin'),
         ),
       );
 
       await tester.tap(find.text('Indicar o Trato'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(copiado, isNotNull);
       expect(find.text('Convite copiado!'), findsOneWidget);
