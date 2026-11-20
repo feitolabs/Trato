@@ -3,24 +3,14 @@ import 'package:flutter/material.dart';
 import '../../componentes/imagem_trato.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
+import '../profissional/dinheiro.dart';
 
 /// Início de frase: "o profissional" vira "O profissional"; "Maria" continua "Maria".
 String primeiraMaiuscula(String texto) =>
     texto.isEmpty ? texto : '${texto[0].toUpperCase()}${texto.substring(1)}';
 
 /// "R$ 1.234,56" a partir de centavos inteiros. Só formata: o cálculo é do backend.
-String formatarReais(int centavos) {
-  final negativo = centavos < 0;
-  final abs = centavos.abs();
-  final reais = (abs ~/ 100).toString();
-  final cents = (abs % 100).toString().padLeft(2, '0');
-  final buffer = StringBuffer();
-  for (var i = 0; i < reais.length; i++) {
-    if (i > 0 && (reais.length - i) % 3 == 0) buffer.write('.');
-    buffer.write(reais[i]);
-  }
-  return '${negativo ? '-' : ''}R\$ $buffer,$cents';
-}
+String formatarReais(int centavos) => Dinheiro.formatar(centavos);
 
 /// "31/12/2026".
 String formatarData(DateTime data) =>

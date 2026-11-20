@@ -111,6 +111,7 @@ import '../pedidos/pedido_aberto_tela.dart';
 import '../pedidos/pedido_execucao_tela.dart';
 import '../pedidos/seus_pedidos_tela.dart';
 import '../profissional/calculadora_orcamento_tela.dart';
+import '../profissional/dinheiro.dart';
 import '../profissional/check_in_tela.dart';
 import '../profissional/check_out_tela.dart';
 import '../profissional/detalhe_orcamento_enviado_tela.dart';
@@ -1084,13 +1085,8 @@ abstract final class RotasTrato {
     return resto == 0 ? '$intParte' : '$intParte,$resto';
   }
 
-  static String _textoCentavosCampo(int centavos) {
-    final intParte = centavos ~/ 100;
-    final resto = centavos % 100;
-    return resto == 0
-        ? '$intParte'
-        : '$intParte,${resto.toString().padLeft(2, '0')}';
-  }
+  static String _textoCentavosCampo(int centavos) =>
+      Dinheiro.paraCampoSemZeros(centavos);
 
   static void _abrirDetalheOrcamentoEnviado(
     BuildContext context,

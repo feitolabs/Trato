@@ -11,6 +11,7 @@ import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart' show OfertaExclusividadeCliente;
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto, formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
+import '../profissional/dinheiro.dart';
 
 /// "R$ 1.250,50", "1250,5" ou "1250" viram centavos. Vazio ou inválido: nulo.
 int? centavosDoTexto(String texto) {
@@ -122,7 +123,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
   void _comecarEdicao() {
     _descricao.text = _dados.descricao;
     final max = _dados.faixaMaxCentavos;
-    _valor.text = max == null ? '' : (max / 100).toStringAsFixed(2).replaceAll('.', ',');
+    _valor.text = max == null ? '' : Dinheiro.paraCampo(max);
     _cep.text = widget.cepInicial;
     _rua.text = _dados.logradouro ?? '';
     _numero.text = _dados.numero ?? '';

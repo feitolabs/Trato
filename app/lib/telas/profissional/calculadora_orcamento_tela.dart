@@ -806,7 +806,7 @@ class _NovoItemMaterialState extends State<_NovoItemMaterial> {
   late final _valor = TextEditingController(
     text: widget.inicial == null
         ? ''
-        : '${widget.inicial!.centavos ~/ 100},${(widget.inicial!.centavos % 100).toString().padLeft(2, '0')}',
+        : Dinheiro.paraCampo(widget.inicial!.centavos),
   );
   bool _tentou = false;
 

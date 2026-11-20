@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../tema/tema.dart';
+import '../profissional/dinheiro.dart';
 import 'modelos.dart';
 
 /// "R$ 200" (sem centavos quando redondo) ou "R$ 12,50". Só formata.
-String reaisCurto(int centavos) {
-  final reais = centavos ~/ 100;
-  final cents = centavos % 100;
-  final inteiro = reais.toString().replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (_) => '.',
-      );
-  return cents == 0 ? 'R\$ $inteiro' : 'R\$ $inteiro,${cents.toString().padLeft(2, '0')}';
-}
+String reaisCurto(int centavos) => Dinheiro.formatarCurto(centavos);
 
 /// "R$ 200 a R$ 500", "R$ 350" ou "Sem faixa".
 String textoFaixa(PedidoAberto p) {

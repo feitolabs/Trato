@@ -1037,7 +1037,7 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
 
   String _sinalMaterial(int? centavos) => centavos == null || centavos == 0
       ? ''
-      : 'Sinal de material: R\$ ${(centavos ~/ 100)},${(centavos % 100).toString().padLeft(2, '0')}';
+      : 'Sinal de material: ${Dinheiro.formatar(centavos)}';
 
   Orcamento _orcamento(Map<String, dynamic> j, DetalheOrcamento? detalhe) {
     final nome = (j['profissional_nome'] as String?) ?? 'Profissional';
