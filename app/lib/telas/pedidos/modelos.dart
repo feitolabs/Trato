@@ -1,18 +1,11 @@
 import '../../componentes/componentes.dart';
+import '../profissional/dinheiro.dart';
 
 /// Modelos simples das telas de pedidos. Só descrevem o que é mostrado:
 /// quem decide status, aditivo e dinheiro é o backend.
 
 /// Formata centavos como "R$ 45,00" (só exibição, sem regra de dinheiro).
-String formatarReais(int centavos) {
-  final inteiro = centavos ~/ 100;
-  final resto = (centavos % 100).toString().padLeft(2, '0');
-  final milhares = inteiro.toString().replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+$)'),
-        (m) => '${m[1]}.',
-      );
-  return 'R\$ $milhares,$resto';
-}
+String formatarReais(int centavos) => Dinheiro.formatar(centavos);
 
 class PedidoResumo {
   const PedidoResumo({

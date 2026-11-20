@@ -17,14 +17,42 @@ abstract final class Dinheiro {
   static const int limiteDecimosHorasMaximo = 5000;
 
   /// 4650 -> "R$ 46,50". Milhar com ponto: 123456 -> "R$ 1.234,56".
+  /// Negativo: o sinal vem antes do R$ ("-R$ 10,25"); trabalha com o valor absoluto
+  /// (em Dart, -1025 ~/ 100 = -10 e -1025 % 100 = 75, o que erraria o valor).
   static String formatar(int centavos) {
-    final negativo = centavos < 0;
-    final absoluto = centavos.abs();
-    final reais = (absoluto ~/ 100).toString();
-    final cents = (absoluto % 100).toString().padLeft(2, '0');
-    final agrupado = reais.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
-    return '${negativo ? '-' : ''}R\$ $agrupado,$cents';
+    final (sinal, reais, cents) = _partes(centavos);
+    return '${sinal}R\$ ${_milhar(reais)},${_doisDigitos(cents)}';
   }
+
+  /// "R$ 200" (sem centavos quando redondo) ou "R$ 12,50". Só formata.
+  static String formatarCurto(int centavos) {
+    final (sinal, reais, cents) = _partes(centavos);
+    return cents == 0
+        ? '${sinal}R\$ ${_milhar(reais)}'
+        : '${sinal}R\$ ${_milhar(reais)},${_doisDigitos(cents)}';
+  }
+
+  /// Texto para preencher um campo de valor: 1025 -> "10,25" (sempre com 2 casas).
+  static String paraCampo(int centavos) {
+    final (sinal, reais, cents) = _partes(centavos);
+    return '$sinal$reais,${_doisDigitos(cents)}';
+  }
+
+  /// Como [paraCampo], mas sem a vírgula quando redondo: 1000 -> "10"; 1025 -> "10,25".
+  static String paraCampoSemZeros(int centavos) {
+    final (sinal, reais, cents) = _partes(centavos);
+    return cents == 0 ? '$sinal$reais' : '$sinal$reais,${_doisDigitos(cents)}';
+  }
+
+  static (String, int, int) _partes(int centavos) {
+    final absoluto = centavos.abs();
+    return (centavos < 0 ? '-' : '', absoluto ~/ 100, absoluto % 100);
+  }
+
+  static String _doisDigitos(int n) => n.toString().padLeft(2, '0');
+
+  static String _milhar(int reais) =>
+      reais.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
 
   /// "46", "46,5" ou "46,50" (ponto também vale) -> centavos. Vazio ou inválido -> null.
   /// Limita o comprimento para evitar overflow de inteiros de 64 bits.

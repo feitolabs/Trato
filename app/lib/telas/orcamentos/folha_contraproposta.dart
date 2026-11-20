@@ -5,6 +5,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/foco_rolagem.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
+import '../profissional/dinheiro.dart';
 import '../pedidos/pedido_aberto_tela.dart' show centavosDoTexto;
 
 /// Resultado da folha de negociação de valor e/ou prazo em dias.
@@ -81,11 +82,7 @@ Future<PropostaNegociacao?> pedirNovaPropostaProfissional(
   );
 }
 
-String _formatarEntradaReais(int centavos) {
-  final inteiro = centavos ~/ 100;
-  final resto = (centavos % 100).toString().padLeft(2, '0');
-  return '$inteiro,$resto';
-}
+String _formatarEntradaReais(int centavos) => Dinheiro.paraCampo(centavos);
 
 class _FolhaNegociacao extends StatefulWidget {
   const _FolhaNegociacao({
