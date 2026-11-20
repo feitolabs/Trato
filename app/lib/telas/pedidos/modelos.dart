@@ -39,6 +39,39 @@ class PedidoResumo {
   final String profissionalNome;
 }
 
+/// Oferta de exclusividade de 48h vista pelo cliente no detalhe do pedido.
+class OfertaExclusividadeCliente {
+  const OfertaExclusividadeCliente({
+    required this.id,
+    required this.pedidoId,
+    required this.status,
+    this.profissionalId = '',
+    this.profissionalNome,
+    this.notaPublica,
+    this.responderAte,
+    this.expiraEm,
+    this.texto = 'Sem compromisso',
+    this.outrosOrcamentosContinuamVisiveis = true,
+  });
+
+  final String id;
+  final String pedidoId;
+  final String profissionalId;
+  final String? profissionalNome;
+  final double? notaPublica;
+
+  /// `aguardando_cliente`, `ativa` ou `recusada`.
+  final String status;
+  final DateTime? responderAte;
+  final DateTime? expiraEm;
+  final String texto;
+  final bool outrosOrcamentosContinuamVisiveis;
+
+  bool get aguardandoCliente => status == 'aguardando_cliente';
+  bool get ativa => status == 'ativa';
+  bool get recusada => status == 'recusada';
+}
+
 enum EstadoAditivo { aguardando, aprovado, recusado }
 
 class Aditivo {

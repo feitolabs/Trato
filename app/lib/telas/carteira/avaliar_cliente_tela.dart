@@ -14,8 +14,8 @@ class AvaliarClienteTela extends StatefulWidget {
 
   final String pedidoNumero;
 
-  /// Manda a avaliação. Lança erro com mensagem se o servidor recusar.
-  final Future<void> Function(int nota, String comentario) aoEnviar;
+  /// Manda a avaliação e devolve os Tratinhos ganhos (0 ou null se nenhum). Lança erro se o servidor recusar.
+  final Future<Object?> Function(int nota, String comentario) aoEnviar;
 
   @override
   State<AvaliarClienteTela> createState() => _AvaliarClienteTelaState();
@@ -25,6 +25,7 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
   final _comentario = TextEditingController();
   var _nota = 0;
   var _enviando = false;
+  int? _moedasGanhas;
   String? _erro;
 
   @override
@@ -39,8 +40,17 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
       _erro = null;
     });
     try {
-      await widget.aoEnviar(_nota, _comentario.text.trim());
-      if (mounted) Navigator.of(context).pop(true);
+      final resultado = await widget.aoEnviar(_nota, _comentario.text.trim());
+      if (!mounted) return;
+      final ganhas = resultado is int ? resultado : 0;
+      if (ganhas > 0) {
+        setState(() {
+          _enviando = false;
+          _moedasGanhas = ganhas;
+        });
+      } else {
+        Navigator.of(context).pop(true);
+      }
     } on Object catch (e) {
       if (!mounted) return;
       setState(() {
@@ -61,11 +71,17 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
             AvisoFaixa(texto: _erro!, tipo: TipoStatus.perigo, icone: Icons.error_outline),
             const SizedBox(height: EspacosTrato.x3),
           ],
-          BotaoPrimario(
-            texto: 'Enviar avaliação',
-            carregando: _enviando,
-            aoTocar: _nota == 0 ? null : _enviar,
-          ),
+          if (_moedasGanhas != null)
+            BotaoPrimario(
+              texto: 'Continuar',
+              aoTocar: () => Navigator.of(context).pop(true),
+            )
+          else
+            BotaoPrimario(
+              texto: 'Enviar avaliação',
+              carregando: _enviando,
+              aoTocar: _nota == 0 ? null : _enviar,
+            ),
         ],
       ),
       children: [
@@ -88,6 +104,14 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
           dica: 'Ex.: local organizado, pagamento em dia',
           linhas: 3,
         ),
+        if (_moedasGanhas != null && _moedasGanhas! > 0) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          AvisoFaixa(
+            texto: '+$_moedasGanhas Tratinhos a liberar em 7 dias (se não houver disputa)',
+            tipo: TipoStatus.sucesso,
+            icone: Icons.stars_outlined,
+          ),
+        ],
       ],
     );
   }

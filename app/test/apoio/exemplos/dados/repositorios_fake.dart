@@ -49,8 +49,36 @@ class RepositorioPedidosFake implements RepositorioPedidos {
     faixaMaxCentavos: 50000,
   );
 
+  OfertaExclusividadeCliente? _ofertaExclusividade;
+
   @override
   Future<DadosDoPedido> dados(String pedidoId) async => _dadosDemo;
+
+  @override
+  Future<OfertaExclusividadeCliente?> ofertaExclusividade(String pedidoId) async =>
+      _ofertaExclusividade;
+
+  @override
+  Future<OfertaExclusividadeCliente> responderExclusividade(
+    String pedidoId,
+    String exclusividadeId,
+    String decisao,
+  ) async {
+    final atual = _ofertaExclusividade;
+    final novoStatus = decisao == 'aceitar' ? 'ativa' : 'recusada';
+    final resp = OfertaExclusividadeCliente(
+      id: exclusividadeId,
+      pedidoId: pedidoId,
+      status: novoStatus,
+      profissionalId: atual?.profissionalId ?? 'prof-1',
+      profissionalNome: atual?.profissionalNome ?? 'Carlos M.',
+      notaPublica: atual?.notaPublica ?? 4.9,
+      expiraEm: decisao == 'aceitar' ? DateTime.now().add(const Duration(hours: 48)) : null,
+      outrosOrcamentosContinuamVisiveis: true,
+    );
+    _ofertaExclusividade = resp;
+    return resp;
+  }
 
   @override
   Future<DadosDoPedido> editar(
@@ -67,12 +95,10 @@ class RepositorioPedidosFake implements RepositorioPedidos {
     _dadosDemo = DadosDoPedido(
       titulo: _dadosDemo.titulo,
       descricao: descricao ?? _dadosDemo.descricao,
-      faixaMinCentavos: faixaMinCentavos == 0
-          ? null
-          : (faixaMinCentavos ?? _dadosDemo.faixaMinCentavos),
-      faixaMaxCentavos: faixaMaxCentavos == 0
-          ? null
-          : (faixaMaxCentavos ?? _dadosDemo.faixaMaxCentavos),
+      faixaMinCentavos:
+          faixaMinCentavos == 0 ? null : (faixaMinCentavos ?? _dadosDemo.faixaMinCentavos),
+      faixaMaxCentavos:
+          faixaMaxCentavos == 0 ? null : (faixaMaxCentavos ?? _dadosDemo.faixaMaxCentavos),
       cep: cep ?? _dadosDemo.cep,
       logradouro: logradouro ?? _dadosDemo.logradouro,
       numero: numero ?? _dadosDemo.numero,
@@ -200,7 +226,8 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
     String? cupom,
     bool usarMoedas = false,
   }) async {
-    final base = (cupom ?? '').isEmpty ? pag.DadosExemplo.pagamento : await aplicarCupom(pedidoId, cupom!);
+    final base =
+        (cupom ?? '').isEmpty ? pag.DadosExemplo.pagamento : await aplicarCupom(pedidoId, cupom!);
     if (!usarMoedas) return base.copiarCom(moedasSaldo: 5000);
     return base.copiarCom(
       valorAgoraCentavos: base.valorAgoraCentavos - 5000,
@@ -327,7 +354,8 @@ class RepositorioChatFake implements RepositorioChat {
               ),
               MensagemChat(
                 tipo: TipoMensagem.texto,
-                texto: 'Olá! Vi seu relato sobre o pingamento no sifão. Posso passar amanhã às 10h para revisar a vedação.',
+                texto:
+                    'Olá! Vi seu relato sobre o pingamento no sifão. Posso passar amanhã às 10h para revisar a vedação.',
                 hora: '11h15',
               ),
               MensagemChat(tipo: TipoMensagem.foto, texto: '[Foto]', hora: '11h16'),
@@ -393,7 +421,8 @@ class RepositorioChatFake implements RepositorioChat {
               ),
               MensagemChat(
                 tipo: TipoMensagem.texto,
-                texto: 'Olá! O disjuntor geral desarma sempre que ligo o chuveiro e o forno juntos.',
+                texto:
+                    'Olá! O disjuntor geral desarma sempre que ligo o chuveiro e o forno juntos.',
                 hora: '13h05',
               ),
             ],
@@ -608,9 +637,7 @@ class RepositorioPerfilFake implements RepositorioPerfil {
     final base = per.DadosExemplo.perfil;
     final nomeUsuario = (sessao?.nome?.trim().isNotEmpty == true)
         ? sessao!.nome!.trim()
-        : (sessao?.email.isNotEmpty == true
-            ? sessao!.email.split('@').first
-            : base.nome);
+        : (sessao?.email.isNotEmpty == true ? sessao!.email.split('@').first : base.nome);
     if (sessao == null) return base;
     return PerfilCliente(
       nome: nomeUsuario,
@@ -629,7 +656,8 @@ class RepositorioPerfilFake implements RepositorioPerfil {
   }
 
   @override
-  String? get nomeSalvo => ServicoAuthPadrao.atual.sessaoAtual?.nome ?? per.DadosExemplo.perfil.nome;
+  String? get nomeSalvo =>
+      ServicoAuthPadrao.atual.sessaoAtual?.nome ?? per.DadosExemplo.perfil.nome;
 }
 
 class RepositorioProfissionalFake implements RepositorioProfissional {
@@ -679,10 +707,13 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   }
 
   final List<int> notasDoCliente = [];
+  int moedasAoAvaliarCliente = 50;
 
   @override
-  Future<void> avaliarCliente(String pedidoId, int nota, String comentario) async =>
-      notasDoCliente.add(nota);
+  Future<int> avaliarCliente(String pedidoId, int nota, String comentario) async {
+    notasDoCliente.add(nota);
+    return moedasAoAvaliarCliente;
+  }
 
   @override
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async => const DetalheValoresPedido(
@@ -693,8 +724,7 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
       );
 
   @override
-  ServicoOrcamento servicoOrcamento(String pedidoId) =>
-      ServicoOrcamentoFake();
+  ServicoOrcamento servicoOrcamento(String pedidoId) => ServicoOrcamentoFake();
 
   @override
   ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) => ServicoCheckInFake();
@@ -738,6 +768,34 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   @override
   Future<List<int>> baixarExtratoPdf({String? mes}) async =>
       '%PDF-1.4\n%Trato extrato fake\n%%EOF'.codeUnits;
+
+  ResumoExclusividades _exclusividades = const ResumoExclusividades(
+    saldoProfissional: 150,
+    limiteMaximo: 3,
+  );
+
+  @override
+  Future<ResumoExclusividades> minhasExclusividades() async => _exclusividades;
+
+  @override
+  Future<ExclusividadeProfissional> solicitarExclusividade(
+    String pedidoId,
+    String chaveIdempotencia,
+  ) async {
+    final existente = _exclusividades.itens.where((i) => i.pedidoId == pedidoId && i.emAndamento);
+    if (existente.isNotEmpty) return existente.first;
+    final saldoDepois = _exclusividades.saldoProfissional - 100;
+    final nova = ExclusividadeProfissional(
+      id: 'exc-$pedidoId',
+      pedidoId: pedidoId,
+      status: 'aguardando_cliente',
+      moedasCobradas: 100,
+      responderAte: DateTime.now().add(const Duration(hours: 6)),
+      saldoRestante: saldoDepois,
+    );
+    _exclusividades = _exclusividades.comNovaOferta(nova);
+    return nova;
+  }
 
   @override
   Future<bool> alterarDisponivelAgora(bool disponivel) async {

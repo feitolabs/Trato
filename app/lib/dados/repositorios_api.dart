@@ -39,8 +39,9 @@ String _doisDigitos(int n) => n.toString().padLeft(2, '0');
 String _dia(DateTime d) => '${_doisDigitos(d.day)}/${_doisDigitos(d.month)}';
 String _hora(DateTime d) => horaDoAparelho(d);
 
-Map<String, dynamic> _mapa(Object? json) =>
-    json is Map<String, dynamic> ? json : (json is Map ? Map<String, dynamic>.from(json) : const <String, dynamic>{});
+Map<String, dynamic> _mapa(Object? json) => json is Map<String, dynamic>
+    ? json
+    : (json is Map ? Map<String, dynamic>.from(json) : const <String, dynamic>{});
 List<Map<String, dynamic>> _lista(Object? json) => [
       for (final item in (json is List ? json : const []))
         if (item is Map) Map<String, dynamic>.from(item)
@@ -163,6 +164,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
           if (u is String && u.isNotEmpty) u,
       ],
       profissionalConvidadoId: j['profissional_convidado_id'] as String?,
+      estado: (j['estado'] as String?) ?? 'aberto',
     );
   }
 
@@ -181,8 +183,75 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   }
 
   @override
-  Future<DadosDoPedido> dados(String pedidoId) async =>
-      _dadosDeJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/dados')));
+  Future<DadosDoPedido> dados(String pedidoId) async {
+    final base = _dadosDeJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/dados')));
+    OfertaExclusividadeCliente? oferta;
+    try {
+      oferta = await ofertaExclusividade(pedidoId);
+    } on Object {
+      oferta = null;
+    }
+    if (oferta == null) return base;
+    return DadosDoPedido(
+      titulo: base.titulo,
+      descricao: base.descricao,
+      faixaMinCentavos: base.faixaMinCentavos,
+      faixaMaxCentavos: base.faixaMaxCentavos,
+      logradouro: base.logradouro,
+      numero: base.numero,
+      bairro: base.bairro,
+      complemento: base.complemento,
+      cep: base.cep,
+      referencia: base.referencia,
+      modalidade: base.modalidade,
+      fotos: base.fotos,
+      profissionalConvidadoId: base.profissionalConvidadoId,
+      estado: oferta.ativa ? 'reservado' : base.estado,
+      ofertaExclusividade: oferta,
+    );
+  }
+
+  @override
+  Future<OfertaExclusividadeCliente?> ofertaExclusividade(String pedidoId) async {
+    final resposta = await _api.get('/v1/pedidos/$pedidoId/exclusividade');
+    if (resposta == null) return null;
+    final j = _mapa(resposta);
+    if (j.isEmpty || j['id'] is! String) return null;
+    final o = OfertaExclusividadeApi.deJson(j);
+    return OfertaExclusividadeCliente(
+      id: o.id,
+      pedidoId: o.pedidoId,
+      profissionalId: o.profissionalId,
+      profissionalNome: o.profissionalNome,
+      notaPublica: o.notaPublica,
+      status: o.status,
+      responderAte: o.responderAte,
+      expiraEm: o.expiraEm,
+      texto: o.texto,
+    );
+  }
+
+  @override
+  Future<OfertaExclusividadeCliente> responderExclusividade(
+    String pedidoId,
+    String exclusividadeId,
+    String decisao,
+  ) async {
+    final j = _mapa(
+      await _api.post(
+        '/v1/pedidos/$pedidoId/exclusividade/$exclusividadeId/responder',
+        corpo: {'decisao': decisao},
+      ),
+    );
+    final r = RespostaExclusividadeApi.deJson(j);
+    return OfertaExclusividadeCliente(
+      id: r.id,
+      pedidoId: r.pedidoId,
+      status: r.status,
+      expiraEm: r.expiraEm,
+      outrosOrcamentosContinuamVisiveis: r.outrosOrcamentosContinuamVisiveis,
+    );
+  }
 
   @override
   Future<DadosDoPedido> editar(
@@ -270,6 +339,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   PedidoResumo _resumo(PedidoApi p) {
     final (texto, tipo) = switch (p.estado) {
       'aberto' => ('Aguardando orçamentos', TipoStatus.info),
+      'reservado' => ('Reservado (48h)', TipoStatus.sucesso),
       'orcamento_aceito' => ('Aguardando pagamento', TipoStatus.alerta),
       'pago_e_retido' => ('Pagamento confirmado · a agendar', TipoStatus.info),
       'agendado' => ('Agendado', TipoStatus.info),
@@ -328,16 +398,14 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       if ((rascunho.profissionalConvidadoId ?? '').trim().isNotEmpty)
         'profissional_convidado_id': rascunho.profissionalConvidadoId!.trim(),
       'respostas': [
-        for (final e in rascunho.respostas.entries)
-          {'pergunta_id': e.key, 'resposta': e.value},
+        for (final e in rascunho.respostas.entries) {'pergunta_id': e.key, 'resposta': e.value},
         if (rascunho.servicos.isNotEmpty)
           {'pergunta_id': 'servicos', 'resposta': rascunho.servicos.join(', ')},
         if (rascunho.quantidade > 0)
           {'pergunta_id': 'quantidade', 'resposta': rascunho.quantidade.toString()},
         if (rascunho.voltagem.isNotEmpty)
           {'pergunta_id': 'voltagem', 'resposta': rascunho.voltagem},
-        if (rascunho.prazo.isNotEmpty)
-          {'pergunta_id': 'prazo', 'resposta': rascunho.prazo},
+        if (rascunho.prazo.isNotEmpty) {'pergunta_id': 'prazo', 'resposta': rascunho.prazo},
       ],
     };
     // Só ASCII: a chave vai num cabeçalho HTTP e o nome do serviço tem acento ("Orçamento geral").
@@ -384,8 +452,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<PedidoEmExecucao> acompanhar(String pedidoId) async {
     // Em paralelo: pedido, eventos, saldo, aditivos e notas de materiais.
-    final ((pedido, eventosBrutos), (saldo, (aditivosBruto, notasBruto))) =
-        await emParalelo2(
+    final ((pedido, eventosBrutos), (saldo, (aditivosBruto, notasBruto))) = await emParalelo2(
       emParalelo2(
         _pedido(pedidoId),
         _api.get('/v1/pedidos/$pedidoId/eventos'),
@@ -504,16 +571,15 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     var totalNotas = 0;
     if (notasBruto is List) {
       final notasLista = _lista(notasBruto)
-        ..sort((a, b) => ((a['enviada_em'] as String?) ?? '')
-            .compareTo((b['enviada_em'] as String?) ?? ''));
+        ..sort((a, b) =>
+            ((a['enviada_em'] as String?) ?? '').compareTo((b['enviada_em'] as String?) ?? ''));
       for (var i = 0; i < notasLista.length; i++) {
         final n = notasLista[i];
         final valor = (n['total_centavos'] as num?)?.toInt() ?? 0;
         totalNotas += valor;
         final itens = [
           for (final item in (n['itens'] as List? ?? const []))
-            if (item is Map && item['descricao'] is String)
-              (item['descricao'] as String).trim(),
+            if (item is Map && item['descricao'] is String) (item['descricao'] as String).trim(),
         ].where((s) => s.isNotEmpty).toList();
         final enviadaRaw = n['enviada_em'] as String?;
         notas.add(
@@ -521,9 +587,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
             numero: i + 1,
             totalCentavos: valor,
             itensResumo: itens.join(', '),
-            enviadaEm: enviadaRaw == null
-                ? DateTime.now()
-                : DateTime.parse(enviadaRaw).toLocal(),
+            enviadaEm: enviadaRaw == null ? DateTime.now() : DateTime.parse(enviadaRaw).toLocal(),
           ),
         );
       }
@@ -649,7 +713,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
         'A gorjeta ainda não está disponível. Envie a avaliação sem gorjeta.',
       );
     }
-    final dadas = [for (final n in avaliacao.notas) if (n > 0) n];
+    final dadas = [
+      for (final n in avaliacao.notas)
+        if (n > 0) n
+    ];
     if (dadas.isEmpty) {
       throw const ErroTrato(TipoErro.recusado, 'Dê uma nota de 1 a 5 antes de enviar.');
     }
@@ -738,7 +805,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       cliente = null;
     }
     final remoto = dados['modalidade'] == 'remoto' || pedido.remoto;
-    final endereco = dados.isEmpty ? null : RepositorioPedidosApi.dadosDeJson(dados).enderecoCompleto;
+    final endereco =
+        dados.isEmpty ? null : RepositorioPedidosApi.dadosDeJson(dados).enderecoCompleto;
     String situacao(String? e) => switch (e) {
           'proposto' => 'aguardando sua aprovação',
           'aprovado' => 'aprovado, aguardando pagamento',
@@ -1108,8 +1176,8 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     final meio = metodo == MetodoPagamento.pix ? 'pix' : 'cartao';
     final cupomLimpo = (cupom ?? '').trim();
     final sufixoParcela = metodo == MetodoPagamento.cartao && parcelas > 1 ? '-${parcelas}x' : '';
-    final sufixoCupom = (cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}') +
-        (usarMoedas ? '-moedas' : '');
+    final sufixoCupom =
+        (cupomLimpo.isEmpty ? '' : '-${cupomLimpo.toUpperCase()}') + (usarMoedas ? '-moedas' : '');
     final j = _mapa(
       await _api.post(
         '/v1/contratos/$pedidoId/cobranca',
@@ -1187,8 +1255,7 @@ class RepositorioChatApi implements RepositorioChat {
   static MensagemChat _mensagem(Map<String, dynamic> m) {
     final bruto = (m['texto'] as String?) ?? '';
     final (contra, semContra) = ContrapropostaChat.ler(bruto);
-    final (agenda, texto) =
-        contra == null ? PropostaAgendaChat.ler(semContra) : (null, semContra);
+    final (agenda, texto) = contra == null ? PropostaAgendaChat.ler(semContra) : (null, semContra);
     return MensagemChat(
       id: (m['id'] as num?)?.toInt(),
       tipo: contra == null && agenda == null && ehMensagemFoto(bruto)
@@ -1251,16 +1318,15 @@ class RepositorioChatApi implements RepositorioChat {
   }
 
   Map<String, String>? _consulta(String? profissionalId) =>
-      profissionalId == null || profissionalId.isEmpty
-          ? null
-          : {'profissional_id': profissionalId};
+      profissionalId == null || profissionalId.isEmpty ? null : {'profissional_id': profissionalId};
 
   @override
   Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId}) async {
     final numero = PedidoApi.numeroDe(pedidoId);
     final ((mensagens, orcamentos), (pedidoObj, interlocutor)) = await emParalelo2(
       emParalelo2(
-        _api.get('/v1/pedidos/$pedidoId/mensagens', consulta: _consulta(profissionalId))
+        _api
+            .get('/v1/pedidos/$pedidoId/mensagens', consulta: _consulta(profissionalId))
             .then(_lista),
         _api
             .get('/v1/pedidos/$pedidoId/orcamentos')
@@ -1268,7 +1334,10 @@ class RepositorioChatApi implements RepositorioChat {
             .catchError((Object _) => const <Map<String, dynamic>>[]),
       ),
       emParalelo2(
-        _api.get('/v1/pedidos/$pedidoId').then<PedidoApi?>((b) => PedidoApi.deJson(_mapa(b))).catchError((Object e) {
+        _api
+            .get('/v1/pedidos/$pedidoId')
+            .then<PedidoApi?>((b) => PedidoApi.deJson(_mapa(b)))
+            .catchError((Object e) {
           if (e is ErroTrato && e.tipo != TipoErro.naoEncontrado) throw e;
           return null;
         }),
@@ -1699,7 +1768,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       id: j['id'] as String,
       titulo: j['titulo'] as String,
       bairro: (j['bairro'] as String?) ?? '',
-      prazo: urgente ? (prazo == null ? 'Urgente' : 'Urgente · até ${_dia(DateTime.parse(prazo))}') : textoData,
+      prazo: urgente
+          ? (prazo == null ? 'Urgente' : 'Urgente · até ${_dia(DateTime.parse(prazo))}')
+          : textoData,
       faixaMinCentavos: j['faixa_preco_min_centavos'] as int?,
       faixaMaxCentavos: j['faixa_preco_max_centavos'] as int?,
       urgente: urgente,
@@ -1710,6 +1781,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       clienteNome: j['cliente_nome'] as String?,
       modalidade: (j['modalidade'] as String?) ?? 'presencial',
       convidado: j['convidado'] == true,
+      estado: (j['estado'] as String?) ?? 'aberto',
+      permiteExclusividade: j['permite_exclusividade'] != false,
     );
   }
 
@@ -1805,8 +1878,19 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
           if (tentar(() => _orcamentoEnviado(j)) case final o?) o,
       ];
     }).catchError((Object _) {});
+    ResumoExclusividades? exclusividades;
+    final futExclusividades = minhasExclusividades().then((r) {
+      exclusividades = r;
+    }).catchError((Object _) {});
 
-    await Future.wait([futMe, futAbertos, futSaldo, futPedidos, futOrcamentos]);
+    await Future.wait([
+      futMe,
+      futAbertos,
+      futSaldo,
+      futPedidos,
+      futOrcamentos,
+      futExclusividades,
+    ]);
     if (!deuCerto && primeiroErro != null) throw primeiroErro!;
     final meuId = ServicoAuthPadrao.atual.sessaoAtual?.id ?? (me['id'] as String?);
     if (meuId != null) {
@@ -1834,6 +1918,41 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     }
     final nomeMe = ((me['nome'] as String?) ?? '').trim();
     final primeiroNome = nomeMe.isNotEmpty ? nomeMe.split(' ').first : 'Profissional';
+    final porPedido = <String, ExclusividadeProfissional>{};
+    if (exclusividades != null) {
+      for (final ex in exclusividades!.itens) {
+        if (ex.emAndamento) {
+          porPedido[ex.pedidoId] = ex;
+        }
+      }
+      abertos = [
+        for (final p in abertos)
+          if (porPedido[p.id] case final ex?)
+            PedidoAberto(
+              id: p.id,
+              titulo: p.titulo,
+              bairro: p.bairro,
+              distanciaKm: p.distanciaKm,
+              prazo: p.prazo,
+              orcaram: p.orcaram,
+              limiteOrcamentos: p.limiteOrcamentos,
+              faixaMinCentavos: p.faixaMinCentavos,
+              faixaMaxCentavos: p.faixaMaxCentavos,
+              urgente: p.urgente,
+              latitude: p.latitude,
+              longitude: p.longitude,
+              clienteId: p.clienteId,
+              clienteNome: p.clienteNome,
+              modalidade: p.modalidade,
+              convidado: p.convidado,
+              estado: p.estado,
+              permiteExclusividade: p.permiteExclusividade,
+              exclusividade: ex,
+            )
+          else
+            p,
+      ];
+    }
     return InicioProfissional(
       nome: primeiroNome.isEmpty ? 'Profissional' : primeiroNome,
       disponivelAgora: me['disponivel_agora'] == true,
@@ -1843,6 +1962,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       contratados: contratados,
       orcamentosEnviados: enviados,
       emAnalise: emAnalise,
+      exclusividades: exclusividades,
     );
   }
 
@@ -1892,7 +2012,10 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
           }
         }(),
     ]);
-    return {for (final e in achados) if (e != null) e.key: e.value};
+    return {
+      for (final e in achados)
+        if (e != null) e.key: e.value
+    };
   }
 
   PedidoContratado _contratado(PedidoApi p, [DadosDoPedido? dados]) {
@@ -1983,6 +2106,25 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       }
     }
     final aberto = _pedidoAberto(j);
+    ResumoExclusividades? exclusividades;
+    ExclusividadeProfissional? exclusividadeDoPedido;
+    var bloqueadoRecusa = false;
+    try {
+      exclusividades = await minhasExclusividades();
+      for (final ex in exclusividades.itens) {
+        if (ex.pedidoId == pedidoId && ex.emAndamento) {
+          exclusividadeDoPedido = ex;
+          break;
+        }
+      }
+      if (exclusividadeDoPedido == null && aberto.clienteId != null) {
+        bloqueadoRecusa = exclusividades.itens.any(
+          (ex) => ex.clienteId == aberto.clienteId && ex.status == 'recusada',
+        );
+      }
+    } on Object {
+      // Backend antigo sem rota de exclusividades: segue sem quebrar.
+    }
     // Resumo do que o cliente pediu de prazo (o nome já aparece em cima, com o avatar).
     final prazo = DateTime.tryParse('${j['prazo_desejado']}');
     final resumo = [
@@ -2003,6 +2145,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
           if ('${r['pergunta']}'.toLowerCase() != 'prazo')
             LinhaDetalhe('${r['pergunta']}', textoDaResposta(r['resposta'])),
       ],
+      exclusividade: exclusividadeDoPedido,
+      exclusividades: exclusividades,
+      bloqueadoRecusa: bloqueadoRecusa,
     );
   }
 
@@ -2122,14 +2267,67 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   /// `POST /v1/pedidos/{id}/avaliacao` `{nota_geral}`: o servidor vê que quem avalia é o
   /// profissional e grava como avaliação do cliente.
   @override
-  Future<void> avaliarCliente(String pedidoId, int nota, String comentario) async {
-    await _api.post(
+  Future<int> avaliarCliente(String pedidoId, int nota, String comentario) async {
+    final resposta = await _api.post(
       '/v1/pedidos/$pedidoId/avaliacao',
       corpo: {
         'nota_geral': nota,
         if (comentario.isNotEmpty) 'comentario': comentario,
       },
     );
+    if (resposta is Map && resposta['moedas_ganhas'] is int) {
+      return resposta['moedas_ganhas'] as int;
+    }
+    return 0;
+  }
+
+  ExclusividadeProfissional _exclusividadeDeApi(ExclusividadeApi ex) => ExclusividadeProfissional(
+        id: ex.id,
+        pedidoId: ex.pedidoId,
+        clienteId: ex.clienteId,
+        status: ex.status,
+        moedasCobradas: ex.moedasCobradas,
+        responderAte: ex.responderAte,
+        expiraEm: ex.expiraEm,
+        saldoRestante: ex.saldoRestante,
+      );
+
+  @override
+  Future<ResumoExclusividades> minhasExclusividades() async {
+    final lista = ListaExclusividadesApi.deJson(
+      _mapa(await _api.get('/v1/profissional/exclusividades')),
+    );
+    var pendentes = 0;
+    try {
+      final moedas = _mapa(await _api.get('/v1/me/moedas'));
+      pendentes = (moedas['moedas_pendentes_profissional'] as num?)?.toInt() ?? 0;
+    } on Object {
+      pendentes = 0;
+    }
+    return ResumoExclusividades(
+      itens: [for (final i in lista.itens) _exclusividadeDeApi(i)],
+      ativasOuPendentes: lista.ativasOuPendentes,
+      limiteMaximo: lista.limiteMaximo,
+      saldoProfissional: lista.saldoProfissional,
+      moedasPendentesProfissional: pendentes,
+    );
+  }
+
+  @override
+  Future<ExclusividadeProfissional> solicitarExclusividade(
+    String pedidoId,
+    String chaveIdempotencia,
+  ) async {
+    final resposta = _mapa(
+      await _api.post(
+        '/v1/profissional/exclusividades',
+        corpo: {
+          'pedido_id': pedidoId,
+          'chave_idempotencia': chaveIdempotencia,
+        },
+      ),
+    );
+    return _exclusividadeDeApi(ExclusividadeApi.deJson(resposta));
   }
 
   @override
@@ -2137,8 +2335,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       ServicoOrcamentoApi(_api, pedidoId: pedidoId);
 
   @override
-  ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) =>
-      ServicoCheckInApi(
+  ServicoCheckIn servicoCheckIn(String pedidoId, {bool remoto = false}) => ServicoCheckInApi(
         _api,
         pedidoId: pedidoId,
         captura: capturaDoPedido?.call(pedidoId) ?? captura,
@@ -2193,8 +2390,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     final corpo = <String, Object?>{
       'tipo_pix': tipoPix,
       'chave_pix': chavePix.trim(),
-      if (bancoCodigo != null && bancoCodigo.trim().isNotEmpty)
-        'banco_codigo': bancoCodigo.trim(),
+      if (bancoCodigo != null && bancoCodigo.trim().isNotEmpty) 'banco_codigo': bancoCodigo.trim(),
       if (bancoNome != null && bancoNome.trim().isNotEmpty) 'banco_nome': bancoNome.trim(),
       if (agencia != null && agencia.trim().isNotEmpty) 'agencia': agencia.trim(),
       if (conta != null && conta.trim().isNotEmpty) 'conta': conta.trim(),
@@ -2237,7 +2433,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         ),
     ];
     final statusApi = (j['status'] as String?) ?? 'enviado';
-    final sit = situacao ?? (j['aceito'] == true ? 'aceito' : (statusApi == 'enviado' ? 'aguardando' : 'encerrado'));
+    final sit = situacao ??
+        (j['aceito'] == true ? 'aceito' : (statusApi == 'enviado' ? 'aguardando' : 'encerrado'));
     return DetalheOrcamentoEnviado(
       orcamentoId: (j['id'] as String?) ?? orcamentoId,
       pedidoId: (j['pedido_id'] as String?) ?? '',
@@ -2325,9 +2522,8 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
       });
     }
 
-    final totalMaterial = pronto.materialPorMim
-        ? pronto.itens.fold(0, (s, i) => s + i.centavos)
-        : 0;
+    final totalMaterial =
+        pronto.materialPorMim ? pronto.itens.fold(0, (s, i) => s + i.centavos) : 0;
     final sinal = pronto.pedirSinalMaterial ? totalMaterial : 0;
 
     await _api.post(
