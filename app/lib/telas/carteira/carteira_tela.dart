@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
@@ -189,7 +190,7 @@ class _LinhaSaldos extends StatelessWidget {
               rotulo: 'A confirmar',
               cor: CoresTrato.ambarTexto,
               centavos: resumo.aLiberarCentavos,
-              texto: 'Repasse do dinheiro: ${resumo.textoALiberar}',
+              texto: 'Repasse do dinheiro: ${resumo.proximaLiberacao == null ? resumo.textoALiberar : diaMesDoAparelho(resumo.proximaLiberacao!)}',
             ),
           ),
         ],

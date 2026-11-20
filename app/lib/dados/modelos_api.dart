@@ -191,6 +191,7 @@ class ExclusividadeApi {
     this.expiraEm,
     this.encerradaEm,
     this.saldoRestante,
+    this.bloqueadoAte,
   });
 
   factory ExclusividadeApi.deJson(Map<String, dynamic> j) => ExclusividadeApi(
@@ -205,6 +206,7 @@ class ExclusividadeApi {
         expiraEm: _dataOuNulo(j['expira_em']),
         encerradaEm: _dataOuNulo(j['encerrada_em']),
         saldoRestante: (j['saldo_restante'] as num?)?.toInt(),
+        bloqueadoAte: DateTime.tryParse('${j['bloqueado_ate'] ?? ''}'),
       );
 
   final String id;
@@ -218,6 +220,9 @@ class ExclusividadeApi {
   final DateTime? expiraEm;
   final DateTime? encerradaEm;
   final int? saldoRestante;
+
+  /// Fim do bloqueio depois de uma recusa (só em `recusada`). Pode já ter passado.
+  final DateTime? bloqueadoAte;
 }
 
 class ListaExclusividadesApi {

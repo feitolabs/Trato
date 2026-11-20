@@ -45,6 +45,9 @@ class PerfilCliente {
     this.moedasPendentes = 0,
     this.moedasProximaLiberacao,
     this.moedasValorCentavos,
+    this.moedasVenceEm,
+    this.tetoDescontoMesCentavos,
+    this.descontoUsadoMesCentavos,
   });
 
   /// Tratinhos de avaliação ainda em espera (valem 7 dias depois, sem disputa) e a data em que
@@ -52,6 +55,11 @@ class PerfilCliente {
   final int moedasPendentes;
   final DateTime? moedasProximaLiberacao;
   final int? moedasValorCentavos;
+
+  /// Opcionais (API nova): quando o saldo vence e quanto do teto mensal de desconto já foi usado.
+  final DateTime? moedasVenceEm;
+  final int? tetoDescontoMesCentavos;
+  final int? descontoUsadoMesCentavos;
 
   /// O backend diz se o desconto das moedas está disponível. Ausente = true.
   final bool moedasDescontoDisponivel;
