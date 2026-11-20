@@ -676,7 +676,10 @@ def test_perfil_publico_traz_portfolio_e_avaliacoes_anonimas(e2):
     recentes = corpo["avaliacoes_recentes"]
     assert len(recentes) == 5
     assert set(recentes[0]) == {"nota", "comentario", "data"}
-    assert recentes[0]["comentario"] == "Comentário 6"  # a mais nova primeiro
+    assert recentes[0]["data"] == "2026-11-04"  # a mais nova primeiro
+    # Sem moderação ainda: o comentário fica null mesmo quando a avaliação tem texto.
+    assert all(a["comentario"] is None for a in recentes)
+    assert "Comentário" not in r.text
     assert recentes[0]["data"] == "2026-11-04"
     assert "do outro lado" not in r.text  # só avaliações de clientes sobre o profissional
     for proibido in ("cli-secreto", "ped-", "pontual", "telefone", "email", "cpf", "endereco"):

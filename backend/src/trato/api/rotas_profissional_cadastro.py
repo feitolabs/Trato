@@ -831,6 +831,9 @@ class AvaliacaoAnonimaOut(BaseModel):
 
 MAX_PORTFOLIO_PUBLICO = 6
 MAX_AVALIACOES_PUBLICAS = 5
+# Sem moderação ainda: o comentário do cliente NÃO sai na rota pública (vem sempre null).
+# Liberar (True) só quando houver moderação dos comentários.
+PERFIL_PUBLICO_EXIBE_COMENTARIO = False
 
 
 class PerfilSitePublicoOut(BaseModel):
@@ -903,7 +906,7 @@ def _avaliacoes_publicas(contexto: Contexto, profissional_id: str) -> list[Avali
     return [
         AvaliacaoAnonimaOut(
             nota=a.nota_geral,
-            comentario=a.comentario or None,
+            comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
             data=a.criada_em.astimezone(ZoneInfo("America/Sao_Paulo")).date(),
         )
         for a in itens[:MAX_AVALIACOES_PUBLICAS]
