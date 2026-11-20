@@ -164,4 +164,74 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+  group('Exclusividade (Etapa B)', () {
+    const chaves = {
+      'bonus_avaliacao_profissional_moedas': '50',
+      'exclusividade_custo_moedas': '100',
+      'exclusividade_duracao_horas': '48',
+      'exclusividade_max_simultaneas': '3',
+      'exclusividade_prazo_resposta_horas': '6',
+      'exclusividade_bloqueio_recusa_dias': '30',
+    };
+
+    testWidgets('mostra a seção e os 6 campos com os valores, sem formato de reais', (tester) async {
+      await abrirPainel(tester, secao: 'moedas');
+      expect(find.text('Tratinhos do profissional e exclusividade'), findsOneWidget);
+      for (final e in chaves.entries) {
+        final campo = find.byKey(ValueKey('moedas-campo-${e.key}'));
+        expect(tester.widget<TextField>(campo).controller!.text, e.value);
+      }
+      expect(find.text('Bônus do profissional por avaliar um cliente (Tratinhos)'), findsOneWidget);
+      expect(find.text('Dias de bloqueio depois de uma recusa'), findsOneWidget);
+      expect(find.text('Duração da exclusividade (horas)'), findsOneWidget);
+    });
+
+    testWidgets('salvar envia os inteiros certos com motivo', (tester) async {
+      final api = ApiFake();
+      await abrirPainel(tester, api: api, secao: 'moedas');
+      await tester.enterText(find.byKey(const ValueKey('moedas-campo-exclusividade_custo_moedas')), '120');
+      await tester.enterText(find.byKey(const ValueKey('moedas-campo-exclusividade_duracao_horas')), '72');
+      await tester.enterText(find.byKey(const ValueKey('moedas-campo-exclusividade_max_simultaneas')), '5');
+      await tester.pump();
+      final salvar = find.widgetWithText(FilledButton, 'Salvar configuração');
+      await tester.ensureVisible(salvar);
+      await tester.tap(salvar);
+      await tester.pumpAndSettle();
+      await confirmarMotivo(tester, 'Salvar configuração', motivo: 'Ajuste da exclusividade');
+      final x = api.moedasConfigAtual.extras;
+      expect(x['exclusividade_custo_moedas'], 120);
+      expect(x['exclusividade_duracao_horas'], 72);
+      expect(x['exclusividade_max_simultaneas'], 5);
+      expect(x['bonus_avaliacao_profissional_moedas'], 50);
+      expect(x['exclusividade_prazo_resposta_horas'], 6);
+      expect(x['exclusividade_bloqueio_recusa_dias'], 30);
+    });
+
+    testWidgets('valor que não é inteiro bloqueia o salvamento', (tester) async {
+      await abrirPainel(tester, secao: 'moedas');
+      await tester.enterText(find.byKey(const ValueKey('moedas-campo-exclusividade_custo_moedas')), '1,5');
+      await tester.pump();
+      final salvar = find.widgetWithText(FilledButton, 'Salvar configuração');
+      expect(tester.widget<FilledButton>(salvar).onPressed, isNull);
+    });
+
+    testWidgets('campo ausente esconde só o campo', (tester) async {
+      await abrirPainel(
+        tester,
+        api: ApiFake(moedasSemChaves: {'exclusividade_custo_moedas'}),
+        secao: 'moedas',
+      );
+      expect(find.byKey(const ValueKey('moedas-campo-exclusividade_custo_moedas')), findsNothing);
+      expect(find.byKey(const ValueKey('moedas-campo-exclusividade_duracao_horas')), findsOneWidget);
+      expect(find.text('Tratinhos do profissional e exclusividade'), findsOneWidget);
+    });
+
+    testWidgets('backend antigo: sem a seção e a tela não quebra', (tester) async {
+      await abrirPainel(tester, api: ApiFake(moedasSemExtras: true), secao: 'moedas');
+      expect(find.text('Tratinhos do profissional e exclusividade'), findsNothing);
+      expect(find.byKey(const ValueKey('moedas-campo-validade_dias')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
 }

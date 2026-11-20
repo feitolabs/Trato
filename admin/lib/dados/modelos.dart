@@ -976,7 +976,21 @@ class MoedasConfig {
     required this.tetoDescontoClienteMesCentavos,
     required this.tetoDiarioDescontoCentavos,
     required this.diasLiberacaoBonus,
+    this.extras = const {},
   });
+
+  /// Campos de exclusividade e bônus do profissional (inteiros). Só entram as chaves que o backend
+  /// mandou: backend antigo = mapa vazio e a tela esconde esses campos.
+  final Map<String, int> extras;
+
+  static const chavesExtras = [
+    'bonus_avaliacao_profissional_moedas',
+    'exclusividade_custo_moedas',
+    'exclusividade_duracao_horas',
+    'exclusividade_max_simultaneas',
+    'exclusividade_prazo_resposta_horas',
+    'exclusividade_bloqueio_recusa_dias',
+  ];
 
   final bool ativo;
   final int bonusAvaliacaoMoedas;

@@ -1330,6 +1330,10 @@ class ApiAdminHttp implements ApiAdmin {
         tetoDescontoClienteMesCentavos: _int(c['teto_desconto_cliente_mes_centavos']),
         tetoDiarioDescontoCentavos: _int(c['teto_diario_desconto_centavos']),
         diasLiberacaoBonus: _int(c['dias_liberacao_bonus']),
+        extras: {
+          for (final k in MoedasConfig.chavesExtras)
+            if (c[k] is num) k: (c[k] as num).toInt(),
+        },
       );
 
   @override
@@ -1370,6 +1374,7 @@ class ApiAdminHttp implements ApiAdmin {
         'teto_desconto_cliente_mes_centavos': config.tetoDescontoClienteMesCentavos,
         'teto_diario_desconto_centavos': config.tetoDiarioDescontoCentavos,
         'dias_liberacao_bonus': config.diasLiberacaoBonus,
+        ...config.extras,
         'motivo': motivo,
       },
     ));

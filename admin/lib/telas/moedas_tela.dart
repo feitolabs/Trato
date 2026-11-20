@@ -244,6 +244,7 @@ class _CampoConfig {
 class _FormularioMoedasState extends State<_FormularioMoedas> {
   late bool _ativo = widget.config.ativo;
   late final Map<String, _CampoConfig> _campos = _montar(widget.config);
+  late final Map<String, _CampoConfig> _extras = _montarExtras(widget.config);
 
   static Map<String, _CampoConfig> _montar(MoedasConfig c) {
     _CampoConfig n(String chave, String rotulo, int v, {String? sufixo, String? ajuda}) =>
@@ -268,15 +269,33 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
     return {for (final c in lista) c.chave: c};
   }
 
+  /// Seção "Tratinhos do profissional e exclusividade": quantidades e prazos (não são dinheiro).
+  /// Só entram os campos que o backend mandou.
+  static Map<String, _CampoConfig> _montarExtras(MoedasConfig c) {
+    const defs = [
+      ('bonus_avaliacao_profissional_moedas', 'Bônus do profissional por avaliar um cliente (Tratinhos)'),
+      ('exclusividade_custo_moedas', 'Custo da exclusividade (Tratinhos)'),
+      ('exclusividade_duracao_horas', 'Duração da exclusividade (horas)'),
+      ('exclusividade_max_simultaneas', 'Máximo de exclusividades ao mesmo tempo'),
+      ('exclusividade_prazo_resposta_horas', 'Prazo para o cliente responder (horas)'),
+      ('exclusividade_bloqueio_recusa_dias', 'Dias de bloqueio depois de uma recusa'),
+    ];
+    return {
+      for (final (chave, rotulo) in defs)
+        if (c.extras.containsKey(chave))
+          chave: _CampoConfig(chave, rotulo, TextEditingController(text: '${c.extras[chave]}')),
+    };
+  }
+
   @override
   void dispose() {
-    for (final c in _campos.values) {
+    for (final c in [..._campos.values, ..._extras.values]) {
       c.texto.dispose();
     }
     super.dispose();
   }
 
-  bool get _valido => _campos.values.every((c) => c.valor != null);
+  bool get _valido => [..._campos.values, ..._extras.values].every((c) => c.valor != null);
 
   MoedasConfig _montarConfig() {
     int v(String chave) => _campos[chave]!.valor!;
@@ -294,6 +313,7 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
       tetoDescontoClienteMesCentavos: v('teto_desconto_cliente_mes_centavos'),
       tetoDiarioDescontoCentavos: v('teto_diario_desconto_centavos'),
       diasLiberacaoBonus: v('dias_liberacao_bonus'),
+      extras: {for (final e in _extras.entries) e.key: e.value.valor!},
     );
   }
 
@@ -355,6 +375,20 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
               children: [for (final campo in _campos.values) SizedBox(width: largura, child: _campo(campo))],
             );
           }),
+          if (_extras.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x6),
+            Text('Tratinhos do profissional e exclusividade', style: TipografiaTrato.secao),
+            const SizedBox(height: EspacosTrato.x3),
+            LayoutBuilder(builder: (context, c) {
+              final colunas = c.maxWidth >= 900 ? 3 : (c.maxWidth >= 560 ? 2 : 1);
+              final largura = (c.maxWidth - EspacosTrato.x4 * (colunas - 1)) / colunas;
+              return Wrap(
+                spacing: EspacosTrato.x4,
+                runSpacing: EspacosTrato.x4,
+                children: [for (final campo in _extras.values) SizedBox(width: largura, child: _campo(campo))],
+              );
+            }),
+          ],
           const SizedBox(height: EspacosTrato.x4),
           Align(
             alignment: Alignment.centerRight,
