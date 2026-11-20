@@ -311,6 +311,15 @@ class _CartaoCarteira extends StatelessWidget {
               style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
           ],
+          for (final l in carteira.liberacoesPrevistas) ...[
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              'Pedido ${l.pedidoNumero} · ${formatarReais(l.valorCentavos)}'
+              '${l.liberacaoPrevistaEm == null ? '' : ' · ${diaMesDoAparelho(l.liberacaoPrevistaEm!)}'}',
+              key: const Key('liberacao-prevista'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ],
         ],
       ),
     );

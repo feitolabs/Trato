@@ -193,11 +193,22 @@ class EstadoCarregando extends StatelessWidget {
 }
 
 class EstadoVazio extends StatelessWidget {
-  const EstadoVazio({super.key, required this.icone, required this.titulo, required this.texto});
+  const EstadoVazio({
+    super.key,
+    required this.icone,
+    required this.titulo,
+    required this.texto,
+    this.textoAcao,
+    this.aoAcao,
+  });
 
   final IconData icone;
   final String titulo;
   final String texto;
+
+  /// Ação opcional (botão) abaixo do texto; só aparece com [textoAcao] e [aoAcao].
+  final String? textoAcao;
+  final VoidCallback? aoAcao;
 
   @override
   Widget build(BuildContext context) {
@@ -228,6 +239,10 @@ class EstadoVazio extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                   ),
+                  if (textoAcao != null && aoAcao != null) ...[
+                    const SizedBox(height: EspacosTrato.x4),
+                    BotaoSecundario(texto: textoAcao!, aoTocar: aoAcao!),
+                  ],
                 ],
               ),
             ),

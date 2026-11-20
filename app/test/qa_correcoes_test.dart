@@ -64,6 +64,10 @@ void main() {
     testWidgets('Ver pedidos no fluxo de Novo Pedido vai para a aba Pedidos',
         (tester) async {
       ligarDemoNosTestes();
+      // Enviar pedido exige sessão (sem ela o app pede para criar conta; ver F6).
+      final auth = ServicoAuthFake();
+      await auth.entrarComEmail(email: 'ana@teste.com', senha: 'senha-forte-1');
+      ServicoAuthPadrao.atual = auth;
       await _abrir(tester, const CascaClienteTela(abaInicial: 0));
 
       await tester.tap(find.text('Pedir orçamento'));

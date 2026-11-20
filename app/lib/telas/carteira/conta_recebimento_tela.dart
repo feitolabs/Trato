@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../profissional_apoio/apoio.dart';
 import 'modelos.dart';
 
@@ -23,16 +24,39 @@ class ContaRecebimentoTela extends StatefulWidget {
     super.key,
     required this.inicial,
     required this.aoSalvar,
+    this.carregarProximaLiberacao,
   });
 
   final ContaRecebimento inicial;
   final SalvarContaRecebimento aoSalvar;
+
+  /// Data do próximo repasse (`proxima_liberacao_em`), se o backend informar. Falha = sem data.
+  final Future<DateTime?> Function()? carregarProximaLiberacao;
 
   @override
   State<ContaRecebimentoTela> createState() => _ContaRecebimentoTelaState();
 }
 
 class _ContaRecebimentoTelaState extends State<ContaRecebimentoTela> {
+  DateTime? _proximaLiberacao;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarProximaLiberacao();
+  }
+
+  Future<void> _carregarProximaLiberacao() async {
+    final carregar = widget.carregarProximaLiberacao;
+    if (carregar == null) return;
+    try {
+      final data = await carregar();
+      if (mounted && data != null) setState(() => _proximaLiberacao = data);
+    } on Object {
+      // Sem a data o texto geral continua valendo; falha aqui não atrapalha a tela.
+    }
+  }
+
   static const _tiposPix = <String, String>{
     'cpf': 'CPF (titular)',
     'cnpj': 'CNPJ',
@@ -125,9 +149,19 @@ class _ContaRecebimentoTelaState extends State<ContaRecebimentoTela> {
                     ),
                     const SizedBox(height: EspacosTrato.x2),
                     Text(
-                      'Quando o prazo de liberação de um serviço concluído terminar, '
-                      'o repasse é enviado para a conta do mesmo titular abaixo.',
+                      _proximaLiberacao == null
+                          ? 'Quando o prazo de liberação de um serviço concluído terminar, '
+                              'o repasse é enviado para a conta do mesmo titular abaixo.'
+                          : 'Próximo repasse previsto: ${diaMesDoAparelho(_proximaLiberacao!)}, '
+                              'para a conta do mesmo titular abaixo.',
+                      key: const Key('texto-repasse'),
                       style: TipografiaTrato.corpo
+                          .copyWith(color: CoresTrato.textoSecundario),
+                    ),
+                    const SizedBox(height: EspacosTrato.x2),
+                    Text(
+                      'Para proteger seu pagamento contra fraude, a conta precisa estar no seu nome.',
+                      style: TipografiaTrato.corpoPequeno
                           .copyWith(color: CoresTrato.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x5),

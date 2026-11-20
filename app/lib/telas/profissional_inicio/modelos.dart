@@ -212,15 +212,32 @@ class DetalheOrcamentoEnviado {
       ];
 }
 
+/// Um repasse previsto: pedido, valor em centavos e a data prevista (pode faltar).
+class LiberacaoPrevista {
+  const LiberacaoPrevista({
+    required this.pedidoNumero,
+    required this.valorCentavos,
+    this.liberacaoPrevistaEm,
+  });
+
+  final String pedidoNumero;
+  final int valorCentavos;
+  final DateTime? liberacaoPrevistaEm;
+}
+
 class ResumoCarteira {
   const ResumoCarteira({
     required this.retidoCentavos,
     required this.paraSacarCentavos,
     this.proximaLiberacao,
+    this.liberacoesPrevistas = const [],
   });
 
   final int retidoCentavos;
   final int paraSacarCentavos;
+
+  /// Repasses a caminho (`liberacoes_previstas`); vazio quando o backend não informa.
+  final List<LiberacaoPrevista> liberacoesPrevistas;
 
   /// Próxima liberação do repasse (`proxima_liberacao_em`); nulo = sem data.
   final DateTime? proximaLiberacao;

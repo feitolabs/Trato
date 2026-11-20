@@ -19,7 +19,7 @@ enum TextoLegal {
 }
 
 /// Aviso fixo no alto de cada texto legal.
-const avisoRascunhoLegal = 'Documento oficial vigente no piloto vigente. '
+const avisoRascunhoLegal = 'Documento oficial em vigor durante o piloto. '
     'Dúvidas ou exercício de direitos LGPD: privacidade@trato.app.br.';
 
 /// Índice com os dois textos (Termos de uso e Política de privacidade).

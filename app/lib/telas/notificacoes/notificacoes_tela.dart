@@ -54,10 +54,12 @@ class NotificacoesTela extends StatelessWidget {
         construir: (context, itens, _) {
           final recarregar = AtualizadorTela.de(context);
           if (itens.isEmpty) {
-            const vazio = EstadoVazio(
+            final vazio = EstadoVazio(
               icone: Icons.notifications_none,
               titulo: 'Nada por aqui',
               texto: 'Quando houver novidades dos seus pedidos, elas aparecem aqui.',
+              textoAcao: aoAbrirPreferencias == null ? null : 'Ajustar avisos',
+              aoAcao: aoAbrirPreferencias,
             );
             return recarregar == null
                 ? vazio

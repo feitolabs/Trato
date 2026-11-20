@@ -1605,6 +1605,8 @@ abstract final class RotasTrato {
         builder: (_) => ContaRecebimentoTela(
           inicial: atual,
           aoSalvar: repos.profissional.salvarContaRecebimento,
+          carregarProximaLiberacao: () async =>
+              (await repos.profissional.inicio()).carteira.proximaLiberacao,
         ),
       ),
     );
@@ -2128,6 +2130,7 @@ abstract final class RotasTrato {
                 emAndamento: p.emAndamento,
                 finalizados: p.finalizados,
                 aoAbrirPedido: (pedido) => abrirPedido(context, pedido),
+                aoFazerPedido: () => abrirNovoPedido(context),
               ),
             ),
             floatingActionButton: FloatingActionButton.extended(

@@ -71,7 +71,7 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
       return 'Informe um valor maior que zero.';
     }
     if (_centavos! > Dinheiro.limiteAditivoMaximoCentavos) {
-      return 'Valor acima do limite permitido de ${Dinheiro.formatar(Dinheiro.limiteAditivoMaximoCentavos)}.';
+      return 'Esse valor passa do limite do aditivo. Combine no chat e feche um novo orçamento.';
     }
     return null;
   }
