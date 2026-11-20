@@ -58,6 +58,7 @@ import '../nota_material/nota_material.dart';
 import '../nota_material/ver_nota_tela.dart';
 import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
+import '../comuns/botao_de_confianca.dart';
 import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
 import '../comuns/sucesso_acao_tela.dart';
@@ -1837,6 +1838,19 @@ abstract final class RotasTrato {
                         ),
                         (rota) => false,
                       ),
+                      aoChamarDeNovo: (f) => abrirNovoPedido(
+                        context,
+                        profissionalConvidado: Profissional(
+                          id: f.profissionalId,
+                          nome: f.nome ?? 'Profissional',
+                          iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
+                          verificacao: '',
+                          especialidade: '',
+                          servicosConcluidos: f.servicos ?? 0,
+                          nota: f.nota ?? 0,
+                          distanciaKm: 0,
+                        ),
+                      ),
                       aoAbrir: (f) => abrirPerfil(
                         context,
                         Profissional(
@@ -2926,11 +2940,26 @@ abstract final class RotasTrato {
                         proximaLiberacao: saldo?.moedasProximaLiberacao,
                         valorMoedaCentavos: saldo?.moedasValorCentavos,
                         aoContinuar: () => _voltarAoInicio(ctxSucesso),
+                        acaoExtra: dados.profissionalId == null
+                            ? null
+                            : BotaoDeConfianca(
+                                clara: true,
+                                jaEFavorito: () async => (await _conta.favoritos())
+                                    .any((f) => f.profissionalId == dados.profissionalId),
+                                favoritar: () => _conta.favoritar(dados.profissionalId!),
+                              ),
                       )
                     : SucessoAcaoTela(
                         titulo: 'Avaliação enviada!',
                         subtitulo: 'Obrigado por avaliar o profissional.',
                         aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+                        acaoExtra: dados.profissionalId == null
+                            ? null
+                            : BotaoDeConfianca(
+                                jaEFavorito: () async => (await _conta.favoritos())
+                                    .any((f) => f.profissionalId == dados.profissionalId),
+                                favoritar: () => _conta.favoritar(dados.profissionalId!),
+                              ),
                       ),
                 substituirAtual: true,
               );

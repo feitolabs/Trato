@@ -745,6 +745,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       gorjetasCentavos: textos.gorjetas,
       // Sem rota de gorjeta no servidor: a tela não oferece o que não dá para pagar.
       gorjetaDisponivel: false,
+      profissionalId: pedido.profissionalId,
     );
   }
 
