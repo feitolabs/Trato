@@ -19,6 +19,7 @@ import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_out.dart';
 import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
+import '../telas/comuns/desconto_moedas.dart';
 import '../telas/comuns/formato_aparelho.dart';
 import 'cliente_api.dart';
 import 'config_publica.dart';
@@ -1025,6 +1026,12 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
       moedasSaldo: (j['moedas_saldo'] as num?)?.toInt() ?? 0,
       moedasUsadas: (j['moedas_usadas'] as num?)?.toInt() ?? 0,
       moedasDescontoCentavos: (j['moedas_desconto_centavos'] as num?)?.toInt() ?? 0,
+      moedaValorCentavos: (j['valor_moeda_centavos'] as num?)?.toInt(),
+      descontoPossivelCentavos: (j['desconto_possivel_centavos'] as num?)?.toInt(),
+      descontoVoltaEm: lerDataIso(j['desconto_volta_em']),
+      descontoDisponivel: j['desconto_disponivel'] != false, // ausente (backend antigo) = true
+      descontoIndisponivelMotivo:
+          MotivoDescontoIndisponivel.deTexto(j['desconto_indisponivel_motivo']),
       parcelamento: [
         for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
           OpcaoParcelamento(
@@ -1562,14 +1569,32 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       if (concluidos != null) '$concluidos ${concluidos == 1 ? 'serviço' : 'serviços'}',
     ];
     int? moedas;
+    var descontoDisponivel = true;
+    MotivoDescontoIndisponivel? motivo;
+    var pendentes = 0;
+    DateTime? liberacao;
+    DateTime? voltaEm;
+    int? valorMoeda;
     try {
       final m = _mapa(await _api.get('/v1/me/moedas'));
       moedas = m['saldo'] as int?;
+      pendentes = (m['moedas_pendentes'] as num?)?.toInt() ?? 0; // ausente = 0
+      liberacao = lerDataIso(m['proxima_liberacao']);
+      voltaEm = lerDataIso(m['desconto_volta_em']);
+      valorMoeda = (m['valor_moeda_centavos'] as num?)?.toInt();
+      descontoDisponivel = m['desconto_disponivel'] != false; // ausente = true
+      motivo = MotivoDescontoIndisponivel.deTexto(m['desconto_indisponivel_motivo']);
     } on Object {
       moedas = null; // moedas são extra: falha aqui não derruba o perfil
     }
     return PerfilCliente(
       moedas: moedas,
+      moedasDescontoDisponivel: descontoDisponivel,
+      moedasDescontoMotivo: motivo,
+      moedasDescontoVoltaEm: voltaEm,
+      moedasPendentes: pendentes,
+      moedasProximaLiberacao: liberacao,
+      moedasValorCentavos: valorMoeda,
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),

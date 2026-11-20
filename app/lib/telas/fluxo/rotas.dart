@@ -1764,6 +1764,12 @@ abstract final class RotasTrato {
       resumo: p.resumo,
       fotoReferencia: p.fotoReferencia,
       moedas: p.moedas,
+      moedasDescontoDisponivel: p.moedasDescontoDisponivel,
+      moedasDescontoMotivo: p.moedasDescontoMotivo,
+      moedasDescontoVoltaEm: p.moedasDescontoVoltaEm,
+      moedasPendentes: p.moedasPendentes,
+      moedasProximaLiberacao: p.moedasProximaLiberacao,
+      moedasValorCentavos: p.moedasValorCentavos,
       grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
     );
   }
@@ -2647,11 +2653,24 @@ abstract final class RotasTrato {
             });
             if (ok && context.mounted) {
               pedidosMudaram.value++;
+              // Tratinhos em espera e valor de cada um: extras; se falhar, só não mostra a linha.
+              PerfilCliente? saldo;
+              if (moedas > 0) {
+                try {
+                  saldo = await repos.perfil.carregar();
+                } on Object {
+                  saldo = null;
+                }
+              }
+              if (!context.mounted) return;
               await _abrirSucesso<void>(
                 context,
                 (ctxSucesso) => moedas > 0
                     ? MoedasGanhasTela(
                         moedas: moedas,
+                        pendentes: saldo?.moedasPendentes ?? 0,
+                        proximaLiberacao: saldo?.moedasProximaLiberacao,
+                        valorMoedaCentavos: saldo?.moedasValorCentavos,
                         aoContinuar: () => _voltarAoInicio(ctxSucesso),
                       )
                     : SucessoAcaoTela(

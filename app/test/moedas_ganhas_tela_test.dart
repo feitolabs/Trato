@@ -13,18 +13,18 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 3));
     expect(find.text('+50'), findsOneWidget);
-    expect(find.text('moedas do Trato'), findsOneWidget);
+    expect(find.text('Tratinhos'), findsOneWidget);
     await tester.tap(find.text('Continuar'));
     expect(continuou, isTrue);
   });
 
-  testWidgets('uma moeda fica no singular', (tester) async {
+  testWidgets('um Tratinho fica no singular', (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: TemaTrato.claro,
       home: MoedasGanhasTela(moedas: 1, aoContinuar: () {}),
     ));
     await tester.pump();
     await tester.pump(const Duration(seconds: 3));
-    expect(find.text('moeda do Trato'), findsOneWidget);
+    expect(find.text('Tratinho'), findsOneWidget);
   });
 }

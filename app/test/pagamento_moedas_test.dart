@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/telas/pagamento/modelos.dart';
 import 'package:trato/telas/pagamento/pagamento_tela.dart';
 import 'package:trato/tema/tema.dart';
 
@@ -22,15 +21,15 @@ void main() {
         },
       ),
     ));
-    expect(find.text('Você tem 5000 moedas do Trato'), findsOneWidget);
+    expect(find.text('Você tem 5000 Tratinhos'), findsOneWidget);
     await tester.tap(find.byKey(const Key('interruptor-moedas')));
     await tester.pumpAndSettle();
     expect(pedidos, [true]);
-    expect(find.textContaining('Usando 5000 moedas'), findsOneWidget);
+    expect(find.textContaining('Usando 5000 Tratinhos'), findsOneWidget);
     await tester.tap(find.byKey(const Key('interruptor-moedas')));
     await tester.pumpAndSettle();
     expect(pedidos, [true, false]);
-    expect(find.text('Você tem 5000 moedas do Trato'), findsOneWidget);
+    expect(find.text('Você tem 5000 Tratinhos'), findsOneWidget);
   });
 
   testWidgets('sem saldo de moedas o cartão nem aparece', (tester) async {
