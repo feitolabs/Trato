@@ -109,7 +109,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
     } on ErroTrato catch (e) {
       if (mounted) setState(() => _erroCupom = e.mensagem);
     } on Object {
-      if (mounted) setState(() => _erroCupom = 'Não foi possível validar o cupom.');
+      if (mounted) setState(() => _erroCupom = 'Sem conexão. Tente de novo.');
     } finally {
       if (mounted) setState(() => _aplicandoCupom = false);
     }
@@ -132,8 +132,13 @@ class _PagamentoTelaState extends State<PagamentoTela> {
           _parcelas = 1;
         }
       });
+    } on ErroTrato catch (e) {
+      if (mounted) {
+        setState(() => _erroMoedas =
+            e.tipo == TipoErro.semInternet ? 'Sem conexão. Tente de novo.' : e.mensagem);
+      }
     } on Object {
-      if (mounted) setState(() => _erroMoedas = 'Não foi possível usar os Tratinhos agora.');
+      if (mounted) setState(() => _erroMoedas = 'Sem conexão. Tente de novo.');
     } finally {
       if (mounted) setState(() => _trocandoMoedas = false);
     }
@@ -391,7 +396,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                                     controller: _cupomCtrl,
                                     textCapitalization: TextCapitalization.characters,
                                     decoration: InputDecoration(
-                                      hintText: 'Digite o código (ex.: TRATO10)',
+                                      hintText: 'Digite o código do cupom',
                                       errorText: _erroCupom,
                                     ),
                                   ),
@@ -738,7 +743,8 @@ class _FolhaCpfPagamentoState extends State<_FolhaCpfPagamento> {
             Text('Informe seu CPF para pagar', style: TipografiaTrato.titulo),
             const SizedBox(height: EspacosTrato.x2),
             Text(
-              'O provedor de pagamento pede CPF e data de nascimento apenas na primeira cobrança.',
+              'Pedimos só uma vez, para emitir o recibo e proteger seu pagamento. '
+              'O profissional não vê.',
               style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x4),

@@ -172,6 +172,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sair'));
       await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Sair'));
+      await tester.pumpAndSettle();
       expect(find.byType(LoginTela), findsOneWidget);
       expect(sessao.logada, isFalse);
       expect(auth.sessaoAtual, isNull);

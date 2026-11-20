@@ -503,6 +503,20 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             erro: _mostrarErros ? _erroDiasExecucao() : null,
           ),
         ),
+        const SizedBox(height: EspacosTrato.x2),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilterChip(
+            key: const Key('prazo-mesmo-dia'),
+            label: const Text('Mesmo dia'),
+            selected: _diasExecucao.text.trim() == '1',
+            onSelected: (_) {
+              _diasExecucao.text = '1';
+              _mudou();
+              setState(() {});
+            },
+          ),
+        ),
         if (_modo == ModoOrcamento.porHora) ...[
           const SizedBox(height: EspacosTrato.x3),
           Text(

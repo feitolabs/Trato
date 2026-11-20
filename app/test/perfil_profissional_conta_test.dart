@@ -97,8 +97,22 @@ void main() {
 
     await tester.tap(find.text('Meus dados e excluir conta'));
     await tester.tap(find.text('Sair'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sair da conta?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Sair'));
+    await tester.pumpAndSettle();
     expect(tocados, ['Meus dados e excluir conta']);
     expect(saiu, isTrue);
+  });
+
+  testWidgets('Sair pede confirmação e Cancelar não sai', (tester) async {
+    var saiu = false;
+    await _abrir(tester, ConfiguracoesTela(grupos: const [], aoSair: () => saiu = true));
+    await tester.tap(find.text('Sair'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(saiu, isFalse);
   });
 
   testWidgets('sem aoSair, a linha Sair não aparece', (tester) async {

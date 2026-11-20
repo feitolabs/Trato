@@ -74,6 +74,7 @@ class _ExcluirContaTelaState extends State<ExcluirContaTela> {
         Text('O que acontece', style: TipografiaTrato.titulo),
         const SizedBox(height: EspacosTrato.x3),
         const _Item('Você perde o acesso à conta, ao histórico e às conversas.'),
+        const _Item('Você perde seus Tratinhos e não pode ter pedido em andamento.'),
         const _Item('Pedidos em andamento ou em disputa precisam ser resolvidos antes.'),
         const _Item('Seus dados pessoais são apagados ou anonimizados.'),
         const SizedBox(height: EspacosTrato.x5),
