@@ -226,6 +226,15 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
           _dados.titulo,
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
+        if (!_editando && _dados.orcamentosRecebidos == 0) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          const AvisoFaixa(
+            texto:
+                'Pedido enviado aos profissionais da região — avisaremos quando chegar o 1º orçamento.',
+            tipo: TipoStatus.info,
+            icone: Icons.notifications_active_outlined,
+          ),
+        ],
         if (!_editando) ..._cartaoExclusividade(),
         const SizedBox(height: EspacosTrato.x5),
         if (_editando) ..._formulario() else ..._resumo(),

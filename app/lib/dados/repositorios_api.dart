@@ -165,6 +165,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       ],
       profissionalConvidadoId: j['profissional_convidado_id'] as String?,
       estado: (j['estado'] as String?) ?? 'aberto',
+      orcamentosRecebidos: (j['orcamentos_recebidos'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -208,6 +209,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       profissionalConvidadoId: base.profissionalConvidadoId,
       estado: oferta.ativa ? 'reservado' : base.estado,
       ofertaExclusividade: oferta,
+      orcamentosRecebidos: base.orcamentosRecebidos,
     );
   }
 

@@ -19,8 +19,7 @@ enum TextoLegal {
 }
 
 /// Aviso fixo no alto de cada texto legal.
-const avisoRascunhoLegal =
-    'Documento oficial vigente no piloto em Belo Horizonte/MG. '
+const avisoRascunhoLegal = 'Documento oficial vigente no piloto vigente. '
     'Dúvidas ou exercício de direitos LGPD: privacidade@trato.app.br.';
 
 /// Índice com os dois textos (Termos de uso e Política de privacidade).

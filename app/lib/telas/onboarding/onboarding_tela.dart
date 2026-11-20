@@ -23,7 +23,7 @@ List<_PaginaOnboarding> get _paginas => [
       _PaginaOnboarding(
         icone: Icons.format_list_bulleted,
         titulo: 'Descreva o problema,\nreceba orçamentos',
-        texto:
+        texto: 'Orçamento grátis · 0% de taxa. '
             'Até ${ConfigPublica.atual.limiteOrcamentos} profissionais com identidade verificada '
             'respondem em até ${ConfigPublica.horas(ConfigPublica.atual.validadePedidoHoras)}.',
       ),

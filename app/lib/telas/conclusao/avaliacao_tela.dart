@@ -81,6 +81,14 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
+            child: Text(
+              'Avaliar rende +50 Tratinhos (R\$ 0,50 de desconto, liberam em 7 dias sem disputa).',
+              textAlign: TextAlign.center,
+              style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ),
           BotaoPrimario(
             texto: 'Enviar avaliação',
             carregando: _enviando,
@@ -128,44 +136,44 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
         const SizedBox(height: EspacosTrato.x5),
         CampoLongo(rotulo: 'Conte como foi (opcional)', controlador: _comentario),
         if (dados.gorjetaDisponivel) ...[
-        const SizedBox(height: EspacosTrato.x5),
-        Text('Gorjeta (opcional)', style: TipografiaTrato.corpoForte),
-        const SizedBox(height: EspacosTrato.x1),
-        Text(
-          'Vai inteira para o profissional, sem taxa.',
-          style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
-        ),
-        const SizedBox(height: EspacosTrato.x3),
-        Row(
-          children: [
-            _OpcaoGorjeta(
-              texto: 'Não',
-              selecionado: _gorjeta == null,
-              aoTocar: () => setState(() => _gorjeta = null),
-            ),
-            for (final valor in dados.gorjetasCentavos)
+          const SizedBox(height: EspacosTrato.x5),
+          Text('Gorjeta (opcional)', style: TipografiaTrato.corpoForte),
+          const SizedBox(height: EspacosTrato.x1),
+          Text(
+            'Vai inteira para o profissional, sem taxa.',
+            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+          Row(
+            children: [
               _OpcaoGorjeta(
-                texto: formatarReais(valor).replaceAll(',00', ''),
-                selecionado: _gorjeta == valor,
-                aoTocar: () => setState(() => _gorjeta = valor),
+                texto: 'Não',
+                selecionado: _gorjeta == null,
+                aoTocar: () => setState(() => _gorjeta = null),
               ),
-            _OpcaoGorjeta(
-              texto: 'Outro',
-              selecionado: _gorjeta == _outro,
-              aoTocar: () => setState(() => _gorjeta = _outro),
+              for (final valor in dados.gorjetasCentavos)
+                _OpcaoGorjeta(
+                  texto: formatarReais(valor).replaceAll(',00', ''),
+                  selecionado: _gorjeta == valor,
+                  aoTocar: () => setState(() => _gorjeta = valor),
+                ),
+              _OpcaoGorjeta(
+                texto: 'Outro',
+                selecionado: _gorjeta == _outro,
+                aoTocar: () => setState(() => _gorjeta = _outro),
+              ),
+            ],
+          ),
+          if (_gorjeta == _outro) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            CampoTrato(
+              rotulo: 'Valor da gorjeta',
+              controlador: _outraGorjeta,
+              prefixo: 'R\$ ',
+              teclado: TextInputType.number,
+              formatadores: [FilteringTextInputFormatter.digitsOnly],
             ),
           ],
-        ),
-        if (_gorjeta == _outro) ...[
-          const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(
-            rotulo: 'Valor da gorjeta',
-            controlador: _outraGorjeta,
-            prefixo: 'R\$ ',
-            teclado: TextInputType.number,
-            formatadores: [FilteringTextInputFormatter.digitsOnly],
-          ),
-        ],
         ],
       ],
     );

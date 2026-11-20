@@ -56,149 +56,143 @@ class InicioTela extends StatelessWidget {
         ? const <CategoriaServico>[]
         : [
             ...([
-                  for (final c in dados!.categorias)
-                    if (c.nome != 'Ver todas') c,
-                ]..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome)))
+              for (final c in dados!.categorias)
+                if (c.nome != 'Ver todas') c,
+            ]..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome)))
                 .take(7),
-            if (dados!.categorias.isNotEmpty)
-              const CategoriaServico('Ver todas', Icons.grid_view),
+            if (dados!.categorias.isNotEmpty) const CategoriaServico('Ver todas', Icons.grid_view),
           ];
     final recarregar = AtualizadorTela.de(context);
     final conteudo = SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
       child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            nome.isEmpty ? 'Olá' : 'Olá, $nome',
-                            style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.textoSecundario),
-                          ),
-                          const SizedBox(height: EspacosTrato.x1),
-                          Text('O que você precisa hoje?',
-                              style: TipografiaTrato.tituloGrande),
-                        ],
-                      ),
+                    Text(
+                      nome.isEmpty ? 'Olá' : 'Olá, $nome',
+                      style:
+                          TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                     ),
-                    const SizedBox(width: EspacosTrato.x3),
-                    _BotaoSino(
-                      aoTocar: aoAbrirNotificacoes,
-                      naoLidas: dados?.notificacoesNaoLidas ?? 0,
-                    ),
+                    const SizedBox(height: EspacosTrato.x1),
+                    Text('O que você precisa hoje?', style: TipografiaTrato.tituloGrande),
                   ],
                 ),
-                const SizedBox(height: EspacosTrato.x6),
-                GestureDetector(
-                  onTap: aoBuscar,
-                  behavior: HitTestBehavior.opaque,
-                  child: const AbsorbPointer(
-                    child: CampoTrato(
-                      rotulo: 'Buscar',
-                      dica: 'Serviço ou profissional',
-                      iconeInicio: Icons.search,
-                    ),
-                  ),
+              ),
+              const SizedBox(width: EspacosTrato.x3),
+              _BotaoSino(
+                aoTocar: aoAbrirNotificacoes,
+                naoLidas: dados?.notificacoesNaoLidas ?? 0,
+              ),
+            ],
+          ),
+          const SizedBox(height: EspacosTrato.x6),
+          GestureDetector(
+            onTap: aoBuscar,
+            behavior: HitTestBehavior.opaque,
+            child: const AbsorbPointer(
+              child: CampoTrato(
+                rotulo: 'Buscar',
+                dica: 'Serviço ou profissional',
+                iconeInicio: Icons.search,
+              ),
+            ),
+          ),
+          const SizedBox(height: EspacosTrato.x5),
+          CartaoTrato(
+            escuro: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const ChipStatus(
+                  texto: 'Orçamento grátis · 0% de taxa',
+                  tipo: TipoStatus.destaque,
+                ),
+                const SizedBox(height: EspacosTrato.x3),
+                Text(
+                  'Descreva o problema',
+                  style: TipografiaTrato.titulo.copyWith(color: CoresTrato.creme),
+                ),
+                const SizedBox(height: EspacosTrato.x3),
+                Text(
+                  'Receba até ${ConfigPublica.atual.limiteOrcamentos} orçamentos de '
+                  'profissionais com identidade verificada. '
+                  'O pagamento é protegido pelo app até você confirmar o serviço.',
+                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
                 ),
                 const SizedBox(height: EspacosTrato.x5),
-                CartaoTrato(
-                  escuro: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Descreva o problema',
-                        style: TipografiaTrato.titulo
-                            .copyWith(color: CoresTrato.creme),
-                      ),
-                      const SizedBox(height: EspacosTrato.x3),
-                      Text(
-                        'Receba até ${ConfigPublica.atual.limiteOrcamentos} orçamentos de '
-                        'profissionais com identidade verificada. '
-                        'O pagamento é protegido pelo app até você confirmar o serviço.',
-                        style: TipografiaTrato.corpo
-                            .copyWith(color: CoresTrato.creme),
-                      ),
-                      const SizedBox(height: EspacosTrato.x5),
-                      BotaoSecundario(
-                        texto: 'Pedir orçamento',
-                        aoTocar: aoNovoPedido,
-                      ),
-                    ],
-                  ),
+                BotaoSecundario(
+                  texto: 'Pedir orçamento',
+                  aoTocar: aoNovoPedido,
                 ),
-                const SizedBox(height: EspacosTrato.x4),
-                if (andamento != null)
-                  CartaoTrato(
-                    aoTocar: aoAbrirPedidoEmAndamento == null
-                        ? null
-                        : () => aoAbrirPedidoEmAndamento!(andamento),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(andamento.titulo,
-                            style: TipografiaTrato.tituloCartao),
-                        const SizedBox(height: EspacosTrato.x2),
-                        Text(
-                          andamento.situacao,
-                          style: TipografiaTrato.corpo
-                              .copyWith(color: CoresTrato.textoSecundario),
-                        ),
-                        if (andamento.aviso.isNotEmpty) ...[
-                          const SizedBox(height: EspacosTrato.x2),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: ChipStatus(
-                                texto: andamento.aviso,
-                                tipo: TipoStatus.destaque),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: EspacosTrato.x6),
-                Text('Categorias', style: TipografiaTrato.titulo),
-                const SizedBox(height: EspacosTrato.x3),
-                _GradeCategorias(
-                  itens: grade,
-                  aoTocar: (c) {
-                    if (c.nome == 'Ver todas') {
-                      aoVerTodasCategorias?.call();
-                    } else {
-                      aoAbrirCategoria?.call(c);
-                    }
-                  },
-                ),
-                if (recentes.isNotEmpty) ...[
-                  const SizedBox(height: EspacosTrato.x6),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: Text('Serviços recentes',
-                              style: TipografiaTrato.titulo)),
-                      if (aoVerServicos != null)
-                        BotaoLink(texto: 'Ver todos', aoTocar: aoVerServicos),
-                    ],
-                  ),
-                  const SizedBox(height: EspacosTrato.x3),
-                  for (final servico in recentes) ...[
-                    CartaoServicoRecente(
-                      servico: servico,
-                      aoTocar: () => aoAbrirServico?.call(servico),
-                    ),
-                    const SizedBox(height: EspacosTrato.x3),
-                  ],
-                ],
               ],
             ),
-          );
+          ),
+          const SizedBox(height: EspacosTrato.x4),
+          if (andamento != null)
+            CartaoTrato(
+              aoTocar: aoAbrirPedidoEmAndamento == null
+                  ? null
+                  : () => aoAbrirPedidoEmAndamento!(andamento),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(andamento.titulo, style: TipografiaTrato.tituloCartao),
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    andamento.situacao,
+                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                  ),
+                  if (andamento.aviso.isNotEmpty) ...[
+                    const SizedBox(height: EspacosTrato.x2),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ChipStatus(texto: andamento.aviso, tipo: TipoStatus.destaque),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          const SizedBox(height: EspacosTrato.x6),
+          Text('Categorias', style: TipografiaTrato.titulo),
+          const SizedBox(height: EspacosTrato.x3),
+          _GradeCategorias(
+            itens: grade,
+            aoTocar: (c) {
+              if (c.nome == 'Ver todas') {
+                aoVerTodasCategorias?.call();
+              } else {
+                aoAbrirCategoria?.call(c);
+              }
+            },
+          ),
+          if (recentes.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x6),
+            Row(
+              children: [
+                Expanded(child: Text('Serviços recentes', style: TipografiaTrato.titulo)),
+                if (aoVerServicos != null) BotaoLink(texto: 'Ver todos', aoTocar: aoVerServicos),
+              ],
+            ),
+            const SizedBox(height: EspacosTrato.x3),
+            for (final servico in recentes) ...[
+              CartaoServicoRecente(
+                servico: servico,
+                aoTocar: () => aoAbrirServico?.call(servico),
+              ),
+              const SizedBox(height: EspacosTrato.x3),
+            ],
+          ],
+        ],
+      ),
+    );
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
