@@ -431,7 +431,7 @@ void main() {
 
       expect(arquivoSalvo, matches(RegExp(r'^trato_extrato_\d{4}_\d{2}\.pdf$')));
       expect(utf8.decode(bytesSalvos!), startsWith('%PDF-1.4'));
-      expect(find.textContaining('Extrato em PDF salvo:'), findsOneWidget);
+      expect(find.textContaining('Extrato em PDF salvo.'), findsOneWidget);
     });
   });
 
