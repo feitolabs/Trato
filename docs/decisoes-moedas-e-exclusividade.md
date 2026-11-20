@@ -63,6 +63,8 @@ Regras já decididas antes:
 
 **Bloqueio depois de uma recusa (item g): 30 dias** (confirmado pelo João em 20/11/2026), valor em tabela de configuração. Vale só para o mesmo profissional com o mesmo cliente; outros profissionais e outros clientes não são afetados.
 
+**Categorias sem exclusividade (decisão de 20/11/2026):** o catálogo não tem categorias separadas de "vazamento" nem de "falta de luz". Ficam sem exclusividade a categoria **chaveiro** (`permite_exclusividade = false`) e **todo pedido marcado como urgente** pelo cliente (`pedidos.urgente = true`). Encanador e eletricista continuam liberados. O app deve avisar o cliente, ao pedir: "Marque como urgente se não puder esperar". O UPDATE que bloqueia o chaveiro é dado e só roda com o OK do João, junto da aplicação da migration `20261121100000_exclusividade_schema.sql`.
+
 **EM ABERTO:**
 - Os itens que a spec da Etapa B ainda lista como perguntas abertas e que não aparecem acima.
 
