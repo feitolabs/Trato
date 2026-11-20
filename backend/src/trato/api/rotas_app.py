@@ -42,6 +42,7 @@ from trato.api.repositorios_app import (
 )
 from trato.api.servicos import carregar_pedido, eh_participante
 from trato.api.visibilidade import pedido_visivel_ao_profissional
+from trato.financeiro import periodo
 from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
@@ -304,6 +305,15 @@ class MoedasOut(BaseModel):
     )
     proxima_liberacao: date | None = Field(
         None, description="Data (Brasília) da próxima liberação de bônus pendente."
+    )
+    saldo_vence_em: datetime | None = Field(
+        None, description="Quando vence o próximo lote de Tratinhos do cliente (null: sem saldo)."
+    )
+    teto_desconto_mes_centavos: int | None = Field(
+        None, description="Teto mensal de desconto por cliente, em centavos (da configuração)."
+    )
+    desconto_usado_mes_centavos: int | None = Field(
+        None, description="Desconto já usado pelo cliente no mês, em centavos (null: sem dado)."
     )
 
 
@@ -1131,8 +1141,30 @@ def minhas_moedas(
     disp = disponibilidade_desconto(contexto.moedas, usuario_id=usuario.id, agora=agora)
     pendentes, proxima = resumo_pendentes(contexto.moedas, usuario.id)
     pendentes_prof, _ = resumo_pendentes(contexto.moedas, usuario.id, TIPO_BONUS_PROFISSIONAL)
+    cfg_moedas = contexto.moedas.config()
+    saldo_cliente = contexto.moedas.saldo(usuario.id, agora)
+    vence_em: datetime | None = None
+    usado_mes: int | None = None
+    try:
+        if saldo_cliente > 0:
+            vencimentos = [
+                i.expira_em
+                for i in contexto.moedas.extrato(usuario.id, 500)
+                if i.quantidade > 0 and i.expira_em is not None and i.expira_em > agora
+            ]
+            vence_em = min(vencimentos) if vencimentos else None
+        inicio, fim = periodo.mes(*periodo.mes_de(agora))
+        usado_mes = (
+            contexto.moedas.uso_liquido_no_mes(usuario.id, inicio, fim)
+            * cfg_moedas.valor_moeda_centavos
+        )
+    except Exception:  # noqa: BLE001 - campos opcionais: o saldo não quebra por eles
+        log.warning("dados extras das moedas indisponíveis", exc_info=True)
     return MoedasOut(
-        saldo=contexto.moedas.saldo(usuario.id, agora),
+        saldo_vence_em=vence_em,
+        teto_desconto_mes_centavos=cfg_moedas.teto_desconto_cliente_mes_centavos,
+        desconto_usado_mes_centavos=usado_mes,
+        saldo=saldo_cliente,
         saldo_profissional=saldo_profissional(contexto.moedas, usuario.id, agora),
         moedas_pendentes_profissional=pendentes_prof,
         valor_moeda_centavos=contexto.moedas.config().valor_moeda_centavos,

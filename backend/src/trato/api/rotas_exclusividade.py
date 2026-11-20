@@ -8,7 +8,7 @@ existe (404) -> atende a categoria e a região (403) -> função SQL, cujo resul
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -60,6 +60,9 @@ class ExclusividadeOut(BaseModel):
     expira_em: datetime | None = None
     encerrada_em: datetime | None = None
     saldo_restante: int | None = Field(None, description="Só na criação: saldo depois do débito.")
+    bloqueado_ate: datetime | None = Field(
+        None, description="Só na lista, se recusada: até quando não pode pedir este cliente."
+    )
 
 
 class ListaExclusividadesOut(BaseModel):
@@ -94,8 +97,17 @@ def _erro(status: int, codigo: str, mensagem: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"detail": mensagem, "codigo": codigo})
 
 
-def _out(item: Exclusividade, saldo_restante: int | None = None) -> ExclusividadeOut:
+def _out(
+    item: Exclusividade, saldo_restante: int | None = None, bloqueio_dias: int | None = None
+) -> ExclusividadeOut:
+    # Recusada: o profissional fica sem pedir neste cliente até a data (config, em dias).
+    bloqueado_ate = (
+        item.encerrada_em + timedelta(days=bloqueio_dias)
+        if bloqueio_dias is not None and item.status == "recusada" and item.encerrada_em
+        else None
+    )
     return ExclusividadeOut(
+        bloqueado_ate=bloqueado_ate,
         id=item.id,
         pedido_id=item.pedido_id,
         cliente_id=item.cliente_id,
@@ -185,10 +197,11 @@ def minhas_exclusividades(
         itens = contexto.exclusividades.do_profissional(usuario.id)
     except Exception:  # noqa: BLE001 - tabela ainda não existe: lista vazia
         itens = []
+    cfg = contexto.moedas.config()
     return ListaExclusividadesOut(
-        itens=[_out(i) for i in itens],
+        itens=[_out(i, bloqueio_dias=cfg.exclusividade_bloqueio_recusa_dias) for i in itens],
         ativas_ou_pendentes=sum(1 for i in itens if i.status in EM_ANDAMENTO),
-        limite_maximo=contexto.moedas.config().exclusividade_max_simultaneas,
+        limite_maximo=cfg.exclusividade_max_simultaneas,
         saldo_profissional=saldo_profissional(contexto.moedas, usuario.id, agora),
     )
 

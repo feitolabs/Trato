@@ -4,6 +4,7 @@ funções SQL, rotas do profissional e do cliente e as regras do pedido `reserva
 from __future__ import annotations
 
 import threading
+from datetime import timedelta
 
 import pytest
 from conftest import AGORA, CLIENTE, OUTRO_PROFISSIONAL, PROFISSIONAL, cab
@@ -252,6 +253,19 @@ def test_bloqueio_de_30_dias_depois_de_recusa(amb):
     assert r.status_code == 409 and r.json()["codigo"] == "bloqueado_recusa"
     amb.relogio.avancar(days=31)
     assert _pedir(amb, pid="ped-2", chave="k3").status_code == 201
+
+
+def test_lista_traz_ate_quando_dura_o_bloqueio_da_recusa(amb):
+    _ligar(amb, saldo=500)
+    _pedido(amb)
+    eid = _pedir(amb).json()["id"]
+    antes = amb.cliente.get(URL, headers=cab("t-prof")).json()["itens"][0]
+    assert antes["bloqueado_ate"] is None  # ainda sem recusa
+    assert _responder(amb, eid, "recusar").status_code == 200
+    item = amb.cliente.get(URL, headers=cab("t-prof")).json()["itens"][0]
+    esperado = amb.relogio.agora + timedelta(days=30)
+    assert item["status"] == "recusada"
+    assert item["bloqueado_ate"].startswith(esperado.strftime("%Y-%m-%dT%H:%M"))
 
 
 def test_outro_profissional_no_mesmo_pedido_e_pedido_ja_com_oferta(amb):

@@ -219,6 +219,20 @@ def _marco_da_transicao(pedido: Pedido, acao: Acao) -> datetime:
     return marcos[acao] or pedido.aberto_em
 
 
+def instante_liberacao(concluido_em: datetime, config: ConfigRotinas) -> datetime | None:
+    """Quando o saldo do pedido concluído passa de 'a liberar' para 'liberado'.
+
+    `concluido_em + prazo_liberacao`; com `liberacao_espera_congelamento`, o maior entre isso e
+    `concluido_em + janela_congelamento_repasse`. `None` se o prazo não está configurado.
+    """
+    if config.prazo_liberacao is None:
+        return None
+    espera = config.prazo_liberacao
+    if config.liberacao_espera_congelamento and config.janela_congelamento_repasse is not None:
+        espera = max(espera, config.janela_congelamento_repasse)
+    return concluido_em + espera
+
+
 def liberacoes_por_prazo(
     agora: datetime, itens: list[PedidoMonitorado], config: ConfigRotinas
 ) -> list[AcaoRotina]:
@@ -236,10 +250,8 @@ def liberacoes_por_prazo(
             continue
         if item.disputa_aberta or item.saldo_a_liberar_centavos <= 0:
             continue
-        espera = config.prazo_liberacao
-        if config.liberacao_espera_congelamento and config.janela_congelamento_repasse is not None:
-            espera = max(espera, config.janela_congelamento_repasse)
-        if agora < pedido.concluido_em + espera:
+        liberacao = instante_liberacao(pedido.concluido_em, config)
+        if liberacao is None or agora < liberacao:
             continue
         saida.append(
             AcaoRotina(
