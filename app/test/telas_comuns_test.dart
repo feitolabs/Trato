@@ -41,21 +41,74 @@ Future<void> _abrir(
 
 void main() {
   group('Notificações', () {
-    testWidgets('lista, marca como lida e abre o destino', (tester) async {
+    testWidgets('abrir a lista marca tudo como lido e tocar num aviso abre o destino',
+        (tester) async {
       final servico = ServicoNotificacoesFake();
+      final contagens = <int>[];
       Notificacao? aberta;
-      await _abrir(tester, NotificacoesTela(servico: servico, aoAbrirDestino: (n) => aberta = n));
-      expect(find.text('2 não lidas'), findsOneWidget);
+      await _abrir(
+        tester,
+        NotificacoesTela(
+          servico: servico,
+          aoAbrirDestino: (n) => aberta = n,
+          aoContarNaoLidas: contagens.add,
+        ),
+      );
+      // SINO-1: ao abrir, os 2 avisos não lidos passam a lidos, o sino zera e o backend é avisado.
+      expect(find.text('Tudo lido'), findsOneWidget);
+      expect(find.textContaining('não lida'), findsNothing);
+      expect(find.text('Marcar todas como lidas'), findsNothing);
+      expect(servico.marcadas, ['todas']);
+      expect(contagens.last, 0);
+
       await tester.tap(find.text('Novo orçamento recebido'));
       await tester.pump();
       expect(aberta?.destinoId, 'pedido-1');
-      expect(servico.marcadas, ['n1']);
-      expect(find.text('1 não lida'), findsOneWidget);
+      expect(find.text('Tudo lido'), findsOneWidget);
     });
 
-    testWidgets('marcar todas como lidas', (tester) async {
-      final servico = ServicoNotificacoesFake();
-      await _abrir(tester, NotificacoesTela(servico: servico));
+    testWidgets('aviso novo com a lista aberta: tocar marca como lido e abre o destino',
+        (tester) async {
+      final servico = _ServicoComAvisoNovo();
+      final recarregar = ValueNotifier<int>(0);
+      final contagens = <int>[];
+      Notificacao? aberta;
+      await _abrir(
+        tester,
+        NotificacoesTela(
+          servico: servico,
+          atualizarQuando: recarregar,
+          aoAbrirDestino: (n) => aberta = n,
+          aoContarNaoLidas: contagens.add,
+        ),
+      );
+      expect(find.text('Tudo lido'), findsOneWidget);
+
+      recarregar.value++; // chega um aviso novo
+      await tester.pumpAndSettle();
+      expect(find.text('1 não lida'), findsOneWidget);
+      expect(contagens.last, 1);
+
+      await tester.tap(find.text('Aviso novo'));
+      await tester.pump();
+      expect(aberta?.destinoId, 'pedido-9');
+      expect(servico.marcadas, ['novo']); // nada a marcar ao abrir: já estava tudo lido
+      expect(find.text('Tudo lido'), findsOneWidget);
+      expect(contagens.last, 0);
+    });
+
+    testWidgets('marcar todas como lidas: o botão aparece quando chega aviso novo', (tester) async {
+      final servico = _ServicoComAvisoNovo();
+      final recarregar = ValueNotifier<int>(0);
+      await _abrir(
+        tester,
+        NotificacoesTela(servico: servico, atualizarQuando: recarregar),
+      );
+      expect(find.text('Marcar todas como lidas'), findsNothing);
+
+      recarregar.value++;
+      await tester.pumpAndSettle();
+      expect(find.text('1 não lida'), findsOneWidget);
       await tester.tap(find.text('Marcar todas como lidas'));
       await tester.pump();
       expect(find.text('Tudo lido'), findsOneWidget);
@@ -269,4 +322,40 @@ void main() {
       expect(find.byType(EsqueletoLista), findsOneWidget);
     });
   });
+}
+
+/// Na 1ª leitura não há nada novo; depois que a tela é recarregada chega um aviso não lido.
+class _ServicoComAvisoNovo implements ServicoNotificacoes {
+  final marcadas = <String>[];
+  var _leituras = 0;
+
+  @override
+  Future<List<Notificacao>> listar() async {
+    _leituras++;
+    return [
+      const Notificacao(
+        id: 'velho',
+        tipo: TipoNotificacao.pagamento,
+        titulo: 'Aviso antigo',
+        texto: 't',
+        quando: 'ontem',
+        lida: true,
+      ),
+      if (_leituras > 1)
+        const Notificacao(
+          id: 'novo',
+          tipo: TipoNotificacao.pedido,
+          titulo: 'Aviso novo',
+          texto: 't',
+          quando: 'agora',
+          destinoId: 'pedido-9',
+        ),
+    ];
+  }
+
+  @override
+  Future<void> marcarLida(String id) async => marcadas.add(id);
+
+  @override
+  Future<void> marcarTodasLidas() async => marcadas.add('todas');
 }
