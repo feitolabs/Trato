@@ -15,7 +15,11 @@ class Avaliacao {
     required this.detalhes,
     this.id,
     this.resposta,
+    this.etiquetas = const [],
   });
+
+  /// Elogios em tags dessa avaliação (`etiquetas`); vazio em servidor antigo.
+  final List<String> etiquetas;
 
   final String cliente;
   final String servico;
@@ -26,6 +30,29 @@ class Avaliacao {
   final String detalhes;
   final String? id;
   final String? resposta;
+}
+
+/// Um elogio e quantas vezes foi recebido (`{"etiqueta": "Pontual", "total": 12}`).
+class EtiquetaTop {
+  const EtiquetaTop(this.etiqueta, this.total);
+
+  final String etiqueta;
+  final int total;
+
+  /// Lê `etiquetas_top` sem quebrar: campo ausente, nulo ou fora do formato = lista vazia.
+  static List<EtiquetaTop> listaDeJson(Object? bruto) {
+    if (bruto is! List) return const [];
+    final saida = <EtiquetaTop>[];
+    for (final item in bruto) {
+      if (item is! Map) continue;
+      final nome = item['etiqueta'];
+      final total = item['total'];
+      if (nome is String && nome.trim().isNotEmpty && total is num && total > 0) {
+        saida.add(EtiquetaTop(nome.trim(), total.toInt()));
+      }
+    }
+    return saida;
+  }
 }
 
 /// Dados que só aparecem na tela do perfil do profissional.
@@ -43,7 +70,11 @@ class DetalhePerfil {
     this.trabalhos = const [],
     this.fotosUrls = const [],
     this.temHistorico = true,
+    this.etiquetasTop = const [],
   });
+
+  /// Elogios mais recebidos (`etiquetas_top`, já contados pelo backend); vazio = não mostra.
+  final List<EtiquetaTop> etiquetasTop;
 
   /// Falso quando o profissional ainda não encerrou nenhum serviço (a taxa aparece como "—").
   final bool temHistorico;

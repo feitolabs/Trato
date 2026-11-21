@@ -817,7 +817,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final comentario = avaliacao.comentario.trim();
     final resposta = await _api.post(
       '/v1/contratos/$pedidoId/avaliacao',
-      corpo: {'nota_geral': media, if (comentario.isNotEmpty) 'comentario': comentario},
+      corpo: {
+        'nota_geral': media,
+        if (comentario.isNotEmpty) 'comentario': comentario,
+        if (avaliacao.etiquetas.isNotEmpty) 'etiquetas': avaliacao.etiquetas,
+      },
     );
     if (resposta is Map && resposta['moedas_ganhas'] is int) {
       return resposta['moedas_ganhas'] as int;

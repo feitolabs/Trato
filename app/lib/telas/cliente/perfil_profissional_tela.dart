@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'avatar_de_usuario.dart';
 import 'avatar_iniciais.dart' show SeloVerificacao;
+import 'etiquetas_elogio.dart';
 import 'modelos.dart';
 
 /// Tela 10 do protótipo: perfil público do profissional. Só abre para quem tem
@@ -98,6 +99,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                       ),
                     ],
                   ),
+                EtiquetasMaisElogiadas(etiquetas: d.etiquetasTop),
                 if (p.servicosConcluidos >= 5 && d.temHistorico) ...[
                   const SizedBox(height: EspacosTrato.x3),
                   Row(
@@ -415,7 +417,8 @@ class CartaoAvaliacao extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           Text(avaliacao.comentario, style: TipografiaTrato.corpo),
           const SizedBox(height: EspacosTrato.x2),
-          Text(avaliacao.detalhes, style: secundario),
+          if (avaliacao.detalhes.trim().isNotEmpty) Text(avaliacao.detalhes, style: secundario),
+          EtiquetasDaAvaliacao(etiquetas: avaliacao.etiquetas),
           if ((avaliacao.resposta ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: EspacosTrato.x2),
             Container(

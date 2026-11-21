@@ -2,9 +2,9 @@
 /// PROVISÓRIO: formato real vem do backend.
 library;
 
-import '../cliente/modelos.dart' show Avaliacao;
+import '../cliente/modelos.dart' show Avaliacao, EtiquetaTop;
 
-export '../cliente/modelos.dart' show Avaliacao;
+export '../cliente/modelos.dart' show Avaliacao, EtiquetaTop;
 
 class PerfilPublico {
   const PerfilPublico({
@@ -22,7 +22,11 @@ class PerfilPublico {
     required this.ultimasAvaliacoes,
     this.fotoReferencia,
     this.listaFotosPortfolio = const [],
+    this.etiquetasTop = const [],
   });
+
+  /// Elogios mais recebidos (`etiquetas_top`); vazio = não mostra.
+  final List<EtiquetaTop> etiquetasTop;
 
   final String nome;
   final String iniciais;

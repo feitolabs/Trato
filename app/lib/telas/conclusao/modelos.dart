@@ -96,8 +96,15 @@ class DadosAvaliacao {
 
 /// Resultado da avaliação entregue a quem chama a tela.
 class EnvioAvaliacao {
-  const EnvioAvaliacao(
-      {required this.notas, required this.comentario, required this.gorjetaCentavos});
+  const EnvioAvaliacao({
+    required this.notas,
+    required this.comentario,
+    required this.gorjetaCentavos,
+    this.etiquetas = const [],
+  });
+
+  /// Elogios escolhidos ("O que foi bom?"), no máximo 3; vazio = nenhum.
+  final List<String> etiquetas;
 
   /// Nota (0 a 5) por critério, na ordem de [DadosAvaliacao.criterios].
   final List<int> notas;

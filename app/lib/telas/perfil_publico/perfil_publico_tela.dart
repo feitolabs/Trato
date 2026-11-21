@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
+import '../cliente/etiquetas_elogio.dart';
 import '../cliente/modelos.dart' show formatarNota;
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import '../profissional_apoio/apoio.dart';
@@ -195,6 +196,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                         rotulo: 'Serviços concluídos', valor: '${p.servicosConcluidos}')),
               ],
             ),
+            EtiquetasMaisElogiadas(etiquetas: p.etiquetasTop),
             const TituloSecao('Sobre'),
             Text(
               p.sobre.isEmpty ? 'Você ainda não escreveu sobre você.' : p.sobre,
@@ -343,7 +345,8 @@ class CartaoAvaliacao extends StatelessWidget {
             const SizedBox(height: EspacosTrato.x2),
             Text(a.comentario, style: TipografiaTrato.corpo),
             const SizedBox(height: EspacosTrato.x1),
-            Text(a.detalhes, style: TipografiaTrato.legenda),
+            if (a.detalhes.trim().isNotEmpty) Text(a.detalhes, style: TipografiaTrato.legenda),
+            EtiquetasDaAvaliacao(etiquetas: a.etiquetas),
             if ((a.resposta ?? '').trim().isNotEmpty) ...[
               const SizedBox(height: EspacosTrato.x2),
               Container(

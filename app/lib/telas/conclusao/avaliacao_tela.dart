@@ -7,6 +7,7 @@ import 'apoio_conclusao.dart';
 import 'campo_longo.dart';
 import 'modelos.dart';
 import 'estrelas_nota.dart';
+import '../cliente/etiquetas_elogio.dart';
 
 /// Tela 19: avaliação em 5 critérios, comentário e gorjeta opcional.
 class AvaliacaoTela extends StatefulWidget {
@@ -36,6 +37,8 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
   final _comentario = TextEditingController();
   final _outraGorjeta = TextEditingController();
   var _enviando = false;
+  final _etiquetas = <String>[];
+  var _avisoEtiquetas = false;
 
   /// null = "Não"; -1 = "Outro"; senão o valor sugerido em centavos.
   int? _gorjeta;
@@ -58,6 +61,20 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
     return _gorjeta!;
   }
 
+  void _alternarEtiqueta(String e) {
+    setState(() {
+      if (_etiquetas.contains(e)) {
+        _etiquetas.remove(e);
+        _avisoEtiquetas = false;
+      } else if (_etiquetas.length >= maxEtiquetasPorAvaliacao) {
+        _avisoEtiquetas = true; // o 4º toque não seleciona
+      } else {
+        _etiquetas.add(e);
+        _avisoEtiquetas = false;
+      }
+    });
+  }
+
   Future<void> _enviar() async {
     if (_enviando) return;
     setState(() => _enviando = true);
@@ -68,6 +85,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
           notas: List.unmodifiable(_notas),
           comentario: _comentario.text.trim(),
           gorjetaCentavos: _gorjetaCentavos,
+          etiquetas: List.unmodifiable(_etiquetas),
         ),
       );
       // Se quem chamou devolve `true`, a avaliação foi gravada: o botão fica desligado.
@@ -136,6 +154,36 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
             ],
           ),
         ),
+        const SizedBox(height: EspacosTrato.x5),
+        Text('O que foi bom?', style: TipografiaTrato.corpoForte),
+        const SizedBox(height: EspacosTrato.x1),
+        Text(
+          'Opcional. Escolha até $maxEtiquetasPorAvaliacao.',
+          style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Wrap(
+          spacing: EspacosTrato.x2,
+          runSpacing: EspacosTrato.x2,
+          children: [
+            for (final e in etiquetasDeElogio)
+              FilterChip(
+                key: ValueKey('etiqueta-$e'),
+                label: Text(e),
+                selected: _etiquetas.contains(e),
+                onSelected: (_) => _alternarEtiqueta(e),
+              ),
+          ],
+        ),
+        if (_avisoEtiquetas)
+          Padding(
+            padding: const EdgeInsets.only(top: EspacosTrato.x2),
+            child: Text(
+              'Você pode escolher até $maxEtiquetasPorAvaliacao elogios.',
+              key: const Key('aviso-etiquetas'),
+              style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+            ),
+          ),
         const SizedBox(height: EspacosTrato.x5),
         CampoLongo(rotulo: 'Conte como foi (opcional)', controlador: _comentario),
         if (dados.gorjetaDisponivel) ...[

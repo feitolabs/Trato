@@ -311,7 +311,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           servico: servicoDaAvaliacao(a),
           nota: (a['nota_geral'] as num).toDouble(),
           comentario: (a['comentario'] as String?) ?? '',
-          detalhes: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'].join(' · '),
+          detalhes: '',
+          etiquetas: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'],
           resposta: a['resposta'] as String?,
         ),
     ];
@@ -357,6 +358,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           if (nivel == 'verificado_plus') 'Antecedentes conferidos',
         ],
         avaliacoes: avaliacoes,
+        etiquetasTop: EtiquetaTop.listaDeJson(j['etiquetas_top']),
         bio: j['bio'] as String?,
         servicos: portfolio,
         trabalhos: portfolio,
