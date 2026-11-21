@@ -91,7 +91,8 @@ class _ConteudoState extends State<_Conteudo> {
 
   String? _erro(ConfigDefinicao d) {
     final v = _digitado(d);
-    if (_controle(d).text.trim().isEmpty || v == null) return 'Digite um número válido';
+    if (_controle(d).text.trim().isEmpty) return 'Digite um número';
+    if (v == null) return 'Digite um número válido';
     if (v < d.minimo || v > d.maximo) return 'Fora da faixa: ${faixaLegivel(d)}';
     // Resposta da disputa precisa ser menor que o prazo de decisão.
     if (d.chave == 'prazo_resposta_disputa_horas' || d.chave == 'prazo_decisao_disputa_dias_uteis') {
@@ -495,7 +496,7 @@ class _LinhaTabela extends StatelessWidget {
             flex: _flexTabela[3],
             child: Padding(
               padding: const EdgeInsets.only(right: EspacosTrato.x3),
-              child: _campoProposto(def, controle, mudou ? erro : (erro != null && controle.text.isNotEmpty ? erro : null), podePropor, aoMudar),
+              child: _campoProposto(def, controle, erro, podePropor, aoMudar),
             ),
           ),
           Expanded(

@@ -249,6 +249,9 @@ void main() {
       final campo = find.byKey(const ValueKey('campo-adiantamento_bps'));
       await tester.enterText(campo, '');
       await tester.pumpAndSettle();
+      // Campo vazio: mostra a dica e continua sem permitir propor.
+      expect(find.text('Digite um número'), findsOneWidget);
+      expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Propor').first).onPressed, isNull);
 
       await tester.enterText(campo, 'abc');
       await tester.pumpAndSettle();
