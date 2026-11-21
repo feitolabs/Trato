@@ -5,6 +5,8 @@ import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
+import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'excluir_conta_tela.dart';
 import 'modelos.dart';
 
@@ -16,9 +18,17 @@ class CentralPrivacidadeTela extends StatelessWidget {
     required this.servico,
     this.aoAbrirTermos,
     this.aoContaExcluida,
+    this.carregarExclusaoAgendada,
+    this.aoCancelarExclusao,
   });
 
   final ServicoPrivacidade servico;
+
+  /// Data da exclusão agendada (`exclusao_agendada_em` de `GET /v1/me`); nulo = sem exclusão.
+  final Future<DateTime?> Function()? carregarExclusaoAgendada;
+
+  /// Cancela a exclusão agendada; devolve verdadeiro se deu certo.
+  final Future<bool> Function()? aoCancelarExclusao;
 
   /// "Termos e políticas" (texto legal vem de fora).
   final VoidCallback? aoAbrirTermos;
@@ -37,6 +47,8 @@ class CentralPrivacidadeTela extends StatelessWidget {
           itens: itens,
           aoAbrirTermos: aoAbrirTermos,
           aoContaExcluida: aoContaExcluida,
+          carregarExclusaoAgendada: carregarExclusaoAgendada,
+          aoCancelarExclusao: aoCancelarExclusao,
         ),
       ),
     );
@@ -44,8 +56,17 @@ class CentralPrivacidadeTela extends StatelessWidget {
 }
 
 class _Corpo extends StatefulWidget {
-  const _Corpo({required this.servico, required this.itens, this.aoAbrirTermos, this.aoContaExcluida});
+  const _Corpo({
+    required this.servico,
+    required this.itens,
+    this.aoAbrirTermos,
+    this.aoContaExcluida,
+    this.carregarExclusaoAgendada,
+    this.aoCancelarExclusao,
+  });
 
+  final Future<DateTime?> Function()? carregarExclusaoAgendada;
+  final Future<bool> Function()? aoCancelarExclusao;
   final ServicoPrivacidade servico;
   final List<Consentimento> itens;
   final VoidCallback? aoAbrirTermos;
@@ -59,6 +80,45 @@ class _CorpoState extends State<_Corpo> {
   late final Map<String, bool> _ativos = {for (final c in widget.itens) c.id: c.ativo};
   var _exportando = false;
   String? _aviso;
+  DateTime? _exclusaoAgendadaEm;
+  var _cancelandoExclusao = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lerExclusaoAgendada();
+  }
+
+  Future<void> _lerExclusaoAgendada() async {
+    final carregar = widget.carregarExclusaoAgendada;
+    if (carregar == null) return;
+    try {
+      final data = await carregar();
+      if (mounted) setState(() => _exclusaoAgendadaEm = data);
+    } on Object {
+      // Sem o dado, a tela só não mostra o aviso.
+    }
+  }
+
+  Future<void> _cancelarExclusao() async {
+    final cancelar = widget.aoCancelarExclusao;
+    if (cancelar == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _cancelandoExclusao = true);
+    final ok = await cancelar();
+    if (!mounted) return;
+    setState(() {
+      _cancelandoExclusao = false;
+      if (ok) _exclusaoAgendadaEm = null;
+    });
+    if (ok) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Exclusão cancelada. Sua conta continua ativa.')),
+        );
+    }
+  }
 
   Future<void> _alterar(Consentimento c, bool valor) async {
     final anterior = _ativos[c.id]!;
@@ -142,6 +202,24 @@ class _CorpoState extends State<_Corpo> {
           'Aqui você vê o que usamos dos seus dados, pede uma cópia e decide o que fazer com a sua conta.',
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
+        if (_exclusaoAgendadaEm != null) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          AvisoFaixa(
+            key: const ValueKey('aviso-exclusao-agendada'),
+            texto: 'Exclusão da conta agendada para ${diaMesDoAparelho(_exclusaoAgendadaEm!)}. '
+                'Você pode cancelar antes desse prazo.',
+            tipo: TipoStatus.alerta,
+            icone: Icons.schedule,
+          ),
+          if (widget.aoCancelarExclusao != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            BotaoSecundario(
+              key: const ValueKey('botao-cancelar-exclusao'),
+              texto: _cancelandoExclusao ? 'Cancelando...' : 'Cancelar exclusão',
+              aoTocar: _cancelandoExclusao ? null : _cancelarExclusao,
+            ),
+          ],
+        ],
         const SizedBox(height: EspacosTrato.x5),
         Text('CONSENTIMENTOS', style: TipografiaTrato.sobretitulo),
         const SizedBox(height: EspacosTrato.x3),

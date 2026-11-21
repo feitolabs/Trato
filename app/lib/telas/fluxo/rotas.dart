@@ -1788,6 +1788,13 @@ abstract final class RotasTrato {
         context,
         CentralPrivacidadeTela(
           servico: repos.privacidade!,
+          carregarExclusaoAgendada: () async => (await repos.perfil.carregar()).exclusaoAgendadaEm,
+          aoCancelarExclusao: repos.privacidade is CancelamentoExclusao
+              ? () => _tentar(context, () async {
+                    await (repos.privacidade! as CancelamentoExclusao).cancelarExclusao();
+                    pedidosMudaram.value++;
+                  })
+              : null,
           aoAbrirTermos: () => abrirTermos(context),
           aoContaExcluida: () async {
             await sair(context);
@@ -1832,6 +1839,9 @@ abstract final class RotasTrato {
     AcaoPerfil.usarComoProfissional,
   };
 
+  @visibleForTesting
+  static PerfilCliente soNoPerfilParaTeste(PerfilCliente p) => _soNoPerfil(p);
+
   static PerfilCliente _soNoPerfil(PerfilCliente p) {
     final itens = [
       for (final g in p.grupos)
@@ -1850,6 +1860,7 @@ abstract final class RotasTrato {
       moedasPendentes: p.moedasPendentes,
       moedasProximaLiberacao: p.moedasProximaLiberacao,
       moedasValorCentavos: p.moedasValorCentavos,
+      exclusaoAgendadaEm: p.exclusaoAgendadaEm,
       grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
     );
   }
