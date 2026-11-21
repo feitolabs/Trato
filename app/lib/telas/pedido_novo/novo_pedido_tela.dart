@@ -10,6 +10,7 @@ import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../conta/modelos.dart' show EnderecoSalvo;
 import '../profissional/dinheiro.dart' show Dinheiro;
 import '../profissional_apoio/apoio.dart' show CapturarFoto;
+import 'checklists_categoria.dart';
 import 'modelos.dart';
 import 'pecas_pedido.dart';
 
@@ -105,6 +106,21 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   late DateTime _dataPrazo = _agora().add(const Duration(days: 7));
   late FaixaPreco? _faixa = widget.formulario.faixas.firstOrNull;
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
+  List<String> get _itensChecklist => widget.formulario.perguntas.any((q) => q.tipo == 'multipla')
+      ? const []
+      : itensChecklistCategoria(
+          widget.formulario.categoria,
+          excluir: _temPerguntas ? const [] : widget.formulario.servicos,
+        );
+  final Set<String> _checklistMarcados = {};
+
+  String get _descricaoParaEnviar => montarDescricaoComChecklist(
+        textoLivre: _descricao.text,
+        itensMarcados: [
+          for (final item in _itensChecklist)
+            if (_checklistMarcados.contains(item)) item,
+        ],
+      );
   final _controladorValorProprio = TextEditingController();
   late bool _informarValorProprio = widget.formulario.faixas.isEmpty;
   String? _erroValor;
@@ -337,7 +353,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       _tentou && _servicos.isEmpty ? 'Escolha pelo menos um serviço.' : null;
 
   String? get _erroDescricao =>
-      _tentou && _descricao.text.trim().isEmpty ? 'Descreva o que precisa ser feito.' : null;
+      _tentou && _descricaoParaEnviar.isEmpty ? 'Descreva o que precisa ser feito.' : null;
 
   Future<void> _enviar() async {
     if (_enviando) return;
@@ -357,7 +373,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
 
     final faltamPerguntas = _temPerguntas && !_perguntasOk;
     final faltamServicos = !_temPerguntas && _servicos.isEmpty;
-    final faltaDesc = _descricao.text.trim().isEmpty;
+    final faltaDesc = _descricaoParaEnviar.isEmpty;
     final faltaValor = _informarValorProprio && errValor != null;
     final faltaCidade = _exigeCidade && _cidade == null;
     final faltaEndereco = _presencial && !_enderecoCompleto;
@@ -381,7 +397,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         EntradaCampoErro(
           key: _keyDescricao,
           focusNode: _focoDescricao,
-          temErro: () => _descricao.text.trim().isEmpty,
+          temErro: () => _descricaoParaEnviar.isEmpty,
         ),
         if (_informarValorProprio)
           EntradaCampoErro(
@@ -427,7 +443,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       respostas: _temPerguntas ? _respostasParaEnviar : const {},
       quantidade: _quantidade,
       voltagem: _voltagem,
-      descricao: _descricao.text.trim(),
+      descricao: _descricaoParaEnviar,
       prazo: switch (_modoPrazo) {
         _ModoPrazo.flexivel => 'Flexível · ${_formatarData(_dataPrazo)}',
         _ModoPrazo.dataLimite => 'Data limite · ${_formatarData(_dataPrazo)}',
@@ -609,6 +625,28 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const RotuloSecao('Descreva o problema'),
+              if (_itensChecklist.isNotEmpty) ...[
+                const SizedBox(height: EspacosTrato.x2),
+                Text('Toque no que se aplica (opcional):', style: secundario),
+                const SizedBox(height: EspacosTrato.x2),
+                Wrap(
+                  key: const Key('checklist-categoria'),
+                  spacing: EspacosTrato.x2,
+                  runSpacing: EspacosTrato.x2,
+                  children: [
+                    for (final item in _itensChecklist)
+                      ChipOpcao(
+                        texto: item,
+                        marcado: _checklistMarcados.contains(item),
+                        aoTocar: () => setState(() {
+                          if (!_checklistMarcados.remove(item)) {
+                            _checklistMarcados.add(item);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: EspacosTrato.x3),
               TextField(
                 controller: _descricao,
