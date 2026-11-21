@@ -935,11 +935,17 @@ abstract final class RotasTrato {
             final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             _abrir<void>(
               context,
-              _chat(pedido?.id ?? _semId, comoProfissional: true),
+              _chat(
+                pedido?.id ?? _semId,
+                comoProfissional: true,
+                categoriaNome: pedido?.titulo,
+              ),
             );
           },
-          aoPerguntarDoPedido: (pedido) =>
-              _abrir<void>(context, _chat(pedido.id, comoProfissional: true)),
+          aoPerguntarDoPedido: (pedido) => _abrir<void>(
+            context,
+            _chat(pedido.id, comoProfissional: true, categoriaNome: pedido.titulo),
+          ),
         ),
       );
 
@@ -965,7 +971,10 @@ abstract final class RotasTrato {
     OrcamentoEnviado resumo,
   ) {
     if (resumo.orcamentoId.isEmpty) {
-      _abrir<void>(context, _chat(resumo.pedidoId, comoProfissional: true));
+      _abrir<void>(
+        context,
+        _chat(resumo.pedidoId, comoProfissional: true, categoriaNome: resumo.titulo),
+      );
       return;
     }
     _abrir<void>(
@@ -988,7 +997,7 @@ abstract final class RotasTrato {
               : null,
           aoAbrirChat: () => _abrir<void>(
             tela,
-            _chat(det.pedidoId, comoProfissional: true),
+            _chat(det.pedidoId, comoProfissional: true, categoriaNome: det.tituloPedido),
           ),
         ),
       ),
@@ -1978,6 +1987,7 @@ abstract final class RotasTrato {
         conversa.pedidoId,
         profissionalId: comoProfissional ? null : conversa.profissionalId,
         comoProfissional: comoProfissional,
+        categoriaNome: conversa.tituloPedido,
       ),
     );
     if (servico is ServicoConversasApi) await servico.marcarLida(conversa);
@@ -2004,12 +2014,14 @@ abstract final class RotasTrato {
                 profissional ? abrirRetrabalho(context, id) : abrirServico(context, id);
               case TipoNotificacao.orcamento:
                 profissional
-                    ? _abrir<void>(context, _chat(id))
+                    ? _abrir<void>(context, _chat(id, comoProfissional: true))
                     : _abrir<void>(context, _orcamentosRecebidos(id));
               case TipoNotificacao.mensagem:
-                _abrir<void>(context, _chat(id));
+                _abrir<void>(context, _chat(id, comoProfissional: profissional));
               case TipoNotificacao.pedido || TipoNotificacao.pagamento:
-                profissional ? _abrir<void>(context, _chat(id)) : abrirServico(context, id);
+                profissional
+                    ? _abrir<void>(context, _chat(id, comoProfissional: true))
+                    : abrirServico(context, id);
               case TipoNotificacao.sistema:
                 break;
             }
@@ -2273,7 +2285,11 @@ abstract final class RotasTrato {
                       aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
                       aoConversar: (o) => _abrir<void>(
                         context,
-                        _chat(pedidoId, profissionalId: o.profissionalId),
+                        _chat(
+                          pedidoId,
+                          profissionalId: o.profissionalId,
+                          comoProfissional: false,
+                        ),
                       ),
                       aoFazerContraproposta: (o) async {
                         final proposta = await pedirContrapropostaCompleta(
@@ -2604,7 +2620,14 @@ abstract final class RotasTrato {
                 aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
                 aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
                 aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
-                aoConversar: () => _abrir<void>(context, _chat(pedidoId, comoProfissional: false)),
+                aoConversar: () => _abrir<void>(
+                  context,
+                  _chat(
+                    pedidoId,
+                    comoProfissional: false,
+                    categoriaNome: pedido.categoriaNome ?? pedido.titulo,
+                  ),
+                ),
                 aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
                 aoRemarcarVisita: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
                     ? () => _sugerirOuRemarcarVisitaCliente(
@@ -2725,28 +2748,61 @@ abstract final class RotasTrato {
     );
   }
 
+  /// Só para testes do fluxo real do chat (profissional e cliente).
+  static Widget chatParaTeste(
+    String pedidoId, {
+    String? profissionalId,
+    bool? comoProfissional,
+    String? categoriaNome,
+  }) =>
+      _chat(
+        pedidoId,
+        profissionalId: profissionalId,
+        comoProfissional: comoProfissional,
+        categoriaNome: categoriaNome,
+      );
+
   static Widget _chat(
     String pedidoId, {
     String? profissionalId,
     bool? comoProfissional,
-  }) =>
-      Carregador<ConversaPedido>(
-        carregar: () => repos.chat.conversa(pedidoId, profissionalId: profissionalId),
-        atualizarQuando: pedidosMudaram,
-        construir: (context, conversa) {
-          final ehPro = comoProfissional ??
-              (!conversa.souCliente ||
-                  (!repos.modoApi && ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true));
-          final sit = conversa.situacao.toLowerCase();
-          final podeCombinarAgenda = !conversa.pedidoAberto &&
-              !conversa.remoto &&
-              (sit.contains('pago') || sit.contains('agend'));
-          return ChatPedidoTela(
-            conversa: conversa,
-            aoCapturarFoto: _fotografar,
-            aoRecarregar: repos.modoApi
-                ? () => repos.chat.conversa(pedidoId, profissionalId: profissionalId)
-                : null,
+    String? categoriaNome,
+  }) {
+    final categoriaFallback = categoriaNome?.trim();
+    Future<ConversaPedido> carregarConversa() async {
+      final conversa = await repos.chat.conversa(pedidoId, profissionalId: profissionalId);
+      final temCategoria = conversa.categoriaNome?.trim().isNotEmpty ?? false;
+      final categoriaFinal = temCategoria
+          ? conversa.categoriaNome
+          : ((categoriaFallback != null && categoriaFallback.isNotEmpty)
+              ? categoriaFallback
+              : null);
+      final souClienteFinal =
+          comoProfissional != null ? !comoProfissional : conversa.souCliente;
+      if (categoriaFinal == conversa.categoriaNome && souClienteFinal == conversa.souCliente) {
+        return conversa;
+      }
+      return conversa.comContexto(
+        categoriaNome: categoriaFinal,
+        souCliente: souClienteFinal,
+      );
+    }
+
+    return Carregador<ConversaPedido>(
+      carregar: carregarConversa,
+      atualizarQuando: pedidosMudaram,
+      construir: (context, conversa) {
+        final ehPro = comoProfissional ??
+            (!conversa.souCliente ||
+                (!repos.modoApi && ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true));
+        final sit = conversa.situacao.toLowerCase();
+        final podeCombinarAgenda = !conversa.pedidoAberto &&
+            !conversa.remoto &&
+            (sit.contains('pago') || sit.contains('agend'));
+        return ChatPedidoTela(
+          conversa: conversa,
+          aoCapturarFoto: _fotografar,
+          aoRecarregar: repos.modoApi ? carregarConversa : null,
             aoSugerirAgenda: podeCombinarAgenda
                 ? () async {
                     final inicio = await _escolherJanelaVisita(
@@ -2843,16 +2899,17 @@ abstract final class RotasTrato {
               );
               if (!ok) throw StateError('Falha ao enviar mensagem');
             },
-            aoEnviarFoto: (ref) async {
-              final ok = await _tentar(
-                context,
-                () => repos.chat.enviarFoto(pedidoId, ref, profissionalId: profissionalId),
-              );
-              if (!ok) throw StateError('Falha ao enviar foto');
-            },
-          );
-        },
-      );
+          aoEnviarFoto: (ref) async {
+            final ok = await _tentar(
+              context,
+              () => repos.chat.enviarFoto(pedidoId, ref, profissionalId: profissionalId),
+            );
+            if (!ok) throw StateError('Falha ao enviar foto');
+          },
+        );
+      },
+    );
+  }
 
   static Widget _conclusao(String pedidoId) => Carregador<ResumoConclusao>(
         carregar: () => repos.pedidos.conclusao(pedidoId),

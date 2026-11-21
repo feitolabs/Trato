@@ -1,6 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:trato/dados/cliente_api.dart';
+import 'package:trato/dados/repositorios_trato.dart';
+import 'package:trato/dados/sessao.dart';
+import 'package:trato/telas/fluxo/rotas.dart';
 import 'package:trato/telas/pedidos/chat_pedido_tela.dart';
 import 'package:trato/telas/pedidos/modelos.dart';
 import 'package:trato/tema/tema.dart';
@@ -169,5 +177,214 @@ void main() {
         expect(find.text(_estacionar), findsOneWidget);
       });
     }
+  });
+
+  group('F44 · Fluxo real da rota do chat (API + RotasTrato)', () {
+    http.Response jsonResposta(Object corpo, [int status = 200]) => http.Response(
+          jsonEncode(corpo),
+          status,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+
+    ClienteApi clienteSimulado(http.Response Function(http.Request) responder) {
+      final sessao = SessaoTrato()..entrar('token-teste');
+      return ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: sessao,
+        cliente: MockClient((req) async => responder(req)),
+      );
+    }
+
+    Future<void> abrirRota(WidgetTester tester, Widget tela) async {
+      tester.view.physicalSize = const Size(390, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(theme: TemaTrato.claro, home: tela));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'profissional em pedido aberto (404 em /v1/pedidos/{id}) recebe categoria Pintura de interiores e mostra o roteiro sem quebrar chips rápidos',
+      (tester) async {
+        final anteriores = RotasTrato.repos;
+        addTearDown(() => RotasTrato.repos = anteriores);
+
+        final api = clienteSimulado((req) {
+          switch (req.url.path) {
+            case '/v1/pedidos/fdda1234/mensagens':
+              return jsonResposta(<Object>[]);
+            case '/v1/pedidos/fdda1234/orcamentos':
+              return jsonResposta(<Object>[]);
+            case '/v1/pedidos/fdda1234':
+              return jsonResposta({'detail': 'Pedido não encontrado.'}, 404);
+            case '/v1/pedidos/fdda1234/interlocutor':
+              return jsonResposta({'id': 'cli-1', 'nome': 'Ana S.', 'papel': 'cliente'});
+            case '/v1/profissional/pedidos-abertos/fdda1234':
+              return jsonResposta({
+                'id': 'fdda1234',
+                'titulo': 'Pintar sala e corredor',
+                'categoria_nome': 'Pintura de interiores',
+                'modalidade': 'presencial',
+              });
+            default:
+              return jsonResposta({'detail': 'não encontrado'}, 404);
+          }
+        });
+        RotasTrato.repos = RepositoriosTrato.api(api);
+
+        await abrirRota(
+          tester,
+          RotasTrato.chatParaTeste('fdda1234', comoProfissional: true),
+        );
+
+        expect(find.text('Sugestões para combinar'), findsOneWidget);
+        expect(find.text('Esconder sugestões'), findsOneWidget);
+        expect(
+          find.text('Posso mover os móveis ou você prefere deixar cobertos?'),
+          findsOneWidget,
+        );
+        // Chips rápidos existentes continuam intactos.
+        expect(find.text('Tudo certo'), findsOneWidget);
+        expect(find.text('Pode me mandar foto?'), findsOneWidget);
+        await tester.drag(find.text('Pode me mandar foto?'), const Offset(-300, 0));
+        await tester.pumpAndSettle();
+        expect(find.text('Que horas termina?'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'profissional mantém roteiro de Pintura via fallback da rota mesmo se /profissional/pedidos-abertos/{id} retornar 404',
+      (tester) async {
+        final anteriores = RotasTrato.repos;
+        addTearDown(() => RotasTrato.repos = anteriores);
+
+        final api = clienteSimulado((req) {
+          if (req.url.path == '/v1/pedidos/fdda9999/mensagens') return jsonResposta(<Object>[]);
+          if (req.url.path == '/v1/pedidos/fdda9999/interlocutor') {
+            return jsonResposta({'id': 'cli-1', 'nome': 'Ana S.', 'papel': 'cliente'});
+          }
+          return jsonResposta({'detail': 'não encontrado'}, 404);
+        });
+        RotasTrato.repos = RepositoriosTrato.api(api);
+
+        await abrirRota(
+          tester,
+          RotasTrato.chatParaTeste(
+            'fdda9999',
+            comoProfissional: true,
+            categoriaNome: 'Pintura de interiores',
+          ),
+        );
+
+        expect(find.text('Sugestões para combinar'), findsOneWidget);
+        expect(find.text('Esconder sugestões'), findsOneWidget);
+        expect(
+          find.text('Posso mover os móveis ou você prefere deixar cobertos?'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'cliente em pedido aberto de Pintura de interiores vê o roteiro na voz do cliente e os chips rápidos',
+      (tester) async {
+        final anteriores = RotasTrato.repos;
+        addTearDown(() => RotasTrato.repos = anteriores);
+
+        final api = clienteSimulado((req) {
+          switch (req.url.path) {
+            case '/v1/pedidos/cli12345/mensagens':
+              return jsonResposta(<Object>[]);
+            case '/v1/pedidos/cli12345/orcamentos':
+              return jsonResposta(<Object>[]);
+            case '/v1/pedidos/cli12345':
+              return jsonResposta({
+                'id': 'cli12345',
+                'estado': 'aberto',
+                'estado_nome': 'Pedido aberto',
+                'cliente_id': 'cli-1',
+                'profissional_id': null,
+                'aberto_em': '2026-11-21T12:00:00Z',
+                'janela': null,
+                'concluido_em': null,
+                'acoes_permitidas': <String>[],
+                'codigo_inicio': null,
+                'codigo_conclusao': null,
+                'modalidade': 'presencial',
+                'categoria_nome': 'Pintura de interiores',
+                'titulo': 'Pintar sala',
+              });
+            case '/v1/pedidos/cli12345/interlocutor':
+              return jsonResposta({'id': 'pro-1', 'nome': 'Carlos M.', 'papel': 'profissional'});
+            default:
+              return jsonResposta({'detail': 'não encontrado'}, 404);
+          }
+        });
+        RotasTrato.repos = RepositoriosTrato.api(api);
+
+        await abrirRota(
+          tester,
+          RotasTrato.chatParaTeste(
+            'cli12345',
+            profissionalId: 'pro-1',
+            comoProfissional: false,
+          ),
+        );
+
+        expect(find.text('Sugestões para combinar'), findsOneWidget);
+        expect(find.text('Esconder sugestões'), findsOneWidget);
+        expect(find.text('Preciso mover ou cobrir os móveis antes?'), findsOneWidget);
+        expect(find.text('Tudo certo'), findsOneWidget);
+        expect(find.text('Pode me mandar foto?'), findsOneWidget);
+        await tester.drag(find.text('Pode me mandar foto?'), const Offset(-300, 0));
+        await tester.pumpAndSettle();
+        expect(find.text('Que horas termina?'), findsOneWidget);
+      },
+    );
+
+    testWidgets('pedido concluído não exibe a faixa de sugestões no fluxo real', (tester) async {
+      final anteriores = RotasTrato.repos;
+      addTearDown(() => RotasTrato.repos = anteriores);
+
+      final api = clienteSimulado((req) {
+        switch (req.url.path) {
+          case '/v1/pedidos/5226abcd/mensagens':
+            return jsonResposta(<Object>[]);
+          case '/v1/pedidos/5226abcd/orcamentos':
+            return jsonResposta(<Object>[]);
+          case '/v1/pedidos/5226abcd':
+            return jsonResposta({
+              'id': '5226abcd',
+              'estado': 'concluido',
+              'estado_nome': 'Concluído',
+              'cliente_id': 'cli-1',
+              'profissional_id': 'pro-1',
+              'aberto_em': '2026-11-10T12:00:00Z',
+              'janela': null,
+              'concluido_em': '2026-11-12T15:00:00Z',
+              'acoes_permitidas': <String>[],
+              'codigo_inicio': null,
+              'codigo_conclusao': null,
+              'modalidade': 'presencial',
+              'categoria_nome': 'Pintura de interiores',
+              'titulo': 'Pintar sala',
+            });
+          case '/v1/pedidos/5226abcd/interlocutor':
+            return jsonResposta({'id': 'cli-1', 'nome': 'Ana S.', 'papel': 'cliente'});
+          default:
+            return jsonResposta({'detail': 'não encontrado'}, 404);
+        }
+      });
+      RotasTrato.repos = RepositoriosTrato.api(api);
+
+      await abrirRota(
+        tester,
+        RotasTrato.chatParaTeste('5226abcd', comoProfissional: true),
+      );
+
+      expect(find.text('Sugestões para combinar'), findsNothing);
+      expect(find.text('Esconder sugestões'), findsNothing);
+      expect(find.text('Tudo certo'), findsOneWidget);
+    });
   });
 }

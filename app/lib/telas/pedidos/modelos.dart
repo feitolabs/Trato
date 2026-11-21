@@ -349,4 +349,23 @@ class ConversaPedido {
   final String situacao;
   final List<MensagemChat> mensagens;
   final List<String> respostasRapidas;
+
+  /// Copia a conversa completando categoria/papel conhecidos pela rota de origem sem perder
+  /// mensagens nem o estado vindo da API.
+  ConversaPedido comContexto({String? categoriaNome, bool? souCliente}) => ConversaPedido(
+        nome: nome,
+        iniciais: iniciais,
+        numeroPedido: numeroPedido,
+        situacao: situacao,
+        mensagens: mensagens,
+        respostasRapidas: respostasRapidas,
+        usuarioId: usuarioId,
+        orcamentosAtivos: orcamentosAtivos,
+        pedidoAberto: pedidoAberto,
+        souCliente: souCliente ?? this.souCliente,
+        remoto: remoto,
+        pedidoId: pedidoId,
+        estadoApi: estadoApi,
+        categoriaNome: categoriaNome ?? this.categoriaNome,
+      );
 }

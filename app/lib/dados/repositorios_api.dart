@@ -1478,8 +1478,32 @@ class RepositorioChatApi implements RepositorioChat {
             .catchError((Object _) => null),
       ),
     );
+    // Para profissional ainda não contratado, `GET /v1/pedidos/{id}` devolve 404 (só libera
+    // participantes), enquanto `/mensagens` libera pedidos abertos/reservados. Buscamos o detalhe
+    // aberto para recuperar categoria e modalidade, mantendo `estadoApi: 'aberto'` para o roteiro.
+    Map<String, dynamic>? pedidoAbertoDetalhe;
+    if (pedidoObj == null) {
+      pedidoAbertoDetalhe = await _api
+          .get('/v1/profissional/pedidos-abertos/$pedidoId')
+          .then<Map<String, dynamic>?>((b) => _mapa(b))
+          .catchError((Object _) => null);
+    }
+    String? textoNaoVazio(Object? valor) {
+      if (valor is! String) return null;
+      final t = valor.trim();
+      return t.isEmpty ? null : t;
+    }
+
     final situacao = pedidoObj?.estadoNome ?? 'Pedido aberto';
     final pedidoAberto = pedidoObj == null || pedidoObj.estado == 'aberto';
+    final estadoApi = pedidoObj?.estado ?? 'aberto';
+    final categoriaNome = pedidoObj != null
+        ? (textoNaoVazio(pedidoObj.categoriaNome) ?? textoNaoVazio(pedidoObj.titulo))
+        : (textoNaoVazio(pedidoAbertoDetalhe?['categoria_nome']) ??
+            textoNaoVazio(pedidoAbertoDetalhe?['titulo']));
+    final remoto = pedidoObj != null
+        ? pedidoObj.remoto
+        : pedidoAbertoDetalhe?['modalidade'] == 'remoto';
     final orcamentosAtivos = {
       for (final o in orcamentos)
         if (o['id'] is String && o['aceito'] != true && pedidoAberto) o['id'] as String,
@@ -1505,8 +1529,8 @@ class RepositorioChatApi implements RepositorioChat {
                 : ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional != true));
     return ConversaPedido(
       pedidoId: pedidoId,
-      estadoApi: pedidoObj?.estado,
-      categoriaNome: pedidoObj?.categoriaNome,
+      estadoApi: estadoApi,
+      categoriaNome: categoriaNome,
       usuarioId: outroId,
       nome: nome,
       iniciais: iniciais,
@@ -1515,8 +1539,8 @@ class RepositorioChatApi implements RepositorioChat {
       mensagens: [
         for (final m in await _comFotos(pedidoId, mensagens)) _mensagem(m),
       ],
-      respostasRapidas: pedidoObj?.remoto == true ? const [] : textos.respostasRapidas,
-      remoto: pedidoObj?.remoto == true,
+      respostasRapidas: remoto ? const [] : textos.respostasRapidas,
+      remoto: remoto,
       orcamentosAtivos: orcamentosAtivos,
       pedidoAberto: pedidoAberto,
       souCliente: souCliente,

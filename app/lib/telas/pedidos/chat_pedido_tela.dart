@@ -68,6 +68,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   final _controlador = TextEditingController();
   final _sugestoesUsadas = <String>{};
   var _sugestoesOcultas = true; // até ler a preferência do aparelho
+  String? _preferenciaLidaPara;
   late ConversaPedido _conversa = widget.conversa;
   late List<MensagemChat> _mensagens = [...widget.conversa.mensagens];
   int _enviosPendentes = 0;
@@ -76,9 +77,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   @override
   void initState() {
     super.initState();
-    if (chatPermiteSugestoes(widget.conversa.estadoApi)) {
-      unawaited(_lerPreferenciaSugestoes());
-    }
+    _garantirPreferenciaSugestoes();
     if (widget.aoRecarregar != null) {
       unawaited(_sincronizar());
       _relogio = Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
@@ -93,6 +92,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       if (_conversa.mensagens.length >= _mensagens.length - _enviosPendentes) {
         _mensagens = [..._conversa.mensagens];
       }
+      _garantirPreferenciaSugestoes();
     }
   }
 
@@ -108,6 +108,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
           _mensagens = [...atualizada.mensagens];
         }
       });
+      _garantirPreferenciaSugestoes();
     } on Object {
       // Silencioso em segundo plano; próxima leitura tenta novamente.
     }
@@ -201,11 +202,21 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     await PreferenciaSugestoesChat.ocultar(_chaveSugestoes);
   }
 
-  String get _chaveSugestoes => widget.conversa.pedidoId ?? widget.conversa.numeroPedido;
+  String get _chaveSugestoes => _conversa.pedidoId ?? _conversa.numeroPedido;
 
-  Future<void> _lerPreferenciaSugestoes() async {
-    final ocultas = await PreferenciaSugestoesChat.ocultas(_chaveSugestoes);
-    if (mounted) setState(() => _sugestoesOcultas = ocultas);
+  void _garantirPreferenciaSugestoes() {
+    if (!chatPermiteSugestoes(_conversa.estadoApi)) return;
+    final chave = _chaveSugestoes;
+    if (_preferenciaLidaPara == chave) return;
+    _preferenciaLidaPara = chave;
+    unawaited(_lerPreferenciaSugestoes(chave));
+  }
+
+  Future<void> _lerPreferenciaSugestoes(String chave) async {
+    final ocultas = await PreferenciaSugestoesChat.ocultas(chave);
+    if (mounted && _chaveSugestoes == chave) {
+      setState(() => _sugestoesOcultas = ocultas);
+    }
   }
 
   @override
