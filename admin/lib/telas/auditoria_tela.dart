@@ -48,6 +48,7 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
       : null;
 
   Future<void> _verificar() async {
+    if (_verificando) return;
     setState(() {
       _verificando = true;
       _erroCadeia = null;

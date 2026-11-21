@@ -327,13 +327,18 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
               'Outra pessoa só decide se assumir no seu lugar.',
       rotuloConfirmar: substituir ? 'Assumir no lugar' : 'Assumir análise',
     );
-    if (motivo == null || !mounted) return;
-    final ok = await executar(
-      context,
-      () => api.assumirVerificacao(v.id, motivo: motivo, substituir: substituir),
-      sucesso: 'Análise assumida.',
-    );
-    if (ok) await widget.aoMudar();
+    if (motivo == null || !mounted || _decidindo) return;
+    setState(() => _decidindo = true);
+    try {
+      final ok = await executar(
+        context,
+        () => api.assumirVerificacao(v.id, motivo: motivo, substituir: substituir),
+        sucesso: 'Análise assumida.',
+      );
+      if (ok && mounted) await widget.aoMudar();
+    } finally {
+      if (mounted) setState(() => _decidindo = false);
+    }
   }
 
   Future<void> _decidir(bool aprovar) async {
@@ -350,15 +355,18 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
       destrutivo: !aprovar,
       motivosPadrao: aprovar ? null : motivosRecusaPadrao,
     );
-    if (motivo == null || !mounted) return;
+    if (motivo == null || !mounted || _decidindo) return;
     setState(() => _decidindo = true);
-    final ok = await executar(
-      context,
-      () => api.decidirVerificacao(v.id, aprovar: aprovar, motivo: motivo),
-      sucesso: aprovar ? 'Profissional aprovado.' : 'Profissional recusado.',
-    );
-    if (mounted) setState(() => _decidindo = false);
-    if (ok) await widget.aoMudar();
+    try {
+      final ok = await executar(
+        context,
+        () => api.decidirVerificacao(v.id, aprovar: aprovar, motivo: motivo),
+        sucesso: aprovar ? 'Profissional aprovado.' : 'Profissional recusado.',
+      );
+      if (ok && mounted) await widget.aoMudar();
+    } finally {
+      if (mounted) setState(() => _decidindo = false);
+    }
   }
 
   @override
@@ -415,7 +423,10 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
             const SizedBox(height: EspacosTrato.x2),
             Align(
               alignment: Alignment.centerLeft,
-              child: BotaoTrato.secundario('Assumir no lugar', aoPressionar: () => _assumir(substituir: true)),
+              child: BotaoTrato.secundario(
+                'Assumir no lugar',
+                aoPressionar: _decidindo ? null : () => _assumir(substituir: true),
+              ),
             ),
           ],
         ] else if (comigo) ...[

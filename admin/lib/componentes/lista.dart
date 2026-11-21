@@ -368,6 +368,30 @@ class _MestreDetalheState<T> extends State<MestreDetalhe<T>> {
     return _selecionado < widget.itens.length ? _selecionado : 0;
   }
 
+  Widget _construirItem(BuildContext context, int i, bool largo, int atual, Widget? rodape) {
+    if (i == widget.itens.length) return rodape!;
+    final item = widget.itens[i];
+    return InkWell(
+      borderRadius: BorderRadius.circular(EspacosTrato.raio),
+      onTap: () {
+        if (largo) {
+          setState(() {
+            _selecionado = i;
+            _chaveSelecionada = widget.chave?.call(item);
+          });
+        } else {
+          Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (ctx) => Scaffold(
+              appBar: AppBar(title: Text(widget.tituloDetalhe(item))),
+              body: SafeArea(child: widget.detalheBuilder(ctx, item)),
+            ),
+          ));
+        }
+      },
+      child: widget.itemBuilder(context, item, largo && i == atual),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -376,35 +400,34 @@ class _MestreDetalheState<T> extends State<MestreDetalhe<T>> {
         final margem = Responsivo.margemLateral(FaixaPainel.de(context));
         final atual = _indiceAtual();
         final rodape = widget.rodape;
+        if (!largo) {
+          return CustomScrollView(
+            slivers: [
+              if (widget.topo != null) SliverToBoxAdapter(child: widget.topo!),
+              if (widget.itens.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EstadoVazio(widget.mensagemSemItens),
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x2, margem, EspacosTrato.x6),
+                  sliver: SliverList.separated(
+                    itemCount: widget.itens.length + (rodape == null ? 0 : 1),
+                    separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
+                    itemBuilder: (context, i) => _construirItem(context, i, false, atual, rodape),
+                  ),
+                ),
+            ],
+          );
+        }
         final Widget lista = widget.itens.isEmpty
             ? EstadoVazio(widget.mensagemSemItens)
             : ListView.separated(
-                padding: EdgeInsets.fromLTRB(largo ? margem : margem, EspacosTrato.x2, largo ? EspacosTrato.x3 : margem, EspacosTrato.x6),
+                padding: EdgeInsets.fromLTRB(margem, EspacosTrato.x2, EspacosTrato.x3, EspacosTrato.x6),
                 itemCount: widget.itens.length + (rodape == null ? 0 : 1),
                 separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
-                itemBuilder: (context, i) {
-                  if (i == widget.itens.length) return rodape!;
-                  final item = widget.itens[i];
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(EspacosTrato.raio),
-                    onTap: () {
-                      if (largo) {
-                        setState(() {
-                          _selecionado = i;
-                          _chaveSelecionada = widget.chave?.call(item);
-                        });
-                      } else {
-                        Navigator.of(context).push(MaterialPageRoute<void>(
-                          builder: (ctx) => Scaffold(
-                            appBar: AppBar(title: Text(widget.tituloDetalhe(item))),
-                            body: SafeArea(child: widget.detalheBuilder(ctx, item)),
-                          ),
-                        ));
-                      }
-                    },
-                    child: widget.itemBuilder(context, item, largo && i == atual),
-                  );
-                },
+                itemBuilder: (context, i) => _construirItem(context, i, true, atual, rodape),
               );
         final coluna = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -413,7 +436,7 @@ class _MestreDetalheState<T> extends State<MestreDetalhe<T>> {
             Expanded(child: lista),
           ],
         );
-        if (!largo || widget.itens.isEmpty) return coluna;
+        if (widget.itens.isEmpty) return coluna;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
