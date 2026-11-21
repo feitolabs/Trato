@@ -20,6 +20,7 @@ from trato.api.repositorios_app import (
     OrcamentoDoPedido,
     OrcamentoDoProfissional,
     PedidoAberto,
+    PrimeiroEnvio,
 )
 from trato.disputas import ConfigDisputa, Disputa
 from trato.financeiro.ledger import Conta, Lancamento, SaldoPedido
@@ -218,6 +219,9 @@ class RepositorioOrcamentos(Protocol):
 
     def do_profissional(self, profissional_id: str) -> Sequence[OrcamentoDoProfissional]:
         """Última versão de cada orçamento que o profissional enviou, o mais novo primeiro."""
+
+    def primeiros_envios(self, profissional_id: str, desde: datetime) -> Sequence[PrimeiroEnvio]:
+        """Por pedido, o primeiro envio do profissional (de `desde` em diante); selo de resposta."""
 
     def enviar(
         self,

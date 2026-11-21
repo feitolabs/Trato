@@ -55,6 +55,16 @@ class OrcamentoDoProfissional:
 
 
 @dataclass(frozen=True)
+class PrimeiroEnvio:
+    """Primeiro orçamento que o profissional enviou num pedido (base do selo de resposta real).
+    `pedido_criado_em` vem nulo quando o repositório não conhece o pedido (memória)."""
+
+    pedido_id: str
+    primeiro_envio_em: datetime
+    pedido_criado_em: datetime | None = None
+
+
+@dataclass(frozen=True)
 class ItemDoOrcamento:
     tipo: str
     descricao: str

@@ -26,6 +26,7 @@ from trato.api.repositorios_app import (
     OrcamentoDoPedido,
     OrcamentoDoProfissional,
     PedidoAberto,
+    PrimeiroEnvio,
 )
 from trato.disputas import Disputa
 from trato.financeiro.ledger import Conta, Lancamento, Livro, SaldoPedido
@@ -226,6 +227,22 @@ class OrcamentosEmMemoria:
                 d.prazo_execucao_dias,
             )
             for d in ordenados
+        )
+
+    def primeiros_envios(self, profissional_id: str, desde: datetime) -> Sequence[PrimeiroEnvio]:
+        """Por pedido, o PRIMEIRO envio do profissional (qualquer versão), se for de `desde` em
+        diante. Rascunho (sem `enviado_em`) não conta. A criação do pedido o chamador completa."""
+        primeiros: dict[str, datetime] = {}
+        for d in self._detalhes.values():
+            if d.profissional_id != profissional_id or d.enviado_em is None:
+                continue
+            atual = primeiros.get(d.pedido_id)
+            if atual is None or d.enviado_em < atual:
+                primeiros[d.pedido_id] = d.enviado_em
+        return tuple(
+            PrimeiroEnvio(pedido_id, envio)
+            for pedido_id, envio in sorted(primeiros.items())
+            if envio >= desde
         )
 
     def do_pedido(self, pedido_id: str) -> Sequence[OrcamentoDoPedido]:

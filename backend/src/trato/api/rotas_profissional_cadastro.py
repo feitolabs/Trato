@@ -20,6 +20,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.elogios import etiquetas_top
 from trato.api.repositorios_app import NIVEIS_VERIFICACAO, PerfilDetalhe
+from trato.api.resposta_real import responde_em_faixa
 from trato.profissional.config import ConfigProfissional, obter_config_profissional
 from trato.profissional.repositorio import (
     CatalogoEmMemoria,
@@ -163,6 +164,13 @@ class PerfilPublicoOut(BaseModel):
     disponibilidade: list[JanelaIO]
     portfolio: list[PortfolioIO]
     avaliacoes: list[AvaliacaoRecebidaOut]
+    responde_em_faixa: str | None = Field(
+        None,
+        description=(
+            'Selo de resposta real: "no mesmo dia" (mediana até 24 h em 5+ pedidos dos últimos '
+            "90 dias) ou nulo. Nunca devolve faixa pior."
+        ),
+    )
     etiquetas_top: list[EtiquetaTopOut] = Field(
         default_factory=list,
         description="Até 3 elogios mais usados (total desc, depois nome). Só contagem.",
@@ -827,6 +835,7 @@ def perfil_publico(
         avaliacoes=[
             _avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"
         ],
+        responde_em_faixa=responde_em_faixa(contexto, profissional_id, contexto.agora()),
         etiquetas_top=etiquetas_top(
             a for a in avaliacoes if a.direcao == "cliente_para_profissional"
         ),

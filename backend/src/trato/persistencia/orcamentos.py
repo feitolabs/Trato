@@ -11,6 +11,7 @@ from trato.api.repositorios_app import (
     OrcamentoDetalhe,
     OrcamentoDoPedido,
     OrcamentoDoProfissional,
+    PrimeiroEnvio,
 )
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
@@ -69,6 +70,26 @@ class OrcamentosPostgres:
                 l["enviado_em"],
                 l["prazo_execucao_dias"],
             )  # fmt: skip
+            for l in linhas  # noqa: E741
+        )
+
+    def primeiros_envios(self, profissional_id: str, desde: datetime) -> Sequence[PrimeiroEnvio]:
+        """Por pedido, o primeiro envio do profissional (qualquer versão) de `desde` em diante,
+        com a criação do pedido. Calculado na leitura, sem coluna nem cache."""
+        achado = como_uuid(profissional_id)
+        if achado is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select o.pedido_id, min(o.enviado_em) as primeiro, p.criado_em "
+                "from public.orcamentos o join public.pedidos p on p.id = o.pedido_id "
+                "where o.profissional_id = %s and o.enviado_em is not null "
+                "group by o.pedido_id, p.criado_em "
+                "having min(o.enviado_em) >= %s order by primeiro desc",
+                (achado, desde),
+            ).fetchall()
+        return tuple(
+            PrimeiroEnvio(str(l["pedido_id"]), l["primeiro"], l["criado_em"])
             for l in linhas  # noqa: E741
         )
 
