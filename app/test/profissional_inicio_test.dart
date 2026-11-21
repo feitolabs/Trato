@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/componentes/componentes.dart';
-import 'package:trato/dispositivo/abrir_mapa.dart';
 import 'package:trato/telas/profissional_inicio/casca_profissional_tela.dart';
 import 'apoio/exemplos/telas/profissional_inicio/dados_exemplo.dart';
 import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
