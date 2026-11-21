@@ -91,6 +91,10 @@ class _CheckInTelaState extends State<CheckInTela> {
       if (mounted && foto != null) setState(() => _foto = foto);
     } on ErroTrato catch (erro) {
       if (mounted) setState(() => _erroPasso = erro.mensagem);
+    } on Object {
+      if (mounted) {
+        setState(() => _erroPasso = 'Não deu para tirar a foto agora. Tente de novo.');
+      }
     }
   }
 
@@ -104,6 +108,10 @@ class _CheckInTelaState extends State<CheckInTela> {
       if (mounted && metros != null) setState(() => _distancia = metros);
     } on ErroTrato catch (erro) {
       if (mounted) setState(() => _erroPasso = erro.mensagem);
+    } on Object {
+      if (mounted) {
+        setState(() => _erroPasso = 'Não deu para pegar sua localização agora. Tente de novo.');
+      }
     }
   }
 
@@ -158,10 +166,15 @@ class _CheckInTelaState extends State<CheckInTela> {
       }
     } on ErroTrato catch (erro) {
       if (mounted) setState(() => _erroPasso = erro.mensagem);
+    } on Object {
+      if (mounted) {
+        setState(() => _erroPasso = 'Não deu para registrar a ausência agora. Tente de novo.');
+      }
     }
   }
 
   Future<void> _iniciar() async {
+    if (_iniciando) return;
     setState(() {
       _iniciando = true;
       _erroCodigo = null;
@@ -178,6 +191,14 @@ class _CheckInTelaState extends State<CheckInTela> {
         setState(() {
           _iniciando = false;
           _erroPasso = erro.mensagem;
+        });
+      }
+      return;
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _iniciando = false;
+          _erroPasso = 'Não deu para iniciar agora. Tente de novo.';
         });
       }
       return;

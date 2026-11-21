@@ -139,7 +139,9 @@ void main() {
     testWidgets('sem nenhuma opcao de pagamento nao quebra', (t) async {
       await _abrir(t, PagamentoTela(dados: _dados(opcoes: const [])));
       expect(t.takeException(), isNull);
-    }, skip: true); // bug conhecido: QA4-2 pagamento_tela.dart:46 opcoes.first estoura (StateError) se o backend manda opcoes vazias
+      expect(find.text('Pagamento indisponível agora'), findsOneWidget);
+      expect(find.text('Voltar'), findsOneWidget);
+    });
     testWidgets('parcelamento com parcelas 0 e totais absurdos nao quebra', (t) async {
       await _abrir(
         t,
@@ -151,6 +153,32 @@ void main() {
         ),
       );
       expect(t.takeException(), isNull);
+    });
+  });
+
+  group('Pagamento: linha do cupom vem do backend (desconto_cupom_centavos)', () {
+    testWidgets('com o campo (> 0): mostra "Cupom X aplicado · desconto de R\$ ..."', (t) async {
+      await _abrir(
+        t,
+        PagamentoTela(
+          dados: _dados(desconto: 5000, cupom: 'TRATO10')
+              .copiarCom(descontoCupomCentavos: 3000, moedasDescontoCentavos: 2000),
+        ),
+      );
+      // Usa o valor pronto do backend (R\$ 30,00), nao descontoCentavos - moedas.
+      expect(find.textContaining('Cupom TRATO10 aplicado · desconto de R\$ 30,00'), findsOneWidget);
+    });
+
+    testWidgets('sem o campo (backend antigo) ou zero: nao mostra a linha do cupom', (t) async {
+      await _abrir(t, PagamentoTela(dados: _dados(desconto: 5000, cupom: 'TRATO10')));
+      expect(find.textContaining('Cupom TRATO10 aplicado'), findsNothing);
+      await _abrir(
+        t,
+        PagamentoTela(
+          dados: _dados(desconto: 5000, cupom: 'TRATO10').copiarCom(descontoCupomCentavos: 0),
+        ),
+      );
+      expect(find.textContaining('Cupom TRATO10 aplicado'), findsNothing);
     });
   });
 
@@ -231,7 +259,10 @@ void main() {
         await t.pumpAndSettle();
       }, (e, s) => solto = e);
       expect(solto, isNull, reason: 'excecao do pagamento escapa da tela sem mensagem ao usuario');
-    }, skip: true); // bug conhecido: QA4-1 PagamentoTela._pagar faz rethrow sem catch; erro depende do chamador
+      expect(find.byKey(const Key('erro-pagamento')), findsOneWidget);
+      expect(find.textContaining(ErroTrato.semInternet.mensagem), findsOneWidget);
+      expect(_botaoPagar, findsOneWidget); // destravado: pode tentar de novo
+    });
 
     testWidgets('voltar no meio: aoVoltar e chamado uma vez', (t) async {
       var voltou = 0;

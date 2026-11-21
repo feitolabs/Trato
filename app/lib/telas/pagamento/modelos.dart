@@ -37,6 +37,7 @@ class DadosPagamento {
     this.rotuloValor,
     this.parcelamento = const [],
     this.descontoCentavos = 0,
+    this.descontoCupomCentavos,
     this.cupomCodigo,
     this.moedasSaldo = 0,
     this.moedasUsadas = 0,
@@ -77,6 +78,10 @@ class DadosPagamento {
   /// Desconto aplicado pelo cupom (em centavos). Zero quando não há cupom.
   final int descontoCentavos;
 
+  /// Parte do desconto que é do cupom (`desconto_cupom_centavos`), pronta do backend. Ausente
+  /// (backend antigo) = null: a linha do cupom não aparece (o app não calcula dinheiro).
+  final int? descontoCupomCentavos;
+
   /// Código de cupom aceito e aplicado neste cálculo.
   final String? cupomCodigo;
 
@@ -95,6 +100,7 @@ class DadosPagamento {
     int? valorAgoraCentavos,
     List<OpcaoParcelamento>? parcelamento,
     int? descontoCentavos,
+    int? descontoCupomCentavos,
     String? cupomCodigo,
     int? moedasSaldo,
     int? moedasUsadas,
@@ -113,6 +119,7 @@ class DadosPagamento {
         valorAgoraCentavos: valorAgoraCentavos ?? this.valorAgoraCentavos,
         parcelamento: parcelamento ?? this.parcelamento,
         descontoCentavos: descontoCentavos ?? this.descontoCentavos,
+        descontoCupomCentavos: descontoCupomCentavos ?? this.descontoCupomCentavos,
         cupomCodigo: cupomCodigo ?? this.cupomCodigo,
         moedasSaldo: moedasSaldo ?? this.moedasSaldo,
         moedasUsadas: moedasUsadas ?? this.moedasUsadas,

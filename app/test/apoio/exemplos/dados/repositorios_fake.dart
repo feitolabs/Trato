@@ -252,6 +252,7 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
       return base.copiarCom(
         valorAgoraCentavos: finalValor,
         descontoCentavos: desconto,
+        descontoCupomCentavos: desconto,
         cupomCodigo: 'TRATO10',
         parcelamento: [
           for (final p in base.parcelamento)

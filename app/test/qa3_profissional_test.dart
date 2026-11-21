@@ -325,7 +325,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).first, '150,00');
       await tester.pumpAndSettle();
-    }, skip: true); // bug conhecido: QA3B-1
+    });
 
     testWidgets('celular pequeno 320x568 e tablet 1024x768 com fonte 1.3x sem overflow', (tester) async {
       for (final size in [const Size(320, 568), const Size(1024, 768)]) {
@@ -384,7 +384,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byType(BotaoPrimario));
       await tester.pumpAndSettle();
-    }, skip: true); // bug conhecido: QA3B-2
+    });
 
     testWidgets('timeout nao-ErroTrato ao tirar foto / localizar nao explode', (tester) async {
       await _abrir(
@@ -399,7 +399,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Localizar'));
       await tester.pumpAndSettle();
-    }, skip: true); // bug conhecido: QA3B-3
+    });
   });
 
   group('InicioProfissionalTela & DetalhePedidoTela (exclusividade)', () {
