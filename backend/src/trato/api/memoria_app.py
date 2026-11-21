@@ -222,7 +222,11 @@ class AvaliacoesEmMemoria:
         return atualizada
 
     def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
-        achadas = [a for a in self._itens.values() if a.avaliado_id == avaliado_id]
+        achadas = [
+            a
+            for a in self._itens.values()
+            if a.avaliado_id == avaliado_id and a.status == "publicada"
+        ]
         return tuple(sorted(achadas, key=lambda a: a.criada_em, reverse=True))
 
 

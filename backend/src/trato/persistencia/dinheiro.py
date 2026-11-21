@@ -553,7 +553,8 @@ class AvaliacoesPostgres:
         return self.obter_por_id(aid)
 
     def recebidas(self, avaliado_id: str) -> list[Avaliacao]:
-        """Avaliações recebidas por uma pessoa, da mais recente à mais antiga (perfil)."""
+        """Avaliações PUBLICADAS recebidas por uma pessoa, da mais recente à mais antiga (perfil).
+        Descartada ou em revisão não aparece nem entra na contagem de elogios."""
         uid = como_uuid(avaliado_id)
         if uid is None:
             return []
@@ -563,7 +564,7 @@ class AvaliacoesPostgres:
                 "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
                 "from public.avaliacoes a "
                 "join public.contratos c on c.id = a.contrato_id "
-                "where a.avaliado_id = %s order by a.criada_em desc",
+                "where a.avaliado_id = %s and a.status = 'publicada' order by a.criada_em desc",
                 (uid,),
             ).fetchall()
         return [self._de_linha(l) for l in linhas]  # noqa: E741

@@ -182,6 +182,8 @@ class Avaliacao:
     criada_em: datetime
     id: str | None = None
     resposta: str | None = None
+    # Moderação (coluna `avaliacoes.status`): só "publicada" aparece no perfil e conta no selo.
+    status: str = "publicada"
 
 
 class RepositorioConversas(Protocol):
