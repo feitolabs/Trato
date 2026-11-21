@@ -71,7 +71,7 @@ class _SplashTelaState extends State<SplashTela> {
                             ),
                             const SizedBox(height: EspacosTrato.x4),
                             Text(
-                              'Serviço combinado, tudo no app.',
+                              'Conectando Clientes a Profissionais de Qualidade.',
                               textAlign: TextAlign.center,
                               style: TipografiaTrato.lema.copyWith(color: CoresTrato.logoAzulClaro),
                             ),

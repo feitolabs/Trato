@@ -147,11 +147,8 @@ void main() {
 
   group('GAN-1: regra de liberação', () {
     test('texto com e sem data', () {
-      expect(
-        textoRegraLiberacao(DateTime(2026, 11, 27)),
-        allOf(startsWith('Libera em '), contains('48 horas para o cliente confirmar')),
-      );
-      expect(textoRegraLiberacao(null), startsWith('Libera após 48 horas'));
+      expect(textoRegraLiberacao(DateTime(2026, 11, 27)), 'Cai na sua conta em 27/11');
+      expect(textoRegraLiberacao(null), startsWith('Cai na sua conta depois que o cliente'));
     });
 
     testWidgets('Carteira mostra a regra e os Tratinhos pendentes', (tester) async {

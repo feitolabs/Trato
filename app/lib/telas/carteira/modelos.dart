@@ -27,7 +27,7 @@ class ResumoCarteira {
 
   final int aLiberarCentavos;
 
-  /// Ex.: "Automático em até 48 h". O prazo depende de P1 (48 h x 7 dias): vem do dado.
+  /// Ex.: "Automático em até 48 h". O prazo vem do dado (configuração), nunca fixo na tela.
   final String textoALiberar;
 
   /// Data do próximo repasse (API). Com data, ela substitui o texto de prazo.
@@ -136,17 +136,16 @@ class ContaRecebimento {
 }
 
 /// Tudo que a tela precisa. [erro] preenchido mostra a mensagem com "Tentar de novo".
-/// Regra de liberação do repasse: 48 h para o cliente confirmar + 7 dias do prazo de retrabalho.
-/// Os prazos vêm da configuração pública (se não vierem, usa 48 h e 7 dias). A data (`DD/MM`)
-/// só aparece quando o backend a informa.
-String textoRegraLiberacao(DateTime? libera) {
-  final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
-  final dias =
-      ConfigPublica.atual.prazoLiberacaoDias > 0 ? ConfigPublica.atual.prazoLiberacaoDias : 7;
-  final regra = '${ConfigPublica.horas(horas)} para o cliente confirmar + '
-      '${ConfigPublica.dias(dias)} do prazo de retrabalho';
-  return libera == null ? 'Libera após $regra' : 'Libera em ${diaMesDoAparelho(libera)}: $regra';
-}
+/// Quando o repasse cai na conta. A data (`DD/MM`) vem do backend; sem ela, só a regra geral,
+/// sem citar número de horas ou dias (o prazo é da configuração e pode mudar).
+String textoRegraLiberacao(DateTime? libera) => libera == null
+    ? 'Cai na sua conta depois que o cliente confirmar o serviço'
+    : 'Cai na sua conta em ${diaMesDoAparelho(libera)}';
+
+/// Resposta do toque em "Por quê?" na regra de liberação.
+const textoPorQueLiberacao =
+    'O valor fica guardado até o cliente confirmar o serviço e o prazo de reclamação terminar. '
+    'Depois é repassado à sua conta cadastrada. Sem taxa.';
 
 /// Monta o resumo da Carteira só com o que a API do saldo devolveu (`liberado_centavos`,
 /// `retido_centavos`, `a_liberar_centavos`, `proxima_liberacao_em`). Nada é somado nem calculado.

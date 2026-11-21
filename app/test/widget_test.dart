@@ -6,6 +6,6 @@ void main() {
     await tester.pumpWidget(const TratoApp());
 
     expect(find.text('Trato'), findsOneWidget);
-    expect(find.text('Serviço combinado, tudo no app.'), findsOneWidget);
+    expect(find.text('Conectando Clientes a Profissionais de Qualidade.'), findsOneWidget);
   });
 }

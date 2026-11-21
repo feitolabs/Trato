@@ -560,7 +560,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     if (pedido.estado == 'em_confirmacao' && fimConfirmacao != null && horasPrazo > 0) {
       final limite = fimConfirmacao.add(Duration(hours: horasPrazo));
       prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horasPrazo)} para confirmar, '
-          'até ${_dia(limite)} · ${_hora(limite)}.';
+          'até ${_dia(limite)} · ${_hora(limite)}. '
+          'Se você não responder, o serviço é confirmado e o pagamento é liberado ao profissional.';
     }
     // Descrição do pedido (quando há categoria) e endereço (para compartilhar/SOS em execução).
     String? descricaoPedido;
@@ -725,7 +726,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       if (fim != null && horas > 0) {
         final limite = fim.toLocal().add(Duration(hours: horas));
         prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horas)} para confirmar, '
-            'até ${_dia(limite)} · ${_hora(limite)}.';
+            'até ${_dia(limite)} · ${_hora(limite)}. '
+            'Se você não responder, o serviço é confirmado e o pagamento é liberado ao profissional.';
       }
     } on Object {
       prazoConfirmacao = null;

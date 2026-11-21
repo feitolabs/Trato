@@ -5,6 +5,7 @@ import '../../tema/tema.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart';
 import 'modelos.dart';
+import 'regra_liberacao.dart';
 
 /// Valores de um pedido para o profissional: o valor inteiro que o cliente pagou, a taxa do
 /// Trato descontada e o que fica para ele. Também lista aditivos e notas de materiais.
@@ -27,19 +28,14 @@ class DetalheValoresTela extends StatelessWidget {
       tituloVazio: '',
       textoVazio: '',
       construir: (context, d) {
-        final secundario =
-            TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+        final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
         return CorpoRolavel(
           children: [
             Text('Pedido ${d.pedidoNumero}', style: TipografiaTrato.tituloGrande),
             const SizedBox(height: EspacosTrato.x2),
             Text(d.situacao, style: secundario),
             const SizedBox(height: EspacosTrato.x1),
-            Text(
-              textoRegraLiberacao(d.liberaEm),
-              key: const ValueKey('regra-liberacao'),
-              style: secundario,
-            ),
+            RegraLiberacao(libera: d.liberaEm, chave: const ValueKey('regra-liberacao')),
             const SizedBox(height: EspacosTrato.x4),
             CartaoTrato(
               key: const ValueKey('valores-do-pedido'),

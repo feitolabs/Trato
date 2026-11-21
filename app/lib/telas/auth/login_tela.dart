@@ -175,7 +175,13 @@ class _LoginTelaState extends State<LoginTela> {
       children: [
         const SizedBox(height: EspacosTrato.x6),
         Text('Trato', style: TipografiaTrato.marcaPequena.copyWith(fontSize: 40)),
-        const SizedBox(height: EspacosTrato.x2),
+        const SizedBox(height: EspacosTrato.x1),
+        Text(
+          'Conectando Clientes a Profissionais de Qualidade.',
+          key: const Key('frase-principal'),
+          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+        ),
+        const SizedBox(height: EspacosTrato.x4),
         Text('Entrar na sua conta', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x6),
         KeyedSubtree(
@@ -218,7 +224,8 @@ class _LoginTelaState extends State<LoginTela> {
         if (_aviso != null)
           Padding(
             padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
-            child: Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+            child:
+                Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
           ),
         BotaoPrimario(texto: 'Entrar', aoTocar: _entrar, carregando: _carregando),
         const SizedBox(height: EspacosTrato.x4),

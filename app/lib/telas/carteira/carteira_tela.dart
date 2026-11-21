@@ -6,6 +6,7 @@ import '../../tema/tema.dart';
 import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../profissional/dinheiro.dart';
 import 'modelos.dart';
+import 'regra_liberacao.dart';
 
 /// Tela 27 — Carteira do profissional. Só exibe o que o backend devolveu em [dados]:
 /// nenhum saldo, taxa ou líquido é calculado aqui. O repasse é automático: não há botão de saque.
@@ -79,11 +80,7 @@ class CarteiraTela extends StatelessWidget {
               style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x1),
-            Text(
-              textoRegraLiberacao(dados.proximaLiberacao),
-              key: const Key('regra-liberacao'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
-            ),
+            RegraLiberacao(libera: dados.proximaLiberacao, chave: const Key('regra-liberacao')),
             if (dados.tratinhosPendentesTexto != null) ...[
               const SizedBox(height: EspacosTrato.x1),
               Text(
