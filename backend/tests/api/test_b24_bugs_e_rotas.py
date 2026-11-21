@@ -312,6 +312,35 @@ def test_pedido_urgente_persiste_retorna_notifica_e_bloqueia_exclusividade(amb):
     assert exc.json()["codigo"] == "pedido_urgente"
 
 
+def test_b25_urgente_aparece_na_lista_e_no_detalhe_do_cliente(amb):
+    """Tudo que o app cliente lê (lista, detalhe, /dados) devolve `urgente` gravado no POST."""
+    base = AbrirPedidoIn(
+        categoria_id="eletrica",
+        cidade_id="sp",
+        titulo="Tomada soltando faísca",
+        descricao="Preciso hoje",
+        modalidade="presencial",
+        endereco={"logradouro": "Rua A", "numero": "10", "bairro": "Centro", "cep": "01001000"},
+    ).model_dump(mode="json")
+    urgente = amb.cliente.post(
+        "/v1/pedidos", headers=cab("t-cliente"), json={**base, "urgente": True}
+    ).json()
+    normal = amb.cliente.post(
+        "/v1/pedidos", headers=cab("t-cliente"), json={**base, "urgente": False}
+    ).json()
+    assert urgente["urgente"] is True and normal["urgente"] is False
+
+    lista = amb.cliente.get("/v1/pedidos?como=cliente", headers=cab("t-cliente")).json()
+    por_id = {p["id"]: p for p in lista}
+    assert por_id[urgente["id"]]["urgente"] is True
+    assert por_id[normal["id"]]["urgente"] is False
+    for pedido in (urgente, normal):
+        det = amb.cliente.get(f"/v1/pedidos/{pedido['id']}", headers=cab("t-cliente")).json()
+        assert det["urgente"] is pedido["urgente"]
+        dados = amb.cliente.get(f"/v1/pedidos/{pedido['id']}/dados", headers=cab("t-cliente"))
+        assert dados.json()["urgente"] is pedido["urgente"]
+
+
 # --- Item 4: LGPD exclusao agendada em /v1/me --------------------------------------------------
 
 
@@ -364,12 +393,9 @@ def test_recusar_orcamento_idempotente_e_notifica_profissional(amb):
     )
 
     # Outro usuario nao pode recusar (carregar_pedido oculta como 404)
-    assert (
-        amb.cliente.post(
-            f"/v1/pedidos/{pid}/orcamentos/{oid}/recusar", headers=cab("t-prof")
-        ).status_code
-        in (403, 404)
-    )
+    assert amb.cliente.post(
+        f"/v1/pedidos/{pid}/orcamentos/{oid}/recusar", headers=cab("t-prof")
+    ).status_code in (403, 404)
 
     # Cliente dono recusa (1a vez)
     r1 = amb.cliente.post(f"/v1/pedidos/{pid}/orcamentos/{oid}/recusar", headers=cab("t-cliente"))
@@ -383,9 +409,7 @@ def test_recusar_orcamento_idempotente_e_notifica_profissional(amb):
 
     # Notificou o profissional 1 vez e nao aparece mais na lista de ativos do pedido
     avisos = [
-        n
-        for n in notif.listar(PROFISSIONAL.id, False, 50)
-        if n.titulo == "Orçamento recusado"
+        n for n in notif.listar(PROFISSIONAL.id, False, 50) if n.titulo == "Orçamento recusado"
     ]
     assert len(avisos) == 1
     assert amb.contexto.orcamentos.do_pedido(pid) == ()
