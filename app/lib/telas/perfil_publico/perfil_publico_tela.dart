@@ -91,12 +91,19 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
         return;
       }
     }
-    final nova = await capturar();
-    if (nova != null && mounted) {
-      setState(() {
-        _fotoAtual = nova;
-        _fotoSalvaSessao = nova;
-      });
+    try {
+      final nova = await capturar();
+      if (nova != null && mounted) {
+        setState(() {
+          _fotoAtual = nova;
+          _fotoSalvaSessao = nova;
+        });
+      }
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível atualizar a foto agora. Tente de novo.')),
+      );
     }
   }
 

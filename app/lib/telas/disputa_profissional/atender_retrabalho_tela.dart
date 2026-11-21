@@ -25,7 +25,7 @@ class AtenderRetrabalhoTela extends StatelessWidget {
     return PaginaCarregavel<DadosRetrabalho?>(
       titulo: 'Atender retrabalho',
       carregar: () => servico.carregarRetrabalho(disputaId),
-      estaVazio: (d) => d == null || d.opcoesHorario.isEmpty,
+      estaVazio: (d) => d == null || (d.estado == 'aberto' && d.opcoesHorario.isEmpty),
       iconeVazio: Icons.event_busy_outlined,
       tituloVazio: 'Sem retrabalho para agendar',
       textoVazio: 'Não há retrabalho pendente ou horários disponíveis agora.',
@@ -60,6 +60,7 @@ class _CorpoState extends State<_Corpo> {
   }
 
   Future<void> _executar(Future<void> Function() acao, String aviso, String proximo) async {
+    if (_enviando) return;
     setState(() {
       _enviando = true;
       _erro = null;
