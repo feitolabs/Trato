@@ -1496,6 +1496,9 @@ class RepositorioChatApi implements RepositorioChat {
                 ? pedidoObj.clienteId == meuId
                 : ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional != true));
     return ConversaPedido(
+      pedidoId: pedidoId,
+      estadoApi: pedidoObj?.estado,
+      categoriaNome: pedidoObj?.categoriaNome,
       usuarioId: outroId,
       nome: nome,
       iniciais: iniciais,

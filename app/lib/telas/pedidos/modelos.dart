@@ -324,7 +324,16 @@ class ConversaPedido {
     this.pedidoAberto = true,
     this.souCliente = true,
     this.remoto = false,
+    this.pedidoId,
+    this.estadoApi,
+    this.categoriaNome,
   });
+
+  /// Id do pedido, estado da API (`aberto`, `agendado`...) e categoria: só para o roteiro de
+  /// sugestões do chat. Nulos (dados antigos ou de exemplo) = sem sugestões.
+  final String? pedidoId;
+  final String? estadoApi;
+  final String? categoriaNome;
 
   /// Serviço remoto: sem respostas rápidas nem sugestão de horário de visita.
   final bool remoto;

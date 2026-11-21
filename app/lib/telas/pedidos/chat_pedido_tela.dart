@@ -7,6 +7,7 @@ import '../../tema/tema.dart';
 import '../comuns/formato_aparelho.dart';
 import 'modelos.dart';
 import 'pecas.dart';
+import 'sugestoes_chat.dart';
 
 /// Tela 17 — Chat do pedido. O envio real, a guarda como prova e a ocultação de telefones e
 /// e-mails são do backend (`GET/POST /v1/pedidos/{id}/mensagens`). Quando [aoRecarregar] é
@@ -65,6 +66,8 @@ class ChatPedidoTela extends StatefulWidget {
 
 class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   final _controlador = TextEditingController();
+  final _sugestoesUsadas = <String>{};
+  var _sugestoesOcultas = true; // até ler a preferência do aparelho
   late ConversaPedido _conversa = widget.conversa;
   late List<MensagemChat> _mensagens = [...widget.conversa.mensagens];
   int _enviosPendentes = 0;
@@ -73,10 +76,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   @override
   void initState() {
     super.initState();
+    if (chatPermiteSugestoes(widget.conversa.estadoApi)) {
+      unawaited(_lerPreferenciaSugestoes());
+    }
     if (widget.aoRecarregar != null) {
       unawaited(_sincronizar());
-      _relogio =
-          Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
+      _relogio = Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
     }
   }
 
@@ -174,6 +179,35 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     }
   }
 
+  bool _mostrarSugestoes(ConversaPedido c) =>
+      !_sugestoesOcultas &&
+      chatPermiteSugestoes(c.estadoApi) &&
+      _sugestoesUsadas.length <
+          sugestoesDoChat(souCliente: c.souCliente, categoria: c.categoriaNome).length;
+
+  /// Tocar numa sugestão só preenche o campo (nunca envia) e a sugestão usada some.
+  void _usarSugestao(String texto) {
+    final atual = _controlador.text.trim();
+    final novo = atual.isEmpty ? texto : '$atual $texto';
+    _controlador.value = TextEditingValue(
+      text: novo,
+      selection: TextSelection.collapsed(offset: novo.length),
+    );
+    setState(() => _sugestoesUsadas.add(texto));
+  }
+
+  Future<void> _esconderSugestoes() async {
+    setState(() => _sugestoesOcultas = true);
+    await PreferenciaSugestoesChat.ocultar(_chaveSugestoes);
+  }
+
+  String get _chaveSugestoes => widget.conversa.pedidoId ?? widget.conversa.numeroPedido;
+
+  Future<void> _lerPreferenciaSugestoes() async {
+    final ocultas = await PreferenciaSugestoesChat.ocultas(_chaveSugestoes);
+    if (mounted) setState(() => _sugestoesOcultas = ocultas);
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversa = _conversa;
@@ -190,8 +224,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
             _Cabecalho(
               conversa: conversa,
               aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
-              aoProporNovaCondicao:
-                  conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
+              aoProporNovaCondicao: conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
               aoSugerirAgenda: widget.aoSugerirAgenda == null
                   ? null
                   : () async {
@@ -204,8 +237,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               child: ConteudoResponsivo(
                 child: ListView(
                   reverse: true,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
+                  padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
                   children: [
                     // reverse: a lista começa colada embaixo, perto do campo de envio.
                     for (var i = _mensagens.length - 1; i >= 0; i--)
@@ -214,8 +246,19 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
                 ),
               ),
             ),
-            _RespostasRapidas(
-                respostas: conversa.respostasRapidas, aoTocar: _enviar),
+            if (_mostrarSugestoes(conversa))
+              SugestoesChat(
+                sugestoes: [
+                  for (final s in sugestoesDoChat(
+                    souCliente: conversa.souCliente,
+                    categoria: conversa.categoriaNome,
+                  ))
+                    if (!_sugestoesUsadas.contains(s)) s,
+                ],
+                aoTocar: _usarSugestao,
+                aoEsconder: _esconderSugestoes,
+              ),
+            _RespostasRapidas(respostas: conversa.respostasRapidas, aoTocar: _enviar),
             _CampoEnvio(
               controlador: _controlador,
               aoEnviar: _enviar,
@@ -388,15 +431,13 @@ class _AvisoPrivacidade extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.shield_outlined,
-                size: 20, color: CoresTrato.azulTexto),
+            const Icon(Icons.shield_outlined, size: 20, color: CoresTrato.azulTexto),
             const SizedBox(width: EspacosTrato.x3),
             Expanded(
               child: Text(
                 'As mensagens ficam guardadas e servem de prova. '
                 'Antes de contratar, telefones e e-mails ficam ocultos.',
-                style: TipografiaTrato.corpoPequeno
-                    .copyWith(color: CoresTrato.azulTexto),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
               ),
             ),
           ],
@@ -423,8 +464,7 @@ class _LinhaMensagem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final legendaHora =
-        TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
+    final legendaHora = TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
     if (mensagem.tipo == TipoMensagem.sistema) {
       return Padding(
         padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
@@ -433,8 +473,7 @@ class _LinhaMensagem extends StatelessWidget {
             Text(
               mensagem.texto ?? '',
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpoPequeno
-                  .copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x1),
             Text(mensagem.hora, style: legendaHora),
@@ -448,8 +487,7 @@ class _LinhaMensagem extends StatelessWidget {
     final prop = mensagem.contraproposta;
     final agenda = mensagem.propostaAgenda;
     final Widget corpo = mensagem.tipo == TipoMensagem.foto
-        ? EspacoFoto(
-            rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
+        ? EspacoFoto(rotulo: mensagem.texto ?? '[Foto]', largura: 220, altura: 180)
         : Container(
             padding: const EdgeInsets.symmetric(
               horizontal: EspacosTrato.x4,
@@ -468,8 +506,7 @@ class _LinhaMensagem extends StatelessWidget {
                   Text(
                     prop.ehPropostaDoProfissional ? 'Nova proposta' : 'Contraproposta',
                     style: TipografiaTrato.sobretitulo.copyWith(
-                      color:
-                          minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x1),
@@ -530,8 +567,7 @@ class _LinhaMensagem extends StatelessWidget {
                       rotuloInativo: 'Proposta substituída',
                       aoTocar: () => aoAceitarProposta!(prop),
                     ),
-                  ] else if (!prop.ehPropostaDoProfissional &&
-                      aoAceitarContraproposta != null) ...[
+                  ] else if (!prop.ehPropostaDoProfissional && aoAceitarContraproposta != null) ...[
                     const SizedBox(height: EspacosTrato.x3),
                     _BotaoProposta(
                       ativo: podeAceitarProposta,
@@ -548,12 +584,9 @@ class _LinhaMensagem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
       child: Column(
-        crossAxisAlignment:
-            minha ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: minha ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: larguraMaxima),
-              child: corpo),
+          ConstrainedBox(constraints: BoxConstraints(maxWidth: larguraMaxima), child: corpo),
           const SizedBox(height: EspacosTrato.x1),
           if (!minha)
             Text(mensagem.hora, style: legendaHora)
@@ -581,9 +614,7 @@ class _LinhaMensagem extends StatelessWidget {
                               : 'pino-enviada',
                     ),
                     size: 16,
-                    color: mensagem.lida
-                        ? CoresTrato.azulTexto
-                        : CoresTrato.textoSecundario,
+                    color: mensagem.lida ? CoresTrato.azulTexto : CoresTrato.textoSecundario,
                   ),
                 ],
               ),
@@ -607,8 +638,7 @@ class _RespostasRapidas extends StatelessWidget {
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding:
-            const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
+        padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.margemTela),
         itemCount: respostas.length,
         separatorBuilder: (_, __) => const SizedBox(width: EspacosTrato.x2),
         itemBuilder: (_, i) => Material(
@@ -619,9 +649,7 @@ class _RespostasRapidas extends StatelessWidget {
             onTap: () => aoTocar(respostas[i]),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-              child: Center(
-                  child:
-                      Text(respostas[i], style: TipografiaTrato.corpoPequeno)),
+              child: Center(child: Text(respostas[i], style: TipografiaTrato.corpoPequeno)),
             ),
           ),
         ),
