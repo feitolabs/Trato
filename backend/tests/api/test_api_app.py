@@ -267,6 +267,7 @@ def test_me_devolve_o_perfil_sem_dados_pessoais(amb):
     assert corpo.pop("status_verificacao") is None
     assert corpo.pop("disponivel_agora") is False
     assert corpo.pop("cpf_cadastrado") is False
+    assert corpo.pop("exclusao_agendada_em") is None
     assert corpo == {
         "id": "pro-1", "nome": "Ana", "papel": "profissional", "status": "ativo",
         "nivel_verificacao": "verificado", "nota_publica": 4.8, "servicos_concluidos": 12,
@@ -358,7 +359,7 @@ def test_cliente_e_profissional_avaliam_uma_vez_cada(amb):
     )
     assert r.status_code == 201, r.text
     assert r.json()["direcao"] == "cliente_para_profissional"
-    assert r.json()["comentario"] == "Ótimo" and r.json()["etiquetas"] == ["pontual"]
+    assert r.json()["comentario"] == "Ótimo" and r.json()["etiquetas"] == ["Pontual"]
     assert post(amb, url, "t-cliente", {"nota_geral": 1}).status_code == 409  # só uma vez
     r = post(amb, url, "t-prof", {"nota_geral": 4})
     assert r.status_code == 201 and r.json()["direcao"] == "profissional_para_cliente"

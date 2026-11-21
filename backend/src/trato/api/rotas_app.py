@@ -25,6 +25,7 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.elogios import validar_etiquetas_elogio
 from trato.api.exclusividades import profissional_exclusivo
 from trato.api.moedas import (
     TIPO_BONUS_PROFISSIONAL,
@@ -55,7 +56,7 @@ from trato.persistencia.erros import Duplicado, RegraDoBanco
 from trato.profissional.config import ORDEM_NIVEIS, obter_config_profissional
 from trato.profissional.repositorio import slugs
 from trato.seguranca.config import obter_config_seguranca
-from trato.seguranca.texto_livre import limpar_etiquetas, limpar_texto
+from trato.seguranca.texto_livre import limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["app"])
 log = logging.getLogger("trato.api")
@@ -1371,7 +1372,12 @@ def avaliar(
         if corpo.comentario
         else None
     )
-    etiquetas = limpar_etiquetas(corpo.etiquetas, cfg_seg)
+    if direcao == "cliente_para_profissional":
+        etiquetas = validar_etiquetas_elogio(corpo.etiquetas)
+    elif any(e.strip() for e in corpo.etiquetas):
+        raise HTTPException(422, "Só o cliente pode escolher etiquetas de elogio.")
+    else:
+        etiquetas = ()
     repetida = contexto.avaliacoes.obter(pedido.id, direcao)
     if repetida is not None:
         if not _mesma_avaliacao(repetida, corpo.nota_geral, comentario, etiquetas):

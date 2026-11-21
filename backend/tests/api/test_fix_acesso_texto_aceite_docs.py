@@ -48,10 +48,9 @@ def test_etiquetas_tem_limite_de_quantidade_e_de_tamanho(amb):
     assert _avaliar(amb, etiquetas=["a" * (CFG.etiqueta_max_chars + 1)]).status_code == 422
 
 
-def test_etiqueta_com_telefone_e_mascarada(amb):
+def test_etiqueta_com_telefone_e_recusada_por_nao_estar_na_lista(amb):
     r = _avaliar(amb, etiquetas=["pontual", "liga 31 98888-7777"])
-    assert r.status_code == 201
-    assert not any("98888" in e for e in r.json()["etiquetas"])
+    assert r.status_code == 422  # lista fechada (B27): texto livre nem chega a ser gravado
 
 
 def test_titulo_e_descricao_do_pedido_sao_limitados_e_mascarados(amb):

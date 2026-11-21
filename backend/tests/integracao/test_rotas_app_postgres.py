@@ -200,8 +200,14 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
         c, url_av, "cliente", {"nota_geral": 5, "comentario": "Excelente", "etiquetas": ["pontual"]}
     )
     assert r.status_code == 201 and r.json()["direcao"] == "cliente_para_profissional"
+    assert r.json()["etiquetas"] == ["Pontual"]  # B27: valor canônico da lista fechada
     assert post(c, url_av, "cliente", {"nota_geral": 4}).status_code == 409
+    # B27: o profissional não manda elogio; o perfil conta só o que o cliente elogiou
+    com_tag = post(c, url_av, "profissional", {"nota_geral": 5, "etiquetas": ["Pontual"]})
+    assert com_tag.status_code == 422
     assert post(c, url_av, "profissional", {"nota_geral": 5}).status_code == 201
+    perfil = get(c, f"/v1/profissionais/{c.ids['profissional']}", "cliente").json()
+    assert perfil["etiquetas_top"] == [{"etiqueta": "Pontual", "total": 1}]
     assert post(c, url_av, "cliente2", {"nota_geral": 5}).status_code == 404
     assert post(c, url_av, "equipe1", {"nota_geral": 5}).status_code == 403
 
@@ -229,7 +235,7 @@ def test_me_do_cliente_e_do_profissional(cenario):
     assert set(pro) == {
         "id", "nome", "papel", "status", "nivel_verificacao", "nota_publica", "servicos_concluidos",
         "papeis", "tem_perfil_profissional", "status_verificacao", "disponivel_agora",
-        "cpf_cadastrado",
+        "cpf_cadastrado", "exclusao_agendada_em",
     }  # fmt: skip
 
 

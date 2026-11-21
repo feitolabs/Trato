@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.elogios import etiquetas_top
 from trato.api.repositorios_app import NIVEIS_VERIFICACAO, PerfilDetalhe
 from trato.profissional.config import ConfigProfissional, obter_config_profissional
 from trato.profissional.repositorio import (
@@ -140,6 +141,11 @@ class AvaliacaoRecebidaOut(BaseModel):
     categoria: str | None = Field(None, description="Categoria do serviço avaliado.")
 
 
+class EtiquetaTopOut(BaseModel):
+    etiqueta: str
+    total: int
+
+
 class PerfilPublicoOut(BaseModel):
     id: str
     nome: str | None
@@ -157,6 +163,10 @@ class PerfilPublicoOut(BaseModel):
     disponibilidade: list[JanelaIO]
     portfolio: list[PortfolioIO]
     avaliacoes: list[AvaliacaoRecebidaOut]
+    etiquetas_top: list[EtiquetaTopOut] = Field(
+        default_factory=list,
+        description="Até 3 elogios mais usados (total desc, depois nome). Só contagem.",
+    )
     no_trato_desde: datetime = Field(description="Quando o perfil foi criado.")
     cidades: list[str] = Field(
         default_factory=list, description='Cidades que atende, em texto ("Belo Horizonte/MG").'
@@ -817,6 +827,9 @@ def perfil_publico(
         avaliacoes=[
             _avaliacao_out(a) for a in avaliacoes if a.direcao == "cliente_para_profissional"
         ],
+        etiquetas_top=etiquetas_top(
+            a for a in avaliacoes if a.direcao == "cliente_para_profissional"
+        ),
     )
 
 
