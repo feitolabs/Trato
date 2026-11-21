@@ -83,8 +83,14 @@ def pg(cenario, migrations_novas):
     return cenario
 
 
+CPF_SINTETICO = "52998224725"  # sintético, com dígitos verificadores válidos; não é de pessoa real
+
+
 def cobrar(c, pedido_id, meio="pix", quem="cliente"):
-    http, _, _ = c.pagto
+    http, contexto, _ = c.pagto
+    # a cobrança exige CPF cadastrado (422 cpf_obrigatorio); grava pelo mesmo repositório da API
+    if quem == "cliente":  # CPF é único por conta: só o cliente padrão recebe o sintético
+        contexto.usuarios.registrar_dados_privados(c.ids[quem], CPF_SINTETICO, None)
     return http.post(
         f"/v1/pedidos/{pedido_id}/cobranca", json={"meio": meio}, headers=c.token(quem)
     )

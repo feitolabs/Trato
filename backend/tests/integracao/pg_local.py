@@ -97,6 +97,11 @@ class BancoLocal:
                 "*moedas_gamificacao.sql",
                 "*moedas_desconto.sql",
                 "*ranking_config.sql",
+                "*moedas_orcamento.sql",
+                "*moedas_reservas.sql",
+                "*exclusividade_schema.sql",
+                "*exclusividade_funcoes.sql",
+                "*cpf_opcional_cadastro.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     con.execute(arquivo.read_text(encoding="utf-8"))
