@@ -97,11 +97,19 @@ def test_moedas_config_ver_e_alterar(painel):
         "validade_dias": None,
         "motivo": "Teste de ligar as moedas",
     }
-    assert painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=corpo).status_code == 200
+    assert (
+        painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=corpo).status_code
+        == 200
+    )
     r = painel.chamar("administrador", "GET", "/v1/admin/moedas/config")
     assert r.json()["bonus_avaliacao_moedas"] == 30 and r.json()["ativo"] is True
     sem_motivo = {**corpo, "motivo": "curto"}
-    assert painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=sem_motivo).status_code == 422
+    assert (
+        painel.chamar(
+            "administrador", "PUT", "/v1/admin/moedas/config", json=sem_motivo
+        ).status_code
+        == 422
+    )
 
 
 def test_painel_le_e_altera_os_pesos_com_motivo(painel):
@@ -123,7 +131,13 @@ def test_painel_le_e_altera_os_pesos_com_motivo(painel):
     assert painel.chamar("administrador", "GET", url).json()["peso_volume"] == 30
     curto = {**corpo, "motivo": "curto"}
     assert painel.chamar("administrador", "PUT", url, json=curto).status_code == 422
-    zerado = {**corpo, "peso_nota": 0, "peso_volume": 0, "peso_verificacao": 0, "peso_disponivel": 0}
+    zerado = {
+        **corpo,
+        "peso_nota": 0,
+        "peso_volume": 0,
+        "peso_verificacao": 0,
+        "peso_disponivel": 0,
+    }
     assert painel.chamar("administrador", "PUT", url, json=zerado).status_code == 422
     fora = {**corpo, "nota_prior": 7}
     assert painel.chamar("administrador", "PUT", url, json=fora).status_code == 422
