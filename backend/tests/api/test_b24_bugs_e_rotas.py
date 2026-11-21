@@ -466,3 +466,25 @@ def test_avaliacao_resposta_aparece_nas_listagens(e2):  # noqa: F811
     assert perfil_logado.status_code == 200
     assert perfil_logado.json()["avaliacoes"][0]["resposta"] == "Muito obrigado pela confianca!"
     assert perfil_logado.json()["avaliacoes"][0]["id"] == "av-resp-1"
+
+
+def test_avaliacoes_postgres_de_linha_sem_type_error():
+    from trato.persistencia.dinheiro import AvaliacoesPostgres
+
+    repo = AvaliacoesPostgres(None)  # type: ignore[arg-type]
+    av = repo._de_linha(
+        {
+            "id": "av-pg-1",
+            "pedido_id": "ped-pg-1",
+            "direcao": "cliente_para_profissional",
+            "avaliador_id": "cli-1",
+            "avaliado_id": "pro-1",
+            "nota_geral": 5,
+            "comentario": "Otimo",
+            "etiquetas": ["pontual"],
+            "criada_em": AGORA,
+            "resposta": "Obrigado!",
+        }
+    )
+    assert av.id == "av-pg-1"
+    assert av.resposta == "Obrigado!"

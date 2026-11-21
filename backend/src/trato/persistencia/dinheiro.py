@@ -493,6 +493,7 @@ class AvaliacoesPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
+    @staticmethod
     def _de_linha(l: Any) -> Avaliacao:  # noqa: E741
         return Avaliacao(
             id=str(l["id"]),
