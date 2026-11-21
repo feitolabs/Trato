@@ -155,7 +155,7 @@ void main() {
       expect(find.byType(DetalheOrcamentoTela), findsOneWidget);
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('Aceitar orçamento'));
+      await tester.tap(find.textContaining('Aceitar e ir para o pagamento'));
       await tester.pumpAndSettle();
       expect(b.chamadas, contains('aceitar:${orcamentosExemplo[1].id}'));
       expect(b.estado, 'orcamento_aceito');

@@ -139,8 +139,9 @@ class ResumoPedido {
   /// "31 horas".
   final String tempoRestante;
 }
+
 /// Texto quando o profissional ainda não tem nota.
-const semAvaliacoes = 'Sem avaliações';
+const semAvaliacoes = 'Novo no Trato';
 
 /// Linha de valor com nome e, se houver, a situação ("Aditivo · Pago").
 class LinhaContrato {

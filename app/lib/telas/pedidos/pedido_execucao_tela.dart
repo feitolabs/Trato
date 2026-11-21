@@ -216,7 +216,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
           children: [
             if (pedido.pagamentoConfirmado)
               const ChipStatus(
-                texto: 'Pagamento acompanhado no app',
+                texto: 'Pagamento protegido: fica guardado até o serviço ser confirmado.',
                 tipo: TipoStatus.info,
                 icone: Icons.lock_outline,
               )

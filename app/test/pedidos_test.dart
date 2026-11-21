@@ -87,7 +87,7 @@ void main() {
           tamanho: const Size(390, 2200));
       expect(find.text('Aditivo aguardando sua resposta'), findsOneWidget);
       expect(find.textContaining('R\$ 45,00'), findsOneWidget);
-      expect(find.text('Pagamento acompanhado no app'), findsOneWidget);
+      expect(find.text('Pagamento protegido: fica guardado até o serviço ser confirmado.'), findsOneWidget);
 
       await tester.tap(find.text('Aprovar aditivo'));
       await tester.pumpAndSettle();

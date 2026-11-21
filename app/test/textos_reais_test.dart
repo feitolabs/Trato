@@ -135,7 +135,7 @@ void main() {
       return _json({'detail': 'não'}, 404);
     }
 
-    test('nota, serviços e selo que o servidor manda; sem nota, "Sem avaliações"', () async {
+    test('nota, serviços e selo que o servidor manda; sem nota, "Novo no Trato"', () async {
       final r = await RepositorioOrcamentosApi(_api(responder)).listar('p1');
       final gabriel = r.orcamentos.firstWhere((o) => o.id == 'o1');
       expect(gabriel.notaResumo, '4,0');
@@ -254,7 +254,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Contrato do serviço'), findsOneWidget);
       expect(find.byKey(const ValueKey('aviso-contrato')), findsOneWidget);
-      expect(find.textContaining('Aceitar orçamento'), findsNothing);
+      expect(find.textContaining('Aceitar e ir para o pagamento'), findsNothing);
       expect(find.byType(Checkbox), findsNothing);
     });
 

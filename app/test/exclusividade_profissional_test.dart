@@ -85,20 +85,25 @@ void main() {
 
       expect(find.text('1 de 3 exclusividades em andamento'), findsOneWidget);
       expect(find.text('150 Tratinhos'), findsOneWidget);
-      expect(find.text('Use 100 Tratinhos: prioridade que você ganhou avaliando'), findsOneWidget);
+      expect(find.byKey(const ValueKey('texto-exclusividade')), findsOneWidget);
+      expect(
+        find.text(
+          '48 horas sem concorrência neste pedido. Se o cliente recusar ou não responder em 6 horas, '
+          'seus 100 Tratinhos voltam. Se você não atender em 48 horas, eles não voltam.',
+        ),
+        findsNWidgets(1),
+      );
       expect(find.text('Pedir exclusividade de 48 horas'), findsOneWidget);
       expect(find.textContaining('comprar cliente'), findsNothing);
 
       await tester.tap(find.text('Pedir exclusividade de 48 horas'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('6 horas para responder'), findsOneWidget);
-      expect(find.textContaining('Se ele recusar ou não responder, os 100 Tratinhos voltam'),
-          findsOneWidget);
-      expect(find.textContaining('48 horas e precisa enviar o orçamento'), findsOneWidget);
-      expect(
-          find.textContaining('se não enviar o orçamento em até 48h, os 100 Tratinhos NÃO voltam'),
-          findsOneWidget);
+      // A folha onde ele gasta os 100 Tratinhos repete o texto exato.
+      expect(find.byKey(const ValueKey('texto-exclusividade-folha')), findsOneWidget);
+      expect(find.textContaining('Se você não atender em 48 horas, eles não voltam.'),
+          findsNWidgets(2));
+      expect(find.textContaining('NÃO voltam'), findsNothing);
 
       await tester.tap(find.text('Confirmar por 100 Tratinhos'));
       await tester.pumpAndSettle();

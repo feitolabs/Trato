@@ -28,6 +28,11 @@ Widget _fotoPedido(int indice, String item) {
       : EspacoFoto(legenda: item);
 }
 
+/// Explicação da exclusividade, onde o profissional gasta os 100 Tratinhos.
+const textoExclusividadeProfissional =
+    '48 horas sem concorrência neste pedido. Se o cliente recusar ou não responder em 6 horas, '
+    'seus 100 Tratinhos voltam. Se você não atender em 48 horas, eles não voltam.';
+
 /// Tela 24 do protótipo: detalhe de um pedido aberto, visto pelo profissional.
 /// Mostra só bairro e distância: o endereço completo aparece depois da contratação.
 class DetalhePedidoTela extends StatefulWidget {
@@ -129,24 +134,14 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
               Text('Pedir exclusividade de 48 horas', style: TipografiaTrato.titulo),
               const SizedBox(height: EspacosTrato.x3),
               Text(
-                '1. O cliente tem 6 horas para responder.',
+                textoExclusividadeProfissional,
+                key: const ValueKey('texto-exclusividade-folha'),
                 style: TipografiaTrato.corpo,
               ),
               const SizedBox(height: EspacosTrato.x2),
               Text(
-                '2. Se ele recusar ou não responder, os 100 Tratinhos voltam.',
-                style: TipografiaTrato.corpo,
-              ),
-              const SizedBox(height: EspacosTrato.x2),
-              Text(
-                '3. Se ele aceitar, você tem 48 horas e precisa enviar o orçamento.',
-                style: TipografiaTrato.corpo,
-              ),
-              const SizedBox(height: EspacosTrato.x2),
-              Text(
-                '4. Atenção: se não enviar o orçamento em até 48h, os 100 Tratinhos NÃO voltam. '
-                'Conta como enviado quando você manda o orçamento ao cliente pelo app.',
-                style: TipografiaTrato.corpo.copyWith(fontWeight: FontWeight.w700),
+                'Conta como atendido quando você manda o orçamento ao cliente pelo app.',
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
               ),
               const SizedBox(height: EspacosTrato.x5),
               BotaoPrimario(
@@ -238,7 +233,8 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
           ),
           const SizedBox(height: EspacosTrato.x2),
           Text(
-            'Use 100 Tratinhos: prioridade que você ganhou avaliando',
+            textoExclusividadeProfissional,
+            key: const ValueKey('texto-exclusividade'),
             style: TipografiaTrato.corpoPequeno,
           ),
           const SizedBox(height: EspacosTrato.x3),

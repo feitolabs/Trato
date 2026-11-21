@@ -206,7 +206,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         Text('Criar conta', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
         Text(
-          fraseSemTaxa,
+          fraseSemTaxaCadastro,
           key: const Key('frase-sem-taxa'),
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),

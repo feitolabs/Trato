@@ -135,7 +135,7 @@ void main() {
     testWidgets('aparece no pagamento, com o texto exato', (tester) async {
       await tester.pumpWidget(_pagamento(base));
       expect(
-        find.text('Sem taxa para você. O Trato é gratuito enquanto crescemos.'),
+        find.text('Sem taxa para você neste serviço.'),
         findsOneWidget,
       );
     });
@@ -146,7 +146,7 @@ void main() {
         home: CriarContaTela(servico: ServicoAuthFake()),
       ));
       expect(
-        find.text('Sem taxa para você. O Trato é gratuito enquanto crescemos.'),
+        find.text('Sem taxa para você.'),
         findsOneWidget,
       );
     });

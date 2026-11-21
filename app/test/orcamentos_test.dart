@@ -422,7 +422,7 @@ void main() {
       expect(find.text('Garantia de 90 dias'), findsOneWidget);
       expect(find.text('Fora do escopo'), findsOneWidget);
       expect(find.text('Cancelamento'), findsOneWidget);
-      expect(find.text('Aceitar orçamento · R\$ 380,00'), findsOneWidget);
+      expect(find.text('Aceitar e ir para o pagamento'), findsOneWidget);
       expect(find.text('Fazer contraproposta'), findsOneWidget);
     });
 
@@ -430,7 +430,7 @@ void main() {
       Orcamento? aceito;
       await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos, aoAceitar: (o) => aceito = o));
 
-      await _tocar(tester, find.textContaining('Aceitar orçamento'));
+      await _tocar(tester, find.textContaining('Aceitar e ir para o pagamento'));
 
       expect(find.text('Marque que leu para aceitar o orçamento.'), findsOneWidget);
       expect(aceito, isNull);
@@ -441,10 +441,10 @@ void main() {
       // O aviso da caixa fica abaixo da dobra: sem a mensagem o botão parece não responder.
       await _abrir(tester, DetalheOrcamentoTela(orcamento: carlos, aoAceitar: (o) {}));
 
-      await _tocar(tester, find.textContaining('Aceitar orçamento'));
+      await _tocar(tester, find.textContaining('Aceitar e ir para o pagamento'));
       await tester.pump();
 
-      expect(find.textContaining('Marque "Li o escopo'), findsOneWidget);
+      expect(find.textContaining('Marque "Li o que está incluso'), findsOneWidget);
     });
 
     testWidgets('orçamento por hora mostra o total de horas ao cliente', (tester) async {
@@ -531,7 +531,7 @@ void main() {
 
       await tester.tap(find.byType(Checkbox));
       await tester.pump();
-      await _tocar(tester, find.textContaining('Aceitar orçamento'));
+      await _tocar(tester, find.textContaining('Aceitar e ir para o pagamento'));
 
       expect(aceito?.id, 'carlos');
     });

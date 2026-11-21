@@ -102,7 +102,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-              content: Text('Marque "Li o escopo, a garantia e as regras" para aceitar.')),
+              content: Text(
+                  'Marque "Li o que está incluso, a garantia e o cancelamento" para aceitar.')),
         );
       return;
     }
@@ -141,7 +142,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 BotaoPrimario(
-                  texto: 'Aceitar orçamento · ${formatarReais(o.totalCentavos)}',
+                  texto: 'Aceitar e ir para o pagamento',
                   carregando: _aceitando,
                   aoTocar: _aceitando ? null : _aceitar,
                 ),
@@ -326,8 +327,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                           child: Padding(
                             padding: const EdgeInsets.only(top: EspacosTrato.x3),
                             child: Text(
-                              'Li o escopo, a garantia e as regras de cancelamento. '
-                              'Ao aceitar, este orçamento vira o contrato do serviço.',
+                              'Li o que está incluso, a garantia e o cancelamento.',
                               style: TipografiaTrato.corpo,
                             ),
                           ),

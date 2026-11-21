@@ -71,36 +71,46 @@ class PerfilProfissionalTela extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x5),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _Indicador(
-                        rotulo: 'Nota',
-                        valor: formatarNota(p.nota),
-                        extra: '(${d.totalAvaliacoes})',
+                if (d.totalAvaliacoes == 0 || p.servicosConcluidos == 0)
+                  Text(
+                    p.verificacao.isNotEmpty
+                        ? 'Novo no Trato · Identidade verificada'
+                        : 'Novo no Trato',
+                    key: const ValueKey('novo-no-trato'),
+                    style: TipografiaTrato.corpoForte,
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Indicador(
+                          rotulo: 'Nota',
+                          valor: formatarNota(p.nota),
+                          extra: '(${d.totalAvaliacoes})',
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: EspacosTrato.x3),
-                    Expanded(
-                      child: _Indicador(
-                        rotulo: 'Serviços concluídos',
-                        valor: '${p.servicosConcluidos}',
+                      const SizedBox(width: EspacosTrato.x3),
+                      Expanded(
+                        child: _Indicador(
+                          rotulo: 'Serviços concluídos',
+                          valor: '${p.servicosConcluidos}',
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: EspacosTrato.x3),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _Indicador(
+                    ],
+                  ),
+                if (p.servicosConcluidos >= 5 && d.temHistorico) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Indicador(
                           rotulo: 'Taxa de conclusão',
-                          valor: d.temHistorico ? '${d.taxaConclusao}%' : '—'),
-                    ),
-                    const SizedBox(width: EspacosTrato.x3),
-                    Expanded(child: _Indicador(rotulo: 'Responde em', valor: d.respondeEm)),
-                  ],
-                ),
+                          valor: '${d.taxaConclusao}%',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (d.bio != null && d.bio!.isNotEmpty) ...[
                   const SizedBox(height: EspacosTrato.x6),
                   Text('Sobre', style: TipografiaTrato.titulo),

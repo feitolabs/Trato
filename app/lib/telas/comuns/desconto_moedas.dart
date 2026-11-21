@@ -38,7 +38,10 @@ const _explicacaoLimite =
     'O desconto é pago pelo Trato e tem limite por dia e por mês. Seus Tratinhos continuam guardados.';
 
 /// Frase fixa aprovada pelo João. Não prometer mais nada além disso.
-const fraseSemTaxa = 'Sem taxa para você. O Trato é gratuito enquanto crescemos.';
+const fraseSemTaxa = 'Sem taxa para você neste serviço.';
+
+/// Cadastro (sem serviço ainda): sem a promessa nem o aviso de cobrança futura.
+const fraseSemTaxaCadastro = 'Sem taxa para você.';
 
 /// Esclarece que o desconto vale tanto no Pix quanto no cartão.
 const fraseDescontoMetodos =
