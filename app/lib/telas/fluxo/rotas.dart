@@ -2504,13 +2504,20 @@ abstract final class RotasTrato {
     );
   }
 
+  @visibleForTesting
+  static Widget pagamentoParaTeste(String pedidoId) => _pagamento(pedidoId);
+
   static Widget _pagamento(String pedidoId) {
+    // "Tentar de novo" (sem forma de pagamento): o Carregador refaz a mesma chamada em silêncio.
+    final recarregar = ValueNotifier<int>(0);
     var iniciandoPagamento = false;
     var usarMoedas =
         false; // o que o cliente escolheu; quantas moedas entram, o backend decide
     return Carregador<DadosPagamento>(
       carregar: () => repos.pagamento.dados(pedidoId),
+      atualizarQuando: recarregar,
       construir: (context, dados) => PagamentoTela(
+        aoTentarNovamente: () => recarregar.value++,
         dados: dados,
         aoAplicarCupom: (codigo) => usarMoedas
             ? repos.pagamento
