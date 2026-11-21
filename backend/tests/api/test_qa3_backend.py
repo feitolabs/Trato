@@ -155,6 +155,10 @@ def test_corrida_de_8_threads_na_mesma_acao_so_uma_vence(estado, acao):
         ts = [threading.Thread(target=f) for _ in range(8)]
         [t.start() for t in ts]
         [t.join() for t in ts]
+        if acao == "confirmar_conclusao":
+            # IDEM-1 (B19): duplo toque do mesmo cliente devolve o mesmo sucesso, nunca 409/500.
+            assert res == [200] * 8, sorted(res)
+            continue
         assert res.count(200) == 1, sorted(res)
         assert res.count(409) == 7, sorted(res)  # quem perde a corrida leva 409, nunca 200 nem 500
 

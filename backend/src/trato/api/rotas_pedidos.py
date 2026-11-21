@@ -76,6 +76,7 @@ from trato.pedidos.estados import (
     ProvaDisputa,
     ProvaRetrabalho,
 )
+from trato.persistencia.erros import ConflitoDeEstado
 from trato.seguranca.cliente import dispositivo_do_cliente, ip_do_cliente
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.tentativas_codigo import CodigoBloqueado
@@ -155,7 +156,12 @@ def _concluir_efeitos(contexto: Contexto, pedido: Pedido) -> None:
         return
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     categoria = contrato.categoria_id if contrato else None
-    garantia = abrir_garantia(pedido.concluido_em, categoria, contexto.config.carregar().garantias)
+    garantia = abrir_garantia(
+        pedido.concluido_em,
+        categoria,
+        contexto.config.carregar().garantias,
+        dias_contrato=contrato.garantia_dias if contrato else None,
+    )
     contexto.garantias.salvar_garantia(pedido.id, garantia)
 
 
@@ -503,6 +509,12 @@ def mudar_estado(
                 "Muitas tentativas de código. Aguarde um pouco e tente de novo.",
                 headers={"Retry-After": str(bloqueio.retry_apos_s)},
             ) from None
+    if (
+        acao is Acao.CONFIRMAR_CONCLUSAO
+        and pedido.estado is Estado.CONCLUIDO
+        and pedido.cliente_id == usuario.id
+    ):  # duplo toque: já concluído por esta pessoa, devolve o mesmo sucesso
+        return pedido_out(pedido, usuario)
     try:
         transicao = estados.transicionar(
             pedido, acao, ator_de(usuario, pedido), contexto.agora(), prova, cfg.prazos_pedido
@@ -545,7 +557,20 @@ def mudar_estado(
                         aceite_dispositivo=dispositivo,
                     )
                 )
-        gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        try:
+            gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        except ConflitoDeEstado:
+            # Corrida de dois toques em confirmar a conclusão: quem perdeu devolve o sucesso do
+            # outro (o pedido já está concluído por esta pessoa). Outros casos seguem como 409.
+            atual = contexto.pedidos.obter(pedido.id)
+            if (
+                acao is Acao.CONFIRMAR_CONCLUSAO
+                and atual is not None
+                and atual.estado is Estado.CONCLUIDO
+                and atual.cliente_id == usuario.id
+            ):
+                return pedido_out(atual, usuario)
+            raise
         _concluir_efeitos(contexto, gravado)
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, acao, contexto)

@@ -9,6 +9,7 @@ Dados pessoais (documento, telefone, e-mail, endereço exato) nunca saem daqui.
 
 from __future__ import annotations
 
+import logging
 import math
 import re
 import threading
@@ -17,7 +18,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
@@ -65,6 +66,7 @@ from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["app"])
+log = logging.getLogger(__name__)
 
 TETO_CENTAVOS = 10**10
 TETO_NOTA_MATERIAL_CENTAVOS = 100_000_000  # R$ 1.000.000,00 (mesmo teto do app)
@@ -515,17 +517,20 @@ def _criar_cobranca(
             ) from erro
 
     def _cobrar(valor: int, desconto: int, moedas: int):
-        return servico.cobrar(
-            contexto,
-            pedido,
-            valor,
-            corpo.meio,
-            parcelas=corpo.parcelas,
-            cliente_externo=preparo.cliente_id if preparo else None,
-            cupom_codigo=aplicado.codigo if aplicado else None,
-            desconto_centavos=desconto,
-            moedas_usadas=moedas,
-        )
+        try:
+            return servico.cobrar(
+                contexto,
+                pedido,
+                valor,
+                corpo.meio,
+                parcelas=corpo.parcelas,
+                cliente_externo=preparo.cliente_id if preparo else None,
+                cupom_codigo=aplicado.codigo if aplicado else None,
+                desconto_centavos=desconto,
+                moedas_usadas=moedas,
+            )
+        except ErroProvedor as erro:
+            raise _recusa_do_provedor(erro, corpo.meio) from erro
 
     try:
         cobranca = _cobrar(valor_servico, desconto_total, moedas_usadas)
@@ -769,6 +774,8 @@ def _decidir_aditivo(
             aditivo = servico.recusar_aditivo(contexto, pedido, aditivo_id)
         except ErroFluxo as erro:
             raise HTTPException(erro.status, str(erro)) from erro
+        except ErroProvedor as erro:
+            raise _recusa_do_provedor(erro, meio) from erro
         return AditivoDecididoOut(
             aditivo=AditivoContratoOut(
                 id=aditivo.id,
@@ -885,6 +892,16 @@ def _nota_out(nota: NotaMaterial, servico_uploads: object | None = None) -> Nota
     )
 
 
+def _recusa_do_provedor(erro: ErroProvedor, meio: MeioPagamento) -> HTTPException:
+    """O parceiro recusou a cobrança (ex.: Pix desligado na conta): 502 claro, não 500 mudo."""
+    log.warning("cobrança recusada pelo provedor (%s): %s", meio.value, erro)
+    if meio is MeioPagamento.PIX:
+        return HTTPException(
+            502, "Não foi possível gerar o Pix agora. Tente de novo ou pague com cartão."
+        )
+    return HTTPException(502, "Não foi possível processar o pagamento agora. Tente de novo.")
+
+
 def _cupom_ja_reservado(
     contexto: Contexto, servico: Any, usuario_id: str, pedido_id: str, codigo: str
 ) -> bool:
@@ -987,10 +1004,11 @@ def listar_notas_material(
 def avaliar_contrato(
     contrato_id: str,
     corpo: AvaliarIn,
+    resposta: Response,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AvaliacaoOut:
-    return rotas_app.avaliar(contrato_id, corpo, usuario, contexto)
+    return rotas_app.avaliar(contrato_id, corpo, resposta, usuario, contexto)
 
 
 # --- Contraproposta de valor e prazo ------------------------------------------------------

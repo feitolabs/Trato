@@ -381,10 +381,10 @@ def test_garantia_aditivo_e_nota_de_material(cenario):
     assert g["iniciada"] and g["ativa"] and g["dias"] == 90  # garantia da categoria do cenário
     av = post(c, f"/v1/contratos/{pedido_id}/avaliacao", "cliente", {"nota_geral": 5})
     assert av.status_code == 201 and av.json()["direcao"] == "cliente_para_profissional"
-    assert (
-        post(c, f"/v1/contratos/{pedido_id}/avaliacao", "cliente", {"nota_geral": 5}).status_code
-        == 409
-    )
+    repetida = post(c, f"/v1/contratos/{pedido_id}/avaliacao", "cliente", {"nota_geral": 5})
+    assert repetida.status_code == 200 and repetida.json() == av.json()  # IDEM-1: duplo toque
+    outra = post(c, f"/v1/contratos/{pedido_id}/avaliacao", "cliente", {"nota_geral": 1})
+    assert outra.status_code == 409  # nota diferente não é repetição
     # o pedido diz que o cliente já avaliou (o app esconde "Avaliar") e o perfil público conta
     assert get(c, f"/v1/pedidos/{pedido_id}", "cliente").json()["ja_avaliou"] is True
     assert get(c, f"/v1/pedidos/{pedido_id}", "profissional").json()["ja_avaliou"] is False

@@ -684,3 +684,23 @@ def test_perfil_publico_traz_portfolio_e_avaliacoes_anonimas(e2):
     assert "do outro lado" not in r.text  # só avaliações de clientes sobre o profissional
     for proibido in ("cli-secreto", "ped-", "pontual", "telefone", "email", "cpf", "endereco"):
         assert proibido not in r.text, proibido
+
+
+def test_perfil_logado_tambem_esconde_comentario_do_cliente(e2):
+    """COM-1: a rota logada segue a mesma flag da pública (sem moderação, comentário null)."""
+    _aprovar(e2)
+    e2.amb.contexto.avaliacoes.salvar(
+        Avaliacao(
+            "ped-com", "cliente_para_profissional", "cli-secreto", "pro-1", 4,
+            "Texto livre do cliente", ("pontual",), AGORA,
+        )
+    )  # fmt: skip
+
+    r = e2.get("/v1/profissionais/pro-1", "t-cliente")
+
+    assert r.status_code == 200, r.text
+    assert "Texto livre do cliente" not in r.text
+    listas = [v for v in r.json().values() if isinstance(v, list) and v and "nota_geral" in v[0]]
+    assert listas, "a rota logada deve seguir devolvendo as avaliações (nota e etiquetas)"
+    assert all(a["comentario"] is None for a in listas[0])
+    assert listas[0][0]["nota_geral"] == 4

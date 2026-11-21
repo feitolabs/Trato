@@ -8,11 +8,12 @@ pede e mostra. Dados pessoais (documento, telefone, e-mail, endereço exato) nun
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
 
 from trato.api.admin.papeis import Permissao
@@ -26,6 +27,7 @@ from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_a
 from trato.api.exclusividades import profissional_exclusivo
 from trato.api.moedas import (
     TIPO_BONUS_PROFISSIONAL,
+    bonus_avaliacao_disponivel,
     calcular_uso_moedas,
     conceder_bonus_avaliacao,
     conceder_bonus_profissional,
@@ -46,7 +48,7 @@ from trato.financeiro import periodo
 from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
-from trato.persistencia.erros import RegraDoBanco
+from trato.persistencia.erros import Duplicado, RegraDoBanco
 from trato.profissional.config import ORDEM_NIVEIS, obter_config_profissional
 from trato.profissional.repositorio import slugs
 from trato.seguranca.config import obter_config_seguranca
@@ -279,6 +281,16 @@ class AvaliacaoOut(BaseModel):
     etiquetas: list[str]
     criada_em: datetime
     moedas_ganhas: int = Field(0, description="Moedas de bônus por esta avaliação (0 se nenhuma).")
+
+
+class AvaliacaoDadosOut(BaseModel):
+    pedido_id: str
+    ja_avaliou: bool = Field(description="Esta pessoa já avaliou este serviço.")
+    bonus_disponivel: bool = Field(
+        description="Avaliar agora rende Tratinhos de bônus (teto do mês, limite por profissional "
+        "e valor mínimo já considerados). O app só promete o bônus se for verdadeiro."
+    )
+    bonus_moedas: int = Field(0, description="Quantas moedas o bônus daria agora (0 se nenhuma).")
 
 
 class MoedaLancamentoOut(BaseModel):
@@ -1193,6 +1205,77 @@ def minhas_moedas(
 # --- Avaliação --------------------------------------------------------------------------
 
 
+def _direcao_da_avaliacao(pedido: Any, usuario: Usuario) -> tuple[str, str | None]:
+    if pedido.cliente_id == usuario.id:
+        return "cliente_para_profissional", pedido.profissional_id
+    return "profissional_para_cliente", pedido.cliente_id
+
+
+@router.get(
+    "/pedidos/{pedido_id}/avaliacao",
+    response_model=AvaliacaoDadosOut,
+    summary="Dados para avaliar: já avaliou? o bônus está disponível?",
+    description="Só lê, não credita nada. `bonus_disponivel` segue as regras do bônus real.",
+)
+def dados_da_avaliacao(
+    pedido_id: str,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> AvaliacaoDadosOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    direcao, avaliado = _direcao_da_avaliacao(pedido, usuario)
+    ja = contexto.avaliacoes.obter(pedido.id, direcao) is not None
+    moedas = 0
+    if direcao == "cliente_para_profissional" and not ja and avaliado is not None:
+        contrato = contexto.contratos.obter_do_pedido(pedido.id)
+        moedas = bonus_avaliacao_disponivel(
+            contexto.moedas,
+            cliente_id=usuario.id,
+            agora=contexto.agora(),
+            profissional_id=avaliado,
+            valor_servico_centavos=contrato.valor_centavos if contrato else 0,
+        )
+    return AvaliacaoDadosOut(
+        pedido_id=pedido.id, ja_avaliou=ja, bonus_disponivel=moedas > 0, bonus_moedas=moedas
+    )
+
+
+def _moedas_ja_dadas(contexto: Contexto, usuario: Usuario, pedido: Any, direcao: str) -> int:
+    """Bônus que a primeira chamada deixou (pendente): para a repetição devolver o mesmo corpo."""
+    try:
+        if direcao == "cliente_para_profissional":
+            chave = f"avaliacao:{pedido.id}"
+            achados = contexto.moedas.pendentes_do_usuario(usuario.id)
+        else:
+            chave = f"avaliacao-prof:{usuario.id}:{pedido.cliente_id}"
+            achados = contexto.moedas.pendentes_do_usuario(usuario.id, TIPO_BONUS_PROFISSIONAL)
+        return sum(p.quantidade for p in achados if p.chave_idempotencia == chave)
+    except Exception:  # noqa: BLE001 - só informativo
+        return 0
+
+
+def _mesma_avaliacao(
+    antiga: Avaliacao, nota: int, comentario: str | None, etiquetas: Sequence[str]
+) -> bool:
+    return (
+        antiga.nota_geral == nota
+        and (antiga.comentario or None) == (comentario or None)
+        and tuple(antiga.etiquetas) == tuple(etiquetas)
+    )
+
+
+def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
+    return AvaliacaoOut(
+        moedas_ganhas=ganhas,
+        pedido_id=nova.pedido_id,
+        direcao=nova.direcao,
+        nota_geral=nova.nota_geral,
+        comentario=nova.comentario,
+        etiquetas=list(nova.etiquetas),
+        criada_em=nova.criada_em,
+    )
+
+
 @router.post(
     "/pedidos/{pedido_id}/avaliacao",
     response_model=AvaliacaoOut,
@@ -1203,6 +1286,7 @@ def minhas_moedas(
 def avaliar(
     pedido_id: str,
     corpo: AvaliarIn,
+    resposta: Response,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AvaliacaoOut:
@@ -1215,8 +1299,6 @@ def avaliar(
         direcao, avaliado = "profissional_para_cliente", pedido.cliente_id
     if avaliado is None:
         raise HTTPException(409, "Este pedido não tem profissional contratado.")
-    if contexto.avaliacoes.obter(pedido.id, direcao) is not None:
-        raise HTTPException(409, "Você já avaliou este serviço.")
     cfg_seg = obter_config_seguranca()
     comentario = (
         limpar_texto(corpo.comentario, "comentário", cfg_seg.comentario_max_chars, cfg_seg) or None
@@ -1224,6 +1306,13 @@ def avaliar(
         else None
     )
     etiquetas = limpar_etiquetas(corpo.etiquetas, cfg_seg)
+    repetida = contexto.avaliacoes.obter(pedido.id, direcao)
+    if repetida is not None:
+        if not _mesma_avaliacao(repetida, corpo.nota_geral, comentario, etiquetas):
+            raise HTTPException(409, "Você já avaliou este serviço.")
+        # duplo toque (mesmo corpo): o mesmo sucesso, sem novo registro nem novo bônus
+        resposta.status_code = 200
+        return _avaliacao_out(repetida, _moedas_ja_dadas(contexto, usuario, pedido, direcao))
     nova = Avaliacao(
         pedido_id=pedido.id,
         direcao=direcao,
@@ -1234,7 +1323,16 @@ def avaliar(
         etiquetas=etiquetas,
         criada_em=contexto.agora(),
     )
-    contexto.avaliacoes.salvar(nova)
+    try:
+        contexto.avaliacoes.salvar(nova)
+    except Duplicado:  # corrida de dois toques: quem perdeu devolve o sucesso de quem ganhou
+        repetida = contexto.avaliacoes.obter(pedido.id, direcao)
+        if repetida is None or not _mesma_avaliacao(
+            repetida, corpo.nota_geral, comentario, etiquetas
+        ):
+            raise
+        resposta.status_code = 200
+        return _avaliacao_out(repetida, _moedas_ja_dadas(contexto, usuario, pedido, direcao))
     ganhas = 0
     if direcao == "cliente_para_profissional":
         try:
@@ -1261,12 +1359,4 @@ def avaliar(
             )
         except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
             ganhas = 0
-    return AvaliacaoOut(
-        moedas_ganhas=ganhas,
-        pedido_id=nova.pedido_id,
-        direcao=nova.direcao,
-        nota_geral=nova.nota_geral,
-        comentario=nova.comentario,
-        etiquetas=list(nova.etiquetas),
-        criada_em=nova.criada_em,
-    )
+    return _avaliacao_out(nova, ganhas)

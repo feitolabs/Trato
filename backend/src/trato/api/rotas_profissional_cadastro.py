@@ -784,7 +784,8 @@ def perfil_publico(
         dados = contexto.pedidos.dados_do_pedido(a.pedido_id)
         return AvaliacaoRecebidaOut(
             nota_geral=a.nota_geral,
-            comentario=a.comentario,
+            # sem moderação ainda: mesma regra da rota pública (ver a flag)
+            comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
             etiquetas=list(a.etiquetas),
             criada_em=a.criada_em,
             cliente_nome=_nome_abreviado(quem.nome) if quem else None,

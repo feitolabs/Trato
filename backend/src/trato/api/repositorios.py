@@ -74,6 +74,7 @@ class Contrato:
     aceite_ip: str | None = None
     aceite_dispositivo: str | None = None
     prazo_execucao_dias: int | None = None
+    garantia_dias: int | None = None  # prometido no orçamento aceito (vence a da categoria)
 
 
 @dataclass(frozen=True)

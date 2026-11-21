@@ -38,7 +38,7 @@ class ContratosPostgres:
         with self._banco.transacao() as con:
             linha = con.execute(
                 "select c.pedido_id, c.orcamento_id, c.profissional_id, c.valor_total_centavos, "
-                "c.aceito_em, c.prazo_execucao_dias, "
+                "c.aceito_em, c.prazo_execucao_dias, c.garantia_dias, "
                 "p.categoria_id from public.contratos c "
                 "join public.pedidos p on p.id = c.pedido_id where c.pedido_id = %s",
                 (achado,),
@@ -53,6 +53,7 @@ class ContratosPostgres:
             categoria_id=str(linha["categoria_id"]),
             aceito_em=linha["aceito_em"],
             prazo_execucao_dias=linha["prazo_execucao_dias"],
+            garantia_dias=linha["garantia_dias"],
         )
 
     def salvar(self, contrato: Contrato) -> None:

@@ -940,6 +940,68 @@ class MoedasPostgres:
         return l is not None
 
 
+def _apurar_bonus_avaliacao(
+    repo: RepositorioMoedas,
+    *,
+    cliente_id: str,
+    agora: datetime,
+    profissional_id: str | None,
+    valor_servico_centavos: int,
+) -> tuple[int, bool]:
+    """Quanto o bônus de avaliação vale agora (0 se não vale) e se vai para pendentes.
+
+    Só LÊ: a mesma regra serve para conceder e para avisar o app antes de avaliar.
+    """
+    cfg = repo.config()
+    if not cfg.ativo or cfg.bonus_avaliacao_moedas <= 0:
+        return 0, False
+    if valor_servico_centavos < cfg.min_servico_centavos:
+        return 0, False
+    inicio_mes, _ = periodo.mes(*periodo.mes_de(agora))
+    usa_pendente = cfg.dias_liberacao_bonus > 0
+    pendentes: list[PendenteMoeda] = []
+    if usa_pendente:
+        try:
+            pendentes = [
+                p for p in repo.pendentes_do_usuario(cliente_id) if p.criada_em >= inicio_mes
+            ]
+        except Exception:  # noqa: BLE001 - sem a tabela: crédito imediato como antes
+            log.warning("moedas_pendentes indisponível: bônus creditado direto", exc_info=True)
+            usa_pendente = False
+    if profissional_id is not None:
+        do_par = repo.bonus_do_par(cliente_id, profissional_id, inicio_mes) + sum(
+            1 for p in pendentes if p.parceiro_id == profissional_id
+        )
+        if do_par >= cfg.max_bonus_por_profissional_mes:
+            return 0, False
+    ja_no_mes = repo.creditado_no_mes(cliente_id, "bonus_avaliacao", inicio_mes) + sum(
+        p.quantidade for p in pendentes
+    )
+    quantidade = min(cfg.bonus_avaliacao_moedas, max(cfg.teto_mensal_moedas - ja_no_mes, 0))
+    return max(quantidade, 0), usa_pendente
+
+
+def bonus_avaliacao_disponivel(
+    repo: RepositorioMoedas,
+    *,
+    cliente_id: str,
+    agora: datetime,
+    profissional_id: str | None,
+    valor_servico_centavos: int,
+) -> int:
+    """Moedas que o bônus de avaliação daria agora, SEM creditar (0 = não há bônus)."""
+    try:
+        return _apurar_bonus_avaliacao(
+            repo,
+            cliente_id=cliente_id,
+            agora=agora,
+            profissional_id=profissional_id,
+            valor_servico_centavos=valor_servico_centavos,
+        )[0]
+    except Exception:  # noqa: BLE001 - sem dados confiáveis, o app não promete bônus
+        return 0
+
+
 def conceder_bonus_avaliacao(
     repo: RepositorioMoedas,
     *,
@@ -958,34 +1020,16 @@ def conceder_bonus_avaliacao(
     Idempotente por pedido e respeita o teto mensal (o que está pendente conta). Nunca levanta
     erro para o chamador: falha de gamificação não pode atrapalhar a avaliação.
     """
-    cfg = repo.config()
-    if not cfg.ativo or cfg.bonus_avaliacao_moedas <= 0:
-        return 0
-    if valor_servico_centavos < cfg.min_servico_centavos:
-        return 0
-    inicio_mes, _ = periodo.mes(*periodo.mes_de(agora))
-    usa_pendente = cfg.dias_liberacao_bonus > 0
-    pendentes: list[PendenteMoeda] = []
-    if usa_pendente:
-        try:
-            pendentes = [
-                p for p in repo.pendentes_do_usuario(cliente_id) if p.criada_em >= inicio_mes
-            ]
-        except Exception:  # noqa: BLE001 - sem a tabela: crédito imediato como antes
-            log.warning("moedas_pendentes indisponível: bônus creditado direto", exc_info=True)
-            usa_pendente = False
-    if profissional_id is not None:
-        do_par = repo.bonus_do_par(cliente_id, profissional_id, inicio_mes) + sum(
-            1 for p in pendentes if p.parceiro_id == profissional_id
-        )
-        if do_par >= cfg.max_bonus_por_profissional_mes:
-            return 0
-    ja_no_mes = repo.creditado_no_mes(cliente_id, "bonus_avaliacao", inicio_mes) + sum(
-        p.quantidade for p in pendentes
+    quantidade, usa_pendente = _apurar_bonus_avaliacao(
+        repo,
+        cliente_id=cliente_id,
+        agora=agora,
+        profissional_id=profissional_id,
+        valor_servico_centavos=valor_servico_centavos,
     )
-    quantidade = min(cfg.bonus_avaliacao_moedas, max(cfg.teto_mensal_moedas - ja_no_mes, 0))
     if quantidade <= 0:
         return 0
+    cfg = repo.config()
     chave = f"avaliacao:{pedido_id}"
     if usa_pendente:
         try:

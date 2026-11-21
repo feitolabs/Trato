@@ -28,9 +28,15 @@ class Garantia:
 
 
 def abrir_garantia(
-    concluido_em: datetime, categoria: str | None, config: ConfigGarantia
+    concluido_em: datetime,
+    categoria: str | None,
+    config: ConfigGarantia,
+    dias_contrato: int | None = None,
 ) -> Garantia:
+    """Dias: o do contrato (prometido no orçamento) se houver; senão categoria; senão padrão."""
     _exigir_aware(concluido_em)
+    if dias_contrato is not None and dias_contrato > 0:
+        return Garantia(inicio_em=concluido_em, dias=int(dias_contrato))
     return Garantia(inicio_em=concluido_em, dias=config.dias_da_categoria(categoria))
 
 
