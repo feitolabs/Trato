@@ -1,8 +1,7 @@
 name: trato
-description: "Trato — serviço feito, dinheiro liberado. Um app Feito Labs."
+description: "Trato â€” serviÃ§o feito, dinheiro liberado. Um app Feito Labs."
 publish_to: "none"
-version: 0.1.32+33
-
+version: 0.1.33+34
 environment:
   sdk: ">=3.5.0 <4.0.0"
 
@@ -38,7 +37,7 @@ flutter:
 
   assets:
     - assets/logo/
-    # Cópias de docs/juridico/ (rascunho); um teste confere que continuam iguais.
+    # CÃ³pias de docs/juridico/ (rascunho); um teste confere que continuam iguais.
     - assets/legal/
 
   fonts:
