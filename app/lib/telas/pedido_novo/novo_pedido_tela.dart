@@ -102,10 +102,10 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
 
   _ModoPrazo _modoPrazo = _ModoPrazo.flexivel;
   late DateTime _dataPrazo = _agora().add(const Duration(days: 7));
-  late FaixaPreco _faixa = widget.formulario.faixas.first;
+  late FaixaPreco? _faixa = widget.formulario.faixas.firstOrNull;
   late final _descricao = TextEditingController(text: widget.formulario.descricaoInicial);
   final _controladorValorProprio = TextEditingController();
-  bool _informarValorProprio = false;
+  late bool _informarValorProprio = widget.formulario.faixas.isEmpty;
   String? _erroValor;
   var _tentou = false;
   var _enviando = false;
@@ -433,7 +433,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
       },
       prazoDesejado: _dataPrazo,
       urgente: _modoPrazo == _ModoPrazo.urgente,
-      faixa: _faixa,
+      faixa: _faixa ?? const FaixaPreco(minimoCentavos: 0, maximoCentavos: 0),
       fotos: List.of(_fotosNovas),
       categoriaId: widget.formulario.categoriaId,
       // Sem cidade carregada o pedido não abre (o repositório avisa); nada de cidade inventada.
@@ -701,48 +701,50 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         const SizedBox(height: EspacosTrato.x5),
         const RotuloSecao('Quanto pensa gastar?'),
         const SizedBox(height: EspacosTrato.x3),
-        Row(
-          children: [
-            Expanded(
-              child: _OpcaoRadio(
-                texto: 'Faixa estimada',
-                marcada: !_informarValorProprio,
-                aoTocar: () {
-                  setState(() {
-                    _informarValorProprio = false;
-                    _erroValor = null;
-                    if (_faixa.minimoCentavos == _faixa.maximoCentavos && f.faixas.isNotEmpty) {
-                      _faixa = f.faixas.first;
-                    }
-                  });
-                },
-              ),
-            ),
-            const SizedBox(width: EspacosTrato.x2),
-            Expanded(
-              child: _OpcaoRadio(
-                texto: 'Informar meu valor',
-                marcada: _informarValorProprio,
-                aoTocar: () {
-                  setState(() {
-                    _informarValorProprio = true;
-                    if (_controladorValorProprio.text.trim().isNotEmpty) {
-                      final c = _lerCentavos(_controladorValorProprio.text);
-                      if (c != null && c > 0) {
-                        _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+        if (f.faixas.isNotEmpty) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _OpcaoRadio(
+                  texto: 'Faixa estimada',
+                  marcada: !_informarValorProprio,
+                  aoTocar: () {
+                    setState(() {
+                      _informarValorProprio = false;
+                      _erroValor = null;
+                      if (_faixa == null || _faixa!.minimoCentavos == _faixa!.maximoCentavos) {
+                        _faixa = f.faixas.first;
                       }
-                    }
-                  });
-                },
+                    });
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: EspacosTrato.x3),
-        if (!_informarValorProprio) ...[
+              const SizedBox(width: EspacosTrato.x2),
+              Expanded(
+                child: _OpcaoRadio(
+                  texto: 'Informar meu valor',
+                  marcada: _informarValorProprio,
+                  aoTocar: () {
+                    setState(() {
+                      _informarValorProprio = true;
+                      if (_controladorValorProprio.text.trim().isNotEmpty) {
+                        final c = _lerCentavos(_controladorValorProprio.text);
+                        if (c != null && c > 0) {
+                          _faixa = FaixaPreco(minimoCentavos: c, maximoCentavos: c);
+                        }
+                      }
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
+        if (f.faixas.isNotEmpty && !_informarValorProprio) ...[
           _CampoLista<FaixaPreco>(
             rotulo: 'Escolha uma faixa',
-            valor: _faixa,
+            valor: _faixa ?? f.faixas.first,
             opcoes: f.faixas,
             texto: _rotuloFaixa,
             aoMudar: (v) => setState(() => _faixa = v),
