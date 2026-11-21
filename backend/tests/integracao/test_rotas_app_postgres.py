@@ -196,6 +196,13 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     url_av = f"/v1/pedidos/{pedido_id}/avaliacao"
     assert post(c, url_av, "cliente", {"nota_geral": 5}).status_code == 409
     assert acao(c, "cliente", pedido_id, "confirmar_conclusao").json()["estado"] == "concluido"
+    url_perfil = f"/v1/profissionais/{c.ids['profissional']}"
+
+    def pontuais() -> int:  # o banco do cenário é compartilhado: compara antes e depois
+        top = get(c, url_perfil, "cliente").json()["etiquetas_top"]
+        return next((x["total"] for x in top if x["etiqueta"] == "Pontual"), 0)
+
+    antes = pontuais()
     r = post(
         c, url_av, "cliente", {"nota_geral": 5, "comentario": "Excelente", "etiquetas": ["pontual"]}
     )
@@ -206,8 +213,9 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     com_tag = post(c, url_av, "profissional", {"nota_geral": 5, "etiquetas": ["Pontual"]})
     assert com_tag.status_code == 422
     assert post(c, url_av, "profissional", {"nota_geral": 5}).status_code == 201
-    perfil = get(c, f"/v1/profissionais/{c.ids['profissional']}", "cliente").json()
-    assert perfil["etiquetas_top"] == [{"etiqueta": "Pontual", "total": 1}]
+    assert pontuais() == antes + 1  # só a do cliente entrou; a recusada do profissional não
+    top = get(c, url_perfil, "cliente").json()["etiquetas_top"]
+    assert len(top) <= 3 and all(set(x) == {"etiqueta", "total"} for x in top)
     assert post(c, url_av, "cliente2", {"nota_geral": 5}).status_code == 404
     assert post(c, url_av, "equipe1", {"nota_geral": 5}).status_code == 403
 
