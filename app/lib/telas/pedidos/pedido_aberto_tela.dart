@@ -102,6 +102,14 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
   final _focoBairro = FocusNode();
 
   @override
+  void didUpdateWidget(covariant PedidoAbertoTela oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_editando && widget.dados != oldWidget.dados) {
+      _dados = widget.dados;
+    }
+  }
+
+  @override
   void dispose() {
     _scroll.dispose();
     for (final c in [_descricao, _valor, _cep, _rua, _numero, _bairro]) {

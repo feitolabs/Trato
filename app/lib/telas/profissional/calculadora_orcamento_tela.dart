@@ -139,15 +139,20 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _atualizarResumo();
   }
 
+  bool get _temMaterialNoOrcamento => !widget.remoto && _itens.isNotEmpty;
+
+  String _rotuloSugestaoFora(String chave) =>
+      chave == 'Material' && _temMaterialNoOrcamento ? 'Demais materiais' : chave;
+
   /// Chip de sugestão: acrescenta o texto ao campo (editável) e o chip usado some.
-  void _acrescentarForaDoEscopo(String sugestao) {
+  void _acrescentarForaDoEscopo(String chave, String texto) {
     final atual = _foraDoEscopo.text.trimRight();
-    final novo = atual.isEmpty ? sugestao : '$atual, $sugestao';
+    final novo = atual.isEmpty ? texto : '$atual, $texto';
     _foraDoEscopo.value = TextEditingValue(
       text: novo,
       selection: TextSelection.collapsed(offset: novo.length),
     );
-    setState(() => _sugestoesForaUsadas.add(sugestao));
+    setState(() => _sugestoesForaUsadas.add(chave));
   }
 
   @override
@@ -613,10 +618,15 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
               children: [
                 for (final s in sugestoesNaoInclui)
                   if (!_sugestoesForaUsadas.contains(s))
-                    ActionChip(
-                      key: ValueKey('sugestao-nao-incluso-$s'),
-                      label: Text(s),
-                      onPressed: () => _acrescentarForaDoEscopo(s),
+                    Builder(
+                      builder: (_) {
+                        final rotulo = _rotuloSugestaoFora(s);
+                        return ActionChip(
+                          key: ValueKey('sugestao-nao-incluso-$rotulo'),
+                          label: Text(rotulo),
+                          onPressed: () => _acrescentarForaDoEscopo(s, rotulo),
+                        );
+                      },
                     ),
               ],
             ),

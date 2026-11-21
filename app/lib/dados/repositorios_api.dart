@@ -198,13 +198,21 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       }
     }
     final base = _dadosDeJson(bruto, categoriaNome: categoria);
+    var orcamentosRecebidos = base.orcamentosRecebidos;
+    if (bruto['orcamentos_recebidos'] == null) {
+      try {
+        orcamentosRecebidos = _lista(await _api.get('/v1/pedidos/$pedidoId/orcamentos')).length;
+      } on Object {
+        orcamentosRecebidos = base.orcamentosRecebidos;
+      }
+    }
     OfertaExclusividadeCliente? oferta;
     try {
       oferta = await ofertaExclusividade(pedidoId);
     } on Object {
       oferta = null;
     }
-    if (oferta == null) return base;
+    if (oferta == null && orcamentosRecebidos == base.orcamentosRecebidos) return base;
     return DadosDoPedido(
       categoriaNome: base.categoriaNome,
       titulo: base.titulo,
@@ -220,9 +228,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       modalidade: base.modalidade,
       fotos: base.fotos,
       profissionalConvidadoId: base.profissionalConvidadoId,
-      estado: oferta.ativa ? 'reservado' : base.estado,
+      estado: oferta?.ativa == true ? 'reservado' : base.estado,
       ofertaExclusividade: oferta,
-      orcamentosRecebidos: base.orcamentosRecebidos,
+      orcamentosRecebidos: orcamentosRecebidos,
       urgente: base.urgente,
     );
   }
@@ -1501,9 +1509,8 @@ class RepositorioChatApi implements RepositorioChat {
         ? (textoNaoVazio(pedidoObj.categoriaNome) ?? textoNaoVazio(pedidoObj.titulo))
         : (textoNaoVazio(pedidoAbertoDetalhe?['categoria_nome']) ??
             textoNaoVazio(pedidoAbertoDetalhe?['titulo']));
-    final remoto = pedidoObj != null
-        ? pedidoObj.remoto
-        : pedidoAbertoDetalhe?['modalidade'] == 'remoto';
+    final remoto =
+        pedidoObj != null ? pedidoObj.remoto : pedidoAbertoDetalhe?['modalidade'] == 'remoto';
     final orcamentosAtivos = {
       for (final o in orcamentos)
         if (o['id'] is String && o['aceito'] != true && pedidoAberto) o['id'] as String,
