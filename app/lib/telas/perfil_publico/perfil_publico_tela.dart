@@ -196,6 +196,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                         rotulo: 'Serviços concluídos', valor: '${p.servicosConcluidos}')),
               ],
             ),
+            SeloRespostaReal(faixa: p.respondeEmFaixa),
             EtiquetasMaisElogiadas(etiquetas: p.etiquetasTop),
             const TituloSecao('Sobre'),
             Text(

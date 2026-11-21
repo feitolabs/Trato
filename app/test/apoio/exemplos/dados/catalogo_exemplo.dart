@@ -131,7 +131,6 @@ Profissional _p({
       noTratoDesde: desde,
       totalAvaliacoes: avaliacoesTotal == 0 ? avaliacoes.length : avaliacoesTotal,
       taxaConclusao: conclusao,
-      respondeEm: resposta == null ? '~3 horas' : '~${resposta.replaceAll('resp. em ', '')}',
       verificacoes: verificacoes,
       avaliacoes: avaliacoes,
       bio: bio,

@@ -68,6 +68,34 @@ class EtiquetasMaisElogiadas extends StatelessWidget {
   }
 }
 
+/// Selo de resposta real: o texto é fixo; a API só diz se vale. Sem valor, nada aparece.
+class SeloRespostaReal extends StatelessWidget {
+  const SeloRespostaReal({super.key, required this.faixa});
+
+  final String? faixa;
+
+  @override
+  Widget build(BuildContext context) {
+    if ((faixa ?? '').trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: EspacosTrato.x3),
+      child: Row(
+        key: const Key('selo-resposta-real'),
+        children: [
+          const Icon(Icons.schedule, size: EspacosTrato.x4, color: CoresTrato.petroleo),
+          const SizedBox(width: EspacosTrato.x2),
+          Flexible(
+            child: Text(
+              'Costuma responder no mesmo dia',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ChipElogio extends StatelessWidget {
   const _ChipElogio({required this.texto});
 

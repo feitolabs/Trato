@@ -31,7 +31,6 @@ Profissional _pro({
         noTratoDesde: 2026,
         totalAvaliacoes: avaliacoes,
         taxaConclusao: 96,
-        respondeEm: '—',
         verificacoes: const [],
         avaliacoes: const [],
         temHistorico: historico,

@@ -54,7 +54,6 @@ Profissional _pro({List<EtiquetaTop> top = const [], List<String> etiquetasAv = 
         noTratoDesde: 2026,
         totalAvaliacoes: 1,
         taxaConclusao: 96,
-        respondeEm: '—',
         verificacoes: const [],
         etiquetasTop: top,
         avaliacoes: [

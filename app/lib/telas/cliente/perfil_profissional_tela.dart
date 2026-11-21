@@ -99,6 +99,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                       ),
                     ],
                   ),
+                SeloRespostaReal(faixa: d.respondeEmFaixa),
                 EtiquetasMaisElogiadas(etiquetas: d.etiquetasTop),
                 if (p.servicosConcluidos >= 5 && d.temHistorico) ...[
                   const SizedBox(height: EspacosTrato.x3),

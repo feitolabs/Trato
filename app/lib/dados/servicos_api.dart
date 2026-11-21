@@ -691,6 +691,7 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico, RespostaAvaliacao
 
     var avaliacoes = <Avaliacao>[];
     var etiquetasTop = <EtiquetaTop>[];
+    String? respondeEmFaixa;
     var cidades = <String>[];
     var noTratoDesde = DateTime.now().year;
     if (usuarioId.isNotEmpty) {
@@ -702,6 +703,7 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico, RespostaAvaliacao
         cidades = [for (final c in (pub['cidades'] as List? ?? const [])) '$c'];
         avaliacoes = _converterAvaliacoes(pub['avaliacoes'] as List? ?? const []);
         etiquetasTop = EtiquetaTop.listaDeJson(pub['etiquetas_top']);
+        respondeEmFaixa = DetalhePerfil.lerFaixaResposta(pub['responde_em_faixa']);
       } on ErroTrato {
         // Perfil ainda em análise (não aprovado publicamente): usa dados privados de /v1/profissional/perfil.
       }
@@ -775,6 +777,7 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico, RespostaAvaliacao
       fotosPortfolio: fotosPortfolio.length,
       ultimasAvaliacoes: avaliacoes,
       etiquetasTop: etiquetasTop,
+      respondeEmFaixa: respondeEmFaixa,
       listaFotosPortfolio: fotosPortfolio,
     );
   }

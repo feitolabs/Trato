@@ -61,7 +61,6 @@ class DetalhePerfil {
     required this.noTratoDesde,
     required this.totalAvaliacoes,
     required this.taxaConclusao,
-    required this.respondeEm,
     required this.verificacoes,
     required this.avaliacoes,
     this.fotosTrabalhos = 3,
@@ -71,7 +70,19 @@ class DetalhePerfil {
     this.fotosUrls = const [],
     this.temHistorico = true,
     this.etiquetasTop = const [],
+    this.respondeEmFaixa,
   });
+
+  /// `responde_em_faixa` da API ("no mesmo dia"); só a presença importa: o texto da tela é fixo.
+  /// Nulo/vazio = não mostra nada.
+  final String? respondeEmFaixa;
+
+  /// Lê `responde_em_faixa` sem quebrar: ausente, nulo, vazio ou de outro tipo = nulo.
+  static String? lerFaixaResposta(Object? bruto) {
+    if (bruto is! String) return null;
+    final t = bruto.trim();
+    return t.isEmpty ? null : t;
+  }
 
   /// Elogios mais recebidos (`etiquetas_top`, já contados pelo backend); vazio = não mostra.
   final List<EtiquetaTop> etiquetasTop;
@@ -94,7 +105,6 @@ class DetalhePerfil {
   final int noTratoDesde;
   final int totalAvaliacoes;
   final int taxaConclusao;
-  final String respondeEm;
   final List<String> verificacoes;
   final List<Avaliacao> avaliacoes;
   final int fotosTrabalhos;

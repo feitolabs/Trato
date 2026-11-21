@@ -4,7 +4,7 @@ library;
 
 import '../cliente/modelos.dart' show Avaliacao, EtiquetaTop;
 
-export '../cliente/modelos.dart' show Avaliacao, EtiquetaTop;
+export '../cliente/modelos.dart' show Avaliacao, DetalhePerfil, EtiquetaTop;
 
 class PerfilPublico {
   const PerfilPublico({
@@ -23,7 +23,11 @@ class PerfilPublico {
     this.fotoReferencia,
     this.listaFotosPortfolio = const [],
     this.etiquetasTop = const [],
+    this.respondeEmFaixa,
   });
+
+  /// `responde_em_faixa` da API; nulo/vazio = não mostra o selo de resposta.
+  final String? respondeEmFaixa;
 
   /// Elogios mais recebidos (`etiquetas_top`); vazio = não mostra.
   final List<EtiquetaTop> etiquetasTop;

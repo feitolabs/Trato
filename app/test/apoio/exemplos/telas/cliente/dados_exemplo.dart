@@ -49,7 +49,6 @@ const profissionais = [
       noTratoDesde: 2025,
       totalAvaliacoes: 64,
       taxaConclusao: 98,
-      respondeEm: '~1 hora',
       verificacoes: [
         'Documento e selfie com prova de vida',
         'Certidão de antecedentes',

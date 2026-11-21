@@ -351,8 +351,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
         totalAvaliacoes: avaliacoes.length,
         taxaConclusao: (j['taxa_conclusao'] as num?)?.toInt() ?? 0,
         temHistorico: j['taxa_conclusao'] != null,
-        // O Trato ainda não mede o tempo de resposta: traço em vez de um número inventado.
-        respondeEm: '—',
+        respondeEmFaixa: DetalhePerfil.lerFaixaResposta(j['responde_em_faixa']),
         verificacoes: [
           if (nivel == 'verificado' || nivel == 'verificado_plus') 'Identidade conferida',
           if (nivel == 'verificado_plus') 'Antecedentes conferidos',
