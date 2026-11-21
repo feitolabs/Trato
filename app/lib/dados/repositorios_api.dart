@@ -545,6 +545,18 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horasPrazo)} para confirmar, '
           'até ${_dia(limite)} · ${_hora(limite)}.';
     }
+    // Descrição do pedido: só vale buscar quando há categoria para virar o título.
+    String? descricaoPedido;
+    final categoria = pedido.categoriaNome?.trim() ?? '';
+    if (categoria.isNotEmpty) {
+      try {
+        final d = _mapa(await _api.get('/v1/pedidos/$pedidoId/dados'));
+        final texto = (d['descricao'] as String?)?.trim() ?? '';
+        if (texto.isNotEmpty) descricaoPedido = texto;
+      } on Object {
+        descricaoPedido = null;
+      }
+    }
     Aditivo? aditivoPendente;
     final aditivos = <ItemResumoAditivo>[];
     var aditivosPagos = 0;
@@ -617,6 +629,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     return PedidoEmExecucao(
       numero: pedido.numero,
       titulo: switch (pedido.estado) {
+        'aberto' || 'reservado' => 'Aguardando orçamentos',
         'orcamento_aceito' => 'Aguardando o pagamento',
         'pago_e_retido' => 'Pagamento confirmado',
         'agendado' => pedido.remoto ? 'Início combinado' : 'Visita marcada',
@@ -632,6 +645,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       pagamentoConfirmado: pedido.pagamentoConfirmado,
       estadoApi: pedido.estado,
       remoto: pedido.remoto,
+      categoriaNome: categoria.isEmpty ? null : categoria,
+      descricao: descricaoPedido,
+      jaAvaliou: pedido.jaAvaliou,
       visita: pedido.janelaRotulo,
       prazoConfirmacao: prazoConfirmacao,
       etapas: etapas,

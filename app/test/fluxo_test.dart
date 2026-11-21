@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/telas/aditivo/responder_aditivo_tela.dart';
 import 'package:trato/telas/busca/busca_profissionais_tela.dart';
 import 'package:trato/telas/cliente/perfil_profissional_tela.dart';
-import 'package:trato/telas/servicos/detalhe_servico_tela.dart';
 import 'package:trato/telas/disputa_profissional/atender_retrabalho_tela.dart';
 import 'package:trato/telas/disputa_profissional/responder_disputa_tela.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
@@ -112,8 +111,7 @@ void main() {
 
     await _tocar(tester, 'Vazamento na pia');
 
-    expect(find.byType(DetalheServicoTela), findsOneWidget);
-    expect(find.text('Disputa aberta · em análise'), findsOneWidget);
+    expect(find.byType(PedidoExecucaoTela), findsOneWidget); // tela única do pedido
   });
 
   group('cadastro', () {
@@ -214,7 +212,7 @@ void main() {
     await _tocar(tester, 'Notificações');
 
     await _tocar(tester, 'Disputa aberta no seu serviço');
-    expect(find.byType(DetalheServicoTela), findsOneWidget);
+    expect(find.byType(PedidoExecucaoTela), findsOneWidget);
     await _voltar(tester);
 
     await _tocar(tester, 'Novo orçamento');

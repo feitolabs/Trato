@@ -46,8 +46,6 @@ import '../mensagens/servico_conversas.dart' show ServicoConversasApi;
 import '../mensagens/servico_pedidos.dart';
 import '../orcamentos/modelos.dart' show DadosContrato, Orcamento;
 import '../pedido_novo/modelos.dart' show FormularioPedido;
-import '../servicos/detalhe_servico_tela.dart';
-import '../servicos/modelos.dart';
 import '../servicos/servicos_recentes_tela.dart';
 import '../cliente/perfil_profissional_tela.dart';
 import '../disputa_profissional/atender_retrabalho_tela.dart';
@@ -574,82 +572,9 @@ abstract final class RotasTrato {
         ),
       );
 
-  /// Detalhe do serviço (pedido) com as ações possíveis em cada estado.
+  /// Acompanhamento do pedido: a MESMA tela para quem vem da lista e da notificação.
   static void abrirServico(BuildContext context, String pedidoId) =>
-      _abrir<void>(
-        context,
-        Carregador<DetalheServico>(
-          carregar: () => repos.servicos.detalhe(pedidoId),
-          atualizarQuando: pedidosMudaram,
-          construir: (context, dados) => DetalheServicoTela(
-            dados: dados,
-            aoAcao: (acao) => _acaoDoServico(context, acao, pedidoId),
-            aoEditarPedido: (dados.profissional == null &&
-                    dados.acoes.contains(AcaoServico.cancelar))
-                ? () => _abrir<void>(context, _pedidoAberto(pedidoId))
-                : null,
-            aoVerContrato: dados.profissional != null
-                ? () => abrirContrato(context, pedidoId)
-                : null,
-            aoVerNota: dados.profissional != null
-                ? () => _abrir<void>(
-                      context,
-                      VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
-                    )
-                : null,
-            aoVerAditivo: dados.profissional != null
-                ? () => _abrir<void>(
-                      context,
-                      ResponderAditivoTela(
-                        servico: servicoAditivo,
-                        aditivoId: pedidoId,
-                        aoCobrancaCriada: (cobranca) =>
-                            _pagarAditivo(context, pedidoId, cobranca),
-                      ),
-                    )
-                : null,
-            aoVerConclusao:
-                const {'em_confirmacao', 'concluido'}.contains(dados.estadoApi)
-                    ? () => _abrir<void>(context, _conclusao(pedidoId))
-                    : null,
-            aoVerProfissional: (pro) => abrirPerfil(
-              context,
-              Profissional(
-                id: pro.id,
-                nome: pro.nome,
-                iniciais: pro.iniciais,
-                verificacao: pro.verificacao ?? 'Verificado',
-                especialidade: '',
-                servicosConcluidos: 0,
-                nota: 0,
-                distanciaKm: 0,
-              ),
-            ),
-          ),
-        ),
-      );
-
-  static void _acaoDoServico(
-      BuildContext context, AcaoServico acao, String pedidoId) {
-    switch (acao) {
-      case AcaoServico.verOrcamentos:
-        _abrir<void>(context, _orcamentosRecebidos(pedidoId));
-      case AcaoServico.pagar:
-        _abrir<void>(context, _pagamento(pedidoId));
-      case AcaoServico.acompanhar:
-        _abrir<void>(context, _pedidoEmExecucao(pedidoId));
-      case AcaoServico.conversar:
-        _abrir<void>(context, _chat(pedidoId, comoProfissional: false));
-      case AcaoServico.avaliar:
-        _abrir<void>(context, _avaliacao(pedidoId));
-      case AcaoServico.verGarantia:
-        abrirGarantia(context, pedidoId: pedidoId);
-      case AcaoServico.abrirProblema:
-        _abrir<void>(context, _relatarProblema(pedidoId));
-      case AcaoServico.cancelar:
-        _cancelarPedido(context, pedidoId);
-    }
-  }
+      _abrir<void>(context, _pedidoEmExecucao(pedidoId));
 
   /// Pede o motivo, confirma e cancela. Quem decide se pode e cuida de eventuais devoluções é
   /// o atendimento e processamento do app; em caso de recusa, a pessoa vê o motivo.
@@ -1361,6 +1286,22 @@ abstract final class RotasTrato {
         ),
       );
 
+  /// Abre o menu de ações do pedido do profissional (para testes de widget).
+  @visibleForTesting
+  static void acoesPedidoProfissionalParaTeste(
+    BuildContext context, {
+    required String estadoApi,
+    bool remoto = false,
+  }) =>
+      _acoesPedidoProfissional(
+        context,
+        pedidoId: 'p1',
+        titulo: 'Pedido de teste',
+        estadoApi: estadoApi,
+        remoto: remoto,
+        aoCheckIn: () {},
+      );
+
   static void _acoesPedidoProfissional(
     BuildContext context, {
     required String pedidoId,
@@ -1371,10 +1312,15 @@ abstract final class RotasTrato {
     bool remoto = false,
     String? consultaMapa,
   }) {
+    // Início e Pedidos oferecem as MESMAS ações: com o estado da API, só ele decide.
     final precisaAgendar = estadoApi == 'pago_e_retido';
-    final agendado = estado == EstadoAgendamento.agendado;
+    final agendado = estadoApi != null
+        ? const {'pago_e_retido', 'agendado'}.contains(estadoApi)
+        : estado == EstadoAgendamento.agendado;
     final podeCheckIn = agendado && !precisaAgendar;
-    final emAndamento = estado == EstadoAgendamento.emAndamento;
+    final emAndamento = estadoApi != null
+        ? estadoApi == 'em_andamento'
+        : estado == EstadoAgendamento.emAndamento;
     final emDisputa = estadoApi == 'em_disputa';
     final emRetrabalho = estadoApi == 'retrabalho';
     final finalizado = estadoApi == 'concluido' ||
@@ -1493,10 +1439,11 @@ abstract final class RotasTrato {
                       _abrir<void>(context, _criarAditivo(pedidoId, titulo));
                     },
                   ),
-                if (agendado || emAndamento || finalizado)
+                if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
                   ListTile(
                     leading: const Icon(Icons.receipt_outlined),
-                    title: Text(finalizado
+                    title: Text((estadoApi == 'concluido' ||
+                            (estadoApi == null && estado == EstadoAgendamento.concluido))
                         ? 'Ver valores e avaliar cliente'
                         : 'Ver valores do pedido'),
                     onTap: () {
@@ -2326,15 +2273,6 @@ abstract final class RotasTrato {
       switch (estado) {
         case 'aberto' || 'reservado':
           _abrir<void>(context, _pedidoAberto(id));
-        case 'orcamento_aceito':
-          _abrir<void>(context, _pagamento(id));
-        case 'concluido':
-          abrirGarantia(context, pedidoId: id);
-        case 'pago_e_retido' ||
-              'agendado' ||
-              'em_andamento' ||
-              'em_confirmacao':
-          _abrir<void>(context, _pedidoEmExecucao(id));
         default:
           abrirServico(context, id);
       }
@@ -2768,9 +2706,15 @@ abstract final class RotasTrato {
         carregar: () => repos.pedidos.acompanhar(pedidoId),
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
-        construir: (context, pedido) => PedidoExecucaoTela(
+        // Aguardando orçamentos continua na tela do pedido aberto (editar, exclusividade).
+        construir: (context, pedido) => const {'aberto', 'reservado'}.contains(pedido.estadoApi)
+            ? _pedidoAberto(pedidoId)
+            : PedidoExecucaoTela(
           pedido: pedido,
           atualizarAditivoLocalmente: false,
+          aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
+          aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
+          aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
           aoAprovarAditivo: () =>
               _responderAditivoInline(context, pedidoId, aprovar: true),
           aoRecusarAditivo: () =>

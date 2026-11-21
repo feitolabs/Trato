@@ -145,7 +145,19 @@ class PedidoEmExecucao {
     this.remoto = false,
     this.visita,
     this.prazoConfirmacao,
+    this.categoriaNome,
+    this.descricao,
+    this.jaAvaliou = false,
   });
+
+  /// Nome da categoria (`categoria_nome`, opcional). Vindo, vira o título da tela.
+  final String? categoriaNome;
+
+  /// O que o cliente pediu; subtítulo quando há [categoriaNome].
+  final String? descricao;
+
+  /// O cliente já avaliou: a ação "Avaliar" some.
+  final bool jaAvaliou;
 
   /// Serviço remoto: a tela esconde o que é presencial.
   final bool remoto;

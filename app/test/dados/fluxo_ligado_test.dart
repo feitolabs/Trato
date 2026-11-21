@@ -248,16 +248,9 @@ void main() {
         Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => RotasTrato.abrirPedido(
-                context,
-                const PedidoResumo(
-                  id: 'p1',
-                  estadoApi: 'orcamento_aceito',
-                  titulo: 'T',
-                  subtitulo: 'S',
-                  statusTexto: 'Aguardando pagamento',
-                  statusTipo: TipoStatus.info,
-                ),
+              // O 'Pagar' do acompanhamento abre esta mesma tela de pagamento.
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => RotasTrato.pagamentoParaTeste('p1')),
               ),
               child: const Text('abrir'),
             ),

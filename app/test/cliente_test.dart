@@ -10,7 +10,7 @@ import 'package:trato/telas/catalogo/categoria_tela.dart';
 import 'package:trato/telas/catalogo/todas_categorias_tela.dart';
 import 'package:trato/telas/cliente/modelos.dart' show Profissional;
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
-import 'package:trato/telas/servicos/detalhe_servico_tela.dart';
+import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 Future<void> _abrir(
@@ -133,7 +133,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await _tocar(tester, find.text('Pintura da sala'));
-      expect(find.byType(DetalheServicoTela), findsOneWidget);
+      expect(find.byType(PedidoExecucaoTela), findsOneWidget); // tela única do pedido
     });
   });
 

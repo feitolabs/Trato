@@ -23,8 +23,17 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoAbrirProblema,
     this.aoCancelarPedido,
     this.aoRemarcarVisita,
+    this.aoPagar,
+    this.aoAvaliar,
+    this.aoVerGarantia,
     this.atualizarAditivoLocalmente = true,
   });
+
+  /// Ação principal por estado: `Pagar` (orçamento aceito), `Avaliar` e `Ver garantia`
+  /// (finalizado). `Confirmar serviço` usa [aoVerConclusao]. Sem o callback, a ação não aparece.
+  final VoidCallback? aoPagar;
+  final VoidCallback? aoAvaliar;
+  final VoidCallback? aoVerGarantia;
 
   final PedidoEmExecucao pedido;
   final VoidCallback? aoAprovarAditivo;
@@ -64,6 +73,44 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
     aviso?.call();
   }
 
+  /// UMA ação principal por estado (o que o cliente faz agora). Sem callback, sem botão.
+  Widget? _acaoPrincipal(PedidoEmExecucao pedido) {
+    switch (pedido.estadoApi) {
+      case 'orcamento_aceito':
+        final pagar = widget.aoPagar;
+        return pagar == null
+            ? null
+            : BotaoPrimario(key: const ValueKey('acao-principal'), texto: 'Pagar', aoTocar: pagar);
+      case 'em_confirmacao':
+        final ver = widget.aoVerConclusao;
+        return ver == null
+            ? null
+            : BotaoPrimario(
+                key: const ValueKey('acao-principal'),
+                texto: 'Confirmar serviço',
+                aoTocar: ver,
+              );
+      case 'concluido':
+        final avaliar = widget.aoAvaliar;
+        if (!pedido.jaAvaliou && avaliar != null) {
+          return BotaoPrimario(
+            key: const ValueKey('acao-principal'),
+            texto: 'Avaliar',
+            aoTocar: avaliar,
+          );
+        }
+        final garantia = widget.aoVerGarantia;
+        return garantia == null
+            ? null
+            : BotaoPrimario(
+                key: const ValueKey('acao-principal'),
+                texto: 'Ver garantia',
+                aoTocar: garantia,
+              );
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final pedido = widget.pedido;
@@ -74,22 +121,57 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
       children: [
         _Topo(numero: pedido.numero, aoTocarSos: widget.aoTocarSos),
         const SizedBox(height: EspacosTrato.x3),
-        Text(pedido.titulo, style: TipografiaTrato.tituloGrande),
-        const SizedBox(height: EspacosTrato.x3),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: pedido.pagamentoConfirmado
-              ? const ChipStatus(
-                  texto: 'Pagamento acompanhado no app',
-                  tipo: TipoStatus.info,
-                  icone: Icons.lock_outline,
-                )
-              : const ChipStatus(
-                  texto: 'Aguardando o pagamento',
-                  tipo: TipoStatus.alerta,
-                  icone: Icons.schedule,
-                ),
+        Text(
+          (pedido.categoriaNome ?? '').isNotEmpty ? pedido.categoriaNome! : pedido.titulo,
+          key: const ValueKey('titulo-pedido'),
+          style: TipografiaTrato.tituloGrande,
         ),
+        if ((pedido.categoriaNome ?? '').isNotEmpty) ...[
+          if ((pedido.descricao ?? '').isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              pedido.descricao!,
+              key: const ValueKey('descricao-pedido'),
+              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ],
+          const SizedBox(height: EspacosTrato.x2),
+          Text(pedido.titulo,
+              key: const ValueKey('situacao-pedido'), style: TipografiaTrato.corpoForte),
+        ],
+        const SizedBox(height: EspacosTrato.x3),
+        Wrap(
+          spacing: EspacosTrato.x2,
+          runSpacing: EspacosTrato.x2,
+          children: [
+            if (pedido.pagamentoConfirmado)
+              const ChipStatus(
+                texto: 'Pagamento acompanhado no app',
+                tipo: TipoStatus.info,
+                icone: Icons.lock_outline,
+              )
+            else
+              const ChipStatus(
+                texto: 'Aguardando o pagamento',
+                tipo: TipoStatus.alerta,
+                icone: Icons.schedule,
+              ),
+            if (pedido.remoto)
+              const ChipStatus(
+                key: ValueKey('selo-remoto'),
+                texto: 'Remoto',
+                tipo: TipoStatus.info,
+                icone: Icons.videocam_outlined,
+              ),
+          ],
+        ),
+        if (pedido.etapas.isNotEmpty &&
+            !const {'aberto', 'reservado'}.contains(pedido.estadoApi)) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          Text('Linha do tempo', style: TipografiaTrato.titulo),
+          const SizedBox(height: EspacosTrato.x4),
+          LinhaDoTempo(etapas: pedido.etapas),
+        ],
         if (pedido.visita != null || pedido.prazoConfirmacao != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           if (pedido.visita != null)
@@ -161,6 +243,10 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             ),
           ),
         ],
+        if (_acaoPrincipal(pedido) case final principal?) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          principal,
+        ],
         if (_aditivo != null) ...[
           const SizedBox(height: EspacosTrato.x4),
           CartaoAditivo(
@@ -170,6 +256,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
           ),
         ],
         if (widget.aoRemarcarVisita != null ||
+            (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido') ||
             widget.aoVerContrato != null ||
             widget.aoVerNota != null ||
             widget.aoVerAditivo != null) ...[
@@ -187,6 +274,12 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                           ? 'Remarcar visita'
                           : 'Sugerir horário da visita'),
                   aoTocar: widget.aoRemarcarVisita!,
+                ),
+              if (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido')
+                BotaoLink(
+                  key: const ValueKey('ver-garantia'),
+                  texto: 'Ver garantia ou pedir retrabalho',
+                  aoTocar: widget.aoVerGarantia!,
                 ),
               if (widget.aoVerContrato != null)
                 BotaoLink(
@@ -215,10 +308,6 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             aoAbrirNotas: widget.aoVerNota,
           ),
         ],
-        const SizedBox(height: EspacosTrato.x6),
-        Text('Linha do tempo', style: TipografiaTrato.titulo),
-        const SizedBox(height: EspacosTrato.x4),
-        LinhaDoTempo(etapas: pedido.etapas),
         if (pedido.fotos.isNotEmpty) ...[
           const SizedBox(height: EspacosTrato.x6),
           Row(
@@ -268,7 +357,8 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             _Rodape(
               aoConversar: widget.aoConversar,
               aoVerConclusao: widget.pedido.podeVerConclusao ? widget.aoVerConclusao : null,
-              mostrarConclusao: widget.pedido.podeVerConclusao,
+              mostrarConclusao:
+                  widget.pedido.podeVerConclusao && widget.pedido.estadoApi != 'em_confirmacao',
             ),
           ],
         ),

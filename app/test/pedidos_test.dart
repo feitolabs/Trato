@@ -83,7 +83,8 @@ void main() {
       await _abrir(
           tester,
           PedidoExecucaoTela(
-              pedido: exped.DadosExemplo.pedidoEmExecucao, aoAprovarAditivo: () => aprovou = true));
+              pedido: exped.DadosExemplo.pedidoEmExecucao, aoAprovarAditivo: () => aprovou = true),
+          tamanho: const Size(390, 2200));
       expect(find.text('Aditivo aguardando sua resposta'), findsOneWidget);
       expect(find.textContaining('R\$ 45,00'), findsOneWidget);
       expect(find.text('Pagamento acompanhado no app'), findsOneWidget);
@@ -100,7 +101,8 @@ void main() {
       await _abrir(
           tester,
           PedidoExecucaoTela(
-              pedido: exped.DadosExemplo.pedidoEmExecucao, aoRecusarAditivo: () => recusou = true));
+              pedido: exped.DadosExemplo.pedidoEmExecucao, aoRecusarAditivo: () => recusou = true),
+          tamanho: const Size(390, 2200));
       await tester.tap(find.text('Recusar'));
       await tester.pumpAndSettle();
       expect(recusou, isTrue);

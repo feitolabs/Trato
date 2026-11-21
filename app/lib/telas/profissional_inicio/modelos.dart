@@ -15,6 +15,20 @@ class AvisoACaminho {
   final int? etaMinutos;
 }
 
+/// "O que fazer agora" do profissional, em uma linha, por estado do pedido. Nulo quando não há
+/// nada a fazer (estado desconhecido ou cancelado). Só texto: quem decide o estado é o backend.
+String? oQueFazerAgora(String? estadoApi, {bool remoto = false}) => switch (estadoApi) {
+      'orcamento_aceito' => 'Aguardar o pagamento do cliente',
+      'pago_e_retido' => remoto ? 'Combinar início' : 'Marcar a data da visita',
+      'agendado' => remoto ? 'Iniciar atendimento' : 'Fazer check-in',
+      'em_andamento' => 'Pedir o código de conclusão ao cliente',
+      'em_confirmacao' => 'Aguardar confirmação do cliente',
+      'retrabalho' => 'Atender retrabalho',
+      'em_disputa' => 'Responder à disputa',
+      'concluido' => 'Avaliar cliente',
+      _ => null,
+    };
+
 class ProximoAtendimento {
   const ProximoAtendimento({
     required this.quando,

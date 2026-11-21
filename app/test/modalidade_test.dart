@@ -284,11 +284,11 @@ void main() {
       );
       expect(find.text('Foto de chegada'), findsNothing);
       expect(find.text('Localização'), findsNothing);
-      expect(find.text('Iniciar atendimento'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Iniciar atendimento'), findsOneWidget);
       // com 4 dígitos já dá para iniciar (no presencial precisaria de foto e localização)
       await tester.enterText(find.byType(TextField).first, '4821');
       await tester.pump();
-      await tester.tap(find.text('Iniciar serviço'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Iniciar atendimento'));
       await tester.pumpAndSettle();
       expect(servico.codigosEnviados, ['4821']);
     });

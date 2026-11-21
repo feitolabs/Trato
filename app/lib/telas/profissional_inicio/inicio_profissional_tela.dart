@@ -284,6 +284,14 @@ class _CartaoProximo extends StatelessWidget {
               ),
             ],
           ),
+          if (oQueFazerAgora(proximo.estadoApi, remoto: proximo.remoto) case final agora?) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            Text(
+              'O que fazer agora: $agora',
+              key: const ValueKey('o-que-fazer-agora'),
+              style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme),
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x4),
           BotaoSecundario(
             texto: proximo.precisaAgendarVisita

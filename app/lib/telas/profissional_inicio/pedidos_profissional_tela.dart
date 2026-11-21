@@ -202,6 +202,17 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                     color: c.aguardandoPagamento ? CoresTrato.laranja : CoresTrato.textoSecundario,
                   ),
                 ),
+                if (oQueFazerAgora(c.estadoApi, remoto: c.remoto) case final agora?) ...[
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    'O que fazer agora: $agora',
+                    key: const ValueKey('o-que-fazer-agora'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.petroleo,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
                 if (c.quando != null) ...[
                   const SizedBox(height: EspacosTrato.x1),
                   Text(
