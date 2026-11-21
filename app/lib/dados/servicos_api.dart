@@ -14,6 +14,7 @@ import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
+import '../telas/profissional_inicio/primeiros_passos.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
 import 'cliente_api.dart';
@@ -663,6 +664,30 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
         rethrow;
       }
     }
+  }
+}
+
+/// Dados da trilha dos primeiros passos: `GET /v1/profissional/perfil` e `GET /v1/me`
+/// (rotas que o app já usa). Falha em uma das duas = o passo fica pendente.
+class ServicoPrimeirosPassosApi {
+  ServicoPrimeirosPassosApi(this._api);
+
+  final ClienteApi _api;
+
+  Future<DadosPrimeirosPassos> carregar() async {
+    Map<String, dynamic>? perfil;
+    try {
+      perfil = _mapa(await _api.get('/v1/profissional/perfil'));
+    } on Object {
+      perfil = null;
+    }
+    Object? concluidos;
+    try {
+      concluidos = _mapa(await _api.get('/v1/me'))['servicos_concluidos'];
+    } on Object {
+      concluidos = null;
+    }
+    return DadosPrimeirosPassos.deApi(perfil: perfil, servicosConcluidos: concluidos);
   }
 }
 

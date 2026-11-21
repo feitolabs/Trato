@@ -15,6 +15,7 @@ import 'detalhe_pedido_tela.dart';
 import 'filtros_pedidos_tela.dart';
 import 'inicio_profissional_tela.dart';
 import 'modelos.dart';
+import 'primeiros_passos.dart';
 import 'pedidos_profissional_tela.dart';
 
 /// Casca do app do profissional: barra inferior com as 5 abas (Início · Pedidos · Agenda ·
@@ -56,7 +57,15 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoAlterarDisponivel,
     this.atualizarACada,
     this.atualizarQuando,
+    this.carregarPrimeirosPassos,
+    this.aoAbrirContaRecebimento,
   });
+
+  /// Busca os dados da trilha dos primeiros passos; nulo = a trilha não aparece.
+  final Future<DadosPrimeirosPassos> Function()? carregarPrimeirosPassos;
+
+  /// Abre a conta de recebimento (passo 1 da trilha, quando é o que falta).
+  final VoidCallback? aoAbrirContaRecebimento;
 
   /// Atualiza "Disponível agora" no backend (prioriza e notifica pedidos urgentes).
   final Future<bool> Function(bool disponivel)? aoAlterarDisponivel;
@@ -375,6 +384,17 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         aoAbrirPedido: _abrirDetalhe,
         aoAbrirNotificacoes: widget.aoAbrirNotificacoes,
         aoUsarComoCliente: widget.aoUsarComoCliente,
+        carregarPrimeirosPassos: widget.carregarPrimeirosPassos,
+        aoCompletarPerfil: (destino) {
+          if (destino == DestinoCompletar.contaRecebimento &&
+              widget.aoAbrirContaRecebimento != null) {
+            widget.aoAbrirContaRecebimento!();
+          } else {
+            _ir(4);
+          }
+        },
+        aoVerPedidos: () => _ir(1),
+        aoVerAgenda: () => _ir(2),
       ),
       PedidosProfissionalTela(
         pedidos: _inicio.pedidos,

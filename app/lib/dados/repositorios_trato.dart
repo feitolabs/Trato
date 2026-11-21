@@ -46,6 +46,7 @@ class RepositoriosTrato {
     this.disputaProfissional,
     this.cadastroProfissional,
     this.perfilPublico,
+    this.primeirosPassos,
     this.privacidade,
     this.conta,
     this.cep,
@@ -60,6 +61,9 @@ class RepositoriosTrato {
   final ServicoDisputaProfissional? disputaProfissional;
   final ServicoCadastroProfissional? cadastroProfissional;
   final ServicoPerfilPublico? perfilPublico;
+
+  /// Trilha dos primeiros passos do profissional (só na API real).
+  final ServicoPrimeirosPassosApi? primeirosPassos;
   final ServicoPrivacidade? privacidade;
 
   /// Dados pessoais, endereços, favoritos e contatos de confiança (`/v1/me/...`).
@@ -67,7 +71,6 @@ class RepositoriosTrato {
 
   /// Consulta de endereço por CEP (`GET /v1/cep/{cep}`).
   final ServicoCep? cep;
-
 
   /// Listas de conversas. Nulo = montadas a partir dos pedidos (o normal); testes injetam as suas.
   final ServicoMensagens? mensagens;
@@ -100,30 +103,31 @@ class RepositoriosTrato {
     // Prazos e limites para os textos das telas (sem esperar: até chegar, valem os padrões).
     unawaited(ConfigPublica.carregar(api));
     return RepositoriosTrato(
-        modoApi: true,
-        catalogo: RepositorioCatalogoApi(api),
-        servicos: RepositorioServicosClienteApi(api, pedidos),
-        agenda: RepositorioAgendaApi(profissional),
-        pedidos: pedidos,
-        orcamentos: RepositorioOrcamentosApi(api),
-        pagamento: RepositorioPagamentoApi(api),
-        chat: RepositorioChatApi(api, upload: upload),
-        mensagens: ServicoConversasApi(api, comoProfissional: false),
-        mensagensProfissional: ServicoConversasApi(api, comoProfissional: true),
-        notificacoes: RepositorioNotificacoesApi(api),
-        perfil: RepositorioPerfilApi(api, upload: upload),
-        profissional: profissional,
-        aditivo: ServicoAditivoApi(api),
-        notaMaterial: ServicoNotaMaterialApi(api, upload: upload),
-        verificacao: ServicoVerificacaoApi(api),
-        disputaProfissional: ServicoDisputaProfissionalApi(api, upload: upload),
-        cadastroProfissional: ServicoCadastroProfissionalApi(api, upload: upload),
-        perfilPublico: ServicoPerfilPublicoApi(api),
-        privacidade: ServicoPrivacidadeApi(api),
-        conta: ServicoContaApi(api),
-        cep: ServicoCepApi(api),
-        capturaVerificacao:
-            camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
+      modoApi: true,
+      catalogo: RepositorioCatalogoApi(api),
+      servicos: RepositorioServicosClienteApi(api, pedidos),
+      agenda: RepositorioAgendaApi(profissional),
+      pedidos: pedidos,
+      orcamentos: RepositorioOrcamentosApi(api),
+      pagamento: RepositorioPagamentoApi(api),
+      chat: RepositorioChatApi(api, upload: upload),
+      mensagens: ServicoConversasApi(api, comoProfissional: false),
+      mensagensProfissional: ServicoConversasApi(api, comoProfissional: true),
+      notificacoes: RepositorioNotificacoesApi(api),
+      perfil: RepositorioPerfilApi(api, upload: upload),
+      profissional: profissional,
+      aditivo: ServicoAditivoApi(api),
+      notaMaterial: ServicoNotaMaterialApi(api, upload: upload),
+      verificacao: ServicoVerificacaoApi(api),
+      disputaProfissional: ServicoDisputaProfissionalApi(api, upload: upload),
+      cadastroProfissional: ServicoCadastroProfissionalApi(api, upload: upload),
+      perfilPublico: ServicoPerfilPublicoApi(api),
+      primeirosPassos: ServicoPrimeirosPassosApi(api),
+      privacidade: ServicoPrivacidadeApi(api),
+      conta: ServicoContaApi(api),
+      cep: ServicoCepApi(api),
+      capturaVerificacao:
+          camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
     );
   }
 

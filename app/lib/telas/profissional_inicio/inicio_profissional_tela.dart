@@ -10,6 +10,7 @@ import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
 import 'pecas_profissional.dart';
+import 'primeiros_passos.dart';
 
 /// Tela 23 do protótipo: Início do profissional ("Pedidos perto de você").
 /// Todos os botões chamam callbacks opcionais; sem callback, não fazem nada.
@@ -25,7 +26,17 @@ class InicioProfissionalTela extends StatefulWidget {
     this.aoAbrirNotificacoes,
     this.aoUsarComoCliente,
     this.aoAvisarACaminho,
+    this.carregarPrimeirosPassos,
+    this.aoCompletarPerfil,
+    this.aoVerPedidos,
+    this.aoVerAgenda,
   });
+
+  /// Trilha dos primeiros passos (só profissional aprovado); nulo = não aparece.
+  final Future<DadosPrimeirosPassos> Function()? carregarPrimeirosPassos;
+  final ValueChanged<DestinoCompletar>? aoCompletarPerfil;
+  final VoidCallback? aoVerPedidos;
+  final VoidCallback? aoVerAgenda;
 
   /// Avisa o cliente que o profissional está a caminho. Sem isso, o botão não aparece.
   final Future<AvisoACaminho> Function(String pedidoId, int? etaMinutos)? aoAvisarACaminho;
@@ -134,6 +145,15 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
               icone: Icons.hourglass_top_outlined,
             ),
           ],
+          if (!dados.emAnalise)
+            CartaoPrimeirosPassos(
+              carregar: widget.carregarPrimeirosPassos,
+              orcamentosEnviados: dados.orcamentosEnviados.length,
+              semPedidosAbertos: dados.pedidos.isEmpty,
+              aoCompletar: widget.aoCompletarPerfil,
+              aoVerPedidos: widget.aoVerPedidos,
+              aoVerAgenda: widget.aoVerAgenda,
+            ),
           // Só aparece quando alguém grava a escolha: o backend ainda não tem "disponível agora",
           // e um interruptor que não grava em lugar nenhum engana o profissional.
           if (widget.aoAlterarDisponivel != null) ...[

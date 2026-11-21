@@ -803,6 +803,13 @@ abstract final class RotasTrato {
           abaCarteira: _abaCarteira(),
           abaPerfil: _abaPerfilProfissional(),
           abaAgenda: _abaAgenda(),
+          carregarPrimeirosPassos: repos.primeirosPassos?.carregar,
+          aoAbrirContaRecebimento: () async {
+            final conta = await repos.profissional
+                .obterContaRecebimento()
+                .catchError((_) => const ContaRecebimento(cadastrada: false));
+            if (context.mounted) await _abrirContaRecebimento(context, conta);
+          },
           abaConversas: Builder(
             builder: (context) => ListaConversas(
               servico: repos.mensagensProfissional ??
