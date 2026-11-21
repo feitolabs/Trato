@@ -8,7 +8,6 @@ import 'package:trato/telas/conclusao/modelos.dart';
 import 'package:trato/telas/pedidos/modelos.dart';
 import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/telas/profissional/check_in_tela.dart';
-import 'package:trato/telas/profissional/servico_check_in.dart';
 import 'package:trato/tema/tema.dart';
 
 import 'apoio/exemplos/telas/profissional/servico_check_in_fake.dart';
