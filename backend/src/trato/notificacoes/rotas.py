@@ -121,6 +121,7 @@ def montar_servicos(
         ConversasAppPostgres(banco) if banco is not None else ConversasAppEmMemoria(contexto)
     )
     contexto.apos_transicao.append(criar_gancho(servico))
+    contexto.extras["notificador"] = servico  # avisos fora de transição (ex.: aditivo pago)
     return servico, mensagens
 
 

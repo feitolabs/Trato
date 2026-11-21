@@ -39,6 +39,7 @@ class Evento(StrEnum):
     CODIGO_CONCLUSAO = "execucao.codigo_conclusao"
     CLIENTE_CONFIRMOU = "execucao.cliente_confirmou"
     ADITIVO_APROVADO = "execucao.aditivo_aprovado"
+    ADITIVO_PAGO = "execucao.aditivo_pago"
     NOTA_MATERIAL = "execucao.nota_material"
     RETRABALHO_RESOLVIDO = "garantia.retrabalho_resolvido"
     ADITIVO_PENDENTE = "execucao.aditivo_pendente"
@@ -173,6 +174,14 @@ MODELOS: dict[Evento, ModeloEvento] = {
         Categoria.EXECUCAO,
         "Aditivo aprovado",
         "O cliente aprovou o aditivo do serviço.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.ADITIVO_PAGO: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Aditivo pago",
+        "O cliente pagou o aditivo. O valor fica retido até o cliente confirmar o serviço.",
         "pedido",
         essencial=True,
         somente_app=True,

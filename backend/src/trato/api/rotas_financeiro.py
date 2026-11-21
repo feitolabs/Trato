@@ -20,7 +20,7 @@ from trato.api.modelos import (
 )
 from trato.api.servicos import carregar_pedido
 from trato.financeiro import extrato_profissional, periodo
-from trato.financeiro.ledger import Conta, Lancamento, a_liberar, liberado
+from trato.financeiro.ledger import CUSTODIA, Conta, Lancamento, a_liberar, liberado
 from trato.persistencia.comum import como_uuid
 from trato.rotinas.regras import ConfigRotinas, instante_liberacao
 
@@ -79,6 +79,7 @@ def saldo_do_pedido(
         retido_centavos=saldo.retido,
         a_liberar_centavos=saldo.a_liberar,
         liberado_centavos=saldo.liberado,
+        liberacao_prevista_em=liberacao_prevista(contexto, pedido.concluido_em),
     )
 
 
@@ -118,9 +119,32 @@ def saldo_do_profissional(
     return SaldoProfissionalOut(
         a_liberar_centavos=contexto.ledger.saldo_da_conta(a_liberar(usuario.id)),
         liberado_centavos=contexto.ledger.saldo_da_conta(liberado(usuario.id)),
+        retido_centavos=_retido_do_profissional(contexto, usuario.id),
         proxima_liberacao_em=min(datas) if datas else None,
         liberacoes_previstas=previstas,
     )
+
+
+def _retido_do_profissional(contexto: Contexto, profissional_id: str) -> int:
+    """Dinheiro pago e retido (custódia) dos pedidos deste profissional, até ser liberado.
+    Só leitura: nunca falha a carteira."""
+    try:
+        por_pedido: dict[str, int] = {}
+        for item in contexto.ledger.lancamentos():
+            if item.credito == CUSTODIA:
+                por_pedido[item.pedido_id] = por_pedido.get(item.pedido_id, 0) + item.valor
+            if item.debito == CUSTODIA:
+                por_pedido[item.pedido_id] = por_pedido.get(item.pedido_id, 0) - item.valor
+        total = 0
+        for pedido_id, valor in por_pedido.items():
+            if valor <= 0:
+                continue
+            pedido = contexto.pedidos.obter(pedido_id)
+            if pedido is not None and pedido.profissional_id == profissional_id:
+                total += valor
+        return total
+    except Exception:  # noqa: BLE001 - campo opcional
+        return 0
 
 
 def _regra_liberacao(contexto: Contexto) -> ConfigRotinas:

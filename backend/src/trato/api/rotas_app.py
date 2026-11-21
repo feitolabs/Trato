@@ -45,6 +45,7 @@ from trato.api.repositorios_app import (
 )
 from trato.api.servicos import carregar_pedido, eh_participante
 from trato.api.visibilidade import pedido_visivel_ao_profissional
+from trato.config import obter_config
 from trato.financeiro import periodo
 from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import validar_e_calcular_cupom
@@ -148,6 +149,11 @@ class PagamentoValoresOut(BaseModel):
     )
     pago_centavos: int = Field(description="O que o ledger mostra como pago (webhook assinado).")
     pagamento_confirmado: bool
+    pix_disponivel: bool | None = Field(
+        None,
+        description="O Pix pode ser oferecido agora (config `TRATO_PIX_HABILITADO`; padrão false). "
+        "O app esconde o Pix quando não for true.",
+    )
     meios_disponiveis: list[str]
     cobranca_pendente_id: str | None = None
     desconto_centavos: int = 0
@@ -310,7 +316,14 @@ class MoedasOut(BaseModel):
     moedas_pendentes_profissional: int = Field(
         0, description="Bônus do profissional ainda aguardando a liberação (não é saldo)."
     )
-    valor_moeda_centavos: int
+    valor_moeda_centavos: int | None = Field(
+        None,
+        description="Quanto vale 1 Tratinho em centavos (carteira do cliente). Null para o "
+        "profissional: a moeda dele nunca vira desconto.",
+    )
+    proxima_liberacao_profissional: date | None = Field(
+        None, description="Data (Brasília) do próximo bônus pendente do PROFISSIONAL."
+    )
     extrato: list[MoedaLancamentoOut]
     desconto_disponivel: bool = True
     desconto_indisponivel_motivo: str | None = Field(
@@ -751,6 +764,7 @@ def valores_do_pagamento(
         opcoes_parcelamento=opcoes,
         pago_centavos=saldo.cliente_pagou,
         pagamento_confirmado=pedido.referencia_pagamento is not None,
+        pix_disponivel=bool(obter_config().trato_pix_habilitado),
         meios_disponiveis=[m.value for m in MeioPagamento],
         cobranca_pendente_id=pendente,
         desconto_centavos=desconto_centavos,
@@ -1162,7 +1176,9 @@ def minhas_moedas(
     agora = contexto.agora()
     disp = disponibilidade_desconto(contexto.moedas, usuario_id=usuario.id, agora=agora)
     pendentes, proxima = resumo_pendentes(contexto.moedas, usuario.id)
-    pendentes_prof, _ = resumo_pendentes(contexto.moedas, usuario.id, TIPO_BONUS_PROFISSIONAL)
+    pendentes_prof, proxima_prof = resumo_pendentes(
+        contexto.moedas, usuario.id, TIPO_BONUS_PROFISSIONAL
+    )
     cfg_moedas = contexto.moedas.config()
     saldo_cliente = contexto.moedas.saldo(usuario.id, agora)
     vence_em: datetime | None = None
@@ -1189,7 +1205,10 @@ def minhas_moedas(
         saldo=saldo_cliente,
         saldo_profissional=saldo_profissional(contexto.moedas, usuario.id, agora),
         moedas_pendentes_profissional=pendentes_prof,
-        valor_moeda_centavos=contexto.moedas.config().valor_moeda_centavos,
+        valor_moeda_centavos=(
+            cfg_moedas.valor_moeda_centavos if usuario.papel is PapelUsuario.CLIENTE else None
+        ),
+        proxima_liberacao_profissional=proxima_prof,
         desconto_disponivel=disp.disponivel,
         desconto_indisponivel_motivo=disp.motivo,
         desconto_volta_em=disp.volta_em,

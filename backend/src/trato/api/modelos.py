@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from trato.api.localizacao import na_grade
 from trato.api.repositorios import DadosPedido, EnderecoPedido, RespostaPedido
 from trato.pedidos.estados import (
     Foto,
@@ -91,14 +92,16 @@ class AbrirPedidoIn(_Entrada):
     )
 
     def para_dados(self) -> DadosPedido:
+        remoto = self.modalidade == "remoto"
         return DadosPedido(
             categoria_id=self.categoria_id,
             cidade_id=self.cidade_id,
             titulo=self.titulo,
             descricao=self.descricao,
             bairro=self.bairro,
-            local_aprox_lat=self.local_aprox_lat,
-            local_aprox_lng=self.local_aprox_lng,
+            # MAP-1: o servidor guarda só a grade de ~500 m; remoto nunca tem ponto
+            local_aprox_lat=None if remoto else na_grade(self.local_aprox_lat),
+            local_aprox_lng=None if remoto else na_grade(self.local_aprox_lng),
             prazo_desejado=self.prazo_desejado,
             faixa_preco_min_centavos=self.faixa_preco_min_centavos,
             faixa_preco_max_centavos=self.faixa_preco_max_centavos,
@@ -316,7 +319,10 @@ class PedidoOut(BaseModel):
     codigo_conclusao: str | None = Field(None, description="Só o cliente vê.")
     modalidade: str = Field("presencial", description="`presencial` ou `remoto`.")
     ja_avaliou: bool = Field(
-        False, description="Quem pergunta já avaliou este serviço (só preenchido ao ver o pedido)."
+        False, description="Quem pergunta já avaliou este serviço (lista e detalhe)."
+    )
+    categoria_nome: str | None = Field(
+        None, description="Nome da categoria do pedido (do catálogo); null se não achar."
     )
     titulo: str | None = Field(None, description="O que o cliente pediu (ex.: Montagem de móveis).")
     cliente_nome: str | None = Field(
@@ -375,6 +381,7 @@ class SaldoPedidoOut(BaseModel):
     retido_centavos: int
     a_liberar_centavos: int
     liberado_centavos: int
+    liberacao_prevista_em: datetime | None = None  # quando o valor do pedido é liberado
 
 
 class LiberacaoPrevistaOut(BaseModel):
@@ -386,6 +393,7 @@ class LiberacaoPrevistaOut(BaseModel):
 class SaldoProfissionalOut(BaseModel):
     a_liberar_centavos: int
     liberado_centavos: int
+    retido_centavos: int = 0  # pago pelo cliente e retido, de pedidos ainda não liberados
     # Só leitura: quando cada valor "a liberar" passa a liberado (null se o prazo não existe).
     proxima_liberacao_em: datetime | None = None
     liberacoes_previstas: list[LiberacaoPrevistaOut] = Field(default_factory=list)

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from fastapi import HTTPException, Request
 
 from trato.api.acesso import auditar_consulta, operador_com
@@ -9,7 +12,7 @@ from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, papel_das_regras
 from trato.api.modelos import JanelaOut, PedidoOut
-from trato.pedidos.estados import Ator, Papel, Pedido, acoes_permitidas
+from trato.pedidos.estados import Ator, Estado, Papel, Pedido, acoes_permitidas
 
 
 def eh_participante(pedido: Pedido, usuario: Usuario) -> bool:
@@ -65,16 +68,51 @@ def nome_abreviado(nome: str | None) -> str | None:
     return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
 
 
+def nomes_de_categorias(request: Any) -> dict[str, str]:
+    """id e slug da categoria -> nome, do catálogo. Vazio se o catálogo não está disponível."""
+    try:
+        modulo = getattr(request.app.state, "modulo_profissional", None)
+        if modulo is None:
+            return {}
+        nomes: dict[str, str] = {}
+        for c in modulo.catalogo.categorias_publicas():
+            nomes[str(c.id)] = c.nome
+            nomes.setdefault(str(c.slug), c.nome)
+        return nomes
+    except Exception:  # noqa: BLE001 - campo opcional: sem o catálogo, vai sem o nome
+        return {}
+
+
+def _ja_avaliou(contexto: Contexto, pedido: Pedido, usuario: Usuario) -> bool:
+    direcao = (
+        "cliente_para_profissional"
+        if pedido.cliente_id == usuario.id
+        else "profissional_para_cliente"
+    )
+    try:
+        return contexto.avaliacoes.obter(pedido.id, direcao) is not None
+    except Exception:  # noqa: BLE001 - campo opcional
+        return False
+
+
 def pedido_out_completo(
-    contexto: Contexto, pedido: Pedido, usuario: Usuario, ja_avaliou: bool = False
+    contexto: Contexto,
+    pedido: Pedido,
+    usuario: Usuario,
+    ja_avaliou: bool = False,
+    categorias: Mapping[str, str] | None = None,
 ) -> PedidoOut:
-    """`pedido_out` mais o título do serviço e, para o profissional, o nome do cliente."""
+    """`pedido_out` mais o título do serviço, o nome da categoria e, para o profissional, o nome
+    do cliente. `ja_avaliou` vale para quem consulta (lista e detalhe)."""
+    if not ja_avaliou and pedido.estado is Estado.CONCLUIDO:
+        ja_avaliou = _ja_avaliou(contexto, pedido, usuario)
     saida = pedido_out(pedido, usuario, ja_avaliou)
     try:
         dados = contexto.pedidos.dados_do_pedido(pedido.id)
     except Exception:  # noqa: BLE001 - sem os dados, o app mostra o número do pedido
         dados = None
     titulo = (dados.titulo or "").strip() if dados is not None else ""
+    categoria_nome = (categorias or {}).get(str(dados.categoria_id)) if dados is not None else None
     cliente_nome = None
     profissional_nome = None
     if pedido.profissional_id == usuario.id and pedido.cliente_id != usuario.id:
@@ -93,6 +131,7 @@ def pedido_out_completo(
     return saida.model_copy(
         update={
             "titulo": titulo or None,
+            "categoria_nome": categoria_nome,
             "cliente_nome": cliente_nome,
             "profissional_nome": profissional_nome,
             "contratado_em": contratado_em,

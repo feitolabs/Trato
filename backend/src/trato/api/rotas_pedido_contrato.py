@@ -26,6 +26,7 @@ from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_evento, avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.localizacao import na_grade
 from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
 from trato.api.moedas import (
     MOTIVO_ORCAMENTO_ESGOTADO,
@@ -1422,13 +1423,13 @@ def _saida_aberto(
     usuario_id: str | None = None,
 ) -> PedidoAbertoOut:
     km = None
-    if (
-        lat is not None
-        and lng is not None
-        and p.local_aprox_lat is not None
-        and p.local_aprox_lng is not None
-    ):
-        km = round(_distancia_km(lat, lng, p.local_aprox_lat, p.local_aprox_lng), 1)
+    # MAP-1: mesmo para pedido já salvo, o servidor devolve só a grade de ~500 m (nunca o ponto
+    # exato) e o remoto nunca devolve ponto. A distância usa o ponto já encaixado.
+    remoto = p.modalidade == "remoto"
+    ponto_lat = None if remoto else na_grade(p.local_aprox_lat)
+    ponto_lng = None if remoto else na_grade(p.local_aprox_lng)
+    if lat is not None and lng is not None and ponto_lat is not None and ponto_lng is not None:
+        km = round(_distancia_km(lat, lng, ponto_lat, ponto_lng), 1)
     nome = None
     if contexto is not None and p.cliente_id:
         detalhe = contexto.usuarios.detalhe(p.cliente_id)
@@ -1436,6 +1437,7 @@ def _saida_aberto(
         if partes:
             nome = partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
     campos = {k: v for k, v in vars(p).items() if k != "convidado"}
+    campos["local_aprox_lat"], campos["local_aprox_lng"] = ponto_lat, ponto_lng
     return PedidoAbertoOut(
         **campos,
         distancia_km=km,

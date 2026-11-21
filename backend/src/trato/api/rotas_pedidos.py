@@ -53,7 +53,13 @@ from trato.api.modelos import (
 )
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
 from trato.api.rotas_upload import urls_fotos_do_pedido
-from trato.api.servicos import ator_de, carregar_pedido, pedido_out, pedido_out_completo
+from trato.api.servicos import (
+    ator_de,
+    carregar_pedido,
+    nomes_de_categorias,
+    pedido_out,
+    pedido_out_completo,
+)
 from trato.financeiro.ledger import taxa_descontada
 from trato.garantias import (
     ErroRetrabalho,
@@ -308,13 +314,15 @@ def abrir_pedido(
 
 @router.get("", response_model=list[PedidoOut], summary="Meus pedidos")
 def listar_pedidos(
+    request: Request,
     como: str | None = None,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[PedidoOut]:
     como_cliente = (como == "cliente") if como else (usuario.papel is PapelUsuario.CLIENTE)
     achados = contexto.pedidos.listar_do_usuario(usuario.id, como_cliente)
-    return [pedido_out_completo(contexto, p, usuario) for p in achados]
+    categorias = nomes_de_categorias(request)
+    return [pedido_out_completo(contexto, p, usuario, categorias=categorias) for p in achados]
 
 
 @router.get("/{pedido_id}", response_model=PedidoOut, summary="Ver pedido")
@@ -335,7 +343,9 @@ def ver_pedido(
             else "profissional_para_cliente"
         )
         ja_avaliou = contexto.avaliacoes.obter(pedido.id, direcao) is not None
-    return pedido_out_completo(contexto, pedido, usuario, ja_avaliou)
+    return pedido_out_completo(
+        contexto, pedido, usuario, ja_avaliou, categorias=nomes_de_categorias(request)
+    )
 
 
 def _dados_out(

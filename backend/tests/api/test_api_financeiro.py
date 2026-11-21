@@ -18,6 +18,7 @@ def test_saldo_do_pedido_vem_do_ledger(amb):
         "retido_centavos": 0,
         "a_liberar_centavos": 92_500,
         "liberado_centavos": 0,
+        "liberacao_prevista_em": None,  # B21: pedido ainda não concluído
     }
 
 

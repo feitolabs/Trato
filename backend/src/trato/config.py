@@ -46,6 +46,9 @@ class Config(BaseSettings):
     stripe_secret_key: SecretStr = SecretStr("")
     stripe_publishable_key: str = ""
     stripe_webhook_secret: SecretStr = SecretStr("")
+    # Liga o Pix no app (`pix_disponivel`). Só vira true depois que o Pix estiver ativo no painel do
+    # Stripe. Fly/env: TRATO_PIX_HABILITADO=true. Padrão: desligado.
+    trato_pix_habilitado: bool = False
 
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000

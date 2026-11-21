@@ -55,6 +55,7 @@ from trato.financeiro.ledger import (
     separar_custo_parcelamento,
 )
 from trato.financeiro.repasses import repasse_dos_lancamentos
+from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import confirmar_uso_cupom
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.memoria import OrdensEstornoEmMemoria
@@ -370,6 +371,7 @@ class ServicoPagamento:
             if aditivo is None or aditivo.estado is EstadoAditivo.PROPOSTO:
                 return self._devolver_pagamento_orfao(cobranca)
             self.aditivos.salvar(replace(aditivo, estado=EstadoAditivo.PAGO))
+            self._avisar_aditivo_pago(contexto, cobranca, aditivo.id)
         else:
             if pedido is None:
                 return self._devolver_pagamento_orfao(cobranca)
@@ -442,6 +444,24 @@ class ServicoPagamento:
                 confirmado_em=agora,
                 forcar_limite_usuario=True,  # desconto já dado: o uso nunca se perde
             )
+
+    @staticmethod
+    def _avisar_aditivo_pago(contexto: Contexto, cobranca: CobrancaLocal, aditivo_id: str) -> None:
+        """Avisa o profissional (uma vez por aditivo). Aviso é secundário: nunca derruba o
+        webhook nem toca no dinheiro."""
+        try:
+            notificador = contexto.extras.get("notificador") if contexto.extras else None
+            pedido = contexto.pedidos.obter(cobranca.pedido_id)
+            if notificador is None or pedido is None or not pedido.profissional_id:
+                return
+            notificador.notificar(
+                Evento.ADITIVO_PAGO,
+                pedido.profissional_id,
+                chave=f"aditivo-pago:{aditivo_id}",
+                pedido_id=pedido.id,
+            )
+        except Exception:  # noqa: BLE001 - aviso é secundário
+            logging.getLogger("trato.pagamentos").exception("Aviso de aditivo pago falhou")
 
     def _moedas_do_pagamento(
         self,
