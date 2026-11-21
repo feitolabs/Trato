@@ -167,5 +167,11 @@ jobs:
         run: |
           python -m venv /tmp/audit
           /tmp/audit/bin/python -m pip install --upgrade pip
+          # O pacote do próprio Trato não existe no PyPI: com `--local` o pip-audit falhava com
+          # "Dependency not found on PyPI", e com --strict o `--skip-editable` também vira erro.
+          # Por isso audita-se a lista congelada (versões exatas) de tudo o que está instalado,
+          # menos o trato-backend. Todas as dependências de terceiros continuam auditadas, e
+          # --strict continua ligado.
           /tmp/audit/bin/python -m pip install "pip-audit==2.9.0" ./backend
-          /tmp/audit/bin/pip-audit --local --strict
+          /tmp/audit/bin/python -m pip freeze --exclude-editable --exclude trato-backend > /tmp/audit/requisitos.txt
+          /tmp/audit/bin/pip-audit -r /tmp/audit/requisitos.txt --no-deps --disable-pip --strict

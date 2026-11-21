@@ -33,6 +33,17 @@ PADROES_SEGREDO = {
         r"(?i)\b(password|senha|secret|api_key|apikey|token)\b\s*[:=]\s*['\"][^'\"\s]{6,}['\"]"
     ),
 }
+# Exceções estreitas da varredura de segredos (arquivo + padrão + formato exato da linha).
+# Só valem para a senha de uma CONTA DE TESTE em testes do app: chamada `entrarComEmail` com e-mail
+# de domínio teste.com e senha no formato palavra-palavra-dígito (veja a regex abaixo). A varredura
+# continua ligada para todo o resto, inclusive para o restante desses mesmos arquivos.
+_LINHA_LOGIN_DE_TESTE = re.compile(
+    r"entrarComEmail\(\s*email:\s*'[^'\s]+@teste\.com',\s*senha:\s*'[a-z]+-[a-z]+-\d'\s*\)"
+)
+EXCECOES_SEGREDO: dict[tuple[str, str], re.Pattern[str]] = {
+    ("app/test/dados/fluxo_ligado_test.dart", "senha atribuída"): _LINHA_LOGIN_DE_TESTE,
+    ("app/test/qa_correcoes_test.dart", "senha atribuída"): _LINHA_LOGIN_DE_TESTE,
+}
 EXTENSOES_BINARIAS = {
     ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".ttf", ".otf", ".woff", ".woff2",
     ".apk", ".aab", ".ipa", ".so", ".jar", ".zip", ".gz", ".wasm", ".symbols",
@@ -68,6 +79,9 @@ def checar_segredos() -> bool:
                 continue
             for nome, padrao in PADROES_SEGREDO.items():
                 if padrao.search(linha):
+                    excecao = EXCECOES_SEGREDO.get((arquivo.relative_to(RAIZ).as_posix(), nome))
+                    if excecao is not None and excecao.search(linha):
+                        continue
                     print(f"FALHA: possível {nome} em {arquivo.relative_to(RAIZ)}:{numero}")
                     ok = False
     if ok:
