@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +21,7 @@ class CupomAplicado:
     servico_com_desconto_centavos: int
 
 
+log = logging.getLogger(__name__)
 _TRAVA_USO_CUPOM = threading.RLock()  # atomicidade do uso de cupom no ramo em memória
 
 
@@ -47,6 +49,17 @@ def _buscar_cupom(contexto: Contexto, codigo: str) -> dict[str, Any] | None:
         return None
     achado = cupons.get(codigo)
     return dict(achado) if isinstance(achado, dict) else None
+
+
+def limite_por_usuario_do_cupom(contexto: Contexto, codigo: str) -> int | None:
+    """`limite_por_usuario` do cupom (None: sem limite ou cupom desconhecido)."""
+    dados = _buscar_cupom(contexto, codigo.strip().upper())
+    bruto = dados.get("limite_por_usuario") if dados else None
+    return int(bruto) if bruto is not None else None
+
+
+def usos_do_usuario_do_cupom(contexto: Contexto, codigo: str, usuario_id: str) -> int:
+    return _usos_do_usuario(contexto, codigo.strip().upper(), usuario_id)
 
 
 def _usos_do_usuario(contexto: Contexto, codigo: str, usuario_id: str) -> int:
@@ -177,8 +190,13 @@ def confirmar_uso_cupom(
     pedido_id: str,
     desconto_centavos: int = 0,
     confirmado_em: datetime | None = None,
+    forcar_limite_usuario: bool = False,
 ) -> bool:
-    """Contabiliza uso de cupom somente após webhook confirmado e de forma idempotente."""
+    """Contabiliza uso de cupom somente após webhook confirmado e de forma idempotente.
+
+    `forcar_limite_usuario`: o desconto já foi dado ao cliente (pagamento confirmado); o uso é
+    registrado mesmo acima de `limite_por_usuario`, com alerta no log. Nunca perde o registro.
+    """
     codigo = codigo_bruto.strip().upper()
     if not codigo or not cobranca_id:
         return False
@@ -204,7 +222,13 @@ def confirmar_uso_cupom(
                     (codigo, uid, cobranca_id),
                 ).fetchone()
                 if int(ja_usou["total"] or 0) >= int(existe["limite_por_usuario"]):
-                    return False
+                    if not forcar_limite_usuario:
+                        return False
+                    log.warning(
+                        "cupom %s: limite por usuário estourado (cobranca %s); uso registrado",
+                        codigo,
+                        cobranca_id,
+                    )
             gravado = con.execute(
                 "INSERT INTO public.cupom_usos "
                 "(cupom_codigo, usuario_id, cobranca_id, pedido_id, desconto_centavos, "
@@ -238,7 +262,13 @@ def confirmar_uso_cupom(
         limite_usuario = cup.get("limite_por_usuario") if isinstance(cup, dict) else None
         if limite_usuario is not None and usuario_id:
             if _usos_do_usuario(contexto, codigo, usuario_id) >= int(limite_usuario):
-                return False
+                if not forcar_limite_usuario:
+                    return False
+                log.warning(
+                    "cupom %s: limite por usuário estourado (cobranca %s); uso registrado",
+                    codigo,
+                    cobranca_id,
+                )
         if not registrar_uso_cupom(contexto, codigo):
             return False
         if isinstance(usos, dict):

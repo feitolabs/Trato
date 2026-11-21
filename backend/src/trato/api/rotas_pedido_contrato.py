@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import date, datetime
+import threading
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -38,7 +39,11 @@ from trato.api.rotas_pedidos import respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.api.visibilidade import pedido_visivel_ao_profissional
-from trato.pagamentos.cupons import validar_e_calcular_cupom
+from trato.pagamentos.cupons import (
+    limite_por_usuario_do_cupom,
+    usos_do_usuario_do_cupom,
+    validar_e_calcular_cupom,
+)
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
@@ -62,6 +67,11 @@ from trato.seguranca.texto_livre import limpar_texto
 router = APIRouter(prefix="/v1", tags=["app"])
 
 TETO_CENTAVOS = 10**10
+TETO_NOTA_MATERIAL_CENTAVOS = 100_000_000  # R$ 1.000.000,00 (mesmo teto do app)
+MAX_QUANTIDADE_ITEM_NOTA = 9999
+JANELA_NOTA_DUPLICADA = timedelta(seconds=60)
+_TRAVA_COBRANCA_CUPOM = threading.RLock()  # reserva do uso do cupom: checar+cobrar atômicos
+_TRAVA_NOTA_MATERIAL = threading.RLock()  # check+gravação da nota atômicos (em memória)
 ESTADOS_COBRAVEIS = (Estado.ORCAMENTO_ACEITO, Estado.AGUARDANDO_CONFIRMACAO)
 
 
@@ -263,7 +273,7 @@ class AprovarAditivoContratoIn(_Entrada):
 
 class ItemNotaIn(_Entrada):
     descricao: str = Field(min_length=1, max_length=200)
-    quantidade: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
+    quantidade: Decimal = Field(gt=0, le=MAX_QUANTIDADE_ITEM_NOTA, max_digits=10, decimal_places=2)
     valor_unitario_centavos: StrictInt = Field(ge=0, le=TETO_CENTAVOS)
 
 
@@ -439,6 +449,19 @@ def criar_cobranca(
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> CobrancaContratoOut | JSONResponse:
+    if corpo.cupom and corpo.cupom.strip():
+        with _TRAVA_COBRANCA_CUPOM:
+            return _criar_cobranca(contrato_id, corpo, request, usuario, contexto)
+    return _criar_cobranca(contrato_id, corpo, request, usuario, contexto)
+
+
+def _criar_cobranca(
+    contrato_id: str,
+    corpo: CobrarContratoIn,
+    request: Request,
+    usuario: Usuario,
+    contexto: Contexto,
+) -> CobrancaContratoOut | JSONResponse:
     servico = _servico(request)
     pedido, contrato = _contrato_do_usuario(contexto, contrato_id, usuario)
     if pedido.cliente_id != usuario.id:
@@ -462,7 +485,10 @@ def criar_cobranca(
             )
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from None
-        valor_servico = aplicado.servico_com_desconto_centavos
+        if _cupom_ja_reservado(contexto, servico, usuario.id, pedido.id, aplicado.codigo):
+            aplicado = None  # o uso permitido já está reservado por outra cobrança pendente
+        else:
+            valor_servico = aplicado.servico_com_desconto_centavos
     desconto_total = aplicado.desconto_centavos if aplicado else 0
     moedas_usadas = 0
     valor_sem_moedas, desconto_sem_moedas = valor_servico, desconto_total
@@ -859,6 +885,25 @@ def _nota_out(nota: NotaMaterial, servico_uploads: object | None = None) -> Nota
     )
 
 
+def _cupom_ja_reservado(
+    contexto: Contexto, servico: Any, usuario_id: str, pedido_id: str, codigo: str
+) -> bool:
+    """Cobrança com cupom pendente reserva o uso: respeita `limite_por_usuario` já na criação."""
+    limite = limite_por_usuario_do_cupom(contexto, codigo)
+    if limite is None:
+        return False
+    pendentes = 0
+    for outro in contexto.pedidos.listar_do_usuario(usuario_id, True, limite=200):
+        if outro.id == pedido_id:
+            continue
+        pendentes += sum(
+            1
+            for c in servico.cobrancas.do_pedido(outro.id)
+            if c.status is EstadoCobranca.AGUARDANDO and c.cupom_codigo == codigo
+        )
+    return pendentes + usos_do_usuario_do_cupom(contexto, codigo, usuario_id) >= limite
+
+
 @router.post(
     "/contratos/{contrato_id}/notas-material",
     response_model=NotaMaterialOut,
@@ -896,19 +941,21 @@ def enviar_nota_material(
             )
         )
     total_nota = sum(t for *_, t in linhas)
-    if total_nota > TETO_CENTAVOS:
+    if total_nota > TETO_NOTA_MATERIAL_CENTAVOS:
         raise HTTPException(422, "O total da nota é alto demais.")
-    nota = contexto.notas_material.registrar(
-        NotaMaterial(
-            "",
-            pedido.id,
-            usuario.id,
-            foto,
-            tuple(linhas),
-            total_nota,
-            contexto.agora(),
-        )  # fmt: skip
-    )
+    agora = contexto.agora()
+    with _TRAVA_NOTA_MATERIAL:
+        for antiga in contexto.notas_material.do_pedido(pedido.id):
+            if (
+                antiga.profissional_id == usuario.id
+                and antiga.foto_storage_path == foto
+                and tuple(antiga.itens) == tuple(linhas)
+                and timedelta(0) <= agora - antiga.enviada_em < JANELA_NOTA_DUPLICADA
+            ):
+                raise HTTPException(409, "Esta nota já foi enviada.")
+        nota = contexto.notas_material.registrar(
+            NotaMaterial("", pedido.id, usuario.id, foto, tuple(linhas), total_nota, agora)
+        )
     return _nota_out(nota, getattr(request.app.state, "servico_uploads", None))
 
 
