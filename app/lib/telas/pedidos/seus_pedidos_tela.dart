@@ -53,9 +53,8 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
                 p,
           ];
     final recarregar = AtualizadorTela.de(context);
-    final mostrarBusca = widget.emAndamento.isNotEmpty ||
-        widget.finalizados.isNotEmpty ||
-        _busca.text.isNotEmpty;
+    final mostrarBusca =
+        widget.emAndamento.isNotEmpty || widget.finalizados.isNotEmpty || _busca.text.isNotEmpty;
 
     final lista = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -94,9 +93,8 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
         if (pedidosDaAba.isEmpty)
           EstadoVazio(
             icone: _verFinalizados ? Icons.task_alt_outlined : Icons.assignment_outlined,
-            titulo: _verFinalizados
-                ? 'Nenhum serviço finalizado ainda'
-                : 'Nenhum pedido em andamento',
+            titulo:
+                _verFinalizados ? 'Nenhum serviço finalizado ainda' : 'Nenhum pedido em andamento',
             texto: _verFinalizados
                 ? 'Os serviços concluídos ou cancelados aparecem aqui.'
                 : 'Toque em "Início" e peça um orçamento para começar.',
@@ -123,9 +121,7 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
-          child: recarregar == null
-              ? lista
-              : RefreshIndicator(onRefresh: recarregar, child: lista),
+          child: recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista),
         ),
       ),
     );
@@ -240,11 +236,17 @@ class _CartaoPedido extends StatelessWidget {
               ChipStatus(texto: pedido.statusTexto, tipo: pedido.statusTipo),
               if (pedido.remoto)
                 const ChipStatus(
-                              key: ValueKey('selo-remoto'),
-                              texto: 'Remoto',
-                              tipo: TipoStatus.info,
-                              icone: Icons.videocam_outlined,
-                            ),
+                  key: ValueKey('selo-remoto'),
+                  texto: 'Remoto',
+                  tipo: TipoStatus.info,
+                  icone: Icons.videocam_outlined,
+                ),
+              if (pedido.urgente)
+                const ChipStatus(
+                  key: ValueKey('selo-urgente'),
+                  texto: 'Urgente',
+                  tipo: TipoStatus.destaque,
+                ),
             ],
           ),
         ],

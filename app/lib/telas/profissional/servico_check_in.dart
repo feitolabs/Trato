@@ -20,6 +20,11 @@ enum ResultadoInicio {
   guardadoOffline,
 }
 
+/// Implementado pelos serviços que guardam check-in/check-out na fila offline.
+abstract interface class ReenvioOffline {
+  Future<int> reenviarPendentes();
+}
+
 /// Porta entre a tela de check-in e câmera, GPS e backend. Nenhuma validação de prova
 /// acontece no app (escopo 4): o app captura e envia; o backend decide.
 abstract interface class ServicoCheckIn {

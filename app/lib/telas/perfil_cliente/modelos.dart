@@ -48,6 +48,7 @@ class PerfilCliente {
     this.moedasVenceEm,
     this.tetoDescontoMesCentavos,
     this.descontoUsadoMesCentavos,
+    this.exclusaoAgendadaEm,
   });
 
   /// Tratinhos de avaliação ainda em espera (valem 7 dias depois, sem disputa) e a data em que
@@ -76,4 +77,7 @@ class PerfilCliente {
   final String resumo;
   final List<GrupoPerfil> grupos;
   final String? fotoReferencia;
+
+  /// Data prevista de exclusão da conta (LGPD), quando houver pedido pendente.
+  final DateTime? exclusaoAgendadaEm;
 }

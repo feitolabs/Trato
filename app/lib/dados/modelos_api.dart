@@ -4,8 +4,9 @@ library;
 
 import '../telas/comuns/formato_aparelho.dart';
 
-DateTime _data(Object? valor) => DateTime.parse(valor! as String);
-DateTime? _dataOuNulo(Object? valor) => valor == null ? null : DateTime.parse(valor as String);
+DateTime _data(Object? valor) => DateTime.parse(valor! as String).toLocal();
+DateTime? _dataOuNulo(Object? valor) =>
+    valor == null ? null : DateTime.parse(valor as String).toLocal();
 
 class PedidoApi {
   const PedidoApi({
@@ -31,10 +32,14 @@ class PedidoApi {
     this.pagamentoConfirmado = false,
     this.contratadoEm,
     this.checkOutSemCodigo = false,
+    this.urgente = false,
   });
 
   /// Verdadeiro quando o profissional concluiu o check-out sem código (Plano B).
   final bool checkOutSemCodigo;
+
+  /// Pedido marcado como urgente pelo cliente.
+  final bool urgente;
 
   /// Quando o cliente aceitou o orçamento.
   final DateTime? contratadoEm;
@@ -96,6 +101,7 @@ class PedidoApi {
         codigoInicio: j['codigo_inicio'] as String?,
         codigoConclusao: j['codigo_conclusao'] as String?,
         checkOutSemCodigo: j['check_out_sem_codigo'] == true,
+        urgente: j['urgente'] == true,
       );
 
   final String id;

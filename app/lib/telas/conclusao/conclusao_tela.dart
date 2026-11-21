@@ -78,10 +78,14 @@ class _ConclusaoTelaState extends State<ConclusaoTela> {
         ),
         const SizedBox(height: EspacosTrato.x2),
         Text(
-          resumo.checkOutSemCodigo
-              ? 'O profissional encerrou sem o código de conclusão e enviou a foto final. '
-                  'Confira antes de liberar o pagamento.'
-              : 'Confira as fotos e o resultado antes de confirmar.',
+          resumo.remoto
+              ? (resumo.checkOutSemCodigo
+                  ? 'O profissional encerrou sem o código de conclusão. Confira o resultado antes de liberar o pagamento.'
+                  : 'Confira o resultado antes de confirmar.')
+              : (resumo.checkOutSemCodigo
+                  ? 'O profissional encerrou sem o código de conclusão e enviou a foto final. '
+                      'Confira antes de liberar o pagamento.'
+                  : 'Confira as fotos e o resultado antes de confirmar.'),
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
         if (resumo.checkOutSemCodigo) ...[
@@ -92,27 +96,30 @@ class _ConclusaoTelaState extends State<ConclusaoTela> {
             icone: Icons.info_outline,
           ),
         ],
-        const SizedBox(height: EspacosTrato.x5),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _FotoComHora(
-                foto: resumo.fotoAntes ?? (resumo.fotosCarregadas ? 'Sem foto' : '[Foto antes]'),
-                referencia: resumo.fotoAntes,
-                hora: resumo.legendaFotoAntes,
+        if (!resumo.remoto) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _FotoComHora(
+                  foto: resumo.fotoAntes ?? (resumo.fotosCarregadas ? 'Sem foto' : '[Foto antes]'),
+                  referencia: resumo.fotoAntes,
+                  hora: resumo.legendaFotoAntes,
+                ),
               ),
-            ),
-            const SizedBox(width: EspacosTrato.x2),
-            Expanded(
-              child: _FotoComHora(
-                foto: resumo.fotoDepois ?? (resumo.fotosCarregadas ? 'Sem foto' : '[Foto depois]'),
-                referencia: resumo.fotoDepois,
-                hora: resumo.legendaFotoDepois,
+              const SizedBox(width: EspacosTrato.x2),
+              Expanded(
+                child: _FotoComHora(
+                  foto:
+                      resumo.fotoDepois ?? (resumo.fotosCarregadas ? 'Sem foto' : '[Foto depois]'),
+                  referencia: resumo.fotoDepois,
+                  hora: resumo.legendaFotoDepois,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         CartaoTrato(
           child: Column(

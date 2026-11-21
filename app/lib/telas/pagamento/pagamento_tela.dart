@@ -48,6 +48,7 @@ class PagamentoTela extends StatefulWidget {
 class _PagamentoTelaState extends State<PagamentoTela> {
   late DadosPagamento _dados = widget.dados;
   late MetodoPagamento? _metodo = _metodoInicial(widget.dados);
+
   /// Começa no cartão: o Pix nunca vem pré-selecionado.
   static MetodoPagamento? _metodoInicial(DadosPagamento d) {
     if (d.opcoes.isEmpty) return null;
@@ -310,9 +311,10 @@ class _PagamentoTelaState extends State<PagamentoTela> {
     final comoPagar = _metodo == MetodoPagamento.pix
         ? 'com Pix'
         : (parcelaSel != null ? 'em ${parcelaSel.parcelas}x no cartão' : 'com cartão');
-    final mostrarCupom = widget.aoAplicarCupom != null ||
-        dados.descontoCentavos > 0 ||
-        (dados.cupomCodigo ?? '').isNotEmpty;
+    final cupomAplicado =
+        (dados.cupomCodigo ?? '').isNotEmpty || (dados.descontoCupomCentavos ?? 0) > 0;
+    final mostrarCupom =
+        widget.aoAplicarCupom != null || dados.descontoCentavos > 0 || cupomAplicado;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -479,7 +481,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                                   ),
                                 ),
                                 const SizedBox(width: EspacosTrato.x2),
-                                if (dados.descontoCentavos > 0)
+                                if (cupomAplicado)
                                   TextButton(
                                     key: const Key('botao-remover-cupom'),
                                     onPressed: _aplicandoCupom ? null : _removerCupom,
@@ -560,7 +562,8 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                             _erroPagamento!,
                             key: const Key('erro-pagamento'),
                             textAlign: TextAlign.center,
-                            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                            style: TipografiaTrato.corpoPequeno
+                                .copyWith(color: CoresTrato.vermelhoTexto),
                           ),
                         ),
                         const SizedBox(height: EspacosTrato.x2),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Directory, File, Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -38,8 +39,7 @@ import '../catalogo/avaliacoes_profissional_tela.dart';
 import '../catalogo/categoria_tela.dart';
 import '../catalogo/todas_categorias_tela.dart';
 import '../cliente/inicio_tela.dart';
-import '../cliente/modelos.dart'
-    show CategoriaServico, DadosInicio, Profissional;
+import '../cliente/modelos.dart' show CategoriaServico, DadosInicio, Profissional;
 import '../legal/texto_legal_tela.dart';
 import '../mensagens/modelos.dart' show ConversaResumo, ServicoMensagens;
 import '../mensagens/servico_conversas.dart' show ServicoConversasApi;
@@ -130,8 +130,7 @@ abstract final class RotasTrato {
   static FolhaCartao folhaCartao = FolhaCartaoFake();
 
   @visibleForTesting
-  static Future<String> Function(List<int> bytes, String arquivo)?
-      salvarPdfParaTeste;
+  static Future<String> Function(List<int> bytes, String arquivo)? salvarPdfParaTeste;
 
   /// Compartilhamento do arquivo salvo (os testes trocam pelo falso).
   @visibleForTesting
@@ -146,16 +145,13 @@ abstract final class RotasTrato {
     if (!repos.modoApi || !temSessao) return;
     _subPush ??= push.aoAtualizarToken.listen((t) {
       push.ultimoTokenRegistrado = t.token;
-      repos.notificacoes
-          .registrarDispositivo(t.token, t.plataforma)
-          .catchError((_) {});
+      repos.notificacoes.registrarDispositivo(t.token, t.plataforma).catchError((_) {});
     });
     try {
       final atual = await push.obterToken();
       if (atual != null) {
         push.ultimoTokenRegistrado = atual.token;
-        await repos.notificacoes
-            .registrarDispositivo(atual.token, atual.plataforma);
+        await repos.notificacoes.registrarDispositivo(atual.token, atual.plataforma);
       }
     } on Object {
       // Sem push nativo configurado (ex.: navegador/desktop/teste): segue normalmente.
@@ -185,14 +181,12 @@ abstract final class RotasTrato {
   }) {
     final servico = profissional
         ? (repos.mensagensProfissional ??
-            ServicoMensagensDoProfissional(repos.profissional,
-                chat: repos.chat))
+            ServicoMensagensDoProfissional(repos.profissional, chat: repos.chat))
         : _servicoMensagens;
     unawaited(() async {
       try {
         final lista = await servico.listar();
-        mensagensNaoLidas.value =
-            lista.fold<int>(0, (soma, item) => soma + item.naoLidas);
+        mensagensNaoLidas.value = lista.fold<int>(0, (soma, item) => soma + item.naoLidas);
       } on Object {
         // Atualização de badge em segundo plano não bloqueia a tela.
       }
@@ -208,14 +202,12 @@ abstract final class RotasTrato {
   /// Verdadeiro quando o usuário pulou o onboarding sem entrar, ou em modo API sem sessão.
   static bool modoVisitante = false;
 
-  static bool get emModoVisitante =>
-      modoVisitante || (repos.modoApi && !temSessao);
+  static bool get emModoVisitante => modoVisitante || (repos.modoApi && !temSessao);
 
   /// Nota de materiais, aditivo e disputa vêm sempre da API (`repos`).
   static ServicoNotaMaterial get servicoNota => repos.notaMaterial!;
   static ServicoAditivo get servicoAditivo => repos.aditivo!;
-  static ServicoDisputaProfissional get servicoDisputa =>
-      repos.disputaProfissional!;
+  static ServicoDisputaProfissional get servicoDisputa => repos.disputaProfissional!;
 
   /// Busca por texto: pede ao catálogo (modo `api`: demonstração até a rota de busca existir).
   static ServicoBusca get servicoBusca => _ServicoBuscaCatalogo(repos.catalogo);
@@ -223,13 +215,11 @@ abstract final class RotasTrato {
   /// Lista de conversas da aba Mensagens. No modo `api` vem de `GET /v1/conversas` (todas as
   /// conversas, antes e depois de contratar); na demonstração, a lista montada dos pedidos.
   static ServicoMensagens get _servicoMensagens =>
-      repos.mensagens ??
-      ServicoMensagensDosPedidos(repos.pedidos, chat: repos.chat);
+      repos.mensagens ?? ServicoMensagensDosPedidos(repos.pedidos, chat: repos.chat);
 
   /// Intervalo da atualização automática das telas. Só no modo `api` (na demonstração e nos
   /// testes os dados não mudam sozinhos e não há por que manter relógios ligados).
-  static Duration? get _intervalo =>
-      repos.modoApi ? RelogioDeAtualizacao.intervaloPadrao : null;
+  static Duration? get _intervalo => repos.modoApi ? RelogioDeAtualizacao.intervaloPadrao : null;
 
   /// Sessão do cliente HTTP, para o "Sair" limpar o token. O `main.dart` liga.
   static SessaoTrato? sessao;
@@ -243,10 +233,9 @@ abstract final class RotasTrato {
   /// Avisa a lista de pedidos que ela precisa recarregar (criou pedido, mexeu num pedido).
   static final ValueNotifier<int> pedidosMudaram = ValueNotifier<int>(0);
 
-  static Future<T?> _abrir<T>(BuildContext context, Widget tela) =>
-      Navigator.of(context)
-          .push(MaterialPageRoute<T>(builder: (_) => tela))
-          .whenComplete(() => pedidosMudaram.value++);
+  static Future<T?> _abrir<T>(BuildContext context, Widget tela) => Navigator.of(context)
+      .push(MaterialPageRoute<T>(builder: (_) => tela))
+      .whenComplete(() => pedidosMudaram.value++);
 
   static void _voltarAoInicio(
     BuildContext context, {
@@ -268,9 +257,7 @@ abstract final class RotasTrato {
     final rota = MaterialPageRoute<T>(
       builder: (ctxSucesso) => construtor(ctxSucesso),
     );
-    return (substituirAtual
-            ? nav.pushReplacement<T, void>(rota)
-            : nav.push<T>(rota))
+    return (substituirAtual ? nav.pushReplacement<T, void>(rota) : nav.push<T>(rota))
         .whenComplete(() => pedidosMudaram.value++);
   }
 
@@ -292,8 +279,7 @@ abstract final class RotasTrato {
   }
 
   /// Faz uma chamada e, se der erro, avisa em português simples. Devolve se deu certo.
-  static Future<bool> _tentar(
-      BuildContext context, Future<void> Function() acao) async {
+  static Future<bool> _tentar(BuildContext context, Future<void> Function() acao) async {
     try {
       await acao();
       return true;
@@ -333,8 +319,7 @@ abstract final class RotasTrato {
                 'Os profissionais de ${rascunho.modalidade.name == 'remoto' ? 'qualquer região' : 'sua região'} foram notificados e você já pode acompanhar os orçamentos.',
             textoBotaoPrimario: 'Ver pedidos',
             aoTocarPrimario: () => Navigator.of(ctxSucesso).pushAndRemoveUntil(
-              MaterialPageRoute<void>(
-                  builder: (_) => const CascaClienteTela(abaInicial: 2)),
+              MaterialPageRoute<void>(builder: (_) => const CascaClienteTela(abaInicial: 2)),
               (rota) => false,
             ),
             textoBotaoSecundario: 'Voltar ao início',
@@ -409,8 +394,7 @@ abstract final class RotasTrato {
 
   /// Perfil público de quem enviou o orçamento. Com o id do profissional (API), abre direto;
   /// sem ele, procura pelo nome no catálogo.
-  static Future<void> abrirPerfilDoOrcamento(
-      BuildContext context, Orcamento o) async {
+  static Future<void> abrirPerfilDoOrcamento(BuildContext context, Orcamento o) async {
     if (o.profissionalId != null) {
       abrirPerfil(
         context,
@@ -431,11 +415,9 @@ abstract final class RotasTrato {
   }
 
   /// Procura o profissional pelo nome no catálogo; sem perfil, avisa em vez de abrir tela vazia.
-  static Future<void> abrirPerfilProfissional(
-      BuildContext context, String nome) async {
+  static Future<void> abrirPerfilProfissional(BuildContext context, String nome) async {
     var achados = <Profissional>[];
-    final ok = await _tentar(
-        context, () async => achados = await repos.catalogo.buscar(nome));
+    final ok = await _tentar(context, () async => achados = await repos.catalogo.buscar(nome));
     if (!ok) return;
     final p = achados.where((x) => x.nome == nome).firstOrNull;
     if (p == null) {
@@ -450,9 +432,8 @@ abstract final class RotasTrato {
   static void abrirPerfil(BuildContext context, Profissional p) => _abrir<void>(
         context,
         Carregador<Profissional>(
-          carregar: () async => p.detalhe != null || p.id == null
-              ? p
-              : await repos.catalogo.perfil(p.id!),
+          carregar: () async =>
+              p.detalhe != null || p.id == null ? p : await repos.catalogo.perfil(p.id!),
           vazio: (perfil) => perfil.detalhe == null,
           tituloVazio: 'Perfil indisponível',
           textoVazio: 'Este perfil ainda não tem as informações completas.',
@@ -461,29 +442,25 @@ abstract final class RotasTrato {
             final ehProprio = meuId != null && perfil.id == meuId;
             return PerfilProfissionalTela(
               profissional: perfil,
-              aoPedirOrcamento:
-                  ehProprio ? null : (x) => _pedirOrcamentoA(context, x),
+              aoPedirOrcamento: ehProprio ? null : (x) => _pedirOrcamentoA(context, x),
               aoVerAvaliacoes: (x) => _abrir<void>(
                 context,
                 AvaliacoesProfissionalTela(profissional: x),
               ),
               favoritoAtual: perfil.id == null || ehProprio
                   ? null
-                  : () async => (await _conta.favoritos())
-                      .any((f) => f.profissionalId == perfil.id),
+                  : () async =>
+                      (await _conta.favoritos()).any((f) => f.profissionalId == perfil.id),
               aoMudarFavorito: perfil.id == null || ehProprio
                   ? null
-                  : (v) => v
-                      ? _conta.favoritar(perfil.id!)
-                      : _conta.desfavoritar(perfil.id!),
+                  : (v) => v ? _conta.favoritar(perfil.id!) : _conta.desfavoritar(perfil.id!),
             );
           },
         ),
       );
 
   /// "Pedir orçamento" no perfil: abre o Novo pedido na categoria do profissional (direcionado a ele).
-  static Future<void> _pedirOrcamentoA(
-      BuildContext context, Profissional p) async {
+  static Future<void> _pedirOrcamentoA(BuildContext context, Profissional p) async {
     CategoriaServico? categoria;
     final ok = await _tentar(context, () async {
       final todas = await repos.catalogo.categorias();
@@ -492,8 +469,7 @@ abstract final class RotasTrato {
       }
       if (categoria == null && p.especialidade.trim().isNotEmpty) {
         final esp = p.especialidade.toLowerCase();
-        categoria =
-            todas.where((c) => esp.contains(c.nome.toLowerCase())).firstOrNull;
+        categoria = todas.where((c) => esp.contains(c.nome.toLowerCase())).firstOrNull;
       }
     });
     if (!ok || !context.mounted) return;
@@ -516,12 +492,10 @@ abstract final class RotasTrato {
         context,
         categoria == null
             ? _escolherCategoria(profissionalConvidado: profissionalConvidado)
-            : _novoPedido(categoria,
-                profissionalConvidado: profissionalConvidado),
+            : _novoPedido(categoria, profissionalConvidado: profissionalConvidado),
       );
 
-  static Widget _escolherCategoria({Profissional? profissionalConvidado}) =>
-      Builder(
+  static Widget _escolherCategoria({Profissional? profissionalConvidado}) => Builder(
         builder: (context) => TodasCategoriasTela(
           titulo: 'Que serviço você precisa?',
           carregar: repos.catalogo.categorias,
@@ -546,18 +520,14 @@ abstract final class RotasTrato {
         ),
       );
 
-  static void abrirCategoria(
-          BuildContext context, CategoriaServico categoria) =>
-      _abrir<void>(
+  static void abrirCategoria(BuildContext context, CategoriaServico categoria) => _abrir<void>(
         context,
         Builder(
           builder: (context) => CategoriaTela(
             categoria: categoria,
-            carregar: (filtro) =>
-                repos.catalogo.profissionais(categoria.id, filtro),
+            carregar: (filtro) => repos.catalogo.profissionais(categoria.id, filtro),
             aoAbrirProfissional: (p) => abrirPerfil(context, p),
-            aoPedirOrcamento: (_) =>
-                abrirNovoPedido(context, categoria: categoria),
+            aoPedirOrcamento: (_) => abrirNovoPedido(context, categoria: categoria),
           ),
         ),
       );
@@ -578,15 +548,13 @@ abstract final class RotasTrato {
 
   /// Pede o motivo, confirma e cancela. Quem decide se pode e cuida de eventuais devoluções é
   /// o atendimento e processamento do app; em caso de recusa, a pessoa vê o motivo.
-  static Future<void> _cancelarPedido(
-      BuildContext context, String pedidoId) async {
+  static Future<void> _cancelarPedido(BuildContext context, String pedidoId) async {
     final motivo = await showDialog<String>(
       context: context,
       builder: (_) => const _DialogoCancelarPedido(),
     );
     if (motivo == null || motivo.isEmpty || !context.mounted) return;
-    final ok =
-        await _tentar(context, () => repos.pedidos.cancelar(pedidoId, motivo));
+    final ok = await _tentar(context, () => repos.pedidos.cancelar(pedidoId, motivo));
     if (!ok || !context.mounted) return;
     pedidosMudaram.value++;
     await _abrirSucesso<void>(
@@ -603,8 +571,7 @@ abstract final class RotasTrato {
 
   /// Notificações. [profissional] muda para onde o toque leva (disputa e retrabalho abrem as
   /// telas do profissional; o cliente vê o serviço).
-  static Future<void> abrirNotificacoes(BuildContext context,
-      {bool profissional = false}) async {
+  static Future<void> abrirNotificacoes(BuildContext context, {bool profissional = false}) async {
     await _abrir<void>(context, _notificacoes(profissional: profissional));
     pedidosMudaram.value++;
   }
@@ -613,8 +580,7 @@ abstract final class RotasTrato {
   static void abrirTermos(BuildContext context) => _abrir<void>(
         context,
         Builder(
-          builder: (context) =>
-              TermosEPoliticaTela(aoAbrir: (t) => abrirTextoLegal(context, t)),
+          builder: (context) => TermosEPoliticaTela(aoAbrir: (t) => abrirTextoLegal(context, t)),
         ),
       );
 
@@ -622,8 +588,7 @@ abstract final class RotasTrato {
       _abrir<void>(context, TextoLegalTela.de(texto));
 
   /// Aba "Início" do cliente: carrega nome, categorias, pedido em andamento e serviços recentes.
-  static Widget abaInicio({required VoidCallback aoBuscar}) =>
-      Carregador<DadosInicio>(
+  static Widget abaInicio({required VoidCallback aoBuscar}) => Carregador<DadosInicio>(
         carregar: _carregarInicio,
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
@@ -634,8 +599,7 @@ abstract final class RotasTrato {
               ? () => abrirNotificacoes(context)
               : () => _abrir<void>(context, const LoginTela()),
           aoNovoPedido: () => abrirNovoPedido(context),
-          aoAbrirPedidoEmAndamento: (p) =>
-              abrirServico(context, p.pedidoId ?? _semId),
+          aoAbrirPedidoEmAndamento: (p) => abrirServico(context, p.pedidoId ?? _semId),
           aoAbrirCategoria: (c) => abrirCategoria(context, c),
           aoVerTodasCategorias: () => abrirTodasCategorias(context),
           aoAbrirServico: (s) => abrirServico(context, s.pedidoId ?? _semId),
@@ -650,8 +614,7 @@ abstract final class RotasTrato {
     }
     // Em paralelo: a tela espera a mais lenta, não a soma das chamadas.
     _atualizarMensagensNaoLidasEmSegundoPlano(profissional: false);
-    final ((perfil, categorias), (andamento, (recentes, naoLidas))) =
-        await emParalelo2(
+    final ((perfil, categorias), (andamento, (recentes, naoLidas))) = await emParalelo2(
       emParalelo2(repos.perfil.carregar(), repos.catalogo.categorias()),
       emParalelo2(
         repos.servicos.emAndamento(),
@@ -702,10 +665,8 @@ abstract final class RotasTrato {
               builder: (ctxVerif) => VerificacaoTela(
                 servico: repos.verificacao!,
                 obrigatoria: true,
-                aoCapturarDocumento:
-                    repos.capturaVerificacao?.documento ?? _fotografar,
-                aoCapturarSelfie:
-                    repos.capturaVerificacao?.selfie ?? _fotografar,
+                aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
+                aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
                 aoVoltarCliente: () => irParaCliente(ctxVerif),
                 aoConcluir: () {
                   if (ctxVerif.mounted) _entrarNaCascaProfissional(ctxVerif);
@@ -739,8 +700,7 @@ abstract final class RotasTrato {
     return local;
   }
 
-  static Future<List<String>> _selecionarFotos() =>
-      dispositivo.fotografarMultiplasEEnviar();
+  static Future<List<String>> _selecionarFotos() => dispositivo.fotografarMultiplasEEnviar();
 
   static void _entrarNaCascaProfissional(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
@@ -754,9 +714,7 @@ abstract final class RotasTrato {
         context,
         Builder(
           builder: (context) => CadastroProfissionalTela(
-            nomeInicial: repos.perfil.nomeSalvo ??
-                ServicoAuthPadrao.atual.sessaoAtual?.nome ??
-                '',
+            nomeInicial: repos.perfil.nomeSalvo ?? ServicoAuthPadrao.atual.sessaoAtual?.nome ?? '',
             servico: repos.cadastroProfissional!,
             servicoCep: repos.cep,
             aoAdicionarFoto: _fotografar,
@@ -767,10 +725,8 @@ abstract final class RotasTrato {
                 builder: (ctxVerif) => VerificacaoTela(
                   servico: repos.verificacao!,
                   obrigatoria: true,
-                  aoCapturarDocumento:
-                      repos.capturaVerificacao?.documento ?? _fotografar,
-                  aoCapturarSelfie:
-                      repos.capturaVerificacao?.selfie ?? _fotografar,
+                  aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
+                  aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
                   aoVoltarCliente: () => irParaCliente(ctxVerif),
                   aoConcluir: () {
                     if (ctxVerif.mounted) _entrarNaCascaProfissional(ctxVerif);
@@ -784,15 +740,12 @@ abstract final class RotasTrato {
 
   /// "Editar cadastro" de quem já é profissional: formulário preenchido com o que está salvo;
   /// salvou, mostra confirmação e volta atualizado. A verificação não se repete por editar.
-  static Future<void> _editarCadastroProfissional(BuildContext context) =>
-      _abrir<void>(
+  static Future<void> _editarCadastroProfissional(BuildContext context) => _abrir<void>(
         context,
         Builder(
           builder: (tela) => CadastroProfissionalTela(
             edicao: true,
-            nomeInicial: repos.perfil.nomeSalvo ??
-                ServicoAuthPadrao.atual.sessaoAtual?.nome ??
-                '',
+            nomeInicial: repos.perfil.nomeSalvo ?? ServicoAuthPadrao.atual.sessaoAtual?.nome ?? '',
             servico: _ServicoCadastroEdicao(
               repos.cadastroProfissional!,
               repos.verificacao,
@@ -806,8 +759,7 @@ abstract final class RotasTrato {
                 tela,
                 (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Cadastro atualizado!',
-                  subtitulo:
-                      'Suas informações já estão atualizadas para os clientes.',
+                  subtitulo: 'Suas informações já estão atualizadas para os clientes.',
                   textoBotaoPrimario: 'Voltar ao perfil',
                   aoTocarPrimario: () => Navigator.of(ctxSucesso).pop(),
                   textoBotaoSecundario: 'Voltar ao início',
@@ -835,8 +787,7 @@ abstract final class RotasTrato {
     return inicio.comNotificacoesNaoLidas(naoLidas);
   }
 
-  static Widget _cascaProfissional({int abaInicial = 0}) =>
-      Carregador<InicioProfissional>(
+  static Widget _cascaProfissional({int abaInicial = 0}) => Carregador<InicioProfissional>(
         carregar: _carregarInicioProfissional,
         construir: (context, inicio) => CascaProfissionalTela(
           abaInicial: abaInicial,
@@ -854,10 +805,8 @@ abstract final class RotasTrato {
           abaConversas: Builder(
             builder: (context) => ListaConversas(
               servico: repos.mensagensProfissional ??
-                  ServicoMensagensDoProfissional(repos.profissional,
-                      chat: repos.chat),
-              textoVazio:
-                  'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
+                  ServicoMensagensDoProfissional(repos.profissional, chat: repos.chat),
+              textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
               atualizarACada: _intervalo,
               atualizarQuando: pedidosMudaram,
               aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
@@ -872,8 +821,7 @@ abstract final class RotasTrato {
           carregarPedidos: repos.profissional.pedidosAbertos,
           recarregarInicio: _carregarInicioProfissional,
           aoAlterarDisponivel: repos.profissional.alterarDisponivelAgora,
-          aoAbrirOrcamentoEnviado: (o) =>
-              _abrirDetalheOrcamentoEnviado(context, o),
+          aoAbrirOrcamentoEnviado: (o) => _abrirDetalheOrcamentoEnviado(context, o),
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
           aoAbrirMapa: abrirNoMapa,
@@ -909,16 +857,13 @@ abstract final class RotasTrato {
             try {
               final atual = await cadastro.carregarAtual();
               if (atual == null || atual.categorias.isEmpty) return todas;
-              final filtradas = todas
-                  .where((c) => atual.categorias.contains(c.nome))
-                  .toList();
+              final filtradas = todas.where((c) => atual.categorias.contains(c.nome)).toList();
               return filtradas.isEmpty ? todas : filtradas;
             } on Object {
               return todas;
             }
           },
-          aoAbrirNotificacoes: () =>
-              abrirNotificacoes(context, profissional: true),
+          aoAbrirNotificacoes: () => abrirNotificacoes(context, profissional: true),
           aoUsarComoCliente: () => irParaCliente(context),
           aoGerenciarProximo: (proximo) => _acoesPedidoProfissional(
             context,
@@ -939,9 +884,7 @@ abstract final class RotasTrato {
                   proximo?.pedidoId ?? _semId,
                   remoto: proximo?.remoto ?? false,
                 ),
-                tituloBarra: proximo == null
-                    ? 'Check-in'
-                    : '${proximo.titulo} · ${proximo.quando}',
+                tituloBarra: proximo == null ? 'Check-in' : '${proximo.titulo} · ${proximo.quando}',
               ),
             ),
           ),
@@ -973,8 +916,7 @@ abstract final class RotasTrato {
             ),
           ),
           aoFazerOrcamento: () {
-            final pedido =
-                inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
+            final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             final id = pedido?.id ?? _semId;
             final titulo = pedido?.titulo ?? 'Orçamento';
             _abrirOrcamento(context, id, titulo, remoto: pedido?.remoto ?? false);
@@ -982,8 +924,7 @@ abstract final class RotasTrato {
           aoFazerOrcamentoDoPedido: (pedido) =>
               _abrirOrcamento(context, pedido.id, pedido.titulo, remoto: pedido.remoto),
           aoPerguntar: () {
-            final pedido =
-                inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
+            final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             _abrir<void>(
               context,
               _chat(pedido?.id ?? _semId, comoProfissional: true),
@@ -997,12 +938,9 @@ abstract final class RotasTrato {
   /// Check-in do pedido. No modo API o serviço já recebe a captura real (câmera, upload e GPS) e
   /// é ele quem guarda foto e posição para enviar; embrulhá-lo no serviço do aparelho fazia a
   /// tela marcar "Feito" sem o envio ter foto nem posição. O embrulho só vale na demonstração.
-  static ServicoCheckIn _servicoCheckIn(String pedidoId,
-      {bool remoto = false}) {
+  static ServicoCheckIn _servicoCheckIn(String pedidoId, {bool remoto = false}) {
     final base = repos.profissional.servicoCheckIn(pedidoId, remoto: remoto);
-    return repos.modoApi
-        ? base
-        : ServicoCheckInDispositivo(base: base, dispositivo: dispositivo);
+    return repos.modoApi ? base : ServicoCheckInDispositivo(base: base, dispositivo: dispositivo);
   }
 
   static String? _textoDecimos(int decimos) {
@@ -1012,8 +950,7 @@ abstract final class RotasTrato {
     return resto == 0 ? '$intParte' : '$intParte,$resto';
   }
 
-  static String _textoCentavosCampo(int centavos) =>
-      Dinheiro.paraCampoSemZeros(centavos);
+  static String _textoCentavosCampo(int centavos) => Dinheiro.paraCampoSemZeros(centavos);
 
   static void _abrirDetalheOrcamentoEnviado(
     BuildContext context,
@@ -1067,15 +1004,9 @@ abstract final class RotasTrato {
           edicao: inicial != null,
           remoto: remoto,
           mostrarForaDoEscopo: true,
-          deslocamentoInicial: inicial == null
-              ? null
-              : _textoDecimos(inicial.decimosDeslocamento),
-          horasInicial: inicial == null
-              ? null
-              : _textoDecimos(inicial.decimosTrabalhadas),
-          valorHoraInicial: inicial == null
-              ? null
-              : _textoCentavosCampo(inicial.valorHoraCentavos),
+          deslocamentoInicial: inicial == null ? null : _textoDecimos(inicial.decimosDeslocamento),
+          horasInicial: inicial == null ? null : _textoDecimos(inicial.decimosTrabalhadas),
+          valorHoraInicial: inicial == null ? null : _textoCentavosCampo(inicial.valorHoraCentavos),
           garantiaInicialDias: inicial?.garantiaDias ?? 90,
           prazoExecucaoInicialDias: inicial?.prazoExecucaoDias ?? 3,
           itensIniciais: inicial?.materiais ?? const [],
@@ -1088,11 +1019,8 @@ abstract final class RotasTrato {
               await _abrirSucesso<void>(
                 tela,
                 (ctxSucesso) => SucessoAcaoTela(
-                  titulo: inicial != null
-                      ? 'Orçamento atualizado!'
-                      : 'Orçamento enviado!',
-                  subtitulo:
-                      'O cliente já pode analisar o valor e o prazo combinados.',
+                  titulo: inicial != null ? 'Orçamento atualizado!' : 'Orçamento enviado!',
+                  subtitulo: 'O cliente já pode analisar o valor e o prazo combinados.',
                   detalhes: [
                     ItemResumoSucesso('Pedido', titulo),
                     ItemResumoSucesso(
@@ -1177,9 +1105,7 @@ abstract final class RotasTrato {
   }) async {
     final inicio = await _escolherJanelaVisita(
       context,
-      tituloDia: remoto
-          ? 'Dia do início'
-          : (remarcar ? 'Novo dia da visita' : 'Dia da visita'),
+      tituloDia: remoto ? 'Dia do início' : (remarcar ? 'Novo dia da visita' : 'Dia da visita'),
       tituloHora: remoto ? 'Hora do início' : 'Hora da chegada',
     );
     if (inicio == null || !context.mounted) return;
@@ -1214,8 +1140,7 @@ abstract final class RotasTrato {
       context,
       (ctxSucesso) => SucessoAcaoTela(
         titulo: 'Serviço iniciado!',
-        subtitulo:
-            'O cliente foi avisado. Ao concluir, faça o check-out no app.',
+        subtitulo: 'O cliente foi avisado. Ao concluir, faça o check-out no app.',
         aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
         textoBotaoSecundario: 'Ir para a agenda',
         aoTocarSecundario: () => _voltarAoInicio(ctxSucesso, aba: 2),
@@ -1226,8 +1151,7 @@ abstract final class RotasTrato {
 
   /// Check-out: foto final e o código de conclusão que o cliente informa. Quem confere o código
   /// é o backend; ao ser aceito o serviço vai para "em confirmação" e o cliente é avisado.
-  static void _abrirCheckOut(
-      BuildContext context, String pedidoId, String titulo,
+  static void _abrirCheckOut(BuildContext context, String pedidoId, String titulo,
       {bool remoto = false}) {
     _abrir<void>(
       context,
@@ -1257,8 +1181,7 @@ abstract final class RotasTrato {
     );
   }
 
-  static void _abrirValoresEAvaliar(BuildContext context, String pedidoId) =>
-      _abrir<void>(
+  static void _abrirValoresEAvaliar(BuildContext context, String pedidoId) => _abrir<void>(
         context,
         DetalheValoresTela(
           carregar: () => repos.profissional.valoresDoPedido(pedidoId),
@@ -1267,8 +1190,8 @@ abstract final class RotasTrato {
               context,
               AvaliarClienteTela(
                 pedidoNumero: PedidoApi.numeroDe(pedidoId),
-                aoEnviar: (nota, comentario) => repos.profissional
-                    .avaliarCliente(pedidoId, nota, comentario),
+                aoEnviar: (nota, comentario) =>
+                    repos.profissional.avaliarCliente(pedidoId, nota, comentario),
               ),
             );
             if (enviou == true && context.mounted) {
@@ -1322,9 +1245,8 @@ abstract final class RotasTrato {
         ? const {'pago_e_retido', 'agendado'}.contains(estadoApi)
         : estado == EstadoAgendamento.agendado;
     final podeCheckIn = agendado && !precisaAgendar;
-    final emAndamento = estadoApi != null
-        ? estadoApi == 'em_andamento'
-        : estado == EstadoAgendamento.emAndamento;
+    final emAndamento =
+        estadoApi != null ? estadoApi == 'em_andamento' : estado == EstadoAgendamento.emAndamento;
     final emDisputa = estadoApi == 'em_disputa';
     final emRetrabalho = estadoApi == 'retrabalho';
     final finalizado = estadoApi == 'concluido' ||
@@ -1335,8 +1257,7 @@ abstract final class RotasTrato {
       isScrollControlled: true,
       // Rolável: com 8 ações a lista passa da altura de um celular menor e estourava embaixo.
       builder: (folha) => ConstrainedBox(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -1373,8 +1294,7 @@ abstract final class RotasTrato {
                 if (podeCheckIn)
                   ListTile(
                     leading: Icon(remoto ? Icons.play_circle_outline : Icons.place_outlined),
-                    title:
-                        Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
+                    title: Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
                     onTap: () {
                       Navigator.of(folha).pop();
                       aoCheckIn();
@@ -1412,8 +1332,7 @@ abstract final class RotasTrato {
                   title: const Text('Conversar com o cliente'),
                   onTap: () {
                     Navigator.of(folha).pop();
-                    _abrir<void>(
-                        context, _chat(pedidoId, comoProfissional: true));
+                    _abrir<void>(context, _chat(pedidoId, comoProfissional: true));
                   },
                 ),
                 if (agendado)
@@ -1476,8 +1395,7 @@ abstract final class RotasTrato {
               context,
               (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Nota enviada!',
-                subtitulo:
-                    'O cliente já recebeu a nota dos materiais no pedido.',
+                subtitulo: 'O cliente já recebeu a nota dos materiais no pedido.',
                 aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
               ),
               substituirAtual: true,
@@ -1498,8 +1416,7 @@ abstract final class RotasTrato {
               context,
               (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Aditivo enviado!',
-                subtitulo:
-                    'O cliente foi notificado para aprovar a cobrança extra.',
+                subtitulo: 'O cliente foi notificado para aprovar a cobrança extra.',
                 aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
               ),
               substituirAtual: true,
@@ -1509,8 +1426,7 @@ abstract final class RotasTrato {
       );
 
   /// Disputa aberta pelo cliente, vista pelo profissional (a partir da notificação).
-  static void abrirDisputa(BuildContext context, String disputaId) =>
-      _abrir<void>(
+  static void abrirDisputa(BuildContext context, String disputaId) => _abrir<void>(
         context,
         Builder(
           builder: (context) => ResponderDisputaTela(
@@ -1523,8 +1439,7 @@ abstract final class RotasTrato {
                 context,
                 (ctxSucesso) => SucessoAcaoTela(
                   titulo: 'Resposta enviada!',
-                  subtitulo:
-                      'O cliente e nossa equipe foram avisados da sua posição.',
+                  subtitulo: 'O cliente e nossa equipe foram avisados da sua posição.',
                   aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                 ),
                 substituirAtual: true,
@@ -1535,8 +1450,7 @@ abstract final class RotasTrato {
       );
 
   /// Retrabalho pedido pelo cliente: o profissional escolhe o horário.
-  static void abrirRetrabalho(BuildContext context, String disputaId) =>
-      _abrir<void>(
+  static void abrirRetrabalho(BuildContext context, String disputaId) => _abrir<void>(
         context,
         Builder(
           builder: (context) => AtenderRetrabalhoTela(
@@ -1560,8 +1474,7 @@ abstract final class RotasTrato {
 
   /// Carteira do profissional como EXTRATO (D15): sem saldo próprio, sem saque.
   static Widget _abaCarteira() => _AbaCarteiraPaginada(
-        aoAbrirItem: (context, pedidoId) =>
-            _abrirValoresEAvaliar(context, pedidoId),
+        aoAbrirItem: (context, pedidoId) => _abrirValoresEAvaliar(context, pedidoId),
         aoConfigurarRecebimento: _abrirContaRecebimento,
         aoBaixarExtratoPdf: _baixarExtratoPdf,
       );
@@ -1585,8 +1498,7 @@ abstract final class RotasTrato {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-              content: Text('Conta de recebimento salva com sucesso.')),
+          const SnackBar(content: Text('Conta de recebimento salva com sucesso.')),
         );
     }
   }
@@ -1610,8 +1522,7 @@ abstract final class RotasTrato {
             initialValue: selecionado,
             isExpanded: true,
             items: [
-              for (final op in opcoes)
-                DropdownMenuItem(value: op.$1, child: Text('Mês ${op.$2}')),
+              for (final op in opcoes) DropdownMenuItem(value: op.$1, child: Text('Mês ${op.$2}')),
             ],
             onChanged: (v) {
               if (v != null) setStateDialog(() => selecionado = v);
@@ -1635,8 +1546,7 @@ abstract final class RotasTrato {
     try {
       final bytes = await repos.profissional.baixarExtratoPdf(mes: confirmado);
       final arquivo = 'trato_extrato_${confirmado.replaceAll('-', '_')}.pdf';
-      final caminho =
-          await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
+      final caminho = await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
       if (!context.mounted) return;
       mensagens
         ..hideCurrentSnackBar()
@@ -1732,15 +1642,12 @@ abstract final class RotasTrato {
                       context,
                       VerificacaoTela(
                         servico: repos.verificacao!,
-                        aoCapturarDocumento:
-                            repos.capturaVerificacao?.documento ?? _fotografar,
-                        aoCapturarSelfie:
-                            repos.capturaVerificacao?.selfie ?? _fotografar,
+                        aoCapturarDocumento: repos.capturaVerificacao?.documento ?? _fotografar,
+                        aoCapturarSelfie: repos.capturaVerificacao?.selfie ?? _fotografar,
                       ),
                     ),
             aoUsarComoCliente: () => irParaCliente(context),
-            aoAbrirConfiguracoes: () =>
-                abrirConfiguracoes(context, profissional: true),
+            aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: true),
           );
         },
       );
@@ -1759,21 +1666,17 @@ abstract final class RotasTrato {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(titulo,
-                        style: TipografiaTrato.titulo,
-                        textAlign: TextAlign.center),
+                    Text(titulo, style: TipografiaTrato.titulo, textAlign: TextAlign.center),
                     const SizedBox(height: EspacosTrato.x2),
                     Text(
                       texto,
                       textAlign: TextAlign.center,
-                      style: TipografiaTrato.corpo
-                          .copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x5),
                     BotaoPrimario(
                       texto: 'Criar conta',
-                      aoTocar: () =>
-                          _abrir<void>(context, const CriarContaTela()),
+                      aoTocar: () => _abrir<void>(context, const CriarContaTela()),
                     ),
                     const SizedBox(height: EspacosTrato.x2),
                     BotaoSecundario(
@@ -1792,8 +1695,7 @@ abstract final class RotasTrato {
   static Widget abaPerfil() => emModoVisitante
       ? _telaVisitante(
           titulo: 'Entre na sua conta',
-          texto:
-              'Crie uma conta ou entre para gerenciar seus dados e endereços.',
+          texto: 'Crie uma conta ou entre para gerenciar seus dados e endereços.',
         )
       : Carregador<PerfilCliente>(
           carregar: repos.perfil.carregar,
@@ -1801,8 +1703,7 @@ abstract final class RotasTrato {
           construir: (context, perfil) => PerfilClienteTela(
             perfil: _soNoPerfil(perfil),
             aoCapturarFotoPerfil: _fotografarPerfil,
-            aoAbrirConfiguracoes: () =>
-                abrirConfiguracoes(context, profissional: false),
+            aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: false),
             aoTocarItem: (acao) {
               switch (acao) {
                 case AcaoPerfil.usarComoProfissional:
@@ -1821,13 +1722,11 @@ abstract final class RotasTrato {
                     DadosPessoaisTela(
                       servico: _conta,
                       servicoCep: repos.cep,
-                      aoAlterarCredenciais: () =>
-                          _abrir<void>(context, const SegurancaContaTela()),
+                      aoAlterarCredenciais: () => _abrir<void>(context, const SegurancaContaTela()),
                     ),
                   );
                 case AcaoPerfil.enderecos:
-                  _abrir<void>(context,
-                      EnderecosTela(servico: _conta, servicoCep: repos.cep));
+                  _abrir<void>(context, EnderecosTela(servico: _conta, servicoCep: repos.cep));
                 case AcaoPerfil.favoritos:
                   _abrir<void>(
                     context,
@@ -1857,8 +1756,7 @@ abstract final class RotasTrato {
                         Profissional(
                           id: f.profissionalId,
                           nome: f.nome ?? 'Profissional',
-                          iniciais:
-                              (f.nome ?? 'P').substring(0, 1).toUpperCase(),
+                          iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
                           verificacao: '',
                           especialidade: '',
                           servicosConcluidos: f.servicos ?? 0,
@@ -1889,8 +1787,9 @@ abstract final class RotasTrato {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content:
-                      Text('Sua conta foi excluída e você foi desconectado.'),
+                  content: Text(
+                    'Pedido de exclusão agendado. Sua conta será excluída em 7 dias se você não cancelar. Você foi desconectado.',
+                  ),
                 ),
               );
             }
@@ -1909,8 +1808,7 @@ abstract final class RotasTrato {
           : () async {
               final abriu = await abrirEmail(email, 'Ajuda com o Trato');
               if (!abriu && context.mounted) {
-                _avisoSimples(context,
-                    'Não achamos um app de e-mail. Escreva para $email.');
+                _avisoSimples(context, 'Não achamos um app de e-mail. Escreva para $email.');
               }
             },
       aoRelatarProblema: comoCliente ? () => abrirServicos(context) : null,
@@ -1945,16 +1843,13 @@ abstract final class RotasTrato {
       moedasPendentes: p.moedasPendentes,
       moedasProximaLiberacao: p.moedasProximaLiberacao,
       moedasValorCentavos: p.moedasValorCentavos,
-      grupos: itens.isEmpty
-          ? const []
-          : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
+      grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
     );
   }
 
   /// Configurações da conta (engrenagem do Perfil), iguais para cliente e profissional. Formas de
   /// pagamento salvas ficam de fora: o cartão é guardado pelo Stripe, sem rota no Trato.
-  static void abrirConfiguracoes(BuildContext context,
-          {required bool profissional}) =>
+  static void abrirConfiguracoes(BuildContext context, {required bool profissional}) =>
       _abrir<void>(
         context,
         Builder(
@@ -1979,29 +1874,25 @@ abstract final class RotasTrato {
                   ItemContaPerfil(
                     icone: Icons.key_outlined,
                     titulo: 'E-mail e senha',
-                    aoTocar: () =>
-                        _abrir<void>(context, const SegurancaContaTela()),
+                    aoTocar: () => _abrir<void>(context, const SegurancaContaTela()),
                   ),
                   ItemContaPerfil(
                     icone: Icons.notifications_none,
                     titulo: 'Notificações',
-                    aoTocar: () =>
-                        abrirNotificacoes(context, profissional: profissional),
+                    aoTocar: () => abrirNotificacoes(context, profissional: profissional),
                   ),
                   ItemContaPerfil(
                     icone: Icons.tune,
                     titulo: 'Preferências de alertas',
                     aoTocar: () => _abrir<void>(
                       context,
-                      PreferenciasNotificacoesTela(
-                          repositorio: repos.notificacoes),
+                      PreferenciasNotificacoesTela(repositorio: repos.notificacoes),
                     ),
                   ),
                   ItemContaPerfil(
                     icone: Icons.shield_outlined,
                     titulo: 'Contatos de confiança',
-                    aoTocar: () => _abrir<void>(
-                        context, ContatosConfiancaTela(servico: _conta)),
+                    aoTocar: () => _abrir<void>(context, ContatosConfiancaTela(servico: _conta)),
                   ),
                 ],
               ),
@@ -2016,8 +1907,8 @@ abstract final class RotasTrato {
                   ItemContaPerfil(
                     icone: Icons.help_outline,
                     titulo: 'Central de ajuda',
-                    aoTocar: () => _abrir<void>(context,
-                        _telaAjuda(context, comoCliente: !profissional)),
+                    aoTocar: () =>
+                        _abrir<void>(context, _telaAjuda(context, comoCliente: !profissional)),
                   ),
                   ItemContaPerfil(
                     icone: Icons.description_outlined,
@@ -2044,8 +1935,7 @@ abstract final class RotasTrato {
             atualizarACada: _intervalo,
             atualizarQuando: pedidosMudaram,
             aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
-            aoAbrirConversa: (conversa) =>
-                _abrirConversa(context, conversa, _servicoMensagens),
+            aoAbrirConversa: (conversa) => _abrirConversa(context, conversa, _servicoMensagens),
           ),
         );
 
@@ -2084,13 +1974,9 @@ abstract final class RotasTrato {
             if (id == null) return;
             switch (n.tipo) {
               case TipoNotificacao.disputa:
-                profissional
-                    ? abrirDisputa(context, id)
-                    : abrirServico(context, id);
+                profissional ? abrirDisputa(context, id) : abrirServico(context, id);
               case TipoNotificacao.retrabalho:
-                profissional
-                    ? abrirRetrabalho(context, id)
-                    : abrirServico(context, id);
+                profissional ? abrirRetrabalho(context, id) : abrirServico(context, id);
               case TipoNotificacao.orcamento:
                 profissional
                     ? _abrir<void>(context, _chat(id))
@@ -2098,9 +1984,7 @@ abstract final class RotasTrato {
               case TipoNotificacao.mensagem:
                 _abrir<void>(context, _chat(id));
               case TipoNotificacao.pedido || TipoNotificacao.pagamento:
-                profissional
-                    ? _abrir<void>(context, _chat(id))
-                    : abrirServico(context, id);
+                profissional ? _abrir<void>(context, _chat(id)) : abrirServico(context, id);
               case TipoNotificacao.sistema:
                 break;
             }
@@ -2111,13 +1995,10 @@ abstract final class RotasTrato {
   /// Aba "Buscar" do cliente: busca por serviço e abertura do perfil do profissional.
   static Widget abaBuscar() => Carregador<List<CategoriaServico>>(
         // Se o catálogo falhar, a busca por texto continua sem as sugestões de categoria.
-        carregar: () => repos.catalogo
-            .categorias()
-            .catchError((Object _) => <CategoriaServico>[]),
+        carregar: () => repos.catalogo.categorias().catchError((Object _) => <CategoriaServico>[]),
         atualizarQuando: pedidosMudaram,
         construir: (context, cats) {
-          final ordenadas = [...cats]
-            ..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));
+          final ordenadas = [...cats]..sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));
           return BuscaProfissionaisTela(
             servico: servicoBusca,
             sugestoes: [
@@ -2135,8 +2016,7 @@ abstract final class RotasTrato {
   static Widget abaPedidos() => emModoVisitante
       ? _telaVisitante(
           titulo: 'Seus pedidos',
-          texto:
-              'Entre ou crie uma conta para acompanhar seus pedidos e orçamentos.',
+          texto: 'Entre ou crie uma conta para acompanhar seus pedidos e orçamentos.',
         )
       : Builder(
           builder: (context) => Scaffold(
@@ -2172,9 +2052,7 @@ abstract final class RotasTrato {
       emParalelo2(
         repos.catalogo.formulario(categoriaId),
         (temSessao && repos.conta != null)
-            ? repos.conta!
-                .enderecos()
-                .catchError((Object _) => <EnderecoSalvo>[])
+            ? repos.conta!.enderecos().catchError((Object _) => <EnderecoSalvo>[])
             : Future.value(const <EnderecoSalvo>[]),
       );
 
@@ -2211,8 +2089,7 @@ abstract final class RotasTrato {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Falta pouco para enviar seu pedido',
-                          style: TipografiaTrato.titulo),
+                      Text('Falta pouco para enviar seu pedido', style: TipografiaTrato.titulo),
                       const SizedBox(height: EspacosTrato.x2),
                       Text(
                         'Crie sua conta ou entre para receber orçamentos dos profissionais.',
@@ -2246,8 +2123,7 @@ abstract final class RotasTrato {
           enviandoPedido = true;
           try {
             String? id;
-            final ok = await _tentar(
-                context, () async => id = await repos.pedidos.criar(rascunho));
+            final ok = await _tentar(context, () async => id = await repos.pedidos.criar(rascunho));
             if (ok) pedidosMudaram.value++;
             if (!ok || id == null || !context.mounted) return;
             await _abrirSucesso<void>(
@@ -2301,18 +2177,14 @@ abstract final class RotasTrato {
         construir: (context, dados) {
           var dadosAtuais = dados;
           return PedidoAbertoTela(
-            numero: pedidoId
-                .substring(0, pedidoId.length < 4 ? pedidoId.length : 4)
-                .toUpperCase(),
+            numero: pedidoId.substring(0, pedidoId.length < 4 ? pedidoId.length : 4).toUpperCase(),
             dados: dados,
             servicoCep: repos.cep,
             cepInicial: dados.cep ?? '',
-            aoVerOrcamentos: () =>
-                _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
+            aoVerOrcamentos: () => _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
             aoCancelar: () => _cancelarPedido(context, pedidoId),
             aoResponderExclusividade: (eid, decisao) async {
-              final resp = await repos.pedidos
-                  .responderExclusividade(pedidoId, eid, decisao);
+              final resp = await repos.pedidos.responderExclusividade(pedidoId, eid, decisao);
               pedidosMudaram.value++;
               return resp;
             },
@@ -2341,8 +2213,7 @@ abstract final class RotasTrato {
                 dadosAtuais = novos;
                 pedidosMudaram.value++;
                 if (context.mounted) {
-                  _avisoSimples(context,
-                      'Pedido atualizado. Os profissionais já veem a mudança.');
+                  _avisoSimples(context, 'Pedido atualizado. Os profissionais já veem a mudança.');
                 }
                 return novos;
               } on Object catch (erro) {
@@ -2354,8 +2225,7 @@ abstract final class RotasTrato {
         },
       );
 
-  static Widget _orcamentosRecebidos(String pedidoId) =>
-      Carregador<OrcamentosDoPedido>(
+  static Widget _orcamentosRecebidos(String pedidoId) => Carregador<OrcamentosDoPedido>(
         carregar: () => repos.orcamentos.listar(pedidoId),
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
@@ -2405,12 +2275,10 @@ abstract final class RotasTrato {
                               subtitulo:
                                   'O profissional recebeu sua proposta na conversa e pode aceitar ou responder.',
                               textoBotaoPrimario: 'Abrir conversa',
-                              aoTocarPrimario: () =>
-                                  Navigator.of(ctxSucesso).pushReplacement(
+                              aoTocarPrimario: () => Navigator.of(ctxSucesso).pushReplacement(
                                 MaterialPageRoute<void>(
                                   builder: (_) => _chat(pedidoId,
-                                      profissionalId: o.profissionalId,
-                                      comoProfissional: false),
+                                      profissionalId: o.profissionalId, comoProfissional: false),
                                 ),
                               ),
                               textoBotaoSecundario: 'Voltar ao início',
@@ -2482,22 +2350,18 @@ abstract final class RotasTrato {
     // "Tentar de novo" (sem forma de pagamento): o Carregador refaz a mesma chamada em silêncio.
     final recarregar = ValueNotifier<int>(0);
     var iniciandoPagamento = false;
-    var usarMoedas =
-        false; // o que o cliente escolheu; quantas moedas entram, o backend decide
+    var usarMoedas = false; // o que o cliente escolheu; quantas moedas entram, o backend decide
     return Carregador<DadosPagamento>(
       carregar: () => repos.pagamento.dados(pedidoId),
       atualizarQuando: recarregar,
       construir: (context, dados) => PagamentoTela(
         aoTentarNovamente: () => recarregar.value++,
         dados: dados,
-        aoAplicarCupom: (codigo) => usarMoedas
-            ? repos.pagamento
-                .recalcular(pedidoId, cupom: codigo, usarMoedas: true)
-            : repos.pagamento.aplicarCupom(pedidoId, codigo),
+        aoAplicarCupom: (codigo) =>
+            repos.pagamento.recalcular(pedidoId, cupom: codigo, usarMoedas: usarMoedas),
         aoAlternarMoedas: (usar, cupom) {
           usarMoedas = usar;
-          return repos.pagamento
-              .recalcular(pedidoId, cupom: cupom, usarMoedas: usar);
+          return repos.pagamento.recalcular(pedidoId, cupom: cupom, usarMoedas: usar);
         },
         aoCadastrarCpf: repos.pagamento.cadastrarCpf,
         aoPagarDetalhado: (metodo, parcelas, cupom) async {
@@ -2525,9 +2389,7 @@ abstract final class RotasTrato {
             // Cartão: a folha do provedor lista os cartões salvos e cadastra um novo. O app só
             // abre a folha; quem diz "pago" continua sendo o backend.
             final c = cobranca;
-            if (metodo == MetodoPagamento.cartao &&
-                c != null &&
-                c.precisaDaFolhaDeCartao) {
+            if (metodo == MetodoPagamento.cartao && c != null && c.precisaDaFolhaDeCartao) {
               ResultadoCartao? resultado;
               final aberto = await _tentar(
                 context,
@@ -2541,8 +2403,7 @@ abstract final class RotasTrato {
               );
               if (!aberto || !context.mounted) return;
               if (resultado == ResultadoCartao.cancelado) {
-                _avisoSimples(context,
-                    'Pagamento cancelado. Você pode escolher outro cartão.');
+                _avisoSimples(context, 'Pagamento cancelado. Você pode escolher outro cartão.');
                 return;
               }
             }
@@ -2554,8 +2415,7 @@ abstract final class RotasTrato {
                 consultar: () => repos.pagamento.status(pedidoId),
                 // Pago (confirmado pelo backend): mostra o pedido em andamento.
                 aoConfirmar: () => Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(
-                      builder: (_) => _pedidoEmExecucao(pedidoId)),
+                  MaterialPageRoute<void>(builder: (_) => _pedidoEmExecucao(pedidoId)),
                   (rota) => rota.isFirst,
                 ),
               ),
@@ -2569,8 +2429,7 @@ abstract final class RotasTrato {
   }
 
   /// O contrato do serviço é o orçamento que o cliente aceitou (escopo, valor e garantia).
-  static void abrirContrato(BuildContext context, String pedidoId) =>
-      _abrir<void>(
+  static void abrirContrato(BuildContext context, String pedidoId) => _abrir<void>(
         context,
         Carregador<(Orcamento?, DadosContrato)>(
           carregar: () async {
@@ -2578,9 +2437,7 @@ abstract final class RotasTrato {
               repos.orcamentos.listar(pedidoId),
               repos.pedidos.contrato(pedidoId),
             );
-            final aceito = todos.orcamentos
-                .where((o) => o.aceito && o.detalhe != null)
-                .firstOrNull;
+            final aceito = todos.orcamentos.where((o) => o.aceito && o.detalhe != null).firstOrNull;
             return (aceito, contrato);
           },
           vazio: (x) => x.$1 == null,
@@ -2596,8 +2453,7 @@ abstract final class RotasTrato {
         ),
       );
 
-  static void abrirGarantia(BuildContext context, {String pedidoId = _semId}) =>
-      _abrir<void>(
+  static void abrirGarantia(BuildContext context, {String pedidoId = _semId}) => _abrir<void>(
         context,
         Carregador<DadosGarantia>(
           carregar: () => repos.pedidos.garantia(pedidoId),
@@ -2622,12 +2478,8 @@ abstract final class RotasTrato {
           title: const Text('Recusar o aditivo?'),
           content: const Text('O serviço segue pelo valor combinado antes.'),
           actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(c, false),
-                child: const Text('Voltar')),
-            TextButton(
-                onPressed: () => Navigator.pop(c, true),
-                child: const Text('Recusar')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Voltar')),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Recusar')),
           ],
         ),
       );
@@ -2642,33 +2494,28 @@ abstract final class RotasTrato {
     Cobranca? cobranca;
     final ok = await _tentar(
       context,
-      () async =>
-          cobranca = await servicoAditivo.responder(pedidoId, aprovar: true),
+      () async => cobranca = await servicoAditivo.responder(pedidoId, aprovar: true),
     );
     if (!ok || !context.mounted) return;
     pedidosMudaram.value++;
     if (cobranca != null) await _pagarAditivo(context, pedidoId, cobranca!);
   }
 
-  static Future<void> _pedirRetrabalho(
-      BuildContext context, String pedidoId) async {
+  static Future<void> _pedirRetrabalho(BuildContext context, String pedidoId) async {
     final pedido = await showDialog<({String descricao, List<String> fotos})>(
       context: context,
       builder: (_) => const _DialogoPedirRetrabalho(),
     );
     if (pedido == null || pedido.descricao.isEmpty || !context.mounted) return;
-    final ok = await _tentar(
-        context,
-        () => repos.pedidos
-            .pedirRetrabalho(pedidoId, pedido.descricao, fotos: pedido.fotos));
+    final ok = await _tentar(context,
+        () => repos.pedidos.pedirRetrabalho(pedidoId, pedido.descricao, fotos: pedido.fotos));
     if (ok && context.mounted) {
       pedidosMudaram.value++;
       await _abrirSucesso<void>(
         context,
         (ctxSucesso) => SucessoAcaoTela(
           titulo: 'Pedido de retrabalho enviado!',
-          subtitulo:
-              'O profissional foi notificado para agendar o atendimento.',
+          subtitulo: 'O profissional foi notificado para agendar o atendimento.',
           aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
         ),
       );
@@ -2706,8 +2553,7 @@ abstract final class RotasTrato {
     }
   }
 
-  static Widget _pedidoEmExecucao(String pedidoId) =>
-      Carregador<PedidoEmExecucao>(
+  static Widget _pedidoEmExecucao(String pedidoId) => Carregador<PedidoEmExecucao>(
         carregar: () => repos.pedidos.acompanhar(pedidoId),
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
@@ -2715,49 +2561,133 @@ abstract final class RotasTrato {
         construir: (context, pedido) => const {'aberto', 'reservado'}.contains(pedido.estadoApi)
             ? _pedidoAberto(pedidoId)
             : PedidoExecucaoTela(
-          pedido: pedido,
-          atualizarAditivoLocalmente: false,
-          aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
-          aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
-          aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
-          aoAprovarAditivo: () =>
-              _responderAditivoInline(context, pedidoId, aprovar: true),
-          aoRecusarAditivo: () =>
-              _responderAditivoInline(context, pedidoId, aprovar: false),
-          aoConversar: () =>
-              _abrir<void>(context, _chat(pedidoId, comoProfissional: false)),
-          aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
-          aoRemarcarVisita:
-              const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
-                  ? () => _sugerirOuRemarcarVisitaCliente(
-                        context,
-                        pedidoId,
-                        jaAgendado: pedido.estadoApi == 'agendado',
-                      )
-                  : null,
-          aoVerNota: () => _abrir<void>(
-            context,
-            VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
-          ),
-          // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
-          aoVerAditivo: () => _abrir<void>(
-            context,
-            ResponderAditivoTela(
-              servico: servicoAditivo,
-              aditivoId: pedidoId,
-              // Aprovou: o cliente paga a cobrança do aditivo (a do pedido já foi paga).
-              aoCobrancaCriada: (cobranca) =>
-                  _pagarAditivo(context, pedidoId, cobranca),
-            ),
-          ),
-          aoVerContrato: () => abrirContrato(context, pedidoId),
-          aoAbrirProblema: () =>
-              _abrir<void>(context, _relatarProblema(pedidoId)),
-          aoCancelarPedido: pedido.podeVerConclusao
-              ? null
-              : () => _cancelarPedido(context, pedidoId),
-        ),
+                pedido: pedido,
+                atualizarAditivoLocalmente: false,
+                aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
+                aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
+                aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
+                aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
+                aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
+                aoConversar: () => _abrir<void>(context, _chat(pedidoId, comoProfissional: false)),
+                aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
+                aoRemarcarVisita: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
+                    ? () => _sugerirOuRemarcarVisitaCliente(
+                          context,
+                          pedidoId,
+                          jaAgendado: pedido.estadoApi == 'agendado',
+                        )
+                    : null,
+                aoVerNota: () => _abrir<void>(
+                  context,
+                  VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
+                ),
+                // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
+                aoVerAditivo: () => _abrir<void>(
+                  context,
+                  ResponderAditivoTela(
+                    servico: servicoAditivo,
+                    aditivoId: pedidoId,
+                    // Aprovou: o cliente paga a cobrança do aditivo (a do pedido já foi paga).
+                    aoCobrancaCriada: (cobranca) => _pagarAditivo(context, pedidoId, cobranca),
+                  ),
+                ),
+                aoVerContrato: () => abrirContrato(context, pedidoId),
+                aoAbrirProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
+                aoCompartilharAtendimento: () => _compartilharAtendimento(context, pedido),
+                aoSosEmergencia: () => _abrirSosEmergencia(context, pedido),
+                aoCancelarPedido:
+                    pedido.podeVerConclusao ? null : () => _cancelarPedido(context, pedidoId),
+              ),
       );
+
+  static String _resumoAtendimento(PedidoEmExecucao pedido) => [
+        'Atendimento Trato (${pedido.numero})',
+        if ((pedido.profissionalNome ?? '').isNotEmpty) 'Profissional: ${pedido.profissionalNome}',
+        if ((pedido.visita ?? '').isNotEmpty) 'Horário: ${pedido.visita}',
+        if ((pedido.enderecoResumo ?? '').isNotEmpty) 'Endereço: ${pedido.enderecoResumo}',
+      ].join('\n');
+
+  static Future<void> _compartilharAtendimento(
+    BuildContext context,
+    PedidoEmExecucao pedido,
+  ) async {
+    final resumo = _resumoAtendimento(pedido);
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (folha) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(EspacosTrato.x5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Compartilhar atendimento', style: TipografiaTrato.titulo),
+              const SizedBox(height: EspacosTrato.x3),
+              Text(resumo, style: TipografiaTrato.corpo),
+              const SizedBox(height: EspacosTrato.x4),
+              BotaoPrimario(
+                texto: 'Compartilhar agora',
+                aoTocar: () async {
+                  Navigator.of(folha).pop();
+                  await compartilharNoAparelho(resumo);
+                },
+              ),
+              const SizedBox(height: EspacosTrato.x2),
+              BotaoSecundario(
+                texto: 'Contatos de confiança',
+                aoTocar: () {
+                  Navigator.of(folha).pop();
+                  _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Future<void> _abrirSosEmergencia(
+    BuildContext context,
+    PedidoEmExecucao pedido,
+  ) async {
+    final resumo = _resumoAtendimento(pedido);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        title: const Text('SOS / Emergência'),
+        content: Text(
+          'Em caso de risco, ligue para 190 ou copie os dados do atendimento para enviar a um contato de confiança.\n\n$resumo',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: resumo));
+              if (dialogo.mounted) Navigator.of(dialogo).pop();
+              if (context.mounted) {
+                _avisoSimples(context, 'Dados do atendimento copiados.');
+              }
+            },
+            child: const Text('Copiar dados'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogo).pop();
+              await launchUrl(
+                Uri(scheme: 'tel', path: '190'),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+            child: const Text('Ligar 190'),
+          ),
+        ],
+      ),
+    );
+  }
 
   static Widget _chat(
     String pedidoId, {
@@ -2765,15 +2695,12 @@ abstract final class RotasTrato {
     bool? comoProfissional,
   }) =>
       Carregador<ConversaPedido>(
-        carregar: () =>
-            repos.chat.conversa(pedidoId, profissionalId: profissionalId),
+        carregar: () => repos.chat.conversa(pedidoId, profissionalId: profissionalId),
         atualizarQuando: pedidosMudaram,
         construir: (context, conversa) {
           final ehPro = comoProfissional ??
               (!conversa.souCliente ||
-                  (!repos.modoApi &&
-                      ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional ==
-                          true));
+                  (!repos.modoApi && ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true));
           final sit = conversa.situacao.toLowerCase();
           final podeCombinarAgenda = !conversa.pedidoAberto &&
               !conversa.remoto &&
@@ -2782,8 +2709,7 @@ abstract final class RotasTrato {
             conversa: conversa,
             aoCapturarFoto: _fotografar,
             aoRecarregar: repos.modoApi
-                ? () => repos.chat
-                    .conversa(pedidoId, profissionalId: profissionalId)
+                ? () => repos.chat.conversa(pedidoId, profissionalId: profissionalId)
                 : null,
             aoSugerirAgenda: podeCombinarAgenda
                 ? () async {
@@ -2802,8 +2728,7 @@ abstract final class RotasTrato {
                     );
                     if (ok && context.mounted) {
                       pedidosMudaram.value++;
-                      _avisoSimples(
-                          context, 'Sugestão de horário enviada no chat.');
+                      _avisoSimples(context, 'Sugestão de horário enviada no chat.');
                     }
                   }
                 : null,
@@ -2836,8 +2761,7 @@ abstract final class RotasTrato {
               );
               if (ok && context.mounted) {
                 pedidosMudaram.value++;
-                _avisoSimples(context,
-                    'Orçamento atualizado com o valor e prazo combinados.');
+                _avisoSimples(context, 'Orçamento atualizado com o valor e prazo combinados.');
               }
             },
             aoAceitarProposta: (c) async {
@@ -2856,8 +2780,7 @@ abstract final class RotasTrato {
                 _abrir<void>(context, _pagamento(pedidoId));
               }
             },
-            aoProporNovaCondicao: (ehPro &&
-                    conversa.orcamentosAtivos.isNotEmpty)
+            aoProporNovaCondicao: (ehPro && conversa.orcamentosAtivos.isNotEmpty)
                 ? () async {
                     final prop = await pedirNovaPropostaProfissional(context);
                     if (prop == null || !context.mounted) return;
@@ -2873,24 +2796,21 @@ abstract final class RotasTrato {
                     );
                     if (ok && context.mounted) {
                       pedidosMudaram.value++;
-                      _avisoSimples(
-                          context, 'Nova proposta enviada ao cliente.');
+                      _avisoSimples(context, 'Nova proposta enviada ao cliente.');
                     }
                   }
                 : null,
             aoEnviar: (texto) async {
               final ok = await _tentar(
                 context,
-                () => repos.chat
-                    .enviar(pedidoId, texto, profissionalId: profissionalId),
+                () => repos.chat.enviar(pedidoId, texto, profissionalId: profissionalId),
               );
               if (!ok) throw StateError('Falha ao enviar mensagem');
             },
             aoEnviarFoto: (ref) async {
               final ok = await _tentar(
                 context,
-                () => repos.chat
-                    .enviarFoto(pedidoId, ref, profissionalId: profissionalId),
+                () => repos.chat.enviarFoto(pedidoId, ref, profissionalId: profissionalId),
               );
               if (!ok) throw StateError('Falha ao enviar foto');
             },
@@ -2904,15 +2824,13 @@ abstract final class RotasTrato {
         construir: (context, resumo) => ConclusaoTela(
           resumo: resumo,
           aoConfirmar: () async {
-            final ok = await _tentar(
-                context, () => repos.pedidos.confirmarConclusao(pedidoId));
+            final ok = await _tentar(context, () => repos.pedidos.confirmarConclusao(pedidoId));
             if (ok && context.mounted) {
               pedidosMudaram.value++;
               _abrir<void>(context, _avaliacao(pedidoId));
             }
           },
-          aoRelatarProblema: () =>
-              _abrir<void>(context, _relatarProblema(pedidoId)),
+          aoRelatarProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
         ),
       );
 
@@ -2976,15 +2894,14 @@ abstract final class RotasTrato {
         ),
       );
 
-  static Widget _relatarProblema(String pedidoId) =>
-      Carregador<DadosRelatoProblema>(
+  static Widget _relatarProblema(String pedidoId) => Carregador<DadosRelatoProblema>(
         carregar: () => repos.pedidos.dadosRelato(pedidoId),
         construir: (context, dados) => RelatarProblemaTela(
           dados: dados,
           aoCapturarFoto: _fotografar,
           aoEnviar: (relato) async {
-            final ok = await _tentar(
-                context, () => repos.pedidos.relatarProblema(pedidoId, relato));
+            final ok =
+                await _tentar(context, () => repos.pedidos.relatarProblema(pedidoId, relato));
             if (ok && context.mounted) {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
@@ -3009,8 +2926,7 @@ class _DialogoPedirRetrabalho extends StatefulWidget {
   const _DialogoPedirRetrabalho();
 
   @override
-  State<_DialogoPedirRetrabalho> createState() =>
-      _DialogoPedirRetrabalhoState();
+  State<_DialogoPedirRetrabalho> createState() => _DialogoPedirRetrabalhoState();
 }
 
 class _DialogoPedirRetrabalhoState extends State<_DialogoPedirRetrabalho> {
@@ -3118,8 +3034,7 @@ class _DialogoCancelarPedidoState extends State<_DialogoCancelarPedido> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-                'Conte o motivo. Se já houve pagamento, analisamos a devolução para você.'),
+            const Text('Conte o motivo. Se já houve pagamento, analisamos a devolução para você.'),
             const SizedBox(height: 8),
             TextField(
               controller: _motivo,
@@ -3241,12 +3156,10 @@ class _DetalheOrcamentoAtualizado extends StatefulWidget {
   final Widget Function(Orcamento orcamento) construir;
 
   @override
-  State<_DetalheOrcamentoAtualizado> createState() =>
-      _DetalheOrcamentoAtualizadoState();
+  State<_DetalheOrcamentoAtualizado> createState() => _DetalheOrcamentoAtualizadoState();
 }
 
-class _DetalheOrcamentoAtualizadoState
-    extends State<_DetalheOrcamentoAtualizado> {
+class _DetalheOrcamentoAtualizadoState extends State<_DetalheOrcamentoAtualizado> {
   late Orcamento _atual = widget.inicial;
   RelogioDeAtualizacao? _relogio;
 
@@ -3258,8 +3171,7 @@ class _DetalheOrcamentoAtualizadoState
       _relogio = RelogioDeAtualizacao(
         intervalo: intervalo,
         aoAtualizar: _atualizar,
-        deveAtualizar: () =>
-            mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+        deveAtualizar: () => mounted && (ModalRoute.of(context)?.isCurrent ?? true),
       );
     }
   }
@@ -3274,8 +3186,7 @@ class _DetalheOrcamentoAtualizadoState
     final dono = _atual.profissionalId;
     if (dono == null) return;
     final lista = await RotasTrato.repos.orcamentos.listar(widget.pedidoId);
-    final novo =
-        lista.orcamentos.where((o) => o.profissionalId == dono).firstOrNull;
+    final novo = lista.orcamentos.where((o) => o.profissionalId == dono).firstOrNull;
     if (novo == null || !mounted) return;
     setState(() => _atual = novo);
   }
@@ -3311,8 +3222,7 @@ class _ServicoCadastroEdicao implements ServicoCadastroProfissional {
     }
     try {
       final sit = await _verificacao.carregarSituacao();
-      if (sit.status == StatusVerificacao.emAnalise ||
-          sit.status == StatusVerificacao.aprovada) {
+      if (sit.status == StatusVerificacao.emAnalise || sit.status == StatusVerificacao.aprovada) {
         return atual.comCategoriasTravadas(true);
       }
     } on Object {
@@ -3333,8 +3243,7 @@ class _AbaCarteiraPaginada extends StatefulWidget {
   });
 
   final void Function(BuildContext context, String pedidoId) aoAbrirItem;
-  final Future<void> Function(BuildContext context, ContaRecebimento atual)
-      aoConfigurarRecebimento;
+  final Future<void> Function(BuildContext context, ContaRecebimento atual) aoConfigurarRecebimento;
   final Future<void> Function(BuildContext context) aoBaixarExtratoPdf;
 
   @override
@@ -3486,9 +3395,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
       return RefreshIndicator(
         onRefresh: _carregarInicial,
         child: EstadoTela(
-          texto: erro is ErroTrato
-              ? erro.mensagem
-              : 'Algo deu errado. Tente de novo em instantes.',
+          texto: erro is ErroTrato ? erro.mensagem : 'Algo deu errado. Tente de novo em instantes.',
           aoTentarNovamente: _carregarInicial,
         ),
       );
@@ -3504,8 +3411,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
           tratinhosPendentesTexto: _tratinhosPendentes,
         ),
         aoAbrirItem: (item) => widget.aoAbrirItem(context, item.pedidoId!),
-        aoConfigurarRecebimento: () =>
-            widget.aoConfigurarRecebimento(context, _conta),
+        aoConfigurarRecebimento: () => widget.aoConfigurarRecebimento(context, _conta),
         aoBaixarExtratoPdf: () => widget.aoBaixarExtratoPdf(context),
         aoCarregarMais: _carregarMais,
         temMaisExtrato: _temMais,

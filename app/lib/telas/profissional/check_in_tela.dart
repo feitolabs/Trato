@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -62,6 +64,8 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
   String? _erroCodigo;
   String? _aviso;
   String? _erroPasso;
+  Timer? _timerOffline;
+  var _reenviandoOffline = false;
 
   @override
   void initState() {
@@ -72,13 +76,43 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
   /// Ao voltar ao primeiro plano o "Sem internet" antigo sai: a conexão pode ter voltado.
   @override
   void didChangeAppLifecycleState(AppLifecycleState estado) {
-    if (estado == AppLifecycleState.resumed && _aviso != null && mounted) {
-      setState(() => _aviso = null);
+    if (estado == AppLifecycleState.resumed && mounted) {
+      if (_aviso != null) setState(() => _aviso = null);
+      if (_timerOffline != null) _tentarReenviarOffline();
+    }
+  }
+
+  void _iniciarTimerOffline() {
+    _timerOffline?.cancel();
+    _timerOffline = Timer.periodic(
+      const Duration(seconds: 6),
+      (_) => _tentarReenviarOffline(),
+    );
+  }
+
+  Future<void> _tentarReenviarOffline() async {
+    if (!mounted || _iniciando || _reenviandoOffline) return;
+    final servico = widget.servico;
+    if (servico is! ReenvioOffline) return;
+    _reenviandoOffline = true;
+    try {
+      final enviadas = await (servico as ReenvioOffline).reenviarPendentes();
+      if (enviadas > 0 && mounted) {
+        _timerOffline?.cancel();
+        _timerOffline = null;
+        setState(() => _aviso = null);
+        widget.aoIniciar?.call();
+      }
+    } on Object {
+      // Ainda sem sinal: a próxima tentativa do timer resolve.
+    } finally {
+      _reenviandoOffline = false;
     }
   }
 
   @override
   void dispose() {
+    _timerOffline?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _codigo.dispose();
     _justificativa.dispose();
@@ -205,6 +239,7 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
 
   Future<void> _iniciar() async {
     if (_iniciando) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _iniciando = true;
       _aviso = null; // nova tentativa: o "Sem internet" antigo sai
@@ -243,9 +278,14 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
       if (resultado == ResultadoInicio.guardadoOffline) {
         _aviso = 'Sem internet. Guardamos sua chegada e enviamos assim que o sinal voltar. '
             'O serviço só começa quando o Trato confirmar.';
+        _iniciarTimerOffline();
       }
     });
-    if (resultado == ResultadoInicio.iniciado) widget.aoIniciar?.call();
+    if (resultado == ResultadoInicio.iniciado) {
+      _timerOffline?.cancel();
+      _timerOffline = null;
+      widget.aoIniciar?.call();
+    }
   }
 
   @override

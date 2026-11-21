@@ -168,6 +168,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       profissionalConvidadoId: j['profissional_convidado_id'] as String?,
       estado: (j['estado'] as String?) ?? 'aberto',
       orcamentosRecebidos: (j['orcamentos_recebidos'] as num?)?.toInt() ?? 0,
+      urgente: j['urgente'] == true,
     );
   }
 
@@ -222,6 +223,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       estado: oferta.ativa ? 'reservado' : base.estado,
       ofertaExclusividade: oferta,
       orcamentosRecebidos: base.orcamentosRecebidos,
+      urgente: base.urgente,
     );
   }
 
@@ -370,6 +372,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       estadoApi: p.estado,
       profissionalNome: p.profissionalNome ?? '',
       remoto: p.remoto,
+      urgente: p.urgente,
       descricao: (p.descricao ?? '').trim().isEmpty ? null : p.descricao!.trim(),
       titulo: p.rotulo,
       subtitulo: p.rotulo == 'Pedido ${p.numero}'
@@ -388,8 +391,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       throw const ErroTrato(TipoErro.recusado, 'Escolha a categoria e a cidade do serviço.');
     }
     // Remoto não pede a localização (o profissional não vê região exata).
-    final onde =
-        rascunho.modalidade == Modalidade.presencial ? await posicao?.call() : null;
+    final onde = rascunho.modalidade == Modalidade.presencial ? await posicao?.call() : null;
     final corpo = <String, dynamic>{
       'categoria_id': categoriaId,
       'cidade_id': cidadeId,
@@ -560,14 +562,21 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horasPrazo)} para confirmar, '
           'até ${_dia(limite)} · ${_hora(limite)}.';
     }
-    // Descrição do pedido: só vale buscar quando há categoria para virar o título.
+    // Descrição do pedido (quando há categoria) e endereço (para compartilhar/SOS em execução).
     String? descricaoPedido;
+    String? enderecoResumo;
     final categoria = pedido.categoriaNome?.trim() ?? '';
-    if (categoria.isNotEmpty) {
+    final precisaEndereco = !pedido.remoto && pedido.estado == 'em_andamento';
+    if (categoria.isNotEmpty || precisaEndereco) {
       try {
         final d = _mapa(await _api.get('/v1/pedidos/$pedidoId/dados'));
-        final texto = (d['descricao'] as String?)?.trim() ?? '';
-        if (texto.isNotEmpty) descricaoPedido = texto;
+        if (categoria.isNotEmpty) {
+          final texto = (d['descricao'] as String?)?.trim() ?? '';
+          if (texto.isNotEmpty) descricaoPedido = texto;
+        }
+        if (precisaEndereco) {
+          enderecoResumo = _dadosDeJson(d, categoriaNome: categoria).enderecoCompleto;
+        }
       } on Object {
         descricaoPedido = null;
       }
@@ -663,6 +672,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       categoriaNome: categoria.isEmpty ? null : categoria,
       descricao: descricaoPedido,
       jaAvaliou: pedido.jaAvaliou,
+      urgente: pedido.urgente,
+      profissionalNome: pedido.profissionalNome,
+      enderecoResumo: enderecoResumo,
       visita: pedido.janelaRotulo,
       prazoConfirmacao: prazoConfirmacao,
       etapas: etapas,
@@ -703,9 +715,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     String? garantiaTexto;
     try {
       final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
-      final eventos = [for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j)];
-      final fim = eventos.where((e) => e.acao == 'fazer_check_out').map((e) => e.em).fold<DateTime?>(
-          null, (a, b) => a == null || b.isAfter(a) ? b : a);
+      final eventos = [
+        for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j)
+      ];
+      final fim = eventos
+          .where((e) => e.acao == 'fazer_check_out')
+          .map((e) => e.em)
+          .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
       if (fim != null && horas > 0) {
         final limite = fim.toLocal().add(Duration(hours: horas));
         prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horas)} para confirmar, '
@@ -717,7 +733,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     try {
       final g = _mapa(await _api.get('/v1/contratos/$pedidoId/garantia'));
       final dias = (g['dias'] as num?)?.toInt() ?? 0;
-      if (dias > 0) garantiaTexto = 'Garantia de ${ConfigPublica.dias(dias)} a partir da sua confirmação.';
+      if (dias > 0)
+        garantiaTexto = 'Garantia de ${ConfigPublica.dias(dias)} a partir da sua confirmação.';
     } on Object {
       garantiaTexto = null;
     }
@@ -1106,9 +1123,8 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
     return Dinheiro.formatarHoras((horas * 10).round());
   }
 
-  String _sinalMaterial(int? centavos) => centavos == null || centavos == 0
-      ? ''
-      : 'Sinal de material: ${Dinheiro.formatar(centavos)}';
+  String _sinalMaterial(int? centavos) =>
+      centavos == null || centavos == 0 ? '' : 'Sinal de material: ${Dinheiro.formatar(centavos)}';
 
   Orcamento _orcamento(Map<String, dynamic> j, DetalheOrcamento? detalhe) {
     final nome = (j['profissional_nome'] as String?) ?? 'Profissional';
@@ -1163,7 +1179,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     final meios = [for (final m in (j['meios_disponiveis'] as List? ?? const [])) m as String];
     return DadosPagamento(
       subtitulo: 'Pedido ${PedidoApi.numeroDe(pedidoId)}',
-      valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
+      valorAgoraCentavos: (j['total_a_pagar_centavos'] as num?)?.toInt() ?? valor,
       descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
       descontoCupomCentavos: (j['desconto_cupom_centavos'] as num?)?.toInt(),
       cupomCodigo: j['cupom_codigo'] as String?,
@@ -1777,6 +1793,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),
       fotoReferencia: foto,
+      exclusaoAgendadaEm: lerDataIso(j['exclusao_agendada_em']),
       grupos: const [
         GrupoPerfil(
           titulo: 'CONTA',
@@ -2751,7 +2768,7 @@ class CapturaIndisponivel implements CapturaCheckIn {
   Future<PosicaoCapturada?> posicao() async => null;
 }
 
-class ServicoCheckInApi implements ServicoCheckIn {
+class ServicoCheckInApi implements ServicoCheckIn, ReenvioOffline {
   ServicoCheckInApi(
     this._api, {
     required this.pedidoId,
@@ -3000,6 +3017,7 @@ class ServicoCheckInApi implements ServicoCheckIn {
 
   /// Tenta enviar o que ficou guardado deste pedido. Devolve quantas ações saíram. Chamar ao
   /// abrir a tela e quando a conexão voltar. Ação recusada pelo backend sai da fila.
+  @override
   Future<int> reenviarPendentes() async {
     final f = fila;
     if (f == null) return 0;
@@ -3020,7 +3038,7 @@ class ServicoCheckInApi implements ServicoCheckIn {
 }
 
 /// Check-out: foto final + código de conclusão. O app envia; o backend confere.
-class ServicoCheckOutApi implements ServicoCheckOut {
+class ServicoCheckOutApi implements ServicoCheckOut, ReenvioOffline {
   ServicoCheckOutApi(this._checkIn, this._captura);
 
   final ServicoCheckInApi _checkIn;
@@ -3040,6 +3058,9 @@ class ServicoCheckOutApi implements ServicoCheckOut {
 
   @override
   Future<int?> localizar() => _checkIn.localizar();
+
+  @override
+  Future<int> reenviarPendentes() => _checkIn.reenviarPendentes();
 
   @override
   Future<ResultadoFim> finalizar(

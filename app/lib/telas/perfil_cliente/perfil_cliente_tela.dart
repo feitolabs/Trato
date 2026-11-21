@@ -5,6 +5,8 @@ import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../comuns/desconto_moedas.dart';
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
+import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import '../comuns/moeda_trato.dart';
 import '../profissional/dinheiro.dart';
 import 'modelos.dart';
@@ -96,146 +98,155 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x6),
       children: [
-              Row(
+        Row(
+          children: [
+            AvatarIniciais(
+              iniciais: perfil.iniciais,
+              tamanho: 72,
+              fotoReferencia: _fotoAtual,
+              aoTocar: widget.aoCapturarFotoPerfil == null ? null : _tocarAvatar,
+            ),
+            const SizedBox(width: EspacosTrato.x4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AvatarIniciais(
-                    iniciais: perfil.iniciais,
-                    tamanho: 72,
-                    fotoReferencia: _fotoAtual,
-                    aoTocar: widget.aoCapturarFotoPerfil == null ? null : _tocarAvatar,
-                  ),
-                  const SizedBox(width: EspacosTrato.x4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(perfil.nome, style: TipografiaTrato.tituloGrande),
-                        const SizedBox(height: EspacosTrato.x1),
-                        Text(
-                          perfil.resumo,
-                          style: TipografiaTrato.corpoPequeno.copyWith(
-                            color: CoresTrato.textoSecundario,
-                          ),
-                        ),
-                      ],
+                  Text(perfil.nome, style: TipografiaTrato.tituloGrande),
+                  const SizedBox(height: EspacosTrato.x1),
+                  Text(
+                    perfil.resumo,
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: CoresTrato.textoSecundario,
                     ),
                   ),
-                  if (widget.aoAbrirConfiguracoes != null)
-                    IconButton(
-                      tooltip: 'Configurações',
-                      icon: const Icon(Icons.settings_outlined, color: CoresTrato.petroleo),
-                      onPressed: widget.aoAbrirConfiguracoes,
-                    ),
                 ],
               ),
-              if ((perfil.moedas ?? 0) > 0 || perfil.moedasPendentes > 0) ...[
-                const SizedBox(height: EspacosTrato.x5),
-                Card(
-                  margin: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: const MoedaTrato(tamanho: 32),
-                    title: const Text('Seus Tratinhos'),
-                    subtitle: perfil.moedasValorCentavos == null
-                        ? null
-                        : Text(
-                            textoTratinhosEmReais(
-                              perfil.moedas ?? 0,
-                              perfil.moedasValorCentavos,
-                            ),
-                            key: const Key('moedas-em-reais'),
-                          ),
-                    trailing: Text('${perfil.moedas}', style: TipografiaTrato.tituloGrande),
-                  ),
-                ),
-                if (perfil.moedasPendentes > 0) ...[
-                  const SizedBox(height: EspacosTrato.x2),
-                  Text(
-                    textoTratinhosPendentes(
-                      perfil.moedasPendentes,
-                      perfil.moedasProximaLiberacao,
-                      perfil.moedasValorCentavos,
-                    )!,
-                    key: const Key('moedas-pendentes'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
+            ),
+            if (widget.aoAbrirConfiguracoes != null)
+              IconButton(
+                tooltip: 'Configurações',
+                icon: const Icon(Icons.settings_outlined, color: CoresTrato.petroleo),
+                onPressed: widget.aoAbrirConfiguracoes,
+              ),
+          ],
+        ),
+        if (perfil.exclusaoAgendadaEm != null) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          AvisoFaixa(
+            key: const ValueKey('aviso-exclusao-agendada'),
+            texto:
+                'Exclusão da conta agendada para ${diaMesDoAparelho(perfil.exclusaoAgendadaEm!)}. '
+                'Se mudar de ideia, fale com o suporte antes desse prazo.',
+            tipo: TipoStatus.alerta,
+            icone: Icons.schedule,
+          ),
+        ],
+        if ((perfil.moedas ?? 0) > 0 || perfil.moedasPendentes > 0) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              leading: const MoedaTrato(tamanho: 32),
+              title: const Text('Seus Tratinhos'),
+              subtitle: perfil.moedasValorCentavos == null
+                  ? null
+                  : Text(
+                      textoTratinhosEmReais(
+                        perfil.moedas ?? 0,
+                        perfil.moedasValorCentavos,
+                      ),
+                      key: const Key('moedas-em-reais'),
                     ),
-                  ),
-                ],
-                if (perfil.moedasVenceEm != null) ...[
-                  const SizedBox(height: EspacosTrato.x2),
-                  Text(
-                    'Tratinhos vencem em ${formatarDiaMes(perfil.moedasVenceEm!)}',
-                    key: const Key('moedas-vencem'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
-                    ),
-                  ),
-                ],
-                if (perfil.descontoUsadoMesCentavos != null &&
-                    perfil.tetoDescontoMesCentavos != null) ...[
-                  const SizedBox(height: EspacosTrato.x2),
-                  Text(
-                    'Desconto usado no mês: ${Dinheiro.formatar(perfil.descontoUsadoMesCentavos!)} '
-                    'de ${Dinheiro.formatar(perfil.tetoDescontoMesCentavos!)}',
-                    key: const Key('moedas-desconto-mes'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
-                    ),
-                  ),
-                ],
-                if (!perfil.moedasDescontoDisponivel) ...[
-                  const SizedBox(height: EspacosTrato.x2),
-                  Text(
-                    mensagemDescontoIndisponivel(
-                      perfil.moedasDescontoMotivo,
-                      voltaEm: perfil.moedasDescontoVoltaEm,
-                    ),
-                    key: const Key('moedas-desconto-indisponivel'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
-                    ),
-                  ),
-                ],
-              ],
-              for (final grupo in perfil.grupos) ...[
-                const SizedBox(height: EspacosTrato.x5),
-                Text(grupo.titulo, style: TipografiaTrato.sobretitulo),
-                const SizedBox(height: EspacosTrato.x3),
-                _CartaoGrupo(grupo: grupo, aoTocar: widget.aoTocarItem),
-              ],
-              const SizedBox(height: EspacosTrato.x6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const LogoFeitoLabs(tamanho: 28, sobreFundoClaro: true),
-                          const SizedBox(width: EspacosTrato.x2),
-                          Flexible(
-                            child: Text(
-                              'um app Feito Labs',
-                              style: TipografiaTrato.corpoPequeno.copyWith(
-                                color: CoresTrato.textoSecundario,
-                              ),
-                            ),
-                          ),
-                        ],
+              trailing: Text('${perfil.moedas}', style: TipografiaTrato.tituloGrande),
+            ),
+          ),
+          if (perfil.moedasPendentes > 0) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              textoTratinhosPendentes(
+                perfil.moedasPendentes,
+                perfil.moedasProximaLiberacao,
+                perfil.moedasValorCentavos,
+              )!,
+              key: const Key('moedas-pendentes'),
+              style: TipografiaTrato.corpoPequeno.copyWith(
+                color: CoresTrato.textoSecundario,
+              ),
+            ),
+          ],
+          if (perfil.moedasVenceEm != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'Tratinhos vencem em ${formatarDiaMes(perfil.moedasVenceEm!)}',
+              key: const Key('moedas-vencem'),
+              style: TipografiaTrato.corpoPequeno.copyWith(
+                color: CoresTrato.textoSecundario,
+              ),
+            ),
+          ],
+          if (perfil.descontoUsadoMesCentavos != null &&
+              perfil.tetoDescontoMesCentavos != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'Desconto usado no mês: ${Dinheiro.formatar(perfil.descontoUsadoMesCentavos!)} '
+              'de ${Dinheiro.formatar(perfil.tetoDescontoMesCentavos!)}',
+              key: const Key('moedas-desconto-mes'),
+              style: TipografiaTrato.corpoPequeno.copyWith(
+                color: CoresTrato.textoSecundario,
+              ),
+            ),
+          ],
+          if (!perfil.moedasDescontoDisponivel) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              mensagemDescontoIndisponivel(
+                perfil.moedasDescontoMotivo,
+                voltaEm: perfil.moedasDescontoVoltaEm,
+              ),
+              key: const Key('moedas-desconto-indisponivel'),
+              style: TipografiaTrato.corpoPequeno.copyWith(
+                color: CoresTrato.textoSecundario,
+              ),
+            ),
+          ],
+        ],
+        for (final grupo in perfil.grupos) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          Text(grupo.titulo, style: TipografiaTrato.sobretitulo),
+          const SizedBox(height: EspacosTrato.x3),
+          _CartaoGrupo(grupo: grupo, aoTocar: widget.aoTocarItem),
+        ],
+        const SizedBox(height: EspacosTrato.x6),
+        Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LogoFeitoLabs(tamanho: 28, sobreFundoClaro: true),
+                    const SizedBox(width: EspacosTrato.x2),
+                    Flexible(
+                      child: Text(
+                        'um app Feito Labs',
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: CoresTrato.textoSecundario,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
-          );
+            ),
+          ],
+        ),
+      ],
+    );
     return Scaffold(
       body: SafeArea(
         child: ConteudoResponsivo(
-          child: recarregar == null
-              ? lista
-              : RefreshIndicator(onRefresh: recarregar, child: lista),
+          child: recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista),
         ),
       ),
     );

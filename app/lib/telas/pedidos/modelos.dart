@@ -18,6 +18,7 @@ class PedidoResumo {
     this.profissionalNome = '',
     this.remoto = false,
     this.descricao,
+    this.urgente = false,
   });
 
   /// Descrição do cliente, mostrada como subtítulo (opcional).
@@ -25,6 +26,9 @@ class PedidoResumo {
 
   /// Atendimento remoto: a lista mostra o selo "Remoto".
   final bool remoto;
+
+  /// Pedido urgente: a lista mostra o selo "Urgente".
+  final bool urgente;
 
   /// Id do pedido na API (nulo nos dados de exemplo).
   final String? id;
@@ -152,6 +156,9 @@ class PedidoEmExecucao {
     this.categoriaNome,
     this.descricao,
     this.jaAvaliou = false,
+    this.urgente = false,
+    this.profissionalNome,
+    this.enderecoResumo,
   });
 
   /// Nome da categoria (`categoria_nome`, opcional). Vindo, vira o título da tela.
@@ -162,6 +169,13 @@ class PedidoEmExecucao {
 
   /// O cliente já avaliou: a ação "Avaliar" some.
   final bool jaAvaliou;
+
+  /// Pedido urgente (para hoje).
+  final bool urgente;
+
+  /// Nome do profissional contratado e endereço resumido (para compartilhar/SOS).
+  final String? profissionalNome;
+  final String? enderecoResumo;
 
   /// Serviço remoto: a tela esconde o que é presencial.
   final bool remoto;

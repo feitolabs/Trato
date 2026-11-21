@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
@@ -26,6 +27,8 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoPagar,
     this.aoAvaliar,
     this.aoVerGarantia,
+    this.aoCompartilharAtendimento,
+    this.aoSosEmergencia,
     this.atualizarAditivoLocalmente = true,
   });
 
@@ -34,6 +37,8 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoPagar;
   final VoidCallback? aoAvaliar;
   final VoidCallback? aoVerGarantia;
+  final VoidCallback? aoCompartilharAtendimento;
+  final VoidCallback? aoSosEmergencia;
 
   final PedidoEmExecucao pedido;
   final VoidCallback? aoAprovarAditivo;
@@ -64,6 +69,71 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
     if (widget.pedido.aditivo != oldWidget.pedido.aditivo) {
       _aditivo = widget.pedido.aditivo;
     }
+  }
+
+  String _textoResumoAtendimento(PedidoEmExecucao pedido) {
+    final partes = <String>[
+      'Atendimento Trato (${pedido.numero})',
+      if ((pedido.profissionalNome ?? '').isNotEmpty) 'Profissional: ${pedido.profissionalNome}',
+      if ((pedido.visita ?? '').isNotEmpty) 'Horário: ${pedido.visita}',
+      if ((pedido.enderecoResumo ?? '').isNotEmpty) 'Endereço: ${pedido.enderecoResumo}',
+    ];
+    return partes.join('\n');
+  }
+
+  Future<void> _abrirResumoCompartilhamento(PedidoEmExecucao pedido) async {
+    final resumo = _textoResumoAtendimento(pedido);
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (folha) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(EspacosTrato.x5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Compartilhar atendimento', style: TipografiaTrato.titulo),
+              const SizedBox(height: EspacosTrato.x3),
+              Text(resumo, style: TipografiaTrato.corpo),
+              const SizedBox(height: EspacosTrato.x4),
+              BotaoPrimario(
+                texto: 'Copiar resumo',
+                aoTocar: () async {
+                  await Clipboard.setData(ClipboardData(text: resumo));
+                  if (folha.mounted) Navigator.of(folha).pop();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _abrirConfirmacaoSos(PedidoEmExecucao pedido) async {
+    final resumo = _textoResumoAtendimento(pedido);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        title: const Text('SOS / Emergência'),
+        content: Text(
+          'Se você estiver em risco, ligue para a polícia (190) ou copie os dados do atendimento para enviar a um contato de confiança.\n\n$resumo',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(),
+            child: const Text('Fechar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: resumo));
+              if (dialogo.mounted) Navigator.of(dialogo).pop();
+            },
+            child: const Text('Copiar dados'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _decidir(EstadoAditivo estado, VoidCallback? aviso) {
@@ -163,6 +233,12 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 tipo: TipoStatus.info,
                 icone: Icons.videocam_outlined,
               ),
+            if (pedido.urgente)
+              const ChipStatus(
+                key: ValueKey('selo-urgente'),
+                texto: 'Urgente',
+                tipo: TipoStatus.destaque,
+              ),
           ],
         ),
         if (pedido.etapas.isNotEmpty &&
@@ -246,6 +322,32 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
         if (_acaoPrincipal(pedido) case final principal?) ...[
           const SizedBox(height: EspacosTrato.x4),
           principal,
+        ],
+        if (!pedido.remoto && pedido.estadoApi == 'em_andamento') ...[
+          const SizedBox(height: EspacosTrato.x4),
+          Wrap(
+            spacing: EspacosTrato.x3,
+            runSpacing: EspacosTrato.x2,
+            children: [
+              OutlinedButton.icon(
+                key: const ValueKey('botao-compartilhar-atendimento'),
+                onPressed:
+                    widget.aoCompartilharAtendimento ?? () => _abrirResumoCompartilhamento(pedido),
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: const Text('Compartilhar atendimento'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('botao-sos-emergencia'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: CoresTrato.vermelhoTexto,
+                  side: const BorderSide(color: CoresTrato.vermelhoTexto),
+                ),
+                onPressed: widget.aoSosEmergencia ?? () => _abrirConfirmacaoSos(pedido),
+                icon: const Icon(Icons.warning_amber_rounded, size: 18),
+                label: const Text('SOS / Emergência'),
+              ),
+            ],
+          ),
         ],
         if (_aditivo != null) ...[
           const SizedBox(height: EspacosTrato.x4),

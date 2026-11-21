@@ -235,16 +235,26 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
           key: const ValueKey('subtitulo-pedido'),
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
-        if (_dados.remoto) ...[
+        if (_dados.remoto || _dados.urgente) ...[
           const SizedBox(height: EspacosTrato.x3),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: ChipStatus(
-              key: ValueKey('selo-remoto'),
-              texto: 'Remoto',
-              tipo: TipoStatus.info,
-              icone: Icons.videocam_outlined,
-            ),
+          Wrap(
+            spacing: EspacosTrato.x2,
+            runSpacing: EspacosTrato.x2,
+            children: [
+              if (_dados.remoto)
+                const ChipStatus(
+                  key: ValueKey('selo-remoto'),
+                  texto: 'Remoto',
+                  tipo: TipoStatus.info,
+                  icone: Icons.videocam_outlined,
+                ),
+              if (_dados.urgente)
+                const ChipStatus(
+                  key: ValueKey('selo-urgente'),
+                  texto: 'Urgente',
+                  tipo: TipoStatus.destaque,
+                ),
+            ],
           ),
         ],
         if (!_editando) ...[

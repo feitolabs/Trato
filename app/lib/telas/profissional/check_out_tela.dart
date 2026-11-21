@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -49,6 +51,8 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
   String? _erroCodigo;
   String? _erro;
   String? _aviso;
+  Timer? _timerOffline;
+  var _reenviandoOffline = false;
 
   @override
   void initState() {
@@ -59,13 +63,43 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
   /// Ao voltar ao primeiro plano o "Sem internet" antigo sai: a conexão pode ter voltado.
   @override
   void didChangeAppLifecycleState(AppLifecycleState estado) {
-    if (estado == AppLifecycleState.resumed && _aviso != null && mounted) {
-      setState(() => _aviso = null);
+    if (estado == AppLifecycleState.resumed && mounted) {
+      if (_aviso != null) setState(() => _aviso = null);
+      if (_timerOffline != null) _tentarReenviarOffline();
+    }
+  }
+
+  void _iniciarTimerOffline() {
+    _timerOffline?.cancel();
+    _timerOffline = Timer.periodic(
+      const Duration(seconds: 6),
+      (_) => _tentarReenviarOffline(),
+    );
+  }
+
+  Future<void> _tentarReenviarOffline() async {
+    if (!mounted || _enviando || _reenviandoOffline) return;
+    final servico = widget.servico;
+    if (servico is! ReenvioOffline) return;
+    _reenviandoOffline = true;
+    try {
+      final enviadas = await (servico as ReenvioOffline).reenviarPendentes();
+      if (enviadas > 0 && mounted) {
+        _timerOffline?.cancel();
+        _timerOffline = null;
+        setState(() => _aviso = null);
+        widget.aoConcluir?.call();
+      }
+    } on Object {
+      // Ainda sem sinal: a próxima tentativa do timer resolve.
+    } finally {
+      _reenviandoOffline = false;
     }
   }
 
   @override
   void dispose() {
+    _timerOffline?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _codigo.dispose();
     _justificativa.dispose();
@@ -127,6 +161,7 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
 
   Future<void> _concluir() async {
     if (_enviando) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _enviando = true;
       _aviso = null; // novo envio: o "Sem internet" antigo sai
@@ -166,9 +201,14 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
       if (r == ResultadoFim.guardadoOffline) {
         _aviso = 'Sem internet. Guardamos a conclusão e enviamos assim que o sinal voltar. '
             'O Trato ainda vai confirmar.';
+        _iniciarTimerOffline();
       }
     });
-    if (r == ResultadoFim.concluido) widget.aoConcluir?.call();
+    if (r == ResultadoFim.concluido) {
+      _timerOffline?.cancel();
+      _timerOffline = null;
+      widget.aoConcluir?.call();
+    }
   }
 
   @override

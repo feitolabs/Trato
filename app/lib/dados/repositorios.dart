@@ -42,10 +42,14 @@ class DadosDoPedido {
     this.ofertaExclusividade,
     this.orcamentosRecebidos = 0,
     this.categoriaNome,
+    this.urgente = false,
   });
 
   /// Nome da categoria (`categoria_nome`, opcional): vira o título do pedido.
   final String? categoriaNome;
+
+  /// Pedido urgente (para hoje).
+  final bool urgente;
 
   final List<String> fotos;
   final String? profissionalConvidadoId;
