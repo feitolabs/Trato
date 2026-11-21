@@ -128,7 +128,8 @@ void main() {
     testWidgets('mostra só bairro e distância, com aviso do endereço', (tester) async {
       await _abrir(tester, const DetalhePedidoTela(dados: detalhePedidoExemplo, ), tamanho: const Size(390, 2000));
       expect(find.text('Fecha em 31 horas · 3 de 5 orçaram'), findsOneWidget);
-      expect(find.textContaining('Savassi, a 2,1 km'), findsOneWidget);
+      expect(find.text('Savassi'), findsOneWidget);
+      expect(find.text('a 2,1 km de você'), findsOneWidget);
       expect(
           find.textContaining(
               'endereço completo aparece depois da contratação'),
@@ -164,22 +165,16 @@ void main() {
       }
     });
 
-    testWidgets('tocar a área aproximada abre o mapa só quando há ponto',
+    testWidgets('cartão Região aproximada: bairro, distância e Abrir no mapa só com ponto',
         (tester) async {
       final abertos = <(double, double)>[];
-      final antes = abrirNoMapa;
-      abrirNoMapa = (lat, lng, _) async {
-        abertos.add((lat, lng));
-        return true;
-      };
-      addTearDown(() => abrirNoMapa = antes);
       const comPonto = DetalhePedido(
         pedido: PedidoAberto(
           id: 'x',
           titulo: 't',
           bairro: 'Savassi',
           prazo: 'hoje',
-          distanciaKm: 0.4,
+          distanciaKm: 3.2,
           latitude: -19.92,
           longitude: -43.94,
         ),
@@ -189,15 +184,54 @@ void main() {
         descricao: 'd',
         linhas: [],
       );
-      await _abrir(tester, const DetalhePedidoTela(dados: comPonto),
-          tamanho: const Size(390, 2000));
-      expect(find.textContaining('Savassi, a 0,4 km'), findsOneWidget);
-      await tester.tap(find.textContaining('toque para ver no mapa'));
+      await _abrir(
+        tester,
+        DetalhePedidoTela(dados: comPonto, aoAbrirMapa: (lat, lng, _) => abertos.add((lat, lng))),
+        tamanho: const Size(390, 2000),
+      );
+      expect(find.text('Região aproximada'), findsOneWidget);
+      expect(find.text('Savassi'), findsOneWidget);
+      expect(find.text('a 3,2 km de você'), findsOneWidget);
+      expect(find.text('O endereço completo aparece depois da contratação.'), findsOneWidget);
+      await tester.tap(find.text('Abrir no mapa'));
       expect(abertos, [(-19.92, -43.94)]);
 
-      await _abrir(tester, const DetalhePedidoTela(dados: detalhePedidoExemplo),
+      // Sem coordenada (localização negada): só o bairro e a frase, sem botão.
+      const semPonto = DetalhePedido(
+        pedido: PedidoAberto(id: 'y', titulo: 't', bairro: 'Funcionários', prazo: 'hoje'),
+        fechaEm: 'Aberto agora',
+        clienteResumo: '',
+        legendasFotos: [],
+        descricao: 'd',
+        linhas: [],
+      );
+      await _abrir(tester, const DetalhePedidoTela(dados: semPonto),
           tamanho: const Size(390, 2000));
-      expect(find.textContaining('toque para ver no mapa'), findsNothing);
+      expect(find.text('Funcionários'), findsOneWidget);
+      expect(find.text('Abrir no mapa'), findsNothing);
+      expect(find.byKey(const ValueKey('regiao-distancia')), findsNothing);
+    });
+
+    testWidgets('pedido remoto não mostra o cartão de região', (tester) async {
+      const remoto = DetalhePedido(
+        pedido: PedidoAberto(
+          id: 'z',
+          titulo: 't',
+          bairro: 'Savassi',
+          prazo: 'hoje',
+          modalidade: 'remoto',
+          latitude: -19.92,
+          longitude: -43.94,
+        ),
+        fechaEm: 'Aberto agora',
+        clienteResumo: '',
+        legendasFotos: [],
+        descricao: 'd',
+        linhas: [],
+      );
+      await _abrir(tester, const DetalhePedidoTela(dados: remoto), tamanho: const Size(390, 2000));
+      expect(find.byKey(const ValueKey('cartao-regiao')), findsNothing);
+      expect(find.text('Abrir no mapa'), findsNothing);
     });
 
     testWidgets('Perguntar e Fazer orçamento chamam os callbacks',

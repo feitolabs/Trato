@@ -38,7 +38,11 @@ class DetalhePedidoTela extends StatefulWidget {
     this.aoPerguntar,
     this.aoRecusar,
     this.aoPedirExclusividade,
+    this.aoAbrirMapa,
   });
+
+  /// Abre o app de mapas no ponto aproximado (padrão: `abrirNoMapa`). Existe para testes.
+  final void Function(double latitude, double longitude, String rotulo)? aoAbrirMapa;
 
   final DetalhePedido dados;
   final VoidCallback? aoFazerOrcamento;
@@ -349,38 +353,18 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
                       ),
                     ),
                     if (!pedido.remoto) ...[
-                    const SizedBox(height: EspacosTrato.x4),
-                    _Mapa(
-                      aoTocar: pedido.latitude == null || pedido.longitude == null
-                          ? null
-                          : () => abrirNoMapa(
-                                pedido.latitude!,
-                                pedido.longitude!,
-                                pedido.bairro.isEmpty ? 'Região do pedido' : pedido.bairro,
-                              ),
-                    ),
-                    const SizedBox(height: EspacosTrato.x2),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.lock_outline, size: EspacosTrato.x5),
-                        const SizedBox(width: EspacosTrato.x2),
-                        Expanded(
-                          child: Text(
-                            pedido.bairro.isEmpty
-                                ? 'Região da sua área. '
-                                    'O endereço completo aparece depois da contratação.'
-                                : pedido.distanciaKm == null
-                                    ? 'Bairro ${pedido.bairro}. '
-                                        'O endereço completo aparece depois da contratação.'
-                                    : '${pedido.bairro}, a ${textoDistancia(pedido.distanciaKm)}. '
-                                        'O endereço completo aparece depois da contratação.',
-                            style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.textoSecundario),
-                          ),
-                        ),
-                      ],
-                    ),
+                      const SizedBox(height: EspacosTrato.x4),
+                      _CartaoRegiao(
+                        bairro: pedido.bairro,
+                        distanciaKm: pedido.distanciaKm,
+                        aoAbrirNoMapa: pedido.latitude == null || pedido.longitude == null
+                            ? null
+                            : () => (widget.aoAbrirMapa ?? abrirNoMapa)(
+                                  pedido.latitude!,
+                                  pedido.longitude!,
+                                  pedido.bairro.isEmpty ? 'Região do pedido' : pedido.bairro,
+                                ),
+                      ),
                     ],
                     if (widget.aoPedirExclusividade != null ||
                         _exclusividade != null ||
@@ -432,56 +416,56 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
   static String _capitalizar(String t) => t.isEmpty ? t : t[0].toUpperCase() + t.substring(1);
 }
 
-/// Espaço do mapa do protótipo (área aproximada, sem endereço exato).
-class _Mapa extends StatelessWidget {
-  const _Mapa({this.aoTocar});
+/// Etapa 1 do mapa: um cartão honesto com a região aproximada (bairro e distância), sem desenho
+/// de mapa nem pino. O botão abre o app de mapas no ponto aproximado, quando há coordenada.
+class _CartaoRegiao extends StatelessWidget {
+  const _CartaoRegiao({required this.bairro, this.distanciaKm, this.aoAbrirNoMapa});
 
-  /// Abre o app de mapas no ponto aproximado. Sem ponto, o cartão só ilustra a área.
-  final VoidCallback? aoTocar;
+  final String bairro;
+  final double? distanciaKm;
+  final VoidCallback? aoAbrirNoMapa;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: aoTocar == null ? 'Mapa da região aproximada' : 'Abrir região aproximada no mapa',
-      button: aoTocar != null,
-      child: GestureDetector(
-        onTap: aoTocar,
-        child: Container(
-          height: 160,
-          width: double.infinity,
-          padding: const EdgeInsets.all(EspacosTrato.x3),
-          decoration: BoxDecoration(
-            color: CoresTrato.azulSuave,
-            borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-            border: Border.all(color: CoresTrato.borda),
-          ),
-          child: Stack(
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    return CartaoTrato(
+      key: const ValueKey('cartao-regiao'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Align(
-                alignment: const Alignment(0, -0.45),
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: CoresTrato.azulClaro,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: CoresTrato.azulTexto, width: 1.5),
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  aoTocar == null ? 'Área aproximada' : 'Área aproximada · toque para ver no mapa',
-                  style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.petroleo,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+              const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
+              const SizedBox(width: EspacosTrato.x2),
+              Expanded(child: Text('Região aproximada', style: TipografiaTrato.corpoForte)),
             ],
           ),
-        ),
+          const SizedBox(height: EspacosTrato.x2),
+          Text(
+            bairro.isEmpty ? 'Região da sua área' : bairro,
+            key: const ValueKey('regiao-bairro'),
+            style: TipografiaTrato.tituloGrande,
+          ),
+          if (distanciaKm != null) ...[
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              'a ${textoDistancia(distanciaKm)} de você',
+              key: const ValueKey('regiao-distancia'),
+              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ],
+          const SizedBox(height: EspacosTrato.x2),
+          Text('O endereço completo aparece depois da contratação.', style: secundario),
+          if (aoAbrirNoMapa != null) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            BotaoSecundario(
+              key: const ValueKey('abrir-no-mapa'),
+              texto: 'Abrir no mapa',
+              icone: Icons.map_outlined,
+              aoTocar: aoAbrirNoMapa!,
+            ),
+          ],
+        ],
       ),
     );
   }

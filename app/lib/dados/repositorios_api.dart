@@ -1860,7 +1860,10 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     final textoData = prazo == null ? 'Sem data fixa' : 'Até ${_dia(DateTime.parse(prazo))}';
     return PedidoAberto(
       id: j['id'] as String,
-      titulo: j['titulo'] as String,
+      // `categoria_nome` (opcional) é o título; sem ele, o título de antes.
+      titulo: ((j['categoria_nome'] as String?)?.trim().isNotEmpty ?? false)
+          ? (j['categoria_nome'] as String).trim()
+          : j['titulo'] as String,
       bairro: (j['bairro'] as String?) ?? '',
       prazo: urgente
           ? (prazo == null ? 'Urgente' : 'Urgente · até ${_dia(DateTime.parse(prazo))}')
@@ -2145,6 +2148,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       quando: p.janelaRotulo,
       janelaInicio: p.janelaInicio?.toLocal(),
       remoto: p.remoto,
+      jaAvaliou: p.jaAvaliou,
       endereco: dados?.enderecoCompleto,
       consultaMapa: dados?.consultaDoMapa,
     );

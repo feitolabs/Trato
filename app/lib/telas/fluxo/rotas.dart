@@ -882,6 +882,7 @@ abstract final class RotasTrato {
             pedidoId: c.pedidoId,
             titulo: c.titulo,
             remoto: c.remoto,
+            jaAvaliou: c.jaAvaliou,
             consultaMapa: c.consultaMapa,
             estadoApi: c.estadoApi,
             // Antes do pagamento só há a conversa; `concluido` aqui só esconde check-in e check-out.
@@ -1292,6 +1293,7 @@ abstract final class RotasTrato {
     BuildContext context, {
     required String estadoApi,
     bool remoto = false,
+    bool jaAvaliou = false,
   }) =>
       _acoesPedidoProfissional(
         context,
@@ -1299,6 +1301,7 @@ abstract final class RotasTrato {
         titulo: 'Pedido de teste',
         estadoApi: estadoApi,
         remoto: remoto,
+        jaAvaliou: jaAvaliou,
         aoCheckIn: () {},
       );
 
@@ -1310,6 +1313,7 @@ abstract final class RotasTrato {
     EstadoAgendamento estado = EstadoAgendamento.agendado,
     String? estadoApi,
     bool remoto = false,
+    bool jaAvaliou = false,
     String? consultaMapa,
   }) {
     // Início e Pedidos oferecem as MESMAS ações: com o estado da API, só ele decide.
@@ -1442,8 +1446,9 @@ abstract final class RotasTrato {
                 if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
                   ListTile(
                     leading: const Icon(Icons.receipt_outlined),
-                    title: Text((estadoApi == 'concluido' ||
-                            (estadoApi == null && estado == EstadoAgendamento.concluido))
+                    title: Text(((estadoApi == 'concluido' ||
+                                (estadoApi == null && estado == EstadoAgendamento.concluido)) &&
+                            !jaAvaliou)
                         ? 'Ver valores e avaliar cliente'
                         : 'Ver valores do pedido'),
                     onTap: () {

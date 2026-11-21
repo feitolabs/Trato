@@ -202,7 +202,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                     color: c.aguardandoPagamento ? CoresTrato.laranja : CoresTrato.textoSecundario,
                   ),
                 ),
-                if (oQueFazerAgora(c.estadoApi, remoto: c.remoto) case final agora?) ...[
+                if (oQueFazerAgora(c.estadoApi, remoto: c.remoto, jaAvaliou: c.jaAvaliou) case final agora?) ...[
                   const SizedBox(height: EspacosTrato.x1),
                   Text(
                     'O que fazer agora: $agora',

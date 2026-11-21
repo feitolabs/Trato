@@ -305,7 +305,7 @@ void main() {
 
       expect(find.text('Exclusividades: 2 de 3'), findsOneWidget);
       expect(find.text('150 Tratinhos'), findsOneWidget);
-      expect(find.text('50 Tratinhos a liberar'), findsOneWidget);
+      expect(find.text('Você tem 50 Tratinhos a liberar'), findsOneWidget);
       expect(
         find.text('Ganhe Tratinhos avaliando clientes e use 100 para pedir 48h de exclusividade.'),
         findsOneWidget,
