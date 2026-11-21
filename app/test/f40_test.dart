@@ -173,6 +173,44 @@ void main() {
       expect(find.text('Nada informado'), findsOneWidget);
     });
 
+    Text naoInclui(WidgetTester tester) => tester.widget<Text>(
+          find
+              .descendant(
+                of: find.byKey(const Key('orcamento-nao-inclui')),
+                matching: find.byType(Text),
+              )
+              .last,
+        );
+
+    testWidgets('comparador limita o "Não inclui" a 2 linhas; o detalhe mostra completo',
+        (tester) async {
+      const longo = 'Troca de fiação embutida, quebra de parede, pintura, reboco e retirada de '
+          'entulho. Se for preciso, o profissional propõe um aditivo e você aprova antes.';
+      final longoOrc = _orc('c', 'Carla Dias', _detalhe(fora: longo));
+      await _abrir(
+        tester,
+        OrcamentosRecebidosTela(
+          pedido: const ResumoPedido(
+            numero: 'AB12',
+            titulo: 'Tomada',
+            recebidos: 1,
+            limite: 5,
+            tempoRestante: '30 horas',
+          ),
+          orcamentos: [longoOrc],
+        ),
+      );
+      final noComparador = naoInclui(tester);
+      expect(noComparador.data, longo); // o texto inteiro está lá; só a exibição é cortada
+      expect(noComparador.maxLines, 2);
+      expect(noComparador.overflow, TextOverflow.ellipsis);
+
+      await _abrir(tester, DetalheOrcamentoTela(orcamento: longoOrc));
+      final noDetalhe = naoInclui(tester);
+      expect(noDetalhe.maxLines, isNull);
+      expect(noDetalhe.data, longo);
+    });
+
     testWidgets('detalhe: mesmo rótulo e mesma ordem', (tester) async {
       await _abrir(tester, DetalheOrcamentoTela(orcamento: completo));
       expect(find.byKey(const Key('orcamento-inclui')), findsOneWidget);

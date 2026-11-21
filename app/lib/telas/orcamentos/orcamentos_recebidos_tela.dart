@@ -185,7 +185,7 @@ class _CartaoOrcamento extends StatelessWidget {
             ],
           ),
           const SizedBox(height: EspacosTrato.x3),
-          IncluiNaoInclui(detalhe: o.detalhe),
+          IncluiNaoInclui(detalhe: o.detalhe, maxLinhasNaoInclui: 2),
           const SizedBox(height: EspacosTrato.x3),
           Text(
             o.observacao,

@@ -137,20 +137,37 @@ void main() {
       expect(find.text('Sugestões para combinar'), findsOneWidget);
     });
 
-    testWidgets('categorias especiais trocam a 3ª pergunta', (tester) async {
-      await _abrir(tester, _conversa(categoria: 'Eletricista'));
-      expect(find.text('Sabe me dizer se o quadro de luz está identificado?'), findsOneWidget);
-      expect(find.text(_materialCliente), findsNothing);
+    // 3ª pergunta por categoria e por papel: o cliente fala na versão inversa.
+    const porCategoria = {
+      'Eletricista': (
+        'Preciso deixar o quadro de luz identificado antes da visita?',
+        'Sabe me dizer se o quadro de luz está identificado?',
+      ),
+      'Pintura': (
+        'Preciso mover ou cobrir os móveis antes?',
+        'Posso mover os móveis ou você prefere deixar cobertos?',
+      ),
+      'Câmeras e segurança': (
+        'Preciso ter internet e tomada perto de onde ficarão as câmeras?',
+        'Tem internet e tomada perto de onde ficarão as câmeras?',
+      ),
+    };
+    for (final MapEntry(key: categoria, value: (cliente, profissional)) in porCategoria.entries) {
+      testWidgets('$categoria: o cliente vê a versão dele', (tester) async {
+        await _abrir(tester, _conversa(categoria: categoria));
+        expect(find.text(cliente), findsOneWidget);
+        expect(find.text(profissional), findsNothing);
+        expect(find.text(_materialCliente), findsNothing);
+        expect(find.text(_estacionar), findsOneWidget); // as outras 3 continuam
+      });
 
-      await _abrir(tester, _conversa(categoria: 'Pintura'));
-      expect(find.text('Posso mover os móveis ou você prefere deixar cobertos?'), findsOneWidget);
-
-      await _abrir(tester, _conversa(categoria: 'Câmeras e segurança'));
-      expect(
-        find.text('Tem internet e tomada perto de onde ficarão as câmeras?'),
-        findsOneWidget,
-      );
-      expect(find.text(_estacionar), findsOneWidget); // as outras 3 continuam
-    });
+      testWidgets('$categoria: o profissional mantém a versão atual', (tester) async {
+        await _abrir(tester, _conversa(categoria: categoria, souCliente: false));
+        expect(find.text(profissional), findsOneWidget);
+        expect(find.text(cliente), findsNothing);
+        expect(find.text(_materialPro), findsNothing);
+        expect(find.text(_estacionar), findsOneWidget);
+      });
+    }
   });
 }

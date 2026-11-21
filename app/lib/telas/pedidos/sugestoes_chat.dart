@@ -37,11 +37,17 @@ List<String> sugestoesDoChat({required bool souCliente, String? categoria}) {
   final c = _semAcento((categoria ?? '').trim());
   final String terceira;
   if (c.contains('eletric')) {
-    terceira = 'Sabe me dizer se o quadro de luz está identificado?';
+    terceira = souCliente
+        ? 'Preciso deixar o quadro de luz identificado antes da visita?'
+        : 'Sabe me dizer se o quadro de luz está identificado?';
   } else if (c.contains('pintura')) {
-    terceira = 'Posso mover os móveis ou você prefere deixar cobertos?';
+    terceira = souCliente
+        ? 'Preciso mover ou cobrir os móveis antes?'
+        : 'Posso mover os móveis ou você prefere deixar cobertos?';
   } else if (c.contains('cameras')) {
-    terceira = 'Tem internet e tomada perto de onde ficarão as câmeras?';
+    terceira = souCliente
+        ? 'Preciso ter internet e tomada perto de onde ficarão as câmeras?'
+        : 'Tem internet e tomada perto de onde ficarão as câmeras?';
   } else if (souCliente) {
     terceira = 'Você traz o material ou eu compro?';
   } else {

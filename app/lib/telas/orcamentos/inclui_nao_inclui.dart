@@ -6,9 +6,12 @@ import 'modelos.dart';
 /// "Inclui:" e "Não inclui:" de um orçamento, lado a lado. Mesmo rótulo e mesma ordem no
 /// comparador e no detalhe. Só leitura do que a API já devolveu: nenhum valor é calculado.
 class IncluiNaoInclui extends StatelessWidget {
-  const IncluiNaoInclui({super.key, required this.detalhe});
+  const IncluiNaoInclui({super.key, required this.detalhe, this.maxLinhasNaoInclui});
 
   final DetalheOrcamento? detalhe;
+
+  /// Limite de linhas do "Não inclui:" (reticências); nulo = texto completo (detalhe).
+  final int? maxLinhasNaoInclui;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +31,7 @@ class IncluiNaoInclui extends StatelessWidget {
             chave: const Key('orcamento-nao-inclui'),
             rotulo: 'Não inclui:',
             valor: textoNaoInclui(detalhe),
+            maxLinhas: maxLinhasNaoInclui,
           ),
         ),
       ],
@@ -36,11 +40,17 @@ class IncluiNaoInclui extends StatelessWidget {
 }
 
 class _Coluna extends StatelessWidget {
-  const _Coluna({required this.chave, required this.rotulo, required this.valor});
+  const _Coluna({
+    required this.chave,
+    required this.rotulo,
+    required this.valor,
+    this.maxLinhas,
+  });
 
   final Key chave;
   final String rotulo;
   final String valor;
+  final int? maxLinhas;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +63,12 @@ class _Coluna extends StatelessWidget {
           style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x1),
-        Text(valor, style: TipografiaTrato.corpoForte),
+        Text(
+          valor,
+          maxLines: maxLinhas,
+          overflow: maxLinhas == null ? null : TextOverflow.ellipsis,
+          style: TipografiaTrato.corpoForte,
+        ),
       ],
     );
   }
