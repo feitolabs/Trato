@@ -59,10 +59,12 @@ void main() {
     expect(find.text('Repasse do dinheiro: Automático em até 48 h'), findsOneWidget);
 
     expect(find.text('Instalar 4 luminárias'), findsOneWidget);
-    expect(find.text('R\$ 200,00 – R\$ 10,00 de taxa'), findsNWidgets(2));
+    expect(find.textContaining('de taxa'), findsNothing);
+    expect(find.text('Sem taxa'), findsNWidgets(4));
     expect(find.text('R\$ 380,00'), findsOneWidget); // líquido do portão
     expect(find.text('Confirmado'), findsNWidgets(3));
-    expect(find.text('A confirmar'), findsNWidgets(2)); // cartão de saldo + chip
+    expect(find.text('A liberar'), findsNWidgets(2)); // cartão de saldo + chip
+    expect(find.text('Retido'), findsOneWidget);
   });
 
   testWidgets('a tela não calcula: taxa e líquido mudam só pelo dado', (tester) async {
@@ -88,30 +90,87 @@ void main() {
     );
     await _abrir(tester, const CarteiraTela(dados: dados, soExtrato: false));
 
-    expect(find.text('R\$ 1.000,00 – R\$ 7,00 de taxa'), findsOneWidget);
+    expect(find.textContaining('de taxa'), findsNothing);
+    expect(find.text('Sem taxa'), findsOneWidget);
     expect(find.text('R\$ 123,45'), findsOneWidget);
     expect(find.text('Repasse do dinheiro: Automático em até 7 dias'), findsOneWidget);
     expect(find.textContaining('5%'), findsNothing);
   });
 
-  testWidgets('Sacar via Pix chama o callback', (tester) async {
-    var sacou = 0;
-    await _abrir(
-        tester,
-        CarteiraTela(
-            dados: DadosExemploCarteira.completo, soExtrato: false, aoSacarPix: () => sacou++));
-    await tester.tap(find.text('Sacar via Pix'));
-    expect(sacou, 1);
-  });
-
-  testWidgets('sem saldo disponível o saque fica desligado', (tester) async {
-    var sacou = 0;
+  testWidgets('F35: card escuro, Retido, A liberar, extrato com chips e sem taxa', (tester) async {
+    var abriu = 0;
     await _abrir(
       tester,
-      CarteiraTela(dados: DadosExemploCarteira.vazio, soExtrato: false, aoSacarPix: () => sacou++),
+      CarteiraTela(
+        soExtrato: false,
+        aoConfigurarRecebimento: () => abriu++,
+        dados: const DadosCarteira(
+          resumo: ResumoCarteira(
+            disponivelCentavos: 71250,
+            textoPix: 'Pix na chave CPF ***.482.***-12',
+            retidoCentavos: 42500,
+            textoRetido: 'Serviço em andamento',
+            aLiberarCentavos: 19000,
+            textoALiberar: 'Automático em até 48 horas',
+          ),
+          contaRecebimento: ContaRecebimento(cadastrada: true, chavePixMascarada: '***.482.***-12'),
+          extrato: [
+            ItemExtrato(
+              titulo: 'Instalar luminárias',
+              detalheData: 'Ontem · aguardando confirmação',
+              brutoCentavos: 20000,
+              textoTaxa: 'x',
+              liquidoCentavos: 20000,
+              status: StatusExtrato.aLiberar,
+            ),
+            ItemExtrato(
+              titulo: 'Pintura de portão',
+              detalheData: '26/10/2026',
+              brutoCentavos: 40000,
+              textoTaxa: 'x',
+              liquidoCentavos: 40000,
+              status: StatusExtrato.liberado,
+            ),
+          ],
+        ),
+      ),
     );
-    await tester.tap(find.text('Sacar via Pix'), warnIfMissed: false);
-    expect(sacou, 0);
+    expect(find.text('Carteira'), findsOneWidget);
+    // Bloco 1: card escuro com o disponível, a chave Pix e o botão de conta (sem saque).
+    expect(find.text('Disponível para saque'), findsOneWidget);
+    expect(find.text('R\$ 712,50'), findsOneWidget);
+    expect(find.text('Pix na chave CPF ***.482.***-12'), findsOneWidget);
+    expect(find.text('Sacar via Pix'), findsNothing);
+    await tester.tap(find.byKey(const Key('botao-alterar-conta')));
+    expect(abriu, 1);
+    expect(find.text('Alterar conta de recebimento'), findsOneWidget);
+    // Bloco 2: Retido e A liberar lado a lado.
+    expect(find.text('Retido'), findsOneWidget);
+    expect(find.text('R\$ 425,00'), findsOneWidget);
+    expect(find.text('Serviço em andamento'), findsOneWidget);
+    expect(find.text('R\$ 190,00'), findsOneWidget); // card A liberar
+    expect(find.text('R\$ 200,00'), findsOneWidget); // linha do extrato
+    expect(find.text('R\$ 400,00'), findsOneWidget);
+    expect(find.text('Repasse do dinheiro: Automático em até 48 horas'), findsOneWidget);
+    // Bloco 3: extrato com chips, sem texto de taxa e com a conta ativa e a regra de liberação.
+    expect(find.text('Extrato por serviço'), findsOneWidget);
+    expect(find.text('Conta de recebimento ativa'), findsOneWidget);
+    expect(find.byKey(const Key('regra-liberacao')), findsOneWidget);
+    expect(find.text('A liberar'), findsNWidgets(2)); // card + chip
+    expect(find.text('Confirmado'), findsOneWidget);
+    expect(find.text('Sem taxa'), findsNWidgets(2));
+    expect(find.textContaining('de taxa'), findsNothing);
+    expect(find.textContaining('%'), findsNothing);
+  });
+
+  testWidgets('F35: sem conta de recebimento ligada não há botão de saque nem de conta',
+      (tester) async {
+    await _abrir(
+      tester,
+      const CarteiraTela(dados: DadosExemploCarteira.completo, soExtrato: false),
+    );
+    expect(find.text('Sacar via Pix'), findsNothing);
+    expect(find.byKey(const Key('botao-alterar-conta')), findsNothing);
   });
 
   testWidgets('Ver tudo chama o callback', (tester) async {

@@ -5,16 +5,14 @@ import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
 import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../profissional/dinheiro.dart';
-import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
 
 /// Tela 27 — Carteira do profissional. Só exibe o que o backend devolveu em [dados]:
-/// nenhum saldo, taxa ou líquido é calculado aqui. "Sacar via Pix" só chama [aoSacarPix].
+/// nenhum saldo, taxa ou líquido é calculado aqui. O repasse é automático: não há botão de saque.
 class CarteiraTela extends StatelessWidget {
   const CarteiraTela({
     super.key,
     required this.dados,
-    this.aoSacarPix,
     this.aoVerTudo,
     this.aoTentarNovamente,
     this.barraInferior,
@@ -44,7 +42,6 @@ class CarteiraTela extends StatelessWidget {
   final bool soExtrato;
 
   final DadosCarteira dados;
-  final VoidCallback? aoSacarPix;
   final VoidCallback? aoVerTudo;
   final VoidCallback? aoTentarNovamente;
 
@@ -66,13 +63,22 @@ class CarteiraTela extends StatelessWidget {
           if (dados.erro != null)
             _CartaoErro(mensagem: dados.erro!, aoTentarNovamente: aoTentarNovamente)
           else if (resumo != null || soExtrato) ...[
-            const AvisoFaixa(
-              texto:
-                  'Repasse automático: após a liberação, o valor cai automaticamente na sua conta cadastrada.',
-              tipo: TipoStatus.info,
-              icone: Icons.autorenew,
+            if (!soExtrato && resumo != null) ...[
+              _CartaoDisponivel(
+                resumo: resumo,
+                contaCadastrada: dados.contaRecebimento?.cadastrada == true,
+                aoAlterarConta: aoConfigurarRecebimento,
+              ),
+              const SizedBox(height: EspacosTrato.x3),
+              _LinhaSaldos(resumo: resumo),
+              const SizedBox(height: EspacosTrato.x4),
+            ],
+            Text(
+              'Repasse automático: após a liberação, o valor cai automaticamente na sua conta cadastrada.',
+              key: const Key('aviso-repasse-automatico'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
-            const SizedBox(height: EspacosTrato.x2),
+            const SizedBox(height: EspacosTrato.x1),
             Text(
               textoRegraLiberacao(dados.proximaLiberacao),
               key: const Key('regra-liberacao'),
@@ -87,12 +93,6 @@ class CarteiraTela extends StatelessWidget {
               ),
             ],
             const SizedBox(height: EspacosTrato.x4),
-            if (!soExtrato && resumo != null) ...[
-              _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),
-              const SizedBox(height: EspacosTrato.x3),
-              _LinhaSaldos(resumo: resumo),
-              const SizedBox(height: EspacosTrato.x6),
-            ],
             if (aoConfigurarRecebimento != null) ...[
               _CartaoContaRecebimento(
                 conta: dados.contaRecebimento,
@@ -140,10 +140,15 @@ class CarteiraTela extends StatelessWidget {
 }
 
 class _CartaoDisponivel extends StatelessWidget {
-  const _CartaoDisponivel({required this.resumo, required this.aoSacarPix});
+  const _CartaoDisponivel({
+    required this.resumo,
+    required this.contaCadastrada,
+    required this.aoAlterarConta,
+  });
 
   final ResumoCarteira resumo;
-  final VoidCallback? aoSacarPix;
+  final bool contaCadastrada;
+  final VoidCallback? aoAlterarConta;
 
   @override
   Widget build(BuildContext context) {
@@ -166,11 +171,16 @@ class _CartaoDisponivel extends StatelessWidget {
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(resumo.textoPix, style: claro),
-          const SizedBox(height: EspacosTrato.x4),
-          BotaoSecundario(
-            texto: 'Sacar via Pix',
-            aoTocar: resumo.disponivelCentavos > 0 ? aoSacarPix : null,
-          ),
+          if (aoAlterarConta != null) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            BotaoSecundario(
+              key: const Key('botao-alterar-conta'),
+              texto: contaCadastrada
+                  ? 'Alterar conta de recebimento'
+                  : 'Cadastrar conta de recebimento',
+              aoTocar: aoAlterarConta,
+            ),
+          ],
         ],
       ),
     );
@@ -191,7 +201,7 @@ class _LinhaSaldos extends StatelessWidget {
           Expanded(
             child: _CartaoSaldo(
               icone: Icons.lock_outline,
-              rotulo: 'Em andamento',
+              rotulo: 'Retido',
               cor: CoresTrato.azulTexto,
               centavos: resumo.retidoCentavos,
               texto: resumo.textoRetido,
@@ -201,10 +211,11 @@ class _LinhaSaldos extends StatelessWidget {
           Expanded(
             child: _CartaoSaldo(
               icone: Icons.schedule,
-              rotulo: 'A confirmar',
+              rotulo: 'A liberar',
               cor: CoresTrato.ambarTexto,
               centavos: resumo.aLiberarCentavos,
-              texto: 'Repasse do dinheiro: ${resumo.proximaLiberacao == null ? resumo.textoALiberar : diaMesDoAparelho(resumo.proximaLiberacao!)}',
+              texto:
+                  'Repasse do dinheiro: ${resumo.proximaLiberacao == null ? resumo.textoALiberar : diaMesDoAparelho(resumo.proximaLiberacao!)}',
             ),
           ),
         ],
@@ -388,15 +399,13 @@ class _LinhaExtrato extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                item.brutoCentavos == item.liquidoCentavos && item.textoTaxa != 'Estorno'
-                    ? 'Sem taxa'
-                    : '${Dinheiro.formatar(item.brutoCentavos)} – ${item.textoTaxa}',
+                item.textoTaxa == 'Estorno' ? 'Estorno' : 'Sem taxa',
                 style: secundario,
               ),
             ),
             const SizedBox(width: EspacosTrato.x2),
             ChipStatus(
-              texto: liberado ? 'Confirmado' : 'A confirmar',
+              texto: liberado ? 'Confirmado' : 'A liberar',
               tipo: liberado ? TipoStatus.sucesso : TipoStatus.alerta,
             ),
           ],

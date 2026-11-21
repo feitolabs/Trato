@@ -35,8 +35,12 @@ void main() {
             theme: TemaTrato.claro,
             debugShowCheckedModeBanner: false,
             builder: (context, filho) => EscalaFonteLimitada(child: filho!),
-            home:
-                CarteiraTela(dados: dados, aoSacarPix: () {}, aoVerTudo: () {}),
+            home: CarteiraTela(
+              dados: dados,
+              soExtrato: false,
+              aoVerTudo: () {},
+              aoConfigurarRecebimento: () {},
+            ),
           ),
         );
         await tester.pump();

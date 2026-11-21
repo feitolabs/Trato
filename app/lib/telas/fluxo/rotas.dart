@@ -3286,6 +3286,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
   ContaRecebimento _conta = const ContaRecebimento(cadastrada: false);
   DateTime? _proximaLiberacao;
   String? _tratinhosPendentes;
+  (int, int, int)? _saldo; // liberado, retido, a liberar (como a API devolveu)
   Object? _erro;
   bool _iniciado = false;
   bool _carregando = false;
@@ -3349,7 +3350,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
               (_) => const ContaRecebimento(cadastrada: false),
             ),
         // Extras da Carteira (data do repasse e Tratinhos pendentes): se falhar, só não aparecem.
-        RotasTrato.repos.profissional.inicio().then<(DateTime?, String?)>((i) {
+        RotasTrato.repos.profissional.inicio().then<(DateTime?, String?, (int, int, int)?)>((i) {
           final ex = i.exclusividades;
           return (
             i.carteira.proximaLiberacao,
@@ -3360,8 +3361,13 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
                     ex.moedasPendentesLiberacao,
                     ex.moedaValorCentavos,
                   ),
+            (
+              i.carteira.paraSacarCentavos,
+              i.carteira.retidoDesdePagamentoCentavos ?? 0,
+              i.carteira.retidoCentavos,
+            ),
           );
-        }).catchError((Object _) => (null, null)),
+        }).catchError((Object _) => (null, null, null)),
       );
       if (!mounted || minha != _geracao) return;
       setState(() {
@@ -3369,6 +3375,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
         _conta = conta;
         _proximaLiberacao = extras.$1;
         _tratinhosPendentes = extras.$2;
+        _saldo = extras.$3;
         _erro = null;
         _temMais = itens.length >= _tamanhoPagina;
         _carregado = true;
@@ -3432,8 +3439,17 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
     return RefreshIndicator(
       onRefresh: () => _carregarInicial(silencioso: true),
       child: CarteiraTela(
-        soExtrato: true,
+        soExtrato: false,
         dados: DadosCarteira(
+          resumo: _saldo == null
+              ? null
+              : resumoCarteiraDoSaldo(
+                  liberadoCentavos: _saldo!.$1,
+                  retidoCentavos: _saldo!.$2,
+                  aLiberarCentavos: _saldo!.$3,
+                  proximaLiberacao: _proximaLiberacao,
+                  conta: _conta,
+                ),
           extrato: _itens,
           contaRecebimento: _conta,
           proximaLiberacao: _proximaLiberacao,

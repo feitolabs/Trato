@@ -141,12 +141,35 @@ class ContaRecebimento {
 /// só aparece quando o backend a informa.
 String textoRegraLiberacao(DateTime? libera) {
   final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
-  final dias = ConfigPublica.atual.prazoLiberacaoDias > 0
-      ? ConfigPublica.atual.prazoLiberacaoDias
-      : 7;
+  final dias =
+      ConfigPublica.atual.prazoLiberacaoDias > 0 ? ConfigPublica.atual.prazoLiberacaoDias : 7;
   final regra = '${ConfigPublica.horas(horas)} para o cliente confirmar + '
       '${ConfigPublica.dias(dias)} do prazo de retrabalho';
   return libera == null ? 'Libera após $regra' : 'Libera em ${diaMesDoAparelho(libera)}: $regra';
+}
+
+/// Monta o resumo da Carteira só com o que a API do saldo devolveu (`liberado_centavos`,
+/// `retido_centavos`, `a_liberar_centavos`, `proxima_liberacao_em`). Nada é somado nem calculado.
+/// O prazo de queda do Pix não vem da API: a linha mostra só a chave.
+ResumoCarteira resumoCarteiraDoSaldo({
+  required int liberadoCentavos,
+  required int retidoCentavos,
+  required int aLiberarCentavos,
+  DateTime? proximaLiberacao,
+  ContaRecebimento? conta,
+}) {
+  final chave = conta?.resumoExibicao ?? conta?.chavePixMascarada;
+  final cadastrada = conta?.cadastrada == true && (chave ?? '').isNotEmpty;
+  return ResumoCarteira(
+    disponivelCentavos: liberadoCentavos,
+    textoPix: cadastrada ? 'Pix na chave $chave' : 'Cadastre sua conta Pix para receber',
+    retidoCentavos: retidoCentavos,
+    textoRetido: 'Serviço em andamento',
+    aLiberarCentavos: aLiberarCentavos,
+    textoALiberar:
+        'Automático em até ${ConfigPublica.horas(ConfigPublica.atual.prazoConfirmacaoHoras)}',
+    proximaLiberacao: proximaLiberacao,
+  );
 }
 
 class DadosCarteira {
