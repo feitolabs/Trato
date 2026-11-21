@@ -28,6 +28,7 @@ class Evento(StrEnum):
     PEDIDO_DIRECIONADO = "pedido.direcionado"
     PEDIDO_URGENTE = "pedido.urgente"
     ORCAMENTO_ACEITO = "orcamento.aceito"
+    ORCAMENTO_RECUSADO = "orcamento.recusado"
     PAGAMENTO_CONFIRMADO = "pagamento.confirmado"
     LEMBRETE_AGENDAMENTO = "agenda.lembrete"
     CODIGO_INICIO = "agenda.codigo_inicio"
@@ -95,6 +96,12 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "O cliente aceitou o seu orçamento.",
         "pedido",
         essencial=True,
+    ),
+    Evento.ORCAMENTO_RECUSADO: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Orçamento recusado",
+        "O cliente recusou o seu orçamento.",
+        "pedido_aberto",
     ),
     Evento.PAGAMENTO_CONFIRMADO: ModeloEvento(
         Categoria.PAGAMENTOS,

@@ -128,8 +128,10 @@ class PerfilProfissionalOut(BaseModel):
 
 
 class AvaliacaoRecebidaOut(BaseModel):
+    id: str | None = None
     nota_geral: int
     comentario: str | None
+    resposta: str | None = None
     etiquetas: list[str]
     criada_em: datetime
     cliente_nome: str | None = Field(
@@ -783,9 +785,11 @@ def perfil_publico(
         quem = contexto.usuarios.detalhe(a.avaliador_id)
         dados = contexto.pedidos.dados_do_pedido(a.pedido_id)
         return AvaliacaoRecebidaOut(
+            id=a.id,
             nota_geral=a.nota_geral,
             # sem moderação ainda: mesma regra da rota pública (ver a flag)
             comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
+            resposta=a.resposta,
             etiquetas=list(a.etiquetas),
             criada_em=a.criada_em,
             cliente_nome=_nome_abreviado(quem.nome) if quem else None,
@@ -827,6 +831,7 @@ CACHE_PUBLICO = "public, max-age=60"
 class AvaliacaoAnonimaOut(BaseModel):
     nota: int
     comentario: str | None = None
+    resposta: str | None = None
     data: date
 
 
@@ -908,6 +913,7 @@ def _avaliacoes_publicas(contexto: Contexto, profissional_id: str) -> list[Avali
         AvaliacaoAnonimaOut(
             nota=a.nota_geral,
             comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
+            resposta=a.resposta,
             data=a.criada_em.astimezone(ZoneInfo("America/Sao_Paulo")).date(),
         )
         for a in itens[:MAX_AVALIACOES_PUBLICAS]

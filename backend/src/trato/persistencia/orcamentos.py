@@ -230,3 +230,16 @@ class OrcamentosPostgres:
                 (agora, novo),
             )
         return str(novo)
+
+    def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
+        pid = como_uuid(pedido_id)
+        oid = como_uuid(orcamento_id)
+        if pid is None or oid is None:
+            return False
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "update public.orcamentos set status = 'recusado', atualizado_em = now() "
+                "where id = %s and pedido_id = %s and status = 'enviado' returning id",
+                (oid, pid),
+            ).fetchone()
+        return linha is not None

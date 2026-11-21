@@ -374,6 +374,51 @@ class OrcamentosEmMemoria:
         )
         return novo_id
 
+    def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
+        det = self._detalhes.get(orcamento_id)
+        if det is not None:
+            if det.pedido_id != pedido_id or det.status != "enviado":
+                return False
+            self._detalhes[orcamento_id] = OrcamentoDetalhe(
+                id=det.id,
+                pedido_id=det.pedido_id,
+                profissional_id=det.profissional_id,
+                profissional_nome=det.profissional_nome,
+                versao=det.versao,
+                status="recusado",
+                valor_centavos=det.valor_centavos,
+                prazo_execucao_dias=det.prazo_execucao_dias,
+                validade_ate=det.validade_ate,
+                garantia_dias=det.garantia_dias,
+                fora_do_escopo=det.fora_do_escopo,
+                sinal_material_centavos=det.sinal_material_centavos,
+                observacoes=det.observacoes,
+                enviado_em=det.enviado_em,
+                itens=det.itens,
+            )
+            return True
+        o = self._itens.get(orcamento_id)
+        if o is None or o.pedido_id != pedido_id:
+            return False
+        self._detalhes[orcamento_id] = OrcamentoDetalhe(
+            id=o.id,
+            pedido_id=o.pedido_id,
+            profissional_id=o.profissional_id,
+            profissional_nome=None,
+            versao=1,
+            status="recusado",
+            valor_centavos=o.valor_centavos,
+            prazo_execucao_dias=None,
+            validade_ate=None,
+            garantia_dias=None,
+            fora_do_escopo=None,
+            sinal_material_centavos=None,
+            observacoes=None,
+            enviado_em=None,
+            itens=(),
+        )
+        return True
+
 
 class ContratosEmMemoria:
     def __init__(self) -> None:

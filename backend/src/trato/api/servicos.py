@@ -132,6 +132,7 @@ def pedido_out_completo(
         update={
             "titulo": titulo or None,
             "categoria_nome": categoria_nome,
+            "urgente": bool(dados.urgente) if dados is not None else False,
             "cliente_nome": cliente_nome,
             "profissional_nome": profissional_nome,
             "contratado_em": contratado_em,

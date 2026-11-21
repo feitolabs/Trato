@@ -493,30 +493,63 @@ class AvaliacoesPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
-    def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None:
-        pid = como_uuid(pedido_id)
-        if pid is None:
-            return None
-        with self._banco.transacao() as con:
-            l = con.execute(  # noqa: E741
-                "select a.avaliador_id, a.avaliado_id, a.nota_geral, a.comentario, a.etiquetas, "
-                "a.criada_em from public.avaliacoes a "
-                "join public.contratos c on c.id = a.contrato_id "
-                "where c.pedido_id = %s and a.direcao = %s",
-                (pid, direcao),
-            ).fetchone()
-        if l is None:
-            return None
+    def _de_linha(l: Any) -> Avaliacao:  # noqa: E741
         return Avaliacao(
-            pedido_id=pid,
-            direcao=direcao,
+            id=str(l["id"]),
+            pedido_id=str(l["pedido_id"]),
+            direcao=l["direcao"],
             avaliador_id=str(l["avaliador_id"]),
             avaliado_id=str(l["avaliado_id"]),
             nota_geral=int(l["nota_geral"]),
             comentario=l["comentario"],
             etiquetas=tuple(l["etiquetas"] or ()),
             criada_em=l["criada_em"],
+            resposta=l["resposta"],
         )
+
+    def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None:
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return None
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
+                "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
+                "from public.avaliacoes a "
+                "join public.contratos c on c.id = a.contrato_id "
+                "where c.pedido_id = %s and a.direcao = %s",
+                (pid, direcao),
+            ).fetchone()
+        return self._de_linha(l) if l is not None else None
+
+    def obter_por_id(self, avaliacao_id: str) -> Avaliacao | None:
+        aid = como_uuid(avaliacao_id)
+        if aid is None:
+            return None
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
+                "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
+                "from public.avaliacoes a "
+                "join public.contratos c on c.id = a.contrato_id "
+                "where a.id = %s",
+                (aid,),
+            ).fetchone()
+        return self._de_linha(l) if l is not None else None
+
+    def responder(self, avaliacao_id: str, resposta: str) -> Avaliacao | None:
+        aid = como_uuid(avaliacao_id)
+        if aid is None:
+            return None
+        with self._banco.transacao() as con:
+            atualizada = con.execute(
+                "update public.avaliacoes set resposta = %s "
+                "where id = %s and resposta is null returning id",
+                (resposta, aid),
+            ).fetchone()
+        if atualizada is None:
+            return None
+        return self.obter_por_id(aid)
 
     def recebidas(self, avaliado_id: str) -> list[Avaliacao]:
         """Avaliações recebidas por uma pessoa, da mais recente à mais antiga (perfil)."""
@@ -525,25 +558,14 @@ class AvaliacoesPostgres:
             return []
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, a.nota_geral, "
-                "a.comentario, a.etiquetas, a.criada_em from public.avaliacoes a "
+                "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
+                "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
+                "from public.avaliacoes a "
                 "join public.contratos c on c.id = a.contrato_id "
                 "where a.avaliado_id = %s order by a.criada_em desc",
                 (uid,),
             ).fetchall()
-        return [
-            Avaliacao(
-                pedido_id=str(l["pedido_id"]),
-                direcao=l["direcao"],
-                avaliador_id=str(l["avaliador_id"]),
-                avaliado_id=str(l["avaliado_id"]),
-                nota_geral=int(l["nota_geral"]),
-                comentario=l["comentario"],
-                etiquetas=tuple(l["etiquetas"] or ()),
-                criada_em=l["criada_em"],
-            )
-            for l in linhas  # noqa: E741
-        ]
+        return [self._de_linha(l) for l in linhas]  # noqa: E741
 
     def salvar(self, avaliacao: Avaliacao) -> None:
         with self._banco.transacao() as con:

@@ -198,12 +198,28 @@ class VerificacoesEmMemoria:
 class AvaliacoesEmMemoria:
     def __init__(self) -> None:
         self._itens: dict[tuple[str, str], Avaliacao] = {}
+        self._seq = 0
 
     def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None:
         return self._itens.get((pedido_id, direcao))
 
+    def obter_por_id(self, avaliacao_id: str) -> Avaliacao | None:
+        return next((a for a in self._itens.values() if a.id == avaliacao_id), None)
+
     def salvar(self, avaliacao: Avaliacao) -> None:
-        self._itens[(avaliacao.pedido_id, avaliacao.direcao)] = avaliacao
+        chave = (avaliacao.pedido_id, avaliacao.direcao)
+        if avaliacao.id is None:
+            self._seq += 1
+            avaliacao = replace(avaliacao, id=f"av-{self._seq}")
+        self._itens[chave] = avaliacao
+
+    def responder(self, avaliacao_id: str, resposta: str) -> Avaliacao | None:
+        achada = self.obter_por_id(avaliacao_id)
+        if achada is None or achada.resposta is not None:
+            return None
+        atualizada = replace(achada, resposta=resposta)
+        self._itens[(achada.pedido_id, achada.direcao)] = atualizada
+        return atualizada
 
     def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
         achadas = [a for a in self._itens.values() if a.avaliado_id == avaliado_id]

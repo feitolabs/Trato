@@ -170,6 +170,8 @@ class Avaliacao:
     comentario: str | None
     etiquetas: tuple[str, ...]
     criada_em: datetime
+    id: str | None = None
+    resposta: str | None = None
 
 
 class RepositorioConversas(Protocol):
@@ -245,7 +247,11 @@ class RepositorioVerificacoes(Protocol):
 class RepositorioAvaliacoes(Protocol):
     def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None: ...
 
+    def obter_por_id(self, avaliacao_id: str) -> Avaliacao | None: ...
+
     def salvar(self, avaliacao: Avaliacao) -> None: ...
+
+    def responder(self, avaliacao_id: str, resposta: str) -> Avaliacao | None: ...
 
     def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
         """Avaliações recebidas por uma pessoa, da mais recente para a mais antiga."""

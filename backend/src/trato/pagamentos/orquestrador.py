@@ -199,8 +199,13 @@ class ServicoPagamento:
         total = self.total_a_cobrar(contexto, pedido, servico_centavos, aditivo_id, parcelas)
         for antiga in antigas:
             if antiga.status is EstadoCobranca.AGUARDANDO:
+                reserva_ativa = (
+                    antiga.moedas_usadas <= 0
+                    or situacao_reserva(contexto.moedas, cobranca_id=antiga.id) != "devolvida"
+                )
                 if (
-                    antiga.meio is meio
+                    reserva_ativa
+                    and antiga.meio is meio
                     and antiga.parcelas == parcelas
                     and antiga.valor_centavos == total.cobrado_centavos
                     and (antiga.cupom_codigo or None) == cupom_norm
@@ -209,6 +214,15 @@ class ServicoPagamento:
                     return antiga
                 self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
                 self._liberar_reserva(contexto, antiga)
+                if antiga.moedas_usadas > 0:
+                    try:
+                        self.provedor.cancelar_cobranca(antiga.id)
+                    except Exception:  # noqa: BLE001 - melhor esforço; cobrança já cancelada localmente
+                        logging.getLogger("trato.pagamentos").warning(
+                            "cancelar cobrança %s no provedor ao substituir falhou",
+                            antiga.id,
+                            exc_info=True,
+                        )
         # A chave leva o que define a cobrança (meio, valor, parcelas, cliente, cupom): o Stripe
         # recusa a MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be
         # used with the same parameters").
@@ -482,6 +496,7 @@ class ServicoPagamento:
         cliente pagou o valor com desconto; o financeiro decide).
         """
         situacao = situacao_reserva(contexto.moedas, cobranca_id=cobranca.id)
+        chave_confirmacao = cobranca.id
         if situacao not in ("reservada", "confirmada"):
             reaberta = situacao != "indisponivel" and reabrir_reserva_desconto(
                 contexto.moedas,
@@ -490,6 +505,22 @@ class ServicoPagamento:
                 usuario_id=pedido.cliente_id,
                 agora=agora,
             )
+            if not reaberta and situacao == "devolvida":
+                chave_reabertura = f"reabertura:{cobranca.id}"
+                sit_reabertura = situacao_reserva(contexto.moedas, cobranca_id=chave_reabertura)
+                if sit_reabertura in ("reservada", "confirmada"):
+                    reaberta = True
+                    chave_confirmacao = chave_reabertura
+                elif sit_reabertura != "indisponivel":
+                    reaberta = reabrir_reserva_desconto(
+                        contexto.moedas,
+                        cobranca_id=chave_reabertura,
+                        moedas=cobranca.moedas_usadas,
+                        usuario_id=pedido.cliente_id,
+                        agora=agora,
+                    )
+                    if reaberta:
+                        chave_confirmacao = chave_reabertura
             if not reaberta:
                 contexto.eventos_webhook.marcar_revisao(
                     bruto,
@@ -505,7 +536,7 @@ class ServicoPagamento:
             moedas=cobranca.moedas_usadas,
             agora=agora,
         )
-        confirmar_reserva_desconto(contexto.moedas, cobranca_id=cobranca.id)
+        confirmar_reserva_desconto(contexto.moedas, cobranca_id=chave_confirmacao)
 
     def _pagamento_falhou(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook
@@ -515,6 +546,15 @@ class ServicoPagamento:
         if cobranca is not None and cobranca.status is EstadoCobranca.AGUARDANDO:
             self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.FALHOU))
             self._liberar_reserva(contexto, cobranca)  # só na 1ª vez: depois ela já não aguarda
+            if cobranca.moedas_usadas > 0:
+                try:
+                    self.provedor.cancelar_cobranca(cobranca.id)
+                except Exception:  # noqa: BLE001 - melhor esforço; cobrança já marcada FALHOU
+                    logging.getLogger("trato.pagamentos").warning(
+                        "cancelar cobrança %s no provedor após falha falhou",
+                        cobranca.id,
+                        exc_info=True,
+                    )
 
     def _estorno_confirmado(
         self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook

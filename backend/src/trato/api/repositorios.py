@@ -235,6 +235,9 @@ class RepositorioOrcamentos(Protocol):
         observacoes: str | None = None,
     ) -> str: ...
 
+    def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
+        """Marca o orçamento enviado como `recusado`. Devolve True se mudou agora."""
+
 
 class RepositorioContratos(Protocol):
     def obter_do_pedido(self, pedido_id: str) -> Contrato | None: ...

@@ -223,6 +223,7 @@ class PerfilOut(BaseModel):
     )
     disponivel_agora: bool = False
     cpf_cadastrado: bool = False
+    exclusao_agendada_em: datetime | None = None
 
 
 class PedidoAbertoOut(BaseModel):
@@ -288,13 +289,19 @@ class VerificacaoOut(BaseModel):
 
 
 class AvaliacaoOut(BaseModel):
+    id: str | None = None
     pedido_id: str
     direcao: str
     nota_geral: int
     comentario: str | None
+    resposta: str | None = None
     etiquetas: list[str]
     criada_em: datetime
     moedas_ganhas: int = Field(0, description="Moedas de bônus por esta avaliação (0 se nenhuma).")
+
+
+class ResponderAvaliacaoIn(_Entrada):
+    resposta: str = Field(min_length=1, max_length=1000)
 
 
 class AvaliacaoDadosOut(BaseModel):
@@ -1293,14 +1300,45 @@ def _mesma_avaliacao(
 
 def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
     return AvaliacaoOut(
+        id=nova.id,
         moedas_ganhas=ganhas,
         pedido_id=nova.pedido_id,
         direcao=nova.direcao,
         nota_geral=nova.nota_geral,
         comentario=nova.comentario,
+        resposta=nova.resposta,
         etiquetas=list(nova.etiquetas),
         criada_em=nova.criada_em,
     )
+
+
+@router.post(
+    "/avaliacoes/{avaliacao_id}/responder",
+    response_model=AvaliacaoOut,
+    summary="Profissional responde uma avaliação recebida",
+    description="Somente o profissional avaliado pode responder, uma única vez por avaliação.",
+)
+def responder_avaliacao(
+    avaliacao_id: str,
+    corpo: ResponderAvaliacaoIn,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> AvaliacaoOut:
+    av = contexto.avaliacoes.obter_por_id(avaliacao_id)
+    if av is None:
+        raise HTTPException(404, "Avaliação não encontrada.")
+    if av.direcao != "cliente_para_profissional" or av.avaliado_id != usuario.id:
+        raise HTTPException(403, "Só o profissional avaliado pode responder esta avaliação.")
+    if av.resposta is not None:
+        raise HTTPException(409, "Esta avaliação já foi respondida.")
+    cfg_seg = obter_config_seguranca()
+    texto = limpar_texto(corpo.resposta, "resposta", cfg_seg.comentario_max_chars, cfg_seg)
+    if not texto:
+        raise HTTPException(422, "Informe uma resposta válida.")
+    atualizada = contexto.avaliacoes.responder(avaliacao_id, texto)
+    if atualizada is None:
+        raise HTTPException(409, "Esta avaliação já foi respondida.")
+    return _avaliacao_out(atualizada, 0)
 
 
 @router.post(
@@ -1400,4 +1438,5 @@ def avaliar(
             else None  # o texto padrão do evento; o comentário nunca vai no aviso
         ),
     )
-    return _avaliacao_out(nova, ganhas)
+    salva = contexto.avaliacoes.obter(pedido.id, direcao) or nova
+    return _avaliacao_out(salva, ganhas)

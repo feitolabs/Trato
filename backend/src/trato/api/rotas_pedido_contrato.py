@@ -386,6 +386,50 @@ def detalhe_do_orcamento(
     )
 
 
+class RecusarOrcamentoOut(BaseModel):
+    orcamento_id: str
+    pedido_id: str
+    status: str
+
+
+@router.post(
+    "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/recusar",
+    response_model=RecusarOrcamentoOut,
+    summary="Cliente recusa um orçamento recebido",
+    description="Somente o dono do pedido pode recusar. Idempotente se já estiver recusado.",
+)
+def recusar_orcamento(
+    pedido_id: str,
+    orcamento_id: str,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> RecusarOrcamentoOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido pode recusar um orçamento.")
+    orc = contexto.orcamentos.detalhe(orcamento_id)
+    if orc is None or orc.pedido_id != pedido.id:
+        raise HTTPException(404, "Orçamento não encontrado.")
+    if orc.status == "aceito":
+        raise HTTPException(409, "Este orçamento já foi aceito.")
+    if orc.status == "recusado":
+        return RecusarOrcamentoOut(orcamento_id=orc.id, pedido_id=pedido.id, status="recusado")
+    if orc.status != "enviado":
+        raise HTTPException(409, f"Orçamento em estado '{orc.status}' não pode ser recusado.")
+    mudou = contexto.orcamentos.recusar(pedido.id, orc.id)
+    if mudou:
+        notificador = getattr(request.app.state, "notificador", None)
+        if notificador is not None:
+            notificador.notificar(
+                Evento.ORCAMENTO_RECUSADO,
+                orc.profissional_id,
+                chave=f"orcamento-recusado:{orc.id}",
+                pedido_id=pedido.id,
+            )
+    return RecusarOrcamentoOut(orcamento_id=orc.id, pedido_id=pedido.id, status="recusado")
+
+
 # --- Cobrança e estado do pagamento -----------------------------------------------------
 
 
@@ -1813,6 +1857,16 @@ def _perfil_out(contexto: Contexto, usuario: Usuario, request: Request | None = 
     if usuario.papel is PapelUsuario.PROFISSIONAL and "cliente" not in papeis:
         papeis.insert(0, "cliente")  # quem é profissional também pode pedir serviço
     disponivel_agora = _profissional_disponivel_agora(request, usuario.id) if tem_perfil else False
+    exclusao_agendada_em = None
+    if request is not None:
+        fabrica = getattr(request.app.state, "lgpd_fabrica", None)
+        if fabrica is not None:
+            try:
+                servico_lgpd = fabrica(request.app)
+                if servico_lgpd is not None:
+                    exclusao_agendada_em = servico_lgpd.exclusao_agendada_em(usuario.id)
+            except Exception:  # noqa: BLE001 - falha no módulo LGPD não derruba /me
+                exclusao_agendada_em = None
     return PerfilOut(
         id=detalhe.id,
         nome=detalhe.nome,
@@ -1826,6 +1880,7 @@ def _perfil_out(contexto: Contexto, usuario: Usuario, request: Request | None = 
         disponivel_agora=disponivel_agora,
         status_verificacao=contexto.usuarios.status_verificacao(usuario.id) if tem_perfil else None,
         cpf_cadastrado=contexto.usuarios.tem_cpf(usuario.id),
+        exclusao_agendada_em=exclusao_agendada_em,
     )
 
 

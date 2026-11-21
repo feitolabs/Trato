@@ -106,6 +106,12 @@ class ServicoLgpd:
         ativo = self._r.exclusoes.ativo_do_usuario(usuario.id)
         return {"pedido": self._resumo_pedido(ativo) if ativo else None}
 
+    def exclusao_agendada_em(self, usuario_id: str) -> datetime | None:
+        ativo = self._r.exclusoes.ativo_do_usuario(usuario_id)
+        if ativo is not None and ativo.status == "agendada":
+            return ativo.executar_apos
+        return None
+
     def pedir_exclusao(self, usuario: Usuario, agora: datetime) -> dict[str, Any]:
         """Passo 1: mostra o que será apagado e mantido e devolve o código de confirmação."""
         pendencias = self._r.fonte.pendencias(usuario.id)
