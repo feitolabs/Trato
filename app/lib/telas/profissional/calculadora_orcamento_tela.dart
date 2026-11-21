@@ -15,6 +15,14 @@ export 'servico_orcamento.dart' show ItemMaterial, OrcamentoPronto;
 
 enum ModoOrcamento { porHora, valorFechado }
 
+/// Sugestões para o campo "Fora do escopo": acrescentam o texto, nunca são obrigatórias.
+const sugestoesNaoInclui = [
+  'Material',
+  'Limpeza e retirada de entulho',
+  'Deslocamento adicional',
+  'Reparos além do combinado',
+];
+
 /// Tela 25: "Seu orçamento". Soma (horas de deslocamento + horas trabalhadas) x valor da hora +
 /// material (só para exibir). O cliente vê o total de horas.
 /// Taxa e líquido NÃO são calculados aqui: vêm de [servico] (regra de dinheiro é do backend).
@@ -84,6 +92,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   late final _valorFechado = TextEditingController(text: widget.valorFechadoInicial);
   late final _diasExecucao = TextEditingController(text: '${widget.prazoExecucaoInicialDias}');
   late final _foraDoEscopo = TextEditingController(text: widget.foraDoEscopoInicial);
+  final _sugestoesForaUsadas = <String>{};
   late final _observacoes = TextEditingController(text: widget.observacoesInicial);
   final _keyDeslocamento = GlobalKey();
   final _keyHoras = GlobalKey();
@@ -128,6 +137,17 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   void initState() {
     super.initState();
     _atualizarResumo();
+  }
+
+  /// Chip de sugestão: acrescenta o texto ao campo (editável) e o chip usado some.
+  void _acrescentarForaDoEscopo(String sugestao) {
+    final atual = _foraDoEscopo.text.trimRight();
+    final novo = atual.isEmpty ? sugestao : '$atual, $sugestao';
+    _foraDoEscopo.value = TextEditingValue(
+      text: novo,
+      selection: TextSelection.collapsed(offset: novo.length),
+    );
+    setState(() => _sugestoesForaUsadas.add(sugestao));
   }
 
   @override
@@ -584,6 +604,23 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             controlador: _foraDoEscopo,
             dica: 'Ex.: quebra de alvenaria, pintura ou peças extras',
           ),
+          if (_sugestoesForaUsadas.length < sugestoesNaoInclui.length) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Wrap(
+              key: const Key('sugestoes-nao-incluso'),
+              spacing: EspacosTrato.x2,
+              runSpacing: EspacosTrato.x2,
+              children: [
+                for (final s in sugestoesNaoInclui)
+                  if (!_sugestoesForaUsadas.contains(s))
+                    ActionChip(
+                      key: ValueKey('sugestao-nao-incluso-$s'),
+                      label: Text(s),
+                      onPressed: () => _acrescentarForaDoEscopo(s),
+                    ),
+              ],
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x4),
           CampoTrato(
             rotulo: 'Observações (opcional)',

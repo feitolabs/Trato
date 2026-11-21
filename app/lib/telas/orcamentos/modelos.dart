@@ -38,7 +38,12 @@ class DetalheOrcamento {
     required this.garantiaDetalhe,
     required this.foraDoEscopo,
     required this.cancelamento,
+    this.tiposDosItens = const [],
   });
+
+  /// `tipo` de cada item do orçamento (`deslocamento`, `horas`, `material`, `outro`), como a API
+  /// devolveu; é daqui que sai o "Inclui:". Vazio em servidor antigo ou dado de exemplo.
+  final List<String> tiposDosItens;
 
   /// Ex.: "31/10" (a barra mostra "Válido até 31/10").
   final String validoAte;
@@ -138,6 +143,34 @@ class ResumoPedido {
 
   /// "31 horas".
   final String tempoRestante;
+}
+
+/// Rótulo de cada tipo de item, na ordem em que aparecem no "Inclui:".
+const _rotuloPorTipo = {
+  'deslocamento': 'Deslocamento',
+  'horas': 'Mão de obra',
+  'material': 'Material',
+  'outro': 'Outros',
+};
+
+/// "Inclui:" do orçamento: só os tipos que existem, sempre na mesma ordem. Sem itens (ou sem
+/// detalhe), "Valor combinado". Tipo que o app não conhece conta como "Outros".
+String textoInclui(DetalheOrcamento? detalhe) {
+  final tipos = detalhe?.tiposDosItens ?? const <String>[];
+  final presentes = {
+    for (final t in tipos) _rotuloPorTipo.containsKey(t) ? t : 'outro',
+  };
+  final rotulos = [
+    for (final e in _rotuloPorTipo.entries)
+      if (presentes.contains(e.key)) e.value,
+  ];
+  return rotulos.isEmpty ? 'Valor combinado' : rotulos.join(', ');
+}
+
+/// "Não inclui:" é o texto livre `fora_do_escopo`; vazio = "Nada informado".
+String textoNaoInclui(DetalheOrcamento? detalhe) {
+  final texto = (detalhe?.foraDoEscopo ?? '').trim();
+  return texto.isEmpty ? 'Nada informado' : texto;
 }
 
 /// Texto quando o profissional ainda não tem nota.

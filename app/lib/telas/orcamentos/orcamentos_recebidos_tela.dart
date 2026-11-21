@@ -7,6 +7,7 @@ import '../cliente/avatar_iniciais.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
 import 'detalhe_orcamento_tela.dart';
+import 'inclui_nao_inclui.dart';
 import 'modelos.dart';
 
 /// Tela 12 do protótipo: "Orçamentos recebidos", com ordenação por valor, nota ou data.
@@ -183,6 +184,8 @@ class _CartaoOrcamento extends StatelessWidget {
               Expanded(child: _Dado(rotulo: 'Garantia', valor: o.garantia)),
             ],
           ),
+          const SizedBox(height: EspacosTrato.x3),
+          IncluiNaoInclui(detalhe: o.detalhe),
           const SizedBox(height: EspacosTrato.x3),
           Text(
             o.observacao,

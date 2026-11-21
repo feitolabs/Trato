@@ -1121,6 +1121,10 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
         garantiaDetalhe: garantia == null ? '' : '$garantia dias',
         foraDoEscopo: (j['fora_do_escopo'] as String?) ?? '',
         cancelamento: '',
+        tiposDosItens: [
+          for (final i in (j['itens'] as List? ?? const []))
+            if (i is Map && i['tipo'] is String) i['tipo'] as String,
+        ],
       );
     } on ErroTrato catch (erro) {
       if (erro.tipo == TipoErro.sessaoExpirada) rethrow;

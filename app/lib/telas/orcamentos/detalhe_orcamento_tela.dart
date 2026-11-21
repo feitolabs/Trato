@@ -8,6 +8,7 @@ import '../cliente/modelos.dart' show formatarNota;
 import '../comuns/foco_rolagem.dart';
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
+import 'inclui_nao_inclui.dart';
 import 'modelos.dart';
 
 /// Tela 13 do protótipo: detalhe do orçamento, com aceite e contraproposta.
@@ -214,6 +215,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             texto: 'Ver perfil de ${o.profissional}',
             aoTocar: () => widget.aoVerPerfil!(o),
           ),
+        const SizedBox(height: EspacosTrato.x4),
+        IncluiNaoInclui(detalhe: d),
         const SizedBox(height: EspacosTrato.x4),
         CartaoTrato(
           child: Column(

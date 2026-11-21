@@ -45,6 +45,7 @@ final orcamentosExemplo = [
     observacao: 'Inclui material: 2 tomadas 20 A e resistência do chuveiro.',
     detalhe: DetalheOrcamento(
       validoAte: '31/10',
+      tiposDosItens: ['deslocamento', 'horas', 'material', 'material'],
       itens: [
         ItemOrcamento(descricao: 'Deslocamento', centavos: 3000),
         ItemOrcamento(descricao: 'Mão de obra · 3 horas', centavos: 24000),
