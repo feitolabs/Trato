@@ -23,6 +23,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import (
     avisar_check_in_sem_codigo,
     avisar_exclusividade_encerrada,
+    avisar_orcamentos_nao_escolhidos,
     avisar_pedido_direcionado,
     avisar_pedido_urgente,
 )
@@ -539,6 +540,12 @@ def mudar_estado(
         contexto.limite_codigo.acertou(pedido.id)
     # Uma transação só: contrato + pedido + garantia + efeitos no dinheiro (tudo ou nada).
     encerramentos = []
+    perdedores: tuple[tuple[str, str], ...] = ()
+    if acao is Acao.ACEITAR_ORCAMENTO:
+        # Lidos ANTES do aceite (o contrato marca os outros como recusados); o aviso só sai
+        # depois que o aceite foi confirmado.
+        with contextlib.suppress(Exception):
+            perdedores = tuple(contexto.orcamentos.enviados_do_pedido(pedido.id))
     with contexto.transacao():
         if acao in (Acao.ACEITAR_ORCAMENTO, Acao.CANCELAR) and pedido.estado in (
             Estado.ABERTO,
@@ -600,6 +607,16 @@ def mudar_estado(
         avisar_check_in_sem_codigo(
             request, contexto, pedido_id=gravado.id, cliente_id=gravado.cliente_id
         )
+    if perdedores:  # aceite já confirmado; aviso nunca desfaz nem derruba o aceite
+        with contextlib.suppress(Exception):
+            avisar_orcamentos_nao_escolhidos(
+                request,
+                contexto,
+                pedido_id=gravado.id,
+                perdedores=perdedores,
+                vencedor_orcamento_id=gravado.orcamento_id,
+                vencedor_profissional_id=gravado.profissional_id,
+            )
     for enc in encerramentos:
         if enc.resultado == "cancelada":
             moedas = 100

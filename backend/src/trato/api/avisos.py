@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -86,6 +87,31 @@ def avisar_evento(
         servico.notificar(evento, usuario_id, chave=chave, pedido_id=pedido_id, corpo=corpo)
     except Exception:  # noqa: BLE001 - aviso é secundário
         log.exception("Aviso %s falhou", evento.value)
+
+
+def avisar_orcamentos_nao_escolhidos(
+    request: Request,
+    contexto: Contexto,
+    *,
+    pedido_id: str,
+    perdedores: Sequence[tuple[str, str]],
+    vencedor_orcamento_id: str | None,
+    vencedor_profissional_id: str | None,
+) -> None:
+    """Avisa quem perdeu porque o cliente ACEITOU outro orçamento (a recusa individual tem o
+    seu próprio evento). Uma vez por orçamento (chave pedido+orçamento); falha de um aviso não
+    impede os outros nem desfaz o aceite, que já foi confirmado."""
+    for orcamento_id, profissional_id in perdedores:
+        if orcamento_id == vencedor_orcamento_id or profissional_id == vencedor_profissional_id:
+            continue
+        avisar_evento(
+            request,
+            contexto,
+            Evento.ORCAMENTO_NAO_ESCOLHIDO,
+            profissional_id,
+            pedido_id=pedido_id,
+            chave=f"{pedido_id}:{orcamento_id}",
+        )
 
 
 def avisar_orcamento_recebido(

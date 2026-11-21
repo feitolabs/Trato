@@ -252,6 +252,18 @@ class OrcamentosPostgres:
             )
         return str(novo)
 
+    def enviados_do_pedido(self, pedido_id: str) -> Sequence[tuple[str, str]]:
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return ()
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select id, profissional_id from public.orcamentos "
+                "where pedido_id = %s and status = 'enviado' order by enviado_em, id",
+                (pid,),
+            ).fetchall()
+        return tuple((str(l["id"]), str(l["profissional_id"])) for l in linhas)  # noqa: E741
+
     def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
         pid = como_uuid(pedido_id)
         oid = como_uuid(orcamento_id)

@@ -29,6 +29,7 @@ class Evento(StrEnum):
     PEDIDO_URGENTE = "pedido.urgente"
     ORCAMENTO_ACEITO = "orcamento.aceito"
     ORCAMENTO_RECUSADO = "orcamento.recusado"
+    ORCAMENTO_NAO_ESCOLHIDO = "orcamento.nao_escolhido"
     PAGAMENTO_CONFIRMADO = "pagamento.confirmado"
     LEMBRETE_AGENDAMENTO = "agenda.lembrete"
     CODIGO_INICIO = "agenda.codigo_inicio"
@@ -101,6 +102,14 @@ MODELOS: dict[Evento, ModeloEvento] = {
         Categoria.ORCAMENTOS,
         "Orçamento recusado",
         "O cliente recusou o seu orçamento.",
+        "pedido_aberto",
+    ),
+    # Quando o cliente aceita OUTRO orçamento do pedido. Sem nome do cliente nem do vencedor, sem
+    # valores e sem promessa. Mesma categoria, preferência e destino do ORCAMENTO_RECUSADO.
+    Evento.ORCAMENTO_NAO_ESCOLHIDO: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Cliente escolheu outro orçamento",
+        "Desta vez não foi o seu orçamento. Veja outros pedidos abertos.",
         "pedido_aberto",
     ),
     Evento.PAGAMENTO_CONFIRMADO: ModeloEvento(
