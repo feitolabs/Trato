@@ -1665,9 +1665,15 @@ def aceitar_agenda(
 def recusar_pedido(
     pedido_id: str,
     corpo: RecusarIn,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> RecusaOut:
+    if usuario.papel is not PapelUsuario.PROFISSIONAL:
+        # Não revela que o pedido existe: só o cliente dono vê o 403 de "papel errado".
+        dono = contexto.pedidos.obter(pedido_id)
+        if dono is None or dono.cliente_id != usuario.id:
+            raise HTTPException(404, "Pedido não encontrado.")
+        exigir_papel(PapelUsuario.PROFISSIONAL)(usuario, contexto)  # levanta o 403 de sempre
     visivel = pedido_visivel_ao_profissional(contexto, pedido_id, usuario.id) is not None
     ja_recusou = any(r.pedido_id == pedido_id for r in contexto.recusas.do_profissional(usuario.id))
     if not (visivel or ja_recusou):

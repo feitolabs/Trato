@@ -151,6 +151,11 @@ class PagamentoValoresOut(BaseModel):
     moedas_usadas: int = Field(0, description="Moedas que serão usadas (já no desconto).")
     moedas_saldo: int = Field(0, description="Saldo de moedas do cliente.")
     moedas_desconto_centavos: int = Field(0, description="Parte do desconto que vem das moedas.")
+    desconto_cupom_centavos: int = Field(
+        0,
+        ge=0,
+        description="Parte do desconto que vem do cupom (desconto_centavos = cupom + moedas).",
+    )
     desconto_disponivel: bool = Field(
         True, description="Se o desconto de moedas pode ser dado (orçamento e teto do cliente)."
     )
@@ -673,6 +678,7 @@ def valores_do_pagamento(
     cupom_codigo: str | None = None
     moedas_usadas = 0
     moedas_desconto = 0
+    desconto_cupom = 0
     ignorar = servico.reservas_pendentes_do_pedido(pedido.id) if servico is not None else set()
     disp = disponibilidade_desconto(
         contexto.moedas, usuario_id=usuario.id, agora=contexto.agora(), ignorar=ignorar
@@ -695,6 +701,7 @@ def valores_do_pagamento(
                 raise HTTPException(422, str(erro)) from None
             base_centavos = aplicado.servico_com_desconto_centavos
             desconto_centavos = aplicado.desconto_centavos
+            desconto_cupom = aplicado.desconto_centavos
             cupom_codigo = aplicado.codigo
         if pedido.cliente_id == usuario.id:
             # Sempre calcula (sem reservar): o app mostra "você pode abater até R$ X" mesmo com o
@@ -736,6 +743,7 @@ def valores_do_pagamento(
         cupom_codigo=cupom_codigo,
         moedas_usadas=moedas_usadas,
         moedas_desconto_centavos=moedas_desconto,
+        desconto_cupom_centavos=desconto_cupom,
         desconto_disponivel=desconto_disponivel,
         desconto_indisponivel_motivo=desconto_motivo,
         desconto_volta_em=desconto_volta,

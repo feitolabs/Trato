@@ -32,7 +32,7 @@ from trato.financeiro.ledger import Conta, Lancamento, Livro, SaldoPedido
 from trato.garantias import Garantia, Retrabalho
 from trato.pagamentos.idempotencia import RegistroEventosEmMemoria
 from trato.pedidos.estados import Estado, Evento, Pedido
-from trato.persistencia.erros import DadosInvalidos
+from trato.persistencia.erros import ConflitoDeEstado, DadosInvalidos
 
 
 class PedidosEmMemoria:
@@ -42,6 +42,9 @@ class PedidosEmMemoria:
         self._dados: dict[str, DadosPedido] = {}
         # Quem tem a exclusividade ativa do pedido (ligado pelo Contexto).
         self._exclusivo_de = lambda _pedido_id: None
+        # Mesma garantia do Postgres (`for update` + estado esperado): duas ações do mesmo
+        # pedido entram uma de cada vez e quem chega depois leva 409.
+        self._trava = threading.RLock()
 
     def vincular_exclusividades(self, quem: Any) -> None:
         self._exclusivo_de = quem
@@ -52,13 +55,19 @@ class PedidosEmMemoria:
     def salvar(
         self, pedido: Pedido, evento: Evento | None = None, dados: DadosPedido | None = None
     ) -> Pedido:
-        self._pedidos[pedido.id] = pedido
-        if dados is not None:
-            self._dados.setdefault(pedido.id, dados)
-        lista = self._eventos.setdefault(pedido.id, [])
-        if evento is not None:
-            lista.append(evento)
-        return pedido
+        with self._trava:
+            atual = self._pedidos.get(pedido.id)
+            if evento is not None and atual is not None and atual.estado is not evento.de:
+                raise ConflitoDeEstado(
+                    "O pedido mudou enquanto você agia. Atualize a tela e tente de novo."
+                )
+            self._pedidos[pedido.id] = pedido
+            if dados is not None:
+                self._dados.setdefault(pedido.id, dados)
+            lista = self._eventos.setdefault(pedido.id, [])
+            if evento is not None:
+                lista.append(evento)
+            return pedido
 
     def eventos(self, pedido_id: str) -> Sequence[Evento]:
         return tuple(self._eventos.get(pedido_id, ()))
