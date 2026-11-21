@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
-from trato.api.avisos import avisar_mensagem_nova, avisar_orcamento_recebido
+from trato.api.avisos import avisar_evento, avisar_mensagem_nova, avisar_orcamento_recebido
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
 from trato.api.moedas import (
@@ -40,6 +40,7 @@ from trato.api.rotas_pedidos import respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import ator_de, carregar_pedido, pedido_out
 from trato.api.visibilidade import pedido_visivel_ao_profissional
+from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import (
     limite_por_usuario_do_cupom,
     usos_do_usuario_do_cupom,
@@ -708,6 +709,10 @@ def propor_aditivo(
             novo = servico.propor_aditivo(contexto, pedido, descricao, corpo.valor_centavos)
         except ErroFluxo as erro:
             raise HTTPException(erro.status, str(erro)) from erro
+        avisar_evento(
+            request, contexto, Evento.ADITIVO_PENDENTE, pedido.cliente_id,
+            pedido_id=pedido.id, chave=f"aditivo-proposto:{novo.id}",
+        )  # fmt: skip
         return AditivoContratoOut(
             id=novo.id, contrato_id=pedido.id, descricao=novo.descricao,
             valor_centavos=novo.valor_centavos, estado=novo.estado.value,
@@ -717,10 +722,22 @@ def propor_aditivo(
     novo_id = contexto.extras["execucao"].propor_aditivo(
         pedido.id, usuario.id, descricao, corpo.valor_centavos
     )
+    avisar_evento(
+        request, contexto, Evento.ADITIVO_PENDENTE, pedido.cliente_id,
+        pedido_id=pedido.id, chave=f"aditivo-proposto:{novo_id}",
+    )  # fmt: skip
     return AditivoContratoOut(
         id=novo_id, contrato_id=pedido.id, descricao=descricao,
         valor_centavos=corpo.valor_centavos, estado="proposto",
     )  # fmt: skip
+
+
+def _avisar_aditivo_aprovado(request: Request, contexto: Contexto, pedido, aditivo_id: str) -> None:  # type: ignore[no-untyped-def]
+    if pedido.profissional_id:
+        avisar_evento(
+            request, contexto, Evento.ADITIVO_APROVADO, pedido.profissional_id,
+            pedido_id=pedido.id, chave=f"aditivo-aprovado:{aditivo_id}",
+        )  # fmt: skip
 
 
 def _decidir_aditivo(
@@ -761,6 +778,7 @@ def _decidir_aditivo(
                 if preparo is not None:
                     saida_cobranca.cliente_externo_id = preparo.cliente_id
                     saida_cobranca.chave_efemera = preparo.chave_efemera
+                _avisar_aditivo_aprovado(request, contexto, pedido, aditivo_id)
                 return AditivoDecididoOut(
                     aditivo=AditivoContratoOut(
                         id=aditivo.id,
@@ -800,6 +818,8 @@ def _decidir_aditivo(
         )
     except NaoEncontrado as erro:
         raise HTTPException(404, "Aditivo não encontrado.") from erro
+    if aprovar:
+        _avisar_aditivo_aprovado(request, contexto, pedido, aditivo_id)
     return AditivoDecididoOut(
         aditivo=atual.model_copy(update={"estado": "aprovado" if aprovar else "recusado"})
     )
@@ -973,6 +993,10 @@ def enviar_nota_material(
         nota = contexto.notas_material.registrar(
             NotaMaterial("", pedido.id, usuario.id, foto, tuple(linhas), total_nota, agora)
         )
+    avisar_evento(
+        request, contexto, Evento.NOTA_MATERIAL, pedido.cliente_id,
+        pedido_id=pedido.id, chave=f"nota-material:{nota.id}",
+    )  # fmt: skip
     return _nota_out(nota, getattr(request.app.state, "servico_uploads", None))
 
 
@@ -1004,11 +1028,12 @@ def listar_notas_material(
 def avaliar_contrato(
     contrato_id: str,
     corpo: AvaliarIn,
+    request: Request,
     resposta: Response,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AvaliacaoOut:
-    return rotas_app.avaliar(contrato_id, corpo, resposta, usuario, contexto)
+    return rotas_app.avaliar(contrato_id, corpo, request, resposta, usuario, contexto)
 
 
 # --- Contraproposta de valor e prazo ------------------------------------------------------

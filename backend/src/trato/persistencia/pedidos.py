@@ -65,9 +65,11 @@ select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
        (select h.prova -> 'dados' ->> 'referencia_pagamento' from public.pedido_historico h
          where h.pedido_id = p.id and h.para_status = 'pago_retido'
          order by h.id desc limit 1) as referencia_pagamento,
-       coalesce((select (h.prova -> 'dados' ->> 'sem_codigo') = 'true'
+       coalesce((select (h.prova ->> 'acao') = 'resolver_retrabalho'
+                        or (h.prova -> 'dados' ->> 'sem_codigo') = 'true'
          from public.pedido_historico h
-         where h.pedido_id = p.id and h.prova ->> 'acao' = 'fazer_check_out'
+         where h.pedido_id = p.id
+           and h.prova ->> 'acao' in ('fazer_check_out', 'resolver_retrabalho')
          order by h.id desc limit 1), false) as check_out_sem_codigo
   from public.pedidos p
   left join public.contratos c on c.pedido_id = p.id

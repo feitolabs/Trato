@@ -89,6 +89,7 @@ router = APIRouter(prefix="/v1/pedidos", tags=["pedidos"])
 _ROTA_DEDICADA = {
     Acao.ABRIR_DISPUTA: "POST /v1/pedidos/{id}/disputa",
     Acao.PEDIR_RETRABALHO: "POST /v1/pedidos/{id}/retrabalho",
+    Acao.RESOLVER_RETRABALHO: "POST /v1/pedidos/{id}/retrabalho/atender (etapa resolver)",
     Acao.RESERVAR_EXCLUSIVIDADE: "POST /v1/pedidos/{id}/exclusividade/{eid}/responder",
 }
 # Pontos de extensão: dependem de fluxos que ainda não existem (ver README da API).
@@ -784,7 +785,9 @@ def pedir_retrabalho(
     with contexto.transacao():
         contexto.garantias.salvar_garantia(pedido.id, garantia)
         contexto.garantias.salvar_retrabalho(pedido.id, retrabalho)
-        contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    for gancho in contexto.apos_transicao:  # avisa o profissional (NOT-1)
+        gancho(pedido, gravado, Acao.PEDIR_RETRABALHO, contexto)
     return RetrabalhoOut(
         pedido_id=pedido.id,
         estado=retrabalho.estado.value,
@@ -863,6 +866,23 @@ def atender_retrabalho(
             "O prazo de atendimento acabou; o caso segue por suporte e análise de problemas."
         )
     novo = transicionar(atual, destino, agora)
+    # Resolver devolve o pedido ao fluxo: aguarda o cliente confirmar de novo (RET-1). Sem
+    # dinheiro novo: a garantia e o pagamento já existem.
+    transicao = None
+    if destino is EstadoRetrabalho.RESOLVIDO and pedido.estado is Estado.RETRABALHO:
+        transicao = estados.transicionar(
+            pedido,
+            Acao.RESOLVER_RETRABALHO,
+            ator_de(usuario, pedido),
+            agora,
+            None,
+            contexto.config.carregar().prazos_pedido,
+        )
     with contexto.transacao():
         contexto.garantias.salvar_retrabalho(pedido.id, novo)
+        if transicao is not None:
+            gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    if transicao is not None:
+        for gancho in contexto.apos_transicao:
+            gancho(pedido, gravado, Acao.RESOLVER_RETRABALHO, contexto)
     return _retrabalho_out(pedido.id, novo)

@@ -35,6 +35,12 @@ class Evento(StrEnum):
     CLIENTE_AUSENTE = "agenda.cliente_ausente"
     A_CAMINHO = "agenda.a_caminho"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
+    SERVICO_INICIADO = "execucao.iniciado"
+    CODIGO_CONCLUSAO = "execucao.codigo_conclusao"
+    CLIENTE_CONFIRMOU = "execucao.cliente_confirmou"
+    ADITIVO_APROVADO = "execucao.aditivo_aprovado"
+    NOTA_MATERIAL = "execucao.nota_material"
+    RETRABALHO_RESOLVIDO = "garantia.retrabalho_resolvido"
     ADITIVO_PENDENTE = "execucao.aditivo_pendente"
     DISPUTA_ABERTA = "disputa.aberta"
     DISPUTA_RESPONDIDA = "disputa.respondida"
@@ -59,6 +65,7 @@ class ModeloEvento:
     corpo: str
     tela: str  # tela do app: vira o deep link
     essencial: bool = False  # sempre aparece na caixa de entrada, mesmo com a categoria desligada
+    somente_app: bool = False  # só a lista do app: sem push nem e-mail
 
 
 MODELOS: dict[Evento, ModeloEvento] = {
@@ -91,7 +98,7 @@ MODELOS: dict[Evento, ModeloEvento] = {
     Evento.PAGAMENTO_CONFIRMADO: ModeloEvento(
         Categoria.PAGAMENTOS,
         "Pagamento confirmado",
-        "O parceiro de pagamento confirmou o pagamento do pedido.",
+        "Pagamento confirmado. Combine o início com o profissional.",
         "pedido",
         essencial=True,
     ),
@@ -136,6 +143,55 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "O profissional terminou. Confirme se está tudo certo.",
         "pedido",
         essencial=True,
+    ),
+    Evento.SERVICO_INICIADO: ModeloEvento(
+        Categoria.EXECUCAO,
+        "Serviço iniciado",
+        "O profissional começou o serviço.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.CODIGO_CONCLUSAO: ModeloEvento(
+        Categoria.EXECUCAO,
+        "Código de conclusão disponível",
+        "Passe este código ao profissional quando o serviço estiver pronto. "
+        "Não envie por mensagem.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.CLIENTE_CONFIRMOU: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Serviço confirmado pelo cliente",
+        "O cliente confirmou o serviço.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.ADITIVO_APROVADO: ModeloEvento(
+        Categoria.EXECUCAO,
+        "Aditivo aprovado",
+        "O cliente aprovou o aditivo do serviço.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.NOTA_MATERIAL: ModeloEvento(
+        Categoria.EXECUCAO,
+        "Nota de material enviada",
+        "O profissional enviou uma nota de material. Veja os itens e o valor.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.RETRABALHO_RESOLVIDO: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Retrabalho resolvido",
+        "O profissional informou que resolveu o problema. Confirme se está tudo certo.",
+        "pedido",
+        essencial=True,
+        somente_app=True,
     ),
     Evento.ADITIVO_PENDENTE: ModeloEvento(
         Categoria.EXECUCAO,

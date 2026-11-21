@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import (
+    avisar_evento,
     avisar_mensagem_nova,
     avisar_orcamento_recebido,
     servicos_de_notificacao,
@@ -45,6 +46,7 @@ from trato.api.repositorios_app import (
 from trato.api.servicos import carregar_pedido, eh_participante
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.financeiro import periodo
+from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import validar_e_calcular_cupom
 from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular_custo_stripe
 from trato.pedidos.estados import Estado, Pedido
@@ -1286,6 +1288,7 @@ def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
 def avaliar(
     pedido_id: str,
     corpo: AvaliarIn,
+    request: Request,
     resposta: Response,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
@@ -1359,4 +1362,17 @@ def avaliar(
             )
         except Exception:  # noqa: BLE001 - gamificação nunca derruba a avaliação
             ganhas = 0
+    avisar_evento(
+        request,
+        contexto,
+        Evento.AVALIACAO,
+        avaliado,
+        pedido_id=pedido.id,
+        chave=f"{pedido.id}:{direcao}",
+        corpo=(
+            "Seu profissional avaliou você."
+            if direcao == "profissional_para_cliente"
+            else None  # o texto padrão do evento; o comentário nunca vai no aviso
+        ),
+    )
     return _avaliacao_out(nova, ganhas)

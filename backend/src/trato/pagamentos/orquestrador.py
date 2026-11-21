@@ -19,6 +19,7 @@ Nada aqui conhece HTTP; as rotas ficam em `api/rotas_pagamento.py`.
 from __future__ import annotations
 
 import hashlib
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
@@ -387,7 +388,18 @@ class ServicoPagamento:
                     agora,
                     ProvaPagamento(cobranca.id),
                 )
-                contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+                gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+                # Avisos (cliente e profissional). Não repete o gancho do dinheiro: este caminho
+                # já lança a cobrança logo abaixo. Falha de aviso nunca derruba o webhook.
+                for gancho in contexto.apos_transicao:
+                    if gancho == self._apos_transicao:
+                        continue
+                    try:
+                        gancho(pedido, gravado, Acao.CONFIRMAR_PAGAMENTO, contexto)
+                    except Exception:  # noqa: BLE001 - aviso é secundário
+                        logging.getLogger("trato.pagamentos").exception(
+                            "Gancho pós-pagamento falhou"
+                        )
 
         # O custo do parcelado sai da custódia já na confirmação. O serviço fica retido inteiro: a
         # taxa só é descontada do profissional na conclusão, e reembolso devolve o valor todo.

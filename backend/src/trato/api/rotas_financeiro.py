@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
@@ -121,6 +121,31 @@ def saldo_do_profissional(
         proxima_liberacao_em=min(datas) if datas else None,
         liberacoes_previstas=previstas,
     )
+
+
+def _regra_liberacao(contexto: Contexto) -> ConfigRotinas:
+    cfg = contexto.config.carregar()
+    congelamento = timedelta(hours=cfg.disputas.prazo_congelar_repasse_horas)
+    prazo = (
+        timedelta(days=cfg.prazo_liberacao_dias)
+        if cfg.prazo_liberacao_dias is not None
+        else congelamento
+    )
+    return ConfigRotinas(
+        prazo_liberacao=prazo,
+        janela_congelamento_repasse=congelamento,
+        liberacao_espera_congelamento=True,
+    )
+
+
+def liberacao_prevista(contexto: Contexto, concluido_em: datetime | None) -> datetime | None:
+    """Quando o valor do pedido concluído é liberado (mesma regra da rotina). Nunca levanta."""
+    if concluido_em is None:
+        return None
+    try:
+        return instante_liberacao(concluido_em, _regra_liberacao(contexto))
+    except Exception:  # noqa: BLE001 - texto de aviso: sem data, o aviso sai sem ela
+        return None
 
 
 def _liberacoes_previstas(contexto: Contexto, profissional_id: str) -> list[LiberacaoPrevistaOut]:

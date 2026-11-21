@@ -87,6 +87,7 @@ class Acao(StrEnum):
     ENCERRAR_DISPUTA_POR_ACORDO = "encerrar_disputa_por_acordo"
     DECIDIR_DISPUTA = "decidir_disputa"
     PEDIR_RETRABALHO = "pedir_retrabalho"
+    RESOLVER_RETRABALHO = "resolver_retrabalho"  # o profissional terminou: cliente confirma
     RESERVAR_EXCLUSIVIDADE = "reservar_exclusividade"  # cliente aceita a exclusividade
     EXPIRAR_EXCLUSIVIDADE = "expirar_exclusividade"  # 48h sem atender: o pedido reabre
 
@@ -391,6 +392,9 @@ REGRAS: dict[Acao, _Regra] = {
     ),
     Acao.PEDIR_RETRABALHO: _Regra(
         "pedir retrabalho", {Papel.CLIENTE: _de(E.CONCLUIDO)}, ProvaRetrabalho
+    ),
+    Acao.RESOLVER_RETRABALHO: _Regra(
+        "resolver o retrabalho", {Papel.PROFISSIONAL: _de(E.RETRABALHO)}, None
     ),
     Acao.RESERVAR_EXCLUSIVIDADE: _Regra(
         "aceitar a exclusividade", {Papel.CLIENTE: _de(E.ABERTO)}, None
@@ -735,6 +739,16 @@ def _entrar_em_retrabalho(pedido: Pedido, gerar: Callable[[], str]) -> Pedido:
     )
 
 
+def _resolver_retrabalho(pedido, ator, agora, prova, prazos, gerar):
+    """Volta ao fluxo normal: o cliente confirma de novo (garantia e pagamento não se repetem).
+
+    Sem código de conclusão: a confirmação tem de ser explícita do cliente (nada de concluir
+    sozinho por prazo logo depois, pois o check-out original já passou)."""
+    return replace(
+        pedido, estado=Estado.EM_CONFIRMACAO, check_out_em=agora, check_out_sem_codigo=True
+    )
+
+
 def _pedir_retrabalho(pedido, ator, agora, prova: ProvaRetrabalho, prazos, gerar):
     garantia = _prazo(prazos, "garantia", "garantia")
     if pedido.concluido_em is None or agora > pedido.concluido_em + garantia:
@@ -765,6 +779,7 @@ _APLICAR = {
     Acao.ENCERRAR_DISPUTA_POR_ACORDO: _encerrar_disputa_por_acordo,
     Acao.DECIDIR_DISPUTA: _decidir_disputa,
     Acao.PEDIR_RETRABALHO: _pedir_retrabalho,
+    Acao.RESOLVER_RETRABALHO: _resolver_retrabalho,
     Acao.RESERVAR_EXCLUSIVIDADE: _reservar_exclusividade,
     Acao.EXPIRAR_EXCLUSIVIDADE: _expirar_exclusividade,
 }

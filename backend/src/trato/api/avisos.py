@@ -70,6 +70,24 @@ def _profissional(contexto: Contexto, pedido_id: str, autor_id: str, destinatari
     return autor_id
 
 
+def avisar_evento(
+    request: Request,
+    contexto: Contexto,
+    evento: Evento,
+    usuario_id: str,
+    *,
+    pedido_id: str,
+    chave: str,
+    corpo: str | None = None,
+) -> None:
+    """Aviso simples de um evento do pedido (NOT-1). Uma vez por `chave`; nunca levanta."""
+    try:
+        servico, _ = servicos_de_notificacao(request, contexto)
+        servico.notificar(evento, usuario_id, chave=chave, pedido_id=pedido_id, corpo=corpo)
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Aviso %s falhou", evento.value)
+
+
 def avisar_orcamento_recebido(
     request: Request,
     contexto: Contexto,
