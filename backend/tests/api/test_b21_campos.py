@@ -260,3 +260,49 @@ def test_aditivo_pago_avisa_o_profissional_uma_vez(fluxo: Fluxo):  # noqa: F811
     )
     assert avisos[0].dados["pedido_id"] == pid
     assert fluxo.saldo(pid)["cliente_pagou_centavos"] > saldo_antes["cliente_pagou_centavos"]
+
+
+# --- B23: categoria_nome nos pedidos abertos do profissional -----------------------------------
+
+ID_TESTE = "adc6dfe8-90e9-4344-96b1-22928063c9b9"
+
+
+def test_pedidos_abertos_trazem_categoria_nome_na_lista_e_no_detalhe_e_veem_categoria_nova(amb):
+    catalogo = [CategoriaPublica("pintura", "Pintura", "pintura")]
+    amb.cliente.app.state.modulo_profissional = SimpleNamespace(
+        catalogo=SimpleNamespace(categorias_publicas=lambda: list(catalogo))
+    )
+    _abrir(amb, "pres", "pintura", "Orçamento geral", local=(-19.92, -43.94))
+    _abrir(amb, "rem", ID_TESTE, "Orçamento geral", remoto=True)
+    url = "/v1/profissional/pedidos-abertos"
+
+    antes = {p["id"]: p for p in _get(amb, url, "t-prof").json()}
+    assert antes["pres"]["categoria_nome"] == "Pintura" and antes["pres"]["ja_avaliou"] is False
+    assert antes["rem"]["categoria_nome"] is None  # categoria ainda fora do catálogo: sem nome
+
+    # a categoria é criada DEPOIS do boot (direto no banco): o próximo pedido já a enxerga
+    catalogo.append(
+        CategoriaPublica(ID_TESTE, "[TESTE] Desenvolvimento de software",
+                         "teste-desenvolvimento-de-software", aceita_remoto=True)
+    )  # fmt: skip
+    depois = {p["id"]: p for p in _get(amb, url, "t-prof").json()}
+    assert depois["rem"]["categoria_nome"] == "[TESTE] Desenvolvimento de software"
+    assert depois["rem"]["modalidade"] == "remoto" and depois["rem"]["titulo"] == "Orçamento geral"
+
+    for pid, nome in (("pres", "Pintura"), ("rem", "[TESTE] Desenvolvimento de software")):
+        det = _get(amb, f"{url}/{pid}", "t-prof").json()
+        assert det["categoria_nome"] == nome and det["ja_avaliou"] is False
+        assert "categoria_id" in det and "titulo" in det  # nada existente foi removido
+
+
+def test_pedido_aberto_casa_a_categoria_pelo_slug_e_sem_catalogo_vai_null(amb):
+    _abrir(amb, "p1", "pintura", "Pintar")
+    url = "/v1/profissional/pedidos-abertos"
+    assert _get(amb, url, "t-prof").json()[0]["categoria_nome"] is None  # sem módulo/catálogo
+
+    amb.cliente.app.state.modulo_profissional = SimpleNamespace(
+        catalogo=SimpleNamespace(
+            categorias_publicas=lambda: [CategoriaPublica(ID_TESTE, "Pintura", "pintura")]
+        )
+    )
+    assert _get(amb, url, "t-prof").json()[0]["categoria_nome"] == "Pintura"  # casou pelo slug

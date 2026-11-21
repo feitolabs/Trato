@@ -250,6 +250,12 @@ class PedidoAbertoOut(BaseModel):
         default=None, description="Primeiro nome e inicial do sobrenome (nunca dado de contato)."
     )
     modalidade: str = Field("presencial", description="`presencial` ou `remoto`.")
+    categoria_nome: str | None = Field(
+        None, description="Nome da categoria do pedido (catálogo vivo); null se não achar."
+    )
+    ja_avaliou: bool = Field(
+        False, description="Sempre false: pedido aberto ainda não tem serviço para avaliar."
+    )
     convidado: bool = Field(
         default=False, description="Verdadeiro quando o cliente direcionou este pedido a você."
     )

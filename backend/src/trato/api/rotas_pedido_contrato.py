@@ -13,6 +13,7 @@ import logging
 import math
 import re
 import threading
+from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
@@ -39,7 +40,7 @@ from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.rotas_pedidos import respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
-from trato.api.servicos import ator_de, carregar_pedido, pedido_out
+from trato.api.servicos import ator_de, carregar_pedido, nomes_de_categorias, pedido_out
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import (
@@ -1421,6 +1422,7 @@ def _saida_aberto(
     contexto: Contexto | None = None,
     *,
     usuario_id: str | None = None,
+    categorias: Mapping[str, str] | None = None,
 ) -> PedidoAbertoOut:
     km = None
     # MAP-1: mesmo para pedido já salvo, o servidor devolve só a grade de ~500 m (nunca o ponto
@@ -1442,6 +1444,8 @@ def _saida_aberto(
         **campos,
         distancia_km=km,
         cliente_nome=nome,
+        categoria_nome=(categorias or {}).get(str(p.categoria_id)) if p.categoria_id else None,
+        ja_avaliou=False,
         convidado=_eh_convidado_do_pedido(contexto, p, usuario_id),
     )
 
@@ -1493,6 +1497,7 @@ def pedidos_abertos(
         and preco_min_centavos > preco_max_centavos
     ):
         raise HTTPException(422, "O preço mínimo não pode passar do máximo.")
+    categorias = nomes_de_categorias(request)  # catálogo lido na hora: vê categoria nova
     recusados = {r.pedido_id for r in contexto.recusas.do_profissional(usuario.id)}
     itens = [p for p in contexto.pedidos.listar_abertos(usuario.id) if p.id not in recusados]
     if categoria_id:
@@ -1528,14 +1533,20 @@ def pedidos_abertos(
             )
         )
     elif ordenar is OrdemPedidos.PROXIMOS and lat is not None and lng is not None:
-        saida = [_saida_aberto(p, lat, lng, contexto, usuario_id=usuario.id) for p in itens]
+        saida = [
+            _saida_aberto(p, lat, lng, contexto, usuario_id=usuario.id, categorias=categorias)
+            for p in itens
+        ]
         saida.sort(key=lambda o: (not o.convidado, o.distancia_km is None, o.distancia_km or 0.0))
         return saida[:limite]
     elif _profissional_disponivel_agora(request, usuario.id):
         itens.sort(key=lambda p: (not p.urgente, -p.aberto_em.timestamp()))
     else:
         itens.sort(key=lambda p: p.aberto_em, reverse=True)
-    saida = [_saida_aberto(p, lat, lng, contexto, usuario_id=usuario.id) for p in itens]
+    saida = [
+        _saida_aberto(p, lat, lng, contexto, usuario_id=usuario.id, categorias=categorias)
+        for p in itens
+    ]
     saida.sort(key=lambda o: not o.convidado)
     return saida[:limite]
 
@@ -1576,7 +1587,14 @@ def pedido_aberto(
         raise HTTPException(404, "Pedido não encontrado.")
     orcamentos = contexto.orcamentos.do_pedido(achado.id)
     return PedidoAbertoDetalheOut(
-        **_saida_aberto(achado, lat, lng, contexto, usuario_id=usuario.id).model_dump(),
+        **_saida_aberto(
+            achado,
+            lat,
+            lng,
+            contexto,
+            usuario_id=usuario.id,
+            categorias=nomes_de_categorias(request),
+        ).model_dump(),
         orcamentos_recebidos=len(orcamentos),
         ja_orcou=any(o.profissional_id == usuario.id for o in orcamentos),
         respostas=respostas_out(contexto, achado.id),
