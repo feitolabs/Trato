@@ -133,8 +133,9 @@ def test_responder_aceitar_e_recusar_notificam_profissional(amb):
     assert _responder(amb, eid2, "recusar", pid="ped-2").status_code == 200
     notas_recusa = [n for n in _notas(amb, "t-prof") if n["tipo"] == Evento.EXCLUSIVIDADE_RECUSADA]
     assert len(notas_recusa) == 1
-    assert "O cliente preferiu ver outros orçamentos. Seus 100 Tratinhos voltaram." == (
-        notas_recusa[0]["corpo"]
+    assert (
+        "O cliente preferiu ver outros orçamentos. Seus 100 Tratinhos voltaram."
+        == (notas_recusa[0]["corpo"])
     )
 
 
@@ -241,9 +242,7 @@ def test_expiracao_48h_reabre_pedido_sem_estorno_e_notifica_profissional_e_clien
     assert len(notas_pro) == 1
     assert "48h" in (notas_pro[0].corpo or "")
     assert len(notas_cli) == 1
-    assert (
-        notas_cli[0].corpo == "Seu pedido voltou a receber orçamentos de outros profissionais."
-    )
+    assert notas_cli[0].corpo == "Seu pedido voltou a receber orçamentos de outros profissionais."
 
     # Segundo ciclo não duplica.
     assert agendador.rodar_uma_vez().exclusividades_expiradas == 0

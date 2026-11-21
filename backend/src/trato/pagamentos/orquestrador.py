@@ -428,6 +428,7 @@ class ServicoPagamento:
                 pedido_id=cobranca.pedido_id,
                 desconto_centavos=cobranca.desconto_centavos,
                 confirmado_em=agora,
+                forcar_limite_usuario=True,  # desconto já dado: o uso nunca se perde
             )
 
     def _moedas_do_pagamento(

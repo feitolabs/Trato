@@ -480,6 +480,8 @@ def mudar_estado(
     if acao in _ROTA_DEDICADA:
         raise HTTPException(400, f"Use a rota {_ROTA_DEDICADA[acao]}.")
     if acao in _NAO_DISPONIVEIS:
+        if usuario.papel is not PapelUsuario.EQUIPE:
+            raise HTTPException(403, "Só o mediador decide a disputa.")
         raise HTTPException(501, _NAO_DISPONIVEIS[acao])
 
     bruto, offline_em = offline.separar(

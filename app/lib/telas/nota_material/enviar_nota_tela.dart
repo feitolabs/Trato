@@ -50,6 +50,8 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   }
 
   void _adicionarItem() {
+    const maxQtd = 9999;
+    const maxTotalCentavos = 100000000;
     final desc = _descricao.text.trim();
     final qtdTexto = _quantidade.text.trim();
     final qtd = int.tryParse(qtdTexto);
@@ -57,12 +59,21 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
     if (desc.isEmpty) {
       return setState(() => _erroItem = 'Descrição vazia. Digite o que é o item.');
     }
-    if (qtd == null || qtd <= 0) {
-      return setState(() => _erroItem = 'Quantidade inválida. Digite um número inteiro maior que zero.');
+    if (qtd == null || qtd <= 0 || qtd > maxQtd) {
+      return setState(
+          () => _erroItem = 'Quantidade inválida. Digite um número inteiro entre 1 e 9.999.');
     }
     if (centavos == null || centavos <= 0) {
       return setState(() => _erroItem =
           'Valor não informado. Digite um valor em reais maior que zero (ex.: 46,50).');
+    }
+    if (centavos > maxTotalCentavos || qtd > maxTotalCentavos ~/ centavos) {
+      return setState(() => _erroItem = 'Valor do item acima do limite permitido.');
+    }
+    final totalItem = qtd * centavos;
+    final somaAtual = _itens.fold<int>(0, (s, i) => s + i.centavos);
+    if (somaAtual > maxTotalCentavos - totalItem) {
+      return setState(() => _erroItem = 'Soma da nota acima do limite permitido.');
     }
     setState(() {
       _itens.add(ItemNota(
@@ -78,8 +89,14 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   }
 
   Future<void> _tirarFoto() async {
-    final ref = await widget.aoCapturarFoto?.call();
-    if (ref != null && mounted) setState(() => _foto = ref);
+    try {
+      final ref = await widget.aoCapturarFoto?.call();
+      if (ref != null && mounted) setState(() => _foto = ref);
+    } on Object {
+      if (mounted) {
+        setState(() => _erroEnvio = 'Não foi possível capturar a foto agora. Tente de novo.');
+      }
+    }
   }
 
   Future<void> _enviar() async {
@@ -166,6 +183,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
                   Padding(
                     padding: EdgeInsets.only(bottom: i == _itens.length - 1 ? 0 : EspacosTrato.x2),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
@@ -174,10 +192,19 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
                           ),
                         ),
                         const SizedBox(width: EspacosTrato.x2),
-                        Text(formatarReais(_itens[i].centavos), style: TipografiaTrato.corpoForte),
+                        Flexible(
+                          flex: 0,
+                          child: Text(
+                            formatarReais(_itens[i].centavos),
+                            style: TipografiaTrato.corpoForte,
+                          ),
+                        ),
                         IconButton(
                           tooltip: 'Remover ${_itens[i].descricao}',
                           icon: const Icon(Icons.close, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                           onPressed: () => setState(() => _itens.removeAt(i)),
                         ),
                       ],

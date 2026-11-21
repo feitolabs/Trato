@@ -78,6 +78,10 @@ class _CheckOutTelaState extends State<CheckOutTela> {
       if (mounted && metros != null) setState(() => _distancia = metros);
     } on ErroTrato catch (e) {
       if (mounted) setState(() => _erro = e.mensagem);
+    } on Object {
+      if (mounted) {
+        setState(() => _erro = 'Não deu para pegar sua localização agora. Tente de novo.');
+      }
     }
   }
 
@@ -93,10 +97,15 @@ class _CheckOutTelaState extends State<CheckOutTela> {
       if (mounted && foto != null) setState(() => _foto = foto);
     } on ErroTrato catch (e) {
       if (mounted) setState(() => _erro = e.mensagem);
+    } on Object {
+      if (mounted) {
+        setState(() => _erro = 'Não deu para tirar a foto agora. Tente de novo.');
+      }
     }
   }
 
   Future<void> _concluir() async {
+    if (_enviando) return;
     setState(() {
       _enviando = true;
       _erro = null;
@@ -114,6 +123,14 @@ class _CheckOutTelaState extends State<CheckOutTela> {
         setState(() {
           _enviando = false;
           _erro = e.mensagem;
+        });
+      }
+      return;
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _enviando = false;
+          _erro = 'Não deu para concluir agora. Tente de novo.';
         });
       }
       return;

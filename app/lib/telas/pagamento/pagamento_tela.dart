@@ -21,6 +21,7 @@ class PagamentoTela extends StatefulWidget {
     this.aoAlternarMoedas,
     this.aoVoltar,
     this.aoCadastrarCpf,
+    this.aoTentarNovamente,
   });
 
   final DadosPagamento dados;
@@ -37,13 +38,17 @@ class PagamentoTela extends StatefulWidget {
   /// Cadastra CPF e data de nascimento (aaaa-mm-dd) antes do primeiro pagamento.
   final Future<void> Function(String cpf, String nascimentoIso)? aoCadastrarCpf;
 
+  /// "Tentar de novo" quando não há nenhuma forma de pagamento disponível. Sem ele, só "Voltar".
+  final VoidCallback? aoTentarNovamente;
+
   @override
   State<PagamentoTela> createState() => _PagamentoTelaState();
 }
 
 class _PagamentoTelaState extends State<PagamentoTela> {
   late DadosPagamento _dados = widget.dados;
-  late MetodoPagamento _metodo = widget.dados.opcoes.first.metodo;
+  late MetodoPagamento? _metodo =
+      widget.dados.opcoes.isEmpty ? null : widget.dados.opcoes.first.metodo;
   int _parcelas = 1;
   final _cupomCtrl = TextEditingController();
   var _pagando = false;
@@ -53,12 +58,14 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   late var _cpfCadastrado = widget.dados.cpfCadastrado;
   String? _erroCupom;
   String? _erroMoedas;
+  String? _erroPagamento;
 
   @override
   void didUpdateWidget(covariant PagamentoTela oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.dados != oldWidget.dados) {
       _dados = widget.dados;
+      if (_metodo == null && _dados.opcoes.isNotEmpty) _metodo = _dados.opcoes.first.metodo;
       if (_parcelas > 1 && !_dados.parcelamento.any((p) => p.parcelas == _parcelas)) {
         _parcelas = 1;
       }
@@ -191,34 +198,82 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   }
 
   Future<void> _pagar() async {
-    if (_pagando) return;
+    final metodo = _metodo;
+    if (_pagando || metodo == null) return;
     if (!_cpfCadastrado && widget.aoCadastrarCpf != null) {
       final cadastrou = await _pedirCpf();
       if (!cadastrou || !mounted) return;
     }
-    setState(() => _pagando = true);
+    setState(() {
+      _pagando = true;
+      _erroPagamento = null;
+    });
     try {
-      final parcelasEnvio = _metodo == MetodoPagamento.cartao ? _parcelas : 1;
+      final parcelasEnvio = metodo == MetodoPagamento.cartao ? _parcelas : 1;
       if (widget.aoPagarDetalhado != null) {
         try {
-          await widget.aoPagarDetalhado!.call(_metodo, parcelasEnvio, _dados.cupomCodigo);
+          await widget.aoPagarDetalhado!.call(metodo, parcelasEnvio, _dados.cupomCodigo);
         } on ErroTrato catch (e) {
           if (e.codigo == 'cpf_obrigatorio' && widget.aoCadastrarCpf != null && mounted) {
             setState(() => _pagando = false);
             final cadastrou = await _pedirCpf();
             if (!cadastrou || !mounted) return;
             setState(() => _pagando = true);
-            await widget.aoPagarDetalhado!.call(_metodo, parcelasEnvio, _dados.cupomCodigo);
+            await widget.aoPagarDetalhado!.call(metodo, parcelasEnvio, _dados.cupomCodigo);
           } else {
             rethrow;
           }
         }
       } else {
-        await widget.aoPagar?.call(_metodo);
+        await widget.aoPagar?.call(metodo);
       }
+    } on ErroTrato catch (e) {
+      // Quem chama (rotas.dart) já trata os erros dele; o que chegar até aqui aparece na tela.
+      if (mounted) setState(() => _erroPagamento = e.mensagem);
+    } on Object {
+      if (mounted) setState(() => _erroPagamento = 'Não deu para pagar agora. Tente de novo.');
     } finally {
       if (mounted) setState(() => _pagando = false);
     }
+  }
+
+  /// Sem nenhuma forma de pagamento (resposta vazia do servidor): não quebra, explica e dá saída.
+  Widget _construirIndisponivel() {
+    return Scaffold(
+      body: SafeArea(
+        child: ConteudoResponsivo(
+          child: Padding(
+            padding: const EdgeInsets.all(EspacosTrato.x4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Pagamento indisponível agora',
+                  key: const Key('pagamento-indisponivel'),
+                  textAlign: TextAlign.center,
+                  style: TipografiaTrato.titulo,
+                ),
+                const SizedBox(height: EspacosTrato.x2),
+                Text(
+                  'Não encontramos uma forma de pagamento para este pedido. Tente de novo em instantes.',
+                  textAlign: TextAlign.center,
+                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                ),
+                const SizedBox(height: EspacosTrato.x4),
+                if (widget.aoTentarNovamente != null) ...[
+                  BotaoPrimario(texto: 'Tentar de novo', aoTocar: widget.aoTentarNovamente!),
+                  const SizedBox(height: EspacosTrato.x2),
+                ],
+                BotaoSecundario(
+                  texto: 'Voltar',
+                  aoTocar: widget.aoVoltar ?? () => Navigator.maybePop(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   static const _passos = [
@@ -231,6 +286,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   @override
   Widget build(BuildContext context) {
     final dados = _dados;
+    if (dados.opcoes.isEmpty) return _construirIndisponivel();
     final valor = Dinheiro.formatar(_valorExibidoCentavos);
     final parcelaSel = _parcelaEscolhida;
     final comoPagar = _metodo == MetodoPagamento.pix
@@ -273,10 +329,10 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         ),
                       ),
                     ],
-                    if (dados.descontoCentavos - dados.moedasDescontoCentavos > 0) ...[
+                    if ((dados.descontoCupomCentavos ?? 0) > 0) ...[
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
-                        'Cupom ${dados.cupomCodigo ?? ''} aplicado · desconto de ${Dinheiro.formatar(dados.descontoCentavos - dados.moedasDescontoCentavos)}',
+                        'Cupom ${dados.cupomCodigo ?? ''} aplicado · desconto de ${Dinheiro.formatar(dados.descontoCupomCentavos!)}',
                         style: TipografiaTrato.corpoPequeno.copyWith(
                           color: CoresTrato.verdeTexto,
                           fontWeight: FontWeight.w600,
@@ -473,10 +529,27 @@ class _PagamentoTelaState extends State<PagamentoTela> {
               child: ConteudoResponsivo(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
-                  child: BotaoPrimario(
-                    texto: 'Pagar $valor $comoPagar',
-                    carregando: _pagando,
-                    aoTocar: _pagando ? null : _pagar,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_erroPagamento != null) ...[
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _erroPagamento!,
+                            key: const Key('erro-pagamento'),
+                            textAlign: TextAlign.center,
+                            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                          ),
+                        ),
+                        const SizedBox(height: EspacosTrato.x2),
+                      ],
+                      BotaoPrimario(
+                        texto: 'Pagar $valor $comoPagar',
+                        carregando: _pagando,
+                        aoTocar: _pagando ? null : _pagar,
+                      ),
+                    ],
                   ),
                 ),
               ),

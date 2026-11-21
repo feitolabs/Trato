@@ -1094,6 +1094,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
       subtitulo: 'Pedido ${PedidoApi.numeroDe(pedidoId)}',
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as int?) ?? valor,
       descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
+      descontoCupomCentavos: (j['desconto_cupom_centavos'] as num?)?.toInt(),
       cupomCodigo: j['cupom_codigo'] as String?,
       moedasSaldo: (j['moedas_saldo'] as num?)?.toInt() ?? 0,
       moedasUsadas: (j['moedas_usadas'] as num?)?.toInt() ?? 0,

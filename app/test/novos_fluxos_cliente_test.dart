@@ -209,6 +209,7 @@ void main() {
             aoAplicarCupom: (codigo) async => dadosBase.copiarCom(
               valorAgoraCentavos: 90000,
               descontoCentavos: 10000,
+              descontoCupomCentavos: 10000,
               cupomCodigo: codigo.trim().toUpperCase(),
               parcelamento: const [
                 OpcaoParcelamento(

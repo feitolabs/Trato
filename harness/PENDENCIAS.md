@@ -3,6 +3,52 @@
 Itens que precisam de resposta do João (ou de advogado/contador) antes de virar código.
 Não inventar regra: enquanto estiver aqui, não implementar.
 
+## Estado em 20/11/2026 (atualização D2)
+
+Fonte: `harness/PROGRESSO.md`, `git log`, arquivos no disco e `flyctl releases`. Legenda: ✅ resolvida, 🔶 parcial, ⏳ aberta.
+Tudo abaixo desta seção até "Para o João decidir" é novo; as seções antigas continuam como histórico, com marcas ✅/⏳ de 20/11 onde houve mudança.
+
+### ✅ Resolvidas (com evidência)
+
+- ✅ **Taxa do Trato (P2, P3, P5 e a "tabela de taxas" do painel v2):** decisão do João em 18/11: o app é 100% gratuito e a taxa saiu do código. Evidência: PROGRESSO "2026-11-18 — App 100% gratuito" e "Taxa removida de vez". As respostas do Emanuel sobre faixas de taxa (03/11) ficaram sem efeito. O custo do Stripe no Pix e no cartão à vista é do Trato; o custo de parcelamento continua com o cliente.
+- ✅ **P1, prazo de liberação:** 48 h para o cliente confirmar + 7 dias de janela (D16); registro em `8b2abab` ("decisão de prazo 48h").
+- ✅ **Etapa B, exclusividade de 48 h:** commits `7e88d2b` (backend, rotina de expiração e avisos) e `5839a4e` (telas); migrations `20261121100000_exclusividade_schema.sql` e `20261121200000_exclusividade_funcoes.sql` aplicadas no Supabase em 20/11 (cabeçalho da segunda: "APLICADA em 2026-11-20"; a primeira foi informada pelo Mestre); backend no ar na release v31 do Fly. Decisões em `docs/decisoes-moedas-e-exclusividade.md`.
+- ✅ **CPF opcional no cadastro:** `bed0c35` (migration), `e6bf09c` (backend), `e0886b1` (app); migration `20261121300000_cpf_opcional_cadastro.sql` aplicada em 20/11 (cabeçalho); no ar na release v32.
+- ✅ **Fuso do mês no bônus das moedas:** B13 `c5f0b41` (bônus no fuso de São Paulo, reservas só do mês corrente, `limite_por_usuario` do cupom).
+- ✅ **Publicar backend e painel (antes "publicar no Render/Vercel"):** backend no Fly (app `trato`, gru), release **v37** `complete` (`flyctl releases -a trato`, 20/11); painel na Vercel (projeto `trato-admin`, https://trato-admin-delta.vercel.app), publicado em 20/11 com o commit `5dbc8c1` (define nova senha + "Esqueci a senha"). O código já não referencia o Render (PROGRESSO 10/11, linha "App aponta para a API no Fly.io").
+- ✅ **Extrato em PDF no app do profissional:** F18 `4cad35b` ("Compartilhar no extrato em PDF"), B7 `19c0ce7` e B9 `0b23fa1` (resumo de ganhos, "Sem taxa", CPF e serviços do período).
+- ✅ **Perfil público sem login e sem comentário de avaliação:** B8 `1569e10` (`GET /v1/publico/profissionais/{id}`) e B10 `d2b2de9` (comentários somem até haver moderação).
+- ✅ **Moedas/Tratinhos:** moeda própria, desconto, orçamento de desconto (R$ 300/mês, R$ 10/dia, R$ 5 por cliente/mês), reservas por cobrança, Pix com validade e bônus em 7 dias; migrations `20261118150000_moedas_gamificacao`, `20261119120000_moedas_desconto`, `20261120100000_moedas_orcamento` e `20261120200000_moedas_reservas` aplicadas (PROGRESSO 18 a 20/11). Ranking: `20261119140000_ranking_config` aplicada.
+- ✅ **Bugs das rodadas QA3 a QA5:** todos corrigidos nos commits B12 `0beda5e`, B13 `c5f0b41`, B14 `27a5351`, F21 `6269a7b` a F24 `cdc7e28` e A4 `6163cbb` (PROGRESSO "2026-11-20/21 — Rodada QA3 a QA5"). **Estão só locais** (ver abaixo).
+- ✅ **Ambiente:** `origin` ligado (`https://github.com/feitolabs/Trato.git`); GitHub CLI `gh` 2.103.3 instalado; `flutter` resolve em `C:lutterin` no PowerShell desta máquina (conferi em 20/11).
+
+### ⏳ Abertas (decisão ou ação necessária)
+
+- ⏳ **Código local sem push nem deploy:** `origin/develop` está em `3977e3d`; `develop` local tem 10 commits à frente (B12, B13, B14, F21 a F24, A4, correção da dica "Digite um número" e testes QA3/QA4). Backend no ar (v37) = B11, sem B12 a B14. Precisa de OK do João para push, deploy do backend no Fly e do painel na Vercel (e novo build do app, se for entregar F21 a F24).
+- ⏳ **Agendador desligado no Fly (`TRATO_AGENDADOR_EMBUTIDO="false"`, `backend/fly.toml` linha 17):** sem ele as reservas de Tratinhos não expiram, os bônus de avaliação não são liberados, e também não rodam confirmação automática por prazo, expiração de pedido e de pagamento, lembretes, reenvio de notificações e exclusão LGPD. Hoje a decisão do João é manter desligado (informado pelo Mestre em 20/11). Como ligar: ver "Auditoria do app (15/11/2026)" abaixo.
+- ⏳ **Contabilidade do desconto (cupom e Tratinhos):** como lançar no ledger/fechamento o desconto pago pela empresa (próxima rodada, PROGRESSO 20/11).
+- ⏳ **Bônus em pedido estornado:** o que fazer com o bônus de avaliação quando o pedido é estornado (PROGRESSO 20/11).
+- ⏳ **`UPDATE` da validade de 90 dias** dos Tratinhos (PROGRESSO 20/11): ajuste de dados pendente.
+- ⏳ **Permissão própria do admin para a configuração de moedas** (hoje reaproveita outra permissão; PROGRESSO 20/11).
+- ⏳ **Fallback do bônus com `Exception` genérica** (PROGRESSO 20/11): trocar por tratamento específico.
+- ⏳ **Teste de concorrência em Postgres real:** o ramo `SELECT ... FOR UPDATE` do cupom nunca foi executado; as travas `RLock` valem só por processo, então vários workers precisam de trava no banco (PROGRESSO 20/11/21, limite 1). Também: 2 testes de concorrência de `test_qa3_backend.py` falharam uma vez na suíte completa sob carga e passam isolados (em verificação).
+- ⏳ **Auditoria formal no webhook:** quando o limite por usuário do cupom estoura, só há `log.warning` (PROGRESSO 20/11/21, limite 2).
+- ⏳ **R3 sem revisão da Seguranca:** Pix com validade e webhook tardio não foram revisados (decisão do João de seguir; PROGRESSO 20/11). A rodada da Seguranca sobre B12/B13 foi "aprovado com ressalvas" (SEG-1, SEG-2 e SEG-4 corrigidos na B14); a revalidação dos 4 testes após a B14 estava em andamento.
+- ⏳ **Migration `20261118150000_remove_faixas_taxa.sql`:** preparada e **não aplicada** (destrutiva, apaga `config_faixas_taxa`; ordem segura: só depois de o backend novo estar no ar, o que já é verdade para a v37). Também falta zerar `taxa_bps` e `taxa_minima_centavos` na configuração (nova versão, dupla aprovação) e decidir se as colunas legadas de taxa saem do banco (PROGRESSO 18/11).
+- ⏳ **Domínio `tratofeitolabs.com.br` (Registro.br):** sem DNS e sem versão web do app. Plano enviado ao Mestre em 20/11 (host recomendado: Cloudflare Pages). Depende do João: host, trocar os servidores de nome no Registro.br, rota pública nova no backend para o perfil, OK para CORS (`TRATO_SEG_CORS_ORIGENS`), URLs do Supabase Auth (Site e Redirect), `assetlinks.json` (SHA-256 do Android) e `apple-app-site-association` (conta Apple Developer).
+- ⏳ **Licença do painel na Vercel:** `docs/hospedagem-fly-io.md` diz que o plano Hobby não vale para uso comercial; decidir entre Vercel Pro, Cloudflare Pages ou Netlify antes de operar com dinheiro real.
+- ⏳ **Evento do Stripe e testes reais:** não há registro de que os eventos `charge.dispute.*`, `transfer.reversed` e `payout.failed` foram assinados no Stripe, nem de que `harness/teste_real_*.py` rodaram contra o ambiente real depois de 15/11. Conferir antes do piloto.
+- ⏳ **Consultas novas do B9 sem tráfego autenticado:** as consultas do B9 (CPF próprio, portfólio, número do pedido) só foram testadas em memória; foi vigiado o log do Fly por ~3 min na v36 e na v37, sem erro, mas sem tráfego autenticado.
+
+### Dúvidas desta atualização (sem evidência suficiente; deixei como estava)
+
+- Estado real, no Supabase, das migrations antigas `20261029040000_notificacoes_dispositivos_agendador`, `20261030000000_fix_acesso_storage_pedido_historico`, `20261030120000_ordens_estorno` e `20261030140000_b2_grants_por_coluna`: os cabeçalhos dizem "NÃO APLICADA", mas o PROGRESSO de 31/10 diz que `ordens_estorno` "já foi aplicada". Só o banco responde.
+- Respostas do João para P10 (fornecedor de verificação) e P16 a P19: nenhuma registrada nos arquivos que li.
+- Se continua valendo "sem os 30% adiantados" (D16) no app atual; o RESUMO foi alinhado a D16, não conferi o código do pagamento.
+- Contas duplicadas "João Vitor Cardoso" na equipe e dados de teste no banco (painel v2, 03/11): sem registro de limpeza.
+- Google e Apple no Supabase (desligados em 15/11), push (Firebase), chamado de suporte no app, ausência do cliente, preferências de notificação e remarcar visita: sem registro de mudança depois de 15/11.
+- Se a Vercel tinha outro deploy do painel às 18:00 de 20/11 (feito por outra pessoa ou agente, versão antiga); o deploy vigente é o das ~18:03 com `5dbc8c1`.
+
 ## Respondidas (decisão D16, 30/10/2026, em `DECISOES.md`)
 
 Atualizado em 04/11/2026. A tabela abaixo mantém o histórico das dúvidas; estas já têm resposta:
@@ -13,8 +59,8 @@ Atualizado em 04/11/2026. A tabela abaixo mantém o histórico das dúvidas; est
 - **P7:** Stripe, caminho A (ledger espelho).
 - **P11:** sem SMS no piloto (login por e-mail, Google e Apple).
 - **P12 a P14:** seguem as recomendações de `docs/fidelidade-visual.md`.
-- **P2:** regra única e transparente no piloto; **o valor ainda estava a fechar** (aberto até o João informar o número).
-- **Ainda abertas:** P10 (fornecedor de verificação), P16 a P19 (sem resposta registrada nos arquivos).
+- **P2:** regra única e transparente no piloto; **o valor ainda estava a fechar** (aberto até o João informar o número). ✅ Superada em 18/11/2026: o app ficou gratuito (sem taxa).
+- **Ainda abertas:** P10 (fornecedor de verificação), P16 a P19 (sem resposta registrada nos arquivos; conferido de novo em 20/11/2026).
 
 ## Para o João decidir
 
@@ -42,6 +88,8 @@ Atualizado em 04/11/2026. A tabela abaixo mantém o histórico das dúvidas; est
 
 ## Sobras da revisão de segurança (30/10/2026)
 
+> 20/11/2026: o estado de aplicação destas migrations no Supabase **não está confirmado** nos arquivos (cabeçalhos dizem NÃO APLICADA; o PROGRESSO de 31/10 diz que `ordens_estorno` já foi aplicada). Conferir no banco antes de agir. A revisão da Seguranca de 20/11 (B12/B13) está resumida em "Estado em 20/11/2026".
+
 Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `docs/roteiro-testes-reais.md`.
 
 - **PRECISO DO SEU OK (migration, só em arquivo):** `20261030140000_b2_grants_por_coluna.sql` (B2). Seguem aguardando OK
@@ -64,14 +112,16 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 
 ## Ambiente
 
-- Flutter 3.47.8 instalado em `C:\flutter`, mas **fora do PATH** (o `verificar` acha sozinho).
+- ✅ (20/11) `flutter` já resolve em `C:\flutter\bin` no PowerShell desta máquina. Texto original: Flutter 3.47.8 instalado em `C:\flutter`, mas **fora do PATH** (o `verificar` acha sozinho).
   Para usar no terminal: adicionar `C:\flutter\bin` ao PATH do usuário.
 - Android Studio e SDK instalados; emulador `Medium_Phone_API_37.0` ok. **Falta:** "Android SDK Command-line Tools" e `flutter doctor --android-licenses` (o João aceita). O primeiro build baixou NDK 28.2 e Platform 36 sozinho (~10 min).
 - **iOS:** build e simulador só em macOS com Xcode. Definir um Mac (ou CI na nuvem, ex.: Codemagic) antes da Fase 9.
-- Supabase CLI e GitHub CLI (`gh`) não estão instalados (opcionais).
-- Repositório GitHub "Trato" ainda não está ligado como `origin`.
+- GitHub CLI (`gh` 2.103.3) está instalado (20/11). Supabase CLI não foi encontrado no PATH do Git Bash (opcional).
+- ✅ Repositório GitHub ligado: `origin` = `https://github.com/feitolabs/Trato.git` (PROGRESSO 29/10; `git remote -v` em 20/11).
 
 ## Painel admin v2 (03/11/2026)
+
+> 20/11/2026: a decisão 1 (tabela de taxas) e as respostas do Emanuel sobre faixas de taxa ficaram **sem efeito** (app gratuito desde 18/11). O "quem paga o cupom" segue como o Trato (desconto pago pela empresa); falta só a contabilidade (ver Estado em 20/11/2026).
 
 **Decisões suas (travam requisitos obrigatórios do documento, seção 10):**
 1. **Tabela de taxas:** hoje há só a taxa única de 7,50% (`taxa_progressiva_ativa = 0`). Faixas e como aparecem em Configurações.
@@ -104,7 +154,7 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
   de teste). Versões de configuração aprovadas são imutáveis e a auditoria é imutável: limpar exige decisão sua (RNF-07).
 
 **Não feito (precisa de OK ou de dependência externa):**
-- **Publicar o backend e o painel da Operação** (filas paginadas, assumir, atualização automática). A migration
+- ✅ RESOLVIDO em 20/11 (backend no Fly, release v37; painel na Vercel). Texto original: **Publicar o backend e o painel da Operação** (filas paginadas, assumir, atualização automática). A migration
   `disputas_responsavel` já está no Supabase (08/11). Precisa de OK ou de o João publicar no Render.
 - Convite por e-mail e 2FA obrigatório no primeiro acesso (RF-EQP-01, RNF-03): precisa da API de admin do Supabase e envio de e-mail
   (efeito real). Hoje a pessoa precisa já ter conta no Trato.
@@ -118,11 +168,11 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 - Cobertura de testes de integração contra o Supabase real para as consultas novas (validei as principais com `SELECT` no banco real).
 
 ## App do profissional (07/11/2026)
-- Raio de atendimento ("Até onde você vai"): a tela coleta, mas o app não envia e o backend não guarda (`CadastroIn` não tem o campo). Decidir: gravar o raio (coluna + filtro de pedidos por distância, RN-01) ou tirar a pergunta da tela.
+- ⏳ Segue aberto em 20/11 (nenhuma ocorrência de `raio_atendimento` no backend nem nas migrations). Raio de atendimento ("Até onde você vai"): a tela coleta, mas o app não envia e o backend não guarda (`CadastroIn` não tem o campo). Decidir: gravar o raio (coluna + filtro de pedidos por distância, RN-01) ou tirar a pergunta da tela.
 
 ## Financeiro do painel (08/11/2026)
 - Migration `20261108120000_financeiro_contestacoes_fechamento.sql` **aplicada no Supabase em 08/11/2026** (OK do João).
-  Falta publicar o backend novo no Render (passo a passo enviado ao João). Antes da aplicação valia:
+  ✅ (20/11: o backend foi publicado no Fly, não mais no Render.) Texto original: Falta publicar o backend novo no Render (passo a passo enviado ao João). Antes da aplicação valia:
   Sem ela, em produção: contestações não são gravadas (o webhook de contestação falha e o Stripe reenvia),
   "Fechamento do mês" responde erro e a trava do mês não existe. Rollback em `supabase/rollback/`.
   **Ordem obrigatória: aplicar a migration ANTES de publicar este backend.** O aviso de liquidação
@@ -132,14 +182,14 @@ Detalhe item a item em `docs/sobras-seguranca.md`; testes em ambiente real em `d
 - Conciliação do dia testada só com extrato simulado; falta rodar contra o Stripe de teste e agendar a conferência
   diária (hoje é sob demanda, na aba).
 - Fechamento sem o custo de cupom: o pedido não guarda o desconto (quem paga já foi decidido: o Trato).
-- Extrato em PDF só pelo painel; o app do profissional ainda não tem o botão.
+- ✅ RESOLVIDO: F18 `4cad35b` ("Compartilhar no extrato em PDF" no app). Texto original: Extrato em PDF só pelo painel; o app do profissional ainda não tem o botão.
 - Prazo do alerta de pagamento parado: 30 min até alguém propor e aprovar `alerta_pagamento_parado_minutos`.
 
 ## Auditoria do app (15/11/2026)
 
 Detalhe em `harness/AUDITORIA-APP.md`.
 
-- **Ligar o agendador (decisão do João: ainda não).** Código pronto e testado. Para ligar: trocar
+- ⏳ Em 20/11 segue desligado (`backend/fly.toml` linha 17; ver "Estado em 20/11/2026"). **Ligar o agendador (decisão do João: ainda não).** Código pronto e testado. Para ligar: trocar
   `TRATO_AGENDADOR_EMBUTIDO` para `"true"` em `backend/fly.toml` (ou `fly secrets set TRATO_AGENDADOR_EMBUTIDO=true`),
   fazer o deploy e conferir que `select count(*) from agendador_execucoes` cresce a cada minuto; vigiar a memória
   (512 MB). **Enquanto estiver desligado não acontecem:** confirmação automática por prazo, expiração de pedido e de
@@ -151,5 +201,5 @@ Detalhe em `harness/AUDITORIA-APP.md`.
 - Ausência do cliente: a máquina de estados só tem ausência do profissional (feita pelo sistema). Definir a regra.
 - Google e Apple: ligar no Supabase (hoje desligados) e passar os client ids.
 - Preferências de notificação (o backend tem a rota; o app não tem a tela). Remarcar visita (o servidor responde 501).
-- Dados fixos no app: faixas de preço e prazos do Novo pedido; quadrinhos "Trabalho 1/2/3" do perfil sem portfólio.
+- Dados fixos no app: faixas de preço e prazos do Novo pedido; quadrinhos "Trabalho 1/2/3" do perfil sem portfólio. 🔶 20/11: B9 `0b23fa1` trouxe o portfólio ao perfil público, mas ainda há 2 ocorrências de "Trabalho N" em `app/lib`; confirmar.
 

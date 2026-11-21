@@ -229,6 +229,7 @@ def test_me_do_cliente_e_do_profissional(cenario):
     assert set(pro) == {
         "id", "nome", "papel", "status", "nivel_verificacao", "nota_publica", "servicos_concluidos",
         "papeis", "tem_perfil_profissional", "status_verificacao", "disponivel_agora",
+        "cpf_cadastrado",
     }  # fmt: skip
 
 

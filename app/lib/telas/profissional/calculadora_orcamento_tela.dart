@@ -100,6 +100,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   bool _enviando = false;
 
   ResumoOrcamento? _resumo;
+  var _resumoFalhou = false;
   int _ultimoPedido = -1;
 
   static final _formatadoresDeslocamento = [
@@ -171,14 +172,32 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     final total = _total;
     if (total <= 0 || total > Dinheiro.limiteOrcamentoMaximoCentavos) {
       _ultimoPedido = -1;
-      if (_resumo != null) setState(() => _resumo = null);
+      if (_resumo != null || _resumoFalhou) {
+        setState(() {
+          _resumo = null;
+          _resumoFalhou = false;
+        });
+      }
       return;
     }
     if (total == _ultimoPedido) return;
     _ultimoPedido = total;
-    final resumo = await widget.servico.resumir(total);
-    // Resposta atrasada de um total antigo não pode sobrescrever o atual.
-    if (mounted && _ultimoPedido == total) setState(() => _resumo = resumo);
+    try {
+      final resumo = await widget.servico.resumir(total);
+      // Resposta atrasada de um total antigo não pode sobrescrever o atual.
+      if (mounted && _ultimoPedido == total) {
+        setState(() {
+          _resumo = resumo;
+          _resumoFalhou = false;
+        });
+      }
+    } on Object {
+      // O resumo é só uma prévia: sem ele a tela segue (mantém o anterior) e a próxima mudança tenta de novo.
+      if (mounted && _ultimoPedido == total) {
+        _ultimoPedido = -1;
+        setState(() => _resumoFalhou = true);
+      }
+    }
   }
 
   String? _erroDeslocamento() {
@@ -568,6 +587,15 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
         ],
         const SizedBox(height: EspacosTrato.x5),
         _ResumoEscuro(totalCentavos: _total, resumo: _resumo),
+        if (_resumoFalhou)
+          Padding(
+            padding: const EdgeInsets.only(top: EspacosTrato.x2),
+            child: Text(
+              'Não deu para calcular o resumo agora.',
+              key: const Key('resumo-indisponivel'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+          ),
       ],
     );
   }
