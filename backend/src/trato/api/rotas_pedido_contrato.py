@@ -14,10 +14,11 @@ import math
 import re
 import threading
 from collections.abc import Mapping
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -1648,6 +1649,7 @@ def pedido_aberto(
 
 # --- Proposta e aceite de horário de visita no chat --------------------------------------
 
+_FUSO_BR = ZoneInfo("America/Sao_Paulo")
 _REGEX_AGENDA = re.compile(r"^\[agenda:([^|\]]+)\|([^\]]+)\]")
 
 
@@ -1662,6 +1664,10 @@ class AceitarAgendaIn(_Entrada):
 
 
 def _formatar_janela_br(inicio: datetime, fim: datetime) -> str:
+    """Texto da visita em America/Sao_Paulo (o instante vem em UTC; sem fuso = UTC)."""
+    inicio, fim = (
+        (d if d.tzinfo else d.replace(tzinfo=UTC)).astimezone(_FUSO_BR) for d in (inicio, fim)
+    )
     return (
         f"{inicio.day:02d}/{inicio.month:02d} das "
         f"{inicio.hour:02d}:{inicio.minute:02d} às {fim.hour:02d}:{fim.minute:02d}"

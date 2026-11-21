@@ -4,7 +4,7 @@ e negociação/remarcação de agenda pelo chat."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from conftest import AGORA, CLIENTE, PROFISSIONAL, cab
 from test_fluxo_pagamento_e2e import Fluxo, fluxo  # noqa: F401
@@ -277,6 +277,35 @@ def test_negociacao_e_remarcacao_de_agenda_no_chat(amb):
     assert r_ok2.json()["estado"] == "agendado"
     assert datetime.fromisoformat(r_ok2.json()["janela"]["inicio"]) == datetime.fromisoformat(
         j2["inicio"]
+    )
+
+
+def test_b26_texto_da_visita_sai_em_horario_de_brasilia(amb):
+    """UTC 21:00-23:00 vira 18:00-20:00 no texto (sugestão e confirmação); o marcador não muda."""
+    from trato.api.rotas_pedido_contrato import _formatar_janela_br
+
+    amb.semear_pedido(Estado.PAGO_E_RETIDO)
+    inicio = (AGORA + timedelta(days=2)).replace(hour=21, minute=0, second=0, microsecond=0)
+    inicio = inicio.astimezone(UTC)
+    fim = inicio + timedelta(hours=2)
+    r = amb.cliente.post(
+        "/v1/pedidos/ped-1/agenda/propor",
+        json={"janela": {"inicio": inicio.isoformat(), "fim": fim.isoformat()}},
+        headers=cab("t-cliente"),
+    )
+    assert r.status_code == 201, r.text
+    texto = r.json()["texto"]
+    assert "das 18:00 às 20:00" in texto and "21:00" not in texto.split("] ", 1)[1]
+    assert texto.startswith(f"[agenda:{inicio.isoformat()}|{fim.isoformat()}]")  # UTC intacto
+
+    # Virada de dia: 02:00-04:00 UTC é 23:00-01:00 do dia anterior em Brasília
+    madrugada = datetime(2026, 11, 22, 2, 0, tzinfo=UTC)
+    assert _formatar_janela_br(madrugada, madrugada + timedelta(hours=2)) == (
+        "21/11 das 23:00 às 01:00"
+    )
+    # Sem fuso, vale UTC
+    assert _formatar_janela_br(datetime(2026, 11, 21, 21, 0), datetime(2026, 11, 21, 23, 0)) == (
+        "21/11 das 18:00 às 20:00"
     )
 
 
