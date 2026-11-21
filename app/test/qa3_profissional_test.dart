@@ -468,14 +468,14 @@ void main() {
       await _abrir(
         tester,
         DetalhePedidoTela(
-          dados: DetalhePedido(
+          dados: const DetalhePedido(
             pedido: pedidoTomadasExemplo,
             fechaEm: '30h',
             clienteResumo: 'Mariana',
-            legendasFotos: const [],
+            legendasFotos: [],
             descricao: 'Desc',
-            linhas: const [],
-            exclusividades: const ResumoExclusividades(saldoProfissional: 0),
+            linhas: [],
+            exclusividades: ResumoExclusividades(saldoProfissional: 0),
           ),
           aoPedirExclusividade: (_) async => const ExclusividadeProfissional(
             id: 'e1',

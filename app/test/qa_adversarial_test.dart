@@ -1,5 +1,4 @@
 ﻿// QA adversarial (so teste; sem rede real). Marcados com skip: 'bug conhecido: QA-n'.
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';

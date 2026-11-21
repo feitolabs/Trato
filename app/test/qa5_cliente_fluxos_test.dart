@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/componentes/componentes.dart';
-import 'package:trato/dados/carregador.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';
@@ -355,8 +353,8 @@ void main() {
 
   group('QA5 — CarteiraTela e DetalheValoresTela', () {
     testWidgets('saldo zero, 500 itens e erro de carregamento sem overflow', (tester) async {
-      final vazio = DadosCarteira(
-        resumo: const ResumoCarteira(
+      final vazio = const DadosCarteira(
+        resumo: ResumoCarteira(
           disponivelCentavos: 0,
           textoPix: 'Sem chave',
           retidoCentavos: 0,
@@ -364,7 +362,7 @@ void main() {
           aLiberarCentavos: 0,
           textoALiberar: 'Nenhum',
         ),
-        extrato: const [],
+        extrato: [],
       );
       await tester.pumpWidget(_envolver(
         CarteiraTela(dados: vazio),

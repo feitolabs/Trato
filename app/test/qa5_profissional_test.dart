@@ -127,6 +127,7 @@ class _ServicoDisputaEspiao implements ServicoDisputaProfissional {
   _ServicoDisputaEspiao({
     this.aoCarregarRetrabalho,
     this.aoAgendar,
+    // ignore: unused_element_parameter
     this.aoAvancar,
   });
 

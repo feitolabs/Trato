@@ -12,10 +12,12 @@ import 'apoio/api_fake.dart';
 class _ApiQa5Espiao extends ApiFake {
   _ApiQa5Espiao({
     super.vazio,
+    // ignore: unused_element_parameter
     super.erro,
     this.verificacoesFixas,
     this.aoDecidir,
     this.aoAssumir,
+    // ignore: unused_element_parameter
     this.aoListarVerificacoes,
     this.aoVerificarCadeia,
     this.aoSolicitarRelatorio,

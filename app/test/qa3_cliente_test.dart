@@ -59,7 +59,7 @@ void main() {
             tipo: TipoNotificacao.values[i % TipoNotificacao.values.length],
             titulo: _hostis[i % _hostis.length],
             texto: _hostis[(i + 3) % _hostis.length],
-            quando: _hostis[(i + 5) % _hostis.length].substring(0, 0) + 'ha $i min',
+            quando: '${_hostis[(i + 5) % _hostis.length].substring(0, 0)}ha $i min',
             destinoId: 'p$i',
           ),
       ];
