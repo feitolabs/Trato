@@ -145,9 +145,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   static DadosDoPedido dadosDeJson(Map<String, dynamic> j) => _dadosDeJson(j);
 
-  static DadosDoPedido _dadosDeJson(Map<String, dynamic> j) {
+  static DadosDoPedido _dadosDeJson(Map<String, dynamic> j, {String? categoriaNome}) {
     final e = j['endereco'] as Map<String, dynamic>?;
+    final categoria = (categoriaNome ?? j['categoria_nome'] as String?)?.trim();
     return DadosDoPedido(
+      categoriaNome: (categoria ?? '').isEmpty ? null : categoria,
       titulo: j['titulo'] as String,
       descricao: j['descricao'] as String,
       faixaMinCentavos: j['faixa_preco_min_centavos'] as int?,
@@ -185,7 +187,16 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   @override
   Future<DadosDoPedido> dados(String pedidoId) async {
-    final base = _dadosDeJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/dados')));
+    final bruto = _mapa(await _api.get('/v1/pedidos/$pedidoId/dados'));
+    String? categoria = (bruto['categoria_nome'] as String?)?.trim();
+    if ((categoria ?? '').isEmpty) {
+      try {
+        categoria = (await _pedido(pedidoId)).categoriaNome;
+      } on Object {
+        categoria = null;
+      }
+    }
+    final base = _dadosDeJson(bruto, categoriaNome: categoria);
     OfertaExclusividadeCliente? oferta;
     try {
       oferta = await ofertaExclusividade(pedidoId);
@@ -194,6 +205,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     }
     if (oferta == null) return base;
     return DadosDoPedido(
+      categoriaNome: base.categoriaNome,
       titulo: base.titulo,
       descricao: base.descricao,
       faixaMinCentavos: base.faixaMinCentavos,
@@ -358,6 +370,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       estadoApi: p.estado,
       profissionalNome: p.profissionalNome ?? '',
       remoto: p.remoto,
+      descricao: (p.descricao ?? '').trim().isEmpty ? null : p.descricao!.trim(),
       titulo: p.rotulo,
       subtitulo: p.rotulo == 'Pedido ${p.numero}'
           ? 'Aberto em ${_dia(p.abertoEm)}'
@@ -374,7 +387,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     if (categoriaId == null || cidadeId == null) {
       throw const ErroTrato(TipoErro.recusado, 'Escolha a categoria e a cidade do serviço.');
     }
-    final onde = await posicao?.call();
+    // Remoto não pede a localização (o profissional não vê região exata).
+    final onde =
+        rascunho.modalidade == Modalidade.presencial ? await posicao?.call() : null;
     final corpo = <String, dynamic>{
       'categoria_id': categoriaId,
       'cidade_id': cidadeId,

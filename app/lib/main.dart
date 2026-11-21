@@ -18,6 +18,7 @@ import 'dados/servico_upload.dart';
 import 'dispositivo/dispositivo_real.dart';
 import 'dispositivo/folha_cartao.dart';
 import 'dispositivo/servico_camera_real.dart';
+import 'dados/sessao_expirada.dart';
 import 'dispositivo/servico_localizacao_real.dart';
 import 'galeria/galeria_componentes.dart';
 import 'telas/fluxo/rotas.dart';
@@ -97,6 +98,7 @@ Future<void> main() async {
     ServicoAuthPadrao.atual.recuperacaoDeSenha.listen((_) => _abrirNovaSenha());
   }
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
+  abrirLoginPorSessaoExpiradaHook = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
   RotasTrato.repos = RepositoriosTrato.deConfig(

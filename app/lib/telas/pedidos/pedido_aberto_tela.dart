@@ -221,17 +221,60 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
             ),
       children: [
         const SizedBox(width: double.infinity, height: EspacosTrato.x2),
-        Text('Seu pedido', style: TipografiaTrato.tituloGrande),
+        Text(
+          (_dados.categoriaNome ?? '').isNotEmpty ? _dados.categoriaNome! : 'Seu pedido',
+          key: const ValueKey('titulo-pedido'),
+          style: TipografiaTrato.tituloGrande,
+        ),
         const SizedBox(height: EspacosTrato.x2),
         Text(
-          _dados.titulo,
+          // Com categoria, a descrição que o cliente escreveu é o subtítulo; sem ela, o de antes.
+          (_dados.categoriaNome ?? '').isNotEmpty && _dados.descricao.trim().isNotEmpty
+              ? _dados.descricao
+              : _dados.titulo,
+          key: const ValueKey('subtitulo-pedido'),
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
+        if (_dados.remoto) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: ChipStatus(
+              key: ValueKey('selo-remoto'),
+              texto: 'Remoto',
+              tipo: TipoStatus.info,
+              icone: Icons.videocam_outlined,
+            ),
+          ),
+        ],
+        if (!_editando) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          const LinhaDoTempo(
+            etapas: [
+              EtapaLinhaDoTempo(
+                titulo: 'Pedido enviado',
+                detalhe: 'Os profissionais já podem ver',
+                estado: EstadoEtapa.atual,
+              ),
+              EtapaLinhaDoTempo(
+                titulo: 'Orçamentos',
+                detalhe: 'Você compara e escolhe',
+                estado: EstadoEtapa.futura,
+              ),
+              EtapaLinhaDoTempo(
+                titulo: 'Contratação',
+                detalhe: 'Você aceita um orçamento e paga',
+                estado: EstadoEtapa.futura,
+              ),
+            ],
+          ),
+        ],
         if (!_editando && _dados.orcamentosRecebidos == 0) ...[
           const SizedBox(height: EspacosTrato.x4),
-          const AvisoFaixa(
+          AvisoFaixa(
             texto:
-                'Pedido enviado aos profissionais da região — avisaremos quando chegar o 1º orçamento.',
+                'Pedido enviado aos profissionais ${_dados.remoto ? 'de qualquer região' : 'da região'} '
+                '— avisaremos quando chegar o 1º orçamento.',
             tipo: TipoStatus.info,
             icone: Icons.notifications_active_outlined,
           ),

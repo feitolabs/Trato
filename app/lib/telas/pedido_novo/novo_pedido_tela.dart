@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../dispositivo/localizacao_do_pedido.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
@@ -245,7 +246,8 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
     if (data != null && mounted) setState(() => _dataPrazo = data);
   }
 
-  bool get _exigeCidade => widget.formulario.cidades.isNotEmpty;
+  // Remoto: sem cartão de cidade/endereço; a cidade padrão vai no envio (`_cidade ?? primeira`).
+  bool get _exigeCidade => widget.formulario.cidades.isNotEmpty && _presencial;
 
   String? get _erroCidade =>
       _tentou && _exigeCidade && _cidade == null ? 'Escolha a cidade onde será o serviço.' : null;
@@ -806,7 +808,9 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           ),
           const SizedBox(height: EspacosTrato.x5),
         ],
-        if (_exigeCidade)
+        if (!_presencial)
+          const SizedBox.shrink()
+        else if (_exigeCidade)
           KeyedSubtree(
             key: _keyCidade,
             child: InkWell(
@@ -869,6 +873,19 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
           Text(
             'Só o profissional que você contratar vê o endereço completo.',
             style: secundario,
+          ),
+          ValueListenableBuilder<int>(
+            valueListenable: LocalizacaoDoPedido.negacoes,
+            builder: (_, __, ___) => LocalizacaoDoPedido.naoPerguntarMais
+                ? Padding(
+                    padding: const EdgeInsets.only(top: EspacosTrato.x1),
+                    child: Text(
+                      'Sem localização: o profissional vê só o bairro.',
+                      key: const ValueKey('sem-localizacao'),
+                      style: secundario,
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
           if (widget.enderecosSalvos.isNotEmpty) ...[
             const SizedBox(height: EspacosTrato.x3),

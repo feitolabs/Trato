@@ -25,6 +25,7 @@ class PedidoApi {
     this.jaAvaliou = false,
     this.titulo,
     this.categoriaNome,
+    this.descricao,
     this.clienteNome,
     this.profissionalNome,
     this.pagamentoConfirmado = false,
@@ -47,6 +48,9 @@ class PedidoApi {
   /// Nome da categoria (`categoria_nome`, opcional). Quando vem, é o título do pedido: o
   /// `titulo` pode ser o nome da pergunta ("Orçamento geral").
   final String? categoriaNome;
+
+  /// O que o cliente descreveu (`descricao`, opcional na lista); subtítulo na lista de pedidos.
+  final String? descricao;
 
   /// Nome abreviado do cliente ("Mariana S."); só vem para o profissional do pedido.
   final String? clienteNome;
@@ -74,6 +78,7 @@ class PedidoApi {
         jaAvaliou: j['ja_avaliou'] == true,
         titulo: j['titulo'] as String?,
         categoriaNome: j['categoria_nome'] as String?,
+        descricao: j['descricao'] as String?,
         clienteNome: j['cliente_nome'] as String?,
         profissionalNome: j['profissional_nome'] as String?,
         pagamentoConfirmado: j['pagamento_confirmado'] == true,

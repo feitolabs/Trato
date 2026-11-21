@@ -4,6 +4,7 @@ import '../componentes/componentes.dart';
 import '../tema/tema.dart';
 import 'erros.dart';
 import 'relogio_de_atualizacao.dart';
+import 'sessao_expirada.dart';
 
 /// Expõe o callback assíncrono de atualização do [Carregador]/[CarregadorTela] para telas filhas
 /// usarem diretamente no `RefreshIndicator`.
@@ -151,6 +152,7 @@ class _CarregadorState<T> extends State<Carregador<T>> {
   /// Mostra o carregando e busca de novo (depois de erro ou "Tentar de novo").
   void _recarregar() {
     if (!mounted) return;
+    if (tratarSessaoExpirada(_erro)) return;
     setState(() {
       _pronto = false;
       _erro = null;

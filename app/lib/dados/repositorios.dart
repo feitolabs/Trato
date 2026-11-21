@@ -41,7 +41,11 @@ class DadosDoPedido {
     this.estado = 'aberto',
     this.ofertaExclusividade,
     this.orcamentosRecebidos = 0,
+    this.categoriaNome,
   });
+
+  /// Nome da categoria (`categoria_nome`, opcional): vira o título do pedido.
+  final String? categoriaNome;
 
   final List<String> fotos;
   final String? profissionalConvidadoId;

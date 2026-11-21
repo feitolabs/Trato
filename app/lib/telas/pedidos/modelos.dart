@@ -17,7 +17,11 @@ class PedidoResumo {
     this.estadoApi,
     this.profissionalNome = '',
     this.remoto = false,
+    this.descricao,
   });
+
+  /// Descrição do cliente, mostrada como subtítulo (opcional).
+  final String? descricao;
 
   /// Atendimento remoto: a lista mostra o selo "Remoto".
   final bool remoto;

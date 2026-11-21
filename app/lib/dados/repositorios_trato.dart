@@ -5,6 +5,7 @@ import 'servico_cep.dart';
 import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';
+import '../dispositivo/localizacao_do_pedido.dart';
 import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_profissional/disputa.dart';
@@ -166,9 +167,14 @@ class RepositoriosTrato {
       posicao: localizacao == null
           ? null
           : () async {
+              // Já negou duas vezes: não pergunta de novo a cada envio.
+              if (LocalizacaoDoPedido.naoPerguntarMais) return null;
               try {
                 return await localizacao.posicaoAtual();
-              } on ErroLocalizacao {
+              } on ErroLocalizacao catch (e) {
+                if (e.falha == FalhaLocalizacao.semPermissao) {
+                  LocalizacaoDoPedido.registrarNegacao();
+                }
                 return null;
               }
             },

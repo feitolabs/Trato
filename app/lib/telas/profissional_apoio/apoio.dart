@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
+import '../../dados/sessao_expirada.dart';
 import '../../tema/tema.dart';
 
 /// Peças comuns das telas do profissional (cadastro, verificação, nota, aditivo, disputa, perfil).
@@ -211,6 +212,7 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
   }
 
   void _tentarDeNovo() {
+    if (tratarSessaoExpirada(_erro)) return;
     setState(() {
       _pronto = false;
       _erro = null;

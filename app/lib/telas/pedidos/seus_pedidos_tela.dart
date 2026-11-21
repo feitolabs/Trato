@@ -217,6 +217,16 @@ class _CartaoPedido extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(pedido.titulo, style: TipografiaTrato.tituloCartao),
+          if ((pedido.descricao ?? '').isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              pedido.descricao!,
+              key: const ValueKey('descricao-do-pedido'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TipografiaTrato.corpo,
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x2),
           Text(
             pedido.subtitulo,
