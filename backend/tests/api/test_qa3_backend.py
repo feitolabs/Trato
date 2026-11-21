@@ -4,8 +4,11 @@ corrida em acoes do pedido, estados fora de ordem. Marcas: xfail 'bug conhecido:
 
 from __future__ import annotations
 
+import importlib.util
 import re
+import sys
 import threading
+from pathlib import Path
 
 import pytest
 from conftest import AGORA, cab
@@ -114,6 +117,16 @@ def test_idor_escrita_em_pedido_alheio_da_404(amb, metodo, url, corpo, token):
     assert amb.contexto.pedidos.obter("ped-1") == antes
 
 
+def _conftest_da_api():
+    nome = "_conftest_api_qa3"
+    if nome not in sys.modules:
+        spec = importlib.util.spec_from_file_location(nome, Path(__file__).parent / "conftest.py")
+        modulo = importlib.util.module_from_spec(spec)
+        sys.modules[nome] = modulo
+        spec.loader.exec_module(modulo)
+    return sys.modules[nome]
+
+
 @pytest.mark.parametrize(
     "estado,acao",
     [
@@ -122,10 +135,12 @@ def test_idor_escrita_em_pedido_alheio_da_404(amb, metodo, url, corpo, token):
     ],
 )
 def test_corrida_de_8_threads_na_mesma_acao_so_uma_vence(estado, acao):
-    import conftest
+    # Há vários conftest.py (api, seguranca, integracao): `import conftest` pegaria o último
+    # carregado. Carrega o de tests/api pelo caminho, sob nome próprio.
+    conftest_api = _conftest_da_api()
 
     for _ in range(100):
-        amb = conftest.amb.__wrapped__()
+        amb = conftest_api.amb.__wrapped__()
         amb.semear_pedido(estado)
         res, barreira = [], threading.Barrier(8)
 
