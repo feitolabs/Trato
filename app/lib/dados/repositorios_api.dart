@@ -985,6 +985,12 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
 
   final ClienteApi _api;
 
+  /// `POST /v1/pedidos/{id}/orcamentos/{orc}/recusar` -> `{"orcamento_id", "pedido_id", "status": "recusado"}`.
+  @override
+  Future<void> recusar(String pedidoId, String orcamentoId) async {
+    await _api.post('/v1/pedidos/$pedidoId/orcamentos/$orcamentoId/recusar');
+  }
+
   /// `POST /v1/pedidos/{id}/orcamentos/{orc}/contraproposta` `{valor_centavos, prazo_execucao_dias?, mensagem?}`.
   @override
   Future<void> contraproporValor(

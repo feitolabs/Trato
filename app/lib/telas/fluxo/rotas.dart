@@ -72,6 +72,7 @@ import '../../dados/modelos_api.dart' show PedidoApi;
 import '../../dispositivo/abrir_email.dart';
 import '../conta/servico_fake.dart';
 import '../lgpd/central_privacidade_tela.dart';
+import '../lgpd/modelos.dart' show CancelamentoExclusao;
 import '../mensagens/mensagens_tela.dart';
 import '../perfil_publico/avaliacoes_recebidas_tela.dart';
 import '../perfil_publico/perfil_publico_tela.dart';
@@ -1703,6 +1704,12 @@ abstract final class RotasTrato {
           construir: (context, perfil) => PerfilClienteTela(
             perfil: _soNoPerfil(perfil),
             aoCapturarFotoPerfil: _fotografarPerfil,
+            aoCancelarExclusao: repos.privacidade is CancelamentoExclusao
+                ? () => _tentar(context, () async {
+                      await (repos.privacidade! as CancelamentoExclusao).cancelarExclusao();
+                      pedidosMudaram.value++;
+                    })
+                : null,
             aoAbrirConfiguracoes: () => abrirConfiguracoes(context, profissional: false),
             aoTocarItem: (acao) {
               switch (acao) {
@@ -2285,6 +2292,17 @@ abstract final class RotasTrato {
                               aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
                             ),
                           );
+                        }
+                      },
+                      aoRecusar: (o) async {
+                        final ok = await _tentar(
+                          context,
+                          () => repos.orcamentos.recusar(pedidoId, o.id),
+                        );
+                        if (ok && context.mounted) {
+                          pedidosMudaram.value++;
+                          Navigator.of(context).pop();
+                          _avisoSimples(context, 'Orçamento recusado.');
                         }
                       },
                       aoAceitar: (o) async {

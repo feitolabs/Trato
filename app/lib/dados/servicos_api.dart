@@ -253,7 +253,8 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
             sha256: crypto.sha256.convert(bytes).toString(),
             capturadaEm: DateTime.now().toUtc(),
           );
-          final res = await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
+          final res =
+              await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
           midiaId = res.arquivoId;
         } else if (temArquivoImagem(fotoPath)) {
           final caminho = obterCaminhoImagem(fotoPath) ?? fotoPath;
@@ -265,7 +266,8 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
               sha256: crypto.sha256.convert(b).toString(),
               capturadaEm: DateTime.now().toUtc(),
             );
-            final res = await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
+            final res =
+                await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
             midiaId = res.arquivoId;
           }
         }
@@ -559,10 +561,8 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
       for (final c in cids)
         if (c['nome'] is String && c['id'] is String) (c['nome'] as String): (c['id'] as String),
     };
-    final categoriasOrdenadas = _idPorNomeCategoria.keys.toList()
-      ..sort(compararAlfabeticoPtBr);
-    final cidadesOrdenadas = _idPorNomeCidade.keys.toList()
-      ..sort(compararAlfabeticoPtBr);
+    final categoriasOrdenadas = _idPorNomeCategoria.keys.toList()..sort(compararAlfabeticoPtBr);
+    final cidadesOrdenadas = _idPorNomeCidade.keys.toList()..sort(compararAlfabeticoPtBr);
     return OpcoesCadastro(
       categorias: categoriasOrdenadas,
       cidades: cidadesOrdenadas,
@@ -586,8 +586,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
     const para = 'aaaaaeeeeiiiiooooouuuuc';
     final minusculo = texto.trim().toLowerCase();
     return [
-      for (final letra in minusculo.split(''))
-        de.contains(letra) ? para[de.indexOf(letra)] : letra,
+      for (final letra in minusculo.split('')) de.contains(letra) ? para[de.indexOf(letra)] : letra,
     ].join();
   }
 
@@ -669,7 +668,7 @@ class ServicoCadastroProfissionalApi implements ServicoCadastroProfissional {
 
 /// Perfil público do próprio profissional (`GET /v1/me` + `GET /v1/profissional/perfil`
 /// + `GET /v1/profissionais/{id}`).
-class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
+class ServicoPerfilPublicoApi implements ServicoPerfilPublico, RespostaAvaliacao {
   ServicoPerfilPublicoApi(this._api);
 
   final ClienteApi _api;
@@ -793,15 +792,26 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico {
     }
   }
 
+  @override
+  Future<String?> responderAvaliacao(String avaliacaoId, String resposta) async {
+    final texto = resposta.trim();
+    final j = _mapa(
+      await _api.post('/v1/avaliacoes/$avaliacaoId/responder', corpo: {'resposta': texto}),
+    );
+    return (j['resposta'] as String?) ?? texto;
+  }
+
   List<Avaliacao> _converterAvaliacoes(List<dynamic> brutas) => [
         for (final a in brutas)
           if (a is Map)
             Avaliacao(
+              id: a['id'] as String?,
               cliente: (a['cliente_nome'] as String?) ?? 'Cliente',
               servico: servicoDaAvaliacao(a),
               nota: (a['nota_geral'] as num).toDouble(),
               comentario: (a['comentario'] as String?) ?? '',
               detalhes: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'].join(' · '),
+              resposta: a['resposta'] as String?,
             ),
       ];
 }
@@ -886,7 +896,10 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
       final lista = _lista(await _api.get('/v1/pedidos/$disputaId/retrabalho'));
       // Só o que ainda pede ação do profissional; retrabalho resolvido ou vencido não abre tela.
       const emCurso = {'aberto', 'aceito', 'em_execucao'};
-      final abertos = [for (final r in lista) if (emCurso.contains(r['estado'])) r];
+      final abertos = [
+        for (final r in lista)
+          if (emCurso.contains(r['estado'])) r
+      ];
       if (abertos.isEmpty) return null;
       final ultimo = abertos.last;
       return DadosRetrabalho(
@@ -930,7 +943,7 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
 
 /// Central de privacidade e exclusão da conta (LGPD) falando com a API real:
 /// `GET /v1/me/consentimentos`, `POST /v1/me/consentimentos`, `GET /v1/me/dados`, `POST /v1/me/exclusao`.
-class ServicoPrivacidadeApi implements ServicoPrivacidade {
+class ServicoPrivacidadeApi implements ServicoPrivacidade, CancelamentoExclusao {
   ServicoPrivacidadeApi(this._api);
 
   final ClienteApi _api;
@@ -1012,6 +1025,11 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade {
       }
     }
     return jsonFormatado;
+  }
+
+  @override
+  Future<void> cancelarExclusao() async {
+    await _api.delete('/v1/me/exclusao');
   }
 
   @override

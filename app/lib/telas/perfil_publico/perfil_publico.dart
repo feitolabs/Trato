@@ -42,9 +42,12 @@ class PerfilPublico {
   final List<String> listaFotosPortfolio;
 }
 
+abstract interface class RespostaAvaliacao {
+  Future<String?> responderAvaliacao(String avaliacaoId, String resposta);
+}
+
 abstract interface class ServicoPerfilPublico {
   Future<PerfilPublico> carregarPerfil();
   Future<List<Avaliacao>> carregarAvaliacoes();
   Future<bool> temPerfilProfissional();
 }
-

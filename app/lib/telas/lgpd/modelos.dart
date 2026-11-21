@@ -19,6 +19,10 @@ class Consentimento {
 
 /// Contrato com o backend. Exportar e excluir só pedem; quem executa, registra e decide
 /// o que a lei manda reter é o backend.
+abstract interface class CancelamentoExclusao {
+  Future<void> cancelarExclusao();
+}
+
 abstract interface class ServicoPrivacidade {
   Future<List<Consentimento>> consentimentos();
   Future<void> alterarConsentimento(String id, {required bool ativo});

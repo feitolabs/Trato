@@ -35,6 +35,7 @@ class PerfilPublicoTela extends StatefulWidget {
 
   final ServicoPerfilPublico servico;
   final VoidCallback? aoVerAvaliacoes;
+
   /// Abre a edição; quando ela termina, o perfil é carregado de novo.
   final FutureOr<void> Function()? aoEditarCadastro;
   final VoidCallback? aoUsarComoCliente;
@@ -155,7 +156,8 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                           if (p.cidade.trim().isNotEmpty) p.cidade.trim(),
                           'no Trato desde ${p.noTratoDesde}',
                         ].join(' · '),
-                        style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                        style: TipografiaTrato.corpoPequeno
+                            .copyWith(color: CoresTrato.textoSecundario),
                       ),
                     ],
                   ),
@@ -188,7 +190,9 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   ),
                 ),
                 const SizedBox(width: EspacosTrato.x3),
-                Expanded(child: _Indicador(rotulo: 'Serviços concluídos', valor: '${p.servicosConcluidos}')),
+                Expanded(
+                    child: _Indicador(
+                        rotulo: 'Serviços concluídos', valor: '${p.servicosConcluidos}')),
               ],
             ),
             const TituloSecao('Sobre'),
@@ -205,12 +209,18 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
             else
               Row(
                 children: [
-                  for (var i = 0; i < (p.listaFotosPortfolio.isNotEmpty ? p.listaFotosPortfolio.length : p.fotosPortfolio); i++) ...[
+                  for (var i = 0;
+                      i <
+                          (p.listaFotosPortfolio.isNotEmpty
+                              ? p.listaFotosPortfolio.length
+                              : p.fotosPortfolio);
+                      i++) ...[
                     if (i > 0) const SizedBox(width: EspacosTrato.x3),
                     Expanded(
                       child: EspacoFoto(
                         legenda: '[Foto]',
-                        referencia: i < p.listaFotosPortfolio.length ? p.listaFotosPortfolio[i] : null,
+                        referencia:
+                            i < p.listaFotosPortfolio.length ? p.listaFotosPortfolio[i] : null,
                         altura: 88,
                       ),
                     ),
@@ -300,9 +310,10 @@ class _Indicador extends StatelessWidget {
 
 /// Uma avaliação recebida: cliente, serviço, nota, comentário e critérios.
 class CartaoAvaliacao extends StatelessWidget {
-  const CartaoAvaliacao({super.key, required this.avaliacao});
+  const CartaoAvaliacao({super.key, required this.avaliacao, this.aoResponder});
 
   final Avaliacao avaliacao;
+  final VoidCallback? aoResponder;
 
   @override
   Widget build(BuildContext context) {
@@ -333,6 +344,31 @@ class CartaoAvaliacao extends StatelessWidget {
             Text(a.comentario, style: TipografiaTrato.corpo),
             const SizedBox(height: EspacosTrato.x1),
             Text(a.detalhes, style: TipografiaTrato.legenda),
+            if ((a.resposta ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: EspacosTrato.x2),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(EspacosTrato.x3),
+                decoration: BoxDecoration(
+                  color: CoresTrato.creme,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'Sua resposta: ${a.resposta!.trim()}',
+                  style: TipografiaTrato.corpoPequeno,
+                ),
+              ),
+            ] else if (aoResponder != null) ...[
+              const SizedBox(height: EspacosTrato.x2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: ValueKey('responder-avaliacao-${a.id ?? ''}'),
+                  onPressed: aoResponder,
+                  child: const Text('Responder'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

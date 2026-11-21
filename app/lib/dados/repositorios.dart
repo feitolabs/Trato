@@ -190,6 +190,9 @@ abstract interface class RepositorioOrcamentos {
   /// Só pede ao backend. Taxa e líquido nunca são calculados no app.
   Future<void> aceitar(String pedidoId, String orcamentoId);
 
+  /// Cliente recusa o orçamento (`POST /v1/pedidos/{id}/orcamentos/{orc}/recusar`).
+  Future<void> recusar(String pedidoId, String orcamentoId);
+
   /// Cliente propõe um valor e/ou prazo em dias (vai para a conversa do profissional). O backend valida.
   Future<void> contraproporValor(
     String pedidoId,

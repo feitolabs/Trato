@@ -58,13 +58,10 @@ IconData iconeDaCategoria(String? slug) => switch (slug) {
     };
 
 String _iniciais(String nome) {
-  final partes =
-      nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
   if (partes.isEmpty) return '?';
   final primeira = partes.first[0].toUpperCase();
-  return partes.length == 1
-      ? primeira
-      : primeira + partes.last[0].toUpperCase();
+  return partes.length == 1 ? primeira : primeira + partes.last[0].toUpperCase();
 }
 
 /// Catálogo ligado à API real (`GET /v1/catalogo/categorias`, `GET /v1/profissionais` e
@@ -92,16 +89,14 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final itens = (resposta as List? ?? const []).cast<Map<String, dynamic>>();
     _nomesCategorias = {
       for (final c in itens)
-        if (c['id'] is String && c['nome'] is String)
-          c['id'] as String: c['nome'] as String,
+        if (c['id'] is String && c['nome'] is String) c['id'] as String: c['nome'] as String,
     };
     _nomesCarregadosEm = DateTime.now();
     final lista = [
       for (final item in itens)
         CategoriaServico(
           (item['nome'] as String?) ?? 'Serviço',
-          iconeDaCategoria(
-              (item['slug'] as String?) ?? (item['id'] as String?)),
+          iconeDaCategoria((item['slug'] as String?) ?? (item['id'] as String?)),
           id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
           aceitaRemoto: item['aceita_remoto'] == true,
         ),
@@ -175,14 +170,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   @override
-  Future<List<Profissional>> profissionais(
-      String categoriaId, FiltroProfissionais filtro) async {
+  Future<List<Profissional>> profissionais(String categoriaId, FiltroProfissionais filtro) async {
     final consulta = <String, String>{
       'categoria_id': categoriaId,
-      if (filtro.bairro != null && filtro.bairro!.isNotEmpty)
-        'bairro': filtro.bairro!,
-      if (filtro.notaMinima != null)
-        'nota_minima': filtro.notaMinima!.toString(),
+      if (filtro.bairro != null && filtro.bairro!.isNotEmpty) 'bairro': filtro.bairro!,
+      if (filtro.notaMinima != null) 'nota_minima': filtro.notaMinima!.toString(),
       if (filtro.soDisponiveisHoje) 'atende_hoje': 'true',
     };
     final (bruto, _) = await emParalelo2(
@@ -266,12 +258,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       categoriaId: categoriaId,
       icone: c?.icone ?? Icons.handyman_outlined,
       categoria: c?.nome ?? 'Serviço solicitado',
-      servicos: (c?.servicos.isEmpty ?? true)
-          ? const ['Orçamento geral']
-          : c!.servicos,
-      servicosIniciais: {
-        (c?.servicos.isEmpty ?? true) ? 'Orçamento geral' : c!.servicos.first
-      },
+      servicos: (c?.servicos.isEmpty ?? true) ? const ['Orçamento geral'] : c!.servicos,
+      servicosIniciais: {(c?.servicos.isEmpty ?? true) ? 'Orçamento geral' : c!.servicos.first},
       perguntaQuantidade: 'Quantos itens ou ambientes?',
       dicaQuantidade: 'Uma estimativa já ajuda',
       quantidadeInicial: 1,
@@ -286,8 +274,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
         FaixaPreco(minimoCentavos: 30000, maximoCentavos: 80000),
       ],
       endereco: 'Seu endereço atual',
-      avisoEndereco:
-          'O endereço completo só aparece para o profissional contratado.',
+      avisoEndereco: 'O endereço completo só aparece para o profissional contratado.',
       avisoPrazo: 'Você recebe até ${ConfigPublica.atual.limiteOrcamentos} orçamentos em '
           '${ConfigPublica.horas(ConfigPublica.atual.validadePedidoHoras)}.',
       aceitaRemoto: c?.aceitaRemoto ?? false,
@@ -319,13 +306,13 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final avaliacoes = [
       for (final a in (j['avaliacoes'] as List? ?? const []))
         Avaliacao(
-          cliente: ((a as Map)['cliente_nome'] as String?) ?? 'Cliente',
+          id: (a as Map)['id'] as String?,
+          cliente: (a['cliente_nome'] as String?) ?? 'Cliente',
           servico: servicoDaAvaliacao(a),
           nota: (a['nota_geral'] as num).toDouble(),
           comentario: (a['comentario'] as String?) ?? '',
-          detalhes: [
-            for (final e in (a['etiquetas'] as List? ?? const [])) '$e'
-          ].join(' · '),
+          detalhes: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'].join(' · '),
+          resposta: a['resposta'] as String?,
         ),
     ];
     final itensPortfolio = [
@@ -435,8 +422,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
 
   @override
   Future<DetalheServico> detalhe(String pedidoId) async {
-    final pedido =
-        PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
+    final pedido = PedidoApi.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId')));
     final antesDaContratacao = pedido.estado == 'aberto';
     final cfg = ConfigPublica.atual;
     final etapas = antesDaContratacao
@@ -501,23 +487,18 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
         final orcamentoInicial = s.clientePagouCentavos >= aditivosPagos
             ? s.clientePagouCentavos - aditivosPagos
             : s.clientePagouCentavos;
-        final temExtras = aditivosPagos > 0 ||
-            aditivosAprovados > 0 ||
-            aditivosPendentes > 0 ||
-            totalNotas > 0;
+        final temExtras =
+            aditivosPagos > 0 || aditivosAprovados > 0 || aditivosPendentes > 0 || totalNotas > 0;
         valores = [
           if (s.clientePagouCentavos > 0 && temExtras)
             LinhaValor('Orçamento inicial', orcamentoInicial),
           if (aditivosPagos + aditivosAprovados > 0)
             LinhaValor('Aditivos aprovados/pagos', aditivosPagos + aditivosAprovados),
-          if (aditivosPendentes > 0)
-            LinhaValor('Aditivos pendentes', aditivosPendentes),
-          if (totalNotas > 0)
-            LinhaValor('Notas de materiais', totalNotas),
+          if (aditivosPendentes > 0) LinhaValor('Aditivos pendentes', aditivosPendentes),
+          if (totalNotas > 0) LinhaValor('Notas de materiais', totalNotas),
           if (s.clientePagouCentavos > 0)
             LinhaValor('Total pago', s.clientePagouCentavos, destaque: true),
-          if (s.liberadoCentavos > 0)
-            LinhaValor('Já liberado ao profissional', s.liberadoCentavos),
+          if (s.liberadoCentavos > 0) LinhaValor('Já liberado ao profissional', s.liberadoCentavos),
         ];
       } on Object {
         // Sem saldo (ainda sem pagamento): mostra o pedido sem valores.
@@ -529,10 +510,7 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
       'pago_e_retido' => ('Pagamento confirmado · a agendar', TipoStatus.info),
       'agendado' => ('Agendado', TipoStatus.info),
       'em_andamento' => ('Em execução', TipoStatus.info),
-      'em_confirmacao' => (
-          'Em execução · aguardando sua confirmação',
-          TipoStatus.info
-        ),
+      'em_confirmacao' => ('Em execução · aguardando sua confirmação', TipoStatus.info),
       'concluido' => ('Finalizado', TipoStatus.sucesso),
       'cancelado' => ('Cancelado', TipoStatus.alerta),
       'em_disputa' => ('Disputa aberta · em análise', TipoStatus.alerta),
@@ -565,9 +543,8 @@ class RepositorioServicosClienteApi implements RepositorioServicosCliente {
       remoto: pedido.remoto,
       jaAvaliou: pedido.jaAvaliou,
       local: local,
-      codigoInicio: const {'pago_e_retido', 'agendado'}.contains(pedido.estado)
-          ? pedido.codigoInicio
-          : null,
+      codigoInicio:
+          const {'pago_e_retido', 'agendado'}.contains(pedido.estado) ? pedido.codigoInicio : null,
       codigoConclusao: pedido.estado == 'em_andamento' ? pedido.codigoConclusao : null,
       pedidoId: pedido.id,
       numero: pedido.numero,

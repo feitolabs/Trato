@@ -50,8 +50,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    AvatarDeUsuario(
-                        iniciais: p.iniciais, usuarioId: p.id, tamanho: 80),
+                    AvatarDeUsuario(iniciais: p.iniciais, usuarioId: p.id, tamanho: 80),
                     const SizedBox(width: EspacosTrato.x4),
                     Expanded(
                       child: Column(
@@ -99,9 +98,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                           valor: d.temHistorico ? '${d.taxaConclusao}%' : '—'),
                     ),
                     const SizedBox(width: EspacosTrato.x3),
-                    Expanded(
-                        child: _Indicador(
-                            rotulo: 'Responde em', valor: d.respondeEm)),
+                    Expanded(child: _Indicador(rotulo: 'Responde em', valor: d.respondeEm)),
                   ],
                 ),
                 if (d.bio != null && d.bio!.isNotEmpty) ...[
@@ -120,8 +117,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                     children: [
                       for (final servico in d.servicos)
                         Chip(
-                          label: Text(servico,
-                              style: TipografiaTrato.corpoPequeno),
+                          label: Text(servico, style: TipografiaTrato.corpoPequeno),
                           backgroundColor: CoresTrato.superficie,
                           side: const BorderSide(color: CoresTrato.borda),
                         ),
@@ -137,8 +133,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.check,
-                            size: 22, color: CoresTrato.verdeTexto),
+                        const Icon(Icons.check, size: 22, color: CoresTrato.verdeTexto),
                         const SizedBox(width: EspacosTrato.x3),
                         Expanded(child: Text(v, style: TipografiaTrato.corpo)),
                       ],
@@ -147,8 +142,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Text(
                   'O selo mostra o que foi conferido no cadastro. Compare os orçamentos e '
                   'converse antes de decidir.',
-                  style: TipografiaTrato.corpoPequeno
-                      .copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                 ),
                 const SizedBox(height: EspacosTrato.x6),
                 Text('Trabalhos', style: TipografiaTrato.titulo),
@@ -156,8 +150,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 if (d.fotosTrabalhos == 0 && d.trabalhos.isEmpty)
                   Text(
                     'Sem fotos de trabalhos ainda.',
-                    style: TipografiaTrato.corpo
-                        .copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
                   )
                 else
                   Row(
@@ -166,9 +159,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                         if (i > 0) const SizedBox(width: EspacosTrato.x3),
                         Expanded(
                           child: _FotoReservada(
-                            legenda: i < d.trabalhos.length
-                                ? d.trabalhos[i]
-                                : 'Trabalho ${i + 1}',
+                            legenda: i < d.trabalhos.length ? d.trabalhos[i] : 'Trabalho ${i + 1}',
                             url: i < d.fotosUrls.length ? d.fotosUrls[i] : null,
                           ),
                         ),
@@ -178,9 +169,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x6),
                 Row(
                   children: [
-                    Expanded(
-                        child:
-                            Text('Avaliações', style: TipografiaTrato.titulo)),
+                    Expanded(child: Text('Avaliações', style: TipografiaTrato.titulo)),
                     if (aoVerAvaliacoes != null)
                       BotaoLink(
                         texto: 'Ver as ${d.totalAvaliacoes}',
@@ -216,13 +205,10 @@ class PerfilProfissionalTela extends StatelessWidget {
             child: Center(
               heightFactor: 1,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                    maxWidth: Responsivo.larguraMaximaConteudo),
+                constraints: const BoxConstraints(maxWidth: Responsivo.larguraMaximaConteudo),
                 child: BotaoPrimario(
                   texto: 'Pedir orçamento ao ${p.primeiroNome}',
-                  aoTocar: aoPedirOrcamento == null
-                      ? null
-                      : () => aoPedirOrcamento!(p),
+                  aoTocar: aoPedirOrcamento == null ? null : () => aoPedirOrcamento!(p),
                 ),
               ),
             ),
@@ -266,8 +252,7 @@ class _BotaoFavoritoState extends State<_BotaoFavorito> {
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(
-              content: Text('Não foi possível salvar. Tente de novo.')));
+          ..showSnackBar(const SnackBar(content: Text('Não foi possível salvar. Tente de novo.')));
       }
     } finally {
       if (mounted) setState(() => _salvando = false);
@@ -309,8 +294,7 @@ class _Indicador extends StatelessWidget {
             child: Text(
               rotulo,
               maxLines: 1,
-              style: TipografiaTrato.corpoPequeno
-                  .copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
           ),
           const SizedBox(height: EspacosTrato.x1),
@@ -326,8 +310,8 @@ class _Indicador extends StatelessWidget {
                   if (extra != null)
                     TextSpan(
                       text: ' $extra',
-                      style: TipografiaTrato.corpoPequeno
-                          .copyWith(color: CoresTrato.textoSecundario),
+                      style:
+                          TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                     ),
                 ],
               ),
@@ -358,9 +342,7 @@ class _FotoReservada extends StatelessWidget {
         child: Container(
           alignment: Alignment.bottomLeft,
           clipBehavior: imagem != null ? Clip.antiAlias : Clip.none,
-          padding: imagem != null
-              ? EdgeInsets.zero
-              : const EdgeInsets.all(EspacosTrato.x2),
+          padding: imagem != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
           decoration: BoxDecoration(
             color: CoresTrato.azulClaro,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
@@ -391,8 +373,7 @@ class CartaoAvaliacao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno
-        .copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
     return CartaoTrato(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,6 +406,21 @@ class CartaoAvaliacao extends StatelessWidget {
           Text(avaliacao.comentario, style: TipografiaTrato.corpo),
           const SizedBox(height: EspacosTrato.x2),
           Text(avaliacao.detalhes, style: secundario),
+          if ((avaliacao.resposta ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(EspacosTrato.x3),
+              decoration: BoxDecoration(
+                color: CoresTrato.creme,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Resposta do profissional: ${avaliacao.resposta!.trim()}',
+                style: TipografiaTrato.corpoPequeno,
+              ),
+            ),
+          ],
         ],
       ),
     );

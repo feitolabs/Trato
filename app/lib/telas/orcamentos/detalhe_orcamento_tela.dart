@@ -19,6 +19,7 @@ class DetalheOrcamentoTela extends StatefulWidget {
     super.key,
     required this.orcamento,
     this.aoAceitar,
+    this.aoRecusar,
     this.aoFazerContraproposta,
     this.aoConversar,
     this.aoVerPerfil,
@@ -39,6 +40,7 @@ class DetalheOrcamentoTela extends StatefulWidget {
 
   final Orcamento orcamento;
   final dynamic Function(Orcamento)? aoAceitar;
+  final dynamic Function(Orcamento)? aoRecusar;
   final ValueChanged<Orcamento>? aoFazerContraproposta;
   final ValueChanged<Orcamento>? aoConversar;
 
@@ -60,6 +62,33 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   void dispose() {
     _scroll.dispose();
     super.dispose();
+  }
+
+  Future<void> _confirmarRecusa() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        title: const Text('Recusar orçamento?'),
+        content: const Text('Este orçamento sairá da sua lista de pendentes.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogo).pop(true),
+            child: const Text('Recusar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+    setState(() => _aceitando = true);
+    try {
+      await widget.aoRecusar?.call(widget.orcamento);
+    } finally {
+      if (mounted) setState(() => _aceitando = false);
+    }
   }
 
   Future<void> _aceitar() async {
@@ -120,6 +149,13 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   BotaoLink(
                     texto: 'Fazer contraproposta',
                     aoTocar: () => widget.aoFazerContraproposta!(o),
+                  ),
+                if (widget.aoRecusar != null)
+                  BotaoLink(
+                    key: const ValueKey('botao-recusar-orcamento'),
+                    texto: 'Recusar orçamento',
+                    destrutivo: true,
+                    aoTocar: _aceitando ? null : _confirmarRecusa,
                   ),
               ],
             ),

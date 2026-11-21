@@ -13,6 +13,8 @@ class Avaliacao {
     required this.nota,
     required this.comentario,
     required this.detalhes,
+    this.id,
+    this.resposta,
   });
 
   final String cliente;
@@ -22,6 +24,8 @@ class Avaliacao {
 
   /// Ex.: "Pontualidade 5 · Qualidade 5 · Limpeza 5".
   final String detalhes;
+  final String? id;
+  final String? resposta;
 }
 
 /// Dados que só aparecem na tela do perfil do profissional.

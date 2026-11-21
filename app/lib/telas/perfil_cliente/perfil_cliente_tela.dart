@@ -20,6 +20,7 @@ class PerfilClienteTela extends StatefulWidget {
     this.aoTocarItem,
     this.aoAbrirConfiguracoes,
     this.aoCapturarFotoPerfil,
+    this.aoCancelarExclusao,
   });
 
   final PerfilCliente perfil;
@@ -28,6 +29,7 @@ class PerfilClienteTela extends StatefulWidget {
   /// Abre as configurações; a engrenagem só aparece se vier.
   final VoidCallback? aoAbrirConfiguracoes;
   final Future<String?> Function()? aoCapturarFotoPerfil;
+  final Future<bool> Function()? aoCancelarExclusao;
 
   /// Limpa a foto guardada em memória ao encerrar a sessão.
   static void limparFotoSessao() => _PerfilClienteTelaState._fotoSalvaSessao = null;
@@ -39,6 +41,8 @@ class PerfilClienteTela extends StatefulWidget {
 class _PerfilClienteTelaState extends State<PerfilClienteTela> {
   static String? _fotoSalvaSessao;
   String? _fotoAtual;
+  var _exclusaoCancelada = false;
+  var _cancelandoExclusao = false;
 
   @override
   void initState() {
@@ -130,16 +134,44 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               ),
           ],
         ),
-        if (perfil.exclusaoAgendadaEm != null) ...[
+        if (perfil.exclusaoAgendadaEm != null && !_exclusaoCancelada) ...[
           const SizedBox(height: EspacosTrato.x4),
           AvisoFaixa(
             key: const ValueKey('aviso-exclusao-agendada'),
             texto:
                 'Exclusão da conta agendada para ${diaMesDoAparelho(perfil.exclusaoAgendadaEm!)}. '
-                'Se mudar de ideia, fale com o suporte antes desse prazo.',
+                'Você pode cancelar antes desse prazo.',
             tipo: TipoStatus.alerta,
             icone: Icons.schedule,
           ),
+          if (widget.aoCancelarExclusao != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            BotaoSecundario(
+              key: const ValueKey('botao-cancelar-exclusao'),
+              texto: _cancelandoExclusao ? 'Cancelando...' : 'Cancelar exclusão',
+              aoTocar: _cancelandoExclusao
+                  ? null
+                  : () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      setState(() => _cancelandoExclusao = true);
+                      final ok = await widget.aoCancelarExclusao!();
+                      if (!mounted) return;
+                      setState(() {
+                        _cancelandoExclusao = false;
+                        if (ok) _exclusaoCancelada = true;
+                      });
+                      if (ok) {
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(
+                              content: Text('Exclusão cancelada. Sua conta continua ativa.'),
+                            ),
+                          );
+                      }
+                    },
+            ),
+          ],
         ],
         if ((perfil.moedas ?? 0) > 0 || perfil.moedasPendentes > 0) ...[
           const SizedBox(height: EspacosTrato.x5),
