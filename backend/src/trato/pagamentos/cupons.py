@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -17,6 +18,9 @@ class CupomAplicado:
     valor: int
     desconto_centavos: int
     servico_com_desconto_centavos: int
+
+
+_TRAVA_USO_CUPOM = threading.RLock()  # atomicidade do uso de cupom no ramo em memória
 
 
 def _para_datetime(valor: Any) -> datetime | None:
@@ -187,10 +191,20 @@ def confirmar_uso_cupom(
             return registrar_uso_cupom(contexto, codigo)
         with banco.transacao() as con:
             existe = con.execute(
-                "SELECT 1 FROM public.cupons WHERE codigo = %s", (codigo,)
+                "SELECT limite_por_usuario FROM public.cupons WHERE codigo = %s FOR UPDATE",
+                (codigo,),
             ).fetchone()
             if existe is None:
                 return False
+            # a linha do cupom está travada: dois pedidos do mesmo cliente se serializam aqui
+            if existe["limite_por_usuario"] is not None:
+                ja_usou = con.execute(
+                    "SELECT count(*) AS total FROM public.cupom_usos "
+                    "WHERE cupom_codigo = %s AND usuario_id = %s AND cobranca_id <> %s",
+                    (codigo, uid, cobranca_id),
+                ).fetchone()
+                if int(ja_usou["total"] or 0) >= int(existe["limite_por_usuario"]):
+                    return False
             gravado = con.execute(
                 "INSERT INTO public.cupom_usos "
                 "(cupom_codigo, usuario_id, cobranca_id, pedido_id, desconto_centavos, "
@@ -215,21 +229,28 @@ def confirmar_uso_cupom(
                 return False
             return True
 
-    usos = contexto.extras.setdefault("cupom_usos", {})
-    if isinstance(usos, dict) and cobranca_id in usos:
-        return False
-    if not registrar_uso_cupom(contexto, codigo):
-        return False
-    if isinstance(usos, dict):
-        usos[cobranca_id] = {
-            "cupom_codigo": codigo,
-            "usuario_id": usuario_id or "",
-            "cobranca_id": cobranca_id,
-            "pedido_id": pedido_id,
-            "desconto_centavos": max(0, int(desconto_centavos)),
-            "confirmado_em": quando,
-        }
-    return True
+    with _TRAVA_USO_CUPOM:
+        usos = contexto.extras.setdefault("cupom_usos", {})
+        if isinstance(usos, dict) and cobranca_id in usos:
+            return False
+        cupons = contexto.extras.get("cupons")
+        cup = cupons.get(codigo) if isinstance(cupons, dict) else None
+        limite_usuario = cup.get("limite_por_usuario") if isinstance(cup, dict) else None
+        if limite_usuario is not None and usuario_id:
+            if _usos_do_usuario(contexto, codigo, usuario_id) >= int(limite_usuario):
+                return False
+        if not registrar_uso_cupom(contexto, codigo):
+            return False
+        if isinstance(usos, dict):
+            usos[cobranca_id] = {
+                "cupom_codigo": codigo,
+                "usuario_id": usuario_id or "",
+                "cobranca_id": cobranca_id,
+                "pedido_id": pedido_id,
+                "desconto_centavos": max(0, int(desconto_centavos)),
+                "confirmado_em": quando,
+            }
+        return True
 
 
 def custo_cupons_do_mes(contexto: Contexto, inicio: datetime, fim: datetime) -> int:

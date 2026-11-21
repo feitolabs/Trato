@@ -963,7 +963,7 @@ def conceder_bonus_avaliacao(
         return 0
     if valor_servico_centavos < cfg.min_servico_centavos:
         return 0
-    inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    inicio_mes, _ = periodo.mes(*periodo.mes_de(agora))
     usa_pendente = cfg.dias_liberacao_bonus > 0
     pendentes: list[PendenteMoeda] = []
     if usa_pendente:
@@ -1212,7 +1212,9 @@ def disponibilidade_desconto(
         return Disponibilidade(
             False, MOTIVO_LIMITE_DIARIO, 0, volta_em(MOTIVO_LIMITE_DIARIO, agora)
         )
-    usado_cliente += sum(r.desconto_centavos for r in abertas)  # reservado também conta no teto
+    usado_cliente += sum(
+        r.desconto_centavos for r in abertas if r.mes_ref == mes_ref(agora)
+    )  # reservado também conta no teto
     sobra_cliente = cfg.teto_desconto_cliente_mes_centavos - usado_cliente
     if sobra_cliente <= 0:
         return Disponibilidade(False, MOTIVO_TETO_CLIENTE, 0, volta_em(MOTIVO_TETO_CLIENTE, agora))
