@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -7,7 +9,7 @@ import 'apoio_conclusao.dart';
 import 'modelos.dart';
 
 /// Tela 18: o profissional terminou; o cliente confere fotos, valor retido e o código.
-class ConclusaoTela extends StatelessWidget {
+class ConclusaoTela extends StatefulWidget {
   const ConclusaoTela({
     super.key,
     required this.resumo,
@@ -16,8 +18,28 @@ class ConclusaoTela extends StatelessWidget {
   });
 
   final ResumoConclusao resumo;
-  final VoidCallback? aoConfirmar;
+  final FutureOr<void> Function()? aoConfirmar;
   final VoidCallback? aoRelatarProblema;
+
+  @override
+  State<ConclusaoTela> createState() => _ConclusaoTelaState();
+}
+
+class _ConclusaoTelaState extends State<ConclusaoTela> {
+  var _confirmando = false;
+
+  ResumoConclusao get resumo => widget.resumo;
+
+  /// Desliga o botão no 1º toque: um 2º toque rápido não repete a confirmação.
+  Future<void> _confirmar() async {
+    if (_confirmando) return;
+    setState(() => _confirmando = true);
+    try {
+      await widget.aoConfirmar?.call();
+    } finally {
+      if (mounted) setState(() => _confirmando = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,14 +48,27 @@ class ConclusaoTela extends StatelessWidget {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (resumo.prazoConfirmacao != null || resumo.garantiaTexto != null) ...[
+            Text(
+              [
+                if (resumo.prazoConfirmacao != null) resumo.prazoConfirmacao!,
+                if (resumo.garantiaTexto != null) resumo.garantiaTexto!,
+              ].join(' '),
+              key: const ValueKey('prazo-e-garantia'),
+              textAlign: TextAlign.center,
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+            const SizedBox(height: EspacosTrato.x2),
+          ],
           BotaoPrimario(
             texto: resumo.checkOutSemCodigo
                 ? 'Confirmar conclusão e liberar pagamento'
                 : 'Confirmar serviço',
-            aoTocar: aoConfirmar ?? () {},
+            carregando: _confirmando,
+            aoTocar: widget.aoConfirmar == null ? () {} : _confirmar,
           ),
           const SizedBox(height: EspacosTrato.x2),
-          BotaoSecundario(texto: 'Relatar problema', aoTocar: aoRelatarProblema ?? () {}),
+          BotaoSecundario(texto: 'Relatar problema', aoTocar: widget.aoRelatarProblema ?? () {}),
         ],
       ),
       children: [
@@ -101,13 +136,13 @@ class ConclusaoTela extends StatelessWidget {
           CartaoTrato(
             child: Column(
               children: [
-                Text('Código de conclusão (libera o pagamento)',
-                    style: TipografiaTrato.tituloCartao),
+                Text('Código de conclusão', style: TipografiaTrato.tituloCartao),
                 const SizedBox(height: EspacosTrato.x4),
                 _CodigoConclusao(codigo: resumo.codigo),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(
-                  'Passe ao profissional só se o serviço estiver pronto, ou confirme aqui.',
+                  'Passe ao profissional só se o serviço estiver pronto, ou confirme aqui. '
+                  'Não envie o código por mensagem.',
                   textAlign: TextAlign.center,
                   style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
                 ),

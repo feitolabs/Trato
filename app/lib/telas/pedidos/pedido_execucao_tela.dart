@@ -90,14 +90,28 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   icone: Icons.schedule,
                 ),
         ),
+        if (pedido.visita != null || pedido.prazoConfirmacao != null) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          if (pedido.visita != null)
+            Text(
+              pedido.remoto ? 'Início combinado: ${pedido.visita}' : 'Visita: ${pedido.visita}',
+              key: const ValueKey('visita-marcada'),
+              style: TipografiaTrato.corpoForte,
+            ),
+          if (pedido.prazoConfirmacao != null)
+            Text(
+              pedido.prazoConfirmacao!,
+              key: const ValueKey('prazo-confirmacao'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+        ],
         if (pedido.codigoInicio != null) ...[
           const SizedBox(height: EspacosTrato.x4),
           CartaoTrato(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Código de chegada (não libera dinheiro)',
-                    style: TipografiaTrato.tituloCartao),
+                Text('Código de início', style: TipografiaTrato.tituloCartao),
                 const SizedBox(height: EspacosTrato.x2),
                 Semantics(
                   label: 'Código de início ${pedido.codigoInicio!.split('').join(' ')}',
@@ -107,7 +121,11 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 ),
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
-                  'Passe este código ao profissional quando ele chegar.',
+                  pedido.remoto
+                      ? 'Passe este código ao profissional quando o atendimento começar. '
+                          'Não envie o código por mensagem.'
+                      : 'Passe este código ao profissional quando ele chegar. '
+                          'Não envie o código por mensagem.',
                   style: TipografiaTrato.corpoPequeno.copyWith(
                     color: CoresTrato.textoSecundario,
                   ),
@@ -123,8 +141,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Código de conclusão (libera o pagamento)',
-                    style: TipografiaTrato.tituloCartao),
+                Text('Código de conclusão', style: TipografiaTrato.tituloCartao),
                 const SizedBox(height: EspacosTrato.x2),
                 Semantics(
                   label: 'Código de conclusão ${pedido.codigoConclusao!.split('').join(' ')}',
@@ -135,7 +152,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   'Quando o serviço estiver pronto, passe este código ao profissional '
-                  'para ele concluir.',
+                  'para ele concluir. Não envie o código por mensagem.',
                   style: TipografiaTrato.corpoPequeno.copyWith(
                     color: CoresTrato.textoSecundario,
                   ),
@@ -161,11 +178,14 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             spacing: EspacosTrato.x3,
             runSpacing: EspacosTrato.x1,
             children: [
-              if (widget.aoRemarcarVisita != null)
+              if (widget.aoRemarcarVisita != null &&
+                  !(pedido.remoto && pedido.estadoApi == 'agendado'))
                 BotaoLink(
-                  texto: pedido.estadoApi == 'agendado'
-                      ? 'Remarcar visita'
-                      : 'Sugerir horário da visita',
+                  texto: pedido.remoto
+                      ? 'Combinar início'
+                      : (pedido.estadoApi == 'agendado'
+                          ? 'Remarcar visita'
+                          : 'Sugerir horário da visita'),
                   aoTocar: widget.aoRemarcarVisita!,
                 ),
               if (widget.aoVerContrato != null)
@@ -173,7 +193,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   texto: 'Ver contrato do serviço',
                   aoTocar: widget.aoVerContrato!,
                 ),
-              if (widget.aoVerNota != null)
+              if (widget.aoVerNota != null && !pedido.remoto)
                 BotaoLink(
                   texto: 'Ver nota de materiais',
                   aoTocar: widget.aoVerNota!,

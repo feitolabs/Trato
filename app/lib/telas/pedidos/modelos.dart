@@ -138,7 +138,19 @@ class PedidoEmExecucao {
     this.podeVerConclusao = true,
     this.pagamentoConfirmado = true,
     this.estadoApi,
+    this.remoto = false,
+    this.visita,
+    this.prazoConfirmacao,
   });
+
+  /// Serviço remoto: a tela esconde o que é presencial.
+  final bool remoto;
+
+  /// Dia e janela da visita (ou do início combinado, no remoto); nulo enquanto não marcada.
+  final String? visita;
+
+  /// Prazo para o cliente confirmar, com a data limite; nulo fora do estado de confirmação.
+  final String? prazoConfirmacao;
 
   /// Estado atual na API (`pago_e_retido`, `agendado`, ...).
   final String? estadoApi;
@@ -277,7 +289,11 @@ class ConversaPedido {
     this.orcamentosAtivos = const {},
     this.pedidoAberto = true,
     this.souCliente = true,
+    this.remoto = false,
   });
+
+  /// Serviço remoto: sem respostas rápidas nem sugestão de horário de visita.
+  final bool remoto;
 
   /// Quem está do outro lado (para buscar a foto de perfil).
   final String? usuarioId;

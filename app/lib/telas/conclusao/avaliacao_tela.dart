@@ -61,16 +61,19 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
   Future<void> _enviar() async {
     if (_enviando) return;
     setState(() => _enviando = true);
+    var sucesso = false;
     try {
-      await widget.aoEnviar?.call(
+      final resposta = await widget.aoEnviar?.call(
         EnvioAvaliacao(
           notas: List.unmodifiable(_notas),
           comentario: _comentario.text.trim(),
           gorjetaCentavos: _gorjetaCentavos,
         ),
       );
+      // Se quem chamou devolve `true`, a avaliação foi gravada: o botão fica desligado.
+      sucesso = resposta == true;
     } finally {
-      if (mounted) setState(() => _enviando = false);
+      if (mounted) setState(() => _enviando = sucesso);
     }
   }
 

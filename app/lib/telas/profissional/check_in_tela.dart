@@ -101,6 +101,9 @@ class _CheckInTelaState extends State<CheckInTela> {
   Future<void> _localizar() async {
     setState(() => _erroPasso = null);
     if (!await _permitido(TipoPermissao.localizacao, TextoPermissao.localizacao)) {
+      if (mounted) {
+        setState(() => _erroPasso = 'Ative a localização nas configurações para fazer o check-in.');
+      }
       return;
     }
     try {
@@ -177,6 +180,7 @@ class _CheckInTelaState extends State<CheckInTela> {
     if (_iniciando) return;
     setState(() {
       _iniciando = true;
+      _aviso = null; // nova tentativa: o "Sem internet" antigo sai
       _erroCodigo = null;
     });
     final ResultadoInicio resultado;
@@ -224,7 +228,7 @@ class _CheckInTelaState extends State<CheckInTela> {
     return EstruturaAuth(
       tituloBarra: widget.tituloBarra,
       rodape: BotaoPrimario(
-        texto: 'Iniciar serviço',
+        texto: widget.remoto ? 'Iniciar atendimento' : 'Iniciar serviço',
         carregando: _iniciando,
         aoTocar: _podeIniciar ? _iniciar : null,
       ),
@@ -317,25 +321,36 @@ class _CheckInTelaState extends State<CheckInTela> {
               _erroCodigo = null;
             }),
           ),
-        const SizedBox(height: EspacosTrato.x4),
-        Text('Mensagem rápida', style: TipografiaTrato.corpoForte),
-        const SizedBox(height: EspacosTrato.x3),
-        Wrap(
-          spacing: EspacosTrato.x2,
-          runSpacing: EspacosTrato.x2,
-          children: [
-            for (final mensagem in widget.mensagensRapidas)
-              _ChipMensagem(texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
-          ],
-        ),
+        if (!widget.remoto) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          Text('Mensagem rápida', style: TipografiaTrato.corpoForte),
+          const SizedBox(height: EspacosTrato.x3),
+          Wrap(
+            spacing: EspacosTrato.x2,
+            runSpacing: EspacosTrato.x2,
+            children: [
+              for (final mensagem in widget.mensagensRapidas)
+                _ChipMensagem(texto: mensagem, aoTocar: () => _enviarMensagem(mensagem)),
+            ],
+          ),
+        ],
         if (_aviso != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           Text(_aviso!, style: TipografiaTrato.legenda),
         ],
-        const SizedBox(height: EspacosTrato.x5),
-        Center(
-            child:
-                BotaoLink(texto: 'Cliente não está no local', aoTocar: _confirmarClienteAusente)),
+        if (!widget.remoto) ...[
+          const SizedBox(height: EspacosTrato.x8),
+          const Divider(),
+          const SizedBox(height: EspacosTrato.x3),
+          Center(
+            child: TextButton(
+              key: const Key('cliente-ausente'),
+              onPressed: _confirmarClienteAusente,
+              style: TextButton.styleFrom(foregroundColor: CoresTrato.textoSecundario),
+              child: const Text('Cliente não está no local'),
+            ),
+          ),
+        ],
       ],
     );
   }

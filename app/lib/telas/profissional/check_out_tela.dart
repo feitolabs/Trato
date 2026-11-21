@@ -108,6 +108,7 @@ class _CheckOutTelaState extends State<CheckOutTela> {
     if (_enviando) return;
     setState(() {
       _enviando = true;
+      _aviso = null; // novo envio: o "Sem internet" antigo sai
       _erro = null;
       _erroCodigo = null;
     });

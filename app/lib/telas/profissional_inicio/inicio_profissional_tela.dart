@@ -287,11 +287,13 @@ class _CartaoProximo extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x4),
           BotaoSecundario(
             texto: proximo.precisaAgendarVisita
-                ? 'Marcar data da visita'
-                : (proximo.emAndamento ? 'Gerenciar serviço (check-out)' : 'Fazer check-in'),
+                ? (proximo.remoto ? 'Combinar início' : 'Marcar data da visita')
+                : (proximo.emAndamento
+                    ? 'Gerenciar serviço (check-out)'
+                    : (proximo.remoto ? 'Iniciar atendimento' : 'Fazer check-in')),
             aoTocar: aoFazerCheckIn ?? () {},
           ),
-          if (proximo.agendado && aoAvisarACaminho != null) ...[
+          if (proximo.agendado && !proximo.remoto && aoAvisarACaminho != null) ...[
             const SizedBox(height: EspacosTrato.x3),
             _AvisoACaminho(pedidoId: proximo.pedidoId!, enviar: aoAvisarACaminho!),
           ],

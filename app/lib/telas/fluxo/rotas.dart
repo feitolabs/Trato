@@ -331,7 +331,7 @@ abstract final class RotasTrato {
           builder: (ctxSucesso) => SucessoAcaoTela(
             titulo: 'Pedido enviado!',
             subtitulo:
-                'Os profissionais da sua região foram notificados e você já pode acompanhar os orçamentos.',
+                'Os profissionais de ${rascunho.modalidade.name == 'remoto' ? 'qualquer região' : 'sua região'} foram notificados e você já pode acompanhar os orçamentos.',
             textoBotaoPrimario: 'Ver pedidos',
             aoTocarPrimario: () => Navigator.of(ctxSucesso).pushAndRemoveUntil(
               MaterialPageRoute<void>(
@@ -1239,10 +1239,14 @@ abstract final class RotasTrato {
     BuildContext context,
     String pedidoId, {
     bool remarcar = false,
+    bool remoto = false,
   }) async {
     final inicio = await _escolherJanelaVisita(
       context,
-      tituloDia: remarcar ? 'Novo dia da visita' : 'Dia da visita',
+      tituloDia: remoto
+          ? 'Dia do início'
+          : (remarcar ? 'Novo dia da visita' : 'Dia da visita'),
+      tituloHora: remoto ? 'Hora do início' : 'Hora da chegada',
     );
     if (inicio == null || !context.mounted) return;
     final fim = inicio.add(const Duration(hours: 2));
@@ -1258,8 +1262,10 @@ abstract final class RotasTrato {
         SnackBar(
           content: Text(
             remarcar
-                ? 'Visita remarcada com sucesso.'
-                : 'Visita marcada. O cliente já pode ver o código de início.',
+                ? (remoto ? 'Início remarcado com sucesso.' : 'Visita remarcada com sucesso.')
+                : (remoto
+                    ? 'Início combinado. O cliente já pode ver o código de início.'
+                    : 'Visita marcada. O cliente já pode ver o código de início.'),
           ),
         ),
       );
@@ -1391,13 +1397,13 @@ abstract final class RotasTrato {
                 if (precisaAgendar)
                   ListTile(
                     leading: const Icon(Icons.event_available_outlined),
-                    title: const Text('Marcar data da visita'),
+                    title: Text(remoto ? 'Combinar início' : 'Marcar data da visita'),
                     onTap: () {
                       Navigator.of(folha).pop();
-                      _marcarVisita(context, pedidoId);
+                      _marcarVisita(context, pedidoId, remoto: remoto);
                     },
                   ),
-                if (agendado && !precisaAgendar)
+                if (agendado && !precisaAgendar && !remoto)
                   ListTile(
                     leading: const Icon(Icons.edit_calendar_outlined),
                     title: const Text('Remarcar data da visita'),
@@ -1408,7 +1414,7 @@ abstract final class RotasTrato {
                   ),
                 if (podeCheckIn)
                   ListTile(
-                    leading: const Icon(Icons.place_outlined),
+                    leading: Icon(remoto ? Icons.play_circle_outline : Icons.place_outlined),
                     title:
                         Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
                     onTap: () {
@@ -1461,7 +1467,7 @@ abstract final class RotasTrato {
                       _cancelarPedido(context, pedidoId);
                     },
                   ),
-                if (agendado || emAndamento)
+                if ((agendado || emAndamento) && !remoto)
                   ListTile(
                     leading: const Icon(Icons.receipt_long_outlined),
                     title: const Text('Enviar nota de materiais'),
@@ -1677,6 +1683,8 @@ abstract final class RotasTrato {
         ..showSnackBar(
           SnackBar(
             content: const Text('Extrato em PDF salvo.'),
+            duration: const Duration(seconds: 4),
+            persist: false,
             action: SnackBarAction(
               label: 'Compartilhar',
               onPressed: () async {
@@ -1687,7 +1695,11 @@ abstract final class RotasTrato {
                   mensagens
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
-                      const SnackBar(content: Text('Extrato em PDF salvo.')),
+                      const SnackBar(
+                        content: Text('Extrato em PDF salvo.'),
+                        duration: Duration(seconds: 4),
+                        persist: false,
+                      ),
                     );
                 }
               },
@@ -2275,7 +2287,7 @@ abstract final class RotasTrato {
               (ctxSucesso) => SucessoAcaoTela(
                 titulo: 'Pedido enviado!',
                 subtitulo:
-                    'Os profissionais da sua região foram notificados e você já pode acompanhar os orçamentos.',
+                    'Os profissionais de ${rascunho.modalidade.name == 'remoto' ? 'qualquer região' : 'sua região'} foram notificados e você já pode acompanhar os orçamentos.',
                 textoBotaoPrimario: 'Ver pedidos',
                 aoTocarPrimario: () => _voltarAoInicio(ctxSucesso, aba: 2),
                 textoBotaoSecundario: 'Voltar ao início',
@@ -2799,6 +2811,7 @@ abstract final class RotasTrato {
                           true));
           final sit = conversa.situacao.toLowerCase();
           final podeCombinarAgenda = !conversa.pedidoAberto &&
+              !conversa.remoto &&
               (sit.contains('pago') || sit.contains('agend'));
           return ChatPedidoTela(
             conversa: conversa,
@@ -2958,7 +2971,7 @@ abstract final class RotasTrato {
                   saldo = null;
                 }
               }
-              if (!context.mounted) return;
+              if (!context.mounted) return true;
               await _abrirSucesso<void>(
                 context,
                 (ctxSucesso) => moedas > 0
@@ -2992,6 +3005,7 @@ abstract final class RotasTrato {
                 substituirAtual: true,
               );
             }
+            return ok;
           },
           aoAvaliarDepois: () => _voltarAoInicio(context),
         ),

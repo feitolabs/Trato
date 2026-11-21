@@ -21,7 +21,19 @@ class ResumoConclusao {
     this.fotoDepois,
     this.fotosCarregadas = false,
     this.checkOutSemCodigo = false,
+    this.prazoConfirmacao,
+    this.garantiaTexto,
+    this.remoto = false,
   });
+
+  /// Serviço remoto: texto do código muda (não há chegada).
+  final bool remoto;
+
+  /// "Você tem 48 horas para confirmar, até 23/11 · 14:30." Nulo se o backend não deu a data.
+  final String? prazoConfirmacao;
+
+  /// "Garantia de 90 dias a partir da sua confirmação." Nulo se o backend não deu os dias.
+  final String? garantiaTexto;
 
   /// Verdadeiro quando o profissional encerrou sem código de conclusão.
   final bool checkOutSemCodigo;

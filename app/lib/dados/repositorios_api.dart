@@ -515,7 +515,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final etapas = [
       for (var i = 0; i < titulos.length; i++)
         EtapaLinhaDoTempo(
-          titulo: titulos[i],
+          titulo: pedido.remoto && i == 1 ? 'Início combinado' : titulos[i],
           detalhe: quando[i] != null ? '${_dia(quando[i]!)} · ${_hora(quando[i]!)}' : '',
           estado: etapaMapeada != null
               ? (i < etapaMapeada
@@ -534,6 +534,16 @@ class RepositorioPedidosApi implements RepositorioPedidos {
                               : EstadoEtapa.futura),
         ),
     ];
+    // Remoto não tem chegada: a etapa "Chegou" não aparece.
+    if (pedido.remoto) etapas.removeAt(2);
+    final fimConfirmacao = quando[4];
+    final horasPrazo = ConfigPublica.atual.prazoConfirmacaoHoras;
+    String? prazoConfirmacao;
+    if (pedido.estado == 'em_confirmacao' && fimConfirmacao != null && horasPrazo > 0) {
+      final limite = fimConfirmacao.add(Duration(hours: horasPrazo));
+      prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horasPrazo)} para confirmar, '
+          'até ${_dia(limite)} · ${_hora(limite)}.';
+    }
     Aditivo? aditivoPendente;
     final aditivos = <ItemResumoAditivo>[];
     var aditivosPagos = 0;
@@ -608,7 +618,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       titulo: switch (pedido.estado) {
         'orcamento_aceito' => 'Aguardando o pagamento',
         'pago_e_retido' => 'Pagamento confirmado',
-        'agendado' => 'Visita marcada',
+        'agendado' => pedido.remoto ? 'Início combinado' : 'Visita marcada',
         'em_andamento' => 'Serviço em execução',
         'em_confirmacao' => 'Confirme o serviço',
         'concluido' => 'Serviço finalizado',
@@ -620,6 +630,9 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
       pagamentoConfirmado: pedido.pagamentoConfirmado,
       estadoApi: pedido.estado,
+      remoto: pedido.remoto,
+      visita: pedido.janelaRotulo,
+      prazoConfirmacao: prazoConfirmacao,
       etapas: etapas,
       aditivo: aditivoPendente,
       aditivos: aditivos,
@@ -653,7 +666,33 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       aditivosPagos = 0;
     }
     if (aditivosPagos > saldo.clientePagouCentavos) aditivosPagos = 0;
+    // Prazo e garantia só enfeitam a tela: se faltar dado, a linha simplesmente não aparece.
+    String? prazoConfirmacao;
+    String? garantiaTexto;
+    try {
+      final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
+      final eventos = [for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j)];
+      final fim = eventos.where((e) => e.acao == 'fazer_check_out').map((e) => e.em).fold<DateTime?>(
+          null, (a, b) => a == null || b.isAfter(a) ? b : a);
+      if (fim != null && horas > 0) {
+        final limite = fim.toLocal().add(Duration(hours: horas));
+        prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horas)} para confirmar, '
+            'até ${_dia(limite)} · ${_hora(limite)}.';
+      }
+    } on Object {
+      prazoConfirmacao = null;
+    }
+    try {
+      final g = _mapa(await _api.get('/v1/contratos/$pedidoId/garantia'));
+      final dias = (g['dias'] as num?)?.toInt() ?? 0;
+      if (dias > 0) garantiaTexto = 'Garantia de ${ConfigPublica.dias(dias)} a partir da sua confirmação.';
+    } on Object {
+      garantiaTexto = null;
+    }
     return ResumoConclusao(
+      remoto: pedido.remoto,
+      prazoConfirmacao: prazoConfirmacao,
+      garantiaTexto: garantiaTexto,
       numeroPedido: pedido.numero,
       nomeProfissional: await _nomeDoProfissional(pedido),
       fotoAntes: fotos['antes'],
@@ -1408,7 +1447,8 @@ class RepositorioChatApi implements RepositorioChat {
       mensagens: [
         for (final m in await _comFotos(pedidoId, mensagens)) _mensagem(m),
       ],
-      respostasRapidas: textos.respostasRapidas,
+      respostasRapidas: pedidoObj?.remoto == true ? const [] : textos.respostasRapidas,
+      remoto: pedidoObj?.remoto == true,
       orcamentosAtivos: orcamentosAtivos,
       pedidoAberto: pedidoAberto,
       souCliente: souCliente,

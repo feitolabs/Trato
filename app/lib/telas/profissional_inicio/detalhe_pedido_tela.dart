@@ -348,6 +348,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
                         ],
                       ),
                     ),
+                    if (!pedido.remoto) ...[
                     const SizedBox(height: EspacosTrato.x4),
                     _Mapa(
                       aoTocar: pedido.latitude == null || pedido.longitude == null
@@ -380,6 +381,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
                         ),
                       ],
                     ),
+                    ],
                     if (widget.aoPedirExclusividade != null ||
                         _exclusividade != null ||
                         _resumo != null ||

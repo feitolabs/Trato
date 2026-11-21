@@ -101,7 +101,11 @@ class DetalheServicoTela extends StatelessWidget {
                         Text(dados.codigoInicio!, style: TipografiaTrato.tituloGrande),
                         const SizedBox(height: EspacosTrato.x1),
                         Text(
-                          'Passe este código ao profissional quando ele chegar.',
+                          dados.remoto
+                              ? 'Passe este código ao profissional quando o atendimento começar. '
+                                  'Não envie o código por mensagem.'
+                              : 'Passe este código ao profissional quando ele chegar. '
+                                  'Não envie o código por mensagem.',
                           style: secundario,
                         ),
                       ],
@@ -121,7 +125,7 @@ class DetalheServicoTela extends StatelessWidget {
                         const SizedBox(height: EspacosTrato.x1),
                         Text(
                           'Quando o serviço estiver pronto, passe este código ao profissional '
-                          'para ele concluir.',
+                          'para ele concluir. Não envie o código por mensagem.',
                           style: secundario,
                         ),
                       ],
@@ -216,7 +220,7 @@ class DetalheServicoTela extends StatelessWidget {
                     ),
                   if (aoVerContrato != null)
                     BotaoLink(texto: 'Ver contrato', aoTocar: aoVerContrato),
-                  if (aoVerNota != null)
+                  if (aoVerNota != null && !dados.remoto)
                     BotaoLink(texto: 'Ver nota de materiais', aoTocar: aoVerNota),
                   if (aoVerAditivo != null)
                     BotaoLink(texto: 'Ver aditivo do serviço', aoTocar: aoVerAditivo),
