@@ -16,7 +16,11 @@ class PedidoResumo {
     this.id,
     this.estadoApi,
     this.profissionalNome = '',
+    this.remoto = false,
   });
+
+  /// Atendimento remoto: a lista mostra o selo "Remoto".
+  final bool remoto;
 
   /// Id do pedido na API (nulo nos dados de exemplo).
   final String? id;

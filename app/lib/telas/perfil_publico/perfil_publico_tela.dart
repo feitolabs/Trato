@@ -22,7 +22,11 @@ class PerfilPublicoTela extends StatefulWidget {
     this.aoCapturarFotoPerfil,
     this.aoAbrirConfiguracoes,
     this.aoAbrirVerificacao,
+    this.carregarTratinhosPendentes,
   });
+
+  /// Texto dos Tratinhos a liberar ("Você tem 50 Tratinhos a liberar em 27/11"); nulo = não mostra.
+  final Future<String?> Function()? carregarTratinhosPendentes;
 
   /// Abre as configurações (dados pessoais, notificações, privacidade, ajuda, termos, sair).
   /// A engrenagem só aparece se vier.
@@ -158,6 +162,21 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 ),
               ],
             ),
+            if (widget.carregarTratinhosPendentes != null)
+              FutureBuilder<String?>(
+                future: widget.carregarTratinhosPendentes!().catchError((Object _) => null),
+                builder: (context, snap) => snap.data == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: EspacosTrato.x3),
+                        child: Text(
+                          snap.data!,
+                          key: const Key('tratinhos-pendentes-perfil'),
+                          style: TipografiaTrato.corpoPequeno
+                              .copyWith(color: CoresTrato.textoSecundario),
+                        ),
+                      ),
+              ),
             const SizedBox(height: EspacosTrato.x5),
             Row(
               children: [

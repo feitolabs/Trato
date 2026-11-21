@@ -223,7 +223,20 @@ class _CartaoPedido extends StatelessWidget {
             style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x3),
-          ChipStatus(texto: pedido.statusTexto, tipo: pedido.statusTipo),
+          Wrap(
+            spacing: EspacosTrato.x2,
+            runSpacing: EspacosTrato.x1,
+            children: [
+              ChipStatus(texto: pedido.statusTexto, tipo: pedido.statusTipo),
+              if (pedido.remoto)
+                const ChipStatus(
+                              key: ValueKey('selo-remoto'),
+                              texto: 'Remoto',
+                              tipo: TipoStatus.info,
+                              icone: Icons.videocam_outlined,
+                            ),
+            ],
+          ),
         ],
       ),
     );

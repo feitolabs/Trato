@@ -745,7 +745,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Não foi possível salvar. Tente de novo.'), findsOneWidget);
+      expect(find.text('Não foi possível salvar. Confira sua internet e tente de novo.'), findsOneWidget);
       expect(tester.widget<BotaoPrimario>(find.byType(BotaoPrimario)).carregando, isFalse);
 
       // Nova tentativa funciona e avanca estado para aceito

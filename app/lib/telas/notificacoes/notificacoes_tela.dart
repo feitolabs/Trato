@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../dados/carregador.dart';
@@ -96,6 +98,16 @@ class _ListaNotificacoes extends StatefulWidget {
 
 class _ListaNotificacoesState extends State<_ListaNotificacoes> {
   late List<Notificacao> _itens = widget.itens;
+
+  /// Abrir a lista é ver os avisos: marca tudo como lido (sino e contador zeram).
+  @override
+  void initState() {
+    super.initState();
+    if (_naoLidas == 0) return;
+    unawaited(widget.servico.marcarTodasLidas().catchError((Object _) {}));
+    _itens = [for (final i in _itens) i.comoLida()];
+    WidgetsBinding.instance.addPostFrameCallback((_) => widget.aoContarNaoLidas?.call(0));
+  }
 
   @override
   void didUpdateWidget(covariant _ListaNotificacoes antigo) {

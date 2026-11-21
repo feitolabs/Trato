@@ -47,8 +47,18 @@ class PagamentoTela extends StatefulWidget {
 
 class _PagamentoTelaState extends State<PagamentoTela> {
   late DadosPagamento _dados = widget.dados;
-  late MetodoPagamento? _metodo =
-      widget.dados.opcoes.isEmpty ? null : widget.dados.opcoes.first.metodo;
+  late MetodoPagamento? _metodo = _metodoInicial(widget.dados);
+  /// Começa no cartão: o Pix nunca vem pré-selecionado.
+  static MetodoPagamento? _metodoInicial(DadosPagamento d) {
+    if (d.opcoes.isEmpty) return null;
+    for (final o in d.opcoes) {
+      if (o.metodo == MetodoPagamento.cartao) return o.metodo;
+    }
+    return d.opcoes.first.metodo;
+  }
+
+  static const _msgCpf = 'Precisamos do seu CPF para concluir o pagamento.';
+
   int _parcelas = 1;
   final _cupomCtrl = TextEditingController();
   var _pagando = false;
@@ -65,7 +75,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
     super.didUpdateWidget(oldWidget);
     if (widget.dados != oldWidget.dados) {
       _dados = widget.dados;
-      if (_metodo == null && _dados.opcoes.isNotEmpty) _metodo = _dados.opcoes.first.metodo;
+      _metodo ??= _metodoInicial(_dados);
       if (_parcelas > 1 && !_dados.parcelamento.any((p) => p.parcelas == _parcelas)) {
         _parcelas = 1;
       }
@@ -202,7 +212,11 @@ class _PagamentoTelaState extends State<PagamentoTela> {
     if (_pagando || metodo == null) return;
     if (!_cpfCadastrado && widget.aoCadastrarCpf != null) {
       final cadastrou = await _pedirCpf();
-      if (!cadastrou || !mounted) return;
+      if (!mounted) return;
+      if (!cadastrou) {
+        setState(() => _erroPagamento = _msgCpf);
+        return;
+      }
     }
     setState(() {
       _pagando = true;
@@ -217,7 +231,11 @@ class _PagamentoTelaState extends State<PagamentoTela> {
           if (e.codigo == 'cpf_obrigatorio' && widget.aoCadastrarCpf != null && mounted) {
             setState(() => _pagando = false);
             final cadastrou = await _pedirCpf();
-            if (!cadastrou || !mounted) return;
+            if (!mounted) return;
+            if (!cadastrou) {
+              setState(() => _erroPagamento = _msgCpf);
+              return;
+            }
             setState(() => _pagando = true);
             await widget.aoPagarDetalhado!.call(metodo, parcelasEnvio, _dados.cupomCodigo);
           } else {
@@ -450,6 +468,9 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                                   child: TextField(
                                     key: const Key('campo-cupom'),
                                     controller: _cupomCtrl,
+                                    onChanged: (_) {
+                                      if (_erroCupom != null) setState(() => _erroCupom = null);
+                                    },
                                     textCapitalization: TextCapitalization.characters,
                                     decoration: InputDecoration(
                                       hintText: 'Digite o código do cupom',

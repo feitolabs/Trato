@@ -4,7 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
-import '../comuns/desconto_moedas.dart' show textoTratinhos;
+import '../comuns/desconto_moedas.dart' show textoTratinhos, textoTratinhosPendentes;
 import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
@@ -410,6 +410,14 @@ class _CartaoCarteira extends StatelessWidget {
               Expanded(child: _Valor(rotulo: 'Liberado', centavos: carteira.paraSacarCentavos)),
             ],
           ),
+          if ((carteira.retidoDesdePagamentoCentavos ?? 0) > 0) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            _Valor(
+              key: const Key('valor-retido'),
+              rotulo: 'Retido',
+              centavos: carteira.retidoDesdePagamentoCentavos!,
+            ),
+          ],
           if (carteira.proximaLiberacao != null) ...[
             const SizedBox(height: EspacosTrato.x2),
             Text(
@@ -434,7 +442,7 @@ class _CartaoCarteira extends StatelessWidget {
 }
 
 class _Valor extends StatelessWidget {
-  const _Valor({required this.rotulo, required this.centavos});
+  const _Valor({super.key, required this.rotulo, required this.centavos});
 
   final String rotulo;
   final int centavos;
@@ -492,7 +500,12 @@ class _CartaoExclusividades extends StatelessWidget {
           if (resumo.moedasPendentesProfissional > 0) ...[
             const SizedBox(height: EspacosTrato.x1),
             Text(
-              '${textoTratinhos(resumo.moedasPendentesProfissional)} a liberar',
+              textoTratinhosPendentes(
+                    resumo.moedasPendentesProfissional,
+                    resumo.moedasPendentesLiberacao,
+                    resumo.moedaValorCentavos,
+                  ) ??
+                  '${textoTratinhos(resumo.moedasPendentesProfissional)} a liberar',
               style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
             ),
           ],

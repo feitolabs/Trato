@@ -1,3 +1,6 @@
+import '../../dados/config_publica.dart';
+import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
+
 /// Dados da Carteira do profissional. TUDO vem pronto do backend: o app só exibe.
 /// Valores em centavos inteiros; saldos, taxa e líquido nunca são calculados na tela.
 class ResumoCarteira {
@@ -79,6 +82,7 @@ class DetalheValoresPedido {
     required this.pagoPeloClienteCentavos,
     required this.voceRecebeCentavos,
     required this.situacao,
+    this.liberaEm,
     this.aditivos = const [],
     this.notas = const [],
     this.podeAvaliarCliente = false,
@@ -97,6 +101,9 @@ class DetalheValoresPedido {
 
   /// Ex.: "Retido até o serviço ser confirmado".
   final String situacao;
+
+  /// Data prevista da liberação (opcional: `liberacao_prevista_em` do saldo do pedido).
+  final DateTime? liberaEm;
   final List<LinhaDeValor> aditivos;
   final List<LinhaDeValor> notas;
 }
@@ -129,13 +136,34 @@ class ContaRecebimento {
 }
 
 /// Tudo que a tela precisa. [erro] preenchido mostra a mensagem com "Tentar de novo".
+/// Regra de liberação do repasse: 48 h para o cliente confirmar + 7 dias do prazo de retrabalho.
+/// Os prazos vêm da configuração pública (se não vierem, usa 48 h e 7 dias). A data (`DD/MM`)
+/// só aparece quando o backend a informa.
+String textoRegraLiberacao(DateTime? libera) {
+  final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
+  final dias = ConfigPublica.atual.prazoLiberacaoDias > 0
+      ? ConfigPublica.atual.prazoLiberacaoDias
+      : 7;
+  final regra = '${ConfigPublica.horas(horas)} para o cliente confirmar + '
+      '${ConfigPublica.dias(dias)} do prazo de retrabalho';
+  return libera == null ? 'Libera após $regra' : 'Libera em ${diaMesDoAparelho(libera)}: $regra';
+}
+
 class DadosCarteira {
   const DadosCarteira({
+    this.proximaLiberacao,
+    this.tratinhosPendentesTexto,
     this.resumo,
     this.extrato = const [],
     this.contaRecebimento,
     this.erro,
   });
+
+  /// Data do próximo repasse (a que o app já recebe do saldo); nula = só a regra, sem data.
+  final DateTime? proximaLiberacao;
+
+  /// "Você tem 50 Tratinhos a liberar em 27/11"; nulo = sem pendentes.
+  final String? tratinhosPendentesTexto;
 
   final ResumoCarteira? resumo;
   final List<ItemExtrato> extrato;

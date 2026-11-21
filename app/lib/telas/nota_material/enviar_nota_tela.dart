@@ -64,8 +64,8 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
           () => _erroItem = 'Quantidade inválida. Digite um número inteiro entre 1 e 9.999.');
     }
     if (centavos == null || centavos <= 0) {
-      return setState(() => _erroItem =
-          'Valor não informado. Digite um valor em reais maior que zero (ex.: 46,50).');
+      return setState(() =>
+          _erroItem = 'Valor não informado. Digite um valor em reais maior que zero (ex.: 46,50).');
     }
     if (centavos > maxTotalCentavos || qtd > maxTotalCentavos ~/ centavos) {
       return setState(() => _erroItem = 'Valor do item acima do limite permitido.');
@@ -257,9 +257,6 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   }
 
   String _rotuloItem(ItemNota item) {
-    if (item.quantidade <= 1) return item.descricao;
-    final regex = RegExp(r'^\d+\s*x?\s+', caseSensitive: false);
-    if (regex.hasMatch(item.descricao)) return item.descricao;
-    return '${item.quantidade}x ${item.descricao}';
+    return item.rotuloComConta(formatarReais);
   }
 }

@@ -72,6 +72,20 @@ class CarteiraTela extends StatelessWidget {
               tipo: TipoStatus.info,
               icone: Icons.autorenew,
             ),
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              textoRegraLiberacao(dados.proximaLiberacao),
+              key: const Key('regra-liberacao'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            ),
+            if (dados.tratinhosPendentesTexto != null) ...[
+              const SizedBox(height: EspacosTrato.x1),
+              Text(
+                dados.tratinhosPendentesTexto!,
+                key: const Key('tratinhos-pendentes-carteira'),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              ),
+            ],
             const SizedBox(height: EspacosTrato.x4),
             if (!soExtrato && resumo != null) ...[
               _CartaoDisponivel(resumo: resumo, aoSacarPix: aoSacarPix),

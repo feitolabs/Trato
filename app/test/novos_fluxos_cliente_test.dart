@@ -236,7 +236,11 @@ void main() {
       await t.tap(find.byKey(const Key('botao-aplicar-cupom')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('botao-remover-cupom')), findsOneWidget);
-      await t.drag(find.byType(ListView), const Offset(0, 400));
+      await t.dragUntilVisible(
+        find.textContaining('Cupom TRATO10 aplicado'),
+        find.byType(ListView),
+        const Offset(0, 200),
+      );
       await t.pumpAndSettle();
       expect(find.textContaining('Cupom TRATO10 aplicado'), findsOneWidget);
 

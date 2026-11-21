@@ -893,7 +893,7 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
         estado: ultimo['estado'] as String,
         disputaId: disputaId,
         titulo:
-            'Retrabalho do pedido #${disputaId.substring(0, disputaId.length < 6 ? disputaId.length : 6).toUpperCase()}',
+            'Retrabalho do pedido #${disputaId.substring(0, disputaId.length < 4 ? disputaId.length : 4).toUpperCase()}',
         descricaoProblema: (ultimo['descricao'] as String?) ?? 'Retrabalho solicitado',
         prazoAtendimentoDias: ConfigPublica.atual.prazoRetrabalhoDias,
         opcoesHorario: const ['Manhã', 'Tarde'],

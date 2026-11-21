@@ -357,6 +357,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       id: p.id,
       estadoApi: p.estado,
       profissionalNome: p.profissionalNome ?? '',
+      remoto: p.remoto,
       titulo: p.rotulo,
       subtitulo: p.rotulo == 'Pedido ${p.numero}'
           ? 'Aberto em ${_dia(p.abertoEm)}'
@@ -1154,7 +1155,8 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           ),
       ],
       opcoes: [
-        if (meios.contains('pix'))
+        // `pix_disponivel: false` (campo opcional) esconde o Pix; ausente = como antes.
+        if (meios.contains('pix') && j['pix_disponivel'] != false)
           const OpcaoPagamento(
             metodo: MetodoPagamento.pix,
             titulo: 'Pix',
@@ -1923,6 +1925,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       carteira = ResumoCarteira(
         retidoCentavos: (saldo['a_liberar_centavos'] as num?)?.toInt() ?? 0,
         paraSacarCentavos: (saldo['liberado_centavos'] as num?)?.toInt() ?? 0,
+        retidoDesdePagamentoCentavos: (saldo['retido_centavos'] as num?)?.toInt(),
         proximaLiberacao: DateTime.tryParse('${saldo['proxima_liberacao_em'] ?? ''}')?.toLocal(),
         liberacoesPrevistas: [
           for (final l in (saldo['liberacoes_previstas'] as List? ?? const []))
@@ -2345,6 +2348,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       pagoPeloClienteCentavos: cent(saldo['cliente_pagou_centavos']),
       voceRecebeCentavos: retido + aLiberar + liberado,
       situacao: situacao,
+      liberaEm: DateTime.tryParse('${saldo['liberacao_prevista_em'] ?? ''}')?.toLocal(),
       podeAvaliarCliente: concluidoSemAvaliar,
       aditivos: [
         for (final a in aditivos)
@@ -2412,9 +2416,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       _mapa(await _api.get('/v1/profissional/exclusividades')),
     );
     var pendentes = 0;
+    DateTime? liberacaoMoedas;
+    int? valorMoeda;
     try {
       final moedas = _mapa(await _api.get('/v1/me/moedas'));
       pendentes = (moedas['moedas_pendentes_profissional'] as num?)?.toInt() ?? 0;
+      liberacaoMoedas = lerDataIso(moedas['proxima_liberacao_profissional']);
+      valorMoeda = (moedas['valor_moeda_centavos'] as num?)?.toInt();
     } on Object {
       pendentes = 0;
     }
@@ -2424,6 +2432,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       limiteMaximo: lista.limiteMaximo,
       saldoProfissional: lista.saldoProfissional,
       moedasPendentesProfissional: pendentes,
+      moedasPendentesLiberacao: liberacaoMoedas,
+      moedaValorCentavos: valorMoeda,
     );
   }
 

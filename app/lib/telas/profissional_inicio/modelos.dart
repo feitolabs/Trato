@@ -243,7 +243,11 @@ class ResumoCarteira {
     required this.paraSacarCentavos,
     this.proximaLiberacao,
     this.liberacoesPrevistas = const [],
+    this.retidoDesdePagamentoCentavos,
   });
+
+  /// Valor retido desde o pagamento do cliente (`retido_centavos` do saldo); nulo/0 = sem linha.
+  final int? retidoDesdePagamentoCentavos;
 
   final int retidoCentavos;
   final int paraSacarCentavos;
@@ -313,6 +317,8 @@ class ResumoExclusividades {
     this.limiteMaximo = 3,
     this.saldoProfissional = 0,
     this.moedasPendentesProfissional = 0,
+    this.moedasPendentesLiberacao,
+    this.moedaValorCentavos,
   });
 
   final List<ExclusividadeProfissional> itens;
@@ -321,12 +327,20 @@ class ResumoExclusividades {
   final int saldoProfissional;
   final int moedasPendentesProfissional;
 
+  /// Quando os Tratinhos pendentes são liberados (`proxima_liberacao_profissional`); opcional.
+  final DateTime? moedasPendentesLiberacao;
+
+  /// Valor de 1 Tratinho em centavos (`valor_moeda_centavos`), só para mostrar em reais; opcional.
+  final int? moedaValorCentavos;
+
   ResumoExclusividades comPendentes(int pendentes) => ResumoExclusividades(
         itens: itens,
         ativasOuPendentes: ativasOuPendentes,
         limiteMaximo: limiteMaximo,
         saldoProfissional: saldoProfissional,
         moedasPendentesProfissional: pendentes,
+        moedasPendentesLiberacao: moedasPendentesLiberacao,
+        moedaValorCentavos: moedaValorCentavos,
       );
 
   ResumoExclusividades comNovaOferta(ExclusividadeProfissional oferta) {
@@ -340,6 +354,8 @@ class ResumoExclusividades {
       limiteMaximo: limiteMaximo,
       saldoProfissional: oferta.saldoRestante ?? saldoProfissional,
       moedasPendentesProfissional: moedasPendentesProfissional,
+      moedasPendentesLiberacao: moedasPendentesLiberacao,
+      moedaValorCentavos: moedaValorCentavos,
     );
   }
 }

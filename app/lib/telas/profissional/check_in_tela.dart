@@ -52,7 +52,7 @@ class CheckInTela extends StatefulWidget {
   State<CheckInTela> createState() => _CheckInTelaState();
 }
 
-class _CheckInTelaState extends State<CheckInTela> {
+class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
   final _codigo = TextEditingController();
   final _justificativa = TextEditingController();
   late FotoChegada? _foto = widget.fotoInicial;
@@ -64,7 +64,22 @@ class _CheckInTelaState extends State<CheckInTela> {
   String? _erroPasso;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Ao voltar ao primeiro plano o "Sem internet" antigo sai: a conexão pode ter voltado.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState estado) {
+    if (estado == AppLifecycleState.resumed && _aviso != null && mounted) {
+      setState(() => _aviso = null);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _codigo.dispose();
     _justificativa.dispose();
     super.dispose();
@@ -82,7 +97,10 @@ class _CheckInTelaState extends State<CheckInTela> {
   }
 
   Future<void> _tirarFoto() async {
-    setState(() => _erroPasso = null);
+    setState(() {
+      _erroPasso = null;
+      _aviso = null;
+    });
     if (!await _permitido(TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {
       return;
     }
@@ -99,7 +117,10 @@ class _CheckInTelaState extends State<CheckInTela> {
   }
 
   Future<void> _localizar() async {
-    setState(() => _erroPasso = null);
+    setState(() {
+      _erroPasso = null;
+      _aviso = null;
+    });
     if (!await _permitido(TipoPermissao.localizacao, TextoPermissao.localizacao)) {
       if (mounted) {
         setState(() => _erroPasso = 'Ative a localização nas configurações para fazer o check-in.');
@@ -119,7 +140,10 @@ class _CheckInTelaState extends State<CheckInTela> {
   }
 
   Future<void> _enviarMensagem(String mensagem) async {
-    setState(() => _erroPasso = null);
+    setState(() {
+      _erroPasso = null;
+      _aviso = null;
+    });
     try {
       await widget.servico.enviarMensagemRapida(mensagem);
       if (mounted) setState(() => _aviso = 'Mensagem enviada: $mensagem');
@@ -158,7 +182,10 @@ class _CheckInTelaState extends State<CheckInTela> {
   }
 
   Future<void> _clienteAusente() async {
-    setState(() => _erroPasso = null);
+    setState(() {
+      _erroPasso = null;
+      _aviso = null;
+    });
     try {
       await widget.servico.avisarClienteAusente();
       if (mounted) {

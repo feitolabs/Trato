@@ -24,6 +24,7 @@ class PedidoApi {
     this.modalidade = 'presencial',
     this.jaAvaliou = false,
     this.titulo,
+    this.categoriaNome,
     this.clienteNome,
     this.profissionalNome,
     this.pagamentoConfirmado = false,
@@ -43,6 +44,10 @@ class PedidoApi {
   /// O que o cliente pediu ("Montagem de móveis"). Nulo em servidor antigo.
   final String? titulo;
 
+  /// Nome da categoria (`categoria_nome`, opcional). Quando vem, é o título do pedido: o
+  /// `titulo` pode ser o nome da pergunta ("Orçamento geral").
+  final String? categoriaNome;
+
   /// Nome abreviado do cliente ("Mariana S."); só vem para o profissional do pedido.
   final String? clienteNome;
 
@@ -51,7 +56,8 @@ class PedidoApi {
 
   /// Título para mostrar: o do serviço, ou "Pedido #AB12" quando não houver.
   String get rotulo {
-    final t = titulo?.trim() ?? '';
+    final c = categoriaNome?.trim() ?? '';
+    final t = c.isNotEmpty ? c : (titulo?.trim() ?? '');
     return t.isEmpty ? 'Pedido $numero' : t;
   }
 
@@ -67,6 +73,7 @@ class PedidoApi {
         modalidade: (j['modalidade'] as String?) ?? 'presencial',
         jaAvaliou: j['ja_avaliou'] == true,
         titulo: j['titulo'] as String?,
+        categoriaNome: j['categoria_nome'] as String?,
         clienteNome: j['cliente_nome'] as String?,
         profissionalNome: j['profissional_nome'] as String?,
         pagamentoConfirmado: j['pagamento_confirmado'] == true,

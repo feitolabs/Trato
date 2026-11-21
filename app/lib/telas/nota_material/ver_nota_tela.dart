@@ -24,7 +24,10 @@ class VerNotaTela extends StatelessWidget {
       tituloVazio: 'Nenhuma nota enviada',
       textoVazio: 'Quando o profissional enviar a notinha dos materiais, ela aparece aqui.',
       construir: (context, todas) {
-        final notas = [for (final n in todas) if (n.itens.isNotEmpty) n];
+        final notas = [
+          for (final n in todas)
+            if (n.itens.isNotEmpty) n
+        ];
         final varias = notas.length > 1;
         final primeira = notas.first;
         return CorpoRolavel(
@@ -79,10 +82,7 @@ class VerNotaTela extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
                 child: LinhaValor(
-                  rotulo: i.quantidade > 1 &&
-                          !RegExp(r'^\d+\s*x?\s+', caseSensitive: false).hasMatch(i.descricao)
-                      ? '${i.quantidade}x ${i.descricao}'
-                      : i.descricao,
+                  rotulo: i.rotuloComConta(formatarReais),
                   valor: formatarReais(i.centavos),
                 ),
               ),

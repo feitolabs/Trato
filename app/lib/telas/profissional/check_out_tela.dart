@@ -39,7 +39,7 @@ class CheckOutTela extends StatefulWidget {
   State<CheckOutTela> createState() => _CheckOutTelaState();
 }
 
-class _CheckOutTelaState extends State<CheckOutTela> {
+class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver {
   final _codigo = TextEditingController();
   final _justificativa = TextEditingController();
   FotoChegada? _foto;
@@ -51,7 +51,22 @@ class _CheckOutTelaState extends State<CheckOutTela> {
   String? _aviso;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Ao voltar ao primeiro plano o "Sem internet" antigo sai: a conexão pode ter voltado.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState estado) {
+    if (estado == AppLifecycleState.resumed && _aviso != null && mounted) {
+      setState(() => _aviso = null);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _codigo.dispose();
     _justificativa.dispose();
     super.dispose();
@@ -66,7 +81,10 @@ class _CheckOutTelaState extends State<CheckOutTela> {
   }
 
   Future<void> _localizar() async {
-    setState(() => _erro = null);
+    setState(() {
+      _erro = null;
+      _aviso = null;
+    });
     final p = widget.permissao;
     if (p != null &&
         !await garantirPermissao(
@@ -86,7 +104,10 @@ class _CheckOutTelaState extends State<CheckOutTela> {
   }
 
   Future<void> _tirarFoto() async {
-    setState(() => _erro = null);
+    setState(() {
+      _erro = null;
+      _aviso = null;
+    });
     final p = widget.permissao;
     if (p != null &&
         !await garantirPermissao(context, p, TipoPermissao.camera, TextoPermissao.cameraCheckIn)) {

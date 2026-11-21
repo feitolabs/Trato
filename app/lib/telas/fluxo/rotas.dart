@@ -60,6 +60,7 @@ import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
 import '../comuns/botao_de_confianca.dart';
 import '../comuns/convite.dart';
+import '../comuns/desconto_moedas.dart' show textoTratinhosPendentes;
 import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
 import '../comuns/sucesso_acao_tela.dart';
@@ -1050,10 +1051,10 @@ abstract final class RotasTrato {
                 inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             final id = pedido?.id ?? _semId;
             final titulo = pedido?.titulo ?? 'Orçamento';
-            _abrirOrcamento(context, id, titulo);
+            _abrirOrcamento(context, id, titulo, remoto: pedido?.remoto ?? false);
           },
           aoFazerOrcamentoDoPedido: (pedido) =>
-              _abrirOrcamento(context, pedido.id, pedido.titulo),
+              _abrirOrcamento(context, pedido.id, pedido.titulo, remoto: pedido.remoto),
           aoPerguntar: () {
             final pedido =
                 inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
@@ -1128,6 +1129,7 @@ abstract final class RotasTrato {
     String pedidoId,
     String titulo, {
     DetalheOrcamentoEnviado? inicial,
+    bool remoto = false,
   }) {
     final servico = repos.profissional.servicoOrcamento(pedidoId);
     _abrir<void>(
@@ -1137,6 +1139,7 @@ abstract final class RotasTrato {
           servico: servico,
           tituloPedido: titulo,
           edicao: inicial != null,
+          remoto: remoto,
           mostrarForaDoEscopo: true,
           deslocamentoInicial: inicial == null
               ? null
@@ -1219,7 +1222,7 @@ abstract final class RotasTrato {
     final hoje = DateTime.now();
     final dia = await showDatePicker(
       context: context,
-      firstDate: hoje,
+      firstDate: DateTime(hoje.year, hoje.month, hoje.day), // dias passados ficam desabilitados
       lastDate: hoje.add(const Duration(days: 90)),
       helpText: tituloDia,
     );
@@ -1230,7 +1233,12 @@ abstract final class RotasTrato {
       helpText: tituloHora,
     );
     if (hora == null || !context.mounted) return null;
-    return DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute);
+    final escolhido = DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute);
+    if (escolhido.isBefore(DateTime.now())) {
+      _avisoSimples(context, 'Escolha um horário que ainda não passou.');
+      return null;
+    }
+    return escolhido;
   }
 
   /// Ações do pedido de hoje: check-in, nota de materiais e aditivo.
@@ -1753,6 +1761,14 @@ abstract final class RotasTrato {
           return PerfilPublicoTela(
             servico: servico,
             aoCapturarFotoPerfil: _fotografarPerfil,
+            carregarTratinhosPendentes: () async {
+              final ex = (await repos.profissional.minhasExclusividades());
+              return textoTratinhosPendentes(
+                ex.moedasPendentesProfissional,
+                ex.moedasPendentesLiberacao,
+                ex.moedaValorCentavos,
+              );
+            },
             aoVerAvaliacoes: () => _abrir<void>(
               context,
               AvaliacoesRecebidasTela(servico: servico),
@@ -3381,6 +3397,8 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
 
   List<ItemExtrato> _itens = const [];
   ContaRecebimento _conta = const ContaRecebimento(cadastrada: false);
+  DateTime? _proximaLiberacao;
+  String? _tratinhosPendentes;
   Object? _erro;
   bool _iniciado = false;
   bool _carregando = false;
@@ -3435,7 +3453,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
       _carregando = true;
     }
     try {
-      final (itens, conta) = await emParalelo2(
+      final (itens, conta, extras) = await emParalelo3(
         RotasTrato.repos.profissional.extrato(
           limite: _tamanhoPagina,
           deslocamento: 0,
@@ -3443,11 +3461,27 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
         RotasTrato.repos.profissional.obterContaRecebimento().catchError(
               (_) => const ContaRecebimento(cadastrada: false),
             ),
+        // Extras da Carteira (data do repasse e Tratinhos pendentes): se falhar, só não aparecem.
+        RotasTrato.repos.profissional.inicio().then<(DateTime?, String?)>((i) {
+          final ex = i.exclusividades;
+          return (
+            i.carteira.proximaLiberacao,
+            ex == null
+                ? null
+                : textoTratinhosPendentes(
+                    ex.moedasPendentesProfissional,
+                    ex.moedasPendentesLiberacao,
+                    ex.moedaValorCentavos,
+                  ),
+          );
+        }).catchError((Object _) => (null, null)),
       );
       if (!mounted || minha != _geracao) return;
       setState(() {
         _itens = itens;
         _conta = conta;
+        _proximaLiberacao = extras.$1;
+        _tratinhosPendentes = extras.$2;
         _erro = null;
         _temMais = itens.length >= _tamanhoPagina;
         _carregado = true;
@@ -3514,7 +3548,12 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
       onRefresh: () => _carregarInicial(silencioso: true),
       child: CarteiraTela(
         soExtrato: true,
-        dados: DadosCarteira(extrato: _itens, contaRecebimento: _conta),
+        dados: DadosCarteira(
+          extrato: _itens,
+          contaRecebimento: _conta,
+          proximaLiberacao: _proximaLiberacao,
+          tratinhosPendentesTexto: _tratinhosPendentes,
+        ),
         aoAbrirItem: (item) => widget.aoAbrirItem(context, item.pedidoId!),
         aoConfigurarRecebimento: () =>
             widget.aoConfigurarRecebimento(context, _conta),

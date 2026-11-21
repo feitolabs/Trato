@@ -68,35 +68,38 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
               const SizedBox(height: EspacosTrato.x4),
               Text('Pedidos', style: TipografiaTrato.tituloGrande),
               const SizedBox(height: EspacosTrato.x4),
-              Wrap(
-                spacing: EspacosTrato.x2,
-                runSpacing: EspacosTrato.x2,
-                children: [
-                  _Segmento(
-                    texto: 'Abertos',
-                    ativo: _aba == _Aba.abertos,
-                    aoTocar: () => setState(() => _aba = _Aba.abertos),
-                  ),
-                  _Segmento(
-                    texto: widget.orcamentosEnviados.isEmpty
-                        ? 'Orçamentos'
-                        : 'Orçamentos (${widget.orcamentosEnviados.length})',
-                    ativo: _aba == _Aba.orcamentos,
-                    aoTocar: () => setState(() => _aba = _Aba.orcamentos),
-                  ),
-                  _Segmento(
-                    texto: widget.contratados.isEmpty
-                        ? 'Em andamento'
-                        : 'Em andamento (${widget.contratados.length})',
-                    ativo: _aba == _Aba.andamento,
-                    aoTocar: () => setState(() => _aba = _Aba.andamento),
-                  ),
-                  _Segmento(
-                    texto: 'Conversas',
-                    ativo: _aba == _Aba.conversas,
-                    aoTocar: () => setState(() => _aba = _Aba.conversas),
-                  ),
-                ],
+              // Rola na horizontal: em tela estreita as abas não empilham nem quebram o nome.
+              SingleChildScrollView(
+                key: const Key('abas-pedidos'),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _Segmento(
+                      texto: 'Abertos',
+                      ativo: _aba == _Aba.abertos,
+                      aoTocar: () => setState(() => _aba = _Aba.abertos),
+                    ),
+                    _Segmento(
+                      texto: widget.orcamentosEnviados.isEmpty
+                          ? 'Orçamentos'
+                          : 'Orçamentos (${widget.orcamentosEnviados.length})',
+                      ativo: _aba == _Aba.orcamentos,
+                      aoTocar: () => setState(() => _aba = _Aba.orcamentos),
+                    ),
+                    _Segmento(
+                      texto: widget.contratados.isEmpty
+                          ? 'Em andamento'
+                          : 'Em andamento (${widget.contratados.length})',
+                      ativo: _aba == _Aba.andamento,
+                      aoTocar: () => setState(() => _aba = _Aba.andamento),
+                    ),
+                    _Segmento(
+                      texto: 'Conversas',
+                      ativo: _aba == _Aba.conversas,
+                      aoTocar: () => setState(() => _aba = _Aba.conversas),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: EspacosTrato.x3),
               Expanded(
@@ -307,26 +310,32 @@ class _Segmento extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: ativo,
-      child: Material(
-        color: ativo ? CoresTrato.petroleo : CoresTrato.superficie,
-        shape: StadiumBorder(
-          side: BorderSide(color: ativo ? CoresTrato.petroleo : CoresTrato.borda),
-        ),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: aoTocar,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: EspacosTrato.x5,
-              vertical: EspacosTrato.x3,
-            ),
-            child: Text(
-              texto,
-              style: TipografiaTrato.corpoForte.copyWith(
-                color: ativo ? CoresTrato.creme : CoresTrato.petroleo,
+    return Padding(
+      padding: const EdgeInsets.only(right: EspacosTrato.x2),
+      child: Semantics(
+        button: true,
+        selected: ativo,
+        child: Material(
+          color: ativo ? CoresTrato.petroleo : CoresTrato.superficie,
+          shape: StadiumBorder(
+            side: BorderSide(color: ativo ? CoresTrato.petroleo : CoresTrato.borda),
+          ),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: aoTocar,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: EspacosTrato.x5,
+                vertical: EspacosTrato.x3,
+              ),
+              child: Text(
+                texto,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: TipografiaTrato.corpoForte.copyWith(
+                  color: ativo ? CoresTrato.creme : CoresTrato.petroleo,
+                ),
               ),
             ),
           ),

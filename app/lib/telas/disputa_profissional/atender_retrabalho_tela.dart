@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../conclusao/campo_longo.dart';
 import '../profissional_apoio/apoio.dart';
@@ -73,11 +74,17 @@ class _CorpoState extends State<_Corpo> {
         _aviso = aviso;
         _estado = proximo;
       });
-    } catch (_) {
+    } catch (erro) {
       if (!mounted) return;
+      // Erro de rede (do app ou do servidor sem resposta) cita a internet; os outros, não.
+      final semRede = erro is ErroTrato
+          ? erro.tipo == TipoErro.semInternet
+          : erro is! FormatException;
       setState(() {
         _enviando = false;
-        _erro = 'Não foi possível salvar. Tente de novo.';
+        _erro = semRede
+            ? 'Não foi possível salvar. Confira sua internet e tente de novo.'
+            : 'Não foi possível salvar. Tente de novo.';
       });
     }
   }

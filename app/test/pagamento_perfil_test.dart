@@ -51,32 +51,33 @@ void main() {
       expect(find.text('R\$ 380,00'), findsOneWidget);
       expect(find.text('Como funciona o pagamento', skipOffstage: false), findsOneWidget);
       expect(find.textContaining('só no nome do seu CPF', skipOffstage: false), findsOneWidget);
-      expect(find.text('Pagar R\$ 380,00 com Pix'), findsOneWidget);
+      expect(find.text('Pagar R\$ 380,00 com cartão'), findsOneWidget);
     });
 
-    testWidgets('trocar para cartão muda o botão e o método enviado', (tester) async {
+    testWidgets('trocar para Pix muda o botão e o método enviado', (tester) async {
       MetodoPagamento? pago;
       await _abrir(tester, PagamentoTela(dados: expag.DadosExemplo.pagamento, aoPagar: (m) => pago = m));
-      await tester.tap(find.text('Cartão de crédito à vista'));
+      await tester.tap(find.text('Pix'));
       await tester.pumpAndSettle();
-      expect(find.text('Pagar R\$ 380,00 com cartão'), findsOneWidget);
+      expect(find.text('Pagar R\$ 380,00 com Pix'), findsOneWidget);
 
-      await tester.tap(find.text('Pagar R\$ 380,00 com cartão'));
-      expect(pago, MetodoPagamento.cartao);
+      await tester.tap(find.text('Pagar R\$ 380,00 com Pix'));
+      expect(pago, MetodoPagamento.pix);
     });
 
-    testWidgets('Pix é o padrão e o botão chama o callback', (tester) async {
+    testWidgets('o cartão é o padrão (Pix nunca vem pré-selecionado) e o botão chama o callback',
+        (tester) async {
       MetodoPagamento? pago;
       await _abrir(tester, PagamentoTela(dados: expag.DadosExemplo.pagamento, aoPagar: (m) => pago = m));
       await tester.tap(find.textContaining('Pagar R\$'));
-      expect(pago, MetodoPagamento.pix);
+      expect(pago, MetodoPagamento.cartao);
     });
 
     testWidgets('exibe o valor e o rótulo que vierem dos dados', (tester) async {
       await _abrir(tester, const PagamentoTela(dados: _adiantamento));
       expect(find.text('R\$ 114,00'), findsOneWidget);
       expect(find.text('Adiantamento de 30%'), findsOneWidget);
-      expect(find.text('Pagar R\$ 114,00 com Pix'), findsOneWidget);
+      expect(find.text('Pagar R\$ 114,00 com cartão'), findsOneWidget);
     });
 
     testWidgets('sem rótulo, nada extra aparece', (tester) async {

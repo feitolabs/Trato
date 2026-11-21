@@ -50,7 +50,20 @@ class DetalheServicoTela extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x3),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: ChipStatus(texto: dados.statusTexto, tipo: dados.statusTipo),
+                  child: Wrap(
+                    spacing: EspacosTrato.x2,
+                    runSpacing: EspacosTrato.x1,
+                    children: [
+                      ChipStatus(texto: dados.statusTexto, tipo: dados.statusTipo),
+                      if (dados.remoto)
+                        const ChipStatus(
+                                      key: ValueKey('selo-remoto'),
+                                      texto: 'Remoto',
+                                      tipo: TipoStatus.info,
+                                      icone: Icons.videocam_outlined,
+                                    ),
+                    ],
+                  ),
                 ),
                 if (dados.descricao != null) ...[
                   const SizedBox(height: EspacosTrato.x3),

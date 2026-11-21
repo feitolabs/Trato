@@ -165,7 +165,7 @@ void main() {
       await tester.tap(find.textContaining('Pagar').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      expect(b.chamadas, contains('cobranca:pix'));
+      expect(b.chamadas, contains('cobranca:cartao'));
       expect(find.byType(AguardandoPagamentoTela), findsOneWidget);
       expect(find.text('Aguardando confirmação do pagamento'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));

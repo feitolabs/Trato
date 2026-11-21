@@ -34,6 +34,12 @@ class DetalheValoresTela extends StatelessWidget {
             Text('Pedido ${d.pedidoNumero}', style: TipografiaTrato.tituloGrande),
             const SizedBox(height: EspacosTrato.x2),
             Text(d.situacao, style: secundario),
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              textoRegraLiberacao(d.liberaEm),
+              key: const ValueKey('regra-liberacao'),
+              style: secundario,
+            ),
             const SizedBox(height: EspacosTrato.x4),
             CartaoTrato(
               key: const ValueKey('valores-do-pedido'),

@@ -141,12 +141,13 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Novo orçamento'), findsNothing);
-    expect(find.text('1 não lida'), findsOneWidget);
+    // Abrir a lista marca tudo como lido (SINO-1).
+    expect(find.text('Tudo lido'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 12));
     await tester.pump();
     expect(find.text('Novo orçamento'), findsOneWidget);
-    expect(find.text('2 não lidas'), findsOneWidget);
+    expect(find.text('1 não lida'), findsOneWidget);
   });
 
   testWidgets('aba Pedidos do profissional mostra o pedido aceito antes do pagamento',

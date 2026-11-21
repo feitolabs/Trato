@@ -16,6 +16,13 @@ class ItemNota {
 
   int get centavos => quantidade * valorUnitarioCentavos;
   int get totalCentavos => centavos;
+
+  /// "Parafuso — 2 × R$ 10,00 =" (a linha mostra o total ao lado). Com 1 unidade, só a descrição.
+  /// [formatar] vem da tela (centavos -> reais): a conta do total é do próprio item.
+  String rotuloComConta(String Function(int centavos) formatar) {
+    if (quantidade <= 1) return descricao;
+    return '$descricao — $quantidade × ${formatar(valorUnitarioCentavos)} =';
+  }
 }
 
 /// Envio do profissional: foto da notinha + itens com valor.
@@ -59,4 +66,3 @@ abstract interface class ServicoNotaMaterial {
   /// Lança exceção se falhar; a tela mostra mensagem simples.
   Future<void> enviar(EnvioNota envio);
 }
-

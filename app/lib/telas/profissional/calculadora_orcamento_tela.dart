@@ -39,7 +39,11 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
     this.edicao = false,
     this.modoInicial = ModoOrcamento.porHora,
     this.valorFechadoInicial,
+    this.remoto = false,
   });
+
+  /// Pedido remoto: abre em "Valor fechado", sem deslocamento nem material.
+  final bool remoto;
 
   final ServicoOrcamento servico;
   final String tituloPedido;
@@ -91,7 +95,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   final _focoValorHora = FocusNode();
   final _focoValorFechado = FocusNode();
   final _focoDias = FocusNode();
-  late ModoOrcamento _modo = widget.modoInicial;
+  late ModoOrcamento _modo = widget.remoto ? ModoOrcamento.valorFechado : widget.modoInicial;
   late int _garantia = widget.garantiaInicialDias;
   late final List<ItemMaterial> _itens = [...widget.itensIniciais];
   bool _materialPorMim = true;
@@ -407,14 +411,15 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                 _atualizarResumo();
               },
             ),
-            ChoiceChip(
-              label: const Text('Por hora + deslocamento'),
-              selected: _modo == ModoOrcamento.porHora,
-              onSelected: (_) {
-                setState(() => _modo = ModoOrcamento.porHora);
-                _atualizarResumo();
-              },
-            ),
+            if (!widget.remoto)
+              ChoiceChip(
+                label: const Text('Por hora + deslocamento'),
+                selected: _modo == ModoOrcamento.porHora,
+                onSelected: (_) {
+                  setState(() => _modo = ModoOrcamento.porHora);
+                  _atualizarResumo();
+                },
+              ),
           ],
         ),
         const SizedBox(height: EspacosTrato.x4),
@@ -553,22 +558,23 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           ),
         ],
         const SizedBox(height: EspacosTrato.x5),
-        _CartaoMaterial(
-          itens: _itens,
-          materialPorMim: _materialPorMim,
-          pedirSinal: _pedirSinal,
-          aoAdicionar: _adicionarItem,
-          aoEditar: _editarItem,
-          aoRemover: _removerItem,
-          aoEscolherQuemFornece: (eu) {
-            setState(() {
-              _materialPorMim = eu;
-              _pedirSinal = _pedirSinal && eu;
-            });
-            _atualizarResumo();
-          },
-          aoMarcarSinal: (marcado) => setState(() => _pedirSinal = marcado),
-        ),
+        if (!widget.remoto)
+          _CartaoMaterial(
+            itens: _itens,
+            materialPorMim: _materialPorMim,
+            pedirSinal: _pedirSinal,
+            aoAdicionar: _adicionarItem,
+            aoEditar: _editarItem,
+            aoRemover: _removerItem,
+            aoEscolherQuemFornece: (eu) {
+              setState(() {
+                _materialPorMim = eu;
+                _pedirSinal = _pedirSinal && eu;
+              });
+              _atualizarResumo();
+            },
+            aoMarcarSinal: (marcado) => setState(() => _pedirSinal = marcado),
+          ),
         if (widget.mostrarForaDoEscopo ||
             (widget.foraDoEscopoInicial ?? '').isNotEmpty ||
             (widget.observacoesInicial ?? '').isNotEmpty) ...[
@@ -832,9 +838,7 @@ class _NovoItemMaterial extends StatefulWidget {
 class _NovoItemMaterialState extends State<_NovoItemMaterial> {
   late final _nome = TextEditingController(text: widget.inicial?.nome ?? '');
   late final _valor = TextEditingController(
-    text: widget.inicial == null
-        ? ''
-        : Dinheiro.paraCampo(widget.inicial!.centavos),
+    text: widget.inicial == null ? '' : Dinheiro.paraCampo(widget.inicial!.centavos),
   );
   bool _tentou = false;
 
