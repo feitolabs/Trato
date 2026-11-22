@@ -149,6 +149,8 @@ class PerfilDetalhe:
     taxa_conclusao: int | None = None
     # Quantas avaliações de clientes o profissional recebeu (base da média ponderada do ranking).
     avaliacoes_total: int = 0
+    # Quando a conta foi criada (opcional; usado no resumo seguro do cliente no chat).
+    criado_em: datetime | None = None
 
 
 @dataclass(frozen=True)

@@ -4,6 +4,7 @@ primeiro login válido, de forma idempotente (M11). O papel NUNCA vem do token."
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from trato.api.auth import PapelUsuario
 from trato.api.repositorios_app import PerfilDetalhe
@@ -30,6 +31,7 @@ class PerfilUsuario:
     nome: str
     status: str
     papel: PapelUsuario
+    criado_em: datetime | None = None
 
 
 class UsuariosPostgres:
@@ -180,7 +182,7 @@ class UsuariosPostgres:
             return None
         with self._banco.transacao() as con:
             linha = con.execute(
-                "select u.id, u.nome, u.status, "
+                "select u.id, u.nome, u.status, u.criado_em, "
                 "exists (select 1 from public.equipe e where e.usuario_id = u.id "
                 "        and e.ativo and e.revogado_em is null) as eh_equipe, "
                 "exists (select 1 from public.perfis_profissional p where p.usuario_id = u.id "
@@ -196,7 +198,9 @@ class UsuariosPostgres:
             papel = PapelUsuario.PROFISSIONAL
         else:
             papel = PapelUsuario.CLIENTE
-        return PerfilUsuario(str(linha["id"]), linha["nome"], linha["status"], papel)
+        return PerfilUsuario(
+            str(linha["id"]), linha["nome"], linha["status"], papel, linha.get("criado_em")
+        )
 
     def atualizar_nome(self, usuario_id: str, nome: str) -> None:
         achado = como_uuid(usuario_id)
@@ -254,7 +258,16 @@ class UsuariosPostgres:
                 taxa = self._taxa_conclusao(base.id)
                 avaliacoes = self._total_avaliacoes(base.id)
         return PerfilDetalhe(
-            base.id, base.nome, base.papel, base.status, nivel, nota, servicos, taxa, avaliacoes
+            base.id,
+            base.nome,
+            base.papel,
+            base.status,
+            nivel,
+            nota,
+            servicos,
+            taxa,
+            avaliacoes,
+            criado_em=base.criado_em,
         )
 
     def _total_avaliacoes(self, profissional_id: str) -> int:

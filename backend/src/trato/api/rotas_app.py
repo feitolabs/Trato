@@ -1067,6 +1067,100 @@ def interlocutor(
     return InterlocutorOut(id=outro or "", nome=curto, papel=papel)
 
 
+class PerfilClienteResumoOut(BaseModel):
+    nome: str = Field(description="Primeiro nome e inicial do último (sem sobrenome completo).")
+    nota_media: float | None = Field(
+        None, description="Média das avaliações recebidas pelo cliente (null se nenhuma)."
+    )
+    total_avaliacoes: int = Field(0, description="Quantidade de avaliações recebidas pelo cliente.")
+    servicos_concluidos: int = Field(
+        0, description="Quantidade de pedidos concluídos por este cliente."
+    )
+    membro_desde: str | None = Field(
+        None, description="Data de criação da conta do cliente (YYYY-MM-DD, Brasília), se houver."
+    )
+
+
+@router.get(
+    "/pedidos/{pedido_id}/perfil-cliente",
+    response_model=PerfilClienteResumoOut,
+    summary="Resumo seguro (LGPD) do cliente do pedido para o profissional no chat",
+    description=(
+        "Somente o profissional autenticado com vínculo legítimo no pedido (atribuído, que enviou "
+        "orçamento ou elegível ao chat do pedido). Nunca retorna telefone, e-mail, CPF, endereço "
+        "ou sobrenome completo."
+    ),
+)
+def perfil_cliente_do_pedido(
+    pedido_id: str,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PerfilClienteResumoOut:
+    from zoneinfo import ZoneInfo
+
+    from trato.api.rotas_profissional_cadastro import _nome_abreviado
+
+    pedido = _pedido_visivel(contexto, pedido_id, usuario, request, consulta="chat")
+    if pedido.cliente_id == usuario.id:
+        raise HTTPException(403, "Só o profissional do pedido pode ver o perfil do cliente.")
+    if pedido.profissional_id != usuario.id:
+        orcou = any(
+            o.profissional_id == usuario.id for o in contexto.orcamentos.do_pedido(pedido.id)
+        )
+        if not orcou:
+            _exigir_profissional_do_pedido(contexto, pedido, usuario)
+
+    detalhe = contexto.usuarios.detalhe(pedido.cliente_id)
+    nome = _nome_abreviado(detalhe.nome if detalhe else None) or "Cliente"
+
+    nota_media: float | None = None
+    total_avaliacoes = 0
+    try:
+        recebidas = getattr(contexto.avaliacoes, "recebidas", None)
+        if recebidas is not None:
+            avs = [
+                a
+                for a in recebidas(pedido.cliente_id)
+                if a.direcao == "profissional_para_cliente" and a.status == "publicada"
+            ]
+            total_avaliacoes = len(avs)
+            if total_avaliacoes:
+                soma = sum(
+                    a.nota_decimal if a.nota_decimal is not None else float(a.nota_geral)
+                    for a in avs
+                )
+                nota_media = round(soma / total_avaliacoes, 2)
+    except Exception:  # noqa: BLE001 - fallback seguro se tabela/coluna opcional faltar
+        nota_media = None
+        total_avaliacoes = 0
+
+    servicos_concluidos = 0
+    try:
+        pedidos_cliente = contexto.pedidos.listar_do_usuario(
+            pedido.cliente_id, como_cliente=True, limite=1000
+        )
+        servicos_concluidos = sum(1 for p in pedidos_cliente if p.estado is Estado.CONCLUIDO)
+    except Exception:  # noqa: BLE001 - fallback seguro
+        servicos_concluidos = 0
+
+    membro_desde: str | None = None
+    if detalhe is not None and detalhe.criado_em is not None:
+        dt = detalhe.criado_em
+        if dt.tzinfo is not None:
+            membro_desde = dt.astimezone(ZoneInfo("America/Sao_Paulo")).date().isoformat()
+        else:
+            membro_desde = dt.date().isoformat()
+
+    return PerfilClienteResumoOut(
+        nome=nome,
+        nota_media=nota_media,
+        total_avaliacoes=total_avaliacoes,
+        servicos_concluidos=servicos_concluidos,
+        membro_desde=membro_desde,
+    )
+
+
 @router.post(
     "/pedidos/{pedido_id}/mensagens",
     response_model=MensagemOut,
