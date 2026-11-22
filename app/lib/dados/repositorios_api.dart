@@ -821,12 +821,17 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     if (dadas.isEmpty) {
       throw const ErroTrato(TipoErro.recusado, 'Dê uma nota de 1 a 5 antes de enviar.');
     }
-    final media = (dadas.reduce((a, b) => a + b) / dadas.length).round().clamp(1, 5);
+    final mediaBruta = dadas.reduce((a, b) => a + b) / dadas.length;
+    final notaGeral = mediaBruta.round().clamp(1, 5);
+    final notaDecimal = (mediaBruta * 100).round() / 100.0;
+    final enviarDecimal =
+        notaDecimal >= 1.0 && notaDecimal <= 5.0 && (notaDecimal - notaGeral).abs() <= 0.5;
     final comentario = avaliacao.comentario.trim();
     final resposta = await _api.post(
       '/v1/contratos/$pedidoId/avaliacao',
       corpo: {
-        'nota_geral': media,
+        'nota_geral': notaGeral,
+        if (enviarDecimal) 'nota_decimal': notaDecimal,
         if (comentario.isNotEmpty) 'comentario': comentario,
         if (avaliacao.etiquetas.isNotEmpty) 'etiquetas': avaliacao.etiquetas,
       },
