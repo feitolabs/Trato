@@ -13,6 +13,7 @@ enum DestinoCompletar { perfil, contaRecebimento }
 /// O que a API já devolveu sobre o profissional. Dado que não veio = falso/zero (passo pendente).
 class DadosPrimeirosPassos {
   const DadosPrimeirosPassos({
+    this.usuarioId,
     this.aprovado = false,
     this.temDescricao = false,
     this.temCategoria = false,
@@ -22,12 +23,19 @@ class DadosPrimeirosPassos {
   });
 
   /// Lê `GET /v1/profissional/perfil` (status, bio, categorias, regioes, conta_recebimento) e
-  /// `servicos_concluidos` de `GET /v1/me`. Qualquer campo ausente ou de tipo errado = pendente.
-  factory DadosPrimeirosPassos.deApi({Map<String, dynamic>? perfil, Object? servicosConcluidos}) {
+  /// `id` + `servicos_concluidos` de `GET /v1/me`. Qualquer campo ausente ou de tipo errado = pendente.
+  factory DadosPrimeirosPassos.deApi({
+    Map<String, dynamic>? perfil,
+    Object? servicosConcluidos,
+    Object? usuarioId,
+  }) {
     bool lista(Object? v) => v is List && v.isNotEmpty;
     final conta = perfil?['conta_recebimento'];
     final bio = perfil?['bio'];
+    final idBruto = usuarioId ?? perfil?['usuario_id'];
+    final idLimpo = idBruto is String && idBruto.trim().isNotEmpty ? idBruto.trim() : null;
     return DadosPrimeirosPassos(
+      usuarioId: idLimpo,
       aprovado: perfil?['status'] == 'aprovado',
       temDescricao: bio is String && bio.trim().isNotEmpty,
       temCategoria: lista(perfil?['categorias']),
@@ -37,6 +45,8 @@ class DadosPrimeirosPassos {
     );
   }
 
+  /// Identificador do usuário para isolar as preferências locais por conta no aparelho.
+  final String? usuarioId;
   final bool aprovado;
   final bool temDescricao;
   final bool temCategoria;
@@ -73,10 +83,18 @@ abstract final class PreferenciaPrimeirosPassos {
     }
   }
 
-  static Future<bool> dispensado() => _ler(_chaveDispensado);
-  static Future<void> dispensar() => _gravar(_chaveDispensado);
-  static Future<bool> conclusaoVista() => _ler(_chaveConclusaoVista);
-  static Future<void> marcarConclusaoVista() => _gravar(_chaveConclusaoVista);
+  static String _chave(String base, String? usuarioId) {
+    final id = usuarioId?.trim();
+    return (id == null || id.isEmpty) ? base : '${base}_$id';
+  }
+
+  static Future<bool> dispensado({String? usuarioId}) => _ler(_chave(_chaveDispensado, usuarioId));
+  static Future<void> dispensar({String? usuarioId}) =>
+      _gravar(_chave(_chaveDispensado, usuarioId));
+  static Future<bool> conclusaoVista({String? usuarioId}) =>
+      _ler(_chave(_chaveConclusaoVista, usuarioId));
+  static Future<void> marcarConclusaoVista({String? usuarioId}) =>
+      _gravar(_chave(_chaveConclusaoVista, usuarioId));
 }
 
 /// Cartão "Seus primeiros passos · N de 3" (ou a mensagem de conclusão, uma vez).
@@ -123,16 +141,16 @@ class _CartaoPrimeirosPassosState extends State<CartaoPrimeirosPassos> {
     final carregar = widget.carregar;
     if (carregar == null) return;
     try {
-      final resultados = await Future.wait<Object?>([
-        PreferenciaPrimeirosPassos.dispensado(),
-        PreferenciaPrimeirosPassos.conclusaoVista(),
-        carregar(),
+      final dados = await carregar();
+      final prefs = await Future.wait<bool>([
+        PreferenciaPrimeirosPassos.dispensado(usuarioId: dados.usuarioId),
+        PreferenciaPrimeirosPassos.conclusaoVista(usuarioId: dados.usuarioId),
       ]);
       if (!mounted) return;
       setState(() {
-        _dispensado = resultados[0]! as bool;
-        _conclusaoVista = resultados[1]! as bool;
-        _dados = resultados[2]! as DadosPrimeirosPassos;
+        _dados = dados;
+        _dispensado = prefs[0];
+        _conclusaoVista = prefs[1];
         _carregado = true;
       });
     } on Object {
@@ -142,7 +160,7 @@ class _CartaoPrimeirosPassosState extends State<CartaoPrimeirosPassos> {
 
   Future<void> _dispensar() async {
     setState(() => _dispensado = true);
-    await PreferenciaPrimeirosPassos.dispensar();
+    await PreferenciaPrimeirosPassos.dispensar(usuarioId: _dados?.usuarioId);
   }
 
   @override
@@ -162,7 +180,7 @@ class _CartaoPrimeirosPassosState extends State<CartaoPrimeirosPassos> {
       if (!_mostrandoConclusao) {
         // Mostra uma vez: grava já; nesta abertura ela continua visível até "Fechar".
         _mostrandoConclusao = true;
-        PreferenciaPrimeirosPassos.marcarConclusaoVista();
+        PreferenciaPrimeirosPassos.marcarConclusaoVista(usuarioId: dados.usuarioId);
       }
       return _Moldura(
         chave: const Key('primeiros-passos-concluidos'),

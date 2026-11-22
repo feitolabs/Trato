@@ -290,5 +290,60 @@ void main() {
       expect(find.byKey(const Key('primeiros-passos-concluidos')), findsNothing);
       expect(find.byKey(const Key('cartao-primeiros-passos')), findsNothing);
     });
+
+    testWidgets('dois usuários no mesmo aparelho têm estados independentes (F46)', (tester) async {
+      // Usuário 1 dispensa o cartão.
+      await _abrir(
+        tester,
+        inicio: _inicio(),
+        carregar: () async => const DadosPrimeirosPassos(usuarioId: 'pro-1', aprovado: true),
+      );
+      expect(find.byKey(const Key('cartao-primeiros-passos')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('dispensar-primeiros-passos')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cartao-primeiros-passos')), findsNothing);
+
+      // Usuário 2 faz login no mesmo aparelho: ainda vê o cartão.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _abrir(
+        tester,
+        inicio: _inicio(),
+        carregar: () async => const DadosPrimeirosPassos(usuarioId: 'pro-2', aprovado: true),
+      );
+      expect(find.byKey(const Key('cartao-primeiros-passos')), findsOneWidget);
+
+      // Usuário 1 conclui os 3 passos e vê a mensagem; usuário 2 também vê a própria uma vez.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _abrir(
+        tester,
+        inicio: _inicio(orcamentosEnviados: const [_orcamentoExemplo]),
+        carregar: () async => const DadosPrimeirosPassos(
+          usuarioId: 'pro-3',
+          aprovado: true,
+          temDescricao: true,
+          temCategoria: true,
+          temRegiao: true,
+          contaAtiva: true,
+          servicosConcluidos: 1,
+        ),
+      );
+      expect(find.byKey(const Key('primeiros-passos-concluidos')), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _abrir(
+        tester,
+        inicio: _inicio(orcamentosEnviados: const [_orcamentoExemplo]),
+        carregar: () async => const DadosPrimeirosPassos(
+          usuarioId: 'pro-4',
+          aprovado: true,
+          temDescricao: true,
+          temCategoria: true,
+          temRegiao: true,
+          contaAtiva: true,
+          servicosConcluidos: 1,
+        ),
+      );
+      expect(find.byKey(const Key('primeiros-passos-concluidos')), findsOneWidget);
+    });
   });
 }

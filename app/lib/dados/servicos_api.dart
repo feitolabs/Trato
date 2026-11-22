@@ -682,12 +682,20 @@ class ServicoPrimeirosPassosApi {
       perfil = null;
     }
     Object? concluidos;
+    Object? usuarioId;
     try {
-      concluidos = _mapa(await _api.get('/v1/me'))['servicos_concluidos'];
+      final me = _mapa(await _api.get('/v1/me'));
+      concluidos = me['servicos_concluidos'];
+      usuarioId = me['id'];
     } on Object {
       concluidos = null;
+      usuarioId = null;
     }
-    return DadosPrimeirosPassos.deApi(perfil: perfil, servicosConcluidos: concluidos);
+    return DadosPrimeirosPassos.deApi(
+      perfil: perfil,
+      servicosConcluidos: concluidos,
+      usuarioId: usuarioId,
+    );
   }
 }
 
