@@ -9,6 +9,7 @@ import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import '../comuns/moeda_trato.dart';
 import '../profissional/dinheiro.dart';
+import 'extrato_tratinhos_tela.dart';
 import 'modelos.dart';
 
 /// Tela 22 — Perfil do cliente. Cada item avisa [aoTocarItem]; "Usar como profissional"
@@ -21,9 +22,11 @@ class PerfilClienteTela extends StatefulWidget {
     this.aoAbrirConfiguracoes,
     this.aoCapturarFotoPerfil,
     this.aoCancelarExclusao,
+    this.aoAbrirTratinhos,
   });
 
   final PerfilCliente perfil;
+  final VoidCallback? aoAbrirTratinhos;
   final ValueChanged<AcaoPerfil>? aoTocarItem;
 
   /// Abre as configurações; a engrenagem só aparece se vier.
@@ -173,11 +176,15 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
             ),
           ],
         ],
-        if ((perfil.moedas ?? 0) > 0 || perfil.moedasPendentes > 0) ...[
+        if ((perfil.moedas ?? 0) > 0 ||
+            perfil.moedasPendentes > 0 ||
+            perfil.moedasExtrato.isNotEmpty) ...[
           const SizedBox(height: EspacosTrato.x5),
           Card(
             margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
             child: ListTile(
+              key: const ValueKey('cartao-seus-tratinhos'),
               leading: const MoedaTrato(tamanho: 32),
               title: const Text('Seus Tratinhos'),
               subtitle: perfil.moedasValorCentavos == null
@@ -189,7 +196,20 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                       ),
                       key: const Key('moedas-em-reais'),
                     ),
-              trailing: Text('${perfil.moedas}', style: TipografiaTrato.tituloGrande),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${perfil.moedas ?? 0}', style: TipografiaTrato.tituloGrande),
+                  const SizedBox(width: EspacosTrato.x1),
+                  const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                ],
+              ),
+              onTap: widget.aoAbrirTratinhos ??
+                  () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ExtratoTratinhosTela(perfil: perfil),
+                        ),
+                      ),
             ),
           ),
           if (perfil.moedasPendentes > 0) ...[

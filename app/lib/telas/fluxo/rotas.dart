@@ -1377,7 +1377,10 @@ abstract final class RotasTrato {
                     title: const Text('Enviar nota de materiais'),
                     onTap: () {
                       Navigator.of(folha).pop();
-                      _abrir<void>(context, _enviarNota(pedidoId, titulo));
+                      _abrir<void>(
+                        context,
+                        _enviarNota(pedidoId, titulo, servicoEmAndamento: emAndamento),
+                      );
                     },
                   ),
                 if (emAndamento)
@@ -1410,11 +1413,17 @@ abstract final class RotasTrato {
     );
   }
 
-  static Widget _enviarNota(String pedidoId, String titulo) => Builder(
+  static Widget _enviarNota(
+    String pedidoId,
+    String titulo, {
+    bool servicoEmAndamento = true,
+  }) =>
+      Builder(
         builder: (context) => EnviarNotaTela(
           servico: servicoNota,
           pedidoId: pedidoId,
           tituloPedido: titulo,
+          servicoEmAndamento: servicoEmAndamento,
           aoCapturarFoto: _fotografar,
           aoEnviada: () {
             pedidosMudaram.value++;

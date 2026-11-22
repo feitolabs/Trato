@@ -74,7 +74,19 @@ class DadosAvaliacao {
     required this.gorjetasCentavos,
     this.gorjetaDisponivel = true,
     this.profissionalId,
+    this.bonusDisponivel = false,
+    this.bonusMoedas = 0,
+    this.valorMoedaCentavos,
   });
+
+  /// O backend informa se avaliar este pedido rende Tratinhos de bônus.
+  final bool bonusDisponivel;
+
+  /// Quantidade de Tratinhos do bônus quando [bonusDisponivel] for verdadeiro.
+  final int bonusMoedas;
+
+  /// Valor de 1 Tratinho em centavos (opcional; padrão 1 centavo quando ausente).
+  final int? valorMoedaCentavos;
 
   /// Id do profissional avaliado (para "Salvar como de confiança"); nulo = sem o botão.
   final String? profissionalId;

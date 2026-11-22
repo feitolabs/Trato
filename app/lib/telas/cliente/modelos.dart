@@ -16,10 +16,88 @@ class Avaliacao {
     this.id,
     this.resposta,
     this.etiquetas = const [],
+    this.criterios = const {},
   });
+
+  /// Chaves de critérios na ordem exibida ao cliente e esperada pelo backend.
+  static const chavesCriterios = <String>[
+    'pontualidade',
+    'qualidade',
+    'limpeza',
+    'comunicacao',
+    'preco_justo',
+  ];
+
+  static const rotulosCriterios = <String, String>{
+    'pontualidade': 'Pontualidade',
+    'qualidade': 'Qualidade',
+    'limpeza': 'Limpeza',
+    'comunicacao': 'Comunicação',
+    'preco_justo': 'Preço justo',
+  };
+
+  /// Lê `criterios` da API com fallback seguro quando ausente, nulo ou inválido.
+  static Map<String, int> lerCriterios(Object? bruto) {
+    if (bruto is! Map) return const {};
+    final saida = <String, int>{};
+    for (final chave in chavesCriterios) {
+      final valor = bruto[chave];
+      if (valor is num) {
+        final nota = valor.round();
+        if (nota >= 1 && nota <= 5) saida[chave] = nota;
+      }
+    }
+    for (final entry in bruto.entries) {
+      final k = '${entry.key}'.trim();
+      if (k.isEmpty || saida.containsKey(k)) continue;
+      final v = entry.value;
+      if (v is num) {
+        final nota = v.round();
+        if (nota >= 1 && nota <= 5) saida[k] = nota;
+      }
+    }
+    return Map.unmodifiable(saida);
+  }
+
+  /// Formata os critérios na ordem padrão: "Pontualidade 5 · Qualidade 5 · ...".
+  static String formatarCriterios(Map<String, int> criterios) {
+    if (criterios.isEmpty) return '';
+    final partes = <String>[];
+    for (final chave in chavesCriterios) {
+      final nota = criterios[chave];
+      if (nota != null) {
+        partes.add('${rotulosCriterios[chave] ?? chave} $nota');
+      }
+    }
+    for (final entry in criterios.entries) {
+      if (rotulosCriterios.containsKey(entry.key)) continue;
+      partes.add('${entry.key} ${entry.value}');
+    }
+    return partes.join(' · ');
+  }
+
+  /// Pares (rótulo, nota) prontos para exibição em badges ordenados.
+  List<({String rotulo, int nota})> get itensCriterios {
+    if (criterios.isEmpty) return const [];
+    final itens = <({String rotulo, int nota})>[];
+    for (final chave in chavesCriterios) {
+      final n = criterios[chave];
+      if (n != null) {
+        itens.add((rotulo: rotulosCriterios[chave] ?? chave, nota: n));
+      }
+    }
+    for (final entry in criterios.entries) {
+      if (rotulosCriterios.containsKey(entry.key)) continue;
+      itens.add((rotulo: entry.key, nota: entry.value));
+    }
+    return itens;
+  }
 
   /// Elogios em tags dessa avaliação (`etiquetas`); vazio em servidor antigo.
   final List<String> etiquetas;
+
+  /// Notas individuais por critério (`pontualidade`, `qualidade`, etc.).
+  final Map<String, int> criterios;
 
   final String cliente;
   final String servico;

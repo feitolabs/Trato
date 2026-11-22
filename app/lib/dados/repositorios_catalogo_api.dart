@@ -305,17 +305,24 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final nivel = (j['nivel_verificacao'] as String?) ?? '';
     final avaliacoes = [
       for (final a in (j['avaliacoes'] as List? ?? const []))
-        Avaliacao(
-          id: (a as Map)['id'] as String?,
-          cliente: (a['cliente_nome'] as String?) ?? 'Cliente',
-          servico: servicoDaAvaliacao(a),
-          nota: (a['nota_decimal'] is num ? a['nota_decimal'] as num : a['nota_geral'] as num)
-              .toDouble(),
-          comentario: (a['comentario'] as String?) ?? '',
-          detalhes: '',
-          etiquetas: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'],
-          resposta: a['resposta'] as String?,
-        ),
+        () {
+          final mapa = a as Map;
+          final criterios = Avaliacao.lerCriterios(mapa['criterios']);
+          return Avaliacao(
+            id: mapa['id'] as String?,
+            cliente: (mapa['cliente_nome'] as String?) ?? 'Cliente',
+            servico: servicoDaAvaliacao(mapa),
+            nota: (mapa['nota_decimal'] is num
+                    ? mapa['nota_decimal'] as num
+                    : mapa['nota_geral'] as num)
+                .toDouble(),
+            comentario: (mapa['comentario'] as String?) ?? '',
+            detalhes: Avaliacao.formatarCriterios(criterios),
+            criterios: criterios,
+            etiquetas: [for (final e in (mapa['etiquetas'] as List? ?? const [])) '$e'],
+            resposta: mapa['resposta'] as String?,
+          );
+        }(),
     ];
     final itensPortfolio = [
       for (final p in (j['portfolio'] as List? ?? const [])) p as Map,

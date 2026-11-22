@@ -102,14 +102,21 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
-            child: Text(
-              'Avaliar rende +50 Tratinhos (R\$ 0,50 de desconto, liberam em 7 dias sem disputa).',
-              textAlign: TextAlign.center,
-              style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+          if (dados.bonusDisponivel)
+            Padding(
+              padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
+              child: Text(
+                dados.bonusMoedas > 0
+                    ? 'Avaliar rende +${dados.bonusMoedas} '
+                        '${dados.bonusMoedas == 1 ? 'Tratinho' : 'Tratinhos'} '
+                        '(${formatarReais(dados.bonusMoedas * (dados.valorMoedaCentavos ?? 1))} '
+                        'de desconto, liberam em 7 dias sem disputa).'
+                    : 'Avaliar rende Tratinhos de desconto (liberam em 7 dias sem disputa).',
+                key: const ValueKey('legenda-bonus-tratinhos'),
+                textAlign: TextAlign.center,
+                style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+              ),
             ),
-          ),
           BotaoPrimario(
             texto: 'Enviar avaliação',
             carregando: _enviando,

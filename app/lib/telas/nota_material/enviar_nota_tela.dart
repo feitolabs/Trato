@@ -18,6 +18,7 @@ class EnviarNotaTela extends StatefulWidget {
     required this.tituloPedido,
     this.aoCapturarFoto,
     this.aoEnviada,
+    this.servicoEmAndamento = true,
   });
 
   final ServicoNotaMaterial servico;
@@ -25,6 +26,9 @@ class EnviarNotaTela extends StatefulWidget {
   final String tituloPedido;
   final CapturarFoto? aoCapturarFoto;
   final VoidCallback? aoEnviada;
+
+  /// Verdadeiro quando o profissional já fez check-in e o serviço está em andamento.
+  final bool servicoEmAndamento;
 
   @override
   State<EnviarNotaTela> createState() => _EnviarNotaTelaState();
@@ -132,7 +136,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
   @override
   Widget build(BuildContext context) {
     final soma = _itens.fold<int>(0, (s, i) => s + i.centavos);
-    final pronto = _foto != null && _itens.isNotEmpty && !_enviada;
+    final pronto = _foto != null && _itens.isNotEmpty && !_enviada && widget.servicoEmAndamento;
     return PaginaTrato(
       titulo: 'Nota dos materiais',
       rodape: Column(
@@ -163,6 +167,15 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
           widget.tituloPedido,
           style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
         ),
+        if (!widget.servicoEmAndamento) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          const AvisoFaixa(
+            key: ValueKey('aviso-nota-aguardando-checkin'),
+            texto: 'Envio disponível após iniciar o serviço (check-in).',
+            tipo: TipoStatus.alerta,
+            icone: Icons.info_outline,
+          ),
+        ],
         const TituloSecao('Foto da notinha'),
         CampoFoto(
           rotulo: 'Foto da nota',

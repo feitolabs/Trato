@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'avatar_de_usuario.dart';
 import 'avatar_iniciais.dart' show SeloVerificacao;
+import 'cartao_avaliacao.dart';
 import 'etiquetas_elogio.dart';
 import 'modelos.dart';
 
@@ -183,15 +184,17 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(child: Text('Avaliações', style: TipografiaTrato.titulo)),
-                    if (aoVerAvaliacoes != null)
+                    if (aoVerAvaliacoes != null &&
+                        (d.totalAvaliacoes > 3 || d.avaliacoes.length > 3))
                       BotaoLink(
-                        texto: 'Ver as ${d.totalAvaliacoes}',
+                        texto:
+                            'Ver todas (${d.totalAvaliacoes > d.avaliacoes.length ? d.totalAvaliacoes : d.avaliacoes.length})',
                         aoTocar: () => aoVerAvaliacoes!(p),
                       ),
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x2),
-                for (final a in d.avaliacoes) ...[
+                for (final a in d.avaliacoes.take(3)) ...[
                   CartaoAvaliacao(avaliacao: a),
                   const SizedBox(height: EspacosTrato.x3),
                 ],
@@ -385,58 +388,8 @@ class CartaoAvaliacao extends StatelessWidget {
   final Avaliacao avaliacao;
 
   @override
-  Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
-    return CartaoTrato(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    style: secundario,
-                    children: [
-                      TextSpan(
-                        text: avaliacao.cliente,
-                        style: secundario.copyWith(
-                          color: CoresTrato.petroleo,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      TextSpan(text: ' · ${avaliacao.servico}'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: EspacosTrato.x2),
-              Text(formatarNota(avaliacao.nota), style: secundario),
-            ],
-          ),
-          const SizedBox(height: EspacosTrato.x2),
-          Text(avaliacao.comentario, style: TipografiaTrato.corpo),
-          const SizedBox(height: EspacosTrato.x2),
-          if (avaliacao.detalhes.trim().isNotEmpty) Text(avaliacao.detalhes, style: secundario),
-          EtiquetasDaAvaliacao(etiquetas: avaliacao.etiquetas),
-          if ((avaliacao.resposta ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: EspacosTrato.x2),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(EspacosTrato.x3),
-              decoration: BoxDecoration(
-                color: CoresTrato.creme,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'Resposta do profissional: ${avaliacao.resposta!.trim()}',
-                style: TipografiaTrato.corpoPequeno,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CartaoAvaliacaoVisual(
+        avaliacao: avaliacao,
+        rotuloResposta: 'Resposta do profissional',
+      );
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
+import '../cliente/cartao_avaliacao.dart';
 import '../cliente/etiquetas_elogio.dart';
 import '../cliente/modelos.dart' show formatarNota;
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
@@ -320,61 +321,12 @@ class CartaoAvaliacao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final a = avaliacao;
     return Padding(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
-      child: CartaoTrato(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.star, size: 18, color: CoresTrato.petroleo),
-                const SizedBox(width: EspacosTrato.x1),
-                Text(formatarNota(a.nota), style: TipografiaTrato.corpoForte),
-                const SizedBox(width: EspacosTrato.x3),
-                Expanded(
-                  child: Text(
-                    '${a.cliente} · ${a.servico}',
-                    style: TipografiaTrato.corpoPequeno,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: EspacosTrato.x2),
-            Text(a.comentario, style: TipografiaTrato.corpo),
-            const SizedBox(height: EspacosTrato.x1),
-            if (a.detalhes.trim().isNotEmpty) Text(a.detalhes, style: TipografiaTrato.legenda),
-            EtiquetasDaAvaliacao(etiquetas: a.etiquetas),
-            if ((a.resposta ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: EspacosTrato.x2),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(EspacosTrato.x3),
-                decoration: BoxDecoration(
-                  color: CoresTrato.creme,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'Sua resposta: ${a.resposta!.trim()}',
-                  style: TipografiaTrato.corpoPequeno,
-                ),
-              ),
-            ] else if (aoResponder != null) ...[
-              const SizedBox(height: EspacosTrato.x2),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  key: ValueKey('responder-avaliacao-${a.id ?? ''}'),
-                  onPressed: aoResponder,
-                  child: const Text('Responder'),
-                ),
-              ),
-            ],
-          ],
-        ),
+      child: CartaoAvaliacaoVisual(
+        avaliacao: avaliacao,
+        rotuloResposta: 'Sua resposta',
+        aoResponder: aoResponder,
       ),
     );
   }

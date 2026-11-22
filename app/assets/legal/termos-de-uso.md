@@ -1,7 +1,7 @@
 # Termos de uso do Trato
 
 **Versão 1.1 — 22/11/2026**
-*(Versão anterior: 1.0, de 31/10/2026.)*
+(Versão anterior: 1.0, de 31/10/2026.)
 **Responsável:** Feito Labs Tecnologia Ltda., com sede em Belo Horizonte/MG (`suporte@trato.app.br`).
 
 ---

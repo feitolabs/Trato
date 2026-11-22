@@ -214,18 +214,19 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
           spacing: EspacosTrato.x2,
           runSpacing: EspacosTrato.x2,
           children: [
-            if (pedido.pagamentoConfirmado)
-              const ChipStatus(
-                texto: 'Pagamento protegido: fica guardado até o serviço ser confirmado.',
-                tipo: TipoStatus.info,
-                icone: Icons.lock_outline,
-              )
-            else
-              const ChipStatus(
-                texto: 'Aguardando o pagamento',
-                tipo: TipoStatus.alerta,
-                icone: Icons.schedule,
-              ),
+            if (pedido.estadoApi != 'concluido' && pedido.estadoApi != 'cancelado')
+              if (pedido.pagamentoConfirmado)
+                const ChipStatus(
+                  texto: 'Pagamento protegido: fica guardado até o serviço ser confirmado.',
+                  tipo: TipoStatus.info,
+                  icone: Icons.lock_outline,
+                )
+              else
+                const ChipStatus(
+                  texto: 'Aguardando o pagamento',
+                  tipo: TipoStatus.alerta,
+                  icone: Icons.schedule,
+                ),
             if (pedido.remoto)
               const ChipStatus(
                 key: ValueKey('selo-remoto'),

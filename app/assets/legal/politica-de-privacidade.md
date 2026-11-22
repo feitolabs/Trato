@@ -1,7 +1,7 @@
 # Política de privacidade do Trato
 
 **Versão 1.1 — 22/11/2026**
-*(Versão anterior: 1.0, de 31/10/2026.)*
+(Versão anterior: 1.0, de 31/10/2026.)
 **Controlador dos dados:** Feito Labs Tecnologia Ltda., Belo Horizonte/MG.
 **Encarregado pelo tratamento de dados (DPO):** Encarregado de Proteção de Dados Feito Labs — `privacidade@trato.app.br`.
 
@@ -80,7 +80,7 @@ Você pode, a qualquer momento e sem custo:
 
 - **Confirmar e acessar** os dados que temos sobre você;
 - **Corrigir** dados incompletos, inexatos ou desatualizados;
-- **Exportar uma cópia** dos seus dados (*portabilidade*);
+- **Exportar uma cópia** dos seus dados (portabilidade);
 - **Rever e desligar consentimentos** opcionais (como avisos promocionais e WhatsApp);
 - **Pedir revisão humana** de decisões automatizadas que afetem sua conta;
 - **Solicitar a exclusão da sua conta** e dos dados tratados com base em consentimento ou desnecessários.

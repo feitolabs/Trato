@@ -826,12 +826,25 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final notaDecimal = (mediaBruta * 100).round() / 100.0;
     final enviarDecimal =
         notaDecimal >= 1.0 && notaDecimal <= 5.0 && (notaDecimal - notaGeral).abs() <= 0.5;
+    final criterios = <String, int>{};
+    const chavesCriterios = [
+      'pontualidade',
+      'qualidade',
+      'limpeza',
+      'comunicacao',
+      'preco_justo',
+    ];
+    for (var i = 0; i < avaliacao.notas.length && i < chavesCriterios.length; i++) {
+      final n = avaliacao.notas[i];
+      if (n > 0) criterios[chavesCriterios[i]] = n.clamp(1, 5);
+    }
     final comentario = avaliacao.comentario.trim();
     final resposta = await _api.post(
       '/v1/contratos/$pedidoId/avaliacao',
       corpo: {
         'nota_geral': notaGeral,
         if (enviarDecimal) 'nota_decimal': notaDecimal,
+        if (criterios.isNotEmpty) 'criterios': criterios,
         if (comentario.isNotEmpty) 'comentario': comentario,
         if (avaliacao.etiquetas.isNotEmpty) 'etiquetas': avaliacao.etiquetas,
       },
@@ -845,6 +858,15 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<DadosAvaliacao> dadosAvaliacao(String pedidoId) async {
     final (saldo, pedido) = await emParalelo2(_saldo(pedidoId), _pedido(pedidoId));
+    var bonusDisponivel = false;
+    var bonusMoedas = 0;
+    try {
+      final info = _mapa(await _api.get('/v1/pedidos/$pedidoId/avaliacao'));
+      bonusDisponivel = info['bonus_disponivel'] == true;
+      bonusMoedas = (info['bonus_moedas'] as num?)?.toInt() ?? 0;
+    } on Object {
+      // Fallback seguro: servidor antigo ou erro transitório não promete bônus.
+    }
     return DadosAvaliacao(
       nomeProfissional: await _nomeDoProfissional(pedido),
       valorLiberadoCentavos: saldo.clientePagouCentavos,
@@ -853,6 +875,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       // Sem rota de gorjeta no servidor: a tela não oferece o que não dá para pagar.
       gorjetaDisponivel: false,
       profissionalId: pedido.profissionalId,
+      bonusDisponivel: bonusDisponivel,
+      bonusMoedas: bonusMoedas,
     );
   }
 
@@ -1818,6 +1842,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
     DateTime? venceEm;
     int? tetoMes;
     int? usadoMes;
+    var extratoMoedas = const <LancamentoTratinho>[];
     try {
       final m = _mapa(await _api.get('/v1/me/moedas'));
       venceEm = DateTime.tryParse('${m['saldo_vence_em'] ?? ''}')?.toLocal();
@@ -1830,6 +1855,16 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       valorMoeda = (m['valor_moeda_centavos'] as num?)?.toInt();
       descontoDisponivel = m['desconto_disponivel'] != false; // ausente = true
       motivo = MotivoDescontoIndisponivel.deTexto(m['desconto_indisponivel_motivo']);
+      extratoMoedas = [
+        for (final item in (m['extrato'] as List? ?? const []))
+          if (item is Map && item['quantidade'] is num)
+            LancamentoTratinho(
+              tipo: '${item['tipo'] ?? ''}',
+              quantidade: (item['quantidade'] as num).toInt(),
+              criadaEm: DateTime.tryParse('${item['criada_em'] ?? ''}')?.toLocal(),
+              expiraEm: DateTime.tryParse('${item['expira_em'] ?? ''}')?.toLocal(),
+            ),
+      ];
     } on Object {
       moedas = null; // moedas são extra: falha aqui não derruba o perfil
     }
@@ -1844,6 +1879,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       moedasVenceEm: venceEm,
       tetoDescontoMesCentavos: tetoMes,
       descontoUsadoMesCentavos: usadoMes,
+      moedasExtrato: extratoMoedas,
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),

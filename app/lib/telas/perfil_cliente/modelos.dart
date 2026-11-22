@@ -31,6 +31,21 @@ class GrupoPerfil {
   final List<ItemPerfil> itens;
 }
 
+/// Um lançamento no extrato de Tratinhos (`GET /v1/me/moedas`).
+class LancamentoTratinho {
+  const LancamentoTratinho({
+    required this.tipo,
+    required this.quantidade,
+    required this.criadaEm,
+    this.expiraEm,
+  });
+
+  final String tipo;
+  final int quantidade;
+  final DateTime? criadaEm;
+  final DateTime? expiraEm;
+}
+
 class PerfilCliente {
   const PerfilCliente({
     required this.nome,
@@ -48,8 +63,12 @@ class PerfilCliente {
     this.moedasVenceEm,
     this.tetoDescontoMesCentavos,
     this.descontoUsadoMesCentavos,
+    this.moedasExtrato = const [],
     this.exclusaoAgendadaEm,
   });
+
+  /// Lançamentos recentes de Tratinhos do cliente.
+  final List<LancamentoTratinho> moedasExtrato;
 
   /// Tratinhos de avaliação ainda em espera (valem 7 dias depois, sem disputa) e a data em que
   /// liberam. Ausente = 0. O valor em reais de cada um vem do backend; sem ele, só a quantidade.
