@@ -32,6 +32,7 @@ MIGRATIONS = (
     "alertas_risco_fluxo",
     "campanhas_tipo",
     "avaliacao_nota_decimal",
+    "avaliacao_criterios",
 )
 
 
@@ -104,6 +105,7 @@ class BancoLocal:
                 "*exclusividade_funcoes.sql",
                 "*cpf_opcional_cadastro.sql",
                 "*avaliacao_nota_decimal.sql",
+                "*avaliacao_criterios.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     con.execute(arquivo.read_text(encoding="utf-8"))
