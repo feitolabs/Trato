@@ -23,7 +23,6 @@ class BuscaProfissionaisTela extends StatefulWidget {
     this.sugestoes = const [],
     this.aoEscolherCategoria,
     this.aoVerTodas,
-    this.aoPedirOrcamento,
   });
 
   /// Toque numa categoria das sugestões. Sem isso, o toque busca pelo nome da categoria.
@@ -31,9 +30,6 @@ class BuscaProfissionaisTela extends StatefulWidget {
 
   /// Toque em "Ver todas" nas sugestões.
   final VoidCallback? aoVerTodas;
-
-  /// Abre o fluxo de pedir orçamento quando o usuário não encontra na busca rápida.
-  final VoidCallback? aoPedirOrcamento;
 
   final ServicoBusca servico;
   final ValueChanged<Profissional>? aoAbrirProfissional;
@@ -228,7 +224,6 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
       aoEscolherCategoria: widget.aoEscolherCategoria,
       aoVerTodas: widget.aoVerTodas,
       aoEscolherTexto: _escolher,
-      aoPedirOrcamento: widget.aoPedirOrcamento,
     );
     if (atualizador == null) return conteudo;
     return RefreshIndicator(onRefresh: atualizador, child: conteudo);
@@ -357,7 +352,6 @@ class _Sugestoes extends StatelessWidget {
     required this.aoEscolherCategoria,
     required this.aoVerTodas,
     required this.aoEscolherTexto,
-    this.aoPedirOrcamento,
   });
 
   final List<CategoriaServico> sugestoes;
@@ -367,7 +361,6 @@ class _Sugestoes extends StatelessWidget {
   final ValueChanged<CategoriaServico>? aoEscolherCategoria;
   final VoidCallback? aoVerTodas;
   final ValueChanged<String> aoEscolherTexto;
-  final VoidCallback? aoPedirOrcamento;
 
   @override
   Widget build(BuildContext context) {
@@ -438,53 +431,6 @@ class _Sugestoes extends StatelessWidget {
                   },
                 ),
             ],
-          ),
-          const SizedBox(height: EspacosTrato.x6),
-          Container(
-            key: const ValueKey('cartao-nao-achou-busca'),
-            width: double.infinity,
-            padding: const EdgeInsets.all(EspacosTrato.x4),
-            decoration: BoxDecoration(
-              color: cores.superficie,
-              borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-              border: Border.all(color: cores.borda, width: EspacosTrato.bordaFina),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: cores.azulSuave,
-                        borderRadius: BorderRadius.circular(EspacosTrato.raio),
-                      ),
-                      child: Icon(Icons.post_add_outlined, size: 22, color: cores.azulTexto),
-                    ),
-                    const SizedBox(width: EspacosTrato.x3),
-                    Expanded(
-                      child: Text(
-                        'Não achou o que procura?',
-                        style: TipografiaTrato.tituloCartao.copyWith(color: cores.texto),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: EspacosTrato.x2),
-                Text(
-                  'Descreva o serviço e receba orçamentos de profissionais verificados.',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: cores.textoSecundario),
-                ),
-                const SizedBox(height: EspacosTrato.x4),
-                BotaoPrimario(
-                  key: const ValueKey('botao-pedir-orcamento-busca'),
-                  texto: 'Pedir orçamento',
-                  aoTocar: aoPedirOrcamento ?? aoVerTodas,
-                ),
-              ],
-            ),
           ),
         ],
       ),

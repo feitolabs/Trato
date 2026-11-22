@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/telas/busca/busca_profissionais_tela.dart';
-import 'package:trato/telas/busca/modelos.dart';
 import 'package:trato/telas/catalogo/avaliacoes_profissional_tela.dart';
 import 'package:trato/telas/cliente/modelos.dart';
 import 'package:trato/telas/mensagens/mensagens_tela.dart';
@@ -19,11 +17,6 @@ class _ServicoMensagensF60Fake implements ServicoMensagens {
 
   @override
   Future<List<ConversaResumo>> listar() async => itens;
-}
-
-class _ServicoBuscaF60Fake implements ServicoBusca {
-  @override
-  Future<List<Profissional>> buscar(String termo) async => const [];
 }
 
 class _ServicoPerfilPublicoF60Fake implements pub.ServicoPerfilPublico {
@@ -108,35 +101,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Pintura de interiores · #FDDA'), findsOneWidget);
       expect(find.text('Pintura de interiores · #4A75'), findsNothing);
-    });
-  });
-
-  group('F60 — BuscaProfissionaisTela (card "Não achou o que procura?")', () {
-    testWidgets('exibe card e botão "Pedir orçamento" dispara aoPedirOrcamento',
-        (tester) async {
-      var pediuOrcamento = false;
-      await tester.pumpWidget(
-        _envolver(
-          BuscaProfissionaisTela(
-            servico: _ServicoBuscaF60Fake(),
-            sugestoes: const [
-              CategoriaServico('Eletricista', Icons.bolt),
-            ],
-            aoPedirOrcamento: () => pediuOrcamento = true,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Não achou o que procura?'), findsOneWidget);
-      expect(
-        find.text('Descreva o serviço e receba orçamentos de profissionais verificados.'),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const ValueKey('botao-pedir-orcamento-busca')));
-      await tester.pumpAndSettle();
-      expect(pediuOrcamento, isTrue);
     });
   });
 
