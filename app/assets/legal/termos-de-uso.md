@@ -1,6 +1,6 @@
 # Termos de uso do Trato
 
-**Versão 1.1 — rascunho para revisão do advogado — 22/11/2026**
+**Versão 1.1 — 22/11/2026**
 *(Versão anterior: 1.0, de 31/10/2026.)*
 **Responsável:** Feito Labs Tecnologia Ltda., com sede em Belo Horizonte/MG (`suporte@trato.app.br`).
 
@@ -35,7 +35,7 @@ Você é responsável pelo uso da sua conta e por guardar sua senha. Se notar ac
 3. **Escolha e pagamento.** O cliente compara e aceita um orçamento. O pagamento é feito em **valor único integral** dentro do aplicativo, por **Pix** ou **cartão de crédito** (à vista ou parcelado), processado por parceiro de pagamento (**Stripe Brasil Soluções de Pagamento Ltda.**). O valor pago fica retido até a conclusão do serviço e a confirmação do cliente.
 4. **Agendamento e código de início.** Com o pagamento confirmado pelo parceiro, o endereço completo é liberado ao profissional contratado e o cliente recebe um **código de início**.
 5. **Execução.** Ao chegar, o profissional registra presença no aplicativo (foto e localização) e informa o código de início dito pelo cliente. Ao terminar, registra a conclusão com foto e o código final. Se o profissional concluir sem o código do cliente, o pedido exige confirmação explícita do cliente.
-6. **Confirmação e liberação.** O cliente tem até **48 horas** após o check-out para confirmar o serviço ou relatar um problema. O repasse ao profissional e a janela para congelar o repasse por disputa seguem o prazo de **até 48 horas após a conclusão** *(decisão de 20/11/2026; nota de conflito para revisão do advogado: a versão 1.0 e o registro D16 previam 48 horas de confirmação mais 7 dias de janela de proteção)*. O fim desse prazo interno **não reduz** os direitos garantidos pela lei ao consumidor.
+6. **Confirmação e liberação.** O cliente tem até **48 horas** após o check-out para confirmar o serviço ou relatar um problema. O repasse ao profissional e a janela para congelar o repasse por disputa seguem o prazo de **até 48 horas após a conclusão**. O fim desse prazo interno **não reduz** os direitos garantidos pela lei ao consumidor.
 
 ---
 

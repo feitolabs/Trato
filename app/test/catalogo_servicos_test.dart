@@ -277,14 +277,25 @@ void main() {
   });
 
   group('termos e política', () {
-    test('as cópias do app são iguais aos textos de docs/juridico', () {
+    test('as cópias do app acompanham docs/juridico sem rótulos ou notas internas', () {
+      String limparNotasInternas(String texto) => texto
+          .replaceAll(' — rascunho para revisão do advogado — ', ' — ')
+          .replaceAll(RegExp(r' \*\(decisão de [^)]*revisão do advogado[^)]*\)\*'), '');
+
       for (final (copia, original) in [
         ('assets/legal/termos-de-uso.md', '../docs/juridico/termos-de-uso.md'),
         ('assets/legal/politica-de-privacidade.md', '../docs/juridico/politica-de-privacidade.md'),
       ]) {
         final a = File(copia).readAsStringSync().replaceAll('\r\n', '\n');
-        final b = File(original).readAsStringSync().replaceAll('\r\n', '\n');
-        expect(a, b, reason: '$copia está diferente de $original');
+        final b = limparNotasInternas(
+          File(original).readAsStringSync().replaceAll('\r\n', '\n'),
+        );
+        expect(a, b, reason: '$copia está diferente do conteúdo limpo de $original');
+        expect(
+          RegExp(r'rascunho|D16|advogado|A VALIDAR', caseSensitive: false).hasMatch(a),
+          isFalse,
+          reason: '$copia não deve expor rótulos ou notas internas ao usuário',
+        );
       }
     });
 
