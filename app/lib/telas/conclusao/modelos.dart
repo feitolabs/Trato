@@ -77,7 +77,11 @@ class DadosAvaliacao {
     this.bonusDisponivel = false,
     this.bonusMoedas = 0,
     this.valorMoedaCentavos,
+    this.jaAvaliou = false,
   });
+
+  /// Verdadeiro quando o cliente já enviou avaliação para este pedido (ex.: após retrabalho).
+  final bool jaAvaliou;
 
   /// O backend informa se avaliar este pedido rende Tratinhos de bônus.
   final bool bonusDisponivel;

@@ -278,15 +278,32 @@ abstract final class RotasTrato {
         : erro is ErroFolhaCartao
             ? erro.mensagem
             : 'Algo deu errado. Tente de novo.';
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(texto)));
+    _mostrarToast(context, texto, icone: Icons.error_outline);
   }
 
   static void _avisoSimples(BuildContext context, String texto) {
+    _mostrarToast(context, texto, icone: Icons.info_outline);
+  }
+
+  static void _mostrarToast(
+    BuildContext context,
+    String texto, {
+    required IconData icone,
+  }) {
+    final cor = Theme.of(context).snackBarTheme.closeIconColor ?? CoresTrato.toastTexto;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(texto)));
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(icone, size: 20, color: cor),
+              const SizedBox(width: EspacosTrato.x3),
+              Expanded(child: Text(texto)),
+            ],
+          ),
+        ),
+      );
   }
 
   /// Faz uma chamada e, se der erro, avisa em português simples. Devolve se deu certo.

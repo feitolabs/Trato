@@ -19,7 +19,15 @@ class PedidoResumo {
     this.remoto = false,
     this.descricao,
     this.urgente = false,
+    this.categoria,
+    this.abertoEm,
   });
+
+  /// Categoria do serviço (usada nos filtros de Seus pedidos).
+  final String? categoria;
+
+  /// Data de abertura do pedido (usada nos filtros de período e ordenação).
+  final DateTime? abertoEm;
 
   /// Descrição do cliente, mostrada como subtítulo (opcional).
   final String? descricao;

@@ -95,9 +95,55 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
     }
   }
 
+  String _textoBonus(DadosAvaliacao dados) {
+    if (dados.bonusMoedas <= 0) {
+      return 'Avaliar rende Tratinhos de desconto (liberam em 7 dias sem disputa).';
+    }
+    final nomeMoeda = dados.bonusMoedas == 1 ? 'Tratinho' : 'Tratinhos';
+    final valorCentavos = dados.valorMoedaCentavos;
+    if (valorCentavos != null) {
+      return 'Avaliar rende +${dados.bonusMoedas} $nomeMoeda '
+          '(${formatarReais(dados.bonusMoedas * valorCentavos)} '
+          'de desconto, liberam em 7 dias sem disputa).';
+    }
+    return 'Avaliar rende +${dados.bonusMoedas} $nomeMoeda (liberam em 7 dias sem disputa).';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final dados = widget.dados;
+    if (dados.jaAvaliou) {
+      return EstruturaConclusao(
+        rodape: BotaoPrimario(
+          texto: 'Voltar',
+          aoTocar: widget.aoAvaliarDepois ?? () => Navigator.of(context).maybePop(),
+        ),
+        children: [
+          const SizedBox(height: EspacosTrato.x8),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: c.verdeSuave,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.check_rounded, size: 36, color: c.verdeTexto),
+          ),
+          const SizedBox(height: EspacosTrato.x5),
+          Text(
+            'Você já avaliou este serviço',
+            style: TipografiaTrato.tituloGrande.copyWith(color: c.texto),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+          Text(
+            'Sua avaliação sobre o atendimento de ${dados.nomeProfissional} já foi registrada.',
+            style: TipografiaTrato.corpo.copyWith(color: c.textoSecundario),
+          ),
+        ],
+      );
+    }
+
     return EstruturaConclusao(
       rodape: Column(
         mainAxisSize: MainAxisSize.min,
@@ -106,15 +152,10 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
             Padding(
               padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
               child: Text(
-                dados.bonusMoedas > 0
-                    ? 'Avaliar rende +${dados.bonusMoedas} '
-                        '${dados.bonusMoedas == 1 ? 'Tratinho' : 'Tratinhos'} '
-                        '(${formatarReais(dados.bonusMoedas * (dados.valorMoedaCentavos ?? 1))} '
-                        'de desconto, liberam em 7 dias sem disputa).'
-                    : 'Avaliar rende Tratinhos de desconto (liberam em 7 dias sem disputa).',
+                _textoBonus(dados),
                 key: const ValueKey('legenda-bonus-tratinhos'),
                 textAlign: TextAlign.center,
-                style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
+                style: TipografiaTrato.legenda.copyWith(color: c.textoSecundario),
               ),
             ),
           BotaoPrimario(

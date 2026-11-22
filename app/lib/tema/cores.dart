@@ -46,6 +46,11 @@ abstract final class CoresTrato {
   static const moedaOuro = Color(0xFFF2B632);
   static const moedaOuroEscuro = Color(0xFFB87408);
   static const moedaOuroProfundo = Color(0xFF7A4A00);
+
+  /// Toast/SnackBar elevado e distinto do botão primário no modo claro.
+  static const toastFundo = Color(0xFF182B31);
+  static const toastTexto = Color(0xFFF4F1E8);
+  static const toastBorda = Color(0xFF2F4E57);
 }
 
 /// Paleta semântica usada em runtime pelo tema escuro (alto contraste e profundidade).
@@ -74,4 +79,9 @@ abstract final class CoresTratoEscuro {
   static const texto = Color(0xFFF4F1E8);
   static const textoSecundario = Color(0xFFB8CCCB);
   static const textoDica = Color(0xFF8AA3A3);
+
+  /// Toast/SnackBar elevado com contraste nítido no modo escuro.
+  static const toastFundo = Color(0xFF1E343D);
+  static const toastTexto = Color(0xFFF4F1E8);
+  static const toastBorda = bordaControle;
 }

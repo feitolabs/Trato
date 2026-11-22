@@ -381,6 +381,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       profissionalNome: p.profissionalNome ?? '',
       remoto: p.remoto,
       urgente: p.urgente,
+      categoria: (p.categoriaNome ?? '').trim().isEmpty ? null : p.categoriaNome!.trim(),
+      abertoEm: p.abertoEm,
       descricao: (p.descricao ?? '').trim().isEmpty ? null : p.descricao!.trim(),
       titulo: p.rotulo,
       subtitulo: p.rotulo == 'Pedido ${p.numero}'
@@ -860,10 +862,12 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final (saldo, pedido) = await emParalelo2(_saldo(pedidoId), _pedido(pedidoId));
     var bonusDisponivel = false;
     var bonusMoedas = 0;
+    var jaAvaliou = pedido.jaAvaliou;
     try {
       final info = _mapa(await _api.get('/v1/pedidos/$pedidoId/avaliacao'));
       bonusDisponivel = info['bonus_disponivel'] == true;
       bonusMoedas = (info['bonus_moedas'] as num?)?.toInt() ?? 0;
+      if (info['ja_avaliou'] == true) jaAvaliou = true;
     } on Object {
       // Fallback seguro: servidor antigo ou erro transitório não promete bônus.
     }
@@ -877,6 +881,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       profissionalId: pedido.profissionalId,
       bonusDisponivel: bonusDisponivel,
       bonusMoedas: bonusMoedas,
+      jaAvaliou: jaAvaliou,
     );
   }
 

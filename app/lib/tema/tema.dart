@@ -313,20 +313,32 @@ abstract final class TemaTrato {
         ),
       ),
       dividerTheme: DividerThemeData(color: c.borda, thickness: 1),
-      // Avisos (toasts): cartão flutuante arredondado, longe da borda e com texto legível.
+      // Avisos (toasts): flutuante, distinto do botão primário e acima da barra inferior.
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: c.petroleo,
-        contentTextStyle: TipografiaTrato.corpo.copyWith(color: c.sobrePetroleo),
-        shape: RoundedRectangleBorder(borderRadius: raio),
+        backgroundColor:
+            brilho == Brightness.dark ? CoresTratoEscuro.toastFundo : CoresTrato.toastFundo,
+        elevation: 6,
+        dismissDirection: DismissDirection.horizontal,
+        contentTextStyle: TipografiaTrato.corpoPequeno.copyWith(
+          color: brilho == Brightness.dark ? CoresTratoEscuro.toastTexto : CoresTrato.toastTexto,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: brilho == Brightness.dark ? CoresTratoEscuro.toastBorda : CoresTrato.toastBorda,
+            width: EspacosTrato.bordaFina,
+          ),
+        ),
         insetPadding: const EdgeInsets.fromLTRB(
           EspacosTrato.x4,
           0,
           EspacosTrato.x4,
-          EspacosTrato.x6,
+          96,
         ),
         showCloseIcon: true,
-        closeIconColor: c.sobrePetroleo,
+        closeIconColor:
+            brilho == Brightness.dark ? CoresTratoEscuro.toastTexto : CoresTrato.toastTexto,
       ),
     );
   }
