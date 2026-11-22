@@ -541,11 +541,6 @@ def mudar_estado(
     # Uma transação só: contrato + pedido + garantia + efeitos no dinheiro (tudo ou nada).
     encerramentos = []
     perdedores: tuple[tuple[str, str], ...] = ()
-    if acao is Acao.ACEITAR_ORCAMENTO:
-        # Lidos ANTES do aceite (o contrato marca os outros como recusados); o aviso só sai
-        # depois que o aceite foi confirmado.
-        with contextlib.suppress(Exception):
-            perdedores = tuple(contexto.orcamentos.enviados_do_pedido(pedido.id))
     with contexto.transacao():
         if acao in (Acao.ACEITAR_ORCAMENTO, Acao.CANCELAR) and pedido.estado in (
             Estado.ABERTO,
@@ -561,9 +556,10 @@ def mudar_estado(
         if acao is Acao.ACEITAR_ORCAMENTO:
             # Contrato antes do pedido: se o contrato falhar (ex.: taxa não publicada), o pedido
             # continua aberto. Gravar o contrato de novo com os mesmos dados não duplica.
+            # Os perdedores vêm do próprio UPDATE atômico na transação (aviso só após commit).
             orcamento = contexto.orcamentos.obter(transicao.pedido.orcamento_id or "")
             if orcamento is not None:
-                contexto.contratos.salvar(
+                recusados = contexto.contratos.salvar(
                     Contrato(
                         pedido.id,
                         orcamento.id,
@@ -575,6 +571,7 @@ def mudar_estado(
                         aceite_dispositivo=dispositivo,
                     )
                 )
+                perdedores = tuple(recusados) if recusados else ()
         try:
             gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
         except ConflitoDeEstado:

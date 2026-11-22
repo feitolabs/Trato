@@ -56,8 +56,9 @@ class ContratosPostgres:
             garantia_dias=linha["garantia_dias"],
         )
 
-    def salvar(self, contrato: Contrato) -> None:
-        """Aceita o orçamento e gera o contrato, tudo numa transação. Repetir é inofensivo."""
+    def salvar(self, contrato: Contrato) -> tuple[tuple[str, str], ...]:
+        """Aceita o orçamento, recusa os outros `enviado` e gera o contrato na mesma transação.
+        Devolve `(orcamento_id, profissional_id)` dos recusados agora; repetir é inofensivo."""
         pedido = exigir_uuid(contrato.pedido_id, "pedido")
         orcamento = exigir_uuid(contrato.orcamento_id, "orçamento")
         aceito_em = contrato.aceito_em or datetime.now(UTC)
@@ -67,7 +68,7 @@ class ContratosPostgres:
             ).fetchone()
             if existente is not None:
                 if str(existente["orcamento_id"]) == orcamento:
-                    return
+                    return ()
                 raise Duplicado("Este pedido já tem contrato com outro orçamento.")
 
             orc = con.execute(
@@ -118,11 +119,12 @@ class ContratosPostgres:
             con.execute(
                 "update public.orcamentos set status = 'aceito' where id = %s", (orcamento,)
             )
-            con.execute(
+            recusados = con.execute(
                 "update public.orcamentos set status = 'recusado' "
-                "where pedido_id = %s and id <> %s and status = 'enviado'",
+                "where pedido_id = %s and id <> %s and status = 'enviado' "
+                "returning id, profissional_id",
                 (pedido, orcamento),
-            )
+            ).fetchall()
             novo = con.execute(
                 "insert into public.contratos (pedido_id, orcamento_id, cliente_id, "
                 "profissional_id, escopo_texto, fora_do_escopo, itens, prazo_execucao_dias, "
@@ -158,3 +160,4 @@ class ContratosPostgres:
                 ip=contrato.aceite_ip,
                 dispositivo=contrato.aceite_dispositivo,
             )
+            return tuple((str(r["id"]), str(r["profissional_id"])) for r in recusados)

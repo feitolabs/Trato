@@ -135,3 +135,57 @@ def test_vale_para_qualquer_vencedor(amb, vencedor, perdem):
     assert _aceitar(amb, vencedor).status_code == 200
     com_aviso = {u for u in (GANHADOR, PERDEDOR_B, PERDEDOR_C) if _avisos(repo, u)}
     assert com_aviso == perdem
+
+
+def test_avisa_apenas_orcamentos_realmente_recusados_no_aceite(amb):
+    from trato.api.repositorios_app import OrcamentoDetalhe
+
+    repo = _ligar(amb)
+    _pedido_com_tres_orcamentos(amb)
+    # orc-b já foi recusado individualmente antes; orc-d está em rascunho; só orc-c está enviado.
+    assert amb.contexto.orcamentos.recusar("ped-1", "orc-b") is True
+    amb.contexto.orcamentos.adicionar(
+        Orcamento("orc-d", "ped-1", "pro-d", 44_400, "cat-1"),
+        OrcamentoDetalhe(
+            id="orc-d",
+            pedido_id="ped-1",
+            profissional_id="pro-d",
+            profissional_nome=None,
+            versao=1,
+            status="rascunho",
+            valor_centavos=44_400,
+            prazo_execucao_dias=None,
+            validade_ate=None,
+            garantia_dias=None,
+            fora_do_escopo=None,
+            sinal_material_centavos=None,
+            observacoes=None,
+            enviado_em=None,
+            itens=(),
+        ),
+    )
+
+    r = _aceitar(amb, "orc-a")
+    assert r.status_code == 200, r.text
+    assert len(_avisos(repo, PERDEDOR_C)) == 1
+    assert _avisos(repo, PERDEDOR_B) == []  # já estava recusado antes do aceite
+    assert _avisos(repo, "pro-d") == []  # rascunho não foi recusado pelo aceite
+    assert _avisos(repo, GANHADOR) == []
+    assert amb.contexto.orcamentos.detalhe("orc-a").status == "aceito"
+    assert amb.contexto.orcamentos.detalhe("orc-c").status == "recusado"
+
+
+def test_falha_na_transacao_nao_envia_aviso(amb, monkeypatch):
+    from trato.persistencia.erros import ConflitoDeEstado
+
+    repo = _ligar(amb)
+    _pedido_com_tres_orcamentos(amb)
+
+    def falha_salvar(*_a, **_k):
+        raise ConflitoDeEstado("corrida no aceite")
+
+    monkeypatch.setattr(amb.contexto.pedidos, "salvar", falha_salvar)
+    r = _aceitar(amb, "orc-a")
+    assert r.status_code == 409, r.text
+    assert _avisos(repo, PERDEDOR_B) == []
+    assert _avisos(repo, PERDEDOR_C) == []

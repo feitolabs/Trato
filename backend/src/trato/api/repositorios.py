@@ -250,7 +250,9 @@ class RepositorioOrcamentos(Protocol):
 class RepositorioContratos(Protocol):
     def obter_do_pedido(self, pedido_id: str) -> Contrato | None: ...
 
-    def salvar(self, contrato: Contrato) -> None: ...
+    def salvar(self, contrato: Contrato) -> Sequence[tuple[str, str]]:
+        """Aceita o orçamento, gera o contrato e recusa os demais orçamentos `enviado` do pedido
+        na mesma transação. Devolve `(orcamento_id, profissional_id)` dos recusados agora."""
 
 
 class RepositorioLedger(Protocol):

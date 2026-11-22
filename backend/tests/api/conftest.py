@@ -132,7 +132,7 @@ def amb() -> Ambiente:
         auth=ProvedorAuthFalso(TOKENS),
         pedidos=PedidosEmMemoria(),
         orcamentos=orcamentos,
-        contratos=ContratosEmMemoria(),
+        contratos=ContratosEmMemoria(orcamentos),
         ledger=LedgerEmMemoria(),
         disputas=DisputasEmMemoria(),
         garantias=GarantiasEmMemoria(),

@@ -398,6 +398,21 @@ class OrcamentosEmMemoria:
             if d.pedido_id == pedido_id and d.status == "enviado"
         )
 
+    def aceitar_e_recusar_outros(
+        self, pedido_id: str, orcamento_aceito_id: str
+    ) -> tuple[tuple[str, str], ...]:
+        """Marca o orçamento aceito como `aceito` e os outros `enviado` do pedido como `recusado`.
+        Devolve `(orcamento_id, profissional_id)` dos realmente recusados agora."""
+        recusados: list[tuple[str, str]] = []
+        for o_id, det in list(self._detalhes.items()):
+            if det.pedido_id != pedido_id or det.status != "enviado":
+                continue
+            novo_status = "aceito" if o_id == orcamento_aceito_id else "recusado"
+            self._detalhes[o_id] = replace(det, status=novo_status)
+            if novo_status == "recusado":
+                recusados.append((det.id, det.profissional_id))
+        return tuple(recusados)
+
     def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
         det = self._detalhes.get(orcamento_id)
         if det is not None:
@@ -445,14 +460,21 @@ class OrcamentosEmMemoria:
 
 
 class ContratosEmMemoria:
-    def __init__(self) -> None:
+    def __init__(self, orcamentos: OrcamentosEmMemoria | None = None) -> None:
         self._itens: dict[str, Contrato] = {}
+        self._orcamentos = orcamentos
 
     def obter_do_pedido(self, pedido_id: str) -> Contrato | None:
         return self._itens.get(pedido_id)
 
-    def salvar(self, contrato: Contrato) -> None:
+    def salvar(self, contrato: Contrato) -> tuple[tuple[str, str], ...]:
+        ja_mesmo = (
+            existente := self._itens.get(contrato.pedido_id)
+        ) is not None and existente.orcamento_id == contrato.orcamento_id
         self._itens[contrato.pedido_id] = contrato
+        if ja_mesmo or self._orcamentos is None:
+            return ()
+        return self._orcamentos.aceitar_e_recusar_outros(contrato.pedido_id, contrato.orcamento_id)
 
 
 class LedgerEmMemoria:
