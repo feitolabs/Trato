@@ -12,9 +12,9 @@ primary_region = "gru" # São Paulo, mesma região do Supabase (sa-east-1)
   TRATO_AMBIENTE = "producao"
   TRATO_PERSISTENCIA = "postgres"
   # O agendador (liberação por prazo, expiração de pedido e de pagamento, lembretes) roda dentro da
-  # API quando "true". DESLIGADO por decisão do João (15/11/2026) até ele mandar ligar: sem ele
-  # nada disso acontece. A trava no banco evita ciclo duplicado com 2 máquinas.
-  TRATO_AGENDADOR_EMBUTIDO = "false"
+  # API quando "true". LIGADO por decisão do João (22/11/2026). A trava no banco (advisory lock do
+  # Postgres) evita ciclo duplicado com 2 máquinas.
+  TRATO_AGENDADOR_EMBUTIDO = "true"
   # Atrás do proxy do Fly o IP real vem em X-Forwarded-For. Sem isto o limite de taxa por IP
   # enxerga um IP só (o do proxy) e bloqueia todo mundo junto.
   TRATO_SEG_CONFIAR_X_FORWARDED_FOR = "true"
