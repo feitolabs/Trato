@@ -186,6 +186,8 @@ class Avaliacao:
     status: str = "publicada"
     # Média opcional dos critérios (1.00 a 5.00, máx. 2 casas); None em avaliações antigas.
     nota_decimal: float | None = None
+    # Notas individuais opcionais (1 a 5) por critério; None em avaliações antigas ou sem critérios.
+    criterios: dict[str, int] | None = None
 
 
 class RepositorioConversas(Protocol):

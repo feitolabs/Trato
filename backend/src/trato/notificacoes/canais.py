@@ -10,8 +10,11 @@ D14: SMS só para confirmar o celular (`ServicoSmsConfirmacao`). WhatsApp fica p
 
 from __future__ import annotations
 
+import base64
+import binascii
 import importlib.util
 import json
+import re
 import smtplib
 import time
 from collections.abc import Callable
@@ -434,19 +437,50 @@ class _ProvedorJwtApns:
         return token
 
 
-def _montar_fcm(config: ConfigNotificacoes) -> PushFcm:
-    if not (config.push_ativo and config.fcm_projeto_id and config.fcm_credenciais_arquivo):
-        return PushFcm(config)
+def _decodificar_credenciais_fcm_texto(texto: str) -> dict[str, Any] | None:
+    """Lê JSON cru ou base64 de JSON da conta de serviço FCM. Nunca expõe o conteúdo em erros."""
+    limpo = texto.strip()
+    if not limpo:
+        return None
+    try:
+        dados = json.loads(limpo)
+        return dados if isinstance(dados, dict) else None
+    except ValueError:
+        pass
+    try:
+        compacto = re.sub(r"\s+", "", limpo)
+        decodificado = base64.b64decode(compacto, validate=True).decode("utf-8")
+        dados = json.loads(decodificado)
+        return dados if isinstance(dados, dict) else None
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return None
+
+
+def _ler_credenciais_fcm(config: ConfigNotificacoes) -> dict[str, Any] | None:
+    bruto_env = config.fcm_credenciais_json.get_secret_value().strip()
+    if bruto_env:
+        return _decodificar_credenciais_fcm_texto(bruto_env)
+    if not config.fcm_credenciais_arquivo:
+        return None
     caminho = Path(config.fcm_credenciais_arquivo)
     if not caminho.is_file():
-        return PushFcm(config)
+        return None
     try:
-        bruto = json.loads(caminho.read_text(encoding="utf-8"))
-        email = str(bruto.get("client_email") or "").strip()
-        chave = str(bruto.get("private_key") or "").strip()
-        uri = str(bruto.get("token_uri") or "https://oauth2.googleapis.com/token").strip()
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+        return dados if isinstance(dados, dict) else None
     except (OSError, ValueError):
+        return None
+
+
+def _montar_fcm(config: ConfigNotificacoes) -> PushFcm:
+    if not (config.push_ativo and config.fcm_projeto_id):
         return PushFcm(config)
+    bruto = _ler_credenciais_fcm(config)
+    if bruto is None:
+        return PushFcm(config)
+    email = str(bruto.get("client_email") or "").strip()
+    chave = str(bruto.get("private_key") or "").strip()
+    uri = str(bruto.get("token_uri") or "https://oauth2.googleapis.com/token").strip()
     if not email or not chave:
         return PushFcm(config)
     return PushFcm(config, _transporte_httpx, _ProvedorTokenFcm(email, chave, uri))

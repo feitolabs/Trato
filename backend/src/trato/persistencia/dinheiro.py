@@ -490,12 +490,28 @@ class GarantiasPostgres:
 class AvaliacoesPostgres:
     """`avaliacoes` (F3.6): uma por contrato e direção; nota e comentário não se editam."""
 
+    _COLS_COM_CRITERIOS = (
+        "a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
+        "a.nota_geral, a.nota_decimal, a.criterios, a.comentario, a.etiquetas, "
+        "a.criada_em, a.resposta"
+    )
+    _COLS_SEM_CRITERIOS = (
+        "a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
+        "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta"
+    )
+
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
     @staticmethod
     def _de_linha(l: Any) -> Avaliacao:  # noqa: E741
         nota_dec = l.get("nota_decimal") if isinstance(l, dict) else None
+        bruto_crit = l.get("criterios") if isinstance(l, dict) else None
+        criterios = (
+            {str(k): int(v) for k, v in bruto_crit.items()}
+            if isinstance(bruto_crit, dict) and bruto_crit
+            else None
+        )
         return Avaliacao(
             id=str(l["id"]),
             pedido_id=str(l["pedido_id"]),
@@ -504,23 +520,42 @@ class AvaliacoesPostgres:
             avaliado_id=str(l["avaliado_id"]),
             nota_geral=int(l["nota_geral"]),
             nota_decimal=float(nota_dec) if nota_dec is not None else None,
+            criterios=criterios,
             comentario=l["comentario"],
             etiquetas=tuple(l["etiquetas"] or ()),
             criada_em=l["criada_em"],
             resposta=l["resposta"],
         )
 
+    @staticmethod
+    def _executar_com_fallback_criterios(
+        con: psycopg.Connection[Any],
+        sql_com: str,
+        params_com: tuple[Any, ...],
+        sql_sem: str,
+        params_sem: tuple[Any, ...],
+    ) -> Any:
+        try:
+            with con.transaction():
+                return con.execute(sql_com, params_com)
+        except psycopg.errors.UndefinedColumn:
+            return con.execute(sql_sem, params_sem)
+
     def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None:
         pid = como_uuid(pedido_id)
         if pid is None:
             return None
+        where = (
+            "from public.avaliacoes a "
+            "join public.contratos c on c.id = a.contrato_id "
+            "where c.pedido_id = %s and a.direcao = %s"
+        )
         with self._banco.transacao() as con:
-            l = con.execute(  # noqa: E741
-                "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-                "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta "
-                "from public.avaliacoes a "
-                "join public.contratos c on c.id = a.contrato_id "
-                "where c.pedido_id = %s and a.direcao = %s",
+            l = self._executar_com_fallback_criterios(  # noqa: E741
+                con,
+                f"select {self._COLS_COM_CRITERIOS} {where}",  # noqa: S608
+                (pid, direcao),
+                f"select {self._COLS_SEM_CRITERIOS} {where}",  # noqa: S608
                 (pid, direcao),
             ).fetchone()
         return self._de_linha(l) if l is not None else None
@@ -529,13 +564,17 @@ class AvaliacoesPostgres:
         aid = como_uuid(avaliacao_id)
         if aid is None:
             return None
+        where = (
+            "from public.avaliacoes a "
+            "join public.contratos c on c.id = a.contrato_id "
+            "where a.id = %s"
+        )
         with self._banco.transacao() as con:
-            l = con.execute(  # noqa: E741
-                "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-                "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta "
-                "from public.avaliacoes a "
-                "join public.contratos c on c.id = a.contrato_id "
-                "where a.id = %s",
+            l = self._executar_com_fallback_criterios(  # noqa: E741
+                con,
+                f"select {self._COLS_COM_CRITERIOS} {where}",  # noqa: S608
+                (aid,),
+                f"select {self._COLS_SEM_CRITERIOS} {where}",  # noqa: S608
                 (aid,),
             ).fetchone()
         return self._de_linha(l) if l is not None else None
@@ -560,13 +599,17 @@ class AvaliacoesPostgres:
         uid = como_uuid(avaliado_id)
         if uid is None:
             return []
+        where = (
+            "from public.avaliacoes a "
+            "join public.contratos c on c.id = a.contrato_id "
+            "where a.avaliado_id = %s and a.status = 'publicada' order by a.criada_em desc"
+        )
         with self._banco.transacao() as con:
-            linhas = con.execute(
-                "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-                "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta "
-                "from public.avaliacoes a "
-                "join public.contratos c on c.id = a.contrato_id "
-                "where a.avaliado_id = %s and a.status = 'publicada' order by a.criada_em desc",
+            linhas = self._executar_com_fallback_criterios(
+                con,
+                f"select {self._COLS_COM_CRITERIOS} {where}",  # noqa: S608
+                (uid,),
+                f"select {self._COLS_SEM_CRITERIOS} {where}",  # noqa: S608
                 (uid,),
             ).fetchall()
         return [self._de_linha(l) for l in linhas]  # noqa: E741
@@ -574,21 +617,29 @@ class AvaliacoesPostgres:
     def salvar(self, avaliacao: Avaliacao) -> None:
         with self._banco.transacao() as con:
             contrato = _exigir_contrato(con, avaliacao.pedido_id)
-            con.execute(
+            base = (
+                contrato["id"],
+                avaliacao.direcao,
+                exigir_uuid(avaliacao.avaliador_id, "avaliador"),
+                exigir_uuid(avaliacao.avaliado_id, "avaliado"),
+                avaliacao.nota_geral,
+                avaliacao.nota_decimal,
+            )
+            fim = (
+                avaliacao.comentario,
+                list(avaliacao.etiquetas),
+                avaliacao.criada_em,
+            )
+            self._executar_com_fallback_criterios(
+                con,
+                "insert into public.avaliacoes (contrato_id, direcao, avaliador_id, avaliado_id, "
+                "nota_geral, nota_decimal, criterios, comentario, etiquetas, criada_em) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (*base, Jsonb(avaliacao.criterios) if avaliacao.criterios else None, *fim),
                 "insert into public.avaliacoes (contrato_id, direcao, avaliador_id, avaliado_id, "
                 "nota_geral, nota_decimal, comentario, etiquetas, criada_em) "
                 "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (
-                    contrato["id"],
-                    avaliacao.direcao,
-                    exigir_uuid(avaliacao.avaliador_id, "avaliador"),
-                    exigir_uuid(avaliacao.avaliado_id, "avaliado"),
-                    avaliacao.nota_geral,
-                    avaliacao.nota_decimal,
-                    avaliacao.comentario,
-                    list(avaliacao.etiquetas),
-                    avaliacao.criada_em,
-                ),
+                (*base, *fim),
             )
 
 

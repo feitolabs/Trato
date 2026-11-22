@@ -133,6 +133,7 @@ class AvaliacaoRecebidaOut(BaseModel):
     id: str | None = None
     nota_geral: int
     nota_decimal: float | None = None
+    criterios: dict[str, int] | None = None
     comentario: str | None
     resposta: str | None = None
     etiquetas: list[str]
@@ -807,6 +808,7 @@ def perfil_publico(
             id=a.id,
             nota_geral=a.nota_geral,
             nota_decimal=a.nota_decimal,
+            criterios=dict(a.criterios) if a.criterios else None,
             # sem moderação ainda: mesma regra da rota pública (ver a flag)
             comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
             resposta=a.resposta,
@@ -858,6 +860,7 @@ CACHE_PUBLICO = "public, max-age=60"
 
 class AvaliacaoAnonimaOut(BaseModel):
     nota: int
+    criterios: dict[str, int] | None = None
     comentario: str | None = None
     resposta: str | None = None
     data: date
@@ -940,6 +943,7 @@ def _avaliacoes_publicas(contexto: Contexto, profissional_id: str) -> list[Avali
     return [
         AvaliacaoAnonimaOut(
             nota=a.nota_geral,
+            criterios=dict(a.criterios) if a.criterios else None,
             comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
             resposta=a.resposta,
             data=a.criada_em.astimezone(ZoneInfo("America/Sao_Paulo")).date(),

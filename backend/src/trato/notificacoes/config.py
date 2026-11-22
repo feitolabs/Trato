@@ -37,6 +37,7 @@ class ConfigNotificacoes(BaseSettings):
     push_ativo: bool = False
     fcm_projeto_id: str = ""
     fcm_credenciais_arquivo: str = ""  # caminho do JSON da conta de serviço (fora do git)
+    fcm_credenciais_json: SecretStr = SecretStr("")  # JSON cru ou base64 (ex.: Fly.io secret)
     apns_ativo: bool = False
     apns_chave_arquivo: str = ""  # caminho do .p8 (fora do git)
     apns_chave_id: str = ""

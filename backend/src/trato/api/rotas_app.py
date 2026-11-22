@@ -303,6 +303,7 @@ class AvaliacaoOut(BaseModel):
     direcao: str
     nota_geral: int
     nota_decimal: float | None = None
+    criterios: dict[str, int] | None = None
     comentario: str | None
     resposta: str | None = None
     etiquetas: list[str]
@@ -413,6 +414,11 @@ class VerificacaoIn(_Entrada):
     documentos: list[DocumentoIn] = Field(min_length=1, max_length=12)
 
 
+CRITERIOS_AVALIACAO = frozenset(
+    {"pontualidade", "qualidade", "limpeza", "comunicacao", "preco_justo"}
+)
+
+
 class AvaliarIn(_Entrada):
     nota_geral: StrictInt = Field(ge=1, le=5)
     nota_decimal: float | None = Field(
@@ -421,10 +427,33 @@ class AvaliarIn(_Entrada):
             "Média opcional dos critérios (1.00 a 5.00, máx. 2 casas e a até 0,5 de nota_geral)."
         ),
     )
+    criterios: dict[str, int] | None = Field(
+        None,
+        description=(
+            "Notas opcionais de 1 a 5 por critério "
+            "(pontualidade, qualidade, limpeza, comunicacao, preco_justo)."
+        ),
+    )
     # Tamanhos finais vêm da configuração (`TRATO_SEG_COMENTARIO_MAX_CHARS` etc.); estes tetos
     # só protegem a validação contra corpo absurdo.
     comentario: str | None = Field(None, max_length=20_000)
     etiquetas: list[str] = Field(default_factory=list, max_length=200)
+
+    @field_validator("criterios", mode="before")
+    @classmethod
+    def _validar_criterios(cls, v: Any) -> dict[str, int] | None:
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            raise ValueError("criterios deve ser um objeto com notas inteiras de 1 a 5.")
+        limpo: dict[str, int] = {}
+        for chave, nota in v.items():
+            if not isinstance(chave, str) or chave not in CRITERIOS_AVALIACAO:
+                raise ValueError(f"Critério desconhecido: {chave!r}.")
+            if isinstance(nota, bool) or not isinstance(nota, int) or not (1 <= nota <= 5):
+                raise ValueError(f"Nota do critério '{chave}' deve ser um inteiro de 1 a 5.")
+            limpo[chave] = nota
+        return limpo or None
 
     @field_validator("nota_decimal", mode="before")
     @classmethod
@@ -1339,10 +1368,12 @@ def _mesma_avaliacao(
     comentario: str | None,
     etiquetas: Sequence[str],
     nota_decimal: float | None = None,
+    criterios: dict[str, int] | None = None,
 ) -> bool:
     return (
         antiga.nota_geral == nota
         and antiga.nota_decimal == nota_decimal
+        and (antiga.criterios or None) == (criterios or None)
         and (antiga.comentario or None) == (comentario or None)
         and tuple(antiga.etiquetas) == tuple(etiquetas)
     )
@@ -1356,6 +1387,7 @@ def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
         direcao=nova.direcao,
         nota_geral=nova.nota_geral,
         nota_decimal=nova.nota_decimal,
+        criterios=dict(nova.criterios) if nova.criterios else None,
         comentario=nova.comentario,
         resposta=nova.resposta,
         etiquetas=list(nova.etiquetas),
@@ -1431,7 +1463,7 @@ def avaliar(
     repetida = contexto.avaliacoes.obter(pedido.id, direcao)
     if repetida is not None:
         if not _mesma_avaliacao(
-            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal
+            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal, corpo.criterios
         ):
             raise HTTPException(409, "Você já avaliou este serviço.")
         # duplo toque (mesmo corpo): o mesmo sucesso, sem novo registro nem novo bônus
@@ -1444,6 +1476,7 @@ def avaliar(
         avaliado_id=avaliado,
         nota_geral=corpo.nota_geral,
         nota_decimal=corpo.nota_decimal,
+        criterios=dict(corpo.criterios) if corpo.criterios else None,
         comentario=comentario,
         etiquetas=etiquetas,
         criada_em=contexto.agora(),
@@ -1453,7 +1486,7 @@ def avaliar(
     except Duplicado:  # corrida de dois toques: quem perdeu devolve o sucesso de quem ganhou
         repetida = contexto.avaliacoes.obter(pedido.id, direcao)
         if repetida is None or not _mesma_avaliacao(
-            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal
+            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal, corpo.criterios
         ):
             raise
         resposta.status_code = 200
