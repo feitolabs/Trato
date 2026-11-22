@@ -5,6 +5,7 @@ import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/telas/onboarding/ilustracoes_cliente.dart';
 import 'package:trato/telas/onboarding/ilustracoes_profissional.dart';
 import 'package:trato/telas/onboarding/tour_perfil_tela.dart';
+import 'package:trato/componentes/componentes.dart';
 import 'package:trato/tema/tema.dart';
 
 import 'apoio/fontes.dart';
@@ -78,6 +79,41 @@ void main() {
           ),
         );
         expect(scroll.position.maxScrollExtent, 0.0, reason: 'Página profissional $i gerou scroll');
+        if (i < 3) {
+          await tester.tap(find.text('Avançar'));
+          await tester.pumpAndSettle();
+        }
+      }
+    });
+
+    testWidgets(
+        'páginas 1..3 mostram Avançar, página 4 mostra Começar, indicador inativo claro e sem scroll em 390x844 (F52)',
+        (tester) async {
+      await _abrir(
+        tester,
+        TourPerfilTela(perfil: PerfilUso.cliente, aoConcluir: () {}),
+        const Size(390, 844),
+      );
+
+      final indicador = tester.widget<IndicadorPaginas>(find.byType(IndicadorPaginas));
+      expect(indicador.corInativa, CoresTrato.borda);
+      expect(indicador.corAtiva, CoresTrato.petroleo);
+
+      for (var i = 0; i < 4; i++) {
+        if (i < 3) {
+          expect(find.text('Avançar'), findsOneWidget);
+          expect(find.text('Começar'), findsNothing);
+        } else {
+          expect(find.text('Começar'), findsOneWidget);
+          expect(find.text('Avançar'), findsNothing);
+        }
+        final scroll = tester.state<ScrollableState>(
+          find.descendant(
+            of: find.byType(PaginaTourVisual),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(scroll.position.maxScrollExtent, 0.0, reason: 'Página $i gerou scroll em 390x844');
         if (i < 3) {
           await tester.tap(find.text('Avançar'));
           await tester.pumpAndSettle();

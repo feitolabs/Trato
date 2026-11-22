@@ -52,13 +52,15 @@ void main() {
         ),
       ];
 
-      for (final (ind, titulo, texto) in esperados) {
+      for (var i = 0; i < esperados.length; i++) {
+        final (ind, titulo, texto) = esperados[i];
+        final botao = i == esperados.length - 1 ? 'Começar' : 'Avançar';
         expect(find.text(ind), findsOneWidget);
         expect(find.text(titulo), findsOneWidget);
         expect(find.text(texto), findsOneWidget);
         expect(find.text('Pular'), findsOneWidget);
-        expect(find.text('Avançar'), findsOneWidget);
-        await tester.tap(find.text('Avançar'));
+        expect(find.text(botao), findsOneWidget);
+        await tester.tap(find.text(botao));
         await tester.pumpAndSettle();
       }
 
@@ -97,12 +99,15 @@ void main() {
         ),
       ];
 
-      for (final (ind, titulo, texto) in esperados) {
+      for (var i = 0; i < esperados.length; i++) {
+        final (ind, titulo, texto) = esperados[i];
+        final botao = i == esperados.length - 1 ? 'Começar' : 'Avançar';
         expect(find.text(ind), findsOneWidget);
         expect(find.text(titulo), findsOneWidget);
         expect(find.text(texto), findsOneWidget);
         expect(find.text('Pular'), findsOneWidget);
-        await tester.tap(find.text('Avançar'));
+        expect(find.text(botao), findsOneWidget);
+        await tester.tap(find.text(botao));
         await tester.pumpAndSettle();
       }
 

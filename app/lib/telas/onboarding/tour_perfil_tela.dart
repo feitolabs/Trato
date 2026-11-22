@@ -185,12 +185,16 @@ class _TourPerfilTelaState extends State<TourPerfilTela> {
               ),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: margem),
-                child: IndicadorPaginas(total: paginas.length, atual: _pagina),
+                child: IndicadorPaginas(
+                  total: paginas.length,
+                  atual: _pagina,
+                  corInativa: CoresTrato.borda,
+                ),
               ),
               const SizedBox(height: EspacosTrato.x6),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: margem),
-                child: BotaoPrimario(texto: 'Avançar', aoTocar: _avancar),
+                child: BotaoPrimario(texto: _ultima ? 'Começar' : 'Avançar', aoTocar: _avancar),
               ),
               const SizedBox(height: EspacosTrato.x4),
             ],
@@ -235,30 +239,37 @@ class PaginaTourVisual extends StatelessWidget {
         final maxPorLargura = (constraints.maxWidth - margem * 2).clamp(110.0, 240.0);
         final lado = maxPorAltura < maxPorLargura ? maxPorAltura : maxPorLargura;
 
+        final alturaMinima = usaIlustracao
+            ? (constraints.maxHeight - padVertical * 2).clamp(0.0, double.infinity)
+            : 0.0;
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: margem, vertical: padVertical),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (usaIlustracao)
-                Center(child: construirIlustracao!(lado))
-              else
-                Container(
-                  height: 260,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: CoresTrato.azulClaro,
-                    borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: alturaMinima),
+            child: Column(
+              mainAxisAlignment: usaIlustracao ? MainAxisAlignment.center : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (usaIlustracao)
+                  Center(child: construirIlustracao!(lado))
+                else
+                  Container(
+                    height: 260,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: CoresTrato.azulClaro,
+                      borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+                    ),
+                    child: Icon(icone, size: 72, color: CoresTrato.petroleo),
                   ),
-                  child: Icon(icone, size: 72, color: CoresTrato.petroleo),
-                ),
-              SizedBox(height: espacoTopoTexto),
-              Text('${numero + 1} DE $total', style: TipografiaTrato.sobretitulo),
-              SizedBox(height: espacoEntre),
-              Text(titulo, style: TipografiaTrato.tituloGrande),
-              SizedBox(height: espacoEntre),
-              Text(texto, style: TipografiaTrato.corpoGrande),
-            ],
+                SizedBox(height: espacoTopoTexto),
+                Text('${numero + 1} DE $total', style: TipografiaTrato.sobretitulo),
+                SizedBox(height: espacoEntre),
+                Text(titulo, style: TipografiaTrato.tituloGrande),
+                SizedBox(height: espacoEntre),
+                Text(texto, style: TipografiaTrato.corpoGrande),
+              ],
+            ),
           ),
         );
       },
