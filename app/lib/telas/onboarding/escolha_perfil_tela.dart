@@ -4,6 +4,8 @@ import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../auth/criar_conta_tela.dart';
+import '../fluxo/rotas.dart';
+import 'tour_perfil_tela.dart';
 
 enum PerfilUso {
   cliente(
@@ -47,6 +49,27 @@ class EscolhaPerfilTela extends StatefulWidget {
 class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
   var _escolhido = PerfilUso.cliente;
 
+  Future<void> _continuar() async {
+    final perfil = _escolhido;
+    final jaViu = RotasTrato.temSessao || await PreferenciaTourPerfil.visto(perfil);
+    if (!mounted) return;
+    final destino = MaterialPageRoute<void>(
+      builder: (_) => CriarContaTela(perfil: perfil, servico: widget.servico),
+    );
+    if (jaViu) {
+      await Navigator.of(context).push(destino);
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (tourContext) => TourPerfilTela(
+          perfil: perfil,
+          aoConcluir: () => Navigator.of(tourContext).pushReplacement(destino),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,11 +106,7 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
               ),
               BotaoPrimario(
                 texto: _escolhido.botao,
-                aoTocar: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => CriarContaTela(perfil: _escolhido, servico: widget.servico),
-                  ),
-                ),
+                aoTocar: _continuar,
               ),
               const SizedBox(height: EspacosTrato.x4),
             ],

@@ -24,6 +24,7 @@ import '../../dados/repositorios_trato.dart';
 import '../../dados/sessao.dart';
 import '../auth/login_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart' show PerfilUso;
+import '../onboarding/tour_perfil_tela.dart';
 import '../../tema/tema.dart';
 import '../../dispositivo/check_in_dispositivo.dart';
 import '../../dispositivo/dispositivo.dart';
@@ -1842,6 +1843,14 @@ abstract final class RotasTrato {
               }
             },
       aoRelatarProblema: comoCliente ? () => abrirServicos(context) : null,
+      aoVerTour: () => _abrir<void>(
+        context,
+        TourPerfilTela(
+          perfil: comoCliente ? PerfilUso.cliente : PerfilUso.profissional,
+          registrarVisto: false,
+          aoConcluir: () => Navigator.of(context).pop(),
+        ),
+      ),
     );
   }
 
@@ -2777,8 +2786,7 @@ abstract final class RotasTrato {
           : ((categoriaFallback != null && categoriaFallback.isNotEmpty)
               ? categoriaFallback
               : null);
-      final souClienteFinal =
-          comoProfissional != null ? !comoProfissional : conversa.souCliente;
+      final souClienteFinal = comoProfissional != null ? !comoProfissional : conversa.souCliente;
       if (categoriaFinal == conversa.categoriaNome && souClienteFinal == conversa.souCliente) {
         return conversa;
       }
@@ -2803,102 +2811,102 @@ abstract final class RotasTrato {
           conversa: conversa,
           aoCapturarFoto: _fotografar,
           aoRecarregar: repos.modoApi ? carregarConversa : null,
-            aoSugerirAgenda: podeCombinarAgenda
-                ? () async {
-                    final inicio = await _escolherJanelaVisita(
-                      context,
-                      tituloDia: 'Sugerir dia da visita',
-                    );
-                    if (inicio == null || !context.mounted) return;
-                    final ok = await _tentar(
-                      context,
-                      () => repos.chat.proporAgenda(
-                        pedidoId,
-                        inicio,
-                        inicio.add(const Duration(hours: 2)),
-                      ),
-                    );
-                    if (ok && context.mounted) {
-                      pedidosMudaram.value++;
-                      _avisoSimples(context, 'Sugestão de horário enviada no chat.');
-                    }
+          aoSugerirAgenda: podeCombinarAgenda
+              ? () async {
+                  final inicio = await _escolherJanelaVisita(
+                    context,
+                    tituloDia: 'Sugerir dia da visita',
+                  );
+                  if (inicio == null || !context.mounted) return;
+                  final ok = await _tentar(
+                    context,
+                    () => repos.chat.proporAgenda(
+                      pedidoId,
+                      inicio,
+                      inicio.add(const Duration(hours: 2)),
+                    ),
+                  );
+                  if (ok && context.mounted) {
+                    pedidosMudaram.value++;
+                    _avisoSimples(context, 'Sugestão de horário enviada no chat.');
                   }
-                : null,
-            aoAceitarAgenda: (msg) async {
-              final prop = msg.propostaAgenda;
-              if (prop == null) return;
-              final ok = await _tentar(
-                context,
-                () => repos.chat.aceitarAgenda(
-                  pedidoId,
-                  mensagemId: msg.id,
-                  inicio: prop.inicio,
-                  fim: prop.fim,
-                ),
-              );
-              if (ok && context.mounted) {
-                pedidosMudaram.value++;
-                _avisoSimples(context, 'Horário confirmado! Visita agendada.');
-              }
-            },
-            aoAceitarContraproposta: (c) async {
-              final ok = await _tentar(
-                context,
-                () => repos.orcamentos.aceitarContraproposta(
-                  pedidoId,
-                  c.orcamentoId,
-                  c.valorCentavos,
-                  prazoExecucaoDias: c.prazoExecucaoDias,
-                ),
-              );
-              if (ok && context.mounted) {
-                pedidosMudaram.value++;
-                _avisoSimples(context, 'Orçamento atualizado com o valor e prazo combinados.');
-              }
-            },
-            aoAceitarProposta: (c) async {
-              final ok = await _tentar(
-                context,
-                () async {
-                  try {
-                    await repos.orcamentos.aceitar(pedidoId, c.orcamentoId);
-                  } on ErroTrato catch (e) {
-                    if (!e.mensagem.toLowerCase().contains('aceit')) rethrow;
+                }
+              : null,
+          aoAceitarAgenda: (msg) async {
+            final prop = msg.propostaAgenda;
+            if (prop == null) return;
+            final ok = await _tentar(
+              context,
+              () => repos.chat.aceitarAgenda(
+                pedidoId,
+                mensagemId: msg.id,
+                inicio: prop.inicio,
+                fim: prop.fim,
+              ),
+            );
+            if (ok && context.mounted) {
+              pedidosMudaram.value++;
+              _avisoSimples(context, 'Horário confirmado! Visita agendada.');
+            }
+          },
+          aoAceitarContraproposta: (c) async {
+            final ok = await _tentar(
+              context,
+              () => repos.orcamentos.aceitarContraproposta(
+                pedidoId,
+                c.orcamentoId,
+                c.valorCentavos,
+                prazoExecucaoDias: c.prazoExecucaoDias,
+              ),
+            );
+            if (ok && context.mounted) {
+              pedidosMudaram.value++;
+              _avisoSimples(context, 'Orçamento atualizado com o valor e prazo combinados.');
+            }
+          },
+          aoAceitarProposta: (c) async {
+            final ok = await _tentar(
+              context,
+              () async {
+                try {
+                  await repos.orcamentos.aceitar(pedidoId, c.orcamentoId);
+                } on ErroTrato catch (e) {
+                  if (!e.mensagem.toLowerCase().contains('aceit')) rethrow;
+                }
+              },
+            );
+            if (ok && context.mounted) {
+              pedidosMudaram.value++;
+              _abrir<void>(context, _pagamento(pedidoId));
+            }
+          },
+          aoProporNovaCondicao: (ehPro && conversa.orcamentosAtivos.isNotEmpty)
+              ? () async {
+                  final prop = await pedirNovaPropostaProfissional(context);
+                  if (prop == null || !context.mounted) return;
+                  final ok = await _tentar(
+                    context,
+                    () => repos.orcamentos.proporNovaCondicao(
+                      pedidoId,
+                      conversa.orcamentosAtivos.first,
+                      prop.valorCentavos,
+                      prazoExecucaoDias: prop.prazoExecucaoDias,
+                      mensagem: prop.mensagem,
+                    ),
+                  );
+                  if (ok && context.mounted) {
+                    pedidosMudaram.value++;
+                    _avisoSimples(context, 'Nova proposta enviada ao cliente.');
                   }
-                },
-              );
-              if (ok && context.mounted) {
-                pedidosMudaram.value++;
-                _abrir<void>(context, _pagamento(pedidoId));
-              }
-            },
-            aoProporNovaCondicao: (ehPro && conversa.orcamentosAtivos.isNotEmpty)
-                ? () async {
-                    final prop = await pedirNovaPropostaProfissional(context);
-                    if (prop == null || !context.mounted) return;
-                    final ok = await _tentar(
-                      context,
-                      () => repos.orcamentos.proporNovaCondicao(
-                        pedidoId,
-                        conversa.orcamentosAtivos.first,
-                        prop.valorCentavos,
-                        prazoExecucaoDias: prop.prazoExecucaoDias,
-                        mensagem: prop.mensagem,
-                      ),
-                    );
-                    if (ok && context.mounted) {
-                      pedidosMudaram.value++;
-                      _avisoSimples(context, 'Nova proposta enviada ao cliente.');
-                    }
-                  }
-                : null,
-            aoEnviar: (texto) async {
-              final ok = await _tentar(
-                context,
-                () => repos.chat.enviar(pedidoId, texto, profissionalId: profissionalId),
-              );
-              if (!ok) throw StateError('Falha ao enviar mensagem');
-            },
+                }
+              : null,
+          aoEnviar: (texto) async {
+            final ok = await _tentar(
+              context,
+              () => repos.chat.enviar(pedidoId, texto, profissionalId: profissionalId),
+            );
+            if (!ok) throw StateError('Falha ao enviar mensagem');
+          },
           aoEnviarFoto: (ref) async {
             final ok = await _tentar(
               context,

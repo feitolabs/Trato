@@ -14,11 +14,13 @@ class AjudaTela extends StatelessWidget {
     required this.servico,
     this.aoFalarComSuporte,
     this.aoRelatarProblema,
+    this.aoVerTour,
   });
 
   final ServicoAjuda servico;
   final VoidCallback? aoFalarComSuporte;
   final VoidCallback? aoRelatarProblema;
+  final VoidCallback? aoVerTour;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,7 @@ class AjudaTela extends StatelessWidget {
           itens: itens,
           aoFalarComSuporte: aoFalarComSuporte,
           aoRelatarProblema: aoRelatarProblema,
+          aoVerTour: aoVerTour,
         ),
       ),
     );
@@ -41,11 +44,13 @@ class _ConteudoAjuda extends StatefulWidget {
     required this.itens,
     this.aoFalarComSuporte,
     this.aoRelatarProblema,
+    this.aoVerTour,
   });
 
   final List<PerguntaFrequente> itens;
   final VoidCallback? aoFalarComSuporte;
   final VoidCallback? aoRelatarProblema;
+  final VoidCallback? aoVerTour;
 
   @override
   State<_ConteudoAjuda> createState() => _ConteudoAjudaState();
@@ -128,6 +133,15 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
               ],
             ),
           ),
+        if (widget.aoVerTour != null) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          BotaoSecundario(
+            key: const Key('ver-tour-de-novo'),
+            texto: 'Ver tour de novo',
+            icone: Icons.explore_outlined,
+            aoTocar: widget.aoVerTour,
+          ),
+        ],
         if (widget.aoFalarComSuporte != null || widget.aoRelatarProblema != null) ...[
           const SizedBox(height: EspacosTrato.x6),
           Text('PRECISA DE MAIS AJUDA?', style: TipografiaTrato.sobretitulo),

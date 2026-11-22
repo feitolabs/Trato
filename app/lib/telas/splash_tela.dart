@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../componentes/componentes.dart';
 import '../tema/tema.dart';
 import 'fluxo/rotas.dart';
-import 'onboarding/onboarding_tela.dart';
+import 'onboarding/escolha_perfil_tela.dart';
 
 /// Tela 1 do protótipo: logo Feito Labs, "Trato" e o lema. Toque em qualquer lugar para começar.
 class SplashTela extends StatefulWidget {
@@ -32,7 +32,7 @@ class _SplashTelaState extends State<SplashTela> {
       return;
     }
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const OnboardingTela()),
+      MaterialPageRoute<void>(builder: (_) => const EscolhaPerfilTela()),
     );
   }
 

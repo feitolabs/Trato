@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trato/main.dart';
 import 'package:trato/telas/auth/criar_conta_tela.dart';
 import 'package:trato/telas/auth/login_tela.dart';
 import 'package:trato/telas/onboarding/escolha_perfil_tela.dart';
 import 'package:trato/telas/cliente/casca_cliente_tela.dart';
 import 'package:trato/telas/onboarding/onboarding_tela.dart';
+import 'package:trato/telas/onboarding/tour_perfil_tela.dart';
 
 void main() {
-  testWidgets('splash: toque leva ao onboarding', (tester) async {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('splash: toque leva à escolha de perfil', (tester) async {
     await tester.pumpWidget(const TratoApp());
 
     expect(find.text('FEITO LABS APRESENTA'), findsOneWidget);
@@ -16,8 +22,7 @@ void main() {
     await tester.tap(find.text('Toque para começar'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(OnboardingTela), findsOneWidget);
-    expect(find.text('1 DE 3'), findsOneWidget);
+    expect(find.byType(EscolhaPerfilTela), findsOneWidget);
   });
 
   group('onboarding', () {
@@ -83,12 +88,16 @@ void main() {
       expect(find.text('Criar conta de cliente'), findsNothing);
     });
 
-    testWidgets('botão abre o cadastro do perfil escolhido', (tester) async {
+    testWidgets('botão abre o tour do perfil na 1ª vez e depois o cadastro', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: EscolhaPerfilTela()));
 
       await tester.tap(find.text('Quero trabalhar'));
       await tester.pump();
       await tester.tap(find.text('Criar conta de profissional'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TourPerfilTela), findsOneWidget);
+      await tester.tap(find.text('Pular'));
       await tester.pumpAndSettle();
 
       expect(find.byType(CriarContaTela), findsOneWidget);

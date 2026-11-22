@@ -7,6 +7,7 @@ import '../../tema/tema.dart';
 import '../auth/login_tela.dart';
 import '../fluxo/rotas.dart';
 import 'escolha_perfil_tela.dart';
+import 'tour_perfil_tela.dart';
 
 class _PaginaOnboarding {
   const _PaginaOnboarding({required this.icone, required this.titulo, required this.texto});
@@ -111,7 +112,14 @@ class _OnboardingTelaState extends State<OnboardingTela> {
                   controller: _controlador,
                   itemCount: _paginas.length,
                   onPageChanged: (i) => setState(() => _pagina = i),
-                  itemBuilder: (_, i) => _Pagina(pagina: _paginas[i], numero: i, margem: margem),
+                  itemBuilder: (_, i) => PaginaTourVisual(
+                    icone: _paginas[i].icone,
+                    titulo: _paginas[i].titulo,
+                    texto: _paginas[i].texto,
+                    numero: i,
+                    total: _paginas.length,
+                    margem: margem,
+                  ),
                 ),
               ),
               Padding(
@@ -128,41 +136,6 @@ class _OnboardingTelaState extends State<OnboardingTela> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Pagina extends StatelessWidget {
-  const _Pagina({required this.pagina, required this.numero, required this.margem});
-
-  final _PaginaOnboarding pagina;
-  final int numero;
-  final double margem;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: margem, vertical: EspacosTrato.x6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 260,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: CoresTrato.azulClaro,
-              borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-            ),
-            child: Icon(pagina.icone, size: 72, color: CoresTrato.petroleo),
-          ),
-          const SizedBox(height: EspacosTrato.x6),
-          Text('${numero + 1} DE ${_paginas.length}', style: TipografiaTrato.sobretitulo),
-          const SizedBox(height: EspacosTrato.x3),
-          Text(pagina.titulo, style: TipografiaTrato.tituloGrande),
-          const SizedBox(height: EspacosTrato.x3),
-          Text(pagina.texto, style: TipografiaTrato.corpoGrande),
-        ],
       ),
     );
   }
