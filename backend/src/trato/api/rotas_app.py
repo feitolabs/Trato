@@ -476,6 +476,11 @@ class AvaliarIn(_Entrada):
 
     @model_validator(mode="after")
     def _coerencia_nota_decimal(self) -> AvaliarIn:
+        if self.criterios:
+            media = round(sum(self.criterios.values()) / len(self.criterios), 2)
+            self.nota_decimal = media
+            self.nota_geral = max(1, min(5, int(media + 0.5)))
+            return self
         if self.nota_decimal is not None:
             diff = abs(Decimal(str(self.nota_decimal)) - Decimal(self.nota_geral))
             if diff > Decimal("0.5"):
@@ -1554,10 +1559,17 @@ def avaliar(
         raise HTTPException(422, "Só o cliente pode escolher etiquetas de elogio.")
     else:
         etiquetas = ()
+    if corpo.criterios:
+        media = round(sum(corpo.criterios.values()) / len(corpo.criterios), 2)
+        nota_decimal: float | None = media
+        nota_geral = max(1, min(5, int(media + 0.5)))
+    else:
+        nota_decimal = corpo.nota_decimal
+        nota_geral = corpo.nota_geral
     repetida = contexto.avaliacoes.obter(pedido.id, direcao)
     if repetida is not None:
         if not _mesma_avaliacao(
-            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal, corpo.criterios
+            repetida, nota_geral, comentario, etiquetas, nota_decimal, corpo.criterios
         ):
             raise HTTPException(409, "Você já avaliou este serviço.")
         # duplo toque (mesmo corpo): o mesmo sucesso, sem novo registro nem novo bônus
@@ -1568,8 +1580,8 @@ def avaliar(
         direcao=direcao,
         avaliador_id=usuario.id,
         avaliado_id=avaliado,
-        nota_geral=corpo.nota_geral,
-        nota_decimal=corpo.nota_decimal,
+        nota_geral=nota_geral,
+        nota_decimal=nota_decimal,
         criterios=dict(corpo.criterios) if corpo.criterios else None,
         comentario=comentario,
         etiquetas=etiquetas,
@@ -1580,7 +1592,7 @@ def avaliar(
     except Duplicado:  # corrida de dois toques: quem perdeu devolve o sucesso de quem ganhou
         repetida = contexto.avaliacoes.obter(pedido.id, direcao)
         if repetida is None or not _mesma_avaliacao(
-            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal, corpo.criterios
+            repetida, nota_geral, comentario, etiquetas, nota_decimal, corpo.criterios
         ):
             raise
         resposta.status_code = 200

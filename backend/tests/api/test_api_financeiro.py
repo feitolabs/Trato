@@ -69,9 +69,9 @@ def test_carteira_traz_a_data_prevista_de_repasse_pelo_prazo_da_configuracao(amb
 
 
 def test_carteira_so_para_profissional(amb):
-    assert (
-        amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-cliente")).status_code == 403
-    )
+    cli = amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-cliente"))
+    assert cli.status_code == 200
+    assert (cli.json()["a_liberar_centavos"], cli.json()["liberado_centavos"]) == (0, 0)
     assert amb.cliente.get("/v1/profissionais/me/saldo", headers=cab("t-equipe")).status_code == 403
 
 

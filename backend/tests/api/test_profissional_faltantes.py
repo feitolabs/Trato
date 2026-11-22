@@ -257,10 +257,15 @@ def test_4_baixar_extrato_mensal_em_pdf_pelo_profissional(amb):
     )
     assert invalido.status_code == 422
 
-    proibido_cliente = amb.cliente.get(
+    cliente_conta_dupla = amb.cliente.get(
         "/v1/profissionais/me/extrato.pdf?mes=2026-10", headers=cab("t-cliente")
     )
-    assert proibido_cliente.status_code == 403
+    assert cliente_conta_dupla.status_code == 200
+
+    proibido_equipe = amb.cliente.get(
+        "/v1/profissionais/me/extrato.pdf?mes=2026-10", headers=cab("t-equipe")
+    )
+    assert proibido_equipe.status_code == 403
 
 
 def test_5_disponivel_agora_prioriza_e_notifica_pedidos_urgentes(amb):

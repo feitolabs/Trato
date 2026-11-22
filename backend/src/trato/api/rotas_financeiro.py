@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
@@ -111,7 +112,7 @@ def extrato_do_pedido(
     summary="Carteira do profissional (a liberar e liberado)",
 )
 def saldo_do_profissional(
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> SaldoProfissionalOut:
     previstas = _liberacoes_previstas(contexto, usuario.id)
@@ -234,10 +235,16 @@ def _liberacoes_previstas(contexto: Contexto, profissional_id: str) -> list[Libe
 def meu_extrato(
     limite: int = Query(20, ge=1, le=LIMITE_MAXIMO),
     deslocamento: int = Query(0, ge=0),
+    como: Literal["cliente", "profissional"] | None = Query(
+        None, description="Papel do extrato (cliente ou profissional)."
+    ),
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> ExtratoOut:
-    if usuario.papel is PapelUsuario.PROFISSIONAL:
+    modo_profissional = como == "profissional" or (
+        como is None and usuario.papel is PapelUsuario.PROFISSIONAL
+    )
+    if modo_profissional:
         minhas = {a_liberar(usuario.id), liberado(usuario.id)}
         itens = [
             i for i in contexto.ledger.lancamentos() if i.debito in minhas or i.credito in minhas
@@ -284,7 +291,7 @@ def baixar_meu_extrato_pdf(
     mes: str | None = Query(
         None, description="Mês no formato AAAA-MM (horário de Brasília). Padrão: mês atual."
     ),
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Response:
     agora = contexto.agora()

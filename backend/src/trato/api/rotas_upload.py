@@ -315,7 +315,10 @@ def pedir_upload(
     regra = DESTINOS.get(corpo.destino)
     if regra is None:
         raise HTTPException(422, "Destino de arquivo desconhecido.")
-    if regra.registro == "portfolio" and usuario.papel is not PapelUsuario.PROFISSIONAL:
+    if regra.registro == "portfolio" and usuario.papel not in (
+        PapelUsuario.PROFISSIONAL,
+        PapelUsuario.CLIENTE,
+    ):
         raise HTTPException(403, "Só profissionais enviam fotos de portfólio.")
     pedido_id = None
     if regra.registro == "midia":
