@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import 'escolha_perfil_tela.dart';
+import 'ilustracoes_cliente.dart';
+import 'ilustracoes_profissional.dart';
 
 /// Uma página do tour rápido de onboarding por perfil.
 class PaginaTour {
@@ -170,7 +172,9 @@ class _TourPerfilTelaState extends State<TourPerfilTela> {
                   itemCount: paginas.length,
                   onPageChanged: (i) => setState(() => _pagina = i),
                   itemBuilder: (_, i) => PaginaTourVisual(
-                    icone: paginas[i].icone,
+                    construirIlustracao: (tamanho) => widget.perfil == PerfilUso.cliente
+                        ? IlustracaoOnboardingCliente(pagina: i, tamanho: tamanho)
+                        : IlustracaoOnboardingProfissional(pagina: i, tamanho: tamanho),
                     titulo: paginas[i].titulo,
                     texto: paginas[i].texto,
                     numero: i,
@@ -197,19 +201,21 @@ class _TourPerfilTelaState extends State<TourPerfilTela> {
   }
 }
 
-/// Página visual reutilizável (ícone, indicador "N DE M", título e texto) do onboarding/tour.
+/// Página visual reutilizável (ilustração ou ícone, indicador "N DE M", título e texto).
 class PaginaTourVisual extends StatelessWidget {
   const PaginaTourVisual({
     super.key,
-    required this.icone,
+    this.icone,
+    this.construirIlustracao,
     required this.titulo,
     required this.texto,
     required this.numero,
     required this.total,
     required this.margem,
-  });
+  }) : assert(icone != null || construirIlustracao != null);
 
-  final IconData icone;
+  final IconData? icone;
+  final Widget Function(double tamanho)? construirIlustracao;
   final String titulo;
   final String texto;
   final int numero;
@@ -218,28 +224,44 @@ class PaginaTourVisual extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: margem, vertical: EspacosTrato.x6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 260,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: CoresTrato.azulClaro,
-              borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-            ),
-            child: Icon(icone, size: 72, color: CoresTrato.petroleo),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final usaIlustracao = construirIlustracao != null;
+        final compacto = usaIlustracao && constraints.maxHeight < 460;
+        final padVertical = compacto ? EspacosTrato.x3 : EspacosTrato.x6;
+        final espacoTopoTexto = compacto ? EspacosTrato.x3 : EspacosTrato.x6;
+        final espacoEntre = compacto ? EspacosTrato.x2 : EspacosTrato.x3;
+        final maxPorAltura = (constraints.maxHeight * (compacto ? 0.36 : 0.44)).clamp(110.0, 240.0);
+        final maxPorLargura = (constraints.maxWidth - margem * 2).clamp(110.0, 240.0);
+        final lado = maxPorAltura < maxPorLargura ? maxPorAltura : maxPorLargura;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: margem, vertical: padVertical),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (usaIlustracao)
+                Center(child: construirIlustracao!(lado))
+              else
+                Container(
+                  height: 260,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: CoresTrato.azulClaro,
+                    borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+                  ),
+                  child: Icon(icone, size: 72, color: CoresTrato.petroleo),
+                ),
+              SizedBox(height: espacoTopoTexto),
+              Text('${numero + 1} DE $total', style: TipografiaTrato.sobretitulo),
+              SizedBox(height: espacoEntre),
+              Text(titulo, style: TipografiaTrato.tituloGrande),
+              SizedBox(height: espacoEntre),
+              Text(texto, style: TipografiaTrato.corpoGrande),
+            ],
           ),
-          const SizedBox(height: EspacosTrato.x6),
-          Text('${numero + 1} DE $total', style: TipografiaTrato.sobretitulo),
-          const SizedBox(height: EspacosTrato.x3),
-          Text(titulo, style: TipografiaTrato.tituloGrande),
-          const SizedBox(height: EspacosTrato.x3),
-          Text(texto, style: TipografiaTrato.corpoGrande),
-        ],
-      ),
+        );
+      },
     );
   }
 }
