@@ -683,7 +683,7 @@ void main() {
         CadastroProfissionalTela(servico: lento, nomeInicial: '   '),
         tamanho: const Size(390, 1800),
       );
-      await tester.tap(find.text('Salvar e continuar'));
+      await tester.tap(find.text('Continuar'));
       await tester.pumpAndSettle();
       expect(lento.envios, 0);
       expect(find.textContaining('mínimo 3 letras'), findsOneWidget);

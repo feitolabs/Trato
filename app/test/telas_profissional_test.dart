@@ -125,10 +125,12 @@ void main() {
       final fake = ServicoCadastroProfissionalFake();
       await _abrir(t, CadastroProfissionalTela(servico: fake));
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
+      await _tocar(t, find.text('Continuar'));
       await _tocar(t, find.text('Eletricista'));
+      await _tocar(t, find.text('Continuar'));
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));
-      await _tocar(t, find.text('Salvar e continuar'));
+      await _tocar(t, find.text('Continuar'));
       expect(find.textContaining('Escolha a cidade onde você atende'), findsOneWidget);
       expect(fake.salvos, isEmpty);
       // A cidade é escolhida na lista (as do banco), nunca digitada.
@@ -139,11 +141,14 @@ void main() {
     testWidgets('recusa com motivo mostra o motivo, não "confira sua conexão"', (t) async {
       await _abrir(t, CadastroProfissionalTela(servico: _CadastroRecusado()));
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await _tocar(t, find.text('Belo Horizonte'));
+      await _tocar(t, find.text('Continuar'));
       await _tocar(t, find.text('Eletricista'));
+      await _tocar(t, find.text('Continuar'));
+      await _tocar(t, find.text('Belo Horizonte'));
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));
-      await _tocar(t, find.text('Salvar e continuar'));
+      await _tocar(t, find.text('Continuar'));
+      await _tocar(t, find.text('Salvar cadastro'));
       expect(find.textContaining('Ainda não atendemos essa cidade'), findsOneWidget);
       expect(find.textContaining('Confira sua conexão'), findsNothing);
     });
@@ -159,26 +164,33 @@ void main() {
           aoConcluir: () => concluiu = true,
         ),
       );
-      await _tocar(t, find.text('Salvar e continuar'));
+      await _tocar(t, find.text('Continuar'));
       expect(
         find.text('Informe seu nome completo (mínimo 3 letras).'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Escolha pelo menos uma categoria.'),
         findsOneWidget,
       );
       expect(fake.salvos, isEmpty);
 
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await t.enterText(find.widgetWithText(TextField, '').first, 'x'); // sobre (ignorado)
+      await t.enterText(find.byType(TextField).at(1), 'x');
+      await _tocar(t, find.text('Continuar'));
+
+      await _tocar(t, find.text('Continuar'));
+      expect(
+        find.text('Escolha pelo menos uma categoria.'),
+        findsOneWidget,
+      );
       await _tocar(t, find.text('Eletricista'));
-      await _tocar(t, find.text('Seg'));
-      await _tocar(t, find.text('Manhã'));
+      await _tocar(t, find.text('Continuar'));
+
       await _tocar(t, find.text('Belo Horizonte'));
       await _tocar(t, find.text('20 km'));
-      await _tocar(t, find.text('Adicionar foto'));
-      await _tocar(t, find.text('Salvar e continuar'));
+      await _tocar(t, find.text('Seg'));
+      await _tocar(t, find.text('Manhã'));
+      await _tocar(t, find.text('Continuar'));
+
+      await _tocar(t, find.text('+ Adicionar foto'));
+      await _tocar(t, find.text('Salvar cadastro'));
 
       expect(fake.salvos, hasLength(1));
       final d = fake.salvos.single;
@@ -192,11 +204,14 @@ void main() {
       final fake = ServicoCadastroProfissionalFake(falharAoSalvar: true);
       await _abrir(t, CadastroProfissionalTela(servico: fake));
       await t.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      await _tocar(t, find.text('Belo Horizonte'));
+      await _tocar(t, find.text('Continuar'));
       await _tocar(t, find.text('Eletricista'));
+      await _tocar(t, find.text('Continuar'));
+      await _tocar(t, find.text('Belo Horizonte'));
       await _tocar(t, find.text('Seg'));
       await _tocar(t, find.text('Manhã'));
-      await _tocar(t, find.text('Salvar e continuar'));
+      await _tocar(t, find.text('Continuar'));
+      await _tocar(t, find.text('Salvar cadastro'));
       expect(
         find.text(
           'Não foi possível salvar os dados. Confira sua conexão e tente novamente.',
@@ -230,8 +245,8 @@ void main() {
           aoConcluir: () => concluiu = true,
         ),
       );
-      expect(find.text('Salvar e continuar'), findsNothing);
-      expect(find.text('Faço instalação elétrica há 10 anos.'), findsOneWidget);
+      expect(find.text('Salvar cadastro'), findsNothing);
+      expect(find.textContaining('Faço instalação elétrica há 10 anos.'), findsOneWidget);
 
       await _tocar(t, find.text('Salvar alterações'));
 
@@ -247,9 +262,10 @@ void main() {
       expect(concluiu, isTrue);
     });
 
-    testWidgets('primeiro cadastro continua vazio e com "Salvar e continuar"', (t) async {
+    testWidgets('primeiro cadastro começa no passo 1 de 4 com "Continuar"', (t) async {
       await _abrir(t, CadastroProfissionalTela(servico: ServicoCadastroProfissionalFake()));
-      expect(find.text('Salvar e continuar'), findsOneWidget);
+      expect(find.text('1 de 4'), findsOneWidget);
+      expect(find.text('Continuar'), findsOneWidget);
       expect(find.text('Salvar alterações'), findsNothing);
     });
   });

@@ -99,8 +99,22 @@ void main() {
       await tester.tap(find.text('Editar cadastro'));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('Dados básicos'));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      for (final texto in ['Belo Horizonte', 'Eletricista', 'Seg', 'Manhã']) {
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Categorias'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eletricista').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Voltar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Área e horários'));
+      await tester.pumpAndSettle();
+      for (final texto in ['Belo Horizonte', 'Seg', 'Manhã']) {
         final finder = find.text(texto).last;
         await tester.ensureVisible(finder);
         await tester.pumpAndSettle();
@@ -194,6 +208,9 @@ void main() {
         tester,
         CadastroProfissionalTela(edicao: true, servico: servico),
       );
+
+      await tester.tap(find.text('Categorias'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Eletricista'), findsOneWidget);
       expect(find.text('Encanador'), findsNothing);
