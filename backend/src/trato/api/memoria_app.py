@@ -229,6 +229,19 @@ class AvaliacoesEmMemoria:
         ]
         return tuple(sorted(achadas, key=lambda a: a.criada_em, reverse=True))
 
+    def media_recebida(self, avaliado_id: str) -> float | None:
+        """Média das avaliações de clientes usando coalesce(nota_decimal, nota_geral), 2 casas."""
+        notas = [
+            a.nota_decimal if a.nota_decimal is not None else float(a.nota_geral)
+            for a in self._itens.values()
+            if a.avaliado_id == avaliado_id
+            and a.direcao == "cliente_para_profissional"
+            and a.status == "publicada"
+        ]
+        if not notas:
+            return None
+        return round(sum(notas) / len(notas), 2)
+
 
 class RecusasEmMemoria:
     def __init__(self) -> None:

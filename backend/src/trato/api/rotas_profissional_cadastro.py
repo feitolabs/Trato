@@ -132,6 +132,7 @@ class PerfilProfissionalOut(BaseModel):
 class AvaliacaoRecebidaOut(BaseModel):
     id: str | None = None
     nota_geral: int
+    nota_decimal: float | None = None
     comentario: str | None
     resposta: str | None = None
     etiquetas: list[str]
@@ -805,6 +806,7 @@ def perfil_publico(
         return AvaliacaoRecebidaOut(
             id=a.id,
             nota_geral=a.nota_geral,
+            nota_decimal=a.nota_decimal,
             # sem moderação ainda: mesma regra da rota pública (ver a flag)
             comentario=(a.comentario or None) if PERFIL_PUBLICO_EXIBE_COMENTARIO else None,
             resposta=a.resposta,
@@ -813,6 +815,10 @@ def perfil_publico(
             cliente_nome=_nome_abreviado(quem.nome) if quem else None,
             categoria=nomes_categorias.get(dados.categoria_id) if dados else None,
         )
+
+    nota_publica = detalhe.nota_publica
+    if nota_publica is None and hasattr(contexto.avaliacoes, "media_recebida"):
+        nota_publica = contexto.avaliacoes.media_recebida(profissional_id)
 
     return PerfilPublicoOut(
         no_trato_desde=perfil.criado_em,
@@ -823,7 +829,7 @@ def perfil_publico(
         nome=_nome_abreviado(detalhe.nome),
         bio=base.bio,
         nivel_verificacao=perfil.nivel_verificacao,
-        nota_publica=detalhe.nota_publica,
+        nota_publica=nota_publica,
         servicos_concluidos=detalhe.servicos_concluidos,
         taxa_conclusao=detalhe.taxa_conclusao,
         atende_presencial=perfil.atende_presencial,

@@ -184,6 +184,8 @@ class Avaliacao:
     resposta: str | None = None
     # Moderação (coluna `avaliacoes.status`): só "publicada" aparece no perfil e conta no selo.
     status: str = "publicada"
+    # Média opcional dos critérios (1.00 a 5.00, máx. 2 casas); None em avaliações antigas.
+    nota_decimal: float | None = None
 
 
 class RepositorioConversas(Protocol):

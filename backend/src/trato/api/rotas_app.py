@@ -10,11 +10,19 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
@@ -294,6 +302,7 @@ class AvaliacaoOut(BaseModel):
     pedido_id: str
     direcao: str
     nota_geral: int
+    nota_decimal: float | None = None
     comentario: str | None
     resposta: str | None = None
     etiquetas: list[str]
@@ -406,10 +415,45 @@ class VerificacaoIn(_Entrada):
 
 class AvaliarIn(_Entrada):
     nota_geral: StrictInt = Field(ge=1, le=5)
+    nota_decimal: float | None = Field(
+        None,
+        description=(
+            "Média opcional dos critérios (1.00 a 5.00, máx. 2 casas e a até 0,5 de nota_geral)."
+        ),
+    )
     # Tamanhos finais vêm da configuração (`TRATO_SEG_COMENTARIO_MAX_CHARS` etc.); estes tetos
     # só protegem a validação contra corpo absurdo.
     comentario: str | None = Field(None, max_length=20_000)
     etiquetas: list[str] = Field(default_factory=list, max_length=200)
+
+    @field_validator("nota_decimal", mode="before")
+    @classmethod
+    def _validar_nota_decimal(cls, v: Any) -> float | None:
+        if v is None:
+            return None
+        if isinstance(v, bool) or not isinstance(v, (int, float, Decimal)):
+            raise ValueError("nota_decimal deve ser um número entre 1.00 e 5.00.")
+        try:
+            dec = Decimal(str(v))
+        except InvalidOperation as err:
+            raise ValueError("nota_decimal inválida.") from err
+        if not dec.is_finite():
+            raise ValueError("nota_decimal deve ser um número finito.")
+        if dec < Decimal("1") or dec > Decimal("5"):
+            raise ValueError("nota_decimal deve ficar entre 1.00 e 5.00.")
+        if dec != dec.quantize(Decimal("0.01")):
+            raise ValueError("nota_decimal aceita no máximo 2 casas decimais.")
+        return float(dec)
+
+    @model_validator(mode="after")
+    def _coerencia_nota_decimal(self) -> AvaliarIn:
+        if self.nota_decimal is not None:
+            diff = abs(Decimal(str(self.nota_decimal)) - Decimal(self.nota_geral))
+            if diff > Decimal("0.5"):
+                raise ValueError(
+                    "nota_decimal deve estar a no máximo 0,5 de distância de nota_geral."
+                )
+        return self
 
 
 # --- Acesso -----------------------------------------------------------------------------
@@ -1290,10 +1334,15 @@ def _moedas_ja_dadas(contexto: Contexto, usuario: Usuario, pedido: Any, direcao:
 
 
 def _mesma_avaliacao(
-    antiga: Avaliacao, nota: int, comentario: str | None, etiquetas: Sequence[str]
+    antiga: Avaliacao,
+    nota: int,
+    comentario: str | None,
+    etiquetas: Sequence[str],
+    nota_decimal: float | None = None,
 ) -> bool:
     return (
         antiga.nota_geral == nota
+        and antiga.nota_decimal == nota_decimal
         and (antiga.comentario or None) == (comentario or None)
         and tuple(antiga.etiquetas) == tuple(etiquetas)
     )
@@ -1306,6 +1355,7 @@ def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
         pedido_id=nova.pedido_id,
         direcao=nova.direcao,
         nota_geral=nova.nota_geral,
+        nota_decimal=nova.nota_decimal,
         comentario=nova.comentario,
         resposta=nova.resposta,
         etiquetas=list(nova.etiquetas),
@@ -1380,7 +1430,9 @@ def avaliar(
         etiquetas = ()
     repetida = contexto.avaliacoes.obter(pedido.id, direcao)
     if repetida is not None:
-        if not _mesma_avaliacao(repetida, corpo.nota_geral, comentario, etiquetas):
+        if not _mesma_avaliacao(
+            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal
+        ):
             raise HTTPException(409, "Você já avaliou este serviço.")
         # duplo toque (mesmo corpo): o mesmo sucesso, sem novo registro nem novo bônus
         resposta.status_code = 200
@@ -1391,6 +1443,7 @@ def avaliar(
         avaliador_id=usuario.id,
         avaliado_id=avaliado,
         nota_geral=corpo.nota_geral,
+        nota_decimal=corpo.nota_decimal,
         comentario=comentario,
         etiquetas=etiquetas,
         criada_em=contexto.agora(),
@@ -1400,7 +1453,7 @@ def avaliar(
     except Duplicado:  # corrida de dois toques: quem perdeu devolve o sucesso de quem ganhou
         repetida = contexto.avaliacoes.obter(pedido.id, direcao)
         if repetida is None or not _mesma_avaliacao(
-            repetida, corpo.nota_geral, comentario, etiquetas
+            repetida, corpo.nota_geral, comentario, etiquetas, corpo.nota_decimal
         ):
             raise
         resposta.status_code = 200

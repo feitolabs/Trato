@@ -495,6 +495,7 @@ class AvaliacoesPostgres:
 
     @staticmethod
     def _de_linha(l: Any) -> Avaliacao:  # noqa: E741
+        nota_dec = l.get("nota_decimal") if isinstance(l, dict) else None
         return Avaliacao(
             id=str(l["id"]),
             pedido_id=str(l["pedido_id"]),
@@ -502,6 +503,7 @@ class AvaliacoesPostgres:
             avaliador_id=str(l["avaliador_id"]),
             avaliado_id=str(l["avaliado_id"]),
             nota_geral=int(l["nota_geral"]),
+            nota_decimal=float(nota_dec) if nota_dec is not None else None,
             comentario=l["comentario"],
             etiquetas=tuple(l["etiquetas"] or ()),
             criada_em=l["criada_em"],
@@ -515,7 +517,7 @@ class AvaliacoesPostgres:
         with self._banco.transacao() as con:
             l = con.execute(  # noqa: E741
                 "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-                "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
+                "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta "
                 "from public.avaliacoes a "
                 "join public.contratos c on c.id = a.contrato_id "
                 "where c.pedido_id = %s and a.direcao = %s",
@@ -530,7 +532,7 @@ class AvaliacoesPostgres:
         with self._banco.transacao() as con:
             l = con.execute(  # noqa: E741
                 "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-                "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
+                "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta "
                 "from public.avaliacoes a "
                 "join public.contratos c on c.id = a.contrato_id "
                 "where a.id = %s",
@@ -561,7 +563,7 @@ class AvaliacoesPostgres:
         with self._banco.transacao() as con:
             linhas = con.execute(
                 "select a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-                "a.nota_geral, a.comentario, a.etiquetas, a.criada_em, a.resposta "
+                "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta "
                 "from public.avaliacoes a "
                 "join public.contratos c on c.id = a.contrato_id "
                 "where a.avaliado_id = %s and a.status = 'publicada' order by a.criada_em desc",
@@ -574,14 +576,15 @@ class AvaliacoesPostgres:
             contrato = _exigir_contrato(con, avaliacao.pedido_id)
             con.execute(
                 "insert into public.avaliacoes (contrato_id, direcao, avaliador_id, avaliado_id, "
-                "nota_geral, comentario, etiquetas, criada_em) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s)",
+                "nota_geral, nota_decimal, comentario, etiquetas, criada_em) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     contrato["id"],
                     avaliacao.direcao,
                     exigir_uuid(avaliacao.avaliador_id, "avaliador"),
                     exigir_uuid(avaliacao.avaliado_id, "avaliado"),
                     avaliacao.nota_geral,
+                    avaliacao.nota_decimal,
                     avaliacao.comentario,
                     list(avaliacao.etiquetas),
                     avaliacao.criada_em,
