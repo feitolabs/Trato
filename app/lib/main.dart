@@ -20,6 +20,7 @@ import 'dispositivo/folha_cartao.dart';
 import 'dispositivo/servico_camera_real.dart';
 import 'dados/sessao_expirada.dart';
 import 'dispositivo/servico_localizacao_real.dart';
+import 'dispositivo/servico_push_firebase.dart';
 import 'galeria/galeria_componentes.dart';
 import 'telas/fluxo/rotas.dart';
 import 'telas/splash_tela.dart';
@@ -58,6 +59,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // O app é só vertical. Android e iOS também travam isso no manifesto e no Info.plist.
   await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
+  await inicializarFirebaseComSeguranca();
   var config = ConfigTrato.doAmbiente();
   var configAuth = ConfigAuth.doAmbiente();
 
@@ -68,8 +70,9 @@ Future<void> main() async {
   if (!configAuth.supabaseConfigurado) {
     configAuth = ConfigAuth(
       supabaseUrl: configAuth.supabaseUrl.isNotEmpty ? configAuth.supabaseUrl : _defaultSupabaseUrl,
-      supabaseAnonKey:
-          configAuth.supabaseAnonKey.isNotEmpty ? configAuth.supabaseAnonKey : _defaultSupabaseAnonKey,
+      supabaseAnonKey: configAuth.supabaseAnonKey.isNotEmpty
+          ? configAuth.supabaseAnonKey
+          : _defaultSupabaseAnonKey,
       googleWebClientId: configAuth.googleWebClientId,
       googleIosClientId: configAuth.googleIosClientId,
     );
@@ -81,26 +84,11 @@ Future<void> main() async {
       api: config.usaApi ? ClienteApi(urlBase: config.apiUrl, sessao: sessaoTrato) : null,
     );
   }
-  LigacaoSessao(
-    ServicoAuthPadrao.atual,
-    sessaoTrato,
-    // Primeiro login: GET /v1/me cria o usuário no backend (idempotente).
-    // Só no modo api; em demo não chama nada.
-    aoEntrar: () async {
-      if (config.usaApi) {
-        await RotasTrato.repos.perfil.carregar();
-        await RotasTrato.sincronizarPush();
-      }
-    },
-  );
-  // Link do e-mail de recuperação: o app abre direto na tela de senha nova.
-  if (configAuth.supabaseConfigurado) {
-    ServicoAuthPadrao.atual.recuperacaoDeSenha.listen((_) => _abrirNovaSenha());
-  }
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   abrirLoginPorSessaoExpiradaHook = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
+  RotasTrato.push = ServicoPushFirebase();
   RotasTrato.repos = RepositoriosTrato.deConfig(
     config,
     sessaoTrato,
@@ -110,6 +98,26 @@ Future<void> main() async {
     fila: await _abrirFilaOffline(),
   );
   RotasTrato.folhaCartao = FolhaCartaoStripe();
+  LigacaoSessao(
+    ServicoAuthPadrao.atual,
+    sessaoTrato,
+    // Primeiro login: GET /v1/me cria o usuário no backend (idempotente).
+    // Só no modo api; em demo não chama nada.
+    aoEntrar: () async {
+      if (config.usaApi) {
+        try {
+          await RotasTrato.repos.perfil.carregar();
+        } on Object {
+          // Rede instável no perfil não impede tentar registrar o push.
+        }
+        await RotasTrato.sincronizarPush();
+      }
+    },
+  );
+  // Link do e-mail de recuperação: o app abre direto na tela de senha nova.
+  if (configAuth.supabaseConfigurado) {
+    ServicoAuthPadrao.atual.recuperacaoDeSenha.listen((_) => _abrirNovaSenha());
+  }
   runApp(const TratoApp());
 }
 

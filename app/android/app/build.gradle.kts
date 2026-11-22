@@ -74,8 +74,6 @@ flutter {
 dependencies {
     // Tema AppCompat da folha de cartão (Stripe PaymentSheet).
     implementation("androidx.appcompat:appcompat:1.7.0")
-    // FCM para push nativo; o plugin google-services só ativa se google-services.json existir.
-    implementation("com.google.firebase:firebase-messaging:24.1.0")
 }
 
 if (file("google-services.json").exists()) {

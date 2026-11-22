@@ -16,6 +16,7 @@ import '../../dados/config_publica.dart';
 import '../../dados/relogio_de_atualizacao.dart';
 import '../../dispositivo/mapa.dart';
 import '../../dispositivo/servico_push.dart';
+import '../../dispositivo/servico_push_firebase.dart';
 import '../../dados/repositorios.dart';
 import '../../dispositivo/folha_cartao.dart';
 import '../orcamentos/folha_contraproposta.dart';
@@ -139,13 +140,14 @@ abstract final class RotasTrato {
   static CompartilharArquivo compartilharArquivo = compartilharArquivoNoAparelho;
 
   /// Canal nativo de push (FCM / APNs). Nos testes fica falso/silencioso.
-  static ServicoPush push = ServicoPushNativo();
+  static ServicoPush push = ServicoPushFirebase();
   static StreamSubscription<TokenPushDispositivo>? _subPush;
 
   /// Registra o token de push do aparelho no backend após autenticar.
   static Future<void> sincronizarPush() async {
     if (!repos.modoApi || !temSessao) return;
     _subPush ??= push.aoAtualizarToken.listen((t) {
+      if (!repos.modoApi || !temSessao) return;
       push.ultimoTokenRegistrado = t.token;
       repos.notificacoes.registrarDispositivo(t.token, t.plataforma).catchError((_) {});
     });
@@ -158,6 +160,13 @@ abstract final class RotasTrato {
     } on Object {
       // Sem push nativo configurado (ex.: navegador/desktop/teste): segue normalmente.
     }
+  }
+
+  /// Limpa a inscrição de atualização de token entre testes.
+  @visibleForTesting
+  static Future<void> resetarPushParaTeste() async {
+    await _subPush?.cancel();
+    _subPush = null;
   }
 
   /// Permissões de câmera e GPS (usadas no check-in e check-out).

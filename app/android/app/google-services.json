@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "769820723257",
+    "project_id": "trato-63fc8",
+    "storage_bucket": "trato-63fc8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:769820723257:android:c8c06d1d8db622b60965e8",
+        "android_client_info": {
+          "package_name": "br.com.feitolabs.trato"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-0cA5dJiivxyJ0JEvwSWI9RRAVPExHpg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
