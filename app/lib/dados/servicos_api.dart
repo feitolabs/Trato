@@ -847,7 +847,8 @@ class ServicoPerfilPublicoApi implements ServicoPerfilPublico, RespostaAvaliacao
               id: a['id'] as String?,
               cliente: (a['cliente_nome'] as String?) ?? 'Cliente',
               servico: servicoDaAvaliacao(a),
-              nota: (a['nota_geral'] as num).toDouble(),
+              nota: (a['nota_decimal'] is num ? a['nota_decimal'] as num : a['nota_geral'] as num)
+                  .toDouble(),
               comentario: (a['comentario'] as String?) ?? '',
               detalhes: '',
               etiquetas: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'],
