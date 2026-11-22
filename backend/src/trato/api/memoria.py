@@ -391,13 +391,6 @@ class OrcamentosEmMemoria:
         )
         return novo_id
 
-    def enviados_do_pedido(self, pedido_id: str) -> Sequence[tuple[str, str]]:
-        return tuple(
-            (d.id, d.profissional_id)
-            for d in self._detalhes.values()
-            if d.pedido_id == pedido_id and d.status == "enviado"
-        )
-
     def aceitar_e_recusar_outros(
         self, pedido_id: str, orcamento_aceito_id: str
     ) -> tuple[tuple[str, str], ...]:

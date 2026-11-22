@@ -239,10 +239,6 @@ class RepositorioOrcamentos(Protocol):
         observacoes: str | None = None,
     ) -> str: ...
 
-    def enviados_do_pedido(self, pedido_id: str) -> Sequence[tuple[str, str]]:
-        """`(orcamento_id, profissional_id)` dos orçamentos ainda `enviado` do pedido (os que o
-        aceite de outro orçamento vai recusar). Só leitura."""
-
     def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
         """Marca o orçamento enviado como `recusado`. Devolve True se mudou agora."""
 
