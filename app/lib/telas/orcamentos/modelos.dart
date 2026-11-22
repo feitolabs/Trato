@@ -157,26 +157,38 @@ const _rotuloPorTipo = {
 /// vírgula, ponto e vírgula ou quebra de linha.
 final _itemMaterialExato = RegExp(r'(^|[,;\n]\s*)material(?=\s*($|[,;\n]))', caseSensitive: false);
 
+/// Casa o item exato "demais materiais" (sem distinguir maiúsculas) dentro de uma lista separada
+/// por vírgula, ponto e vírgula ou quebra de linha.
+final _itemDemaisMateriaisExato =
+    RegExp(r'(^|[,;\n]\s*)demais\s+materiais(?=\s*($|[,;\n]))', caseSensitive: false);
+
 bool _temConflitoMaterial(DetalheOrcamento? detalhe) {
   if (detalhe == null) return false;
   if (!detalhe.tiposDosItens.contains('material')) return false;
   return _itemMaterialExato.hasMatch(detalhe.foraDoEscopo.trim());
 }
 
+bool _deveRotularMaterialListado(DetalheOrcamento? detalhe) {
+  if (detalhe == null) return false;
+  if (!detalhe.tiposDosItens.contains('material')) return false;
+  final fora = detalhe.foraDoEscopo.trim();
+  return _itemMaterialExato.hasMatch(fora) || _itemDemaisMateriaisExato.hasMatch(fora);
+}
+
 /// "Inclui:" do orçamento: só os tipos que existem, sempre na mesma ordem. Sem itens (ou sem
 /// detalhe), "Valor combinado". Tipo que o app não conhece conta como "Outros".
-/// Quando há item de material listado e "Material" também aparece em "Não inclui", exibe
-/// "Material listado" para evitar contradição.
+/// Quando há item de material listado e "Material" ou "Demais materiais" aparece em "Não inclui",
+/// exibe "Material listado" para deixar claro que só os itens listados estão inclusos.
 String textoInclui(DetalheOrcamento? detalhe) {
   final tipos = detalhe?.tiposDosItens ?? const <String>[];
   final presentes = {
     for (final t in tipos) _rotuloPorTipo.containsKey(t) ? t : 'outro',
   };
-  final conflitoMaterial = _temConflitoMaterial(detalhe);
+  final rotularMaterialListado = _deveRotularMaterialListado(detalhe);
   final rotulos = [
     for (final e in _rotuloPorTipo.entries)
       if (presentes.contains(e.key))
-        e.key == 'material' && conflitoMaterial ? 'Material listado' : e.value,
+        e.key == 'material' && rotularMaterialListado ? 'Material listado' : e.value,
   ];
   return rotulos.isEmpty ? 'Valor combinado' : rotulos.join(', ');
 }
