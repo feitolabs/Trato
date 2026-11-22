@@ -90,7 +90,8 @@ class CarteiraTela extends StatelessWidget {
               ),
             ],
             const SizedBox(height: EspacosTrato.x4),
-            if (aoConfigurarRecebimento != null) ...[
+            if (aoConfigurarRecebimento != null &&
+                dados.contaRecebimento?.cadastrada == true) ...[
               _CartaoContaRecebimento(
                 conta: dados.contaRecebimento,
                 aoTocar: aoConfigurarRecebimento!,

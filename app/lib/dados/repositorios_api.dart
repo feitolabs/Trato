@@ -2440,7 +2440,11 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     final json = _mapa(
       await _api.get(
         '/v1/extrato',
-        consulta: {'limite': '$limite', 'deslocamento': '$deslocamento'},
+        consulta: {
+          'como': 'profissional',
+          'limite': '$limite',
+          'deslocamento': '$deslocamento',
+        },
       ),
     );
     return [

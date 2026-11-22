@@ -148,13 +148,20 @@ void main() {
       await _bombearTela(
         tester,
         CarteiraTela(
-          soExtrato: true,
-          dados: DadosCarteira(extrato: extratoExemplo),
+          soExtrato: false,
+          dados: DadosCarteira(
+            resumo: resumoCarteiraDoSaldo(
+              liberadoCentavos: 0,
+              retidoCentavos: 0,
+              aLiberarCentavos: 0,
+            ),
+            extrato: extratoExemplo,
+          ),
           aoConfigurarRecebimento: () => abriuConfig = true,
         ),
       );
-      expect(find.text('Cadastre sua conta Pix'), findsOneWidget);
-      await tester.tap(find.text('Cadastrar'));
+      expect(find.text('Cadastre sua conta Pix'), findsNothing);
+      await tester.tap(find.text('Cadastrar conta de recebimento'));
       await tester.pumpAndSettle();
       expect(abriuConfig, isTrue);
 
