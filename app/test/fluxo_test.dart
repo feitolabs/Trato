@@ -124,7 +124,8 @@ void main() {
       expect(find.byType(CascaClienteTela), findsOneWidget);
     });
 
-    testWidgets('profissional passa por cadastro e verificação e cai na casca do profissional', (tester) async {
+    testWidgets('profissional passa por cadastro e verificação e cai na casca do profissional',
+        (tester) async {
       await _abrir(
         tester,
         const ConfirmarCelularTela(celular: '(31) 98888-4417', perfil: PerfilUso.profissional),
@@ -134,8 +135,16 @@ void main() {
       expect(find.byType(CadastroProfissionalTela), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).first, 'Carlos Almeida');
-      for (final texto in ['Belo Horizonte', 'Eletricista', 'Seg', 'Manhã', 'Salvar e continuar']) {
-        // a tela de cadastro rola: traz o item para a área visível antes de tocar
+      for (final texto in [
+        'Continuar',
+        'Eletricista',
+        'Continuar',
+        'Belo Horizonte',
+        'Seg',
+        'Manhã',
+        'Continuar',
+        'Salvar cadastro',
+      ]) {
         await tester.ensureVisible(find.text(texto).last);
         await tester.pumpAndSettle();
         await _tocar(tester, texto);
@@ -158,13 +167,22 @@ void main() {
     await _tocar(tester, 'Instalar ventilador de teto');
     expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
 
-    await tester.tap(find.text('Ver orçamento').at(1));
+    final verOrcamento = find.text('Ver orçamento').at(1);
+    await tester.ensureVisible(verOrcamento);
+    await tester.pumpAndSettle();
+    await tester.tap(verOrcamento);
     await tester.pumpAndSettle();
     expect(find.byType(DetalheOrcamentoTela), findsOneWidget);
 
-    await tester.tap(find.byType(Checkbox));
+    final aceite = find.byType(Checkbox);
+    await tester.ensureVisible(aceite);
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Aceitar e ir para o pagamento'));
+    await tester.tap(aceite);
+    await tester.pumpAndSettle();
+    final botaoAceitar = find.textContaining('Aceitar e ir para o pagamento');
+    await tester.ensureVisible(botaoAceitar);
+    await tester.pumpAndSettle();
+    await tester.tap(botaoAceitar);
     await tester.pumpAndSettle();
     expect(find.byType(PagamentoTela), findsOneWidget);
   });
