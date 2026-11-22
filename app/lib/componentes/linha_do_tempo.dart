@@ -39,6 +39,7 @@ class _LinhaEtapa extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final futura = etapa.estado == EstadoEtapa.futura;
     return IntrinsicHeight(
       child: Row(
@@ -50,8 +51,8 @@ class _LinhaEtapa extends StatelessWidget {
               children: [
                 _Marcador(estado: etapa.estado),
                 if (!ultima)
-                  const Expanded(
-                    child: VerticalDivider(width: 2, thickness: 2, color: CoresTrato.borda),
+                  Expanded(
+                    child: VerticalDivider(width: 2, thickness: 2, color: c.borda),
                   ),
               ],
             ),
@@ -67,17 +68,17 @@ class _LinhaEtapa extends StatelessWidget {
                     etapa.titulo,
                     style: futura
                         ? TipografiaTrato.tituloCartao.copyWith(
-                            color: CoresTrato.textoSecundario,
+                            color: c.textoSecundario,
                             fontWeight: FontWeight.w500,
                             fontVariations: const [FontVariation('wght', 500)],
                           )
-                        : TipografiaTrato.tituloCartao,
+                        : TipografiaTrato.tituloCartao.copyWith(color: c.texto),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     etapa.detalhe,
                     style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
+                      color: c.textoSecundario,
                     ),
                   ),
                 ],
@@ -97,10 +98,11 @@ class _Marcador extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final (fundo, borda) = switch (estado) {
-      EstadoEtapa.feita => (CoresTrato.petroleo, CoresTrato.petroleo),
-      EstadoEtapa.atual => (CoresTrato.azulSuave, CoresTrato.azulTexto),
-      EstadoEtapa.futura => (CoresTrato.superficie, CoresTrato.textoSecundario),
+      EstadoEtapa.feita => (c.petroleo, c.petroleo),
+      EstadoEtapa.atual => (c.azulSuave, c.azulTexto),
+      EstadoEtapa.futura => (c.superficie, c.textoSecundario),
     };
     return Container(
       width: LinhaDoTempo._tamanhoMarcador,
@@ -111,7 +113,7 @@ class _Marcador extends StatelessWidget {
         border: Border.all(color: borda, width: 2),
       ),
       child: estado == EstadoEtapa.feita
-          ? const Icon(Icons.check, size: EspacosTrato.x4, color: CoresTrato.creme)
+          ? Icon(Icons.check, size: EspacosTrato.x4, color: c.sobrePetroleo)
           : null,
     );
   }

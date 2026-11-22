@@ -15,9 +15,14 @@ class LogoFeitoLabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fundoClaroEfetivo =
+        sobreFundoClaro && Theme.of(context).brightness == Brightness.light;
     return Semantics(
       label: 'Feito Labs',
-      child: CustomPaint(size: Size.square(tamanho), painter: _PintorLogo(sobreFundoClaro)),
+      child: CustomPaint(
+        size: Size.square(tamanho),
+        painter: _PintorLogo(fundoClaroEfetivo),
+      ),
     );
   }
 }

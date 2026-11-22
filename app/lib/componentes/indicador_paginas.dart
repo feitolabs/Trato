@@ -8,15 +8,15 @@ class IndicadorPaginas extends StatelessWidget {
     super.key,
     required this.total,
     required this.atual,
-    this.corAtiva = CoresTrato.petroleo,
-    this.corInativa = CoresTrato.textoSecundario,
+    this.corAtiva,
+    this.corInativa,
     this.pilula = true,
   });
 
   final int total;
   final int atual;
-  final Color corAtiva;
-  final Color corInativa;
+  final Color? corAtiva;
+  final Color? corInativa;
 
   /// `true`: a página atual fica alongada (28x10). `false`: todos os pontos são iguais (10x10).
   final bool pilula;
@@ -25,6 +25,9 @@ class IndicadorPaginas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
+    final ativa = corAtiva ?? c.petroleo;
+    final inativa = corInativa ?? c.textoSecundario;
     return Semantics(
       label: 'Página ${atual + 1} de $total',
       child: Row(
@@ -38,7 +41,7 @@ class IndicadorPaginas extends StatelessWidget {
                 width: pilula && i == atual ? 32 : _altura,
                 height: _altura,
                 decoration: BoxDecoration(
-                  color: i == atual ? corAtiva : corInativa,
+                  color: i == atual ? ativa : inativa,
                   borderRadius: BorderRadius.circular(EspacosTrato.raioPilula),
                 ),
               ),

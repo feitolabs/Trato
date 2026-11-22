@@ -48,30 +48,30 @@ abstract final class CoresTrato {
   static const moedaOuroProfundo = Color(0xFF7A4A00);
 }
 
-/// Paleta semântica usada em runtime pelos temas claro e escuro.
+/// Paleta semântica usada em runtime pelo tema escuro (alto contraste e profundidade).
 abstract final class CoresTratoEscuro {
-  static const petroleo = Color(0xFF8FC1C8);
-  static const sobrePetroleo = Color(0xFF0A1B20);
-  static const fundo = Color(0xFF0A1B20);
-  static const superficie = Color(0xFF12272D);
-  static const borda = Color(0xFF23424A);
-  static const bordaControle = Color(0xFF395E67);
+  static const petroleo = Color(0xFF7FD0DD);
+  static const sobrePetroleo = Color(0xFF08181D);
+  static const fundo = Color(0xFF0B1317);
+  static const superficie = Color(0xFF15242B);
+  static const borda = Color(0xFF27414B);
+  static const bordaControle = Color(0xFF3E626E);
 
-  static const azulSuave = Color(0xFF173A42);
-  static const azulTexto = Color(0xFF8FC1C8);
+  static const azulSuave = Color(0xFF1A3D47);
+  static const azulTexto = Color(0xFF8AD7E3);
 
-  static const laranja = Color(0xFFFF8A4C);
+  static const laranja = Color(0xFFFF9457);
 
-  static const ambarSuave = Color(0xFF352811);
-  static const ambarTexto = Color(0xFFF3C66F);
+  static const ambarSuave = Color(0xFF3B2B12);
+  static const ambarTexto = Color(0xFFF6C96E);
 
-  static const verdeSuave = Color(0xFF163222);
-  static const verdeTexto = Color(0xFF7FD49B);
+  static const verdeSuave = Color(0xFF163826);
+  static const verdeTexto = Color(0xFF82DDA0);
 
-  static const vermelhoSuave = Color(0xFF3B1A19);
-  static const vermelhoTexto = Color(0xFFF28B82);
+  static const vermelhoSuave = Color(0xFF421C1B);
+  static const vermelhoTexto = Color(0xFFF69088);
 
-  static const texto = Color(0xFFF4EEE2);
-  static const textoSecundario = Color(0xFFB3C7C6);
-  static const textoDica = Color(0xFF839C9B);
+  static const texto = Color(0xFFF4F1E8);
+  static const textoSecundario = Color(0xFFB8CCCB);
+  static const textoDica = Color(0xFF8AA3A3);
 }

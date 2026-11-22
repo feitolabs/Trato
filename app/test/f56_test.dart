@@ -3,8 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/dados/repositorios.dart';
+import 'package:trato/telas/configuracoes/configuracoes_tela.dart';
 import 'package:trato/telas/pedidos/chat_pedido_tela.dart';
 import 'package:trato/telas/pedidos/modelos.dart';
+import 'package:trato/telas/perfil_cliente/modelos.dart';
+import 'package:trato/telas/perfil_cliente/perfil_cliente_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 Widget _envolver(Widget child, {ThemeData? tema}) =>
@@ -159,6 +162,97 @@ void main() {
       final ctrl2 = ControladorTema();
       await ctrl2.carregar(prefs: prefs);
       expect(ctrl2.modo, ThemeMode.system);
+    });
+  });
+
+  group('F58a — Modo Dark de alto contraste e seletor apenas em Configurações', () {
+    const perfilDemo = PerfilCliente(
+      nome: 'João Silva',
+      iniciais: 'JS',
+      resumo: '2 serviços concluídos',
+      moedas: 150,
+      grupos: [
+        GrupoPerfil(
+          titulo: 'CONTA',
+          itens: [
+            ItemPerfil(titulo: 'Dados pessoais', acao: AcaoPerfil.dadosPessoais),
+            ItemPerfil(titulo: 'Usar como profissional', acao: AcaoPerfil.usarComoProfissional),
+          ],
+        ),
+      ],
+    );
+
+    testWidgets('PerfilClienteTela não mostra SeletorAparencia e usa cores de CoresTratoEscuro',
+        (tester) async {
+      await tester.pumpWidget(
+        _envolver(
+          PerfilClienteTela(
+            perfil: perfilDemo,
+            aoAbrirConfiguracoes: () {},
+          ),
+          tema: TemaTrato.escuro,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SeletorAparencia), findsNothing);
+      expect(find.text('APARÊNCIA'), findsNothing);
+
+      final ctx = tester.element(find.text('João Silva'));
+      expect(Theme.of(ctx).scaffoldBackgroundColor, CoresTratoEscuro.fundo);
+      expect(Theme.of(ctx).cardTheme.color, CoresTratoEscuro.superficie);
+
+      final textoNome = tester.widget<Text>(find.text('João Silva'));
+      expect(textoNome.style?.color, CoresTratoEscuro.texto);
+
+      final textoMoedas = tester.widget<Text>(find.text('150'));
+      expect(textoMoedas.style?.color, CoresTratoEscuro.texto);
+
+      final iconeConfig = tester.widget<Icon>(find.byIcon(Icons.settings_outlined));
+      expect(iconeConfig.color, CoresTratoEscuro.petroleo);
+
+      final divisor = tester.widget<Divider>(find.byType(Divider).first);
+      expect(divisor.color, CoresTratoEscuro.borda);
+    });
+
+    testWidgets('ConfiguracoesTela mantém SeletorAparencia e usa cores de CoresTratoEscuro',
+        (tester) async {
+      await tester.pumpWidget(
+        _envolver(
+          ConfiguracoesTela(
+            grupos: [
+              GrupoConfiguracao(
+                titulo: 'CONTA',
+                itens: [
+                  ItemContaPerfil(
+                    icone: Icons.person_outline,
+                    titulo: 'Dados pessoais',
+                    aoTocar: () {},
+                  ),
+                ],
+              ),
+            ],
+          ),
+          tema: TemaTrato.escuro,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SeletorAparencia), findsOneWidget);
+      expect(find.text('APARÊNCIA'), findsOneWidget);
+      expect(find.text('Claro'), findsOneWidget);
+      expect(find.text('Escuro'), findsOneWidget);
+      expect(find.text('Sistema'), findsOneWidget);
+
+      final iconeConta = tester.widget<Icon>(find.byIcon(Icons.person_outline));
+      expect(iconeConta.color, CoresTratoEscuro.petroleo);
+    });
+
+    test('TipografiaTrato não fixa cor para herdar do tema claro ou escuro', () {
+      expect(TipografiaTrato.tituloGrande.color, isNull);
+      expect(TipografiaTrato.corpo.color, isNull);
+      expect(TipografiaTrato.legenda.color, isNull);
+      expect(TipografiaTrato.sobretitulo.color, isNull);
     });
   });
 }

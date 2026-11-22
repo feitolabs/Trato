@@ -34,11 +34,15 @@ class ConfiguracoesTela extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return PaginaTrato(
       titulo: 'Configurações',
       children: [
         for (final grupo in grupos) ...[
-          Text(grupo.titulo, style: TipografiaTrato.sobretitulo),
+          Text(
+            grupo.titulo,
+            style: TipografiaTrato.sobretitulo.copyWith(color: c.textoSecundario),
+          ),
           const SizedBox(height: EspacosTrato.x3),
           _Cartao(itens: [
             for (final i in grupo.itens)
@@ -85,6 +89,7 @@ class _Cartao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -92,10 +97,10 @@ class _Cartao extends StatelessWidget {
         children: [
           for (var i = 0; i < itens.length; i++) ...[
             if (i > 0)
-              const Divider(
+              Divider(
                 height: 1,
                 thickness: 1,
-                color: CoresTrato.borda,
+                color: c.borda,
                 indent: EspacosTrato.x4,
                 endIndent: EspacosTrato.x4,
               ),
@@ -116,10 +121,11 @@ class _Linha extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return ListTile(
-      leading: Icon(icone, color: CoresTrato.petroleo),
-      title: Text(titulo, style: TipografiaTrato.corpoForte),
-      trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+      leading: Icon(icone, color: c.petroleo),
+      title: Text(titulo, style: TipografiaTrato.corpoForte.copyWith(color: c.texto)),
+      trailing: Icon(Icons.chevron_right, color: c.textoSecundario),
       onTap: aoTocar,
     );
   }

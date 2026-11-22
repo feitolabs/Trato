@@ -1,9 +1,8 @@
 import 'package:flutter/painting.dart';
 
-import 'cores.dart';
-
 /// Estilos de texto do protótipo (ver docs/design-tokens.md).
 /// As fontes são variáveis: o peso vai em [FontWeight] e no eixo `wght`.
+/// Sem cor fixa para herdar automaticamente a cor do tema claro ou escuro.
 abstract final class TipografiaTrato {
   static const fonteTitulos = 'Archivo';
   static const fonteCorpo = 'Figtree';
@@ -14,7 +13,7 @@ abstract final class TipografiaTrato {
     int peso, {
     double? altura,
     double? espacamento,
-    Color cor = CoresTrato.petroleo,
+    Color? cor,
   }) {
     return TextStyle(
       fontFamily: familia,
@@ -43,13 +42,11 @@ abstract final class TipografiaTrato {
     14,
     400,
     altura: 1.4,
-    cor: CoresTrato.textoSecundario,
   );
   static final sobretitulo = _estilo(
     fonteCorpo,
     13,
     700,
     espacamento: 1.5,
-    cor: CoresTrato.textoSecundario,
   );
 }

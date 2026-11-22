@@ -76,8 +76,9 @@ class BlocoEsqueleto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = cor ?? CoresTrato.borda;
-    final brilho = Color.lerp(base, CoresTrato.superficie, 0.75)!;
+    final c = context.cores;
+    final base = cor ?? c.borda;
+    final brilho = Color.lerp(base, c.superficie, 0.65)!;
     final animacao = _AnimacaoEsqueleto.de(context);
     BoxDecoration decoracao(double t) {
       // t vai de 0 a 1: a faixa clara entra pela esquerda e sai pela direita.
@@ -149,14 +150,14 @@ class CartaoEsqueleto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Container(
       height: altura,
       padding: const EdgeInsets.all(EspacosTrato.paddingCartao),
       decoration: BoxDecoration(
-        color: CoresTrato.superficie,
+        color: c.superficie,
         borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-        border:
-            Border.all(color: CoresTrato.borda, width: EspacosTrato.bordaFina),
+        border: Border.all(color: c.borda, width: EspacosTrato.bordaFina),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,17 +236,18 @@ class EsqueletoPagina extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Scaffold(
-      backgroundColor: CoresTrato.creme,
+      backgroundColor: c.fundo,
       appBar: AppBar(
         automaticallyImplyLeading: comVoltar,
-        backgroundColor: CoresTrato.creme,
+        backgroundColor: c.fundo,
         elevation: 0,
         title: tituloBarra != null
             ? Text(
                 tituloBarra!,
                 style: TipografiaTrato.corpoPequeno.copyWith(
-                  color: CoresTrato.textoSecundario,
+                  color: c.textoSecundario,
                 ),
               )
             : const BlocoEsqueleto(largura: 80, altura: 14),

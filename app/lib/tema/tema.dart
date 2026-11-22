@@ -207,20 +207,35 @@ abstract final class TemaTrato {
       textTheme: TextTheme(
         displayLarge: TipografiaTrato.marca.copyWith(color: c.texto),
         headlineMedium: TipografiaTrato.tituloGrande.copyWith(color: c.texto),
+        headlineSmall: TipografiaTrato.titulo.copyWith(color: c.texto),
         titleLarge: TipografiaTrato.titulo.copyWith(color: c.texto),
         titleMedium: TipografiaTrato.tituloCartao.copyWith(color: c.texto),
+        titleSmall: TipografiaTrato.corpoForte.copyWith(color: c.texto),
         bodyLarge: TipografiaTrato.corpo.copyWith(color: c.texto),
         bodyMedium: TipografiaTrato.corpoPequeno.copyWith(color: c.texto),
         bodySmall: TipografiaTrato.legenda.copyWith(color: c.textoSecundario),
         labelLarge: TipografiaTrato.corpoForte.copyWith(color: c.texto),
+        labelMedium: TipografiaTrato.corpoPequeno.copyWith(color: c.texto),
         labelSmall: TipografiaTrato.sobretitulo.copyWith(color: c.textoSecundario),
-      ),
+      ).apply(bodyColor: c.texto, displayColor: c.texto),
+      iconTheme: IconThemeData(color: c.texto),
+      primaryIconTheme: IconThemeData(color: c.texto),
       appBarTheme: AppBarTheme(
         backgroundColor: c.fundo,
         foregroundColor: c.texto,
+        iconTheme: IconThemeData(color: c.texto),
         elevation: 0,
         scrolledUnderElevation: 0,
         titleTextStyle: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: c.petroleo,
+          foregroundColor: c.sobrePetroleo,
+          minimumSize: const Size.fromHeight(EspacosTrato.alturaBotao),
+          shape: RoundedRectangleBorder(borderRadius: raio),
+          textStyle: TipografiaTrato.corpoForte,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -251,6 +266,9 @@ abstract final class TemaTrato {
         filled: true,
         fillColor: c.superficie,
         hintStyle: TipografiaTrato.corpo.copyWith(color: c.textoDica),
+        labelStyle: TipografiaTrato.corpo.copyWith(color: c.textoSecundario),
+        floatingLabelStyle: TipografiaTrato.corpoPequeno.copyWith(color: c.petroleo),
+        errorStyle: TipografiaTrato.corpoPequeno.copyWith(color: c.vermelhoTexto),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: EspacosTrato.x4,
           vertical: (EspacosTrato.alturaCampo - 24) / 2,
@@ -269,6 +287,29 @@ abstract final class TemaTrato {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
           side: bordaCartao,
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: c.petroleo,
+        textColor: c.texto,
+        titleTextStyle: TipografiaTrato.corpoForte.copyWith(color: c.texto),
+        subtitleTextStyle: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: c.superficie,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TipografiaTrato.titulo.copyWith(color: c.texto),
+        contentTextStyle: TipografiaTrato.corpo.copyWith(color: c.textoSecundario),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+          side: bordaCartao,
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: c.superficie,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(EspacosTrato.raioGrande)),
         ),
       ),
       dividerTheme: DividerThemeData(color: c.borda, thickness: 1),

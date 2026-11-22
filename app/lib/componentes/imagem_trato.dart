@@ -124,7 +124,7 @@ class _ImagemDaRede extends StatelessWidget {
           height: double.infinity,
           memCacheWidth: largura,
           fadeInDuration: const Duration(milliseconds: 150),
-          placeholder: (_, __) => const ColoredBox(color: CoresTrato.azulClaro),
+          placeholder: (context, __) => ColoredBox(color: context.cores.azulSuave),
           errorWidget: (_, __, ___) => const SizedBox.shrink(),
         );
       },
@@ -266,14 +266,15 @@ class _IlustracaoPreviewDemo extends StatelessWidget {
                 ? Icons.verified_outlined
                 : Icons.photo_outlined;
 
+    final c = context.cores;
     return Container(
       constraints: const BoxConstraints(maxWidth: 360, maxHeight: 420),
       width: double.infinity,
       padding: const EdgeInsets.all(EspacosTrato.x6),
       decoration: BoxDecoration(
-        color: CoresTrato.azulClaro,
+        color: c.azulSuave,
         borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-        border: Border.all(color: CoresTrato.borda, width: 1.5),
+        border: Border.all(color: c.borda, width: 1.5),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -281,23 +282,23 @@ class _IlustracaoPreviewDemo extends StatelessWidget {
           Container(
             width: 96,
             height: 96,
-            decoration: const BoxDecoration(
-              color: CoresTrato.superficie,
+            decoration: BoxDecoration(
+              color: c.superficie,
               shape: BoxShape.circle,
             ),
-            child: Icon(icone, size: 48, color: CoresTrato.petroleo),
+            child: Icon(icone, size: 48, color: c.petroleo),
           ),
           const SizedBox(height: EspacosTrato.x5),
           Text(
             limpo.isEmpty ? 'Imagem do serviço' : limpo,
             textAlign: TextAlign.center,
-            style: TipografiaTrato.titulo.copyWith(color: CoresTrato.petroleo),
+            style: TipografiaTrato.titulo.copyWith(color: c.texto),
           ),
           const SizedBox(height: EspacosTrato.x2),
           Text(
             'Registro fotográfico anexado ao pedido no Trato.',
             textAlign: TextAlign.center,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
           ),
         ],
       ),

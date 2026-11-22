@@ -58,6 +58,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
     if (capturar == null) return;
     final temFoto = _fotoAtual != null && _fotoAtual!.isNotEmpty;
     if (temFoto) {
+      final c = context.cores;
       final acao = await showModalBottomSheet<String>(
         context: context,
         builder: (folha) => SafeArea(
@@ -65,12 +66,12 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.zoom_in, color: CoresTrato.petroleo),
+                leading: Icon(Icons.zoom_in, color: c.petroleo),
                 title: const Text('Ver foto de perfil'),
                 onTap: () => Navigator.of(folha).pop('ver'),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_camera_outlined, color: CoresTrato.petroleo),
+                leading: Icon(Icons.photo_camera_outlined, color: c.petroleo),
                 title: const Text('Trocar foto de perfil'),
                 onTap: () => Navigator.of(folha).pop('trocar'),
               ),
@@ -99,6 +100,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final perfil = widget.perfil;
     final recarregar = AtualizadorTela.de(context);
     final lista = ListView(
@@ -118,12 +120,15 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(perfil.nome, style: TipografiaTrato.tituloGrande),
+                  Text(
+                    perfil.nome,
+                    style: TipografiaTrato.tituloGrande.copyWith(color: c.texto),
+                  ),
                   const SizedBox(height: EspacosTrato.x1),
                   Text(
                     perfil.resumo,
                     style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
+                      color: c.textoSecundario,
                     ),
                   ),
                 ],
@@ -132,7 +137,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
             if (widget.aoAbrirConfiguracoes != null)
               IconButton(
                 tooltip: 'Configurações',
-                icon: const Icon(Icons.settings_outlined, color: CoresTrato.petroleo),
+                icon: Icon(Icons.settings_outlined, color: c.petroleo),
                 onPressed: widget.aoAbrirConfiguracoes,
               ),
           ],
@@ -199,9 +204,12 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('${perfil.moedas ?? 0}', style: TipografiaTrato.tituloGrande),
+                  Text(
+                    '${perfil.moedas ?? 0}',
+                    style: TipografiaTrato.tituloGrande.copyWith(color: c.texto),
+                  ),
                   const SizedBox(width: EspacosTrato.x1),
-                  const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                  Icon(Icons.chevron_right, color: c.textoSecundario),
                 ],
               ),
               onTap: widget.aoAbrirTratinhos ??
@@ -222,7 +230,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               )!,
               key: const Key('moedas-pendentes'),
               style: TipografiaTrato.corpoPequeno.copyWith(
-                color: CoresTrato.textoSecundario,
+                color: c.textoSecundario,
               ),
             ),
           ],
@@ -232,7 +240,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               'Tratinhos vencem em ${formatarDiaMes(perfil.moedasVenceEm!)}',
               key: const Key('moedas-vencem'),
               style: TipografiaTrato.corpoPequeno.copyWith(
-                color: CoresTrato.textoSecundario,
+                color: c.textoSecundario,
               ),
             ),
           ],
@@ -244,7 +252,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               'de ${Dinheiro.formatar(perfil.tetoDescontoMesCentavos!)}',
               key: const Key('moedas-desconto-mes'),
               style: TipografiaTrato.corpoPequeno.copyWith(
-                color: CoresTrato.textoSecundario,
+                color: c.textoSecundario,
               ),
             ),
           ],
@@ -257,19 +265,20 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
               ),
               key: const Key('moedas-desconto-indisponivel'),
               style: TipografiaTrato.corpoPequeno.copyWith(
-                color: CoresTrato.textoSecundario,
+                color: c.textoSecundario,
               ),
             ),
           ],
         ],
         for (final grupo in perfil.grupos) ...[
           const SizedBox(height: EspacosTrato.x5),
-          Text(grupo.titulo, style: TipografiaTrato.sobretitulo),
+          Text(
+            grupo.titulo,
+            style: TipografiaTrato.sobretitulo.copyWith(color: c.textoSecundario),
+          ),
           const SizedBox(height: EspacosTrato.x3),
           _CartaoGrupo(grupo: grupo, aoTocar: widget.aoTocarItem),
         ],
-        const SizedBox(height: EspacosTrato.x5),
-        const SeletorAparencia(),
         const SizedBox(height: EspacosTrato.x6),
         Row(
           children: [
@@ -285,7 +294,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
                       child: Text(
                         'um app Feito Labs',
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.textoSecundario,
+                          color: c.textoSecundario,
                         ),
                       ),
                     ),
@@ -315,6 +324,7 @@ class _CartaoGrupo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -322,12 +332,12 @@ class _CartaoGrupo extends StatelessWidget {
         children: [
           for (var i = 0; i < grupo.itens.length; i++) ...[
             if (i > 0)
-              const Divider(
+              Divider(
                 height: 1,
                 thickness: 1,
                 indent: EspacosTrato.x4,
                 endIndent: EspacosTrato.x4,
-                color: CoresTrato.borda,
+                color: c.borda,
               ),
             _LinhaItem(item: grupo.itens[i], aoTocar: () => aoTocar?.call(grupo.itens[i].acao)),
           ],
@@ -345,6 +355,7 @@ class _LinhaItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return InkWell(
       onTap: aoTocar,
       child: Padding(
@@ -354,7 +365,12 @@ class _LinhaItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Expanded(child: Text(item.titulo, style: TipografiaTrato.corpo)),
+            Expanded(
+              child: Text(
+                item.titulo,
+                style: TipografiaTrato.corpo.copyWith(color: c.texto),
+              ),
+            ),
             if (item.valor != null) ...[
               const SizedBox(width: EspacosTrato.x2),
               ConstrainedBox(
@@ -362,12 +378,12 @@ class _LinhaItem extends StatelessWidget {
                 child: Text(
                   item.valor!,
                   textAlign: TextAlign.end,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
                 ),
               ),
             ],
             const SizedBox(width: EspacosTrato.x2),
-            const Icon(Icons.chevron_right, color: CoresTrato.petroleo),
+            Icon(Icons.chevron_right, color: c.petroleo),
           ],
         ),
       ),

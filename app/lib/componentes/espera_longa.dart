@@ -64,28 +64,29 @@ class _ProgressoEsperaLongaState extends State<ProgressoEsperaLonga> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(EspacosTrato.x6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.hourglass_top_rounded,
               size: 48,
-              color: CoresTrato.petroleo,
+              color: c.petroleo,
             ),
             const SizedBox(height: EspacosTrato.x4),
             Text(
               widget.titulo,
               textAlign: TextAlign.center,
-              style: TipografiaTrato.titulo,
+              style: TipografiaTrato.titulo.copyWith(color: c.texto),
             ),
             const SizedBox(height: EspacosTrato.x2),
             Text(
               widget.mensagem,
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: c.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x6),
             ClipRRect(
@@ -94,8 +95,8 @@ class _ProgressoEsperaLongaState extends State<ProgressoEsperaLonga> {
                 height: 8,
                 child: LinearProgressIndicator(
                   value: _fracaoProgresso,
-                  backgroundColor: CoresTrato.borda,
-                  valueColor: const AlwaysStoppedAnimation<Color>(CoresTrato.petroleo),
+                  backgroundColor: c.borda,
+                  valueColor: AlwaysStoppedAnimation<Color>(c.petroleo),
                 ),
               ),
             ),
@@ -105,12 +106,12 @@ class _ProgressoEsperaLongaState extends State<ProgressoEsperaLonga> {
               children: [
                 Text(
                   'Decorrido: ${_decorridos}s',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
                 ),
                 Text(
                   'Tempo restante: ~${_segundosRestantes}s',
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.petroleo,
+                    color: c.petroleo,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
