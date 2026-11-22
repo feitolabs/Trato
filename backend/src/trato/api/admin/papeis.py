@@ -48,6 +48,7 @@ class Permissao(StrEnum):
     RISCO_DECIDIR = "risco_decidir"
     NOTIFICACOES_ENVIAR = "notificacoes_enviar"
     CUPONS_GERENCIAR = "cupons_gerenciar"
+    MOEDAS_CONFIGURAR = "moedas_configurar"  # alterar a configuração dos Tratinhos
     EQUIPE_GERENCIAR = "equipe_gerenciar"
     RELATORIOS_EXPORTAR = "relatorios_exportar"
 
@@ -97,6 +98,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.CONFIG_PROPOR,
             X.DASHBOARD_VER,
             X.CUPONS_GERENCIAR,
+            X.MOEDAS_CONFIGURAR,
             X.RELATORIOS_EXPORTAR,
         }
     ),

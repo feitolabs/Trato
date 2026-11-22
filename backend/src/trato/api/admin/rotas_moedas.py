@@ -115,7 +115,7 @@ def ver_orcamento(
 @router.put("/config", response_model=ConfigMoedasOut, summary="Alterar a configuração das moedas")
 def alterar_config(
     corpo: ConfigMoedasIn,
-    operador: Operador = Depends(exigir(Permissao.CUPONS_GERENCIAR)),
+    operador: Operador = Depends(exigir(Permissao.MOEDAS_CONFIGURAR)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
 ) -> ConfigMoedasOut:

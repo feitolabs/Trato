@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import secrets
 import threading
 import time
@@ -79,6 +80,19 @@ def guardar_para_baixar(conteudo: bytes, nome: str, operador_id: str, midia: str
     """Outro módulo do painel (fechamento, extrato) entrega arquivo pelo mesmo código de uso
     único: o token nunca vai na URL e o link morre em poucos minutos."""
     return _guardar(conteudo, nome, operador_id, midia)
+
+
+_NUMERO_PURO = re.compile(r"^-?[\d.,]+$")
+
+
+def _sanitizar_celula_csv(valor: Any) -> Any:
+    """Barra CSV Formula Injection: texto que começa com = + - @ TAB CR ganha `'` na frente.
+    Números e números formatados (inclusive negativos) passam intactos."""
+    if not isinstance(valor, str) or not valor:
+        return valor
+    if valor[0] in ("=", "+", "-", "@", "\t", "\r") and not _NUMERO_PURO.match(valor):
+        return "'" + valor
+    return valor
 
 
 def _banco(contexto: Contexto) -> Any:
@@ -287,8 +301,8 @@ def pedir_relatorio(
         cab, linhas = _gerar(con, tipo, de, ate, cidade, corpo.formato, pessoais)
         saida = io.StringIO()
         escritor = csv.writer(saida, delimiter=";" if corpo.formato == "excel_br" else ",")
-        escritor.writerow(cab)
-        escritor.writerows(linhas)
+        escritor.writerow([_sanitizar_celula_csv(c) for c in cab])
+        escritor.writerows([[_sanitizar_celula_csv(c) for c in linha] for linha in linhas])
         conteudo = ("﻿" + saida.getvalue()).encode("utf-8")
         nome = f"trato_{tipo}_{datetime.now(UTC):%Y%m%d_%H%M}.csv"
         admin.auditoria.registrar(
@@ -320,9 +334,13 @@ def pedir_relatorio(
     "/baixar/{codigo}",
     summary="Baixa o arquivo pelo código de uso único (vale poucos minutos)",
 )
-def baixar(codigo: str) -> Response:
+def baixar(codigo: str, operador: Operador = Depends(exigir())) -> Response:
     with _trava:
-        pronto = _prontos.pop(codigo, None)
+        pronto = _prontos.get(codigo)
+        if pronto is not None and pronto.operador_id != operador.id:
+            raise HTTPException(403, "Este arquivo foi gerado por outro operador.")
+        if pronto is not None:
+            del _prontos[codigo]
     if pronto is None or pronto.expira < time.monotonic():
         raise HTTPException(404, "Este link já foi usado ou expirou. Gere o relatório de novo.")
     return Response(

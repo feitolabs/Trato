@@ -47,7 +47,7 @@ def test_filtro_de_periodo_vale_antes_de_montar_a_lista(adm):  # noqa: F811
 
 
 def _baixar(adm, codigo):  # noqa: F811
-    return adm.cliente.get(f"{BASE}/relatorios/baixar/{codigo}")
+    return adm.cliente.get(f"{BASE}/relatorios/baixar/{codigo}", headers=FIN)
 
 
 def test_fechar_mes_grava_retrato_e_nao_deixa_fechar_de_novo(adm):  # noqa: F811

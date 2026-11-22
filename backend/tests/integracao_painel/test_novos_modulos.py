@@ -67,12 +67,19 @@ def test_relatorios_csv(painel):
     assert r.status_code in (201, 503)
     if r.status_code == 201:
         pronto = r.json()
-        baixado = painel.http.get(f"/v1/admin/relatorios/baixar/{pronto['codigo']}")
+        baixado = painel.chamar(
+            "administrador", "GET", f"/v1/admin/relatorios/baixar/{pronto['codigo']}"
+        )
         assert baixado.status_code == 200
         assert baixado.text.startswith("﻿ID_Pagamento;Data;")
         assert "attachment; filename=" in baixado.headers.get("Content-Disposition", "")
         # o código vale uma vez só
-        assert painel.http.get(f"/v1/admin/relatorios/baixar/{pronto['codigo']}").status_code == 404
+        assert (
+            painel.chamar(
+                "administrador", "GET", f"/v1/admin/relatorios/baixar/{pronto['codigo']}"
+            ).status_code
+            == 404
+        )
 
 
 def test_token_na_url_nao_autentica(painel):
