@@ -1914,6 +1914,20 @@ class ApiFake implements ApiAdmin {
     return const ArquivoPronto(url: 'https://exemplo.test/baixar/extrato', nomeArquivo: 'trato_extrato.pdf');
   }
 
+  /// Downloads pedidos pela tela (url, nome).
+  final List<(String, String)> downloads = [];
+
+  /// Erro a lançar no próximo download (simula link usado/vencido).
+  Object? erroDownload;
+
+  @override
+  Future<void> baixarArquivo(String url, String nomeArquivo) async {
+    await Future<void>.delayed(atraso);
+    final e = erroDownload;
+    if (e != null) throw e;
+    downloads.add((url, nomeArquivo));
+  }
+
   @override
   Future<RelatorioPronto> solicitarRelatorio(
     String tipo, {

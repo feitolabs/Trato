@@ -229,6 +229,7 @@ class _ConteudoState extends State<_Conteudo> {
                   DropdownMenuItem(value: null, child: Text('Todos')),
                   DropdownMenuItem(value: 'confirmado', child: Text('Confirmado')),
                   DropdownMenuItem(value: 'andamento', child: Text('Em andamento')),
+                  DropdownMenuItem(value: 'falhou', child: Text('Falhou')),
                   DropdownMenuItem(value: 'reembolsado', child: Text('Reembolsado')),
                   DropdownMenuItem(value: 'divergencia', child: Text('Divergência')),
                 ],
@@ -286,7 +287,7 @@ abstract final class PagamentosStatus {
         StatusProvedor.confirmado => 'confirmado',
         StatusProvedor.aguardandoConfirmacao => 'andamento',
         StatusProvedor.reembolsado || StatusProvedor.reembolsadoParcial => 'reembolsado',
-        StatusProvedor.falhou => 'andamento',
+        StatusProvedor.falhou => 'falhou',
       };
 }
 

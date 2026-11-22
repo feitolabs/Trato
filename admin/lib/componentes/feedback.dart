@@ -195,6 +195,9 @@ void mostrarErro(BuildContext context, Object erro) {
 /// Executa uma chamada e mostra o aviso de sucesso (com o registro de auditoria) ou o erro.
 /// Devolve true se deu certo.
 Future<bool> executar(BuildContext context, Future<void> Function() acao, {String? sucesso}) async {
+  // Uma ação de escrita por vez: um segundo clique/toque enquanto a primeira está em voo é ignorado.
+  if (_executando) return false;
+  _executando = true;
   final api = context.api;
   try {
     await acao();
@@ -206,8 +209,12 @@ Future<bool> executar(BuildContext context, Future<void> Function() acao, {Strin
   } catch (e) {
     if (context.mounted) mostrarErro(context, e);
     return false;
+  } finally {
+    _executando = false;
   }
 }
+
+bool _executando = false;
 
 String _milhar(int n) {
   final s = n.toString();

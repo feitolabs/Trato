@@ -217,6 +217,16 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
   }
 
   Future<void> _assumir({required bool substituir}) async {
+    if (_enviando) return;
+    setState(() => _enviando = true);
+    try {
+      await _assumirSemTrava(substituir: substituir);
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  Future<void> _assumirSemTrava({required bool substituir}) async {
     final api = context.api;
     final d = widget.disputa;
     final quem = d.responsavelNome ?? 'outra pessoa';
@@ -317,7 +327,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
             const SizedBox(height: EspacosTrato.x2),
             Align(
               alignment: Alignment.centerLeft,
-              child: BotaoTrato.secundario('Assumir no lugar', aoPressionar: () => _assumir(substituir: true)),
+              child: BotaoTrato.secundario('Assumir no lugar', aoPressionar: _enviando ? null : () => _assumir(substituir: true)),
             ),
           ],
         ] else if (comigo) ...[
@@ -327,7 +337,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
           const SizedBox(height: EspacosTrato.x2),
           Align(
             alignment: Alignment.centerLeft,
-            child: BotaoTrato.secundario('Assumir disputa', aoPressionar: () => _assumir(substituir: false)),
+            child: BotaoTrato.secundario('Assumir disputa', aoPressionar: _enviando ? null : () => _assumir(substituir: false)),
           ),
         ],
         const SizedBox(height: EspacosTrato.x4),
@@ -521,13 +531,33 @@ class _CartaoEvidencia extends StatelessWidget {
 }
 
 /// Decisão acima da alçada: outra pessoa (líder ou administrador) aprova com a própria conta.
-class _AprovacaoSegundaPessoa extends StatelessWidget {
+class _AprovacaoSegundaPessoa extends StatefulWidget {
   const _AprovacaoSegundaPessoa({required this.disputa, required this.aoMudar});
 
   final Disputa disputa;
   final Future<void> Function() aoMudar;
 
+  @override
+  State<_AprovacaoSegundaPessoa> createState() => _AprovacaoSegundaPessoaState();
+}
+
+class _AprovacaoSegundaPessoaState extends State<_AprovacaoSegundaPessoa> {
+  bool _ocupado = false;
+
+  Disputa get disputa => widget.disputa;
+
   Future<void> _aprovar(BuildContext context) async {
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
+    try {
+      await _aprovarSemTrava(context);
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  Future<void> _aprovarSemTrava(BuildContext context) async {
+    final aoMudar = widget.aoMudar;
     final api = context.api;
     final motivo = await pedirMotivo(
       context,
@@ -556,7 +586,7 @@ class _AprovacaoSegundaPessoa extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x3),
           Align(
             alignment: Alignment.centerRight,
-            child: BotaoTrato.primario('Aprovar decisão', aoPressionar: () => _aprovar(context)),
+            child: BotaoTrato.primario('Aprovar decisão', aoPressionar: _ocupado ? null : () => _aprovar(context)),
           ),
         ],
       ],

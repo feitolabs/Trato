@@ -710,10 +710,14 @@ class SeletorTrato<T> extends StatelessWidget {
     required this.aoMudar,
     this.ajuda,
     this.erro,
+    this.habilitado = true,
   });
 
   final String rotulo;
   final T? valor;
+
+  /// Falso = só mostra o valor (sem permissão para mudar).
+  final bool habilitado;
 
   /// (valor, rótulo)
   final List<(T, String)> opcoes;
@@ -731,21 +735,25 @@ class SeletorTrato<T> extends StatelessWidget {
         isExpanded: true,
         decoration: InputDecoration(labelText: rotulo, helperText: ajuda, errorText: erro),
         items: [for (final o in opcoes) DropdownMenuItem<T>(value: o.$1, child: Text(o.$2))],
-        onChanged: (v) {
-          if (v != null) aoMudar(v);
-        },
+        onChanged: habilitado
+            ? (v) {
+                if (v != null) aoMudar(v);
+              }
+            : null,
       );
     }
     final atual = opcoes.where((o) => o.$1 == valor).firstOrNull;
     return InkWell(
       borderRadius: BorderRadius.circular(EspacosTrato.raio),
-      onTap: () async {
-        final r = await mostrarModal<T>(
-          context,
-          construir: (_) => _EscolhaComBusca<T>(titulo: rotulo, opcoes: opcoes),
-        );
-        if (r != null) aoMudar(r);
-      },
+      onTap: !habilitado
+          ? null
+          : () async {
+              final r = await mostrarModal<T>(
+                context,
+                construir: (_) => _EscolhaComBusca<T>(titulo: rotulo, opcoes: opcoes),
+              );
+              if (r != null) aoMudar(r);
+            },
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: rotulo,

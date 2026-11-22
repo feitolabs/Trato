@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
@@ -540,8 +539,9 @@ class _AbaFechamentoMesState extends State<AbaFechamentoMes> {
     final api = context.api;
     ArquivoPronto? arquivo;
     final ok = await executar(context, () async => arquivo = await api.exportarFechamento(mes));
-    if (!ok || arquivo == null) return;
-    await launchUrl(Uri.parse(arquivo!.url), webOnlyWindowName: '_blank');
+    final pronto = arquivo;
+    if (!ok || pronto == null || !mounted) return;
+    await executar(context, () => api.baixarArquivo(pronto.url, pronto.nomeArquivo));
   }
 
   @override

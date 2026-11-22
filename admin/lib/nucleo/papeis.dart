@@ -55,6 +55,7 @@ enum Permissao {
   riscoDecidir,
   notificacoesEnviar,
   cuponsGerenciar,
+  moedasConfigurar,
   equipeGerenciar,
   relatoriosExportar,
 }
@@ -103,6 +104,7 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.configPropor,
     Permissao.dashboardVer,
     Permissao.cuponsGerenciar,
+    Permissao.moedasConfigurar,
     Permissao.relatoriosExportar,
   },
   Papel.seguranca: {

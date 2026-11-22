@@ -37,7 +37,7 @@ class ConfigTela extends StatelessWidget {
             carregar: context.api.carregarConfig,
             estaVazio: (c) => c.definicoes.isEmpty,
             mensagemVazia: 'Nenhum parâmetro cadastrado.',
-            detalheVazio: 'Os parâmetros de taxa, prazos e limites aparecem aqui.',
+            detalheVazio: 'Os parâmetros de prazos e limites aparecem aqui.',
             construir: (context, config, recarregar) => _Conteudo(config: config, aoMudar: recarregar),
           ),
         ),
@@ -412,6 +412,7 @@ Widget _campoProposto(ConfigDefinicao d, TextEditingController controle, String?
   if (d.unidade == UnidadeConfig.quantidade && d.minimo == 0 && d.maximo == 1) {
     return SeletorTrato<String>(
       rotulo: 'Valor proposto',
+      habilitado: habilitado,
       valor: controle.text.trim().isEmpty ? '0' : controle.text.trim(),
       opcoes: const [('0', 'Desligada'), ('1', 'Ligada')],
       aoMudar: (v) {

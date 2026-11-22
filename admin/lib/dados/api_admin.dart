@@ -279,6 +279,10 @@ abstract interface class ApiAdmin {
     required String motivo,
   });
 
+  /// Baixa o arquivo do link de uso único mandando o login no cabeçalho (o token nunca vai na URL)
+  /// e entrega ao navegador. Falha (link usado/vencido, sem permissão) vira erro, não aviso de sucesso.
+  Future<void> baixarArquivo(String url, String nomeArquivo);
+
   // Módulo 7: Exportação de Relatórios CSV
 
   /// Gera o relatório ([tipo]: `financeiro`, `pedidos` ou `repasses`) e devolve o link de uso único.

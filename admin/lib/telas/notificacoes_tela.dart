@@ -47,16 +47,14 @@ class _NotificacoesTelaState extends State<NotificacoesTela> {
               const SizedBox(height: EspacosTrato.x5),
               Text('Histórico', style: TipografiaTrato.secao),
               const SizedBox(height: EspacosTrato.x3),
-              SizedBox(
-                height: 360,
-                child: CarregaDados<List<CampanhaNotificacao>>(
-                  key: ValueKey('campanhas-$_versao'),
-                  carregar: context.api.listarCampanhasNotificacao,
-                  estaVazio: (l) => l.isEmpty,
-                  mensagemVazia: 'Nenhuma campanha enviada',
-                  detalheVazio: 'As campanhas enviadas aparecem aqui com entregues e abertos.',
-                  construir: (context, lista, _) => _Historico(lista),
-                ),
+              CarregaDados<List<CampanhaNotificacao>>(
+                key: ValueKey('campanhas-$_versao'),
+                carregar: context.api.listarCampanhasNotificacao,
+                esqueleto: const SizedBox(height: 240, child: EsqueletoLista(linhas: 3)),
+                estaVazio: (l) => l.isEmpty,
+                mensagemVazia: 'Nenhuma campanha enviada',
+                detalheVazio: 'As campanhas enviadas aparecem aqui com entregues e abertos.',
+                construir: (context, lista, _) => _Historico(lista),
               ),
             ],
           ),
@@ -437,6 +435,8 @@ class _Historico extends StatelessWidget {
 
     if (celular) {
       return ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         itemCount: lista.length,
         separatorBuilder: (_, _) => const SizedBox(height: EspacosTrato.intervaloCartoes),
         itemBuilder: (context, i) {

@@ -1374,7 +1374,7 @@ class ApiAdminHttp implements ApiAdmin {
         minServicoCentavos: _int(c['min_servico_centavos']),
         maxBonusPorProfissionalMes: _int(c['max_bonus_por_profissional_mes']),
         maxDescontoPercentual: _int(c['max_desconto_percentual']),
-        validadeDias: _int(c['validade_dias']),
+        validadeDias: (c['validade_dias'] as num?)?.toInt(),
         orcamentoMensalDescontoCentavos: _int(c['orcamento_mensal_desconto_centavos']),
         avisoPercentual: _int(c['aviso_percentual']),
         tetoDescontoClienteMesCentavos: _int(c['teto_desconto_cliente_mes_centavos']),
@@ -1698,6 +1698,36 @@ class ApiAdminHttp implements ApiAdmin {
         '/v1/admin/financeiro/profissionais/$usuarioId/extrato',
         corpo: {'inicio': _dia(inicio), 'fim': _dia(fim), 'motivo': motivo},
       ));
+
+  @override
+  Future<void> baixarArquivo(String url, String nomeArquivo) async {
+    final token = _token;
+    if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
+    // Só baixa do próprio backend: o login não pode seguir para outro endereço.
+    if (!url.startsWith('$_api/')) throw const ErroApi('Endereço de download inválido.');
+    try {
+      final r = await http.Response.fromStream(
+        await _cliente
+            .send(http.Request('GET', Uri.parse(url))..headers['Authorization'] = 'Bearer $token')
+            .timeout(tempoLimite),
+      );
+      if (r.statusCode < 200 || r.statusCode >= 300) {
+        Object? json;
+        try {
+          json = jsonDecode(utf8.decode(r.bodyBytes));
+        } on FormatException {
+          json = null;
+        }
+        throw _erro(_Resposta(r.statusCode, json));
+      }
+      final tipo = r.headers['content-type'] ?? 'application/octet-stream';
+      salvarArquivo(r.bodyBytes, nomeArquivo, tipo);
+    } on TimeoutException {
+      throw const ErroApi('O servidor demorou para responder. Tente de novo.');
+    } on http.ClientException {
+      throw const ErroApi('Não foi possível falar com o servidor.');
+    }
+  }
 
   // ---------- Módulo 7: Exportação de Relatórios CSV ----------
 

@@ -970,7 +970,7 @@ class MoedasConfig {
     required this.minServicoCentavos,
     required this.maxBonusPorProfissionalMes,
     required this.maxDescontoPercentual,
-    required this.validadeDias,
+    this.validadeDias,
     required this.orcamentoMensalDescontoCentavos,
     required this.avisoPercentual,
     required this.tetoDescontoClienteMesCentavos,
@@ -999,7 +999,8 @@ class MoedasConfig {
   final int minServicoCentavos;
   final int maxBonusPorProfissionalMes;
   final int maxDescontoPercentual;
-  final int validadeDias;
+  /// Nulo = os Tratinhos não vencem. Nunca vira 0.
+  final int? validadeDias;
   final int orcamentoMensalDescontoCentavos;
   final int avisoPercentual;
   final int tetoDescontoClienteMesCentavos;

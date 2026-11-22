@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
@@ -90,7 +89,7 @@ class _AuditoriaTelaState extends State<AuditoriaTela> {
       });
     }
     final r = pronto;
-    if (ok && r != null) await launchUrl(Uri.parse(r.url), webOnlyWindowName: '_blank');
+    if (ok && r != null && mounted) await executar(context, () => api.baixarArquivo(r.url, r.nomeArquivo));
   }
 
   @override

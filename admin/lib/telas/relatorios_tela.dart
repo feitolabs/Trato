@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
@@ -73,12 +72,14 @@ class _RelatoriosTelaState extends State<RelatoriosTela> {
     });
     final r = pronto;
     if (!ok || r == null) return;
+    // Baixa com o login no cabeçalho; só avisa "começa agora" se o servidor entregou o arquivo.
+    final baixou = await executar(context, () => api.baixarArquivo(r.url, r.nomeArquivo));
+    if (!baixou || !mounted) return;
     mostrarAviso(
       context,
       'Relatório pronto.',
       detalhe: '${formatarMilhar(r.linhas)} linhas · ${r.colunas} colunas. O download começa agora.',
     );
-    await launchUrl(Uri.parse(r.url), webOnlyWindowName: '_blank');
   }
 
   @override
@@ -242,7 +243,7 @@ class _RelatoriosTelaState extends State<RelatoriosTela> {
                         final d = e.detalhes;
                         final filtros = [
                           if (d['inicio'] != null && d['fim'] != null) '${_br(d['inicio'])} a ${_br(d['fim'])}',
-                          'todas as cidades',
+                          _cidadeDoRegistro(d),
                         ].join(' · ');
                         return CartaoLista(
                           titulo: descreverAcao(e),
@@ -261,6 +262,18 @@ class _RelatoriosTelaState extends State<RelatoriosTela> {
         ),
       ],
     );
+  }
+
+  /// Cidade filtrada no registro: nome se vier, senão o nome pelo id conhecido, senão "uma cidade".
+  String _cidadeDoRegistro(Map<String, dynamic> d) {
+    final nome = d['cidade_nome'] ?? d['cidade'];
+    if (nome is String && nome.isNotEmpty) return nome;
+    final id = d['cidade_id'];
+    if (id == null || '$id'.isEmpty) return 'todas as cidades';
+    for (final c in _cidades) {
+      if (c.id == '$id') return '${c.nome} - ${c.uf}';
+    }
+    return 'uma cidade';
   }
 
   static String _br(Object? iso) {

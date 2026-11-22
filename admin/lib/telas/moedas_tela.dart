@@ -4,6 +4,7 @@ import '../componentes/base.dart';
 import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
+import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
 
 /// "2026-11" ou "2026-11-01" -> "11/2026". Texto fora do padrão volta como veio.
@@ -225,13 +226,32 @@ class _FormularioMoedas extends StatefulWidget {
 }
 
 class _CampoConfig {
-  _CampoConfig(this.chave, this.rotulo, this.texto, {this.reais = false, this.sufixo, this.ajuda});
+  _CampoConfig(this.chave, this.rotulo, this.texto,
+      {this.reais = false, this.sufixo, this.ajuda, this.opcional = false, this.minimo});
   final String chave;
   final String rotulo;
   final TextEditingController texto;
   final bool reais;
   final String? sufixo;
   final String? ajuda;
+
+  /// Vazio é aceito e vai como `null` (ex.: Tratinhos sem validade).
+  final bool opcional;
+
+  /// Menor inteiro que o backend aceita neste campo (ele continua sendo quem decide).
+  final int? minimo;
+
+  /// Mensagem de erro inline, ou null se o texto está ok.
+  String? get erro {
+    final t = texto.text.trim();
+    if (t.isEmpty) return opcional ? null : (reais ? 'Informe um valor em reais' : 'Informe um número inteiro');
+    final v = valor;
+    if (v == null) return reais ? 'Informe um valor em reais' : 'Informe um número inteiro';
+    if (minimo != null && v < minimo!) return 'Informe um número a partir de $minimo';
+    return null;
+  }
+
+  bool get valido => erro == null;
 
   /// Valor inteiro (centavos nos campos em reais). Nulo = ainda não é um número válido.
   int? get valor {
@@ -257,9 +277,17 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
       n('teto_mensal_moedas', 'Teto mensal de Tratinhos', c.tetoMensalMoedas, sufixo: 'Tratinhos'),
       r('min_servico_centavos', 'Serviço mínimo para ganhar', c.minServicoCentavos),
       n('max_bonus_por_profissional_mes', 'Máx. de bônus por profissional no mês', c.maxBonusPorProfissionalMes,
-          sufixo: 'Tratinhos'),
+          sufixo: 'por mês'),
       n('max_desconto_percentual', 'Desconto máximo por pedido', c.maxDescontoPercentual, sufixo: '%'),
-      n('validade_dias', 'Validade dos Tratinhos', c.validadeDias, sufixo: 'dias'),
+      _CampoConfig(
+        'validade_dias',
+        'Validade dos Tratinhos',
+        TextEditingController(text: c.validadeDias == null ? '' : '${c.validadeDias}'),
+        sufixo: 'dias',
+        ajuda: 'Deixe vazio para os Tratinhos não vencerem.',
+        opcional: true,
+        minimo: 1,
+      ),
       r('orcamento_mensal_desconto_centavos', 'Orçamento mensal de desconto', c.orcamentoMensalDescontoCentavos),
       n('aviso_percentual', 'Avisar quando o uso chegar a', c.avisoPercentual, sufixo: '%'),
       r('teto_desconto_cliente_mes_centavos', 'Teto de desconto por cliente no mês', c.tetoDescontoClienteMesCentavos),
@@ -273,17 +301,17 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
   /// Só entram os campos que o backend mandou.
   static Map<String, _CampoConfig> _montarExtras(MoedasConfig c) {
     const defs = [
-      ('bonus_avaliacao_profissional_moedas', 'Bônus do profissional por avaliar um cliente (Tratinhos)'),
-      ('exclusividade_custo_moedas', 'Custo da exclusividade (Tratinhos)'),
-      ('exclusividade_duracao_horas', 'Duração da exclusividade (horas)'),
-      ('exclusividade_max_simultaneas', 'Máximo de exclusividades ao mesmo tempo'),
-      ('exclusividade_prazo_resposta_horas', 'Prazo para o cliente responder (horas)'),
-      ('exclusividade_bloqueio_recusa_dias', 'Dias de bloqueio depois de uma recusa'),
+      ('bonus_avaliacao_profissional_moedas', 'Bônus do profissional por avaliar um cliente (Tratinhos)', 1),
+      ('exclusividade_custo_moedas', 'Custo da exclusividade (Tratinhos)', 1),
+      ('exclusividade_duracao_horas', 'Duração da exclusividade (horas)', 1),
+      ('exclusividade_max_simultaneas', 'Máximo de exclusividades ao mesmo tempo', 1),
+      ('exclusividade_prazo_resposta_horas', 'Prazo para o cliente responder (horas)', 1),
+      ('exclusividade_bloqueio_recusa_dias', 'Dias de bloqueio depois de uma recusa', 0),
     ];
     return {
-      for (final (chave, rotulo) in defs)
+      for (final (chave, rotulo, minimo) in defs)
         if (c.extras.containsKey(chave))
-          chave: _CampoConfig(chave, rotulo, TextEditingController(text: '${c.extras[chave]}')),
+          chave: _CampoConfig(chave, rotulo, TextEditingController(text: '${c.extras[chave]}'), minimo: minimo),
     };
   }
 
@@ -295,7 +323,7 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
     super.dispose();
   }
 
-  bool get _valido => [..._campos.values, ..._extras.values].every((c) => c.valor != null);
+  bool get _valido => [..._campos.values, ..._extras.values].every((c) => c.valido);
 
   MoedasConfig _montarConfig() {
     int v(String chave) => _campos[chave]!.valor!;
@@ -307,7 +335,7 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
       minServicoCentavos: v('min_servico_centavos'),
       maxBonusPorProfissionalMes: v('max_bonus_por_profissional_mes'),
       maxDescontoPercentual: v('max_desconto_percentual'),
-      validadeDias: v('validade_dias'),
+      validadeDias: _campos['validade_dias']!.valor,
       orcamentoMensalDescontoCentavos: v('orcamento_mensal_desconto_centavos'),
       avisoPercentual: v('aviso_percentual'),
       tetoDescontoClienteMesCentavos: v('teto_desconto_cliente_mes_centavos'),
@@ -317,11 +345,11 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
     );
   }
 
-  Widget _campo(_CampoConfig c) {
-    final invalido = c.texto.text.trim().isNotEmpty && c.valor == null;
+  Widget _campo(_CampoConfig c, bool editavel) {
     return TextField(
       key: ValueKey('moedas-campo-${c.chave}'),
       controller: c.texto,
+      enabled: editavel,
       keyboardType: TextInputType.number,
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
@@ -329,13 +357,14 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
         prefixText: c.reais ? 'R\$ ' : null,
         suffixText: c.sufixo,
         helperText: c.ajuda,
-        errorText: invalido ? (c.reais ? 'Informe um valor em reais' : 'Informe um número inteiro') : null,
+        errorText: c.erro,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final editavel = context.pode(Permissao.moedasConfigurar);
     return CartaoSecao(
       titulo: 'Configuração do programa',
       child: Column(
@@ -360,11 +389,16 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
                 child: Switch(
                   key: const ValueKey('moedas-ativo'),
                   value: _ativo,
-                  onChanged: (v) => setState(() => _ativo = v),
+                  onChanged: editavel ? (v) => setState(() => _ativo = v) : null,
                 ),
               ),
             ],
           ),
+          if (!editavel) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text('Você pode ver a configuração, mas só Financeiro e Administrador podem alterá-la.',
+                style: TipografiaTrato.legenda),
+          ],
           const SizedBox(height: EspacosTrato.x3),
           LayoutBuilder(builder: (context, c) {
             final colunas = c.maxWidth >= 900 ? 3 : (c.maxWidth >= 560 ? 2 : 1);
@@ -372,7 +406,7 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
             return Wrap(
               spacing: EspacosTrato.x4,
               runSpacing: EspacosTrato.x4,
-              children: [for (final campo in _campos.values) SizedBox(width: largura, child: _campo(campo))],
+              children: [for (final campo in _campos.values) SizedBox(width: largura, child: _campo(campo, editavel))],
             );
           }),
           if (_extras.isNotEmpty) ...[
@@ -385,18 +419,20 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
               return Wrap(
                 spacing: EspacosTrato.x4,
                 runSpacing: EspacosTrato.x4,
-                children: [for (final campo in _extras.values) SizedBox(width: largura, child: _campo(campo))],
+                children: [for (final campo in _extras.values) SizedBox(width: largura, child: _campo(campo, editavel))],
               );
             }),
           ],
-          const SizedBox(height: EspacosTrato.x4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: BotaoTrato.primario(
-              'Salvar configuração',
-              aoPressionar: _valido ? () => widget.aoSalvar(_montarConfig()) : null,
+          if (editavel) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: BotaoTrato.primario(
+                'Salvar configuração',
+                aoPressionar: _valido ? () => widget.aoSalvar(_montarConfig()) : null,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
@@ -289,9 +288,14 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
     ArquivoPronto? arquivo;
     final ok = await executar(context, () async {
       arquivo = await api.extratoProfissional(u.id, inicio: inicio, fim: fim, motivo: r.$2);
-    }, sucesso: 'Extrato pronto. O download começa agora.');
-    if (!ok || arquivo == null) return;
-    await launchUrl(Uri.parse(arquivo!.url), webOnlyWindowName: '_blank');
+    });
+    final pronto = arquivo;
+    if (!ok || pronto == null || !mounted) return;
+    await executar(
+      context,
+      () => api.baixarArquivo(pronto.url, pronto.nomeArquivo),
+      sucesso: 'Extrato pronto. O download começa agora.',
+    );
   }
 
   void _diagnosticar() {
