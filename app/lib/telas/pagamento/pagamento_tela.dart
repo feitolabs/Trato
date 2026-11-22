@@ -907,8 +907,11 @@ class _CartaoMoedas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final restantes = saldo - usadas;
     final detalhe = ligado && usadas > 0
-        ? 'Usando ${textoTratinhos(usadas)} · desconto de ${Dinheiro.formatar(descontoCentavos)}'
+        ? (restantes > 0
+            ? 'Usando ${textoTratinhos(usadas)} · desconto de ${Dinheiro.formatar(descontoCentavos)} · restam ${textoTratinhos(restantes)}'
+            : 'Usando ${textoTratinhos(usadas)} · desconto de ${Dinheiro.formatar(descontoCentavos)}')
         : 'Você tem ${textoTratinhosEmReais(saldo, valorMoedaCentavos)}';
     return Card(
       margin: EdgeInsets.zero,
