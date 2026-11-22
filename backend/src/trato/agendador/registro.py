@@ -1,7 +1,7 @@
 """Registro de ações de rotina já executadas (idempotência por chave).
 
 A chave vem de `trato.rotinas.regras.AcaoRotina.chave` e é estável. O Postgres usa a tabela
-`agendador_execucoes` (migration 20261029040000, ainda não aplicada no banco real).
+`agendador_execucoes` (migration 20261029040000, aplicada e confirmada no banco real em 22/11/2026).
 """
 
 from __future__ import annotations

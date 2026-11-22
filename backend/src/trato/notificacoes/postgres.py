@@ -1,5 +1,6 @@
 """Repositório de notificações no Postgres (tabelas `notificacoes`, `notificacao_preferencias`
-e `dispositivos_push`, esta última da migration 20261029040000, ainda não aplicada)."""
+e `dispositivos_push`, esta última da migration 20261029040000, aplicada e confirmada no banco
+real em 22/11/2026)."""
 
 from __future__ import annotations
 
