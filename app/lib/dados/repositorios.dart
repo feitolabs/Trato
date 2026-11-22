@@ -280,8 +280,28 @@ abstract interface class RepositorioPagamento {
   Future<void> cadastrarCpf(String cpf, String nascimentoIso) async {}
 }
 
+/// Resumo seguro (LGPD) do cliente do pedido exibido ao profissional no topo do chat.
+class ResumoPerfilCliente {
+  const ResumoPerfilCliente({
+    required this.nome,
+    this.notaMedia,
+    this.totalAvaliacoes = 0,
+    this.servicosConcluidos = 0,
+    this.membroDesde,
+  });
+
+  final String nome;
+  final double? notaMedia;
+  final int totalAvaliacoes;
+  final int servicosConcluidos;
+  final String? membroDesde;
+}
+
 abstract interface class RepositorioChat {
   Future<ConversaPedido> conversa(String pedidoId, {String? profissionalId});
+
+  /// `GET /v1/pedidos/{pedido_id}/perfil-cliente`. Nulo em modo demo ou backend antigo.
+  Future<ResumoPerfilCliente?> perfilClienteDoPedido(String pedidoId) async => null;
   Future<void> enviar(String pedidoId, String texto, {String? profissionalId});
   Future<void> enviarFoto(String pedidoId, String referencia, {String? profissionalId});
   Future<void> proporAgenda(

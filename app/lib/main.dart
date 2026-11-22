@@ -59,6 +59,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // O app é só vertical. Android e iOS também travam isso no manifesto e no Info.plist.
   await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
+  await ControladorTema.instancia.carregar();
   await inicializarFirebaseComSeguranca();
   var config = ConfigTrato.doAmbiente();
   var configAuth = ConfigAuth.doAmbiente();
@@ -148,25 +149,28 @@ void _abrirNovaSenha([int tentativa = 0]) {
 }
 
 class TratoApp extends StatelessWidget {
-  const TratoApp({super.key, this.themeMode = ThemeMode.light});
+  const TratoApp({super.key, this.themeMode});
 
-  final ThemeMode themeMode;
+  final ThemeMode? themeMode;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Trato',
-      // Português do Brasil também nos componentes do sistema (calendário, relógio, botões).
-      locale: const Locale('pt', 'BR'),
-      supportedLocales: const [Locale('pt', 'BR')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      navigatorKey: navegadorTrato,
-      debugShowCheckedModeBanner: false,
-      theme: TemaTrato.claro,
-      darkTheme: TemaTrato.escuro,
-      themeMode: themeMode,
-      builder: (context, filho) => EscalaFonteLimitada(child: filho!),
-      home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
+    return ListenableBuilder(
+      listenable: ControladorTema.instancia,
+      builder: (context, _) => MaterialApp(
+        title: 'Trato',
+        // Português do Brasil também nos componentes do sistema (calendário, relógio, botões).
+        locale: const Locale('pt', 'BR'),
+        supportedLocales: const [Locale('pt', 'BR')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        navigatorKey: navegadorTrato,
+        debugShowCheckedModeBanner: false,
+        theme: TemaTrato.claro,
+        darkTheme: TemaTrato.escuro,
+        themeMode: themeMode ?? ControladorTema.instancia.modo,
+        builder: (context, filho) => EscalaFonteLimitada(child: filho!),
+        home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
+      ),
     );
   }
 }

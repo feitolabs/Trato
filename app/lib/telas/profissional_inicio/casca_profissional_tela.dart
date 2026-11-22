@@ -435,6 +435,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
       child: AtualizadorTela(
         recarregar: _atualizarEmSilencio,
         child: Scaffold(
+          extendBody: true,
           body: IndexedStack(
             index: _aba,
             children: [
@@ -451,7 +452,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
                         i == 1 ? abasProfissional[i].comBadge(naoLidas) : abasProfissional[i],
                     ]
                   : abasProfissional;
-              return BarraAbasTrato(
+              return BarraAbasFlutuante(
                 abas: abas,
                 indiceAtual: _aba,
                 aoSelecionar: _ir,

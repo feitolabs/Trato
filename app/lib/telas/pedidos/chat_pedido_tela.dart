@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../dados/repositorios.dart' show ResumoPerfilCliente;
 import '../../tema/tema.dart';
 import '../comuns/formato_aparelho.dart';
 import 'modelos.dart';
@@ -26,6 +27,7 @@ class ChatPedidoTela extends StatefulWidget {
     this.aoProporNovaCondicao,
     this.aoAceitarAgenda,
     this.aoSugerirAgenda,
+    this.aoAbrirPerfil,
     this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
@@ -51,6 +53,9 @@ class ChatPedidoTela extends StatefulWidget {
 
   /// Abre seletor de data/horário para sugerir ou remarcar visita pelo chat.
   final Future<void> Function()? aoSugerirAgenda;
+
+  /// Abre o perfil da outra parte ao tocar no avatar/nome no cabeçalho do chat.
+  final VoidCallback? aoAbrirPerfil;
   final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
@@ -234,6 +239,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
           children: [
             _Cabecalho(
               conversa: conversa,
+              aoAbrirPerfil: widget.aoAbrirPerfil,
               aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
               aoProporNovaCondicao: conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
               aoSugerirAgenda: widget.aoSugerirAgenda == null
@@ -324,12 +330,14 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
 class _Cabecalho extends StatelessWidget {
   const _Cabecalho({
     required this.conversa,
+    this.aoAbrirPerfil,
     this.aoAtualizar,
     this.aoProporNovaCondicao,
     this.aoSugerirAgenda,
   });
 
   final ConversaPedido conversa;
+  final VoidCallback? aoAbrirPerfil;
   final Future<void> Function()? aoAtualizar;
   final Future<void> Function()? aoProporNovaCondicao;
   final Future<void> Function()? aoSugerirAgenda;
@@ -353,31 +361,67 @@ class _Cabecalho extends StatelessWidget {
                   onPressed: () => Navigator.maybePop(context),
                   icon: const Icon(Icons.arrow_back_ios_new, size: 18),
                 ),
-                AvatarDeUsuario(
-                  iniciais: conversa.iniciais,
-                  usuarioId: conversa.usuarioId,
-                  tamanho: 48,
-                ),
-                const SizedBox(width: EspacosTrato.x3),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        conversa.nome,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TipografiaTrato.tituloCartao.copyWith(color: c.texto),
-                      ),
-                      Text(
-                        'Pedido ${conversa.numeroPedido} · ${conversa.situacao}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: c.textoSecundario,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      key: const ValueKey('cabecalho-chat-perfil'),
+                      onTap: aoAbrirPerfil,
+                      borderRadius: BorderRadius.circular(EspacosTrato.raio),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: EspacosTrato.x1,
+                          vertical: EspacosTrato.x1,
+                        ),
+                        child: Row(
+                          children: [
+                            AvatarDeUsuario(
+                              iniciais: conversa.iniciais,
+                              usuarioId: conversa.usuarioId,
+                              tamanho: 48,
+                            ),
+                            const SizedBox(width: EspacosTrato.x3),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          conversa.nome,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TipografiaTrato.tituloCartao.copyWith(
+                                            color: c.texto,
+                                          ),
+                                        ),
+                                      ),
+                                      if (aoAbrirPerfil != null) ...[
+                                        const SizedBox(width: 2),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          size: 18,
+                                          color: c.textoSecundario,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  Text(
+                                    'Pedido ${conversa.numeroPedido} · ${conversa.situacao}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TipografiaTrato.corpoPequeno.copyWith(
+                                      color: c.textoSecundario,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
                 if (aoAtualizar != null)
@@ -778,6 +822,190 @@ class _BotaoPropostaState extends State<_BotaoProposta> {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Text(habilitado ? widget.rotuloAtivo : widget.rotuloInativo),
+    );
+  }
+}
+
+/// Bottom sheet de resumo seguro (LGPD) do cliente aberto pelo profissional no topo do chat.
+class FolhaResumoPerfilCliente extends StatefulWidget {
+  const FolhaResumoPerfilCliente({
+    super.key,
+    required this.carregar,
+    required this.nomeFallback,
+    required this.iniciaisFallback,
+  });
+
+  final Future<ResumoPerfilCliente?> Function() carregar;
+  final String nomeFallback;
+  final String iniciaisFallback;
+
+  @override
+  State<FolhaResumoPerfilCliente> createState() => _FolhaResumoPerfilClienteState();
+}
+
+class _FolhaResumoPerfilClienteState extends State<FolhaResumoPerfilCliente> {
+  late Future<ResumoPerfilCliente?> _futuro = widget.carregar();
+
+  void _tentarDeNovo() => setState(() => _futuro = widget.carregar());
+
+  static String? _formatarMembroDesde(String? iso) {
+    final limpo = iso?.trim() ?? '';
+    if (limpo.isEmpty) return null;
+    final dt = DateTime.tryParse(limpo);
+    if (dt == null) return limpo;
+    final mes = dt.month.toString().padLeft(2, '0');
+    return '$mes/${dt.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cores;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          EspacosTrato.x5,
+          EspacosTrato.x5,
+          EspacosTrato.x5,
+          EspacosTrato.x6,
+        ),
+        child: FutureBuilder<ResumoPerfilCliente?>(
+          future: _futuro,
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: EspacosTrato.x6),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snap.hasError) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Perfil do cliente', style: TipografiaTrato.titulo.copyWith(color: c.texto)),
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    'Não foi possível carregar o resumo agora. Tente de novo.',
+                    style: TipografiaTrato.corpo.copyWith(color: c.textoSecundario),
+                  ),
+                  const SizedBox(height: EspacosTrato.x4),
+                  TextButton(onPressed: _tentarDeNovo, child: const Text('Tentar de novo')),
+                ],
+              );
+            }
+            final dados = snap.data;
+            final nome =
+                (dados?.nome.trim().isNotEmpty ?? false) ? dados!.nome.trim() : widget.nomeFallback;
+            final nota = dados?.notaMedia;
+            final totalAv = dados?.totalAvaliacoes ?? 0;
+            final concluidos = dados?.servicosConcluidos ?? 0;
+            final desde = _formatarMembroDesde(dados?.membroDesde);
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: c.azulSuave,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: c.borda),
+                      ),
+                      child: Text(
+                        widget.iniciaisFallback,
+                        style: TipografiaTrato.tituloCartao.copyWith(color: c.texto),
+                      ),
+                    ),
+                    const SizedBox(width: EspacosTrato.x3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(nome, style: TipografiaTrato.titulo.copyWith(color: c.texto)),
+                          if (desde != null)
+                            Text(
+                              'No Trato desde $desde',
+                              style: TipografiaTrato.corpoPequeno.copyWith(
+                                color: c.textoSecundario,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: EspacosTrato.x4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(EspacosTrato.x3),
+                        decoration: BoxDecoration(
+                          color: c.fundo,
+                          borderRadius: BorderRadius.circular(EspacosTrato.raio),
+                          border: Border.all(color: c.borda),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Avaliação',
+                              style: TipografiaTrato.legenda.copyWith(color: c.textoSecundario),
+                            ),
+                            const SizedBox(height: 4),
+                            if (nota != null)
+                              Text(
+                                '★ ${nota.toStringAsFixed(1).replaceAll('.', ',')} ($totalAv)',
+                                style: TipografiaTrato.corpoForte.copyWith(color: c.texto),
+                              )
+                            else
+                              Text(
+                                'Sem avaliações ainda',
+                                style: TipografiaTrato.corpoPequeno.copyWith(
+                                  color: c.textoSecundario,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: EspacosTrato.x3),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(EspacosTrato.x3),
+                        decoration: BoxDecoration(
+                          color: c.fundo,
+                          borderRadius: BorderRadius.circular(EspacosTrato.raio),
+                          border: Border.all(color: c.borda),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Serviços concluídos',
+                              style: TipografiaTrato.legenda.copyWith(color: c.textoSecundario),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$concluidos',
+                              style: TipografiaTrato.corpoForte.copyWith(color: c.texto),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

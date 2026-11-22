@@ -2825,8 +2825,36 @@ abstract final class RotasTrato {
         final podeCombinarAgenda = !conversa.pedidoAberto &&
             !conversa.remoto &&
             (sit.contains('pago') || sit.contains('agend'));
+        final idProChat = profissionalId ?? conversa.usuarioId;
+        final VoidCallback? aoAbrirPerfilChat = ehPro
+            ? (repos.modoApi
+                ? () => showModalBottomSheet<void>(
+                      context: context,
+                      builder: (_) => FolhaResumoPerfilCliente(
+                        carregar: () => repos.chat.perfilClienteDoPedido(pedidoId),
+                        nomeFallback: conversa.nome,
+                        iniciaisFallback: conversa.iniciais,
+                      ),
+                    )
+                : null)
+            : ((idProChat != null && idProChat.isNotEmpty)
+                ? () => abrirPerfil(
+                      context,
+                      Profissional(
+                        id: idProChat,
+                        nome: conversa.nome,
+                        iniciais: conversa.iniciais,
+                        verificacao: '',
+                        especialidade: '',
+                        servicosConcluidos: 0,
+                        nota: 0,
+                        distanciaKm: 0,
+                      ),
+                    )
+                : null);
         return ChatPedidoTela(
           conversa: conversa,
+          aoAbrirPerfil: aoAbrirPerfilChat,
           aoCapturarFoto: _fotografar,
           aoRecarregar: repos.modoApi ? carregarConversa : null,
           aoSugerirAgenda: podeCombinarAgenda

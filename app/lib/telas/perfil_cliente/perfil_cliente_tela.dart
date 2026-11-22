@@ -268,6 +268,8 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
           const SizedBox(height: EspacosTrato.x3),
           _CartaoGrupo(grupo: grupo, aoTocar: widget.aoTocarItem),
         ],
+        const SizedBox(height: EspacosTrato.x5),
+        const SeletorAparencia(),
         const SizedBox(height: EspacosTrato.x6),
         Row(
           children: [

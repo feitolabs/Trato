@@ -1383,6 +1383,19 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
 class RepositorioChatApi implements RepositorioChat {
   RepositorioChatApi(this._api, {this.textos = const TextosPadraoTelas(), this.upload});
 
+  @override
+  Future<ResumoPerfilCliente?> perfilClienteDoPedido(String pedidoId) async {
+    final j = _mapa(await _api.get('/v1/pedidos/$pedidoId/perfil-cliente'));
+    final nome = (j['nome'] as String?)?.trim() ?? '';
+    return ResumoPerfilCliente(
+      nome: nome.isEmpty ? 'Cliente' : nome,
+      notaMedia: j['nota_media'] is num ? (j['nota_media'] as num).toDouble() : null,
+      totalAvaliacoes: (j['total_avaliacoes'] as num?)?.toInt() ?? 0,
+      servicosConcluidos: (j['servicos_concluidos'] as num?)?.toInt() ?? 0,
+      membroDesde: j['membro_desde'] is String ? (j['membro_desde'] as String).trim() : null,
+    );
+  }
+
   final ClienteApi _api;
   final TextosPadraoTelas textos;
 

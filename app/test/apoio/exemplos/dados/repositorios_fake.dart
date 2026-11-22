@@ -293,6 +293,8 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
 }
 
 class RepositorioChatFake implements RepositorioChat {
+  @override
+  Future<ResumoPerfilCliente?> perfilClienteDoPedido(String pedidoId) async => null;
   final List<String> enviadas = [];
   final Map<String, ConversaPedido> _conversas = {};
 

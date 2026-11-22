@@ -1,4 +1,6 @@
 export 'barra_abas.dart';
+export 'barra_abas_flutuante.dart';
+export 'seletor_aparencia.dart';
 export 'botoes.dart';
 export 'campo.dart';
 export 'cep_campo.dart';

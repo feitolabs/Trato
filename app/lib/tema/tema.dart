@@ -4,6 +4,7 @@ import 'cores.dart';
 import 'espacos.dart';
 import 'tipografia.dart';
 
+export 'controlador_tema.dart';
 export 'cores.dart';
 export 'espacos.dart';
 export 'responsivo.dart';

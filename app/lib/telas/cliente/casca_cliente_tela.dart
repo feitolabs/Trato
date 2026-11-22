@@ -71,6 +71,7 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
         if (!didPop && _aba != 0) _ir(0);
       },
       child: Scaffold(
+        extendBody: true,
         body: IndexedStack(
           index: _aba,
           children: [
@@ -87,7 +88,7 @@ class _CascaClienteTelaState extends State<CascaClienteTela> {
                       i == 3 ? abasCliente[i].comBadge(naoLidas) : abasCliente[i],
                   ]
                 : abasCliente;
-            return BarraAbasTrato(
+            return BarraAbasFlutuante(
               abas: abas,
               indiceAtual: _aba,
               aoSelecionar: _ir,
