@@ -62,7 +62,7 @@ class EstruturaConclusao extends StatelessWidget {
           if (rodape != null)
             Container(
               width: double.infinity,
-              color: CoresTrato.superficie,
+              color: context.cores.superficie,
               child: SafeArea(
                 top: false,
                 child: Padding(
@@ -107,7 +107,7 @@ class EspacoFoto extends StatelessWidget {
         padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
         alignment: Alignment.bottomLeft,
         decoration: BoxDecoration(
-          color: CoresTrato.azulClaro,
+          color: context.cores.azulSuave,
           borderRadius: BorderRadius.circular(EspacosTrato.raio),
         ),
         child: imagemReal != null
@@ -145,7 +145,7 @@ class EspacoFoto extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.creme,
+                          color: context.cores.sobrePetroleo,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -158,7 +158,7 @@ class EspacoFoto extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TipografiaTrato.corpoPequeno.copyWith(
-                  color: CoresTrato.petroleo,
+                  color: context.cores.petroleo,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -178,7 +178,7 @@ class LinhaValor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final estiloValor = destaque
-        ? TipografiaTrato.tituloGrande.copyWith(color: CoresTrato.petroleo)
+        ? TipografiaTrato.tituloGrande.copyWith(color: context.cores.petroleo)
         : TipografiaTrato.corpoForte;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,

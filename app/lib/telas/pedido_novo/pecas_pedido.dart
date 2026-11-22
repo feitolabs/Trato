@@ -52,7 +52,7 @@ class EstruturaPedido extends StatelessWidget {
           if (rodape != null)
             Container(
               width: double.infinity,
-              color: CoresTrato.superficie,
+              color: context.cores.superficie,
               child: SafeArea(
                 top: false,
                 child: Padding(
@@ -80,18 +80,18 @@ class AvisoInfo extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(EspacosTrato.x4),
       decoration: BoxDecoration(
-        color: CoresTrato.azulSuave,
+        color: context.cores.azulSuave,
         borderRadius: BorderRadius.circular(EspacosTrato.raio),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icone, size: 22, color: CoresTrato.azulTexto),
+          Icon(icone, size: 22, color: context.cores.azulTexto),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
             child: Text.rich(
               TextSpan(
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
                 children: [texto],
               ),
             ),
@@ -116,9 +116,9 @@ class ChipOpcao extends StatelessWidget {
       button: true,
       selected: marcado,
       child: Material(
-        color: marcado ? CoresTrato.petroleo : CoresTrato.superficie,
+        color: marcado ? context.cores.petroleo : context.cores.superficie,
         shape: StadiumBorder(
-          side: BorderSide(color: marcado ? CoresTrato.petroleo : CoresTrato.borda),
+          side: BorderSide(color: marcado ? context.cores.petroleo : context.cores.borda),
         ),
         child: InkWell(
           customBorder: const StadiumBorder(),
@@ -131,7 +131,7 @@ class ChipOpcao extends StatelessWidget {
             child: Text(
               texto,
               style: TipografiaTrato.corpoForte.copyWith(
-                color: marcado ? CoresTrato.creme : CoresTrato.petroleo,
+                color: marcado ? context.cores.sobrePetroleo : context.cores.petroleo,
                 fontWeight: FontWeight.w600,
               ),
             ),

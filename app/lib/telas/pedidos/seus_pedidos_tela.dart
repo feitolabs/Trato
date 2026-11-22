@@ -58,7 +58,10 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
 
     final lista = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(top: EspacosTrato.x6, bottom: EspacosTrato.x4),
+      padding: const EdgeInsets.only(
+        top: EspacosTrato.x6,
+        bottom: BarraAbasFlutuante.alturaReservada + 72,
+      ),
       children: [
         Text('Seus pedidos', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x4),
@@ -137,8 +140,8 @@ class _Abas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: CoresTrato.borda)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.cores.borda)),
       ),
       child: Row(
         children: [
@@ -178,7 +181,7 @@ class _Aba extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: ativa ? CoresTrato.petroleo : CoresTrato.creme,
+                color: ativa ? context.cores.petroleo : context.cores.sobrePetroleo,
                 width: 2,
               ),
             ),
@@ -189,7 +192,7 @@ class _Aba extends StatelessWidget {
               texto,
               maxLines: 1,
               style: TipografiaTrato.corpoForte.copyWith(
-                color: ativa ? CoresTrato.petroleo : CoresTrato.textoSecundario,
+                color: ativa ? context.cores.petroleo : context.cores.textoSecundario,
               ),
             ),
           ),
@@ -226,7 +229,7 @@ class _CartaoPedido extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           Text(
             pedido.subtitulo,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x3),
           Wrap(

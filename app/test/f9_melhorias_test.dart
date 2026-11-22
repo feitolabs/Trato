@@ -163,7 +163,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('0% de taxa enquanto crescemos — receba pedidos direto no celular.'),
+        find.text('Sem taxa de serviço. Receba pedidos direto no celular.'),
         findsOneWidget,
       );
     });

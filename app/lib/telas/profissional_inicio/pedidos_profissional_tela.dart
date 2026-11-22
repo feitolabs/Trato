@@ -193,13 +193,13 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                   Text(
                     'Cliente: ${c.cliente}',
                     key: const ValueKey('cliente-do-pedido'),
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                   ),
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   c.situacao,
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: c.aguardandoPagamento ? CoresTrato.laranja : CoresTrato.textoSecundario,
+                    color: c.aguardandoPagamento ? context.cores.laranja : context.cores.textoSecundario,
                   ),
                 ),
                 if (oQueFazerAgora(c.estadoApi, remoto: c.remoto, jaAvaliou: c.jaAvaliou) case final agora?) ...[
@@ -208,7 +208,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                     'O que fazer agora: $agora',
                     key: const ValueKey('o-que-fazer-agora'),
                     style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.petroleo,
+                      color: context.cores.petroleo,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -217,7 +217,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                   const SizedBox(height: EspacosTrato.x1),
                   Text(
                     c.quando!,
-                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                   ),
                 ],
                 const SizedBox(height: EspacosTrato.x2),
@@ -225,7 +225,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                   Row(
                     key: const ValueKey('modalidade-remoto'),
                     children: [
-                      const Icon(Icons.videocam_outlined, size: 18, color: CoresTrato.petroleo),
+                      Icon(Icons.videocam_outlined, size: 18, color: context.cores.petroleo),
                       const SizedBox(width: EspacosTrato.x2),
                       Text('Atendimento remoto', style: TipografiaTrato.corpoPequeno),
                     ],
@@ -234,7 +234,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 18, color: CoresTrato.petroleo),
+                      Icon(Icons.location_on_outlined, size: 18, color: context.cores.petroleo),
                       const SizedBox(width: EspacosTrato.x2),
                       Expanded(
                         child: Text(
@@ -256,7 +256,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                 ] else
                   Text(
                     'O cliente ainda não informou o endereço: combine pelo chat.',
-                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                   ),
               ],
             ),
@@ -327,9 +327,9 @@ class _Segmento extends StatelessWidget {
         button: true,
         selected: ativo,
         child: Material(
-          color: ativo ? CoresTrato.petroleo : CoresTrato.superficie,
+          color: ativo ? context.cores.petroleo : context.cores.superficie,
           shape: StadiumBorder(
-            side: BorderSide(color: ativo ? CoresTrato.petroleo : CoresTrato.borda),
+            side: BorderSide(color: ativo ? context.cores.petroleo : context.cores.borda),
           ),
           child: InkWell(
             customBorder: const StadiumBorder(),
@@ -345,7 +345,7 @@ class _Segmento extends StatelessWidget {
                 softWrap: false,
                 overflow: TextOverflow.ellipsis,
                 style: TipografiaTrato.corpoForte.copyWith(
-                  color: ativo ? CoresTrato.creme : CoresTrato.petroleo,
+                  color: ativo ? context.cores.sobrePetroleo : context.cores.petroleo,
                 ),
               ),
             ),

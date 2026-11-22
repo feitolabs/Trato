@@ -77,7 +77,7 @@ class CarteiraTela extends StatelessWidget {
             Text(
               'Repasse automático: após a liberação, o valor cai automaticamente na sua conta cadastrada.',
               key: const Key('aviso-repasse-automatico'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x1),
             RegraLiberacao(libera: dados.proximaLiberacao, chave: const Key('regra-liberacao')),
@@ -86,7 +86,7 @@ class CarteiraTela extends StatelessWidget {
               Text(
                 dados.tratinhosPendentesTexto!,
                 key: const Key('tratinhos-pendentes-carteira'),
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
             ],
             const SizedBox(height: EspacosTrato.x4),
@@ -149,7 +149,7 @@ class _CartaoDisponivel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final claro = TipografiaTrato.corpo.copyWith(color: CoresTrato.creme);
+    final claro = TipografiaTrato.corpo.copyWith(color: context.cores.sobrePetroleo);
     return CartaoTrato(
       escuro: true,
       child: Column(
@@ -163,7 +163,7 @@ class _CartaoDisponivel extends StatelessWidget {
             child: Text(
               Dinheiro.formatar(resumo.disponivelCentavos),
               maxLines: 1,
-              style: TipografiaTrato.marcaPequena.copyWith(color: CoresTrato.creme, fontSize: 44),
+              style: TipografiaTrato.marcaPequena.copyWith(color: context.cores.sobrePetroleo, fontSize: 44),
             ),
           ),
           const SizedBox(height: EspacosTrato.x3),
@@ -199,7 +199,7 @@ class _LinhaSaldos extends StatelessWidget {
             child: _CartaoSaldo(
               icone: Icons.lock_outline,
               rotulo: 'Retido',
-              cor: CoresTrato.azulTexto,
+              cor: context.cores.azulTexto,
               centavos: resumo.retidoCentavos,
               texto: resumo.textoRetido,
             ),
@@ -209,7 +209,7 @@ class _LinhaSaldos extends StatelessWidget {
             child: _CartaoSaldo(
               icone: Icons.schedule,
               rotulo: 'A liberar',
-              cor: CoresTrato.ambarTexto,
+              cor: context.cores.ambarTexto,
               centavos: resumo.aLiberarCentavos,
               texto:
                   'Repasse do dinheiro: ${resumo.proximaLiberacao == null ? resumo.textoALiberar : diaMesDoAparelho(resumo.proximaLiberacao!)}',
@@ -265,7 +265,7 @@ class _CartaoSaldo extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             texto,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
         ],
       ),
@@ -310,7 +310,7 @@ class _CartaoContaRecebimento extends StatelessWidget {
     return CartaoTrato(
       child: Row(
         children: [
-          const Icon(Icons.account_balance_outlined, color: CoresTrato.petroleo),
+          Icon(Icons.account_balance_outlined, color: context.cores.petroleo),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
             child: Column(
@@ -325,7 +325,7 @@ class _CartaoContaRecebimento extends StatelessWidget {
                   cadastrada && (resumo ?? '').isNotEmpty
                       ? resumo!
                       : 'Informe sua chave Pix para receber os repasses liberados.',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
             ),
@@ -377,7 +377,7 @@ class _LinhaExtrato extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final liberado = item.status == StatusExtrato.liberado;
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -425,7 +425,7 @@ class _ExtratoVazio extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             'Quando você concluir um serviço, ele aparece aqui com o valor que você recebe, sem taxa.',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
         ],
       ),

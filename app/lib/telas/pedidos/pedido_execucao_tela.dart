@@ -202,7 +202,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             Text(
               pedido.descricao!,
               key: const ValueKey('descricao-pedido'),
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
             ),
           ],
           const SizedBox(height: EspacosTrato.x2),
@@ -261,7 +261,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             Text(
               pedido.prazoConfirmacao!,
               key: const ValueKey('prazo-confirmacao'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
         ],
         if (pedido.codigoInicio != null) ...[
@@ -286,7 +286,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                       : 'Passe este código ao profissional quando ele chegar. '
                           'Não envie o código por mensagem.',
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.textoSecundario,
+                    color: context.cores.textoSecundario,
                   ),
                 ),
               ],
@@ -313,7 +313,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   'Quando o serviço estiver pronto, passe este código ao profissional '
                   'para ele concluir. Não envie o código por mensagem.',
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.textoSecundario,
+                    color: context.cores.textoSecundario,
                   ),
                 ),
               ],
@@ -340,8 +340,8 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
               OutlinedButton.icon(
                 key: const ValueKey('botao-sos-emergencia'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: CoresTrato.vermelhoTexto,
-                  side: const BorderSide(color: CoresTrato.vermelhoTexto),
+                  foregroundColor: context.cores.vermelhoTexto,
+                  side: BorderSide(color: context.cores.vermelhoTexto),
                 ),
                 onPressed: widget.aoSosEmergencia ?? () => _abrirConfirmacaoSos(pedido),
                 icon: const Icon(Icons.warning_amber_rounded, size: 18),
@@ -492,7 +492,7 @@ class _Topo extends StatelessWidget {
               'Pedido $numero',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
             ),
           ),
           if (kSosHabilitado) BotaoSos(aoTocar: aoTocarSos),
@@ -518,9 +518,9 @@ class _Rodape extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: CoresTrato.superficie,
-        border: Border(top: BorderSide(color: CoresTrato.borda)),
+      decoration: BoxDecoration(
+        color: context.cores.superficie,
+        border: Border(top: BorderSide(color: context.cores.borda)),
       ),
       child: ConteudoResponsivo(
         child: Padding(
@@ -559,7 +559,7 @@ class _CartaoValoresAditivosNotas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     final aditivosAprovados = pedido.aditivos
         .where((a) => a.estado == 'aprovado' || a.estado == 'pago')
         .fold<int>(0, (soma, a) => soma + a.valorCentavos);

@@ -40,7 +40,7 @@ class EstrelasNota extends StatelessWidget {
                 child: Icon(
                   i <= nota ? Icons.star : Icons.star_border,
                   size: tamanho - 4,
-                  color: CoresTrato.petroleo,
+                  color: context.cores.petroleo,
                 ),
               ),
             ),

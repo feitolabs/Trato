@@ -70,11 +70,11 @@ class SucessoAcaoTela extends StatelessWidget {
                           Container(
                             width: 84,
                             height: 84,
-                            decoration: const BoxDecoration(
-                              color: CoresTrato.verdeSuave,
+                            decoration: BoxDecoration(
+                              color: context.cores.verdeSuave,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(icone, size: 48, color: CoresTrato.verdeTexto),
+                            child: Icon(icone, size: 48, color: context.cores.verdeTexto),
                           ),
                           const SizedBox(height: EspacosTrato.x5),
                           Text(
@@ -86,7 +86,7 @@ class SucessoAcaoTela extends StatelessWidget {
                           Text(
                             subtitulo,
                             style: TipografiaTrato.corpo.copyWith(
-                              color: CoresTrato.textoSecundario,
+                              color: context.cores.textoSecundario,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -102,7 +102,7 @@ class SucessoAcaoTela extends StatelessWidget {
                                       rotulo: detalhes[i].rotulo,
                                       valor: detalhes[i].valor,
                                       estiloRotulo: TipografiaTrato.corpoPequeno.copyWith(
-                                        color: CoresTrato.textoSecundario,
+                                        color: context.cores.textoSecundario,
                                       ),
                                     ),
                                   ],
@@ -118,7 +118,7 @@ class SucessoAcaoTela extends StatelessWidget {
               ),
               Container(
                 width: double.infinity,
-                color: CoresTrato.superficie,
+                color: context.cores.superficie,
                 child: SafeArea(
                   top: false,
                   child: Padding(

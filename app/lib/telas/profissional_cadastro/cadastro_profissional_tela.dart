@@ -352,7 +352,7 @@ class _FormularioCadastroProfissionalState
         subtitulo: 'Essas informações aparecem no seu perfil para os clientes.',
         destaque: _modoEdicao
             ? null
-            : '0% de taxa enquanto crescemos — receba pedidos direto no celular.',
+            : 'Sem taxa de serviço. Receba pedidos direto no celular.',
       ),
       const SizedBox(height: EspacosTrato.x6),
       CampoTrato(

@@ -179,7 +179,7 @@ class _LoginTelaState extends State<LoginTela> {
         Text(
           'Conectando Clientes a Profissionais de Qualidade.',
           key: const Key('frase-principal'),
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         Text('Entrar na sua conta', style: TipografiaTrato.tituloGrande),
@@ -225,7 +225,7 @@ class _LoginTelaState extends State<LoginTela> {
           Padding(
             padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
             child:
-                Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+                Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: context.cores.azulTexto)),
           ),
         BotaoPrimario(texto: 'Entrar', aoTocar: _entrar, carregando: _carregando),
         const SizedBox(height: EspacosTrato.x4),
@@ -269,7 +269,7 @@ class _DivisorOu extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x3),
           child: Text(
             'ou',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
         ),
         const Expanded(child: Divider()),

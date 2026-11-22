@@ -22,7 +22,7 @@ class DetalheOrcamentoEnviadoTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final secundario =
-        TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+        TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     final (rotuloSituacao, tipoSituacao) = switch (detalhe.situacao) {
       'aceito' => ('Aceito pelo cliente', TipoStatus.sucesso),
       'encerrado' => ('Encerrado', TipoStatus.alerta),
@@ -58,13 +58,13 @@ class DetalheOrcamentoEnviadoTela extends StatelessWidget {
                           Text(
                             'Valor proposto ao cliente',
                             style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.creme),
+                                .copyWith(color: context.cores.sobrePetroleo),
                           ),
                           const SizedBox(height: EspacosTrato.x1),
                           Text(
                             formatarReais(detalhe.valorCentavos),
                             style: TipografiaTrato.tituloGrande
-                                .copyWith(color: CoresTrato.creme),
+                                .copyWith(color: context.cores.sobrePetroleo),
                           ),
                         ],
                       ),
@@ -156,7 +156,7 @@ class DetalheOrcamentoEnviadoTela extends StatelessWidget {
           if ((aoEditar != null && detalhe.podeEditar) || aoAbrirChat != null)
             Container(
               width: double.infinity,
-              color: CoresTrato.superficie,
+              color: context.cores.superficie,
               child: SafeArea(
                 top: false,
                 child: Padding(

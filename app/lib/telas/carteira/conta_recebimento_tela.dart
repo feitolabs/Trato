@@ -156,13 +156,13 @@ class _ContaRecebimentoTelaState extends State<ContaRecebimentoTela> {
                               'para a conta do mesmo titular abaixo.',
                       key: const Key('texto-repasse'),
                       style: TipografiaTrato.corpo
-                          .copyWith(color: CoresTrato.textoSecundario),
+                          .copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x2),
                     Text(
                       'Para proteger seu pagamento contra fraude, a conta precisa estar no seu nome.',
                       style: TipografiaTrato.corpoPequeno
-                          .copyWith(color: CoresTrato.textoSecundario),
+                          .copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x5),
                     Text('Tipo de chave Pix', style: TipografiaTrato.corpoForte),
@@ -273,7 +273,7 @@ class _ContaRecebimentoTelaState extends State<ContaRecebimentoTela> {
           ),
           Container(
             width: double.infinity,
-            color: CoresTrato.superficie,
+            color: context.cores.superficie,
             child: SafeArea(
               top: false,
               child: Padding(

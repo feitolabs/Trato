@@ -69,11 +69,11 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                   Container(
                     width: 48,
                     height: 48,
-                    decoration: const BoxDecoration(
-                      color: CoresTrato.azulClaro,
+                    decoration: BoxDecoration(
+                      color: context.cores.azulSuave,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(c.icone, color: CoresTrato.petroleo),
+                    child: Icon(c.icone, color: context.cores.petroleo),
                   ),
                   const SizedBox(width: EspacosTrato.x3),
                   Expanded(child: Text(c.nome, style: TipografiaTrato.tituloGrande)),
@@ -83,7 +83,7 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                 const SizedBox(height: EspacosTrato.x2),
                 Text(
                   c.descricao,
-                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
               const SizedBox(height: EspacosTrato.x4),
@@ -137,7 +137,7 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                             return Text(
                               '${lista.length} ${lista.length == 1 ? 'profissional' : 'profissionais'}',
                               style: TipografiaTrato.corpoPequeno
-                                  .copyWith(color: CoresTrato.textoSecundario),
+                                  .copyWith(color: context.cores.textoSecundario),
                             );
                           }
                           final p = lista[i - 1];
@@ -178,7 +178,7 @@ Future<FiltroProfissionais?> mostrarFiltrosProfissionais(
   return showModalBottomSheet<FiltroProfissionais>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: CoresTrato.creme,
+    backgroundColor: context.cores.fundo,
     builder: (_) => _FolhaFiltros(atual: atual),
   );
 }
@@ -254,11 +254,11 @@ class _FolhaFiltrosState extends State<_FolhaFiltros> {
                     Switch(
                       value: _hoje,
                       onChanged: (v) => setState(() => _hoje = v),
-                      activeTrackColor: CoresTrato.petroleo,
-                      activeThumbColor: CoresTrato.creme,
-                      inactiveTrackColor: CoresTrato.borda,
-                      inactiveThumbColor: CoresTrato.superficie,
-                      trackOutlineColor: const WidgetStatePropertyAll(CoresTrato.petroleo),
+                      activeTrackColor: context.cores.petroleo,
+                      activeThumbColor: context.cores.sobrePetroleo,
+                      inactiveTrackColor: context.cores.borda,
+                      inactiveThumbColor: context.cores.superficie,
+                      trackOutlineColor: WidgetStatePropertyAll(context.cores.petroleo),
                     ),
                   ],
                 ),

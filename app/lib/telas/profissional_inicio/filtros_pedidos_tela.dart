@@ -95,7 +95,7 @@ class _FiltrosPedidosAbertosTelaState extends State<FiltrosPedidosAbertosTela> {
                 const SizedBox(height: EspacosTrato.x2),
                 Text(
                   'Escolha o que aparece em "Pedidos abertos".',
-                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                 ),
                 if (widget.categorias.length > 1) ...[
                   const SizedBox(height: EspacosTrato.x5),
@@ -180,9 +180,9 @@ class _Rodape extends StatelessWidget {
   Widget build(BuildContext context) {
     final margem = Responsivo.margemLateral(TamanhoTela.de(context));
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: CoresTrato.creme,
-        border: Border(top: BorderSide(color: CoresTrato.borda)),
+      decoration: BoxDecoration(
+        color: context.cores.sobrePetroleo,
+        border: Border(top: BorderSide(color: context.cores.borda)),
       ),
       child: SafeArea(
         top: false,

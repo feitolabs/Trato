@@ -171,9 +171,9 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
             onSubmitted: _buscar,
             decoration: InputDecoration(
               hintText: 'Serviço, especialidade, bairro ou nome',
-              prefixIcon: const Padding(
-                padding: EdgeInsets.only(left: EspacosTrato.x4, right: EspacosTrato.x3),
-                child: Icon(Icons.search, size: 22, color: CoresTrato.petroleo),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: EspacosTrato.x4, right: EspacosTrato.x3),
+                child: Icon(Icons.search, size: 22, color: context.cores.petroleo),
               ),
               prefixIconConstraints: const BoxConstraints(
                 minWidth: 48,
@@ -318,7 +318,7 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
                             return Text(
                               '${filtrados.length} ${filtrados.length == 1 ? 'resultado' : 'resultados'}',
                               style: TipografiaTrato.corpoPequeno
-                                  .copyWith(color: CoresTrato.textoSecundario),
+                                  .copyWith(color: context.cores.textoSecundario),
                             );
                           }
                           final p = filtrados[i - 1];
@@ -384,10 +384,10 @@ class _Sugestoes extends StatelessWidget {
               children: [
                 for (final termo in recentes)
                   ActionChip(
-                    avatar: const Icon(Icons.history, size: 18, color: CoresTrato.petroleo),
+                    avatar: Icon(Icons.history, size: 18, color: context.cores.petroleo),
                     label: Text(termo, style: TipografiaTrato.corpoPequeno),
-                    backgroundColor: CoresTrato.superficie,
-                    side: const BorderSide(color: CoresTrato.borda),
+                    backgroundColor: context.cores.superficie,
+                    side: BorderSide(color: context.cores.borda),
                     onPressed: () => aoEscolherRecente(termo),
                   ),
               ],
@@ -402,10 +402,10 @@ class _Sugestoes extends StatelessWidget {
             children: [
               for (final c in sugestoes)
                 ActionChip(
-                  avatar: Icon(c.icone, size: 18, color: CoresTrato.petroleo),
+                  avatar: Icon(c.icone, size: 18, color: context.cores.petroleo),
                   label: Text(c.nome, style: TipografiaTrato.corpoPequeno),
-                  backgroundColor: CoresTrato.superficie,
-                  side: const BorderSide(color: CoresTrato.borda),
+                  backgroundColor: context.cores.superficie,
+                  side: BorderSide(color: context.cores.borda),
                   onPressed: () {
                     if (c.nome == 'Ver todas' && aoVerTodas != null) {
                       aoVerTodas!();
@@ -438,10 +438,10 @@ class _CartaoResultado extends StatelessWidget {
       label: '${p.nome}, ${p.especialidade}, nota ${p.nota}',
       excludeSemantics: true,
       child: Material(
-        color: CoresTrato.superficie,
+        color: context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-          side: const BorderSide(color: CoresTrato.borda),
+          side: BorderSide(color: context.cores.borda),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -460,7 +460,7 @@ class _CartaoResultado extends StatelessWidget {
                       Text(
                         p.especialidade,
                         style: TipografiaTrato.corpoPequeno
-                            .copyWith(color: CoresTrato.textoSecundario),
+                            .copyWith(color: context.cores.textoSecundario),
                       ),
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
@@ -475,7 +475,7 @@ class _CartaoResultado extends StatelessWidget {
                         Text(
                           'Atende hoje',
                           style: TipografiaTrato.legenda.copyWith(
-                            color: CoresTrato.petroleo,
+                            color: context.cores.petroleo,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -483,7 +483,7 @@ class _CartaoResultado extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: CoresTrato.petroleo),
+                Icon(Icons.chevron_right, color: context.cores.petroleo),
               ],
             ),
           ),

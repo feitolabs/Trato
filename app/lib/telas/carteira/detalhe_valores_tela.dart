@@ -28,7 +28,7 @@ class DetalheValoresTela extends StatelessWidget {
       tituloVazio: '',
       textoVazio: '',
       construir: (context, d) {
-        final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+        final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
         return CorpoRolavel(
           children: [
             Text('Pedido ${d.pedidoNumero}', style: TipografiaTrato.tituloGrande),
@@ -124,7 +124,7 @@ class _Linha extends StatelessWidget {
           if (nota != null)
             Text(
               nota!,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
         ],
       ),

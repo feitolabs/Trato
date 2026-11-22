@@ -115,10 +115,10 @@ class _LinhaConversa extends StatelessWidget {
           '${novas ? ' ${item.naoLidas} não lidas.' : ''}',
       excludeSemantics: true,
       child: Material(
-        color: CoresTrato.superficie,
+        color: context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-          side: const BorderSide(color: CoresTrato.borda),
+          side: BorderSide(color: context.cores.borda),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -138,7 +138,7 @@ class _LinhaConversa extends StatelessWidget {
                         item.tituloPedido,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                        style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                       ),
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
@@ -159,20 +159,20 @@ class _LinhaConversa extends StatelessWidget {
                   children: [
                     Text(
                       item.quando,
-                      style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                     ),
                     if (novas) ...[
                       const SizedBox(height: EspacosTrato.x2),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: CoresTrato.laranja,
+                          color: context.cores.laranja,
                           borderRadius: BorderRadius.circular(EspacosTrato.raioPilula),
                         ),
                         child: Text(
                           '${item.naoLidas}',
                           style: TipografiaTrato.legenda
-                              .copyWith(color: CoresTrato.petroleo, fontWeight: FontWeight.w700),
+                              .copyWith(color: context.cores.petroleo, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ],

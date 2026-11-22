@@ -166,7 +166,7 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
           ],
           centralizado: true,
           estilo: estiloCodigo,
-          estiloDica: estiloCodigo.copyWith(color: CoresTrato.textoDica),
+          estiloDica: estiloCodigo.copyWith(color: context.cores.textoDica),
           erro: _tentou ? ValidacaoAuth.codigoSms(_codigo.text) : null,
           aoMudar: (_) => setState(() {}),
         ),
@@ -174,30 +174,30 @@ class _ConfirmarCelularTelaState extends State<ConfirmarCelularTela> {
         if (_restante > 0)
           Text(
             'Reenviar em $_tempo',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           )
         else
           BotaoLink(texto: 'Reenviar código', aoTocar: _reenviar),
         if (_aviso != null)
-          Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+          Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: context.cores.azulTexto)),
         BotaoLink(texto: 'Mudar número', aoTocar: () => Navigator.of(context).pop()),
         const SizedBox(height: EspacosTrato.x4),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(EspacosTrato.x4),
           decoration: BoxDecoration(
-            color: CoresTrato.azulSuave,
+            color: context.cores.azulSuave,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.lock_outline, size: 22, color: CoresTrato.azulTexto),
+              Icon(Icons.lock_outline, size: 22, color: context.cores.azulTexto),
               const SizedBox(width: EspacosTrato.x3),
               Expanded(
                 child: Text(
                   'Seu número não aparece para os profissionais. As conversas acontecem pelo chat do pedido.',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
                 ),
               ),
             ],

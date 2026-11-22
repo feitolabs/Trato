@@ -379,6 +379,7 @@ class _Cabecalho extends StatelessWidget {
                               iniciais: conversa.iniciais,
                               usuarioId: conversa.usuarioId,
                               tamanho: 48,
+                              permitirAmpliacao: false,
                             ),
                             const SizedBox(width: EspacosTrato.x3),
                             Expanded(
@@ -476,7 +477,7 @@ class _AvisoPrivacidade extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: CoresTrato.azulSuave,
+      color: context.cores.azulSuave,
       padding: const EdgeInsets.symmetric(
         horizontal: EspacosTrato.margemTela,
         vertical: EspacosTrato.x3,
@@ -486,13 +487,13 @@ class _AvisoPrivacidade extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.shield_outlined, size: 20, color: CoresTrato.azulTexto),
+            Icon(Icons.shield_outlined, size: 20, color: context.cores.azulTexto),
             const SizedBox(width: EspacosTrato.x3),
             Expanded(
               child: Text(
                 'As mensagens ficam guardadas e servem de prova. '
                 'Antes de contratar, telefones e e-mails ficam ocultos.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
               ),
             ),
           ],
@@ -519,7 +520,7 @@ class _LinhaMensagem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final legendaHora = TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario);
+    final legendaHora = TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario);
     if (mensagem.tipo == TipoMensagem.sistema) {
       return Padding(
         padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
@@ -528,7 +529,7 @@ class _LinhaMensagem extends StatelessWidget {
             Text(
               mensagem.texto ?? '',
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x1),
             Text(mensagem.hora, style: legendaHora),
@@ -549,9 +550,9 @@ class _LinhaMensagem extends StatelessWidget {
               vertical: EspacosTrato.x3,
             ),
             decoration: BoxDecoration(
-              color: minha ? CoresTrato.petroleo : CoresTrato.superficie,
+              color: minha ? context.cores.petroleo : context.cores.superficie,
               borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-              border: minha ? null : Border.all(color: CoresTrato.borda),
+              border: minha ? null : Border.all(color: context.cores.borda),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,7 +562,7 @@ class _LinhaMensagem extends StatelessWidget {
                   Text(
                     prop.ehPropostaDoProfissional ? 'Nova proposta' : 'Contraproposta',
                     style: TipografiaTrato.sobretitulo.copyWith(
-                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                      color: minha ? context.cores.sobrePetroleo : context.cores.textoSecundario,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x1),
@@ -569,7 +570,7 @@ class _LinhaMensagem extends StatelessWidget {
                     'Valor: ${formatarReais(prop.valorCentavos)}'
                     '${prop.prazoExecucaoDias == null ? '' : ' · Prazo: ${prop.prazoExecucaoDias} ${prop.prazoExecucaoDias == 1 ? 'dia' : 'dias'}'}',
                     style: TipografiaTrato.corpoForte.copyWith(
-                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                      color: minha ? context.cores.sobrePetroleo : context.cores.petroleo,
                     ),
                   ),
                   if ((mensagem.texto ?? '').trim().isNotEmpty)
@@ -579,7 +580,7 @@ class _LinhaMensagem extends StatelessWidget {
                   Text(
                     'Sugestão de visita',
                     style: TipografiaTrato.sobretitulo.copyWith(
-                      color: minha ? CoresTrato.creme : CoresTrato.textoSecundario,
+                      color: minha ? context.cores.sobrePetroleo : context.cores.textoSecundario,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x1),
@@ -591,7 +592,7 @@ class _LinhaMensagem extends StatelessWidget {
                     '${agenda.fim.hour.toString().padLeft(2, '0')}h'
                     '${agenda.fim.minute.toString().padLeft(2, '0')}',
                     style: TipografiaTrato.corpoForte.copyWith(
-                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                      color: minha ? context.cores.sobrePetroleo : context.cores.petroleo,
                     ),
                   ),
                   if ((mensagem.texto ?? '').trim().isNotEmpty)
@@ -601,7 +602,7 @@ class _LinhaMensagem extends StatelessWidget {
                   Text(
                     mensagem.texto ?? '',
                     style: TipografiaTrato.corpo.copyWith(
-                      color: minha ? CoresTrato.creme : CoresTrato.petroleo,
+                      color: minha ? context.cores.sobrePetroleo : context.cores.petroleo,
                     ),
                   ),
                 if (agenda != null && !minha && aoAceitarAgenda != null) ...[
@@ -669,7 +670,7 @@ class _LinhaMensagem extends StatelessWidget {
                               : 'pino-enviada',
                     ),
                     size: 16,
-                    color: mensagem.lida ? CoresTrato.azulTexto : CoresTrato.textoSecundario,
+                    color: mensagem.lida ? context.cores.azulTexto : context.cores.textoSecundario,
                   ),
                 ],
               ),
@@ -697,8 +698,8 @@ class _RespostasRapidas extends StatelessWidget {
         itemCount: respostas.length,
         separatorBuilder: (_, __) => const SizedBox(width: EspacosTrato.x2),
         itemBuilder: (_, i) => Material(
-          color: CoresTrato.superficie,
-          shape: const StadiumBorder(side: BorderSide(color: CoresTrato.borda)),
+          color: context.cores.superficie,
+          shape: StadiumBorder(side: BorderSide(color: context.cores.borda)),
           child: InkWell(
             customBorder: const StadiumBorder(),
             onTap: () => aoTocar(respostas[i]),
@@ -727,9 +728,9 @@ class _CampoEnvio extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: CoresTrato.superficie,
-        border: Border(top: BorderSide(color: CoresTrato.borda)),
+      decoration: BoxDecoration(
+        color: context.cores.superficie,
+        border: Border(top: BorderSide(color: context.cores.borda)),
       ),
       child: ConteudoResponsivo(
         child: Padding(

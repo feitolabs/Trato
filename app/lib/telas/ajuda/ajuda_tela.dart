@@ -108,12 +108,12 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
         if (widget.itens.isEmpty)
           Text(
             'Ainda não há perguntas por aqui. Fale com o suporte abaixo.',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           )
         else if (filtradas.isEmpty)
           Text(
             'Nenhuma dúvida encontrada para "${_busca.text.trim()}".',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           )
         else
           CartaoTrato(
@@ -148,7 +148,7 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
           const SizedBox(height: EspacosTrato.x3),
           Text(
             'Nossa equipe responde por mensagem, com atenção a cada caso.',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x4),
           if (widget.aoFalarComSuporte != null)

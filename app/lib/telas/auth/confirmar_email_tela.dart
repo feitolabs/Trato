@@ -186,30 +186,30 @@ class _ConfirmarEmailTelaState extends State<ConfirmarEmailTela> {
         if (_restante > 0)
           Text(
             'Reenviar e-mail em $_tempo',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           )
         else
           BotaoLink(texto: 'Reenviar e-mail', aoTocar: _reenviar),
         if (_aviso != null)
-          Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+          Text(_aviso!, style: TipografiaTrato.corpo.copyWith(color: context.cores.azulTexto)),
         BotaoLink(texto: 'Trocar e-mail', aoTocar: () => Navigator.of(context).pop()),
         const SizedBox(height: EspacosTrato.x4),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(EspacosTrato.x4),
           decoration: BoxDecoration(
-            color: CoresTrato.azulSuave,
+            color: context.cores.azulSuave,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.mail_outline, size: 22, color: CoresTrato.azulTexto),
+              Icon(Icons.mail_outline, size: 22, color: context.cores.azulTexto),
               const SizedBox(width: EspacosTrato.x3),
               Expanded(
                 child: Text(
                   'Não achou? Olhe a caixa de spam ou lixo eletrônico.',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
                 ),
               ),
             ],

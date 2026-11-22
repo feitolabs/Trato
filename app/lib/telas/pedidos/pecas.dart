@@ -34,7 +34,7 @@ class EspacoFoto extends StatelessWidget {
         padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
         alignment: Alignment.bottomLeft,
         decoration: BoxDecoration(
-          color: CoresTrato.azulClaro,
+          color: context.cores.azulSuave,
           borderRadius: BorderRadius.circular(EspacosTrato.raio),
         ),
         child: imagemReal != null
@@ -72,7 +72,7 @@ class EspacoFoto extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.creme,
+                          color: context.cores.sobrePetroleo,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -100,8 +100,8 @@ class BotaoSos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: CoresTrato.vermelhoSuave,
-      shape: const StadiumBorder(side: BorderSide(color: CoresTrato.vermelhoTexto, width: 1.5)),
+      color: context.cores.vermelhoSuave,
+      shape: StadiumBorder(side: BorderSide(color: context.cores.vermelhoTexto, width: 1.5)),
       child: InkWell(
         customBorder: const StadiumBorder(),
         onTap: aoTocar,
@@ -113,11 +113,11 @@ class BotaoSos extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.warning_amber_rounded, size: 20, color: CoresTrato.vermelhoTexto),
+              Icon(Icons.warning_amber_rounded, size: 20, color: context.cores.vermelhoTexto),
               const SizedBox(width: EspacosTrato.x2),
               Text(
                 'SOS',
-                style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.vermelhoTexto),
+                style: TipografiaTrato.corpoForte.copyWith(color: context.cores.vermelhoTexto),
               ),
             ],
           ),
@@ -147,7 +147,7 @@ class CartaoAditivo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(EspacosTrato.x4),
       decoration: BoxDecoration(
-        color: CoresTrato.ambarSuave,
+        color: context.cores.ambarSuave,
         borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
       ),
       child: Column(
@@ -155,13 +155,13 @@ class CartaoAditivo extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.schedule, size: 18, color: CoresTrato.ambarTexto),
+              Icon(Icons.schedule, size: 18, color: context.cores.ambarTexto),
               const SizedBox(width: EspacosTrato.x2),
               Expanded(
                 child: Text(
                   aguardando ? 'Aditivo aguardando sua resposta' : 'Aditivo',
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.ambarTexto,
+                    color: context.cores.ambarTexto,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -188,7 +188,7 @@ class CartaoAditivo extends StatelessWidget {
                     Text(
                       aditivo.descricao,
                       style: TipografiaTrato.corpoPequeno.copyWith(
-                        color: CoresTrato.textoSecundario,
+                        color: context.cores.textoSecundario,
                       ),
                     ),
                   ],

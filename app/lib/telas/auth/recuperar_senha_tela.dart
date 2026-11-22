@@ -81,7 +81,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
         children: [
           Text(
             'Sem acesso ao e-mail? ',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
           BotaoLink(texto: 'Fale com o suporte', aoTocar: _abrirAjuda),
         ],
@@ -109,7 +109,7 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
             padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
             child: Text(
               'Pronto! Se este e-mail tem conta, você vai receber as instruções em instantes.',
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto),
+              style: TipografiaTrato.corpo.copyWith(color: context.cores.azulTexto),
             ),
           ),
         BotaoPrimario(texto: 'Enviar link', aoTocar: _enviar, carregando: _carregando),

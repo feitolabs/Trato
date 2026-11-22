@@ -87,7 +87,7 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
               'Avaliar o cliente vale +50 Tratinhos (1 por cliente). '
               'Tratinhos liberados: ${_dataLiberacao()} (7 dias, se não houver disputa).',
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x3),
             BotaoPrimario(
@@ -103,7 +103,7 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           'Pedido ${widget.pedidoNumero}. Sua nota ajuda outros profissionais.',
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x5),
         EstrelasNota(

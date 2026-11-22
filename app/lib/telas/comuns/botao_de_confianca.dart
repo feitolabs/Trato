@@ -68,7 +68,7 @@ class _BotaoDeConfiancaState extends State<BotaoDeConfianca> {
   @override
   Widget build(BuildContext context) {
     if (_favorito) {
-      final cor = widget.clara ? CoresTrato.creme : null;
+      final cor = widget.clara ? context.cores.sobrePetroleo : null;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -86,7 +86,7 @@ class _BotaoDeConfiancaState extends State<BotaoDeConfianca> {
     if (widget.clara) {
       return TextButton(
         key: const Key('salvar-de-confianca'),
-        style: TextButton.styleFrom(foregroundColor: CoresTrato.creme),
+        style: TextButton.styleFrom(foregroundColor: context.cores.sobrePetroleo),
         onPressed: _salvar,
         child: const Text('Salvar como profissional de confiança'),
       );

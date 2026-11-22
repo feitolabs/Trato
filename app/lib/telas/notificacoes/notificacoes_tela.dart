@@ -149,7 +149,7 @@ class _ListaNotificacoesState extends State<_ListaNotificacoes> {
               _naoLidas == 0
                   ? 'Tudo lido'
                   : '$_naoLidas ${_naoLidas == 1 ? 'não lida' : 'não lidas'}',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             if (_naoLidas > 0)
               TextButton(
@@ -194,10 +194,10 @@ class _LinhaNotificacao extends StatelessWidget {
       label: '${forte ? 'Não lida. ' : ''}${item.tipo.rotulo}. ${item.titulo}. ${item.quando}',
       excludeSemantics: true,
       child: Material(
-        color: forte ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: forte ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-          side: const BorderSide(color: CoresTrato.borda),
+          side: BorderSide(color: context.cores.borda),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -207,7 +207,7 @@ class _LinhaNotificacao extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(item.tipo.icone, color: CoresTrato.petroleo),
+                Icon(item.tipo.icone, color: context.cores.petroleo),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
                   child: Column(
@@ -221,12 +221,12 @@ class _LinhaNotificacao extends StatelessWidget {
                       Text(
                         item.texto,
                         style: TipografiaTrato.corpoPequeno
-                            .copyWith(color: CoresTrato.textoSecundario),
+                            .copyWith(color: context.cores.textoSecundario),
                       ),
                       const SizedBox(height: EspacosTrato.x2),
                       Text(
                         '${item.tipo.rotulo} · ${item.quando}',
-                        style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                        style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                       ),
                     ],
                   ),
@@ -236,8 +236,8 @@ class _LinhaNotificacao extends StatelessWidget {
                     margin: const EdgeInsets.only(left: EspacosTrato.x2, top: EspacosTrato.x1),
                     width: 10,
                     height: 10,
-                    decoration: const BoxDecoration(
-                      color: CoresTrato.laranja,
+                    decoration: BoxDecoration(
+                      color: context.cores.laranja,
                       shape: BoxShape.circle,
                     ),
                   ),

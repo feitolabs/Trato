@@ -79,7 +79,7 @@ class _EnderecosTelaState extends State<EnderecosTela> {
                             const SizedBox(width: EspacosTrato.x2),
                             Text('Principal',
                                 style: TipografiaTrato.corpoPequeno
-                                    .copyWith(color: CoresTrato.verdeTexto)),
+                                    .copyWith(color: context.cores.verdeTexto)),
                           ],
                         ],
                       ),
@@ -87,7 +87,7 @@ class _EnderecosTelaState extends State<EnderecosTela> {
                       Text(e.linha1, style: TipografiaTrato.corpoPequeno),
                       Text('${e.linha2} · ${formatarCep(e.cep)}',
                           style: TipografiaTrato.corpoPequeno
-                              .copyWith(color: CoresTrato.textoSecundario)),
+                              .copyWith(color: context.cores.textoSecundario)),
                     ],
                   ),
                 ),
@@ -372,7 +372,7 @@ class _FormEnderecoTelaState extends State<_FormEnderecoTela> {
           ),
           if (_erro != null) ...[
             Text(_erro!,
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto)),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto)),
             const SizedBox(height: EspacosTrato.x3),
           ],
           BotaoPrimario(

@@ -75,12 +75,12 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.zoom_in, color: CoresTrato.petroleo),
+                leading: Icon(Icons.zoom_in, color: context.cores.petroleo),
                 title: const Text('Ver foto de perfil'),
                 onTap: () => Navigator.of(folha).pop('ver'),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_camera_outlined, color: CoresTrato.petroleo),
+                leading: Icon(Icons.photo_camera_outlined, color: context.cores.petroleo),
                 title: const Text('Trocar foto de perfil'),
                 onTap: () => Navigator.of(folha).pop('trocar'),
               ),
@@ -159,7 +159,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                           'no Trato desde ${p.noTratoDesde}',
                         ].join(' · '),
                         style: TipografiaTrato.corpoPequeno
-                            .copyWith(color: CoresTrato.textoSecundario),
+                            .copyWith(color: context.cores.textoSecundario),
                       ),
                     ],
                   ),
@@ -177,7 +177,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                           snap.data!,
                           key: const Key('tratinhos-pendentes-perfil'),
                           style: TipografiaTrato.corpoPequeno
-                              .copyWith(color: CoresTrato.textoSecundario),
+                              .copyWith(color: context.cores.textoSecundario),
                         ),
                       ),
               ),
@@ -208,7 +208,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
             if (p.fotosPortfolio == 0 && p.listaFotosPortfolio.isEmpty)
               Text(
                 'Sem fotos de trabalhos ainda.',
-                style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
               )
             else
               Row(
@@ -235,7 +235,7 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
             if (p.ultimasAvaliacoes.isEmpty)
               Text(
                 'Você ainda não recebeu avaliações.',
-                style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
               )
             else ...[
               for (final a in p.ultimasAvaliacoes.take(2)) CartaoAvaliacao(avaliacao: a),
@@ -253,10 +253,10 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 margin: EdgeInsets.zero,
                 clipBehavior: Clip.antiAlias,
                 child: ListTile(
-                  leading: const Icon(Icons.verified_user_outlined, color: CoresTrato.petroleo),
+                  leading: Icon(Icons.verified_user_outlined, color: context.cores.petroleo),
                   title: Text('Verificação de identidade', style: TipografiaTrato.corpoForte),
                   subtitle: Text('Enviar ou acompanhar documentos', style: TipografiaTrato.legenda),
-                  trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                  trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoAbrirVerificacao,
                 ),
               ),
@@ -267,10 +267,10 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                 margin: EdgeInsets.zero,
                 clipBehavior: Clip.antiAlias,
                 child: ListTile(
-                  leading: const Icon(Icons.swap_horiz, color: CoresTrato.petroleo),
+                  leading: Icon(Icons.swap_horiz, color: context.cores.petroleo),
                   title: Text('Usar como cliente', style: TipografiaTrato.corpoForte),
                   subtitle: Text('Trocar para contratar serviços', style: TipografiaTrato.legenda),
-                  trailing: const Icon(Icons.chevron_right, color: CoresTrato.textoSecundario),
+                  trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoUsarComoCliente,
                 ),
               ),

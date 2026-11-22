@@ -71,7 +71,7 @@ class _MoedasGanhasTelaState extends State<MoedasGanhasTela>
         if (!didPop) widget.aoContinuar();
       },
       child: Scaffold(
-        backgroundColor: CoresTrato.petroleo,
+        backgroundColor: context.cores.petroleo,
         body: SafeArea(
           child: Column(
             children: [
@@ -108,8 +108,8 @@ class _MoedasGanhasTelaState extends State<MoedasGanhasTela>
                         child: FilledButton(
                           onPressed: widget.aoContinuar,
                           style: FilledButton.styleFrom(
-                            backgroundColor: CoresTrato.creme,
-                            foregroundColor: CoresTrato.petroleo,
+                            backgroundColor: context.cores.fundo,
+                            foregroundColor: context.cores.petroleo,
                             minimumSize: const Size.fromHeight(52),
                             textStyle: TipografiaTrato.corpoForte,
                           ),
@@ -175,7 +175,7 @@ class _Conteudo extends StatelessWidget {
         Text(
           '+$valor',
           style: TipografiaTrato.marca
-              .copyWith(color: CoresTrato.creme, fontSize: 80),
+              .copyWith(color: context.cores.sobrePetroleo, fontSize: 80),
         ),
         Opacity(
           opacity: textos,
@@ -192,14 +192,14 @@ class _Conteudo extends StatelessWidget {
                               : 'Tratinhos reservados'))
                       : (moedas == 1 ? 'Tratinho' : 'Tratinhos'),
                   style: TipografiaTrato.titulo
-                      .copyWith(color: CoresTrato.azulClaro),
+                      .copyWith(color: context.cores.azulSuave),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(
                   'Valeu pela avaliação!',
                   style: TipografiaTrato.tituloGrande
-                      .copyWith(color: CoresTrato.creme),
+                      .copyWith(color: context.cores.sobrePetroleo),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: EspacosTrato.x2),
@@ -210,7 +210,7 @@ class _Conteudo extends StatelessWidget {
                     'Quem vem depois vai escolher com mais segurança por causa de você. '
                     '${pendentes > 0 ? 'Seus Tratinhos ficam guardados até a liberação.' : 'Os Tratinhos já estão na sua conta.'}',
                     style:
-                        TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
+                        TipografiaTrato.corpo.copyWith(color: context.cores.sobrePetroleo),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -220,7 +220,7 @@ class _Conteudo extends StatelessWidget {
                     textoTratinhosEmReais(moedas, valorMoedaCentavos),
                     key: const Key('tratinhos-em-reais'),
                     style: TipografiaTrato.corpoPequeno
-                        .copyWith(color: CoresTrato.azulClaro),
+                        .copyWith(color: context.cores.azulSuave),
                   ),
                 ],
                 if (pendentes > 0) ...[
@@ -230,7 +230,7 @@ class _Conteudo extends StatelessWidget {
                         pendentes, proximaLiberacao, valorMoedaCentavos)!,
                     key: const Key('tratinhos-pendentes'),
                     style: TipografiaTrato.corpoPequeno
-                        .copyWith(color: CoresTrato.azulClaro),
+                        .copyWith(color: context.cores.azulSuave),
                     textAlign: TextAlign.center,
                   ),
                 ],

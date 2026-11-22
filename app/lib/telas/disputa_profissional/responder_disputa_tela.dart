@@ -161,7 +161,7 @@ class _CorpoState extends State<_Corpo> {
           children: [
             Icon(
               marcada ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: CoresTrato.petroleo,
+              color: context.cores.petroleo,
               semanticLabel: marcada ? 'Selecionado' : 'Não selecionado',
             ),
             const SizedBox(width: EspacosTrato.x3),
@@ -206,7 +206,7 @@ class _CorpoState extends State<_Corpo> {
       children: [
         Text('${d.cliente} relatou um problema', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
-        Text(d.titulo, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario)),
+        Text(d.titulo, style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario)),
         const SizedBox(height: EspacosTrato.x4),
         CartaoTrato(
           child: Column(
@@ -270,7 +270,7 @@ class _CorpoState extends State<_Corpo> {
                   padding: const EdgeInsets.only(top: EspacosTrato.x2),
                   child: Text(
                     _erroMensagem!,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
                   ),
                 ),
             ],

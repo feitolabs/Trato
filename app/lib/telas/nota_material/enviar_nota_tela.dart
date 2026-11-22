@@ -165,7 +165,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           widget.tituloPedido,
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         if (!widget.servicoEmAndamento) ...[
           const SizedBox(height: EspacosTrato.x3),
@@ -186,7 +186,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
         if (_itens.isEmpty)
           Text(
             'Nenhum item ainda. Adicione cada material da nota.',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           )
         else
           CartaoTrato(
@@ -260,7 +260,7 @@ class _EnviarNotaTelaState extends State<EnviarNotaTela> {
           const SizedBox(height: EspacosTrato.x2),
           Text(
             _erroItem!,
-            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+            style: TipografiaTrato.legenda.copyWith(color: context.cores.vermelhoTexto),
           ),
         ],
         const SizedBox(height: EspacosTrato.x3),

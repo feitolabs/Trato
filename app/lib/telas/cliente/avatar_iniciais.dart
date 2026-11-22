@@ -11,34 +11,37 @@ class AvatarIniciais extends StatelessWidget {
     this.tamanho = 56,
     this.fotoReferencia,
     this.aoTocar,
+    this.permitirAmpliacao = true,
   });
 
   final String iniciais;
   final double tamanho;
   final String? fotoReferencia;
   final VoidCallback? aoTocar;
+  final bool permitirAmpliacao;
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     final imagemReal = construirImagemReal(fotoReferencia);
     final circulo = Container(
       width: tamanho,
       height: tamanho,
       alignment: Alignment.center,
       clipBehavior: imagemReal != null ? Clip.antiAlias : Clip.none,
-      decoration: const BoxDecoration(color: CoresTrato.azulClaro, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: c.azulSuave, shape: BoxShape.circle),
       child: imagemReal ??
           Text(
             iniciais,
             style:
                 (tamanho >= 80 ? TipografiaTrato.tituloOpcao : TipografiaTrato.corpoForte).copyWith(
-              color: CoresTrato.petroleo,
+              color: c.azulTexto,
             ),
           ),
     );
 
     if (aoTocar == null) {
-      if (imagemReal != null && fotoReferencia != null) {
+      if (permitirAmpliacao && imagemReal != null && fotoReferencia != null) {
         return ToquePreviewImagem(
           referencia: fotoReferencia!,
           legenda: 'Foto de perfil',
@@ -65,14 +68,14 @@ class AvatarIniciais extends StatelessWidget {
                 width: 26,
                 height: 26,
                 decoration: BoxDecoration(
-                  color: CoresTrato.petroleo,
+                  color: c.petroleo,
                   shape: BoxShape.circle,
-                  border: Border.all(color: CoresTrato.superficie, width: 2),
+                  border: Border.all(color: c.superficie, width: 2),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.photo_camera_outlined,
                   size: 14,
-                  color: CoresTrato.creme,
+                  color: c.sobrePetroleo,
                 ),
               ),
             ),
@@ -91,16 +94,17 @@ class SeloVerificacao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.shield_outlined, size: EspacosTrato.x4, color: CoresTrato.azulTexto),
+        Icon(Icons.shield_outlined, size: EspacosTrato.x4, color: c.azulTexto),
         const SizedBox(width: EspacosTrato.x1),
         Flexible(
           child: Text(
             texto,
             style: TipografiaTrato.corpoPequeno.copyWith(
-              color: CoresTrato.azulTexto,
+              color: c.azulTexto,
               fontWeight: FontWeight.w700,
               fontVariations: const [FontVariation('wght', 700)],
             ),

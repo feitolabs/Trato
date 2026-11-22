@@ -295,7 +295,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     final item = await showModalBottomSheet<ItemMaterial>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: CoresTrato.creme,
+      backgroundColor: context.cores.fundo,
       builder: (_) => const _NovoItemMaterial(),
     );
     if (item == null) return;
@@ -308,7 +308,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     final atualizado = await showModalBottomSheet<ItemMaterial>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: CoresTrato.creme,
+      backgroundColor: context.cores.fundo,
       builder: (_) => _NovoItemMaterial(inicial: atual),
     );
     if (atualizado == null) return;
@@ -646,7 +646,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             child: Text(
               'Não deu para calcular o resumo agora.',
               key: const Key('resumo-indisponivel'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
           ),
       ],
@@ -759,7 +759,7 @@ class _CartaoMaterial extends StatelessWidget {
                       tooltip: 'Remover item',
                       visualDensity: VisualDensity.compact,
                       onPressed: () => aoRemover(i),
-                      icon: const Icon(Icons.close, size: 18, color: CoresTrato.textoSecundario),
+                      icon: Icon(Icons.close, size: 18, color: context.cores.textoSecundario),
                     ),
                   ],
                 ),
@@ -834,7 +834,7 @@ class _ResumoEscuro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final claroForte = TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme);
+    final claroForte = TipografiaTrato.corpoForte.copyWith(color: context.cores.sobrePetroleo);
     final r = resumo;
     return CartaoTrato(
       escuro: true,
@@ -853,7 +853,7 @@ class _ResumoEscuro extends StatelessWidget {
                   child: Text(
                     r == null ? '—' : Dinheiro.formatar(r.totalCentavos),
                     style: TipografiaTrato.tituloGrande.copyWith(
-                      color: CoresTrato.creme,
+                      color: context.cores.sobrePetroleo,
                       fontSize: 34,
                     ),
                     maxLines: 1,
@@ -865,7 +865,7 @@ class _ResumoEscuro extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x3),
           Text(
             'O Trato é grátis: não cobramos taxa sobre o seu serviço.',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.sobrePetroleo),
           ),
         ],
       ),

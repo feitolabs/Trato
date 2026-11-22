@@ -16,7 +16,7 @@ class RegraLiberacao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [

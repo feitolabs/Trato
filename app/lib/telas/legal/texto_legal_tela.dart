@@ -38,16 +38,16 @@ class TermosEPoliticaTela extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
               child: Material(
-                color: CoresTrato.superficie,
+                color: context.cores.superficie,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
-                  side: const BorderSide(color: CoresTrato.borda),
+                  side: BorderSide(color: context.cores.borda),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: ListTile(
                   minVerticalPadding: EspacosTrato.x4,
                   title: Text(t.titulo, style: TipografiaTrato.tituloCartao),
-                  trailing: const Icon(Icons.chevron_right, color: CoresTrato.petroleo),
+                  trailing: Icon(Icons.chevron_right, color: context.cores.petroleo),
                   onTap: () => aoAbrir(t),
                 ),
               ),
@@ -82,12 +82,12 @@ class TextoLegalTela extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(EspacosTrato.x3),
                 decoration: BoxDecoration(
-                  color: CoresTrato.azulSuave,
+                  color: context.cores.azulSuave,
                   borderRadius: BorderRadius.circular(EspacosTrato.raio),
                 ),
                 child: Text(
                   avisoRascunhoLegal,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
                 ),
               ),
               const SizedBox(height: EspacosTrato.x4),

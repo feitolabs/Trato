@@ -114,7 +114,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
                     : 'Avaliar rende Tratinhos de desconto (liberam em 7 dias sem disputa).',
                 key: const ValueKey('legenda-bonus-tratinhos'),
                 textAlign: TextAlign.center,
-                style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
               ),
             ),
           BotaoPrimario(
@@ -144,7 +144,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           'Sua nota ajuda outros clientes. ${primeiraMaiuscula(dados.nomeProfissional)} também avalia você.',
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x5),
         CartaoTrato(
@@ -166,7 +166,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
         const SizedBox(height: EspacosTrato.x1),
         Text(
           'Opcional. Escolha até $maxEtiquetasPorAvaliacao.',
-          style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x3),
         Wrap(
@@ -188,7 +188,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
             child: Text(
               'Você pode escolher até $maxEtiquetasPorAvaliacao elogios.',
               key: const Key('aviso-etiquetas'),
-              style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+              style: TipografiaTrato.legenda.copyWith(color: context.cores.vermelhoTexto),
             ),
           ),
         const SizedBox(height: EspacosTrato.x5),
@@ -199,7 +199,7 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             'Vai inteira para o profissional, sem taxa.',
-            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x3),
           Row(

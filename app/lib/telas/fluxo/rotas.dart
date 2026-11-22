@@ -1707,7 +1707,7 @@ abstract final class RotasTrato {
                     Text(
                       texto,
                       textAlign: TextAlign.center,
-                      style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x5),
                     BotaoPrimario(
@@ -2098,12 +2098,16 @@ abstract final class RotasTrato {
                 aoFazerPedido: () => abrirNovoPedido(context),
               ),
             ),
-            floatingActionButton: FloatingActionButton.extended(
-              backgroundColor: CoresTrato.petroleo,
-              foregroundColor: CoresTrato.creme,
-              icon: const Icon(Icons.add),
-              label: const Text('Novo pedido'),
-              onPressed: () => abrirNovoPedido(context),
+            floatingActionButton: Padding(
+              padding: const EdgeInsets.only(bottom: BarraAbasFlutuante.alturaReservada),
+              child: FloatingActionButton.extended(
+                key: const ValueKey('fab-novo-pedido'),
+                backgroundColor: context.cores.petroleo,
+                foregroundColor: context.cores.sobrePetroleo,
+                icon: const Icon(Icons.add),
+                label: const Text('Novo pedido'),
+                onPressed: () => abrirNovoPedido(context),
+              ),
             ),
           ),
         );

@@ -188,7 +188,7 @@ class _TourPerfilTelaState extends State<TourPerfilTela> {
                 child: IndicadorPaginas(
                   total: paginas.length,
                   atual: _pagina,
-                  corInativa: CoresTrato.borda,
+                  corInativa: context.cores.borda,
                 ),
               ),
               const SizedBox(height: EspacosTrato.x6),
@@ -257,10 +257,10 @@ class PaginaTourVisual extends StatelessWidget {
                     height: 260,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: CoresTrato.azulClaro,
+                      color: context.cores.azulSuave,
                       borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
                     ),
-                    child: Icon(icone, size: 72, color: CoresTrato.petroleo),
+                    child: Icon(icone, size: 72, color: context.cores.petroleo),
                   ),
                 SizedBox(height: espacoTopoTexto),
                 Text('${numero + 1} DE $total', style: TipografiaTrato.sobretitulo),

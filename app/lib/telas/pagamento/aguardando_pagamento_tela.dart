@@ -93,14 +93,14 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
                     ? 'Nada foi cobrado. Volte e tente de novo.'
                     : 'Assim que o pagamento for confirmado, avisamos você por aqui. '
                         'Isso leva apenas alguns instantes.',
-                style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
               ),
               if (!_falhou) ...[
                 const SizedBox(height: EspacosTrato.x5),
                 Center(
                   child: Semantics(
                     label: 'Aguardando',
-                    child: const CircularProgressIndicator(color: CoresTrato.petroleo),
+                    child: CircularProgressIndicator(color: context.cores.petroleo),
                   ),
                 ),
               ],
@@ -134,7 +134,7 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
                 const SizedBox(height: EspacosTrato.x4),
                 Text(
                   _erro!,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
               if (_falhou) ...[

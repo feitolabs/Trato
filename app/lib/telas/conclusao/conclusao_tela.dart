@@ -56,7 +56,7 @@ class _ConclusaoTelaState extends State<ConclusaoTela> {
               ].join(' '),
               key: const ValueKey('prazo-e-garantia'),
               textAlign: TextAlign.center,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x2),
           ],
@@ -86,7 +86,7 @@ class _ConclusaoTelaState extends State<ConclusaoTela> {
                   ? 'O profissional encerrou sem o código de conclusão e enviou a foto final. '
                       'Confira antes de liberar o pagamento.'
                   : 'Confira as fotos e o resultado antes de confirmar.'),
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         if (resumo.checkOutSemCodigo) ...[
           const SizedBox(height: EspacosTrato.x4),
@@ -151,7 +151,7 @@ class _ConclusaoTelaState extends State<ConclusaoTela> {
                   'Passe ao profissional só se o serviço estiver pronto, ou confirme aqui. '
                   'Não envie o código por mensagem.',
                   textAlign: TextAlign.center,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
             ),
@@ -182,7 +182,7 @@ class _FotoComHora extends StatelessWidget {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           hora,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
       ],
     );
@@ -213,9 +213,9 @@ class _CodigoConclusao extends StatelessWidget {
                   child: Container(
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: CoresTrato.superficie,
+                      color: context.cores.superficie,
                       borderRadius: BorderRadius.circular(EspacosTrato.raio),
-                      border: Border.all(color: CoresTrato.petroleo, width: 1.5),
+                      border: Border.all(color: context.cores.petroleo, width: 1.5),
                     ),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
@@ -242,16 +242,16 @@ class _AvisoRelogio extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(EspacosTrato.x4),
       decoration: BoxDecoration(
-        color: CoresTrato.azulSuave,
+        color: context.cores.azulSuave,
         borderRadius: BorderRadius.circular(EspacosTrato.raio),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.schedule, color: CoresTrato.azulTexto),
+          Icon(Icons.schedule, color: context.cores.azulTexto),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
-            child: Text(texto, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.azulTexto)),
+            child: Text(texto, style: TipografiaTrato.corpo.copyWith(color: context.cores.azulTexto)),
           ),
         ],
       ),

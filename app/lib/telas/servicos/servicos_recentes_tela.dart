@@ -40,18 +40,18 @@ class CartaoServicoRecente extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           Text(
             quando,
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           ),
           if (servico.garantia != null) ...[
             const SizedBox(height: EspacosTrato.x3),
             Row(
               children: [
-                const Icon(Icons.verified_user_outlined, size: 20, color: CoresTrato.azulTexto),
+                Icon(Icons.verified_user_outlined, size: 20, color: context.cores.azulTexto),
                 const SizedBox(width: EspacosTrato.x2),
                 Expanded(
                   child: Text(
                     servico.garantia!,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.azulTexto),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
                   ),
                 ),
               ],

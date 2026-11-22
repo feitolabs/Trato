@@ -98,14 +98,14 @@ class _FavoritosTelaState extends State<FavoritosTela> {
                                 if (detalhe.isNotEmpty)
                                   Text(detalhe,
                                       style: TipografiaTrato.corpoPequeno
-                                          .copyWith(color: CoresTrato.textoSecundario)),
+                                          .copyWith(color: context.cores.textoSecundario)),
                               ],
                             ),
                           ),
                           IconButton(
                             tooltip: 'Remover dos profissionais de confiança',
                             onPressed: () => _tirar(f),
-                            icon: const Icon(Icons.favorite, color: CoresTrato.petroleo),
+                            icon: Icon(Icons.favorite, color: context.cores.petroleo),
                           ),
                         ],
                       ),
@@ -193,7 +193,7 @@ class _ContatosConfiancaTelaState extends State<ContatosConfiancaTela> {
             children: [
               Text(
                 'Pessoas de confiança que você quer ter à mão durante um serviço. Até 5.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
               const SizedBox(height: EspacosTrato.x4),
               if (itens.isEmpty)
@@ -217,7 +217,7 @@ class _ContatosConfiancaTelaState extends State<ContatosConfiancaTela> {
                                 if ((c.parentesco ?? '').isNotEmpty) c.parentesco!,
                               ].join(' · '),
                               style: TipografiaTrato.corpoPequeno
-                                  .copyWith(color: CoresTrato.textoSecundario),
+                                  .copyWith(color: context.cores.textoSecundario),
                             ),
                           ],
                         ),
@@ -225,7 +225,7 @@ class _ContatosConfiancaTelaState extends State<ContatosConfiancaTela> {
                       IconButton(
                         tooltip: 'Remover',
                         onPressed: () => _remover(c),
-                        icon: const Icon(Icons.delete_outline, color: CoresTrato.petroleo),
+                        icon: Icon(Icons.delete_outline, color: context.cores.petroleo),
                       ),
                     ],
                   ),
@@ -353,7 +353,7 @@ class _FormContatoTelaState extends State<_FormContatoTela> {
           if (_erro != null) ...[
             const SizedBox(height: EspacosTrato.x3),
             Text(_erro!,
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto)),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto)),
           ],
           const SizedBox(height: EspacosTrato.x5),
           BotaoPrimario(

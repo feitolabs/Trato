@@ -148,10 +148,10 @@ class _Bloco extends StatelessWidget {
       label: 'Categoria ${categoria.nome}',
       excludeSemantics: true,
       child: Material(
-        color: CoresTrato.superficie,
+        color: context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
-          side: const BorderSide(color: CoresTrato.borda),
+          side: BorderSide(color: context.cores.borda),
         ),
         child: InkWell(
           borderRadius: raio,
@@ -161,7 +161,7 @@ class _Bloco extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(categoria.icone, size: 28, color: CoresTrato.petroleo),
+                Icon(categoria.icone, size: 28, color: context.cores.petroleo),
                 const SizedBox(height: EspacosTrato.x2),
                 Flexible(
                   child: Text(

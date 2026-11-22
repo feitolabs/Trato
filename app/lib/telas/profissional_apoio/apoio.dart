@@ -83,7 +83,7 @@ class CorpoRolavel extends StatelessWidget {
         if (rodape != null)
           Container(
             width: double.infinity,
-            color: CoresTrato.superficie,
+            color: context.cores.superficie,
             child: SafeArea(
               top: false,
               child: Padding(
@@ -291,14 +291,14 @@ class MensagemCentral extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                Icon(icone, size: 48, color: CoresTrato.textoSecundario),
+                Icon(icone, size: 48, color: context.cores.textoSecundario),
                 const SizedBox(height: EspacosTrato.x4),
                 Text(titulo, style: TipografiaTrato.titulo, textAlign: TextAlign.center),
                 if (texto.isNotEmpty) ...[
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
                     texto,
-                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -417,10 +417,10 @@ class _Pilula extends StatelessWidget {
       label: texto,
       excludeSemantics: true,
       child: Material(
-        color: marcada ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: marcada ? context.cores.azulSuave : context.cores.superficie,
         shape: StadiumBorder(
           side: BorderSide(
-            color: marcada ? CoresTrato.petroleo : CoresTrato.borda,
+            color: marcada ? context.cores.petroleo : context.cores.borda,
             width: marcada ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -438,7 +438,7 @@ class _Pilula extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (marcada) ...[
-                    const Icon(Icons.check, size: 18, color: CoresTrato.petroleo),
+                    Icon(Icons.check, size: 18, color: context.cores.petroleo),
                     const SizedBox(width: EspacosTrato.x1),
                   ],
                   Flexible(child: Text(texto, style: TipografiaTrato.corpoPequeno)),
@@ -478,7 +478,7 @@ class CampoFoto extends StatelessWidget {
       label: tem ? '$rotulo, enviada. Toque para trocar' : '$rotulo. Toque para tirar a foto',
       excludeSemantics: true,
       child: Material(
-        color: tem ? CoresTrato.azulClaro : CoresTrato.superficie,
+        color: tem ? context.cores.azulSuave : context.cores.superficie,
         borderRadius: BorderRadius.circular(EspacosTrato.raio),
         child: InkWell(
           borderRadius: BorderRadius.circular(EspacosTrato.raio),
@@ -489,7 +489,7 @@ class CampoFoto extends StatelessWidget {
             padding: const EdgeInsets.all(EspacosTrato.x3),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(EspacosTrato.raio),
-              border: Border.all(color: CoresTrato.borda),
+              border: Border.all(color: context.cores.borda),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -538,16 +538,16 @@ class CampoFoto extends StatelessWidget {
                   ToquePreviewImagem(
                     referencia: referencia!,
                     legenda: rotulo,
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_circle_outline,
-                      color: CoresTrato.petroleo,
+                      color: context.cores.petroleo,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x2),
                 ] else ...[
-                  const Icon(
+                  Icon(
                     Icons.photo_camera_outlined,
-                    color: CoresTrato.petroleo,
+                    color: context.cores.petroleo,
                   ),
                   const SizedBox(height: EspacosTrato.x2),
                 ],
@@ -562,7 +562,7 @@ class CampoFoto extends StatelessWidget {
                   const SizedBox(height: EspacosTrato.x1),
                   Text(
                     dica!,
-                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -570,7 +570,7 @@ class CampoFoto extends StatelessWidget {
                 ],
                 Text(
                   tem ? 'Toque na foto para ampliar ou aqui para trocar' : 'Toque para tirar a foto',
-                  style: TipografiaTrato.legenda.copyWith(color: CoresTrato.petroleo),
+                  style: TipografiaTrato.legenda.copyWith(color: context.cores.petroleo),
                   textAlign: TextAlign.center,
                 ),
               ],

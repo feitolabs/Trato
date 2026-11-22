@@ -79,7 +79,7 @@ class InicioTela extends StatelessWidget {
                     Text(
                       nome.isEmpty ? 'Olá' : 'Olá, $nome',
                       style:
-                          TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                          TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x1),
                     Text('O que você precisa hoje?', style: TipografiaTrato.tituloGrande),
@@ -118,14 +118,14 @@ class InicioTela extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x3),
                 Text(
                   'Descreva o problema',
-                  style: TipografiaTrato.titulo.copyWith(color: CoresTrato.creme),
+                  style: TipografiaTrato.titulo.copyWith(color: context.cores.sobrePetroleo),
                 ),
                 const SizedBox(height: EspacosTrato.x3),
                 Text(
                   'Receba até ${ConfigPublica.atual.limiteOrcamentos} orçamentos de '
                   'profissionais com identidade verificada. '
                   'O pagamento é protegido pelo app até você confirmar o serviço.',
-                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
+                  style: TipografiaTrato.corpo.copyWith(color: context.cores.sobrePetroleo),
                 ),
                 const SizedBox(height: EspacosTrato.x5),
                 BotaoSecundario(
@@ -148,7 +148,7 @@ class InicioTela extends StatelessWidget {
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
                     andamento.situacao,
-                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                   ),
                   if (andamento.aviso.isNotEmpty) ...[
                     const SizedBox(height: EspacosTrato.x2),
@@ -234,7 +234,7 @@ class _BotaoSino extends StatelessWidget {
                       count: naoLidas,
                       maxCount: 99,
                       backgroundColor: c.laranja,
-                      textColor: CoresTrato.petroleo,
+                      textColor: context.cores.petroleo,
                       child: icone,
                     )
                   : icone,
@@ -295,10 +295,10 @@ class _Categoria extends StatelessWidget {
     return Semantics(
       button: true,
       child: Material(
-        color: CoresTrato.superficie,
+        color: context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
-          side: const BorderSide(color: CoresTrato.borda),
+          side: BorderSide(color: context.cores.borda),
         ),
         child: InkWell(
           borderRadius: raio,
@@ -312,7 +312,7 @@ class _Categoria extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(categoria.icone, color: CoresTrato.petroleo),
+                Icon(categoria.icone, color: context.cores.petroleo),
                 const SizedBox(height: EspacosTrato.x2),
                 // Mesmo tamanho em todas: nome longo quebra em 2 linhas em vez de encolher a fonte.
                 Text(

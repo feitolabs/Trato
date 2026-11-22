@@ -68,7 +68,7 @@ class _OrcamentosRecebidosTelaState extends State<OrcamentosRecebidosTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           p.titulo,
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x5),
         AvisoInfo(
@@ -158,7 +158,7 @@ class _CartaoOrcamento extends StatelessWidget {
                     Text(
                       'total',
                       style: TipografiaTrato.corpoPequeno.copyWith(
-                        color: CoresTrato.textoSecundario,
+                        color: context.cores.textoSecundario,
                       ),
                     ),
                   ],
@@ -189,7 +189,7 @@ class _CartaoOrcamento extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x3),
           Text(
             o.observacao,
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x4),
           BotaoSecundario(texto: 'Ver orçamento', aoTocar: aoVer),
@@ -212,7 +212,7 @@ class _Dado extends StatelessWidget {
       children: [
         Text(
           rotulo,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x1),
         Text(valor, style: TipografiaTrato.corpoForte),

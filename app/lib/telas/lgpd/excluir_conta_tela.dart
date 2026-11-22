@@ -109,7 +109,7 @@ class _ExcluirContaTelaState extends State<ExcluirContaTela> {
             liveRegion: true,
             child: Text(
               _erro!,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
             ),
           ),
         ],
@@ -139,9 +139,9 @@ class _Item extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2, right: EspacosTrato.x2),
-            child: Icon(Icons.circle, size: 8, color: CoresTrato.petroleo),
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: EspacosTrato.x2),
+            child: Icon(Icons.circle, size: 8, color: context.cores.petroleo),
           ),
           Expanded(child: Text(texto, style: TipografiaTrato.corpo)),
         ],

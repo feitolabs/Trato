@@ -34,7 +34,7 @@ class DetalheServicoTela extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     final acoes = dados.acoes;
     final pro = dados.profissional;
     final recarregar = AtualizadorTela.de(context);
@@ -79,7 +79,7 @@ class DetalheServicoTela extends StatelessWidget {
                     children: [
                       Icon(
                         dados.remoto ? Icons.videocam_outlined : Icons.location_on_outlined,
-                        color: CoresTrato.petroleo,
+                        color: context.cores.petroleo,
                       ),
                       const SizedBox(width: EspacosTrato.x3),
                       Expanded(

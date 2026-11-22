@@ -12,7 +12,7 @@ Future<MotivoRecusa?> pedirMotivoRecusa(BuildContext context) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: CoresTrato.creme,
+    backgroundColor: context.cores.fundo,
     builder: (_) => const _FolhaRecusa(),
   );
 }
@@ -41,7 +41,7 @@ class _FolhaRecusaState extends State<_FolhaRecusa> {
               const SizedBox(height: EspacosTrato.x2),
               Text(
                 'Por que você não vai orçar? O cliente não vê o motivo.',
-                style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
               ),
               const SizedBox(height: EspacosTrato.x4),
               for (final motivo in MotivoRecusa.values) ...[

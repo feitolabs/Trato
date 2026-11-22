@@ -190,7 +190,7 @@ class _CorpoState extends State<_Corpo> {
           Text(
             'A verificação confere sua identidade para dar mais segurança a quem contrata, '
             'junto com avaliações reais de clientes e pagamento protegido no app.',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
           if (_podeEnviar) ...[
             const SizedBox(height: EspacosTrato.x4),
@@ -200,7 +200,7 @@ class _CorpoState extends State<_Corpo> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.badge_outlined, color: CoresTrato.petroleo, size: 20),
+                      Icon(Icons.badge_outlined, color: context.cores.petroleo, size: 20),
                       const SizedBox(width: EspacosTrato.x2),
                       Expanded(
                         child: Text('Documentos e orientações', style: TipografiaTrato.corpoForte),
@@ -261,7 +261,7 @@ class _CorpoState extends State<_Corpo> {
               onChanged: (v) => setState(() => _ciente = v ?? false),
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
-              activeColor: CoresTrato.petroleo,
+              activeColor: context.cores.petroleo,
               title: Text(
                 'Li como meus dados serão usados e quero enviar.',
                 style: TipografiaTrato.corpo,

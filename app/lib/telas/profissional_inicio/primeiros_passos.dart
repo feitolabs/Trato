@@ -189,7 +189,7 @@ class _CartaoPrimeirosPassosState extends State<CartaoPrimeirosPassos> {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             'Você fez os 3. Acompanhe seus pedidos no Início.',
-            style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x3),
           BotaoLink(
@@ -201,7 +201,7 @@ class _CartaoPrimeirosPassosState extends State<CartaoPrimeirosPassos> {
       );
     }
 
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return _Moldura(
       chave: const Key('cartao-primeiros-passos'),
       children: [
@@ -304,7 +304,7 @@ class _Passo extends StatelessWidget {
       child: feito
           ? Text(
               textoFeito,
-              style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.petroleo),
+              style: TipografiaTrato.corpoForte.copyWith(color: context.cores.petroleo),
             )
           : Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -317,7 +317,7 @@ class _Passo extends StatelessWidget {
                       Text(
                         detalhe,
                         style: TipografiaTrato.corpoPequeno
-                            .copyWith(color: CoresTrato.textoSecundario),
+                            .copyWith(color: context.cores.textoSecundario),
                       ),
                     ],
                   ),

@@ -60,7 +60,7 @@ class _Coluna extends StatelessWidget {
       children: [
         Text(
           rotulo,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x1),
         Text(

@@ -143,7 +143,7 @@ class _CorpoState extends State<_Corpo> {
         Text(
           '${d.profissional.isEmpty ? 'O profissional' : d.profissional} pediu um valor a mais em '
           '"${d.pedidoTitulo}".',
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         switch (_estado) {

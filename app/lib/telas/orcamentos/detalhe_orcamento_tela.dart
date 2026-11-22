@@ -120,7 +120,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   Widget build(BuildContext context) {
     final o = widget.orcamento;
     final d = o.detalhe!; // a tela só abre para orçamento com detalhe
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return EstruturaPedido(
       scrollController: _scroll,
       tituloBarra: widget.contrato ? 'Contrato do serviço' : 'Válido até ${d.validoAte}',
@@ -343,13 +343,13 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   padding: const EdgeInsets.only(left: EspacosTrato.x3, top: EspacosTrato.x1),
                   child: Text(
                     'Cancelar antes de o serviço começar não gera cobrança do profissional.',
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                   ),
                 ),
                 if (_tentou && !_leu)
                   Text(
                     'Marque que leu para aceitar o orçamento.',
-                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+                    style: TipografiaTrato.legenda.copyWith(color: context.cores.vermelhoTexto),
                   ),
               ],
             ),
@@ -374,7 +374,7 @@ class _BlocoRegra extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icone, color: CoresTrato.petroleo),
+          Icon(icone, color: context.cores.petroleo),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
             child: Column(
@@ -384,7 +384,7 @@ class _BlocoRegra extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   texto,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
             ),
@@ -417,7 +417,7 @@ class _SecoesDoContrato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     Widget secao(String titulo, List<Widget> filhos, {Key? key}) => Padding(
           padding: const EdgeInsets.only(top: EspacosTrato.x4),
           child: CartaoTrato(

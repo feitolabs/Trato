@@ -172,7 +172,7 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           widget.tituloPedido,
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         const AvisoFaixa(
@@ -198,7 +198,7 @@ class _CriarAditivoTelaState extends State<CriarAditivoTela> {
                   padding: const EdgeInsets.only(top: EspacosTrato.x2),
                   child: Text(
                     _erroMotivo!,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
                   ),
                 ),
             ],
@@ -256,7 +256,7 @@ class _CartaoLiquido extends StatelessWidget {
                   : digitou
                       ? 'Calculando…'
                       : 'Digite o valor para ver quanto sobra para você.',
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
             ),
         ],
       ),

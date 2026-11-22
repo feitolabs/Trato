@@ -148,7 +148,7 @@ class _CorpoState extends State<_Corpo> {
       children: [
         Text('Quando você volta?', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
-        Text(d.titulo, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario)),
+        Text(d.titulo, style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario)),
         const SizedBox(height: EspacosTrato.x4),
         CartaoTrato(
           child: Column(
@@ -160,7 +160,7 @@ class _CorpoState extends State<_Corpo> {
               const SizedBox(height: EspacosTrato.x3),
               Text(
                 'Você tem ${d.prazoAtendimentoDias} dias para atender.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
             ],
           ),

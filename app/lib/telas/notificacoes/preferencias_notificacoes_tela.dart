@@ -105,7 +105,7 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
       children: [
         Text(
           'Escolha como quer receber cada tipo de aviso. Alertas críticos de segurança ou conta continuam sendo enviados quando necessário.',
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         for (var i = 0; i < _itens.length; i++) ...[
@@ -121,7 +121,7 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
                   Text(
                     subtitulo,
                     style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.textoSecundario,
+                      color: context.cores.textoSecundario,
                     ),
                   ),
                   const SizedBox(height: EspacosTrato.x2),
@@ -164,14 +164,14 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
         if (_erro != null) ...[
           Text(
             _erro!,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
           ),
           const SizedBox(height: EspacosTrato.x3),
         ],
         if (_aviso != null) ...[
           Text(
             _aviso!,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.verdeTexto),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.verdeTexto),
           ),
           const SizedBox(height: EspacosTrato.x3),
         ],

@@ -208,7 +208,7 @@ class _FolhaNegociacaoState extends State<_FolhaNegociacao> {
             const SizedBox(height: EspacosTrato.x2),
             Text(
               subtitulo,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x4),
             KeyedSubtree(

@@ -89,7 +89,7 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
                       const SizedBox(height: EspacosTrato.x2),
                       Text(
                         'Dá para mudar depois, no seu perfil.',
-                        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                        style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                       ),
                       const SizedBox(height: EspacosTrato.x6),
                       for (final perfil in PerfilUso.values) ...[
@@ -131,11 +131,11 @@ class _OpcaoPerfil extends StatelessWidget {
       button: true,
       selected: selecionado,
       child: Material(
-        color: selecionado ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: selecionado ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
           side: BorderSide(
-            color: selecionado ? CoresTrato.petroleo : CoresTrato.borda,
+            color: selecionado ? context.cores.petroleo : context.cores.borda,
             width: selecionado ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -151,10 +151,10 @@ class _OpcaoPerfil extends StatelessWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: CoresTrato.azulClaro,
+                    color: context.cores.azulSuave,
                     borderRadius: BorderRadius.circular(EspacosTrato.raio),
                   ),
-                  child: Icon(perfil.icone, size: 28, color: CoresTrato.petroleo),
+                  child: Icon(perfil.icone, size: 28, color: context.cores.petroleo),
                 ),
                 const SizedBox(width: EspacosTrato.x4),
                 Expanded(

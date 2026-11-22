@@ -141,7 +141,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
               const SizedBox(height: EspacosTrato.x2),
               Text(
                 'Conta como atendido quando você manda o orçamento ao cliente pelo app.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
               const SizedBox(height: EspacosTrato.x5),
               BotaoPrimario(
@@ -222,12 +222,12 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
               Expanded(
                 child: Text(
                   '${resumo.ativasOuPendentes} de ${resumo.limiteMaximo} exclusividades em andamento',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ),
               Text(
                 textoTratinhos(resumo.saldoProfissional),
-                style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.petroleo),
+                style: TipografiaTrato.corpoForte.copyWith(color: context.cores.petroleo),
               ),
             ],
           ),
@@ -248,7 +248,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
             const SizedBox(height: EspacosTrato.x2),
             Text(
               motivoDesabilitado,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
           ],
           if (_erroExclusividade != null) ...[
@@ -313,7 +313,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
                       const SizedBox(height: EspacosTrato.x2),
                       Text(
                         dados.clienteResumo,
-                        style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                        style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                       ),
                     ],
                     if (dados.legendasFotos.isNotEmpty) ...[
@@ -383,7 +383,7 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
           ),
           Container(
             width: double.infinity,
-            color: CoresTrato.superficie,
+            color: context.cores.superficie,
             child: SafeArea(
               top: false,
               child: Padding(
@@ -423,7 +423,7 @@ class _CartaoRegiao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return CartaoTrato(
       key: const ValueKey('cartao-regiao'),
       child: Column(
@@ -431,7 +431,7 @@ class _CartaoRegiao extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
+              Icon(Icons.location_on_outlined, color: context.cores.petroleo),
               const SizedBox(width: EspacosTrato.x2),
               Expanded(child: Text('Região aproximada', style: TipografiaTrato.corpoForte)),
             ],
@@ -447,7 +447,7 @@ class _CartaoRegiao extends StatelessWidget {
             Text(
               'a ${textoDistancia(distanciaKm)} de você',
               key: const ValueKey('regiao-distancia'),
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
             ),
           ],
           const SizedBox(height: EspacosTrato.x2),

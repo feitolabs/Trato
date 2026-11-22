@@ -244,10 +244,10 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
                         referencia: foto.referencia ?? 'Foto final · ${foto.hora}',
                         legenda: 'Foto final · ${foto.hora}',
                         child: construirImagemReal(foto.referencia) ??
-                            const ColoredBox(
-                              color: CoresTrato.azulClaro,
+                            ColoredBox(
+                              color: context.cores.azulSuave,
                               child: Center(
-                                child: Icon(Icons.zoom_in, size: 20, color: CoresTrato.petroleo),
+                                child: Icon(Icons.zoom_in, size: 20, color: context.cores.petroleo),
                               ),
                             ),
                       ),
@@ -293,13 +293,13 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
           CartaoTrato(
             child: Row(
               children: [
-                const ClipRRect(
-                  borderRadius: BorderRadius.all(Radius.circular(EspacosTrato.raio)),
+                ClipRRect(
+                  borderRadius: const BorderRadius.all(Radius.circular(EspacosTrato.raio)),
                   child: SizedBox.square(
                     dimension: EspacosTrato.x12 + EspacosTrato.x2,
                     child: ColoredBox(
-                      color: CoresTrato.azulSuave,
-                      child: Icon(Icons.location_on_outlined, color: CoresTrato.azulTexto),
+                      color: context.cores.azulSuave,
+                      child: Icon(Icons.location_on_outlined, color: context.cores.azulTexto),
                     ),
                   ),
                 ),

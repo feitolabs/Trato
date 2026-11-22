@@ -72,7 +72,7 @@ class MensagemErroAuth extends StatelessWidget {
         liveRegion: true,
         child: Text(
           mensagem!,
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.vermelhoTexto),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.vermelhoTexto),
         ),
       ),
     );

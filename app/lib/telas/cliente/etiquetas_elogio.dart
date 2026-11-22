@@ -53,7 +53,7 @@ class EtiquetasMaisElogiadas extends StatelessWidget {
         children: [
           Text(
             'Mais elogiado por',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x2),
           Wrap(
@@ -82,12 +82,12 @@ class SeloRespostaReal extends StatelessWidget {
       child: Row(
         key: const Key('selo-resposta-real'),
         children: [
-          const Icon(Icons.schedule, size: EspacosTrato.x4, color: CoresTrato.petroleo),
+          Icon(Icons.schedule, size: EspacosTrato.x4, color: context.cores.petroleo),
           const SizedBox(width: EspacosTrato.x2),
           Flexible(
             child: Text(
               'Costuma responder no mesmo dia',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.petroleo),
             ),
           ),
         ],
@@ -106,10 +106,10 @@ class _ChipElogio extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x3, vertical: EspacosTrato.x1),
       decoration: BoxDecoration(
-        color: CoresTrato.azulSuave,
+        color: context.cores.azulSuave,
         borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
       ),
-      child: Text(texto, style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo)),
+      child: Text(texto, style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.petroleo)),
     );
   }
 }

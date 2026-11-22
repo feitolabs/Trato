@@ -276,7 +276,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                 Text(
                   'Não encontramos uma forma de pagamento para este pedido. Tente de novo em instantes.',
                   textAlign: TextAlign.center,
-                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                 ),
                 const SizedBox(height: EspacosTrato.x4),
                 if (widget.aoTentarNovamente != null) ...[
@@ -336,7 +336,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                     const SizedBox(height: EspacosTrato.x2),
                     Text(
                       dados.subtitulo,
-                      style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x3),
                     Text(valor, style: TipografiaTrato.marcaPequena.copyWith(fontSize: 36)),
@@ -345,7 +345,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                       Text(
                         dados.rotuloValor!,
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.textoSecundario,
+                          color: context.cores.textoSecundario,
                         ),
                       ),
                     ],
@@ -354,7 +354,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                       Text(
                         'Cupom ${dados.cupomCodigo ?? ''} aplicado · desconto de ${Dinheiro.formatar(dados.descontoCupomCentavos!)}',
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.verdeTexto,
+                          color: context.cores.verdeTexto,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -386,7 +386,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                           'neste serviço',
                           key: const Key('desconto-possivel'),
                           style: TipografiaTrato.corpoPequeno.copyWith(
-                            color: CoresTrato.textoSecundario,
+                            color: context.cores.textoSecundario,
                           ),
                         ),
                       ],
@@ -396,7 +396,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                           fraseDescontoMetodos,
                           key: const Key('desconto-metodos'),
                           style: TipografiaTrato.corpoPequeno.copyWith(
-                            color: CoresTrato.textoSecundario,
+                            color: context.cores.textoSecundario,
                           ),
                         ),
                       ],
@@ -406,7 +406,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                           _erroMoedas!,
                           key: const Key('erro-moedas'),
                           style: TipografiaTrato.corpoPequeno.copyWith(
-                            color: CoresTrato.vermelhoTexto,
+                            color: context.cores.vermelhoTexto,
                           ),
                         ),
                       ],
@@ -416,7 +416,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                       fraseSemTaxa,
                       key: const Key('frase-sem-taxa'),
                       style: TipografiaTrato.corpoPequeno.copyWith(
-                        color: CoresTrato.textoSecundario,
+                        color: context.cores.textoSecundario,
                       ),
                     ),
                     const SizedBox(height: EspacosTrato.x6),
@@ -523,10 +523,10 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.lock_outline,
                           size: 20,
-                          color: CoresTrato.textoSecundario,
+                          color: context.cores.textoSecundario,
                         ),
                         const SizedBox(width: EspacosTrato.x3),
                         Expanded(
@@ -534,7 +534,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                             'Pix e cartão só no nome do seu CPF. '
                             'O Trato não guarda o número do seu cartão.',
                             style: TipografiaTrato.corpoPequeno.copyWith(
-                              color: CoresTrato.textoSecundario,
+                              color: context.cores.textoSecundario,
                             ),
                           ),
                         ),
@@ -545,9 +545,9 @@ class _PagamentoTelaState extends State<PagamentoTela> {
               ),
             ),
             DecoratedBox(
-              decoration: const BoxDecoration(
-                color: CoresTrato.superficie,
-                border: Border(top: BorderSide(color: CoresTrato.borda)),
+              decoration: BoxDecoration(
+                color: context.cores.superficie,
+                border: Border(top: BorderSide(color: context.cores.borda)),
               ),
               child: ConteudoResponsivo(
                 child: Padding(
@@ -563,7 +563,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                             key: const Key('erro-pagamento'),
                             textAlign: TextAlign.center,
                             style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.vermelhoTexto),
+                                .copyWith(color: context.cores.vermelhoTexto),
                           ),
                         ),
                         const SizedBox(height: EspacosTrato.x2),
@@ -599,11 +599,11 @@ class _OpcaoMetodo extends StatelessWidget {
       button: true,
       selected: selecionada,
       child: Material(
-        color: selecionada ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: selecionada ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
           side: BorderSide(
-            color: selecionada ? CoresTrato.petroleo : CoresTrato.borda,
+            color: selecionada ? context.cores.petroleo : context.cores.borda,
             width: selecionada ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -617,7 +617,7 @@ class _OpcaoMetodo extends StatelessWidget {
                 Icon(
                   selecionada ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                   size: 28,
-                  color: selecionada ? CoresTrato.petroleo : CoresTrato.textoSecundario,
+                  color: selecionada ? context.cores.petroleo : context.cores.textoSecundario,
                 ),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
@@ -629,7 +629,7 @@ class _OpcaoMetodo extends StatelessWidget {
                       Text(
                         opcao.descricao,
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.textoSecundario,
+                          color: context.cores.textoSecundario,
                         ),
                       ),
                     ],
@@ -665,11 +665,11 @@ class _OpcaoParcela extends StatelessWidget {
       button: true,
       selected: selecionada,
       child: Material(
-        color: selecionada ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: selecionada ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
           side: BorderSide(
-            color: selecionada ? CoresTrato.petroleo : CoresTrato.borda,
+            color: selecionada ? context.cores.petroleo : context.cores.borda,
             width: selecionada ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -686,7 +686,7 @@ class _OpcaoParcela extends StatelessWidget {
                 Icon(
                   selecionada ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                   size: 20,
-                  color: selecionada ? CoresTrato.petroleo : CoresTrato.textoSecundario,
+                  color: selecionada ? context.cores.petroleo : context.cores.textoSecundario,
                 ),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
@@ -698,7 +698,7 @@ class _OpcaoParcela extends StatelessWidget {
                       Text(
                         detalhe,
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.textoSecundario,
+                          color: context.cores.textoSecundario,
                         ),
                       ),
                     ],
@@ -728,11 +728,11 @@ class _Passo extends StatelessWidget {
           width: 28,
           height: 28,
           alignment: Alignment.center,
-          decoration: const BoxDecoration(color: CoresTrato.azulSuave, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: context.cores.azulSuave, shape: BoxShape.circle),
           child: Text(
             '$numero',
             style: TipografiaTrato.corpoPequeno.copyWith(
-              color: CoresTrato.azulTexto,
+              color: context.cores.azulTexto,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -760,7 +760,7 @@ class _CartaoMoedasIndisponivel extends StatelessWidget {
         title: Text('Desconto indisponível agora', style: TipografiaTrato.corpoForte),
         subtitle: Text(
           mensagem,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
       ),
     );
@@ -842,7 +842,7 @@ class _FolhaCpfPagamentoState extends State<_FolhaCpfPagamento> {
             Text(
               'Pedimos só uma vez, para emitir o recibo e proteger seu pagamento. '
               'O profissional não vê.',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x4),
             CampoTrato(
@@ -868,7 +868,7 @@ class _FolhaCpfPagamentoState extends State<_FolhaCpfPagamento> {
               const SizedBox(height: EspacosTrato.x3),
               Text(
                 _erro!,
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
               ),
             ],
             const SizedBox(height: EspacosTrato.x4),
@@ -919,7 +919,7 @@ class _CartaoMoedas extends StatelessWidget {
         subtitle: Text(
           detalhe,
           style: TipografiaTrato.corpoPequeno.copyWith(
-            color: ligado && usadas > 0 ? CoresTrato.verdeTexto : CoresTrato.textoSecundario,
+            color: ligado && usadas > 0 ? context.cores.verdeTexto : context.cores.textoSecundario,
           ),
         ),
         value: ligado,

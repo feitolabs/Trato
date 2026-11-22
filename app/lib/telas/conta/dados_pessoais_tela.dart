@@ -328,7 +328,7 @@ class _FormularioState extends State<_Formulario> {
         const SizedBox(height: EspacosTrato.x2),
         Text(
           'Nome, e-mail e CPF não mudam por aqui. Para corrigir, fale com a Central de ajuda.',
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         if ((d.cpfFinal ?? '').isEmpty) ...[
           const SizedBox(height: EspacosTrato.x5),
@@ -347,7 +347,7 @@ class _FormularioState extends State<_Formulario> {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             'Sua conta ainda não tem CPF. Ele é gravado uma única vez e não muda depois.',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
         ],
         const SizedBox(height: EspacosTrato.x5),
@@ -374,7 +374,7 @@ class _FormularioState extends State<_Formulario> {
           const SizedBox(height: EspacosTrato.x1),
           Text(
             _erroNascimento!,
-            style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto),
+            style: TipografiaTrato.legenda.copyWith(color: context.cores.vermelhoTexto),
           ),
         ],
         const SizedBox(height: EspacosTrato.x6),
@@ -474,11 +474,11 @@ class _FormularioState extends State<_Formulario> {
         if (_erroEnderecoGeral != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           Text(_erroEnderecoGeral!,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.vermelhoTexto)),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto)),
         ],
         if (_aviso != null) ...[
           const SizedBox(height: EspacosTrato.x3),
-          Text(_aviso!, style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.verdeTexto)),
+          Text(_aviso!, style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.verdeTexto)),
         ],
         const SizedBox(height: EspacosTrato.x5),
         if (widget.aoAlterarCredenciais != null) ...[
@@ -510,7 +510,7 @@ class _Linha extends StatelessWidget {
       child: Row(
         children: [
           Text(rotulo,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario)),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario)),
           const SizedBox(width: EspacosTrato.x4),
           Expanded(child: Text(valor, textAlign: TextAlign.end, style: TipografiaTrato.corpo)),
         ],

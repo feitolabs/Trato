@@ -187,7 +187,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
     void atualizar(String _) => setState(() {});
     final estiloTexto = TipografiaTrato.corpo;
     final estiloLink = estiloTexto.copyWith(
-      color: CoresTrato.azulTexto,
+      color: context.cores.azulTexto,
       decoration: TextDecoration.underline,
     );
     return EstruturaAuth(
@@ -208,7 +208,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         Text(
           fraseSemTaxaCadastro,
           key: const Key('frase-sem-taxa'),
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         KeyedSubtree(
@@ -328,7 +328,7 @@ class _LinhaMarcar extends StatelessWidget {
           ],
         )),
         if (erro != null)
-          Text(erro!, style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto)),
+          Text(erro!, style: TipografiaTrato.legenda.copyWith(color: context.cores.vermelhoTexto)),
       ],
     );
   }

@@ -39,7 +39,7 @@ class VerNotaTela extends StatelessWidget {
                   ? '${primeira.pedidoTitulo} · ${primeira.profissional} · ${notas.length} notas'
                   : '${primeira.pedidoTitulo} · ${primeira.profissional} · '
                       'enviada em ${formatarData(primeira.enviadaEm)}',
-              style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
             ),
             for (var k = 0; k < notas.length; k++) ..._nota(notas[k], k + 1, varias),
             if (varias) ...[

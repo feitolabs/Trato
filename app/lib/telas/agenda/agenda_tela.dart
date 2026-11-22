@@ -136,7 +136,7 @@ class _CartaoAgendamento extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = agendamento;
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     final tipo = switch (a.estado) {
       EstadoAgendamento.agendado => TipoStatus.info,
       EstadoAgendamento.emAndamento => TipoStatus.destaque,
@@ -157,7 +157,7 @@ class _CartaoAgendamento extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x2),
           Row(
             children: [
-              const Icon(Icons.schedule, size: 18, color: CoresTrato.petroleo),
+              Icon(Icons.schedule, size: 18, color: context.cores.petroleo),
               const SizedBox(width: EspacosTrato.x2),
               Expanded(child: Text(a.horario, style: TipografiaTrato.corpoForte)),
             ],
@@ -167,7 +167,7 @@ class _CartaoAgendamento extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.place_outlined, size: 18, color: CoresTrato.petroleo),
+                Icon(Icons.place_outlined, size: 18, color: context.cores.petroleo),
                 const SizedBox(width: EspacosTrato.x2),
                 Expanded(child: Text(a.local, style: secundario)),
               ],

@@ -289,7 +289,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
               ListTile(
                 leading: Icon(
                   c.id == _cidade?.id ? Icons.check_circle : Icons.location_city_outlined,
-                  color: CoresTrato.petroleo,
+                  color: context.cores.petroleo,
                 ),
                 title: Text(c.rotulo),
                 onTap: () => Navigator.of(folha).pop(c),
@@ -486,7 +486,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
   @override
   Widget build(BuildContext context) {
     final f = widget.formulario;
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return EstruturaPedido(
       scrollController: _scroll,
       tituloBarra: 'Novo pedido',
@@ -504,18 +504,18 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             key: const Key('banner-profissional-convidado'),
             padding: const EdgeInsets.all(EspacosTrato.x3),
             decoration: BoxDecoration(
-              color: CoresTrato.azulSuave,
+              color: context.cores.azulSuave,
               borderRadius: BorderRadius.circular(EspacosTrato.raio),
             ),
             child: Row(
               children: [
-                const Icon(Icons.person_pin_outlined, size: 20, color: CoresTrato.azulTexto),
+                Icon(Icons.person_pin_outlined, size: 20, color: context.cores.azulTexto),
                 const SizedBox(width: EspacosTrato.x2),
                 Expanded(
                   child: Text(
                     'Pedido direto para ${widget.profissionalConvidadoNome!.trim()}. Ele será avisado primeiro.',
                     style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.azulTexto,
+                      color: context.cores.azulTexto,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -527,7 +527,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
         const SizedBox(height: EspacosTrato.x2),
         Row(
           children: [
-            Icon(f.icone, size: 22, color: CoresTrato.petroleo),
+            Icon(f.icone, size: 22, color: context.cores.petroleo),
             const SizedBox(width: EspacosTrato.x2),
             Expanded(child: Text(f.categoria, style: secundario)),
             if (widget.aoTrocarCategoria != null)
@@ -858,7 +858,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
+                    Icon(Icons.location_on_outlined, color: context.cores.petroleo),
                     const SizedBox(width: EspacosTrato.x3),
                     Expanded(
                       child: Column(
@@ -873,7 +873,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                         ],
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down, color: CoresTrato.petroleo),
+                    Icon(Icons.keyboard_arrow_down, color: context.cores.petroleo),
                   ],
                 ),
               ),
@@ -884,7 +884,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.location_on_outlined, color: CoresTrato.petroleo),
+                Icon(Icons.location_on_outlined, color: context.cores.petroleo),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
                   child: Column(
@@ -933,10 +933,10 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
               children: [
                 for (final saved in widget.enderecosSalvos)
                   ActionChip(
-                    avatar: const Icon(Icons.home_outlined, size: 18, color: CoresTrato.petroleo),
+                    avatar: Icon(Icons.home_outlined, size: 18, color: context.cores.petroleo),
                     label: Text(saved.apelido.isNotEmpty ? saved.apelido : 'Endereço salvo'),
-                    backgroundColor: CoresTrato.superficie,
-                    side: const BorderSide(color: CoresTrato.borda),
+                    backgroundColor: context.cores.superficie,
+                    side: BorderSide(color: context.cores.borda),
                     onPressed: () => _aplicarEnderecoSalvo(saved),
                   ),
               ],
@@ -1032,7 +1032,7 @@ class _MensagemErro extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: EspacosTrato.x2),
         child:
-            Text(texto, style: TipografiaTrato.legenda.copyWith(color: CoresTrato.vermelhoTexto)),
+            Text(texto, style: TipografiaTrato.legenda.copyWith(color: context.cores.vermelhoTexto)),
       );
 }
 
@@ -1047,8 +1047,8 @@ class _Contador extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: CoresTrato.superficie,
-        border: Border.all(color: CoresTrato.borda),
+        color: context.cores.superficie,
+        border: Border.all(color: context.cores.borda),
         borderRadius: BorderRadius.circular(EspacosTrato.raio),
       ),
       child: Row(
@@ -1088,11 +1088,11 @@ class _OpcaoRadio extends StatelessWidget {
       button: true,
       selected: marcada,
       child: Material(
-        color: marcada ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: marcada ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
           side: BorderSide(
-            color: marcada ? CoresTrato.petroleo : CoresTrato.borda,
+            color: marcada ? context.cores.petroleo : context.cores.borda,
             width: marcada ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -1112,7 +1112,7 @@ class _OpcaoRadio extends StatelessWidget {
                   Icon(
                     marcada ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                     size: EspacosTrato.x4,
-                    color: CoresTrato.petroleo,
+                    color: context.cores.petroleo,
                   ),
                   const SizedBox(width: EspacosTrato.x2),
                   Text(
@@ -1152,7 +1152,7 @@ class _FotoReservada extends StatelessWidget {
           padding: imagemReal != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
           alignment: Alignment.bottomLeft,
           decoration: BoxDecoration(
-            color: CoresTrato.azulClaro,
+            color: context.cores.azulSuave,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
           child: imagemReal != null
@@ -1185,7 +1185,7 @@ class _FotoReservada extends StatelessWidget {
                   child: Text(
                     rotulo,
                     style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: CoresTrato.petroleo,
+                      color: context.cores.petroleo,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1244,7 +1244,7 @@ class _AdicionarFoto extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.photo_camera_outlined, color: CoresTrato.petroleo),
+                    Icon(Icons.photo_camera_outlined, color: context.cores.petroleo),
                     const SizedBox(height: EspacosTrato.x2),
                     Text('Adicionar', style: TipografiaTrato.corpoForte),
                   ],
@@ -1309,7 +1309,7 @@ class _CampoLista<T> extends StatelessWidget {
         DropdownButtonFormField<T>(
           initialValue: valor,
           isExpanded: true,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.petroleo),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.petroleo),
           items: [
             for (final o in opcoes)
               DropdownMenuItem<T>(

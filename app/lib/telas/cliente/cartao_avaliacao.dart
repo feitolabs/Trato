@@ -33,7 +33,7 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
     final respostaLimpa = (a.resposta ?? '').trim();
     final itensCriterios = a.itensCriterios;
     final detalhesLimpo = a.detalhes.trim();
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
 
     return CartaoTrato(
       child: Column(
@@ -47,14 +47,14 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: CoresTrato.azulClaro,
+                  color: context.cores.azulSuave,
                   shape: BoxShape.circle,
-                  border: Border.all(color: CoresTrato.borda),
+                  border: Border.all(color: context.cores.borda),
                 ),
                 child: Text(
                   _iniciaisCliente(a.cliente),
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.petroleo,
+                    color: context.cores.petroleo,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -89,19 +89,19 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
                   vertical: EspacosTrato.x1,
                 ),
                 decoration: BoxDecoration(
-                  color: CoresTrato.creme,
+                  color: context.cores.sobrePetroleo,
                   borderRadius: BorderRadius.circular(EspacosTrato.raio),
-                  border: Border.all(color: CoresTrato.borda),
+                  border: Border.all(color: context.cores.borda),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_rounded, size: 16, color: CoresTrato.petroleo),
+                    Icon(Icons.star_rounded, size: 16, color: context.cores.petroleo),
                     const SizedBox(width: 4),
                     Text(
                       formatarNota(a.nota),
                       style: TipografiaTrato.corpoPequeno.copyWith(
-                        color: CoresTrato.petroleo,
+                        color: context.cores.petroleo,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -123,13 +123,13 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: CoresTrato.creme,
+                      color: context.cores.sobrePetroleo,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: CoresTrato.borda),
+                      border: Border.all(color: context.cores.borda),
                     ),
                     child: Text(
                       '${item.rotulo} ${item.nota}',
-                      style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                     ),
                   ),
               ],
@@ -138,7 +138,7 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
             const SizedBox(height: EspacosTrato.x2),
             Text(
               detalhesLimpo,
-              style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
             ),
           ],
           if (comentarioLimpo.isNotEmpty) ...[
@@ -152,9 +152,9 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(EspacosTrato.x3),
               decoration: BoxDecoration(
-                color: CoresTrato.creme,
+                color: context.cores.sobrePetroleo,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: CoresTrato.borda),
+                border: Border.all(color: context.cores.borda),
               ),
               child: Text(
                 '$rotuloResposta: $respostaLimpa',

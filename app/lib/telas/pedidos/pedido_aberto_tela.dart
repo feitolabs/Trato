@@ -241,7 +241,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
               ? _dados.descricao
               : _dados.titulo,
           key: const ValueKey('subtitulo-pedido'),
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         if (_dados.remoto || _dados.urgente) ...[
           const SizedBox(height: EspacosTrato.x3),
@@ -380,7 +380,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
               const SizedBox(height: EspacosTrato.x2),
               Text(
                 'Outros orçamentos já enviados continuam disponíveis.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
             ],
           ),
@@ -432,7 +432,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
               const SizedBox(height: EspacosTrato.x1),
               Text(
                 'Responda até ${diaMesDoAparelho(responderAte)} às ${horaDoAparelho(responderAte)}',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
             ],
             const SizedBox(height: EspacosTrato.x2),
@@ -584,7 +584,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
         ),
         if (_erro != null) ...[
           const SizedBox(height: EspacosTrato.x3),
-          Text(_erro!, style: TipografiaTrato.corpo.copyWith(color: CoresTrato.vermelhoTexto)),
+          Text(_erro!, style: TipografiaTrato.corpo.copyWith(color: context.cores.vermelhoTexto)),
         ],
       ];
 }

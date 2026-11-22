@@ -17,9 +17,9 @@ class BarraAcaoInferior extends StatelessWidget {
   Widget build(BuildContext context) {
     final margem = Responsivo.margemLateral(TamanhoTela.de(context));
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: CoresTrato.creme,
-        border: Border(top: BorderSide(color: CoresTrato.borda)),
+      decoration: BoxDecoration(
+        color: context.cores.sobrePetroleo,
+        border: Border(top: BorderSide(color: context.cores.borda)),
       ),
       child: SafeArea(
         top: false,
@@ -56,7 +56,7 @@ class CartaoProfissional extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = profissional;
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -106,7 +106,7 @@ class CartaoProfissional extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star_rounded, size: 18, color: CoresTrato.petroleo),
+                            Icon(Icons.star_rounded, size: 18, color: context.cores.petroleo),
                             const SizedBox(width: EspacosTrato.x1),
                             Text(formatarNota(p.nota), style: TipografiaTrato.tituloCartao),
                           ],

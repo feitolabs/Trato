@@ -105,7 +105,7 @@ class SugestoesChat extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Sugestões para combinar',
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                   ),
                 ),
                 BotaoLink(
@@ -126,8 +126,8 @@ class SugestoesChat extends StatelessWidget {
                     constraints: const BoxConstraints(maxWidth: 260),
                     child: Material(
                       key: ValueKey('sugestao-$s'),
-                      color: CoresTrato.superficie,
-                      shape: const StadiumBorder(side: BorderSide(color: CoresTrato.borda)),
+                      color: context.cores.superficie,
+                      shape: StadiumBorder(side: BorderSide(color: context.cores.borda)),
                       child: InkWell(
                         customBorder: const StadiumBorder(),
                         onTap: () => aoTocar(s),

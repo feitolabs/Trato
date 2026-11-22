@@ -71,7 +71,7 @@ class GarantiaTela extends StatelessWidget {
                       child: Text(
                         'até ${formatarData(dados.fimEm)}',
                         style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: CoresTrato.textoSecundario,
+                          color: context.cores.textoSecundario,
                         ),
                         maxLines: 1,
                       ),
@@ -85,8 +85,8 @@ class GarantiaTela extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: dados.progresso,
                   minHeight: 8,
-                  color: CoresTrato.azulTexto,
-                  backgroundColor: CoresTrato.borda,
+                  color: context.cores.azulTexto,
+                  backgroundColor: context.cores.borda,
                 ),
               ),
             ],
@@ -102,7 +102,7 @@ class GarantiaTela extends StatelessWidget {
         Text(
           'O profissional tem ${dados.prazoAtendimentoDias} dias para atender. '
           'Se não houver atendimento, o suporte analisa o caso.',
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         Row(
@@ -132,7 +132,7 @@ class _ItemCobertura extends StatelessWidget {
           padding: const EdgeInsets.only(top: 2),
           child: Icon(
             cobre ? Icons.check : Icons.close,
-            color: cobre ? CoresTrato.verdeTexto : CoresTrato.vermelhoTexto,
+            color: cobre ? context.cores.verdeTexto : context.cores.vermelhoTexto,
             semanticLabel: cobre ? 'Cobre' : 'Não cobre',
           ),
         ),

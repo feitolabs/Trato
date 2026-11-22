@@ -162,7 +162,7 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
         Text(
           '${primeiraMaiuscula(dados.nomeProfissional)} tem ${dados.prazoRespostaHoras} horas para responder. '
           'Sem acordo, nosso suporte analisa o caso e decide com base no chat, nas fotos e no orçamento.',
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
       ],
     );
@@ -176,17 +176,17 @@ class _AvisoCongelado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = TipografiaTrato.corpo.copyWith(color: CoresTrato.ambarTexto);
+    final base = TipografiaTrato.corpo.copyWith(color: context.cores.ambarTexto);
     return Container(
       padding: const EdgeInsets.all(EspacosTrato.x4),
       decoration: BoxDecoration(
-        color: CoresTrato.ambarSuave,
+        color: context.cores.ambarSuave,
         borderRadius: BorderRadius.circular(EspacosTrato.raio),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lock_outline, color: CoresTrato.ambarTexto),
+          Icon(Icons.lock_outline, color: context.cores.ambarTexto),
           const SizedBox(width: EspacosTrato.x3),
           Expanded(
             child: Text.rich(
@@ -225,11 +225,11 @@ class _OpcaoMotivo extends StatelessWidget {
       inMutuallyExclusiveGroup: true,
       checked: selecionado,
       child: Material(
-        color: selecionado ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: selecionado ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
           side: BorderSide(
-            color: selecionado ? CoresTrato.petroleo : CoresTrato.borda,
+            color: selecionado ? context.cores.petroleo : context.cores.borda,
             width: selecionado ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -245,14 +245,14 @@ class _OpcaoMotivo extends StatelessWidget {
               children: [
                 Icon(
                   selecionado ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: CoresTrato.petroleo,
+                  color: context.cores.petroleo,
                 ),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(
                   child: Text(
                     texto,
                     style: TipografiaTrato.corpo.copyWith(
-                      color: CoresTrato.petroleo,
+                      color: context.cores.petroleo,
                       fontWeight: selecionado ? FontWeight.w700 : FontWeight.w400,
                     ),
                   ),

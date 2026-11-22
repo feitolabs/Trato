@@ -89,7 +89,7 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                     Text(
                       'Olá, ${dados.nome}',
                       style:
-                          TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                          TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x1),
                     Text('Pedidos perto de você', style: TipografiaTrato.tituloGrande),
@@ -122,7 +122,7 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                                       count: naoLidas,
                                       maxCount: 99,
                                       backgroundColor: c.laranja,
-                                      textColor: CoresTrato.petroleo,
+                                      textColor: context.cores.petroleo,
                                       child: icone,
                                     )
                                   : icone,
@@ -194,7 +194,7 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                 dados.emAnalise
                     ? 'Assim que seu cadastro for aprovado, os pedidos disponíveis aparecerão aqui.'
                     : 'Nenhum pedido aberto na sua região no momento.',
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
               ),
             )
           else
@@ -239,7 +239,7 @@ class _CartaoDisponivel extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   'Você recebe pedidos urgentes da sua região',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
             ),
@@ -250,11 +250,11 @@ class _CartaoDisponivel extends StatelessWidget {
             child: Switch(
               value: ligado,
               onChanged: aoMudar,
-              activeTrackColor: CoresTrato.petroleo,
-              activeThumbColor: CoresTrato.creme,
-              inactiveTrackColor: CoresTrato.borda,
-              inactiveThumbColor: CoresTrato.superficie,
-              trackOutlineColor: const WidgetStatePropertyAll(CoresTrato.petroleo),
+              activeTrackColor: context.cores.petroleo,
+              activeThumbColor: context.cores.sobrePetroleo,
+              inactiveTrackColor: context.cores.borda,
+              inactiveThumbColor: context.cores.superficie,
+              trackOutlineColor: WidgetStatePropertyAll(context.cores.petroleo),
             ),
           ),
         ],
@@ -283,23 +283,23 @@ class _CartaoProximo extends StatelessWidget {
         children: [
           Text(
             proximo.quando.toUpperCase(),
-            style: TipografiaTrato.sobretitulo.copyWith(color: CoresTrato.creme),
+            style: TipografiaTrato.sobretitulo.copyWith(color: context.cores.sobrePetroleo),
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
             proximo.titulo,
-            style: TipografiaTrato.titulo.copyWith(color: CoresTrato.creme),
+            style: TipografiaTrato.titulo.copyWith(color: context.cores.sobrePetroleo),
           ),
           const SizedBox(height: EspacosTrato.x3),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.place_outlined, color: CoresTrato.creme),
+              Icon(Icons.place_outlined, color: context.cores.sobrePetroleo),
               const SizedBox(width: EspacosTrato.x2),
               Expanded(
                 child: Text(
                   proximo.endereco,
-                  style: TipografiaTrato.corpo.copyWith(color: CoresTrato.creme),
+                  style: TipografiaTrato.corpo.copyWith(color: context.cores.sobrePetroleo),
                 ),
               ),
             ],
@@ -309,7 +309,7 @@ class _CartaoProximo extends StatelessWidget {
             Text(
               'O que fazer agora: $agora',
               key: const ValueKey('o-que-fazer-agora'),
-              style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.creme),
+              style: TipografiaTrato.corpoForte.copyWith(color: context.cores.sobrePetroleo),
             ),
           ],
           const SizedBox(height: EspacosTrato.x4),
@@ -385,7 +385,7 @@ class _AvisoACaminhoState extends State<_AvisoACaminho> {
           children: [
             Text(
               'Chego em:',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.sobrePetroleo),
             ),
             for (final min in const [15, 30, 45])
               ChoiceChip(
@@ -409,7 +409,7 @@ class _AvisoACaminhoState extends State<_AvisoACaminho> {
               child: Text(
                 _mensagem!,
                 key: const Key('mensagem-a-caminho'),
-                style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.creme),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.sobrePetroleo),
               ),
             ),
           ),
@@ -451,7 +451,7 @@ class _CartaoCarteira extends StatelessWidget {
             Text(
               'Repasse do dinheiro: ${diaMesDoAparelho(carteira.proximaLiberacao!)}',
               key: const Key('repasse-previsto'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
           ],
           for (final l in carteira.liberacoesPrevistas) ...[
@@ -460,7 +460,7 @@ class _CartaoCarteira extends StatelessWidget {
               'Pedido ${l.pedidoNumero} · ${formatarReais(l.valorCentavos)}'
               '${l.liberacaoPrevistaEm == null ? '' : ' · ${diaMesDoAparelho(l.liberacaoPrevistaEm!)}'}',
               key: const Key('liberacao-prevista'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
           ],
         ],
@@ -482,7 +482,7 @@ class _Valor extends StatelessWidget {
       children: [
         Text(
           rotulo,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x1),
         FittedBox(
@@ -516,14 +516,14 @@ class _CartaoExclusividades extends StatelessWidget {
               ),
               Text(
                 textoTratinhos(resumo.saldoProfissional),
-                style: TipografiaTrato.corpoForte.copyWith(color: CoresTrato.petroleo),
+                style: TipografiaTrato.corpoForte.copyWith(color: context.cores.petroleo),
               ),
             ],
           ),
           const SizedBox(height: EspacosTrato.x1),
           Text(
             'Ganhe Tratinhos avaliando clientes e use 100 para pedir 48h de exclusividade.',
-            style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
           if (resumo.moedasPendentesProfissional > 0) ...[
             const SizedBox(height: EspacosTrato.x1),
@@ -534,7 +534,7 @@ class _CartaoExclusividades extends StatelessWidget {
                     resumo.moedaValorCentavos,
                   ) ??
                   '${textoTratinhos(resumo.moedasPendentesProfissional)} a liberar',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
           ],
           if (recentes.isNotEmpty) ...[
@@ -555,7 +555,7 @@ class _CartaoExclusividades extends StatelessWidget {
                     const SizedBox(width: EspacosTrato.x2),
                     Text(
                       item.rotuloStatus,
-                      style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                      style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                     ),
                   ],
                 ),
@@ -575,7 +575,7 @@ class CartaoPedidoAberto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     final partesSub = [
       if (pedido.remoto)
         'Atendimento remoto'

@@ -65,7 +65,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                           Text(
                             '${p.especialidade} · no Trato desde ${d.noTratoDesde}',
                             style: TipografiaTrato.corpoPequeno
-                                .copyWith(color: CoresTrato.textoSecundario),
+                                .copyWith(color: context.cores.textoSecundario),
                           ),
                         ],
                       ),
@@ -132,8 +132,8 @@ class PerfilProfissionalTela extends StatelessWidget {
                       for (final servico in d.servicos)
                         Chip(
                           label: Text(servico, style: TipografiaTrato.corpoPequeno),
-                          backgroundColor: CoresTrato.superficie,
-                          side: const BorderSide(color: CoresTrato.borda),
+                          backgroundColor: context.cores.superficie,
+                          side: BorderSide(color: context.cores.borda),
                         ),
                     ],
                   ),
@@ -147,7 +147,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.check, size: 22, color: CoresTrato.verdeTexto),
+                        Icon(Icons.check, size: 22, color: context.cores.verdeTexto),
                         const SizedBox(width: EspacosTrato.x3),
                         Expanded(child: Text(v, style: TipografiaTrato.corpo)),
                       ],
@@ -156,7 +156,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Text(
                   'O selo mostra o que foi conferido no cadastro. Compare os orçamentos e '
                   'converse antes de decidir.',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
                 const SizedBox(height: EspacosTrato.x6),
                 Text('Trabalhos', style: TipografiaTrato.titulo),
@@ -164,7 +164,7 @@ class PerfilProfissionalTela extends StatelessWidget {
                 if (d.fotosTrabalhos == 0 && d.trabalhos.isEmpty)
                   Text(
                     'Sem fotos de trabalhos ainda.',
-                    style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                   )
                 else
                   Row(
@@ -204,9 +204,9 @@ class PerfilProfissionalTela extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: CoresTrato.creme,
-          border: Border(top: BorderSide(color: CoresTrato.borda)),
+        decoration: BoxDecoration(
+          color: context.cores.sobrePetroleo,
+          border: Border(top: BorderSide(color: context.cores.borda)),
         ),
         child: SafeArea(
           top: false,
@@ -285,7 +285,7 @@ class _BotaoFavoritoState extends State<_BotaoFavorito> {
       onPressed: _alternar,
       icon: Icon(
         _favorito! ? Icons.favorite : Icons.favorite_border,
-        color: CoresTrato.petroleo,
+        color: context.cores.petroleo,
       ),
     );
   }
@@ -310,7 +310,7 @@ class _Indicador extends StatelessWidget {
             child: Text(
               rotulo,
               maxLines: 1,
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
           ),
           const SizedBox(height: EspacosTrato.x1),
@@ -327,7 +327,7 @@ class _Indicador extends StatelessWidget {
                     TextSpan(
                       text: ' $extra',
                       style:
-                          TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                          TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                     ),
                 ],
               ),
@@ -360,7 +360,7 @@ class _FotoReservada extends StatelessWidget {
           clipBehavior: imagem != null ? Clip.antiAlias : Clip.none,
           padding: imagem != null ? EdgeInsets.zero : const EdgeInsets.all(EspacosTrato.x2),
           decoration: BoxDecoration(
-            color: CoresTrato.azulClaro,
+            color: context.cores.azulSuave,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
           child: imagem ??
@@ -371,7 +371,7 @@ class _FotoReservada extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: CoresTrato.petroleo,
+                    color: context.cores.petroleo,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

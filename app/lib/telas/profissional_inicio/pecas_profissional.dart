@@ -50,11 +50,11 @@ class OpcaoUnica extends StatelessWidget {
       inMutuallyExclusiveGroup: true,
       checked: selecionada,
       child: Material(
-        color: selecionada ? CoresTrato.azulSuave : CoresTrato.superficie,
+        color: selecionada ? context.cores.azulSuave : context.cores.superficie,
         shape: RoundedRectangleBorder(
           borderRadius: raio,
           side: BorderSide(
-            color: selecionada ? CoresTrato.petroleo : CoresTrato.borda,
+            color: selecionada ? context.cores.petroleo : context.cores.borda,
             width: selecionada ? 1.5 : EspacosTrato.bordaFina,
           ),
         ),
@@ -67,7 +67,7 @@ class OpcaoUnica extends StatelessWidget {
               children: [
                 Icon(
                   selecionada ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: CoresTrato.petroleo,
+                  color: context.cores.petroleo,
                 ),
                 const SizedBox(width: EspacosTrato.x3),
                 Expanded(child: Text(texto, style: TipografiaTrato.corpo)),

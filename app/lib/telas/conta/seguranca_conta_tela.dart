@@ -122,7 +122,7 @@ class _SegurancaContaTelaState extends State<SegurancaContaTela> {
           if (emailAtual != null && emailAtual.isNotEmpty) ...[
             Text(
               'Conta conectada como $emailAtual',
-              style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x4),
           ],
@@ -144,7 +144,7 @@ class _SegurancaContaTelaState extends State<SegurancaContaTela> {
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
                     _avisoEmail!,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.verdeTexto),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.verdeTexto),
                   ),
                 ],
                 const SizedBox(height: EspacosTrato.x4),
@@ -183,7 +183,7 @@ class _SegurancaContaTelaState extends State<SegurancaContaTela> {
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
                     _avisoSenha!,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.verdeTexto),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.verdeTexto),
                   ),
                 ],
                 const SizedBox(height: EspacosTrato.x4),

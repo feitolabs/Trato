@@ -39,7 +39,7 @@ class ExtratoTratinhosTela extends StatelessWidget {
     final pendentes = perfil.moedasPendentes;
     final valorCentavos = perfil.moedasValorCentavos;
     final extrato = perfil.moedasExtrato;
-    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario);
+    final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
 
     return MolduraTelaComum(
       titulo: 'Seus Tratinhos',
@@ -176,7 +176,7 @@ class _LinhaLancamento extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     dataTexto,
-                    style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                   ),
                 ],
               ],
@@ -189,13 +189,13 @@ class _LinhaLancamento extends StatelessWidget {
               Text(
                 qtdTexto,
                 style: TipografiaTrato.corpoForte.copyWith(
-                  color: positivo ? CoresTrato.verdeTexto : CoresTrato.petroleo,
+                  color: positivo ? context.cores.verdeTexto : context.cores.petroleo,
                 ),
               ),
               if (emReais != null)
                 Text(
                   '${positivo ? '+' : '-'}$emReais',
-                  style: TipografiaTrato.legenda.copyWith(color: CoresTrato.textoSecundario),
+                  style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                 ),
             ],
           ),

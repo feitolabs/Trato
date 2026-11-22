@@ -200,7 +200,7 @@ class _CorpoState extends State<_Corpo> {
       children: [
         Text(
           'Aqui você vê o que usamos dos seus dados, pede uma cópia e decide o que fazer com a sua conta.',
-          style: TipografiaTrato.corpo.copyWith(color: CoresTrato.textoSecundario),
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         if (_exclusaoAgendadaEm != null) ...[
           const SizedBox(height: EspacosTrato.x4),
@@ -232,7 +232,7 @@ class _CorpoState extends State<_Corpo> {
                   title: Text(c.titulo, style: TipografiaTrato.corpoForte),
                   subtitle: Text(
                     c.descricao,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: CoresTrato.textoSecundario),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                   ),
                   value: _ativos[c.id]!,
                   onChanged: c.obrigatorio ? null : (v) => _alterar(c, v),
