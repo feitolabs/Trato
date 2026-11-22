@@ -2089,6 +2089,7 @@ abstract final class RotasTrato {
             aoAbrirProfissional: (p) => abrirPerfil(context, p),
             aoEscolherCategoria: (c) => abrirCategoria(context, c),
             aoVerTodas: () => abrirTodasCategorias(context),
+            aoPedirOrcamento: () => abrirNovoPedido(context),
           );
         },
       );

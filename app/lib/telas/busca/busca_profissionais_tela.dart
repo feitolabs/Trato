@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
@@ -22,6 +23,7 @@ class BuscaProfissionaisTela extends StatefulWidget {
     this.sugestoes = const [],
     this.aoEscolherCategoria,
     this.aoVerTodas,
+    this.aoPedirOrcamento,
   });
 
   /// Toque numa categoria das sugestões. Sem isso, o toque busca pelo nome da categoria.
@@ -29,6 +31,9 @@ class BuscaProfissionaisTela extends StatefulWidget {
 
   /// Toque em "Ver todas" nas sugestões.
   final VoidCallback? aoVerTodas;
+
+  /// Abre o fluxo de pedir orçamento quando o usuário não encontra na busca rápida.
+  final VoidCallback? aoPedirOrcamento;
 
   final ServicoBusca servico;
   final ValueChanged<Profissional>? aoAbrirProfissional;
@@ -223,6 +228,7 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
       aoEscolherCategoria: widget.aoEscolherCategoria,
       aoVerTodas: widget.aoVerTodas,
       aoEscolherTexto: _escolher,
+      aoPedirOrcamento: widget.aoPedirOrcamento,
     );
     if (atualizador == null) return conteudo;
     return RefreshIndicator(onRefresh: atualizador, child: conteudo);
@@ -310,7 +316,9 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
                       onRefresh: _recarregarBusca,
                       child: ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+                        padding: const EdgeInsets.only(
+                          bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+                        ),
                         itemCount: filtrados.length + 1,
                         separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
                         itemBuilder: (_, i) {
@@ -349,6 +357,7 @@ class _Sugestoes extends StatelessWidget {
     required this.aoEscolherCategoria,
     required this.aoVerTodas,
     required this.aoEscolherTexto,
+    this.aoPedirOrcamento,
   });
 
   final List<CategoriaServico> sugestoes;
@@ -358,19 +367,28 @@ class _Sugestoes extends StatelessWidget {
   final ValueChanged<CategoriaServico>? aoEscolherCategoria;
   final VoidCallback? aoVerTodas;
   final ValueChanged<String> aoEscolherTexto;
+  final VoidCallback? aoPedirOrcamento;
 
   @override
   Widget build(BuildContext context) {
+    final cores = context.cores;
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+      padding: const EdgeInsets.only(
+        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (recentes.isNotEmpty) ...[
             Row(
               children: [
-                Expanded(child: Text('BUSCAS RECENTES', style: TipografiaTrato.sobretitulo)),
+                Expanded(
+                  child: Text(
+                    'BUSCAS RECENTES',
+                    style: TipografiaTrato.sobretitulo.copyWith(color: cores.textoSecundario),
+                  ),
+                ),
                 TextButton(
                   onPressed: aoLimparRecentes,
                   child: const Text('Limpar'),
@@ -384,17 +402,20 @@ class _Sugestoes extends StatelessWidget {
               children: [
                 for (final termo in recentes)
                   ActionChip(
-                    avatar: Icon(Icons.history, size: 18, color: context.cores.petroleo),
+                    avatar: Icon(Icons.history, size: 18, color: cores.petroleo),
                     label: Text(termo, style: TipografiaTrato.corpoPequeno),
-                    backgroundColor: context.cores.superficie,
-                    side: BorderSide(color: context.cores.borda),
+                    backgroundColor: cores.superficie,
+                    side: BorderSide(color: cores.borda),
                     onPressed: () => aoEscolherRecente(termo),
                   ),
               ],
             ),
             const SizedBox(height: EspacosTrato.x5),
           ],
-          Text('CATEGORIAS', style: TipografiaTrato.sobretitulo),
+          Text(
+            'CATEGORIAS',
+            style: TipografiaTrato.sobretitulo.copyWith(color: cores.textoSecundario),
+          ),
           const SizedBox(height: EspacosTrato.x3),
           Wrap(
             spacing: EspacosTrato.x2,
@@ -402,10 +423,10 @@ class _Sugestoes extends StatelessWidget {
             children: [
               for (final c in sugestoes)
                 ActionChip(
-                  avatar: Icon(c.icone, size: 18, color: context.cores.petroleo),
+                  avatar: Icon(c.icone, size: 18, color: cores.petroleo),
                   label: Text(c.nome, style: TipografiaTrato.corpoPequeno),
-                  backgroundColor: context.cores.superficie,
-                  side: BorderSide(color: context.cores.borda),
+                  backgroundColor: cores.superficie,
+                  side: BorderSide(color: cores.borda),
                   onPressed: () {
                     if (c.nome == 'Ver todas' && aoVerTodas != null) {
                       aoVerTodas!();
@@ -417,6 +438,53 @@ class _Sugestoes extends StatelessWidget {
                   },
                 ),
             ],
+          ),
+          const SizedBox(height: EspacosTrato.x6),
+          Container(
+            key: const ValueKey('cartao-nao-achou-busca'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(EspacosTrato.x4),
+            decoration: BoxDecoration(
+              color: cores.superficie,
+              borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
+              border: Border.all(color: cores.borda, width: EspacosTrato.bordaFina),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: cores.azulSuave,
+                        borderRadius: BorderRadius.circular(EspacosTrato.raio),
+                      ),
+                      child: Icon(Icons.post_add_outlined, size: 22, color: cores.azulTexto),
+                    ),
+                    const SizedBox(width: EspacosTrato.x3),
+                    Expanded(
+                      child: Text(
+                        'Não achou o que procura?',
+                        style: TipografiaTrato.tituloCartao.copyWith(color: cores.texto),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: EspacosTrato.x2),
+                Text(
+                  'Descreva o serviço e receba orçamentos de profissionais verificados.',
+                  style: TipografiaTrato.corpoPequeno.copyWith(color: cores.textoSecundario),
+                ),
+                const SizedBox(height: EspacosTrato.x4),
+                BotaoPrimario(
+                  key: const ValueKey('botao-pedir-orcamento-busca'),
+                  texto: 'Pedir orçamento',
+                  aoTocar: aoPedirOrcamento ?? aoVerTodas,
+                ),
+              ],
+            ),
           ),
         ],
       ),

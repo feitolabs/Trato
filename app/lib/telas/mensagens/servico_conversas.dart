@@ -46,6 +46,9 @@ class ServicoConversasApi implements ServicoMensagens {
           conversaId: j['id'] as String?,
           outraParteId: outraId,
           profissionalId: comoProfissional ? null : outraId,
+          codigoPedido: _numero(pedidoId),
+          encerrada: j['encerrada'] == true,
+          contratado: j['contratado'] == true,
         ),
       );
     }
