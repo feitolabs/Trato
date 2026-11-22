@@ -25,6 +25,7 @@ class Categoria(StrEnum):
 
 class Evento(StrEnum):
     ORCAMENTO_RECEBIDO = "orcamento.recebido"
+    PEDIDO_NOVO = "pedido.novo"
     PEDIDO_DIRECIONADO = "pedido.direcionado"
     PEDIDO_URGENTE = "pedido.urgente"
     ORCAMENTO_ACEITO = "orcamento.aceito"
@@ -77,6 +78,12 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Novo orçamento",
         "Você recebeu um orçamento para o seu pedido.",
         "orcamentos",
+    ),
+    Evento.PEDIDO_NOVO: ModeloEvento(
+        Categoria.ORCAMENTOS,
+        "Novo pedido perto de você",
+        "Há um novo pedido aberto na sua região.",
+        "pedido_aberto",
     ),
     Evento.PEDIDO_DIRECIONADO: ModeloEvento(
         Categoria.ORCAMENTOS,

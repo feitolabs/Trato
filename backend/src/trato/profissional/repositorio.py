@@ -240,6 +240,41 @@ class ProfissionaisEmMemoria:
         """Profissionais aprovados com o modo 'Disponível agora' ativo."""
         return [p for p in self._itens.values() if p.status == "aprovado" and p.disponivel_agora]
 
+    def listar_elegiveis_para_pedido(
+        self,
+        categoria_id: str,
+        cidade_id: str | None,
+        *,
+        remoto: bool = False,
+        excluir_usuario_ids: tuple[str, ...] = (),
+        limite: int = 20,
+        detalhe: Callable[[str], PerfilDetalhe | None] | None = None,
+    ) -> list[str]:
+        """Profissionais aprovados e ativos elegíveis para aviso de pedido comum.
+
+        Ordenados por `nota_publica` decrescente (nulos por último) e `usuario_id` crescente."""
+        if limite <= 0 or (not remoto and not cidade_id):
+            return []
+        excluidos = set(excluir_usuario_ids)
+        candidatos: list[tuple[tuple[bool, float, str], str]] = []
+        for p in self._itens.values():
+            if p.status != "aprovado" or p.usuario_id in excluidos:
+                continue
+            if categoria_id not in p.categorias:
+                continue
+            if remoto:
+                if not p.atende_remoto:
+                    continue
+            elif not any(r.cidade_id == cidade_id for r in p.regioes):
+                continue
+            d = detalhe(p.usuario_id) if detalhe is not None else None
+            if d is not None and d.status != "ativo":
+                continue
+            nota = d.nota_publica if d is not None else None
+            candidatos.append(((nota is None, -(nota or 0.0), p.usuario_id), p.usuario_id))
+        candidatos.sort(key=lambda item: item[0])
+        return [uid for _, uid in candidatos[:limite]]
+
     def buscar(
         self, filtro: FiltroBusca, detalhe: Callable[[str], PerfilDetalhe | None]
     ) -> tuple[list[ResultadoBusca], int]:

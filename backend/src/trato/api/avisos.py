@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -160,6 +160,109 @@ def _eh_uuid(valor: str | None) -> bool:
         return True
     except ValueError:
         return False
+
+
+MAX_PROFISSIONAIS_AVISO_PEDIDO_NOVO = 20
+
+
+def _corpo_pedido_novo(
+    modulo: object,
+    *,
+    categoria_id: str | None,
+    cidade_id: str | None,
+    bairro: str | None,
+    remoto: bool,
+) -> str | None:
+    """Corpo curto só com categoria e cidade/bairro (ou Remoto). Nunca dado pessoal/endereço."""
+    cat_nome: str | None = None
+    cid_nome: str | None = None
+    catalogo = getattr(modulo, "catalogo", None)
+    if catalogo is not None:
+        try:
+            if categoria_id:
+                cat_nome = next(
+                    (
+                        c.nome
+                        for c in catalogo.categorias_publicas()
+                        if c.id == categoria_id or getattr(c, "slug", None) == categoria_id
+                    ),
+                    None,
+                )
+            if cidade_id and not remoto:
+                cid_nome = next(
+                    (c.nome for c in catalogo.cidades_publicas() if c.id == cidade_id),
+                    None,
+                )
+        except Exception:  # noqa: BLE001 - fallback para texto padrão do modelo
+            log.debug("Catálogo indisponível para montar corpo de pedido novo", exc_info=True)
+    bairro_limpo = (bairro or "").strip() or None
+    if remoto:
+        local = "Remoto"
+    elif bairro_limpo and cid_nome:
+        local = f"{bairro_limpo}, {cid_nome}"
+    else:
+        local = cid_nome or bairro_limpo
+    partes = [p for p in (cat_nome, local) if p]
+    return " · ".join(partes) if partes else None
+
+
+def avisar_pedido_novo(
+    request: Request,
+    contexto: Contexto,
+    *,
+    pedido_id: str,
+    categoria_id: str | None,
+    cidade_id: str | None,
+    bairro: str | None,
+    cliente_id: str,
+    remoto: bool = False,
+    convidado_id: str | None = None,
+    ja_notificados: Collection[str] = (),
+    limite: int = MAX_PROFISSIONAIS_AVISO_PEDIDO_NOVO,
+) -> None:
+    """Avisa até `limite` profissionais elegíveis quando um pedido comum é aberto (após commit).
+
+    Idempotente por `(pedido, profissional)`. Falha na leitura ou em um destinatário nunca
+    desfaz a abertura do pedido nem impede os demais avisos."""
+    if not categoria_id:
+        return
+    try:
+        modulo = getattr(request.app.state, "modulo_profissional", None)
+        if modulo is None or not hasattr(modulo.repo, "listar_elegiveis_para_pedido"):
+            return
+        excluir = tuple(dict.fromkeys(u for u in (cliente_id, convidado_id, *ja_notificados) if u))
+        elegiveis = modulo.repo.listar_elegiveis_para_pedido(
+            categoria_id,
+            cidade_id,
+            remoto=remoto,
+            excluir_usuario_ids=excluir,
+            limite=limite,
+            detalhe=contexto.usuarios.detalhe,
+        )
+        if not elegiveis:
+            return
+        servico, _ = servicos_de_notificacao(request, contexto)
+        corpo = _corpo_pedido_novo(
+            modulo,
+            categoria_id=categoria_id,
+            cidade_id=cidade_id,
+            bairro=bairro,
+            remoto=remoto,
+        )
+    except Exception:  # noqa: BLE001 - aviso é secundário
+        log.exception("Leitura de elegíveis para aviso de pedido novo falhou")
+        return
+    for profissional_id in elegiveis:
+        try:
+            servico.notificar(
+                Evento.PEDIDO_NOVO,
+                profissional_id,
+                chave=f"{pedido_id}:{profissional_id}",
+                pedido_id=pedido_id,
+                corpo=corpo,
+            )
+        except Exception:  # noqa: BLE001 - falha de um não bloqueia os outros
+            log.exception("Aviso de pedido novo falhou para %s", profissional_id)
 
 
 def avisar_pedido_urgente(

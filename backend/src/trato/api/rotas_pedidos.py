@@ -25,6 +25,7 @@ from trato.api.avisos import (
     avisar_exclusividade_encerrada,
     avisar_orcamentos_nao_escolhidos,
     avisar_pedido_direcionado,
+    avisar_pedido_novo,
     avisar_pedido_urgente,
 )
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
@@ -309,6 +310,17 @@ def abrir_pedido(
             categoria_id=dados.categoria_id,
             cliente_id=usuario.id,
             titulo_pedido=dados.titulo,
+        )
+    if dados is not None and not dados.profissional_convidado_id and not dados.urgente:
+        avisar_pedido_novo(
+            request,
+            contexto,
+            pedido_id=gravado.id,
+            categoria_id=dados.categoria_id,
+            cidade_id=dados.cidade_id,
+            bairro=dados.bairro,
+            cliente_id=usuario.id,
+            remoto=dados.modalidade == "remoto",
         )
     return pedido_out_completo(contexto, gravado, usuario)
 

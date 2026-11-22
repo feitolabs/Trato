@@ -191,6 +191,66 @@ class ProfissionaisPostgres:
                 saida.append(perfil)
         return saida
 
+    def listar_elegiveis_para_pedido(
+        self,
+        categoria_id: str,
+        cidade_id: str | None,
+        *,
+        remoto: bool = False,
+        excluir_usuario_ids: tuple[str, ...] = (),
+        limite: int = 20,
+        detalhe: Callable[[str], Any] | None = None,
+    ) -> list[str]:
+        """Profissionais aprovados e ativos da categoria/cidade (ou remoto), por nota desc."""
+        del detalhe  # no Postgres a nota e o status vêm direto do banco
+        if limite <= 0:
+            return []
+        with self._banco.transacao() as con:
+            cat_uuid = como_uuid(categoria_id)
+            if cat_uuid is None:
+                slug = str(categoria_id or "").strip().lower()
+                row = con.execute(
+                    "select id from public.categorias where lower(slug) = %s "
+                    "or lower(replace(nome, ' ', '-')) = %s or lower(nome) = %s limit 1",
+                    (slug, slug, slug),
+                ).fetchone()
+                if row is None:
+                    return []
+                cat_uuid = str(row["id"])
+            onde = [
+                "p.status = 'aprovado'",
+                "u.status = 'ativo'",
+                "exists (select 1 from public.profissional_categorias pc "
+                "where pc.profissional_id = p.usuario_id and pc.suspensa_em is null "
+                "and pc.categoria_id = %s)",
+            ]
+            params: list[Any] = [cat_uuid]
+            if remoto:
+                onde.append("p.atende_remoto = true")
+            else:
+                cid_uuid = como_uuid(cidade_id) if cidade_id else None
+                if cid_uuid is None:
+                    return []
+                onde.append(
+                    "exists (select 1 from public.profissional_regioes r "
+                    "where r.profissional_id = p.usuario_id and r.cidade_id = %s)"
+                )
+                params.append(cid_uuid)
+            excluidos = [u for u in map(como_uuid, excluir_usuario_ids) if u]
+            if excluidos:
+                onde.append("not (p.usuario_id = any(%s::uuid[]))")
+                params.append(excluidos)
+            params.append(limite)
+            linhas = con.execute(
+                "select p.usuario_id from public.perfis_profissional p "  # noqa: S608
+                "join public.usuarios u on u.id = p.usuario_id "
+                "where " + " and ".join(onde) + " "
+                "order by p.nota_publica desc nulls last, p.usuario_id asc "
+                "limit %s",
+                params,
+            ).fetchall()
+        return [str(l["usuario_id"]) for l in linhas]  # noqa: E741
+
     def salvar(self, perfil: PerfilProfissional) -> None:
         usuario = exigir_uuid(perfil.usuario_id, "profissional")
         disponibilidade = [
