@@ -88,7 +88,9 @@ class _Dias extends StatelessWidget {
     final dias = porDia.keys.toList()..sort();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: EspacosTrato.x6),
+      padding: const EdgeInsets.only(
+        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+      ),
       children: [
         if (semData.isNotEmpty) ...[
           Padding(

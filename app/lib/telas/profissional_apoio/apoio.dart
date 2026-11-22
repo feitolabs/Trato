@@ -65,7 +65,12 @@ class CorpoRolavel extends StatelessWidget {
     final conteudo = SingleChildScrollView(
       controller: scrollController,
       physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
-      padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x6),
+      padding: EdgeInsets.only(
+        top: EspacosTrato.x2,
+        bottom: rodape == null
+            ? BarraAbasFlutuante.alturaReservada + EspacosTrato.x4
+            : EspacosTrato.x6,
+      ),
       child: ConteudoResponsivo(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
       ),

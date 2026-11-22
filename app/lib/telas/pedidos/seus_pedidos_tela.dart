@@ -336,6 +336,7 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
 
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: ConteudoResponsivo(
           child: recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista),
         ),

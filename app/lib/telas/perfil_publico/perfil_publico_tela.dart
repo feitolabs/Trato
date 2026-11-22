@@ -131,9 +131,6 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
       construir: (context, p) {
         final fotoExibida = _fotoAtual ?? p.fotoReferencia ?? _fotoSalvaSessao;
         return CorpoRolavel(
-          rodape: widget.aoEditarCadastro == null
-              ? null
-              : BotaoSecundario(texto: 'Editar cadastro', aoTocar: _editarCadastro),
           children: [
             Row(
               children: [
@@ -274,6 +271,10 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   onTap: widget.aoUsarComoCliente,
                 ),
               ),
+            ],
+            if (widget.aoEditarCadastro != null) ...[
+              const SizedBox(height: EspacosTrato.x4),
+              BotaoSecundario(texto: 'Editar cadastro', aoTocar: _editarCadastro),
             ],
           ],
         );

@@ -669,6 +669,29 @@ abstract final class RotasTrato {
 
   static const _perfilIndisponivel = 'Perfil indisponível por enquanto.';
 
+  /// Ao tocar em "Usar como profissional" no perfil do cliente: exibe o tour de 4 páginas do
+  /// profissional na 1ª vez (gravado em [PreferenciaTourPerfil]) antes de entrar no modo profissional.
+  static Future<void> abrirModoProfissionalComTour(BuildContext context) async {
+    final jaViu = await PreferenciaTourPerfil.visto(PerfilUso.profissional);
+    if (!context.mounted) return;
+    if (!jaViu) {
+      await _abrir<void>(
+        context,
+        Builder(
+          builder: (tourCtx) => TourPerfilTela(
+            perfil: PerfilUso.profissional,
+            registrarVisto: true,
+            aoConcluir: () {
+              if (tourCtx.mounted) irParaProfissional(tourCtx);
+            },
+          ),
+        ),
+      );
+      return;
+    }
+    await irParaProfissional(context);
+  }
+
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static Future<void> irParaProfissional(BuildContext context) async {
     final tem = repos.modoApi
@@ -1766,7 +1789,7 @@ abstract final class RotasTrato {
             aoTocarItem: (acao) {
               switch (acao) {
                 case AcaoPerfil.usarComoProfissional:
-                  irParaProfissional(context);
+                  abrirModoProfissionalComTour(context);
                 case AcaoPerfil.notificacoes:
                   abrirNotificacoes(context);
                 case AcaoPerfil.termos:

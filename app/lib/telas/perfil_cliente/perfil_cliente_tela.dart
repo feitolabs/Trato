@@ -105,7 +105,10 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
     final recarregar = AtualizadorTela.de(context);
     final lista = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x6),
+      padding: const EdgeInsets.only(
+        top: EspacosTrato.x6,
+        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x6,
+      ),
       children: [
         Row(
           children: [
@@ -308,6 +311,7 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
     );
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: ConteudoResponsivo(
           child: recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista),
         ),

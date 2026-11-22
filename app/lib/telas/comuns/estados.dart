@@ -318,6 +318,7 @@ class MolduraTelaComum extends StatelessWidget {
     return Scaffold(
       appBar: comVoltar ? AppBar(actions: acoes.isEmpty ? null : acoes) : null,
       body: SafeArea(
+        bottom: false,
         child: ConteudoResponsivo(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
