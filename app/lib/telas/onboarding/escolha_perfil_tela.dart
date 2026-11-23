@@ -4,6 +4,7 @@ import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../auth/criar_conta_tela.dart';
+import '../auth/login_tela.dart';
 import '../fluxo/rotas.dart';
 import 'tour_perfil_tela.dart';
 
@@ -70,6 +71,10 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
     );
   }
 
+  void _entrar() => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => LoginTela(servico: widget.servico)),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -108,7 +113,16 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
                 texto: _escolhido.botao,
                 aoTocar: _continuar,
               ),
-              const SizedBox(height: EspacosTrato.x4),
+              const SizedBox(height: EspacosTrato.x2),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('Já tem conta? ', style: TipografiaTrato.corpo),
+                  BotaoLink(texto: 'Entrar', aoTocar: _entrar),
+                ],
+              ),
+              const SizedBox(height: EspacosTrato.x2),
             ],
           ),
         ),

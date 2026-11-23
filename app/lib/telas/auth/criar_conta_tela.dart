@@ -12,6 +12,7 @@ import '../fluxo/rotas.dart';
 import 'confirmar_celular_tela.dart';
 import 'confirmar_email_tela.dart';
 import 'estrutura_auth.dart';
+import 'login_tela.dart';
 import 'validacao.dart';
 
 /// Tela 5 do protótipo: "Criar conta", passo 1 de 2.
@@ -199,6 +200,22 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         children: [
           MensagemErroAuth(_erroServico),
           BotaoPrimario(texto: 'Criar conta', aoTocar: _criar, carregando: _carregando),
+          const SizedBox(height: EspacosTrato.x2),
+          Center(
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Já tem conta? ', style: TipografiaTrato.corpo),
+                BotaoLink(
+                  texto: 'Entrar',
+                  aoTocar: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => LoginTela(servico: widget.servico)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       children: [
