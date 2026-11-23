@@ -247,9 +247,9 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
 
     final lista = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         top: EspacosTrato.x6,
-        bottom: BarraAbasFlutuante.alturaReservada + 72,
+        bottom: BarraAbasFlutuante.folgaInferior(context) + 72,
       ),
       children: [
         Text('Seus pedidos', style: TipografiaTrato.tituloGrande),

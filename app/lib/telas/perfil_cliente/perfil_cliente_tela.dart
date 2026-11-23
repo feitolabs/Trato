@@ -105,9 +105,9 @@ class _PerfilClienteTelaState extends State<PerfilClienteTela> {
     final recarregar = AtualizadorTela.de(context);
     final lista = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         top: EspacosTrato.x6,
-        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x6,
+        bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x6,
       ),
       children: [
         Row(

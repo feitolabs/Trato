@@ -75,9 +75,9 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
     final recarregar = AtualizadorTela.de(context);
     final rolagem = SingleChildScrollView(
       physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         top: EspacosTrato.x4,
-        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+        bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

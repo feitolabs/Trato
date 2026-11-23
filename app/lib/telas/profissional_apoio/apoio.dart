@@ -68,7 +68,7 @@ class CorpoRolavel extends StatelessWidget {
       padding: EdgeInsets.only(
         top: EspacosTrato.x2,
         bottom: rodape == null
-            ? BarraAbasFlutuante.alturaReservada + EspacosTrato.x4
+            ? BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4
             : EspacosTrato.x6,
       ),
       child: ConteudoResponsivo(

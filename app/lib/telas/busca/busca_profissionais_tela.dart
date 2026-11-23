@@ -311,8 +311,8 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
                       onRefresh: _recarregarBusca,
                       child: ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.only(
-                          bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+                        padding: EdgeInsets.only(
+                          bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4,
                         ),
                         itemCount: filtrados.length + 1,
                         separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
@@ -367,8 +367,8 @@ class _Sugestoes extends StatelessWidget {
     final cores = context.cores;
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(
-        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+      padding: EdgeInsets.only(
+        bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

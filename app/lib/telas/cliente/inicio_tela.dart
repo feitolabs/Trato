@@ -65,9 +65,9 @@ class InicioTela extends StatelessWidget {
     final recarregar = AtualizadorTela.de(context);
     final conteudo = SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         top: EspacosTrato.x4,
-        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+        bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

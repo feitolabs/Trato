@@ -2139,7 +2139,7 @@ abstract final class RotasTrato {
               ),
             ),
             floatingActionButton: Padding(
-              padding: const EdgeInsets.only(bottom: BarraAbasFlutuante.alturaReservada),
+              padding: EdgeInsets.only(bottom: BarraAbasFlutuante.folgaInferior(context)),
               child: FloatingActionButton.extended(
                 key: const ValueKey('fab-novo-pedido'),
                 backgroundColor: context.cores.petroleo,

@@ -189,8 +189,8 @@ class _PainelConversasState extends State<_PainelConversas> {
           )
         : ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(
-              bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4,
+            padding: EdgeInsets.only(
+              bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4,
             ),
             itemCount: filtradas.length,
             separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),

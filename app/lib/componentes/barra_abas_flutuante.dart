@@ -22,6 +22,15 @@ class BarraAbasFlutuante extends StatelessWidget {
   /// Altura aproximada ocupada pela cápsula + margem, para reservar espaço no scroll.
   static const alturaReservada = 88.0;
 
+  /// Folga inferior real para listas e botões. Dentro do corpo de um Scaffold com extendBody, o
+  /// `padding.bottom` é a altura real da cápsula (já com o inset de gestos/3 botões) e o
+  /// `viewPadding.bottom` vem zerado; fora dele vale [alturaReservada] + inset do sistema.
+  static double folgaInferior(BuildContext context) {
+    final midia = MediaQuery.of(context);
+    final fora = alturaReservada + midia.viewPadding.bottom;
+    return midia.padding.bottom > fora ? midia.padding.bottom : fora;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.cores;

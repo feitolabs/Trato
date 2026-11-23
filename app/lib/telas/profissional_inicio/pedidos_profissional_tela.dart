@@ -130,7 +130,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
     } else {
       lista = ListView.separated(
         physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
-        padding: const EdgeInsets.only(bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4),
+        padding: EdgeInsets.only(bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4),
         itemCount: widget.orcamentosEnviados.length,
         separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
         itemBuilder: (_, i) {
@@ -179,7 +179,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
     } else {
       lista = ListView.separated(
         physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
-        padding: const EdgeInsets.only(bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4),
+        padding: EdgeInsets.only(bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4),
         itemCount: widget.contratados.length,
         separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
         itemBuilder: (_, i) {
@@ -281,7 +281,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
           )
         : ListView.separated(
             physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
-            padding: const EdgeInsets.only(bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x4),
+            padding: EdgeInsets.only(bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4),
             itemCount: widget.pedidos.length,
             separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
             itemBuilder: (_, i) => CartaoPedidoAberto(

@@ -55,9 +55,9 @@ class CarteiraTela extends StatelessWidget {
     final recarregar = AtualizadorTela.de(context);
     final corpo = SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         top: EspacosTrato.x5,
-        bottom: BarraAbasFlutuante.alturaReservada + EspacosTrato.x5,
+        bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x5,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
