@@ -258,6 +258,48 @@ class ExecutorContexto:
             self._c.moedas, agora=agora, situacao_disputa=situacao
         ).liberados
 
+    def liberar_indicacoes(self, agora: datetime) -> int:
+        """Libera (ou cancela) as indicações do Indique e Ganhe cujo prazo venceu.
+
+        Cancela se o pedido gatilho teve disputa aberta ou decidida em favor do cliente, estorno
+        ou cancelamento. Idempotente (chave por indicação e lado). Devolve quantas liberou.
+        """
+        from trato.api.indicacoes import liberar_vencidas
+
+        c = self._c
+
+        def situacao(pedido_id: str) -> str:
+            if self._pedido_estornado_ou_cancelado(pedido_id):
+                return "estornado"
+            pedido = c.pedidos.obter(pedido_id)
+            if pedido is not None and pedido.profissional_id:
+                if c.ledger.saldos_pedido(pedido_id, pedido.profissional_id).cliente_pagou <= 0:
+                    return "estornado"  # tudo devolvido ao cliente
+            disputa = c.disputas.obter(pedido_id)
+            if disputa is None:
+                return "nenhuma"
+            if disputa.estado is not EstadoDisputa.DECIDIDA:
+                return "aberta"
+            divisao = disputa.divisao
+            if divisao is not None and divisao.para_cliente > 0:
+                return "procedente"
+            return "nenhuma"
+
+        def avisar(ind: Any, usuario_id: str, quantidade: int, lado: str) -> None:
+            if self._notif is None:
+                return
+            try:
+                self._notif.notificar(
+                    Evento.INDICACAO_LIBERADA,
+                    usuario_id,
+                    chave=f"indicacao:{ind.id}:{lado}",
+                    corpo=f"Você ganhou {quantidade} Tratinhos pela indicação.",
+                )
+            except Exception:  # noqa: BLE001 - aviso é secundário ao crédito
+                log.exception("Aviso de indicação liberada falhou (%s)", ind.id)
+
+        return liberar_vencidas(c, agora, situacao, avisar)
+
     def executar(self, acao: AcaoRotina, agora: datetime) -> None:
         if acao.tipo is TipoAcaoRotina.TRANSICIONAR:
             self._transicionar(acao, agora)

@@ -38,6 +38,7 @@ class Evento(StrEnum):
     CLIENTE_AUSENTE = "agenda.cliente_ausente"
     A_CAMINHO = "agenda.a_caminho"
     REAGENDAMENTO_PROPOSTO = "agenda.reagendamento_proposto"
+    INDICACAO_LIBERADA = "indicacao.liberada"
     REAGENDAMENTO_RESPONDIDO = "agenda.reagendamento_respondido"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
     SERVICO_INICIADO = "execucao.iniciado"
@@ -148,6 +149,12 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "justificativa.",
         "pedido",
         essencial=True,
+    ),
+    Evento.INDICACAO_LIBERADA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Tratinhos de indicação liberados",
+        "Seus Tratinhos da indicação já estão na carteira.",
+        "indique-e-ganhe",
     ),
     Evento.REAGENDAMENTO_PROPOSTO: ModeloEvento(
         Categoria.AGENDA,

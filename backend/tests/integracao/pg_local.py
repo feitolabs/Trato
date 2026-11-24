@@ -34,6 +34,9 @@ MIGRATIONS = (
     "avaliacao_nota_decimal",
     "avaliacao_criterios",
     "reagendamentos",
+    "indicacoes",
+    "recorrencias",
+    # moedas_tipo_indicacao fica só no bloco abaixo: precisa de moedas_lancamentos.
 )
 
 
@@ -108,6 +111,9 @@ class BancoLocal:
                 "*avaliacao_nota_decimal.sql",
                 "*avaliacao_criterios.sql",
                 "*reagendamentos.sql",
+                "*indicacoes.sql",
+                "*recorrencias.sql",
+                "*moedas_tipo_indicacao.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     con.execute(arquivo.read_text(encoding="utf-8"))

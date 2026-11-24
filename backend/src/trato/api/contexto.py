@@ -101,6 +101,7 @@ def _repasses_em_memoria() -> RepositorioRepasses:
 
 from trato.api.denuncias import DenunciasEmMemoria  # noqa: E402
 from trato.api.exclusividades import ExclusividadesEmMemoria  # noqa: E402
+from trato.api.indicacoes import IndicacoesEmMemoria, gancho_indicacoes  # noqa: E402
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
 from trato.api.reagendamentos import ReagendamentosEmMemoria  # noqa: E402
 from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
@@ -137,6 +138,8 @@ class Contexto:
     reagendamentos: Any = field(default_factory=lambda: ReagendamentosEmMemoria())
     # Denúncias de perfil/chat: viram alertas na fila de risco (alertas_risco).
     denuncias: Any = field(default_factory=lambda: DenunciasEmMemoria())
+    # Indique e Ganhe Tratinhos (tabelas `codigos_indicacao` e `indicacoes`).
+    indicacoes: Any = field(default_factory=lambda: IndicacoesEmMemoria())
     # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
     ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
@@ -187,6 +190,9 @@ class Contexto:
             pendentes.append(funcao)
 
     def __post_init__(self) -> None:
+        # Ao concluir um pedido, arma a indicação do indicado (bônus de Indique e Ganhe).
+        if gancho_indicacoes not in self.apos_transicao:
+            self.apos_transicao.append(gancho_indicacoes)
         # A versão em memória das exclusividades usa o livro de moedas e os pedidos daqui.
         vincular = getattr(self.exclusividades, "vincular", None)
         if vincular is not None:
