@@ -504,7 +504,8 @@ void main() {
         deslocamento: 40,
       );
       expect(itens, isEmpty);
-      expect(chamadas.single.caminho, '/v1/extrato?limite=20&deslocamento=40');
+      // F63: o extrato do profissional pede explicitamente a visão `como=profissional`.
+      expect(chamadas.single.caminho, '/v1/extrato?como=profissional&limite=20&deslocamento=40');
 
       final (apiErro, _) = _cliente(
         (_) => _json({'detail': 'Serviço indisponível'}, 500),

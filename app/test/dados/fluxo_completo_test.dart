@@ -150,10 +150,17 @@ void main() {
       expect(find.byType(OrcamentosRecebidosTela), findsOneWidget);
 
       // 2. Detalhe do orçamento e aceite (o app só pede; o estado muda no backend).
+      // Com a barra flutuante, o segundo card fica abaixo da área visível: rola até ele.
+      await tester.ensureVisible(find.text('Ver orçamento').at(1));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Ver orçamento').at(1));
       await tester.pumpAndSettle();
       expect(find.byType(DetalheOrcamentoTela), findsOneWidget);
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(Checkbox));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.textContaining('Aceitar e ir para o pagamento'));
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('Aceitar e ir para o pagamento'));
       await tester.pumpAndSettle();

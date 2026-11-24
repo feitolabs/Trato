@@ -372,7 +372,19 @@ void main() {
         const EnvioAvaliacao(notas: [5, 5, 4, 5, 5], comentario: 'Ótimo', gorjetaCentavos: 0),
       );
 
-      expect(chamadas.single.corpo, {'nota_geral': 5, 'comentario': 'Ótimo'});
+      // F55: além da nota geral (média arredondada), vai a média com 2 casas e a nota de cada critério.
+      expect(chamadas.single.corpo, {
+        'nota_geral': 5,
+        'nota_decimal': 4.8,
+        'criterios': {
+          'pontualidade': 5,
+          'qualidade': 5,
+          'limpeza': 4,
+          'comunicacao': 5,
+          'preco_justo': 5,
+        },
+        'comentario': 'Ótimo',
+      });
       expect(moedas, 50);
     });
 

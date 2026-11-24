@@ -509,6 +509,9 @@ void main() {
         find.byKey(const Key('botao-salvar-preferencias')),
         200,
       );
+      // O botão fica no fim da lista: garante que está inteiro na tela antes de tocar.
+      await t.ensureVisible(find.byKey(const Key('botao-salvar-preferencias')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('botao-salvar-preferencias')));
       await t.pumpAndSettle();
 
