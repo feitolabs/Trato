@@ -5,6 +5,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
+import '../pedido_novo/pecas_pedido.dart' show EstruturaPedido;
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart';
 import 'modelos.dart';
@@ -271,18 +272,9 @@ class _DetalheRecorrenciaTelaState extends State<DetalheRecorrenciaTela> {
   @override
   Widget build(BuildContext context) {
     final s = _serie;
-    Widget corpo;
-    if (s == null && _erroCarga == null) {
-      corpo = const EstadoCarregando();
-    } else if (s == null) {
-      corpo = EstadoErro(
-        mensagem: _erroCarga is ErroTrato
-            ? (_erroCarga! as ErroTrato).mensagem
-            : 'Não foi possível carregar agora. Confira sua conexão e tente de novo.',
-        aoTentarNovamente: _carregar,
-      );
-    } else {
-      corpo = _Conteudo(
+    if (s != null) {
+      return _Conteudo(
+        aoAtualizar: _carregar,
         serie: s,
         ocupado: _ocupado,
         erroAcao: _erroAcao,
@@ -304,12 +296,25 @@ class _DetalheRecorrenciaTelaState extends State<DetalheRecorrenciaTela> {
             : (pedidoId) => widget.aoAbrirPedido!(pedidoId, s.souCliente),
       );
     }
-    return MolduraTelaComum(titulo: 'Serviço recorrente', child: corpo);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Serviço recorrente')),
+      body: SafeArea(
+        child: _erroCarga == null
+            ? const EstadoCarregando()
+            : EstadoErro(
+                mensagem: _erroCarga is ErroTrato
+                    ? (_erroCarga! as ErroTrato).mensagem
+                    : 'Não foi possível carregar agora. Confira sua conexão e tente de novo.',
+                aoTentarNovamente: _carregar,
+              ),
+      ),
+    );
   }
 }
 
 class _Conteudo extends StatelessWidget {
   const _Conteudo({
+    required this.aoAtualizar,
     required this.serie,
     required this.ocupado,
     required this.erroAcao,
@@ -326,6 +331,7 @@ class _Conteudo extends StatelessWidget {
     required this.aoAbrirPedido,
   });
 
+  final Future<void> Function() aoAtualizar;
   final Recorrencia serie;
   final bool ocupado;
   final String? erroAcao;
@@ -347,14 +353,18 @@ class _Conteudo extends StatelessWidget {
     final s = serie;
     final nome = (s.outraParteNome ?? '').trim().isEmpty ? 'a outra pessoa' : s.outraParteNome!;
     final podeAgir = s.ativa || s.pausada;
-    return CorpoRolavel(
+    return EstruturaPedido(
+      tituloBarra: 'Serviço recorrente',
+      aoAtualizar: aoAtualizar,
       children: [
-        Text(nome == 'a outra pessoa' ? 'Serviço recorrente' : nome, style: TipografiaTrato.tituloGrande),
+        Text(nome == 'a outra pessoa' ? 'Serviço recorrente' : nome,
+            style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x1),
         Text(
           s.textoStatus,
           key: const ValueKey('status-detalhe'),
-          style: TipografiaTrato.corpoForte.copyWith(color: s.cancelada ? c.textoSecundario : c.azulTexto),
+          style: TipografiaTrato.corpoForte
+              .copyWith(color: s.cancelada ? c.textoSecundario : c.azulTexto),
         ),
         const SizedBox(height: EspacosTrato.x2),
         Text(
@@ -364,7 +374,7 @@ class _Conteudo extends StatelessWidget {
         ),
         if (!s.cancelada)
           Text(
-            'Próxima visita: ${dataHoraBrasilia(s.proximaVisita)} (horário de Brasília)',
+            'Próxima visita: ${dataHoraBrasilia(s.proximaVisita)} (Brasília)',
             key: const ValueKey('proxima-visita'),
             style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
           ),
@@ -381,13 +391,16 @@ class _Conteudo extends StatelessWidget {
         ],
         if (s.proposta) ...[
           const SizedBox(height: EspacosTrato.x4),
-          CartaoTrato(
+          _LarguraToda(
+              child: CartaoTrato(
             key: const ValueKey('cartao-proposta'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  s.propostoPorMim ? 'Aguardando resposta de $nome' : 'Proposta de serviço recorrente',
+                  s.propostoPorMim
+                      ? 'Aguardando resposta de $nome'
+                      : 'Proposta de serviço recorrente',
                   style: TipografiaTrato.corpoForte,
                 ),
                 const SizedBox(height: EspacosTrato.x1),
@@ -422,11 +435,12 @@ class _Conteudo extends StatelessWidget {
                 ],
               ],
             ),
-          ),
+          )),
         ],
         if (podeAgir && s.temReajustePendente) ...[
           const SizedBox(height: EspacosTrato.x4),
-          CartaoTrato(
+          _LarguraToda(
+              child: CartaoTrato(
             key: const ValueKey('cartao-reajuste'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,45 +476,56 @@ class _Conteudo extends StatelessWidget {
                 ],
               ],
             ),
-          ),
+          )),
         ],
         if (podeAgir) ...[
           const SizedBox(height: EspacosTrato.x4),
-          Wrap(
-            spacing: EspacosTrato.x3,
-            runSpacing: EspacosTrato.x1,
-            children: [
-              if (s.ativa)
-                BotaoLink(
-                  key: const ValueKey('pausar-serie'),
-                  texto: 'Pausar série',
-                  aoTocar: ocupado ? null : aoPausar,
-                ),
-              if (s.pausada)
-                BotaoLink(
-                  key: const ValueKey('retomar-serie'),
-                  texto: 'Retomar série',
-                  aoTocar: ocupado ? null : aoRetomar,
-                ),
-              if (s.ativa)
-                BotaoLink(
-                  key: const ValueKey('pular-proxima'),
-                  texto: 'Pular próxima visita',
-                  aoTocar: ocupado ? null : aoPularProxima,
-                ),
-              if (!s.souCliente && !s.temReajustePendente)
-                BotaoLink(
-                  key: const ValueKey('propor-reajuste'),
-                  texto: 'Propor novo valor',
-                  aoTocar: ocupado ? null : aoProporReajuste,
-                ),
-              BotaoLink(
-                key: const ValueKey('cancelar-serie'),
-                texto: 'Cancelar série',
-                destrutivo: true,
-                aoTocar: ocupado ? null : aoCancelarSerie,
+          _LarguraToda(
+            child: Card(
+              key: const ValueKey('acoes-serie'),
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  if (s.ativa)
+                    _Acao(
+                      chave: const ValueKey('pausar-serie'),
+                      icone: Icons.pause_circle_outline,
+                      texto: 'Pausar série',
+                      aoTocar: ocupado ? null : aoPausar,
+                    ),
+                  if (s.pausada)
+                    _Acao(
+                      chave: const ValueKey('retomar-serie'),
+                      icone: Icons.play_circle_outline,
+                      texto: 'Retomar série',
+                      aoTocar: ocupado ? null : aoRetomar,
+                    ),
+                  if (s.ativa)
+                    _Acao(
+                      chave: const ValueKey('pular-proxima'),
+                      icone: Icons.skip_next_outlined,
+                      texto: 'Pular próxima visita',
+                      aoTocar: ocupado ? null : aoPularProxima,
+                    ),
+                  if (!s.souCliente && !s.temReajustePendente)
+                    _Acao(
+                      chave: const ValueKey('propor-reajuste'),
+                      icone: Icons.payments_outlined,
+                      texto: 'Propor novo valor',
+                      aoTocar: ocupado ? null : aoProporReajuste,
+                    ),
+                  Divider(height: 1, color: c.borda),
+                  _Acao(
+                    chave: const ValueKey('cancelar-serie'),
+                    icone: Icons.cancel_outlined,
+                    texto: 'Cancelar série',
+                    cor: c.vermelhoTexto,
+                    aoTocar: ocupado ? null : aoCancelarSerie,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
         const TituloSecao('Visitas'),
@@ -516,7 +541,8 @@ class _Conteudo extends StatelessWidget {
           for (final v in s.visitas)
             Padding(
               padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
-              child: CartaoTrato(
+              child: _LarguraToda(
+                  child: CartaoTrato(
                 key: ValueKey('visita-${v.id}'),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,8 +552,7 @@ class _Conteudo extends StatelessWidget {
                       v.textoStatus,
                       style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
                     ),
-                    if ((v.pedidoId != null && aoAbrirPedido != null) ||
-                        (v.agendada && podeAgir))
+                    if ((v.pedidoId != null && aoAbrirPedido != null) || (v.agendada && podeAgir))
                       Wrap(
                         spacing: EspacosTrato.x3,
                         children: [
@@ -547,9 +572,48 @@ class _Conteudo extends StatelessWidget {
                       ),
                   ],
                 ),
-              ),
+              )),
             ),
       ],
+    );
+  }
+}
+
+/// Cartões do detalhe ocupam a largura toda (sem isso encolhem até o texto).
+class _LarguraToda extends StatelessWidget {
+  const _LarguraToda({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(width: double.infinity, child: child);
+}
+
+/// Linha de ação da série: ícone e texto alinhados à esquerda.
+class _Acao extends StatelessWidget {
+  const _Acao({
+    required this.chave,
+    required this.icone,
+    required this.texto,
+    required this.aoTocar,
+    this.cor,
+  });
+
+  final Key chave;
+  final IconData icone;
+  final String texto;
+  final VoidCallback? aoTocar;
+  final Color? cor;
+
+  @override
+  Widget build(BuildContext context) {
+    final tom = cor ?? context.cores.petroleo;
+    return ListTile(
+      key: chave,
+      enabled: aoTocar != null,
+      leading: Icon(icone, color: tom),
+      title: Text(texto, style: TipografiaTrato.corpoForte.copyWith(color: tom)),
+      onTap: aoTocar,
     );
   }
 }
@@ -600,7 +664,8 @@ class _DialogoNovoValorState extends State<_DialogoNovoValor> {
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-            decoration: InputDecoration(labelText: 'Novo valor por visita', prefixText: 'R\$ ', errorText: _erro),
+            decoration: InputDecoration(
+                labelText: 'Novo valor por visita', prefixText: 'R\$ ', errorText: _erro),
             onChanged: (_) {
               if (_erro != null) setState(() => _erro = null);
             },

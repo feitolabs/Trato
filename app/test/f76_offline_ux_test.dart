@@ -203,11 +203,11 @@ void main() {
       );
       await tester.enterText(find.byKey(const ValueKey('campo')), 'meu texto');
       final topoAntes = tester.getTopLeft(find.text('Seus pedidos')).dy;
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
 
       online.value = false;
       await tester.pump();
-      expect(find.text('Sem conexão com a internet'), findsOneWidget);
+      expect(find.text('Sem internet'), findsOneWidget);
       final banner = tester.getRect(find.byKey(const ValueKey('banner-sem-conexao')));
       final titulo = tester.getRect(find.text('Seus pedidos'));
       expect(banner.bottom, lessThanOrEqualTo(titulo.top), reason: 'banner cobriu a AppBar');
@@ -215,15 +215,15 @@ void main() {
       // Mudar o estado não recria as telas: o que a pessoa digitou continua.
       expect(find.text('meu texto'), findsOneWidget);
 
-      expect(find.text('Mostrando dados salvos — sem internet'), findsNothing);
+      expect(find.text('Mostrando dados salvos'), findsNothing);
       salvos.value = true;
       await tester.pump();
-      expect(find.text('Mostrando dados salvos — sem internet'), findsOneWidget);
+      expect(find.text('Mostrando dados salvos'), findsOneWidget);
 
       online.value = true;
       salvos.value = false;
       await tester.pump();
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
       expect(tester.getTopLeft(find.text('Seus pedidos')).dy, topoAntes);
     });
   });

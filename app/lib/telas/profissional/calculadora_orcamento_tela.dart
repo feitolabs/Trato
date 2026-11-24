@@ -676,7 +676,7 @@ class _CampoGarantia extends StatelessWidget {
         DropdownButtonFormField<int>(
           initialValue: opcoes.contains(valor) ? valor : null,
           isExpanded: true,
-          style: TipografiaTrato.corpo,
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.texto),
           icon: const Icon(Icons.keyboard_arrow_down),
           items: [
             for (final dias in opcoes)

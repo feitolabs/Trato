@@ -21,6 +21,7 @@ class ExtratoTratinhosTela extends StatelessWidget {
         'estorno' || 'estorno_desconto' || 'devolucao' => 'Devolução de Tratinhos',
         'expiracao' || 'expirado' => 'Tratinhos expirados',
         'exclusividade' => 'Exclusividade em pedido',
+        'bonus_indicacao' => 'Bônus de indicação',
         _ => tipo.replaceAll('_', ' ').trim().isEmpty
             ? 'Movimentação de Tratinhos'
             : tipo.replaceAll('_', ' '),

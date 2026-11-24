@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../dados/estado_conexao.dart';
 import '../tema/tema.dart';
 
-/// Faixa discreta no topo, "Sem conexão com a internet", enquanto [EstadoConexao.online] for
-/// falso. Some sozinha na próxima chamada que der certo ou ao tocar em "Tentar novamente".
+/// Faixa discreta no topo, "Sem internet" (e "Mostrando dados salvos" quando for o caso), enquanto
+/// [EstadoConexao.online] for falso. Some sozinha na próxima chamada que der certo ou ao tocar em "Tentar novamente".
 class BannerSemConexao extends StatelessWidget {
   const BannerSemConexao({super.key, this.estado, this.dadosSalvos, this.aoTentarNovamente});
 
@@ -46,45 +47,12 @@ class BannerSemConexao extends StatelessWidget {
                     horizontal: EspacosTrato.x3,
                     vertical: EspacosTrato.x1,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.wifi_off, size: 18, color: c.sobrePetroleo),
-                      const SizedBox(width: EspacosTrato.x2),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sem conexão com a internet',
-                              style: TipografiaTrato.corpoPequeno.copyWith(color: c.sobrePetroleo),
-                            ),
-                            ValueListenableBuilder<bool>(
-                              valueListenable: dadosSalvos ?? EstadoConexao.dadosSalvos,
-                              builder: (context, salvos, _) => salvos
-                                  ? Text(
-                                      'Mostrando dados salvos — sem internet',
-                                      key: const ValueKey('aviso-dados-salvos'),
-                                      style: TipografiaTrato.legenda
-                                          .copyWith(color: c.sobrePetroleo),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          sinal.value = true;
-                          aoTentarNovamente?.call();
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: c.sobrePetroleo,
-                          minimumSize: const Size(0, 36),
-                          padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x2),
-                        ),
-                        child: const Text('Tentar novamente'),
-                      ),
-                    ],
+                  child: _Conteudo(
+                    dadosSalvos: dadosSalvos ?? EstadoConexao.dadosSalvos,
+                    aoTentar: () {
+                      sinal.value = true;
+                      aoTentarNovamente?.call();
+                    },
                   ),
                 ),
               ),
@@ -92,6 +60,99 @@ class BannerSemConexao extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Ícone, "Sem internet" + "Mostrando dados salvos" e "Tentar novamente". O botão fica na mesma
+/// linha quando os textos cabem inteiros; senão (fonte ampliada, tela estreita) desce para baixo,
+/// alinhado à direita. Nenhum texto quebra no meio.
+class _Conteudo extends StatelessWidget {
+  const _Conteudo({required this.dadosSalvos, required this.aoTentar});
+
+  final ValueNotifier<bool> dadosSalvos;
+  final VoidCallback aoTentar;
+
+  static const _principal = 'Sem internet';
+  static const _secundario = 'Mostrando dados salvos';
+  static const _botao = 'Tentar novamente';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cores;
+    final forte = TipografiaTrato.corpoPequeno.copyWith(
+      color: c.sobrePetroleo,
+      fontWeight: FontWeight.w700,
+    );
+    final fraco = TipografiaTrato.legenda.copyWith(color: c.sobrePetroleo);
+    final acao = TipografiaTrato.corpoPequeno.copyWith(
+      color: c.sobrePetroleo,
+      fontWeight: FontWeight.w700,
+      decoration: TextDecoration.underline,
+      decorationColor: c.sobrePetroleo,
+    );
+    final escala = MediaQuery.textScalerOf(context);
+    final base = DefaultTextStyle.of(context).style;
+    double largura(String texto, TextStyle estilo) {
+      final p = TextPainter(
+        text: TextSpan(text: texto, style: base.merge(estilo)),
+        textDirection: TextDirection.ltr,
+        textScaler: escala,
+        maxLines: 1,
+      )..layout();
+      final w = p.width;
+      p.dispose();
+      return w;
+    }
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: dadosSalvos,
+      builder: (context, salvos, _) => LayoutBuilder(
+        builder: (context, limites) {
+          final textos = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_principal, style: forte),
+              if (salvos)
+                Text(_secundario, key: const ValueKey('aviso-dados-salvos'), style: fraco),
+            ],
+          );
+          final botao = TextButton(
+            onPressed: aoTentar,
+            style: TextButton.styleFrom(
+              foregroundColor: c.sobrePetroleo,
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x1),
+            ),
+            child: Text(_botao, style: acao),
+          );
+          final maiorTexto = [
+            largura(_principal, forte),
+            if (salvos) largura(_secundario, fraco),
+          ].reduce((a, b) => a > b ? a : b);
+          // ícone (18) + 2 espaços (8) + folga do botão (8)
+          final cabe = 18 + EspacosTrato.x2 * 2 + 8 + maiorTexto + largura(_botao, acao) <=
+              limites.maxWidth;
+          final linha = Row(
+            children: [
+              Icon(Icons.wifi_off, size: 18, color: c.sobrePetroleo),
+              const SizedBox(width: EspacosTrato.x2),
+              Expanded(child: textos),
+              if (cabe) ...[const SizedBox(width: EspacosTrato.x2), botao],
+            ],
+          );
+          if (cabe) return linha;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Padding(padding: const EdgeInsets.only(top: EspacosTrato.x1), child: linha),
+              botao,
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -117,23 +178,36 @@ class MoldeConexao extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: estado ?? EstadoConexao.online,
-      builder: (context, online, _) => Column(
-        children: [
-          BannerSemConexao(
-            estado: estado,
-            dadosSalvos: dadosSalvos,
-            aoTentarNovamente: aoTentarNovamente,
+      // Fundo do app atrás de tudo: sem ele a área da barra de status fica preta com o banner.
+      builder: (context, online, _) {
+        final claro = Theme.of(context).brightness == Brightness.light;
+        final arvore = ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Column(
+            children: [
+              BannerSemConexao(
+                estado: estado,
+                dadosSalvos: dadosSalvos,
+                aoTentarNovamente: aoTentarNovamente,
+              ),
+              // A faixa já cuida do recuo do topo; as telas de baixo não repetem.
+              Expanded(
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeTop: !online,
+                  child: child,
+                ),
+              ),
+            ],
           ),
-          // A faixa já cuida do recuo do topo; as telas de baixo não repetem.
-          Expanded(
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: !online,
-              child: child,
-            ),
-          ),
-        ],
-      ),
+        );
+        // Onde não há AppBar (a área do banner), os ícones da barra de status seguem o tema; as
+        // barras das próprias telas continuam mandando nelas. Sempre presente: não recria as telas.
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: claro ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+          child: arvore,
+        );
+      },
     );
   }
 }

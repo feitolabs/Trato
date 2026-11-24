@@ -152,7 +152,7 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
         DropdownButtonFormField<String>(
           initialValue: _solucao,
           isExpanded: true,
-          style: TipografiaTrato.corpo,
+          style: TipografiaTrato.corpo.copyWith(color: context.cores.texto),
           items: [
             for (final s in dados.solucoes) DropdownMenuItem(value: s, child: Text(s)),
           ],

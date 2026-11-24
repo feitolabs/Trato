@@ -30,15 +30,15 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(theme: TemaTrato.claro, home: Scaffold(body: BannerSemConexao(estado: estado))),
       );
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
 
       estado.value = false;
       await tester.pump();
-      expect(find.text('Sem conexão com a internet'), findsOneWidget);
+      expect(find.text('Sem internet'), findsOneWidget);
 
       estado.value = true;
       await tester.pump();
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
     });
 
     testWidgets('"Tentar novamente" some com o banner e avisa quem recarrega', (tester) async {
@@ -56,18 +56,18 @@ void main() {
       await tester.pump();
       expect(recarregou, 1);
       expect(estado.value, isTrue);
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
     });
 
     testWidgets('no app (TratoApp): aparece quando o sinal global cai', (tester) async {
       await tester.pumpWidget(const TratoApp());
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
       EstadoConexao.marcarOffline();
       await tester.pump();
-      expect(find.text('Sem conexão com a internet'), findsOneWidget);
+      expect(find.text('Sem internet'), findsOneWidget);
       EstadoConexao.marcarOnline();
       await tester.pump();
-      expect(find.text('Sem conexão com a internet'), findsNothing);
+      expect(find.text('Sem internet'), findsNothing);
     });
   });
 
