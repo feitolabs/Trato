@@ -20,8 +20,9 @@ from trato.api.modelos import (
     SaldoProfissionalOut,
 )
 from trato.api.servicos import carregar_pedido
-from trato.financeiro import extrato_profissional, periodo
+from trato.financeiro import extrato_profissional, periodo, recibo_pedido
 from trato.financeiro.ledger import CUSTODIA, Conta, Lancamento, a_liberar, liberado
+from trato.pedidos.estados import Estado
 from trato.persistencia.comum import como_uuid
 from trato.rotinas.regras import ConfigRotinas, instante_liberacao
 
@@ -331,4 +332,58 @@ def baixar_meu_extrato_pdf(
         content=conteudo,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{arquivo}"'},
+    )
+
+
+@router.get(
+    "/pedidos/{pedido_id}/recibo.pdf",
+    summary="Baixar o comprovante de serviço do pedido concluído em PDF",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def baixar_recibo_do_pedido(
+    pedido_id: str,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Response:
+    from trato.api.rotas_profissional_cadastro import _nome_abreviado
+
+    pedido = carregar_pedido(contexto, pedido_id, usuario)  # quem não é parte recebe 404
+    if pedido.estado is not Estado.CONCLUIDO:
+        raise HTTPException(409, "O comprovante fica disponível após a conclusão do serviço.")
+    contrato = contexto.contratos.obter_do_pedido(pedido.id)
+    dados_pedido = contexto.pedidos.dados_do_pedido(pedido.id)
+
+    def nome(uid: str | None) -> str:
+        detalhe = contexto.usuarios.detalhe(uid) if uid else None
+        return (_nome_abreviado(detalhe.nome) if detalhe is not None else None) or ""
+
+    categoria_id = (dados_pedido.categoria_id if dados_pedido else None) or (
+        contrato.categoria_id if contrato else None
+    )
+    categoria = _nomes_das_categorias(request).get(str(categoria_id), "") if categoria_id else ""
+    saldo = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
+    numero = _numeros_dos_pedidos(contexto, [pedido.id]).get(pedido.id)
+    codigo = f"PED-{numero}" if numero is not None else pedido.id[:8]
+    dados = recibo_pedido.DadosRecibo(
+        codigo=codigo,
+        titulo=dados_pedido.titulo if dados_pedido else "",
+        categoria=categoria,
+        concluido_em=pedido.concluido_em,
+        cliente_nome=nome(pedido.cliente_id),
+        profissional_nome=nome(pedido.profissional_id),
+        valor_servico_centavos=contrato.valor_centavos if contrato else 0,
+        cliente_pagou_centavos=saldo.cliente_pagou,
+        taxa_trato_centavos=saldo.taxa_trato,
+        liquido_profissional_centavos=saldo.a_liberar + saldo.liberado,
+    )
+    quem = "cliente" if usuario.id == pedido.cliente_id else "profissional"
+    conteudo = recibo_pedido.pdf(dados, quem, contexto.agora())
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="recibo-trato-{codigo}.pdf"',
+            "Cache-Control": "no-store",
+        },
     )
