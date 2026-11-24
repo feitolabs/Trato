@@ -120,6 +120,7 @@ class FiltroBusca:
     nota_minima: float | None = None
     atende_hoje: bool = False
     atende_remoto: bool | None = None
+    disponivel_agora: bool = False
     texto: str | None = None
     # Preenchidos pela rota quando há `texto` para permitir casar categoria/cidade em memória.
     categorias_texto: frozenset[str] = field(default_factory=frozenset)
@@ -145,6 +146,7 @@ class ResultadoBusca:
     cidades: tuple[str, ...] = ()
     bairros: tuple[str, ...] = ()
     atende_remoto: bool = False
+    disponivel_agora: bool = False
     _regioes_ids: tuple[Regiao, ...] = ()
     _portfolio_texto: str = ""
 
@@ -289,6 +291,8 @@ class ProfissionaisEmMemoria:
                 continue
             if filtro.atende_remoto is not None and p.atende_remoto != filtro.atende_remoto:
                 continue
+            if filtro.disponivel_agora and not p.disponivel_agora:
+                continue
             if not _atende(p, filtro):
                 continue
             if hoje is not None and not any(j.dia_semana == hoje for j in p.disponibilidade):
@@ -314,6 +318,7 @@ class ProfissionaisEmMemoria:
                 p.categorias,
                 bairros=bairros,
                 atende_remoto=p.atende_remoto,
+                disponivel_agora=p.disponivel_agora,
                 _regioes_ids=p.regioes,
             )
             concluidos = d.servicos_concluidos if d and d.servicos_concluidos else 0

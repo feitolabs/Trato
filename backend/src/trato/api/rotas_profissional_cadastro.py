@@ -606,6 +606,7 @@ class ProfissionalBuscaOut(BaseModel):
     )
     bairros: list[str] = Field(default_factory=list)
     atende_remoto: bool = False
+    disponivel_agora: bool = False
 
 
 class BuscaProfissionaisOut(BaseModel):
@@ -710,6 +711,7 @@ def buscar_profissionais(
     nota_minima: Annotated[float | None, Query(ge=0.0, le=5.0)] = None,
     atende_hoje: Annotated[bool, Query()] = False,
     atende_remoto: Annotated[bool | None, Query()] = None,
+    disponivel_agora: Annotated[bool, Query()] = False,
     pagina: Annotated[int, Query(ge=1, le=1000)] = 1,
     limite: Annotated[int, Query(ge=1, le=50)] = 20,
     usuario: Usuario = Depends(_pessoa),
@@ -732,6 +734,7 @@ def buscar_profissionais(
         nota_minima=nota_minima,
         atende_hoje=atende_hoje,
         atende_remoto=atende_remoto,
+        disponivel_agora=disponivel_agora,
         texto=q,
         categorias_texto=_categorias_por_tokens(modulo, tokens_texto),
         cidades_texto=_cidades_por_tokens(modulo, tokens_texto),
@@ -762,6 +765,7 @@ def buscar_profissionais(
                 ),
                 bairros=list(r.bairros),
                 atende_remoto=r.atende_remoto,
+                disponivel_agora=r.disponivel_agora,
             )
             for r in achados
         ],

@@ -359,6 +359,8 @@ class ProfissionaisPostgres:
         if filtro.atende_remoto is not None:
             onde.append("p.atende_remoto = %s")
             params.append(filtro.atende_remoto)
+        if filtro.disponivel_agora:
+            onde.append("p.disponivel_agora = true")
         tokens = [t for t in normalizar_busca(filtro.texto or "").split() if t]
         sem_bio = _sem_acento_sql("coalesce(p.bio, '')")
         sem_cat_nome = _sem_acento_sql("cat.nome")
@@ -498,7 +500,7 @@ class ProfissionaisPostgres:
         with self._banco.transacao() as con:
             linhas = con.execute(
                 "select p.usuario_id, u.nome, p.bio, p.nivel_verificacao, p.nota_publica, "  # noqa: S608
-                "p.servicos_concluidos, p.atende_remoto, "
+                "p.servicos_concluidos, p.atende_remoto, p.disponivel_agora, "
                 "coalesce((select array_agg(pc.categoria_id::text "
                 "order by pc.categoria_id) from public.profissional_categorias pc "
                 "where pc.profissional_id = p.usuario_id and pc.suspensa_em is null), '{}') "
@@ -530,6 +532,7 @@ class ProfissionaisPostgres:
                 cidades=tuple(por_id[uid]["cidades"]),
                 bairros=tuple(por_id[uid]["bairros"]),
                 atende_remoto=bool(por_id[uid]["atende_remoto"]),
+                disponivel_agora=bool(por_id[uid]["disponivel_agora"]),
             )
             for uid in pagina
             if uid in por_id
