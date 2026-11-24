@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/denuncia_folha.dart' show MenuDenunciar;
 import 'avatar_de_usuario.dart';
+import 'chips_categorias.dart';
 import 'avatar_iniciais.dart' show SeloVerificacao;
 import 'cartao_avaliacao.dart';
 import 'etiquetas_elogio.dart';
@@ -68,8 +69,10 @@ class PerfilProfissionalTela extends StatelessWidget {
                           const SizedBox(height: EspacosTrato.x1),
                           if (p.verificacao.isNotEmpty) SeloVerificacao(p.verificacao),
                           const SizedBox(height: EspacosTrato.x1),
+                          ChipsCategorias(categorias: p.especialidade),
+                          const SizedBox(height: EspacosTrato.x1),
                           Text(
-                            '${p.especialidade} · no Trato desde ${d.noTratoDesde}',
+                            'no Trato desde ${d.noTratoDesde}',
                             style: TipografiaTrato.corpoPequeno
                                 .copyWith(color: context.cores.textoSecundario),
                           ),

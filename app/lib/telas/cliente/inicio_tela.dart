@@ -224,20 +224,24 @@ class _GradeCategorias extends StatelessWidget {
   final List<CategoriaServico> itens;
   final ValueChanged<CategoriaServico> aoTocar;
 
-  static const _porLinha = 4;
+  /// Com a fonte ampliada (1,3x), 4 colunas deixam ~75 dp por nome e "condicionado" não cabe:
+  /// vira 3 por linha, com o nome em até 2 linhas e reticências.
+  static int _colunas(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(12) / 12 > 1.15 ? 3 : 4;
 
   @override
   Widget build(BuildContext context) {
+    final porLinha = _colunas(context);
     return Column(
       children: [
-        for (var inicio = 0; inicio < itens.length; inicio += _porLinha) ...[
+        for (var inicio = 0; inicio < itens.length; inicio += porLinha) ...[
           if (inicio > 0) const SizedBox(height: EspacosTrato.x2),
           // Cartões da mesma linha com a mesma altura, tenha o nome 1 ou 2 linhas.
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var i = inicio; i < inicio + _porLinha; i++) ...[
+                for (var i = inicio; i < inicio + porLinha; i++) ...[
                   if (i > inicio) const SizedBox(width: EspacosTrato.x2),
                   Expanded(
                     child: i < itens.length

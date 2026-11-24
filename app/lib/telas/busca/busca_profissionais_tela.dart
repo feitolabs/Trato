@@ -7,6 +7,7 @@ import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_de_usuario.dart';
+import '../cliente/chips_categorias.dart';
 import '../cliente/modelos.dart';
 import '../comuns/estados.dart';
 import '../comuns/foco_rolagem.dart';
@@ -484,7 +485,7 @@ class _CartaoResultado extends StatelessWidget {
     final p = profissional;
     return Semantics(
       button: true,
-      label: '${p.nome}, ${p.especialidade}, nota ${p.nota}',
+      label: '${p.nome}, ${descricaoDeCategorias(p.especialidade)}, nota ${formatarNota(p.nota)}',
       excludeSemantics: true,
       child: Material(
         color: context.cores.superficie,
@@ -506,11 +507,8 @@ class _CartaoResultado extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(p.nome, style: TipografiaTrato.tituloCartao),
-                      Text(
-                        p.especialidade,
-                        style: TipografiaTrato.corpoPequeno
-                            .copyWith(color: context.cores.textoSecundario),
-                      ),
+                      const SizedBox(height: EspacosTrato.x1),
+                      ChipsCategorias(categorias: p.especialidade),
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
                         '${p.nota.toStringAsFixed(1).replaceAll('.', ',')} · '

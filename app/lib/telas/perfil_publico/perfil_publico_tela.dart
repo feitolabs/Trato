@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
+import '../cliente/chips_categorias.dart';
 import '../cliente/cartao_avaliacao.dart';
 import '../cliente/etiquetas_elogio.dart';
 import '../cliente/modelos.dart' show formatarNota;
@@ -163,9 +164,10 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                       const SizedBox(height: EspacosTrato.x1),
                       if (p.verificacao != null) SeloVerificacao(p.verificacao!),
                       const SizedBox(height: EspacosTrato.x1),
+                      ChipsCategorias(categorias: p.categoria),
+                      const SizedBox(height: EspacosTrato.x1),
                       Text(
                         [
-                          if (p.categoria.trim().isNotEmpty) p.categoria.trim(),
                           if (p.cidade.trim().isNotEmpty) p.cidade.trim(),
                           'no Trato desde ${p.noTratoDesde}',
                         ].join(' · '),
