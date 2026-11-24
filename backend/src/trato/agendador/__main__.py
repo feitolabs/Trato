@@ -31,7 +31,9 @@ from trato.persistencia.conexao import Banco
 from trato.persistencia.pagamentos import CobrancasPostgres
 
 
-def montar() -> tuple[Agendador, Banco, float]:
+def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
+    """Monta o agendador. `banco` = pool já aberto do processo (agendador embutido na API);
+    sem ele (CLI `python -m trato.agendador`), abre o próprio."""
     config = obter_config()
     if config.trato_persistencia.strip().lower() != "postgres":
         raise SystemExit("O agendador precisa de TRATO_PERSISTENCIA=postgres e DATABASE_URL.")
@@ -39,7 +41,13 @@ def montar() -> tuple[Agendador, Banco, float]:
     if not dsn:
         raise SystemExit("Defina DATABASE_URL no .env.")
     cfg = obter_config_agendador()
-    banco = Banco(dsn, papel=config.trato_banco_papel)
+    if banco is None:
+        banco = Banco(
+            dsn,
+            papel=config.trato_banco_papel,
+            tamanho_min=config.trato_banco_pool_min,
+            tamanho_max=config.trato_banco_pool_max,
+        )
     contexto = criar_contexto_postgres(banco, config)
     cn = obter_config_notificacoes()
     notif = ServicoNotificacoes(

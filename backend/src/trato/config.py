@@ -35,6 +35,11 @@ class Config(BaseSettings):
     database_url: SecretStr = SecretStr("")
     # Papel usado em cada transação (`set local role`); vazio = o usuário da própria URL.
     trato_banco_papel: str = "service_role"
+    # Pool de conexões do processo (UM só `Banco`, dividido entre a API e o agendador embutido).
+    # O pooler do Supabase em modo sessão (5432) aceita 15 clientes no total: com 2 máquinas e
+    # deploy rolling, cada processo precisa de poucas (max 3 + 1 da trava do agendador).
+    trato_banco_pool_min: int = 1
+    trato_banco_pool_max: int = 3
     # Validação do JWT do Supabase Auth: o segredo HS256 OU a URL das chaves públicas (JWKS).
     supabase_jwt_secret: SecretStr = SecretStr("")
     supabase_jwks_url: str = ""

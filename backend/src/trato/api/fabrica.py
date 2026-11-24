@@ -184,15 +184,21 @@ def montar_servico_pagamento(banco: Banco, config: Config) -> ServicoPagamento:
 
 
 def iniciar_agendador_embutido(
-    config: Config, parar: threading.Event, montar: Callable[[], Any] | None = None
+    config: Config,
+    parar: threading.Event,
+    montar: Callable[[], Any] | None = None,
+    banco: Banco | None = None,
 ) -> threading.Thread | None:
     """Liga o agendador num fio do próprio processo. Se não conseguir montar, a API segue de pé
-    (o erro vai para o log) em vez de não subir."""
+    (o erro vai para o log) em vez de não subir. Com `banco`, usa o MESMO pool da API (não abre
+    outro: o pooler do Supabase tem poucas conexões)."""
     try:
         if montar is None:
             from trato.agendador.__main__ import montar as montar_padrao
 
-            montar = montar_padrao
+            def montar() -> Any:
+                return montar_padrao(banco)
+
         agendador, banco_agendador, intervalo = montar()
     except (Exception, SystemExit):
         logging.getLogger(__name__).exception("Agendador embutido não subiu")
@@ -202,7 +208,8 @@ def iniciar_agendador_embutido(
         try:
             agendador.rodar_sempre(parar, intervalo)
         finally:
-            banco_agendador.fechar()
+            if banco_agendador is not banco:  # o pool compartilhado quem fecha é a API
+                banco_agendador.fechar()
 
     fio = threading.Thread(target=laco, name="agendador", daemon=True)
     fio.start()
@@ -225,13 +232,23 @@ def criar_app_da_config(config: Config | None = None) -> FastAPI:
     dsn = config.database_url.get_secret_value()
     if not dsn:
         raise RuntimeError("Defina DATABASE_URL no .env para usar TRATO_PERSISTENCIA=postgres.")
-    banco = Banco(dsn, papel=config.trato_banco_papel, abrir=False)
+    banco = Banco(
+        dsn,
+        papel=config.trato_banco_papel,
+        tamanho_min=config.trato_banco_pool_min,
+        tamanho_max=config.trato_banco_pool_max,
+        abrir=False,
+    )
 
     @asynccontextmanager
     async def ciclo(_: FastAPI) -> AsyncIterator[None]:
         banco.abrir()
         parar = threading.Event()
-        fio = iniciar_agendador_embutido(config, parar) if config.trato_agendador_embutido else None
+        fio = (
+            iniciar_agendador_embutido(config, parar, banco=banco)
+            if config.trato_agendador_embutido
+            else None
+        )
         try:
             yield
         finally:
