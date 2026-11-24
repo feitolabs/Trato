@@ -300,6 +300,40 @@ class ExecutorContexto:
 
         return liberar_vencidas(c, agora, situacao, avisar)
 
+    def gerar_visitas_recorrentes(self, agora: datetime) -> int:
+        """Gera a próxima visita (e o pedido dela) das séries recorrentes ativas.
+
+        Não cobra nada: o cliente aprova o orçamento e paga a visita. Sem pagamento até o limite
+        configurado, a visita expira e a agenda do profissional é liberada. Devolve quantas
+        visitas gerou.
+        """
+        from trato.api.recorrencias import (
+            cancelar_pedido_da_visita,
+            fechar_visitas,
+            gerar_visitas,
+        )
+
+        c = self._c
+
+        def avisar(rec: Any, visita: Any) -> None:
+            if self._notif is None:
+                return
+            try:
+                self._notif.notificar(
+                    Evento.RECORRENCIA_VISITA,
+                    rec.cliente_id,
+                    chave=f"recorrencia:{rec.id}:visita:{visita.id}",
+                    pedido_id=visita.pedido_id,
+                )
+            except Exception:  # noqa: BLE001 - aviso é secundário à geração
+                log.exception("Aviso de visita recorrente falhou (%s)", visita.id)
+
+        geradas = gerar_visitas(c, agora, avisar)
+        _, expiradas = fechar_visitas(c, agora, lambda r, p: cancelar_pedido_da_visita(c, r, p))
+        if expiradas:
+            log.info("Visitas recorrentes expiradas por falta de pagamento: %s", expiradas)
+        return geradas
+
     def executar(self, acao: AcaoRotina, agora: datetime) -> None:
         if acao.tipo is TipoAcaoRotina.TRANSICIONAR:
             self._transicionar(acao, agora)

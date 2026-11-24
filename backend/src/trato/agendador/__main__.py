@@ -60,6 +60,7 @@ def montar() -> tuple[Agendador, Banco, float]:
         executor.expirar_reservas_moedas,
         executor.expirar_exclusividades,
         executor.liberar_indicacoes,
+        executor.gerar_visitas_recorrentes,
     )
     return agendador, banco, cfg.intervalo_segundos
 

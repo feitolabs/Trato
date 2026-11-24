@@ -39,6 +39,8 @@ class Evento(StrEnum):
     A_CAMINHO = "agenda.a_caminho"
     REAGENDAMENTO_PROPOSTO = "agenda.reagendamento_proposto"
     INDICACAO_LIBERADA = "indicacao.liberada"
+    RECORRENCIA_ATUALIZADA = "recorrencia.atualizada"
+    RECORRENCIA_VISITA = "recorrencia.visita"
     REAGENDAMENTO_RESPONDIDO = "agenda.reagendamento_respondido"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
     SERVICO_INICIADO = "execucao.iniciado"
@@ -147,6 +149,19 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Serviço iniciado sem código",
         "O profissional iniciou o serviço sem o código e registrou foto, localização e "
         "justificativa.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.RECORRENCIA_ATUALIZADA: ModeloEvento(
+        Categoria.AGENDA,
+        "Serviço recorrente",
+        "Há uma novidade no seu serviço recorrente. Veja no app.",
+        "recorrencias",
+    ),
+    Evento.RECORRENCIA_VISITA: ModeloEvento(
+        Categoria.AGENDA,
+        "Próxima visita do serviço recorrente",
+        "Sua próxima visita está chegando. Aprove o orçamento e pague para confirmar.",
         "pedido",
         essencial=True,
     ),

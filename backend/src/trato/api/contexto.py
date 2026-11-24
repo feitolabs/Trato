@@ -102,6 +102,7 @@ def _repasses_em_memoria() -> RepositorioRepasses:
 from trato.api.denuncias import DenunciasEmMemoria  # noqa: E402
 from trato.api.exclusividades import ExclusividadesEmMemoria  # noqa: E402
 from trato.api.indicacoes import IndicacoesEmMemoria, gancho_indicacoes  # noqa: E402
+from trato.api.recorrencias import RecorrenciasEmMemoria  # noqa: E402
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
 from trato.api.reagendamentos import ReagendamentosEmMemoria  # noqa: E402
 from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
@@ -140,6 +141,8 @@ class Contexto:
     denuncias: Any = field(default_factory=lambda: DenunciasEmMemoria())
     # Indique e Ganhe Tratinhos (tabelas `codigos_indicacao` e `indicacoes`).
     indicacoes: Any = field(default_factory=lambda: IndicacoesEmMemoria())
+    # Serviço recorrente (tabelas recorrencias e recorrencia_visitas).
+    recorrencias: Any = field(default_factory=lambda: RecorrenciasEmMemoria())
     # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
     ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
