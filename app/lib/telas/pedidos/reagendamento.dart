@@ -393,6 +393,29 @@ class _CartaoProposta extends StatelessWidget {
   final VoidCallback aoAceitar;
   final VoidCallback aoRecusar;
 
+  /// Cancelar a própria proposta pede confirmação antes de chamar o servidor.
+  Future<void> _confirmarCancelamento(BuildContext context) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        title: const Text('Cancelar a proposta?'),
+        content: const Text('A outra pessoa deixa de ver essa nova data.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogo).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirmar-cancelar-proposta'),
+            onPressed: () => Navigator.of(dialogo).pop(true),
+            child: const Text('Cancelar proposta'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou == true) aoRecusar();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.cores;
@@ -423,7 +446,7 @@ class _CartaoProposta extends StatelessWidget {
             BotaoSecundario(
               key: const ValueKey('cancelar-proposta'),
               texto: 'Cancelar proposta',
-              aoTocar: ocupado ? null : aoRecusar,
+              aoTocar: ocupado ? null : () => _confirmarCancelamento(context),
             )
           else ...[
             BotaoPrimario(

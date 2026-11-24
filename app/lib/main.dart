@@ -11,6 +11,7 @@ import 'telas/auth/nova_senha_tela.dart';
 import 'dados/cliente_api.dart';
 import 'componentes/banner_sem_conexao.dart';
 import 'dados/config.dart';
+import 'dados/monitor_conexao.dart';
 import 'dados/fila_offline.dart';
 import 'dados/fila_offline_arquivo.dart';
 import 'dados/repositorios_trato.dart';
@@ -100,6 +101,12 @@ Future<void> main() async {
     fila: await _abrirFilaOffline(),
   );
   RotasTrato.folhaCartao = FolhaCartaoStripe();
+  // Sem internet, testa a rede de tempos em tempos; ao voltar, recarrega as telas com dados novos.
+  final sondaApi = ClienteApi(urlBase: config.apiUrl, sessao: sessaoTrato);
+  MonitorConexao(
+    sonda: () => sondaApi.get('/v1/config/publica'),
+    aoReconectar: () => RotasTrato.pedidosMudaram.value++,
+  );
   LigacaoSessao(
     ServicoAuthPadrao.atual,
     sessaoTrato,
@@ -170,17 +177,10 @@ class TratoApp extends StatelessWidget {
         darkTheme: TemaTrato.escuro,
         themeMode: themeMode ?? ControladorTema.instancia.modo,
         builder: (context, filho) => EscalaFonteLimitada(
-          child: Stack(
-            children: [
-              filho!,
-              // Faixa discreta; só aparece quando a camada de API perde a rede.
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: BannerSemConexao(aoTentarNovamente: () => RotasTrato.pedidosMudaram.value++),
-              ),
-            ],
+          // Faixa de "sem conexão" no topo, empurrando o app para baixo (não cobre a AppBar).
+          child: MoldeConexao(
+            aoTentarNovamente: () => RotasTrato.pedidosMudaram.value++,
+            child: filho!,
           ),
         ),
         home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),

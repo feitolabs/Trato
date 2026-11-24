@@ -282,6 +282,10 @@ void main() {
       expect(find.text('Recusar'), findsNothing);
       await tester.tap(find.text('Cancelar proposta'));
       await tester.pumpAndSettle();
+      // Pede confirmação antes de chamar o servidor.
+      expect(mundo.chamadas, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('confirmar-cancelar-proposta')));
+      await tester.pumpAndSettle();
       expect(mundo.chamadas, ['recusar:r1']);
     });
 

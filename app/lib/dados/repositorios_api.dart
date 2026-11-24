@@ -1664,11 +1664,17 @@ class RepositorioChatApi implements RepositorioChat {
   }
 
   @override
-  Future<void> enviar(String pedidoId, String texto, {String? profissionalId}) async {
+  Future<void> enviar(
+    String pedidoId,
+    String texto, {
+    String? profissionalId,
+    String? chaveIdempotencia,
+  }) async {
     await _api.post(
       '/v1/pedidos/$pedidoId/mensagens',
       consulta: _consulta(profissionalId),
       corpo: {'texto': texto},
+      chaveIdempotencia: chaveIdempotencia,
     );
   }
 

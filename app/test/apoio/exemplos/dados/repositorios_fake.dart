@@ -514,7 +514,12 @@ class RepositorioChatFake implements RepositorioChat {
       _obter(pedidoId);
 
   @override
-  Future<void> enviar(String pedidoId, String texto, {String? profissionalId}) async {
+  Future<void> enviar(
+    String pedidoId,
+    String texto, {
+    String? profissionalId,
+    String? chaveIdempotencia,
+  }) async {
     enviadas.add(texto);
     final chave = _normalizarId(pedidoId);
     final atual = _obter(chave);

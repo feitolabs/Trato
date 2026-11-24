@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'cache_leitura.dart';
 import 'erros.dart';
 import 'estado_conexao.dart';
 import 'sessao.dart';
@@ -18,7 +19,14 @@ class ClienteApi {
     http.Client? cliente,
     this.tempoLimite = const Duration(seconds: 15),
     this.intervaloBaseRetry = const Duration(milliseconds: 200),
-  }) : _cliente = cliente ?? http.Client();
+    this.cache,
+  }) : _cliente = cliente ?? http.Client() {
+    // Sair da conta apaga as leituras guardadas deste aparelho.
+    if (cache != null) sessao.aoSair.add(() => unawaited(cache!.limpar()));
+  }
+
+  /// Últimas leituras para mostrar sem internet (opcional).
+  final CacheLeitura? cache;
 
   final String urlBase;
   final SessaoTrato sessao;
@@ -156,7 +164,20 @@ class ClienteApi {
       _semRede();
     }
 
-    var resposta = await executarComRetry();
+    http.Response resposta;
+    try {
+      resposta = await executarComRetry();
+    } on ErroTrato catch (e) {
+      // Sem internet numa leitura: mostra a última resposta guardada, se houver.
+      if (metodo == 'GET' && e.tipo == TipoErro.semInternet) {
+        final guardado = await _lerDoCache(caminho, consulta);
+        if (guardado.achou) {
+          EstadoConexao.dadosSalvos.value = true;
+          return guardado.valor;
+        }
+      }
+      rethrow;
+    }
     // 401 com sessão: tenta renovar o token uma vez e repete a chamada (mesma chave de
     // idempotência, então não duplica). Se não renovar, `_tratar` limpa a sessão.
     if (resposta.statusCode == 401 && sessao.logada) {
@@ -164,7 +185,26 @@ class ClienteApi {
       final novo = await sessao.renovarToken();
       if (novo != null && novo != anterior) resposta = await tentar();
     }
-    return _tratar(resposta);
+    final resultado = _tratar(resposta);
+    if (metodo == 'GET') _guardarNoCache(caminho, consulta, resultado);
+    return resultado;
+  }
+
+  Future<({bool achou, Object? valor})> _lerDoCache(
+    String caminho,
+    Map<String, String>? consulta,
+  ) async {
+    try {
+      return await cache?.buscar(caminho, consulta) ?? (achou: false, valor: null);
+    } on Object {
+      return (achou: false, valor: null);
+    }
+  }
+
+  void _guardarNoCache(String caminho, Map<String, String>? consulta, Object? json) {
+    final c = cache;
+    if (c == null) return;
+    unawaited(c.guardar(caminho, consulta, json).catchError((Object _) {}));
   }
 
   /// Falha de rede: avisa o banner "Sem conexão" e lança o erro de sempre.

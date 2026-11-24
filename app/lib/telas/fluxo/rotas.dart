@@ -276,12 +276,16 @@ abstract final class RotasTrato {
 
   static void _aviso(BuildContext context, Object erro) {
     final texto = erro is ErroTrato
-        ? erro.mensagem
+        // Ação que precisa do servidor (pagar, cancelar, aceitar...): sem internet, aviso humano.
+        ? (erro.tipo == TipoErro.semInternet ? avisoAcaoSemInternet : erro.mensagem)
         : erro is ErroFolhaCartao
             ? erro.mensagem
             : 'Algo deu errado. Tente de novo.';
     _mostrarToast(context, texto, icone: Icons.error_outline);
   }
+
+  /// Aviso de ação que só funciona com internet (pagamento, cancelamento, aceite de orçamento).
+  static const avisoAcaoSemInternet = 'Sem internet. Conecte-se para concluir esta ação.';
 
   static void _avisoSimples(BuildContext context, String texto) {
     _mostrarToast(context, texto, icone: Icons.info_outline);
@@ -2588,6 +2592,11 @@ abstract final class RotasTrato {
   @visibleForTesting
   static Widget pagamentoParaTeste(String pedidoId) => _pagamento(pedidoId);
 
+  /// Para teste: roda uma ação como as telas de ação do app (aviso humano se faltar internet).
+  @visibleForTesting
+  static Future<bool> tentarParaTeste(BuildContext context, Future<void> Function() acao) =>
+      _tentar(context, acao);
+
   @visibleForTesting
   static Future<void> baixarReciboPdfParaTeste(BuildContext context, String pedidoId) =>
       _baixarReciboPdf(context, pedidoId);
@@ -3131,6 +3140,21 @@ abstract final class RotasTrato {
               () => repos.chat.enviar(pedidoId, texto, profissionalId: profissionalId),
             );
             if (!ok) throw StateError('Falha ao enviar mensagem');
+          },
+          // Com chave: sem internet a mensagem espera e sai sozinha depois, sem duplicar.
+          aoEnviarIdempotente: (texto, chave) async {
+            try {
+              await repos.chat.enviar(
+                pedidoId,
+                texto,
+                profissionalId: profissionalId,
+                chaveIdempotencia: chave,
+              );
+            } on ErroTrato catch (e) {
+              if (e.tipo == TipoErro.semInternet) rethrow;
+              if (context.mounted) _aviso(context, e);
+              throw StateError('Falha ao enviar mensagem');
+            }
           },
           aoEnviarFoto: (ref) async {
             final ok = await _tentar(

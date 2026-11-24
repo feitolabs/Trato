@@ -323,7 +323,14 @@ abstract interface class RepositorioChat {
 
   /// `GET /v1/pedidos/{pedido_id}/perfil-cliente`. Nulo em modo demo ou backend antigo.
   Future<ResumoPerfilCliente?> perfilClienteDoPedido(String pedidoId) async => null;
-  Future<void> enviar(String pedidoId, String texto, {String? profissionalId});
+  /// [chaveIdempotencia]: mesma chave em cada tentativa da mesma mensagem, para o backend não
+  /// duplicar quando o reenvio acontece depois de a internet voltar.
+  Future<void> enviar(
+    String pedidoId,
+    String texto, {
+    String? profissionalId,
+    String? chaveIdempotencia,
+  });
   Future<void> enviarFoto(String pedidoId, String referencia, {String? profissionalId});
   Future<void> proporAgenda(
     String pedidoId,

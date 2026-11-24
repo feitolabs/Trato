@@ -15,6 +15,7 @@ import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
+import 'cache_leitura.dart';
 import 'cliente_api.dart';
 import 'config_publica.dart';
 import 'fila_offline.dart';
@@ -143,7 +144,12 @@ class RepositoriosTrato {
     if (!config.usaApi) {
       throw StateError('App sem API configurada: passe TRATO_MODO=api e TRATO_API_URL.');
     }
-    final api = ClienteApi(urlBase: config.apiUrl, sessao: sessao);
+    // Últimas leituras por usuário, para mostrar sem internet (limpas ao sair da conta).
+    final api = ClienteApi(
+      urlBase: config.apiUrl,
+      sessao: sessao,
+      cache: CacheLeitura(CacheArquivo(), usuarioId: () => sessao.usuarioId),
+    );
     final upload = criarUpload?.call(api);
     return RepositoriosTrato.api(
       api,

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Sessão do usuário. Guarda só o token que o serviço de login entrega; quem faz o login
 /// (`ServicoAuth`) chama [entrar]/[sair]. Nunca grava token em código ou log.
 class SessaoTrato {
@@ -11,6 +13,26 @@ class SessaoTrato {
   Future<String?> Function()? renovar;
 
   String? get token => _token;
+
+  /// Id do usuário (`sub` do token), só para separar o cache de leitura de cada conta. Nulo se o
+  /// token não for um JWT legível. Não guarda nada.
+  String? get usuarioId {
+    final t = _token;
+    if (t == null) return null;
+    final partes = t.split('.');
+    if (partes.length != 3) return null;
+    try {
+      final json = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(partes[1]))));
+      final sub = json is Map ? json['sub'] : null;
+      return sub is String && sub.isNotEmpty ? sub : null;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// Avisados ao sair (logout ou sessão expirada): ex. limpar o cache de leitura.
+  final List<void Function()> aoSair = [];
+
   bool get logada => _token != null && _token!.isNotEmpty;
 
   /// Tenta renovar o token (uma tentativa de cada vez, mesmo com várias chamadas em paralelo).
@@ -29,13 +51,27 @@ class SessaoTrato {
   Future<String?>? _renovando;
 
   void entrar(String token) => _token = token;
-  void sair() => _token = null;
+  void sair() {
+    _token = null;
+    _avisarSaida();
+  }
+
+  void _avisarSaida() {
+    for (final f in List.of(aoSair)) {
+      try {
+        f();
+      } on Object {
+        // limpeza é secundária
+      }
+    }
+  }
 
   /// A API respondeu 401: limpa o token e avisa uma vez só (várias chamadas em paralelo
   /// recebem 401 juntas).
   void expirar() {
     if (!logada) return;
     _token = null;
+    _avisarSaida();
     aoExpirar?.call();
   }
 }

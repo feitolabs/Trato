@@ -3,6 +3,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../dados/erros.dart';
+import '../../dados/estado_conexao.dart';
 import '../../dados/repositorios.dart' show ResumoPerfilCliente;
 import '../../tema/tema.dart';
 import '../comuns/denuncia_folha.dart' show MenuDenunciar;
@@ -19,6 +21,7 @@ class ChatPedidoTela extends StatefulWidget {
     super.key,
     required this.conversa,
     this.aoEnviar,
+    this.aoEnviarIdempotente,
     this.aoTocarCamera,
     this.aoCapturarFoto,
     this.aoEnviarFoto,
@@ -36,6 +39,11 @@ class ChatPedidoTela extends StatefulWidget {
 
   final ConversaPedido conversa;
   final FutureOr<void> Function(String)? aoEnviar;
+
+  /// Envio com chave de idempotência: sem internet a mensagem fica "Aguardando conexão" e é
+  /// reenviada sozinha, com a mesma chave, quando a conexão volta (sem duplicar). Se vier, vale
+  /// no lugar de [aoEnviar]; deve lançar [ErroTrato] (`semInternet`) quando não houver rede.
+  final FutureOr<void> Function(String texto, String chave)? aoEnviarIdempotente;
   final VoidCallback? aoTocarCamera;
   final Future<String?> Function()? aoCapturarFoto;
   final FutureOr<void> Function(String)? aoEnviarFoto;
@@ -84,10 +92,16 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   int _enviosPendentes = 0;
   Timer? _relogio;
 
+  /// Mensagens que esperam a internet voltar (na ordem do envio), com a chave de idempotência.
+  final Map<MensagemChat, ({String conteudo, String chave})> _aguardando = Map.identity();
+  var _reenviando = false;
+  var _contadorChave = 0;
+
   @override
   void initState() {
     super.initState();
     _garantirPreferenciaSugestoes();
+    EstadoConexao.online.addListener(_aoMudarConexao);
     if (widget.aoRecarregar != null) {
       unawaited(_sincronizar());
       _relogio = Timer.periodic(widget.intervaloAtualizacao, (_) => _sincronizar());
@@ -100,7 +114,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     if (oldWidget.conversa != widget.conversa) {
       _conversa = widget.conversa;
       if (_conversa.mensagens.length >= _mensagens.length - _enviosPendentes) {
-        _mensagens = [..._conversa.mensagens];
+        _mensagens = [..._conversa.mensagens, ..._aguardando.keys];
       }
       _garantirPreferenciaSugestoes();
     }
@@ -115,7 +129,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       setState(() {
         _conversa = atualizada;
         if (atualizada.mensagens.length >= _mensagens.length - _enviosPendentes) {
-          _mensagens = [...atualizada.mensagens];
+          _mensagens = [...atualizada.mensagens, ..._aguardando.keys];
         }
       });
       _garantirPreferenciaSugestoes();
@@ -126,6 +140,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
 
   @override
   void dispose() {
+    EstadoConexao.online.removeListener(_aoMudarConexao);
     _relogio?.cancel();
     _controlador.dispose();
     super.dispose();
@@ -144,13 +159,26 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       hora: widget.horaAgora(),
       minha: true,
     );
+    final chave = 'msg-${DateTime.now().microsecondsSinceEpoch}-${_contadorChave++}';
     setState(() {
       _mensagens.add(otimista);
       _enviosPendentes++;
       if (digitada) _controlador.clear();
     });
+    var aguardar = false;
     try {
-      await widget.aoEnviar?.call(conteudo);
+      await _despachar(conteudo, chave);
+    } on ErroTrato catch (e) {
+      if (e.tipo == TipoErro.semInternet && widget.aoEnviarIdempotente != null) {
+        // Sem internet: a mensagem fica na tela como "Aguardando conexão" e sai sozinha depois.
+        aguardar = true;
+        if (mounted) setState(() => _aguardando[otimista] = (conteudo: conteudo, chave: chave));
+      } else if (mounted) {
+        setState(() {
+          _mensagens.remove(otimista);
+          if (digitada && _controlador.text.isEmpty) _controlador.text = conteudo;
+        });
+      }
     } on Object {
       if (mounted) {
         setState(() {
@@ -162,7 +190,53 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       }
     } finally {
       _emVoo.remove(conteudo);
-      _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+      if (!aguardar) _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+    }
+  }
+
+  Future<void> _despachar(String conteudo, String chave) async {
+    final idempotente = widget.aoEnviarIdempotente;
+    if (idempotente != null) {
+      await idempotente(conteudo, chave);
+    } else {
+      await widget.aoEnviar?.call(conteudo);
+    }
+  }
+
+  void _aoMudarConexao() {
+    if (EstadoConexao.online.value && _aguardando.isNotEmpty) unawaited(_reenviarAguardando());
+  }
+
+  /// A internet voltou: reenvia na ordem, com a mesma chave de cada mensagem.
+  Future<void> _reenviarAguardando() async {
+    if (_reenviando) return;
+    _reenviando = true;
+    try {
+      for (final e in _aguardando.entries.toList()) {
+        try {
+          await _despachar(e.value.conteudo, e.value.chave);
+          if (!mounted) return;
+          setState(() => _aguardando.remove(e.key));
+          _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+        } on ErroTrato catch (erro) {
+          if (erro.tipo == TipoErro.semInternet) return; // continua esperando
+          if (!mounted) return;
+          setState(() {
+            _aguardando.remove(e.key);
+            _mensagens.remove(e.key);
+          });
+          _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+        } on Object {
+          if (!mounted) return;
+          setState(() {
+            _aguardando.remove(e.key);
+            _mensagens.remove(e.key);
+          });
+          _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+        }
+      }
+    } finally {
+      _reenviando = false;
     }
   }
 
@@ -259,7 +333,8 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
                       await _sincronizar();
                     },
             ),
-            const _AvisoPrivacidade(),
+            // Com o teclado aberto o espaço é curto: o aviso volta quando ele fecha.
+            if (MediaQuery.viewInsetsOf(context).bottom == 0) const _AvisoPrivacidade(),
             Expanded(
               child: ConteudoResponsivo(
                 child: ListView(
@@ -314,6 +389,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
 
     return _LinhaMensagem(
       mensagem: m,
+      aguardandoConexao: _aguardando.containsKey(m),
       podeAceitarProposta: podeAceitar,
       aoAceitarContraproposta: widget.aoAceitarContraproposta == null
           ? null
@@ -520,6 +596,7 @@ class _LinhaMensagem extends StatelessWidget {
   const _LinhaMensagem({
     required this.mensagem,
     required this.podeAceitarProposta,
+    this.aguardandoConexao = false,
     this.aoAceitarContraproposta,
     this.aoAceitarProposta,
     this.aoAceitarAgenda,
@@ -527,6 +604,9 @@ class _LinhaMensagem extends StatelessWidget {
 
   final MensagemChat mensagem;
   final bool podeAceitarProposta;
+
+  /// Enviada sem internet: espera a conexão para sair.
+  final bool aguardandoConexao;
   final Future<void> Function(ContrapropostaChat)? aoAceitarContraproposta;
   final Future<void> Function(ContrapropostaChat)? aoAceitarProposta;
   final Future<void> Function(MensagemChat)? aoAceitarAgenda;
@@ -659,6 +739,16 @@ class _LinhaMensagem extends StatelessWidget {
           const SizedBox(height: EspacosTrato.x1),
           if (!minha)
             Text(mensagem.hora, style: legendaHora)
+          else if (aguardandoConexao)
+            Row(
+              key: const ValueKey('aguardando-conexao'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule, size: 14, color: context.cores.textoSecundario),
+                const SizedBox(width: EspacosTrato.x1),
+                Text('Aguardando conexão', style: legendaHora),
+              ],
+            )
           else
             // Pinzinho de quem mandou: ✓ enviada · ✓✓ cinza recebida · ✓✓ azul visualizada.
             Semantics(
