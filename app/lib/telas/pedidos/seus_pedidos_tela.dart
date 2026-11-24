@@ -318,10 +318,10 @@ class _SeusPedidosTelaState extends State<SeusPedidosTela> {
             texto: _filtros.temAtivos
                 ? 'Nenhum pedido corresponde aos filtros selecionados.'
                 : 'Não achamos "${_busca.text.trim()}" nesta aba.',
-            textoAcao: _filtros.temAtivos ? 'Limpar filtros' : null,
+            textoAcao: _filtros.temAtivos ? 'Limpar filtros' : 'Limpar busca',
             aoAcao: _filtros.temAtivos
                 ? () => setState(() => _filtros = const _FiltrosPedidos())
-                : null,
+                : () => setState(_busca.clear),
           )
         else
           for (final pedido in pedidos) ...[

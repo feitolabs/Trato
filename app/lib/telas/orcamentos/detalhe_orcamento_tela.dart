@@ -25,6 +25,7 @@ class DetalheOrcamentoTela extends StatefulWidget {
     this.aoConversar,
     this.aoVerPerfil,
     this.contrato = false,
+    this.somenteLeitura = false,
     this.dadosContrato,
     this.aoVerTermos,
   });
@@ -38,6 +39,10 @@ class DetalheOrcamentoTela extends StatefulWidget {
   /// Mostra o orçamento aceito como o contrato do serviço: só leitura, sem aceitar,
   /// contraproposta nem a caixa de "li e aceito".
   final bool contrato;
+
+  /// Orçamento que não aceita mais ação (o pedido já tem orçamento aceito): sem aceitar, contraproposta
+  /// nem recusar, para não gerar erro 409 do backend.
+  final bool somenteLeitura;
 
   final Orcamento orcamento;
   final dynamic Function(Orcamento)? aoAceitar;
@@ -137,7 +142,7 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
           const SizedBox(width: EspacosTrato.x2),
         ],
       ],
-      rodape: widget.contrato
+      rodape: (widget.contrato || widget.somenteLeitura)
           ? null
           : Column(
               mainAxisSize: MainAxisSize.min,
@@ -308,6 +313,13 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
             'Este é o orçamento que você aceitou: ele vale como o contrato do serviço '
             '(escopo, valor e garantia).',
             key: const ValueKey('aviso-contrato'),
+            style: TipografiaTrato.corpo,
+          ),
+        ] else if (widget.somenteLeitura) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          Text(
+            'Este orçamento não está mais disponível para aceite: o pedido já tem um orçamento aceito.',
+            key: const ValueKey('aviso-somente-leitura'),
             style: TipografiaTrato.corpo,
           ),
         ] else ...[

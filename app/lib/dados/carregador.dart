@@ -39,6 +39,7 @@ class Carregador<T> extends StatefulWidget {
     this.vazio,
     this.tituloVazio = 'Nada por aqui ainda',
     this.textoVazio = '',
+    this.textoAcaoVazio,
     this.atualizarQuando,
     this.atualizarACada,
   });
@@ -60,6 +61,9 @@ class Carregador<T> extends StatefulWidget {
   final bool Function(T dado)? vazio;
   final String tituloVazio;
   final String textoVazio;
+
+  /// Botão do estado vazio (ex.: "Atualizar"), que recarrega. Sem isso, o vazio fica só com texto.
+  final String? textoAcaoVazio;
 
   @override
   State<Carregador<T>> createState() => _CarregadorState<T>();
@@ -208,7 +212,12 @@ class _CarregadorState<T> extends State<Carregador<T>> {
     if (widget.vazio?.call(dado) ?? false) {
       return RefreshIndicator(
         onRefresh: _atualizarEmSilencio,
-        child: EstadoTela(titulo: widget.tituloVazio, texto: widget.textoVazio),
+        child: EstadoTela(
+          titulo: widget.tituloVazio,
+          texto: widget.textoVazio,
+          aoTentarNovamente: widget.textoAcaoVazio == null ? null : _recarregar,
+          textoBotao: widget.textoAcaoVazio ?? 'Tentar de novo',
+        ),
       );
     }
     return AtualizadorTela(
@@ -227,6 +236,7 @@ class EstadoTela extends StatelessWidget {
     this.titulo,
     this.texto,
     this.aoTentarNovamente,
+    this.textoBotao = 'Tentar de novo',
   });
 
   final bool carregando;
@@ -234,6 +244,7 @@ class EstadoTela extends StatelessWidget {
   final String? titulo;
   final String? texto;
   final VoidCallback? aoTentarNovamente;
+  final String textoBotao;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +299,7 @@ class EstadoTela extends StatelessWidget {
                                   if (aoTentarNovamente != null) ...[
                                     const SizedBox(height: EspacosTrato.x4),
                                     BotaoSecundario(
-                                      texto: 'Tentar de novo',
+                                      texto: textoBotao,
                                       aoTocar: aoTentarNovamente,
                                     ),
                                   ],

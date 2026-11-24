@@ -2338,91 +2338,114 @@ abstract final class RotasTrato {
         vazio: (o) => o.orcamentos.isEmpty,
         tituloVazio: 'Ainda sem orçamentos',
         textoVazio: 'Avisamos quando os profissionais responderem.',
-        construir: (context, dados) => OrcamentosRecebidosTela(
-          pedido: dados.pedido,
-          orcamentos: dados.orcamentos,
-          aoVerOrcamento: (orcamento) => _abrir<void>(
-            context,
-            // O protótipo só traz o detalhe de alguns orçamentos.
-            orcamento.detalhe == null
-                ? _PerfilAoAbrir(orcamento: orcamento)
-                : _DetalheOrcamentoAtualizado(
-                    pedidoId: pedidoId,
-                    inicial: orcamento,
-                    construir: (orcamento) => DetalheOrcamentoTela(
-                      orcamento: orcamento,
-                      aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
-                      aoConversar: (o) => _abrir<void>(
-                        context,
-                        _chat(
-                          pedidoId,
-                          profissionalId: o.profissionalId,
-                          comoProfissional: false,
-                        ),
-                      ),
-                      aoFazerContraproposta: (o) async {
-                        final proposta = await pedirContrapropostaCompleta(
-                          context,
-                          atualCentavos: o.totalCentavos,
-                        );
-                        if (proposta == null || !context.mounted) return;
-                        final ok = await _tentar(
-                          context,
-                          () => repos.orcamentos.contraproporValor(
-                            pedidoId,
-                            o.id,
-                            proposta.valorCentavos,
-                            prazoExecucaoDias: proposta.prazoExecucaoDias,
-                            mensagem: proposta.mensagem,
-                          ),
-                        );
-                        if (ok && context.mounted) {
-                          pedidosMudaram.value++;
-                          await _abrirSucesso<void>(
-                            context,
-                            (ctxSucesso) => SucessoAcaoTela(
-                              titulo: 'Contraproposta enviada!',
-                              subtitulo:
-                                  'O profissional recebeu sua proposta na conversa e pode aceitar ou responder.',
-                              textoBotaoPrimario: 'Abrir conversa',
-                              aoTocarPrimario: () => Navigator.of(ctxSucesso).pushReplacement(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => _chat(pedidoId,
-                                      profissionalId: o.profissionalId, comoProfissional: false),
+        textoAcaoVazio: 'Atualizar',
+        construir: (context, dados) {
+          // Já há orçamento aceito: os outros ficam só para leitura (aceitar/recusar dá 409).
+          final jaTemAceito = dados.orcamentos.any((o) => o.aceito);
+          return OrcamentosRecebidosTela(
+            pedido: dados.pedido,
+            orcamentos: dados.orcamentos,
+            aoVerOrcamento: (orcamento) => _abrir<void>(
+              context,
+              // O protótipo só traz o detalhe de alguns orçamentos.
+              orcamento.detalhe == null
+                  ? _PerfilAoAbrir(orcamento: orcamento)
+                  : _DetalheOrcamentoAtualizado(
+                      pedidoId: pedidoId,
+                      inicial: orcamento,
+                      construir: (orcamento) => orcamento.aceito || jaTemAceito
+                          ? DetalheOrcamentoTela(
+                              orcamento: orcamento,
+                              contrato: orcamento.aceito,
+                              somenteLeitura: !orcamento.aceito,
+                              aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
+                              aoVerTermos: () => abrirTermos(context),
+                              aoConversar: (o) => _abrir<void>(
+                                context,
+                                _chat(
+                                  pedidoId,
+                                  profissionalId: o.profissionalId,
+                                  comoProfissional: false,
                                 ),
                               ),
-                              textoBotaoSecundario: 'Voltar ao início',
-                              aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+                            )
+                          : DetalheOrcamentoTela(
+                              orcamento: orcamento,
+                              aoVerPerfil: (o) => abrirPerfilDoOrcamento(context, o),
+                              aoConversar: (o) => _abrir<void>(
+                                context,
+                                _chat(
+                                  pedidoId,
+                                  profissionalId: o.profissionalId,
+                                  comoProfissional: false,
+                                ),
+                              ),
+                              aoFazerContraproposta: (o) async {
+                                final proposta = await pedirContrapropostaCompleta(
+                                  context,
+                                  atualCentavos: o.totalCentavos,
+                                );
+                                if (proposta == null || !context.mounted) return;
+                                final ok = await _tentar(
+                                  context,
+                                  () => repos.orcamentos.contraproporValor(
+                                    pedidoId,
+                                    o.id,
+                                    proposta.valorCentavos,
+                                    prazoExecucaoDias: proposta.prazoExecucaoDias,
+                                    mensagem: proposta.mensagem,
+                                  ),
+                                );
+                                if (ok && context.mounted) {
+                                  pedidosMudaram.value++;
+                                  await _abrirSucesso<void>(
+                                    context,
+                                    (ctxSucesso) => SucessoAcaoTela(
+                                      titulo: 'Contraproposta enviada!',
+                                      subtitulo:
+                                          'O profissional recebeu sua proposta na conversa e pode aceitar ou responder.',
+                                      textoBotaoPrimario: 'Abrir conversa',
+                                      aoTocarPrimario: () =>
+                                          Navigator.of(ctxSucesso).pushReplacement(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => _chat(pedidoId,
+                                              profissionalId: o.profissionalId,
+                                              comoProfissional: false),
+                                        ),
+                                      ),
+                                      textoBotaoSecundario: 'Voltar ao início',
+                                      aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+                                    ),
+                                  );
+                                }
+                              },
+                              aoRecusar: (o) async {
+                                final ok = await _tentar(
+                                  context,
+                                  () => repos.orcamentos.recusar(pedidoId, o.id),
+                                );
+                                if (ok && context.mounted) {
+                                  pedidosMudaram.value++;
+                                  Navigator.of(context).pop();
+                                  _avisoSimples(context, 'Orçamento recusado.');
+                                }
+                              },
+                              aoAceitar: (o) async {
+                                // Só pede ao backend; taxa e líquido são dele.
+                                final ok = await _tentar(
+                                  context,
+                                  () => repos.orcamentos.aceitar(pedidoId, o.id),
+                                );
+                                if (ok && context.mounted) {
+                                  pedidosMudaram.value++;
+                                  _abrir<void>(context, _pagamento(pedidoId));
+                                }
+                              },
                             ),
-                          );
-                        }
-                      },
-                      aoRecusar: (o) async {
-                        final ok = await _tentar(
-                          context,
-                          () => repos.orcamentos.recusar(pedidoId, o.id),
-                        );
-                        if (ok && context.mounted) {
-                          pedidosMudaram.value++;
-                          Navigator.of(context).pop();
-                          _avisoSimples(context, 'Orçamento recusado.');
-                        }
-                      },
-                      aoAceitar: (o) async {
-                        // Só pede ao backend; taxa e líquido são dele.
-                        final ok = await _tentar(
-                          context,
-                          () => repos.orcamentos.aceitar(pedidoId, o.id),
-                        );
-                        if (ok && context.mounted) {
-                          pedidosMudaram.value++;
-                          _abrir<void>(context, _pagamento(pedidoId));
-                        }
-                      },
                     ),
-                  ),
-          ),
-        ),
+            ),
+          );
+        },
       );
 
   /// Cartão do aditivo: abre a folha do provedor e espera o backend confirmar (webhook).

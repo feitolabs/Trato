@@ -309,6 +309,8 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
               texto: _disponivelAgora
                   ? 'Não há profissionais disponíveis agora para "$_termo". Desligue "Disponíveis agora" para ver todos.'
                   : 'Não achamos resultados para "$_termo". Tente outro serviço, bairro ou categoria.',
+              textoAcao: _disponivelAgora ? 'Limpar filtros' : 'Limpar busca',
+              aoAcao: _disponivelAgora ? _limparFiltros : _limpar,
             ),
           );
           // Com o filtro do servidor ligado, o chip precisa continuar na tela para poder desligar.
