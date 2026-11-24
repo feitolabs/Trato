@@ -69,7 +69,13 @@ class CacheArquivo implements ArmazenamentoCache {
 /// documentos; e campos de segredo (token, código de início/conclusão, chaves) saem antes de
 /// gravar. Sem usuário logado não grava nem lê. O logout limpa tudo.
 class CacheLeitura {
-  CacheLeitura(this._armazenamento, {required this.usuarioId});
+  CacheLeitura(this._armazenamento, {required this.usuarioId, DateTime Function()? agora})
+      : _agora = agora ?? DateTime.now;
+
+  final DateTime Function() _agora;
+
+  /// Mensagens do chat só valem no cache por este tempo.
+  static const validadeChat = Duration(hours: 24);
 
   final ArmazenamentoCache _armazenamento;
 
@@ -85,9 +91,11 @@ class CacheLeitura {
     RegExp(r'^/v1/pedidos/[^/]+/(dados|orcamentos|eventos|reagendamentos|interlocutor|saldo|mensagens|perfil-cliente)$'),
     RegExp(r'^/v1/orcamentos/[^/]+$'),
     RegExp(r'^/v1/me$'),
-    RegExp(r'^/v1/me/(dados-pessoais|enderecos|favoritos|moedas)$'),
+    // Dados pessoais e endereços ficam de fora (dado sensível): só no servidor.
+    RegExp(r'^/v1/me/(favoritos|moedas)$'),
     RegExp(r'^/v1/notificacoes$'),
     RegExp(r'^/v1/indicacoes/meu-codigo$'),
+    RegExp(r'^/v1/recorrencias(/[^/]+)?$'),
     RegExp(r'^/v1/profissional/(pedidos-abertos(/[^/]+)?|orcamentos|perfil)$'),
     RegExp(r'^/v1/profissionais/me/saldo$'),
     RegExp(r'^/v1/profissionais/[^/]+$'),
@@ -99,6 +107,11 @@ class CacheLeitura {
   );
 
   static bool elegivel(String caminho) => _permitidos.any((r) => r.hasMatch(caminho));
+
+  static final _chat = RegExp(r'^/v1/pedidos/[^/]+/mensagens$');
+
+  /// Validade do cache desse caminho; nulo = sem prazo (vale até o próximo logout).
+  static Duration? validadeDe(String caminho) => _chat.hasMatch(caminho) ? validadeChat : null;
 
   String? _chave(String caminho, Map<String, String>? consulta) {
     final id = usuarioId();
@@ -122,7 +135,8 @@ class CacheLeitura {
   Future<void> guardar(String caminho, Map<String, String>? consulta, Object? json) async {
     final chave = _chave(caminho, consulta);
     if (chave == null) return;
-    final texto = jsonEncode(_limpo(json));
+    // Guarda com a hora da gravação, para o prazo das mensagens do chat.
+    final texto = jsonEncode({'t': _agora().millisecondsSinceEpoch, 'v': _limpo(json)});
     if (texto.length > tamanhoMaximo) return;
     await _armazenamento.gravar(chave, texto);
   }
@@ -134,11 +148,30 @@ class CacheLeitura {
     final texto = await _armazenamento.ler(chave);
     if (texto == null) return (achou: false, valor: null);
     try {
-      return (achou: true, valor: jsonDecode(texto));
+      final lido = jsonDecode(texto);
+      // Entradas antigas (sem hora) contam como gravadas em 0: expiram nos caminhos com prazo.
+      final envelope = lido is Map && lido.containsKey('v') && lido.containsKey('t');
+      final gravadoEm = envelope && lido['t'] is num ? (lido['t'] as num).toInt() : 0;
+      final validade = validadeDe(caminho);
+      if (validade != null &&
+          _agora().millisecondsSinceEpoch - gravadoEm > validade.inMilliseconds) {
+        return (achou: false, valor: null);
+      }
+      return (achou: true, valor: envelope ? lido['v'] : lido);
     } on FormatException {
       return (achou: false, valor: null);
     }
   }
 
   Future<void> limpar() => _armazenamento.limpar();
+
+  /// Ao abrir o app sem ninguém logada, não deve sobrar leitura de uma conta anterior.
+  Future<void> limparSeSemSessao({required bool temSessao}) async {
+    if (temSessao) return;
+    try {
+      await limpar();
+    } on Object {
+      // limpeza é secundária: não impede o app de abrir
+    }
+  }
 }

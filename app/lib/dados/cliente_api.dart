@@ -22,7 +22,7 @@ class ClienteApi {
     this.cache,
   }) : _cliente = cliente ?? http.Client() {
     // Sair da conta apaga as leituras guardadas deste aparelho.
-    if (cache != null) sessao.aoSair.add(() => unawaited(cache!.limpar()));
+    if (cache != null) sessao.aoSair.add(cache!.limpar);
   }
 
   /// Últimas leituras para mostrar sem internet (opcional).
@@ -70,6 +70,10 @@ class ClienteApi {
     }
     if (resposta.statusCode >= 200 && resposta.statusCode < 300) {
       return resposta.bodyBytes;
+    }
+    if (resposta.statusCode == 401) {
+      await sessao.expirar(); // limpa o cache antes de seguir
+      throw ErroTrato.sessaoExpirada;
     }
     _tratar(resposta);
     throw ErroTrato.servidor;
@@ -185,6 +189,10 @@ class ClienteApi {
       final novo = await sessao.renovarToken();
       if (novo != null && novo != anterior) resposta = await tentar();
     }
+    if (resposta.statusCode == 401) {
+      await sessao.expirar(); // limpa o cache antes de seguir
+      throw ErroTrato.sessaoExpirada;
+    }
     final resultado = _tratar(resposta);
     if (metodo == 'GET') _guardarNoCache(caminho, consulta, resultado);
     return resultado;
@@ -224,7 +232,7 @@ class ClienteApi {
       }
     }
     if (codigo == 401) {
-      sessao.expirar();
+      // A sessão é expirada (e o cache limpo) por quem chama, com await.
       throw ErroTrato.sessaoExpirada;
     }
     if (codigo == 404) {

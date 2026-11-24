@@ -10,6 +10,7 @@ import 'telas/auth/login_tela.dart';
 import 'telas/auth/nova_senha_tela.dart';
 import 'dados/cliente_api.dart';
 import 'componentes/banner_sem_conexao.dart';
+import 'dados/cache_leitura.dart';
 import 'dados/config.dart';
 import 'dados/monitor_conexao.dart';
 import 'dados/fila_offline.dart';
@@ -92,9 +93,13 @@ Future<void> main() async {
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
   RotasTrato.push = ServicoPushFirebase();
+  // Abriu o app sem ninguém logada: não sobra leitura guardada de uma conta anterior.
+  final cacheLeitura = CacheLeitura(CacheArquivo(), usuarioId: () => sessaoTrato.usuarioId);
+  await cacheLeitura.limparSeSemSessao(temSessao: ServicoAuthPadrao.atual.sessaoAtual != null);
   RotasTrato.repos = RepositoriosTrato.deConfig(
     config,
     sessaoTrato,
+    cache: cacheLeitura,
     criarUpload: ServicoUploadApi.new,
     camera: ServicoCameraReal(),
     localizacao: const ServicoLocalizacaoReal(),

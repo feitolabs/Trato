@@ -28,6 +28,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoAvaliar,
     this.aoVerGarantia,
     this.aoBaixarComprovante,
+    this.aoRepetirServico,
     this.secaoReagendamento,
     this.aoCompartilharAtendimento,
     this.aoSosEmergencia,
@@ -42,6 +43,9 @@ class PedidoExecucaoTela extends StatefulWidget {
 
   /// Baixa o comprovante (PDF) do pedido concluído. Só aparece com o pedido `concluido`.
   final VoidCallback? aoBaixarComprovante;
+
+  /// "Repetir este serviço" (serviço recorrente): só no pedido `concluido`.
+  final VoidCallback? aoRepetirServico;
 
   /// Reagendamento dentro do pedido (botão "Reagendar" ou proposta pendente). Quem monta a tela
   /// só passa nos estados pago/agendado.
@@ -374,6 +378,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
         if (widget.aoRemarcarVisita != null ||
             (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido') ||
             (widget.aoBaixarComprovante != null && pedido.estadoApi == 'concluido') ||
+            (widget.aoRepetirServico != null && pedido.estadoApi == 'concluido') ||
             widget.aoVerContrato != null ||
             widget.aoVerNota != null ||
             widget.aoVerAditivo != null) ...[
@@ -397,6 +402,12 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   key: const ValueKey('ver-garantia'),
                   texto: 'Ver garantia ou pedir retrabalho',
                   aoTocar: widget.aoVerGarantia!,
+                ),
+              if (widget.aoRepetirServico != null && pedido.estadoApi == 'concluido')
+                BotaoLink(
+                  key: const ValueKey('repetir-servico'),
+                  texto: 'Repetir este serviço',
+                  aoTocar: widget.aoRepetirServico!,
                 ),
               if (widget.aoBaixarComprovante != null && pedido.estadoApi == 'concluido')
                 BotaoLink(

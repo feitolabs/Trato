@@ -64,6 +64,10 @@ import '../comuns/denuncia_folha.dart';
 import '../indicacoes/indique_e_ganhe_tela.dart';
 import '../indicacoes/modelos.dart';
 import '../indicacoes/servico_fake.dart';
+import '../recorrencias/modelos.dart';
+import '../recorrencias/repetir_servico_folha.dart';
+import '../recorrencias/servico_fake.dart';
+import '../recorrencias/servicos_recorrentes_tela.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhosPendentes;
 import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
@@ -422,7 +426,7 @@ abstract final class RotasTrato {
     }
     PerfilClienteTela.limparFotoSessao();
     PerfilPublicoTela.limparFotoSessao();
-    sessao?.sair();
+    await sessao?.sair(); // espera apagar o cache de leitura antes de voltar ao login
     navegador.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginTela()),
       (rota) => false,
@@ -1478,6 +1482,16 @@ abstract final class RotasTrato {
                       _baixarReciboPdf(context, pedidoId);
                     },
                   ),
+                if (estadoApi == 'concluido')
+                  ListTile(
+                    key: const ValueKey('repetir-servico'),
+                    leading: const Icon(Icons.event_repeat_outlined),
+                    title: const Text('Repetir este serviço'),
+                    onTap: () {
+                      Navigator.of(folha).pop();
+                      _repetirServico(context, pedidoId);
+                    },
+                  ),
                 if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
                   ListTile(
                     leading: const Icon(Icons.receipt_outlined),
@@ -1803,6 +1817,7 @@ abstract final class RotasTrato {
             aoCapturarFotoPerfil: _fotografarPerfil,
             compartilharPerfil: compartilharNoAparelho,
             aoAbrirIndicacoes: () => abrirIndicacoes(context),
+            aoAbrirRecorrencias: () => abrirRecorrencias(context),
             carregarTratinhosPendentes: () async {
               final ex = (await repos.profissional.minhasExclusividades());
               return textoTratinhosPendentes(
@@ -1954,6 +1969,8 @@ abstract final class RotasTrato {
                   );
                 case AcaoPerfil.contatosConfianca:
                   _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
+                case AcaoPerfil.servicosRecorrentes:
+                  abrirRecorrencias(context);
                 case AcaoPerfil.indiqueEGanhe:
                   abrirIndicacoes(context, valorMoedaCentavos: perfil.moedasValorCentavos);
                 default:
@@ -2020,6 +2037,58 @@ abstract final class RotasTrato {
 
   static final ServicoConta _contaDemo = ServicoContaFake();
 
+  static final ServicoRecorrencias _recorrenciasDemo = ServicoRecorrenciasFake();
+  static ServicoRecorrencias get _recorrencias => repos.recorrencias ?? _recorrenciasDemo;
+
+  /// "Serviços recorrentes": a lista da conta (cliente ou profissional) e o detalhe de cada série.
+  static void abrirRecorrencias(BuildContext context) => _abrir<void>(
+        context,
+        ServicosRecorrentesTela(
+          servico: _recorrencias,
+          aoAbrirPedido: (pedidoId, souCliente) => _abrirPedidoDaVisita(context, pedidoId, souCliente),
+        ),
+      );
+
+  /// A visita da série é um pedido: o cliente abre o serviço (aceita o orçamento e paga); o
+  /// profissional abre a conversa do pedido.
+  static void _abrirPedidoDaVisita(BuildContext context, String pedidoId, bool souCliente) =>
+      souCliente
+          ? abrirServico(context, pedidoId)
+          : _abrir<void>(context, _chat(pedidoId, comoProfissional: true));
+
+  static var _propondoRecorrencia = false;
+
+  /// "Repetir este serviço" num pedido concluído (cliente ou profissional): abre a folha de
+  /// frequência, data da 1ª visita e valor, envia a proposta e abre a série criada.
+  static Future<void> _repetirServico(
+    BuildContext context,
+    String pedidoId, {
+    int? valorCentavos,
+  }) async {
+    if (_propondoRecorrencia) return;
+    _propondoRecorrencia = true;
+    try {
+      final proposta = await mostrarFolhaRepetirServico(context, valorInicialCentavos: valorCentavos);
+      if (proposta == null || !context.mounted) return;
+      Recorrencia? criada;
+      final ok = await _tentar(context, () async => criada = await _recorrencias.propor(pedidoId, proposta));
+      final serie = criada;
+      if (!ok || serie == null || !context.mounted) return;
+      _avisoSimples(context, 'Proposta enviada. A outra pessoa precisa aceitar.');
+      _abrir<void>(
+        context,
+        DetalheRecorrenciaTela(
+          servico: _recorrencias,
+          recorrenciaId: serie.id,
+          inicial: serie,
+          aoAbrirPedido: (id, souCliente) => _abrirPedidoDaVisita(context, id, souCliente),
+        ),
+      );
+    } finally {
+      _propondoRecorrencia = false;
+    }
+  }
+
   static final ServicoIndicacoes _indicacoesDemo = ServicoIndicacoesFake();
   static ServicoIndicacoes get _indicacoes => repos.indicacoes ?? _indicacoesDemo;
 
@@ -2035,6 +2104,7 @@ abstract final class RotasTrato {
     AcaoPerfil.enderecos,
     AcaoPerfil.favoritos,
     AcaoPerfil.indiqueEGanhe,
+    AcaoPerfil.servicosRecorrentes,
     AcaoPerfil.usarComoProfissional,
   };
 
@@ -2838,6 +2908,11 @@ abstract final class RotasTrato {
                 aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
                 aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
                 aoBaixarComprovante: () => _baixarReciboPdf(context, pedidoId),
+                aoRepetirServico: () => _repetirServico(
+                  context,
+                  pedidoId,
+                  valorCentavos: pedido.totalAtualizadoCentavos ?? pedido.orcamentoCentavos,
+                ),
                 secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
                     ? _secaoReagendamento(pedidoId)
                     : null,

@@ -133,7 +133,7 @@ void main() {
       await m.api.get('/v1/pedidos');
       await Future<void>.delayed(Duration.zero);
       expect(m.disco.itens, isNotEmpty);
-      m.sessao.sair();
+      await m.sessao.sair();
       await Future<void>.delayed(Duration.zero);
       expect(m.disco.itens, isEmpty);
     });
@@ -508,4 +508,164 @@ void main() {
       await acessivel(tester, find.widgetWithText(BotaoPrimario, 'Enviar proposta'));
     });
   });
+
+  group('Segurança do cache de leitura', () {
+    test('dados pessoais e endereços não são guardados (nem lidos do cache) sem internet', () async {
+      expect(CacheLeitura.elegivel('/v1/me/dados-pessoais'), isFalse);
+      expect(CacheLeitura.elegivel('/v1/me/enderecos'), isFalse);
+      expect(CacheLeitura.elegivel('/v1/me/favoritos'), isTrue);
+
+      var offline = false;
+      final disco = CacheMemoria();
+      final api = ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: SessaoTrato()..entrar('t'),
+        intervaloBaseRetry: Duration.zero,
+        cache: CacheLeitura(disco, usuarioId: () => 'u1'),
+        cliente: MockClient((req) async {
+          if (offline) throw const SocketException('sem rede');
+          return _json({'nome': 'Ana', 'cpf_final': '09'});
+        }),
+      );
+      await api.get('/v1/me/dados-pessoais');
+      await api.get('/v1/me/enderecos');
+      await Future<void>.delayed(Duration.zero);
+      expect(disco.itens, isEmpty);
+      offline = true;
+      await expectLater(api.get('/v1/me/dados-pessoais'), throwsA(isA<ErroTrato>()));
+      await expectLater(api.get('/v1/me/enderecos'), throwsA(isA<ErroTrato>()));
+    });
+
+    test('mensagens do chat valem no cache por no máximo 24 h; o resto não tem esse prazo',
+        () async {
+      var agora = DateTime(2030, 1, 1, 12);
+      final disco = CacheMemoria();
+      final cache = CacheLeitura(disco, usuarioId: () => 'u1', agora: () => agora);
+      await cache.guardar('/v1/pedidos/p1/mensagens', null, [
+        {'texto': 'oi'},
+      ]);
+      await cache.guardar('/v1/pedidos', null, {'itens': <Object>[]});
+
+      agora = DateTime(2030, 1, 2, 11, 59); // 23 h 59 min depois
+      expect((await cache.buscar('/v1/pedidos/p1/mensagens', null)).achou, isTrue);
+
+      agora = DateTime(2030, 1, 2, 12, 1); // 24 h 1 min depois
+      expect((await cache.buscar('/v1/pedidos/p1/mensagens', null)).achou, isFalse);
+
+      agora = DateTime(2030, 1, 10); // dias depois: a lista de pedidos segue valendo
+      expect((await cache.buscar('/v1/pedidos', null)).achou, isTrue);
+    });
+
+    test('entrada antiga (sem hora) expira no chat e continua valendo nos outros caminhos',
+        () async {
+      final disco = CacheMemoria();
+      final cache = CacheLeitura(disco, usuarioId: () => 'u1');
+      disco.itens['u1|/v1/pedidos/p1/mensagens?'] = jsonEncode([1]);
+      disco.itens['u1|/v1/pedidos?'] = jsonEncode({'itens': <Object>[]});
+      expect((await cache.buscar('/v1/pedidos/p1/mensagens', null)).achou, isFalse);
+      expect((await cache.buscar('/v1/pedidos', null)).achou, isTrue);
+    });
+
+    test('sem internet o chat recebe a última leitura só dentro do prazo', () async {
+      var offline = false;
+      var agora = DateTime(2030, 1, 1, 12);
+      final disco = CacheMemoria();
+      final api = ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: SessaoTrato()..entrar('t'),
+        intervaloBaseRetry: Duration.zero,
+        cache: CacheLeitura(disco, usuarioId: () => 'u1', agora: () => agora),
+        cliente: MockClient((req) async {
+          if (offline) throw const SocketException('sem rede');
+          return _json([
+            {'texto': 'oi'},
+          ]);
+        }),
+      );
+      await api.get('/v1/pedidos/p1/mensagens');
+      await Future<void>.delayed(Duration.zero);
+      offline = true;
+      agora = agora.add(const Duration(hours: 2));
+      expect(await api.get('/v1/pedidos/p1/mensagens'), isNotEmpty);
+      agora = agora.add(const Duration(hours: 23));
+      await expectLater(api.get('/v1/pedidos/p1/mensagens'), throwsA(isA<ErroTrato>()));
+    });
+
+    test('sair da conta só termina depois de apagar o cache (await)', () async {
+      final disco = _DiscoLento();
+      final sessao = SessaoTrato()..entrar('t');
+      ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: sessao,
+        cache: CacheLeitura(disco, usuarioId: () => 'u1'),
+        cliente: MockClient((_) async => _json({})),
+      );
+      disco.itens['x'] = 'y';
+      await sessao.sair();
+      expect(disco.itens, isEmpty, reason: 'sair() voltou antes de apagar o cache');
+      expect(disco.limpou, isTrue);
+    });
+
+    test('sessão expirada (401): o cache é apagado antes de avisar o app', () async {
+      final disco = _DiscoLento();
+      final sessao = SessaoTrato()..entrar('t');
+      var avisouComCacheVazio = false;
+      sessao.aoExpirar = () => avisouComCacheVazio = disco.itens.isEmpty;
+      final api = ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: sessao,
+        intervaloBaseRetry: Duration.zero,
+        cache: CacheLeitura(disco, usuarioId: () => 'u1'),
+        cliente: MockClient((_) async => http.Response('{}', 401)),
+      );
+      disco.itens['x'] = 'y';
+      await expectLater(
+        api.get('/v1/pedidos'),
+        throwsA(isA<ErroTrato>().having((e) => e.tipo, 'tipo', TipoErro.sessaoExpirada)),
+      );
+      expect(disco.itens, isEmpty);
+      expect(avisouComCacheVazio, isTrue);
+      expect(sessao.logada, isFalse);
+    });
+
+    test('abrir o app sem sessão limpa o cache; com sessão mantém', () async {
+      final disco = CacheMemoria()..itens['u1|/v1/pedidos?'] = '{}';
+      final cache = CacheLeitura(disco, usuarioId: () => 'u1');
+      await cache.limparSeSemSessao(temSessao: true);
+      expect(disco.itens, isNotEmpty);
+      await cache.limparSeSemSessao(temSessao: false);
+      expect(disco.itens, isEmpty);
+    });
+
+    test('falha ao limpar não derruba a abertura do app nem o logout', () async {
+      final cache = CacheLeitura(_DiscoQueFalha(), usuarioId: () => 'u1');
+      await cache.limparSeSemSessao(temSessao: false); // não lança
+      final sessao = SessaoTrato()..entrar('t');
+      ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: sessao,
+        cache: cache,
+        cliente: MockClient((_) async => _json({})),
+      );
+      await sessao.sair(); // não lança
+      expect(sessao.logada, isFalse);
+    });
+  });
+}
+
+/// Armazenamento que demora para apagar: prova que o logout espera.
+class _DiscoLento extends CacheMemoria {
+  var limpou = false;
+
+  @override
+  Future<void> limpar() async {
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    itens.clear();
+    limpou = true;
+  }
+}
+
+class _DiscoQueFalha extends CacheMemoria {
+  @override
+  Future<void> limpar() async => throw StateError('disco cheio');
 }

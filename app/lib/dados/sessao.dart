@@ -31,7 +31,7 @@ class SessaoTrato {
   }
 
   /// Avisados ao sair (logout ou sessão expirada): ex. limpar o cache de leitura.
-  final List<void Function()> aoSair = [];
+  final List<Future<void> Function()> aoSair = [];
 
   bool get logada => _token != null && _token!.isNotEmpty;
 
@@ -51,27 +51,28 @@ class SessaoTrato {
   Future<String?>? _renovando;
 
   void entrar(String token) => _token = token;
-  void sair() {
+  /// Sai da conta e espera a limpeza (cache de leitura) terminar.
+  Future<void> sair() async {
     _token = null;
-    _avisarSaida();
+    await _avisarSaida();
   }
 
-  void _avisarSaida() {
+  Future<void> _avisarSaida() async {
     for (final f in List.of(aoSair)) {
       try {
-        f();
+        await f();
       } on Object {
-        // limpeza é secundária
+        // limpeza é secundária: não impede o logout
       }
     }
   }
 
   /// A API respondeu 401: limpa o token e avisa uma vez só (várias chamadas em paralelo
   /// recebem 401 juntas).
-  void expirar() {
+  Future<void> expirar() async {
     if (!logada) return;
-    _token = null;
-    _avisarSaida();
+    _token = null; // já sem token: nenhuma chamada nova usa a sessão velha
+    await _avisarSaida();
     aoExpirar?.call();
   }
 }

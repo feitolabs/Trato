@@ -28,7 +28,11 @@ class PerfilPublicoTela extends StatefulWidget {
     this.carregarTratinhosPendentes,
     this.compartilharPerfil,
     this.aoAbrirIndicacoes,
+    this.aoAbrirRecorrencias,
   });
+
+  /// Abre "Serviços recorrentes". O card só aparece com isso.
+  final VoidCallback? aoAbrirRecorrencias;
 
   /// Abre o "Indique e ganhe". O card só aparece com isso.
   final VoidCallback? aoAbrirIndicacoes;
@@ -265,6 +269,21 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   subtitle: Text('Enviar ou acompanhar documentos', style: TipografiaTrato.legenda),
                   trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoAbrirVerificacao,
+                ),
+              ),
+            ],
+            if (widget.aoAbrirRecorrencias != null) ...[
+              const SizedBox(height: EspacosTrato.x3),
+              Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  key: const Key('abrir-servicos-recorrentes'),
+                  leading: Icon(Icons.event_repeat_outlined, color: context.cores.petroleo),
+                  title: Text('Serviços recorrentes', style: TipografiaTrato.corpoForte),
+                  subtitle: Text('Visitas toda semana, quinzena ou mês', style: TipografiaTrato.legenda),
+                  trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
+                  onTap: widget.aoAbrirRecorrencias,
                 ),
               ),
             ],

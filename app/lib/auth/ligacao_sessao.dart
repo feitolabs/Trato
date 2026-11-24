@@ -25,7 +25,7 @@ class LigacaoSessao {
   void _atualizar(SessaoAuth? quem) {
     final token = quem == null ? null : _auth.tokenAtual;
     if (token == null || token.isEmpty) {
-      _sessao.sair();
+      unawaited(_sessao.sair());
     } else {
       final jaEstava = _sessao.token == token;
       _sessao.entrar(token);
@@ -39,6 +39,6 @@ class LigacaoSessao {
   Future<void> encerrar() async {
     await _inscricao?.cancel();
     _sessao.renovar = null;
-    _sessao.sair();
+    await _sessao.sair();
   }
 }

@@ -3,7 +3,9 @@ import 'dart:async';
 import '../telas/conta/modelos.dart';
 import '../telas/indicacoes/modelos.dart';
 import 'servico_cep.dart';
+import '../telas/recorrencias/modelos.dart';
 import 'servico_indicacoes_api.dart';
+import 'servico_recorrencias_api.dart';
 import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';
@@ -53,6 +55,7 @@ class RepositoriosTrato {
     this.privacidade,
     this.conta,
     this.indicacoes,
+    this.recorrencias,
     this.cep,
     this.mensagens,
     this.mensagensProfissional,
@@ -75,6 +78,9 @@ class RepositoriosTrato {
 
   /// Indique e ganhe (`/v1/indicacoes/...`). Nulo = demonstração.
   final ServicoIndicacoes? indicacoes;
+
+  /// Serviço recorrente (`/v1/recorrencias`). Nulo = demonstração.
+  final ServicoRecorrencias? recorrencias;
 
   /// Consulta de endereço por CEP (`GET /v1/cep/{cep}`).
   final ServicoCep? cep;
@@ -133,6 +139,7 @@ class RepositoriosTrato {
       privacidade: ServicoPrivacidadeApi(api),
       conta: ServicoContaApi(api),
       indicacoes: ServicoIndicacoesApi(api),
+      recorrencias: ServicoRecorrenciasApi(api),
       cep: ServicoCepApi(api),
       capturaVerificacao:
           camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
@@ -147,6 +154,7 @@ class RepositoriosTrato {
     ServicoCamera? camera,
     ServicoLocalizacao? localizacao,
     FilaOffline? fila,
+    CacheLeitura? cache,
   }) {
     if (!config.usaApi) {
       throw StateError('App sem API configurada: passe TRATO_MODO=api e TRATO_API_URL.');
@@ -155,7 +163,7 @@ class RepositoriosTrato {
     final api = ClienteApi(
       urlBase: config.apiUrl,
       sessao: sessao,
-      cache: CacheLeitura(CacheArquivo(), usuarioId: () => sessao.usuarioId),
+      cache: cache ?? CacheLeitura(CacheArquivo(), usuarioId: () => sessao.usuarioId),
     );
     final upload = criarUpload?.call(api);
     return RepositoriosTrato.api(

@@ -1956,6 +1956,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
             ItemPerfil(acao: AcaoPerfil.dadosPessoais, titulo: 'Dados pessoais'),
             ItemPerfil(acao: AcaoPerfil.enderecos, titulo: 'Endereços salvos'),
             ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais de confiança'),
+            ItemPerfil(acao: AcaoPerfil.servicosRecorrentes, titulo: 'Serviços recorrentes'),
             ItemPerfil(acao: AcaoPerfil.indiqueEGanhe, titulo: 'Indique e ganhe'),
           ],
         ),
