@@ -136,21 +136,18 @@ class Aditivo {
     required this.valorCentavos,
     required this.descricao,
     this.estado = EstadoAditivo.aguardando,
-    this.mostrarFoto = true,
   });
 
   final String titulo;
   final int valorCentavos;
   final String descricao;
   final EstadoAditivo estado;
-  final bool mostrarFoto;
 
   Aditivo comEstado(EstadoAditivo novo) => Aditivo(
         titulo: titulo,
         valorCentavos: valorCentavos,
         descricao: descricao,
         estado: novo,
-        mostrarFoto: mostrarFoto,
       );
 }
 

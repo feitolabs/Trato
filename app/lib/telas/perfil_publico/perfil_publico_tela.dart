@@ -235,7 +235,8 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                     if (i > 0) const SizedBox(width: EspacosTrato.x3),
                     Expanded(
                       child: EspacoFoto(
-                        legenda: '[Foto]',
+                        legenda: 'Trabalho ${i + 1}',
+                        legendaSobreFoto: false,
                         referencia:
                             i < p.listaFotosPortfolio.length ? p.listaFotosPortfolio[i] : null,
                         altura: 88,

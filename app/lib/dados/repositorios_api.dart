@@ -606,7 +606,6 @@ class RepositorioPedidosApi implements RepositorioPedidos {
             titulo: 'Aditivo proposto',
             valorCentavos: valor,
             descricao: desc,
-            mostrarFoto: false,
           );
         }
         if (estado == 'pago') aditivosPagos += valor;

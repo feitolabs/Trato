@@ -85,12 +85,16 @@ class EspacoFoto extends StatelessWidget {
     this.altura = 140,
     this.largura,
     this.referencia,
+    this.legendaSobreFoto = true,
   });
 
   final String legenda;
   final double altura;
   final double? largura;
   final String? referencia;
+
+  /// Falso: a foto aparece sem a faixa com a legenda (ela segue no preview ampliado).
+  final bool legendaSobreFoto;
 
   @override
   Widget build(BuildContext context) {
@@ -131,26 +135,27 @@ class EspacoFoto extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Container(
-                      width: double.infinity,
-                      color: CoresTrato.overlayFoto,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: EspacosTrato.x2,
-                        vertical: EspacosTrato.x1,
-                      ),
-                      child: Text(
-                        textoExibido,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TipografiaTrato.corpoPequeno.copyWith(
-                          color: context.cores.sobrePetroleo,
-                          fontWeight: FontWeight.w700,
+                  if (legendaSobreFoto)
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Container(
+                        width: double.infinity,
+                        color: CoresTrato.overlayFoto,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: EspacosTrato.x2,
+                          vertical: EspacosTrato.x1,
+                        ),
+                        child: Text(
+                          textoExibido,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TipografiaTrato.corpoPequeno.copyWith(
+                            color: context.cores.sobrePetroleo,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               )
             : Text(

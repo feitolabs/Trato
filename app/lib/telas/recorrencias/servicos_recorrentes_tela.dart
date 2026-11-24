@@ -95,36 +95,29 @@ class _CartaoSerie extends StatelessWidget {
     return CartaoTrato(
       key: ValueKey('serie-${serie.id}'),
       aoTocar: aoTocar,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(nome.isEmpty ? 'Serviço recorrente' : nome, style: TipografiaTrato.corpoForte),
-                const SizedBox(height: EspacosTrato.x1),
-                Text(
-                  '${serie.textoFrequencia} · ${Dinheiro.formatar(serie.valorCentavos)} por visita',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
-                ),
-                if (!serie.cancelada)
-                  Text(
-                    'Próxima visita: ${dataHoraBrasilia(serie.proximaVisita)}',
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
-                  ),
-                const SizedBox(height: EspacosTrato.x2),
-                Text(
-                  serie.textoStatus,
-                  key: ValueKey('status-${serie.id}'),
-                  style: TipografiaTrato.corpoPequeno.copyWith(
-                    color: serie.cancelada ? c.textoSecundario : c.azulTexto,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+          Text(nome.isEmpty ? 'Serviço recorrente' : nome, style: TipografiaTrato.corpoForte),
+          const SizedBox(height: EspacosTrato.x1),
+          Text(
+            '${serie.textoFrequencia} · ${Dinheiro.formatar(serie.valorCentavos)} por visita',
+            style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+          ),
+          if (!serie.cancelada)
+            Text(
+              'Próxima visita: ${dataHoraBrasilia(serie.proximaVisita)}',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+            ),
+          const SizedBox(height: EspacosTrato.x2),
+          Text(
+            serie.textoStatus,
+            key: ValueKey('status-${serie.id}'),
+            style: TipografiaTrato.corpoPequeno.copyWith(
+              color: serie.cancelada ? c.textoSecundario : c.azulTexto,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          Icon(Icons.chevron_right, color: c.textoSecundario),
         ],
       ),
     );
