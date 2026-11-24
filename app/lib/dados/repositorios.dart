@@ -162,6 +162,9 @@ abstract interface class RepositorioPedidos {
   /// devolve o dinheiro quando já houve pagamento.
   Future<void> cancelar(String pedidoId, String motivo);
 
+  /// Comprovante do pedido em PDF (`GET /v1/pedidos/{id}/recibo.pdf`), com o token do usuário.
+  Future<List<int>> baixarReciboPdf(String pedidoId);
+
   /// Remarca a janela de visita de um pedido agendado (`POST /v1/pedidos/{id}/acoes/remarcar`).
   Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
 

@@ -27,6 +27,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoPagar,
     this.aoAvaliar,
     this.aoVerGarantia,
+    this.aoBaixarComprovante,
     this.aoCompartilharAtendimento,
     this.aoSosEmergencia,
     this.atualizarAditivoLocalmente = true,
@@ -37,6 +38,9 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoPagar;
   final VoidCallback? aoAvaliar;
   final VoidCallback? aoVerGarantia;
+
+  /// Baixa o comprovante (PDF) do pedido concluído. Só aparece com o pedido `concluido`.
+  final VoidCallback? aoBaixarComprovante;
   final VoidCallback? aoCompartilharAtendimento;
   final VoidCallback? aoSosEmergencia;
 
@@ -360,6 +364,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
         ],
         if (widget.aoRemarcarVisita != null ||
             (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido') ||
+            (widget.aoBaixarComprovante != null && pedido.estadoApi == 'concluido') ||
             widget.aoVerContrato != null ||
             widget.aoVerNota != null ||
             widget.aoVerAditivo != null) ...[
@@ -383,6 +388,12 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   key: const ValueKey('ver-garantia'),
                   texto: 'Ver garantia ou pedir retrabalho',
                   aoTocar: widget.aoVerGarantia!,
+                ),
+              if (widget.aoBaixarComprovante != null && pedido.estadoApi == 'concluido')
+                BotaoLink(
+                  key: const ValueKey('baixar-comprovante'),
+                  texto: 'Baixar comprovante (PDF)',
+                  aoTocar: widget.aoBaixarComprovante!,
                 ),
               if (widget.aoVerContrato != null)
                 BotaoLink(

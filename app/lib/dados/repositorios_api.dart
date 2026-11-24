@@ -985,6 +985,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   /// `POST /v1/pedidos/{id}/acoes/cancelar` `{prova: {motivo}}`.
   @override
+  Future<List<int>> baixarReciboPdf(String pedidoId) =>
+      _api.getBytes('/v1/pedidos/$pedidoId/recibo.pdf');
+
+  @override
   Future<void> cancelar(String pedidoId, String motivo) async {
     await _api.post(
       '/v1/pedidos/$pedidoId/acoes/cancelar',

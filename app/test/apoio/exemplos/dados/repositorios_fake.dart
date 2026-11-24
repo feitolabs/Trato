@@ -147,6 +147,15 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   final List<String> cancelados = [];
   final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
+  /// Ids dos pedidos cujo comprovante em PDF foi pedido.
+  final List<String> recibosBaixados = [];
+
+  @override
+  Future<List<int>> baixarReciboPdf(String pedidoId) async {
+    recibosBaixados.add(pedidoId);
+    return '%PDF-1.4\n%Trato recibo fake\n%%EOF'.codeUnits;
+  }
+
   @override
   Future<void> cancelar(String pedidoId, String motivo) async => cancelados.add(pedidoId);
 

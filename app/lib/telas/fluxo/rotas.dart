@@ -1430,6 +1430,16 @@ abstract final class RotasTrato {
                       _abrir<void>(context, _criarAditivo(pedidoId, titulo));
                     },
                   ),
+                if (estadoApi == 'concluido')
+                  ListTile(
+                    key: const ValueKey('baixar-comprovante'),
+                    leading: const Icon(Icons.picture_as_pdf_outlined),
+                    title: const Text('Baixar comprovante (PDF)'),
+                    onTap: () {
+                      Navigator.of(folha).pop();
+                      _baixarReciboPdf(context, pedidoId);
+                    },
+                  ),
                 if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
                   ListTile(
                     leading: const Icon(Icons.receipt_outlined),
@@ -1663,6 +1673,49 @@ abstract final class RotasTrato {
           const SnackBar(
             content: Text('Não foi possível baixar o extrato em PDF agora.'),
           ),
+        );
+    }
+  }
+
+  /// Comprovante do pedido (`GET /v1/pedidos/{id}/recibo.pdf`): salva e abre como o extrato em PDF,
+  /// com "Compartilhar" no aviso. Cliente e profissional usam o mesmo caminho.
+  static Future<void> _baixarReciboPdf(BuildContext context, String pedidoId) async {
+    final mensagens = ScaffoldMessenger.of(context);
+    try {
+      final bytes = await repos.pedidos.baixarReciboPdf(pedidoId);
+      final arquivo = 'trato_comprovante_${pedidoId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf';
+      final caminho = await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
+      if (!context.mounted) return;
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('Comprovante em PDF salvo.'),
+            duration: const Duration(seconds: 4),
+            persist: false,
+            action: SnackBarAction(
+              label: 'Compartilhar',
+              onPressed: () async {
+                try {
+                  await compartilharArquivo(caminho);
+                } on Object {
+                  // Sem compartilhamento: fica só o aviso de salvo.
+                }
+              },
+            ),
+          ),
+        );
+    } on ErroTrato catch (e) {
+      if (!context.mounted) return;
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.mensagem)));
+    } on Object {
+      if (!context.mounted) return;
+      mensagens
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Não foi possível baixar o comprovante agora.')),
         );
     }
   }
@@ -2491,6 +2544,10 @@ abstract final class RotasTrato {
   @visibleForTesting
   static Widget pagamentoParaTeste(String pedidoId) => _pagamento(pedidoId);
 
+  @visibleForTesting
+  static Future<void> baixarReciboPdfParaTeste(BuildContext context, String pedidoId) =>
+      _baixarReciboPdf(context, pedidoId);
+
   static Widget _pagamento(String pedidoId) {
     // "Tentar de novo" (sem forma de pagamento): o Carregador refaz a mesma chamada em silêncio.
     final recarregar = ValueNotifier<int>(0);
@@ -2711,6 +2768,7 @@ abstract final class RotasTrato {
                 aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
                 aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
                 aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
+                aoBaixarComprovante: () => _baixarReciboPdf(context, pedidoId),
                 aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
                 aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
                 aoConversar: () => _abrir<void>(
