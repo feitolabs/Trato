@@ -37,6 +37,8 @@ class _RiscoTelaState extends State<RiscoTela> {
         'cupom_reutilizado' => 'Cupom reutilizado',
         'mesmo_aparelho_em_2_contas' => 'Mesmo aparelho em 2 contas',
         'saque_travado' => 'Repasses retidos',
+        'denuncia_perfil' => 'Denúncia de perfil',
+        'denuncia_chat' => 'Denúncia no chat',
         final t => '${t[0].toUpperCase()}${t.substring(1).replaceAll('_', ' ')}',
       };
 
@@ -67,15 +69,21 @@ class _FilaRisco extends StatefulWidget {
 class _FilaRiscoState extends State<_FilaRisco> {
   String _status = 'abertos';
   String? _severidade;
+  bool _soDenuncias = false;
+
+  /// Denúncias de perfil e de chat (tipos `denuncia_*`), para a moderação priorizar.
+  static bool ehDenuncia(AlertaRisco a) => a.tipo.startsWith('denuncia_');
 
   @override
   Widget build(BuildContext context) {
     final itens = [
       for (final a in widget.lista)
         if ((_status == 'todos' || (_status == 'abertos') == !a.resolvido) &&
-            (_severidade == null || a.severidade == _severidade))
+            (_severidade == null || a.severidade == _severidade) &&
+            (!_soDenuncias || ehDenuncia(a)))
           a,
     ];
+    final denuncias = widget.lista.where((a) => ehDenuncia(a) && !a.resolvido).length;
     final abertos = widget.lista.where((a) => !a.resolvido).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,6 +109,27 @@ class _FilaRiscoState extends State<_FilaRisco> {
                   ],
                   selecionado: _status,
                   aoMudar: (v) => setState(() => _status = v),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    Responsivo.margemLateral(FaixaPainel.de(context)),
+                    0,
+                    Responsivo.margemLateral(FaixaPainel.de(context)),
+                    EspacosTrato.x3,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilterChip(
+                      key: const ValueKey('risco-so-denuncias'),
+                      label: Text('Só denúncias $denuncias'),
+                      selected: _soDenuncias,
+                      onSelected: (v) => setState(() => _soDenuncias = v),
+                      labelStyle: TipografiaTrato.etiqueta.copyWith(
+                        color: _soDenuncias ? CoresTrato.primaria : CoresTrato.textoMudo,
+                      ),
+                      side: BorderSide(color: _soDenuncias ? CoresTrato.bordaSelecionada : CoresTrato.bordaForte),
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
