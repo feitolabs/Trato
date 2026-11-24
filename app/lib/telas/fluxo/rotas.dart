@@ -630,8 +630,6 @@ abstract final class RotasTrato {
           aoAbrirPedidoEmAndamento: (p) => abrirServico(context, p.pedidoId ?? _semId),
           aoAbrirCategoria: (c) => abrirCategoria(context, c),
           aoVerTodasCategorias: () => abrirTodasCategorias(context),
-          aoAbrirServico: (s) => abrirServico(context, s.pedidoId ?? _semId),
-          aoVerServicos: () => abrirServicos(context),
         ),
       );
 

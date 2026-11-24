@@ -78,6 +78,9 @@ void main() {
             valorLiberadoCentavos: 20000,
             criterios: ['Pontualidade'],
             gorjetasCentavos: [1000],
+            bonusDisponivel: true,
+            bonusMoedas: 50,
+            valorMoedaCentavos: 1,
           ),
         ),
       );

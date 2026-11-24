@@ -10,7 +10,6 @@ import 'package:trato/telas/catalogo/categoria_tela.dart';
 import 'package:trato/telas/catalogo/todas_categorias_tela.dart';
 import 'package:trato/telas/cliente/modelos.dart' show Profissional;
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
-import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 Future<void> _abrir(
@@ -97,8 +96,7 @@ void main() {
             tester.getTopLeft(find.text('Chaveiro')).dx,
         isTrue,
       );
-      expect(find.text('Pintura da sala'), findsOneWidget);
-      expect(find.text('Garantia ativa até 31/12/2026'), findsOneWidget);
+      expect(find.text('Serviços recentes'), findsNothing);
     });
 
     testWidgets('Pedir orçamento abre a escolha da categoria e depois o Novo pedido',
@@ -122,7 +120,7 @@ void main() {
       expect(find.text('Carlos Mendes'), findsOneWidget);
     });
 
-    testWidgets('Ver todas abre todas as categorias; serviço recente abre o detalhe',
+    testWidgets('Ver todas abre todas as categorias e o Início não tem mais serviços recentes',
         (tester) async {
       await _abrir(tester, const CascaClienteTela());
 
@@ -132,8 +130,8 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
 
-      await _tocar(tester, find.text('Pintura da sala'));
-      expect(find.byType(PedidoExecucaoTela), findsOneWidget); // tela única do pedido
+      expect(find.text('Serviços recentes'), findsNothing);
+      expect(find.text('Ver todos'), findsNothing);
     });
   });
 
@@ -153,7 +151,7 @@ void main() {
       expect(find.text('Documento e selfie com prova de vida'), findsOneWidget);
       expect(find.text('Trabalho 1'), findsOneWidget);
       expect(find.text('Trabalho 3'), findsOneWidget);
-      expect(find.text('Ver as 64'), findsOneWidget);
+      expect(find.text('Ver todas (64)'), findsOneWidget);
     });
 
     testWidgets('botão traz o primeiro nome e chama aoPedirOrcamento', (tester) async {

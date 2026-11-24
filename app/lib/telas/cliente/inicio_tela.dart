@@ -6,7 +6,6 @@ import '../../dados/config_publica.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/foco_rolagem.dart';
-import '../servicos/servicos_recentes_tela.dart';
 import 'modelos.dart';
 
 /// Tela 8 do protótipo: Início do cliente. [aoBuscar] leva à aba Buscar.
@@ -23,8 +22,6 @@ class InicioTela extends StatelessWidget {
     this.aoAbrirPedidoEmAndamento,
     this.aoAbrirCategoria,
     this.aoVerTodasCategorias,
-    this.aoAbrirServico,
-    this.aoVerServicos,
   });
 
   final VoidCallback aoBuscar;
@@ -34,24 +31,11 @@ class InicioTela extends StatelessWidget {
   final ValueChanged<PedidoEmAndamento>? aoAbrirPedidoEmAndamento;
   final ValueChanged<CategoriaServico>? aoAbrirCategoria;
   final VoidCallback? aoVerTodasCategorias;
-  final ValueChanged<ServicoRecente>? aoAbrirServico;
-  final VoidCallback? aoVerServicos;
 
   @override
   Widget build(BuildContext context) {
     final nome = dados?.nome ?? '';
     final andamento = dados?.emAndamento;
-    final recentesBrutos = dados?.recentes ?? const <ServicoRecente>[];
-    final recentes = [
-      for (final r in recentesBrutos)
-        // Pelo id quando há (títulos se repetem: dois pedidos de "Pintura"); pelo título só
-        // nos dados de exemplo, que não têm id.
-        if (andamento == null ||
-            (andamento.pedidoId != null
-                ? r.pedidoId != andamento.pedidoId
-                : r.titulo != andamento.titulo))
-          r,
-    ];
     final grade = dados == null
         ? const <CategoriaServico>[]
         : [
@@ -176,23 +160,6 @@ class InicioTela extends StatelessWidget {
               }
             },
           ),
-          if (recentes.isNotEmpty) ...[
-            const SizedBox(height: EspacosTrato.x6),
-            Row(
-              children: [
-                Expanded(child: Text('Serviços recentes', style: TipografiaTrato.titulo)),
-                if (aoVerServicos != null) BotaoLink(texto: 'Ver todos', aoTocar: aoVerServicos),
-              ],
-            ),
-            const SizedBox(height: EspacosTrato.x3),
-            for (final servico in recentes) ...[
-              CartaoServicoRecente(
-                servico: servico,
-                aoTocar: () => aoAbrirServico?.call(servico),
-              ),
-              const SizedBox(height: EspacosTrato.x3),
-            ],
-          ],
         ],
       ),
     );
