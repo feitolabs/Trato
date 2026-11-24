@@ -419,11 +419,9 @@ def recusar_orcamento(
     if pedido.estado not in (Estado.ABERTO, Estado.RESERVADO):
         if pedido.estado == Estado.ORCAMENTO_ACEITO:
             raise HTTPException(409, "Este pedido já tem um orçamento aceito.")
-        raise HTTPException(
-            409, f"Não é possível recusar orçamento com o pedido em {pedido.estado.nome}."
-        )
+        raise HTTPException(409, "Este pedido não aceita mais recusa de orçamento.")
     if orc.status != "enviado":
-        raise HTTPException(409, f"Orçamento em estado '{orc.status}' não pode ser recusado.")
+        raise HTTPException(409, "Este orçamento não pode mais ser recusado.")
     mudou = contexto.orcamentos.recusar(pedido.id, orc.id)
     if mudou:
         notificador = getattr(request.app.state, "notificador", None)

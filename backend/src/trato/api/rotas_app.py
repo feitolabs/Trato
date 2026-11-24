@@ -1298,6 +1298,20 @@ def _verificacao_out(v) -> VerificacaoOut:
     )
 
 
+_ROTULO_NIVEL = {"verificado": "padrão", "verificado_plus": "reforçada"}
+_ROTULO_DOCUMENTO = {
+    "documento_frente": "frente do documento",
+    "documento_verso": "verso do documento",
+    "selfie": "selfie",
+    "antecedentes": "certidão de antecedentes",
+    "comprovante_endereco": "comprovante de endereço",
+    "registro_profissional": "registro profissional",
+    "curso_nr10": "curso NR-10",
+    "seguro": "seguro",
+    "outro": "outro documento",
+}
+
+
 @router.post(
     "/profissional/verificacao",
     response_model=VerificacaoOut,
@@ -1321,13 +1335,19 @@ def enviar_verificacao(
     cfg = obter_config_profissional()
     exigido = _nivel_exigido(request, usuario, cfg)
     if ORDEM_NIVEIS.index(corpo.nivel_solicitado) < ORDEM_NIVEIS.index(exigido):
-        raise HTTPException(422, f"Para as suas categorias é preciso o nível {exigido}.")
+        raise HTTPException(
+            422,
+            "Para as suas categorias é preciso a verificação "
+            + _ROTULO_NIVEL.get(exigido, "mais completa")
+            + ".",
+        )
     tipos = {d.tipo for d in corpo.documentos}
     if not tipos <= set(TIPOS_DOCUMENTO):
         raise HTTPException(422, "Tipo de documento inválido.")
     faltam = set(cfg.verificacao_documentos_obrigatorios[corpo.nivel_solicitado]) - tipos
     if faltam:
-        raise HTTPException(422, f"Faltam documentos: {', '.join(sorted(faltam))}.")
+        nomes = [_ROTULO_DOCUMENTO.get(t, "outro documento") for t in sorted(faltam)]
+        raise HTTPException(422, f"Faltam documentos: {', '.join(nomes)}.")
     agora = contexto.agora()
     excluir_em = agora + timedelta(days=cfg.verificacao_retencao_dias)
     docs = _documentos_da_verificacao(request, corpo, usuario, excluir_em)
