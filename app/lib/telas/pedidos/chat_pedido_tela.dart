@@ -97,6 +97,30 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   var _reenviando = false;
   var _contadorChave = 0;
 
+  /// Mensagens que ainda estão saindo (a rede pode demorar a responder).
+  final Set<MensagemChat> _emEnvio = Set.identity();
+
+  /// A conversa relida mais o que ainda não saiu deste aparelho: sem internet a leitura volta do
+  /// cache, sem a mensagem nova, e ela não pode sumir da tela. Chamar antes de trocar [_conversa].
+  List<MensagemChat> _comPendentes(ConversaPedido nova) {
+    int quantas(Iterable<MensagemChat> lista, String? texto) =>
+        lista.where((m) => m.minha && m.texto == texto).length;
+    // Se o servidor já devolveu a mensagem (a resposta do envio ainda não chegou), não repete.
+    final chegaram = <String?, int>{};
+    final pendentes = <MensagemChat>[];
+    for (final m in _mensagens) {
+      if (!_emEnvio.contains(m) && !_aguardando.containsKey(m)) continue;
+      final novas = chegaram[m.texto] ??=
+          quantas(nova.mensagens, m.texto) - quantas(_conversa.mensagens, m.texto);
+      if (novas > 0) {
+        chegaram[m.texto] = novas - 1;
+      } else {
+        pendentes.add(m);
+      }
+    }
+    return [...nova.mensagens, ...pendentes];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -112,10 +136,10 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   void didUpdateWidget(covariant ChatPedidoTela oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.conversa != widget.conversa) {
-      _conversa = widget.conversa;
-      if (_conversa.mensagens.length >= _mensagens.length - _enviosPendentes) {
-        _mensagens = [..._conversa.mensagens, ..._aguardando.keys];
+      if (widget.conversa.mensagens.length >= _mensagens.length - _enviosPendentes) {
+        _mensagens = _comPendentes(widget.conversa);
       }
+      _conversa = widget.conversa;
       _garantirPreferenciaSugestoes();
     }
   }
@@ -127,12 +151,14 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       final atualizada = await recarregar();
       if (!mounted) return;
       setState(() {
-        _conversa = atualizada;
         if (atualizada.mensagens.length >= _mensagens.length - _enviosPendentes) {
-          _mensagens = [...atualizada.mensagens, ..._aguardando.keys];
+          _mensagens = _comPendentes(atualizada);
         }
+        _conversa = atualizada;
       });
       _garantirPreferenciaSugestoes();
+      // Leitura respondida pelo servidor e ainda há mensagem esperando: tenta de novo.
+      _aoMudarConexao();
     } on Object {
       // Silencioso em segundo plano; próxima leitura tenta novamente.
     }
@@ -162,6 +188,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     final chave = 'msg-${DateTime.now().microsecondsSinceEpoch}-${_contadorChave++}';
     setState(() {
       _mensagens.add(otimista);
+      _emEnvio.add(otimista);
       _enviosPendentes++;
       if (digitada) _controlador.clear();
     });
@@ -190,7 +217,9 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
       }
     } finally {
       _emVoo.remove(conteudo);
+      _emEnvio.remove(otimista);
       if (!aguardar) _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
+      if (mounted) setState(() {});
     }
   }
 
@@ -204,6 +233,8 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
   }
 
   void _aoMudarConexao() {
+    if (!mounted) return;
+    setState(() {}); // o "Aguardando conexão" de quem ainda está saindo acompanha o aviso
     if (EstadoConexao.online.value && _aguardando.isNotEmpty) unawaited(_reenviarAguardando());
   }
 
@@ -253,6 +284,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
         );
         setState(() {
           _mensagens.add(otimista);
+          _emEnvio.add(otimista);
           _enviosPendentes++;
         });
         try {
@@ -262,6 +294,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
             setState(() => _mensagens.remove(otimista));
           }
         } finally {
+          _emEnvio.remove(otimista);
           _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
         }
       }
@@ -389,7 +422,8 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
 
     return _LinhaMensagem(
       mensagem: m,
-      aguardandoConexao: _aguardando.containsKey(m),
+      aguardandoConexao: _aguardando.containsKey(m) ||
+          (_emEnvio.contains(m) && !EstadoConexao.online.value),
       podeAceitarProposta: podeAceitar,
       aoAceitarContraproposta: widget.aoAceitarContraproposta == null
           ? null

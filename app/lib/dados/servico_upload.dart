@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show IOException;
 
 import 'package:http/http.dart' as http;
 
@@ -112,6 +113,8 @@ class ServicoUploadApi implements ServicoUpload {
           .timeout(const Duration(seconds: 60));
       if (r.statusCode < 200 || r.statusCode >= 300) throw ErroTrato.servidor;
     } on http.ClientException {
+      throw ErroTrato.semInternet;
+    } on IOException {
       throw ErroTrato.semInternet;
     } on TimeoutException {
       throw ErroTrato.semInternet;

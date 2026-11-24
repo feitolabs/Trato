@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show SocketException;
+import 'dart:io' show IOException;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -55,7 +55,8 @@ class ClienteApi {
     } on TimeoutException {
       EstadoConexao.marcarOffline();
       throw ErroTrato.semInternet;
-    } on SocketException {
+    } on IOException {
+      // Socket, TLS/handshake e HTTP interrompido: no aparelho sem rede vem qualquer um deles.
       EstadoConexao.marcarOffline();
       throw ErroTrato.semInternet;
     } on http.ClientException {
@@ -155,7 +156,8 @@ class ClienteApi {
           return resposta;
         } on TimeoutException {
           if (tentativa == maxTentativas) _semRede();
-        } on SocketException {
+        } on IOException {
+          // Socket, TLS/handshake e HTTP interrompido também são "sem internet".
           if (tentativa == maxTentativas) _semRede();
         } on http.ClientException {
           if (tentativa == maxTentativas) _semRede();

@@ -3245,6 +3245,10 @@ abstract final class RotasTrato {
               if (e.tipo == TipoErro.semInternet) rethrow;
               if (context.mounted) _aviso(context, e);
               throw StateError('Falha ao enviar mensagem');
+            } on Object catch (e) {
+              // Qualquer outra falha também avisa: a mensagem nunca some calada.
+              if (context.mounted) _aviso(context, e);
+              rethrow;
             }
           },
           aoEnviarFoto: (ref) async {
