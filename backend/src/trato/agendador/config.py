@@ -21,7 +21,8 @@ class ConfigAgendador(BaseSettings):
     # Pedidos concluídos há até N dias ainda são vigiados (podem ter saldo a liberar).
     dias_concluidos_monitorados: int = 60
     # 0 = sem lembrete de agendamento; N = avisa quando faltam N horas para a janela do serviço.
-    lembrete_agenda_horas: int = 0
+    # Padrão 2 h; TRATO_AGENDADOR_LEMBRETE_AGENDA_HORAS=0 desliga.
+    lembrete_agenda_horas: int = 2
 
 
 @lru_cache

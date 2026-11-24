@@ -183,3 +183,29 @@ def test_rodar_sempre_para_quando_pedem(amb):
     agendador.rodar_uma_vez = contar
     agendador.rodar_sempre(parar, 0.01)
     assert ciclos == [1]
+
+
+def test_lembrete_padrao_e_de_2_horas_e_pode_ser_desligado(monkeypatch):
+    from trato.agendador.config import ConfigAgendador
+
+    monkeypatch.delenv("TRATO_AGENDADOR_LEMBRETE_AGENDA_HORAS", raising=False)
+    assert ConfigAgendador(_env_file=None).lembrete_agenda_horas == 2
+    monkeypatch.setenv("TRATO_AGENDADOR_LEMBRETE_AGENDA_HORAS", "0")
+    assert ConfigAgendador(_env_file=None).lembrete_agenda_horas == 0
+
+
+def test_lembrete_2h_avisa_cliente_e_profissional_sem_duplicar(amb):
+    from trato.pedidos.estados import Janela
+
+    # Faltam 3 h: ainda cedo para o lembrete de 2 h.
+    amb.semear_pedido(Estado.AGENDADO, janela=Janela(AGORA + 3 * H, AGORA + 5 * H))
+    cedo, _, _ = montar(amb, antecedencia_lembrete_agenda=2 * H)
+    assert cedo.rodar_uma_vez().lembretes_agenda == 0
+    # Faltam 2 h: ambos recebem, e o segundo ciclo não repete.
+    amb.semear_pedido(Estado.AGENDADO, janela=Janela(AGORA + 2 * H, AGORA + 4 * H))
+    agendador, notif, _ = montar(amb, antecedencia_lembrete_agenda=2 * H)
+    assert agendador.rodar_uma_vez().lembretes_agenda == 2
+    assert agendador.rodar_uma_vez().lembretes_agenda == 0
+    for pessoa in (CLIENTE.id, PROFISSIONAL.id):
+        tipos = [n.tipo for n in notif.repo.listar(pessoa, False, 5)]
+        assert tipos.count("agenda.lembrete") == 1, pessoa
