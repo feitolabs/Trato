@@ -461,6 +461,8 @@ def transicionar(
     if ator.papel not in regra.quem:
         raise AtorNaoAutorizado(f"{papel} não pode {regra.rotulo}.")
     if pedido.estado not in regra.quem[ator.papel]:
+        if acao == Acao.ACEITAR_ORCAMENTO and pedido.estado == Estado.ORCAMENTO_ACEITO:
+            raise EstadoInvalido("Este pedido já tem um orçamento aceito.")
         raise EstadoInvalido(
             f"{papel} não pode {regra.rotulo} com o pedido em {pedido.estado.nome}."
         )

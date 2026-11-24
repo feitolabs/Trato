@@ -416,6 +416,12 @@ def recusar_orcamento(
         raise HTTPException(409, "Este orçamento já foi aceito.")
     if orc.status == "recusado":
         return RecusarOrcamentoOut(orcamento_id=orc.id, pedido_id=pedido.id, status="recusado")
+    if pedido.estado not in (Estado.ABERTO, Estado.RESERVADO):
+        if pedido.estado == Estado.ORCAMENTO_ACEITO:
+            raise HTTPException(409, "Este pedido já tem um orçamento aceito.")
+        raise HTTPException(
+            409, f"Não é possível recusar orçamento com o pedido em {pedido.estado.nome}."
+        )
     if orc.status != "enviado":
         raise HTTPException(409, f"Orçamento em estado '{orc.status}' não pode ser recusado.")
     mudou = contexto.orcamentos.recusar(pedido.id, orc.id)

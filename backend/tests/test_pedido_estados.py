@@ -304,7 +304,7 @@ def test_nao_confirma_conclusao_em_andamento():
 
 
 def test_nao_aceita_orcamento_duas_vezes():
-    with pytest.raises(EstadoInvalido):
+    with pytest.raises(EstadoInvalido, match="Este pedido já tem um orçamento aceito."):
         ir(aceito(), Acao.ACEITAR_ORCAMENTO, CLIENTE, prova=ProvaAceite("o2", "p2"))
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from conftest import OUTRO_PROFISSIONAL, PROFISSIONAL, cab
 
@@ -189,3 +191,23 @@ def test_falha_na_transacao_nao_envia_aviso(amb, monkeypatch):
     assert r.status_code == 409, r.text
     assert _avisos(repo, PERDEDOR_B) == []
     assert _avisos(repo, PERDEDOR_C) == []
+
+
+def test_recusar_outro_orcamento_com_pedido_ja_aceito_da_409_humano(amb):
+    _ligar(amb)
+    _pedido_com_tres_orcamentos(amb)
+    # orc-b segue "enviado", mas o pedido já está com outro orçamento aceito.
+    pedido = amb.contexto.pedidos.obter("ped-1")
+    amb.contexto.pedidos.salvar(replace(pedido, estado=E.ORCAMENTO_ACEITO))
+    r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos/orc-b/recusar", headers=cab("t-cliente"))
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "Este pedido já tem um orçamento aceito."
+
+
+def test_aceitar_de_novo_com_pedido_ja_aceito_da_mensagem_humana(amb):
+    _ligar(amb)
+    _pedido_com_tres_orcamentos(amb)
+    assert _aceitar(amb).status_code == 200
+    r = _aceitar(amb, "orc-b")
+    assert r.status_code == 409, r.text
+    assert "Este pedido já tem um orçamento aceito." in r.text
