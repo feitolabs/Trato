@@ -27,7 +27,11 @@ class PerfilPublicoTela extends StatefulWidget {
     this.aoAbrirVerificacao,
     this.carregarTratinhosPendentes,
     this.compartilharPerfil,
+    this.aoAbrirIndicacoes,
   });
+
+  /// Abre o "Indique e ganhe". O card só aparece com isso.
+  final VoidCallback? aoAbrirIndicacoes;
 
   /// Compartilha o texto de divulgação do perfil. O botão "Compartilhar meu perfil" só aparece
   /// com isso; sem compartilhamento no aparelho, o texto é copiado.
@@ -261,6 +265,21 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   subtitle: Text('Enviar ou acompanhar documentos', style: TipografiaTrato.legenda),
                   trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoAbrirVerificacao,
+                ),
+              ),
+            ],
+            if (widget.aoAbrirIndicacoes != null) ...[
+              const SizedBox(height: EspacosTrato.x3),
+              Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  key: const Key('abrir-indique-e-ganhe'),
+                  leading: Icon(Icons.card_giftcard_outlined, color: context.cores.petroleo),
+                  title: Text('Indique e ganhe', style: TipografiaTrato.corpoForte),
+                  subtitle: Text('Convide amigos e ganhe Tratinhos', style: TipografiaTrato.legenda),
+                  trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
+                  onTap: widget.aoAbrirIndicacoes,
                 ),
               ),
             ],

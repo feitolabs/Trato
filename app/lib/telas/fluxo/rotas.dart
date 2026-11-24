@@ -61,6 +61,9 @@ import '../ajuda/servico_ajuda_local.dart';
 import '../comuns/botao_de_confianca.dart';
 import '../comuns/convite.dart';
 import '../comuns/denuncia_folha.dart';
+import '../indicacoes/indique_e_ganhe_tela.dart';
+import '../indicacoes/modelos.dart';
+import '../indicacoes/servico_fake.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhosPendentes;
 import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
@@ -1799,6 +1802,7 @@ abstract final class RotasTrato {
             servico: servico,
             aoCapturarFotoPerfil: _fotografarPerfil,
             compartilharPerfil: compartilharNoAparelho,
+            aoAbrirIndicacoes: () => abrirIndicacoes(context),
             carregarTratinhosPendentes: () async {
               final ex = (await repos.profissional.minhasExclusividades());
               return textoTratinhosPendentes(
@@ -1950,6 +1954,8 @@ abstract final class RotasTrato {
                   );
                 case AcaoPerfil.contatosConfianca:
                   _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
+                case AcaoPerfil.indiqueEGanhe:
+                  abrirIndicacoes(context, valorMoedaCentavos: perfil.moedasValorCentavos);
                 default:
                   break;
               }
@@ -2013,12 +2019,22 @@ abstract final class RotasTrato {
   }
 
   static final ServicoConta _contaDemo = ServicoContaFake();
+
+  static final ServicoIndicacoes _indicacoesDemo = ServicoIndicacoesFake();
+  static ServicoIndicacoes get _indicacoes => repos.indicacoes ?? _indicacoesDemo;
+
+  /// "Indique e ganhe": meu código, resumo, lista e o campo de código de quem chegou por convite.
+  static void abrirIndicacoes(BuildContext context, {int? valorMoedaCentavos}) => _abrir<void>(
+        context,
+        IndiqueEGanheTela(servico: _indicacoes, valorMoedaCentavos: valorMoedaCentavos),
+      );
   static ServicoConta get _conta => repos.conta ?? _contaDemo;
 
   /// O que fica no Perfil do cliente: o que ele usa no dia a dia. O resto mora em Configurações.
   static const _acoesNoPerfil = {
     AcaoPerfil.enderecos,
     AcaoPerfil.favoritos,
+    AcaoPerfil.indiqueEGanhe,
     AcaoPerfil.usarComoProfissional,
   };
 

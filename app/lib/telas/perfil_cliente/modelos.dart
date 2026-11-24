@@ -6,6 +6,7 @@ enum AcaoPerfil {
   enderecos,
   formasPagamento,
   favoritos,
+  indiqueEGanhe,
   contatosConfianca,
   notificacoes,
   usarComoProfissional,

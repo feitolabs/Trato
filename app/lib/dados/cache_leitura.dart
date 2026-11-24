@@ -87,6 +87,7 @@ class CacheLeitura {
     RegExp(r'^/v1/me$'),
     RegExp(r'^/v1/me/(dados-pessoais|enderecos|favoritos|moedas)$'),
     RegExp(r'^/v1/notificacoes$'),
+    RegExp(r'^/v1/indicacoes/meu-codigo$'),
     RegExp(r'^/v1/profissional/(pedidos-abertos(/[^/]+)?|orcamentos|perfil)$'),
     RegExp(r'^/v1/profissionais/me/saldo$'),
     RegExp(r'^/v1/profissionais/[^/]+$'),

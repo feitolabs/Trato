@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import '../telas/conta/modelos.dart';
+import '../telas/indicacoes/modelos.dart';
 import 'servico_cep.dart';
+import 'servico_indicacoes_api.dart';
 import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';
@@ -50,6 +52,7 @@ class RepositoriosTrato {
     this.primeirosPassos,
     this.privacidade,
     this.conta,
+    this.indicacoes,
     this.cep,
     this.mensagens,
     this.mensagensProfissional,
@@ -69,6 +72,9 @@ class RepositoriosTrato {
 
   /// Dados pessoais, endereços, favoritos e contatos de confiança (`/v1/me/...`).
   final ServicoConta? conta;
+
+  /// Indique e ganhe (`/v1/indicacoes/...`). Nulo = demonstração.
+  final ServicoIndicacoes? indicacoes;
 
   /// Consulta de endereço por CEP (`GET /v1/cep/{cep}`).
   final ServicoCep? cep;
@@ -126,6 +132,7 @@ class RepositoriosTrato {
       primeirosPassos: ServicoPrimeirosPassosApi(api),
       privacidade: ServicoPrivacidadeApi(api),
       conta: ServicoContaApi(api),
+      indicacoes: ServicoIndicacoesApi(api),
       cep: ServicoCepApi(api),
       capturaVerificacao:
           camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
