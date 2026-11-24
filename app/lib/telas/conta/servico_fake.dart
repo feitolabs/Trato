@@ -163,4 +163,25 @@ class ServicoContaFake implements ServicoConta {
     _checar();
     _contatos.removeWhere((c) => c.id == id);
   }
+
+  /// Denúncias enviadas (só para teste e demonstração).
+  final List<Map<String, String?>> denuncias = [];
+
+  @override
+  Future<void> enviarDenuncia({
+    required String alvoTipo,
+    required String denunciadoId,
+    String? pedidoId,
+    required String motivo,
+    required String detalhes,
+  }) async {
+    _checar();
+    denuncias.add({
+      'alvo_tipo': alvoTipo,
+      'denunciado_id': denunciadoId,
+      'pedido_id': pedidoId,
+      'motivo': motivo,
+      'detalhes': detalhes,
+    });
+  }
 }

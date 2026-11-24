@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../comuns/denuncia_folha.dart' show MenuDenunciar;
 import 'avatar_de_usuario.dart';
 import 'avatar_iniciais.dart' show SeloVerificacao;
 import 'cartao_avaliacao.dart';
@@ -21,7 +22,11 @@ class PerfilProfissionalTela extends StatelessWidget {
     this.aoVerAvaliacoes,
     this.favoritoAtual,
     this.aoMudarFavorito,
+    this.aoDenunciar,
   }) : assert(profissional.detalhe != null);
+
+  /// Denunciar o perfil. Fica de fora quando é o próprio perfil de quem está vendo.
+  final VoidCallback? aoDenunciar;
 
   final Profissional profissional;
   final ValueChanged<Profissional>? aoPedirOrcamento;
@@ -40,6 +45,7 @@ class PerfilProfissionalTela extends StatelessWidget {
         actions: [
           if (favoritoAtual != null && aoMudarFavorito != null)
             _BotaoFavorito(atual: favoritoAtual!, aoMudar: aoMudarFavorito!),
+          if (aoDenunciar != null) MenuDenunciar(aoDenunciar: aoDenunciar!),
         ],
       ),
       body: SafeArea(

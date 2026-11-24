@@ -138,4 +138,24 @@ class ServicoContaApi implements ServicoConta {
   Future<void> removerContato(String id) async {
     await _api.delete('/v1/me/contatos-confianca/$id');
   }
+
+  @override
+  Future<void> enviarDenuncia({
+    required String alvoTipo,
+    required String denunciadoId,
+    String? pedidoId,
+    required String motivo,
+    required String detalhes,
+  }) async {
+    await _api.post(
+      '/v1/denuncias',
+      corpo: {
+        'alvo_tipo': alvoTipo,
+        'denunciado_id': denunciadoId,
+        if (pedidoId != null && pedidoId.isNotEmpty) 'pedido_id': pedidoId,
+        'motivo': motivo,
+        'detalhes': detalhes.trim(),
+      },
+    );
+  }
 }

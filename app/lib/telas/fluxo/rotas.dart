@@ -60,6 +60,7 @@ import '../ajuda/ajuda_tela.dart';
 import '../ajuda/servico_ajuda_local.dart';
 import '../comuns/botao_de_confianca.dart';
 import '../comuns/convite.dart';
+import '../comuns/denuncia_folha.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhosPendentes;
 import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
@@ -482,6 +483,9 @@ abstract final class RotasTrato {
               aoMudarFavorito: perfil.id == null || ehProprio
                   ? null
                   : (v) => v ? _conta.favoritar(perfil.id!) : _conta.desfavoritar(perfil.id!),
+              aoDenunciar: perfil.id == null || ehProprio
+                  ? null
+                  : () => denunciar(context, alvoTipo: 'perfil', denunciadoId: perfil.id!),
             );
           },
         ),
@@ -573,6 +577,27 @@ abstract final class RotasTrato {
   /// Acompanhamento do pedido: a MESMA tela para quem vem da lista e da notificação.
   static void abrirServico(BuildContext context, String pedidoId) =>
       _abrir<void>(context, _pedidoEmExecucao(pedidoId));
+
+  /// Denuncia um perfil (`alvoTipo: 'perfil'`) ou a conversa de um pedido (`'chat'`, com [pedidoId]):
+  /// abre a folha de motivo + detalhes e envia (`POST /v1/denuncias`). Avisa ao concluir.
+  static Future<void> denunciar(
+    BuildContext context, {
+    required String alvoTipo,
+    required String denunciadoId,
+    String? pedidoId,
+  }) async {
+    final enviou = await mostrarFolhaDenuncia(
+      context,
+      enviar: (motivo, detalhes) => _conta.enviarDenuncia(
+        alvoTipo: alvoTipo,
+        denunciadoId: denunciadoId,
+        pedidoId: pedidoId,
+        motivo: motivo.codigo,
+        detalhes: detalhes,
+      ),
+    );
+    if (enviou == true && context.mounted) _avisoSimples(context, avisoDenunciaEnviada);
+  }
 
   /// Pede o motivo, confirma e cancela. Quem decide se pode e cuida de eventuais devoluções é
   /// o atendimento e processamento do app; em caso de recusa, a pessoa vê o motivo.
@@ -2979,6 +3004,14 @@ abstract final class RotasTrato {
         return ChatPedidoTela(
           conversa: conversa,
           aoAbrirPerfil: aoAbrirPerfilChat,
+          aoDenunciar: (conversa.usuarioId == null || conversa.usuarioId!.isEmpty)
+              ? null
+              : () => denunciar(
+                    context,
+                    alvoTipo: 'chat',
+                    denunciadoId: conversa.usuarioId!,
+                    pedidoId: pedidoId,
+                  ),
           aoCapturarFoto: _fotografar,
           aoRecarregar: repos.modoApi ? carregarConversa : null,
           aoSugerirAgenda: podeCombinarAgenda

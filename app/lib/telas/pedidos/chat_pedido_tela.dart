@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../dados/repositorios.dart' show ResumoPerfilCliente;
 import '../../tema/tema.dart';
+import '../comuns/denuncia_folha.dart' show MenuDenunciar;
 import '../comuns/formato_aparelho.dart';
 import 'modelos.dart';
 import 'pecas.dart';
@@ -28,6 +29,7 @@ class ChatPedidoTela extends StatefulWidget {
     this.aoAceitarAgenda,
     this.aoSugerirAgenda,
     this.aoAbrirPerfil,
+    this.aoDenunciar,
     this.intervaloAtualizacao = const Duration(seconds: 4),
     this.horaAgora = _horaPadrao,
   });
@@ -56,6 +58,9 @@ class ChatPedidoTela extends StatefulWidget {
 
   /// Abre o perfil da outra parte ao tocar no avatar/nome no cabeçalho do chat.
   final VoidCallback? aoAbrirPerfil;
+
+  /// Denunciar a outra pessoa da conversa; sem isso, o menu não aparece.
+  final VoidCallback? aoDenunciar;
   final Duration intervaloAtualizacao;
 
   /// Hora mostrada na mensagem recém-enviada (injetável nos testes).
@@ -244,6 +249,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
             _Cabecalho(
               conversa: conversa,
               aoAbrirPerfil: widget.aoAbrirPerfil,
+              aoDenunciar: widget.aoDenunciar,
               aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
               aoProporNovaCondicao: conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
               aoSugerirAgenda: widget.aoSugerirAgenda == null
@@ -335,6 +341,7 @@ class _Cabecalho extends StatelessWidget {
   const _Cabecalho({
     required this.conversa,
     this.aoAbrirPerfil,
+    this.aoDenunciar,
     this.aoAtualizar,
     this.aoProporNovaCondicao,
     this.aoSugerirAgenda,
@@ -342,6 +349,7 @@ class _Cabecalho extends StatelessWidget {
 
   final ConversaPedido conversa;
   final VoidCallback? aoAbrirPerfil;
+  final VoidCallback? aoDenunciar;
   final Future<void> Function()? aoAtualizar;
   final Future<void> Function()? aoProporNovaCondicao;
   final Future<void> Function()? aoSugerirAgenda;
@@ -435,8 +443,9 @@ class _Cabecalho extends StatelessWidget {
                     onPressed: aoAtualizar,
                     icon: const Icon(Icons.refresh, size: 20),
                   )
-                else
+                else if (aoDenunciar == null)
                   const SizedBox(width: EspacosTrato.x4),
+                if (aoDenunciar != null) MenuDenunciar(aoDenunciar: aoDenunciar!),
               ],
             ),
           ),
