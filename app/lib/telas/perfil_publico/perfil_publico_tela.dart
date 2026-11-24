@@ -8,6 +8,7 @@ import '../cliente/avatar_iniciais.dart';
 import '../cliente/cartao_avaliacao.dart';
 import '../cliente/etiquetas_elogio.dart';
 import '../cliente/modelos.dart' show formatarNota;
+import '../comuns/convite.dart' show CompartilharTexto, compartilharMeuPerfil, textoDivulgacaoPerfil;
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import '../profissional_apoio/apoio.dart';
 import 'perfil_publico.dart';
@@ -25,7 +26,12 @@ class PerfilPublicoTela extends StatefulWidget {
     this.aoAbrirConfiguracoes,
     this.aoAbrirVerificacao,
     this.carregarTratinhosPendentes,
+    this.compartilharPerfil,
   });
+
+  /// Compartilha o texto de divulgação do perfil. O botão "Compartilhar meu perfil" só aparece
+  /// com isso; sem compartilhamento no aparelho, o texto é copiado.
+  final CompartilharTexto? compartilharPerfil;
 
   /// Texto dos Tratinhos a liberar ("Você tem 50 Tratinhos a liberar em 27/11"); nulo = não mostra.
   final Future<String?> Function()? carregarTratinhosPendentes;
@@ -269,6 +275,18 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   subtitle: Text('Trocar para contratar serviços', style: TipografiaTrato.legenda),
                   trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoUsarComoCliente,
+                ),
+              ),
+            ],
+            if (widget.compartilharPerfil != null) ...[
+              const SizedBox(height: EspacosTrato.x4),
+              BotaoSecundario(
+                key: const Key('compartilhar-meu-perfil'),
+                texto: 'Compartilhar meu perfil',
+                aoTocar: () => compartilharMeuPerfil(
+                  context,
+                  textoDivulgacaoPerfil(nome: p.nome, categoria: p.categoria, cidade: p.cidade),
+                  compartilhar: widget.compartilharPerfil!,
                 ),
               ),
             ],

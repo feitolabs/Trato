@@ -9,6 +9,7 @@ import 'auth/servico_auth_supabase.dart';
 import 'telas/auth/login_tela.dart';
 import 'telas/auth/nova_senha_tela.dart';
 import 'dados/cliente_api.dart';
+import 'componentes/banner_sem_conexao.dart';
 import 'dados/config.dart';
 import 'dados/fila_offline.dart';
 import 'dados/fila_offline_arquivo.dart';
@@ -168,7 +169,20 @@ class TratoApp extends StatelessWidget {
         theme: TemaTrato.claro,
         darkTheme: TemaTrato.escuro,
         themeMode: themeMode ?? ControladorTema.instancia.modo,
-        builder: (context, filho) => EscalaFonteLimitada(child: filho!),
+        builder: (context, filho) => EscalaFonteLimitada(
+          child: Stack(
+            children: [
+              filho!,
+              // Faixa discreta; só aparece quando a camada de API perde a rede.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: BannerSemConexao(aoTentarNovamente: () => RotasTrato.pedidosMudaram.value++),
+              ),
+            ],
+          ),
+        ),
         home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
       ),
     );

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'erros.dart';
+import 'estado_conexao.dart';
 import 'sessao.dart';
 
 /// Cliente HTTP da API do Trato: URL base, cabeçalho Authorization, tempo limite e erros em
@@ -44,12 +45,16 @@ class ClienteApi {
     try {
       resposta = await tentar();
     } on TimeoutException {
+      EstadoConexao.marcarOffline();
       throw ErroTrato.semInternet;
     } on SocketException {
+      EstadoConexao.marcarOffline();
       throw ErroTrato.semInternet;
     } on http.ClientException {
+      EstadoConexao.marcarOffline();
       throw ErroTrato.semInternet;
     }
+    EstadoConexao.marcarOnline();
     if (resposta.statusCode == 401 && sessao.logada) {
       final anterior = sessao.token;
       final novo = await sessao.renovarToken();
@@ -126,6 +131,7 @@ class ClienteApi {
       for (var tentativa = 1; tentativa <= maxTentativas; tentativa++) {
         try {
           final resposta = await tentar();
+          EstadoConexao.marcarOnline();
           if (resposta.statusCode == 429 && permitirRetry && tentativa < maxTentativas) {
             if (intervaloBaseRetry > Duration.zero) {
               final esperaMs = delayMs > 0 ? delayMs * 2 : 500;
@@ -136,18 +142,18 @@ class ClienteApi {
           }
           return resposta;
         } on TimeoutException {
-          if (tentativa == maxTentativas) throw ErroTrato.semInternet;
+          if (tentativa == maxTentativas) _semRede();
         } on SocketException {
-          if (tentativa == maxTentativas) throw ErroTrato.semInternet;
+          if (tentativa == maxTentativas) _semRede();
         } on http.ClientException {
-          if (tentativa == maxTentativas) throw ErroTrato.semInternet;
+          if (tentativa == maxTentativas) _semRede();
         }
         if (delayMs > 0) {
           await Future.delayed(Duration(milliseconds: delayMs));
           delayMs *= 2;
         }
       }
-      throw ErroTrato.semInternet;
+      _semRede();
     }
 
     var resposta = await executarComRetry();
@@ -159,6 +165,12 @@ class ClienteApi {
       if (novo != null && novo != anterior) resposta = await tentar();
     }
     return _tratar(resposta);
+  }
+
+  /// Falha de rede: avisa o banner "Sem conexão" e lança o erro de sempre.
+  Never _semRede() {
+    EstadoConexao.marcarOffline();
+    throw ErroTrato.semInternet;
   }
 
   Object? _tratar(http.Response resposta) {

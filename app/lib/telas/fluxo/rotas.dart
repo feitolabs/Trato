@@ -1697,6 +1697,7 @@ abstract final class RotasTrato {
           return PerfilPublicoTela(
             servico: servico,
             aoCapturarFotoPerfil: _fotografarPerfil,
+            compartilharPerfil: compartilharNoAparelho,
             carregarTratinhosPendentes: () async {
               final ex = (await repos.profissional.minhasExclusividades());
               return textoTratinhosPendentes(

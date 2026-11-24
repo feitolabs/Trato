@@ -27,6 +27,36 @@ Future<void> compartilharArquivoNoAparelho(String caminho) async {
   }
 }
 
+/// Texto pronto para o profissional divulgar o próprio perfil (WhatsApp, redes). Sem link de
+/// loja por enquanto: convida a procurar o nome no Trato.
+String textoDivulgacaoPerfil({required String nome, String categoria = '', String cidade = ''}) {
+  final oQue = categoria.trim().isEmpty ? 'profissional' : categoria.trim();
+  final onde = cidade.trim().isEmpty ? '' : ' em ${cidade.trim()}';
+  return 'Oi! Sou $nome, $oQue$onde. Agora você pode me contratar pelo Trato: '
+      'orçamento grátis, pagamento protegido e sem taxa. '
+      'Procure por "$nome" no app Trato.';
+}
+
+/// Compartilha o texto do perfil; sem compartilhamento (teste, desktop) copia e avisa
+/// "Texto copiado! Cole no WhatsApp para divulgar.".
+Future<void> compartilharMeuPerfil(
+  BuildContext context,
+  String texto, {
+  CompartilharTexto compartilhar = compartilharNoAparelho,
+}) async {
+  final mensagens = ScaffoldMessenger.of(context);
+  try {
+    await compartilhar(texto);
+    return;
+  } on Object {
+    // cai no copiar
+  }
+  await Clipboard.setData(ClipboardData(text: texto));
+  mensagens
+    ..hideCurrentSnackBar()
+    ..showSnackBar(const SnackBar(content: Text('Texto copiado! Cole no WhatsApp para divulgar.')));
+}
+
 /// Compartilha o convite; se o compartilhamento falhar ou não existir (teste, desktop),
 /// copia o texto e avisa com "Convite copiado!".
 Future<void> indicarOTrato(
