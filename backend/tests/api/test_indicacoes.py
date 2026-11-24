@@ -255,11 +255,12 @@ def test_profissional_indicando_profissional_vai_para_a_carteira_do_profissional
 
 def test_profissional_indica_cliente_cai_na_carteira_certa_de_cada_um(ind):
     executor, _ = _executor(ind)
-    assert _aplicar(ind, "cli-1", _codigo(ind, "pro-1")).status_code == 201
+    # O indicador (pro-2) não é o profissional do pedido (pro-1): o serviço vale.
+    assert _aplicar(ind, "cli-1", _codigo(ind, "pro-2")).status_code == 201
     _concluir(ind)
     assert executor.liberar_indicacoes(AGORA + 8 * D) == 1
     moedas = ind.contexto.moedas
-    assert moedas.saldo("pro-1", AGORA + 8 * D, "profissional") == 150
+    assert moedas.saldo("pro-2", AGORA + 8 * D, "profissional") == 150
     assert moedas.saldo("cli-1", AGORA + 8 * D, "cliente") == 300
 
 

@@ -324,11 +324,12 @@ def test_reajuste_so_vale_com_o_aceite_do_cliente(rec):
     executor.gerar_visitas_recorrentes(AGORA)
     (v1,) = rec.contexto.recorrencias.visitas(rid)
     assert rec.contexto.orcamentos.do_pedido(v1.pedido_id)[0].valor_centavos == 100_000
-    assert _acao(rec, rid, "reajuste/aceitar", "t-prof").status_code == 403
-    ok = _acao(rec, rid, "reajuste/aceitar", "t-cliente")
+    corpo_aceite = {"valor_centavos": 120_000}
+    assert _acao(rec, rid, "reajuste/aceitar", "t-prof", json=corpo_aceite).status_code == 403
+    ok = _acao(rec, rid, "reajuste/aceitar", "t-cliente", json=corpo_aceite)
     assert ok.status_code == 200
     assert (ok.json()["valor_centavos"], ok.json()["valor_proposto_centavos"]) == (120_000, None)
-    assert _acao(rec, rid, "reajuste/aceitar", "t-cliente").status_code == 409
+    assert _acao(rec, rid, "reajuste/aceitar", "t-cliente", json=corpo_aceite).status_code == 409
     executor.gerar_visitas_recorrentes(AGORA + 7 * D)
     novas = [v for v in rec.contexto.recorrencias.visitas(rid) if v.id != v1.id]
     assert rec.contexto.orcamentos.do_pedido(novas[0].pedido_id)[0].valor_centavos == 120_000

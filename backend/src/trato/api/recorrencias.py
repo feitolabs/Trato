@@ -128,11 +128,12 @@ class RepositorioRecorrencias(Protocol):
         ...
 
     def propor_reajuste(self, recorrencia_id: str, valor_centavos: int) -> bool:
-        """Só em série ativa ou pausada. Substitui um reajuste anterior ainda sem resposta."""
+        """Só em série ativa ou pausada e SEM outro reajuste esperando resposta."""
         ...
 
-    def aceitar_reajuste(self, recorrencia_id: str) -> bool:
-        """`valor_centavos = valor_proposto_centavos` e zera a proposta (atômico)."""
+    def aceitar_reajuste(self, recorrencia_id: str, valor_centavos: int) -> bool:
+        """Aceita o reajuste pendente SÓ se `valor_proposto_centavos == valor_centavos`:
+        `valor_centavos` da série vira o proposto e a proposta zera (atômico)."""
         ...
 
     def recusar_reajuste(self, recorrencia_id: str) -> bool: ...
@@ -237,17 +238,18 @@ class RecorrenciasEmMemoria:
             recorrencia_id,
             lambda r: (
                 replace(r, valor_proposto_centavos=valor_centavos)
-                if r.status in (ST_ATIVA, ST_PAUSADA)
+                if r.status in (ST_ATIVA, ST_PAUSADA) and r.valor_proposto_centavos is None
                 else None
             ),
         )
 
-    def aceitar_reajuste(self, recorrencia_id: str) -> bool:
+    def aceitar_reajuste(self, recorrencia_id: str, valor_centavos: int) -> bool:
         return self._alterar(
             recorrencia_id,
             lambda r: (
                 replace(r, valor_centavos=r.valor_proposto_centavos, valor_proposto_centavos=None)
-                if r.valor_proposto_centavos is not None and r.status in (ST_ATIVA, ST_PAUSADA)
+                if r.valor_proposto_centavos == valor_centavos
+                and r.status in (ST_ATIVA, ST_PAUSADA)
                 else None
             ),
         )
@@ -365,6 +367,21 @@ def _pedido_da_visita(contexto: Any, rec: Recorrencia, visita: Visita, agora: da
     return gravado.id
 
 
+def _partes_aptas(contexto: Any, rec: Recorrencia) -> bool:
+    """Profissional ativo e aprovado (perfil de profissional) e cliente ativo."""
+    from trato.api.auth import PapelUsuario
+
+    profissional = contexto.usuarios.detalhe(rec.profissional_id)
+    cliente = contexto.usuarios.detalhe(rec.cliente_id)
+    return (
+        profissional is not None
+        and profissional.status == "ativo"
+        and profissional.papel is PapelUsuario.PROFISSIONAL
+        and cliente is not None
+        and cliente.status == "ativo"
+    )
+
+
 def gerar_visitas(
     contexto: Any, agora: datetime, avisar: Callable[[Recorrencia, Visita], None] | None = None
 ) -> int:
@@ -376,6 +393,12 @@ def gerar_visitas(
     repo = contexto.recorrencias
     criadas = 0
     for rec in repo.prontas_para_gerar(agora):
+        if not _partes_aptas(contexto, rec):
+            # Profissional fora (inativo ou sem aprovação) ou cliente inativo: sem visita nova;
+            # a série pausa e quem voltar a ficar apto a retoma pelo app.
+            if repo.mudar_status(rec.id, (ST_ATIVA,), ST_PAUSADA, agora):
+                log.warning("Recorrência %s pausada: parte inativa ou não aprovada", rec.id)
+            continue
         data = rec.proxima_visita_em
         try:
             with contexto.transacao():

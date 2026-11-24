@@ -161,17 +161,18 @@ class RecorrenciasPostgres:
     def propor_reajuste(self, recorrencia_id: str, valor_centavos: int) -> bool:
         return self._atualizar(
             "update public.recorrencias set valor_proposto_centavos = %s, atualizado_em = now() "
-            "where id = %s and status in ('ativa', 'pausada') returning id",
+            "where id = %s and status in ('ativa', 'pausada') "
+            "and valor_proposto_centavos is null returning id",
             (valor_centavos, recorrencia_id),
         )
 
-    def aceitar_reajuste(self, recorrencia_id: str) -> bool:
+    def aceitar_reajuste(self, recorrencia_id: str, valor_centavos: int) -> bool:
         return self._atualizar(
             "update public.recorrencias set valor_centavos = valor_proposto_centavos, "
             "valor_proposto_centavos = null, atualizado_em = now() "
-            "where id = %s and valor_proposto_centavos is not null "
+            "where id = %s and valor_proposto_centavos = %s "
             "and status in ('ativa', 'pausada') returning id",
-            (recorrencia_id,),
+            (recorrencia_id, valor_centavos),
         )
 
     def recusar_reajuste(self, recorrencia_id: str) -> bool:

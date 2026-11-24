@@ -6,7 +6,8 @@ status são UPDATEs condicionais, então duas rotinas ao mesmo tempo nunca liber
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +15,7 @@ import psycopg.errors
 
 from trato.api.indicacoes import (
     STATUS_AGUARDANDO,
+    STATUS_BLOQUEADO_FRAUDE,
     STATUS_CADASTRADO,
     STATUS_LIBERADO,
     ConfigIndicacao,
@@ -188,6 +190,24 @@ class IndicacoesPostgres:
                 ),
             ).fetchone()
         return linha is not None
+
+    def bloquear(self, indicacao_id: str, motivo: str, agora: datetime) -> bool:
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "update public.indicacoes set status = %s, motivo_bloqueio = %s, "
+                "bonus_indicador_tratinhos = 0, bonus_indicado_tratinhos = 0 "
+                "where id = %s and status = %s returning id",
+                (STATUS_BLOQUEADO_FRAUDE, motivo, indicacao_id, STATUS_CADASTRADO),
+            ).fetchone()
+        return linha is not None
+
+    @contextmanager
+    def trava_do_indicador(self, indicador_id: str) -> Iterator[None]:
+        """Advisory lock da transação por indicador: dois gatilhos do mesmo indicador se
+        enfileiram (o 2º só conta o limite depois do 1º confirmar)."""
+        with self._banco.transacao() as con:
+            con.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (indicador_id,))
+            yield
 
     def vencidas(self, agora: datetime) -> list[Indicacao]:
         with self._banco.transacao() as con:

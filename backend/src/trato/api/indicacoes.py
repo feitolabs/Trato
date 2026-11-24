@@ -25,7 +25,8 @@ import hashlib
 import logging
 import threading
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any, Protocol
@@ -61,6 +62,10 @@ class ConfigIndicacao:
     validade_dias: int = 90
     limite_mensal_cliente: int = 3
     limite_mensal_profissional: int = 5
+    # Antifraude: o pedido gatilho feito COM o próprio indicador (ele é o profissional do indicado
+    # ou o cliente do indicado) não conta. Desligue só se o produto aceitar o fluxo
+    # "profissional indica o cliente que o contrata" (o doc de 23/11 descreve esse fluxo).
+    bloquear_contraparte_indicador: bool = True
 
     def bonus_do_tipo(self, tipo: str) -> tuple[int, int]:
         return {
@@ -194,6 +199,14 @@ class RepositorioIndicacoes(Protocol):
         """cadastrado -> aguardando_liberacao (atômico). False se já não estava cadastrado."""
         ...
 
+    def bloquear(self, indicacao_id: str, motivo: str, agora: datetime) -> bool:
+        """cadastrado -> bloqueado_fraude (atômico), zerando os bônus. False se já não era."""
+        ...
+
+    def trava_do_indicador(self, indicador_id: str) -> AbstractContextManager[None]:
+        """Trava exclusiva por indicador: conta o limite do mês e arma sem corrida."""
+        ...
+
     def vencidas(self, agora: datetime) -> list[Indicacao]: ...
 
     def encerrar(self, indicacao_id: str, status: str, agora: datetime, motivo: str = "") -> bool:
@@ -208,6 +221,7 @@ class IndicacoesEmMemoria:
         self._por_codigo: dict[str, str] = {}
         self._itens: dict[str, Indicacao] = {}
         self._trava = threading.Lock()
+        self._travas_indicador: dict[str, threading.RLock] = {}
 
     def config(self) -> ConfigIndicacao:
         return self._config
@@ -299,6 +313,27 @@ class IndicacoesEmMemoria:
             )
             return True
 
+    def bloquear(self, indicacao_id: str, motivo: str, agora: datetime) -> bool:
+        with self._trava:
+            atual = self._itens.get(indicacao_id)
+            if atual is None or atual.status != STATUS_CADASTRADO:
+                return False
+            self._itens[indicacao_id] = replace(
+                atual,
+                status=STATUS_BLOQUEADO_FRAUDE,
+                bonus_indicador_tratinhos=0,
+                bonus_indicado_tratinhos=0,
+                motivo_bloqueio=motivo,
+            )
+            return True
+
+    @contextmanager
+    def trava_do_indicador(self, indicador_id: str) -> Iterator[None]:
+        with self._trava:
+            trava = self._travas_indicador.setdefault(indicador_id, threading.RLock())
+        with trava:
+            yield
+
     def vencidas(self, agora: datetime) -> list[Indicacao]:
         return [
             i
@@ -337,35 +372,54 @@ def _abertura_do_mes(agora: datetime) -> tuple[datetime, datetime]:
     return periodo.mes(*periodo.mes_de(agora))
 
 
+def _motivo_de_fraude(
+    contexto: Any, cfg: ConfigIndicacao, indicacao: Indicacao, contraparte_id: str
+) -> str | None:
+    """Por que o pedido gatilho não vale: a outra ponta do serviço é o próprio indicador ou
+    divide telefone/e-mail com ele (a pessoa estaria pagando a si mesma)."""
+    if cfg.bloquear_contraparte_indicador and contraparte_id == indicacao.indicador_id:
+        return "contraparte_e_o_indicador"
+    repetido = contato_repetido(contexto, contraparte_id, indicacao.indicador_id)
+    return f"contraparte_{repetido}" if repetido else None
+
+
 def acionar_gatilho(contexto: Any, pedido: Any, agora: datetime) -> list[Indicacao]:
-    """Pedido concluído: arma as indicações cujo indicado acabou de fazer o 1º serviço válido."""
+    """Pedido concluído: arma as indicações cujo indicado acabou de fazer o 1º serviço válido.
+
+    Vale só com dinheiro de fato pago (`cliente_pagou`, cobrado menos estornado) a partir do
+    mínimo, e só se a outra ponta do serviço não for o indicador (ou alguém com o mesmo telefone
+    ou e-mail dele). Contar o limite do mês e armar acontecem juntos sob a trava do indicador.
+    """
     repo = contexto.indicacoes
     cfg = repo.config()
-    contrato = contexto.contratos.obter_do_pedido(pedido.id)
-    if contrato is None or contrato.valor_centavos < cfg.valor_minimo_servico_centavos:
-        return []
     if not pedido.profissional_id:
         return []
-    if contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id).cliente_pagou <= 0:
-        return []  # sem pagamento confirmado não há gatilho
-    candidatas: list[Indicacao] = []
+    pago = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id).cliente_pagou
+    if pago < cfg.valor_minimo_servico_centavos:
+        return []  # sem pagamento em dinheiro do valor mínimo não há gatilho
+    candidatas: list[tuple[Indicacao, str]] = []  # (indicação, outra ponta do serviço)
     como_cliente = repo.do_indicado(pedido.cliente_id)
     if como_cliente is not None and como_cliente.tipo != TIPO_PROFISSIONAL_PROFISSIONAL:
-        candidatas.append(como_cliente)
+        candidatas.append((como_cliente, pedido.profissional_id))
     como_profissional = repo.do_indicado(pedido.profissional_id)
     if como_profissional is not None and como_profissional.tipo == TIPO_PROFISSIONAL_PROFISSIONAL:
-        candidatas.append(como_profissional)
+        candidatas.append((como_profissional, pedido.cliente_id))
     inicio, fim = _abertura_do_mes(agora)
     armadas: list[Indicacao] = []
-    for indicacao in candidatas:
+    for indicacao, contraparte_id in candidatas:
         if indicacao.status != STATUS_CADASTRADO:
             continue
-        ja = repo.recompensadas_no_mes(indicacao.indicador_id, inicio, fim, cfg.dias_liberacao)
-        bonus_indicador = (
-            indicacao.bonus_indicador_tratinhos if ja < cfg.limite_do_tipo(indicacao.tipo) else 0
-        )
+        motivo = _motivo_de_fraude(contexto, cfg, indicacao, contraparte_id)
+        if motivo is not None:
+            repo.bloquear(indicacao.id, motivo, agora)
+            continue
         previsao = agora + timedelta(days=cfg.dias_liberacao)
-        if repo.armar(indicacao.id, pedido.id, bonus_indicador, previsao):
+        with contexto.transacao(), repo.trava_do_indicador(indicacao.indicador_id):
+            ja = repo.recompensadas_no_mes(indicacao.indicador_id, inicio, fim, cfg.dias_liberacao)
+            limite = cfg.limite_do_tipo(indicacao.tipo)
+            bonus_indicador = indicacao.bonus_indicador_tratinhos if ja < limite else 0
+            armou = repo.armar(indicacao.id, pedido.id, bonus_indicador, previsao)
+        if armou:
             armadas.append(
                 replace(
                     indicacao,

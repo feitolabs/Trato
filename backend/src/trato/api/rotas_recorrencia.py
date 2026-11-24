@@ -60,6 +60,14 @@ class ReajusteIn(BaseModel):
     valor_centavos: int = Field(gt=0, description="Novo valor por visita, em centavos.")
 
 
+class AceitarReajusteIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    valor_centavos: int = Field(
+        gt=0, description="O valor que o cliente viu (o proposto). Mudou? Responde 409."
+    )
+
+
 class VisitaOut(BaseModel):
     id: str
     data_prevista_em: datetime
@@ -469,7 +477,16 @@ def propor_reajuste(
         raise HTTPException(422, "O novo valor precisa ser diferente do valor atual.")
     if corpo.valor_centavos > contexto.recorrencias.config().valor_maximo_centavos:
         raise HTTPException(422, "O valor de cada visita passa do limite permitido.")
+    if r.valor_proposto_centavos is not None:
+        raise HTTPException(
+            409, "Já existe um reajuste esperando resposta do cliente. Aguarde a resposta."
+        )
     if not contexto.recorrencias.propor_reajuste(r.id, corpo.valor_centavos):
+        atual = contexto.recorrencias.obter(r.id)
+        if atual is not None and atual.valor_proposto_centavos is not None:
+            raise HTTPException(
+                409, "Já existe um reajuste esperando resposta do cliente. Aguarde a resposta."
+            )
         raise HTTPException(409, "Só dá para reajustar um serviço recorrente ativo ou pausado.")
     _avisar(
         request,
@@ -489,6 +506,7 @@ def propor_reajuste(
 )
 def aceitar_reajuste(
     recorrencia_id: str,
+    corpo: AceitarReajusteIn,
     request: Request,
     usuario: Usuario = Depends(exigir_papel(*_PAPEIS)),
     contexto: Contexto = Depends(obter_contexto),
@@ -496,7 +514,14 @@ def aceitar_reajuste(
     r = _da_serie(contexto, recorrencia_id, usuario)
     if usuario.id != r.cliente_id:
         raise HTTPException(403, "Só o cliente aceita um novo valor.")
-    if not contexto.recorrencias.aceitar_reajuste(r.id):
+    if not contexto.recorrencias.aceitar_reajuste(r.id, corpo.valor_centavos):
+        atual = contexto.recorrencias.obter(r.id)
+        if (
+            atual is not None
+            and atual.valor_proposto_centavos is not None
+            and atual.status in (ST_ATIVA, ST_PAUSADA)
+        ):
+            raise HTTPException(409, "O valor do reajuste mudou. Confira o novo valor.")
         raise HTTPException(409, "Não há reajuste esperando resposta.")
     _avisar(
         request, contexto, r, r.profissional_id, "O cliente aceitou o novo valor.", "reajuste_ok"

@@ -74,12 +74,13 @@ def test_recorrencia_completa_no_postgres(cenario):
     assert reservada is None
 
     # Cliente aceita o reajuste: vale daqui para frente.
-    novo = post(c, f"{URL}/{rid}/reajuste/aceitar", "cliente")
+    aceite = {"valor_centavos": valor + 500}
+    novo = post(c, f"{URL}/{rid}/reajuste/aceitar", "cliente", aceite)
     assert (novo.json()["valor_centavos"], novo.json()["valor_proposto_centavos"]) == (
         valor + 500,
         None,
     )
-    assert post(c, f"{URL}/{rid}/reajuste/aceitar", "cliente").status_code == 409
+    assert post(c, f"{URL}/{rid}/reajuste/aceitar", "cliente", aceite).status_code == 409
 
     # Pular a visita gerada cancela o pedido; pausar/retomar/cancelar com UPDATE condicional.
     pulou = post(c, f"{URL}/{rid}/visitas/{visita['id']}/pular", "profissional")
