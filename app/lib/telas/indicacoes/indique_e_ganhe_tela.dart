@@ -250,11 +250,42 @@ class _CampoCodigoIndicacaoState extends State<CampoCodigoIndicacao> {
   String? _erro;
   String? _sucesso;
   var _ocupado = false;
+  final _foco = FocusNode();
+  final _chaveBotao = GlobalKey();
+  var _teclado = 0.0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final teclado = MediaQuery.viewInsetsOf(context).bottom;
+    final subiu = teclado > _teclado;
+    _teclado = teclado;
+    if (subiu && _foco.hasFocus) _mostrarBotao();
+  }
 
   @override
   void dispose() {
+    _foco.dispose();
     _controlador.dispose();
     super.dispose();
+  }
+
+  /// Rola até o botão ficar acima do teclado (o campo vem logo acima dele). Espera dois quadros:
+  /// a rolagem automática do próprio campo acontece no primeiro.
+  void _mostrarBotao() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _chaveBotao.currentContext;
+        if (!mounted || ctx == null || !ctx.mounted) return;
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    });
   }
 
   String get _codigo => _controlador.text.trim().toUpperCase();
@@ -277,6 +308,7 @@ class _CampoCodigoIndicacaoState extends State<CampoCodigoIndicacao> {
     });
     try {
       await acao();
+      if (mounted && _foco.hasFocus) _mostrarBotao();
     } on ErroTrato catch (e) {
       if (mounted) setState(() => _erro = e.mensagem); // texto do backend, como veio
     } on Object {
@@ -332,7 +364,11 @@ class _CampoCodigoIndicacaoState extends State<CampoCodigoIndicacao> {
         TextField(
           key: const ValueKey('campo-codigo-indicacao'),
           controller: _controlador,
-          enabled: !_ocupado,
+          focusNode: _foco,
+          // Com o teclado aberto, sobra espaço abaixo do campo para o botão.
+          scrollPadding: EdgeInsets.fromLTRB(
+              20, 20, 20, 40 + MediaQuery.textScalerOf(context).scale(110)),
+          readOnly: _ocupado,
           textCapitalization: TextCapitalization.characters,
           autocorrect: false,
           maxLength: 32,
@@ -365,19 +401,21 @@ class _CampoCodigoIndicacaoState extends State<CampoCodigoIndicacao> {
           ),
         ],
         const SizedBox(height: EspacosTrato.x3),
-        if (convite == null)
-          BotaoSecundario(
-            key: const ValueKey('validar-codigo'),
-            texto: 'Validar código',
-            aoTocar: _ocupado ? null : _validar,
-          )
-        else
-          BotaoPrimario(
-            key: const ValueKey('aplicar-codigo'),
-            texto: 'Aplicar código',
-            carregando: _ocupado,
-            aoTocar: _ocupado ? null : _aplicar,
-          ),
+        KeyedSubtree(
+          key: _chaveBotao,
+          child: convite == null
+              ? BotaoSecundario(
+                  key: const ValueKey('validar-codigo'),
+                  texto: 'Validar código',
+                  aoTocar: _ocupado ? null : _validar,
+                )
+              : BotaoPrimario(
+                  key: const ValueKey('aplicar-codigo'),
+                  texto: 'Aplicar código',
+                  carregando: _ocupado,
+                  aoTocar: _ocupado ? null : _aplicar,
+                ),
+        ),
       ],
     );
   }
