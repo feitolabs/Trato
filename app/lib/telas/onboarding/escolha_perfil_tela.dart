@@ -114,13 +114,15 @@ class _EscolhaPerfilTelaState extends State<EscolhaPerfilTela> {
                 aoTocar: _continuar,
               ),
               const SizedBox(height: EspacosTrato.x2),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('Já tem conta? ', style: TipografiaTrato.corpo),
-                  BotaoLink(texto: 'Entrar', aoTocar: _entrar),
-                ],
+              Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('Já tem conta? ', style: TipografiaTrato.corpo),
+                    BotaoLink(texto: 'Entrar', aoTocar: _entrar),
+                  ],
+                ),
               ),
               const SizedBox(height: EspacosTrato.x2),
             ],

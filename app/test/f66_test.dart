@@ -32,6 +32,12 @@ void main() {
       expect(find.text('Entrar'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
+      // Conjunto "Já tem conta? Entrar" centralizado na tela (tolerância de 1 px).
+      final conjunto = tester.getRect(find.text('Já tem conta? ')).expandToInclude(
+            tester.getRect(find.text('Entrar')),
+          );
+      expect(conjunto.center.dx, closeTo(tester.getSize(find.byType(MaterialApp)).width / 2, 1));
+
       await tester.ensureVisible(find.text('Entrar'));
       await tester.tap(find.text('Entrar'));
       await tester.pumpAndSettle();
