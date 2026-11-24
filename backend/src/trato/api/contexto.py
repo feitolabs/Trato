@@ -99,6 +99,7 @@ def _repasses_em_memoria() -> RepositorioRepasses:
     return RepassesEmMemoria()
 
 
+from trato.api.denuncias import DenunciasEmMemoria  # noqa: E402
 from trato.api.exclusividades import ExclusividadesEmMemoria  # noqa: E402
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
 from trato.api.reagendamentos import ReagendamentosEmMemoria  # noqa: E402
@@ -134,6 +135,8 @@ class Contexto:
     exclusividades: Any = field(default_factory=lambda: ExclusividadesEmMemoria())
     # Propostas de nova janela do atendimento (tabela `reagendamentos`).
     reagendamentos: Any = field(default_factory=lambda: ReagendamentosEmMemoria())
+    # Denúncias de perfil/chat: viram alertas na fila de risco (alertas_risco).
+    denuncias: Any = field(default_factory=lambda: DenunciasEmMemoria())
     # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
     ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)

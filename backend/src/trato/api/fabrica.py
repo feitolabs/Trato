@@ -46,6 +46,7 @@ from trato.persistencia.conta import ContaPostgres
 from trato.persistencia.contestacoes import ContestacoesPostgres
 from trato.persistencia.contratos import ContratosPostgres
 from trato.persistencia.conversas import ConversasPostgres, NotificacoesPostgres
+from trato.persistencia.denuncias import DenunciasPostgres
 from trato.persistencia.dinheiro import (
     AvaliacoesPostgres,
     DisputasPostgres,
@@ -143,6 +144,7 @@ def criar_contexto_postgres(
         moedas=MoedasPostgres(banco),
         exclusividades=ExclusividadesPostgres(banco),
         reagendamentos=ReagendamentosPostgres(banco),
+        denuncias=DenunciasPostgres(banco),
         ranking=RankingPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),
