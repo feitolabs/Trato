@@ -5,8 +5,6 @@ import '../../dados/carregador.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../comuns/desconto_moedas.dart' show textoTratinhos, textoTratinhosPendentes;
-import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
-import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'modelos.dart';
 import 'pecas_profissional.dart';
@@ -20,7 +18,6 @@ class InicioProfissionalTela extends StatefulWidget {
     required this.dados,
     this.aoAlterarDisponivel,
     this.aoFazerCheckIn,
-    this.aoAbrirCarteira,
     this.aoAbrirFiltros,
     this.aoAbrirPedido,
     this.aoAbrirNotificacoes,
@@ -50,7 +47,6 @@ class InicioProfissionalTela extends StatefulWidget {
   final InicioProfissional dados;
   final ValueChanged<bool>? aoAlterarDisponivel;
   final VoidCallback? aoFazerCheckIn;
-  final VoidCallback? aoAbrirCarteira;
   final VoidCallback? aoAbrirFiltros;
   final ValueChanged<PedidoAberto>? aoAbrirPedido;
 
@@ -177,8 +173,6 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
               aoAvisarACaminho: widget.aoAvisarACaminho,
             ),
           ],
-          const SizedBox(height: EspacosTrato.x4),
-          _CartaoCarteira(carteira: dados.carteira, aoTocar: widget.aoAbrirCarteira),
           if (dados.exclusividades != null) ...[
             const SizedBox(height: EspacosTrato.x4),
             _CartaoExclusividades(resumo: dados.exclusividades!),
@@ -417,82 +411,6 @@ class _AvisoACaminhoState extends State<_AvisoACaminho> {
               ),
             ),
           ),
-      ],
-    );
-  }
-}
-
-class _CartaoCarteira extends StatelessWidget {
-  const _CartaoCarteira({required this.carteira, required this.aoTocar});
-
-  final ResumoCarteira carteira;
-  final VoidCallback? aoTocar;
-
-  @override
-  Widget build(BuildContext context) {
-    return CartaoTrato(
-      aoTocar: aoTocar ?? () {},
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: _Valor(rotulo: 'Em andamento', centavos: carteira.retidoCentavos)),
-              const SizedBox(width: EspacosTrato.x3),
-              Expanded(child: _Valor(rotulo: 'Liberado', centavos: carteira.paraSacarCentavos)),
-            ],
-          ),
-          if ((carteira.retidoDesdePagamentoCentavos ?? 0) > 0) ...[
-            const SizedBox(height: EspacosTrato.x2),
-            _Valor(
-              key: const Key('valor-retido'),
-              rotulo: 'Retido',
-              centavos: carteira.retidoDesdePagamentoCentavos!,
-            ),
-          ],
-          if (carteira.proximaLiberacao != null) ...[
-            const SizedBox(height: EspacosTrato.x2),
-            Text(
-              'Repasse do dinheiro: ${diaMesDoAparelho(carteira.proximaLiberacao!)}',
-              key: const Key('repasse-previsto'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
-            ),
-          ],
-          for (final l in carteira.liberacoesPrevistas) ...[
-            const SizedBox(height: EspacosTrato.x1),
-            Text(
-              'Pedido ${l.pedidoNumero} · ${formatarReais(l.valorCentavos)}'
-              '${l.liberacaoPrevistaEm == null ? '' : ' · ${diaMesDoAparelho(l.liberacaoPrevistaEm!)}'}',
-              key: const Key('liberacao-prevista'),
-              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _Valor extends StatelessWidget {
-  const _Valor({super.key, required this.rotulo, required this.centavos});
-
-  final String rotulo;
-  final int centavos;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          rotulo,
-          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
-        ),
-        const SizedBox(height: EspacosTrato.x1),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(formatarReais(centavos), style: TipografiaTrato.tituloCartao, maxLines: 1),
-        ),
       ],
     );
   }

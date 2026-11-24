@@ -64,12 +64,10 @@ void main() {
   });
 
   group('Início do profissional', () {
-    testWidgets('mostra disponibilidade, atendimento, carteira e pedidos', (tester) async {
+    testWidgets('mostra disponibilidade, atendimento e pedidos', (tester) async {
       await _abrir(tester, const InicioProfissionalTela(dados: inicioProfissionalExemplo, ));
       expect(find.text('Pedidos perto de você'), findsOneWidget);
       expect(find.text('HOJE · 14H'), findsOneWidget);
-      expect(find.text('R\$ 425,00'), findsOneWidget);
-      expect(find.text('R\$ 712,50'), findsOneWidget);
       expect(find.text('Urgente'), findsOneWidget);
       expect(find.text('R\$ 200 a R\$ 500'), findsOneWidget);
       expect(find.text('Savassi · 2,1 km · até sexta, 30/10'), findsOneWidget);
@@ -87,7 +85,6 @@ void main() {
       bool? disponivel;
       var checkIn = false;
       var filtros = false;
-      var carteira = false;
       PedidoAberto? aberto;
       await _abrir(
         tester,
@@ -95,7 +92,6 @@ void main() {
           aoAlterarDisponivel: (v) => disponivel = v,
           aoFazerCheckIn: () => checkIn = true,
           aoAbrirFiltros: () => filtros = true,
-          aoAbrirCarteira: () => carteira = true,
           aoAbrirPedido: (p) => aberto = p,
         ),
       );
@@ -104,9 +100,8 @@ void main() {
       expect(disponivel, isFalse);
       await tester.tap(find.text('Fazer check-in'));
       await tester.tap(find.text('Filtros'));
-      await tester.tap(find.text('Em andamento'));
       await tester.tap(find.text('Disjuntor desarmando'));
-      expect([checkIn, filtros, carteira], [true, true, true]);
+      expect([checkIn, filtros], [true, true]);
       expect(aberto!.id, 'ped-disjuntor');
     });
 
@@ -119,7 +114,6 @@ void main() {
       );
       await _abrir(tester, const InicioProfissionalTela(dados: dados));
       expect(find.text('Fazer check-in'), findsNothing);
-      expect(find.text('R\$ 0,00'), findsNWidgets(2));
     });
   });
 
@@ -296,13 +290,13 @@ void main() {
   group('Casca do profissional', () {
     testWidgets('tem as 5 abas e nenhuma mostra tela provisória', (tester) async {
       await _abrir(tester, const CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, ), tamanho: const Size(390, 844));
-      expect(find.byType(BarraAbasTrato), findsOneWidget);
+      expect(find.byType(BarraAbasFlutuante), findsOneWidget);
       for (final aba in abasProfissional) {
         expect(find.text(aba.rotulo), findsWidgets);
       }
       for (final aba in abasProfissional) {
         await tester.tap(find.descendant(
-          of: find.byType(BarraAbasTrato),
+          of: find.byType(BarraAbasFlutuante),
           matching: find.text(aba.rotulo),
         ));
         await tester.pumpAndSettle();
@@ -310,12 +304,13 @@ void main() {
       }
     });
 
-    testWidgets('tocar a carteira leva à aba Carteira', (tester) async {
-      await _abrir(tester, const CascaProfissionalTela(detalhe: detalhePedidoExemplo, inicio: inicioProfissionalExemplo, ), tamanho: const Size(390, 1200));
-      await tester.tap(find.text('Em andamento'));
-      await tester.pumpAndSettle();
-      final barra = tester.widget<BarraAbasTrato>(find.byType(BarraAbasTrato));
-      expect(barra.indiceAtual, 3);
+    testWidgets('o Início não mostra mais o resumo da carteira (fica na aba Carteira)',
+        (tester) async {
+      await _abrir(tester, const InicioProfissionalTela(dados: inicioProfissionalExemplo));
+      expect(find.text('Em andamento'), findsNothing);
+      expect(find.text('Liberado'), findsNothing);
+      expect(find.textContaining('Repasse do dinheiro'), findsNothing);
+      expect(find.byKey(const Key('repasse-previsto')), findsNothing);
     });
 
     testWidgets('tocar um pedido abre o detalhe e recusar volta à lista',

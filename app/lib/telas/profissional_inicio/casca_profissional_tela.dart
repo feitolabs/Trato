@@ -379,7 +379,6 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
             ? () => widget.aoGerenciarProximo!(_inicio.proximo)
             : widget.aoFazerCheckIn,
         aoAvisarACaminho: widget.aoAvisarACaminho,
-        aoAbrirCarteira: () => _ir(3),
         aoAbrirFiltros: _filtros,
         aoAbrirPedido: _abrirDetalhe,
         aoAbrirNotificacoes: widget.aoAbrirNotificacoes,
