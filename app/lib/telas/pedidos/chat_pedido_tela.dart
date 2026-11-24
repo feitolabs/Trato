@@ -126,9 +126,12 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     super.dispose();
   }
 
+  /// Textos cujo envio ainda não terminou: toque repetido na mesma resposta rápida não duplica.
+  final _emVoo = <String>{};
+
   Future<void> _enviar([String? texto]) async {
     final conteudo = (texto ?? _controlador.text).trim();
-    if (conteudo.isEmpty) return;
+    if (conteudo.isEmpty || !_emVoo.add(conteudo)) return;
     final digitada = texto == null;
     final otimista = MensagemChat(
       tipo: TipoMensagem.texto,
@@ -153,6 +156,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
         });
       }
     } finally {
+      _emVoo.remove(conteudo);
       _enviosPendentes = (_enviosPendentes - 1).clamp(0, 999);
     }
   }
