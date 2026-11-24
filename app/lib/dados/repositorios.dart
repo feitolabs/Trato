@@ -162,6 +162,24 @@ abstract interface class RepositorioPedidos {
   /// devolve o dinheiro quando já houve pagamento.
   Future<void> cancelar(String pedidoId, String motivo);
 
+  /// Propostas de nova data do pedido, da mais recente para a mais antiga
+  /// (`GET /v1/pedidos/{id}/reagendamentos`).
+  Future<List<Reagendamento>> reagendamentos(String pedidoId);
+
+  /// Propõe nova data (`POST /v1/pedidos/{id}/reagendamentos`). O backend diz se o estado permite.
+  Future<void> proporReagendamento(
+    String pedidoId, {
+    required DateTime inicio,
+    required DateTime fim,
+    String? motivo,
+  });
+
+  /// A outra parte aceita (`POST .../reagendamentos/{rid}/aceitar`).
+  Future<void> aceitarReagendamento(String pedidoId, String reagendamentoId);
+
+  /// A outra parte recusa ou quem propôs cancela (`POST .../reagendamentos/{rid}/recusar`).
+  Future<void> recusarReagendamento(String pedidoId, String reagendamentoId);
+
   /// Comprovante do pedido em PDF (`GET /v1/pedidos/{id}/recibo.pdf`), com o token do usuário.
   Future<List<int>> baixarReciboPdf(String pedidoId);
 

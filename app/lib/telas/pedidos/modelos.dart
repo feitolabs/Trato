@@ -85,6 +85,49 @@ class OfertaExclusividadeCliente {
   bool get recusada => status == 'recusada';
 }
 
+/// Proposta de nova data dentro do pedido (`/v1/pedidos/{id}/reagendamentos`). Só descreve o que
+/// o backend devolve; quem aceita, recusa ou cancela é o backend.
+class Reagendamento {
+  const Reagendamento({
+    required this.id,
+    required this.propostoPor,
+    required this.inicio,
+    required this.fim,
+    this.motivo = '',
+    this.status = 'pendente',
+  });
+
+  final String id;
+
+  /// Id de quem propôs (compara com o usuário logado).
+  final String propostoPor;
+  final DateTime inicio;
+  final DateTime fim;
+  final String motivo;
+
+  /// `pendente`, `aceito`, `recusado` ou `cancelado`. Status novo/ausente conta como encerrado.
+  final String status;
+
+  bool get pendente => status == 'pendente';
+
+  /// Lê um item da API; devolve nulo se faltar id ou datas (a lista ignora o item).
+  static Reagendamento? deJson(Object? bruto) {
+    if (bruto is! Map) return null;
+    final id = bruto['id'];
+    final inicio = DateTime.tryParse('${bruto['nova_janela_inicio'] ?? ''}');
+    final fim = DateTime.tryParse('${bruto['nova_janela_fim'] ?? ''}');
+    if (id is! String || inicio == null || fim == null) return null;
+    return Reagendamento(
+      id: id,
+      propostoPor: (bruto['proposto_por'] as String?) ?? '',
+      inicio: inicio.toLocal(),
+      fim: fim.toLocal(),
+      motivo: (bruto['motivo'] as String?) ?? '',
+      status: (bruto['status'] as String?) ?? '',
+    );
+  }
+}
+
 enum EstadoAditivo { aguardando, aprovado, recusado }
 
 class Aditivo {

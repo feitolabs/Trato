@@ -147,6 +147,62 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   final List<String> cancelados = [];
   final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
+  /// Propostas de nova data (só para teste e demonstração): mais recente primeiro.
+  final List<Reagendamento> reagendamentosFake = [];
+
+  /// Chamadas feitas (`propor`, `aceitar:<id>`, `recusar:<id>`).
+  final List<String> chamadasReagendamento = [];
+
+  @override
+  Future<List<Reagendamento>> reagendamentos(String pedidoId) async =>
+      List.of(reagendamentosFake);
+
+  @override
+  Future<void> proporReagendamento(
+    String pedidoId, {
+    required DateTime inicio,
+    required DateTime fim,
+    String? motivo,
+  }) async {
+    chamadasReagendamento.add('propor');
+    reagendamentosFake.insert(
+      0,
+      Reagendamento(
+        id: 'r${reagendamentosFake.length + 1}',
+        propostoPor: 'eu',
+        inicio: inicio,
+        fim: fim,
+        motivo: motivo ?? '',
+      ),
+    );
+  }
+
+  @override
+  Future<void> aceitarReagendamento(String pedidoId, String reagendamentoId) async {
+    chamadasReagendamento.add('aceitar:$reagendamentoId');
+    _encerrarReagendamento(reagendamentoId, 'aceito');
+  }
+
+  @override
+  Future<void> recusarReagendamento(String pedidoId, String reagendamentoId) async {
+    chamadasReagendamento.add('recusar:$reagendamentoId');
+    _encerrarReagendamento(reagendamentoId, 'recusado');
+  }
+
+  void _encerrarReagendamento(String id, String status) {
+    final i = reagendamentosFake.indexWhere((r) => r.id == id);
+    if (i < 0) return;
+    final r = reagendamentosFake[i];
+    reagendamentosFake[i] = Reagendamento(
+      id: r.id,
+      propostoPor: r.propostoPor,
+      inicio: r.inicio,
+      fim: r.fim,
+      motivo: r.motivo,
+      status: status,
+    );
+  }
+
   /// Ids dos pedidos cujo comprovante em PDF foi pedido.
   final List<String> recibosBaixados = [];
 

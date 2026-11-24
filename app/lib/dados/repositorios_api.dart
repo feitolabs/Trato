@@ -985,6 +985,42 @@ class RepositorioPedidosApi implements RepositorioPedidos {
 
   /// `POST /v1/pedidos/{id}/acoes/cancelar` `{prova: {motivo}}`.
   @override
+  Future<List<Reagendamento>> reagendamentos(String pedidoId) async {
+    final itens = _lista(await _api.get('/v1/pedidos/$pedidoId/reagendamentos'));
+    return [
+      for (final j in itens)
+        if (Reagendamento.deJson(j) case final r?) r,
+    ];
+  }
+
+  @override
+  Future<void> proporReagendamento(
+    String pedidoId, {
+    required DateTime inicio,
+    required DateTime fim,
+    String? motivo,
+  }) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/reagendamentos',
+      corpo: {
+        'nova_janela_inicio': inicio.toUtc().toIso8601String(),
+        'nova_janela_fim': fim.toUtc().toIso8601String(),
+        if (motivo != null && motivo.trim().isNotEmpty) 'motivo': motivo.trim(),
+      },
+    );
+  }
+
+  @override
+  Future<void> aceitarReagendamento(String pedidoId, String reagendamentoId) async {
+    await _api.post('/v1/pedidos/$pedidoId/reagendamentos/$reagendamentoId/aceitar');
+  }
+
+  @override
+  Future<void> recusarReagendamento(String pedidoId, String reagendamentoId) async {
+    await _api.post('/v1/pedidos/$pedidoId/reagendamentos/$reagendamentoId/recusar');
+  }
+
+  @override
   Future<List<int>> baixarReciboPdf(String pedidoId) =>
       _api.getBytes('/v1/pedidos/$pedidoId/recibo.pdf');
 

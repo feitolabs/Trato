@@ -28,6 +28,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoAvaliar,
     this.aoVerGarantia,
     this.aoBaixarComprovante,
+    this.secaoReagendamento,
     this.aoCompartilharAtendimento,
     this.aoSosEmergencia,
     this.atualizarAditivoLocalmente = true,
@@ -41,6 +42,10 @@ class PedidoExecucaoTela extends StatefulWidget {
 
   /// Baixa o comprovante (PDF) do pedido concluído. Só aparece com o pedido `concluido`.
   final VoidCallback? aoBaixarComprovante;
+
+  /// Reagendamento dentro do pedido (botão "Reagendar" ou proposta pendente). Quem monta a tela
+  /// só passa nos estados pago/agendado.
+  final Widget? secaoReagendamento;
   final VoidCallback? aoCompartilharAtendimento;
   final VoidCallback? aoSosEmergencia;
 
@@ -361,6 +366,10 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             aoRecusar: () => _decidir(EstadoAditivo.recusado, widget.aoRecusarAditivo),
             aoAprovar: () => _decidir(EstadoAditivo.aprovado, widget.aoAprovarAditivo),
           ),
+        ],
+        if (widget.secaoReagendamento != null) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          widget.secaoReagendamento!,
         ],
         if (widget.aoRemarcarVisita != null ||
             (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido') ||

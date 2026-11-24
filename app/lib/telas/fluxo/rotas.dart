@@ -112,6 +112,7 @@ import '../pedidos/chat_pedido_tela.dart';
 import '../pedidos/modelos.dart';
 import '../pedidos/pedido_aberto_tela.dart';
 import '../pedidos/pedido_execucao_tela.dart';
+import '../pedidos/reagendamento.dart';
 import '../pedidos/seus_pedidos_tela.dart';
 import '../profissional/calculadora_orcamento_tela.dart';
 import '../profissional/dinheiro.dart';
@@ -1354,6 +1355,11 @@ abstract final class RotasTrato {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+                if (estadoApi == 'pago_e_retido' || estadoApi == 'agendado')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                    child: _secaoReagendamento(pedidoId),
+                  ),
                 if (!remoto && consultaMapa != null)
                   ListTile(
                     leading: const Icon(Icons.map_outlined),
@@ -1701,6 +1707,19 @@ abstract final class RotasTrato {
         );
     }
   }
+
+  /// Reagendamento dentro do pedido (cliente e profissional usam as mesmas rotas):
+  /// propor nova data, aceitar, recusar ou cancelar a própria proposta.
+  static Widget _secaoReagendamento(String pedidoId) => SecaoReagendamento(
+        carregar: () => repos.pedidos.reagendamentos(pedidoId),
+        propor: (inicio, fim, motivo) => repos.pedidos
+            .proporReagendamento(pedidoId, inicio: inicio, fim: fim, motivo: motivo),
+        aceitar: (rid) => repos.pedidos.aceitarReagendamento(pedidoId, rid),
+        recusar: (rid) => repos.pedidos.recusarReagendamento(pedidoId, rid),
+        meuId: ServicoAuthPadrao.atual.sessaoAtual?.id,
+        aoMudar: () => pedidosMudaram.value++,
+        intervalo: _intervalo,
+      );
 
   /// Comprovante do pedido (`GET /v1/pedidos/{id}/recibo.pdf`): salva e abre como o extrato em PDF,
   /// com "Compartilhar" no aviso. Cliente e profissional usam o mesmo caminho.
@@ -2794,6 +2813,9 @@ abstract final class RotasTrato {
                 aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
                 aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
                 aoBaixarComprovante: () => _baixarReciboPdf(context, pedidoId),
+                secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
+                    ? _secaoReagendamento(pedidoId)
+                    : null,
                 aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
                 aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
                 aoConversar: () => _abrir<void>(
