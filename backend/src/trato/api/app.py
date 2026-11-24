@@ -21,9 +21,9 @@ from trato.api import (
     rotas_legal,
     rotas_pedido_contrato,
     rotas_pedidos,
-    rotas_recorrencia,
     rotas_profissional_cadastro,
     rotas_reagendamento,
+    rotas_recorrencia,
     rotas_upload,
     rotas_webhook,
 )

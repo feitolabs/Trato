@@ -58,7 +58,6 @@ from trato.persistencia.exclusividades import ExclusividadesPostgres
 from trato.persistencia.execucao import ExecucaoPostgres
 from trato.persistencia.fechamentos import FechamentosPostgres
 from trato.persistencia.indicacoes import IndicacoesPostgres
-from trato.persistencia.recorrencias import RecorrenciasPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
@@ -71,6 +70,7 @@ from trato.persistencia.pagamentos import (
 from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.reagendamentos import ReagendamentosPostgres
+from trato.persistencia.recorrencias import RecorrenciasPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
 from trato.profissional.ranking import RankingPostgres
 from trato.seguranca.config import parametros_docs

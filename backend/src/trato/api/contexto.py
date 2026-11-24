@@ -102,9 +102,9 @@ def _repasses_em_memoria() -> RepositorioRepasses:
 from trato.api.denuncias import DenunciasEmMemoria  # noqa: E402
 from trato.api.exclusividades import ExclusividadesEmMemoria  # noqa: E402
 from trato.api.indicacoes import IndicacoesEmMemoria, gancho_indicacoes  # noqa: E402
-from trato.api.recorrencias import RecorrenciasEmMemoria  # noqa: E402
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
 from trato.api.reagendamentos import ReagendamentosEmMemoria  # noqa: E402
+from trato.api.recorrencias import RecorrenciasEmMemoria  # noqa: E402
 from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
 
 
