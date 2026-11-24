@@ -12,7 +12,7 @@ class ServicoBuscaFake implements ServicoBusca {
 
   /// Filtro simples só para os testes e o modo sem backend.
   @override
-  Future<List<Profissional>> buscar(String termo) {
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false}) {
     if (travar) return Completer<List<Profissional>>().future;
     if (falhar) return Future.error(StateError('falha simulada'));
     final t = termo.toLowerCase();

@@ -3391,7 +3391,8 @@ class _ServicoBuscaCatalogo implements ServicoBusca {
   final RepositorioCatalogo _catalogo;
 
   @override
-  Future<List<Profissional>> buscar(String termo) => _catalogo.buscar(termo);
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false}) =>
+      _catalogo.buscar(termo, disponivelAgora: disponivelAgora);
 }
 
 class _ServicoCadastroEdicao implements ServicoCadastroProfissional {

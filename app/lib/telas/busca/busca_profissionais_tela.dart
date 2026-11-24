@@ -51,6 +51,9 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
   var _soHoje = false;
   var _notaAlta = false;
 
+  /// Filtro do servidor: refaz a busca com `disponivel_agora=true`.
+  var _disponivelAgora = false;
+
   @override
   void initState() {
     super.initState();
@@ -117,8 +120,23 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
     if (registrar) _registrarRecente(termo);
     setState(() {
       _termo = termo;
-      _busca = widget.servico.buscar(termo);
+      _busca = widget.servico.buscar(termo, disponivelAgora: _disponivelAgora);
     });
+  }
+
+  void _alternarDisponivelAgora() {
+    setState(() => _disponivelAgora = !_disponivelAgora);
+    if (_termo.length >= 2) _buscar(_termo, registrar: false);
+  }
+
+  void _limparFiltros() {
+    final tinhaDisponivel = _disponivelAgora;
+    setState(() {
+      _soHoje = false;
+      _notaAlta = false;
+      _disponivelAgora = false;
+    });
+    if (tinhaDisponivel && _termo.length >= 2) _buscar(_termo, registrar: false);
   }
 
   Future<void> _recarregarBusca() async {
@@ -126,7 +144,7 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
       await AtualizadorTela.de(context)?.call();
       return;
     }
-    final futuro = widget.servico.buscar(_termo);
+    final futuro = widget.servico.buscar(_termo, disponivelAgora: _disponivelAgora);
     setState(() => _busca = futuro);
     await futuro;
   }
@@ -139,6 +157,7 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
       _busca = null;
       _soHoje = false;
       _notaAlta = false;
+      _disponivelAgora = false;
     });
   }
 
@@ -271,19 +290,36 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
                 marcado: _notaAlta,
                 aoTocar: () => setState(() => _notaAlta = !_notaAlta),
               ),
+              const SizedBox(width: EspacosTrato.x2),
+              ChipOpcao(
+                texto: 'Disponíveis agora',
+                marcado: _disponivelAgora,
+                aoTocar: _alternarDisponivelAgora,
+              ),
             ],
           ),
         );
 
         if (brutos.isEmpty) {
-          return RefreshIndicator(
+          final vazio = RefreshIndicator(
             onRefresh: _recarregarBusca,
             child: EstadoVazio(
               icone: Icons.search_off,
               titulo: 'Nada encontrado',
-              texto:
-                  'Não achamos resultados para "$_termo". Tente outro serviço, bairro ou categoria.',
+              texto: _disponivelAgora
+                  ? 'Não há profissionais disponíveis agora para "$_termo". Desligue "Disponíveis agora" para ver todos.'
+                  : 'Não achamos resultados para "$_termo". Tente outro serviço, bairro ou categoria.',
             ),
+          );
+          // Com o filtro do servidor ligado, o chip precisa continuar na tela para poder desligar.
+          if (!_disponivelAgora) return vazio;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              barraFiltros,
+              const SizedBox(height: EspacosTrato.x3),
+              Expanded(child: vazio),
+            ],
           );
         }
 
@@ -301,10 +337,7 @@ class _BuscaProfissionaisTelaState extends State<BuscaProfissionaisTela> {
                         titulo: 'Nenhum resultado com esses filtros',
                         texto: 'Limpe os filtros acima para ver todos os resultados de "$_termo".',
                         textoAcao: 'Limpar filtros',
-                        aoAcao: () => setState(() {
-                          _soHoje = false;
-                          _notaAlta = false;
-                        }),
+                        aoAcao: _limparFiltros,
                       ),
                     )
                   : RefreshIndicator(

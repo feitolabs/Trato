@@ -66,7 +66,7 @@ class RepositorioCatalogoFake implements RepositorioCatalogo {
       });
 
   @override
-  Future<List<Profissional>> buscar(String termo) => _responder(() {
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false}) => _responder(() {
         final t = _sem(termo.trim());
         if (t.isEmpty) return <Profissional>[];
         return [

@@ -772,6 +772,20 @@ void main() {
   });
 
   group('RepositorioCatalogoApi com busca e filtro reais', () {
+    test('buscar envia disponivel_agora=true só quando o filtro está ligado', () async {
+      final (api, chamadas) = _cliente((_) => _json({'itens': <Object>[]}));
+      final repo = RepositorioCatalogoApi(api);
+
+      await repo.buscar('eletricista');
+      await repo.buscar('eletricista', disponivelAgora: true);
+
+      final buscas =
+          chamadas.map((c) => c.caminho).where((c) => c.startsWith('/v1/profissionais')).toList();
+      expect(buscas.first, '/v1/profissionais?q=eletricista');
+      expect(buscas.last, contains('disponivel_agora=true'));
+      expect(buscas.last, contains('q=eletricista'));
+    });
+
     test('buscar consulta /v1/profissionais com termo servico', () async {
       final (api, chamadas) = _cliente(
         (_) => _json({

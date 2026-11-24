@@ -191,11 +191,14 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
   }
 
   @override
-  Future<List<Profissional>> buscar(String termo) async {
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false}) async {
     final limpo = termo.trim();
     if (limpo.length < 2) return const [];
     final (bruto, _) = await emParalelo2(
-      _api.get('/v1/profissionais', consulta: {'q': limpo}),
+      _api.get('/v1/profissionais', consulta: {
+        'q': limpo,
+        if (disponivelAgora) 'disponivel_agora': 'true',
+      }),
       _carregarNomesCategorias(),
     );
     final resposta = _mapa(bruto);

@@ -16,7 +16,7 @@ import 'apoio/exemplos/telas/notificacoes/servico_fake.dart';
 
 class _BuscaBaixaNota implements ServicoBusca {
   @override
-  Future<List<Profissional>> buscar(String termo) async => const [
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false}) async => const [
         Profissional(
           nome: 'Bruno K.',
           iniciais: 'BK',

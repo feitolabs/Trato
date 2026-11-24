@@ -37,8 +37,9 @@ abstract interface class RepositorioCatalogo {
 
   Future<List<Profissional>> profissionais(String categoriaId, FiltroProfissionais filtro);
 
-  /// Profissionais e serviços que combinam com [termo].
-  Future<List<Profissional>> buscar(String termo);
+  /// Profissionais e serviços que combinam com [termo]. Com [disponivelAgora], só quem está
+  /// disponível agora (o backend decide).
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false});
 
   /// Perfil público completo (com [Profissional.detalhe]).
   Future<Profissional> perfil(String profissionalId);

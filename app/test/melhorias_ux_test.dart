@@ -51,7 +51,7 @@ class _ServicoBuscaStub implements ServicoBusca {
   final List<String> consultas = [];
 
   @override
-  Future<List<Profissional>> buscar(String termo) async {
+  Future<List<Profissional>> buscar(String termo, {bool disponivelAgora = false}) async {
     consultas.add(termo);
     return resultados;
   }
