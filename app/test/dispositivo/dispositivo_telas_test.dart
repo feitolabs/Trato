@@ -428,7 +428,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(chamadas, 1);
-      expect(find.text('[Foto 3]'), findsOneWidget);
+      expect(find.text('Foto 3'), findsOneWidget);
     });
   });
 }

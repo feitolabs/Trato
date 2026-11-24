@@ -291,7 +291,8 @@ class _CorpoState extends State<_Corpo> {
             children: [
               for (var i = 0; i < _evidencias.length; i++)
                 EspacoFoto(
-                  legenda: '[Foto ${i + 1}]',
+                  legenda: 'Foto ${i + 1}',
+                  legendaSobreFoto: false,
                   referencia: _evidencias[i],
                   altura: 80,
                   largura: 80,

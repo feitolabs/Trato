@@ -677,7 +677,7 @@ class _NovoPedidoTelaState extends State<NovoPedidoTela> {
                   SizedBox.square(
                     dimension: tamanho,
                     child: _FotoReservada(
-                      '[Foto ${f.fotos.length + i + 1}]',
+                      'Foto ${f.fotos.length + i + 1}',
                       referencia: _fotosNovas[i],
                       aoRemover: () => setState(() => _fotosNovas.removeAt(i)),
                     ),
@@ -1155,41 +1155,17 @@ class _FotoReservada extends StatelessWidget {
             color: context.cores.azulSuave,
             borderRadius: BorderRadius.circular(EspacosTrato.raio),
           ),
-          child: imagemReal != null
-              ? Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    imagemReal,
-                    Positioned(
-                      left: 6,
-                      bottom: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: CoresTrato.overlayFoto,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          rotulo,
-                          style: TipografiaTrato.legenda.copyWith(
-                            color: CoresTrato.textoSobreFoto,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    rotulo,
-                    style: TipografiaTrato.corpoPequeno.copyWith(
-                      color: context.cores.petroleo,
-                      fontWeight: FontWeight.w600,
-                    ),
+          child: imagemReal ??
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  rotulo,
+                  style: TipografiaTrato.corpoPequeno.copyWith(
+                    color: context.cores.petroleo,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+              ),
         ),
       ),
     );

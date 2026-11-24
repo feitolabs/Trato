@@ -117,7 +117,8 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
               Stack(
                 children: [
                   EspacoFoto(
-                    legenda: '[Foto ${i + 1}]',
+                    legenda: 'Foto ${i + 1}',
+                    legendaSobreFoto: false,
                     referencia: _fotos[i],
                     altura: 100,
                     largura: 100,
