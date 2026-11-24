@@ -20,6 +20,7 @@ from trato.api import (
     rotas_pedido_contrato,
     rotas_pedidos,
     rotas_profissional_cadastro,
+    rotas_reagendamento,
     rotas_upload,
     rotas_webhook,
 )
@@ -44,6 +45,7 @@ def criar_router() -> APIRouter:
     roteador.include_router(rotas_pedido_contrato.router)
     roteador.include_router(rotas_exclusividade.router)
     roteador.include_router(rotas_a_caminho.router)
+    roteador.include_router(rotas_reagendamento.router)
     roteador.include_router(conta.router)
     roteador.include_router(rotas_financeiro.router)
     roteador.include_router(rotas_webhook.router)

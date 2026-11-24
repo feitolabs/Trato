@@ -67,6 +67,7 @@ from trato.persistencia.pagamentos import (
 )
 from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
+from trato.persistencia.reagendamentos import ReagendamentosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
 from trato.profissional.ranking import RankingPostgres
 from trato.seguranca.config import parametros_docs
@@ -141,6 +142,7 @@ def criar_contexto_postgres(
         avaliacoes=AvaliacoesPostgres(banco),
         moedas=MoedasPostgres(banco),
         exclusividades=ExclusividadesPostgres(banco),
+        reagendamentos=ReagendamentosPostgres(banco),
         ranking=RankingPostgres(banco),
         repasses=RepassesPostgres(banco),
         contestacoes=ContestacoesPostgres(banco),

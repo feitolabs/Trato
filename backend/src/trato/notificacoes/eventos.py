@@ -37,6 +37,8 @@ class Evento(StrEnum):
     CHECK_IN_SEM_CODIGO = "agenda.check_in_sem_codigo"
     CLIENTE_AUSENTE = "agenda.cliente_ausente"
     A_CAMINHO = "agenda.a_caminho"
+    REAGENDAMENTO_PROPOSTO = "agenda.reagendamento_proposto"
+    REAGENDAMENTO_RESPONDIDO = "agenda.reagendamento_respondido"
     CONCLUSAO_PARA_CONFIRMAR = "execucao.confirmar_conclusao"
     SERVICO_INICIADO = "execucao.iniciado"
     CODIGO_CONCLUSAO = "execucao.codigo_conclusao"
@@ -144,6 +146,20 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Serviço iniciado sem código",
         "O profissional iniciou o serviço sem o código e registrou foto, localização e "
         "justificativa.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.REAGENDAMENTO_PROPOSTO: ModeloEvento(
+        Categoria.AGENDA,
+        "Pedido de reagendamento",
+        "A outra parte propôs um novo horário para o serviço. Responda no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.REAGENDAMENTO_RESPONDIDO: ModeloEvento(
+        Categoria.AGENDA,
+        "Reagendamento respondido",
+        "O pedido de reagendamento recebeu uma resposta. Veja o pedido.",
         "pedido",
         essencial=True,
     ),

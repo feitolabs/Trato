@@ -101,6 +101,7 @@ def _repasses_em_memoria() -> RepositorioRepasses:
 
 from trato.api.exclusividades import ExclusividadesEmMemoria  # noqa: E402
 from trato.api.moedas import MoedasEmMemoria  # noqa: E402
+from trato.api.reagendamentos import ReagendamentosEmMemoria  # noqa: E402
 from trato.profissional.ranking import RankingEmMemoria  # noqa: E402
 
 
@@ -131,6 +132,8 @@ class Contexto:
     moedas: Any = field(default_factory=lambda: MoedasEmMemoria())
     # Exclusividade de 48h (funções SQL no Postgres; memória com a mesma semântica).
     exclusividades: Any = field(default_factory=lambda: ExclusividadesEmMemoria())
+    # Propostas de nova janela do atendimento (tabela `reagendamentos`).
+    reagendamentos: Any = field(default_factory=lambda: ReagendamentosEmMemoria())
     # Pesos do ranking de profissionais na busca (tabela `ranking_config`).
     ranking: Any = field(default_factory=lambda: RankingEmMemoria())
     recusas: RepositorioRecusas = field(default_factory=RecusasEmMemoria)
