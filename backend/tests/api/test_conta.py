@@ -138,3 +138,19 @@ def test_contatos_limite_de_cinco(amb):
             amb.cliente.post("/v1/me/contatos-confianca", json=corpo, headers=h).status_code == 201
         )
     assert amb.cliente.post("/v1/me/contatos-confianca", json=corpo, headers=h).status_code == 409
+
+
+def test_favoritos_trazem_so_o_nome_curto_nunca_o_sobrenome_completo(amb):
+    from trato.api.conta import Favorito
+
+    amb.contexto.conta._favoritos["cli-1"] = [
+        Favorito("pro-1", "Tester SuperQA Profissional", 4.8, 3),
+        Favorito("pro-2", "Ana", None, None),
+        Favorito("pro-3", None, None, None),
+    ]
+    resposta = amb.cliente.get("/v1/me/favoritos", headers=cab("t-cliente"))
+    assert resposta.status_code == 200
+    nomes = [f["nome"] for f in resposta.json()]
+    assert nomes == ["Tester P.", "Ana", None]  # mesmo nome curto da busca e do perfil público
+    texto = resposta.text
+    assert "SuperQA" not in texto and "Profissional" not in texto

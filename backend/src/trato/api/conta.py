@@ -410,7 +410,14 @@ def remover_endereco(
 def listar_favoritos(
     usuario: Usuario = Depends(_dono), contexto: Contexto = Depends(obter_contexto)
 ) -> list[FavoritoOut]:
-    return [FavoritoOut(**vars(f)) for f in _conta(contexto).favoritos(usuario.id)]
+    # Mesmo nome curto da busca e do perfil público (primeiro nome + inicial do último):
+    # o sobrenome completo do profissional nunca sai nesta lista (LGPD).
+    from trato.api.rotas_profissional_cadastro import _nome_abreviado
+
+    return [
+        FavoritoOut(**{**vars(f), "nome": _nome_abreviado(f.nome)})
+        for f in _conta(contexto).favoritos(usuario.id)
+    ]
 
 
 @router.put("/favoritos/{profissional_id}", status_code=204, summary="Favoritar um profissional")

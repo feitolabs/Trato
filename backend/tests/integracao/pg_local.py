@@ -35,6 +35,7 @@ MIGRATIONS = (
     "avaliacao_criterios",
     "reagendamentos",
     "indicacoes",
+    "conta_enderecos_favoritos_contatos",
     "recorrencias",
     # moedas_tipo_indicacao fica só no bloco abaixo: precisa de moedas_lancamentos.
 )
