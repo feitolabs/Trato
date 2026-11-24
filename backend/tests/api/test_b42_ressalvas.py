@@ -73,27 +73,52 @@ def _dados(amb, uid, email=None, telefone=None):
 # --- 1. contraparte do pedido gatilho -----------------------------------------------------------
 
 
-def test_servico_com_o_proprio_indicador_nao_conta(b):
+def test_profissional_cliente_contratando_o_proprio_indicador_vale(b):
+    # Fluxo planejado: o cliente antigo contrata o profissional que o indicou.
     assert _aplicar(b, "cli-1", _codigo(b, "pro-1")).status_code == 201  # pro-1 indica cli-1
     _concluir(b)  # e o profissional do pedido é o próprio pro-1
     i = _indicacao(b)
-    assert i.status == "bloqueado_fraude" and i.motivo_bloqueio == "contraparte_e_o_indicador"
-    assert (i.bonus_indicador_tratinhos, i.bonus_indicado_tratinhos) == (0, 0)
-    assert i.pedido_gatilho_id is None
+    assert i.tipo == "profissional_cliente" and i.status == "aguardando_liberacao"
+    assert (i.bonus_indicador_tratinhos, i.bonus_indicado_tratinhos) == (150, 300)
     executor = ExecutorContexto(b.contexto)
-    assert executor.liberar_indicacoes(AGORA + 8 * D) == 0
-    assert b.contexto.moedas.saldo("cli-1", AGORA + 8 * D) == 0
+    assert executor.liberar_indicacoes(AGORA + 8 * D) == 1
+    assert b.contexto.moedas.saldo("pro-1", AGORA + 8 * D, "profissional") == 150
+    assert b.contexto.moedas.saldo("cli-1", AGORA + 8 * D) == 300
 
 
-def test_cliente_que_contrata_o_proprio_indicador_profissional_tambem_nao_conta(b):
-    # pro-1 (profissional do pedido) foi indicado por cli-2?  Não pode (cliente não indica
-    # profissional); o caso espelhado é pro-1 indicado por pro-2 e o pedido ser com pro-2 como cliente.
+def test_profissional_cliente_com_outra_conta_de_mesmo_email_do_indicador_bloqueia(b):
+    # O pedido é com pro-1, que NÃO é o indicador (pro-2), mas divide e-mail com ele.
+    _dados(b, "pro-2", "mesma.pessoa@gmail.com")
+    _dados(b, "pro-1", "mesmapessoa@gmail.com")
+    assert _aplicar(b, "cli-1", _codigo(b, "pro-2")).status_code == 201
+    _concluir(b)
+    assert _indicacao(b).status == "bloqueado_fraude"
+    assert _indicacao(b).motivo_bloqueio == "contraparte_mesmo_email"
+
+
+def test_cliente_cliente_com_o_proprio_indicador_como_profissional_bloqueia(b):
+    # cli-2 indica cli-1 (cliente_cliente) e é, ao mesmo tempo, o profissional do pedido de cli-1.
+    assert _aplicar(b, "cli-1", _codigo(b, "cli-2")).status_code == 201
+    b.semear_pedido(Estado.EM_CONFIRMACAO, profissional_id="cli-2")
+    b.semear_dinheiro(100_000, taxa=10_000)
+    pedido = b.contexto.pedidos.obter("ped-1")
+    assert acionar_gatilho(b.contexto, pedido, AGORA) == []
+    i = _indicacao(b)
+    assert i.tipo == "cliente_cliente" and i.status == "bloqueado_fraude"
+    assert i.motivo_bloqueio == "contraparte_e_o_indicador"
+    assert (i.bonus_indicador_tratinhos, i.bonus_indicado_tratinhos) == (0, 0)
+
+
+def test_profissional_profissional_com_o_proprio_indicador_como_cliente_bloqueia(b):
+    # pro-1 foi indicado por pro-2 e o pedido de pro-1 tem pro-2 como cliente.
     assert _aplicar(b, "pro-1", _codigo(b, "pro-2")).status_code == 201
     b.semear_pedido(Estado.EM_CONFIRMACAO, cliente_id="pro-2")
     b.semear_dinheiro(100_000, taxa=10_000)
     pedido = b.contexto.pedidos.obter("ped-1")
     assert acionar_gatilho(b.contexto, pedido, AGORA) == []
-    assert _indicacao(b, "pro-1").motivo_bloqueio == "contraparte_e_o_indicador"
+    i = _indicacao(b, "pro-1")
+    assert i.tipo == "profissional_profissional" and i.status == "bloqueado_fraude"
+    assert i.motivo_bloqueio == "contraparte_e_o_indicador"
 
 
 @pytest.mark.parametrize(
@@ -114,9 +139,12 @@ def test_contraparte_com_mesmo_contato_do_indicador_bloqueia(b, indicador, contr
 
 def test_bloqueio_da_contraparte_pode_ser_desligado_pela_config(b):
     b.contexto.indicacoes.salvar_config(ConfigIndicacao(bloquear_contraparte_indicador=False))
-    assert _aplicar(b, "cli-1", _codigo(b, "pro-1")).status_code == 201
-    _concluir(b)
-    assert _indicacao(b).status == "aguardando_liberacao"
+    assert _aplicar(b, "pro-1", _codigo(b, "pro-2")).status_code == 201
+    b.semear_pedido(Estado.EM_CONFIRMACAO, cliente_id="pro-2")
+    b.semear_dinheiro(100_000, taxa=10_000)
+    pedido = b.contexto.pedidos.obter("ped-1")
+    assert len(acionar_gatilho(b.contexto, pedido, AGORA)) == 1  # sem o flag, o tipo pp passa
+    assert _indicacao(b, "pro-1").status == "aguardando_liberacao"
 
 
 # --- 2. dinheiro pago de fato -----------------------------------------------------------------

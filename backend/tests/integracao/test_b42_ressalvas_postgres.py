@@ -34,7 +34,11 @@ def _novo(c, nome: str, email: str | None = None) -> str:
 
 def _vinculo(c, indicador: str, indicado: str, tipo: str = "cliente_cliente"):
     codigo = "B42" + uuid.uuid4().hex[:6].upper()
-    bonus = {"cliente_cliente": (300, 300), "profissional_cliente": (150, 300)}[tipo]
+    bonus = {
+        "cliente_cliente": (300, 300),
+        "profissional_cliente": (150, 300),
+        "profissional_profissional": (150, 100),
+    }[tipo]
     return c.contexto.indicacoes.criar(indicador, indicado, codigo, tipo, *bonus, agora())
 
 
@@ -53,16 +57,29 @@ def test_gatilho_bloqueia_contraparte_igual_ao_indicador_ou_com_mesmo_contato(ce
     assert pagar_pelo_webhook(c, pedido_id).status_code == 200  # R$ 900,00 pagos
     pedido = c.contexto.pedidos.obter(pedido_id)
 
-    # a) o indicador É o profissional do pedido
+    # a1) profissional_cliente: o indicador É o profissional do pedido = fluxo planejado, arma
     indicado_a = _novo(c, "Indicado A Teste")
-    _vinculo(c, c.ids["profissional"], indicado_a, "profissional_cliente")
-    assert acionar_gatilho(c.contexto, replace(pedido, cliente_id=indicado_a), agora()) == []
-    assert tuple(_linha(c, indicado_a))[:3] == (
+    vinculo_a = _vinculo(c, c.ids["profissional"], indicado_a, "profissional_cliente")
+    armadas_a = acionar_gatilho(c.contexto, replace(pedido, cliente_id=indicado_a), agora())
+    assert [a.id for a in armadas_a] == [vinculo_a.id]
+    assert tuple(_linha(c, indicado_a))[:3] == ("aguardando_liberacao", "", pedido_id)
+
+    # a2) cliente_cliente: o indicador é o profissional do pedido = bloqueia
+    indicado_a2 = _novo(c, "Indicado A2 Teste")
+    _vinculo(c, c.ids["profissional"], indicado_a2, "cliente_cliente")
+    assert acionar_gatilho(c.contexto, replace(pedido, cliente_id=indicado_a2), agora()) == []
+    assert tuple(_linha(c, indicado_a2))[:3] == (
         "bloqueado_fraude",
         "contraparte_e_o_indicador",
         None,
     )
-    assert _linha(c, indicado_a)[3] == 0
+    assert _linha(c, indicado_a2)[3] == 0
+
+    # a3) profissional_profissional: o indicador é o cliente do pedido = bloqueia
+    indicado_a3 = c.ids["profissional2"]
+    _vinculo(c, c.ids["cliente"], indicado_a3, "profissional_profissional")
+    assert acionar_gatilho(c.contexto, replace(pedido, profissional_id=indicado_a3), agora()) == []
+    assert tuple(_linha(c, indicado_a3))[:2] == ("bloqueado_fraude", "contraparte_e_o_indicador")
 
     # b) a outra ponta é outra conta com o mesmo e-mail normalizado do indicador
     indicador_b = _novo(c, "Indicador B Teste", email="a.b+trato@gmail.com")

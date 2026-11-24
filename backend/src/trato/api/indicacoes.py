@@ -62,9 +62,9 @@ class ConfigIndicacao:
     validade_dias: int = 90
     limite_mensal_cliente: int = 3
     limite_mensal_profissional: int = 5
-    # Antifraude: o pedido gatilho feito COM o próprio indicador (ele é o profissional do indicado
-    # ou o cliente do indicado) não conta. Desligue só se o produto aceitar o fluxo
-    # "profissional indica o cliente que o contrata" (o doc de 23/11 descreve esse fluxo).
+    # Antifraude: nos tipos cliente_cliente e profissional_profissional, o pedido gatilho feito
+    # COM o próprio indicador não conta. No tipo profissional_cliente isso é o fluxo planejado
+    # ("o cliente antigo contrata o profissional que o indicou", doc de 23/11) e é permitido.
     bloquear_contraparte_indicador: bool = True
 
     def bonus_do_tipo(self, tipo: str) -> tuple[int, int]:
@@ -375,10 +375,14 @@ def _abertura_do_mes(agora: datetime) -> tuple[datetime, datetime]:
 def _motivo_de_fraude(
     contexto: Any, cfg: ConfigIndicacao, indicacao: Indicacao, contraparte_id: str
 ) -> str | None:
-    """Por que o pedido gatilho não vale: a outra ponta do serviço é o próprio indicador ou
-    divide telefone/e-mail com ele (a pessoa estaria pagando a si mesma)."""
-    if cfg.bloquear_contraparte_indicador and contraparte_id == indicacao.indicador_id:
-        return "contraparte_e_o_indicador"
+    """Por que o pedido gatilho não vale: a outra ponta do serviço é o próprio indicador (só nos
+    tipos cliente_cliente e profissional_profissional) ou OUTRA conta que divide telefone/e-mail
+    com ele (a pessoa estaria pagando a si mesma)."""
+    if contraparte_id == indicacao.indicador_id:
+        # Mesma conta: o contato igual é óbvio e não é fraude por si só; vale a regra do tipo.
+        if cfg.bloquear_contraparte_indicador and indicacao.tipo != TIPO_PROFISSIONAL_CLIENTE:
+            return "contraparte_e_o_indicador"
+        return None
     repetido = contato_repetido(contexto, contraparte_id, indicacao.indicador_id)
     return f"contraparte_{repetido}" if repetido else None
 
