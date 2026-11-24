@@ -12,6 +12,7 @@ class EstruturaAuth extends StatelessWidget {
     this.tituloBarra,
     this.comVoltar = true,
     this.scrollController,
+    this.rodapeFixoComTeclado = true,
   });
 
   final List<Widget> children;
@@ -20,8 +21,14 @@ class EstruturaAuth extends StatelessWidget {
   final bool comVoltar;
   final ScrollController? scrollController;
 
+  /// Com o teclado aberto, `false` leva o rodapé para dentro da rolagem (no fim): serve quando o
+  /// rodapé é só um link e o botão principal está no conteúdo; assim ele não rouba espaço do botão.
+  final bool rodapeFixoComTeclado;
+
   @override
   Widget build(BuildContext context) {
+    final rodapeNoScroll =
+        rodape != null && !rodapeFixoComTeclado && MediaQuery.viewInsetsOf(context).bottom > 0;
     return PopScope(
       canPop: comVoltar,
       child: Scaffold(
@@ -39,11 +46,17 @@ class EstruturaAuth extends StatelessWidget {
                     padding: const EdgeInsets.only(top: EspacosTrato.x2, bottom: EspacosTrato.x4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: children,
+                      children: [
+                        ...children,
+                        if (rodapeNoScroll) ...[
+                          const SizedBox(height: EspacosTrato.x4),
+                          Center(child: rodape!),
+                        ],
+                      ],
                     ),
                   ),
                 ),
-                if (rodape != null) ...[
+                if (rodape != null && !rodapeNoScroll) ...[
                   rodape!,
                   const SizedBox(height: EspacosTrato.x4),
                 ],

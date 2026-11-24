@@ -161,6 +161,8 @@ class _LoginTelaState extends State<LoginTela> {
     return EstruturaAuth(
       comVoltar: false,
       scrollController: _scrollController,
+      // Rodapé é só um link: com o teclado aberto vai para a rolagem e não esmaga o "Entrar".
+      rodapeFixoComTeclado: false,
       rodape: Wrap(
         alignment: WrapAlignment.center,
         crossAxisAlignment: WrapCrossAlignment.center,

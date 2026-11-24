@@ -1996,7 +1996,10 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     this.upload,
     this.fila,
     this.posicao,
-  });
+    DateTime Function()? agora,
+  }) : _agora = agora ?? DateTime.now;
+
+  final DateTime Function() _agora;
 
   /// Onde o profissional está agora (para calcular a distância dos pedidos). Pode ser nula.
   final Future<PosicaoAtual?> Function()? posicao;
@@ -2012,6 +2015,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   final ServicoUpload? upload;
   final FilaOffline? fila;
   Future<InicioProfissional>? _inicioEmVoo;
+
+  /// A última posição vale por este tempo: a Home atualiza a cada poucos segundos e cada pedido de
+  /// localização acorda o serviço de GPS do Android (e na thread principal: travava o app, ANR).
+  static const validadePosicao = Duration(minutes: 2);
+
+  /// Depois de uma falha ou demora, não tenta de novo por este tempo.
+  static const pausaAposFalhaDePosicao = Duration(minutes: 1);
+
+  PosicaoAtual? _ultimaPosicao;
+  DateTime? _posicaoLidaEm;
+  DateTime? _semPosicaoAte;
+  Future<PosicaoAtual?>? _posicaoEmVoo;
 
   /// `GET /v1/profissional/pedidos-abertos`. O backend já filtra por categoria, cidade, bairro,
   /// faixa de preço e recusas; não vêm distância, nem quantos já orçaram.
@@ -2032,14 +2047,46 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   }
 
   /// A localização só serve para mostrar a distância dos pedidos (limite curto de 1,5 s para não
-  /// travar a tela inicial do profissional).
+  /// travar a tela inicial do profissional). Reusa a última posição por [validadePosicao], nunca
+  /// tem mais de um pedido de localização em andamento e, se falhar ou demorar, espera
+  /// [pausaAposFalhaDePosicao]: o `timeout` só para de esperar, não cancela o GPS no aparelho.
   Future<PosicaoAtual?> _posicaoRapida() async {
     final buscar = posicao;
     if (buscar == null) return null;
+    final agora = _agora();
+    final lidaEm = _posicaoLidaEm;
+    if (_ultimaPosicao != null && lidaEm != null && agora.difference(lidaEm) < validadePosicao) {
+      return _ultimaPosicao;
+    }
+    final pausa = _semPosicaoAte;
+    if (pausa != null && agora.isBefore(pausa)) return _ultimaPosicao;
+    final emVoo = _posicaoEmVoo ??= _buscarPosicao(buscar);
     try {
-      return await buscar().timeout(const Duration(milliseconds: 1500));
+      return await emVoo.timeout(const Duration(milliseconds: 1500));
     } on Object {
+      // Demorou: segue sem distância agora; o pedido em andamento continua e, se terminar bem,
+      // a posição fica guardada para as próximas atualizações.
+      _semPosicaoAte = _agora().add(pausaAposFalhaDePosicao);
+      return _ultimaPosicao;
+    }
+  }
+
+  Future<PosicaoAtual?> _buscarPosicao(Future<PosicaoAtual?> Function() buscar) async {
+    try {
+      final p = await buscar();
+      if (p != null) {
+        _ultimaPosicao = p;
+        _posicaoLidaEm = _agora();
+        _semPosicaoAte = null;
+      } else {
+        _semPosicaoAte = _agora().add(pausaAposFalhaDePosicao);
+      }
+      return p;
+    } on Object {
+      _semPosicaoAte = _agora().add(pausaAposFalhaDePosicao);
       return null;
+    } finally {
+      _posicaoEmVoo = null;
     }
   }
 
