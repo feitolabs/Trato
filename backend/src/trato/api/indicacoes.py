@@ -43,6 +43,7 @@ STATUS_CADASTRADO = "cadastrado"
 STATUS_AGUARDANDO = "aguardando_liberacao"
 STATUS_LIBERADO = "liberado"
 STATUS_CANCELADO = "cancelado"
+STATUS_BLOQUEADO_FRAUDE = "bloqueado_fraude"
 
 # Sem 0/O e 1/I/L: o código é lido e digitado por gente.
 ALFABETO_CODIGO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -102,6 +103,44 @@ def candidatos_de_codigo(usuario_id: str) -> Iterable[str]:
         yield "".join(ALFABETO_CODIGO[b % len(ALFABETO_CODIGO)] for b in resumo[:TAMANHO_CODIGO])
 
 
+def normalizar_email(email: str | None) -> str | None:
+    """E-mail comparável: minúsculas, sem `+tag` e, no Gmail, sem pontos no usuário."""
+    if not email or "@" not in email:
+        return None
+    usuario, _, dominio = email.strip().lower().rpartition("@")
+    usuario = usuario.split("+", 1)[0]
+    if dominio in ("gmail.com", "googlemail.com"):
+        usuario = usuario.replace(".", "")
+        dominio = "gmail.com"
+    return f"{usuario}@{dominio}" if usuario else None
+
+
+def normalizar_telefone(telefone: str | None) -> str | None:
+    """Só dígitos, sem o 55 do país (10 ou 11 dígitos com DDD)."""
+    digitos = "".join(c for c in (telefone or "") if c.isdigit())
+    if digitos.startswith("55") and len(digitos) in (12, 13):
+        digitos = digitos[2:]
+    return digitos if len(digitos) >= 10 else None
+
+
+def contato_repetido(contexto: Any, usuario_a: str, usuario_b: str) -> str | None:
+    """`mesmo_telefone` ou `mesmo_email` se as duas contas dividem o contato; senão None.
+
+    Antifraude leve: só compara o que existe. Sem dado (ou falha ao ler), não bloqueia.
+    """
+    try:
+        a, b = contexto.conta.dados(usuario_a), contexto.conta.dados(usuario_b)
+    except Exception:  # noqa: BLE001 - sem dados confiáveis, a indicação segue
+        return None
+    tel_a, tel_b = normalizar_telefone(a.telefone), normalizar_telefone(b.telefone)
+    if tel_a and tel_a == tel_b:
+        return "mesmo_telefone"
+    mail_a, mail_b = normalizar_email(a.email), normalizar_email(b.email)
+    if mail_a and mail_a == mail_b:
+        return "mesmo_email"
+    return None
+
+
 def resolver_tipo(indicador_profissional: bool, indicado_profissional: bool) -> str | None:
     """O tipo da indicação, ou None se o par não é permitido (cliente indicando profissional)."""
     if indicador_profissional:
@@ -131,6 +170,8 @@ class RepositorioIndicacoes(Protocol):
         bonus_indicador: int,
         bonus_indicado: int,
         agora: datetime,
+        status: str = STATUS_CADASTRADO,
+        motivo_bloqueio: str = "",
     ) -> Indicacao:
         """Levanta `JaIndicado` se o indicado já tem indicação (unique)."""
         ...
@@ -200,6 +241,8 @@ class IndicacoesEmMemoria:
         bonus_indicador: int,
         bonus_indicado: int,
         agora: datetime,
+        status: str = STATUS_CADASTRADO,
+        motivo_bloqueio: str = "",
     ) -> Indicacao:
         with self._trava:
             if self.do_indicado(indicado_id) is not None:
@@ -210,10 +253,11 @@ class IndicacoesEmMemoria:
                 indicado_id=indicado_id,
                 codigo_usado=codigo,
                 tipo=tipo,
-                status=STATUS_CADASTRADO,
+                status=status,
                 criado_em=agora,
                 bonus_indicador_tratinhos=bonus_indicador,
                 bonus_indicado_tratinhos=bonus_indicado,
+                motivo_bloqueio=motivo_bloqueio,
             )
             self._itens[nova.id] = nova
             return nova

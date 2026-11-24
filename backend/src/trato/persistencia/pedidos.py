@@ -184,6 +184,12 @@ class PedidosPostgres:
                 "       (select 1 from public.exclusividades e where e.pedido_id = p.id "
                 "          and e.profissional_id = %s and e.status = 'ativa'))) "
                 "and p.cliente_id <> %s "
+                # Pedido de visita recorrente: só o profissional da série vê (e orça).
+                "and (not exists (select 1 from public.recorrencia_visitas rv "
+                "                 where rv.pedido_id = p.id) "
+                "     or exists (select 1 from public.recorrencia_visitas rv "
+                "                join public.recorrencias rc on rc.id = rv.recorrencia_id "
+                "                where rv.pedido_id = p.id and rc.profissional_id = %s)) "
                 "and exists (select 1 from public.profissional_categorias pc "
                 "            where pc.profissional_id = %s and pc.categoria_id = p.categoria_id "
                 "              and pc.suspensa_em is null) "
@@ -199,7 +205,17 @@ class PedidosPostgres:
                 "      and exists (select 1 from public.perfis_profissional pf "
                 "                  where pf.usuario_id = %s and pf.atende_remoto))) "
                 "order by p.criado_em desc limit %s offset %s",
-                (achado, achado, achado, achado, achado, achado, limite_efetivo, offset_efetivo),
+                (
+                    achado,
+                    achado,
+                    achado,
+                    achado,
+                    achado,
+                    achado,
+                    achado,
+                    limite_efetivo,
+                    offset_efetivo,
+                ),
             ).fetchall()
         return tuple(
             PedidoAberto(

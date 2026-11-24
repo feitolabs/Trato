@@ -112,13 +112,16 @@ class IndicacoesPostgres:
         bonus_indicador: int,
         bonus_indicado: int,
         agora: datetime,
+        status: str = STATUS_CADASTRADO,
+        motivo_bloqueio: str = "",
     ) -> Indicacao:
         try:
             with self._banco.transacao() as con:
                 linha = con.execute(
                     "insert into public.indicacoes (indicador_id, indicado_id, codigo_usado, "  # noqa: S608
-                    "tipo, bonus_indicador_tratinhos, bonus_indicado_tratinhos, criado_em) "
-                    f"values (%s, %s, %s, %s, %s, %s, %s) returning {_COLUNAS}",
+                    "tipo, bonus_indicador_tratinhos, bonus_indicado_tratinhos, criado_em, "
+                    "status, motivo_bloqueio) "
+                    f"values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning {_COLUNAS}",
                     (
                         indicador_id,
                         indicado_id,
@@ -127,6 +130,8 @@ class IndicacoesPostgres:
                         bonus_indicador,
                         bonus_indicado,
                         agora,
+                        status,
+                        motivo_bloqueio,
                     ),
                 ).fetchone()
         except psycopg.errors.UniqueViolation:

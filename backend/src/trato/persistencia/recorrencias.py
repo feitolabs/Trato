@@ -251,6 +251,19 @@ class RecorrenciasPostgres:
             ).fetchall()
         return [_rec(l) for l in linhas]  # noqa: E741
 
+    def profissional_do_pedido_de_visita(self, pedido_id: str) -> str | None:
+        uid = como_uuid(pedido_id)
+        if uid is None:
+            return None
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select r.profissional_id from public.recorrencia_visitas v "
+                "join public.recorrencias r on r.id = v.recorrencia_id "
+                "where v.pedido_id = %s limit 1",
+                (uid,),
+            ).fetchone()
+        return str(linha["profissional_id"]) if linha else None
+
     def visitas_abertas(self) -> list[Visita]:
         with self._banco.transacao() as con:
             linhas = con.execute(

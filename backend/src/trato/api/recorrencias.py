@@ -167,6 +167,10 @@ class RepositorioRecorrencias(Protocol):
         """Visitas ainda 'agendada' (para confirmar o pagamento ou expirar)."""
         ...
 
+    def profissional_do_pedido_de_visita(self, pedido_id: str) -> str | None:
+        """Se o pedido é de uma visita recorrente: o profissional da série; senão None."""
+        ...
+
 
 class RecorrenciasEmMemoria:
     def __init__(self, config: ConfigRecorrencia | None = None) -> None:
@@ -316,6 +320,13 @@ class RecorrenciasEmMemoria:
 
     def visitas_abertas(self) -> list[Visita]:
         return [v for v in self._vis.values() if v.status == V_AGENDADA]
+
+    def profissional_do_pedido_de_visita(self, pedido_id: str) -> str | None:
+        for v in self._vis.values():
+            if v.pedido_id == pedido_id:
+                serie = self._recs.get(v.recorrencia_id)
+                return serie.profissional_id if serie else None
+        return None
 
 
 # --- Rotinas do agendador -----------------------------------------------------------------

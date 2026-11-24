@@ -9,7 +9,8 @@ agenda ou remarcar), então códigos, ganchos e histórico seguem as regras de s
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from dataclasses import replace
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -39,6 +40,9 @@ router = APIRouter(prefix="/v1", tags=["agenda"])
 
 ESTADOS_QUE_REAGENDAM = (Estado.PAGO_E_RETIDO, Estado.AGENDADO)
 _NAO_PODE = "Este pedido não pode ser reagendado no momento."
+# Limites de abuso (a janela nova é de até 60 dias à frente; 5 propostas por pedido a cada 24 h).
+MAX_DIAS_A_FRENTE = 60
+MAX_PROPOSTAS_POR_DIA = 5
 _JA_RESPONDIDO = "Este pedido de reagendamento já foi respondido."
 
 
@@ -114,6 +118,16 @@ def propor_reagendamento(
         raise HTTPException(422, "A nova janela precisa terminar depois de começar.")
     if corpo.nova_janela_inicio <= agora:
         raise HTTPException(422, "A nova janela precisa começar no futuro.")
+    if corpo.nova_janela_inicio > agora + timedelta(days=MAX_DIAS_A_FRENTE):
+        raise HTTPException(
+            422, f"A nova janela pode ser no máximo {MAX_DIAS_A_FRENTE} dias à frente."
+        )
+    desde = agora - timedelta(hours=24)
+    if contexto.reagendamentos.contar_propostas(pedido.id, desde) >= MAX_PROPOSTAS_POR_DIA:
+        raise HTTPException(
+            429,
+            "Este pedido já teve muitos pedidos de reagendamento hoje. Tente de novo amanhã.",
+        )
     motivo = limpar_texto(corpo.motivo or "", "motivo", 500, obter_config_seguranca())
     try:
         nova = contexto.reagendamentos.propor(
@@ -196,9 +210,12 @@ def aceitar_reagendamento(
         respondido = contexto.reagendamentos.responder(r.id, "aceito", usuario.id, agora)
         if respondido is None:
             raise HTTPException(409, _JA_RESPONDIDO)
-        gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+        # O histórico do pedido registra quem de fato aceitou (a regra da agenda exige o
+        # profissional na transição, mas a pessoa que respondeu pode ser o cliente).
+        evento = replace(transicao.evento, ator=ator_de(usuario, pedido))
+        gravado = contexto.pedidos.salvar(transicao.pedido, evento)
         for gancho in contexto.apos_transicao:
-            gancho(pedido, gravado, transicao.evento.acao, contexto)
+            gancho(pedido, gravado, evento.acao, contexto)
     _avisar(
         request,
         contexto,

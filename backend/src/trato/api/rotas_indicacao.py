@@ -9,27 +9,34 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
 from trato.api.indicacoes import (
     STATUS_AGUARDANDO,
+    STATUS_BLOQUEADO_FRAUDE,
     STATUS_CADASTRADO,
     STATUS_LIBERADO,
     Indicacao,
     JaIndicado,
     candidatos_de_codigo,
+    contato_repetido,
     resolver_tipo,
 )
 from trato.financeiro import periodo
 from trato.pedidos.estados import Estado
+from trato.seguranca.cliente import ip_do_cliente
+from trato.seguranca.contadores import Contadores
 
 router = APIRouter(prefix="/v1/indicacoes", tags=["indicacoes"])
 
 _FORMATO_CODIGO = re.compile(r"^[A-Z0-9]{6,12}$")
 _JA_USOU = "Você já utilizou um código de indicação."
+# Consulta pública de código: no máximo 20 por minuto por IP (impede varrer códigos).
+CONSULTAS_POR_MINUTO = 20
+JANELA_CONSULTA_S = 60
 
 
 class IndicadoOut(BaseModel):
@@ -190,6 +197,10 @@ def aplicar_codigo(
             "profissionais.",
         )
     bonus_indicador, bonus_indicado = cfg.bonus_do_tipo(tipo)
+    # Antifraude leve: mesma pessoa em duas contas (telefone ou e-mail repetidos) não ganha.
+    repetido = contato_repetido(contexto, indicador_id, usuario.id)
+    if repetido is not None:
+        bonus_indicador = bonus_indicado = 0
     try:
         nova = repo.criar(
             indicador_id,
@@ -199,9 +210,19 @@ def aplicar_codigo(
             bonus_indicador,
             bonus_indicado,
             contexto.agora(),
+            status=STATUS_BLOQUEADO_FRAUDE if repetido else STATUS_CADASTRADO,
+            motivo_bloqueio=repetido or "",
         )
     except JaIndicado:
         raise HTTPException(409, _JA_USOU) from None
+    if repetido is not None:
+        return AplicarCodigoOut(
+            id=nova.id,
+            tipo=nova.tipo,
+            status=nova.status,
+            bonus_indicado_tratinhos=0,
+            mensagem="Código registrado, mas esta indicação não é elegível a Tratinhos.",
+        )
     reais = f"{cfg.valor_minimo_servico_centavos // 100}"
     return AplicarCodigoOut(
         id=nova.id,
@@ -221,7 +242,22 @@ def aplicar_codigo(
     response_model=CodigoOut,
     summary="Conferir um código de indicação (sem dados privados)",
 )
-def conferir_codigo(codigo: str, contexto: Contexto = Depends(obter_contexto)) -> CodigoOut:
+def conferir_codigo(
+    codigo: str, request: Request, contexto: Contexto = Depends(obter_contexto)
+) -> CodigoOut:
+    contadores = contexto.extras.setdefault(
+        "contadores_consulta_indicacao",
+        Contadores(relogio=lambda: contexto.agora().timestamp()),
+    )
+    chave = f"indicacao:codigo:{ip_do_cliente(request)}"
+    if contadores.quantos(chave, JANELA_CONSULTA_S) >= CONSULTAS_POR_MINUTO:
+        espera = contadores.segundos_ate_liberar(chave, JANELA_CONSULTA_S, CONSULTAS_POR_MINUTO)
+        raise HTTPException(
+            429,
+            "Muitas consultas de código. Aguarde um minuto e tente de novo.",
+            headers={"Retry-After": str(max(espera, 1))},
+        )
+    contadores.adicionar(chave)
     normal = _normalizar(codigo)
     indicador_id = (
         contexto.indicacoes.usuario_do_codigo(normal) if _FORMATO_CODIGO.match(normal) else None

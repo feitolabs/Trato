@@ -43,12 +43,18 @@ class PedidosEmMemoria:
         self._dados: dict[str, DadosPedido] = {}
         # Quem tem a exclusividade ativa do pedido (ligado pelo Contexto).
         self._exclusivo_de = lambda _pedido_id: None
+        # Dono (profissional da série) do pedido de visita recorrente, se for um (ligado pelo
+        # Contexto).
+        self._visita_de = lambda _pedido_id: None
         # Mesma garantia do Postgres (`for update` + estado esperado): duas ações do mesmo
         # pedido entram uma de cada vez e quem chega depois leva 409.
         self._trava = threading.RLock()
 
     def vincular_exclusividades(self, quem: Any) -> None:
         self._exclusivo_de = quem
+
+    def vincular_visitas_recorrentes(self, quem: Any) -> None:
+        self._visita_de = quem
 
     def obter(self, pedido_id: str) -> Pedido | None:
         return self._pedidos.get(pedido_id)
@@ -124,6 +130,7 @@ class PedidosEmMemoria:
             p
             for p in self._pedidos.values()
             if p.cliente_id != profissional_id
+            and self._visita_de(p.id) in (None, profissional_id)  # visita recorrente: só a série
             and (
                 p.estado is Estado.ABERTO
                 or (p.estado is Estado.RESERVADO and self._exclusivo_de(p.id) == profissional_id)

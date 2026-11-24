@@ -53,6 +53,10 @@ class RepositorioReagendamentos(Protocol):
         """Mais recentes primeiro."""
         ...
 
+    def contar_propostas(self, pedido_id: str, desde: datetime) -> int:
+        """Quantas propostas o pedido recebeu desde `desde` (qualquer status)."""
+        ...
+
     def responder(
         self, reagendamento_id: str, status: str, por: str, agora: datetime
     ) -> Reagendamento | None:
@@ -101,6 +105,11 @@ class ReagendamentosEmMemoria:
         return [
             self._itens[i] for i in reversed(self._ordem) if self._itens[i].pedido_id == pedido_id
         ]
+
+    def contar_propostas(self, pedido_id: str, desde: datetime) -> int:
+        return sum(
+            1 for r in self._itens.values() if r.pedido_id == pedido_id and r.criado_em >= desde
+        )
 
     def responder(
         self, reagendamento_id: str, status: str, por: str, agora: datetime

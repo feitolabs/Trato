@@ -7,6 +7,7 @@ parte. Ninguém denuncia a si mesmo.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
+from trato.api.denuncias import marcador
 from trato.api.servicos import carregar_pedido
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_texto
@@ -21,6 +23,9 @@ from trato.seguranca.texto_livre import limpar_texto
 router = APIRouter(prefix="/v1", tags=["denuncias"])
 
 MOTIVOS_GRAVES = ("assedio", "fraude")
+# Denúncia de PERFIL: 1 por alvo a cada 24 h e no máximo 10 por dia por denunciante.
+PERFIL_MAX_POR_DIA = 10
+JANELA_PERFIL = timedelta(hours=24)
 
 
 class DenunciaIn(BaseModel):
@@ -62,13 +67,32 @@ def denunciar(
         pedido_id = pedido.id
     elif contexto.usuarios.detalhe(corpo.denunciado_id) is None:
         raise HTTPException(404, "Perfil não encontrado.")
+    agora = contexto.agora()
+    if corpo.alvo_tipo == "perfil":
+        desde = agora - JANELA_PERFIL
+        mesmo_alvo = marcador(usuario.id, corpo.denunciado_id)
+        if contexto.denuncias.contar("denuncia_perfil", mesmo_alvo, desde) > 0:
+            raise HTTPException(
+                409, "Você já denunciou este perfil nas últimas 24 horas. Aguardamos a análise."
+            )
+        if contexto.denuncias.contar("denuncia_perfil", marcador(usuario.id), desde) >= (
+            PERFIL_MAX_POR_DIA
+        ):
+            raise HTTPException(
+                429,
+                "Você atingiu o limite de denúncias de perfil por dia. Tente de novo amanhã.",
+            )
     texto = limpar_texto(corpo.detalhes, "detalhes", 500, obter_config_seguranca())
-    detalhes = f"Denúncia de {corpo.alvo_tipo} ({corpo.motivo}) por {usuario.id}: {texto}"
+    detalhes = (
+        f"Denúncia de {corpo.alvo_tipo} ({corpo.motivo})"
+        f"{marcador(usuario.id, corpo.denunciado_id)} {texto}"
+    )
     alerta_id = contexto.denuncias.registrar(
         corpo.denunciado_id,
         pedido_id,
         f"denuncia_{corpo.alvo_tipo}",
         "alta" if corpo.motivo in MOTIVOS_GRAVES else "media",
         detalhes,
+        agora,
     )
     return DenunciaOut(id=alerta_id)

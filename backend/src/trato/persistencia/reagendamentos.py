@@ -81,6 +81,15 @@ class ReagendamentosPostgres:
             ).fetchall()
         return [_reagendamento(l) for l in linhas]  # noqa: E741
 
+    def contar_propostas(self, pedido_id: str, desde: datetime) -> int:
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select count(*) as n from public.reagendamentos "
+                "where pedido_id = %s and criado_em >= %s",
+                (pedido_id, desde),
+            ).fetchone()
+        return int(linha["n"])
+
     def responder(
         self, reagendamento_id: str, status: str, por: str, agora: datetime
     ) -> Reagendamento | None:

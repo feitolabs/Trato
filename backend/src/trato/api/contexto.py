@@ -200,6 +200,9 @@ class Contexto:
         vincular = getattr(self.exclusividades, "vincular", None)
         if vincular is not None:
             vincular(self)
+        ligar_visitas = getattr(self.pedidos, "vincular_visitas_recorrentes", None)
+        if ligar_visitas is not None:
+            ligar_visitas(lambda pid: self.recorrencias.profissional_do_pedido_de_visita(pid))
         ligar = getattr(self.pedidos, "vincular_exclusividades", None)
         if ligar is not None:
             ligar(lambda pid: self.exclusividades.profissional_ativo_do_pedido(pid))
