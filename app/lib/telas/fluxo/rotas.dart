@@ -87,6 +87,8 @@ import '../lgpd/modelos.dart' show CancelamentoExclusao;
 import '../mensagens/mensagens_tela.dart';
 import '../perfil_publico/avaliacoes_recebidas_tela.dart';
 import '../perfil_publico/perfil_publico_tela.dart';
+import 'deep_link.dart';
+import 'deep_link_modelo.dart';
 import '../profissional_mei/mei.dart';
 import '../profissional_mei/meu_cnpj_tela.dart';
 import '../profissional_cadastro/cadastro.dart';
@@ -431,6 +433,7 @@ abstract final class RotasTrato {
     PerfilClienteTela.limparFotoSessao();
     PerfilPublicoTela.limparFotoSessao();
     await sessao?.sair(); // espera apagar o cache de leitura antes de voltar ao login
+    DeepLinks.esquecer(); // um link guardado é de quem saiu: não abre para a próxima pessoa
     navegador.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginTela()),
       (rota) => false,
@@ -2428,28 +2431,76 @@ abstract final class RotasTrato {
           ),
           aoAbrirDestino: (n) {
             final id = n.destinoId;
-            if (id == null) return;
-            switch (n.tipo) {
-              case TipoNotificacao.disputa:
-                profissional ? abrirDisputa(context, id) : abrirServico(context, id);
-              case TipoNotificacao.retrabalho:
-                profissional ? abrirRetrabalho(context, id) : abrirServico(context, id);
-              case TipoNotificacao.orcamento:
-                profissional
-                    ? _abrir<void>(context, _chat(id, comoProfissional: true))
-                    : _abrir<void>(context, _orcamentosRecebidos(id));
-              case TipoNotificacao.mensagem:
-                _abrir<void>(context, _chat(id, comoProfissional: profissional));
-              case TipoNotificacao.pedido || TipoNotificacao.pagamento:
-                profissional
-                    ? _abrir<void>(context, _chat(id, comoProfissional: true))
-                    : abrirServico(context, id);
-              case TipoNotificacao.sistema:
-                break;
-            }
+            final destino = _destinoDaNotificacao(n.tipo);
+            if (id == null || destino == null) return;
+            abrirDestino(context, destino, id, profissional: profissional);
           },
         ),
       );
+
+  static DestinoApp? _destinoDaNotificacao(TipoNotificacao tipo) => switch (tipo) {
+        TipoNotificacao.disputa => DestinoApp.disputa,
+        TipoNotificacao.retrabalho => DestinoApp.retrabalho,
+        TipoNotificacao.orcamento => DestinoApp.orcamentos,
+        TipoNotificacao.mensagem => DestinoApp.chat,
+        TipoNotificacao.pedido || TipoNotificacao.pagamento => DestinoApp.pedido,
+        TipoNotificacao.sistema => null,
+      };
+
+  /// O ÚNICO caminho que abre uma tela a partir de fora de uma tela: toque numa notificação e
+  /// deep link. Só abre; nunca aceita, paga nem cancela. O que a pessoa pode ver quem decide é a
+  /// API (403 e 404 viram "não encontrado" dentro de cada tela).
+  static void abrirDestino(
+    BuildContext context,
+    DestinoApp destino,
+    String? id, {
+    required bool profissional,
+  }) {
+    if (destino == DestinoApp.recorrencia) {
+      id == null
+          ? abrirRecorrencias(context)
+          : _abrir<void>(
+              context,
+              DetalheRecorrenciaTela(
+                servico: _recorrencias,
+                recorrenciaId: id,
+                aoAbrirPedido: (pedidoId, souCliente) =>
+                    _abrirPedidoDaVisita(context, pedidoId, souCliente),
+              ),
+            );
+      return;
+    }
+    if (id == null) return;
+    switch (destino) {
+      case DestinoApp.disputa:
+        profissional ? abrirDisputa(context, id) : abrirServico(context, id);
+      case DestinoApp.retrabalho:
+        profissional ? abrirRetrabalho(context, id) : abrirServico(context, id);
+      case DestinoApp.orcamentos:
+        profissional
+            ? _abrir<void>(context, _chat(id, comoProfissional: true))
+            : _abrir<void>(context, _orcamentosRecebidos(id));
+      case DestinoApp.chat:
+        _abrir<void>(context, _chat(id, comoProfissional: profissional));
+      case DestinoApp.pedido:
+        profissional
+            ? _abrir<void>(context, _chat(id, comoProfissional: true))
+            : abrirServico(context, id);
+      case DestinoApp.recorrencia:
+        break;
+    }
+  }
+
+  /// Abre o que um deep link pediu. Id inválido = "não encontrado", nunca erro.
+  static void abrirLink(BuildContext context, ResultadoLink link) {
+    final destino = link.destino;
+    if (destino == null || link.situacao == SituacaoLink.ignorado) return;
+    if (link.situacao == SituacaoLink.invalido) {
+      _abrir<void>(context, telaLinkInvalido(destino));
+      return;
+    }
+    abrirDestino(context, destino, link.id, profissional: ControladorCasca.souProfissional);
+  }
 
   /// Aba "Buscar" do cliente: busca por serviço e abertura do perfil do profissional.
   static Widget abaBuscar() => Carregador<List<CategoriaServico>>(

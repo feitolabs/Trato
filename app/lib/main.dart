@@ -25,6 +25,7 @@ import 'dados/sessao_expirada.dart';
 import 'dispositivo/servico_localizacao_real.dart';
 import 'dispositivo/servico_push_firebase.dart';
 import 'galeria/galeria_componentes.dart';
+import 'telas/fluxo/deep_link.dart';
 import 'telas/fluxo/rotas.dart';
 import 'telas/splash_tela.dart';
 import 'tema/tema.dart';
@@ -132,6 +133,9 @@ Future<void> main() async {
   if (configAuth.supabaseConfigurado) {
     ServicoAuthPadrao.atual.recuperacaoDeSenha.listen((_) => _abrirNovaSenha());
   }
+  // Links br.com.feitolabs.trato://pedido/<id> etc. (o login-callback fica com o supabase_flutter).
+  DeepLinks.navegador = () => navegadorTrato.currentState;
+  DeepLinks.ligar();
   runApp(const TratoApp());
 }
 
@@ -188,7 +192,16 @@ class TratoApp extends StatelessWidget {
             child: filho!,
           ),
         ),
-        home: _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
+        // Com deep link ligado, o Android entrega o endereço do link como rota inicial. O app
+        // sempre começa pela tela inicial; quem abre o destino é o DeepLinks.
+        onGenerateInitialRoutes: (_) => [
+          MaterialPageRoute<void>(
+            builder: (_) => _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
+          ),
+        ],
+        onUnknownRoute: (_) => MaterialPageRoute<void>(
+          builder: (_) => _mostrarGaleria ? const GaleriaComponentes() : const SplashTela(),
+        ),
       ),
     );
   }

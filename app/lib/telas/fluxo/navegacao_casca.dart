@@ -5,13 +5,26 @@ import 'package:flutter/foundation.dart';
 class ControladorCasca {
   static void Function(int aba)? _irParaAba;
   static VoidCallback? _recarregarCasca;
+  static var _profissional = false;
+
+  /// Chamado quando uma casca aparece (o deep link espera por ela). O `deep_link.dart` liga.
+  static VoidCallback? aoCascaPronta;
+
+  /// Há uma casca (Início) na tela.
+  static bool get ativa => _irParaAba != null;
+
+  /// A casca na tela é a do profissional.
+  static bool get souProfissional => _profissional;
 
   static void registrar({
     required void Function(int aba) irParaAba,
     VoidCallback? recarregarCasca,
+    bool profissional = false,
   }) {
     _irParaAba = irParaAba;
     _recarregarCasca = recarregarCasca;
+    _profissional = profissional;
+    aoCascaPronta?.call();
   }
 
   static void desregistrar(void Function(int aba) irParaAba) {

@@ -45,14 +45,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Link de retorno do e-mail de confirmação do Supabase (só este esquema e host).
-                 O supabase_flutter lê o link; o Flutter não deve tratá-lo como rota. -->
-            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
+            <!-- Deep link ligado para os links br.com.feitolabs.trato://<tipo>/<id> (abaixo). O Flutter
+                 entrega todo link do esquema ao app; o host login-callback (retorno do Supabase)
+                 é IGNORADO pelo roteador (DeepLinks) e tratado só pelo supabase_flutter. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="br.com.feitolabs.trato" android:host="login-callback"/>
+            </intent-filter>
+            <!-- Links que abrem telas: só estes hosts. Só ABREM a tela; nenhuma ação é executada. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="br.com.feitolabs.trato" android:host="pedido"/>
+                <data android:scheme="br.com.feitolabs.trato" android:host="orcamentos"/>
+                <data android:scheme="br.com.feitolabs.trato" android:host="chat"/>
+                <data android:scheme="br.com.feitolabs.trato" android:host="recorrencia"/>
+                <data android:scheme="br.com.feitolabs.trato" android:host="disputa"/>
+                <data android:scheme="br.com.feitolabs.trato" android:host="avaliacao"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

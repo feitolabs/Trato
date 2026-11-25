@@ -160,6 +160,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
     ControladorCasca.registrar(
       irParaAba: _ir,
       recarregarCasca: _atualizarEmSilencio,
+      profissional: true,
     );
     widget.atualizarQuando?.addListener(_aoAtualizarExternamente);
     final intervalo = widget.atualizarACada;
