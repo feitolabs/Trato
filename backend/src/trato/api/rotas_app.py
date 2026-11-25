@@ -672,6 +672,12 @@ def enviar_orcamento(
     if pedido_visivel_ao_profissional(contexto, pedido.id, usuario.id) is None:
         raise HTTPException(404, "Pedido não encontrado.")
 
+    from trato.api.rotas_mei import servico_mei
+    from trato.profissional.mei import MENSAGEM_BLOQUEIO
+
+    if not servico_mei(request).liberado(usuario.id):
+        raise HTTPException(422, MENSAGEM_BLOQUEIO)
+
     agora = contexto.agora()
     total_estimado = sum(int(i.quantidade * i.valor_unitario_centavos) for i in dados.itens)
     if total_estimado <= 0:
