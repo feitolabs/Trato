@@ -122,6 +122,17 @@ def planejar(acao: Acao, depois: Pedido, contexto: Any) -> list[Aviso]:
             + _janela(depois)
         )
         para(cliente, Evento.CODIGO_INICIO, f"{pid}:{acao.value}", corpo=corpo)
+    elif acao is Acao.REMARCAR:
+        # O horário mudou (aceito pela outra parte): o código de início antigo deixou de valer.
+        marca = depois.janela.inicio.isoformat() if depois.janela else "sem-janela"
+        para(
+            cliente,
+            Evento.CODIGO_INICIO,
+            f"{pid}:{acao.value}:{marca}",
+            titulo="Novo código de início",
+            corpo="O horário mudou e o código de início também. Abra o pedido para ver o novo "
+            "código." + _janela(depois),
+        )
     elif acao is Acao.FAZER_CHECK_IN:
         para(cliente, Evento.SERVICO_INICIADO, f"{pid}:{acao.value}")
         para(cliente, Evento.CODIGO_CONCLUSAO, f"{pid}:{acao.value}")

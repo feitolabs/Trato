@@ -1,8 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from conftest import AGORA, CLIENTE, PROFISSIONAL, cab, janela_futura
 
 from trato.pedidos.estados import Estado, Janela, Pedido
+
+H = timedelta(hours=1)
 
 
 def acao(amb, quem, acao, prova=None, pedido="ped-1"):
@@ -205,42 +207,39 @@ def test_acoes_com_rota_propria_ou_em_aberto(amb):
     assert acao(amb, "t-mediador", "decidir_disputa").status_code == 403
 
 
-def test_remarcar_visita_no_pedido_agendado(amb):
-    amb.semear_pedido(Estado.AGENDADO, codigo_inicio="1234")
-    nova_janela = janela_futura()
-
-    r_cli = acao(amb, "t-cliente", "remarcar", {"janela": nova_janela})
-    assert r_cli.status_code == 200, r_cli.text
-    assert r_cli.json()["estado"] == "agendado"
-    assert datetime.fromisoformat(r_cli.json()["janela"]["inicio"]) == datetime.fromisoformat(
-        nova_janela["inicio"]
+def test_remarcar_direto_nao_existe_mais_para_nenhum_papel(amb):
+    amb.semear_pedido(
+        Estado.AGENDADO, codigo_inicio="1234", janela=Janela(AGORA + H, AGORA + 3 * H)
     )
-
-    inicio_prof = AGORA + timedelta(days=3)
-    outra_janela = {
-        "inicio": inicio_prof.isoformat(),
-        "fim": (inicio_prof + timedelta(hours=3)).isoformat(),
-    }
-    r_prof = acao(amb, "t-prof", "remarcar", {"janela": outra_janela})
-    assert r_prof.status_code == 200, r_prof.text
-    assert r_prof.json()["estado"] == "agendado"
-    assert datetime.fromisoformat(r_prof.json()["janela"]["inicio"]) == inicio_prof
-
-    # Recusa se informar aceito_por com o próprio id
-    inicio_ruim = AGORA + timedelta(days=4)
-    ruim = acao(
-        amb,
-        "t-cliente",
-        "remarcar",
-        {
-            "janela": {
-                "inicio": inicio_ruim.isoformat(),
-                "fim": (inicio_ruim + timedelta(hours=3)).isoformat(),
-            },
-            "aceito_por": CLIENTE.id,
-        },
+    antes = amb.contexto.pedidos.obter("ped-1")
+    for quem in ("t-cliente", "t-prof"):
+        r = acao(amb, quem, "remarcar", {"janela": janela_futura()})
+        assert r.status_code == 409, (quem, r.text)
+        assert "proposta de reagendamento" in r.json()["detail"]
+        assert "a outra parte precisa aceitar" in r.json()["detail"]
+    # corpo com aceito_por forjado (o id da outra parte) também é recusado
+    forjado = acao(
+        amb, "t-cliente", "remarcar", {"janela": janela_futura(), "aceito_por": PROFISSIONAL.id}
     )
-    assert ruim.status_code == 422
+    assert forjado.status_code == 409
+    depois = amb.contexto.pedidos.obter("ped-1")
+    assert depois.janela == antes.janela and depois.codigo_inicio == "1234"
+
+
+def test_aceitar_agenda_com_janela_solta_nao_remarca_pedido_agendado(amb):
+    amb.semear_pedido(
+        Estado.AGENDADO, codigo_inicio="1234", janela=Janela(AGORA + H, AGORA + 3 * H)
+    )
+    antes = amb.contexto.pedidos.obter("ped-1")
+    for quem in ("t-cliente", "t-prof"):
+        r = amb.cliente.post(
+            "/v1/pedidos/ped-1/agenda/aceitar",
+            json={"janela": janela_futura()},
+            headers=cab(quem),
+        )
+        assert r.status_code == 409, (quem, r.text)
+    depois = amb.contexto.pedidos.obter("ped-1")
+    assert depois.janela == antes.janela and depois.codigo_inicio == "1234"
 
 
 def test_acao_desconhecida_da_422(amb):

@@ -615,7 +615,8 @@ def _remarcar(pedido, ator, agora, prova: ProvaRemarcacao, prazos, gerar):
     if prova.aceito_por != outra_parte:
         raise ProvaInvalida("Remarcação exige o aceite da outra parte.")
     _exigir_janela(prova.janela, agora)
-    return replace(pedido, janela=prova.janela, cliente_ausente_em=None)
+    # Nova janela = novo código de início (o do horário antigo deixa de valer), como no banco.
+    return replace(pedido, janela=prova.janela, cliente_ausente_em=None, codigo_inicio=gerar())
 
 
 def _fazer_check_in(pedido, ator, agora, prova: ProvaCheckIn, prazos, gerar):

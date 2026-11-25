@@ -39,7 +39,7 @@ from trato.api.moedas import (
 from trato.api.repositorios import Contrato, ItemOrcamento
 from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
-from trato.api.rotas_pedidos import respostas_out
+from trato.api.rotas_pedidos import MENSAGEM_SO_POR_PROPOSTA, respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import (
     ator_de,
@@ -1792,6 +1792,9 @@ def aceitar_agenda(
     else:
         raise HTTPException(422, "Informe a mensagem ou a janela de horário.")
 
+    if pedido.estado is Estado.AGENDADO and corpo.mensagem_id is None:
+        # Remarcar só aceitando o horário que a OUTRA parte sugeriu no chat (ou pela proposta).
+        raise HTTPException(409, MENSAGEM_SO_POR_PROPOSTA)
     janela = Janela(inicio, fim)
     agora = contexto.agora()
     prazos = contexto.config.carregar().prazos_pedido

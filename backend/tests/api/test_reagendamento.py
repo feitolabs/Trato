@@ -148,4 +148,62 @@ def test_outra_parte_e_avisada_ao_propor_e_ao_responder(amb):
     pid = _propor(amb).json()["id"]
     assert [n.tipo for n in repo.listar("pro-1", False, 10)] == ["agenda.reagendamento_proposto"]
     amb.cliente.post(f"{URL}/{pid}/aceitar", headers=cab("t-prof"))
-    assert [n.tipo for n in repo.listar("cli-1", False, 10)] == ["agenda.reagendamento_respondido"]
+    # quem propôs é avisado da resposta e, como cliente, do novo código de início
+    assert sorted(n.tipo for n in repo.listar("cli-1", False, 10)) == [
+        "agenda.codigo_inicio",
+        "agenda.reagendamento_respondido",
+    ]
+
+
+def _com_notificacoes(amb):
+    from trato.notificacoes import ligar_ao_contexto
+    from trato.notificacoes.canais import Canais, CanalApp
+    from trato.notificacoes.config import ConfigNotificacoes
+    from trato.notificacoes.repositorio import RepositorioEmMemoria
+    from trato.notificacoes.servico import ServicoNotificacoes
+
+    repo = RepositorioEmMemoria()
+    notif = ServicoNotificacoes(repo, Canais(app=CanalApp()), ConfigNotificacoes(ativo=True))
+    ligar_ao_contexto(amb.cliente.app, amb.contexto, notif)
+    amb.cliente.app.state.notificador = notif
+    return repo
+
+
+def test_aceite_remarca_regera_o_codigo_e_avisa_as_duas_pontas(amb):
+    repo = _com_notificacoes(amb)
+    amb.semear_pedido(
+        Estado.AGENDADO, janela=Janela(AGORA + 24 * H, AGORA + 26 * H), codigo_inicio="1234"
+    )
+    pid = amb.cliente.post(URL, json=_corpo(), headers=cab("t-prof")).json()["id"]  # prof propõe
+    antes = amb.contexto.pedidos.obter("ped-1")
+    assert antes.janela == Janela(AGORA + 24 * H, AGORA + 26 * H)  # proposta não muda nada
+    assert antes.codigo_inicio == "1234"
+
+    r = amb.cliente.post(f"{URL}/{pid}/aceitar", headers=cab("t-cliente"))
+    assert r.status_code == 200, r.text
+    depois = amb.contexto.pedidos.obter("ped-1")
+    assert depois.janela == Janela(AGORA + 48 * H, AGORA + 50 * H)
+    assert depois.codigo_inicio not in ("", "1234")  # novo código só por este fluxo
+    # quem propôs (profissional) é avisado da resposta; o cliente, do novo código
+    assert [n.tipo for n in repo.listar("pro-1", False, 10)] == ["agenda.reagendamento_respondido"]
+    novos = [n for n in repo.listar("cli-1", False, 10) if n.tipo == "agenda.codigo_inicio"]
+    assert len(novos) == 1 and "novo código" in (novos[0].corpo or "").lower()
+    assert "1234" not in (novos[0].corpo or "") and depois.codigo_inicio not in (
+        novos[0].corpo or ""
+    )
+
+
+def test_aceite_pela_parte_errada_nao_remarca(amb):
+    amb.semear_pedido(
+        Estado.AGENDADO, janela=Janela(AGORA + 24 * H, AGORA + 26 * H), codigo_inicio="1234"
+    )
+    pid = _propor(amb, "t-cliente").json()["id"]
+    antes = amb.contexto.pedidos.obter("ped-1")
+    # o próprio autor da proposta não aceita
+    assert amb.cliente.post(f"{URL}/{pid}/aceitar", headers=cab("t-cliente")).status_code == 403
+    # terceiro (outro profissional/cliente) não vê nem aceita
+    for quem in ("t-outro-prof", "t-outro-cliente"):
+        r = amb.cliente.post(f"{URL}/{pid}/aceitar", headers=cab(quem))
+        assert r.status_code in (403, 404), (quem, r.status_code)
+    depois = amb.contexto.pedidos.obter("ped-1")
+    assert depois.janela == antes.janela and depois.codigo_inicio == "1234"

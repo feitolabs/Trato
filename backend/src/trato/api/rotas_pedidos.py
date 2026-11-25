@@ -48,7 +48,6 @@ from trato.api.modelos import (
     EventoOut,
     PedidoOut,
     PedirRetrabalhoIn,
-    RemarcarIn,
     RespostaDisputaIn,
     RespostaPedidoOut,
     RetrabalhoOut,
@@ -107,6 +106,9 @@ _NAO_DISPONIVEIS = {
 }
 
 
+MENSAGEM_SO_POR_PROPOSTA = (
+    "Para mudar a data, envie uma proposta de reagendamento; a outra parte precisa aceitar."
+)
 _ACOES_COM_CODIGO = frozenset({Acao.FAZER_CHECK_IN, Acao.FAZER_CHECK_OUT})
 
 
@@ -136,12 +138,6 @@ def _montar_prova(
         if orcamento is None or orcamento.pedido_id != pedido.id:
             raise estados.ProvaInvalida("Esse orçamento não existe neste pedido.")
         return entrada.para_regra(orcamento.profissional_id)
-    if acao is Acao.REMARCAR:
-        entrada_remarcar: RemarcarIn = _validar(RemarcarIn, bruto)
-        outra_parte = (
-            pedido.profissional_id if usuario.id == pedido.cliente_id else pedido.cliente_id
-        )
-        return entrada_remarcar.para_regra(outra_parte)
     por_acao = {
         Acao.CONFIRMAR_AGENDA: ConfirmarAgendaIn,
         Acao.FAZER_CHECK_IN: CheckInIn,
@@ -507,6 +503,9 @@ def mudar_estado(
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if _so_sistema(acao):
         raise HTTPException(403, "Esta ação é feita só pelo sistema.")
+    if acao is Acao.REMARCAR:
+        # Remarcar exige o aceite da outra parte: só o fluxo de proposta + aceite faz isso.
+        raise HTTPException(409, MENSAGEM_SO_POR_PROPOSTA)
     if acao in _ROTA_DEDICADA:
         raise HTTPException(400, f"Use a rota {_ROTA_DEDICADA[acao]}.")
     if acao in _NAO_DISPONIVEIS:

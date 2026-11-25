@@ -20,7 +20,6 @@ from trato.pedidos.estados import (
     ProvaCheckIn,
     ProvaCheckOut,
     ProvaClienteAusente,
-    ProvaRemarcacao,
 )
 
 
@@ -167,15 +166,6 @@ class ConfirmarAgendaIn(_Entrada):
 
     def para_regra(self) -> ProvaAgenda:
         return ProvaAgenda(Janela(self.janela.inicio, self.janela.fim))
-
-
-class RemarcarIn(_Entrada):
-    janela: JanelaIn
-    aceito_por: str | None = None
-
-    def para_regra(self, outra_parte: str | None = None) -> ProvaRemarcacao:
-        aceito = self.aceito_por if self.aceito_por is not None else (outra_parte or "")
-        return ProvaRemarcacao(Janela(self.janela.inicio, self.janela.fim), aceito)
 
 
 class CheckInIn(_Entrada):

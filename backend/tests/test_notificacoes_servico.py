@@ -214,7 +214,7 @@ def test_gancho_de_pagamento_avisa_cliente_e_profissional(servico):
     gancho(antes, replace(antes, estado=Estado.PAGO_E_RETIDO), Acao.CONFIRMAR_PAGAMENTO, None)
     assert len(servico.repo.listar(ANA, False, 10)) == 1
     assert len(servico.repo.listar(BIA, False, 10)) == 1
-    gancho(antes, antes, Acao.REMARCAR, None)  # ação sem evento: ignorada
+    gancho(antes, antes, Acao.CANCELAR, None)  # ação sem evento: ignorada
     assert len(servico.repo.listar(ANA, False, 10)) == 1
 
 
