@@ -40,6 +40,7 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
     this.itensIniciais = const [],
     this.faixaRegiaoCentavos,
     this.opcoesGarantiaDias = const [30, 60, 90],
+    this.garantiaMinimaDias = 30,
     this.validadeDias = 3,
     this.mostrarForaDoEscopo = false,
     this.foraDoEscopoInicial,
@@ -78,6 +79,20 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
 
   /// Opções de garantia e validade do orçamento: configuração, não número fixo da tela.
   final List<int> opcoesGarantiaDias;
+
+  /// Garantia mínima (CDC): 30 dias para serviço não durável e 90 para durável. O backend
+  /// valida e devolve a regra por categoria; sem ela, o mínimo é 30. Nunca se oferece menos.
+  final int garantiaMinimaDias;
+
+  List<int> get _opcoesGarantia {
+    final lista = {
+      for (final d in opcoesGarantiaDias)
+        if (d >= garantiaMinimaDias) d,
+      garantiaMinimaDias,
+    }.toList()
+      ..sort();
+    return lista;
+  }
   final int validadeDias;
 
   @override
@@ -105,7 +120,9 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   final _focoValorFechado = FocusNode();
   final _focoDias = FocusNode();
   late ModoOrcamento _modo = widget.remoto ? ModoOrcamento.valorFechado : widget.modoInicial;
-  late int _garantia = widget.garantiaInicialDias;
+  late int _garantia = widget.garantiaInicialDias < widget.garantiaMinimaDias
+      ? widget.garantiaMinimaDias
+      : widget.garantiaInicialDias;
   late final List<ItemMaterial> _itens = [...widget.itensIniciais];
   bool _materialPorMim = true;
   bool _pedirSinal = false;
@@ -466,7 +483,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           const SizedBox(height: EspacosTrato.x4),
           _CampoGarantia(
             valor: _garantia,
-            opcoes: widget.opcoesGarantiaDias,
+            opcoes: widget._opcoesGarantia,
             aoMudar: (dias) => setState(() => _garantia = dias),
           ),
         ] else ...[
@@ -529,7 +546,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
               Expanded(
                   child: _CampoGarantia(
                 valor: _garantia,
-                opcoes: widget.opcoesGarantiaDias,
+                opcoes: widget._opcoesGarantia,
                 aoMudar: (dias) => setState(() => _garantia = dias),
               )),
             ],

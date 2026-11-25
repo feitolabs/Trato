@@ -166,6 +166,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       distanciaKm: 0,
       regiao: regiao.isEmpty ? null : regiao,
       categoriaId: categorias.isEmpty ? null : '${categorias.first}',
+      categoriasIds: [for (final c in categorias) '$c'],
     );
   }
 
@@ -357,6 +358,7 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       distanciaKm: 0,
       regiao: regioes.join(', '),
       categoriaId: categoriasIds.isEmpty ? null : '${categoriasIds.first}',
+      categoriasIds: [for (final c in categoriasIds) '$c'],
       detalhe: DetalhePerfil(
         noTratoDesde: (desde ?? DateTime.now()).year,
         totalAvaliacoes: avaliacoes.length,

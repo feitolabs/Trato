@@ -75,8 +75,8 @@ import '../comuns/sucesso_acao_tela.dart';
 import '../conta/dados_pessoais_tela.dart';
 import '../conta/enderecos_tela.dart';
 import '../conta/favoritos_contatos_telas.dart';
+import '../conta/modelos.dart';
 import '../conta/seguranca_conta_tela.dart';
-import '../conta/modelos.dart' show EnderecoSalvo, ServicoConta;
 import 'navegacao_casca.dart';
 import '../../dados/modelos_api.dart' show PedidoApi;
 import '../../dispositivo/abrir_email.dart';
@@ -533,18 +533,58 @@ abstract final class RotasTrato {
     BuildContext context, {
     CategoriaServico? categoria,
     Profissional? profissionalConvidado,
+    List<CategoriaServico>? categoriasPermitidas,
   }) =>
       _abrir<void>(
         context,
         categoria == null
-            ? _escolherCategoria(profissionalConvidado: profissionalConvidado)
+            ? _escolherCategoria(
+                profissionalConvidado: profissionalConvidado,
+                categoriasPermitidas: categoriasPermitidas,
+              )
             : _novoPedido(categoria, profissionalConvidado: profissionalConvidado),
       );
 
-  static Widget _escolherCategoria({Profissional? profissionalConvidado}) => Builder(
+  /// "Chamar de novo": o pedido vai para este profissional, só nas categorias em que ele atua.
+  /// Com uma só, abre direto; sem a informação da API (servidor antigo), mostra todas.
+  static Future<void> chamarDeNovo(BuildContext context, FavoritoConta f) async {
+    final convidado = Profissional(
+      id: f.profissionalId,
+      nome: f.nome ?? 'Profissional',
+      iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
+      verificacao: '',
+      especialidade: '',
+      servicosConcluidos: f.servicos ?? 0,
+      nota: f.nota ?? 0,
+      distanciaKm: 0,
+    );
+    List<CategoriaServico>? dele;
+    final ok = await _tentar(context, () async {
+      final todas = await repos.catalogo.categorias();
+      final perfil = await repos.catalogo.perfil(f.profissionalId);
+      final ids = perfil.categoriasIds.toSet();
+      final filtradas = todas.where((c) => ids.contains(c.id)).toList();
+      dele = filtradas.isEmpty ? null : filtradas;
+    });
+    if (!ok || !context.mounted) return;
+    final lista = dele;
+    if (lista != null && lista.length == 1) {
+      abrirNovoPedido(context, categoria: lista.first, profissionalConvidado: convidado);
+    } else {
+      abrirNovoPedido(context, profissionalConvidado: convidado, categoriasPermitidas: lista);
+    }
+  }
+
+  static Widget _escolherCategoria({
+    Profissional? profissionalConvidado,
+    List<CategoriaServico>? categoriasPermitidas,
+  }) =>
+      Builder(
         builder: (context) => TodasCategoriasTela(
           titulo: 'Que serviço você precisa?',
-          carregar: repos.catalogo.categorias,
+          carregar: categoriasPermitidas == null
+              ? repos.catalogo.categorias
+              : () async => categoriasPermitidas,
           aoEscolher: (c) => Navigator.of(context).pushReplacement(
             MaterialPageRoute<void>(
               builder: (_) => _novoPedido(
@@ -1997,19 +2037,7 @@ abstract final class RotasTrato {
                         ),
                         (rota) => false,
                       ),
-                      aoChamarDeNovo: (f) => abrirNovoPedido(
-                        context,
-                        profissionalConvidado: Profissional(
-                          id: f.profissionalId,
-                          nome: f.nome ?? 'Profissional',
-                          iniciais: (f.nome ?? 'P').substring(0, 1).toUpperCase(),
-                          verificacao: '',
-                          especialidade: '',
-                          servicosConcluidos: f.servicos ?? 0,
-                          nota: f.nota ?? 0,
-                          distanciaKm: 0,
-                        ),
-                      ),
+                      aoChamarDeNovo: (f) => chamarDeNovo(context, f),
                       aoAbrir: (f) => abrirPerfil(
                         context,
                         Profissional(
@@ -2220,11 +2248,6 @@ abstract final class RotasTrato {
                             _abrir<void>(context, const SegurancaContaTela()),
                       ),
                     ),
-                  ),
-                  ItemContaPerfil(
-                    icone: Icons.key_outlined,
-                    titulo: 'E-mail e senha',
-                    aoTocar: () => _abrir<void>(context, const SegurancaContaTela()),
                   ),
                   ItemContaPerfil(
                     icone: Icons.notifications_none,

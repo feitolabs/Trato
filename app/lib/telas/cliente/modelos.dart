@@ -203,6 +203,7 @@ class Profissional {
     this.id,
     this.regiao,
     this.categoriaId,
+    this.categoriasIds = const [],
     this.precoAPartirCentavos,
   });
 
@@ -212,6 +213,9 @@ class Profissional {
   /// Bairro ou região de atendimento, ex.: "Savassi e Funcionários".
   final String? regiao;
   final String? categoriaId;
+
+  /// Todas as categorias em que atua (vazio se a API não mandou).
+  final List<String> categoriasIds;
 
   /// Referência de preço mostrada na lista; o valor do serviço é o do orçamento.
   final int? precoAPartirCentavos;

@@ -2,6 +2,7 @@
 // mentira que os testes de widget usam no lugar da API.
 import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/dados/repositorios.dart' show RepositorioPedidos;
+import 'package:trato/dados/repositorios_catalogo.dart' show RepositorioCatalogo;
 import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/dispositivo/dispositivo.dart';
 import 'package:trato/dispositivo/servicos_dispositivo.dart';
@@ -24,7 +25,8 @@ import 'telas/perfil_publico/perfil_publico_fake.dart';
 import 'telas/profissional_cadastro/cadastro_fake.dart';
 import 'telas/verificacao/verificacao_fake.dart';
 
-RepositoriosTrato repositoriosDemo({RepositorioPedidos? pedidos}) => RepositoriosTrato(
+RepositoriosTrato repositoriosDemo({RepositorioPedidos? pedidos, RepositorioCatalogo? catalogo}) =>
+    RepositoriosTrato(
       pedidos: pedidos ?? RepositorioPedidosFake(),
       orcamentos: RepositorioOrcamentosFake(),
       pagamento: RepositorioPagamentoFake(),
@@ -32,7 +34,7 @@ RepositoriosTrato repositoriosDemo({RepositorioPedidos? pedidos}) => Repositorio
       notificacoes: RepositorioNotificacoesFake(),
       perfil: RepositorioPerfilFake(),
       profissional: RepositorioProfissionalFake(),
-      catalogo: RepositorioCatalogoFake(),
+      catalogo: catalogo ?? RepositorioCatalogoFake(),
       servicos: RepositorioServicosClienteFake(),
       agenda: RepositorioAgendaFake(),
       aditivo: ServicoAditivoFake(detalhe: aditivoExemplo),

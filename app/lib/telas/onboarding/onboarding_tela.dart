@@ -10,9 +10,17 @@ import 'escolha_perfil_tela.dart';
 import 'tour_perfil_tela.dart';
 
 class _PaginaOnboarding {
-  const _PaginaOnboarding({required this.icone, required this.titulo, required this.texto});
+  const _PaginaOnboarding({
+    this.icone,
+    this.mascote,
+    required this.titulo,
+    required this.texto,
+  });
 
-  final IconData icone;
+  final IconData? icone;
+
+  /// Imagem do Tratinho no lugar do ícone.
+  final String? mascote;
   final String titulo;
   final String texto;
 }
@@ -35,10 +43,10 @@ List<_PaginaOnboarding> get _paginas => [
             'O pagamento fica protegido pelo app e só é liberado depois que você confirma o serviço.',
       ),
       const _PaginaOnboarding(
-        icone: Icons.verified_user_outlined,
-        titulo: 'Se algo der errado,\nhá suporte',
+        mascote: 'assets/mascote/tratinho-acenando.webp',
+        titulo: 'Conte comigo.\nSe algo der errado, há suporte',
         texto:
-            'Abra uma disputa e o caso passa por suporte e análise de problemas. O prazo de garantia do serviço vem no orçamento.',
+            'Eu sou o Tratinho. Abra uma disputa e o caso passa por suporte e análise de problemas. O prazo de garantia do serviço vem no orçamento.',
       ),
     ];
 
@@ -113,7 +121,20 @@ class _OnboardingTelaState extends State<OnboardingTela> {
                   itemCount: _paginas.length,
                   onPageChanged: (i) => setState(() => _pagina = i),
                   itemBuilder: (_, i) => PaginaTourVisual(
-                    icone: _paginas[i].icone,
+                    icone: _paginas[i].mascote == null ? _paginas[i].icone : null,
+                    construirIlustracao: _paginas[i].mascote == null
+                        ? null
+                        : (tamanho) => Semantics(
+                              label: 'Tratinho, o mascote do Trato, acenando',
+                              image: true,
+                              child: Image.asset(
+                                _paginas[i].mascote!,
+                                width: tamanho,
+                                height: tamanho,
+                                fit: BoxFit.contain,
+                                excludeFromSemantics: true,
+                              ),
+                            ),
                     titulo: _paginas[i].titulo,
                     texto: _paginas[i].texto,
                     numero: i,

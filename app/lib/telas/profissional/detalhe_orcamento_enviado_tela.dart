@@ -38,7 +38,8 @@ class DetalheOrcamentoEnviadoTela extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: EspacosTrato.x4),
               child: ConteudoResponsivo(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  // Esticado: os cartões só de texto ocupavam metade da largura.
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [

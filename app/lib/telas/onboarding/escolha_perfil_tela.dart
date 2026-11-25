@@ -16,7 +16,7 @@ enum PerfilUso {
     botao: 'Criar conta de cliente',
   ),
   profissional(
-    icone: Icons.edit_outlined,
+    icone: Icons.handyman_outlined,
     titulo: 'Quero trabalhar',
     descricao:
         'Receba pedidos da sua região sem pagar por contato. Veja o valor líquido antes de orçar.',

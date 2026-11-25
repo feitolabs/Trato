@@ -253,14 +253,15 @@ class PaginaTourVisual extends StatelessWidget {
                 if (usaIlustracao)
                   Center(child: construirIlustracao!(lado))
                 else
+                  // Selo compacto: a caixa de 260 px com só um ícone parecia um espaço vazio.
                   Container(
-                    height: 260,
-                    width: double.infinity,
+                    height: 112,
+                    width: 112,
                     decoration: BoxDecoration(
                       color: context.cores.azulSuave,
                       borderRadius: BorderRadius.circular(EspacosTrato.raioGrande),
                     ),
-                    child: Icon(icone, size: 72, color: context.cores.petroleo),
+                    child: Icon(icone, size: 56, color: context.cores.petroleo),
                   ),
                 SizedBox(height: espacoTopoTexto),
                 Text('${numero + 1} DE $total', style: TipografiaTrato.sobretitulo),
