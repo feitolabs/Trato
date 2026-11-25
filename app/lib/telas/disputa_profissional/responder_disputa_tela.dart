@@ -28,6 +28,7 @@ class ResponderDisputaTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PaginaCarregavel<DetalheDisputa?>(
+      textoNaoEncontrado: TextosNaoEncontrado.pedido,
       titulo: 'Responder problema',
       carregar: () => servico.carregarDisputa(disputaId),
       estaVazio: (d) => d == null,

@@ -473,6 +473,7 @@ abstract final class RotasTrato {
   static void abrirPerfil(BuildContext context, Profissional p) => _abrir<void>(
         context,
         Carregador<Profissional>(
+          textoNaoEncontrado: TextosNaoEncontrado.perfil,
           carregar: () async =>
               p.detalhe != null || p.id == null ? p : await repos.catalogo.perfil(p.id!),
           vazio: (perfil) => perfil.detalhe == null,
@@ -1065,6 +1066,7 @@ abstract final class RotasTrato {
     _abrir<void>(
       context,
       Carregador<DetalheOrcamentoEnviado>(
+        textoNaoEncontrado: TextosNaoEncontrado.orcamento,
         carregar: () => repos.profissional.meuOrcamento(
           resumo.orcamentoId,
           tituloPedido: resumo.titulo,
@@ -2466,6 +2468,7 @@ abstract final class RotasTrato {
 
   /// Pedido aguardando orçamentos: o que foi descrito (editável) e a porta para os orçamentos.
   static Widget _pedidoAberto(String pedidoId) => Carregador<DadosDoPedido>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.dados(pedidoId),
         atualizarQuando: pedidosMudaram,
         construir: (context, dados) {
@@ -2520,6 +2523,7 @@ abstract final class RotasTrato {
       );
 
   static Widget _orcamentosRecebidos(String pedidoId) => Carregador<OrcamentosDoPedido>(
+        textoNaoEncontrado: TextosNaoEncontrado.orcamento,
         carregar: () => repos.orcamentos.listar(pedidoId),
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
@@ -2693,6 +2697,7 @@ abstract final class RotasTrato {
     var iniciandoPagamento = false;
     var usarMoedas = false; // o que o cliente escolheu; quantas moedas entram, o backend decide
     return Carregador<DadosPagamento>(
+      textoNaoEncontrado: TextosNaoEncontrado.pedido,
       carregar: () => repos.pagamento.dados(pedidoId),
       atualizarQuando: recarregar,
       construir: (context, dados) => PagamentoTela(
@@ -2773,6 +2778,7 @@ abstract final class RotasTrato {
   static void abrirContrato(BuildContext context, String pedidoId) => _abrir<void>(
         context,
         Carregador<(Orcamento?, DadosContrato)>(
+          textoNaoEncontrado: TextosNaoEncontrado.pedido,
           carregar: () async {
             final (todos, contrato) = await emParalelo2(
               repos.orcamentos.listar(pedidoId),
@@ -2797,6 +2803,7 @@ abstract final class RotasTrato {
   static void abrirGarantia(BuildContext context, {String pedidoId = _semId}) => _abrir<void>(
         context,
         Carregador<DadosGarantia>(
+          textoNaoEncontrado: TextosNaoEncontrado.pedido,
           carregar: () => repos.pedidos.garantia(pedidoId),
           atualizarQuando: pedidosMudaram,
           construir: (context, dados) => GarantiaTela(
@@ -2895,6 +2902,7 @@ abstract final class RotasTrato {
   }
 
   static Widget _pedidoEmExecucao(String pedidoId) => Carregador<PedidoEmExecucao>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.acompanhar(pedidoId),
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
@@ -3086,6 +3094,7 @@ abstract final class RotasTrato {
     }
 
     return Carregador<ConversaPedido>(
+      textoNaoEncontrado: TextosNaoEncontrado.conversa,
       carregar: carregarConversa,
       atualizarQuando: pedidosMudaram,
       construir: (context, conversa) {
@@ -3264,6 +3273,7 @@ abstract final class RotasTrato {
   }
 
   static Widget _conclusao(String pedidoId) => Carregador<ResumoConclusao>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.conclusao(pedidoId),
         atualizarQuando: pedidosMudaram,
         construir: (context, resumo) => ConclusaoTela(
@@ -3280,6 +3290,7 @@ abstract final class RotasTrato {
       );
 
   static Widget _avaliacao(String pedidoId) => Carregador<DadosAvaliacao>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.dadosAvaliacao(pedidoId),
         construir: (context, dados) => AvaliacaoTela(
           dados: dados,
@@ -3340,6 +3351,7 @@ abstract final class RotasTrato {
       );
 
   static Widget _relatarProblema(String pedidoId) => Carregador<DadosRelatoProblema>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.dadosRelato(pedidoId),
         construir: (context, dados) => RelatarProblemaTela(
           dados: dados,

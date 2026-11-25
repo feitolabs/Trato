@@ -42,6 +42,7 @@ class Carregador<T> extends StatefulWidget {
     this.textoAcaoVazio,
     this.atualizarQuando,
     this.atualizarACada,
+    this.textoNaoEncontrado,
   });
 
   final Future<T> Function() carregar;
@@ -64,6 +65,9 @@ class Carregador<T> extends StatefulWidget {
 
   /// Botão do estado vazio (ex.: "Atualizar"), que recarrega. Sem isso, o vazio fica só com texto.
   final String? textoAcaoVazio;
+
+  /// Telas de detalhe: com 404 ou 403 mostra a tela "não encontrado" com esta frase.
+  final String? textoNaoEncontrado;
 
   @override
   State<Carregador<T>> createState() => _CarregadorState<T>();
@@ -199,6 +203,8 @@ class _CarregadorState<T> extends State<Carregador<T>> {
     }
     if (_erro != null) {
       final erro = _erro;
+      final semItem = widget.textoNaoEncontrado;
+      if (semItem != null && ehNaoEncontrado(erro)) return TelaNaoEncontrada(texto: semItem);
       return RefreshIndicator(
         onRefresh: _atualizarEmSilencio,
         child: EstadoTela(

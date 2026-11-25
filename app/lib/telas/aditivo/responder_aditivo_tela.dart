@@ -30,6 +30,7 @@ class ResponderAditivoTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PaginaCarregavel<DetalheAditivo?>(
+      textoNaoEncontrado: TextosNaoEncontrado.aditivo,
       titulo: 'Aditivo',
       carregar: () => servico.carregar(aditivoId),
       estaVazio: (d) => d == null,

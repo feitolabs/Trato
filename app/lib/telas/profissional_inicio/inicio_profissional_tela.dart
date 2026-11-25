@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -351,16 +353,22 @@ class _AvisoACaminhoState extends State<_AvisoACaminho> {
       _enviando = true;
       _mensagem = null;
     });
-    String texto;
+    String? texto;
     try {
       final r = await widget.enviar(widget.pedidoId, _eta);
       texto = r.enviado ? 'Aviso enviado ao cliente' : 'Você já avisou há pouco';
     } on ErroTrato catch (e) {
-      texto = switch (e.codigoHttp) {
-        409 => 'Só dá para avisar em serviço agendado',
-        403 || 404 => 'Não encontramos este pedido para avisar.',
-        _ => 'Não deu para avisar agora. Tente de novo.',
-      };
+      if (ehNaoEncontrado(e)) {
+        if (mounted) {
+          unawaited(Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => const TelaNaoEncontrada(texto: TextosNaoEncontrado.pedido),
+          )));
+        }
+      } else {
+        texto = e.codigoHttp == 409
+            ? 'Só dá para avisar em serviço agendado'
+            : 'Não deu para avisar agora. Tente de novo.';
+      }
     } on Object {
       texto = 'Não deu para avisar agora. Tente de novo.';
     }

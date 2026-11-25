@@ -116,9 +116,13 @@ class PaginaCarregavel<T> extends StatefulWidget {
     this.iconeVazio = Icons.inbox_outlined,
     this.acoes = const [],
     this.atualizarQuando,
+    this.textoNaoEncontrado,
   });
 
   final String titulo;
+
+  /// Telas de detalhe: com 404 ou 403 mostra a tela "não encontrado" com esta frase.
+  final String? textoNaoEncontrado;
 
   /// Botões à direita da barra (ex.: a engrenagem das configurações).
   final List<Widget> acoes;
@@ -233,6 +237,10 @@ class _PaginaCarregavelState<T> extends State<PaginaCarregavel<T>> {
         label: 'Carregando',
         child: const Align(alignment: Alignment.topCenter, child: EsqueletoLista()),
       );
+    } else if (_erro != null &&
+        widget.textoNaoEncontrado != null &&
+        ehNaoEncontrado(_erro)) {
+      corpo = TelaNaoEncontrada(texto: widget.textoNaoEncontrado!);
     } else if (_erro != null) {
       corpo = RefreshIndicator(
         onRefresh: _carregar,

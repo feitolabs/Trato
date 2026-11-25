@@ -320,6 +320,7 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         builder: (_) => carregar == null
             ? tela(widget.detalhe!)
             : Carregador<DetalhePedido>(
+                textoNaoEncontrado: TextosNaoEncontrado.pedido,
                 carregar: () => carregar(pedido),
                 construir: (_, dados) => tela(dados),
               ),

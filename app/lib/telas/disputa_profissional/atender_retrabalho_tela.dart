@@ -24,6 +24,7 @@ class AtenderRetrabalhoTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PaginaCarregavel<DadosRetrabalho?>(
+      textoNaoEncontrado: TextosNaoEncontrado.pedido,
       titulo: 'Atender retrabalho',
       carregar: () => servico.carregarRetrabalho(disputaId),
       estaVazio: (d) => d == null || (d.estado == 'aberto' && d.opcoesHorario.isEmpty),

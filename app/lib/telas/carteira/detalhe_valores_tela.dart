@@ -21,6 +21,7 @@ class DetalheValoresTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PaginaCarregavel<DetalheValoresPedido>(
+      textoNaoEncontrado: TextosNaoEncontrado.pedido,
       titulo: 'Valores do pedido',
       carregar: carregar,
       estaVazio: (_) => false,

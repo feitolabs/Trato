@@ -289,6 +289,9 @@ class _DetalheRecorrenciaTelaState extends State<DetalheRecorrenciaTela> {
             : (pedidoId) => widget.aoAbrirPedido!(pedidoId, s.souCliente),
       );
     }
+    if (ehNaoEncontrado(_erroCarga)) {
+      return const TelaNaoEncontrada(texto: TextosNaoEncontrado.recorrencia);
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Serviço recorrente')),
       body: SafeArea(

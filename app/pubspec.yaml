@@ -39,6 +39,7 @@ flutter:
 
   assets:
     - assets/logo/
+    - assets/mascote/
     # CÃ³pias de docs/juridico/ (rascunho); um teste confere que continuam iguais.
     - assets/legal/
 

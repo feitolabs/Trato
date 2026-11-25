@@ -17,6 +17,7 @@ class VerNotaTela extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PaginaCarregavel<List<NotaMaterial>>(
+      textoNaoEncontrado: TextosNaoEncontrado.pedido,
       titulo: 'Nota dos materiais',
       carregar: () => servico.carregarTodas(pedidoId),
       estaVazio: (notas) => notas.every((n) => n.itens.isEmpty),

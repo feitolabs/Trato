@@ -2,6 +2,7 @@ export 'barra_abas.dart';
 export 'banner_sem_conexao.dart';
 export 'barra_abas_flutuante.dart';
 export 'seletor_aparencia.dart';
+export 'tela_nao_encontrada.dart';
 export 'botoes.dart';
 export 'campo.dart';
 export 'cep_campo.dart';
