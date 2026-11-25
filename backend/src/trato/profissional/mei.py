@@ -1,6 +1,7 @@
 """MEI do profissional: valida o CNPJ na BrasilAPI e guarda o estado da validação.
 
-Regra: CNPJ com dígito verificador válido + situação cadastral ATIVA + optante pelo MEI.
+Regra: CNPJ com dígito verificador válido + situação cadastral ATIVA (MEI, EI, ME, LTDA...).
+O tipo fica em `tipo_cnpj`: "mei" se optante pelo MEI, senão "outro".
 Falha da API (rede, timeout, 429, 5xx) nunca aprova nem reprova: fica "pendente".
 Só o CNPJ (14 dígitos) sai na requisição; nenhum dado pessoal.
 """
@@ -32,9 +33,9 @@ class StatusMei(StrEnum):
 
 
 MOTIVOS = {
-    StatusMei.NAO_INFORMADO: "Informe o CNPJ do seu MEI para enviar orçamentos e receber.",
+    StatusMei.NAO_INFORMADO: "Informe o seu CNPJ para enviar orçamentos e receber.",
     StatusMei.PENDENTE: "Não conseguimos consultar a Receita agora. Tentaremos de novo em breve.",
-    StatusMei.VALIDO: "MEI ativo.",
+    StatusMei.VALIDO: "CNPJ ativo.",
 }
 MOTIVO_DIGITO = "O CNPJ informado não é válido. Confira os 14 números."
 # Texto neutro: o mesmo para CNPJ não encontrado e para CNPJ já usado por outra conta, para a
@@ -42,9 +43,8 @@ MOTIVO_DIGITO = "O CNPJ informado não é válido. Confira os 14 números."
 MOTIVO_NAO_ENCONTRADO = "Não foi possível validar este CNPJ como MEI. Confira o número informado."
 MOTIVO_EM_USO = MOTIVO_NAO_ENCONTRADO
 MOTIVO_INATIVO = "O CNPJ não está com situação cadastral ativa na Receita Federal."
-MOTIVO_NAO_MEI = "O CNPJ existe, mas não é de um MEI. Só MEI ativo pode orçar e receber."
 MENSAGEM_BLOQUEIO = (
-    "Para enviar orçamentos, valide o CNPJ do seu MEI no perfil. Seu cadastro e a navegação "
+    "Para enviar orçamentos, valide o seu CNPJ no perfil. Seu cadastro e a navegação "
     "continuam liberados."
 )
 
@@ -114,6 +114,7 @@ class RegistroMei:
     mei_motivo: str = MOTIVOS[StatusMei.NAO_INFORMADO]
     mei_validado_em: datetime | None = None
     razao_social: str | None = None
+    tipo_cnpj: str | None = None  # "mei" | "outro"; só preenchido quando valido
 
 
 class CnpjEmUso(Exception):
@@ -151,7 +152,7 @@ class MeiEmMemoria:
                 ):
                     raise CnpjEmUso
             else:  # mesma regra do Postgres: pendente/inválido não guardam (nem reservam) o CNPJ
-                registro = replace(registro, cnpj=None)
+                registro = replace(registro, cnpj=None, tipo_cnpj=None)
             self._dados[registro.profissional_id] = registro
 
 
@@ -243,8 +244,6 @@ def avaliar(dados: DadosCnpj) -> tuple[StatusMei, str]:
         return StatusMei.INVALIDO, MOTIVO_NAO_ENCONTRADO
     if not dados.ativo:
         return StatusMei.INVALIDO, MOTIVO_INATIVO
-    if not dados.mei:
-        return StatusMei.INVALIDO, MOTIVO_NAO_MEI
     return StatusMei.VALIDO, MOTIVOS[StatusMei.VALIDO]
 
 
@@ -280,7 +279,7 @@ class ServicoMei:
         if not cnpj_valido(cnpj):
             tentativa = replace(
                 base, cnpj=None, mei_status=StatusMei.INVALIDO, mei_motivo=MOTIVO_DIGITO,
-                mei_validado_em=agora, razao_social=None,
+                mei_validado_em=agora, razao_social=None, tipo_cnpj=None,
             )  # fmt: skip
         else:
             tentativa = self._tentativa(base, cnpj)
@@ -291,7 +290,7 @@ class ServicoMei:
         except CnpjEmUso:
             tentativa = replace(
                 tentativa, cnpj=None, mei_status=StatusMei.INVALIDO, mei_motivo=MOTIVO_EM_USO,
-                mei_validado_em=agora, razao_social=None,
+                mei_validado_em=agora, razao_social=None, tipo_cnpj=None,
             )  # fmt: skip
             if base.mei_status is not StatusMei.VALIDO:
                 self.repo.salvar(tentativa)
@@ -304,12 +303,14 @@ class ServicoMei:
             return replace(
                 base, cnpj=None, mei_status=StatusMei.PENDENTE,
                 mei_motivo=MOTIVOS[StatusMei.PENDENTE], mei_validado_em=None, razao_social=None,
+                tipo_cnpj=None,
             )  # fmt: skip
         status, motivo = avaliar(dados)
         valido = status is StatusMei.VALIDO
         return replace(
             base, cnpj=cnpj if valido else None, mei_status=status, mei_motivo=motivo,
             mei_validado_em=self._agora(), razao_social=dados.razao_social if valido else None,
+            tipo_cnpj=("mei" if dados.mei else "outro") if valido else None,
         )  # fmt: skip
 
     def liberado(self, profissional_id: str) -> bool:

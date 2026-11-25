@@ -217,6 +217,10 @@ class RepositorioUsuarios(Protocol):
 
     def tem_perfil_profissional(self, usuario_id: str) -> bool: ...
 
+    def status_perfil_profissional(self, usuario_id: str) -> str | None:
+        """Status do perfil profissional (em_analise, aprovado, recusado, suspenso) ou None."""
+        ...
+
     def cpf_disponivel(self, cpf: str) -> bool:
         """Verdadeiro se nenhuma conta tem esse CPF (já normalizado em 11 dígitos)."""
 

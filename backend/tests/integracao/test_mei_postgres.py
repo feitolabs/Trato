@@ -92,7 +92,7 @@ def linha(c, uid):
         return (
             con.cursor(row_factory=dict_row)
             .execute(
-                "select cnpj, mei_status, mei_motivo, mei_validado_em, razao_social "
+                "select cnpj, mei_status, mei_motivo, mei_validado_em, razao_social, tipo_cnpj "
                 "from public.perfis_profissional where usuario_id = %s",
                 (uid,),
             )
@@ -158,7 +158,7 @@ def test_nao_squatting_pendente_e_invalido_nao_ocupam_o_indice(cenario):
     assert servico(c, TimeoutError("x")).informar(squatter, cnpj).mei_status is StatusMei.PENDENTE
     assert linha(c, squatter)["cnpj"] is None and linha(c, squatter)["mei_status"] == "pendente"
     assert (
-        servico(c, (200, corpo(mei=False))).informar(squatter, cnpj).mei_status
+        servico(c, (200, corpo(ativa=False))).informar(squatter, cnpj).mei_status
         is StatusMei.INVALIDO
     )
     assert linha(c, squatter)["cnpj"] is None and linha(c, squatter)["razao_social"] is None
@@ -207,3 +207,79 @@ def test_servico_padrao_em_producao_usa_o_postgres(cenario):
     r = get(c, uid)
     assert r.status_code == 200 and r.json()["mei_status"] == "nao_informado"
     assert isinstance(app.state.servico_mei.repo, MeiPostgres)
+
+
+def test_tipo_cnpj_mei_e_outro_persistem_e_saem_na_api(cenario):
+    c = cenario
+    mei, outro = novo_profissional(c), novo_profissional(c)
+    liga_http(c, (200, corpo(mei=True)))
+    assert put(c, mei, cnpj_novo()).json()["tipo_cnpj"] == "mei"
+    liga_http(c, (200, corpo(mei=False)))
+    r = put(c, outro, cnpj_novo())
+    assert r.status_code == 200 and r.json()["tipo_cnpj"] == "outro"
+    assert linha(c, mei)["tipo_cnpj"] == "mei" and linha(c, outro)["tipo_cnpj"] == "outro"
+    depois = servico(c, TimeoutError("fora")).status(outro)  # "reinício"
+    assert depois.tipo_cnpj == "outro" and depois.mei_status is StatusMei.VALIDO
+    assert get(c, outro).json()["tipo_cnpj"] == "outro"
+
+
+def test_tipo_cnpj_fica_nulo_quando_nao_valido(cenario):
+    c = cenario
+    uid = novo_profissional(c)
+    assert servico(c, (200, corpo(ativa=False))).informar(uid, cnpj_novo()).tipo_cnpj is None
+    assert linha(c, uid)["tipo_cnpj"] is None
+
+
+def test_profissional_em_analise_informa_cnpj_mas_so_o_proprio(cenario):
+    c = cenario
+    em_analise, outro = novo_profissional(c, aprovado=False), novo_profissional(c)
+    liga_http(c, (200, corpo(mei=False)))
+    cnpj = cnpj_novo()
+    r = put(c, em_analise, cnpj)
+    assert r.status_code == 200 and r.json()["mei_status"] == "valido"
+    assert get(c, em_analise).json()["cnpj"] == cnpj
+    assert cnpj not in get(c, outro).text
+    cliente_puro = c.token("cliente")
+    assert c.cliente.get("/v1/profissional/mei", headers=cliente_puro).status_code == 403
+
+
+def test_perfil_recusado_ou_suspenso_leva_403_no_cnpj(cenario):
+    c = cenario
+    liga_http(c, (200, corpo()))
+    for status in ("recusado", "suspenso"):
+        uid = novo_profissional(c, aprovado=False)
+        with c.local.admin() as con:
+            if status == "recusado":
+                con.execute(
+                    "update public.perfis_profissional set status = 'recusado' where usuario_id = %s",
+                    (uid,),
+                )
+            else:
+                con.execute(
+                    "update public.perfis_profissional set status = 'suspenso' "
+                    "where usuario_id = %s",
+                    (uid,),
+                )
+        assert get(c, uid).status_code == 403, status
+        assert put(c, uid, cnpj_novo()).status_code == 403, status
+        assert linha(c, uid)["cnpj"] is None
+
+
+def test_leitura_sem_a_coluna_tipo_cnpj_nao_quebra(cenario):
+    c = cenario
+    uid = novo_profissional(c)
+    servico(c, (200, corpo())).informar(uid, cnpj_novo())
+    with c.local.admin() as con:
+        con.execute("alter table public.perfis_profissional rename column tipo_cnpj to tipo_cnpj_x")
+    try:
+        r = MeiPostgres(c.banco).obter(uid)
+        assert r.mei_status is StatusMei.VALIDO and r.tipo_cnpj is None
+        MeiPostgres(c.banco).salvar(
+            RegistroMei(uid, None, StatusMei.PENDENTE, "x")
+        )  # grava sem a coluna
+        assert MeiPostgres(c.banco).obter(uid).mei_status is StatusMei.PENDENTE
+    finally:
+        with c.local.admin() as con:
+            con.execute(
+                "alter table public.perfis_profissional rename column tipo_cnpj_x to tipo_cnpj"
+            )

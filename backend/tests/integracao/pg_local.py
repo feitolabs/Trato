@@ -116,6 +116,7 @@ class BancoLocal:
                 "*recorrencias.sql",
                 "*moedas_tipo_indicacao.sql",
                 "*profissional_mei.sql",
+                "*perfis_profissional_tipo_cnpj.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     con.execute(arquivo.read_text(encoding="utf-8"))

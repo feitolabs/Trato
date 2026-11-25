@@ -95,6 +95,7 @@ class UsuariosEmMemoria:
         self.emails: dict[str, str] = {}  # usuario_id -> email
         self.verificacoes: dict[str, str] = {}  # profissional_id -> status (testes preenchem)
         self.profissionais: set[str] = set()
+        self.status_perfis: dict[str, str] = {}  # testes: recusado/suspenso (padrão em_analise)
 
     def adicionar(self, perfil: PerfilDetalhe) -> None:
         self._perfis[perfil.id] = perfil
@@ -119,6 +120,11 @@ class UsuariosEmMemoria:
 
     def tem_perfil_profissional(self, usuario_id: str) -> bool:
         return usuario_id in self.profissionais
+
+    def status_perfil_profissional(self, usuario_id: str) -> str | None:
+        if usuario_id not in self.profissionais:
+            return None
+        return self.status_perfis.get(usuario_id, "em_analise")
 
     def cpf_disponivel(self, cpf: str) -> bool:
         return cpf not in self._cpfs

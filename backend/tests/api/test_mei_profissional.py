@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import cab
 
+from trato.api.rotas_profissional_cadastro import modulo_em_memoria
 from trato.pedidos.estados import Estado
 from trato.profissional.mei import (
     MOTIVO_NAO_ENCONTRADO,
@@ -104,11 +105,23 @@ def test_cnpj_inativo_e_invalido():
     assert not svc.liberado("pro-1")
 
 
-def test_nao_mei_e_invalido():
+def test_cnpj_ativo_que_nao_e_mei_tambem_vale_e_guarda_o_tipo_outro():
     svc, _ = _servico((200, _corpo(mei=False)))
     r = svc.informar("pro-1", CNPJ_OK)
-    assert r.mei_status is StatusMei.INVALIDO
-    assert "não é de um MEI" in r.mei_motivo
+    assert r.mei_status is StatusMei.VALIDO
+    assert r.tipo_cnpj == "outro"
+    assert svc.liberado("pro-1")
+
+
+def test_cnpj_optante_mei_guarda_o_tipo_mei():
+    svc, _ = _servico((200, _corpo(mei=True)))
+    assert svc.informar("pro-1", CNPJ_OK).tipo_cnpj == "mei"
+
+
+def test_tipo_so_existe_com_cnpj_valido():
+    svc, busca = _servico((200, _corpo(ativa=False)))
+    assert svc.informar("pro-1", CNPJ_OK).tipo_cnpj is None
+    assert svc.informar("pro-2", CNPJ_DV_ERRADO).tipo_cnpj is None
 
 
 def test_cnpj_inexistente_404_e_invalido():
@@ -188,14 +201,14 @@ def test_rota_so_para_profissional(amb):
 
 def test_orcamento_bloqueado_sem_mei_valido_e_liberado_com_mei(amb):
     amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
-    _liga(amb, (200, _corpo(mei=False)))
+    _liga(amb, (200, _corpo()))
     r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=ORCAMENTO, headers=cab("t-prof"))
     assert r.status_code == 422
-    assert "MEI" in r.json()["detail"]
+    assert "CNPJ" in r.json()["detail"]
 
-    amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-prof"))
+    amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_DV_ERRADO}, headers=cab("t-prof"))
     r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=ORCAMENTO, headers=cab("t-prof"))
-    assert r.status_code == 422  # ainda não-MEI
+    assert r.status_code == 422  # CNPJ inválido não libera
 
     svc, busca = _liga(amb, (200, _corpo()))
     amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-prof"))
@@ -252,10 +265,12 @@ def test_nao_squatting_pendente_e_invalido_nao_ocupam_o_cnpj():
     svc = novo()
     assert svc.informar("squatter", CNPJ_OK).mei_status is StatusMei.PENDENTE
     assert repo.obter("squatter").cnpj is None
-    # outra consulta (sem cache) vê "não é MEI": também não reserva o CNPJ
+    # outra consulta (sem cache) vê CNPJ inativo: também não reserva o CNPJ
     cfg = ConfigMei(obrigatorio=True)
     ruim = ServicoMei(
-        repo=repo, consulta=ConsultaCnpj(BrasilApiFalsa((200, _corpo(mei=False))), cfg), config=cfg
+        repo=repo,
+        consulta=ConsultaCnpj(BrasilApiFalsa((200, _corpo(ativa=False))), cfg),
+        config=cfg,
     )
     assert ruim.informar("squatter", CNPJ_OK).mei_status is StatusMei.INVALIDO
     assert repo.obter("squatter").cnpj is None
@@ -336,3 +351,43 @@ def test_postgres_sem_a_coluna_nova_cai_no_padrao_sem_quebrar():
             raise erro from psycopg.errors.UndefinedColumn("coluna mei_status não existe")
 
     assert MeiPostgres(BancoSemColuna()).obter("00000000-0000-0000-0000-000000000001") is None
+
+
+def test_rota_devolve_tipo_cnpj(amb):
+    _liga(amb, (200, _corpo(mei=False)))
+    assert (
+        amb.cliente.get("/v1/profissional/mei", headers=cab("t-prof")).json()["tipo_cnpj"] is None
+    )
+    r = amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-prof"))
+    assert r.status_code == 200 and r.json()["tipo_cnpj"] == "outro"
+    assert (
+        amb.cliente.get("/v1/profissional/mei", headers=cab("t-prof")).json()["tipo_cnpj"]
+        == "outro"
+    )
+
+
+def test_profissional_em_analise_acessa_so_a_rota_do_cnpj(amb):
+    # t-cliente tem papel de cliente; com perfil profissional criado (em análise) ele entra aqui
+    _liga(amb, (200, _corpo()))
+    assert amb.cliente.get("/v1/profissional/mei", headers=cab("t-cliente")).status_code == 403
+    modulo_em_memoria(amb.cliente.app)
+    amb.contexto.usuarios.profissionais.add("cli-1")  # perfil criado, ainda não aprovado
+    r = amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-cliente"))
+    assert r.status_code == 200, r.text
+    assert r.json()["mei_status"] == "valido"
+    # perfil recusado ou suspenso: 403 também nesta rota
+    for status in ("recusado", "suspenso"):
+        amb.contexto.usuarios.status_perfis["cli-1"] = status
+        assert amb.cliente.get("/v1/profissional/mei", headers=cab("t-cliente")).status_code == 403
+        r = amb.cliente.put(
+            "/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-cliente")
+        )
+        assert r.status_code == 403
+    amb.contexto.usuarios.status_perfis["cli-1"] = "em_analise"
+    # as demais rotas de profissional seguem fechadas para quem está em análise
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=ORCAMENTO, headers=cab("t-cliente"))
+    assert r.status_code == 403
+    # e o dado é só do próprio usuário
+    outro = amb.cliente.get("/v1/profissional/mei", headers=cab("t-outro-cliente"))
+    assert outro.status_code == 403

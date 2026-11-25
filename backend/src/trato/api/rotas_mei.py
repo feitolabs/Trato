@@ -1,4 +1,4 @@
-"""MEI do profissional: o app envia o CNPJ e lê o status. Cadastro e navegação seguem livres."""
+"""CNPJ do profissional (MEI ou outro CNPJ ativo): o app envia o CNPJ e lê o status."""
 
 from __future__ import annotations
 
@@ -8,11 +8,27 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from trato.api.auth import PapelUsuario, Usuario
-from trato.api.contexto import exigir_papel
+from trato.api.contexto import Contexto, obter_contexto, usuario_atual
 from trato.profissional.mei import PerfilInexistente, RegistroMei, ServicoMei, StatusMei
 
 router = APIRouter(prefix="/v1", tags=["mei"])
 _PADRAO = ServicoMei()
+
+
+def profissional_ou_em_analise(
+    usuario: Usuario = Depends(usuario_atual),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Profissional aprovado ou com cadastro EM ANÁLISE (ainda tratado como cliente). Perfil
+    recusado, suspenso ou sem perfil recebe 403. Só vale para esta rota."""
+    if usuario.papel is PapelUsuario.PROFISSIONAL:
+        return usuario
+    if (
+        usuario.papel is PapelUsuario.CLIENTE
+        and contexto.usuarios.status_perfil_profissional(usuario.id) == "em_analise"
+    ):
+        return usuario
+    raise HTTPException(403, "Seu perfil não pode fazer isso.")
 
 
 def servico_mei(request: Request) -> ServicoMei:
@@ -38,6 +54,9 @@ class MeiOut(BaseModel):
     mei_status: str = Field(description="nao_informado | pendente | valido | invalido")
     motivo: str = Field(description="Frase curta em português para mostrar ao profissional.")
     razao_social: str | None = None
+    tipo_cnpj: str | None = Field(
+        None, description='"mei" (optante MEI) ou "outro"; null se não valido.'
+    )
     validado_em: datetime | None = None
     pode_orcar_e_receber: bool = Field(description="True quando o MEI está válido.")
 
@@ -48,6 +67,7 @@ def _saida(r: RegistroMei) -> MeiOut:
         mei_status=r.mei_status.value,
         motivo=r.mei_motivo,
         razao_social=r.razao_social,
+        tipo_cnpj=r.tipo_cnpj,
         validado_em=r.mei_validado_em,
         pode_orcar_e_receber=r.mei_status.value == "valido",
     )
@@ -56,7 +76,7 @@ def _saida(r: RegistroMei) -> MeiOut:
 @router.get("/profissional/mei", response_model=MeiOut, summary="Status do MEI")
 def ler_mei(
     request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(profissional_ou_em_analise),
 ) -> MeiOut:
     return _saida(servico_mei(request).status(usuario.id))
 
@@ -65,7 +85,7 @@ def ler_mei(
 def informar_mei(
     corpo: MeiIn,
     request: Request,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(profissional_ou_em_analise),
 ) -> MeiOut:
     try:
         registro = servico_mei(request).informar(usuario.id, corpo.cnpj)

@@ -224,6 +224,16 @@ class UsuariosPostgres:
                 is not None
             )
 
+    def status_perfil_profissional(self, usuario_id: str) -> str | None:
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return None
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select status from public.perfis_profissional where usuario_id = %s", (achado,)
+            ).fetchone()
+        return linha["status"] if linha else None
+
     def status_verificacao(self, usuario_id: str) -> str | None:
         """Status da verificação mais recente (enviada, em_analise, aprovada, recusada)."""
         achado = como_uuid(usuario_id)
