@@ -87,6 +87,8 @@ import '../lgpd/modelos.dart' show CancelamentoExclusao;
 import '../mensagens/mensagens_tela.dart';
 import '../perfil_publico/avaliacoes_recebidas_tela.dart';
 import '../perfil_publico/perfil_publico_tela.dart';
+import '../profissional_mei/mei.dart';
+import '../profissional_mei/meu_cnpj_tela.dart';
 import '../profissional_cadastro/cadastro.dart';
 import '../profissional_cadastro/cadastro_profissional_tela.dart';
 import '../verificacao/verificacao.dart'
@@ -1135,6 +1137,55 @@ abstract final class RotasTrato {
     );
   }
 
+  /// "Meu CNPJ" (Configurações do profissional e aviso ao tentar orçar sem CNPJ).
+  static void abrirMeuCnpj(BuildContext context) {
+    final servico = repos.mei;
+    if (servico == null) return;
+    _abrir<void>(context, MeuCnpjTela(servico: servico));
+  }
+
+  /// Como [_tentar], mas se o servidor barra o orçamento por falta de CNPJ/MEI, mostra o texto dele
+  /// com o botão "Informar meu CNPJ" em vez de um aviso que some.
+  static Future<bool> tentarOrcamento(BuildContext context, Future<void> Function() acao) async {
+    try {
+      await acao();
+      return true;
+    } on ErroTrato catch (erro) {
+      if (context.mounted && erro.codigoHttp == 422 && mensagemDeCnpj(erro.mensagem)) {
+        await _avisoCnpjNecessario(context, erro.mensagem);
+      } else if (context.mounted) {
+        _aviso(context, erro);
+      }
+      return false;
+    } on Object catch (erro) {
+      if (context.mounted) _aviso(context, erro);
+      return false;
+    }
+  }
+
+  static Future<void> _avisoCnpjNecessario(BuildContext context, String texto) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogo) => AlertDialog(
+        key: const Key('dialogo-cnpj-necessario'),
+        title: const Text('Falta o seu CNPJ'),
+        content: Text(texto),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogo).pop(), child: const Text('Fechar')),
+          if (repos.mei != null)
+            FilledButton(
+              key: const Key('botao-informar-cnpj'),
+              onPressed: () {
+                Navigator.of(dialogo).pop();
+                abrirMeuCnpj(context);
+              },
+              child: const Text('Informar meu CNPJ'),
+            ),
+        ],
+      ),
+    );
+  }
+
   /// Garantia mínima (CDC) da categoria do pedido: o backend manda `garantia_minima_dias` em cada
   /// categoria (90 durável, 30 não durável). Sem o dado ou sem rede, o padrão seguro é 30.
   static Future<int> _garantiaMinimaDoPedido(String pedidoId) async {
@@ -1178,7 +1229,7 @@ abstract final class RotasTrato {
           foraDoEscopoInicial: inicial?.foraDoEscopo,
           observacoesInicial: inicial?.observacoes,
           aoEnviar: (pronto) async {
-            final ok = await _tentar(tela, () => servico.enviar(pronto));
+            final ok = await tentarOrcamento(tela, () => servico.enviar(pronto));
             if (ok && tela.mounted) {
               pedidosMudaram.value++;
               await _abrirSucesso<void>(
@@ -2270,6 +2321,12 @@ abstract final class RotasTrato {
                       ),
                     ),
                   ),
+                  if (profissional && repos.mei != null)
+                    ItemContaPerfil(
+                      icone: Icons.badge_outlined,
+                      titulo: 'Meu CNPJ',
+                      aoTocar: () => abrirMeuCnpj(context),
+                    ),
                   ItemContaPerfil(
                     icone: Icons.notifications_none,
                     titulo: 'Notificações',

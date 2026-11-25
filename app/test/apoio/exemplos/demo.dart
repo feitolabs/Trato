@@ -2,11 +2,13 @@
 // mentira que os testes de widget usam no lugar da API.
 import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/dados/repositorios.dart' show RepositorioPedidos;
-import 'package:trato/dados/repositorios_catalogo.dart' show RepositorioCatalogo;
+import 'package:trato/dados/repositorios_catalogo.dart'
+    show RepositorioCatalogo;
 import 'package:trato/dados/repositorios_trato.dart';
 import 'package:trato/dispositivo/dispositivo.dart';
 import 'package:trato/dispositivo/servicos_dispositivo.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
+import 'package:trato/telas/profissional_mei/mei.dart' show ServicoMei;
 
 import 'auth/servico_auth_fake.dart';
 import 'dados/repositorios_catalogo_fake.dart';
@@ -25,7 +27,11 @@ import 'telas/perfil_publico/perfil_publico_fake.dart';
 import 'telas/profissional_cadastro/cadastro_fake.dart';
 import 'telas/verificacao/verificacao_fake.dart';
 
-RepositoriosTrato repositoriosDemo({RepositorioPedidos? pedidos, RepositorioCatalogo? catalogo}) =>
+RepositoriosTrato repositoriosDemo({
+  RepositorioPedidos? pedidos,
+  RepositorioCatalogo? catalogo,
+  ServicoMei? mei,
+}) =>
     RepositoriosTrato(
       pedidos: pedidos ?? RepositorioPedidosFake(),
       orcamentos: RepositorioOrcamentosFake(),
@@ -35,12 +41,13 @@ RepositoriosTrato repositoriosDemo({RepositorioPedidos? pedidos, RepositorioCata
       perfil: RepositorioPerfilFake(),
       profissional: RepositorioProfissionalFake(),
       catalogo: catalogo ?? RepositorioCatalogoFake(),
+      mei: mei,
       servicos: RepositorioServicosClienteFake(),
       agenda: RepositorioAgendaFake(),
       aditivo: ServicoAditivoFake(detalhe: aditivoExemplo),
       notaMaterial: ServicoNotaMaterialFake(nota: notaMaterialExemplo),
-      disputaProfissional:
-          ServicoDisputaProfissionalFake(disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
+      disputaProfissional: ServicoDisputaProfissionalFake(
+          disputa: disputaExemplo, retrabalho: retrabalhoExemplo),
       perfilPublico: ServicoPerfilPublicoFake(),
       cadastroProfissional: ServicoCadastroProfissionalFake(),
       verificacao: ServicoVerificacaoFake(),

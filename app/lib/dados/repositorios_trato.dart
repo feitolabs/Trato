@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../telas/conta/modelos.dart';
+import '../telas/profissional_mei/mei.dart';
 import '../telas/indicacoes/modelos.dart';
 import 'servico_cep.dart';
 import '../telas/recorrencias/modelos.dart';
@@ -54,6 +55,7 @@ class RepositoriosTrato {
     this.primeirosPassos,
     this.privacidade,
     this.conta,
+    this.mei,
     this.indicacoes,
     this.recorrencias,
     this.cep,
@@ -75,6 +77,9 @@ class RepositoriosTrato {
 
   /// Dados pessoais, endereços, favoritos e contatos de confiança (`/v1/me/...`).
   final ServicoConta? conta;
+
+  /// CNPJ do profissional (`/v1/profissional/mei`). Nulo = demonstração: a tela não aparece.
+  final ServicoMei? mei;
 
   /// Indique e ganhe (`/v1/indicacoes/...`). Nulo = demonstração.
   final ServicoIndicacoes? indicacoes;
@@ -138,6 +143,7 @@ class RepositoriosTrato {
       primeirosPassos: ServicoPrimeirosPassosApi(api),
       privacidade: ServicoPrivacidadeApi(api),
       conta: ServicoContaApi(api),
+      mei: ServicoMeiApi(api),
       indicacoes: ServicoIndicacoesApi(api),
       recorrencias: ServicoRecorrenciasApi(api),
       cep: ServicoCepApi(api),
