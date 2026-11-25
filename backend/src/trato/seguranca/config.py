@@ -249,7 +249,7 @@ class ConfigSeguranca(BaseSettings):
 
     # --- Mascaramento do chat -----------------------------------------------------------
     mascara_min_digitos: int = Field(default=8, gt=0)
-    mascara_min_digitos_com_canal: int = Field(default=6, gt=0)  # perto de "zap", "fone"...
+    mascara_min_digitos_com_canal: int = Field(default=4, gt=0)  # perto de "zap", "fone"...
     mascara_tlds: list[str] = Field(
         default_factory=lambda: [
             "com", "net", "org", "br", "app", "io", "me", "ly", "co", "link", "bio", "gg", "tv",

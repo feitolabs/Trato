@@ -121,3 +121,88 @@ def test_depois_de_contratado_o_endereco_passa(amb):
     amb.semear_pedido(Estado.PAGO_E_RETIDO)
     msg = _conversar(amb, "Pode vir na Rua das Flores, 123")
     assert msg["texto"] == "Pode vir na Rua das Flores, 123" and msg["mascarada"] is False
+
+
+# --- BUG-C12: rede social solta e dígitos isolados ------------------------------------------
+
+NOVAS_BURLAS = [
+    "ig fulano",
+    "insta fulano",
+    "me chama no ig fulano",
+    "nove nove oito oito sete sete",
+    "9 9 8 8 7 7",
+    "IG FULANO",
+    "Insta Fulano",
+    "NOVE NOVE OITO OITO SETE SETE",
+    "i g fulano",
+    "insta: fulano",
+    "zap nove nove oito oito sete sete",
+    "Zap 9 9 8 8 7 7",
+    "9.9.8.8.7.7",
+    "9-9-8-8-7-7",
+    "9 nove 8 oito 7 sete",
+    "noventa e nove oitenta e oito setenta e sete",
+    "meu zap 9 9 8 8",
+    "fone 9988",
+    "ligar 9988",
+    "meu número é 9 9 8 8",
+    "chama no whats fulano22",
+    "whatsapp fulanodetal",
+    "facebook joaopintor",
+    "tiktok joaopintor",
+    "x.com/@fulano",
+]
+
+NOVAS_NORMAIS = [
+    "na insta de ontem eu vi",
+    "o ig caiu hoje",
+    "são 3 dias, 2 horas e 5 minutos",
+    "apartamento 12, bloco 3",
+    "R$ 150 e 50 de material",
+    "dia 25 às 9 e 30",
+    "olha a face da parede",
+    "o número do apto é 1203",
+    "código 4821",
+    "o insta é bom",
+    "o whatsapp está lento",
+    "pedido 123456 ok",
+    "chego em 2 ou 3 dias",
+    "são 12 3 4 horas",
+    "1 2 3 4 5",
+    "o zap tá fora do ar",
+    "o instagram não abriu",
+    "Moro na Rua das Flores, 123 CEP 35500-001",
+    "CEP 35500-001",
+    "35500-001",
+]
+
+
+@pytest.mark.parametrize("texto", NOVAS_BURLAS)
+def test_nova_burla_e_escondida(texto):
+    for com_endereco in (True, False):
+        assert AVISO_MASCARA in mascarar(texto, incluir_endereco=com_endereco).exibido, texto
+
+
+@pytest.mark.parametrize("texto", NOVAS_NORMAIS)
+def test_nova_conversa_normal_passa_depois_da_contratacao(texto):
+    assert mascarar(texto, incluir_endereco=False).exibido == texto
+
+
+def test_cep_e_escondido_antes_da_contratacao_e_passa_depois():
+    assert AVISO_MASCARA in mascarar("CEP 35500-001").exibido
+    assert mascarar("CEP 35500-001", incluir_endereco=False).exibido == "CEP 35500-001"
+    # telefone com 5-4 continua escondido nos dois casos
+    assert AVISO_MASCARA in mascarar("98765-4321", incluir_endereco=False).exibido
+
+
+def test_4_ou_5_digitos_so_com_palavra_de_contato():
+    assert AVISO_MASCARA in mascarar("zap 9988 7").exibido
+    assert mascarar("sala 9 9 8 8").exibido == "sala 9 9 8 8"
+    assert mascarar("apto 9 9 8 8 7").exibido == "apto 9 9 8 8 7"
+
+
+def test_rota_do_chat_esconde_rede_social_depois_de_contratado(amb):
+    amb.semear_pedido(Estado.PAGO_E_RETIDO)
+    assert AVISO_MASCARA in _conversar(amb, "me chama no ig fulano")["texto"]
+    assert AVISO_MASCARA in _conversar(amb, "9 9 8 8 7 7")["texto"]
+    assert _conversar(amb, "o ig caiu hoje")["texto"] == "o ig caiu hoje"

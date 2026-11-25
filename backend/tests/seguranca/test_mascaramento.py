@@ -35,7 +35,7 @@ ESCONDE = [
     ("me acha em @joaoeletrica", "rede_social"),
     ("Rua das Flores, 123", "endereco"),
     ("moro na Av. Brasil nº 1500", "endereco"),
-    ("cep 01310-100", "telefone"),  # 8 dígitos: cai como contato, mas some
+    ("cep 01310-100", "endereco"),  # CEP não é telefone: some pela regra de endereço
 ]
 
 PASSA = [

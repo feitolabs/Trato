@@ -68,3 +68,13 @@ def test_piso_ausente_registra_aviso_sem_mudar_o_comportamento(caplog):
         assert garantia_minima_do_pedido(request, contexto, "ped-secreto-123") is None
     assert any("Piso de garantia não aplicado" in r.message for r in caplog.records)
     assert not any("ped-secreto-123" in r.getMessage() for r in caplog.records)
+
+
+def test_regras_novas_de_perfil_e_digitos_isolados_nao_sao_quadraticas():
+    for molde in ("ig fulano{}", "9 {}", "nove {}", "zap{}", "i g{}x", "{}ig"):
+        base = {"ig fulano{}": " ", "9 {}": "9 ", "nove {}": "nove ", "zap{}": " ", "i g{}x": " "}
+        unidade = base.get(molde, " ")
+        pequeno = _melhor_ms(molde.format(unidade * 1000))
+        grande = _melhor_ms(molde.format(unidade * 4000))
+        assert grande < 6 * max(pequeno, 1.0), (molde, pequeno, grande)
+        assert grande < 300, (molde, grande)

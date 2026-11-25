@@ -37,9 +37,22 @@ _TOKEN = rf"(?:\d[️⃣]*|{_COMPOSTA}|\b(?:" + "|".join(_PALAVRAS_DIGITO) + r")
 _SEP = r"[\s().\-_*•·]*"
 _SEQUENCIA = re.compile(rf"[+(]?{_TOKEN}(?:{_SEP}{_TOKEN})*", re.IGNORECASE)
 _CANAL = re.compile(
-    r"(zap|whats|wpp|watsap|telegram|fone|telefone|celular|cel\b|contato|liga[rm]?\b|ligue|chama)",
+    r"(zap|whats|wpp|watsap|telegram|fone|telefone|celular|cel\b|\btel\b|contato|liga[rm]?\b"
+    r"|ligue|chama)",
     re.IGNORECASE,
 )
+# "número" só vale como canal quando o número vem logo depois ("meu número é 9 9 8 8"): senão
+# "o número do apto é 1203" viraria contato. E, com ele, um bloco único de dígitos ("1203") passa.
+_CANAL_NUMERO = re.compile(
+    r"\bn[uú]mero(?:\s+d[oe]s?\s+\w+)?\s*(?:é|eh|e|:|=|-)?\s*$", re.IGNORECASE
+)
+# Itens de uma sequência: número (grupo de dígitos), dezena composta ou número por extenso.
+_ITEM = re.compile(rf"\d+|{_COMPOSTA}|\b(?:" + "|".join(_PALAVRAS_DIGITO) + r")\b", re.IGNORECASE)
+# Sequência de numerais ISOLADOS (um dígito ou um número por extenso por vez) com este total de
+# dígitos esconde mesmo sem "zap"/"fone": "9 9 8 8 7 7", "nove nove oito oito sete sete".
+# Com "zap", "fone", "ligar", "chamar", "número" bastam 4 (config `mascara_min_digitos_com_canal`).
+# Limite aceito: quem divide o número em várias mensagens não é pego aqui; só o aviso fixo ajuda.
+_MINIMO_ISOLADOS = 6
 # Um dígito (ou um número por extenso de 1 dígito) separado por vírgula, barra ou "|":
 # "9,8,7,6,5,4,3,2,1" e "nove, oito, sete...". Exige 8 em sequência (lista de preços não casa).
 _DIGITO_SOLTO = (
@@ -53,6 +66,7 @@ _BARRA = re.compile(
 )
 _MILHAR = re.compile(r"\d{1,3}(?:\.\d{3})+")
 _DATA = re.compile(r"\d{1,2}[.\-]\d{1,2}[.\-]\d{2,4}")
+_CEP_NUMERO = re.compile(r"\d{5}-\d{3}")
 _DECIMAL_DEPOIS = re.compile(r"\s?,\d{1,2}(?!\d)")
 
 _EMAIL = re.compile(
@@ -68,7 +82,8 @@ _PONTO_COM = re.compile(
     re.IGNORECASE,
 )
 _PERFIL = re.compile(
-    r"\b(?:insta(?:gram)?|ig|telegram|tiktok|face(?:book)?|twitter|snap(?:chat)?|kwai)\b"
+    r"\b(?:insta(?:gram)?|i\s?g|telegram|tiktok|face(?:book)?|twitter|snap(?:chat)?|kwai"
+    r"|zap|wpp|whats(?:app)?|watsap)\b"
     # Espaços limitados e sem dois "espaço-estrela" seguidos: evita backtracking quadrático.
     r"(?:\s{0,3}(?P<sep>:|=|-|\bé\b|\beh\b)\s{0,3}|\s{0,3})@?(?P<alvo>[\w.]{3,30})",
     re.IGNORECASE,
@@ -110,12 +125,36 @@ def _contagem_digitos(trecho: str) -> int:
     )
 
 
+def _digitos_do_item(item: str) -> int:
+    if item[0].isdigit():
+        return len(item)
+    return _PALAVRAS_DIGITO.get(item.lower(), 2)  # fora da tabela = dezena composta
+
+
+def _itens(trecho: str) -> list[str]:
+    return [i.group(0) for i in _ITEM.finditer(trecho)]
+
+
+def _maior_bloco_isolado(trecho: str) -> int:
+    """Maior soma de dígitos de itens consecutivos que são 1 dígito ou número por extenso.
+    Número de vários dígitos escritos juntos ("150", "2026") quebra o bloco: preço, medida e
+    data não contam. Linear no tamanho do trecho."""
+    melhor = atual = 0
+    for item in _itens(trecho):
+        if item[0].isdigit() and len(item) > 1:
+            atual = 0
+            continue
+        atual += _digitos_do_item(item)
+        melhor = max(melhor, atual)
+    return melhor
+
+
 def _eh_dinheiro_ou_data(texto: str, ini: int, fim: int) -> bool:
     trecho = texto[ini:fim].strip("+() ")
     if "$" in texto[max(0, ini - 4) : ini]:
         return True
-    if _MILHAR.fullmatch(trecho) or _DATA.fullmatch(trecho):
-        return True
+    if _MILHAR.fullmatch(trecho) or _DATA.fullmatch(trecho) or _CEP_NUMERO.fullmatch(trecho):
+        return True  # CEP (5-3) não é telefone; antes da contratação a regra de endereço o esconde
     return bool(_DECIMAL_DEPOIS.match(texto, fim)) and "," in texto[fim : fim + 4]
 
 
@@ -126,8 +165,13 @@ def _mascarar_telefones(texto: str, minimo: int, minimo_canal: int) -> tuple[str
         nonlocal achou
         digitos = _contagem_digitos(m.group(0))
         antes = texto[max(0, m.start() - 30) : m.start()]
-        limite = minimo_canal if _CANAL.search(antes) else minimo
-        if digitos < limite or _eh_dinheiro_ou_data(texto, m.start(), m.end()):
+        itens = _itens(m.group(0))
+        com_canal = bool(_CANAL.search(antes))
+        if not com_canal and _CANAL_NUMERO.search(antes) and len(itens) > 1:
+            com_canal = True  # só número separado em partes; "número 1203" é endereço/pedido
+        limite = minimo_canal if com_canal else minimo
+        isolados = _maior_bloco_isolado(m.group(0)) >= _MINIMO_ISOLADOS
+        if (digitos < limite and not isolados) or _eh_dinheiro_ou_data(texto, m.start(), m.end()):
             return m.group(0)
         achou = True
         return AVISO_MASCARA
@@ -135,18 +179,31 @@ def _mascarar_telefones(texto: str, minimo: int, minimo_canal: int) -> tuple[str
     return _SEQUENCIA.sub(trocar, texto), achou
 
 
+# Palavras de frase que podem vir depois do nome da rede ("o ig caiu hoje", "na insta de ontem").
+# Lista curta de propósito: o que NÃO está aqui, logo depois do nome de uma rede, é tratado como
+# nome de usuário. Limite conhecido: "face externa" ou "zap lento" fora desta lista é escondido.
+_PALAVRAS_DE_FRASE = frozenset(
+    "de da do dos das para pra que e a o um uma caiu ontem hoje está esta tá ta no na em com foi "
+    "vai tem não nao sim mas já ja é eh era ser fica ficou estava funciona funcionou parou travou "
+    "deu dá amanhã amanha agora depois antes aqui lá la mais também tambem mesmo ainda quando se "
+    "meu minha seu sua os as nos nas ao aos".split()
+)
+
+
 def _perfil_suspeito(m: re.Match[str]) -> str:
     alvo = m.group("alvo").rstrip(".")  # ponto final da frase não conta
     sep = (m.group("sep") or "").lower()
+    baixo = alvo.lower()
+    if baixo in _PALAVRAS_DIGITO or not re.search(r"[^\W\d_]", alvo):
+        return m.group(0)  # número por extenso ou só dígitos: é telefone, a regra de dígitos cuida
     com_cara_de_usuario = bool(re.search(r"[._]|[A-Za-z]\d|\d[A-Za-z]", alvo))
-    if (
-        "@" in m.group(0)
-        or com_cara_de_usuario
-        or (sep in (":", "=") and len(alvo) >= 4)
-        or (sep and len(alvo) >= 8)
-    ):
+    if "@" in m.group(0) or com_cara_de_usuario:
         return AVISO_MASCARA
-    return m.group(0)
+    if sep in ("é", "eh"):  # "meu insta é joaopintor": exige nome longo (senão "o insta é bom")
+        return AVISO_MASCARA if len(alvo) >= 8 else m.group(0)
+    if baixo in _PALAVRAS_DE_FRASE:
+        return m.group(0)
+    return AVISO_MASCARA
 
 
 def mascarar(
