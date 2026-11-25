@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -68,6 +69,9 @@ def nome_abreviado(nome: str | None) -> str | None:
     return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
 
 
+_log = logging.getLogger(__name__)
+
+
 def garantia_minima_do_pedido(request: Any, contexto: Any, pedido_id: str) -> int | None:
     """Dias mínimos de garantia (CDC) da categoria do pedido; None se não der para saber."""
     from trato.garantias.config import garantia_minima_do_slug
@@ -75,10 +79,12 @@ def garantia_minima_do_pedido(request: Any, contexto: Any, pedido_id: str) -> in
     dados = contexto.pedidos.dados_do_pedido(pedido_id)
     modulo = getattr(request.app.state, "modulo_profissional", None)
     if dados is None or modulo is None:
+        _log.warning("Piso de garantia não aplicado: pedido ou catálogo indisponível.")
         return None
     for c in modulo.catalogo.categorias_publicas():
         if str(c.id) == str(dados.categoria_id):
             return garantia_minima_do_slug(c.slug)
+    _log.warning("Piso de garantia não aplicado: categoria do pedido fora do catálogo público.")
     return None
 
 

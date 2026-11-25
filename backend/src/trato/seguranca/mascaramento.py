@@ -69,7 +69,8 @@ _PONTO_COM = re.compile(
 )
 _PERFIL = re.compile(
     r"\b(?:insta(?:gram)?|ig|telegram|tiktok|face(?:book)?|twitter|snap(?:chat)?|kwai)\b"
-    r"\s*(?P<sep>:|=|-|\bé\b|\beh\b)?\s*@?(?P<alvo>[\w.]{3,30})",
+    # Espaços limitados e sem dois "espaço-estrela" seguidos: evita backtracking quadrático.
+    r"(?:\s{0,3}(?P<sep>:|=|-|\bé\b|\beh\b)\s{0,3}|\s{0,3})@?(?P<alvo>[\w.]{3,30})",
     re.IGNORECASE,
 )
 # @usuário: 3+ caracteres com ao menos uma letra ("@10" não é perfil).
