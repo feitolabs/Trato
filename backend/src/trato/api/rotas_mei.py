@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import exigir_papel
-from trato.profissional.mei import RegistroMei, ServicoMei
+from trato.profissional.mei import PerfilInexistente, RegistroMei, ServicoMei, StatusMei
 
 router = APIRouter(prefix="/v1", tags=["mei"])
 _PADRAO = ServicoMei()
@@ -17,7 +17,16 @@ _PADRAO = ServicoMei()
 
 def servico_mei(request: Request) -> ServicoMei:
     personalizado = getattr(request.app.state, "servico_mei", None)
-    return personalizado if isinstance(personalizado, ServicoMei) else _PADRAO
+    if isinstance(personalizado, ServicoMei):
+        return personalizado
+    banco = getattr(request.app.state, "contexto", None)
+    banco = banco.extras.get("banco") if banco is not None else None
+    if banco is not None:  # produção: o MEI mora no Postgres, não na memória do processo
+        from trato.persistencia.mei import MeiPostgres
+
+        request.app.state.servico_mei = ServicoMei(repo=MeiPostgres(banco))
+        return request.app.state.servico_mei
+    return _PADRAO
 
 
 class MeiIn(BaseModel):
@@ -58,4 +67,13 @@ def informar_mei(
     request: Request,
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
 ) -> MeiOut:
-    return _saida(servico_mei(request).informar(usuario.id, corpo.cnpj))
+    try:
+        registro = servico_mei(request).informar(usuario.id, corpo.cnpj)
+    except PerfilInexistente:
+        raise HTTPException(
+            409, "Complete seu cadastro de profissional antes de informar o CNPJ."
+        ) from None
+    if registro.mei_status is StatusMei.INVALIDO:
+        # 422 com o motivo; o texto de "CNPJ em uso por outra conta" é o mesmo de "não validado".
+        raise HTTPException(422, registro.mei_motivo)
+    return _saida(registro)

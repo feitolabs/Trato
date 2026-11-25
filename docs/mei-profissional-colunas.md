@@ -24,3 +24,16 @@ Pontos de atenção:
 - Saída: `cnpj`, `mei_status`, `motivo`, `razao_social`, `validado_em`, `pode_orcar_e_receber`.
 - Com o bloqueio ligado (`TRATO_MEI_OBRIGATORIO=true`), `POST /v1/pedidos/{id}/orcamentos` dá 422
   sem `mei_status == valido`.
+
+## Persistência no Postgres (implementada)
+- Adaptador: `backend/src/trato/persistencia/mei.py` (`MeiPostgres`), usado pela rota quando o app
+  roda com banco; a memória só nos testes.
+- `cnpj` só é gravado quando `mei_status = 'valido'`. Pendente e inválido gravam só estado e motivo
+  (cnpj nulo), para não ocupar `ux_perfis_profissional_cnpj` (evita squatting). Por isso o
+  pendente não guarda o CNPJ: o app manda o CNPJ de novo para tentar outra vez.
+- Violação de unicidade (23505) vira "CNPJ em uso" dentro do backend e a API responde 422 com o
+  mesmo texto de "CNPJ não validado", sem revelar que o número existe.
+- Quem já está `valido` não perde o MEI por uma tentativa que falhou.
+- `PUT /v1/profissional/mei`: 422 com `detail` curto quando o resultado é inválido; limite de
+  5 por hora por usuário (regra `mei_cnpj` em `seguranca/config.py`).
+- `TRATO_MEI_OBRIGATORIO` continua desligado (só o João liga).

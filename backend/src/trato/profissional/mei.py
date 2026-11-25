@@ -37,7 +37,10 @@ MOTIVOS = {
     StatusMei.VALIDO: "MEI ativo.",
 }
 MOTIVO_DIGITO = "O CNPJ informado não é válido. Confira os 14 números."
-MOTIVO_NAO_ENCONTRADO = "Não encontramos esse CNPJ na Receita Federal."
+# Texto neutro: o mesmo para CNPJ não encontrado e para CNPJ já usado por outra conta, para a
+# resposta nunca revelar que um CNPJ existe no Trato.
+MOTIVO_NAO_ENCONTRADO = "Não foi possível validar este CNPJ como MEI. Confira o número informado."
+MOTIVO_EM_USO = MOTIVO_NAO_ENCONTRADO
 MOTIVO_INATIVO = "O CNPJ não está com situação cadastral ativa na Receita Federal."
 MOTIVO_NAO_MEI = "O CNPJ existe, mas não é de um MEI. Só MEI ativo pode orçar e receber."
 MENSAGEM_BLOQUEIO = (
@@ -113,10 +116,21 @@ class RegistroMei:
     razao_social: str | None = None
 
 
+class CnpjEmUso(Exception):
+    """Outro profissional já tem este CNPJ validado (índice único). Nunca vai para o cliente."""
+
+
+class PerfilInexistente(Exception):
+    """O profissional ainda não tem perfil: não há onde gravar o MEI."""
+
+
 class RepositorioMei(Protocol):
     def obter(self, profissional_id: str) -> RegistroMei | None: ...
 
-    def salvar(self, registro: RegistroMei) -> None: ...
+    def salvar(self, registro: RegistroMei) -> None:
+        """Só grava `cnpj` quando `mei_status` é valido; senão o CNPJ NÃO é guardado (não ocupa
+        o índice único). Levanta CnpjEmUso se outro profissional já tem o CNPJ validado."""
+        ...
 
 
 class MeiEmMemoria:
@@ -130,6 +144,14 @@ class MeiEmMemoria:
 
     def salvar(self, registro: RegistroMei) -> None:
         with self._trava:
+            if registro.mei_status is StatusMei.VALIDO:
+                if any(
+                    r.cnpj == registro.cnpj and r.profissional_id != registro.profissional_id
+                    for r in self._dados.values()
+                ):
+                    raise CnpjEmUso
+            else:  # mesma regra do Postgres: pendente/inválido não guardam (nem reservam) o CNPJ
+                registro = replace(registro, cnpj=None)
             self._dados[registro.profissional_id] = registro
 
 
@@ -243,50 +265,52 @@ class ServicoMei:
         self.consulta = consulta or ConsultaCnpj(config=self.config, agora=self._agora)
 
     def status(self, profissional_id: str) -> RegistroMei:
-        """Estado atual; se está pendente, tenta validar de novo (a API pode ter voltado)."""
-        atual = self.repo.obter(profissional_id) or RegistroMei(profissional_id)
-        if atual.mei_status is StatusMei.PENDENTE and atual.cnpj:
-            return self._validar(atual, atual.cnpj)
-        return atual
+        """Estado gravado. Pendente não guarda o CNPJ (não reserva o índice único): o app manda
+        o CNPJ de novo para tentar outra vez."""
+        return self.repo.obter(profissional_id) or RegistroMei(profissional_id)
 
     def informar(self, profissional_id: str, cnpj_bruto: str) -> RegistroMei:
+        """Valida e grava. Só um MEI valido guarda o CNPJ. Quem já está valido nunca perde o MEI
+        por uma tentativa que falhou: o resultado ruim volta, mas nada é regravado."""
         cnpj = normalizar_cnpj(cnpj_bruto)
         base = self.repo.obter(profissional_id) or RegistroMei(profissional_id)
+        if base.mei_status is StatusMei.VALIDO and base.cnpj == cnpj:
+            return base
+        agora = self._agora()
         if not cnpj_valido(cnpj):
-            registro = replace(
-                base,
-                cnpj=cnpj or None,
-                mei_status=StatusMei.INVALIDO,
-                mei_motivo=MOTIVO_DIGITO,
-                mei_validado_em=self._agora(),
-                razao_social=None,
-            )
-            self.repo.salvar(registro)
-            return registro
-        return self._validar(base, cnpj)
+            tentativa = replace(
+                base, cnpj=None, mei_status=StatusMei.INVALIDO, mei_motivo=MOTIVO_DIGITO,
+                mei_validado_em=agora, razao_social=None,
+            )  # fmt: skip
+        else:
+            tentativa = self._tentativa(base, cnpj)
+        if base.mei_status is StatusMei.VALIDO and tentativa.mei_status is not StatusMei.VALIDO:
+            return tentativa  # não derruba o MEI que já estava valido
+        try:
+            self.repo.salvar(tentativa)
+        except CnpjEmUso:
+            tentativa = replace(
+                tentativa, cnpj=None, mei_status=StatusMei.INVALIDO, mei_motivo=MOTIVO_EM_USO,
+                mei_validado_em=agora, razao_social=None,
+            )  # fmt: skip
+            if base.mei_status is not StatusMei.VALIDO:
+                self.repo.salvar(tentativa)
+        return tentativa
 
-    def _validar(self, base: RegistroMei, cnpj: str) -> RegistroMei:
+    def _tentativa(self, base: RegistroMei, cnpj: str) -> RegistroMei:
         try:
             dados = self.consulta.consultar(cnpj)
-            status, motivo = avaliar(dados)
-            registro = replace(
-                base,
-                cnpj=cnpj,
-                mei_status=status,
-                mei_motivo=motivo,
-                mei_validado_em=self._agora(),
-                razao_social=dados.razao_social,
-            )
         except ConsultaIndisponivel:
-            registro = replace(
-                base,
-                cnpj=cnpj,
-                mei_status=StatusMei.PENDENTE,
-                mei_motivo=MOTIVOS[StatusMei.PENDENTE],
-                mei_validado_em=None,
-            )
-        self.repo.salvar(registro)
-        return registro
+            return replace(
+                base, cnpj=None, mei_status=StatusMei.PENDENTE,
+                mei_motivo=MOTIVOS[StatusMei.PENDENTE], mei_validado_em=None, razao_social=None,
+            )  # fmt: skip
+        status, motivo = avaliar(dados)
+        valido = status is StatusMei.VALIDO
+        return replace(
+            base, cnpj=cnpj if valido else None, mei_status=status, mei_motivo=motivo,
+            mei_validado_em=self._agora(), razao_social=dados.razao_social if valido else None,
+        )  # fmt: skip
 
     def liberado(self, profissional_id: str) -> bool:
         """Pode enviar orçamento e receber? Sem o bloqueio ligado, todos passam."""

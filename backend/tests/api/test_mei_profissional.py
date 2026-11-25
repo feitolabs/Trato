@@ -9,8 +9,10 @@ from conftest import cab
 
 from trato.pedidos.estados import Estado
 from trato.profissional.mei import (
+    MOTIVO_NAO_ENCONTRADO,
     ConfigMei,
     ConsultaCnpj,
+    MeiEmMemoria,
     ServicoMei,
     StatusMei,
     cnpj_valido,
@@ -87,6 +89,7 @@ def test_mei_ativo_valido_e_so_o_cnpj_sai_na_requisicao():
     svc, busca = _servico((200, _corpo()))
     r = svc.informar("pro-1", "11.222.333/0001-81")
     assert r.mei_status is StatusMei.VALIDO
+    assert r.cnpj == CNPJ_OK
     assert r.razao_social == "JOAO DA SILVA 12345678900"
     assert r.mei_validado_em is not None
     assert busca.urls == [f"https://brasilapi.com.br/api/cnpj/v1/{CNPJ_OK}"]
@@ -122,11 +125,13 @@ def test_api_fora_do_ar_fica_pendente_e_nunca_reprova(resposta):
     assert not svc.liberado("pro-1")
 
 
-def test_pendente_revalida_na_leitura_quando_a_api_volta():
+def test_pendente_nao_guarda_o_cnpj_e_valida_quando_o_app_manda_de_novo():
     svc, busca = _servico(TimeoutError("x"))
-    assert svc.informar("pro-1", CNPJ_OK).mei_status is StatusMei.PENDENTE
+    r = svc.informar("pro-1", CNPJ_OK)
+    assert r.mei_status is StatusMei.PENDENTE
+    assert svc.status("pro-1").cnpj is None  # não reserva o CNPJ enquanto não validou
     busca.resposta = (200, _corpo())
-    assert svc.status("pro-1").mei_status is StatusMei.VALIDO
+    assert svc.informar("pro-1", CNPJ_OK).mei_status is StatusMei.VALIDO
 
 
 def test_cache_de_24h_nao_repete_a_consulta_e_expira():
@@ -211,3 +216,123 @@ def test_bloqueio_desligado_nao_afeta_orcamento(amb):
     _liga(amb, (200, _corpo()), obrigatorio=False)
     r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=ORCAMENTO, headers=cab("t-prof"))
     assert r.status_code == 201, r.text
+
+
+# --- unicidade, squatting, persistência, taxa e privacidade ----------------------------------
+
+
+def _servicos_com_repo_comum(resposta):
+    relogio = Relogio()
+    cfg = ConfigMei(obrigatorio=True)
+    repo = MeiEmMemoria()
+    busca = BrasilApiFalsa(resposta)
+
+    def novo():  # simula reinício: serviço novo, mesmo repositório
+        return ServicoMei(
+            repo=repo, consulta=ConsultaCnpj(busca, cfg, relogio), config=cfg, agora=relogio
+        )
+
+    return novo, repo, busca
+
+
+def test_cnpj_duplicado_por_dois_profissionais_responde_neutro():
+    novo, _, _ = _servicos_com_repo_comum((200, _corpo()))
+    svc = novo()
+    assert svc.informar("pro-1", CNPJ_OK).mei_status is StatusMei.VALIDO
+    segundo = svc.informar("pro-2", CNPJ_OK)
+    assert segundo.mei_status is StatusMei.INVALIDO
+    assert segundo.cnpj is None
+    assert segundo.mei_motivo == MOTIVO_NAO_ENCONTRADO  # igual ao de "CNPJ não validado"
+    assert "outr" not in segundo.mei_motivo.lower() and "já" not in segundo.mei_motivo.lower()
+    assert svc.status("pro-1").mei_status is StatusMei.VALIDO  # o dono não é afetado
+
+
+def test_nao_squatting_pendente_e_invalido_nao_ocupam_o_cnpj():
+    novo, repo, busca = _servicos_com_repo_comum(TimeoutError("fora"))
+    svc = novo()
+    assert svc.informar("squatter", CNPJ_OK).mei_status is StatusMei.PENDENTE
+    assert repo.obter("squatter").cnpj is None
+    # outra consulta (sem cache) vê "não é MEI": também não reserva o CNPJ
+    cfg = ConfigMei(obrigatorio=True)
+    ruim = ServicoMei(
+        repo=repo, consulta=ConsultaCnpj(BrasilApiFalsa((200, _corpo(mei=False))), cfg), config=cfg
+    )
+    assert ruim.informar("squatter", CNPJ_OK).mei_status is StatusMei.INVALIDO
+    assert repo.obter("squatter").cnpj is None
+    busca.resposta = (200, _corpo())
+    assert svc.informar("dono", CNPJ_OK).mei_status is StatusMei.VALIDO
+
+
+def test_tentativa_ruim_nao_derruba_o_mei_ja_valido():
+    novo, repo, busca = _servicos_com_repo_comum((200, _corpo()))
+    svc = novo()
+    svc.informar("pro-1", CNPJ_OK)
+    busca.resposta = (200, _corpo(ativa=False))
+    outro = "27865757000102"
+    assert cnpj_valido(outro)
+    assert svc.informar("pro-1", outro).mei_status is StatusMei.INVALIDO
+    assert repo.obter("pro-1").mei_status is StatusMei.VALIDO
+    assert repo.obter("pro-1").cnpj == CNPJ_OK
+
+
+def test_persiste_apos_novo_servico():
+    novo, _, _ = _servicos_com_repo_comum((200, _corpo()))
+    novo().informar("pro-1", CNPJ_OK)
+    depois = novo()
+    assert depois.status("pro-1").mei_status is StatusMei.VALIDO
+    assert depois.liberado("pro-1")
+
+
+def test_rota_cnpj_em_uso_e_422_neutro_igual_ao_nao_validado(amb):
+    svc, _ = _liga(amb, (200, _corpo()))
+    svc.informar("pro-2", CNPJ_OK)  # outro profissional já tem
+    em_uso = amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-prof"))
+    svc.consulta._buscador = BrasilApiFalsa((404, None))
+    nao_validado = amb.cliente.put(
+        "/v1/profissional/mei", json={"cnpj": "27865757000102"}, headers=cab("t-prof")
+    )
+    assert em_uso.status_code == nao_validado.status_code == 422
+    assert em_uso.json() == nao_validado.json()
+
+
+def test_regra_padrao_de_limite_do_put_mei_e_5_por_hora_por_usuario():
+    from trato.seguranca.config import ConfigSeguranca
+
+    (regra,) = [r for r in ConfigSeguranca(_env_file=None).limites if r.nome == "mei_cnpj"]
+    assert (regra.metodos, regra.escopo, regra.maximo, regra.janela_s) == (
+        ["PUT"],
+        "usuario",
+        5,
+        3600,
+    )
+
+
+def test_cnpj_e_razao_social_so_para_o_proprio_profissional(amb):
+    svc, _ = _liga(amb, (200, _corpo()))
+    svc.informar("pro-1", CNPJ_OK)
+    meu = amb.cliente.get("/v1/profissional/mei", headers=cab("t-prof")).json()
+    assert meu["cnpj"] == CNPJ_OK and meu["razao_social"]
+    outro = amb.cliente.get("/v1/profissional/mei", headers=cab("t-outro-prof"))
+    assert CNPJ_OK not in outro.text and "JOAO" not in outro.text
+    assert amb.cliente.get("/v1/profissional/mei", headers=cab("t-cliente")).status_code == 403
+
+
+def test_postgres_sem_a_coluna_nova_cai_no_padrao_sem_quebrar():
+    from contextlib import contextmanager
+
+    import psycopg
+
+    from trato.persistencia.erros import ErroPersistencia
+    from trato.persistencia.mei import MeiPostgres
+
+    class BancoSemColuna:
+        @contextmanager
+        def transacao(self):
+            yield self
+            raise AssertionError("não chega aqui")
+
+        def execute(self, *_a, **_k):
+            erro = ErroPersistencia("Erro ao acessar o banco de dados.")
+            raise erro from psycopg.errors.UndefinedColumn("coluna mei_status não existe")
+
+    assert MeiPostgres(BancoSemColuna()).obter("00000000-0000-0000-0000-000000000001") is None

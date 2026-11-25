@@ -110,6 +110,15 @@ def _limites_padrao() -> list[RegraLimite]:
             bloqueio_s=300,
         ),
         # Rotas sensíveis (M12/A8): escrita que gera custo, dado pessoal ou dinheiro.
+        # MEI: cada PUT consulta a BrasilAPI e pode tentar CNPJ alheio; 5 por hora por usuário.
+        RegraLimite(
+            nome="mei_cnpj",
+            prefixo="/v1/profissional/mei",
+            metodos=["PUT"],
+            escopo="usuario",
+            maximo=5,
+            janela_s=3600,
+        ),
         RegraLimite(
             nome="verificacao_envio",
             prefixo="/v1/profissional/verificacao",
