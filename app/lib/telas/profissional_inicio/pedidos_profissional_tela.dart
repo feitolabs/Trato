@@ -21,6 +21,8 @@ class PedidosProfissionalTela extends StatefulWidget {
     this.aoAbrirPedido,
     this.contratados = const [],
     this.aoAbrirContratado,
+    this.finalizados = const [],
+    this.aoAbrirFinalizado,
     this.orcamentosEnviados = const [],
     this.aoAbrirOrcamentoEnviado,
     this.aoAbrirMapa,
@@ -34,6 +36,11 @@ class PedidosProfissionalTela extends StatefulWidget {
   final ValueChanged<OrcamentoEnviado>? aoAbrirOrcamentoEnviado;
 
   final List<PedidoAberto> pedidos;
+
+  /// Pedidos concluídos e cancelados: aba "Finalizados". Tocar abre o pedido (e, no concluído,
+  /// "Avaliar cliente").
+  final List<PedidoContratado> finalizados;
+  final ValueChanged<PedidoContratado>? aoAbrirFinalizado;
 
   /// Pedidos que o cliente já aceitou (do aceite ao fim): não somem quando deixam de ser "abertos".
   final List<PedidoContratado> contratados;
@@ -52,7 +59,7 @@ class PedidosProfissionalTela extends StatefulWidget {
   State<PedidosProfissionalTela> createState() => _PedidosProfissionalTelaState();
 }
 
-enum _Aba { abertos, orcamentos, andamento, conversas }
+enum _Aba { abertos, orcamentos, andamento, finalizados, conversas }
 
 class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
   var _aba = _Aba.abertos;
@@ -95,6 +102,14 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                       aoTocar: () => setState(() => _aba = _Aba.andamento),
                     ),
                     _Segmento(
+                      key: const Key('aba-finalizados'),
+                      texto: widget.finalizados.isEmpty
+                          ? 'Finalizados'
+                          : 'Finalizados (${widget.finalizados.length})',
+                      ativo: _aba == _Aba.finalizados,
+                      aoTocar: () => setState(() => _aba = _Aba.finalizados),
+                    ),
+                    _Segmento(
                       texto: 'Conversas',
                       ativo: _aba == _Aba.conversas,
                       aoTocar: () => setState(() => _aba = _Aba.conversas),
@@ -108,6 +123,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                   _Aba.conversas => widget.conversas,
                   _Aba.orcamentos => _orcamentos(),
                   _Aba.andamento => _andamento(),
+                  _Aba.finalizados => _finalizados(),
                   _Aba.abertos => _abertos(),
                 },
               ),
@@ -268,6 +284,73 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
     return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
   }
 
+  Widget _finalizados() {
+    final recarregar = AtualizadorTela.de(context);
+    Widget lista;
+    if (widget.finalizados.isEmpty) {
+      lista = const EstadoVazio(
+        icone: Icons.task_alt,
+        titulo: 'Nenhum pedido finalizado',
+        texto: 'Os serviços concluídos ou cancelados aparecem aqui. Nos concluídos você avalia o cliente.',
+      );
+    } else {
+      lista = ListView.separated(
+        physics: recarregar != null ? const AlwaysScrollableScrollPhysics() : null,
+        padding: EdgeInsets.only(bottom: BarraAbasFlutuante.folgaInferior(context) + EspacosTrato.x4),
+        itemCount: widget.finalizados.length,
+        separatorBuilder: (_, __) => const SizedBox(height: EspacosTrato.x3),
+        itemBuilder: (_, i) {
+          final c = widget.finalizados[i];
+          final concluido = c.estadoApi == 'concluido';
+          final avaliar = concluido && !c.jaAvaliou;
+          return CartaoTrato(
+            key: ValueKey('finalizado-${c.pedidoId}'),
+            aoTocar: widget.aoAbrirFinalizado == null ? null : () => widget.aoAbrirFinalizado!(c),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: Text(c.titulo, style: TipografiaTrato.tituloCartao)),
+                    const SizedBox(width: EspacosTrato.x2),
+                    ChipStatus(
+                      texto: concluido ? 'Concluído' : 'Cancelado',
+                      tipo: concluido ? TipoStatus.sucesso : TipoStatus.alerta,
+                    ),
+                  ],
+                ),
+                if (c.cliente != null)
+                  Text(
+                    'Cliente: ${c.cliente}',
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                  ),
+                if (avaliar) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    'Avalie o cliente: ganhe Tratinhos',
+                    key: const ValueKey('avaliar-cliente-na-lista'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: context.cores.petroleo,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ] else if (concluido) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text(
+                    'Cliente avaliado',
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      );
+    }
+    return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
+  }
+
   Widget _abertos() {
     if (widget.carregando) return const EstadoCarregando();
     final recarregar = AtualizadorTela.de(context);
@@ -314,7 +397,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
 }
 
 class _Segmento extends StatelessWidget {
-  const _Segmento({required this.texto, required this.ativo, required this.aoTocar});
+  const _Segmento({super.key, required this.texto, required this.ativo, required this.aoTocar});
 
   final String texto;
   final bool ativo;

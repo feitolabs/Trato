@@ -153,7 +153,10 @@ class _CartaoAgendamento extends StatelessWidget {
             children: [
               Expanded(child: Text(a.titulo, style: TipografiaTrato.tituloCartao)),
               const SizedBox(width: EspacosTrato.x2),
-              ChipStatus(texto: a.estado.rotulo, tipo: tipo),
+              ChipStatus(
+                texto: a.aguardandoData ? 'Pago · marque a data' : a.estado.rotulo,
+                tipo: a.aguardandoData ? TipoStatus.alerta : tipo,
+              ),
             ],
           ),
           const SizedBox(height: EspacosTrato.x2),
@@ -177,6 +180,15 @@ class _CartaoAgendamento extends StatelessWidget {
           if (a.cliente != null) ...[
             const SizedBox(height: EspacosTrato.x1),
             Text('Cliente: ${a.cliente}', style: secundario),
+          ],
+          if (a.aguardandoData && aoFazerCheckIn != null) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            BotaoSecundario(
+              key: const ValueKey('marcar-data-agenda'),
+              texto: 'Marcar a data da visita',
+              icone: Icons.event_available_outlined,
+              aoTocar: aoFazerCheckIn,
+            ),
           ],
           if (a.podeFazerCheckIn && aoFazerCheckIn != null) ...[
             const SizedBox(height: EspacosTrato.x3),

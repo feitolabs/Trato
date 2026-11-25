@@ -2243,6 +2243,12 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       for (final p in meusPedidos)
         if (_estadosDoProfissional.contains(p.estado)) _contratado(p, enderecosMeus[p.id]),
     ];
+    // O que acabou (concluído ou cancelado) sai de "Em andamento" mas continua acessível em
+    // "Finalizados": é de lá que o profissional avalia o cliente.
+    final finalizados = [
+      for (final p in meusPedidos)
+        if (const {'concluido', 'cancelado'}.contains(p.estado)) _contratado(p),
+    ];
     for (final p in meusPedidos) {
       if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
         proximo = ProximoAtendimento(
@@ -2303,6 +2309,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       pedidos: abertos,
       proximo: proximo,
       contratados: contratados,
+      finalizados: finalizados,
       orcamentosEnviados: enviados,
       emAnalise: emAnalise,
       exclusividades: exclusividades,
@@ -2339,6 +2346,17 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     'retrabalho',
   };
 
+  /// Estado de cada pedido do profissional (`GET /v1/pedidos?como=profissional`), só id e estado:
+  /// serve para rotular as conversas ("Concluído", "Cancelado") sem recarregar o Início todo.
+  @override
+  Future<Map<String, String>> estadosDosPedidos() async {
+    final lista = _lista(await _api.get('/v1/pedidos', consulta: const {'como': 'profissional'}));
+    return {
+      for (final j in lista)
+        if (j['id'] is String && j['estado'] is String) j['id'] as String: j['estado'] as String,
+    };
+  }
+
   /// `GET /v1/pedidos/{id}/dados` de cada pedido, em paralelo. Falha em um não derruba o Início:
   /// aquele pedido só fica sem o endereço na tela.
   Future<Map<String, DadosDoPedido>> _enderecosDosContratados(List<String> ids) async {
@@ -2371,6 +2389,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       'em_confirmacao' => 'Aguardando a confirmação do cliente',
       'em_disputa' => 'Em análise (reclamação aberta)',
       'retrabalho' => 'Retrabalho em andamento',
+      'concluido' => 'Concluído',
+      'cancelado' => 'Cancelado',
       _ => p.estadoNome,
     };
     return PedidoContratado(

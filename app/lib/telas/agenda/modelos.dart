@@ -24,7 +24,15 @@ class Agendamento {
     this.remoto = false,
     this.consultaMapa,
     this.semData = false,
+    this.estadoApi,
   });
+
+  /// Estado na API (`pago_e_retido`, `agendado`, `em_andamento`). Ausente = o de [estado].
+  final String? estadoApi;
+
+  /// Pago, mas o profissional ainda não marcou a data da visita (`pago_e_retido`): sem horário não
+  /// há check-in; o próximo passo é marcar a data.
+  bool get aguardandoData => estadoApi == 'pago_e_retido';
 
   /// A visita ainda não foi marcada: o atendimento aparece em "Sem data marcada", não em "Hoje".
   final bool semData;
@@ -51,5 +59,5 @@ class Agendamento {
   final String? cliente;
 
   /// Check-in só enquanto o atendimento não terminou.
-  bool get podeFazerCheckIn => estado != EstadoAgendamento.concluido;
+  bool get podeFazerCheckIn => estado != EstadoAgendamento.concluido && !aguardandoData;
 }

@@ -774,6 +774,9 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   Future<DetalhePedido> detalhe(String pedidoId) async => detalhePedidoExemplo;
 
   @override
+  Future<Map<String, String>> estadosDosPedidos() async => const {};
+
+  @override
   Future<void> recusar(String pedidoId, MotivoRecusa motivo) async => recusas.add(motivo);
 
   @override

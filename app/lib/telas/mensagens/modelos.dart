@@ -49,6 +49,24 @@ class ConversaResumo {
   /// Rótulo opcional de estado; quando nulo, derivado de [encerrada], [contratado] e [ultimaMensagem].
   final String? rotuloEstado;
 
+  /// A mesma conversa com o rótulo de estado do pedido ("Concluído", "Cancelado"...).
+  ConversaResumo comRotuloEstado(String rotulo) => ConversaResumo(
+        pedidoId: pedidoId,
+        tituloPedido: tituloPedido,
+        interlocutor: interlocutor,
+        iniciais: iniciais,
+        ultimaMensagem: ultimaMensagem,
+        quando: quando,
+        naoLidas: naoLidas,
+        outraParteId: outraParteId,
+        profissionalId: profissionalId,
+        conversaId: conversaId,
+        codigoPedido: codigoPedido,
+        encerrada: encerrada,
+        contratado: contratado,
+        rotuloEstado: rotulo,
+      );
+
   String get codigoEfetivo {
     final informada = codigoPedido?.trim() ?? '';
     if (informada.isNotEmpty) {

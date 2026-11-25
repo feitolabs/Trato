@@ -625,6 +625,7 @@ class RepositorioAgendaApi implements RepositorioAgenda {
             remoto: c.remoto,
             consultaMapa: c.consultaMapa,
             estado: c.emAndamento ? EstadoAgendamento.emAndamento : EstadoAgendamento.agendado,
+            estadoApi: c.estadoApi,
           ),
     ];
   }

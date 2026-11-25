@@ -51,6 +51,7 @@ class CascaProfissionalTela extends StatefulWidget {
     this.aoUsarComoCliente,
     this.aoGerenciarProximo,
     this.aoAbrirContratado,
+    this.aoAbrirFinalizado,
     this.aoAbrirOrcamentoEnviado,
     this.aoAbrirMapa,
     this.recarregarInicio,
@@ -72,6 +73,9 @@ class CascaProfissionalTela extends StatefulWidget {
 
   /// Toque num pedido que o cliente já aceitou (aba Pedidos > Em andamento).
   final ValueChanged<PedidoContratado>? aoAbrirContratado;
+
+  /// Toque num pedido concluído ou cancelado (aba Pedidos > Finalizados).
+  final ValueChanged<PedidoContratado>? aoAbrirFinalizado;
 
   /// Abre o endereço de um pedido contratado no mapa do aparelho.
   final ValueChanged<String>? aoAbrirMapa;
@@ -401,6 +405,8 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
         pedidos: _inicio.pedidos,
         contratados: _inicio.contratados,
         aoAbrirContratado: widget.aoAbrirContratado,
+        finalizados: _inicio.finalizados,
+        aoAbrirFinalizado: widget.aoAbrirFinalizado,
         orcamentosEnviados: _inicio.orcamentosEnviados,
         aoAbrirOrcamentoEnviado: widget.aoAbrirOrcamentoEnviado,
         aoAbrirMapa: widget.aoAbrirMapa,

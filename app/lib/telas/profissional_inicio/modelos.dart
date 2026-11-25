@@ -120,6 +120,9 @@ class PedidoContratado {
   final String? quando;
   final DateTime? janelaInicio;
 
+  /// Pedido encerrado: concluído ou cancelado.
+  bool get finalizado => estadoApi == 'concluido' || estadoApi == 'cancelado';
+
   bool get aguardandoPagamento =>
       estadoApi == 'orcamento_aceito' || estadoApi == 'aguardando_confirmacao';
 
@@ -459,11 +462,16 @@ class InicioProfissional {
     required this.pedidos,
     this.proximo,
     this.contratados = const [],
+    this.finalizados = const [],
     this.orcamentosEnviados = const [],
     this.emAnalise = false,
     this.notificacoesNaoLidas = 0,
     this.exclusividades,
   });
+
+  /// Pedidos FINALIZADOS do profissional (concluídos e cancelados), para ele reabrir e, nos
+  /// concluídos, avaliar o cliente. Backend/lista sem eles = vazio.
+  final List<PedidoContratado> finalizados;
 
   /// Cadastro ainda aguardando aprovação de documentos pela equipe.
   final bool emAnalise;
@@ -490,6 +498,7 @@ class InicioProfissional {
         carteira: carteira,
         pedidos: novos,
         contratados: contratados,
+        finalizados: finalizados,
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
         notificacoesNaoLidas: notificacoesNaoLidas,
@@ -504,6 +513,7 @@ class InicioProfissional {
         carteira: carteira,
         pedidos: pedidos,
         contratados: contratados,
+        finalizados: finalizados,
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
         notificacoesNaoLidas: notificacoesNaoLidas,
@@ -517,6 +527,7 @@ class InicioProfissional {
         carteira: carteira,
         pedidos: pedidos,
         contratados: contratados,
+        finalizados: finalizados,
         orcamentosEnviados: orcamentosEnviados,
         emAnalise: emAnalise,
         notificacoesNaoLidas: naoLidas,

@@ -464,6 +464,10 @@ abstract interface class RepositorioProfissional {
   Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro);
 
   Future<InicioProfissional> inicio();
+
+  /// Estado (`concluido`, `cancelado`...) de cada pedido do profissional, por id. Servidor ou
+  /// demonstração sem isso = vazio.
+  Future<Map<String, String>> estadosDosPedidos() async => const {};
   Future<DetalhePedido> detalhe(String pedidoId);
   Future<void> recusar(String pedidoId, MotivoRecusa motivo);
 

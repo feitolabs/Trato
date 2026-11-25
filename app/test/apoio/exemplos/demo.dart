@@ -1,7 +1,7 @@
 // Só para testes: o app não tem modo de demonstração. Monta os repositórios e serviços de
 // mentira que os testes de widget usam no lugar da API.
 import 'package:trato/auth/servico_auth.dart';
-import 'package:trato/dados/repositorios.dart' show RepositorioPedidos;
+import 'package:trato/dados/repositorios.dart' show RepositorioPedidos, RepositorioProfissional;
 import 'package:trato/dados/repositorios_catalogo.dart'
     show RepositorioCatalogo;
 import 'package:trato/dados/repositorios_trato.dart';
@@ -31,6 +31,7 @@ RepositoriosTrato repositoriosDemo({
   RepositorioPedidos? pedidos,
   RepositorioCatalogo? catalogo,
   ServicoMei? mei,
+  RepositorioProfissional? profissional,
 }) =>
     RepositoriosTrato(
       pedidos: pedidos ?? RepositorioPedidosFake(),
@@ -39,7 +40,7 @@ RepositoriosTrato repositoriosDemo({
       chat: RepositorioChatFake(),
       notificacoes: RepositorioNotificacoesFake(),
       perfil: RepositorioPerfilFake(),
-      profissional: RepositorioProfissionalFake(),
+      profissional: profissional ?? RepositorioProfissionalFake(),
       catalogo: catalogo ?? RepositorioCatalogoFake(),
       mei: mei,
       servicos: RepositorioServicosClienteFake(),

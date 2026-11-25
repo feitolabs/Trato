@@ -45,6 +45,7 @@ import '../cliente/modelos.dart' show CategoriaServico, DadosInicio, Profissiona
 import '../legal/texto_legal_tela.dart';
 import '../mensagens/modelos.dart' show ConversaResumo, ServicoMensagens;
 import '../mensagens/servico_conversas.dart' show ServicoConversasApi;
+import '../mensagens/servico_estado.dart';
 import '../mensagens/servico_pedidos.dart';
 import '../orcamentos/modelos.dart' show DadosContrato, Orcamento;
 import '../pedido_novo/modelos.dart' show FormularioPedido;
@@ -947,8 +948,12 @@ abstract final class RotasTrato {
           },
           abaConversas: Builder(
             builder: (context) => ListaConversas(
-              servico: repos.mensagensProfissional ??
-                  ServicoMensagensDoProfissional(repos.profissional, chat: repos.chat),
+              // O estado real do pedido (Concluído, Cancelado) no rótulo de cada conversa.
+              servico: ServicoMensagensComEstado(
+                repos.mensagensProfissional ??
+                    ServicoMensagensDoProfissional(repos.profissional, chat: repos.chat),
+                repos.profissional.estadosDosPedidos,
+              ),
               textoVazio: 'Quando um cliente conversar com você sobre um pedido, aparece aqui.',
               atualizarACada: _intervalo,
               atualizarQuando: pedidosMudaram,
@@ -968,6 +973,7 @@ abstract final class RotasTrato {
           atualizarACada: _intervalo,
           atualizarQuando: pedidosMudaram,
           aoAbrirMapa: abrirNoMapa,
+          aoAbrirFinalizado: (c) => _abrir<void>(context, _pedidoDoProfissional(c.pedidoId)),
           aoAbrirContratado: (c) => _acoesPedidoProfissional(
             context,
             pedidoId: c.pedidoId,
@@ -1297,6 +1303,7 @@ abstract final class RotasTrato {
             pedidoId: a.pedidoId,
             titulo: a.titulo,
             estado: a.estado,
+            estadoApi: a.estadoApi,
             remoto: a.remoto,
             consultaMapa: a.consultaMapa,
             aoCheckIn: () => _abrir<void>(
@@ -2619,7 +2626,7 @@ abstract final class RotasTrato {
             : abrirServico(context, id);
       case DestinoApp.avaliacao:
         profissional
-            ? _abrir<void>(context, _pedidoDoProfissional(id, avaliar: true))
+            ? _abrir<void>(context, _pedidoDoProfissional(id))
             : abrirServico(context, id);
       case DestinoApp.recorrencia || DestinoApp.indicacoes:
         break;
@@ -2659,7 +2666,7 @@ abstract final class RotasTrato {
   /// O pedido contratado do lado do profissional (abre pela notificação). Pedido ainda aberto vai
   /// para o detalhe de orçar; serviço concluído e sem avaliar, com [avaliar], para avaliar o
   /// cliente. Nunca a visão do cliente (pagar, avaliar o profissional).
-  static Widget _pedidoDoProfissional(String pedidoId, {bool avaliar = false}) =>
+  static Widget _pedidoDoProfissional(String pedidoId) =>
       Carregador<PedidoEmExecucao>(
         textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.acompanhar(pedidoId),
@@ -2668,9 +2675,6 @@ abstract final class RotasTrato {
         construir: (context, pedido) {
           if (const {'aberto', 'reservado'}.contains(pedido.estadoApi)) {
             return _detalhePedidoAbertoProfissional(pedidoId);
-          }
-          if (avaliar && pedido.estadoApi == 'concluido' && !pedido.jaAvaliou) {
-            return _valoresEAvaliar(pedidoId);
           }
           return PedidoExecucaoTela(
             pedido: pedido,
