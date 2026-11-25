@@ -2674,6 +2674,7 @@ abstract final class RotasTrato {
           }
           return PedidoExecucaoTela(
             pedido: pedido,
+            comoProfissional: true,
             atualizarAditivoLocalmente: false,
             aoConversar: () => _abrir<void>(
               context,

@@ -31,9 +31,16 @@ abstract final class DeepLinks {
 
   /// O toque numa notificação push (app fechado, em segundo plano ou aberto) chegou. Vai pelo
   /// mesmo caminho do link: se ainda não há navegador ou a pessoa não entrou, espera.
-  static void receberPush(Map<String, dynamic> dados, {DateTime Function()? agora}) {
+  /// [inicial]: é a mensagem que ABRIU o app (app fechado). Ela tem prioridade sobre o endereço
+  /// da partida: se esse endereço ainda espera para abrir, é descartado (o destino do push vence).
+  static void receberPush(Map<String, dynamic> dados,
+      {DateTime Function()? agora, bool inicial = false}) {
     try {
       final r = resultadoDoPush(dados);
+      if (inicial && r.situacao != SituacaoLink.ignorado && _pendenteDaPartida) {
+        LinkPendente.limpar();
+      }
+      _pendenteDaPartida = false;
       _aceitar(r, 'push:${r.destino}:${r.id}', agora);
     } on Object {
       // Dado estranho nunca derruba o app.
@@ -96,6 +103,8 @@ abstract final class DeepLinks {
         // abre no modo errado.
         if (dePronta) {
           _trocouModo = false;
+          _limiteDaTroca?.cancel();
+          _limiteDaTroca = null;
           LinkPendente.limpar();
         }
         return;
@@ -104,6 +113,9 @@ abstract final class DeepLinks {
       return;
     }
     _trocouModo = false;
+    _limiteDaTroca?.cancel();
+    _limiteDaTroca = null;
+    _pendenteDaPartida = false;
     final link = LinkPendente.retirar();
     final contexto = nav.context;
     if (link == null || !contexto.mounted) return;
@@ -112,6 +124,20 @@ abstract final class DeepLinks {
 
   static var _trocandoModo = false;
   static var _trocouModo = false;
+  static Timer? _limiteDaTroca;
+
+  /// Quanto esperar a casca do outro modo antes de abrir o destino mesmo assim.
+  static Duration esperaDaTroca = const Duration(seconds: 6);
+
+  static void _abrirSemEsperar(NavigatorState nav) {
+    _limiteDaTroca = null;
+    if (!_trocouModo) return;
+    _trocouModo = false;
+    final link = LinkPendente.retirar();
+    if (link == null) return;
+    final contexto = nav.context;
+    if (contexto.mounted) RotasTrato.abrirLink(contexto, link);
+  }
 
   /// Troca de cliente para profissional (ou o contrário) antes de abrir. Para profissional só se a
   /// conta tem perfil de profissional; sem ele o link é descartado e nenhuma tela de profissional
@@ -126,6 +152,10 @@ abstract final class DeepLinks {
       final contexto = nav.context;
       if (!contexto.mounted) return;
       _trocouModo = true;
+      // Se a casca do modo pedido não aparecer a tempo (verificação, rede lenta), abre o destino
+      // mesmo assim, no modo que o push pediu (o `papel` manda; não o estado da casca).
+      _limiteDaTroca?.cancel();
+      _limiteDaTroca = Timer(esperaDaTroca, () => _abrirSemEsperar(nav));
       if (paraProfissional) {
         await RotasTrato.irParaProfissional(contexto);
       } else {
@@ -134,6 +164,8 @@ abstract final class DeepLinks {
     } on Object {
       LinkPendente.limpar();
       _trocouModo = false;
+      _limiteDaTroca?.cancel();
+      _limiteDaTroca = null;
     } finally {
       _trocandoModo = false;
     }
@@ -166,16 +198,23 @@ abstract final class DeepLinks {
     _inicialLido = true;
     final inicial = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
     final uri = Uri.tryParse(inicial);
-    if (uri != null) receber(uri);
+    if (uri != null) {
+      receber(uri);
+      _pendenteDaPartida = LinkPendente.atual != null;
+    }
   }
 
   static var _inicialLido = false;
+
+  /// O destino guardado veio do endereço da partida (não de um toque de push).
+  static var _pendenteDaPartida = false;
 
   /// Só para testes: volta ao estado de um processo recém-iniciado.
   @visibleForTesting
   static void reiniciarParaTeste() {
     esquecer();
     _inicialLido = false;
+    _pendenteDaPartida = false;
   }
 
   static void esquecer() {
@@ -183,6 +222,8 @@ abstract final class DeepLinks {
     _loginAberto = false;
     _trocouModo = false;
     _trocandoModo = false;
+    _limiteDaTroca?.cancel();
+    _limiteDaTroca = null;
     _ultimo = null;
   }
 }

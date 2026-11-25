@@ -111,6 +111,7 @@ class ServicoToquePush {
   Future<void> ligar({
     required void Function(MensagemPush) aoToque,
     required void Function(MensagemPush) aoChegar,
+    void Function(MensagemPush)? aoInicial,
   }) async {
     try {
       if (!await _garantirFirebase()) return;
@@ -146,7 +147,7 @@ class ServicoToquePush {
         // Já tratada antes (o sistema entregou de novo ao reabrir pelos recentes): não navega.
         if (id != null && await _consumo.jaConsumido(id)) return;
         if (id != null) await _consumo.marcar(id);
-        aoToque(inicial);
+        (aoInicial ?? aoToque)(inicial);
       }
     } on Object {
       // Sem mensagem inicial ou sem Firebase: segue.

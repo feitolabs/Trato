@@ -148,6 +148,8 @@ Future<void> main() async {
   // Toque na notificação push (app fechado, em segundo plano) e aviso com o app aberto.
   unawaited(ServicoToquePush().ligar(
     aoToque: (m) => DeepLinks.receberPush(m.dados),
+    // A mensagem que abriu o app tem prioridade sobre qualquer endereço da partida.
+    aoInicial: (m) => DeepLinks.receberPush(m.dados, inicial: true),
     aoChegar: AvisoPush.mostrar,
   ));
   runApp(const TratoApp());
@@ -195,7 +197,6 @@ class TratoApp extends StatelessWidget {
         supportedLocales: const [Locale('pt', 'BR')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         navigatorKey: navegadorTrato,
-        scaffoldMessengerKey: mensageiroTrato,
         debugShowCheckedModeBanner: false,
         theme: TemaTrato.claro,
         darkTheme: TemaTrato.escuro,

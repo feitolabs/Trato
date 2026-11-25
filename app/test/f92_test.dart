@@ -297,12 +297,12 @@ void main() {
   group('app ABERTO (primeiro plano): aviso dentro do app', () {
     testWidgets('mostra título e corpo, toque navega e some em ~5 s',
         (t) async {
-      final (_, msg, obs) = await abrirCasca(t);
+      final (chave, _, obs) = await abrirCasca(t);
       final antes = obs.empilhadas;
       AvisoPush.mostrar(
         _push({'tela': 'pedido', 'pedido_id': 'srv-pintura'},
             titulo: 'Novo orçamento', corpo: 'Você recebeu um orçamento.'),
-        mensageiro: msg,
+        navegador: () => chave.currentState,
       );
       await t.pump();
       await t.pump(const Duration(milliseconds: 400));
@@ -316,10 +316,10 @@ void main() {
     });
 
     testWidgets('sem toque, o aviso some sozinho em 5 s', (t) async {
-      final (_, msg, _) = await abrirCasca(t);
+      final (chave, _, _) = await abrirCasca(t);
       AvisoPush.mostrar(
           _push({'tela': 'pedido', 'pedido_id': 'a'}, titulo: 'Oi'),
-          mensageiro: msg);
+          navegador: () => chave.currentState);
       await t.pump();
       await t.pump(const Duration(milliseconds: 400));
       expect(find.text('Oi'), findsOneWidget);
@@ -331,12 +331,12 @@ void main() {
     testWidgets(
         'mensagem só de dados: nada aparece; tela desconhecida: sem botão Abrir',
         (t) async {
-      final (_, msg, _) = await abrirCasca(t);
+      final (chave, _, _) = await abrirCasca(t);
       AvisoPush.mostrar(_push({'tela': 'pedido', 'pedido_id': 'a'}),
-          mensageiro: msg);
+          navegador: () => chave.currentState);
       await t.pump();
       expect(find.byKey(const Key('aviso-push')), findsNothing);
-      AvisoPush.mostrar(_push({'tela': 'x'}, titulo: 'Aviso'), mensageiro: msg);
+      AvisoPush.mostrar(_push({'tela': 'x'}, titulo: 'Aviso'), navegador: () => chave.currentState);
       await t.pump();
       await t.pump(const Duration(milliseconds: 400));
       expect(find.text('Aviso'), findsOneWidget);

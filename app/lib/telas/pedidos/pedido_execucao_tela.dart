@@ -28,6 +28,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoPagar,
     this.aoAvaliar,
     this.textoAvaliar = 'Avaliar',
+    this.comoProfissional = false,
     this.aoVerGarantia,
     this.aoBaixarComprovante,
     this.aoRepetirServico,
@@ -45,6 +46,21 @@ class PedidoExecucaoTela extends StatefulWidget {
   /// (finalizado). `Confirmar serviço` usa [aoVerConclusao]. Sem o callback, a ação não aparece.
   final VoidCallback? aoPagar;
   final VoidCallback? aoAvaliar;
+
+  /// A tela é do PROFISSIONAL: os textos falam do cliente ("Aguardando a confirmação do cliente"),
+  /// não de "você".
+  final bool comoProfissional;
+
+  /// Textos que a API monta do ponto de vista do cliente, trocados para o profissional.
+  String _doPonto(String texto) {
+    if (!comoProfissional) return texto;
+    return switch (texto) {
+      'Aguardando o pagamento' => 'Aguardando o pagamento do cliente',
+      'Confirme o serviço' => 'Aguardando o cliente confirmar o serviço',
+      'Aguardando sua confirmação' => 'Aguardando a confirmação do cliente',
+      _ => texto,
+    };
+  }
 
   /// O rótulo do botão de avaliar: "Avaliar" (cliente avalia o profissional) ou "Avaliar cliente".
   final String textoAvaliar;
@@ -226,14 +242,16 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
           CabecalhoAtendimento(
             status: statusDeAtendimento(pedido.estadoApi),
             horario: pedido.visita,
-            papel: 'Profissional',
-            nome: pedido.profissionalNome,
-            usuarioId: pedido.profissionalId,
+            papel: widget.comoProfissional ? 'Cliente' : 'Profissional',
+            nome: widget.comoProfissional ? null : pedido.profissionalNome,
+            usuarioId: widget.comoProfissional ? null : pedido.profissionalId,
           ),
           const SizedBox(height: EspacosTrato.x4),
         ],
         Text(
-          (pedido.categoriaNome ?? '').isNotEmpty ? pedido.categoriaNome! : pedido.titulo,
+          (pedido.categoriaNome ?? '').isNotEmpty
+              ? pedido.categoriaNome!
+              : widget._doPonto(pedido.titulo),
           key: const ValueKey('titulo-pedido'),
           style: TipografiaTrato.tituloGrande,
         ),
@@ -247,7 +265,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             ),
           ],
           const SizedBox(height: EspacosTrato.x2),
-          Text(pedido.titulo,
+          Text(widget._doPonto(pedido.titulo),
               key: const ValueKey('situacao-pedido'), style: TipografiaTrato.corpoForte),
         ],
         const SizedBox(height: EspacosTrato.x3),
@@ -263,8 +281,8 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   icone: Icons.lock_outline,
                 )
               else
-                const ChipStatus(
-                  texto: 'Aguardando o pagamento',
+                ChipStatus(
+                  texto: widget._doPonto('Aguardando o pagamento'),
                   tipo: TipoStatus.alerta,
                   icone: Icons.schedule,
                 ),
@@ -288,7 +306,16 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
           const SizedBox(height: EspacosTrato.x5),
           Text('Linha do tempo', style: TipografiaTrato.titulo),
           const SizedBox(height: EspacosTrato.x4),
-          LinhaDoTempo(etapas: pedido.etapas),
+          LinhaDoTempo(
+            etapas: [
+              for (final e in pedido.etapas)
+                EtapaLinhaDoTempo(
+                  titulo: widget._doPonto(e.titulo),
+                  detalhe: e.detalhe,
+                  estado: e.estado,
+                ),
+            ],
+          ),
         ],
         if (pedido.visita != null || pedido.prazoConfirmacao != null) ...[
           const SizedBox(height: EspacosTrato.x3),
