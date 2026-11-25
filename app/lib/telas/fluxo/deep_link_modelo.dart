@@ -76,6 +76,40 @@ ResultadoLink interpretarLink(Uri uri) {
   return ResultadoLink.valido(destino, segmentos.first);
 }
 
+/// Lê o `data` de um push do backend (`evento`, `tela`, `pedido_id`, `recorrencia_id`, `link`...).
+/// A tabela tela -> destino é a mesma da caixa de notificações: `orcamentos`; `pedido`,
+/// `pedido_aberto` e `avaliacao` (o pedido); `disputa`; `mensagens` (o chat); `recorrencias`.
+/// Qualquer outra tela, tela ausente ou valor que não seja texto: ignorado. A chave `link`
+/// (esquema antigo) e todas as outras são descartadas: o app nunca abre URL vinda do push.
+ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
+  String? texto(String chave) {
+    final v = dados[chave];
+    if (v is! String) return null;
+    final t = v.trim();
+    return t.isEmpty ? null : t;
+  }
+
+  final destino = switch (texto('tela')) {
+    'orcamentos' => DestinoApp.orcamentos,
+    'pedido' || 'pedido_aberto' || 'avaliacao' => DestinoApp.pedido,
+    'disputa' => DestinoApp.disputa,
+    'mensagens' => DestinoApp.chat,
+    'recorrencias' => DestinoApp.recorrencia,
+    _ => null,
+  };
+  if (destino == null) return ResultadoLink.ignorado;
+  // Recorrência: o id da série vem em `recorrencia_id`; sem ele, abre a lista.
+  final bruto = destino == DestinoApp.recorrencia ? texto('recorrencia_id') : texto('pedido_id');
+  if (bruto == null) {
+    return destino == DestinoApp.recorrencia
+        ? const ResultadoLink.valido(DestinoApp.recorrencia, null)
+        : ResultadoLink.ignorado; // sem id não há o que abrir
+  }
+  return idDeLinkValido(bruto)
+      ? ResultadoLink.valido(destino, bruto)
+      : ResultadoLink.invalido(destino);
+}
+
 /// O destino de um link que chegou antes de dar para abrir (app frio ou sem login). Só em
 /// memória: some ao abrir, ao sair da conta e ao fechar o app.
 abstract final class LinkPendente {

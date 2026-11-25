@@ -17,24 +17,38 @@ abstract final class DeepLinks {
   static NavigatorState? Function() navegador = () => null;
 
   static var _loginAberto = false;
-  static Uri? _ultimo;
+  static String? _ultimo;
   static DateTime? _ultimoEm;
 
   /// Um endereço chegou. Devolve se é do app (e portanto já foi tratado, mesmo sendo ignorado).
   static bool receber(Uri uri, {DateTime Function()? agora}) {
     if (uri.scheme.toLowerCase() != esquemaDoApp) return false;
-    final resultado = interpretarLink(uri);
-    if (resultado.situacao == SituacaoLink.ignorado) return true;
-    // O sistema pode entregar o mesmo link duas vezes (partida a frio): abre uma só.
-    final t = (agora ?? DateTime.now)();
-    if (_ultimo == uri && _ultimoEm != null && t.difference(_ultimoEm!).inSeconds < 2) {
-      return true;
+    _aceitar(interpretarLink(uri), uri.toString(), agora);
+    return true;
+  }
+
+  /// O toque numa notificação push (app fechado, em segundo plano ou aberto) chegou. Vai pelo
+  /// mesmo caminho do link: se ainda não há navegador ou a pessoa não entrou, espera.
+  static void receberPush(Map<String, dynamic> dados, {DateTime Function()? agora}) {
+    try {
+      final r = resultadoDoPush(dados);
+      _aceitar(r, 'push:${r.destino}:${r.id}', agora);
+    } on Object {
+      // Dado estranho nunca derruba o app.
     }
-    _ultimo = uri;
+  }
+
+  static void _aceitar(ResultadoLink resultado, String chave, DateTime Function()? agora) {
+    if (resultado.situacao == SituacaoLink.ignorado) return;
+    // O sistema pode entregar o mesmo toque duas vezes (partida a frio): abre uma só.
+    final t = (agora ?? DateTime.now)();
+    if (_ultimo == chave && _ultimoEm != null && t.difference(_ultimoEm!).inSeconds < 2) {
+      return;
+    }
+    _ultimo = chave;
     _ultimoEm = t;
     LinkPendente.guardar(resultado);
     processar();
-    return true;
   }
 
   /// A casca (Início do cliente ou do profissional) acabou de aparecer: abre o que estava

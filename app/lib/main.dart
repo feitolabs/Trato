@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'auth/config_auth.dart';
 import 'auth/ligacao_sessao.dart';
@@ -24,7 +27,9 @@ import 'dispositivo/servico_camera_real.dart';
 import 'dados/sessao_expirada.dart';
 import 'dispositivo/servico_localizacao_real.dart';
 import 'dispositivo/servico_push_firebase.dart';
+import 'dispositivo/toque_push.dart';
 import 'galeria/galeria_componentes.dart';
+import 'telas/comuns/aviso_push.dart';
 import 'telas/fluxo/deep_link.dart';
 import 'telas/fluxo/rotas.dart';
 import 'telas/splash_tela.dart';
@@ -64,7 +69,11 @@ Future<void> main() async {
   // O app é só vertical. Android e iOS também travam isso no manifesto e no Info.plist.
   await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
   await ControladorTema.instancia.carregar();
-  await inicializarFirebaseComSeguranca();
+  final firebaseOk = await inicializarFirebaseComSeguranca();
+  if (firebaseOk) {
+    // Push com o app fechado ou em segundo plano: só não quebrar (a bandeja é do sistema).
+    FirebaseMessaging.onBackgroundMessage(tratarPushEmSegundoPlano);
+  }
   var config = ConfigTrato.doAmbiente();
   var configAuth = ConfigAuth.doAmbiente();
 
@@ -136,6 +145,11 @@ Future<void> main() async {
   // Links br.com.feitolabs.trato://pedido/<id> etc. (o login-callback fica com o supabase_flutter).
   DeepLinks.navegador = () => navegadorTrato.currentState;
   DeepLinks.ligar();
+  // Toque na notificação push (app fechado, em segundo plano) e aviso com o app aberto.
+  unawaited(ServicoToquePush().ligar(
+    aoToque: (m) => DeepLinks.receberPush(m.dados),
+    aoChegar: AvisoPush.mostrar,
+  ));
   runApp(const TratoApp());
 }
 
@@ -181,6 +195,7 @@ class TratoApp extends StatelessWidget {
         supportedLocales: const [Locale('pt', 'BR')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         navigatorKey: navegadorTrato,
+        scaffoldMessengerKey: mensageiroTrato,
         debugShowCheckedModeBanner: false,
         theme: TemaTrato.claro,
         darkTheme: TemaTrato.escuro,
