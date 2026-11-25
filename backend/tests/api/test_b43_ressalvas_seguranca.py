@@ -15,15 +15,23 @@ from trato.seguranca.mascaramento import mascarar
 RAIZ = Path(__file__).resolve().parents[3]
 
 
-def _tempo_ms(texto: str) -> float:
-    inicio = time.perf_counter()
-    mascarar(texto)
-    return (time.perf_counter() - inicio) * 1000
+def _melhor_ms(texto: str, vezes: int = 5) -> float:
+    """Melhor de N execuções: o ruído de uma máquina ocupada só piora, nunca melhora."""
+    melhor = float("inf")
+    for _ in range(vezes):
+        inicio = time.perf_counter()
+        mascarar(texto)
+        melhor = min(melhor, (time.perf_counter() - inicio) * 1000)
+    return melhor
 
 
 def test_perfil_com_muitos_espacos_nao_e_quadratico():
-    for entrada in ("ig" + " " * 2000, "x " + "insta" + " " * 5000 + "!", "ig" + " " * 2000 + "@"):
-        assert _tempo_ms(entrada) < 20, entrada[:10]
+    for molde in ("ig{}", "x insta{}!", "ig{}@"):
+        pequeno = _melhor_ms(molde.format(" " * 1000))
+        grande = _melhor_ms(molde.format(" " * 4000))
+        # 4x a entrada: linear dá ~4x; quadrático daria ~16x. Piso de 1 ms evita razão de ruído.
+        assert grande < 6 * max(pequeno, 1.0), (molde, pequeno, grande)
+        assert grande < 300, (molde, grande)
 
 
 def test_perfil_ainda_mascara_variacoes():
