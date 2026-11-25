@@ -108,7 +108,9 @@ TransporteHttp = Callable[[str, dict[str, str], dict[str, Any]], int]
 
 
 def _dados_texto(dados: dict[str, Any]) -> dict[str, str]:
-    return {str(k): str(v) for k, v in dados.items()}
+    """Dados do push (FCM `data`, APNs) só aceitam texto. Valor ausente (None) e chave vazia ficam
+    de fora: "None" como texto seria lido pelo app como um id de pedido válido."""
+    return {str(k): str(v) for k, v in dados.items() if v is not None and str(k)}
 
 
 class PushFcm:

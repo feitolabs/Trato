@@ -130,3 +130,26 @@ def test_payload_fcm_leva_o_papel_como_texto():
     cfg = ConfigNotificacoes(push_ativo=True, fcm_projeto_id="proj")
     carga = PushFcm(cfg, lambda *a: 200, lambda: "t").carga("tok", msg)
     assert carga["message"]["data"]["papel"] == "profissional"
+
+
+def test_push_nao_leva_none_como_texto_e_converte_o_resto():
+    from trato.notificacoes.canais import PushApns
+
+    dados = {"pedido_id": None, "": "x", "papel": "cliente", "n": 3, "ok": True, "zero": 0}
+    msg = Mensagem("u1", "t", "c", dados, ("tok",))
+    cfg = ConfigNotificacoes(push_ativo=True, fcm_projeto_id="proj")
+    data = PushFcm(cfg, lambda *a: 200, lambda: "t").carga("tok", msg)["message"]["data"]
+    assert data == {"papel": "cliente", "n": "3", "ok": "True", "zero": "0"}
+    assert "None" not in data.values() and "pedido_id" not in data
+    apns = PushApns(cfg, lambda *a: 200, lambda: "t").carga(msg)
+    assert "pedido_id" not in apns and "None" not in str(apns) and apns["n"] == "3"
+
+
+def test_caixa_da_api_nao_devolve_none_como_texto(amb):
+    notif = _servico(amb)
+    notif.notificar(Evento.PAGAMENTO_CONFIRMADO, PROFISSIONAL.id, chave="sp", pedido_id=None)
+    r = amb.cliente.get("/v1/notificacoes", headers=cab("t-prof"))
+    assert r.status_code == 200, r.text
+    assert '"None"' not in r.text
+    itens = r.json()["itens"] if isinstance(r.json(), dict) else r.json()
+    assert itens and itens[0]["dados"]["pedido_id"] is None  # ausente de verdade, não o texto
