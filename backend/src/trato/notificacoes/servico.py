@@ -32,6 +32,11 @@ log = logging.getLogger("trato.notificacoes")
 
 # Consulta do pedido (`contexto.pedidos.obter`): devolve algo com `cliente_id` e `profissional_id`.
 ConsultaPedido = Callable[[str], Any]
+# Quem foi convidado diretamente para o pedido (ainda não é o `profissional_id` dele), ou None.
+ConsultaConvidado = Callable[[str], str | None]
+# Telas só de profissional (pedido novo, direcionado, urgente, orçamento recusado/não escolhido,
+# exclusividade aceita): quem recebe esses eventos é sempre o profissional.
+_TELAS_DE_PROFISSIONAL = frozenset({"pedido_aberto"})
 
 
 class ResolvedorEmail(Protocol):
@@ -53,6 +58,7 @@ class ServicoNotificacoes:
         agora: Callable[[], datetime] = lambda: datetime.now(UTC),
         emails: ResolvedorEmail | None = None,
         pedidos: ConsultaPedido | None = None,
+        convidado: ConsultaConvidado | None = None,
     ) -> None:
         self.repo = repo
         self.canais = canais
@@ -61,6 +67,7 @@ class ServicoNotificacoes:
         self._emails = emails or SemEmail()
         # Quem monta o serviço liga isto ao contexto (`montar_servicos`); sem ele não há `papel`.
         self.pedidos = pedidos
+        self.convidado = convidado
 
     def papel_no_pedido(self, usuario_id: str, pedido_id: str | None) -> str | None:
         """ "profissional" ou "cliente" conforme o lugar da pessoa no pedido; None se não der
@@ -78,6 +85,11 @@ class ServicoNotificacoes:
             return "profissional"
         if usuario_id == getattr(pedido, "cliente_id", None):
             return "cliente"
+        try:  # pedido direto sem orçamento aceito: o convidado ainda não é o profissional_id
+            if self.convidado is not None and self.convidado(pedido_id) == usuario_id:
+                return "profissional"
+        except Exception:  # noqa: BLE001 - extra: sem ele a notificação segue
+            log.warning("Convidado do pedido não consultado para o papel da notificação")
         return None
 
     # --- preferências ----------------------------------------------------------------------
@@ -122,6 +134,8 @@ class ServicoNotificacoes:
         texto_titulo = titulo if titulo is not None else modelo.titulo
         agora = self.agora()
         prefs = self.repo.preferencias(usuario_id)
+        if not papel and modelo.tela in _TELAS_DE_PROFISSIONAL:
+            papel = "profissional"  # sem consultar o pedido
         papel = papel or self.papel_no_pedido(usuario_id, pedido_id)
         conteudo = {
             "evento": evento.value,

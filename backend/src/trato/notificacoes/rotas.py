@@ -109,6 +109,15 @@ def _servicos(request: Request, contexto: Contexto) -> tuple[ServicoNotificacoes
     return guardado
 
 
+def _convidado_do_pedido(contexto: Contexto, pedido_id: str) -> str | None:
+    """Profissional convidado do pedido direto (mesmas fontes de `_eh_convidado_do_pedido`)."""
+    convidados = contexto.extras.get("pedidos_convidados", {})
+    if isinstance(convidados, dict) and convidados.get(pedido_id):
+        return str(convidados[pedido_id])
+    dados = contexto.pedidos.dados_do_pedido(pedido_id)
+    return dados.profissional_convidado_id if dados is not None else None
+
+
 def montar_servicos(
     contexto: Contexto, servico: ServicoNotificacoes | None = None
 ) -> tuple[ServicoNotificacoes, ServicoMensagens]:
@@ -122,6 +131,8 @@ def montar_servicos(
     )
     if servico.pedidos is None:
         servico.pedidos = contexto.pedidos.obter  # `papel` da notificação, pelo pedido
+    if servico.convidado is None:
+        servico.convidado = lambda pid: _convidado_do_pedido(contexto, pid)
     contexto.apos_transicao.append(criar_gancho(servico))
     contexto.extras["notificador"] = servico  # avisos fora de transição (ex.: aditivo pago)
     return servico, mensagens

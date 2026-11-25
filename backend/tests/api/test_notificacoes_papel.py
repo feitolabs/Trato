@@ -153,3 +153,63 @@ def test_caixa_da_api_nao_devolve_none_como_texto(amb):
     assert '"None"' not in r.text
     itens = r.json()["itens"] if isinstance(r.json(), dict) else r.json()
     assert itens and itens[0]["dados"]["pedido_id"] is None  # ausente de verdade, não o texto
+
+
+# --- pedido direto: o convidado ainda não é o profissional_id do pedido ----------------------
+
+
+def test_eventos_da_tela_pedido_aberto_sao_todos_so_de_profissional():
+    """Quem entra aqui recebe `papel = profissional` sem consulta. Evento novo nesta tela precisa
+    ser revisto: se algum dia for para cliente, este teste falha de propósito."""
+    from trato.notificacoes.eventos import MODELOS
+
+    na_tela = {e for e, m in MODELOS.items() if m.tela == "pedido_aberto"}
+    assert na_tela == {
+        Evento.PEDIDO_NOVO,
+        Evento.PEDIDO_DIRECIONADO,
+        Evento.PEDIDO_URGENTE,
+        Evento.ORCAMENTO_RECUSADO,
+        Evento.ORCAMENTO_NAO_ESCOLHIDO,
+        Evento.EXCLUSIVIDADE_ACEITA,
+    }
+
+
+def test_pedido_direcionado_e_pedido_novo_vao_como_profissional_sem_ler_o_pedido(amb):
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    notif = _servico(amb)
+    leituras: list[str] = []
+    notif.pedidos = lambda pid: leituras.append(pid)  # não pode ser chamada para estes eventos
+    notif.notificar(Evento.PEDIDO_DIRECIONADO, PROFISSIONAL.id, chave="d", pedido_id="ped-1")
+    notif.notificar(Evento.PEDIDO_NOVO, OUTRO_PROFISSIONAL.id, chave="n", pedido_id="ped-1")
+    assert _dados(notif, PROFISSIONAL.id, Evento.PEDIDO_DIRECIONADO)["papel"] == "profissional"
+    assert _dados(notif, OUTRO_PROFISSIONAL.id, Evento.PEDIDO_NOVO)["papel"] == "profissional"
+    assert leituras == []
+
+
+def test_convidado_de_pedido_direto_recebe_profissional_em_outros_eventos(amb):
+    # pedido direto ainda sem orçamento aceito: pro-1 é só o convidado (profissional_id vazio)
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    amb.contexto.extras["pedidos_convidados"] = {"ped-1": PROFISSIONAL.id}
+    notif = _servico(amb)
+    notif.notificar(Evento.MENSAGEM_NOVA, PROFISSIONAL.id, chave="m", pedido_id="ped-1")
+    notif.notificar(Evento.MENSAGEM_NOVA, CLIENTE.id, chave="m2", pedido_id="ped-1")
+    notif.notificar(Evento.MENSAGEM_NOVA, OUTRO_PROFISSIONAL.id, chave="m3", pedido_id="ped-1")
+    assert _dados(notif, PROFISSIONAL.id, Evento.MENSAGEM_NOVA)["papel"] == "profissional"
+    assert _dados(notif, CLIENTE.id, Evento.MENSAGEM_NOVA)["papel"] == "cliente"
+    assert "papel" not in _dados(
+        notif, OUTRO_PROFISSIONAL.id, Evento.MENSAGEM_NOVA
+    )  # não convidado
+
+
+def test_convidado_pelos_dados_do_pedido_tambem_vale(amb):
+    from types import SimpleNamespace
+
+    amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
+    amb.contexto.pedidos.dados_do_pedido = lambda _pid: SimpleNamespace(
+        profissional_convidado_id=PROFISSIONAL.id
+    )
+    notif = _servico(amb)
+    notif.notificar(Evento.MENSAGEM_NOVA, PROFISSIONAL.id, chave="m", pedido_id="ped-1")
+    notif.notificar(Evento.MENSAGEM_NOVA, CLIENTE.id, chave="m2", pedido_id="ped-1")
+    assert _dados(notif, PROFISSIONAL.id, Evento.MENSAGEM_NOVA)["papel"] == "profissional"
+    assert _dados(notif, CLIENTE.id, Evento.MENSAGEM_NOVA)["papel"] == "cliente"

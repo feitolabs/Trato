@@ -56,6 +56,9 @@ def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
         cn,
         contexto.agora,
         pedidos=contexto.pedidos.obter,
+        convidado=lambda pid: (
+            d.profissional_convidado_id if (d := contexto.pedidos.dados_do_pedido(pid)) else None
+        ),
     )
     executor = ExecutorContexto(
         contexto, notif, CobrancasPostgres(banco), escolher_provedor(config)
