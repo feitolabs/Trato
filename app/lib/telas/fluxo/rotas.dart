@@ -73,6 +73,7 @@ import '../comuns/foco_rolagem.dart';
 import '../comuns/moedas_ganhas_tela.dart';
 import '../comuns/sucesso_acao_tela.dart';
 import '../conta/dados_pessoais_tela.dart';
+import '../comuns/relatar_bug.dart';
 import '../conta/enderecos_tela.dart';
 import '../conta/favoritos_contatos_telas.dart';
 import '../conta/modelos.dart';
@@ -1134,14 +1135,30 @@ abstract final class RotasTrato {
     );
   }
 
-  static void _abrirOrcamento(
+  /// Garantia mínima (CDC) da categoria do pedido: o backend manda `garantia_minima_dias` em cada
+  /// categoria (90 durável, 30 não durável). Sem o dado ou sem rede, o padrão seguro é 30.
+  static Future<int> _garantiaMinimaDoPedido(String pedidoId) async {
+    try {
+      final dados = await repos.pedidos.dados(pedidoId).timeout(const Duration(seconds: 4));
+      final nome = dados.categoriaNome;
+      if (nome == null) return 30;
+      final todas = await repos.catalogo.categorias().timeout(const Duration(seconds: 4));
+      return todas.where((c) => c.nome == nome).firstOrNull?.garantiaMinimaDias ?? 30;
+    } on Object {
+      return 30;
+    }
+  }
+
+  static Future<void> _abrirOrcamento(
     BuildContext context,
     String pedidoId,
     String titulo, {
     DetalheOrcamentoEnviado? inicial,
     bool remoto = false,
-  }) {
+  }) async {
     final servico = repos.profissional.servicoOrcamento(pedidoId);
+    final minima = await _garantiaMinimaDoPedido(pedidoId);
+    if (!context.mounted) return;
     _abrir<void>(
       context,
       Builder(
@@ -1155,6 +1172,7 @@ abstract final class RotasTrato {
           horasInicial: inicial == null ? null : _textoDecimos(inicial.decimosTrabalhadas),
           valorHoraInicial: inicial == null ? null : _textoCentavosCampo(inicial.valorHoraCentavos),
           garantiaInicialDias: inicial?.garantiaDias ?? 90,
+          garantiaMinimaDias: minima,
           prazoExecucaoInicialDias: inicial?.prazoExecucaoDias ?? 3,
           itensIniciais: inicial?.materiais ?? const [],
           foraDoEscopoInicial: inicial?.foraDoEscopo,
@@ -1410,7 +1428,7 @@ abstract final class RotasTrato {
                 if (estadoApi == 'pago_e_retido' || estadoApi == 'agendado')
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-                    child: _secaoReagendamento(pedidoId),
+                    child: _secaoReagendamento(pedidoId, semHorario: precisaAgendar),
                   ),
                 if (!remoto && consultaMapa != null)
                   ListTile(
@@ -1829,7 +1847,9 @@ abstract final class RotasTrato {
 
   /// Reagendamento dentro do pedido (cliente e profissional usam as mesmas rotas):
   /// propor nova data, aceitar, recusar ou cancelar a própria proposta.
-  static Widget _secaoReagendamento(String pedidoId) => SecaoReagendamento(
+  static Widget _secaoReagendamento(String pedidoId, {bool semHorario = false}) =>
+      SecaoReagendamento(
+        semHorario: semHorario,
         carregar: () => repos.pedidos.reagendamentos(pedidoId),
         propor: (inicio, fim, motivo) => repos.pedidos
             .proporReagendamento(pedidoId, inicio: inicio, fim: fim, motivo: motivo),
@@ -2115,6 +2135,7 @@ abstract final class RotasTrato {
           : pedidoId == null
               ? () => abrirServicos(context)
               : () => _abrir<void>(context, _relatarProblema(pedidoId)),
+      aoRelatarBug: () => relatarBug(context, tela: 'Central de ajuda'),
       aoVerTour: () => _abrir<void>(
         context,
         TourPerfilTela(
@@ -2282,6 +2303,11 @@ abstract final class RotasTrato {
                     titulo: 'Central de ajuda',
                     aoTocar: () =>
                         _abrir<void>(context, _telaAjuda(context, comoCliente: !profissional)),
+                  ),
+                  ItemContaPerfil(
+                    icone: Icons.bug_report_outlined,
+                    titulo: 'Relatar bug',
+                    aoTocar: () => relatarBug(context, tela: 'Configurações'),
                   ),
                   ItemContaPerfil(
                     icone: Icons.description_outlined,
@@ -3006,7 +3032,7 @@ abstract final class RotasTrato {
                   valorCentavos: pedido.totalAtualizadoCentavos ?? pedido.orcamentoCentavos,
                 ),
                 secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
-                    ? _secaoReagendamento(pedidoId)
+                    ? _secaoReagendamento(pedidoId, semHorario: pedido.estadoApi == 'pago_e_retido')
                     : null,
                 aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
                 aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),

@@ -393,8 +393,14 @@ void main() {
       expect(pedidos.chamadasReagendamento, ['aceitar:r9']);
     });
 
-    testWidgets('pedido pago (pago_e_retido) sem proposta: mostra "Reagendar"', (tester) async {
+    testWidgets('pedido pago (pago_e_retido) sem horário: mostra "Agendar"', (tester) async {
       await ligar(tester, 'pago_e_retido');
+      expect(find.text('Agendar'), findsOneWidget);
+      expect(find.text('Reagendar'), findsNothing);
+    });
+
+    testWidgets('pedido agendado sem proposta: continua "Reagendar"', (tester) async {
+      await ligar(tester, 'agendado');
       expect(find.text('Reagendar'), findsOneWidget);
     });
 

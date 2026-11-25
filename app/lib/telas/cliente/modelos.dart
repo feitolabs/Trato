@@ -246,11 +246,15 @@ class CategoriaServico {
     this.servicos = const [],
     this.descricao = '',
     this.aceitaRemoto = false,
+    this.garantiaMinimaDias = 30,
   });
 
   /// O admin liberou o atendimento remoto nesta categoria (o cliente escolhe presencial ou
   /// remoto). Padrão: só presencial, com endereço obrigatório.
   final bool aceitaRemoto;
+
+  /// Garantia mínima em dias (CDC): 90 para serviço durável, 30 para não durável. Ausente = 30.
+  final int garantiaMinimaDias;
 
   /// Id da categoria no catálogo (vazio nos dados do protótipo).
   final String id;

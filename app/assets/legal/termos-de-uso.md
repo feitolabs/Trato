@@ -2,7 +2,7 @@
 
 **Versão 1.1 — 22/11/2026**
 (Versão anterior: 1.0, de 31/10/2026.)
-**Responsável:** Feito Labs Tecnologia Ltda., com sede em Belo Horizonte/MG (`suporte@trato.app.br`).
+**Responsável:** Feito Labs Tecnologia Ltda., com sede em Belo Horizonte/MG (`suporte@tratofeito.com.br`).
 
 ---
 
@@ -24,7 +24,7 @@ Para criar uma conta você precisa:
 - informar dados verdadeiros (nome, data de nascimento, celular e e-mail); o **CPF é opcional no cadastro** e pode ser solicitado quando necessário para recebimento de valores, verificação ou obrigação legal;
 - manter apenas uma conta por pessoa.
 
-Você é responsável pelo uso da sua conta e por guardar sua senha. Se notar acesso estranho, avise o suporte pelo aplicativo ou em `suporte@trato.app.br`.
+Você é responsável pelo uso da sua conta e por guardar sua senha. Se notar acesso estranho, avise o suporte pelo aplicativo ou em `suporte@tratofeito.com.br`.
 
 ---
 
@@ -110,4 +110,4 @@ Estes Termos seguem as leis da República Federativa do Brasil. Fica eleito o fo
 
 Nosso atendimento (SAC) funciona das **08:00 às 20:00**, por equipe própria de suporte.
 
-Dúvidas, reclamações ou solicitações sobre estes Termos: **Central de ajuda** dentro do aplicativo ou pelo e-mail `suporte@trato.app.br`.
+Dúvidas, reclamações ou solicitações sobre estes Termos: **Central de ajuda** dentro do aplicativo ou pelo e-mail `suporte@tratofeito.com.br`.

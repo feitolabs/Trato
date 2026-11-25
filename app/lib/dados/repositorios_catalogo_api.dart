@@ -99,6 +99,10 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
           iconeDaCategoria((item['slug'] as String?) ?? (item['id'] as String?)),
           id: (item['id'] as String?) ?? (item['slug'] as String?) ?? '',
           aceitaRemoto: item['aceita_remoto'] == true,
+          garantiaMinimaDias: switch (item['garantia_minima_dias']) {
+            final num n when n >= 1 => n.toInt(),
+            _ => 30,
+          },
         ),
     ];
     lista.sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));

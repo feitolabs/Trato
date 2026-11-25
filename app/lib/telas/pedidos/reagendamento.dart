@@ -231,7 +231,11 @@ class SecaoReagendamento extends StatefulWidget {
     this.escolherDia,
     this.escolherHora,
     this.agora,
+    this.semHorario = false,
   });
+
+  /// Pedido pago ainda sem horário: o texto fala em "Agendar" e "Aceitar horário".
+  final bool semHorario;
 
   final Future<List<Reagendamento>> Function() carregar;
   final Future<void> Function(DateTime inicio, DateTime fim, String? motivo) propor;
@@ -352,7 +356,7 @@ class _SecaoReagendamentoState extends State<SecaoReagendamento> {
         if (pendente == null)
           BotaoLink(
             key: const ValueKey('reagendar'),
-            texto: 'Reagendar',
+            texto: widget.semHorario ? 'Agendar' : 'Reagendar',
             aoTocar: _ocupado ? null : _propor,
           )
         else
@@ -360,6 +364,7 @@ class _SecaoReagendamentoState extends State<SecaoReagendamento> {
             proposta: pendente,
             minha: widget.meuId != null && pendente.propostoPor == widget.meuId,
             ocupado: _ocupado,
+            semHorario: widget.semHorario,
             aoAceitar: () => _agir(() => widget.aceitar(pendente.id)),
             aoRecusar: () => _agir(() => widget.recusar(pendente.id)),
           ),
@@ -383,8 +388,10 @@ class _CartaoProposta extends StatelessWidget {
     required this.ocupado,
     required this.aoAceitar,
     required this.aoRecusar,
+    this.semHorario = false,
   });
 
+  final bool semHorario;
   final Reagendamento proposta;
 
   /// A proposta é do usuário logado (aguarda a outra parte).
@@ -425,7 +432,11 @@ class _CartaoProposta extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            minha ? 'Aguardando resposta sobre a nova data' : 'Nova data proposta',
+            minha
+                ? (semHorario
+                    ? 'Aguardando resposta sobre o horário'
+                    : 'Aguardando resposta sobre a nova data')
+                : (semHorario ? 'Horário proposto' : 'Nova data proposta'),
             style: TipografiaTrato.corpoForte,
           ),
           const SizedBox(height: EspacosTrato.x1),
@@ -451,7 +462,7 @@ class _CartaoProposta extends StatelessWidget {
           else ...[
             BotaoPrimario(
               key: const ValueKey('aceitar-nova-data'),
-              texto: 'Aceitar nova data',
+              texto: semHorario ? 'Aceitar horário' : 'Aceitar nova data',
               carregando: ocupado,
               aoTocar: ocupado ? null : aoAceitar,
             ),

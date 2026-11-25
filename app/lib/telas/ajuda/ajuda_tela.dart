@@ -15,9 +15,13 @@ class AjudaTela extends StatelessWidget {
     this.aoFalarComSuporte,
     this.aoRelatarProblema,
     this.aoVerTour,
+    this.aoRelatarBug,
   });
 
   final ServicoAjuda servico;
+
+  /// "Relatar bug": abre o e-mail com o relato do app. Sem ele, o botão não aparece.
+  final VoidCallback? aoRelatarBug;
   final VoidCallback? aoFalarComSuporte;
   final VoidCallback? aoRelatarProblema;
   final VoidCallback? aoVerTour;
@@ -33,6 +37,7 @@ class AjudaTela extends StatelessWidget {
           aoFalarComSuporte: aoFalarComSuporte,
           aoRelatarProblema: aoRelatarProblema,
           aoVerTour: aoVerTour,
+          aoRelatarBug: aoRelatarBug,
         ),
       ),
     );
@@ -45,8 +50,10 @@ class _ConteudoAjuda extends StatefulWidget {
     this.aoFalarComSuporte,
     this.aoRelatarProblema,
     this.aoVerTour,
+    this.aoRelatarBug,
   });
 
+  final VoidCallback? aoRelatarBug;
   final List<PerguntaFrequente> itens;
   final VoidCallback? aoFalarComSuporte;
   final VoidCallback? aoRelatarProblema;
@@ -142,7 +149,9 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
             aoTocar: widget.aoVerTour,
           ),
         ],
-        if (widget.aoFalarComSuporte != null || widget.aoRelatarProblema != null) ...[
+        if (widget.aoFalarComSuporte != null ||
+            widget.aoRelatarProblema != null ||
+            widget.aoRelatarBug != null) ...[
           const SizedBox(height: EspacosTrato.x6),
           Text('PRECISA DE MAIS AJUDA?', style: TipografiaTrato.sobretitulo),
           const SizedBox(height: EspacosTrato.x3),
@@ -171,6 +180,15 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
                     icone: Icons.flag_outlined,
                     aoTocar: widget.aoRelatarProblema,
                   ),
+          if (widget.aoRelatarBug != null) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            BotaoSecundario(
+              key: const Key('botao-relatar-bug'),
+              texto: 'Relatar bug',
+              icone: Icons.bug_report_outlined,
+              aoTocar: widget.aoRelatarBug,
+            ),
+          ],
         ],
       ],
     );

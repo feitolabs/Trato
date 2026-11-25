@@ -905,8 +905,8 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
         prazoRespostaHoras: prazo,
         valorCongeladoCentavos: (j['valor_congelado_centavos'] as int?) ?? 0,
       );
-    } on ErroTrato catch (e) {
-      if (e.tipo == TipoErro.naoEncontrado) return null;
+    } on ErroTrato {
+      // 404/403 sobem: a tela mostra "não encontrado", não "Nenhum problema aberto".
       rethrow;
     }
   }
@@ -956,8 +956,8 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
         prazoAtendimentoDias: ConfigPublica.atual.prazoRetrabalhoDias,
         opcoesHorario: const ['Manhã', 'Tarde'],
       );
-    } on ErroTrato catch (e) {
-      if (e.tipo == TipoErro.naoEncontrado) return null;
+    } on ErroTrato {
+      // 404/403 sobem: a tela mostra "não encontrado"; lista vazia (200) segue como "sem retrabalho".
       rethrow;
     }
   }
