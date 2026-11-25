@@ -684,6 +684,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       jaAvaliou: pedido.jaAvaliou,
       urgente: pedido.urgente,
       profissionalNome: pedido.profissionalNome,
+      profissionalId: pedido.profissionalId,
       enderecoResumo: enderecoResumo,
       visita: pedido.janelaRotulo,
       prazoConfirmacao: prazoConfirmacao,

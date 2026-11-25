@@ -87,7 +87,8 @@ void main() {
           tamanho: const Size(390, 2200));
       expect(find.text('Aditivo aguardando sua resposta'), findsOneWidget);
       expect(find.textContaining('R\$ 45,00'), findsOneWidget);
-      expect(find.text('Pagamento protegido: fica guardado até o serviço ser confirmado.'), findsOneWidget);
+      expect(find.text('Pagamento protegido: fica guardado até o serviço ser confirmado.'),
+          findsOneWidget);
 
       await tester.tap(find.text('Aprovar aditivo'));
       await tester.pumpAndSettle();
@@ -187,11 +188,14 @@ void main() {
             conversa: exped.DadosExemplo.conversa,
           ));
       expect(find.textContaining('telefones e e-mails ficam ocultos'), findsOneWidget);
-      expect(find.text('Serviço iniciado com o seu código às 14h10.', skipOffstage: false),
-          findsOneWidget);
       expect(find.text('Vi aqui, vou olhar agora.'), findsOneWidget);
       expect(find.text('15h04'), findsWidgets);
       expect(find.byKey(const ValueKey('pino-visualizada')), findsOneWidget);
+      // Com o aviso fixo de contato no topo, a 1ª mensagem fica logo acima da dobra inicial.
+      await tester.drag(find.byType(ListView).first, const Offset(0, 150));
+      await tester.pumpAndSettle();
+      expect(find.text('Serviço iniciado com o seu código às 14h10.', skipOffstage: false),
+          findsOneWidget);
     });
 
     testWidgets('envia mensagem digitada e resposta rápida', (tester) async {

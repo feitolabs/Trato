@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
+import 'atendimento.dart';
 import 'modelos.dart';
 import 'pecas.dart';
 import 'recursos_mvp.dart';
@@ -32,8 +33,12 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.secaoReagendamento,
     this.aoCompartilharAtendimento,
     this.aoSosEmergencia,
+    this.aoAjuda,
     this.atualizarAditivoLocalmente = true,
   });
+
+  /// Botão "Ajuda" do atendimento: central de ajuda com o relato deste pedido.
+  final VoidCallback? aoAjuda;
 
   /// Ação principal por estado: `Pagar` (orçamento aceito), `Avaliar` e `Ver garantia`
   /// (finalizado). `Confirmar serviço` usa [aoVerConclusao]. Sem o callback, a ação não aparece.
@@ -198,12 +203,23 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
   Widget build(BuildContext context) {
     final pedido = widget.pedido;
     final recarregar = AtualizadorTela.de(context);
+    final emAtendimento = estadosDeAtendimento.contains(pedido.estadoApi);
     final lista = ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: EspacosTrato.x4),
       children: [
         _Topo(numero: pedido.numero, aoTocarSos: widget.aoTocarSos),
         const SizedBox(height: EspacosTrato.x3),
+        if (emAtendimento) ...[
+          CabecalhoAtendimento(
+            status: statusDeAtendimento(pedido.estadoApi),
+            horario: pedido.visita,
+            papel: 'Profissional',
+            nome: pedido.profissionalNome,
+            usuarioId: pedido.profissionalId,
+          ),
+          const SizedBox(height: EspacosTrato.x4),
+        ],
         Text(
           (pedido.categoriaNome ?? '').isNotEmpty ? pedido.categoriaNome! : pedido.titulo,
           key: const ValueKey('titulo-pedido'),
@@ -350,16 +366,6 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 icon: const Icon(Icons.share_outlined, size: 18),
                 label: const Text('Compartilhar atendimento'),
               ),
-              OutlinedButton.icon(
-                key: const ValueKey('botao-sos-emergencia'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.cores.vermelhoTexto,
-                  side: BorderSide(color: context.cores.vermelhoTexto),
-                ),
-                onPressed: widget.aoSosEmergencia ?? () => _abrirConfirmacaoSos(pedido),
-                icon: const Icon(Icons.warning_amber_rounded, size: 18),
-                label: const Text('SOS / Emergência'),
-              ),
             ],
           ),
         ],
@@ -488,12 +494,21 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                     : RefreshIndicator(onRefresh: recarregar, child: lista),
               ),
             ),
-            _Rodape(
-              aoConversar: widget.aoConversar,
-              aoVerConclusao: widget.pedido.podeVerConclusao ? widget.aoVerConclusao : null,
-              mostrarConclusao:
-                  widget.pedido.podeVerConclusao && widget.pedido.estadoApi != 'em_confirmacao',
-            ),
+            if (emAtendimento)
+              BarraAtendimento(
+                aoChat: widget.aoConversar ?? () {},
+                aoAjuda: widget.aoAjuda ?? widget.aoAbrirProblema ?? () {},
+                aoSos: pedido.remoto
+                    ? null
+                    : widget.aoSosEmergencia ?? () => _abrirConfirmacaoSos(pedido),
+              )
+            else
+              _Rodape(
+                aoConversar: widget.aoConversar,
+                aoVerConclusao: widget.pedido.podeVerConclusao ? widget.aoVerConclusao : null,
+                mostrarConclusao:
+                    widget.pedido.podeVerConclusao && widget.pedido.estadoApi != 'em_confirmacao',
+              ),
           ],
         ),
       ),

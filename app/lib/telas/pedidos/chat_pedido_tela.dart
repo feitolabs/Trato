@@ -366,6 +366,7 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
                       await _sincronizar();
                     },
             ),
+            const _AvisoContato(),
             // Com o teclado aberto o espaço é curto: o aviso volta quando ele fecha.
             if (MediaQuery.viewInsetsOf(context).bottom == 0) const _AvisoPrivacidade(),
             Expanded(
@@ -588,6 +589,43 @@ class _Cabecalho extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Fixo no topo da conversa, inclusive com o teclado aberto.
+class _AvisoContato extends StatelessWidget {
+  const _AvisoContato();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cores;
+    return Container(
+      key: const ValueKey('aviso-contato'),
+      width: double.infinity,
+      color: c.ambarSuave,
+      padding: const EdgeInsets.symmetric(
+        horizontal: EspacosTrato.margemTela,
+        vertical: EspacosTrato.x2,
+      ),
+      child: ConteudoResponsivo(
+        comMargem: false,
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, size: 18, color: c.ambarTexto),
+            const SizedBox(width: EspacosTrato.x2),
+            Expanded(
+              child: Text(
+                'Não passe contato. Fora do app não há garantia.',
+                style: TipografiaTrato.corpoPequeno.copyWith(
+                  color: c.ambarTexto,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

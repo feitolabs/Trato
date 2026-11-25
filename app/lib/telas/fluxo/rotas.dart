@@ -118,6 +118,7 @@ import '../perfil_cliente/perfil_cliente_tela.dart';
 import '../pedidos/chat_pedido_tela.dart';
 import '../pedidos/modelos.dart';
 import '../pedidos/pedido_aberto_tela.dart';
+import '../pedidos/atendimento.dart';
 import '../pedidos/pedido_execucao_tela.dart';
 import '../pedidos/reagendamento.dart';
 import '../pedidos/seus_pedidos_tela.dart';
@@ -963,6 +964,7 @@ abstract final class RotasTrato {
             context,
             pedidoId: proximo?.pedidoId ?? _semId,
             titulo: proximo?.titulo ?? 'Pedido de hoje',
+            quando: proximo?.quando,
             remoto: proximo?.remoto ?? false,
             estadoApi: proximo?.estadoApi,
             estado: (proximo?.emAndamento == true)
@@ -988,6 +990,7 @@ abstract final class RotasTrato {
             context,
             pedidoId: inicio.proximo?.pedidoId ?? _semId,
             titulo: inicio.proximo?.titulo ?? 'Pedido de hoje',
+            quando: inicio.proximo?.quando,
             remoto: inicio.proximo?.remoto ?? false,
             estadoApi: inicio.proximo?.estadoApi,
             estado: (inicio.proximo?.emAndamento == true)
@@ -1342,6 +1345,7 @@ abstract final class RotasTrato {
     bool remoto = false,
     bool jaAvaliou = false,
     String? consultaMapa,
+    String? quando,
   }) {
     // Início e Pedidos oferecem as MESMAS ações: com o estado da API, só ele decide.
     final precisaAgendar = estadoApi == 'pago_e_retido';
@@ -1356,18 +1360,13 @@ abstract final class RotasTrato {
     final finalizado = estadoApi == 'concluido' ||
         estadoApi == 'em_confirmacao' ||
         (estadoApi == null && estado == EstadoAgendamento.concluido);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      // Rolável: com 8 ações a lista passa da altura de um celular menor e estourava embaixo.
-      builder: (folha) => ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
+    // Agendado ou em andamento: a tela do atendimento, com Chat, Ajuda e SOS sempre à mão.
+    final emAtendimento = emAndamento || podeCheckIn;
+    Widget acoes(BuildContext folha) => Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+                if (!emAtendimento)
+                  ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
                 if (estadoApi == 'pago_e_retido' || estadoApi == 'agendado')
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
@@ -1508,6 +1507,63 @@ abstract final class RotasTrato {
                     },
                   ),
               ],
+            );
+    if (!emAtendimento) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        // Rolável: com 8 ações a lista passa da altura de um celular menor e estourava embaixo.
+        builder: (folha) => ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+          child: SafeArea(child: SingleChildScrollView(child: acoes(folha))),
+        ),
+      );
+      return;
+    }
+    final status =
+        emAndamento ? statusDeAtendimento('em_andamento') : statusDeAtendimento('agendado');
+    final resumo = [
+      'Atendimento Trato',
+      'Serviço: $titulo',
+      if ((quando ?? '').isNotEmpty) 'Horário: $quando',
+    ].join('\n');
+    final outraParte = repos.chat
+        .conversa(pedidoId)
+        .then<ConversaPedido?>((c) => c)
+        .catchError((Object _) => null);
+    _abrir<void>(
+      context,
+      Builder(
+        builder: (folha) => Scaffold(
+          appBar: AppBar(title: Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          body: SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
+              child: ConteudoResponsivo(
+                child: Column(
+                  children: [
+                    FutureBuilder<ConversaPedido?>(
+                      future: outraParte,
+                      builder: (_, dado) => CabecalhoAtendimento(
+                        status: status,
+                        horario: quando,
+                        papel: 'Cliente',
+                        nome: dado.data?.nome,
+                        usuarioId: dado.data?.usuarioId,
+                      ),
+                    ),
+                    const SizedBox(height: EspacosTrato.x3),
+                    acoes(folha),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          bottomNavigationBar: SafeArea(
+            child: BarraAtendimento(
+              aoChat: () => _abrir<void>(folha, _chat(pedidoId, comoProfissional: true)),
+              aoAjuda: () => _abrir<void>(folha, _telaAjuda(folha, comoCliente: false)),
+              aoSos: remoto ? null : () => _abrirSosEmergencia(folha, resumo),
             ),
           ),
         ),
@@ -2013,7 +2069,7 @@ abstract final class RotasTrato {
 
   /// Central de ajuda. "Falar com o suporte" só aparece se o servidor tem o e-mail do
   /// atendimento; "Relatar um problema" leva o cliente aos serviços, onde ele abre o relato.
-  static Widget _telaAjuda(BuildContext context, {bool comoCliente = true}) {
+  static Widget _telaAjuda(BuildContext context, {bool comoCliente = true, String? pedidoId}) {
     final email = ConfigPublica.atual.suporteEmail;
     return AjudaTela(
       servico: const ServicoAjudaLocal(),
@@ -2025,7 +2081,12 @@ abstract final class RotasTrato {
                 _avisoSimples(context, 'Não achamos um app de e-mail. Escreva para $email.');
               }
             },
-      aoRelatarProblema: comoCliente ? () => abrirServicos(context) : null,
+      // Com contexto de pedido o relato abre direto nele; sem contexto, a pessoa escolhe o serviço.
+      aoRelatarProblema: !comoCliente
+          ? null
+          : pedidoId == null
+              ? () => abrirServicos(context)
+              : () => _abrir<void>(context, _relatarProblema(pedidoId)),
       aoVerTour: () => _abrir<void>(
         context,
         TourPerfilTela(
@@ -2959,7 +3020,8 @@ abstract final class RotasTrato {
                 aoVerContrato: () => abrirContrato(context, pedidoId),
                 aoAbrirProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
                 aoCompartilharAtendimento: () => _compartilharAtendimento(context, pedido),
-                aoSosEmergencia: () => _abrirSosEmergencia(context, pedido),
+                aoSosEmergencia: () => _abrirSosEmergencia(context, _resumoAtendimento(pedido)),
+                aoAjuda: () => _abrir<void>(context, _telaAjuda(context, pedidoId: pedidoId)),
                 aoCancelarPedido:
                     pedido.podeVerConclusao ? null : () => _cancelarPedido(context, pedidoId),
               ),
@@ -3012,11 +3074,7 @@ abstract final class RotasTrato {
     );
   }
 
-  static Future<void> _abrirSosEmergencia(
-    BuildContext context,
-    PedidoEmExecucao pedido,
-  ) async {
-    final resumo = _resumoAtendimento(pedido);
+  static Future<void> _abrirSosEmergencia(BuildContext context, String resumo) async {
     await showDialog<void>(
       context: context,
       builder: (dialogo) => AlertDialog(

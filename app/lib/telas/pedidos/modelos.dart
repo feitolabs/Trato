@@ -206,8 +206,12 @@ class PedidoEmExecucao {
     this.jaAvaliou = false,
     this.urgente = false,
     this.profissionalNome,
+    this.profissionalId,
     this.enderecoResumo,
   });
+
+  /// Id do profissional contratado, para a foto no atendimento.
+  final String? profissionalId;
 
   /// Nome da categoria (`categoria_nome`, opcional). Vindo, vira o título da tela.
   final String? categoriaNome;
