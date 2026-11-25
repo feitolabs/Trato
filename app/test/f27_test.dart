@@ -207,7 +207,8 @@ void main() {
 
     testWidgets('concluído: ver valores e avaliar cliente', (tester) async {
       await menu(tester, 'concluido');
-      expect(find.text('Ver valores e avaliar cliente'), findsOneWidget);
+      expect(find.text('Avaliar cliente'), findsOneWidget);
+      expect(find.text('Ver valores do pedido'), findsOneWidget);
       expect(find.text('Fazer check-in'), findsNothing);
     });
 

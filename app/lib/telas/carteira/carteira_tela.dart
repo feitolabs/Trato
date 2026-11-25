@@ -84,6 +84,12 @@ class CarteiraTela extends StatelessWidget {
             ),
             const SizedBox(height: EspacosTrato.x1),
             RegraLiberacao(libera: dados.proximaLiberacao, chave: const Key('regra-liberacao')),
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              'Você ganha 50 Tratinhos ao avaliar um cliente.',
+              key: const Key('aviso-avaliar-cliente'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+            ),
             if (dados.tratinhosPendentesTexto != null) ...[
               const SizedBox(height: EspacosTrato.x1),
               Text(

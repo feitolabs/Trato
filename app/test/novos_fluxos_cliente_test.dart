@@ -502,17 +502,10 @@ void main() {
       await t.tap(find.byKey(const Key('switch-push-orcamentos')));
       await t.pump();
 
-      await t.scrollUntilVisible(
-        find.byKey(const Key('botao-salvar-preferencias')),
-        200,
-      );
-      // O botão fica no fim da lista: garante que está inteiro na tela antes de tocar.
-      await t.ensureVisible(find.byKey(const Key('botao-salvar-preferencias')));
+      // Grava ao tocar no interruptor (não há mais botão "Salvar preferências").
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('botao-salvar-preferencias')));
-      await t.pumpAndSettle();
-
-      expect(find.text('Preferências salvas.'), findsOneWidget);
+      await t.scrollUntilVisible(find.byKey(const Key('preferencias-salvas')), 200);
+      expect(find.text('Preferência salva.'), findsOneWidget);
       expect(repo.preferenciasSalvas.first.push, isFalse);
     });
   });

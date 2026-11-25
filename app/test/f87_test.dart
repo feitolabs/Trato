@@ -148,7 +148,7 @@ void main() {
     });
   }
 
-  testWidgets('Ajuda do pedido: "Relatar um problema" vai direto ao relato dele', (t) async {
+  testWidgets('Ajuda do pedido vai direto ao relato dele', (t) async {
     await _janela(t, tamanho: const Size(390, 1600));
     RotasTrato.repos = repositoriosDemo(pedidos: _PedidosEmAndamento());
     await t.pumpWidget(_app(Builder(
@@ -163,10 +163,8 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('atendimento-ajuda')));
     await t.pumpAndSettle();
-    expect(find.byType(AjudaTela), findsOneWidget);
-    await t.ensureVisible(find.text('Relatar um problema'));
-    await t.tap(find.text('Relatar um problema'));
-    await t.pumpAndSettle();
+    // Ajuda no atendimento leva DIRETO ao relato do pedido (P06).
+    expect(find.byType(AjudaTela), findsNothing);
     expect(find.byType(RelatarProblemaTela), findsOneWidget);
     expect(find.byType(ServicosRecentesTela), findsNothing);
     await t.pumpWidget(const SizedBox());

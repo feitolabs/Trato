@@ -2110,6 +2110,9 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       convidado: j['convidado'] == true,
       estado: (j['estado'] as String?) ?? 'aberto',
       permiteExclusividade: j['permite_exclusividade'] != false,
+      categoriaId: (j['categoria_id'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (j['categoria_id'] as String).trim(),
     );
   }
 
@@ -2287,6 +2290,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
               estado: p.estado,
               permiteExclusividade: p.permiteExclusividade,
               exclusividade: ex,
+              categoriaId: p.categoriaId,
             )
           else
             p,

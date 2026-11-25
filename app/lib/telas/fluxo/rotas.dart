@@ -1064,10 +1064,12 @@ abstract final class RotasTrato {
             final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             final id = pedido?.id ?? _semId;
             final titulo = pedido?.titulo ?? 'Orçamento';
-            _abrirOrcamento(context, id, titulo, remoto: pedido?.remoto ?? false);
+            _abrirOrcamento(context, id, titulo,
+                remoto: pedido?.remoto ?? false, categoriaId: pedido?.categoriaId);
           },
           aoFazerOrcamentoDoPedido: (pedido) =>
-              _abrirOrcamento(context, pedido.id, pedido.titulo, remoto: pedido.remoto),
+              _abrirOrcamento(context, pedido.id, pedido.titulo,
+                  remoto: pedido.remoto, categoriaId: pedido.categoriaId),
           aoPerguntar: () {
             final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             _abrir<void>(
@@ -1193,17 +1195,38 @@ abstract final class RotasTrato {
 
   /// Garantia mínima (CDC) da categoria do pedido: o backend manda `garantia_minima_dias` em cada
   /// categoria (90 durável, 30 não durável). Sem o dado ou sem rede, o padrão seguro é 30.
-  static Future<int> _garantiaMinimaDoPedido(String pedidoId) async {
+  ///
+  /// A categoria é achada pelo ID (o `categoria_id` do pedido aberto; na edição, o do detalhe do
+  /// pedido). Só se nenhum id estiver disponível usa o nome da categoria, e sem achar nada fica em
+  /// 30: nunca se oferece garantia abaixo do mínimo que se conhece.
+  static Future<int> _garantiaMinimaDoPedido(String pedidoId, {String? categoriaId}) async {
+    const espera = Duration(seconds: 4);
     try {
-      final dados = await repos.pedidos.dados(pedidoId).timeout(const Duration(seconds: 4));
-      final nome = dados.categoriaNome;
+      final todas = await repos.catalogo.categorias().timeout(espera);
+      var id = categoriaId;
+      if (id == null || id.isEmpty) {
+        try {
+          id = (await repos.profissional.detalhe(pedidoId).timeout(espera)).pedido.categoriaId;
+        } on Object {
+          id = null;
+        }
+      }
+      if (id != null && id.isNotEmpty) {
+        final achada = todas.where((c) => c.id == id).firstOrNull;
+        if (achada != null) return achada.garantiaMinimaDias;
+      }
+      final nome = (await repos.pedidos.dados(pedidoId).timeout(espera)).categoriaNome;
       if (nome == null) return 30;
-      final todas = await repos.catalogo.categorias().timeout(const Duration(seconds: 4));
       return todas.where((c) => c.nome == nome).firstOrNull?.garantiaMinimaDias ?? 30;
     } on Object {
       return 30;
     }
   }
+
+  /// Só para testes.
+  @visibleForTesting
+  static Future<int> garantiaMinimaParaTeste(String pedidoId, {String? categoriaId}) =>
+      _garantiaMinimaDoPedido(pedidoId, categoriaId: categoriaId);
 
   static Future<void> _abrirOrcamento(
     BuildContext context,
@@ -1211,9 +1234,10 @@ abstract final class RotasTrato {
     String titulo, {
     DetalheOrcamentoEnviado? inicial,
     bool remoto = false,
+    String? categoriaId,
   }) async {
     final servico = repos.profissional.servicoOrcamento(pedidoId);
-    final minima = await _garantiaMinimaDoPedido(pedidoId);
+    final minima = await _garantiaMinimaDoPedido(pedidoId, categoriaId: categoriaId);
     if (!context.mounted) return;
     _abrir<void>(
       context,
@@ -1448,31 +1472,35 @@ abstract final class RotasTrato {
   static void _abrirValoresEAvaliar(BuildContext context, String pedidoId) =>
       _abrir<void>(context, _valoresEAvaliar(pedidoId));
 
+  /// "Avaliar o cliente": a tela de nota e, ao enviar, a confirmação (+Tratinhos quem decide é o
+  /// servidor). Usada na tela de valores, no pedido concluído e no menu do pedido.
+  static Future<void> _avaliarCliente(BuildContext context, String pedidoId) async {
+    final enviou = await _abrir<bool>(
+      context,
+      AvaliarClienteTela(
+        pedidoNumero: PedidoApi.numeroDe(pedidoId),
+        aoEnviar: (nota, comentario) =>
+            repos.profissional.avaliarCliente(pedidoId, nota, comentario),
+      ),
+    );
+    if (enviou == true && context.mounted) {
+      pedidosMudaram.value++;
+      await _abrirSucesso<void>(
+        context,
+        (ctxSucesso) => SucessoAcaoTela(
+          titulo: 'Avaliação enviada!',
+          subtitulo: 'Obrigado por avaliar o atendimento.',
+          aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+        ),
+        substituirAtual: true,
+      );
+    }
+  }
+
   static Widget _valoresEAvaliar(String pedidoId) => Builder(
         builder: (context) => DetalheValoresTela(
           carregar: () => repos.profissional.valoresDoPedido(pedidoId),
-          aoAvaliarCliente: () async {
-            final enviou = await _abrir<bool>(
-              context,
-              AvaliarClienteTela(
-                pedidoNumero: PedidoApi.numeroDe(pedidoId),
-                aoEnviar: (nota, comentario) =>
-                    repos.profissional.avaliarCliente(pedidoId, nota, comentario),
-              ),
-            );
-            if (enviou == true && context.mounted) {
-              pedidosMudaram.value++;
-              await _abrirSucesso<void>(
-                context,
-                (ctxSucesso) => SucessoAcaoTela(
-                  titulo: 'Avaliação enviada!',
-                  subtitulo: 'Obrigado por avaliar o atendimento.',
-                  aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
-                ),
-                substituirAtual: true,
-              );
-            }
-          },
+          aoAvaliarCliente: () => _avaliarCliente(context, pedidoId),
         ),
       );
 
@@ -1652,14 +1680,23 @@ abstract final class RotasTrato {
                       _repetirServico(context, pedidoId);
                     },
                   ),
+                if ((estadoApi == 'concluido' ||
+                        (estadoApi == null && estado == EstadoAgendamento.concluido)) &&
+                    !jaAvaliou)
+                  ListTile(
+                    key: const ValueKey('avaliar-cliente'),
+                    leading: const Icon(Icons.star_outline),
+                    title: const Text('Avaliar cliente'),
+                    subtitle: const Text('Sua nota ajuda outros profissionais.'),
+                    onTap: () {
+                      Navigator.of(folha).pop();
+                      _avaliarCliente(context, pedidoId);
+                    },
+                  ),
                 if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
                   ListTile(
                     leading: const Icon(Icons.receipt_outlined),
-                    title: Text(((estadoApi == 'concluido' ||
-                                (estadoApi == null && estado == EstadoAgendamento.concluido)) &&
-                            !jaAvaliou)
-                        ? 'Ver valores e avaliar cliente'
-                        : 'Ver valores do pedido'),
+                    title: const Text('Ver valores do pedido'),
                     onTap: () {
                       Navigator.of(folha).pop();
                       _abrirValoresEAvaliar(context, pedidoId);
@@ -2601,6 +2638,7 @@ abstract final class RotasTrato {
             pedidoId,
             dados.pedido.titulo,
             remoto: dados.pedido.remoto,
+            categoriaId: dados.pedido.categoriaId,
           ),
           aoPerguntar: () => _abrir<void>(
             context,
@@ -2643,6 +2681,9 @@ abstract final class RotasTrato {
             ),
             aoAjuda: () => _abrir<void>(context, _telaAjuda(context, comoCliente: false)),
             aoVerContrato: () => abrirContrato(context, pedidoId),
+            // Serviço concluído e ainda não avaliado: "Avaliar cliente" como ação principal.
+            aoAvaliar: () => _avaliarCliente(context, pedidoId),
+            textoAvaliar: 'Avaliar cliente',
             secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
                 ? _secaoReagendamento(pedidoId, semHorario: pedido.estadoApi == 'pago_e_retido')
                 : null,
@@ -3346,7 +3387,8 @@ abstract final class RotasTrato {
                 aoAbrirProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
                 aoCompartilharAtendimento: () => _compartilharAtendimento(context, pedido),
                 aoSosEmergencia: () => _abrirSosEmergencia(context, _resumoAtendimento(pedido)),
-                aoAjuda: () => _abrir<void>(context, _telaAjuda(context, pedidoId: pedidoId)),
+                // Ajuda no atendimento: direto no "Relatar problema" deste pedido (sem escolher serviço).
+                aoAjuda: () => _abrir<void>(context, _relatarProblema(pedidoId)),
                 aoCancelarPedido:
                     pedido.podeVerConclusao ? null : () => _cancelarPedido(context, pedidoId),
               ),

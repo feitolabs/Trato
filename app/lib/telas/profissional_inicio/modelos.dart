@@ -401,7 +401,11 @@ class PedidoAberto {
     this.estado = 'aberto',
     this.permiteExclusividade = true,
     this.exclusividade,
+    this.categoriaId,
   });
+
+  /// Id da categoria do pedido (`categoria_id`). Ausente (backend antigo) = nulo.
+  final String? categoriaId;
 
   /// Verdadeiro quando o cliente direcionou este pedido diretamente a este profissional.
   final bool convidado;

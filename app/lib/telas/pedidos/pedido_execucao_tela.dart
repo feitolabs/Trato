@@ -27,6 +27,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoRemarcarVisita,
     this.aoPagar,
     this.aoAvaliar,
+    this.textoAvaliar = 'Avaliar',
     this.aoVerGarantia,
     this.aoBaixarComprovante,
     this.aoRepetirServico,
@@ -44,6 +45,9 @@ class PedidoExecucaoTela extends StatefulWidget {
   /// (finalizado). `Confirmar serviço` usa [aoVerConclusao]. Sem o callback, a ação não aparece.
   final VoidCallback? aoPagar;
   final VoidCallback? aoAvaliar;
+
+  /// O rótulo do botão de avaliar: "Avaliar" (cliente avalia o profissional) ou "Avaliar cliente".
+  final String textoAvaliar;
   final VoidCallback? aoVerGarantia;
 
   /// Baixa o comprovante (PDF) do pedido concluído. Só aparece com o pedido `concluido`.
@@ -161,6 +165,14 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
     aviso?.call();
   }
 
+  /// "Ver garantia ou pedir retrabalho" como link só quando a ação principal NÃO é "Ver garantia"
+  /// (o que acontece depois de avaliar): assim existe um único acesso à garantia.
+  bool _linkGarantia(PedidoEmExecucao pedido) =>
+      widget.aoVerGarantia != null &&
+      pedido.estadoApi == 'concluido' &&
+      !pedido.jaAvaliou &&
+      widget.aoAvaliar != null;
+
   /// UMA ação principal por estado (o que o cliente faz agora). Sem callback, sem botão.
   Widget? _acaoPrincipal(PedidoEmExecucao pedido) {
     switch (pedido.estadoApi) {
@@ -183,7 +195,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
         if (!pedido.jaAvaliou && avaliar != null) {
           return BotaoPrimario(
             key: const ValueKey('acao-principal'),
-            texto: 'Avaliar',
+            texto: widget.textoAvaliar,
             aoTocar: avaliar,
           );
         }
@@ -382,7 +394,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
           widget.secaoReagendamento!,
         ],
         if (widget.aoRemarcarVisita != null ||
-            (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido') ||
+            _linkGarantia(pedido) ||
             (widget.aoBaixarComprovante != null && pedido.estadoApi == 'concluido') ||
             (widget.aoRepetirServico != null && pedido.estadoApi == 'concluido') ||
             widget.aoVerContrato != null ||
@@ -403,7 +415,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                           : 'Sugerir horário da visita'),
                   aoTocar: widget.aoRemarcarVisita!,
                 ),
-              if (widget.aoVerGarantia != null && pedido.estadoApi == 'concluido')
+              if (_linkGarantia(pedido))
                 BotaoLink(
                   key: const ValueKey('ver-garantia'),
                   texto: 'Ver garantia ou pedir retrabalho',

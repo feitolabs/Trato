@@ -67,36 +67,39 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
         _ => (categoria, 'Alertas desta categoria.'),
       };
 
-  void _atualizar(int indice, PreferenciaNotificacao novo) {
+  /// Salva NA HORA, a cada interruptor. Enquanto grava, os interruptores ficam travados ("Salvando…").
+  /// Se falhar, o interruptor volta ao valor anterior e aparece o erro com "Tentar de novo".
+  Future<void> _alterar(int indice, PreferenciaNotificacao novo) async {
+    if (_salvando) return;
+    final anterior = _itens[indice];
     setState(() {
       _itens[indice] = novo;
-      _aviso = null;
-      _erro = null;
-    });
-  }
-
-  Future<void> _salvar() async {
-    if (_salvando) return;
-    setState(() {
       _salvando = true;
       _erro = null;
       _aviso = null;
+      _repetir = null;
     });
     try {
       final gravado = await widget.repositorio.salvarPreferencias(_itens);
       if (!mounted) return;
       setState(() {
         if (gravado.isNotEmpty) _itens = List.of(gravado);
-        _aviso = 'Preferências salvas.';
+        _aviso = 'Preferência salva.';
       });
-    } on ErroTrato catch (e) {
-      if (mounted) setState(() => _erro = e.mensagem);
-    } on Object {
-      if (mounted) setState(() => _erro = 'Não foi possível salvar suas preferências.');
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _itens[indice] = anterior; // volta ao que está gravado
+        _erro = e is ErroTrato ? e.mensagem : 'Não foi possível salvar. Tente de novo.';
+        _repetir = () => _alterar(indice, novo);
+      });
     } finally {
       if (mounted) setState(() => _salvando = false);
     }
   }
+
+  /// Refaz a última alteração que falhou.
+  VoidCallback? _repetir;
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +110,33 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
           'Escolha como quer receber cada tipo de aviso. Alertas críticos de segurança ou conta continuam sendo enviados quando necessário.',
           style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
-        const SizedBox(height: EspacosTrato.x4),
+        const SizedBox(height: EspacosTrato.x3),
+        // O retorno fica NO TOPO: quem mexe num interruptor vê na hora se gravou ou deu erro.
+        if (_salvando)
+          Text(
+            'Salvando…',
+            key: const Key('preferencias-salvando'),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+          )
+        else if (_erro != null) ...[
+          Text(
+            _erro!,
+            key: const Key('preferencias-erro'),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
+          ),
+          if (_repetir != null)
+            BotaoLink(
+              key: const Key('preferencias-tentar-de-novo'),
+              texto: 'Tentar de novo',
+              aoTocar: _repetir,
+            ),
+        ] else if (_aviso != null)
+          Text(
+            _aviso!,
+            key: const Key('preferencias-salvas'),
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.verdeTexto),
+          ),
+        const SizedBox(height: EspacosTrato.x3),
         for (var i = 0; i < _itens.length; i++) ...[
           () {
             final item = _itens[i];
@@ -133,7 +162,7 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
                     value: item.push,
                     onChanged: _salvando
                         ? null
-                        : (v) => _atualizar(i, item.copiarCom(push: v)),
+                        : (v) => _alterar(i, item.copiarCom(push: v)),
                   ),
                   SwitchListTile(
                     key: Key('switch-app-${item.categoria}'),
@@ -143,7 +172,7 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
                     value: item.app,
                     onChanged: _salvando
                         ? null
-                        : (v) => _atualizar(i, item.copiarCom(app: v)),
+                        : (v) => _alterar(i, item.copiarCom(app: v)),
                   ),
                   SwitchListTile(
                     key: Key('switch-email-${item.categoria}'),
@@ -153,7 +182,7 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
                     value: item.email,
                     onChanged: _salvando
                         ? null
-                        : (v) => _atualizar(i, item.copiarCom(email: v)),
+                        : (v) => _alterar(i, item.copiarCom(email: v)),
                   ),
                 ],
               ),
@@ -161,26 +190,6 @@ class _CorpoPreferenciasState extends State<_CorpoPreferencias> {
           }(),
           const SizedBox(height: EspacosTrato.x3),
         ],
-        if (_erro != null) ...[
-          Text(
-            _erro!,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
-          ),
-          const SizedBox(height: EspacosTrato.x3),
-        ],
-        if (_aviso != null) ...[
-          Text(
-            _aviso!,
-            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.verdeTexto),
-          ),
-          const SizedBox(height: EspacosTrato.x3),
-        ],
-        BotaoPrimario(
-          key: const Key('botao-salvar-preferencias'),
-          texto: 'Salvar preferências',
-          carregando: _salvando,
-          aoTocar: _salvando ? null : _salvar,
-        ),
       ],
     );
   }

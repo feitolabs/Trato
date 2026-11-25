@@ -34,12 +34,12 @@ void main() {
   group('ja_avaliou (profissional)', () {
     testWidgets('menu: concluído e não avaliado oferece Avaliar cliente', (tester) async {
       await _menu(tester, jaAvaliou: false);
-      expect(find.text('Ver valores e avaliar cliente'), findsOneWidget);
+      expect(find.text('Avaliar cliente'), findsOneWidget);
     });
 
     testWidgets('menu: já avaliado só mostra os valores', (tester) async {
       await _menu(tester, jaAvaliou: true);
-      expect(find.text('Ver valores e avaliar cliente'), findsNothing);
+      expect(find.text('Avaliar cliente'), findsNothing);
       expect(find.text('Ver valores do pedido'), findsOneWidget);
     });
 
