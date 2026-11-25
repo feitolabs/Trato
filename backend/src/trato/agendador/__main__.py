@@ -51,7 +51,11 @@ def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
     contexto = criar_contexto_postgres(banco, config)
     cn = obter_config_notificacoes()
     notif = ServicoNotificacoes(
-        NotificacoesServicoPostgres(banco), canais_da_config(cn), cn, contexto.agora
+        NotificacoesServicoPostgres(banco),
+        canais_da_config(cn),
+        cn,
+        contexto.agora,
+        pedidos=contexto.pedidos.obter,
     )
     executor = ExecutorContexto(
         contexto, notif, CobrancasPostgres(banco), escolher_provedor(config)

@@ -7,10 +7,14 @@ Regras:
 - Canal externo desligado ou sem destino (sem token, sem e-mail) nem cria linha.
 - Falha de envio deixa a linha sem `enviada_em`; `reenviar_pendentes()` tenta de novo.
 - Deep link em `dados` (tela + pedido_id + link). Nunca vai código nem dado pessoal.
+- `papel` em `dados` ("cliente" ou "profissional"): para qual visão do app a notificação é, pelo
+  pedido (uma leitura por notificação). Sem pedido, ou se a pessoa não é parte dele, a chave não
+  vai e o app mantém o modo atual.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -23,6 +27,11 @@ from trato.notificacoes.repositorio import (
     Registro,
     RepositorioServicoNotificacoes,
 )
+
+log = logging.getLogger("trato.notificacoes")
+
+# Consulta do pedido (`contexto.pedidos.obter`): devolve algo com `cliente_id` e `profissional_id`.
+ConsultaPedido = Callable[[str], Any]
 
 
 class ResolvedorEmail(Protocol):
@@ -43,12 +52,33 @@ class ServicoNotificacoes:
         config: ConfigNotificacoes,
         agora: Callable[[], datetime] = lambda: datetime.now(UTC),
         emails: ResolvedorEmail | None = None,
+        pedidos: ConsultaPedido | None = None,
     ) -> None:
         self.repo = repo
         self.canais = canais
         self.config = config
         self.agora = agora
         self._emails = emails or SemEmail()
+        # Quem monta o serviço liga isto ao contexto (`montar_servicos`); sem ele não há `papel`.
+        self.pedidos = pedidos
+
+    def papel_no_pedido(self, usuario_id: str, pedido_id: str | None) -> str | None:
+        """ "profissional" ou "cliente" conforme o lugar da pessoa no pedido; None se não der
+        para saber (sem pedido, pedido não achado, pessoa fora dele). Uma leitura só."""
+        if not pedido_id or self.pedidos is None:
+            return None
+        try:
+            pedido = self.pedidos(pedido_id)
+        except Exception:  # noqa: BLE001 - o papel é um extra: sem ele a notificação segue
+            log.warning("Papel da notificação não calculado: leitura do pedido falhou")
+            return None
+        if pedido is None:
+            return None
+        if usuario_id == getattr(pedido, "profissional_id", None):
+            return "profissional"
+        if usuario_id == getattr(pedido, "cliente_id", None):
+            return "cliente"
+        return None
 
     # --- preferências ----------------------------------------------------------------------
 
@@ -84,6 +114,7 @@ class ServicoNotificacoes:
         dados: dict[str, Any] | None = None,
         corpo: str | None = None,
         titulo: str | None = None,
+        papel: str | None = None,
     ) -> list[Registro]:
         """Cria (uma vez) a notificação do evento nos canais ligados. Devolve as linhas novas."""
         modelo = MODELOS[evento]
@@ -91,11 +122,13 @@ class ServicoNotificacoes:
         texto_titulo = titulo if titulo is not None else modelo.titulo
         agora = self.agora()
         prefs = self.repo.preferencias(usuario_id)
+        papel = papel or self.papel_no_pedido(usuario_id, pedido_id)
         conteudo = {
             "evento": evento.value,
             "tela": modelo.tela,
             "pedido_id": pedido_id,
             "link": deep_link(self.config.deep_link_base, modelo.tela, pedido_id),
+            **({"papel": papel} if papel else {}),
             **(dados or {}),
         }
         novas: list[Registro] = []
