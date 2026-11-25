@@ -2,6 +2,7 @@ package br.com.feitolabs.trato
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
 import android.os.Build
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -9,6 +10,17 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : FlutterFragmentActivity() {
     companion object {
         const val CANAL_NOTIFICACOES = "trato_geral"
+    }
+
+    /**
+     * Reaberto pelos "recentes" (FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY), o Android entrega de novo o
+     * intent VIEW que abriu o app da primeira vez (um deep link velho). Nesse caso o app começa
+     * pela tela inicial: o link já foi tratado e não pode abrir "pedido que não existe" de novo.
+     */
+    override fun getInitialRoute(): String? {
+        val deHistorico =
+            (intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        return if (deHistorico) "/" else super.getInitialRoute()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

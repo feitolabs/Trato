@@ -5,21 +5,29 @@ const esquemaDoApp = 'br.com.feitolabs.trato';
 /// Telas que um link ou o toque numa notificação pode abrir. Só ABRE: nenhuma ação é executada.
 enum DestinoApp {
   pedido,
+
+  /// Pedido ainda aberto (novo, direcionado, urgente): para o profissional é a tela de detalhe
+  /// para orçar; para o cliente, o pedido.
+  pedidoAberto,
   orcamentos,
   chat,
   recorrencia,
   disputa,
-  retrabalho;
+  retrabalho,
 
-  /// O host do link (`br.com.feitolabs.trato://<host>/<id>`). `avaliacao` abre o mesmo destino
-  /// que a notificação de avaliação: o pedido.
+  /// Avaliação: abre o pedido; para o profissional de um serviço concluído, a tela de avaliar
+  /// o cliente.
+  avaliacao,
+  indicacoes;
+
+  /// O host do link (`br.com.feitolabs.trato://<host>/<id>`).
   static DestinoApp? doHost(String host) => switch (host) {
         'pedido' => pedido,
         'orcamentos' => orcamentos,
         'chat' => chat,
         'recorrencia' => recorrencia,
         'disputa' => disputa,
-        'avaliacao' => pedido,
+        'avaliacao' => avaliacao,
         _ => null,
       };
 }
@@ -28,30 +36,36 @@ enum SituacaoLink { ignorado, valido, invalido }
 
 /// O que um endereço recebido significa para o app.
 class ResultadoLink {
-  const ResultadoLink._(this.situacao, this.destino, this.id);
+  const ResultadoLink._(this.situacao, this.destino, this.id, this.papel);
 
   /// Outro esquema, `login-callback` ou host desconhecido: o app não faz nada.
-  static const ignorado = ResultadoLink._(SituacaoLink.ignorado, null, null);
+  static const ignorado = ResultadoLink._(SituacaoLink.ignorado, null, null, null);
 
-  const ResultadoLink.valido(DestinoApp destino, String? id)
-      : this._(SituacaoLink.valido, destino, id);
+  const ResultadoLink.valido(DestinoApp destino, String? id, {String? papel})
+      : this._(SituacaoLink.valido, destino, id, papel);
 
   /// Tipo conhecido, mas o id é inválido: mostra "não encontrado".
-  const ResultadoLink.invalido(DestinoApp destino) : this._(SituacaoLink.invalido, destino, null);
+  const ResultadoLink.invalido(DestinoApp destino, {String? papel})
+      : this._(SituacaoLink.invalido, destino, null, papel);
 
   final SituacaoLink situacao;
   final DestinoApp? destino;
   final String? id;
+
+  /// `profissional` ou `cliente`, quando o push diz em que modo a tela deve abrir. Nulo = o
+  /// modo em que o app está agora.
+  final String? papel;
 
   @override
   bool operator ==(Object other) =>
       other is ResultadoLink &&
       other.situacao == situacao &&
       other.destino == destino &&
-      other.id == id;
+      other.id == id &&
+      other.papel == papel;
 
   @override
-  int get hashCode => Object.hash(situacao, destino, id);
+  int get hashCode => Object.hash(situacao, destino, id, papel);
 }
 
 final _formatoId = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
@@ -77,8 +91,10 @@ ResultadoLink interpretarLink(Uri uri) {
 }
 
 /// Lê o `data` de um push do backend (`evento`, `tela`, `pedido_id`, `recorrencia_id`, `link`...).
-/// A tabela tela -> destino é a mesma da caixa de notificações: `orcamentos`; `pedido`,
-/// `pedido_aberto` e `avaliacao` (o pedido); `disputa`; `mensagens` (o chat); `recorrencias`.
+/// A tabela tela -> destino é a mesma da caixa de notificações: `orcamentos`; `pedido`;
+/// `pedido_aberto` (pedido aberto, para o profissional orçar); `avaliacao`; `disputa`; `mensagens`
+/// (o chat); `recorrencias`; `indique-e-ganhe`. A chave `papel` (`profissional` ou `cliente`)
+/// diz em que modo abrir.
 /// Qualquer outra tela, tela ausente ou valor que não seja texto: ignorado. A chave `link`
 /// (esquema antigo) e todas as outras são descartadas: o app nunca abre URL vinda do push.
 ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
@@ -91,23 +107,33 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
 
   final destino = switch (texto('tela')) {
     'orcamentos' => DestinoApp.orcamentos,
-    'pedido' || 'pedido_aberto' || 'avaliacao' => DestinoApp.pedido,
+    'pedido' => DestinoApp.pedido,
+    'pedido_aberto' => DestinoApp.pedidoAberto,
+    'avaliacao' => DestinoApp.avaliacao,
     'disputa' => DestinoApp.disputa,
     'mensagens' => DestinoApp.chat,
     'recorrencias' => DestinoApp.recorrencia,
+    'indique-e-ganhe' => DestinoApp.indicacoes,
     _ => null,
   };
   if (destino == null) return ResultadoLink.ignorado;
+  // Só estes dois valores contam; qualquer outro (ou ausente) = manter o modo atual.
+  final papel = switch (texto('papel')) {
+    'profissional' => 'profissional',
+    'cliente' => 'cliente',
+    _ => null,
+  };
+  if (destino == DestinoApp.indicacoes) return ResultadoLink.valido(destino, null, papel: papel);
   // Recorrência: o id da série vem em `recorrencia_id`; sem ele, abre a lista.
   final bruto = destino == DestinoApp.recorrencia ? texto('recorrencia_id') : texto('pedido_id');
   if (bruto == null) {
     return destino == DestinoApp.recorrencia
-        ? const ResultadoLink.valido(DestinoApp.recorrencia, null)
+        ? ResultadoLink.valido(DestinoApp.recorrencia, null, papel: papel)
         : ResultadoLink.ignorado; // sem id não há o que abrir
   }
   return idDeLinkValido(bruto)
-      ? ResultadoLink.valido(destino, bruto)
-      : ResultadoLink.invalido(destino);
+      ? ResultadoLink.valido(destino, bruto, papel: papel)
+      : ResultadoLink.invalido(destino, papel: papel);
 }
 
 /// O destino de um link que chegou antes de dar para abrir (app frio ou sem login). Só em

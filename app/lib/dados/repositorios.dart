@@ -352,11 +352,21 @@ class Notificacao {
     this.lida = false,
     this.tipo,
     this.destinoId,
+    this.tela,
+    this.papel,
+    this.recorrenciaId,
   });
 
   final String id;
   final String titulo;
   final String texto;
+
+  /// `data.tela` do backend (`pedido`, `pedido_aberto`, `disputa`...), quando vem.
+  final String? tela;
+
+  /// `profissional` ou `cliente`: em que modo a tela abre. Ausente = o modo atual.
+  final String? papel;
+  final String? recorrenciaId;
 
   /// Quando o backend informa: `disputa` ou `retrabalho` (abrem a tela do profissional).
   final String? tipo;

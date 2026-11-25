@@ -26,7 +26,19 @@ class Notificacao {
     required this.quando,
     this.lida = false,
     this.destinoId,
+    this.tela,
+    this.papel,
+    this.recorrenciaId,
+    this.tipoApi,
   });
+
+  /// Do `data` da notificação (ver `resultadoDoPush`): a tela, o modo (`papel`) e a série.
+  final String? tela;
+  final String? papel;
+  final String? recorrenciaId;
+
+  /// O tipo do evento no backend (`pedido.novo`...), usado quando `tela` não veio.
+  final String? tipoApi;
 
   final String id;
   final TipoNotificacao tipo;
@@ -46,6 +58,10 @@ class Notificacao {
         quando: quando,
         lida: true,
         destinoId: destinoId,
+        tela: tela,
+        papel: papel,
+        recorrenciaId: recorrenciaId,
+        tipoApi: tipoApi,
       );
 }
 

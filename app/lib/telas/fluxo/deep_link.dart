@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../../componentes/tela_nao_encontrada.dart';
@@ -56,17 +58,17 @@ abstract final class DeepLinks {
   static void aoCascaPronta() {
     _loginAberto = false;
     if (LinkPendente.atual != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => processar());
+      WidgetsBinding.instance.addPostFrameCallback((_) => processar(dePronta: true));
     }
   }
 
-  static void processar([int tentativa = 0]) {
+  static void processar({int tentativa = 0, bool dePronta = false}) {
     if (LinkPendente.atual == null) return;
     final nav = navegador();
     if (nav == null) {
       // Partida a frio: o navegador ainda não existe. Tenta de novo no próximo quadro.
       if (tentativa < 60) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => processar(tentativa + 1));
+        WidgetsBinding.instance.addPostFrameCallback((_) => processar(tentativa: tentativa + 1, dePronta: dePronta));
       }
       return;
     }
@@ -83,14 +85,74 @@ abstract final class DeepLinks {
       return;
     }
     if (!ControladorCasca.ativa) return; // aoCascaPronta chama de novo
+    if (_trocandoModo) return;
+    final pendente = LinkPendente.atual;
+    if (pendente == null) return;
+    // O push diz em que modo a tela deve abrir (`papel`). Ausente = o modo de agora.
+    final papel = pendente.papel;
+    if (papel != null && (papel == 'profissional') != ControladorCasca.souProfissional) {
+      if (_trocouModo) {
+        // Já troquei de modo: espero a casca nova. Se ela chegou e ainda é a errada, desisto: não
+        // abre no modo errado.
+        if (dePronta) {
+          _trocouModo = false;
+          LinkPendente.limpar();
+        }
+        return;
+      }
+      unawaited(_trocarModo(nav, paraProfissional: papel == 'profissional'));
+      return;
+    }
+    _trocouModo = false;
     final link = LinkPendente.retirar();
     final contexto = nav.context;
     if (link == null || !contexto.mounted) return;
     RotasTrato.abrirLink(contexto, link);
   }
 
+  static var _trocandoModo = false;
+  static var _trocouModo = false;
+
+  /// Troca de cliente para profissional (ou o contrário) antes de abrir. Para profissional só se a
+  /// conta tem perfil de profissional; sem ele o link é descartado e nenhuma tela de profissional
+  /// abre. Ao trocar, a nova casca avisa ([aoCascaPronta]) e o destino abre nela.
+  static Future<void> _trocarModo(NavigatorState nav, {required bool paraProfissional}) async {
+    _trocandoModo = true;
+    try {
+      if (paraProfissional && !await RotasTrato.usuarioTemPerfilProfissional()) {
+        LinkPendente.limpar();
+        return;
+      }
+      final contexto = nav.context;
+      if (!contexto.mounted) return;
+      _trocouModo = true;
+      if (paraProfissional) {
+        await RotasTrato.irParaProfissional(contexto);
+      } else {
+        RotasTrato.irParaCliente(contexto);
+      }
+    } on Object {
+      LinkPendente.limpar();
+      _trocouModo = false;
+    } finally {
+      _trocandoModo = false;
+    }
+  }
+
   /// Ouve os links com o app aberto ou em segundo plano. Chame antes do `runApp`, para vir antes
   /// do tratamento padrão de rotas do Flutter.
+  /// O toque numa notificação da CAIXA. Mesmo caminho do push: se o `papel` é o modo em que o app
+  /// está (ou não veio), abre aqui; senão guarda o destino, troca de modo e abre na casca certa.
+  static void abrirDaCaixa(BuildContext context, ResultadoLink r, {required bool profissional}) {
+    final papel = r.papel;
+    if (papel == null || (papel == 'profissional') == profissional) {
+      RotasTrato.abrirLink(context, r, profissional: profissional);
+      return;
+    }
+    LinkPendente.guardar(r);
+    processar();
+  }
+
   static var _ligado = false;
 
   static void ligar() {
@@ -99,15 +161,28 @@ abstract final class DeepLinks {
       _ligado = true;
       WidgetsBinding.instance.addObserver(_Ouvinte());
     }
-    // Partida a frio: o endereço que abriu o app.
+    // Partida a frio: o endereço que abriu o app. Lido UMA vez por processo (consumido).
+    if (_inicialLido) return;
+    _inicialLido = true;
     final inicial = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
     final uri = Uri.tryParse(inicial);
     if (uri != null) receber(uri);
   }
 
+  static var _inicialLido = false;
+
+  /// Só para testes: volta ao estado de um processo recém-iniciado.
+  @visibleForTesting
+  static void reiniciarParaTeste() {
+    esquecer();
+    _inicialLido = false;
+  }
+
   static void esquecer() {
     LinkPendente.limpar();
     _loginAberto = false;
+    _trocouModo = false;
+    _trocandoModo = false;
     _ultimo = null;
   }
 }

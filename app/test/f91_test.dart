@@ -46,10 +46,7 @@ void main() {
         ('chat', DestinoApp.chat),
         ('recorrencia', DestinoApp.recorrencia),
         ('disputa', DestinoApp.disputa),
-        (
-          'avaliacao',
-          DestinoApp.pedido
-        ), // mesmo destino da notificação de avaliação
+        ('avaliacao', DestinoApp.avaliacao),
       ]) {
         expect(interpretarLink(Uri.parse(_l('$host/$_uuid'))),
             ResultadoLink.valido(destino, _uuid));

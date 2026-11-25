@@ -1722,6 +1722,9 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
           lida: n['lida'] == true,
           tipo: n['tipo'] as String?,
           destinoId: _destino(n['dados']),
+          tela: _textoDoDado(n['dados'], 'tela'),
+          papel: _textoDoDado(n['dados'], 'papel'),
+          recorrenciaId: _textoDoDado(n['dados'], 'recorrencia_id'),
         ),
     ];
   }
@@ -1730,6 +1733,12 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
   @override
   Future<void> marcarLida(String id) async {
     await _api.post('/v1/notificacoes/$id/lida');
+  }
+
+  String? _textoDoDado(Object? dados, String chave) {
+    if (dados is! Map) return null;
+    final v = dados[chave];
+    return v is String && v.trim().isNotEmpty ? v.trim() : null;
   }
 
   String? _destino(Object? dados) {

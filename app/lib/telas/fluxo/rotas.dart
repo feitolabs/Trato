@@ -109,6 +109,8 @@ import '../conclusao/modelos.dart';
 import '../conclusao/garantia_tela.dart';
 import '../conclusao/relatar_problema_tela.dart';
 import '../notificacoes/modelos.dart';
+import '../notificacoes/modelos.dart' as notif;
+import '../profissional_inicio/detalhe_pedido_tela.dart';
 import '../notificacoes/notificacoes_tela.dart';
 import '../notificacoes/preferencias_notificacoes_tela.dart';
 import '../notificacoes/servico_repositorio.dart';
@@ -1443,9 +1445,11 @@ abstract final class RotasTrato {
     );
   }
 
-  static void _abrirValoresEAvaliar(BuildContext context, String pedidoId) => _abrir<void>(
-        context,
-        DetalheValoresTela(
+  static void _abrirValoresEAvaliar(BuildContext context, String pedidoId) =>
+      _abrir<void>(context, _valoresEAvaliar(pedidoId));
+
+  static Widget _valoresEAvaliar(String pedidoId) => Builder(
+        builder: (context) => DetalheValoresTela(
           carregar: () => repos.profissional.valoresDoPedido(pedidoId),
           aoAvaliarCliente: () async {
             final enviou = await _abrir<bool>(
@@ -2473,13 +2477,51 @@ abstract final class RotasTrato {
             PreferenciasNotificacoesTela(repositorio: repos.notificacoes),
           ),
           aoAbrirDestino: (n) {
-            final id = n.destinoId;
-            final destino = _destinoDaNotificacao(n.tipo);
-            if (id == null || destino == null) return;
-            abrirDestino(context, destino, id, profissional: profissional);
+            // A MESMA tabela do push (`resultadoDoPush`): o que o backend manda em `data`.
+            final r = destinoDaCaixa(n, modoAtualProfissional: profissional);
+            if (r == null) return;
+            DeepLinks.abrirDaCaixa(context, r, profissional: profissional);
           },
         ),
       );
+
+  /// O destino de uma notificação da caixa. Com `tela` (como no push) usa a tabela do push; sem
+  /// ela, deduz do tipo do evento. Sem destino, nulo.
+  @visibleForTesting
+  static ResultadoLink? destinoDaCaixa(notif.Notificacao n, {required bool modoAtualProfissional}) {
+    final id = n.destinoId;
+    final papelValido = n.papel == 'profissional' || n.papel == 'cliente' ? n.papel : null;
+    // Retrabalho tem tela própria (agendar o atendimento), mesmo o backend dizendo `pedido`.
+    if (id != null && _destinoDaNotificacao(n.tipo) == DestinoApp.retrabalho) {
+      return ResultadoLink.valido(DestinoApp.retrabalho, id, papel: papelValido);
+    }
+    final tela = n.tela ?? _telaDoTipo(n.tipoApi);
+    if (tela != null) {
+      final r = resultadoDoPush({
+        'tela': tela,
+        'pedido_id': id,
+        'recorrencia_id': n.recorrenciaId,
+        'papel': n.papel,
+      });
+      if (r.situacao != SituacaoLink.ignorado) return r;
+    }
+    final destino = _destinoDaNotificacao(n.tipo);
+    if (id == null || destino == null) return null;
+    return ResultadoLink.valido(destino, id, papel: papelValido);
+  }
+
+  /// Sem `data.tela` (backend antigo): a tela do evento, igual à tabela do backend.
+  static String? _telaDoTipo(String? tipo) => switch (tipo) {
+        'pedido.novo' ||
+        'pedido.direcionado' ||
+        'pedido.urgente' ||
+        'orcamento.recusado' ||
+        'orcamento.nao_escolhido' ||
+        'exclusividade.aceita' =>
+          'pedido_aberto',
+        'avaliacao.recebida' => 'avaliacao',
+        _ => null,
+      };
 
   static DestinoApp? _destinoDaNotificacao(TipoNotificacao tipo) => switch (tipo) {
         TipoNotificacao.disputa => DestinoApp.disputa,
@@ -2499,6 +2541,10 @@ abstract final class RotasTrato {
     String? id, {
     required bool profissional,
   }) {
+    if (destino == DestinoApp.indicacoes) {
+      abrirIndicacoes(context);
+      return;
+    }
     if (destino == DestinoApp.recorrencia) {
       id == null
           ? abrirRecorrencias(context)
@@ -2527,22 +2573,106 @@ abstract final class RotasTrato {
         _abrir<void>(context, _chat(id, comoProfissional: profissional));
       case DestinoApp.pedido:
         profissional
-            ? _abrir<void>(context, _chat(id, comoProfissional: true))
+            ? _abrir<void>(context, _pedidoDoProfissional(id))
             : abrirServico(context, id);
-      case DestinoApp.recorrencia:
+      case DestinoApp.pedidoAberto:
+        // Pedido novo, direcionado ou urgente: o profissional vê o pedido aberto para orçar.
+        profissional
+            ? _abrir<void>(context, _detalhePedidoAbertoProfissional(id))
+            : abrirServico(context, id);
+      case DestinoApp.avaliacao:
+        profissional
+            ? _abrir<void>(context, _pedidoDoProfissional(id, avaliar: true))
+            : abrirServico(context, id);
+      case DestinoApp.recorrencia || DestinoApp.indicacoes:
         break;
     }
   }
 
+  /// Pedido ainda aberto, do lado do profissional: o detalhe para orçar (a mesma tela da lista
+  /// "Pedidos perto de você").
+  static Widget _detalhePedidoAbertoProfissional(String pedidoId) => Carregador<DetalhePedido>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
+        carregar: () => repos.profissional.detalhe(pedidoId),
+        construir: (context, dados) => DetalhePedidoTela(
+          dados: dados,
+          aoFazerOrcamento: () => _abrirOrcamento(
+            context,
+            pedidoId,
+            dados.pedido.titulo,
+            remoto: dados.pedido.remoto,
+          ),
+          aoPerguntar: () => _abrir<void>(
+            context,
+            _chat(pedidoId, comoProfissional: true, categoriaNome: dados.pedido.titulo),
+          ),
+          aoPedirExclusividade: (chave) =>
+              repos.profissional.solicitarExclusividade(pedidoId, chave),
+          aoRecusar: (motivo) async {
+            final navegador = Navigator.of(context);
+            final ok = await _tentar(context, () => repos.profissional.recusar(pedidoId, motivo));
+            if (!ok) return;
+            pedidosMudaram.value++;
+            if (navegador.mounted) navegador.pop();
+          },
+        ),
+      );
+
+  /// O pedido contratado do lado do profissional (abre pela notificação). Pedido ainda aberto vai
+  /// para o detalhe de orçar; serviço concluído e sem avaliar, com [avaliar], para avaliar o
+  /// cliente. Nunca a visão do cliente (pagar, avaliar o profissional).
+  static Widget _pedidoDoProfissional(String pedidoId, {bool avaliar = false}) =>
+      Carregador<PedidoEmExecucao>(
+        textoNaoEncontrado: TextosNaoEncontrado.pedido,
+        carregar: () => repos.pedidos.acompanhar(pedidoId),
+        atualizarQuando: pedidosMudaram,
+        atualizarACada: _intervalo,
+        construir: (context, pedido) {
+          if (const {'aberto', 'reservado'}.contains(pedido.estadoApi)) {
+            return _detalhePedidoAbertoProfissional(pedidoId);
+          }
+          if (avaliar && pedido.estadoApi == 'concluido' && !pedido.jaAvaliou) {
+            return _valoresEAvaliar(pedidoId);
+          }
+          return PedidoExecucaoTela(
+            pedido: pedido,
+            atualizarAditivoLocalmente: false,
+            aoConversar: () => _abrir<void>(
+              context,
+              _chat(pedidoId, comoProfissional: true, categoriaNome: pedido.categoriaNome ?? pedido.titulo),
+            ),
+            aoAjuda: () => _abrir<void>(context, _telaAjuda(context, comoCliente: false)),
+            aoVerContrato: () => abrirContrato(context, pedidoId),
+            secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
+                ? _secaoReagendamento(pedidoId, semHorario: pedido.estadoApi == 'pago_e_retido')
+                : null,
+          );
+        },
+      );
+
+  /// A conta tem perfil de profissional? (Para um push que pede o modo profissional.)
+  static Future<bool> usuarioTemPerfilProfissional() async {
+    try {
+      return repos.modoApi
+          ? (await repos.perfilPublico?.temPerfilProfissional() ?? false)
+          : ((ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true) ||
+              (await repos.perfilPublico?.temPerfilProfissional() ?? false));
+    } on Object {
+      return false;
+    }
+  }
+
   /// Abre o que um deep link pediu. Id inválido = "não encontrado", nunca erro.
-  static void abrirLink(BuildContext context, ResultadoLink link) {
+  static void abrirLink(BuildContext context, ResultadoLink link, {bool? profissional}) {
     final destino = link.destino;
     if (destino == null || link.situacao == SituacaoLink.ignorado) return;
     if (link.situacao == SituacaoLink.invalido) {
       _abrir<void>(context, telaLinkInvalido(destino));
       return;
     }
-    abrirDestino(context, destino, link.id, profissional: ControladorCasca.souProfissional);
+    final comoProfissional = profissional ??
+        (link.papel != null ? link.papel == 'profissional' : ControladorCasca.souProfissional);
+    abrirDestino(context, destino, link.id, profissional: comoProfissional);
   }
 
   /// Aba "Buscar" do cliente: busca por serviço e abertura do perfil do profissional.

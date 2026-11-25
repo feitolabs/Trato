@@ -68,8 +68,8 @@ void main() {
       for (final (tela, destino) in [
         ('orcamentos', DestinoApp.orcamentos),
         ('pedido', DestinoApp.pedido),
-        ('pedido_aberto', DestinoApp.pedido),
-        ('avaliacao', DestinoApp.pedido),
+        ('pedido_aberto', DestinoApp.pedidoAberto),
+        ('avaliacao', DestinoApp.avaliacao),
         ('disputa', DestinoApp.disputa),
         ('mensagens', DestinoApp.chat),
       ]) {
