@@ -183,9 +183,6 @@ abstract interface class RepositorioPedidos {
   /// Comprovante do pedido em PDF (`GET /v1/pedidos/{id}/recibo.pdf`), com o token do usuário.
   Future<List<int>> baixarReciboPdf(String pedidoId);
 
-  /// Remarca a janela de visita de um pedido agendado (`POST /v1/pedidos/{id}/acoes/remarcar`).
-  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
-
   /// Oferta de exclusividade em andamento para o pedido (`GET /v1/pedidos/{id}/exclusividade`).
   Future<OfertaExclusividadeCliente?> ofertaExclusividade(String pedidoId) async => null;
 
@@ -465,9 +462,6 @@ abstract interface class RepositorioProfissional {
 
   /// Marca a visita de um pedido já pago. Sem isso o check-in não é liberado.
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim);
-
-  /// Remarca a visita de um pedido já agendado (`POST /v1/pedidos/{id}/acoes/remarcar`).
-  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
 
   /// Carteira como EXTRATO (D15): sem saldo próprio, sem saque.
   Future<List<ItemExtrato>> extrato({int limite = 50, int deslocamento = 0});

@@ -1287,11 +1287,27 @@ abstract final class RotasTrato {
         ),
       );
 
+  /// Só para testes: no lugar dos seletores de dia e hora.
+  @visibleForTesting
+  static Future<DateTime?> Function(BuildContext context)? escolherJanelaParaTeste;
+
+  /// Só para testes: o caminho do profissional ("Remarcar data da visita" na agenda).
+  @visibleForTesting
+  static Future<void> marcarVisitaParaTeste(
+    BuildContext context,
+    String pedidoId, {
+    bool remarcar = false,
+    bool remoto = false,
+  }) =>
+      _marcarVisita(context, pedidoId, remarcar: remarcar, remoto: remoto);
+
   static Future<DateTime?> _escolherJanelaVisita(
     BuildContext context, {
     String tituloDia = 'Dia da visita',
     String tituloHora = 'Hora da chegada',
   }) async {
+    final gancho = escolherJanelaParaTeste;
+    if (gancho != null) return gancho(context);
     final hoje = DateTime.now();
     final dia = await showDatePicker(
       context: context,
@@ -1329,22 +1345,49 @@ abstract final class RotasTrato {
     );
     if (inicio == null || !context.mounted) return;
     final fim = inicio.add(const Duration(hours: 2));
+    if (remarcar) {
+      // Pedido já agendado: mudar a data é uma PROPOSTA; a outra parte precisa aceitar.
+      await proporNovaDataDoPedido(context, pedidoId, inicio, fim, remoto: remoto);
+      return;
+    }
+    final ok = await _tentar(context, () => repos.profissional.confirmarAgenda(pedidoId, inicio, fim));
+    if (ok) pedidosMudaram.value++;
+    if (ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            remoto
+                ? 'Início combinado. O cliente já pode ver o código de início.'
+                : 'Visita marcada. O cliente já pode ver o código de início.',
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Muda a data de um pedido JÁ agendado, para cliente e profissional: envia uma proposta de
+  /// reagendamento (`POST /v1/pedidos/{id}/reagendamentos`). Nada muda até a outra parte aceitar;
+  /// ela vê o cartão "Aceitar nova data". O app nunca troca a data sozinho. Se o servidor recusar
+  /// (ex.: já há uma proposta), o texto dele aparece.
+  static Future<void> proporNovaDataDoPedido(
+    BuildContext context,
+    String pedidoId,
+    DateTime inicio,
+    DateTime fim, {
+    bool remoto = false,
+  }) async {
     final ok = await _tentar(
       context,
-      () => remarcar
-          ? repos.profissional.remarcarAgenda(pedidoId, inicio, fim)
-          : repos.profissional.confirmarAgenda(pedidoId, inicio, fim),
+      () => repos.pedidos.proporReagendamento(pedidoId, inicio: inicio, fim: fim),
     );
     if (ok) pedidosMudaram.value++;
     if (ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            remarcar
-                ? (remoto ? 'Início remarcado com sucesso.' : 'Visita remarcada com sucesso.')
-                : (remoto
-                    ? 'Início combinado. O cliente já pode ver o código de início.'
-                    : 'Visita marcada. O cliente já pode ver o código de início.'),
+            remoto
+                ? 'Proposta de novo início enviada. Aguardando a outra parte aceitar.'
+                : 'Proposta de nova data enviada. Aguardando a outra parte aceitar.',
           ),
         ),
       );
@@ -3099,21 +3142,16 @@ abstract final class RotasTrato {
     );
     if (inicio == null || !context.mounted) return;
     final fim = inicio.add(const Duration(hours: 2));
-    final ok = await _tentar(
-      context,
-      () => jaAgendado
-          ? repos.pedidos.remarcarAgenda(pedidoId, inicio, fim)
-          : repos.chat.proporAgenda(pedidoId, inicio, fim),
-    );
+    if (jaAgendado) {
+      await proporNovaDataDoPedido(context, pedidoId, inicio, fim);
+      return;
+    }
+    final ok = await _tentar(context, () => repos.chat.proporAgenda(pedidoId, inicio, fim));
     if (ok) pedidosMudaram.value++;
     if (ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            jaAgendado
-                ? 'Visita remarcada com sucesso.'
-                : 'Sugestão de horário enviada no chat para confirmação do profissional.',
-          ),
+        const SnackBar(
+          content: Text('Sugestão de horário enviada no chat para confirmação do profissional.'),
         ),
       );
     }

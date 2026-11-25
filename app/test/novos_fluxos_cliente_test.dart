@@ -385,24 +385,21 @@ void main() {
       expect(texto, 'Sugestão de visita.');
     });
 
-    test('API chama remarcar, agenda/propor e agenda/aceitar', () async {
+    test('API chama agenda/propor e agenda/aceitar (remarcar por ação não existe mais)', () async {
       final caminhos = <String>[];
       final api = _apiSimulado((req) async {
         caminhos.add(req.url.path);
         return _json({'ok': true});
       });
 
-      final pedidosApi = RepositorioPedidosApi(api);
       final chatApi = RepositorioChatApi(api);
       final inicio = DateTime.utc(2026, 11, 20, 12);
       final fim = DateTime.utc(2026, 11, 20, 14);
 
-      await pedidosApi.remarcarAgenda('p1', inicio, fim);
       await chatApi.proporAgenda('p1', inicio, fim, justificativa: 'Tarde');
       await chatApi.aceitarAgenda('p1', mensagemId: 7, inicio: inicio, fim: fim);
 
       expect(caminhos, [
-        '/v1/pedidos/p1/acoes/remarcar',
         '/v1/pedidos/p1/agenda/propor',
         '/v1/pedidos/p1/agenda/aceitar',
       ]);

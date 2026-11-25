@@ -1035,21 +1035,6 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   }
 
   @override
-  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
-    await _api.post(
-      '/v1/pedidos/$pedidoId/acoes/remarcar',
-      corpo: {
-        'prova': {
-          'janela': {
-            'inicio': inicio.toUtc().toIso8601String(),
-            'fim': fim.toUtc().toIso8601String(),
-          },
-        },
-      },
-    );
-  }
-
-  @override
   Future<void> pedirRetrabalho(
     String pedidoId,
     String descricao, {
@@ -2411,21 +2396,6 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
     await _api.post(
       '/v1/pedidos/$pedidoId/acoes/confirmar_agenda',
-      corpo: {
-        'prova': {
-          'janela': {
-            'inicio': inicio.toUtc().toIso8601String(),
-            'fim': fim.toUtc().toIso8601String(),
-          },
-        },
-      },
-    );
-  }
-
-  @override
-  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {
-    await _api.post(
-      '/v1/pedidos/$pedidoId/acoes/remarcar',
       corpo: {
         'prova': {
           'janela': {

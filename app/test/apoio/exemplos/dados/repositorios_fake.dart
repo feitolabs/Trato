@@ -145,7 +145,6 @@ class RepositorioPedidosFake implements RepositorioPedidos {
   Future<DadosGarantia> garantia(String pedidoId) async => dadosGarantiaExemplo;
 
   final List<String> cancelados = [];
-  final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
   /// Propostas de nova data (só para teste e demonstração): mais recente primeiro.
   final List<Reagendamento> reagendamentosFake = [];
@@ -214,10 +213,6 @@ class RepositorioPedidosFake implements RepositorioPedidos {
 
   @override
   Future<void> cancelar(String pedidoId, String motivo) async => cancelados.add(pedidoId);
-
-  @override
-  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async =>
-      agendasRemarcadas.add((pedidoId, inicio, fim));
 
   @override
   Future<void> pedirRetrabalho(String pedidoId, String descricao,
@@ -743,7 +738,6 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
   /// Taxa só de demonstração; a real é decidida pelo backend (progressiva, base 7,5%).
 
   final List<MotivoRecusa> recusas = [];
-  final List<(String, DateTime, DateTime)> agendasRemarcadas = [];
 
   final List<(String, int?)> avisosACaminho = [];
 
@@ -755,10 +749,6 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
 
   @override
   Future<void> confirmarAgenda(String pedidoId, DateTime inicio, DateTime fim) async {}
-
-  @override
-  Future<void> remarcarAgenda(String pedidoId, DateTime inicio, DateTime fim) async =>
-      agendasRemarcadas.add((pedidoId, inicio, fim));
 
   @override
   Future<List<PedidoAberto>> pedidosAbertos(FiltroPedidosAbertos filtro) async =>
