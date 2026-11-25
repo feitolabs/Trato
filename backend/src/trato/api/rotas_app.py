@@ -52,7 +52,7 @@ from trato.api.repositorios_app import (
     Avaliacao,
     DocumentoVerificacao,
 )
-from trato.api.servicos import carregar_pedido, eh_participante
+from trato.api.servicos import carregar_pedido, eh_participante, garantia_minima_do_pedido
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.config import obter_config
 from trato.financeiro import periodo
@@ -678,6 +678,13 @@ def enviar_orcamento(
         raise HTTPException(422, "O valor total do orçamento precisa ser maior que zero.")
     if total_estimado > TETO_ORCAMENTO_CENTAVOS:
         raise HTTPException(422, "O valor total do orçamento não pode passar de R$ 500.000,00.")
+    minima = garantia_minima_do_pedido(request, contexto, pedido.id)
+    if dados.garantia_dias is not None and minima is not None and dados.garantia_dias < minima:
+        raise HTTPException(
+            422,
+            f"A garantia mínima para este serviço é de {minima} dias "
+            "(Código de Defesa do Consumidor).",
+        )
     itens = [
         ItemOrcamento(
             tipo=i.tipo.strip().lower(),

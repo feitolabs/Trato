@@ -86,6 +86,47 @@ def _avisar(
         log.warning("aviso de reagendamento não enviado", exc_info=True)
 
 
+# Pedido pago e ainda SEM horário (`pago_e_retido`): é o primeiro agendamento, não um
+# reagendamento. Os avisos precisam dizer isso (o pedido aparece como "agendado").
+_TEXTOS_PRIMEIRO = {
+    "proposto": (
+        "Horário proposto para o serviço",
+        "A outra parte propôs um horário para o serviço. Responda no pedido.",
+    ),
+    "aceito": ("Serviço agendado", "O horário foi aceito: o serviço está agendado."),
+    "recusado": (
+        "Horário não confirmado",
+        "O horário proposto foi recusado. Combinem outro: ainda não há horário marcado.",
+    ),
+    "cancelado": (
+        "Horário não confirmado",
+        "A proposta de horário foi cancelada. Ainda não há horário marcado.",
+    ),
+}
+_TEXTOS_REMARCAR = {
+    "proposto": (None, None),  # os textos padrão do evento já falam em novo horário
+    "aceito": (
+        "Reagendamento aceito",
+        "O novo horário do serviço foi aceito. Veja os detalhes no pedido.",
+    ),
+    "recusado": (
+        None,
+        "O novo horário foi recusado. O horário combinado continua o mesmo.",
+    ),
+    "cancelado": (
+        None,
+        "O pedido de reagendamento foi cancelado. O horário combinado continua o mesmo.",
+    ),
+}
+
+
+def _textos(pedido: Any, situacao: str) -> dict[str, str]:
+    primeiro = pedido.estado is Estado.PAGO_E_RETIDO
+    titulo, corpo = (_TEXTOS_PRIMEIRO if primeiro else _TEXTOS_REMARCAR)[situacao]
+    extras = {"titulo": titulo, "corpo": corpo}
+    return {k: v for k, v in extras.items() if v is not None}
+
+
 def _outra_parte(pedido: Any, usuario_id: str) -> str | None:
     return pedido.profissional_id if usuario_id == pedido.cliente_id else pedido.cliente_id
 
@@ -144,6 +185,7 @@ def propor_reagendamento(
         _outra_parte(pedido, usuario.id),
         chave=f"reagendamento:{nova.id}:proposto",
         pedido_id=pedido.id,
+        **_textos(pedido, "proposto"),
     )
     return _out(nova)
 
@@ -223,7 +265,7 @@ def aceitar_reagendamento(
         r.proposto_por,
         chave=f"reagendamento:{r.id}:aceito",
         pedido_id=pedido.id,
-        corpo="O novo horário do serviço foi aceito. Veja os detalhes no pedido.",
+        **_textos(pedido, "aceito"),
     )
     return _out(respondido)
 
@@ -250,11 +292,6 @@ def recusar_reagendamento(
     )
     if respondido is None:
         raise HTTPException(409, _JA_RESPONDIDO)
-    texto = (
-        "O pedido de reagendamento foi cancelado. O horário combinado continua o mesmo."
-        if cancelando
-        else "O novo horário foi recusado. O horário combinado continua o mesmo."
-    )
     _avisar(
         request,
         contexto,
@@ -262,6 +299,6 @@ def recusar_reagendamento(
         _outra_parte(pedido, usuario.id),
         chave=f"reagendamento:{r.id}:{respondido.status}",
         pedido_id=pedido.id,
-        corpo=texto,
+        **_textos(pedido, "cancelado" if cancelando else "recusado"),
     )
     return _out(respondido)

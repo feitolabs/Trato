@@ -43,7 +43,7 @@ class ConversasEmMemoria:
             raise NaoEncontrado("Conversa não encontrada ou encerrada.")
         pedido = self._pedido_da_conversa[conversa_id]
         contratado = self.contratado(pedido) if self.contratado else False
-        exibido = corpo if contratado else mascarar_contatos(corpo)
+        exibido = mascarar_contatos(corpo, incluir_endereco=not contratado)
         nova = Mensagem(
             next(self._ids), autor_id, exibido, exibido != corpo, datetime.now(UTC), None
         )

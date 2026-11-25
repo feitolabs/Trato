@@ -35,16 +35,18 @@ MARCADOR_CONTRAPROPOSTA = re.compile(
 MARCADOR_AGENDA = re.compile(r"^\[agenda:[^\]]+\]")
 
 
-def mascarar_contatos(texto: str) -> str:
-    """Esconde telefone, e-mail, link, perfil e endereço antes da contratação (o original fica em
-    `corpo`, só o `corpo_exibido` é mascarado). A regra mora em `trato.seguranca.mascaramento`."""
+def mascarar_contatos(texto: str, *, incluir_endereco: bool = True) -> str:
+    """Esconde telefone, e-mail, link e perfil SEMPRE (e o endereço antes da contratação:
+    `incluir_endereco`). O original fica em `corpo`; só o `corpo_exibido` é mascarado. A regra
+    mora em `trato.seguranca.mascaramento`."""
     if MARCADOR_FOTO.match(texto.strip()):
         return texto
     for padrao in (MARCADOR_CONTRAPROPOSTA, MARCADOR_AGENDA):
         marca = padrao.match(texto)
         if marca:
-            return marca.group(0) + _mascarar(texto[marca.end() :]).exibido
-    return _mascarar(texto).exibido
+            resto = texto[marca.end() :]
+            return marca.group(0) + _mascarar(resto, incluir_endereco=incluir_endereco).exibido
+    return _mascarar(texto, incluir_endereco=incluir_endereco).exibido
 
 
 @dataclass(frozen=True)
@@ -110,7 +112,8 @@ class ConversasPostgres:
         return (str(linha["cliente_id"]), str(linha["profissional_id"])) if linha else None
 
     def enviar(self, conversa_id: str, autor_id: str, corpo: str) -> int:
-        """Grava a mensagem. Antes da contratação (pedido não contratado) o contato é mascarado."""
+        """Grava a mensagem com o contato mascarado, antes e depois da contratação (depois dela
+        o endereço passa)."""
         conversa = exigir_uuid(conversa_id, "conversa")
         with self._banco.transacao() as con:
             linha = con.execute(
@@ -121,7 +124,7 @@ class ConversasPostgres:
             ).fetchone()
             if linha is None:
                 raise NaoEncontrado("Conversa não encontrada ou encerrada.")
-            exibido = corpo if linha["contratado"] else mascarar_contatos(corpo)
+            exibido = mascarar_contatos(corpo, incluir_endereco=not linha["contratado"])
             nova = con.execute(
                 "insert into public.mensagens (conversa_id, autor_id, corpo, corpo_exibido, "
                 "mascarada) values (%s, %s, %s, %s, %s) returning id",
@@ -139,18 +142,23 @@ class ConversasPostgres:
                 "from public.mensagens where conversa_id = %s order by id",
                 (achado,),
             ).fetchall()
-        return tuple(
-            Mensagem(
-                int(l["id"]),
-                str(l["autor_id"]),
-                l["corpo_exibido"],
-                l["mascarada"],
-                l["enviada_em"],
-                l["lida_em"],
-                l["entregue_em"],
-            )  # fmt: skip
-            for l in linhas  # noqa: E741
-        )
+        saida = []
+        for l in linhas:  # noqa: E741
+            # Mensagens antigas, gravadas em claro depois da contratação, também saem mascaradas
+            # (só na leitura, nada é regravado). O endereço já veio tratado no `corpo_exibido`.
+            exibido = mascarar_contatos(l["corpo_exibido"], incluir_endereco=False)
+            saida.append(
+                Mensagem(
+                    int(l["id"]),
+                    str(l["autor_id"]),
+                    exibido,
+                    bool(l["mascarada"]) or exibido != l["corpo_exibido"],
+                    l["enviada_em"],
+                    l["lida_em"],
+                    l["entregue_em"],
+                )
+            )
+        return tuple(saida)
 
     def marcar_lida(self, mensagem_id: int, agora: datetime) -> None:
         """Preenche `lida_em` uma única vez (depois disso o banco não deixa mexer)."""

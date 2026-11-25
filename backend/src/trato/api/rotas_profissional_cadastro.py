@@ -21,6 +21,7 @@ from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_a
 from trato.api.elogios import etiquetas_top
 from trato.api.repositorios_app import NIVEIS_VERIFICACAO, PerfilDetalhe
 from trato.api.resposta_real import responde_em_faixa
+from trato.garantias.config import garantia_minima_do_slug
 from trato.profissional.config import ConfigProfissional, obter_config_profissional
 from trato.profissional.repositorio import (
     CatalogoEmMemoria,
@@ -585,6 +586,9 @@ class CategoriaOut(BaseModel):
     aceita_remoto: bool = Field(
         False, description="O serviço desta categoria pode ser feito de forma remota."
     )
+    garantia_minima_dias: int = Field(
+        30, description="Garantia mínima (CDC) que o orçamento desta categoria precisa dar."
+    )
 
 
 class CidadeOut(BaseModel):
@@ -626,7 +630,10 @@ class BuscaProfissionaisOut(BaseModel):
 def catalogo_categorias(
     _: Usuario = Depends(usuario_atual), modulo: Modulo = Depends(obter_modulo)
 ) -> list[CategoriaOut]:
-    return [CategoriaOut(**vars(c)) for c in modulo.catalogo.categorias_publicas()]
+    return [
+        CategoriaOut(**vars(c), garantia_minima_dias=garantia_minima_do_slug(c.slug))
+        for c in modulo.catalogo.categorias_publicas()
+    ]
 
 
 @router.get(

@@ -14,6 +14,7 @@ import psycopg
 from trato.api.repositorios import ConfigApi
 from trato.disputas import ConfigDisputa
 from trato.garantias import ConfigGarantia
+from trato.garantias.config import garantia_minima_do_slug
 from trato.pedidos.estados import PrazosPedido
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import ConfigNaoPublicada
@@ -62,12 +63,16 @@ class ConfigPostgres:
         with self._banco.transacao() as con:
             versao = versao_vigente(con)
             p = parametros_globais(con, versao)
+            categorias = con.execute(
+                "select id, slug, garantia_retrabalho_dias from public.categorias"
+            ).fetchall()
             por_categoria = {
                 str(linha["id"]): int(linha["garantia_retrabalho_dias"])
-                for linha in con.execute(
-                    "select id, garantia_retrabalho_dias from public.categorias "
-                    "where garantia_retrabalho_dias is not null"
-                ).fetchall()
+                for linha in categorias
+                if linha["garantia_retrabalho_dias"] is not None
+            }
+            minimos = {
+                str(linha["id"]): garantia_minima_do_slug(linha["slug"]) for linha in categorias
             }
         padrao = ConfigGarantia()
         return ConfigApi(
@@ -90,6 +95,7 @@ class ConfigPostgres:
                     "prazo_retrabalho_atendimento_dias", padrao.prazo_atendimento_dias
                 ),
                 garantia_dias_por_categoria=por_categoria,
+                minimo_dias_por_categoria=minimos,
             ),
             valor_maximo_servico_centavos=p.get("valor_maximo_servico_centavos"),
             limite_orcamentos_por_pedido=p.get("limite_orcamentos_por_pedido"),

@@ -1,4 +1,7 @@
-"""Mascaramento de contato no chat antes da contratação (F8.1).
+"""Mascaramento de contato no chat (F8.1): SEMPRE, antes e depois da contratação.
+
+Depois da contratação o endereço passa (o profissional precisa dele); telefone, e-mail, perfil
+(@usuário) e link continuam escondidos.
 
 O texto original fica guardado (`corpo`, evidência para disputa); o que o outro lado lê é o
 `corpo_exibido`, com `mascarada = verdadeiro` quando algo foi escondido. Esconde telefone (inclusive
@@ -14,7 +17,7 @@ from dataclasses import dataclass, field
 
 from trato.seguranca.config import ConfigSeguranca, obter_config_seguranca
 
-AVISO_MASCARA = "[contato oculto até a contratação]"
+AVISO_MASCARA = "[contato oculto]"
 
 # Palavra -> quantos dígitos ela vale ("onze" = 2). Números por extenso também formam telefone.
 _PALAVRAS_DIGITO = {
@@ -26,20 +29,36 @@ _PALAVRAS_DIGITO = {
          "dezessete", "dezoito", "dezenove", "vinte", "trinta", "quarenta", "cinquenta",
          "sessenta", "setenta", "oitenta", "noventa"), 2),
 }  # fmt: skip
-_TOKEN = r"(?:\d[️⃣]*|\b(?:" + "|".join(_PALAVRAS_DIGITO) + r")\b)"
+# Dezena composta por extenso ("noventa e oito") vale 2 dígitos.
+_DEZENAS = r"(?:vinte|trinta|quarenta|cinquenta|sessenta|setenta|oitenta|noventa)"
+_UNIDADES = r"(?:um|dois|duas|tres|três|quatro|cinco|seis|sete|oito|nove)"
+_COMPOSTA = rf"\b{_DEZENAS}\s+e\s+{_UNIDADES}\b"
+_TOKEN = rf"(?:\d[️⃣]*|{_COMPOSTA}|\b(?:" + "|".join(_PALAVRAS_DIGITO) + r")\b)"
 _SEP = r"[\s().\-_*•·]*"
 _SEQUENCIA = re.compile(rf"[+(]?{_TOKEN}(?:{_SEP}{_TOKEN})*", re.IGNORECASE)
 _CANAL = re.compile(
     r"(zap|whats|wpp|watsap|telegram|fone|telefone|celular|cel\b|contato|liga[rm]?\b|ligue|chama)",
     re.IGNORECASE,
 )
+# Um dígito (ou um número por extenso de 1 dígito) separado por vírgula, barra ou "|":
+# "9,8,7,6,5,4,3,2,1" e "nove, oito, sete...". Exige 8 em sequência (lista de preços não casa).
+_DIGITO_SOLTO = (
+    r"(?:(?<!\d)\d(?!\d)|\b(?:zero|um|dois|duas|tres|três|quatro|cinco|seis|meia|sete|oito|nove)\b)"
+)
+_PICADO = re.compile(rf"{_DIGITO_SOLTO}(?:\s*[,/|;]\s*{_DIGITO_SOLTO}){{7,}}", re.IGNORECASE)
+# Celular com barra ou "|" no lugar do traço: "98765/4321", "11/98765/4321".
+_BARRA = re.compile(
+    r"(?<!\d)(?:\d{2}\s*[/|]\s*)?9\d{3,4}\s*[/|]\s*\d{4}(?!\d)"
+    r"|(?<!\d)\d{2}\s*[/|]\s*\d{4}\s*[/|]\s*\d{4}(?!\d)"
+)
 _MILHAR = re.compile(r"\d{1,3}(?:\.\d{3})+")
 _DATA = re.compile(r"\d{1,2}[.\-]\d{1,2}[.\-]\d{2,4}")
 _DECIMAL_DEPOIS = re.compile(r"\s?,\d{1,2}(?!\d)")
 
 _EMAIL = re.compile(
-    r"[\w.+-]{2,64}\s*(?:@|\(\s*at\s*\)|\[\s*at\s*\]|\{\s*at\s*\}|\barroba\b)\s*"
-    r"[\w-]{1,63}(?:\s*(?:\.|\(\s*dot\s*\)|\[\s*dot\s*\]|\bponto\b|\bdot\b)\s*[\w-]{1,63}){1,6}"
+    r"[\w.+-]{2,64}\s*(?:@|[(\[{]\s*(?:at|arroba)\s*[)\]}]|\barroba\b)\s*"
+    r"[\w-]{1,63}(?:\s*(?:\.|[(\[{]\s*(?:dot|ponto)\s*[)\]}]|\bponto\b|\bdot\b)\s*"
+    r"[\w-]{1,63}){1,6}"
     r"|[\w.+-]{2,64}\s+at\s+[\w-]{1,63}\s+dot\s+[\w-]{1,63}(?:\s+dot\s+[\w-]{1,63}){0,4}",
     re.IGNORECASE,
 )
@@ -49,11 +68,16 @@ _PONTO_COM = re.compile(
     re.IGNORECASE,
 )
 _PERFIL = re.compile(
-    r"\b(?:insta(?:gram)?|telegram|tiktok|face(?:book)?|twitter|snap(?:chat)?|kwai)\b"
-    r"\s*(?::|=|-|é|eh)\s*@?([\w.]{4,30})",
+    r"\b(?:insta(?:gram)?|ig|telegram|tiktok|face(?:book)?|twitter|snap(?:chat)?|kwai)\b"
+    r"\s*(?P<sep>:|=|-|\bé\b|\beh\b)?\s*@?(?P<alvo>[\w.]{3,30})",
     re.IGNORECASE,
 )
-_ARROBA = re.compile(r"(?<![\w@.])@[A-Za-z0-9_.]{4,30}")
+# @usuário: 3+ caracteres com ao menos uma letra ("@10" não é perfil).
+_ARROBA = re.compile(r"(?<![\w@.])@(?=[\d_.]*[A-Za-z])[A-Za-z0-9_.]{3,30}")
+# Domínio escrito com espaço antes do ponto: "joaopintor . com . br".
+_DOMINIO_ESPACADO = re.compile(
+    r"\b[\w-]{2,63}\s+\.\s*(?:com|net|org)\b(?:\s*\.\s*br\b)?", re.IGNORECASE
+)
 _RUA = re.compile(
     r"\b(?:rua|r\.|avenida|av\.?|travessa|tv\.|alameda|rodovia|estrada|pra[çc]a|largo|quadra|qd)\s+"
     r"[^\n,;:]{2,50}?,?\s*(?:n[ºo°.]*\s*)?\d{1,5}\b",
@@ -73,10 +97,15 @@ class ResultadoMascara:
         return self.exibido != self.original
 
 
+def _valor_do_token(token: str) -> int:
+    if token[0].isdigit():
+        return 1
+    return _PALAVRAS_DIGITO.get(token.lower(), 2)  # fora da tabela = dezena composta
+
+
 def _contagem_digitos(trecho: str) -> int:
     return sum(
-        1 if token.group(0)[0].isdigit() else _PALAVRAS_DIGITO[token.group(0).lower()]
-        for token in re.finditer(_TOKEN, trecho, re.IGNORECASE)
+        _valor_do_token(token.group(0)) for token in re.finditer(_TOKEN, trecho, re.IGNORECASE)
     )
 
 
@@ -106,13 +135,23 @@ def _mascarar_telefones(texto: str, minimo: int, minimo_canal: int) -> tuple[str
 
 
 def _perfil_suspeito(m: re.Match[str]) -> str:
-    alvo = m.group(1)
-    if "@" in m.group(0) or re.search(r"[._\d]", alvo) or len(alvo) >= 8:
+    alvo = m.group("alvo").rstrip(".")  # ponto final da frase não conta
+    sep = (m.group("sep") or "").lower()
+    com_cara_de_usuario = bool(re.search(r"[._]|[A-Za-z]\d|\d[A-Za-z]", alvo))
+    if (
+        "@" in m.group(0)
+        or com_cara_de_usuario
+        or (sep in (":", "=") and len(alvo) >= 4)
+        or (sep and len(alvo) >= 8)
+    ):
         return AVISO_MASCARA
     return m.group(0)
 
 
-def mascarar(texto: str, config: ConfigSeguranca | None = None) -> ResultadoMascara:
+def mascarar(
+    texto: str, config: ConfigSeguranca | None = None, *, incluir_endereco: bool = True
+) -> ResultadoMascara:
+    """`incluir_endereco=False`: pedido já contratado (o endereço pode ser combinado)."""
     config = config or obter_config_seguranca()
     atual = texto
     categorias: set[str] = set()
@@ -126,6 +165,7 @@ def mascarar(texto: str, config: ConfigSeguranca | None = None) -> ResultadoMasc
 
     passo("email", _EMAIL)
     passo("link", _PONTO_COM)
+    passo("link", _DOMINIO_ESPACADO)
     tlds = "|".join(re.escape(t) for t in config.mascara_tlds)
     link = re.compile(
         rf"(?:https?://|www\.)\S+|\b[\w-]{{1,63}}(?:\.[\w-]{{1,63}}){{0,5}}\.(?:{tlds})\b(?:/\S*)?(?![\w@])",
@@ -134,16 +174,19 @@ def mascarar(texto: str, config: ConfigSeguranca | None = None) -> ResultadoMasc
     passo("link", link)
     passo("rede_social", _PERFIL, _perfil_suspeito)
     passo("rede_social", _ARROBA)
+    passo("telefone", _PICADO)
+    passo("telefone", _BARRA)
     atual, telefone = _mascarar_telefones(
         atual, config.mascara_min_digitos, config.mascara_min_digitos_com_canal
     )
     if telefone:
         categorias.add("telefone")
-    passo("endereco", _RUA)
-    passo("endereco", _CEP)
+    if incluir_endereco:
+        passo("endereco", _RUA)
+        passo("endereco", _CEP)
     return ResultadoMascara(texto, atual, frozenset(categorias))
 
 
-def mascarar_contatos(texto: str) -> str:
+def mascarar_contatos(texto: str, *, incluir_endereco: bool = True) -> str:
     """Só o texto exibido (compatível com o uso antigo em `persistencia/conversas.py`)."""
-    return mascarar(texto).exibido
+    return mascarar(texto, incluir_endereco=incluir_endereco).exibido

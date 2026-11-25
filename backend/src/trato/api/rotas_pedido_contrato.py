@@ -41,7 +41,13 @@ from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.rotas_pedidos import respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
-from trato.api.servicos import ator_de, carregar_pedido, nomes_de_categorias, pedido_out
+from trato.api.servicos import (
+    ator_de,
+    carregar_pedido,
+    garantia_minima_do_pedido,
+    nomes_de_categorias,
+    pedido_out,
+)
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import (
@@ -1191,6 +1197,16 @@ def _itens_preservando_horas(detalhe, valor_centavos: int) -> list[ItemOrcamento
     return itens_novos
 
 
+def _garantia_com_piso(
+    request: Request, contexto: Contexto, pedido_id: str, dias: int | None
+) -> int | None:
+    """Mantém a garantia prometida, mas nunca abaixo do mínimo legal da categoria."""
+    minima = garantia_minima_do_pedido(request, contexto, pedido_id)
+    if dias is None or minima is None:
+        return dias
+    return max(dias, minima)
+
+
 def _publicar_nova_versao_orcamento(
     *,
     request: Request,
@@ -1212,7 +1228,7 @@ def _publicar_nova_versao_orcamento(
         agora=contexto.agora(),
         prazo_execucao_dias=prazo_final,
         validade_ate=detalhe.validade_ate,
-        garantia_dias=detalhe.garantia_dias,
+        garantia_dias=_garantia_com_piso(request, contexto, pedido.id, detalhe.garantia_dias),
         fora_do_escopo=detalhe.fora_do_escopo,
         observacoes=detalhe.observacoes,
     )

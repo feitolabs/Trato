@@ -219,12 +219,12 @@ def test_mensagens_antes_da_contratacao_mascaram_contato(amb):
     assert [m["autor_id"] for m in get(amb, url, "t-prof").json()] == [PROFISSIONAL.id, CLIENTE.id]
 
 
-def test_mensagens_depois_do_contrato_nao_mascaram(amb):
+def test_mensagens_depois_do_contrato_tambem_mascaram_o_contato(amb):
     amb.semear_pedido(Estado.ORCAMENTO_ACEITO)
     url = "/v1/pedidos/ped-1/mensagens"
     r = post(amb, url, "t-cliente", {"texto": "Meu zap 31 99999-8888"})
-    assert r.status_code == 201 and r.json()["mascarada"] is False
-    assert "99999" in get(amb, url, "t-prof").json()[0]["texto"]
+    assert r.status_code == 201 and r.json()["mascarada"] is True
+    assert "99999" not in get(amb, url, "t-prof").json()[0]["texto"]
 
 
 def test_mensagens_acesso_e_validacao(amb):

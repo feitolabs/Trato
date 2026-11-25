@@ -68,6 +68,20 @@ def nome_abreviado(nome: str | None) -> str | None:
     return partes[0] if len(partes) == 1 else f"{partes[0]} {partes[-1][0]}."
 
 
+def garantia_minima_do_pedido(request: Any, contexto: Any, pedido_id: str) -> int | None:
+    """Dias mínimos de garantia (CDC) da categoria do pedido; None se não der para saber."""
+    from trato.garantias.config import garantia_minima_do_slug
+
+    dados = contexto.pedidos.dados_do_pedido(pedido_id)
+    modulo = getattr(request.app.state, "modulo_profissional", None)
+    if dados is None or modulo is None:
+        return None
+    for c in modulo.catalogo.categorias_publicas():
+        if str(c.id) == str(dados.categoria_id):
+            return garantia_minima_do_slug(c.slug)
+    return None
+
+
 def nomes_de_categorias(request: Any) -> dict[str, str]:
     """id e slug da categoria -> nome, do catálogo. Vazio se o catálogo não está disponível."""
     try:

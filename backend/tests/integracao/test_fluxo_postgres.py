@@ -209,7 +209,7 @@ def test_fluxo_completo(cenario):
     ]  # fmt: skip
     assert historico[1]["ator_papel"] == "sistema"
 
-    # 7) conversa e mensagem (contato mascarado só antes da contratação)
+    # 7) conversa e mensagem (contato mascarado sempre; depois da contratação o endereço passa)
     conversas = c.contexto.extras["conversas"]
     conversa = conversas.abrir(pedido_id, c.ids["profissional"])
     assert conversas.abrir(pedido_id, c.ids["profissional"]) == conversa
@@ -217,7 +217,18 @@ def test_fluxo_completo(cenario):
     conversas.enviar(conversa, c.ids["profissional"], "Posso sim. Meu zap 31 99999-8888")
     textos = [m.texto for m in conversas.listar(conversa)]
     assert textos[0] == "Oi! Pode chegar às 9h?"
-    assert "99999" in textos[1]  # já contratado: não mascara
+    assert "99999" not in textos[1] and "contato oculto" in textos[1]  # mesmo já contratado
+    conversas.enviar(conversa, c.ids["cliente"], "Rua das Flores, 123")
+    assert conversas.listar(conversa)[-1].texto == "Rua das Flores, 123"
+    # mensagem antiga gravada em claro (antes desta regra) sai mascarada na leitura
+    with c.local.admin() as con:
+        con.execute(
+            "insert into public.mensagens (conversa_id, autor_id, corpo, corpo_exibido, "
+            "mascarada) values (%s, %s, %s, %s, false)",
+            (conversa, c.ids["cliente"], "zap 31 98888-7777", "zap 31 98888-7777"),
+        )
+    antiga = conversas.listar(conversa)[-1]
+    assert "98888" not in antiga.texto and antiga.mascarada is True
     with pytest.raises(Exception, match="partes"):  # quem não é parte não escreve
         conversas.enviar(conversa, c.ids["cliente2"], "intruso")
 
