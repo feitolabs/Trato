@@ -92,7 +92,13 @@ class _ConteudoState extends State<_Conteudo> {
   String? _erro(ConfigDefinicao d) {
     final v = _digitado(d);
     if (_controle(d).text.trim().isEmpty) return 'Digite um número';
-    if (v == null) return 'Digite um número válido';
+    if (v == null) {
+      return switch (d.unidade) {
+        UnidadeConfig.centavos => kErroReais,
+        UnidadeConfig.bps => kErroPercentual,
+        _ => 'Digite um número válido',
+      };
+    }
     if (v < d.minimo || v > d.maximo) return 'Fora da faixa: ${faixaLegivel(d)}';
     // Resposta da disputa precisa ser menor que o prazo de decisão.
     if (d.chave == 'prazo_resposta_disputa_horas' || d.chave == 'prazo_decisao_disputa_dias_uteis') {
@@ -442,6 +448,7 @@ Widget _campoProposto(ConfigDefinicao d, TextEditingController controle, String?
         prefixText: prefixo,
         suffixText: sufixo,
         errorText: erro,
+        errorMaxLines: 3,
       ),
     ),
   );

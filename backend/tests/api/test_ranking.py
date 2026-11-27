@@ -198,6 +198,7 @@ def _detalhe(uid):
         "nota_publica": 4.0,
         "servicos_concluidos": 1,
         "atende_remoto": False,
+        "disponivel_agora": False,
         "categorias": [],
         "cidades": [],
         "bairros": [],

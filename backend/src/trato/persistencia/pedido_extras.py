@@ -67,9 +67,15 @@ class NotasMaterialPostgres:
         nota_id = self._execucao.registrar_nota_material(
             nota.pedido_id, nota.profissional_id, nota.foto_storage_path, itens
         )
+        with self._banco.transacao() as con:
+            ids = con.execute(
+                "select id from public.nota_material_itens where nota_id = %s order by ordem, id",
+                (nota_id,),
+            ).fetchall()
         return NotaMaterial(
             nota_id, nota.pedido_id, nota.profissional_id, nota.foto_storage_path,
             nota.itens, nota.total_centavos, nota.enviada_em,
+            tuple(str(i["id"]) for i in ids),
         )  # fmt: skip
 
     def do_pedido(self, pedido_id: str) -> Sequence[NotaMaterial]:
@@ -81,13 +87,14 @@ class NotasMaterialPostgres:
                 "select n.id, n.enviada_por, n.total_centavos, n.enviada_em, m.storage_path "
                 "from public.notas_material n join public.contratos c on c.id = n.contrato_id "
                 "join public.midias m on m.id = n.midia_id "
-                "where c.pedido_id = %s order by n.enviada_em, n.id",
+                "where c.pedido_id = %s and c.status <> 'cancelado' "
+                "order by n.enviada_em, n.id",
                 (achado,),
             ).fetchall()
             saida = []
             for n in notas:
                 itens = con.execute(
-                    "select descricao, quantidade, valor_unitario_centavos, total_centavos "
+                    "select id, descricao, quantidade, valor_unitario_centavos, total_centavos "
                     "from public.nota_material_itens where nota_id = %s order by ordem, id",
                     (n["id"],),
                 ).fetchall()
@@ -108,6 +115,7 @@ class NotasMaterialPostgres:
                         ),
                         int(n["total_centavos"]),
                         n["enviada_em"],
+                        tuple(str(i["id"]) for i in itens),
                     )  # fmt: skip
                 )
         return tuple(saida)

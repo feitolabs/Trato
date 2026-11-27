@@ -115,7 +115,7 @@ void main() {
     }
   }
 
-  testWidgets('concluído não mostra a barra; remoto não mostra SOS', (t) async {
+  testWidgets('concluído não mostra a barra; remoto também mostra SOS', (t) async {
     await _janela(t);
     await t.pumpWidget(_app(PedidoExecucaoTela(pedido: _pedido('concluido'))));
     await t.pumpAndSettle();
@@ -123,7 +123,7 @@ void main() {
     await t.pumpWidget(_app(PedidoExecucaoTela(pedido: _pedido('em_andamento', remoto: true))));
     await t.pumpAndSettle();
     expect(find.byType(BarraAtendimento), findsOneWidget);
-    expect(find.byKey(const ValueKey('botao-sos-emergencia')), findsNothing);
+    expect(find.byKey(const ValueKey('botao-sos-emergencia')), findsOneWidget);
   });
 
   for (final fonte in [1.0, 1.3]) {
@@ -141,7 +141,7 @@ void main() {
       expect(find.text('Conversar com o cliente'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('botao-sos-emergencia')));
       await t.pumpAndSettle();
-      expect(find.text('Ligar 190'), findsOneWidget);
+      expect(find.text('Ligar 190 (Polícia)'), findsOneWidget);
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox());
       await t.pump(const Duration(seconds: 30));

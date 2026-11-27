@@ -58,6 +58,19 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in base if not unicodedata.combining(c))
 
 
+_MOTIVOS_DE_PAGAMENTO = frozenset({"fora_da_plataforma", "fugir_da_taxa", "pagamento_direto"})
+_PIX = re.compile(r"\b(pix|chave)\b")
+
+
+def pede_pagamento_por_fora(texto: str) -> bool:
+    """A mensagem fala em pagar fora do aplicativo (ou em chave/Pix): nela o número não é
+    liberado, porque pode ser a chave do pagamento."""
+    limpo = _normalizar(texto)
+    if _PIX.search(limpo):
+        return True
+    return any(m in _MOTIVOS_DE_PAGAMENTO and p.search(limpo) for m, _, p in _SINAIS)
+
+
 def avaliar_contorno(
     texto: str, categorias_mascara: frozenset[str], config: ConfigSeguranca
 ) -> SinalContorno:

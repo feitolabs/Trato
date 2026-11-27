@@ -110,10 +110,10 @@ def _conversar(amb, texto):
     return itens[-1]
 
 
-def test_depois_de_contratado_o_telefone_nao_passa_na_rota_do_chat(amb):
-    amb.semear_pedido(Estado.PAGO_E_RETIDO)  # já contratado (há contrato)
+def test_depois_de_contratado_so_o_telefone_passa_na_rota_do_chat(amb):
+    amb.semear_pedido(Estado.PAGO_E_RETIDO)  # pagamento confirmado (Termos 5.3 e 11.2)
     msg = _conversar(amb, "Me liga no (11) 98765-4321 ou joao@gmail.com")
-    assert "98765" not in msg["texto"] and "gmail" not in msg["texto"]
+    assert "98765-4321" in msg["texto"] and "gmail" not in msg["texto"]
     assert AVISO_MASCARA in msg["texto"] and msg["mascarada"] is True
 
 
@@ -204,5 +204,5 @@ def test_4_ou_5_digitos_so_com_palavra_de_contato():
 def test_rota_do_chat_esconde_rede_social_depois_de_contratado(amb):
     amb.semear_pedido(Estado.PAGO_E_RETIDO)
     assert AVISO_MASCARA in _conversar(amb, "me chama no ig fulano")["texto"]
-    assert AVISO_MASCARA in _conversar(amb, "9 9 8 8 7 7")["texto"]
+    assert _conversar(amb, "9 9 8 8 7 7")["texto"] == "9 9 8 8 7 7"  # telefone: liberado (11.2)
     assert _conversar(amb, "o ig caiu hoje")["texto"] == "o ig caiu hoje"

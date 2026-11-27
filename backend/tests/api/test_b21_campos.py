@@ -3,6 +3,7 @@ de aditivo pago."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -73,6 +74,8 @@ def test_moedas_valor_da_moeda_so_para_cliente_e_proxima_liberacao_do_profission
 
 
 def test_saldo_do_profissional_traz_o_retido_e_o_pedido_a_data_de_liberacao(fluxo: Fluxo):  # noqa: F811
+    config = fluxo.ctx.config
+    config._config = replace(config.carregar(), prazo_liberacao_dias=0)
     pid = fluxo.aceitar()
     fluxo.pagar(pid)
 

@@ -2,10 +2,14 @@
 
 Regras:
 - Respeita `notificacao_preferencias` (categoria x canal). Evento `essencial` sempre entra na
-  caixa de entrada (`app`); push/e-mail continuam obedecendo a preferência.
+  caixa de entrada (`app`); push/e-mail continuam obedecendo a preferência. Disputas e
+  pagamentos são obrigatórios (Termos 15.2): ignoram a preferência em todos os canais.
 - Idempotente: a mesma `chave` para a mesma pessoa e canal não gera outra notificação.
 - Canal externo desligado ou sem destino (sem token, sem e-mail) nem cria linha.
-- Falha de envio deixa a linha sem `enviada_em`; `reenviar_pendentes()` tenta de novo.
+- Falha de envio deixa a linha sem `enviada_em`; `reenviar_pendentes()` tenta de novo, só depois
+  da idade mínima da configuração (antes disso o envio original pode estar em andamento).
+- Push para vários aparelhos: se algum recebeu, a linha é marcada como enviada; token recusado
+  pelo provedor é desligado.
 - Deep link em `dados` (tela + pedido_id + link). Nunca vai código nem dado pessoal.
 - `papel` em `dados` ("cliente" ou "profissional"): para qual visão do app a notificação é, pelo
   pedido (uma leitura por notificação). Sem pedido, ou se a pessoa não é parte dele, a chave não
@@ -21,7 +25,7 @@ from typing import Any, Protocol
 
 from trato.notificacoes.canais import Canais, FalhaEnvio, Mensagem, TokenInvalido
 from trato.notificacoes.config import ConfigNotificacoes
-from trato.notificacoes.eventos import MODELOS, Evento, deep_link
+from trato.notificacoes.eventos import CATEGORIAS_OBRIGATORIAS, MODELOS, Evento, deep_link
 from trato.notificacoes.repositorio import (
     Preferencias,
     Registro,
@@ -102,6 +106,8 @@ class ServicoNotificacoes:
         }.get(canal, False)
 
     def canal_ligado(self, prefs: Preferencias, categoria: str, canal: str) -> bool:
+        if categoria in CATEGORIAS_OBRIGATORIAS:
+            return True  # a escolha gravada é ignorada
         escolha = prefs.get(categoria, {}).get(canal)
         return self._padrao(canal) if escolha is None else bool(escolha)
 
@@ -152,8 +158,10 @@ class ServicoNotificacoes:
                 continue
             if modelo.somente_app and nome != "app":
                 continue
-            ligado = (nome == "app" and modelo.essencial) or self.canal_ligado(
-                prefs, modelo.categoria.value, nome
+            ligado = (
+                (nome == "app" and modelo.essencial)
+                or (nome == "email" and modelo.email_obrigatorio)
+                or self.canal_ligado(prefs, modelo.categoria.value, nome)
             )
             if not ligado or (nome != "app" and not self._destinos(nome, usuario_id)):
                 continue
@@ -199,17 +207,22 @@ class ServicoNotificacoes:
         try:
             canal.enviar(mensagem)
         except TokenInvalido as erro:
-            self.repo.desativar_dispositivo(erro.token)
-            return False  # os outros aparelhos entram no próximo reenvio
+            for token in erro.tokens:
+                self.repo.desativar_dispositivo(token)
+            if not erro.entregues:
+                return False  # ninguém recebeu: o que sobrar entra no próximo reenvio
         except FalhaEnvio:
             return False
         self.repo.marcar_enviada(registro.id, self.agora())
         return True
 
     def reenviar_pendentes(self) -> int:
-        """Tenta de novo o que falhou (só as recentes, pela janela da configuração)."""
-        desde = self.agora() - self.config.reenvio_janela
+        """Tenta de novo o que falhou: dentro da janela da configuração e com a idade mínima,
+        para não repetir um envio que ainda está em andamento."""
+        agora = self.agora()
+        desde = agora - self.config.reenvio_janela
+        ate = agora - self.config.reenvio_idade_minima
         enviadas = 0
-        for registro in self.repo.pendentes(desde, self.config.reenvio_lote):
+        for registro in self.repo.pendentes(desde, self.config.reenvio_lote, ate):
             enviadas += self._entregar(registro)
         return enviadas

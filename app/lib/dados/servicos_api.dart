@@ -2,18 +2,26 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
 import 'package:path_provider/path_provider.dart';
 
 import '../componentes/imagem_trato.dart';
 import '../dispositivo/servico_camera.dart';
+import '../telas/comuns/textos_dos_termos.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/comuns/foco_rolagem.dart';
 import 'repositorios.dart' show Cobranca, StatusPagamento;
+import '../telas/disputa_acordo/acordo.dart';
 import '../telas/disputa_profissional/disputa.dart';
+import '../telas/legal/aceite_dos_termos.dart';
+import '../telas/legal/registro_do_aceite.dart';
 import '../telas/lgpd/modelos.dart';
+import '../telas/contestacao_decisao/modelos.dart' show ErroDeArquivo;
+import '../telas/medidas/modelos.dart' show ProvaEscolhida, textoProvaRecusada, tipoDaProva;
+import '../telas/nota_material/contestacao_material.dart';
 import '../telas/nota_material/nota_material.dart';
 import '../telas/perfil_publico/perfil_publico.dart';
+import '../telas/perfil_publico/revisao_avaliacao.dart';
 import '../telas/profissional_inicio/primeiros_passos.dart';
 import '../telas/profissional_cadastro/cadastro.dart';
 import '../telas/verificacao/verificacao.dart';
@@ -178,7 +186,7 @@ class ServicoAditivoApi implements ServicoAditivo {
 }
 
 /// Nota de materiais. O total sai do backend (quantidade × unitário); o app não soma.
-class ServicoNotaMaterialApi implements ServicoNotaMaterial {
+class ServicoNotaMaterialApi implements ServicoNotaMaterial, ServicoContestacaoMaterial {
   ServicoNotaMaterialApi(
     this._api, {
     this.tituloPedido = 'Pedido',
@@ -190,6 +198,80 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
   final String tituloPedido;
   final String nomeProfissional;
   final ServicoUpload? upload;
+
+  @override
+  bool get podeAnexar => upload != null;
+
+  @override
+  Future<List<ContestacaoMaterial>?> listarContestacoes(String pedidoId) async {
+    try {
+      final j = await _api.get('/v1/pedidos/$pedidoId/materiais/contestacoes');
+      final itens = j is Map ? j['itens'] : null;
+      return [
+        if (itens is List)
+          for (final item in itens)
+            if (item is Map) ContestacaoMaterial.deJson(item),
+      ];
+    } on ErroTrato catch (e) {
+      if (const {403, 404, 503}.contains(e.codigoHttp)) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<ContestacaoMaterial> contestarMaterial(
+    String pedidoId,
+    String notaId, {
+    required String motivo,
+    required String descricao,
+    required int valorCentavos,
+    String? itemId,
+    List<ProvaEscolhida> arquivos = const [],
+  }) async {
+    // A foto que já subiu guarda o id: "tentar de novo" não envia outra vez.
+    for (final (i, a) in arquivos.indexed) {
+      if (a.anexoId != null) continue;
+      final tipo = tipoDaProva(a.bytes);
+      final envio = upload;
+      if (tipo == null || envio == null) throw ErroDeArquivo(i, textoProvaRecusada);
+      try {
+        final enviado = await envio.enviar(
+          ArquivoCapturado(
+            bytes: a.bytes,
+            sha256: crypto.sha256.convert(a.bytes).toString(),
+            capturadaEm: DateTime.now().toUtc(),
+            mime: tipo,
+          ),
+          // O destino de provas que o cliente pode usar neste pedido.
+          FinalidadeArquivo.evidenciaDisputa,
+          pedidoId: pedidoId,
+        );
+        a.anexoId = enviado.arquivoId;
+      } on ErroTrato catch (e) {
+        throw ErroDeArquivo(i, e.mensagem);
+      }
+    }
+    try {
+      final j = await _api.post(
+        '/v1/pedidos/$pedidoId/materiais/$notaId/contestar',
+        corpo: {
+          'motivo': motivo,
+          'descricao': descricao.trim(),
+          'valor_contestado_centavos': valorCentavos,
+          if (itemId != null) 'item_id': itemId,
+          if (arquivos.isNotEmpty) 'anexos': [for (final a in arquivos) a.anexoId],
+        },
+      );
+      return ContestacaoMaterial.deJson(j is Map ? j : const {});
+    } on ErroTrato catch (e) {
+      if (e.codigo == 'anexo_invalido') {
+        for (final a in arquivos) {
+          a.anexoId = null;
+        }
+      }
+      rethrow;
+    }
+  }
 
   /// `GET /v1/contratos/{id}/notas-material`: a nota mais recente, ou `null`.
   @override
@@ -219,6 +301,7 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
     return [
       for (final n in notas)
         NotaMaterial(
+          id: n['id'] is String ? n['id'] as String : null,
           pedidoTitulo: tituloPedido == 'Pedido' ? 'Pedido #$curto' : tituloPedido,
           profissional: nome.isEmpty ? 'Profissional' : nome,
           enviadaEm: DateTime.parse(n['enviada_em'] as String).toLocal(),
@@ -226,6 +309,7 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
           itens: [
             for (final i in (n['itens'] as List).cast<Map<String, dynamic>>())
               ItemNota(
+                id: i['id'] is String ? i['id'] as String : null,
                 descricao: i['descricao'] as String,
                 // O backend manda a quantidade como texto decimal ("2.00").
                 quantidade: num.tryParse('${i['quantidade']}')?.toInt() ?? 1,
@@ -238,67 +322,88 @@ class ServicoNotaMaterialApi implements ServicoNotaMaterial {
     ];
   }
 
+  /// Foto que já subiu e ainda não virou nota (por pedido e foto): tentar de novo reaproveita o
+  /// mesmo `midia_id`, e o servidor continua reconhecendo uma nota repetida.
+  final _fotosEnviadas = <(String, String), String>{};
+
   /// `POST /v1/contratos/{id}/notas-material`. A tela informa descrição e valor de cada item;
   /// a quantidade vai como 1 e o valor como unitário.
+  ///
+  /// A foto vai sempre pelo envio conferido (`midia_id`): o caminho solto (`foto_storage_path`)
+  /// não abre no painel, e a equipe ficaria sem a prova (6.9).
   @override
   Future<void> enviar(EnvioNota envio) async {
-    String? midiaId;
-    final fotoPath = envio.fotoNota;
-    final up = upload;
-    if (up != null && fotoPath.isNotEmpty) {
-      try {
-        final bytes = obterBytesImagem(fotoPath);
-        if (bytes != null && bytes.isNotEmpty) {
-          final cap = ArquivoCapturado(
-            bytes: bytes,
-            sha256: crypto.sha256.convert(bytes).toString(),
-            capturadaEm: DateTime.now().toUtc(),
-          );
-          final res =
-              await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
-          midiaId = res.arquivoId;
-        } else if (temArquivoImagem(fotoPath)) {
-          final caminho = obterCaminhoImagem(fotoPath) ?? fotoPath;
-          final f = File(caminho);
-          if (f.existsSync()) {
-            final b = await f.readAsBytes();
-            final cap = ArquivoCapturado(
-              bytes: b,
-              sha256: crypto.sha256.convert(b).toString(),
-              capturadaEm: DateTime.now().toUtc(),
-            );
-            final res =
-                await up.enviar(cap, FinalidadeArquivo.notaMaterial, pedidoId: envio.pedidoId);
-            midiaId = res.arquivoId;
-          }
-        }
-      } on ErroTrato {
-        rethrow; // sem foto enviada a nota não vale; o caminho do aparelho não serve ao backend
-      } catch (_) {}
-      if (midiaId == null) {
-        throw const ErroTrato(TipoErro.recusado, 'Não conseguimos ler a foto da nota. Tire outra.');
-      }
+    final chave = (envio.pedidoId, envio.fotoNota);
+    final midiaId = _fotosEnviadas[chave] ??= await _enviarFotoDaNota(envio);
+    try {
+      await _api.post(
+        '/v1/contratos/${envio.pedidoId}/notas-material',
+        corpo: {
+          'midia_id': midiaId,
+          'itens': [
+            for (final i in envio.itens)
+              {
+                'descricao': i.descricao,
+                'quantidade': i.quantidade,
+                'valor_unitario_centavos': i.valorUnitarioCentavos,
+              },
+          ],
+        },
+      );
+    } on ErroTrato catch (e) {
+      // 422: o servidor pode ter recusado a foto; a próxima tentativa envia de novo.
+      if (e.codigoHttp == 422) _fotosEnviadas.remove(chave);
+      rethrow;
     }
+    _fotosEnviadas.remove(chave);
+  }
 
-    final corpo = <String, dynamic>{
-      if (midiaId != null)
-        'midia_id': midiaId
-      else
-        'foto_storage_path': fotoPath.replaceAll(RegExp(r'^/+'), ''),
-      'itens': [
-        for (final i in envio.itens)
-          {
-            'descricao': i.descricao,
-            'quantidade': i.quantidade,
-            'valor_unitario_centavos': i.valorUnitarioCentavos,
-          },
-      ],
-    };
-
-    await _api.post(
-      '/v1/contratos/${envio.pedidoId}/notas-material',
-      corpo: corpo,
-    );
+  Future<String> _enviarFotoDaNota(EnvioNota envio) async {
+    final up = upload;
+    if (up == null) {
+      throw const ErroTrato(
+        TipoErro.recusado,
+        'Não dá para enviar a foto da nota agora. Atualize o app e tente de novo.',
+      );
+    }
+    const semLeitura =
+        ErroTrato(TipoErro.recusado, 'Não conseguimos ler a foto da nota. Tire outra.');
+    final fotoPath = envio.fotoNota;
+    Uint8List? bytes;
+    try {
+      bytes = obterBytesImagem(fotoPath);
+      if ((bytes == null || bytes.isEmpty) && temArquivoImagem(fotoPath)) {
+        final f = File(obterCaminhoImagem(fotoPath) ?? fotoPath);
+        if (f.existsSync()) bytes = await f.readAsBytes();
+      }
+    } on Object {
+      throw semLeitura;
+    }
+    if (bytes == null || bytes.isEmpty) throw semLeitura;
+    const falha = 'A foto da nota não foi enviada, então a nota não foi registrada.';
+    try {
+      final res = await up.enviar(
+        ArquivoCapturado(
+          bytes: bytes,
+          sha256: crypto.sha256.convert(bytes).toString(),
+          capturadaEm: DateTime.now().toUtc(),
+        ),
+        FinalidadeArquivo.notaMaterial,
+        pedidoId: envio.pedidoId,
+      );
+      return res.arquivoId;
+    } on ErroTrato catch (e) {
+      // Sem internet e sessão vencida têm tratamento próprio.
+      if (e.tipo == TipoErro.semInternet || e.tipo == TipoErro.sessaoExpirada) rethrow;
+      throw ErroTrato(
+        e.tipo,
+        '$falha ${e.mensagem} Tente de novo.',
+        codigoHttp: e.codigoHttp,
+        codigo: e.codigo,
+      );
+    } on Object {
+      throw const ErroTrato(TipoErro.servidor, '$falha Tente de novo.');
+    }
   }
 }
 
@@ -701,10 +806,46 @@ class ServicoPrimeirosPassosApi {
 
 /// Perfil público do próprio profissional (`GET /v1/me` + `GET /v1/profissional/perfil`
 /// + `GET /v1/profissionais/{id}`).
-class ServicoPerfilPublicoApi implements ServicoPerfilPublico, RespostaAvaliacao {
+class ServicoPerfilPublicoApi
+    implements ServicoPerfilPublico, RespostaAvaliacao, RevisaoDeAvaliacao {
   ServicoPerfilPublicoApi(this._api);
 
   final ClienteApi _api;
+
+  @override
+  Future<List<PedidoRevisaoAvaliacao>?> pedidosDeRevisao() async {
+    const porPagina = 100;
+    final pedidos = <PedidoRevisaoAvaliacao>[];
+    var lidos = 0;
+    try {
+      while (true) {
+        final j = await _api.get(
+          '/v1/me/avaliacoes/revisoes',
+          consulta: {'limite': '$porPagina', 'deslocamento': '$lidos'},
+        );
+        if (j is! Map || j['itens'] is! List) return null;
+        final itens = j['itens'] as List;
+        pedidos.addAll([
+          for (final i in itens)
+            if (PedidoRevisaoAvaliacao.deJson(i) case final p?) p,
+        ]);
+        lidos += itens.length;
+        final total = j['total'];
+        if (itens.isEmpty || total is! int || lidos >= total) return pedidos;
+      }
+    } on ErroTrato catch (e) {
+      if (const {404, 503}.contains(e.codigoHttp)) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> pedirRevisao(String avaliacaoId, String justificativa) async {
+    await _api.post(
+      '/v1/avaliacoes/$avaliacaoId/revisoes',
+      corpo: {'justificativa': justificativa.trim(), 'tipo': 'revisao'},
+    );
+  }
 
   @override
   Future<PerfilPublico> carregarPerfil() async {
@@ -904,6 +1045,9 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
         solucaoPedida: solucao.isEmpty ? 'Não informada' : solucao,
         prazoRespostaHoras: prazo,
         valorCongeladoCentavos: (j['valor_congelado_centavos'] as int?) ?? 0,
+        // Sem o campo (servidor antigo), como antes: espera a resposta.
+        estado: j['estado'] is String ? j['estado'] as String : 'aberta',
+        acordo: AcordoDisputa.deJson(j['acordo']),
       );
     } on ErroTrato {
       // 404/403 sobem: a tela mostra "não encontrado", não "Nenhum problema aberto".
@@ -988,10 +1132,84 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
 
 /// Central de privacidade e exclusão da conta (LGPD) falando com a API real:
 /// `GET /v1/me/consentimentos`, `POST /v1/me/consentimentos`, `GET /v1/me/dados`, `POST /v1/me/exclusao`.
-class ServicoPrivacidadeApi implements ServicoPrivacidade, CancelamentoExclusao {
+class ServicoPrivacidadeApi
+    implements
+        ServicoPrivacidade,
+        CancelamentoExclusao,
+        ConsultaDeTratinhos,
+        PedidosDoTitular,
+        ServicoAceiteDosTermos,
+        ConsultaDoAceite {
   ServicoPrivacidadeApi(this._api);
 
   final ClienteApi _api;
+
+  @override
+  Future<AceitePendente?> aceitePendente() async {
+    try {
+      return AceitePendente.deJson(await _api.get('/v1/me/termos'));
+    } on ErroTrato catch (e) {
+      if (const {403, 404, 503}.contains(e.codigoHttp)) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<RegistroDoAceite?> registroDoAceite() async {
+    try {
+      return RegistroDoAceite.deJson(await _api.get('/v1/me/termos'));
+    } on ErroTrato catch (e) {
+      if (const {404, 503}.contains(e.codigoHttp)) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> aceitarTermos(String versaoMostrada) async {
+    await _api.post('/v1/me/termos/aceite', corpo: {'versao': versaoMostrada});
+  }
+
+  static const _caminhoPedidosLgpd = '/v1/me/lgpd/pedidos';
+
+  @override
+  Future<PaginaPedidosLgpd?> listarPedidosLgpd({int deslocamento = 0}) async {
+    try {
+      final j = await _api.get(
+        _caminhoPedidosLgpd,
+        consulta: {'limite': '20', 'deslocamento': '$deslocamento'},
+      );
+      final brutos = j is Map ? j['itens'] : null;
+      final itens = [
+        if (brutos is List)
+          for (final item in brutos)
+            if (item is Map) PedidoLgpd.deJson(item),
+      ];
+      return PaginaPedidosLgpd(
+        itens: itens,
+        total: _lerInteiroNaoNegativo(j, 'total') ?? deslocamento + itens.length,
+      );
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404 || e.codigoHttp == 503) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<PedidoLgpd> abrirPedidoLgpd({
+    required String tipo,
+    String descricao = '',
+    String? decisaoAutomatizada,
+  }) async {
+    final j = await _api.post(
+      _caminhoPedidosLgpd,
+      corpo: {
+        'tipo': tipo,
+        if (descricao.isNotEmpty) 'descricao': descricao,
+        if (decisaoAutomatizada != null) 'decisao_automatizada': decisaoAutomatizada,
+      },
+    );
+    return PedidoLgpd.deJson(j is Map ? j : const {});
+  }
 
   static const _mapaUiParaBackend = {
     'dados_pedido': 'termos_de_uso',
@@ -1051,7 +1269,9 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade, CancelamentoExclusao 
       corpo: {
         'finalidade': finalidadeBackend,
         'aceito': ativo,
-        'versao_texto': '1.0',
+        // A versão do texto que o app mostra, cada documento com a sua.
+        'versao_texto':
+            finalidadeBackend == 'termos_de_uso' ? versaoDosTermos : versaoDaPrivacidade,
       },
     );
   }
@@ -1072,6 +1292,104 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade, CancelamentoExclusao 
     return jsonFormatado;
   }
 
+  static int? _lerInteiroNaoNegativo(Object? json, String chave) {
+    if (json is! Map) return null;
+    final valor = json[chave];
+    if (valor is int && valor >= 0) return valor;
+    return null;
+  }
+
+  static List<String> _lerPendencias(Object? json) {
+    final lista = json is Map ? json['pendencias'] : null;
+    if (lista is! List) return const [];
+    return [
+      for (final p in lista)
+        if (p is String && p.trim().isNotEmpty) p.trim(),
+    ];
+  }
+
+  static DateTime? _lerGuarda(Object? json) {
+    final v = json is Map ? json['tratinhos_guardados_ate'] : null;
+    return v is String ? DateTime.tryParse(v)?.toLocal() : null;
+  }
+
+  /// Consulta `GET /v1/me/exclusao` para ler `tratinhos_a_perder` (campo opcional).
+  Future<PreviaExclusao?> consultarExclusao() async {
+    try {
+      final j = await _api.get('/v1/me/exclusao');
+      return PreviaExclusao(
+        tratinhosAPerder: _lerInteiroNaoNegativo(j, 'tratinhos_a_perder'),
+        pendencias: _lerPendencias(j),
+        guardadosAte: _lerGuarda(j),
+      );
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404 || e.codigoHttp == 503) return null;
+      rethrow;
+    }
+  }
+
+  /// Passo 1 de `POST /v1/me/exclusao`: devolve o token de confirmação e `tratinhos_a_perder`.
+  Future<PreviaExclusao> iniciarExclusao() async {
+    final r1 = await _api.post('/v1/me/exclusao');
+    final mapa1 = (r1 is Map<String, dynamic>) ? r1 : <String, dynamic>{};
+    final token = mapa1['token_confirmacao'] as String?;
+    return PreviaExclusao(
+      tokenConfirmacao: (token != null && token.isNotEmpty) ? token : null,
+      tratinhosAPerder: _lerInteiroNaoNegativo(mapa1, 'tratinhos_a_perder'),
+      pendencias: _lerPendencias(mapa1),
+      guardadosAte: _lerGuarda(mapa1),
+    );
+  }
+
+  /// Passo 2 de `POST /v1/me/exclusao`: confirma o pedido com o token do passo 1.
+  Future<void> confirmarExclusao(String token) async {
+    await _api.post('/v1/me/exclusao', corpo: {'token_confirmacao': token});
+  }
+
+  @override
+  Future<SaldoTratinhos?> saldoDeTratinhos() async {
+    int? aPerder;
+    var pendencias = const <String>[];
+    DateTime? guardadosAte;
+    var exclusaoIndisponivel = false;
+    try {
+      final previa = await consultarExclusao();
+      if (previa == null) {
+        exclusaoIndisponivel = true;
+      } else {
+        aPerder = previa.tratinhosAPerder;
+        pendencias = previa.pendencias;
+        guardadosAte = previa.guardadosAte;
+      }
+    } on ErroTrato {
+      // Se /v1/me/exclusao falhar, tenta /v1/me/moedas antes de falhar.
+      exclusaoIndisponivel = true;
+    }
+    try {
+      final j = await _api.get('/v1/me/moedas');
+      return SaldoTratinhos(
+        tratinhosAPerder: aPerder,
+        pendencias: pendencias,
+        guardadosAte: guardadosAte,
+        cliente: _lerInteiroNaoNegativo(j, 'saldo'),
+        profissional: _lerInteiroNaoNegativo(j, 'saldo_profissional'),
+        valorMoedaCentavos: _lerInteiroNaoNegativo(j, 'valor_moeda_centavos'),
+      );
+    } on ErroTrato catch (e) {
+      if (aPerder != null || pendencias.isNotEmpty || guardadosAte != null) {
+        return SaldoTratinhos(
+          tratinhosAPerder: aPerder,
+          pendencias: pendencias,
+          guardadosAte: guardadosAte,
+        );
+      }
+      if (e.codigoHttp == 404 || e.codigoHttp == 503) {
+        return exclusaoIndisponivel ? null : const SaldoTratinhos();
+      }
+      rethrow;
+    }
+  }
+
   @override
   Future<void> cancelarExclusao() async {
     await _api.delete('/v1/me/exclusao');
@@ -1079,13 +1397,10 @@ class ServicoPrivacidadeApi implements ServicoPrivacidade, CancelamentoExclusao 
 
   @override
   Future<void> solicitarExclusao() async {
-    // 1º passo: pede a exclusão para obter o token de confirmação
-    final r1 = await _api.post('/v1/me/exclusao');
-    final mapa1 = (r1 is Map<String, dynamic>) ? r1 : <String, dynamic>{};
-    final token = mapa1['token_confirmacao'] as String?;
+    final previa = await iniciarExclusao();
+    final token = previa.tokenConfirmacao;
     if (token != null && token.isNotEmpty) {
-      // 2º passo: confirma com o token emitido
-      await _api.post('/v1/me/exclusao', corpo: {'token_confirmacao': token});
+      await confirmarExclusao(token);
     }
   }
 }

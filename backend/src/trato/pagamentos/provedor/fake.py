@@ -121,9 +121,18 @@ class ProvedorFake:
         if not 0 < valor <= resta:
             raise ErroProvedor("valor do estorno fora do que resta da cobrança")
         self._estornado[cobranca_id] = self._estornado.get(cobranca_id, 0) + valor
-        estorno = EstornoProvedor(f"re_fake_{_curto(chave_idempotencia)}", cobranca_id, valor, True)
+        estorno = EstornoProvedor(
+            f"re_fake_{_curto(chave_idempotencia)}",
+            cobranca_id,
+            valor,
+            True,
+            chave=chave_idempotencia,
+        )
         self._estornos[chave_idempotencia] = estorno
         return estorno
+
+    def estornos_da_cobranca(self, cobranca_id: str) -> Sequence[EstornoProvedor]:
+        return tuple(e for e in self._estornos.values() if e.cobranca_id == cobranca_id)
 
     def preparar_cartao(self, usuario_id: str) -> PreparoCartao:
         self.chamadas.append(("preparar_cartao", usuario_id))
@@ -239,6 +248,18 @@ class ProvedorFake:
         chave = (segredo or self._segredo).encode()
         v1 = hmac.new(chave, f"{instante}.".encode() + corpo, hashlib.sha256).hexdigest()
         return f"t={instante},v1={v1}"
+
+    def estornar_por_fora(self, cobranca_id: str, valor_centavos: int) -> None:
+        """Estorno feito no painel do provedor: não leva a chave de nenhuma ordem."""
+        numero = len(self._estornos) + 1
+        self._estornado[cobranca_id] = self._estornado.get(cobranca_id, 0) + valor_centavos
+        self._estornos[f"fora:{numero}"] = EstornoProvedor(
+            f"re_fora_{numero}", cobranca_id, valor_centavos, True
+        )
+
+    def esquecer_chaves(self) -> None:
+        """A chave de idempotência venceu no provedor: repetir o pedido criaria outro estorno."""
+        self._estornos = {f"velho:{n}": e for n, e in enumerate(self._estornos.values())}
 
     def marcar_paga(self, cobranca_id: str) -> None:
         self._mudar(cobranca_id, StatusCobranca.PAGA)

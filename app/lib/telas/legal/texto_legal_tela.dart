@@ -3,30 +3,44 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
+import '../comuns/textos_dos_termos.dart';
+import 'guardar_texto.dart';
+import 'registro_do_aceite.dart';
 
 /// Textos legais do app. Os arquivos em `assets/legal/` são cópias de `docs/juridico/` (um teste
 /// confere que continuam iguais). São RASCUNHOS: a tela avisa que o texto será revisado.
 enum TextoLegal {
-  termos('Termos de uso', 'assets/legal/termos-de-uso.md'),
-  privacidade('Política de privacidade', 'assets/legal/politica-de-privacidade.md');
+  termos('Termos de uso', 'assets/legal/termos-de-uso.md', versaoDosTermos),
+  privacidade(
+    'Política de privacidade',
+    'assets/legal/politica-de-privacidade.md',
+    versaoDaPrivacidade,
+  );
 
-  const TextoLegal(this.titulo, this.arquivo);
+  const TextoLegal(this.titulo, this.arquivo, this.versao);
 
   final String titulo;
   final String arquivo;
+  final String versao;
+
+  /// Nome do arquivo da cópia que a pessoa guarda.
+  String get nomeDaCopia => 'trato-${arquivo.split('/').last.replaceAll('.md', '')}-v$versao.txt';
 
   Future<String> carregar() => rootBundle.loadString(arquivo);
 }
 
 /// Aviso fixo no alto de cada texto legal.
 const avisoRascunhoLegal = 'Documento oficial em vigor durante o piloto. '
-    'Dúvidas ou exercício de direitos LGPD: privacidade@trato.app.br.';
+    'Dúvidas ou exercício de direitos LGPD: privacidade@tratofeitolabs.com.br.';
 
 /// Índice com os dois textos (Termos de uso e Política de privacidade).
 class TermosEPoliticaTela extends StatelessWidget {
-  const TermosEPoliticaTela({super.key, required this.aoAbrir});
+  const TermosEPoliticaTela({super.key, required this.aoAbrir, this.consultaDoAceite});
 
   final ValueChanged<TextoLegal> aoAbrir;
+
+  /// Termos 1.4: nulo sem conta aberta (não há aceite para consultar).
+  final ConsultaDoAceite? consultaDoAceite;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +66,7 @@ class TermosEPoliticaTela extends StatelessWidget {
                 ),
               ),
             ),
+          if (consultaDoAceite != null) CartaoRegistroDoAceite(consulta: consultaDoAceite!),
         ],
       ),
     );
@@ -60,13 +75,27 @@ class TermosEPoliticaTela extends StatelessWidget {
 
 /// Mostra um texto legal (Markdown simples) com o aviso de rascunho.
 class TextoLegalTela extends StatelessWidget {
-  const TextoLegalTela({super.key, required this.titulo, required this.carregar});
+  const TextoLegalTela({
+    super.key,
+    required this.titulo,
+    required this.carregar,
+    this.nomeDaCopia = 'trato-texto-legal.txt',
+    this.guardar = guardarTextoNoAparelho,
+  });
 
-  TextoLegalTela.de(TextoLegal texto, {Key? key})
-      : this(key: key, titulo: texto.titulo, carregar: texto.carregar);
+  TextoLegalTela.de(TextoLegal texto, {Key? key, GuardarTextoLegal guardar = guardarTextoNoAparelho})
+      : this(
+          key: key,
+          titulo: texto.titulo,
+          carregar: texto.carregar,
+          nomeDaCopia: texto.nomeDaCopia,
+          guardar: guardar,
+        );
 
   final String titulo;
   final Future<String> Function() carregar;
+  final String nomeDaCopia;
+  final GuardarTextoLegal guardar;
 
   @override
   Widget build(BuildContext context) {
@@ -90,8 +119,14 @@ class TextoLegalTela extends StatelessWidget {
                   style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.azulTexto),
                 ),
               ),
+              const SizedBox(height: EspacosTrato.x3),
+              BotaoGuardarTexto(
+                nomeArquivo: nomeDaCopia,
+                conteudo: textoParaGuardar(titulo, blocos),
+                guardar: guardar,
+              ),
               const SizedBox(height: EspacosTrato.x4),
-              for (final b in blocos) _Linha(bloco: b),
+              for (final b in blocos) LinhaDoTextoLegal(bloco: b),
             ],
           );
         },
@@ -135,8 +170,23 @@ List<BlocoLegal> interpretarTextoLegal(String markdown) {
   return saida;
 }
 
-class _Linha extends StatelessWidget {
-  const _Linha({required this.bloco});
+/// O mesmo texto da tela em texto puro, para guardar e imprimir.
+String textoParaGuardar(String titulo, List<BlocoLegal> blocos) {
+  final saida = StringBuffer('$titulo\n');
+  for (final b in blocos) {
+    final limpo = b.texto.replaceAll('**', '').replaceAll('`', '');
+    saida.write(switch (b.tipo) {
+      TipoBlocoLegal.secao => '\n$limpo\n',
+      TipoBlocoLegal.item => '- $limpo\n',
+      TipoBlocoLegal.paragrafo => '$limpo\n',
+    });
+  }
+  return saida.toString();
+}
+
+/// Um bloco de texto legal na tela.
+class LinhaDoTextoLegal extends StatelessWidget {
+  const LinhaDoTextoLegal({super.key, required this.bloco});
 
   final BlocoLegal bloco;
 

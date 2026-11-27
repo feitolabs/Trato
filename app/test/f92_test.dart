@@ -14,6 +14,7 @@ import 'package:trato/telas/fluxo/navegacao_casca.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
 import 'package:trato/tema/tema.dart';
 
+import 'apoio/entrar.dart';
 import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'apoio/exemplos/demo.dart';
 import 'apoio/fontes.dart';
@@ -180,7 +181,7 @@ void main() {
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final auth = ServicoAuthFake();
-    await auth.entrarComEmail(email: 'ana@exemplo.com', senha: '12345678');
+    await entrarNaContaDeTeste(auth, email: 'ana@exemplo.com');
     ServicoAuthPadrao.atual = auth;
     final chave = GlobalKey<NavigatorState>();
     final msg = GlobalKey<ScaffoldMessengerState>();
@@ -275,7 +276,7 @@ void main() {
       expect(find.byType(LoginTela), findsOneWidget);
       expect(LinkPendente.atual, isNotNull);
 
-      await auth.entrarComEmail(email: 'ana@exemplo.com', senha: '12345678');
+      await entrarNaContaDeTeste(auth, email: 'ana@exemplo.com');
       chave.currentState!.pushAndRemoveUntil(
         MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
         (_) => false,

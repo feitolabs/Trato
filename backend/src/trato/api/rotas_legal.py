@@ -114,7 +114,7 @@ HTML_PRIVACIDADE = f"""<!DOCTYPE html>
   </header>
   <main>
     <p><strong>Controlador dos dados:</strong> Feito Labs Tecnologia Ltda., Belo Horizonte/MG.<br/>
-    <strong>Encarregado pelo tratamento de dados (DPO):</strong> Encarregado de Proteção de Dados Feito Labs — <code>privacidade@trato.app.br</code>.</p>
+    <strong>Encarregado pelo tratamento de dados (DPO):</strong> Encarregado de Proteção de Dados Feito Labs — <code>privacidade@tratofeitolabs.com.br</code>.</p>
     <p>Esta política explica, em linguagem simples e conforme a <strong>Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD)</strong>, quais dados pessoais coletamos no aplicativo <strong>Trato</strong>, por que precisamos deles, com quem são compartilhados e como você exerce seus direitos.</p>
 
     <h2>1. Quais dados coletamos e para quê</h2>
@@ -226,10 +226,10 @@ HTML_PRIVACIDADE = f"""<!DOCTYPE html>
 
     <h2>6. Seus direitos como titular (art. 18 da LGPD) e Exclusão de Conta</h2>
     <p>Você pode, a qualquer momento e sem custo, confirmar, acessar, corrigir, exportar uma cópia dos seus dados, rever consentimentos ou solicitar a <strong>exclusão da sua conta</strong>.</p>
-    <p><strong>Como exercer no próprio aplicativo:</strong> Vá em <strong>Perfil → Meus dados (LGPD)</strong>. Nessa tela você consulta e altera seus consentimentos, solicita a <strong>exportação dos seus dados</strong> e pode pedir a <strong>exclusão da sua conta</strong> com confirmação imediata. Se preferir, envie um e-mail para <code>privacidade@trato.app.br</code>.</p>
+    <p><strong>Como exercer no próprio aplicativo:</strong> Vá em <strong>Perfil → Meus dados (LGPD)</strong>. Nessa tela você consulta e altera seus consentimentos, solicita a <strong>exportação dos seus dados</strong> e pode pedir a <strong>exclusão da sua conta</strong> com confirmação imediata. Se preferir, envie um e-mail para <code>privacidade@tratofeitolabs.com.br</code>.</p>
   </main>
   <footer>
-    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@trato.app.br
+    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@tratofeitolabs.com.br
   </footer>
 </body>
 </html>
@@ -297,10 +297,10 @@ HTML_TERMOS = f"""<!DOCTYPE html>
     </ul>
 
     <h2>7. Contato e Foro</h2>
-    <p>Dúvidas ou solicitações: Central de ajuda no aplicativo ou pelo e-mail <code>suporte@trato.app.br</code>. Foro eleito: domicílio do consumidor ou Comarca de <strong>Belo Horizonte/MG</strong>.</p>
+    <p>Dúvidas ou solicitações: Central de ajuda no aplicativo ou pelo e-mail <code>suporte@tratofeitolabs.com.br</code>. Foro eleito: domicílio do consumidor ou Comarca de <strong>Belo Horizonte/MG</strong>.</p>
   </main>
   <footer>
-    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@trato.app.br
+    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@tratofeitolabs.com.br
   </footer>
 </body>
 </html>
@@ -356,7 +356,7 @@ HTML_EMAIL_CONFIRMADO = f"""<!DOCTYPE html>
     <a class="botao-app" href="br.com.feitolabs.trato://login-callback">Abrir o aplicativo Trato</a>
   </main>
   <footer>
-    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@trato.app.br
+    © 2026 Feito Labs Tecnologia Ltda. · Belo Horizonte/MG · suporte@tratofeitolabs.com.br
   </footer>
 </body>
 </html>

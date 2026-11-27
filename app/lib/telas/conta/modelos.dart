@@ -108,7 +108,7 @@ abstract interface class ServicoConta {
 
   /// Denuncia um perfil (`alvoTipo` = `perfil`) ou a conversa de um pedido (`chat`, com [pedidoId]).
   /// `POST /v1/denuncias`. [motivo] é o código do backend (`assedio`, `fraude`, `cobranca_fora`,
-  /// `perfil_falso`, `outro`); [detalhes] tem de 5 a 500 caracteres.
+  /// `perfil_falso`, `dano`, `outro`); [detalhes] tem de 5 a 500 caracteres.
   Future<void> enviarDenuncia({
     required String alvoTipo,
     required String denunciadoId,

@@ -15,7 +15,8 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any, Protocol
 
-from trato.pedidos.estados import Estado
+from trato.api.moedas_saldo import parcelas_do_gasto
+from trato.pedidos.estados import Acao, Ator, Estado, Evento, Papel
 
 CARTEIRA = "profissional"
 TIPO_USO = "exclusividade_uso"
@@ -77,6 +78,30 @@ class Exclusividade:
     respondida_em: datetime | None = None
     expira_em: datetime | None = None
     encerrada_em: datetime | None = None
+    # Quem pagou: "cliente" (Termos 13.6) ou "profissional" (forma antiga, em encerramento).
+    pagador: str = "profissional"
+    orcamento_id: str | None = None
+    motivo_encerramento: str | None = None
+    estornada: bool = False
+    estornada_em: datetime | None = None
+
+
+@dataclass(frozen=True)
+class ResultadoCliente:
+    # ok | ja_existe | nao_encontrado | pedido_indisponivel | orcamento_invalido |
+    # profissional_indisponivel | saldo_insuficiente | indisponivel
+    resultado: str
+    exclusividade_id: str | None = None
+    expira_em: datetime | None = None
+    saldo_restante: int | None = None
+
+
+@dataclass(frozen=True)
+class ResultadoDevolucao:
+    # ok | ja_devolvida | nao_encontrada | ja_encerrada | prazo_vencido | analista_invalido |
+    # nao_elegivel | indisponivel
+    resultado: str
+    devolvido: int = 0
 
 
 @dataclass(frozen=True)
@@ -321,6 +346,8 @@ class ExclusividadesEmMemoria:
         saida: list[Expirada] = []
         with self._trava:
             for item in list(self._itens.values()):
+                if item.pagador == "cliente":
+                    continue
                 if (
                     item.status == "aguardando_cliente"
                     and item.responder_ate
@@ -347,6 +374,8 @@ class ExclusividadesEmMemoria:
             for item in list(self._itens.values()):
                 if item.pedido_id != pedido_id or item.status not in EM_ANDAMENTO:
                     continue
+                if item.pagador == "cliente":
+                    continue
                 if profissional_aceito is not None and profissional_aceito == item.profissional_id:
                     self._mudar(item, status="concluida", encerrada_em=agora)
                     return [Encerramento(item.id, "concluida", item.profissional_id)]
@@ -354,6 +383,254 @@ class ExclusividadesEmMemoria:
                 self._estornar(item, agora)
                 return [Encerramento(item.id, "cancelada", item.profissional_id)]
         return []
+
+    # --- paga pelo cliente (mesma semântica das funções `exclusividade_cliente_*`) ---------------
+
+    def cliente_disponivel(self) -> bool:
+        return True
+
+    def saldo_livre(self, cliente_id: str, agora: datetime) -> int:
+        moedas = self._contexto.moedas
+        presas = sum(r.moedas for r in moedas.reservas_abertas_do_usuario(cliente_id))
+        return max(int(moedas.saldo(cliente_id, agora, "cliente")) - presas, 0)
+
+    def do_pedido_cliente(self, pedido_id: str) -> Exclusividade | None:
+        minhas = [
+            i for i in self._itens.values() if i.pedido_id == pedido_id and i.pagador == "cliente"
+        ]
+        return minhas[-1] if minhas else None
+
+    def listar_cliente(
+        self,
+        pedido_id: str | None = None,
+        cliente_id: str | None = None,
+        status: str | None = None,
+        limite: int = 20,
+        deslocamento: int = 0,
+    ) -> tuple[list[Exclusividade], int]:
+        achadas = [
+            i
+            for i in reversed(list(self._itens.values()))
+            if i.pagador == "cliente"
+            and pedido_id in (None, i.pedido_id)
+            and cliente_id in (None, i.cliente_id)
+            and status in (None, i.status)
+        ]
+        return achadas[deslocamento : deslocamento + limite], len(achadas)
+
+    def _lancar_cliente(
+        self, item: Exclusividade, tipo: str, quantidade: int, chave: str, agora, expira=None
+    ) -> None:
+        from trato.api.moedas import LancamentoMoeda
+
+        self._contexto.moedas.lancar(
+            LancamentoMoeda(
+                usuario_id=item.cliente_id,
+                tipo=tipo,
+                quantidade=quantidade,
+                chave_idempotencia=chave,
+                criada_em=agora,
+                referencia_id=item.id,
+                parceiro_id=item.profissional_id,
+                carteira="cliente",
+                expira_em=expira,
+            )
+        )
+
+    def _transicao_pedido(
+        self, pedido_id: str, de: Estado, para: Estado, acao: Acao, agora
+    ) -> None:
+        pedido = self._contexto.pedidos.obter(pedido_id)
+        if pedido is None or pedido.estado is not de:
+            return
+        ator = Ator(Papel.SISTEMA, "exclusividade")
+        evento = Evento(pedido_id, acao, de, para, ator, agora, None)
+        self._contexto.pedidos.salvar(replace(pedido, estado=para), evento)
+
+    def solicitar_cliente(
+        self,
+        cliente_id: str,
+        pedido_id: str,
+        profissional_id: str | None,
+        orcamento_id: str | None,
+        chave: str,
+        agora: datetime,
+        exigir_mei: bool,
+        apto: Any,
+    ) -> ResultadoCliente:
+        """`apto(profissional_id)`: a regra de quem pode orçar (no banco, dentro da função)."""
+        cfg = self._contexto.moedas.config()
+        with self._trava, self._contexto.moedas.trava(f"exclusividade:{cliente_id}"):
+            saldo = self.saldo_livre(cliente_id, agora)
+
+            def nega(resultado: str) -> ResultadoCliente:
+                return ResultadoCliente(resultado, saldo_restante=saldo)
+
+            if chave in self._por_chave:
+                antiga = self._itens[self._por_chave[chave]]
+                if (antiga.pagador, antiga.cliente_id, antiga.pedido_id) != (
+                    "cliente",
+                    cliente_id,
+                    pedido_id,
+                ):
+                    raise ValueError("chave de idempotência já usada em outra exclusividade")
+                return ResultadoCliente("ja_existe", antiga.id, antiga.expira_em, saldo)
+            pedido = self._contexto.pedidos.obter(pedido_id)
+            if pedido is None or pedido.cliente_id != cliente_id:
+                return nega("nao_encontrado")
+            if pedido.estado is not Estado.ABERTO or any(
+                i.pedido_id == pedido_id and i.status in EM_ANDAMENTO for i in self._itens.values()
+            ):
+                return nega("pedido_indisponivel")
+            if orcamento_id is not None:
+                orcamento = self._contexto.orcamentos.obter(orcamento_id)
+                if (
+                    orcamento is None
+                    or orcamento.pedido_id != pedido_id
+                    or profissional_id not in (None, orcamento.profissional_id)
+                ):
+                    return nega("orcamento_invalido")
+                profissional_id = orcamento.profissional_id
+            if not profissional_id or not apto(profissional_id):
+                return nega("profissional_indisponivel")
+            custo = cfg.exclusividade_custo_moedas
+            if saldo < custo:
+                return nega("saldo_insuficiente")
+            novo = Exclusividade(
+                id=uuid.uuid4().hex,
+                profissional_id=profissional_id,
+                cliente_id=cliente_id,
+                pedido_id=pedido_id,
+                status="ativa",
+                moedas_cobradas=custo,
+                chave_idempotencia=chave,
+                criada_em=agora,
+                responder_ate=agora,
+                expira_em=agora + timedelta(hours=cfg.exclusividade_duracao_horas),
+                pagador="cliente",
+                orcamento_id=orcamento_id,
+            )
+            self._itens[novo.id] = novo
+            self._por_chave[chave] = novo.id
+            self._lancar_cliente(novo, TIPO_USO, -custo, f"exclusividade-uso:{novo.id}", agora)
+            self._transicao_pedido(
+                pedido_id, Estado.ABERTO, Estado.RESERVADO, Acao.RESERVAR_EXCLUSIVIDADE, agora
+            )
+            return ResultadoCliente("ok", novo.id, novo.expira_em, saldo - custo)
+
+    def _vencer(self, item: Exclusividade, agora: datetime) -> None:
+        self._mudar(
+            item,
+            status="expirada_sem_contratacao",
+            motivo_encerramento="prazo_expirado_sem_contratacao",
+            encerrada_em=agora,
+        )
+        self._transicao_pedido(
+            item.pedido_id, Estado.RESERVADO, Estado.ABERTO, Acao.EXPIRAR_EXCLUSIVIDADE, agora
+        )
+
+    def _devolver(self, item: Exclusividade, motivo: str, agora: datetime) -> int:
+        """Devolve na validade original; o que já venceu volta como crédito de 30 dias (13.8)."""
+        uso = f"exclusividade-uso:{item.id}"
+        base = f"exclusividade-estorno:{item.id}"
+        parcelas = parcelas_do_gasto(
+            self._contexto.moedas.lancamentos_da_carteira(item.cliente_id, "cliente"), uso
+        )
+        falta, indice = item.moedas_cobradas, 0
+        for parcela in parcelas:
+            parte = min(parcela.quantidade, falta)
+            if parte <= 0:
+                break
+            indice += 1
+            expira = parcela.expira_em
+            if expira is not None and expira <= agora:
+                expira = agora + timedelta(days=30)
+            chave = base if indice == 1 else f"{base}:{indice}"
+            self._lancar_cliente(item, TIPO_ESTORNO, parte, chave, agora, expira)
+            falta -= parte
+        if falta > 0:
+            chave = base if indice == 0 else f"{base}:{indice + 1}"
+            self._lancar_cliente(
+                item, TIPO_ESTORNO, falta, chave, agora, agora + timedelta(days=30)
+            )
+        ativa = item.status == "ativa"
+        self._mudar(
+            item,
+            status="cancelada",
+            motivo_encerramento=motivo,
+            estornada=True,
+            estornada_em=agora,
+            encerrada_em=item.encerrada_em or agora,
+        )
+        if ativa:
+            self._transicao_pedido(
+                item.pedido_id, Estado.RESERVADO, Estado.ABERTO, Acao.EXPIRAR_EXCLUSIVIDADE, agora
+            )
+        return item.moedas_cobradas
+
+    def desistir_cliente(
+        self, exclusividade_id: str, profissional_id: str, agora: datetime
+    ) -> ResultadoDevolucao:
+        with self._trava:
+            item = self._itens.get(exclusividade_id)
+            if item is None or item.pagador != "cliente" or item.profissional_id != profissional_id:
+                return ResultadoDevolucao("nao_encontrada")
+            if item.estornada:
+                return ResultadoDevolucao("ja_devolvida", item.moedas_cobradas)
+            if item.status != "ativa":
+                return ResultadoDevolucao("ja_encerrada")
+            if item.expira_em <= agora:
+                self._vencer(item, agora)
+                return ResultadoDevolucao("prazo_vencido")
+            return ResultadoDevolucao("ok", self._devolver(item, "desistencia_profissional", agora))
+
+    def falha_trato(
+        self, exclusividade_id: str, analista_id: str, motivo: str, agora: datetime
+    ) -> ResultadoDevolucao:
+        with self._trava:
+            item = self._itens.get(exclusividade_id)
+            if item is None or item.pagador != "cliente":
+                return ResultadoDevolucao("nao_encontrada")
+            if item.estornada:
+                return ResultadoDevolucao("ja_devolvida", item.moedas_cobradas)
+            if item.status == "concluida":
+                return ResultadoDevolucao("nao_elegivel")
+            return ResultadoDevolucao("ok", self._devolver(item, "falha_trato", agora))
+
+    def contratar_cliente(
+        self, pedido_id: str, profissional_id: str | None, agora: datetime
+    ) -> list[Encerramento]:
+        """Contratação confirmada (ou pedido cancelado, sem profissional): nunca devolve."""
+        with self._trava:
+            item = self.do_pedido_cliente(pedido_id)
+            if item is None or item.status != "ativa":
+                return []
+            if item.expira_em <= agora:
+                status, motivo = "expirada_sem_contratacao", "prazo_expirado_sem_contratacao"
+                resultado = "expirada"
+            elif profissional_id == item.profissional_id:
+                status, motivo, resultado = "concluida", "contratacao_realizada", "concluida"
+            else:
+                status, motivo, resultado = "cancelada", "cancelamento_cliente", "cancelada"
+            self._mudar(item, status=status, motivo_encerramento=motivo, encerrada_em=agora)
+            return [Encerramento(item.id, resultado, item.profissional_id)]
+
+    def expirar_cliente(self, agora: datetime) -> list[Expirada]:
+        saida: list[Expirada] = []
+        with self._trava:
+            for item in list(self._itens.values()):
+                if item.pagador == "cliente" and item.status == "ativa" and item.expira_em <= agora:
+                    self._vencer(item, agora)
+                    saida.append(
+                        Expirada(
+                            item.id,
+                            "sem_contratacao",
+                            item.profissional_id,
+                            item.cliente_id,
+                            item.pedido_id,
+                        )
+                    )
+        return saida
 
     # --- leitura --------------------------------------------------------------------------------
 
@@ -386,6 +663,12 @@ def profissional_exclusivo(contexto: Any, pedido_id: str) -> str | None:
         return contexto.exclusividades.profissional_ativo_do_pedido(pedido_id)
     except Exception:  # noqa: BLE001 - tabela ainda não existe: sem exclusividade
         return None
+
+
+def encerrar_na_contratacao(contexto: Any, pedido_id: str, profissional_id: str | None) -> None:
+    """Pagamento confirmado (ou pedido cancelado: sem profissional) encerra a exclusividade do
+    cliente, na mesma transação da mudança do pedido. Sem a função no banco, nada acontece."""
+    contexto.exclusividades.contratar_cliente(pedido_id, profissional_id, contexto.agora())
 
 
 def encerrar_exclusividade_do_pedido(

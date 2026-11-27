@@ -1,13 +1,19 @@
 // Só para testes: o app não tem modo de demonstração. Monta os repositórios e serviços de
 // mentira que os testes de widget usam no lugar da API.
+import 'package:trato/telas/compensacoes/modelos.dart';
+import 'package:trato/telas/contestacao_decisao/modelos.dart';
+import 'package:trato/telas/medidas/modelos.dart';
+import 'package:trato/telas/atendimento/modelos.dart';
 import 'package:trato/auth/servico_auth.dart';
 import 'package:trato/dados/repositorios.dart' show RepositorioPedidos, RepositorioProfissional;
 import 'package:trato/dados/repositorios_catalogo.dart'
     show RepositorioCatalogo;
 import 'package:trato/dados/repositorios_trato.dart';
+import 'package:trato/telas/lgpd/modelos.dart' show ServicoPrivacidade;
 import 'package:trato/dispositivo/dispositivo.dart';
 import 'package:trato/dispositivo/servicos_dispositivo.dart';
 import 'package:trato/telas/fluxo/rotas.dart';
+import 'package:trato/telas/mensagens/modelos.dart';
 import 'package:trato/telas/profissional_mei/mei.dart' show ServicoMei;
 
 import 'auth/servico_auth_fake.dart';
@@ -32,6 +38,12 @@ RepositoriosTrato repositoriosDemo({
   RepositorioCatalogo? catalogo,
   ServicoMei? mei,
   RepositorioProfissional? profissional,
+  ServicoMensagens? mensagens,
+  ServicoSac? sac,
+  ServicoMedidas? medidas,
+  ServicoCompensacoes? compensacoes,
+  ServicoContestacaoDecisao? contestacaoDecisao,
+  ServicoPrivacidade? privacidade,
 }) =>
     RepositoriosTrato(
       pedidos: pedidos ?? RepositorioPedidosFake(),
@@ -52,9 +64,13 @@ RepositoriosTrato repositoriosDemo({
       perfilPublico: ServicoPerfilPublicoFake(),
       cadastroProfissional: ServicoCadastroProfissionalFake(),
       verificacao: ServicoVerificacaoFake(),
-      privacidade: ServicoPrivacidadeFake(),
-      mensagens: const ServicoMensagensFake(),
+      privacidade: privacidade ?? ServicoPrivacidadeFake(),
+      mensagens: mensagens ?? const ServicoMensagensFake(),
       mensagensProfissional: const ServicoMensagensFake(),
+      sac: sac,
+      medidas: medidas,
+      compensacoes: compensacoes,
+      contestacaoDecisao: contestacaoDecisao,
     );
 
 DispositivoTrato dispositivoDemo() =>
@@ -74,5 +90,6 @@ void ligarDemoNosTestes() {
   RotasTrato.dispositivo = dispositivoDemo();
   RotasTrato.permissao = ServicoPermissaoFake();
   RotasTrato.mensagensNaoLidas.value = 0;
+  RotasTrato.esquecerBloqueio();
   RotasTrato.notificacoesNaoLidas.value = 0;
 }

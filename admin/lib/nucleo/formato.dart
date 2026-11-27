@@ -50,16 +50,35 @@ String formatarRestante(DateTime limite, {DateTime? agora}) {
   return '${dif.inDays} dias';
 }
 
-/// Valor digitado em reais ("12,50") para centavos inteiros. Devolve null se for inválido.
+/// Mensagem para um campo em reais com texto que não vale.
+const kErroReais = 'Valor inválido. Use vírgula nos centavos: 12,50 ou 1.234,56.';
+
+/// Única leitura de dinheiro digitado no painel: reais no padrão brasileiro ("1.234,56", "1234,5"
+/// ou "12") para centavos inteiros, sem passar por double. É estrita de propósito: ponto só separa
+/// milhar em grupos de três, então "12.50" e três casas são recusados em vez de mudar de valor.
+/// Devolve null se for inválido (inclusive vazio e negativo); quem chama nunca troca null por zero.
 int? lerReaisEmCentavos(String texto) {
-  final limpo = texto.trim().replaceAll('R\$', '').replaceAll('.', '').replaceAll(' ', '');
-  if (limpo.isEmpty) return null;
-  final partes = limpo.split(',');
-  if (partes.length > 2 || partes.any((p) => p.isEmpty || int.tryParse(p) == null)) return null;
-  final reais = int.parse(partes[0]);
-  final cents = partes.length == 2 ? int.parse(partes[1].padRight(2, '0').substring(0, 2)) : 0;
-  return reais * 100 + cents;
+  final m = RegExp(r'^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$').firstMatch(texto.trim());
+  if (m == null) return null;
+  final inteiros = m.group(1)!.replaceAll('.', '');
+  if (inteiros.length > 10) return null;
+  return int.parse(inteiros) * 100 + int.parse((m.group(2) ?? '').padRight(2, '0'));
 }
+
+/// Mensagem para um campo de percentual com texto que não vale.
+const kErroPercentual = 'Percentual inválido. Use só vírgula nos decimais, com até 2 casas: 7,50.';
+
+/// Percentual digitado ("7,50", "7,5" ou "7") para pontos-base inteiros (750), sem passar por
+/// double. Só a vírgula é decimal: ponto e três casas são recusados, para "7.50" não virar 750%.
+/// Devolve null se for inválido (inclusive vazio e negativo). A faixa quem confere é o parâmetro.
+int? lerPercentualEmBps(String texto) {
+  final m = RegExp(r'^(\d{1,6})(?:,(\d{1,2}))?$').firstMatch(texto.trim());
+  if (m == null) return null;
+  return int.parse(m.group(1)!) * 100 + int.parse((m.group(2) ?? '').padRight(2, '0'));
+}
+
+/// 1050 -> "10,50" (para preencher um campo em reais ou em percentual). Só inteiros.
+String centavosParaCampo(int centavos) => '${centavos ~/ 100},${(centavos % 100).toString().padLeft(2, '0')}';
 
 /// Mostra o valor de uma configuração na unidade certa (bps vira %, centavos vira R$).
 String formatarConfig(int valor, String unidade) => switch (unidade) {

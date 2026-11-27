@@ -63,8 +63,8 @@ String valorLegivel(int valor, ConfigDefinicao d) {
 
 /// Texto que a pessoa edita para o valor atual ("7,50" para 750 bps; "3,00" para 300 centavos).
 String valorParaCampo(int valor, ConfigDefinicao d) => switch (d.unidade) {
-      UnidadeConfig.bps => (valor / 100).toStringAsFixed(2).replaceAll('.', ','),
-      UnidadeConfig.centavos => (valor / 100).toStringAsFixed(2).replaceAll('.', ','),
+      UnidadeConfig.bps => centavosParaCampo(valor),
+      UnidadeConfig.centavos => centavosParaCampo(valor),
       _ => '$valor',
     };
 
@@ -74,8 +74,7 @@ int? campoParaValor(String texto, ConfigDefinicao d) {
   if (t.isEmpty) return null;
   switch (d.unidade) {
     case UnidadeConfig.bps:
-      final v = double.tryParse(t.replaceAll('.', '').replaceAll(',', '.'));
-      return v == null ? null : (v * 100).round();
+      return lerPercentualEmBps(t);
     case UnidadeConfig.centavos:
       return lerReaisEmCentavos(t);
     default:
@@ -83,7 +82,7 @@ int? campoParaValor(String texto, ConfigDefinicao d) {
   }
 }
 
-/// Diferenças entre duas versões, uma frase por parâmetro: "Prazo de resposta da disputa: 48 h → 24 h".
+/// Diferenças entre duas versões, uma frase por parâmetro: "Prazo de resposta da disputa: 24 h → 36 h".
 List<String> diferencas(ConfigVersao nova, ConfigVersao base, List<ConfigDefinicao> definicoes) {
   final linhas = <String>[];
   for (final d in definicoes) {

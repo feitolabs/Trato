@@ -27,8 +27,10 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 from trato.api import rotas_app
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_evento, avisar_mensagem_nova, avisar_orcamento_recebido
+from trato.api.cautela import exigir_contato_livre
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.localizacao import na_grade
+from trato.api.maioridade import exigir_maioridade
 from trato.api.modelos import JanelaIn, PedidoOut, RespostaPedidoOut
 from trato.api.moedas import (
     MOTIVO_ORCAMENTO_ESGOTADO,
@@ -48,6 +50,7 @@ from trato.api.servicos import (
     nomes_de_categorias,
     pedido_out,
 )
+from trato.api.validade import OrcamentoVencido, venceu
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import (
@@ -179,7 +182,8 @@ class CobrancaContratoOut(BaseModel):
 class PagamentoContratoOut(BaseModel):
     contrato_id: str
     estado_pagamento: str = Field(
-        description="`sem_cobranca`, `aguardando_confirmacao`, `pago`, `falhou` ou `cancelada`."
+        description="`sem_cobranca`, `aguardando_confirmacao`, `pago`, `falhou`, `cancelada` ou "
+        "`devolvida` (pagou fora de hora e o valor voltou)."
     )
     pago: bool = Field(description="Verdadeiro só depois do webhook assinado do provedor.")
     valor_centavos: int | None = Field(description="O valor do SERVIÇO (o orçamento).")
@@ -224,6 +228,7 @@ class AditivoDecididoOut(BaseModel):
 
 
 class ItemNotaOut(BaseModel):
+    id: str | None = Field(default=None, description="Use em `item_id` para contestar o item.")
     descricao: str
     quantidade: str
     valor_unitario_centavos: int
@@ -264,6 +269,13 @@ class CobrarContratoIn(_Entrada):
     usar_moedas: bool = Field(
         default=False,
         description="Usa moedas do Trato como desconto. O backend escolhe quantas (nunca o app).",
+    )
+    consentimento_execucao_imediata: bool = Field(
+        False,
+        description=(
+            "Termos 7.3: o cliente marcou (nunca vem marcado) que quer o serviço antes do fim "
+            "dos 7 dias. Vale a escolha da cobrança paga, gravada na confirmação."
+        ),
     )
 
 
@@ -493,6 +505,7 @@ def aplicar_cupom_contrato(
 
 @router.post(
     "/contratos/{contrato_id}/cobranca",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=CobrancaContratoOut,
     status_code=201,
     summary="Criar a cobrança do contrato (Pix ou cartão)",
@@ -586,6 +599,7 @@ def _criar_cobranca(
                 cupom_codigo=aplicado.codigo if aplicado else None,
                 desconto_centavos=desconto,
                 moedas_usadas=moedas,
+                execucao_imediata=corpo.consentimento_execucao_imediata,
             )
         except ErroProvedor as erro:
             raise _recusa_do_provedor(erro, corpo.meio) from erro
@@ -627,7 +641,11 @@ def estado_do_pagamento(
     servico = getattr(request.app.state, "servico_pagamento", None)
     principal = None
     if servico is not None:
-        principais = [c for c in servico.cobrancas.do_pedido(pedido.id) if c.aditivo_id is None]
+        principais = [
+            c
+            for c in servico.cobrancas.do_pedido(pedido.id)
+            if c.aditivo_id is None and not c.contrato_encerrado
+        ]
         principal = principais[-1] if principais else None
     pago = pedido.referencia_pagamento is not None  # prova gravada pelo webhook assinado
     if pago:
@@ -638,6 +656,8 @@ def estado_do_pagamento(
         estado = "falhou"
     elif principal.status is EstadoCobranca.CANCELADA:
         estado = "cancelada"
+    elif principal.status is EstadoCobranca.DEVOLVIDA:
+        estado = "devolvida"
     else:
         estado = "aguardando_confirmacao"
     servico_a_cobrar = contrato.valor_centavos
@@ -757,6 +777,7 @@ def propor_aditivo(
         raise HTTPException(403, "Só o profissional contratado neste pedido pode propor aditivo.")
     if pedido.estado is not Estado.EM_ANDAMENTO:
         raise HTTPException(409, "Só dá para propor aditivo com o serviço em andamento.")
+    exigir_contato_livre(contexto, pedido, usuario.id)  # 9.6
     descricao = limpar_texto(
         corpo.descricao, "descrição", obter_config_seguranca().comentario_max_chars
     )
@@ -884,6 +905,7 @@ def _decidir_aditivo(
 
 @router.post(
     "/contratos/{contrato_id}/aditivos/{aditivo_id}/aprovar",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=AditivoDecididoOut,
     summary="Cliente aprova o aditivo",
     description="Só o cliente do contrato. Com o serviço de pagamento ligado, a cobrança do "
@@ -960,8 +982,14 @@ def _nota_out(nota: NotaMaterial, servico_uploads: object | None = None) -> Nota
         id=nota.id,
         contrato_id=nota.pedido_id,
         itens=[
-            ItemNotaOut(descricao=d, quantidade=q, valor_unitario_centavos=u, total_centavos=t)
-            for d, q, u, t in nota.itens
+            ItemNotaOut(
+                id=nota.item_ids[n] if n < len(nota.item_ids) else None,
+                descricao=d,
+                quantidade=q,
+                valor_unitario_centavos=u,
+                total_centavos=t,
+            )
+            for n, (d, q, u, t) in enumerate(nota.itens)
         ],  # fmt: skip
         total_centavos=nota.total_centavos,
         enviada_em=nota.enviada_em,
@@ -1161,6 +1189,8 @@ def _orcamento_do_pedido(contexto: Contexto, pedido: Pedido, orcamento_id: str):
         raise HTTPException(404, "Orçamento não encontrado.")
     if detalhe.status != "enviado":
         raise HTTPException(409, "Este orçamento foi substituído por uma versão mais nova.")
+    if venceu(detalhe.validade_ate, contexto.agora()):  # nem renegocia nem gera versão vencida
+        raise OrcamentoVencido
     return detalhe
 
 
@@ -1221,6 +1251,7 @@ def _publicar_nova_versao_orcamento(
     prazo_final = (
         prazo_execucao_dias if prazo_execucao_dias is not None else detalhe.prazo_execucao_dias
     )
+    exigir_contato_livre(contexto, pedido, profissional_id)
     novo_id = contexto.orcamentos.enviar(
         pedido_id=pedido.id,
         profissional_id=profissional_id,
@@ -1315,6 +1346,7 @@ def contraproposta(
         f"Contraproposta de {_reais(valor)}{dias_texto} "
         f"(o orçamento atual é {_reais(detalhe.valor_centavos)}).{extra}"
     )
+    exigir_contato_livre(contexto, pedido, detalhe.profissional_id)
     conversa = contexto.conversas.abrir(pedido.id, detalhe.profissional_id)
     mensagem_id = contexto.conversas.enviar(conversa, usuario.id, texto)
     avisar_mensagem_nova(
@@ -1336,6 +1368,7 @@ def contraproposta(
 
 @router.post(
     "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/contraproposta/aceitar",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=AceiteContrapropostaOut,
     status_code=201,
     summary="Profissional aceita a contraproposta e atualiza o orçamento",
@@ -1399,6 +1432,7 @@ def aceitar_contraproposta(
 
 @router.post(
     "/pedidos/{pedido_id}/orcamentos/{orcamento_id}/propor",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=AceiteContrapropostaOut,
     status_code=201,
     summary="Profissional envia nova proposta de valor/dias pelo chat",
@@ -1718,6 +1752,7 @@ def propor_agenda(
     profissional_id = pedido.profissional_id
     if not profissional_id:
         raise HTTPException(409, "Pedido sem profissional contratado.")
+    exigir_contato_livre(contexto, pedido, profissional_id)
     conversa = contexto.conversas.abrir(pedido.id, profissional_id)
     resumo = _formatar_janela_br(corpo.janela.inicio, corpo.janela.fim)
     extra = ""
@@ -1819,6 +1854,7 @@ def aceitar_agenda(
             prazos,
         )
 
+    exigir_contato_livre(contexto, pedido, pedido.profissional_id)
     with contexto.transacao():
         gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
         for gancho in contexto.apos_transicao:

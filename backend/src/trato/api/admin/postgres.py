@@ -677,7 +677,7 @@ class UsuariosAdminPostgres:
             concluidos = con.execute(
                 "select h.ocorrida_em, p.numero from public.pedido_historico h "
                 "join public.pedidos p on p.id = h.pedido_id "
-                "join public.contratos c on c.pedido_id = p.id "
+                "join public.contratos c on c.pedido_id = p.id and c.status <> 'cancelado' "
                 "where h.para_status = 'concluido' and c.profissional_id = %s "
                 "order by h.ocorrida_em desc limit %s",
                 (achado, limite),
@@ -836,7 +836,7 @@ _FRASES_DA_ACAO = {
     "verificacao.recusada": "Verificação recusada",
     "usuario.status_alterado": "Status da conta alterado",
     "dado_pessoal.revelado": "Dados pessoais revelados",
-    "risco.saque_travado": "Saques travados",
+    "risco.saque_travado": "Trava de saques registrada",
     "risco.bloqueio_preventivo": "Bloqueio preventivo aplicado",
 }
 
@@ -875,7 +875,10 @@ class PedidosAdminPostgres:
             "and (%(termo)s::text is null or p.titulo ilike %(like)s escape '\\' "
             "     or p.id::text = %(termo)s)"
         )
-        juncao = "from public.pedidos p left join public.contratos c on c.pedido_id = p.id "
+        juncao = (
+            "from public.pedidos p left join public.contratos c on c.pedido_id = p.id "
+            "and c.status <> 'cancelado' "
+        )
         params = {
             "estado": _ESTADO_PARA_BANCO.get(estado, estado) if estado else None,
             "cliente": cliente,
@@ -942,7 +945,8 @@ class PedidosAdminPostgres:
                 "   from public.pedido_historico h "
                 "  where h.pedido_id = p.id and h.para_status = 'pago_retido' "
                 "  order by h.id desc limit 1) as referencia, "
-                "exists (select 1 from public.contratos c where c.pedido_id = p.id) as contrato "
+                "exists (select 1 from public.contratos c where c.pedido_id = p.id "
+                " and c.status <> 'cancelado') as contrato "
                 "from public.pedidos p where p.id = any(%s)",
                 (ids,),
             ).fetchall()

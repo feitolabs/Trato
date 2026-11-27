@@ -133,10 +133,10 @@ def main():
         verifica("taxa única e mínimo vêm do parâmetro",
                  b.exec("select chave, valor from config_parametros where chave in ('taxa_bps','taxa_minima_centavos') order by chave")
                  == [("taxa_bps", 750), ("taxa_minima_centavos", 500)])
-        verifica("prazos do escopo: resposta 48 h, decisão 5 dias úteis, retrabalho 7 dias",
+        verifica("prazos: resposta 24 h (Termos 8.2), decisão 5 dias úteis, retrabalho 7 dias",
                  b.exec("""select chave, valor from config_parametros where chave in
                     ('prazo_resposta_disputa_horas','prazo_decisao_disputa_dias_uteis','prazo_retrabalho_atendimento_dias')
-                    order by chave""") == [("prazo_decisao_disputa_dias_uteis", 5), ("prazo_resposta_disputa_horas", 48),
+                    order by chave""") == [("prazo_decisao_disputa_dias_uteis", 5), ("prazo_resposta_disputa_horas", 24),
                                            ("prazo_retrabalho_atendimento_dias", 7)])
         verifica("opcionais sem valor ficam de fora do rascunho",
                  n(b, "select count(*) from config_parametros where chave in ('prazo_confirmacao_cliente_horas','prazo_congelar_disputa_horas')") == 0)

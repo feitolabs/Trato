@@ -6,6 +6,7 @@ import 'package:trato/telas/profissional/servico_orcamento.dart';
 import 'package:trato/tema/tema.dart';
 
 import 'apoio/exemplos/telas/carteira/dados_exemplo.dart';
+import 'apoio/orcamento.dart';
 
 class _ServicoOrcamentoMemoria implements ServicoOrcamento {
   @override
@@ -37,6 +38,8 @@ void main() {
         CalculadoraOrcamentoTela(
           servico: _ServicoOrcamentoMemoria(),
           tituloPedido: 'Instalar chuveiro',
+          garantiaInicialDias: 90,
+          prazoExecucaoInicialDias: 3,
           itensIniciais: const [ItemMaterial(nome: 'Disjuntor', centavos: 5000)],
           aoEnviar: (p) => enviado = p,
         ),
@@ -60,6 +63,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await completarOrcamento(tester);
       await tester.tap(find.text('Enviar orçamento'));
       await tester.pumpAndSettle();
 

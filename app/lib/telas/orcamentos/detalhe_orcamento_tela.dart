@@ -2,10 +2,13 @@ import '../cliente/avatar_de_usuario.dart';
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
+import '../comuns/orcamento_vencido.dart';
 import '../cliente/avatar_iniciais.dart';
 import '../cliente/modelos.dart' show formatarNota;
 import '../comuns/foco_rolagem.dart';
+import '../comuns/nota_preco.dart';
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
 import 'inclui_nao_inclui.dart';
@@ -47,7 +50,7 @@ class DetalheOrcamentoTela extends StatefulWidget {
   final Orcamento orcamento;
   final dynamic Function(Orcamento)? aoAceitar;
   final dynamic Function(Orcamento)? aoRecusar;
-  final ValueChanged<Orcamento>? aoFazerContraproposta;
+  final dynamic Function(Orcamento)? aoFazerContraproposta;
   final ValueChanged<Orcamento>? aoConversar;
 
   /// Abre o perfil público do profissional. Sem ele, o link não aparece.
@@ -116,8 +119,23 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
     setState(() => _aceitando = true);
     try {
       await widget.aoAceitar?.call(widget.orcamento);
+    } on ErroTrato catch (e) {
+      if (!ehOrcamentoVencido(e)) rethrow;
+      if (mounted) setState(() => _recusaPorValidade = e.mensagem);
     } finally {
       if (mounted) setState(() => _aceitando = false);
+    }
+  }
+
+  /// Preenchido quando o servidor recusa a ação porque o orçamento venceu.
+  String? _recusaPorValidade;
+
+  Future<void> _contraproposta() async {
+    try {
+      await widget.aoFazerContraproposta!(widget.orcamento);
+    } on ErroTrato catch (e) {
+      if (!ehOrcamentoVencido(e)) rethrow;
+      if (mounted) setState(() => _recusaPorValidade = e.mensagem);
     }
   }
 
@@ -125,6 +143,10 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   Widget build(BuildContext context) {
     final o = widget.orcamento;
     final d = o.detalhe!; // a tela só abre para orçamento com detalhe
+    final venceEm = d.venceEm;
+    // Já vencido (pela data do servidor) ou recusado por ele: não se oferece aceitar nem pagar.
+    final vencido = _recusaPorValidade ??
+        (venceEm != null && !venceEm.isAfter(DateTime.now()) ? textoOrcamentoVencido : null);
     final secundario = TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario);
     return EstruturaPedido(
       scrollController: _scroll,
@@ -147,16 +169,25 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                BotaoPrimario(
-                  texto: 'Aceitar e ir para o pagamento',
-                  carregando: _aceitando,
-                  aoTocar: _aceitando ? null : _aceitar,
-                ),
-                if (widget.aoFazerContraproposta != null)
-                  BotaoLink(
-                    texto: 'Fazer contraproposta',
-                    aoTocar: () => widget.aoFazerContraproposta!(o),
+                if (vencido != null)
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      vencido,
+                      key: const ValueKey('orcamento-vencido'),
+                      textAlign: TextAlign.center,
+                      style: TipografiaTrato.corpo.copyWith(color: context.cores.vermelhoTexto),
+                    ),
+                  )
+                else ...[
+                  BotaoPrimario(
+                    texto: 'Aceitar e ir para o pagamento',
+                    carregando: _aceitando,
+                    aoTocar: _aceitando ? null : _aceitar,
                   ),
+                  if (widget.aoFazerContraproposta != null)
+                    BotaoLink(texto: 'Fazer contraproposta', aoTocar: _contraproposta),
+                ],
                 if (widget.aoRecusar != null)
                   BotaoLink(
                     key: const ValueKey('botao-recusar-orcamento'),
@@ -259,6 +290,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
               LinhaValor(rotulo: 'Total', valor: formatarReais(o.totalCentavos), destaque: true),
               const SizedBox(height: EspacosTrato.x3),
               Text(d.notaMaterial, style: secundario),
+              const SizedBox(height: EspacosTrato.x2),
+              const NotaPrecoComTributos(),
             ],
           ),
         ),

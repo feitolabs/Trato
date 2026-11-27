@@ -16,6 +16,7 @@ import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
 
+import 'apoio/entrar.dart';
 import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'apoio/exemplos/demo.dart';
 import 'apoio/exemplos/telas/perfil_publico/perfil_publico_fake.dart';
@@ -129,7 +130,7 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final auth = ServicoAuthFake();
-      await auth.entrarComEmail(email: 'ana@exemplo.com', senha: '12345678');
+      await entrarNaContaDeTeste(auth, email: 'ana@exemplo.com');
       ServicoAuthPadrao.atual = auth;
       perfilFake().definirTemPerfil(temPerfil);
       final chave = GlobalKey<NavigatorState>();

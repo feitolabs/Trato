@@ -95,7 +95,7 @@ void main() {
         (
           '4 DE 4',
           'Ganhe Tratinhos',
-          'Avalie seus clientes e ganhe Tratinhos. Use para ter 48 horas de exclusividade em um pedido.',
+          'Avalie seus clientes e ganhe Tratinhos.',
         ),
       ];
 
@@ -171,6 +171,7 @@ void main() {
       );
 
       final botao = find.text('Ver tour de novo');
+      await tester.scrollUntilVisible(botao, 200, scrollable: find.byType(Scrollable).first);
       await tester.ensureVisible(botao);
       await tester.pumpAndSettle();
       expect(botao, findsOneWidget);

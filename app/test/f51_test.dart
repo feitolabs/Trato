@@ -97,7 +97,9 @@ void main() {
 
       final indicador = tester.widget<IndicadorPaginas>(find.byType(IndicadorPaginas));
       expect(indicador.corInativa, CoresTrato.borda);
-      expect(indicador.corAtiva, CoresTrato.petroleo);
+      // A ativa vem do tema (claro ou escuro): o tour não fixa cor.
+      expect(indicador.corAtiva, isNull);
+      expect(tester.element(find.byType(IndicadorPaginas)).cores.petroleo, CoresTrato.petroleo);
 
       for (var i = 0; i < 4; i++) {
         if (i < 3) {

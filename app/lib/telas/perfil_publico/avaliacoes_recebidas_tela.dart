@@ -5,6 +5,7 @@ import '../../tema/tema.dart';
 import '../profissional_apoio/apoio.dart';
 import 'perfil_publico.dart';
 import 'perfil_publico_tela.dart' show CartaoAvaliacao;
+import 'revisao_avaliacao.dart';
 
 /// Lista das avaliações que o profissional recebeu, com filtro rápido por estrelas (Todas, ★ 5 .. ★ 1).
 class AvaliacoesRecebidasTela extends StatefulWidget {
@@ -19,6 +20,55 @@ class AvaliacoesRecebidasTela extends StatefulWidget {
 class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
   int _versao = 0;
   int? _estrelaFiltro;
+
+  /// Pedidos de revisão. Nulos enquanto consulta, se a consulta falhar ou sem a função.
+  List<PedidoRevisaoAvaliacao>? _revisoes;
+  var _consultandoRevisoes = false;
+  var _falhaNasRevisoes = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _consultarRevisoes();
+  }
+
+  /// Consulta à parte: se falhar, as avaliações continuam na tela.
+  Future<void> _consultarRevisoes() async {
+    final servico = widget.servico;
+    if (servico is! RevisaoDeAvaliacao) return;
+    setState(() {
+      _consultandoRevisoes = true;
+      _falhaNasRevisoes = false;
+    });
+    try {
+      final pedidos = await (servico as RevisaoDeAvaliacao).pedidosDeRevisao();
+      if (!mounted) return;
+      setState(() {
+        _revisoes = pedidos;
+        _consultandoRevisoes = false;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _consultandoRevisoes = false;
+        _falhaNasRevisoes = true;
+      });
+    }
+  }
+
+  Future<void> _pedirRevisao(String id) async {
+    final servico = widget.servico as RevisaoDeAvaliacao;
+    final enviou = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FolhaPedirRevisao(aoEnviar: (texto) => servico.pedirRevisao(id, texto)),
+    );
+    if (enviou != true || !mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Pedido de revisão enviado.')));
+    await _consultarRevisoes();
+  }
 
   static int _faixaEstrela(double nota) => nota.floor().clamp(1, 5);
 
@@ -48,7 +98,9 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
     required bool selecionado,
     required CoresTemaTrato cores,
     required VoidCallback aoTocar,
+    bool comEstrela = false,
   }) {
+    final corTexto = selecionado ? cores.sobrePetroleo : cores.texto;
     return Material(
       key: chave,
       color: selecionado ? cores.petroleo : cores.superficie,
@@ -66,12 +118,25 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
             horizontal: EspacosTrato.x3 + 2,
             vertical: EspacosTrato.x2,
           ),
-          child: Text(
-            rotulo,
-            style: TipografiaTrato.corpoPequeno.copyWith(
-              color: selecionado ? cores.sobrePetroleo : cores.texto,
-              fontWeight: selecionado ? FontWeight.w600 : FontWeight.w500,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (comEstrela) ...[
+                Icon(
+                  Icons.star_rounded,
+                  size: 14,
+                  color: selecionado ? cores.sobrePetroleo : cores.petroleo,
+                ),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                rotulo,
+                style: TipografiaTrato.corpoPequeno.copyWith(
+                  color: corTexto,
+                  fontWeight: selecionado ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -122,7 +187,8 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
                         final qtd = lista.where((a) => _faixaEstrela(a.nota) == estrela).length;
                         return _chipEstrela(
                           chave: ValueKey('filtro-estrela-$estrela'),
-                          rotulo: qtd > 0 ? '★ $estrela ($qtd)' : '★ $estrela',
+                          rotulo: qtd > 0 ? '$estrela ($qtd)' : '$estrela',
+                          comEstrela: true,
                           selecionado: _estrelaFiltro == estrela,
                           cores: c,
                           aoTocar: () => setState(() => _estrelaFiltro = estrela),
@@ -134,6 +200,22 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
               ),
             ),
             const SizedBox(height: EspacosTrato.x4),
+            if (_consultandoRevisoes && _revisoes == null) ...[
+              Text(
+                'Consultando pedidos de revisão...',
+                style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+              ),
+              const SizedBox(height: EspacosTrato.x3),
+            ],
+            if (_falhaNasRevisoes) ...[
+              Text(
+                'Não foi possível consultar seus pedidos de revisão.',
+                key: const ValueKey('revisoes-falha'),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: c.vermelhoTexto),
+              ),
+              BotaoLink(texto: 'Tentar de novo', aoTocar: _consultarRevisoes),
+              const SizedBox(height: EspacosTrato.x3),
+            ],
             if (filtradas.isEmpty) ...[
               const SizedBox(height: EspacosTrato.x4),
               Text(
@@ -149,11 +231,17 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
               for (final a in filtradas)
                 CartaoAvaliacao(
                   avaliacao: a,
-                  aoResponder: podeResponder &&
-                          (a.id ?? '').isNotEmpty &&
-                          (a.resposta ?? '').trim().isEmpty
-                      ? () => _abrirResposta(a)
-                      : null,
+                  aoResponder:
+                      podeResponder && (a.id ?? '').isNotEmpty && (a.resposta ?? '').trim().isEmpty
+                          ? () => _abrirResposta(a)
+                          : null,
+                  rodape: _revisoes == null || (a.id ?? '').isEmpty
+                      ? null
+                      : SecaoRevisaoAvaliacao(
+                          avaliacaoId: a.id!,
+                          pedido: pedidoDaAvaliacao(_revisoes!, a.id!),
+                          aoPedir: () => _pedirRevisao(a.id!),
+                        ),
                 ),
           ],
         );

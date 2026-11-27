@@ -22,6 +22,16 @@ abstract final class IconesTrato {
 
   // Os módulos do menu lateral.
   static const verificacao = Icons.verified_user_outlined;
+  static const ausencias = Icons.person_off_outlined;
+  static const atendimento = Icons.headset_mic_outlined;
+  static const medidas = Icons.rule_outlined;
+  static const compensacoes = Icons.currency_exchange_outlined;
+  static const contestacoes = Icons.balance_outlined;
+  static const incidentes = Icons.health_and_safety_outlined;
+  static const avaliacoes = Icons.rate_review_outlined;
+  static const lgpd = Icons.privacy_tip_outlined;
+  static const retornoConta = Icons.how_to_reg_outlined;
+  static const materiais = Icons.handyman_outlined;
   static const disputas = Icons.gavel_outlined;
   static const buscaSuporte = Icons.manage_search_outlined;
   static const risco = Icons.shield_outlined;

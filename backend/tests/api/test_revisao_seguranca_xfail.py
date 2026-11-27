@@ -8,7 +8,6 @@ marca. Nenhum código-fonte foi alterado por esta revisão.
 from __future__ import annotations
 
 import re
-from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -17,7 +16,6 @@ from conftest import AGORA, cab
 from test_fluxo_pagamento_e2e import VALOR, Fluxo, _abrir_e_responder_disputa, fluxo  # noqa: F401
 
 from trato import disputas
-from trato.api.admin.rotas_disputas import _planejar_dinheiro
 from trato.disputas import Decisao, Resultado
 from trato.financeiro.ledger import (
     CLIENTE,
@@ -134,26 +132,28 @@ def test_a4_estorno_parcial_do_python_cabe_no_banco():
 # --- A5 (alto): trava de idempotência da decisão compara o campo errado -----------------------
 
 
-def test_a5_refazer_a_decisao_nao_planeja_dinheiro_de_novo(amb):
-    pedido = amb.semear_pedido(Estado.EM_DISPUTA, estado_antes_da_disputa=Estado.EM_CONFIRMACAO)
-    registrar_cobranca(amb.contexto.ledger.livro, "ped-1", 100_000, "cob-ped-1", AGORA)
-    config = amb.contexto.config.carregar().disputas
-    aberta = disputas.abrir(
-        disputas.Ator.CLIENTE, 100_000, disputas.Motivo.MAL_FEITO, AGORA, AGORA, config
-    )
-    decidida = replace(aberta, estado=disputas.Estado.EM_ANALISE).decidir(
+def test_a5_refazer_a_decisao_nao_planeja_dinheiro_de_novo(fluxo: Fluxo):  # noqa: F811
+    pid = fluxo.ate_em_confirmacao()
+    _abrir_e_responder_disputa(fluxo, pid)
+    decidida = fluxo.ctx.disputas.obter(pid).decidir(
         disputas.Ator.ANALISTA,
         "eq-1",
         Decisao(Resultado.REEMBOLSO_PARCIAL, percentual_cliente_bps=2_500),
         AGORA,
         10**9,
     )
+    pedido = fluxo.ctx.pedidos.obter(pid)
+    antes = len(fluxo.ctx.ledger.lancamentos(pid))
 
-    primeiro = _planejar_dinheiro(amb.contexto, pedido, decidida)
-    amb.contexto.ledger.lancar_varios(primeiro)  # a falha veio DEPOIS daqui (ex.: banco caiu)
-    assert primeiro
+    fluxo.servico.dinheiro_da_disputa(fluxo.ctx, pedido, decidida)
+    depois = fluxo.ctx.ledger.lancamentos(pid)
+    assert len(depois) > antes
+    ordens = fluxo.servico.ordens.do_pedido(pid)
 
-    assert _planejar_dinheiro(amb.contexto, pedido, decidida) == []
+    fluxo.servico.dinheiro_da_disputa(fluxo.ctx, pedido, decidida)  # repetir não move nada
+    assert fluxo.ctx.ledger.lancamentos(pid) == depois
+    assert fluxo.servico.ordens.do_pedido(pid) == ordens
+    assert [o.valor_centavos for o in ordens] == [VALOR // 4]
 
 
 # --- A2 (continuação): decisão de disputa pela rota do app ------------------------------------

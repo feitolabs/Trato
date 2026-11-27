@@ -11,6 +11,7 @@ from trato.api.rotas_profissional_cadastro import modulo_em_memoria
 from trato.pedidos.estados import Estado
 from trato.profissional.mei import (
     MOTIVO_NAO_ENCONTRADO,
+    MOTIVO_NAO_MEI,
     ConfigMei,
     ConsultaCnpj,
     MeiEmMemoria,
@@ -105,12 +106,12 @@ def test_cnpj_inativo_e_invalido():
     assert not svc.liberado("pro-1")
 
 
-def test_cnpj_ativo_que_nao_e_mei_tambem_vale_e_guarda_o_tipo_outro():
+def test_cnpj_ativo_que_nao_e_mei_nao_vale():
     svc, _ = _servico((200, _corpo(mei=False)))
     r = svc.informar("pro-1", CNPJ_OK)
-    assert r.mei_status is StatusMei.VALIDO
-    assert r.tipo_cnpj == "outro"
-    assert svc.liberado("pro-1")
+    assert r.mei_status is StatusMei.INVALIDO and r.mei_motivo == MOTIVO_NAO_MEI
+    assert r.cnpj is None and r.tipo_cnpj is None
+    assert svc.status("pro-1").mei_status is StatusMei.INVALIDO
 
 
 def test_cnpj_optante_mei_guarda_o_tipo_mei():
@@ -359,11 +360,9 @@ def test_rota_devolve_tipo_cnpj(amb):
         amb.cliente.get("/v1/profissional/mei", headers=cab("t-prof")).json()["tipo_cnpj"] is None
     )
     r = amb.cliente.put("/v1/profissional/mei", json={"cnpj": CNPJ_OK}, headers=cab("t-prof"))
-    assert r.status_code == 200 and r.json()["tipo_cnpj"] == "outro"
-    assert (
-        amb.cliente.get("/v1/profissional/mei", headers=cab("t-prof")).json()["tipo_cnpj"]
-        == "outro"
-    )
+    assert r.status_code == 422, r.text
+    lido = amb.cliente.get("/v1/profissional/mei", headers=cab("t-prof")).json()
+    assert lido["tipo_cnpj"] is None and lido["pode_orcar_e_receber"] is False
 
 
 def test_profissional_em_analise_acessa_so_a_rota_do_cnpj(amb):

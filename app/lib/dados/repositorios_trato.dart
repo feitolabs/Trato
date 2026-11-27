@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import '../telas/compensacoes/modelos.dart';
+import '../telas/contestacao_decisao/modelos.dart';
+import '../telas/medidas/modelos.dart';
+import '../telas/atendimento/modelos.dart';
 import '../telas/conta/modelos.dart';
 import '../telas/profissional_mei/mei.dart';
 import '../telas/indicacoes/modelos.dart';
@@ -10,9 +14,9 @@ import 'servico_recorrencias_api.dart';
 import 'servico_conta_api.dart';
 import '../dispositivo/captura_check_in_dispositivo.dart';
 import '../dispositivo/servico_camera.dart';
-import '../dispositivo/localizacao_do_pedido.dart';
 import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
+import '../telas/disputa_acordo/acordo.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
 import '../telas/mensagens/modelos.dart';
@@ -50,6 +54,7 @@ class RepositoriosTrato {
     this.verificacao,
     this.capturaVerificacao,
     this.disputaProfissional,
+    this.acordoDisputa,
     this.cadastroProfissional,
     this.perfilPublico,
     this.primeirosPassos,
@@ -59,6 +64,10 @@ class RepositoriosTrato {
     this.indicacoes,
     this.recorrencias,
     this.cep,
+    this.sac,
+    this.medidas,
+    this.compensacoes,
+    this.contestacaoDecisao,
     this.mensagens,
     this.mensagensProfissional,
     required this.catalogo,
@@ -68,6 +77,9 @@ class RepositoriosTrato {
   });
 
   final ServicoDisputaProfissional? disputaProfissional;
+
+  /// Proposta de devolução e acordo da disputa (Termos 8.2).
+  final ServicoAcordoDisputa? acordoDisputa;
   final ServicoCadastroProfissional? cadastroProfissional;
   final ServicoPerfilPublico? perfilPublico;
 
@@ -87,6 +99,18 @@ class RepositoriosTrato {
   /// Serviço recorrente (`/v1/recorrencias`). Nulo = demonstração.
   final ServicoRecorrencias? recorrencias;
 
+  /// Medidas da conta (`/v1/me/medidas`). Nulo = demonstração.
+  final ServicoMedidas? medidas;
+
+  /// Compensações do profissional (`/v1/me/compensacoes`). Nulo = demonstração.
+  final ServicoCompensacoes? compensacoes;
+
+  /// Contestação da decisão de disputa (Termos 8.7). Nulo = demonstração.
+  final ServicoContestacaoDecisao? contestacaoDecisao;
+
+  /// "Falar com o Trato" (`/v1/sac/chamados`). Nulo = demonstração.
+  final ServicoSac? sac;
+
   /// Consulta de endereço por CEP (`GET /v1/cep/{cep}`).
   final ServicoCep? cep;
 
@@ -105,17 +129,17 @@ class RepositoriosTrato {
     CapturaCheckIn Function(String pedidoId)? capturaFinalDoPedido,
     ServicoUpload? upload,
     ServicoCamera? camera,
-    Future<PosicaoAtual?> Function()? posicao,
     FilaOffline? fila,
   }) {
-    final pedidos = RepositorioPedidosApi(api, upload: upload, posicao: posicao);
+    // Termos 14.12: a localização só é lida no check-in e no check-out (as capturas acima).
+    // Pedido e lista do profissional vão sem posição; o endereço digitado vale sozinho.
+    final pedidos = RepositorioPedidosApi(api, upload: upload);
     final profissional = RepositorioProfissionalApi(
       api,
       captura: captura,
       capturaDoPedido: capturaDoPedido,
       capturaFinalDoPedido: capturaFinalDoPedido,
       upload: upload,
-      posicao: posicao,
       fila: fila,
     );
     // Prazos e limites para os textos das telas (sem esperar: até chegar, valem os padrões).
@@ -138,6 +162,7 @@ class RepositoriosTrato {
       notaMaterial: ServicoNotaMaterialApi(api, upload: upload),
       verificacao: ServicoVerificacaoApi(api),
       disputaProfissional: ServicoDisputaProfissionalApi(api, upload: upload),
+      acordoDisputa: ServicoAcordoDisputaApi(api),
       cadastroProfissional: ServicoCadastroProfissionalApi(api, upload: upload),
       perfilPublico: ServicoPerfilPublicoApi(api),
       primeirosPassos: ServicoPrimeirosPassosApi(api),
@@ -147,6 +172,10 @@ class RepositoriosTrato {
       indicacoes: ServicoIndicacoesApi(api),
       recorrencias: ServicoRecorrenciasApi(api),
       cep: ServicoCepApi(api),
+      sac: ServicoSacApi(api),
+      medidas: ServicoMedidasApi(api),
+      compensacoes: ServicoCompensacoesApi(api),
+      contestacaoDecisao: ServicoContestacaoDecisaoApi(api, upload: upload),
       capturaVerificacao:
           camera != null && upload != null ? CapturaVerificacao(camera, upload) : null,
     );
@@ -195,20 +224,6 @@ class RepositoriosTrato {
       upload: upload,
       camera: camera,
       fila: fila,
-      posicao: localizacao == null
-          ? null
-          : () async {
-              // Já negou duas vezes: não pergunta de novo a cada envio.
-              if (LocalizacaoDoPedido.naoPerguntarMais) return null;
-              try {
-                return await localizacao.posicaoAtual();
-              } on ErroLocalizacao catch (e) {
-                if (e.falha == FalhaLocalizacao.semPermissao) {
-                  LocalizacaoDoPedido.registrarNegacao();
-                }
-                return null;
-              }
-            },
     );
   }
 

@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto, LinhaValor, formatarData, formatarReais;
+import '../medidas/modelos.dart' show ProvaEscolhida;
 import '../profissional_apoio/apoio.dart';
+import 'contestacao_material.dart';
 import 'nota_material.dart';
 
 /// F5.9 (cliente): nota dos materiais enviada pelo profissional, item por item.
 /// Só leitura. Se ainda não há nota, mostra o estado vazio.
 class VerNotaTela extends StatelessWidget {
-  const VerNotaTela({super.key, required this.servico, required this.pedidoId});
+  const VerNotaTela({super.key, required this.servico, required this.pedidoId, this.escolherFoto});
+
+  /// Tira a foto para anexar à contestação (nulo se a pessoa cancelar).
+  final Future<ProvaEscolhida?> Function()? escolherFoto;
 
   final ServicoNotaMaterial servico;
   final String pedidoId;
@@ -57,6 +62,13 @@ class VerNotaTela extends StatelessWidget {
               'A nota serve para você conferir o custo de cada material.',
               style: TipografiaTrato.legenda,
             ),
+            if (servico case final ServicoContestacaoMaterial contestacao)
+              SecaoContestacaoMaterial(
+                servico: contestacao,
+                pedidoId: pedidoId,
+                notas: notas,
+                escolherFoto: escolherFoto,
+              ),
           ],
         );
       },

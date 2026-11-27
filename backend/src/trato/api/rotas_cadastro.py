@@ -7,14 +7,18 @@ cadastros simultâneos.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from trato.api.auth import Usuario
-from trato.api.contexto import Contexto, obter_contexto, usuario_atual
-from trato.persistencia.erros import DadosInvalidos
+from trato.api.contexto import Contexto, bearer_opcional, obter_contexto, usuario_atual
+from trato.persistencia.erros import DadosInvalidos, Duplicado
+from trato.persistencia.retorno_conta import hmacs_de_identificadores
+from trato.seguranca.config import ConfigSeguranca, obter_config_seguranca
+from trato.seguranca.contadores import Contadores
 from trato.seguranca.cpf import cpf_valido, normalizar_cpf
 
 router = APIRouter(prefix="/v1", tags=["cadastro"])
@@ -79,6 +83,8 @@ def consultar_cpf(corpo: CpfIn, contexto: Contexto = Depends(obter_contexto)) ->
     cpf = normalizar_cpf(corpo.cpf)
     if not cpf_valido(cpf):
         raise DadosInvalidos("CPF inválido.")
+    if contexto.retorno_conta.esta_impedido(hmacs_de_identificadores(cpf=cpf)):
+        raise HTTPException(403, "Não é possível criar uma nova conta com estes dados.")
     return CpfDisponivelOut(disponivel=contexto.usuarios.cpf_disponivel(cpf))
 
 
@@ -100,24 +106,65 @@ def resolver_identificador(
     "/cadastro/vincular",
     status_code=204,
     summary="Vincula dados iniciais à conta recém-criada no Auth",
+    description=(
+        "Responde sempre 204, tenha gravado ou não (não revela se a conta existe). Com login, só "
+        "grava os dados da própria conta. Sem login, só conta nova que nunca entrou; muitas "
+        "tentativas para a mesma conta respondem 429. Só preenche o que está vazio."
+    ),
 )
 def vincular_cadastro(
-    corpo: VincularCadastroIn, contexto: Contexto = Depends(obter_contexto)
+    corpo: VincularCadastroIn,
+    request: Request,
+    credenciais: HTTPAuthorizationCredentials | None = Depends(bearer_opcional),
+    contexto: Contexto = Depends(obter_contexto),
 ) -> Response:
     cpf: str | None = None
     if corpo.cpf is not None:
         cpf = normalizar_cpf(corpo.cpf)
         if not cpf_valido(cpf):
             raise DadosInvalidos("CPF inválido.")
-    contexto.usuarios.vincular_cadastro(
-        corpo.usuario_id,
-        corpo.email,
-        corpo.nome,
-        cpf,
-        corpo.telefone,
-        corpo.data_nascimento,
-    )
+    if contexto.retorno_conta.esta_impedido(
+        hmacs_de_identificadores(cpf=cpf, email=corpo.email, telefone=corpo.telefone)
+    ):
+        raise HTTPException(403, "Não é possível criar uma nova conta com estes dados.")
+    dados = (corpo.usuario_id, corpo.email, corpo.nome)
+    token = credenciais.credentials if credenciais else None
+    usuario = contexto.auth.autenticar(token) if token else None
+    if usuario is not None:  # sessão válida: só a própria conta
+        if _mesmo_id(usuario.id, corpo.usuario_id):
+            contexto.usuarios.vincular_cadastro(*dados, cpf, corpo.telefone, corpo.data_nascimento)
+        return Response(status_code=204)
+    cfg = obter_config_seguranca()
+    _limitar_por_conta(request, contexto, corpo.usuario_id, cfg)
+    janela = timedelta(minutes=cfg.vincular_janela_conta_minutos)
+    if not contexto.usuarios.pode_vincular_sem_sessao(
+        corpo.usuario_id, corpo.email, contexto.agora(), janela
+    ):
+        return Response(status_code=204)
+    try:
+        contexto.usuarios.vincular_cadastro(*dados, cpf, corpo.telefone, corpo.data_nascimento)
+    except Duplicado:  # CPF de outra conta: sem login a resposta não conta isso
+        contexto.usuarios.vincular_cadastro(*dados, None, corpo.telefone, corpo.data_nascimento)
     return Response(status_code=204)
+
+
+def _mesmo_id(a: str, b: str) -> bool:
+    return a.replace("-", "").lower() == b.replace("-", "").lower()
+
+
+def _limitar_por_conta(
+    request: Request, contexto: Contexto, usuario_id: str, cfg: ConfigSeguranca
+) -> None:
+    """Tentativas sem login para a MESMA conta (o limite por IP já vale para todas). Conta igual
+    exista ou não a conta. Em memória, por instância."""
+    contadores = getattr(request.app.state, "tentativas_vinculo", None)
+    if contadores is None:
+        contadores = Contadores(lambda: contexto.agora().timestamp())
+        request.app.state.tentativas_vinculo = contadores
+    chave = f"vinculo:{usuario_id.replace('-', '').lower()}"
+    if contadores.quantos(chave, cfg.vincular_janela_tentativas_s) >= cfg.vincular_max_por_conta:
+        raise HTTPException(429, "Muitas tentativas. Tente de novo mais tarde.")
+    contadores.adicionar(chave)
 
 
 @router.post(
@@ -146,6 +193,10 @@ def registrar_cpf(
     cpf = normalizar_cpf(corpo.cpf)
     if not cpf_valido(cpf):
         raise DadosInvalidos("CPF inválido.")
+    if contexto.retorno_conta.esta_impedido(
+        hmacs_de_identificadores(cpf=cpf, telefone=corpo.telefone)
+    ):
+        raise HTTPException(403, "Não é possível concluir o cadastro com estes dados.")
     contexto.usuarios.garantir(usuario.id)
     contexto.usuarios.registrar_dados_privados(
         usuario.id, cpf, corpo.telefone, corpo.data_nascimento

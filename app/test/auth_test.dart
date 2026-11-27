@@ -276,6 +276,7 @@ void main() {
   group('criar conta', () {
     Future<void> preencher(WidgetTester tester) async {
       await _digitar(tester, 'Nome completo', 'Mariana Alves');
+      await _digitar(tester, 'Data de nascimento', '15031992');
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');
@@ -393,6 +394,7 @@ void main() {
       final servico = ServicoAuthFake(exigeConfirmacaoEmail: true);
       await _abrir(tester, CriarContaTela(servico: servico));
       await _digitar(tester, 'Nome completo', 'Mariana Alves');
+      await _digitar(tester, 'Data de nascimento', '15031992');
       await _digitar(tester, 'Celular', '31987654417');
       await _digitar(tester, 'E-mail', 'mariana@email.com');
       await _digitar(tester, 'Senha', 'segredo123');

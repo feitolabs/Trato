@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from trato.agendador.executor import Executor, Fonte
+from trato.agendador.executor import Adiada, Executor, Fonte
 from trato.agendador.registro import RegistroExecucoes
 from trato.agendador.trava import Trava
 from trato.notificacoes.eventos import Evento
@@ -39,6 +39,7 @@ class ResultadoCiclo:
     exclusividades_expiradas: int = 0  # ofertas sem resposta ou reservas de 48h expiradas
     indicacoes_liberadas: int = 0  # Indique e Ganhe: Tratinhos que saíram de espera para saldo
     visitas_recorrentes: int = 0  # visitas de serviço recorrente geradas neste ciclo
+    estornos_confirmados: int = 0  # ordens de estorno pendentes confirmadas neste ciclo
 
 
 class Agendador:
@@ -56,7 +57,11 @@ class Agendador:
         rotina_exclusividades: Callable[[datetime], int] | None = None,
         rotina_indicacoes: Callable[[datetime], int] | None = None,
         rotina_recorrencias: Callable[[datetime], int] | None = None,
+        rotina_estornos: Callable[[datetime], int] | None = None,
+        rotina_medidas: Callable[[datetime], int] | None = None,
     ) -> None:
+        self._rotina_medidas = rotina_medidas  # None = sem encerrar medidas vencidas
+        self._rotina_estornos = rotina_estornos  # None = sem reenvio de estornos
         self._fonte = fonte
         self._executor = executor
         self._registro = registro
@@ -84,6 +89,9 @@ class Agendador:
         for acao in acoes:
             try:
                 self._executor.executar(acao, agora)
+            except Adiada as motivo:
+                log.debug("Rotina adiada (%s): %s", motivo, acao.chave)
+                continue
             except Exception:
                 log.exception("Rotina falhou: %s", acao.chave)
                 falhas += 1
@@ -124,6 +132,17 @@ class Agendador:
                 visitas = self._rotina_recorrencias(agora)
             except Exception:  # sem as tabelas ou banco fora: o resto do ciclo segue
                 log.exception("Geração de visitas recorrentes falhou")
+        estornos = 0
+        if self._rotina_estornos is not None:
+            try:
+                estornos = self._rotina_estornos(agora)
+            except Exception:  # provedor ou banco fora: o resto do ciclo segue
+                log.exception("Reenvio de estornos falhou")
+        if self._rotina_medidas is not None:
+            try:
+                self._rotina_medidas(agora)
+            except Exception:  # sem as tabelas ou banco fora: o resto do ciclo segue
+                log.exception("Fim de medidas de conta falhou")
         return ResultadoCiclo(
             False,
             feitas,
@@ -136,6 +155,7 @@ class Agendador:
             exclusividades,
             indicacoes,
             visitas,
+            estornos,
         )
 
     def _lembretes_de_agenda(self, itens: list[PedidoMonitorado], agora: datetime) -> int:

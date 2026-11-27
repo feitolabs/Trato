@@ -7,6 +7,12 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../auth/servico_auth.dart';
 import '../componentes/componentes.dart';
 import '../dispositivo/servico_camera.dart';
+import '../telas/pedidos/documentos_contratacao.dart';
+import '../telas/exclusividade_cliente/modelos.dart';
+import '../telas/ausencia/modelos.dart';
+import '../telas/desistencia/modelos.dart';
+import '../telas/comuns/textos_dos_termos.dart';
+import '../telas/comuns/prazo_avaliacao.dart';
 import '../telas/carteira/modelos.dart' hide ResumoCarteira;
 import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
@@ -21,6 +27,7 @@ import '../telas/profissional/servico_orcamento.dart';
 import '../telas/profissional_inicio/modelos.dart';
 import '../telas/comuns/desconto_moedas.dart';
 import '../telas/comuns/formato_aparelho.dart';
+import '../telas/conta_bloqueada/pedidos_contratados.dart';
 import 'cliente_api.dart';
 import 'config_publica.dart';
 import 'envio_fotos.dart';
@@ -124,17 +131,13 @@ String _iniciais(String nome) {
   return partes.length == 1 ? primeira : primeira + partes.last[0].toUpperCase();
 }
 
-class RepositorioPedidosApi implements RepositorioPedidos {
+class RepositorioPedidosApi
+    implements RepositorioPedidos, ServicoContratacao, PedidosComContaBloqueada {
   RepositorioPedidosApi(
     this._api, {
     this.textos = const TextosPadraoTelas(),
     this.upload,
-    this.posicao,
   });
-
-  /// Posição aproximada do aparelho (nula se o cliente negou o GPS). Vai no pedido para o
-  /// profissional ver a distância.
-  final Future<PosicaoAtual?> Function()? posicao;
 
   final ClienteApi _api;
   final TextosPadraoTelas textos;
@@ -400,14 +403,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     if (categoriaId == null || cidadeId == null) {
       throw const ErroTrato(TipoErro.recusado, 'Escolha a categoria e a cidade do serviço.');
     }
-    // Remoto não pede a localização (o profissional não vê região exata).
-    final onde = rascunho.modalidade == Modalidade.presencial ? await posicao?.call() : null;
+    // Termos 14.12: criar o pedido não lê a localização; vale o endereço digitado.
     final corpo = <String, dynamic>{
       'categoria_id': categoriaId,
       'cidade_id': cidadeId,
-      // Arredondado a ~1 km: o profissional vê a região, nunca o ponto exato.
-      if (onde != null) 'local_aprox_lat': double.parse(onde.latitude.toStringAsFixed(2)),
-      if (onde != null) 'local_aprox_lng': double.parse(onde.longitude.toStringAsFixed(2)),
       if (rascunho.endereco != null && rascunho.modalidade == Modalidade.presencial)
         'bairro': rascunho.endereco!.bairro.trim()
       else if (rascunho.bairro != null && rascunho.bairro!.isNotEmpty)
@@ -567,7 +566,10 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     final fimConfirmacao = quando[4];
     final horasPrazo = ConfigPublica.atual.prazoConfirmacaoHoras;
     String? prazoConfirmacao;
-    if (pedido.estado == 'em_confirmacao' && fimConfirmacao != null && horasPrazo > 0) {
+    if (pedido.estado == 'em_confirmacao' && pedido.checkOutSemCodigo) {
+      // Termos 5.7: sem o código não há confirmação tácita.
+      prazoConfirmacao = textoEncerradoSemCodigo;
+    } else if (pedido.estado == 'em_confirmacao' && fimConfirmacao != null && horasPrazo > 0) {
       final limite = fimConfirmacao.add(Duration(hours: horasPrazo));
       prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horasPrazo)} para confirmar, '
           'até ${_dia(limite)} · ${_hora(limite)}. '
@@ -660,7 +662,11 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       orcamentoCentavos = base;
       totalAtualizadoCentavos = base + aditivosPagos + aditivosAprovados;
     }
+    final prazoAvaliacao = pedido.estado == 'concluido' && !pedido.jaAvaliou
+        ? await _prazoDaAvaliacao(pedidoId)
+        : PrazoAvaliacao.desconhecido;
     return PedidoEmExecucao(
+      prazoAvaliacao: prazoAvaliacao,
       numero: pedido.numero,
       titulo: switch (pedido.estado) {
         'aberto' || 'reservado' => 'Aguardando orçamentos',
@@ -707,6 +713,15 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     );
   }
 
+  /// Sem resposta ou servidor antigo: sem prazo conhecido (a tela fica como antes).
+  Future<PrazoAvaliacao> _prazoDaAvaliacao(String pedidoId) async {
+    try {
+      return PrazoAvaliacao.deJson(_mapa(await _api.get('/v1/pedidos/$pedidoId/avaliacao')));
+    } on Object {
+      return PrazoAvaliacao.desconhecido;
+    }
+  }
+
   @override
   Future<ResumoConclusao> conclusao(String pedidoId) async {
     final (pedido, saldo, fotos) =
@@ -721,36 +736,47 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       aditivosPagos = 0;
     }
     if (aditivosPagos > saldo.clientePagouCentavos) aditivosPagos = 0;
+    // Quem decide se ainda há o que confirmar é a API.
+    final podeConfirmar = pedido.acoesPermitidas.contains('confirmar_conclusao');
     // Prazo e garantia só enfeitam a tela: se faltar dado, a linha simplesmente não aparece.
+    // Em consulta (nada a confirmar) eles nem são buscados.
     String? prazoConfirmacao;
     String? garantiaTexto;
-    try {
-      final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
-      final eventos = [
-        for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j)
-      ];
-      final fim = eventos
-          .where((e) => e.acao == 'fazer_check_out')
-          .map((e) => e.em)
-          .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
-      if (fim != null && horas > 0) {
-        final limite = fim.toLocal().add(Duration(hours: horas));
-        prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horas)} para confirmar, '
-            'até ${_dia(limite)} · ${_hora(limite)}. '
-            'Se você não responder, o serviço é confirmado e o pagamento é liberado ao profissional.';
+    if (podeConfirmar) {
+      try {
+        // Termos 5.7: sem o código não há confirmação tácita nem prazo para ela.
+        if (pedido.checkOutSemCodigo) throw const FormatException('sem prazo');
+        final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
+        final eventos = [
+          for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j)
+        ];
+        final fim = eventos
+            .where((e) => e.acao == 'fazer_check_out')
+            .map((e) => e.em)
+            .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
+        if (fim != null && horas > 0) {
+          final limite = fim.toLocal().add(Duration(hours: horas));
+          prazoConfirmacao = 'Você tem ${ConfigPublica.horas(horas)} para confirmar, '
+              'até ${_dia(limite)} · ${_hora(limite)}. '
+              'Se você não responder, o serviço é confirmado e o pagamento é liberado ao profissional.';
+        }
+      } on Object {
+        prazoConfirmacao = null;
       }
-    } on Object {
-      prazoConfirmacao = null;
-    }
-    try {
-      final g = _mapa(await _api.get('/v1/contratos/$pedidoId/garantia'));
-      final dias = (g['dias'] as num?)?.toInt() ?? 0;
-      if (dias > 0)
-        garantiaTexto = 'Garantia de ${ConfigPublica.dias(dias)} a partir da sua confirmação.';
-    } on Object {
-      garantiaTexto = null;
+      try {
+        final g = _mapa(await _api.get('/v1/contratos/$pedidoId/garantia'));
+        final dias = (g['dias'] as num?)?.toInt() ?? 0;
+        if (dias > 0) {
+          garantiaTexto = 'Garantia de ${ConfigPublica.dias(dias)} a partir da sua confirmação.';
+        }
+      } on Object {
+        garantiaTexto = null;
+      }
     }
     return ResumoConclusao(
+      podeConfirmar: podeConfirmar,
+      podeRelatarProblema: pedido.acoesPermitidas.contains('abrir_disputa'),
+      concluido: pedido.estado == 'concluido',
       remoto: pedido.remoto,
       prazoConfirmacao: prazoConfirmacao,
       garantiaTexto: garantiaTexto,
@@ -763,9 +789,92 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       legendaFotoDepois: 'Depois',
       orcamentoCentavos: saldo.clientePagouCentavos - aditivosPagos,
       aditivoCentavos: aditivosPagos,
-      codigo: pedido.codigoConclusao ?? '',
+      codigo: podeConfirmar ? pedido.codigoConclusao ?? '' : '',
       avisoLiberacao: ConfigPublica.atual.textoLiberacao,
       checkOutSemCodigo: pedido.checkOutSemCodigo,
+    );
+  }
+
+  // --- Conta bloqueada: só as rotas que o servidor abre ao cliente do pedido contratado ------
+
+  @override
+  List<MotivoDoRelato> get motivosDoRelato => [
+        for (var i = 0; i < _motivosDisputa.length && i < textos.motivos.length; i++)
+          (codigo: _motivosDisputa[i], texto: textos.motivos[i]),
+      ];
+
+  @override
+  List<String> get solucoesDoRelato => textos.solucoes;
+
+  @override
+  Future<List<PedidoDeContaBloqueada>> pedidosContratados() async {
+    try {
+      final j = await _api.get('/v1/pedidos', consulta: const {'como': 'cliente'});
+      return [
+        for (final i in _lista(j))
+          if (PedidoDeContaBloqueada.deJson(i) case final p?) p,
+      ];
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 403) return const [];
+      rethrow;
+    }
+  }
+
+  @override
+  Future<PedidoDeContaBloqueada> pedidoContratado(String pedidoId) async {
+    final p = PedidoDeContaBloqueada.deJson(await _api.get('/v1/pedidos/$pedidoId'));
+    if (p == null) throw ErroTrato.servidor;
+    return p;
+  }
+
+  @override
+  Future<void> confirmarPedidoContratado(String pedidoId) async {
+    await _api.post('/v1/pedidos/$pedidoId/acoes/confirmar_conclusao');
+  }
+
+  @override
+  Future<void> relatarPedidoContratado(
+    String pedidoId, {
+    required String motivo,
+    required String descricao,
+    List<String> fotos = const [],
+  }) async {
+    final enviadas = fotos.isEmpty
+        ? null
+        : await enviarFotosLocais(
+            upload,
+            fotos,
+            FinalidadeArquivo.evidenciaDisputa,
+            pedidoId: pedidoId,
+          );
+    await _api.post(
+      '/v1/pedidos/$pedidoId/disputa',
+      corpo: {
+        'motivo': motivo,
+        'descricao': descricao,
+        if (enviadas != null) 'fotos': enviadas,
+      },
+    );
+  }
+
+  @override
+  Future<RelatoDoPedido?> relatoDoPedidoContratado(String pedidoId) async {
+    final Map<String, dynamic> j;
+    try {
+      j = _mapa(await _api.get('/v1/pedidos/$pedidoId/disputa'));
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404) return null;
+      rethrow;
+    }
+    final codigo = '${j['motivo'] ?? ''}';
+    final indice = _motivosDisputa.indexOf(codigo);
+    final descricao = '${j['descricao'] ?? ''}'.trim();
+    return RelatoDoPedido(
+      motivo: indice < 0 || indice >= textos.motivos.length ? 'Problema' : textos.motivos[indice],
+      descricao: descricao.isEmpty ? null : descricao,
+      abertoEm: DateTime.tryParse('${j['aberta_em']}'),
+      respostaAte: DateTime.tryParse('${j['resposta_ate']}'),
+      decisaoAte: DateTime.tryParse('${j['decisao_ate']}'),
     );
   }
 
@@ -778,6 +887,7 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   Future<DadosRelatoProblema> dadosRelato(String pedidoId) async {
     final (pedido, saldo) = await emParalelo2(_pedido(pedidoId), _saldo(pedidoId));
     return DadosRelatoProblema(
+      casoEmAnalise: pedido.estado == 'em_disputa',
       titulo: pedido.rotulo,
       valorCongeladoCentavos: saldo.retidoCentavos + saldo.aLiberarCentavos,
       motivos: textos.motivos,
@@ -863,11 +973,13 @@ class RepositorioPedidosApi implements RepositorioPedidos {
     var bonusDisponivel = false;
     var bonusMoedas = 0;
     var jaAvaliou = pedido.jaAvaliou;
+    var prazo = PrazoAvaliacao.desconhecido;
     try {
       final info = _mapa(await _api.get('/v1/pedidos/$pedidoId/avaliacao'));
       bonusDisponivel = info['bonus_disponivel'] == true;
       bonusMoedas = (info['bonus_moedas'] as num?)?.toInt() ?? 0;
       if (info['ja_avaliou'] == true) jaAvaliou = true;
+      prazo = PrazoAvaliacao.deJson(info);
     } on Object {
       // Fallback seguro: servidor antigo ou erro transitório não promete bônus.
     }
@@ -882,6 +994,8 @@ class RepositorioPedidosApi implements RepositorioPedidos {
       bonusDisponivel: bonusDisponivel,
       bonusMoedas: bonusMoedas,
       jaAvaliou: jaAvaliou,
+      avaliarAte: prazo.ate,
+      prazoEncerrado: prazo.encerrado,
     );
   }
 
@@ -1023,6 +1137,139 @@ class RepositorioPedidosApi implements RepositorioPedidos {
   @override
   Future<List<int>> baixarReciboPdf(String pedidoId) =>
       _api.getBytes('/v1/pedidos/$pedidoId/recibo.pdf');
+
+  @override
+  Future<ContratacaoDoPedido?> contratacao(String pedidoId) async {
+    try {
+      return ContratacaoDoPedido.deJson(await _api.get('/v1/pedidos/$pedidoId/contratacao'));
+    } on ErroTrato catch (e) {
+      // 409: pagamento ainda não confirmado. 404/503: servidor sem a função.
+      if (const {403, 404, 409, 503}.contains(e.codigoHttp)) return null;
+      rethrow;
+    }
+  }
+
+  // Caminho fixo, e não o link da resposta: o token só vai para a API do Trato.
+  @override
+  Future<List<int>> baixarDocumentoContratacao(String pedidoId, DocumentoContratacao documento) =>
+      _api.getBytes('/v1/pedidos/$pedidoId/contratacao/${documento.arquivo}.pdf');
+
+  @override
+  Future<SituacaoExclusividadeCliente?> situacaoExclusividadeCliente(String pedidoId) async {
+    try {
+      return SituacaoExclusividadeCliente.deJson(
+        _mapa(await _api.get('/v1/pedidos/$pedidoId/exclusividade-cliente')),
+      );
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404 || e.codigoHttp == 503) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> pedirExclusividadeCliente(
+    String pedidoId,
+    EscolhaExclusividade escolha,
+    String chaveIdempotencia,
+  ) async {
+    await _api.post(
+      '/v1/pedidos/$pedidoId/exclusividade-cliente',
+      corpo: {
+        if (escolha.orcamentoId != null) 'orcamento_id': escolha.orcamentoId,
+        if (escolha.profissionalId != null) 'profissional_id': escolha.profissionalId,
+        'chave_idempotencia': chaveIdempotencia,
+      },
+    );
+  }
+
+  @override
+  Future<CasoAusencia?> casoDeAusencia(String pedidoId) => _lerAusencia(_api, pedidoId);
+
+  @override
+  Future<CasoAusencia> justificarAusencia(
+    String pedidoId,
+    String texto,
+    List<String> fotos,
+  ) async {
+    final anexos = await enviarFotosLocais(
+      upload,
+      fotos,
+      FinalidadeArquivo.evidenciaDisputa,
+      pedidoId: pedidoId,
+    );
+    return CasoAusencia.deJson(
+      _mapa(await _api.post(
+        '/v1/pedidos/$pedidoId/ausencia/justificativa',
+        corpo: {'texto': texto.trim(), 'anexos': anexos},
+      )),
+    );
+  }
+
+  @override
+  Future<List<AnexoAusencia>?> anexosDaAusencia(String pedidoId) async {
+    try {
+      return [
+        for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/ausencia/anexos')))
+          AnexoAusencia.deJson(j),
+      ];
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404 || e.codigoHttp == 503) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<CasoAusencia> contestarAusencia(
+    String pedidoId,
+    String texto,
+    List<String> fotos,
+  ) async {
+    final anexos = await enviarFotosLocais(
+      upload,
+      fotos,
+      FinalidadeArquivo.evidenciaDisputa,
+      pedidoId: pedidoId,
+    );
+    try {
+      return CasoAusencia.deJson(
+        _mapa(await _api.post(
+          '/v1/pedidos/$pedidoId/ausencia/contestacao',
+          corpo: {'texto': texto.trim(), 'anexos': anexos},
+        )),
+      );
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp != 404 && e.codigoHttp != 503) rethrow;
+      throw const ErroTrato(
+        TipoErro.recusado,
+        'A contestação pelo app está indisponível. Fale com o suporte.',
+      );
+    }
+  }
+
+  @override
+  Future<SituacaoDesistencia?> situacaoDesistencia(String pedidoId) async {
+    try {
+      return SituacaoDesistencia.deJson(
+        _mapa(await _api
+            .get('/v1/pedidos/$pedidoId/desistencia')
+            .timeout(const Duration(seconds: 6))),
+      );
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404) return null; // servidor sem a rota
+      rethrow;
+    }
+  }
+
+  @override
+  Future<RegistroDesistencia> desistir(String pedidoId, String motivo) async {
+    final limpo = motivo.trim();
+    return RegistroDesistencia.deJson(
+      _mapa(await _api.post(
+        '/v1/pedidos/$pedidoId/desistir',
+        corpo: {if (limpo.isNotEmpty) 'motivo': limpo},
+      )),
+    );
+  }
 
   @override
   Future<void> cancelar(String pedidoId, String motivo) async {
@@ -1177,6 +1424,7 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
       final prazo = j['prazo_execucao_dias'] as int?;
       return DetalheOrcamento(
         validoAte: validade == null ? '' : _dia(DateTime.parse(validade).toLocal()),
+        venceEm: validade == null ? null : DateTime.tryParse(validade),
         itens: itens,
         notaMaterial: _sinalMaterial(j['sinal_material_centavos'] as int?),
         totalHoras: _horasTexto(j['total_horas']),
@@ -1257,11 +1505,17 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
   DadosPagamento _dadosDeMapa(String pedidoId, Map<String, dynamic> j) {
     final valor = j['valor_centavos'] as int?;
     if (valor == null) {
-      throw const ErroTrato(TipoErro.recusado, 'Este pedido ainda não tem um valor a pagar.');
+      throw const ErroTrato(
+        TipoErro.recusado,
+        'Este pedido ainda não tem um valor a pagar. Volte ao pedido e peça um orçamento novo.',
+      );
     }
     final meios = [for (final m in (j['meios_disponiveis'] as List? ?? const [])) m as String];
     return DadosPagamento(
       subtitulo: 'Pedido ${PedidoApi.numeroDe(pedidoId)}',
+      validadeAte: DateTime.tryParse('${j['validade_ate'] ?? ''}')?.toLocal(),
+      pagoOuEmConfirmacao:
+          j['pagamento_confirmado'] == true || j['estado'] == 'aguardando_confirmacao',
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as num?)?.toInt() ?? valor,
       descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
       descontoCupomCentavos: (j['desconto_cupom_centavos'] as num?)?.toInt(),
@@ -1315,7 +1569,24 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     } on Object {
       cpfCadastrado = true;
     }
-    return _dadosDeMapa(pedidoId, mapa).copiarCom(cpfCadastrado: cpfCadastrado);
+    final dados = _dadosDeMapa(pedidoId, mapa);
+    int? teto;
+    int? usado;
+    if (dados.moedasSaldo > 0) {
+      try {
+        // Limite de uso, para mostrar antes de usar os Tratinhos.
+        final m = _mapa(await _api.get('/v1/me/moedas'));
+        teto = (m['teto_desconto_mes_centavos'] as num?)?.toInt();
+        usado = (m['desconto_usado_mes_centavos'] as num?)?.toInt();
+      } on Object {
+        // Sem o limite, a tela diz que não foi informado; o pagamento segue.
+      }
+    }
+    return dados.copiarCom(
+      cpfCadastrado: cpfCadastrado,
+      tetoDescontoMesCentavos: teto,
+      descontoUsadoMesCentavos: usado,
+    );
   }
 
   @override
@@ -1370,6 +1641,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     int parcelas = 1,
     String? cupom,
     bool usarMoedas = false,
+    bool execucaoImediata = false,
   }) async {
     final meio = metodo == MetodoPagamento.pix ? 'pix' : 'cartao';
     final cupomLimpo = (cupom ?? '').trim();
@@ -1384,8 +1656,11 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           if (metodo == MetodoPagamento.cartao && parcelas > 1) 'parcelas': parcelas,
           if (cupomLimpo.isNotEmpty) 'cupom': cupomLimpo,
           if (usarMoedas) 'usar_moedas': true,
+          // Termos 7.3: só vai quando o cliente marcou (servidor antigo recusa campo extra).
+          if (execucaoImediata) 'consentimento_execucao_imediata': true,
         },
-        chaveIdempotencia: 'cobranca-$pedidoId-$meio$sufixoParcela$sufixoCupom',
+        chaveIdempotencia: 'cobranca-$pedidoId-$meio$sufixoParcela$sufixoCupom'
+            '${execucaoImediata ? '-execucao' : ''}',
       ),
     );
     return Cobranca(
@@ -1401,9 +1676,17 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
   /// `GET /v1/contratos/{id}/pagamento`. Só `pago: true` vira [StatusPagamento.pago].
   @override
   Future<StatusPagamento> status(String pedidoId) async {
-    final j = _mapa(await _api.get('/v1/contratos/$pedidoId/pagamento'));
+    final Map<String, dynamic> j;
+    try {
+      j = _mapa(await _api.get('/v1/contratos/$pedidoId/pagamento'));
+    } on ErroTrato catch (e) {
+      // Sem contrato (pagamento expirado: o pedido voltou a ficar aberto).
+      if (e.codigoHttp == 404) return StatusPagamento.semContrato;
+      rethrow;
+    }
     if (j['pago'] == true) return StatusPagamento.pago;
     final estado = j['estado_pagamento'] as String?;
+    if (estado == 'devolvida') return StatusPagamento.devolvido;
     if (estado == 'falhou' || estado == 'cancelada') return StatusPagamento.falhou;
     return StatusPagamento.aguardando;
   }
@@ -1725,6 +2008,8 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
           tela: _textoDoDado(n['dados'], 'tela'),
           papel: _textoDoDado(n['dados'], 'papel'),
           recorrenciaId: _textoDoDado(n['dados'], 'recorrencia_id'),
+          chamadoId: _textoDoDado(n['dados'], 'chamado_id'),
+          compensacaoId: _textoDoDado(n['dados'], 'compensacao_id'),
         ),
     ];
   }
@@ -1749,8 +2034,14 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
 
   @override
   Future<List<PreferenciaNotificacao>> carregarPreferencias() async {
-    final j = _mapa(await _api.get('/v1/notificacoes/preferencias'));
+    return _preferenciasDe(_mapa(await _api.get('/v1/notificacoes/preferencias')));
+  }
+
+  /// `obrigatorias` (opcional): categorias que o servidor não deixa desligar. Ausente: nulo.
+  List<PreferenciaNotificacao> _preferenciasDe(Map<String, dynamic> j) {
     final cats = _mapa(j['categorias']);
+    final lista = j['obrigatorias'];
+    final obrigatorias = lista is List ? {for (final c in lista) '$c'} : null;
     return [
       for (final e in cats.entries)
         () {
@@ -1760,6 +2051,7 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
             app: canais['app'] != false,
             push: canais['push'] != false,
             email: canais['email'] != false,
+            obrigatoria: obrigatorias?.contains(e.key),
           );
         }(),
     ];
@@ -1779,20 +2071,9 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
           },
       },
     };
-    final j = _mapa(await _api.put('/v1/notificacoes/preferencias', corpo: payload));
-    final cats = _mapa(j['categorias']);
-    return [
-      for (final e in cats.entries)
-        () {
-          final canais = _mapa(e.value);
-          return PreferenciaNotificacao(
-            categoria: e.key,
-            app: canais['app'] != false,
-            push: canais['push'] != false,
-            email: canais['email'] != false,
-          );
-        }(),
-    ];
+    return _preferenciasDe(
+      _mapa(await _api.put('/v1/notificacoes/preferencias', corpo: payload)),
+    );
   }
 
   @override
@@ -1901,6 +2182,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
     int? tetoMes;
     int? usadoMes;
     var extratoMoedas = const <LancamentoTratinho>[];
+    var creditosMoedas = const <CreditoPorValidade>[];
     try {
       final m = _mapa(await _api.get('/v1/me/moedas'));
       venceEm = DateTime.tryParse('${m['saldo_vence_em'] ?? ''}')?.toLocal();
@@ -1913,6 +2195,14 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       valorMoeda = (m['valor_moeda_centavos'] as num?)?.toInt();
       descontoDisponivel = m['desconto_disponivel'] != false; // ausente = true
       motivo = MotivoDescontoIndisponivel.deTexto(m['desconto_indisponivel_motivo']);
+      creditosMoedas = [
+        for (final c in (m['creditos'] as List? ?? const []))
+          if (c is Map && c['moedas'] is num && (c['moedas'] as num) > 0)
+            CreditoPorValidade(
+              moedas: (c['moedas'] as num).toInt(),
+              expiraEm: DateTime.tryParse('${c['expira_em'] ?? ''}')?.toLocal(),
+            ),
+      ];
       extratoMoedas = [
         for (final item in (m['extrato'] as List? ?? const []))
           if (item is Map && item['quantidade'] is num)
@@ -1938,6 +2228,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
       tetoDescontoMesCentavos: tetoMes,
       descontoUsadoMesCentavos: usadoMes,
       moedasExtrato: extratoMoedas,
+      moedasCreditos: creditosMoedas,
       nome: (nome == null || nome.isEmpty) ? 'Sua conta' : nome,
       iniciais: _iniciais(nome ?? ''),
       resumo: partes.join(' · '),
@@ -2245,9 +2536,18 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     ];
     // O que acabou (concluído ou cancelado) sai de "Em andamento" mas continua acessível em
     // "Finalizados": é de lá que o profissional avalia o cliente.
+    // Termos 12.1: o prazo para avaliar o cliente. Só dos concluídos sem avaliação (30 por vez;
+    // o que já foi lido fica guardado).
+    final semAvaliar = [
+      for (final p in meusPedidos)
+        if (p.estado == 'concluido' && !p.jaAvaliou) p.id,
+    ].take(30).toList();
+    final lidos = await Future.wait([for (final id in semAvaliar) prazoDaAvaliacao(id)]);
+    final prazos = {for (var i = 0; i < semAvaliar.length; i++) semAvaliar[i]: lidos[i]};
     final finalizados = [
       for (final p in meusPedidos)
-        if (const {'concluido', 'cancelado'}.contains(p.estado)) _contratado(p),
+        if (const {'concluido', 'cancelado'}.contains(p.estado))
+          _contratado(p, null, prazos[p.id] ?? PrazoAvaliacao.desconhecido),
     ];
     for (final p in meusPedidos) {
       if (const {'pago_e_retido', 'agendado', 'em_andamento'}.contains(p.estado)) {
@@ -2379,7 +2679,11 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     };
   }
 
-  PedidoContratado _contratado(PedidoApi p, [DadosDoPedido? dados]) {
+  PedidoContratado _contratado(
+    PedidoApi p, [
+    DadosDoPedido? dados,
+    PrazoAvaliacao prazo = PrazoAvaliacao.desconhecido,
+  ]) {
     final situacao = switch (p.estado) {
       'orcamento_aceito' => 'Orçamento aceito · aguardando o pagamento do cliente',
       'aguardando_confirmacao' => 'Pagamento sendo confirmado pelo parceiro',
@@ -2403,6 +2707,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       janelaInicio: p.janelaInicio?.toLocal(),
       remoto: p.remoto,
       jaAvaliou: p.jaAvaliou,
+      prazoAvaliacao: prazo,
       endereco: dados?.enderecoCompleto,
       consultaMapa: dados?.consultaDoMapa,
     );
@@ -2548,19 +2853,25 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     return [
       for (final l in ExtratoApi.deJson(json).itens)
         ItemExtrato(
-          titulo: 'Pedido ${_curto(l.pedidoId)} · ${switch (l.tipo) {
-            'retencao' => 'valor retido',
-            'repasse' => 'valor liberado',
-            'cobranca' => 'pagamento',
-            'taxa' => 'custo do parcelamento',
-            'estorno' => 'estorno',
-            _ => l.tipo.replaceAll('_', ' '),
-          }}',
+          titulo: 'Pedido ${_curto(l.pedidoId)} · ${l.ehCompensacao ? 'Compensação' : l.ehCompensacaoDevolvida ? 'Compensação devolvida' : switch (l.tipo) {
+              'retencao' => 'valor retido',
+              'repasse' => 'valor liberado',
+              'cobranca' => 'pagamento',
+              'taxa' => 'custo do parcelamento',
+              'estorno' => 'estorno',
+              _ => l.tipo.replaceAll('_', ' '),
+            }}',
           detalheData: _dia(l.data.toLocal()),
           brutoCentavos: l.valorCentavos,
           pedidoId: l.pedidoId,
           textoTaxa: l.estornoDe != null ? 'Estorno' : 'Toque para ver os valores',
-          liquidoCentavos: l.valorCentavos,
+          rodape: l.ehCompensacao
+              ? 'Descontado do repasse'
+              : l.ehCompensacaoDevolvida
+                  ? 'Desconto devolvido'
+                  : null,
+          // A compensação sai do que seria repassado: aparece com sinal de menos.
+          liquidoCentavos: l.ehCompensacao ? -l.valorCentavos : l.valorCentavos,
           status: StatusExtrato.liberado,
         ),
     ];
@@ -2571,12 +2882,14 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
   Future<DetalheValoresPedido> valoresDoPedido(String pedidoId) async {
     final saldo = _mapa(await _api.get('/v1/pedidos/$pedidoId/saldo'));
     var concluidoSemAvaliar = false;
+    var prazo = PrazoAvaliacao.desconhecido;
     try {
       final pedido = _mapa(await _api.get('/v1/pedidos/$pedidoId'));
       concluidoSemAvaliar = pedido['estado'] == 'concluido' && pedido['ja_avaliou'] != true;
     } on ErroTrato {
       concluidoSemAvaliar = false;
     }
+    if (concluidoSemAvaliar) prazo = await prazoDaAvaliacao(pedidoId);
     var aditivos = <Map<String, dynamic>>[];
     var notas = <Map<String, dynamic>>[];
     try {
@@ -2612,7 +2925,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       voceRecebeCentavos: retido + aLiberar + liberado,
       situacao: situacao,
       liberaEm: DateTime.tryParse('${saldo['liberacao_prevista_em'] ?? ''}')?.toLocal(),
-      podeAvaliarCliente: concluidoSemAvaliar,
+      podeAvaliarCliente: concluidoSemAvaliar && !prazo.encerrado,
+      avaliarAte: prazo.ate,
       aditivos: [
         for (final a in aditivos)
           LinhaDeValor(
@@ -2644,6 +2958,30 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     }
   }
 
+  /// Prazos já lidos: o encerrado não muda mais; o aberto vale até passar do instante dele.
+  final _prazos = <String, PrazoAvaliacao>{};
+
+  @override
+  Future<PrazoAvaliacao> prazoDaAvaliacao(String pedidoId) async {
+    final guardado = _prazos[pedidoId];
+    if (guardado != null &&
+        (guardado.encerrado || (guardado.ate?.isAfter(DateTime.now()) ?? false))) {
+      return guardado;
+    }
+    try {
+      // Só informa o prazo: resposta lenta não segura a tela.
+      final lido = PrazoAvaliacao.deJson(
+        _mapa(await _api
+            .get('/v1/pedidos/$pedidoId/avaliacao')
+            .timeout(const Duration(seconds: 4))),
+      );
+      _prazos[pedidoId] = lido;
+      return lido;
+    } on Object {
+      return PrazoAvaliacao.desconhecido;
+    }
+  }
+
   /// `POST /v1/pedidos/{id}/avaliacao` `{nota_geral}`: o servidor vê que quem avalia é o
   /// profissional e grava como avaliação do cliente.
   @override
@@ -2671,7 +3009,13 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         expiraEm: ex.expiraEm,
         saldoRestante: ex.saldoRestante,
         bloqueadoAte: ex.bloqueadoAte?.toLocal(),
+        pagador: ex.pagador,
       );
+
+  @override
+  Future<void> desistirDaExclusividade(String exclusividadeId) async {
+    await _api.post('/v1/profissional/exclusividades/$exclusividadeId/desistir');
+  }
 
   @override
   Future<ResumoExclusividades> minhasExclusividades() async {
@@ -2926,7 +3270,8 @@ class ServicoOrcamentoApi implements ServicoOrcamento {
       corpo: {
         'itens': itens,
         'prazo_execucao_dias': pronto.prazoExecucaoDias,
-        'validade_ate': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
+        'validade_ate':
+            DateTime.now().toUtc().add(Duration(days: pronto.validadeDias)).toIso8601String(),
         'sinal_material_centavos': sinal,
         'garantia_dias': pronto.garantiaDias,
         if (pronto.foraDoEscopo != null && pronto.foraDoEscopo!.trim().isNotEmpty)
@@ -2979,7 +3324,17 @@ class CapturaIndisponivel implements CapturaCheckIn {
   Future<PosicaoCapturada?> posicao() async => null;
 }
 
-class ServicoCheckInApi implements ServicoCheckIn, ReenvioOffline {
+/// `GET /v1/pedidos/{id}/ausencia`. 404 (sem registro ou servidor antigo) e 503: nulo.
+Future<CasoAusencia?> _lerAusencia(ClienteApi api, String pedidoId) async {
+  try {
+    return CasoAusencia.deJson(_mapa(await api.get('/v1/pedidos/$pedidoId/ausencia')));
+  } on ErroTrato catch (e) {
+    if (e.codigoHttp == 404 || e.codigoHttp == 503) return null;
+    rethrow;
+  }
+}
+
+class ServicoCheckInApi implements ServicoCheckIn, ReenvioOffline, ServicoChegadaAusencia {
   ServicoCheckInApi(
     this._api, {
     required this.pedidoId,
@@ -3029,6 +3384,35 @@ class ServicoCheckInApi implements ServicoCheckIn, ReenvioOffline {
   @override
   Future<void> enviarMensagemRapida(String mensagem) async {
     await _api.post('/v1/pedidos/$pedidoId/mensagens', corpo: {'texto': mensagem});
+  }
+
+  @override
+  Future<CasoAusencia?> casoDeAusencia() => _lerAusencia(_api, pedidoId);
+
+  @override
+  Future<CasoAusencia?> registrarChegada() async {
+    final corpo = <String, Object?>{};
+    if (!remoto) {
+      final foto = _foto;
+      final posicao = _posicao;
+      if (foto == null || posicao == null) {
+        throw const ErroTrato(
+          TipoErro.recusado,
+          'Tire a foto do local e registre a localização antes de informar cliente ausente.',
+        );
+      }
+      final enviada = _foto = await _enviada(foto, FinalidadeArquivo.checkIn);
+      corpo['foto'] = _fotoJson(enviada);
+      corpo['localizacao'] = {'latitude': posicao.latitude, 'longitude': posicao.longitude};
+    }
+    try {
+      return CasoAusencia.deJson(
+        _mapa(await _api.post('/v1/pedidos/$pedidoId/ausencia/chegada', corpo: corpo)),
+      );
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404 || e.codigoHttp == 503) return null;
+      rethrow;
+    }
   }
 
   @override

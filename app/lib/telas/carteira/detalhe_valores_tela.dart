@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../comuns/prazo_avaliacao.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart';
 import 'modelos.dart';
@@ -91,6 +92,10 @@ class DetalheValoresTela extends StatelessWidget {
                 icone: Icons.star_outline,
                 aoTocar: aoAvaliarCliente,
               ),
+              if (d.avaliarAte != null) ...[
+                const SizedBox(height: EspacosTrato.x2),
+                Text(textoAvaliarAte(d.avaliarAte!), style: secundario),
+              ],
             ],
           ],
         );

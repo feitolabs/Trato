@@ -24,7 +24,11 @@ class CarteiraTela extends StatelessWidget {
     this.aoCarregarMais,
     this.temMaisExtrato = false,
     this.carregandoMais = false,
+    this.entradaCompensacoes,
   });
+
+  /// Entrada das compensações (ela mesma some se o servidor não tiver a função).
+  final Widget? entradaCompensacoes;
 
   /// Toque numa linha do extrato: abre o detalhe dos valores do pedido.
   final ValueChanged<ItemExtrato>? aoAbrirItem;
@@ -64,6 +68,7 @@ class CarteiraTela extends StatelessWidget {
         children: [
           Text('Carteira', style: TipografiaTrato.tituloGrande),
           const SizedBox(height: EspacosTrato.x5),
+          if (entradaCompensacoes != null) entradaCompensacoes!,
           if (dados.erro != null)
             _CartaoErro(mensagem: dados.erro!, aoTentarNovamente: aoTentarNovamente)
           else if (resumo != null || soExtrato) ...[
@@ -86,7 +91,8 @@ class CarteiraTela extends StatelessWidget {
             RegraLiberacao(libera: dados.proximaLiberacao, chave: const Key('regra-liberacao')),
             const SizedBox(height: EspacosTrato.x1),
             Text(
-              'Você ganha 50 Tratinhos ao avaliar um cliente.',
+              // A quantidade é do servidor, que ainda não a informa aqui.
+              'Você pode ganhar Tratinhos ao avaliar um cliente.',
               key: const Key('aviso-avaliar-cliente'),
               style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
@@ -407,7 +413,7 @@ class _LinhaExtrato extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                item.textoTaxa == 'Estorno' ? 'Estorno' : 'Sem taxa',
+                item.rodape ?? (item.textoTaxa == 'Estorno' ? 'Estorno' : 'Sem taxa'),
                 style: secundario,
               ),
             ),

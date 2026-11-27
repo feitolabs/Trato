@@ -148,6 +148,8 @@ def test_trat1_bonus_disponivel_verdadeiro_e_nao_credita(amb):
         "ja_avaliou": False,
         "bonus_disponivel": True,
         "bonus_moedas": 50,
+        "avaliar_ate": "2026-11-28T12:00:00Z",  # conclusão + 30 dias (Termos 12.1)
+        "prazo_encerrado": False,
     }
     assert amb.contexto.moedas.saldo(CLIENTE.id, AGORA) == 0  # só leu
 

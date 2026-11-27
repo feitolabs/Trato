@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
+from trato.api.cautela import exigir_contato_livre
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
 from trato.api.reagendamentos import PropostaPendente, Reagendamento
 from trato.api.servicos import ator_de, carregar_pedido
@@ -154,6 +155,8 @@ def propor_reagendamento(
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.estado not in ESTADOS_QUE_REAGENDAM or not pedido.profissional_id:
         raise HTTPException(409, _NAO_PODE)
+    # 9.6: o pedido de reagendamento (com o texto livre) chega à outra parte
+    exigir_contato_livre(contexto, pedido, pedido.profissional_id)
     agora = contexto.agora()
     if corpo.nova_janela_fim <= corpo.nova_janela_inicio:
         raise HTTPException(422, "A nova janela precisa terminar depois de começar.")

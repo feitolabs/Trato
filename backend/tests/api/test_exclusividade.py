@@ -4,6 +4,7 @@ funções SQL, rotas do profissional e do cliente e as regras do pedido `reserva
 from __future__ import annotations
 
 import threading
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -21,6 +22,15 @@ from trato.pedidos.estados import (
     transicionar,
 )
 from trato.pedidos.estados import Estado as E
+
+
+@pytest.fixture(autouse=True)
+def oferta_antiga_ligada(request):
+    """Estes testes cobrem a prioridade paga pelo profissional, hoje desligada por padrão."""
+    if "amb" in request.fixturenames:
+        config = request.getfixturevalue("amb").contexto.config
+        config._config = replace(config.carregar(), exclusividade_profissional_ofertada=True)
+
 
 PRO, OUTRO_PRO = PROFISSIONAL.id, OUTRO_PROFISSIONAL.id
 URL = "/v1/profissional/exclusividades"
@@ -45,6 +55,8 @@ def _ligar(amb, saldo=300, outro_saldo=0, **cfg):
 
 def _pedido(amb, pid="ped-1", urgente=False, categoria="cat-1", estado=E.ABERTO):
     amb.semear_pedido(estado, id=pid)
+    if estado in (E.ABERTO, E.RESERVADO):  # pedido ainda não contratado não tem contrato
+        amb.contexto.contratos._itens.pop(pid, None)
     amb.contexto.pedidos._dados[pid] = DadosPedido(
         categoria, "cid", "Pintar", "Sala", urgente=urgente
     )

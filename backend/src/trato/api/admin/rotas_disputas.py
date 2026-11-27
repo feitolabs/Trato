@@ -1,9 +1,8 @@
 """Disputas: fila, detalhe (evidências e linha do tempo) e decisão com alçada e segunda pessoa.
 
-Nenhuma regra nova de dinheiro mora aqui. Quem decide é `disputas/` (alçada, segunda pessoa,
-divisão do valor), quem muda o pedido é `pedidos/estados.py` e quem move o espelho é o ledger
-(`financeiro/ledger.py`). Caminho A (D15): o Trato só ESPELHA; a devolução real ao cliente é
-feita no parceiro de pagamento, fora desta API.
+Nenhuma regra de dinheiro mora aqui. Quem decide é `disputas/` (alçada, segunda pessoa, divisão
+do valor) e quem efetiva é `api/decisao_disputa.py`, o mesmo caminho da rota do pedido: o
+estorno ao cliente é pedido ao provedor (Termos 6.10). Não devolver de novo à mão no parceiro.
 """
 
 from __future__ import annotations
@@ -11,9 +10,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from trato import disputas
+from trato.api import decisao_disputa
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import (
     AprovarDisputaIn,
@@ -32,13 +32,12 @@ from trato.api.admin.repositorios import ResponsavelDisputa
 from trato.api.admin.rotas_pagamentos import lancamento_admin_out
 from trato.api.contexto import Contexto, obter_contexto
 from trato.disputas import Ator, Decisao, Disputa, Estado, Resultado
-from trato.financeiro.ledger import CUSTODIA, Lancamento, Livro, estornar_pedido, repartir_custodia
-from trato.financeiro.repasses import repasse_dos_lancamentos
-from trato.garantias import abrir_garantia
-from trato.pedidos import estados
-from trato.pedidos.estados import Acao, Pedido
+from trato.financeiro.ledger import (
+    Lancamento,
+)
 from trato.pedidos.estados import Ator as AtorPedido
 from trato.pedidos.estados import Papel as PapelPedido
+from trato.pedidos.estados import Pedido
 from trato.persistencia.comum import para_json
 
 router = APIRouter(prefix="/v1/admin/disputas", tags=["admin: disputas"])
@@ -62,7 +61,11 @@ def _resumo(
     responsavel: ResponsavelDisputa | None = None,
 ) -> DisputaResumoOut:
     numero, titulo = (rotulos or {}).get(pedido_id, (None, None))
+    caso = contexto.cancelamentos.do_pedido(pedido_id)
     return DisputaResumoOut(
+        desistencia=caso is not None
+        and caso.tipo == "desistencia_arrependimento"
+        and caso.servico_iniciado,
         cliente_nome=partes[0],
         profissional_nome=partes[1],
         responsavel_id=responsavel.usuario_id if responsavel else None,
@@ -216,8 +219,7 @@ def _na_situacao(d: Disputa, estado: Estado | None, situacao: str) -> bool:
         return d.estado is estado
     if situacao == "todas":
         return True
-    decidida = d.estado is Estado.DECIDIDA
-    return decidida if situacao == "decididas" else not decidida
+    return d.encerrada if situacao == "decididas" else not d.encerrada
 
 
 @router.get("", response_model=Pagina[DisputaResumoOut], summary="Fila de disputas")
@@ -266,7 +268,7 @@ def contagem(
     contexto: Contexto = Depends(obter_contexto),
 ) -> dict[str, int]:
     todas = _todas(contexto)
-    decididas = sum(1 for _, d in todas if d.estado is Estado.DECIDIDA)
+    decididas = sum(1 for _, d in todas if d.encerrada)
     return {"abertas": len(todas) - decididas, "decididas": decididas, "todas": len(todas)}
 
 
@@ -287,8 +289,8 @@ def assumir(
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaDetalheOut:
     disputa = _obter(contexto, pedido_id)
-    if disputa.estado is Estado.DECIDIDA:
-        raise HTTPException(409, "Essa disputa já foi decidida.")
+    if disputa.encerrada:
+        raise HTTPException(409, "Essa disputa já foi decidida ou encerrada por acordo.")
     if admin.responsaveis_disputa is None:
         raise HTTPException(503, "Assumir disputa ainda não está configurado neste ambiente.")
     admin.responsaveis_disputa.assumir(pedido_id, operador.id, corpo.motivo, corpo.substituir)
@@ -305,110 +307,50 @@ def detalhe(
     return _detalhe(contexto, admin, pedido_id, _obter(contexto, pedido_id))
 
 
-def _planejar_dinheiro(contexto: Contexto, pedido: Pedido, d: Disputa) -> list[Lancamento]:
-    """Lançamentos do espelho para a decisão, com as funções que o ledger já tem.
-
-    Chaves determinísticas (`disputa/<pedido>/...`): refazer a chamada depois de uma falha no
-    meio não duplica nada (se já estão no ledger, não planeja de novo). Não há taxa do Trato.
-    """
-    prefixo = f"disputa/{pedido.id}/"
-    existentes = contexto.ledger.lancamentos(pedido.id)
-    if any(i.chave.startswith(prefixo) for i in existentes) or d.divisao is None:
-        return []
-    livro = Livro()
-    if existentes:
-        livro.lancar_varios(existentes)
-    antes = len(livro.lancamentos)
-    agora = contexto.agora()
-    if d.divisao.para_cliente > 0:
-        estornar_pedido(livro, pedido.id, d.divisao.para_cliente, f"{prefixo}est", agora)
-    restante = livro.saldo(CUSTODIA, pedido.id)
-    if d.divisao.para_profissional > 0 and restante > 0:
-        repartir_custodia(livro, pedido.id, pedido.profissional_id or "", 0, f"{prefixo}rep", agora)
-    return list(livro.lancamentos[antes:])
-
-
 def _efetivar(
+    request: Request,
     contexto: Contexto,
     admin: AdminContexto,
     operador: Operador,
     pedido_id: str,
+    lida: Disputa,
     decidida: Disputa,
     justificativa: str,
 ) -> DisputaDetalheOut:
-    """Pedido, dinheiro, disputa e auditoria numa transação só: tudo ou nada (C1/A5)."""
-    with contexto.transacao():
-        return _efetivar_na_transacao(contexto, admin, operador, pedido_id, decidida, justificativa)
+    """Efetiva pelo caminho único (`api/decisao_disputa.py`) e grava a auditoria do painel na
+    mesma transação."""
 
-
-def _efetivar_na_transacao(
-    contexto: Contexto,
-    admin: AdminContexto,
-    operador: Operador,
-    pedido_id: str,
-    decidida: Disputa,
-    justificativa: str,
-) -> DisputaDetalheOut:
-    """Disputa já DECIDIDA: muda o pedido, move o espelho, grava a disputa e a auditoria.
-
-    Tudo que pode recusar (estado do pedido, saldo do ledger) roda ANTES de gravar qualquer coisa.
-    """
-    assert decidida.decisao is not None  # noqa: S101 - DECIDIDA sempre tem decisão
-    pedido = contexto.pedidos.obter(pedido_id)
-    if pedido is None:
-        raise HTTPException(404, "Pedido da disputa não encontrado.")
-    transicao = estados.transicionar(
-        pedido,
-        Acao.DECIDIR_DISPUTA,
-        AtorPedido(PapelPedido.MEDIADOR, decidida.decidido_por or operador.id),
-        contexto.agora(),
-        estados.DecisaoDisputa(
-            estados.ResultadoDisputa(decidida.decisao.resultado.value), justificativa
-        ),
-        contexto.config.carregar().prazos_pedido,
-    )
-    novos = _planejar_dinheiro(contexto, pedido, decidida)
-    if novos:
-        contexto.ledger.lancar_varios(novos)
-        repasse = repasse_dos_lancamentos(
-            pedido.id,
-            pedido.profissional_id or "",
-            novos,
-            "decisao_disputa",
-            f"disputa/{pedido.id}/repasse",
+    def auditar(pedido: Pedido, gravado: Pedido, novos: list[Lancamento]) -> None:
+        div = decidida.divisao
+        assert decidida.decisao is not None  # noqa: S101 - DECIDIDA sempre tem decisão
+        admin.auditoria.registrar(
+            ator_id=operador.id,
+            acao="financeiro.disputa_decidida",
+            entidade="pedidos",
+            entidade_id=pedido_id,
+            antes={"estado_pedido": pedido.estado.value},
+            depois={
+                "resultado": decidida.decisao.resultado.value,
+                "estado_pedido": gravado.estado.value,
+                "decidido_por": decidida.decidido_por,
+                "aprovado_por": decidida.aprovado_por,
+                "para_profissional_centavos": div.para_profissional if div else None,
+                "para_cliente_centavos": div.para_cliente if div else None,
+                "retido_centavos": div.retido if div else None,
+                "lancamentos": [n.id for n in novos],
+            },
+            motivo=justificativa,
         )
-        if repasse is not None:
-            contexto.repasses.criar(repasse)
-    gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
-    if gravado.estado is estados.Estado.CONCLUIDO and gravado.concluido_em is not None:
-        if contexto.garantias.obter_garantia(gravado.id) is None:
-            contrato = contexto.contratos.obter_do_pedido(gravado.id)
-            categoria = contrato.categoria_id if contrato else None
-            contexto.garantias.salvar_garantia(
-                gravado.id,
-                abrir_garantia(
-                    gravado.concluido_em, categoria, contexto.config.carregar().garantias
-                ),
-            )
-    contexto.disputas.salvar(pedido_id, decidida)
-    div = decidida.divisao
-    admin.auditoria.registrar(
-        ator_id=operador.id,
-        acao="financeiro.disputa_decidida",
-        entidade="pedidos",
-        entidade_id=pedido_id,
-        antes={"estado_pedido": pedido.estado.value},
-        depois={
-            "resultado": decidida.decisao.resultado.value,
-            "estado_pedido": gravado.estado.value,
-            "decidido_por": decidida.decidido_por,
-            "aprovado_por": decidida.aprovado_por,
-            "para_profissional_centavos": div.para_profissional if div else None,
-            "para_cliente_centavos": div.para_cliente if div else None,
-            "retido_centavos": div.retido if div else None,
-            "lancamentos": [n.id for n in novos],
-        },
-        motivo=justificativa,
+
+    _, novos = decisao_disputa.efetivar(
+        contexto,
+        getattr(request.app.state, "servico_pagamento", None),
+        pedido_id,
+        lida,
+        decidida,
+        AtorPedido(PapelPedido.MEDIADOR, decidida.decidido_por or operador.id),
+        justificativa,
+        auditar,
     )
     return _detalhe(contexto, admin, pedido_id, decidida, novos)
 
@@ -427,11 +369,12 @@ def _efetivar_na_transacao(
 def decidir(
     pedido_id: str,
     corpo: DecidirDisputaIn,
+    request: Request,
     operador: Operador = Depends(exigir(Permissao.DISPUTAS_DECIDIR)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaDetalheOut:
-    disputa = _obter(contexto, pedido_id)
+    disputa = lida = _obter(contexto, pedido_id)
     if corpo.estado_esperado is not None and corpo.estado_esperado != disputa.estado.value:
         raise HTTPException(
             409,
@@ -458,8 +401,10 @@ def decidir(
         alcada = alcada or 0
     nova = disputa.decidir(Ator.ANALISTA, operador.id, decisao, agora, alcada)
     if nova.estado is Estado.DECIDIDA:
-        return _efetivar(contexto, admin, operador, pedido_id, nova, corpo.justificativa)
-    contexto.disputas.salvar(pedido_id, nova)
+        return _efetivar(
+            request, contexto, admin, operador, pedido_id, lida, nova, corpo.justificativa
+        )
+    decisao_disputa.guardar_proposta(contexto, pedido_id, lida, nova)
     admin.auditoria.registrar(
         ator_id=operador.id,
         acao="financeiro.disputa_decisao_proposta",
@@ -487,6 +432,7 @@ def decidir(
 def aprovar(
     pedido_id: str,
     corpo: AprovarDisputaIn,
+    request: Request,
     operador: Operador = Depends(exigir(Permissao.DISPUTAS_SEGUNDA_PESSOA)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
@@ -500,4 +446,6 @@ def aprovar(
         alcada = alcada or 0
     if operador.membro.papel is not PapelEquipe.ADMINISTRADOR and alcada < aprovada.valor_congelado:
         raise disputas.AlcadaInvalida("O valor da disputa está acima da alçada de quem aprova.")
-    return _efetivar(contexto, admin, operador, pedido_id, aprovada, corpo.justificativa)
+    return _efetivar(
+        request, contexto, admin, operador, pedido_id, disputa, aprovada, corpo.justificativa
+    )

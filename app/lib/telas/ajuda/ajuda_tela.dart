@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../comuns/textos_dos_termos.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
@@ -16,7 +17,19 @@ class AjudaTela extends StatelessWidget {
     this.aoRelatarProblema,
     this.aoVerTour,
     this.aoRelatarBug,
+    this.verificarAtendimento,
+    this.aoFalarComOTrato,
+    this.aoVerTermos,
   });
+
+  /// Termos 1.4: os textos e o registro do aceite, consultados pela central de ajuda.
+  final VoidCallback? aoVerTermos;
+
+  /// Falso: o servidor não tem o atendimento pelo app (fica só o e-mail, como antes).
+  final Future<bool> Function()? verificarAtendimento;
+
+  /// "Falar com o Trato" (Termos 25.1): chamados com protocolo.
+  final VoidCallback? aoFalarComOTrato;
 
   final ServicoAjuda servico;
 
@@ -38,6 +51,9 @@ class AjudaTela extends StatelessWidget {
           aoRelatarProblema: aoRelatarProblema,
           aoVerTour: aoVerTour,
           aoRelatarBug: aoRelatarBug,
+          verificarAtendimento: verificarAtendimento,
+          aoFalarComOTrato: aoFalarComOTrato,
+          aoVerTermos: aoVerTermos,
         ),
       ),
     );
@@ -51,8 +67,14 @@ class _ConteudoAjuda extends StatefulWidget {
     this.aoRelatarProblema,
     this.aoVerTour,
     this.aoRelatarBug,
+    this.verificarAtendimento,
+    this.aoFalarComOTrato,
+    this.aoVerTermos,
   });
 
+  final VoidCallback? aoVerTermos;
+  final Future<bool> Function()? verificarAtendimento;
+  final VoidCallback? aoFalarComOTrato;
   final VoidCallback? aoRelatarBug;
   final List<PerguntaFrequente> itens;
   final VoidCallback? aoFalarComSuporte;
@@ -65,6 +87,25 @@ class _ConteudoAjuda extends StatefulWidget {
 
 class _ConteudoAjudaState extends State<_ConteudoAjuda> {
   final _busca = TextEditingController();
+  var _temAtendimento = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _conferirAtendimento();
+  }
+
+  Future<void> _conferirAtendimento() async {
+    final conferir = widget.verificarAtendimento;
+    if (conferir == null || widget.aoFalarComOTrato == null) return;
+    var tem = true;
+    try {
+      tem = await conferir();
+    } on Object {
+      // Falha passageira: o atendimento aparece e a tela dele tem "tentar de novo".
+    }
+    if (mounted) setState(() => _temAtendimento = tem);
+  }
 
   @override
   void dispose() {
@@ -140,6 +181,15 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
               ],
             ),
           ),
+        if (widget.aoVerTermos != null) ...[
+          const SizedBox(height: EspacosTrato.x5),
+          BotaoSecundario(
+            key: const Key('ajuda-termos'),
+            texto: 'Termos e meu aceite',
+            icone: Icons.description_outlined,
+            aoTocar: widget.aoVerTermos,
+          ),
+        ],
         if (widget.aoVerTour != null) ...[
           const SizedBox(height: EspacosTrato.x5),
           BotaoSecundario(
@@ -149,27 +199,45 @@ class _ConteudoAjudaState extends State<_ConteudoAjuda> {
             aoTocar: widget.aoVerTour,
           ),
         ],
-        if (widget.aoFalarComSuporte != null ||
+        if (_temAtendimento ||
+            widget.aoFalarComSuporte != null ||
             widget.aoRelatarProblema != null ||
             widget.aoRelatarBug != null) ...[
           const SizedBox(height: EspacosTrato.x6),
           Text('PRECISA DE MAIS AJUDA?', style: TipografiaTrato.sobretitulo),
           const SizedBox(height: EspacosTrato.x3),
           Text(
-            'Nossa equipe responde por mensagem, com atenção a cada caso.',
+            'Nossa equipe responde por mensagem, com atenção a cada caso. '
+            '$textoAtendimentoHumano',
             style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
           ),
           const SizedBox(height: EspacosTrato.x4),
-          if (widget.aoFalarComSuporte != null)
+          if (_temAtendimento) ...[
+            BotaoPrimario(
+              key: const Key('falar-com-o-trato'),
+              texto: 'Falar com o Trato',
+              icone: Icons.support_agent,
+              aoTocar: widget.aoFalarComOTrato,
+            ),
+            if (widget.aoFalarComSuporte != null) ...[
+              const SizedBox(height: EspacosTrato.x3),
+              BotaoSecundario(
+                texto: 'Escrever por e-mail',
+                icone: Icons.mail_outline,
+                aoTocar: widget.aoFalarComSuporte,
+              ),
+            ],
+          ] else if (widget.aoFalarComSuporte != null)
             BotaoPrimario(
               texto: 'Falar com o suporte',
               icone: Icons.support_agent,
               aoTocar: widget.aoFalarComSuporte,
             ),
-          if (widget.aoFalarComSuporte != null && widget.aoRelatarProblema != null)
+          if ((_temAtendimento || widget.aoFalarComSuporte != null) &&
+              widget.aoRelatarProblema != null)
             const SizedBox(height: EspacosTrato.x3),
           if (widget.aoRelatarProblema != null)
-            widget.aoFalarComSuporte == null
+            !_temAtendimento && widget.aoFalarComSuporte == null
                 ? BotaoPrimario(
                     texto: 'Relatar um problema',
                     icone: Icons.flag_outlined,

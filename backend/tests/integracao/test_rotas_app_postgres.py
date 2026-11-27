@@ -157,9 +157,9 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     assert valores["pago_centavos"] == 0 and valores["meios_disponiveis"] == ["pix", "cartao"]
     assert get(c, f"/v1/pedidos/{pedido_id}/pagamento", "profissional").status_code == 403
 
-    # depois da contratação o contato deixa de ser mascarado
+    # Termos 11.2: antes do pagamento confirmado, o telefone continua oculto na conversa
     r = post(c, url_msg, "profissional", {"texto": "Meu zap 31 99999-8888"})
-    assert r.json()["mascarada"] is False and "99999" in r.json()["texto"]
+    assert r.json()["mascarada"] is True and "99999" not in r.json()["texto"]
 
     # pagamento só por webhook assinado (simulado: ator sistema, como no fluxo existente)
     pedido = c.contexto.pedidos.obter(pedido_id)
@@ -172,6 +172,10 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
     )
     c.contexto.pedidos.salvar(t.pedido, t.evento)
     assert get(c, f"/v1/pedidos/{pedido_id}/pagamento", "cliente").json()["pagamento_confirmado"]
+
+    # depois do pagamento confirmado, o telefone é liberado na conversa do contratado
+    r = post(c, url_msg, "profissional", {"texto": "Meu zap 31 99999-8888"})
+    assert r.json()["mascarada"] is False and "99999" in r.json()["texto"]
 
     # agenda, check-in e check-out
     inicio = agora() + timedelta(days=2)

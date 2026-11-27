@@ -20,15 +20,13 @@ from trato.agendador.config import obter_config_agendador
 from trato.agendador.executor import ExecutorContexto, FonteContexto, ids_ativos_postgres
 from trato.agendador.registro import RegistroPostgres
 from trato.agendador.trava import TravaAdvisoryPostgres
-from trato.api.fabrica import criar_contexto_postgres
+from trato.api.fabrica import criar_contexto_postgres, montar_servico_pagamento
 from trato.config import obter_config
 from trato.notificacoes.canais import canais_da_config
 from trato.notificacoes.config import obter_config_notificacoes
-from trato.notificacoes.postgres import NotificacoesServicoPostgres
+from trato.notificacoes.postgres import EmailsDaContaPostgres, NotificacoesServicoPostgres
 from trato.notificacoes.servico import ServicoNotificacoes
-from trato.pagamentos.montagem import escolher_provedor
 from trato.persistencia.conexao import Banco
-from trato.persistencia.pagamentos import CobrancasPostgres
 
 
 def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
@@ -49,19 +47,30 @@ def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
             tamanho_max=config.trato_banco_pool_max,
         )
     contexto = criar_contexto_postgres(banco, config)
+    # O dinheiro das transições do agendador (estorno na ausência do profissional) é o mesmo
+    # gancho da API: sem ligar aqui, o pedido seria cancelado com o valor preso em custódia.
+    pagamento = montar_servico_pagamento(banco, config)
+    pagamento.ligar(contexto)
     cn = obter_config_notificacoes()
     notif = ServicoNotificacoes(
         NotificacoesServicoPostgres(banco),
         canais_da_config(cn),
         cn,
         contexto.agora,
+        emails=EmailsDaContaPostgres(banco),
         pedidos=contexto.pedidos.obter,
         convidado=lambda pid: (
             d.profissional_convidado_id if (d := contexto.pedidos.dados_do_pedido(pid)) else None
         ),
     )
+    contexto.extras["notificador"] = notif  # avisos de estorno disparados pelo agendador
     executor = ExecutorContexto(
-        contexto, notif, CobrancasPostgres(banco), escolher_provedor(config)
+        contexto,
+        notif,
+        pagamento.cobrancas,
+        pagamento.provedor,
+        pagamento,
+        timedelta(seconds=cfg.estorno_idade_minima_segundos),
     )
     agendador = Agendador(
         FonteContexto(contexto, ids_ativos_postgres(banco, cfg.dias_concluidos_monitorados)),
@@ -76,6 +85,8 @@ def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
         executor.expirar_exclusividades,
         executor.liberar_indicacoes,
         executor.gerar_visitas_recorrentes,
+        executor.reenviar_estornos,
+        executor.encerrar_medidas,
     )
     return agendador, banco, cfg.intervalo_segundos
 

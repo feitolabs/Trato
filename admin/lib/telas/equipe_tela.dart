@@ -61,7 +61,7 @@ class _EquipeTelaState extends State<EquipeTela> {
     int? alcadaDigitada() => alcadaCtrl.text.trim().isEmpty ? 0 : lerReaisEmCentavos(alcadaCtrl.text);
     String? erroAlcada() {
       final v = alcadaDigitada();
-      if (v == null) return 'Informe um valor em reais';
+      if (v == null) return kErroReais;
       if (v > teto()) return 'Passa do teto do papel (${formatarReais(teto())})';
       return null;
     }
@@ -96,13 +96,14 @@ class _EquipeTelaState extends State<EquipeTela> {
           const SizedBox(height: EspacosTrato.x3),
           TextField(
             controller: alcadaCtrl,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => rebuild(),
             decoration: InputDecoration(
               labelText: 'Alçada',
               prefixText: 'R\$ ',
               helperText: 'Teto do papel: ${formatarReais(teto())}. Vazio = sem alçada financeira.',
               errorText: erroAlcada(),
+              errorMaxLines: 3,
             ),
           ),
         ],
@@ -113,7 +114,7 @@ class _EquipeTelaState extends State<EquipeTela> {
         'nome': nome.text.trim(),
         'email': email.text.trim(),
         'papel': papel,
-        'alcada': alcadaDigitada() ?? 0,
+        'alcada': alcadaDigitada()!, // o botão só habilita com valor válido
         'motivo': motivo,
       },
     );
@@ -137,12 +138,12 @@ class _EquipeTelaState extends State<EquipeTela> {
     final tetos = await api.tetosDosPapeis().catchError((_) => <String, int>{});
     if (!mounted) return;
     var papel = m.papel;
-    final alcadaCtrl = TextEditingController(text: m.alcadaCentavos == 0 ? '' : (m.alcadaCentavos / 100).toStringAsFixed(2).replaceAll('.', ','));
+    final alcadaCtrl = TextEditingController(text: m.alcadaCentavos == 0 ? '' : centavosParaCampo(m.alcadaCentavos));
     int teto() => tetos[papel] ?? m.tetoPapelCentavos;
     int? alcadaDigitada() => alcadaCtrl.text.trim().isEmpty ? 0 : lerReaisEmCentavos(alcadaCtrl.text);
     String? erroAlcada() {
       final v = alcadaDigitada();
-      if (v == null) return 'Informe um valor em reais';
+      if (v == null) return kErroReais;
       if (v > teto()) return 'Passa do teto do papel (${formatarReais(teto())})';
       return null;
     }
@@ -167,20 +168,21 @@ class _EquipeTelaState extends State<EquipeTela> {
           const SizedBox(height: EspacosTrato.x3),
           TextField(
             controller: alcadaCtrl,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => rebuild(),
             decoration: InputDecoration(
               labelText: 'Alçada',
               prefixText: 'R\$ ',
               helperText: 'Teto do papel: ${formatarReais(teto())}',
               errorText: erroAlcada(),
+              errorMaxLines: 3,
             ),
           ),
         ],
       ),
       camposValidos: () =>
           erroAlcada() == null && (papel != m.papel || (alcadaDigitada() ?? 0) != m.alcadaCentavos),
-      resultado: (motivo) => {'papel': papel, 'alcada': alcadaDigitada() ?? 0, 'motivo': motivo},
+      resultado: (motivo) => {'papel': papel, 'alcada': alcadaDigitada()!, 'motivo': motivo},
     );
     if (r == null || !mounted) return;
     final ok = await executar(

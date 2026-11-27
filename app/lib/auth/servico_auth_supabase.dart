@@ -10,6 +10,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../telas/comuns/textos_dos_termos.dart';
 import '../dados/cliente_api.dart';
 import '../dados/erros.dart';
 import 'armazenamento_sessao.dart';
@@ -90,6 +91,9 @@ class ServicoAuthSupabase implements ServicoAuth {
   final Set<ProvedorAuth>? _provedoresAtivos;
   String? _cpfPendente;
   String? _nascimentoPendente;
+
+  /// Conta criada cujo `/v1/cadastro/vincular` falhou: tentar de novo não cria outra conta.
+  ({String email, sb.User usuario, sb.Session? sessao})? _vinculoPendente;
 
   // Link de recuperação: o evento pode chegar antes de a tela escutar (app fechado, aberto pelo
   // e-mail). Guardamos o aviso até o primeiro ouvinte.
@@ -236,6 +240,8 @@ class ServicoAuthSupabase implements ServicoAuth {
         token: acesso,
       );
     } on ErroTrato catch (e) {
+      // Conta bloqueada continua logada: a tela de bloqueio assume (sem logout).
+      if (e.codigo == 'conta_bloqueada') return;
       try {
         await _auth.signOut();
       } catch (_) {
@@ -356,32 +362,41 @@ class ServicoAuthSupabase implements ServicoAuth {
         final nascIso = isoDataNascimento(dados.nascimento);
         // Cadastro leve: só confere CPF antes quando informado.
         if (cpf.isNotEmpty) await _exigirCpfLivre(cpf);
-        final r = await _auth.signUp(
-          email: dados.email.trim(),
-          password: dados.senha,
-          emailRedirectTo: kUrlRetornoEmail,
-          // Metadados do usuário: não exigem sessão (nada de updateUser/SMS, D16).
-          // O CPF NÃO vai aqui: iria no token. O backend grava depois do login.
-          data: {
-            'nome': dados.nome,
-            'celular': celularE164(dados.celular),
-            if (dados.perfil != null) 'perfil': dados.perfil,
-            'termos_aceitos': dados.termosAceitos,
-            'termos_aceitos_em': DateTime.now().toUtc().toIso8601String(),
-            'termos_versao': '1.0',
-          },
-        );
-        // Com confirmação de e-mail ligada, e-mail repetido volta sem erro e sem identidades.
-        if (r.user?.identities?.isEmpty ?? false) {
-          throw const ErroAuth(TipoErroAuth.emailJaUsado);
+        final email = dados.email.trim();
+        var pendente = _vinculoPendente;
+        if (pendente?.email != email.toLowerCase()) pendente = null;
+        sb.User? usuario = pendente?.usuario;
+        sb.Session? sessaoNova = pendente?.sessao;
+        if (pendente == null) {
+          final r = await _auth.signUp(
+            email: email,
+            password: dados.senha,
+            emailRedirectTo: kUrlRetornoEmail,
+            // Metadados do usuário: não exigem sessão (nada de updateUser/SMS, D16).
+            // O CPF NÃO vai aqui: iria no token. O backend grava depois do login.
+            data: {
+              'nome': dados.nome,
+              'celular': celularE164(dados.celular),
+              if (dados.perfil != null) 'perfil': dados.perfil,
+              'termos_aceitos': dados.termosAceitos,
+              'termos_aceitos_em': DateTime.now().toUtc().toIso8601String(),
+              'termos_versao': versaoDosTermos,
+            },
+          );
+          // Com confirmação de e-mail ligada, e-mail repetido volta sem erro e sem identidades.
+          if (r.user?.identities?.isEmpty ?? false) {
+            throw const ErroAuth(TipoErroAuth.emailJaUsado);
+          }
+          usuario = r.user;
+          sessaoNova = r.session;
         }
-        if (r.user != null && _api != null) {
+        if (usuario != null && _api != null) {
           try {
             await _api.post(
               '/v1/cadastro/vincular',
               corpo: {
-                'usuario_id': r.user!.id,
-                'email': dados.email.trim(),
+                'usuario_id': usuario.id,
+                'email': email,
                 'nome': dados.nome,
                 if (cpf.isNotEmpty) 'cpf': cpf,
                 'telefone': celularE164(dados.celular),
@@ -389,13 +404,21 @@ class ServicoAuthSupabase implements ServicoAuth {
               },
             );
           } on Object catch (e) {
-            debugPrint('Aviso: vincular_cadastro falhou: $e');
+            _vinculoPendente = (email: email.toLowerCase(), usuario: usuario, sessao: sessaoNova);
+            throw ErroAuth(
+              TipoErroAuth.cadastroNaoVinculado,
+              e is ErroTrato
+                  ? 'Sua conta foi criada, mas não salvamos seus dados. ${e.mensagem} '
+                      'Toque em "Tentar de novo".'
+                  : null,
+            );
           }
         }
-        final sessao = r.session == null ? null : _paraSessao(r.user);
+        _vinculoPendente = null;
+        final sessao = sessaoNova == null ? null : _paraSessao(usuario);
         if (sessao != null) {
           if (cpf.isNotEmpty) {
-            await _gravarCpf(cpf, token: r.session!.accessToken, nascimentoIso: nascIso);
+            await _gravarCpf(cpf, token: sessaoNova!.accessToken, nascimentoIso: nascIso);
           }
           return CadastroComSessao(sessao);
         }

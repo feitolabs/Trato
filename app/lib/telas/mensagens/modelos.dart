@@ -85,6 +85,13 @@ class ConversaResumo {
     return '$tituloPedido · $cod';
   }
 
+  /// Serviço encerrado, pela mesma fonte do selo ([estadoEfetivo]); vale para contagem e filtros.
+  bool get finalizada {
+    final informado = rotuloEstado?.trim() ?? '';
+    if (informado.isNotEmpty) return informado == 'Concluído' || informado == 'Cancelado';
+    return encerrada;
+  }
+
   String get estadoEfetivo {
     final informado = rotuloEstado?.trim() ?? '';
     if (informado.isNotEmpty) return informado;

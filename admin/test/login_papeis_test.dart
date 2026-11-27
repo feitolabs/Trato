@@ -47,7 +47,8 @@ void main() {
       String papel,
       Set<String> visiveis,
     ) async {
-      await abrirPainel(tester, papel: papel);
+      // Janela alta: o menu inteiro fica montado, então a ausência de um item é de verdade.
+      await abrirPainel(tester, papel: papel, altura: 2000);
       const todos = ['verificacao', 'disputas', 'pagamentos', 'busca', 'config', 'auditoria'];
       for (final id in todos) {
         expect(_tem(id), visiveis.contains(id), reason: '$papel / $id');
@@ -78,7 +79,7 @@ void main() {
     });
 
     testWidgets('a partir de 1024 o menu lateral é fixo, agrupado e com rodapé', (tester) async {
-      await abrirPainel(tester, papel: 'administrador', largura: 1280, altura: 900);
+      await abrirPainel(tester, papel: 'administrador', largura: 1280, altura: 2000);
       for (final grupo in ['OPERAÇÃO', 'FINANCEIRO', 'CRESCIMENTO', 'ADMINISTRAÇÃO']) {
         expect(find.text(grupo), findsOneWidget, reason: grupo);
       }
@@ -104,6 +105,8 @@ void main() {
       expect(_tem('equipe'), isFalse);
       await tester.tap(find.byKey(const ValueKey('menu-mais')));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('menu-equipe')), 120,
+          scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
       expect(_tem('equipe'), isTrue);
       expect(find.text('Sair'), findsOneWidget);
     });

@@ -3,7 +3,7 @@ import 'dart:io' show Platform;
 import 'package:url_launcher/url_launcher.dart';
 
 /// Para onde vai o relato de bug.
-const emailRelatoBug = 'suporte@tratofeito.com.br';
+const emailRelatoBug = 'suporte@tratofeitolabs.com.br';
 
 /// Versão do app que vai no relato. Deve acompanhar o `version:` do `pubspec.yaml` (um teste
 /// confere). Uma compilação pode trocar com `--dart-define=TRATO_VERSAO=0.1.50+51`.

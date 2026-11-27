@@ -20,7 +20,7 @@ class IlustracaoOnboardingProfissional extends StatelessWidget {
     'Ilustração: complete seu perfil profissional',
     'Ilustração: receba pedidos no celular',
     'Ilustração: receba na carteira sem taxa',
-    'Ilustração: ganhe Tratinhos com prazo de 48 horas',
+    'Ilustração: ganhe Tratinhos',
   ];
 
   @override

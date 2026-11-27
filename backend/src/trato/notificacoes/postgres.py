@@ -4,6 +4,7 @@ real em 22/11/2026)."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
@@ -14,6 +15,8 @@ from trato.notificacoes.repositorio import Preferencias, Registro
 from trato.persistencia.comum import como_uuid, exigir_uuid, para_json
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import NaoEncontrado
+
+log = logging.getLogger("trato.notificacoes")
 
 _COLUNAS = "id, usuario_id, tipo, canal, titulo, corpo, dados, criada_em, enviada_em, lida_em"
 
@@ -92,13 +95,16 @@ class NotificacoesServicoPostgres:
             raise NaoEncontrado("Notificação não encontrada.")
         return _registro(linha)
 
-    def pendentes(self, desde: datetime, limite: int) -> Sequence[Registro]:
+    def pendentes(
+        self, desde: datetime, limite: int, ate: datetime | None = None
+    ) -> Sequence[Registro]:
         with self._banco.transacao() as con:
             linhas = con.execute(
                 f"select {_COLUNAS} from public.notificacoes "  # noqa: S608
                 "where canal <> 'app' and enviada_em is null and criada_em >= %s "
+                "and (%s::timestamptz is null or criada_em <= %s::timestamptz) "
                 "order by criada_em, id limit %s",
-                (desde, limite),
+                (desde, ate, ate, limite),
             ).fetchall()
         return tuple(_registro(l) for l in linhas)  # noqa: E741
 
@@ -167,3 +173,31 @@ class NotificacoesServicoPostgres:
                 "and (%s::uuid is null or usuario_id = %s::uuid)",
                 (token, dono, dono),
             )
+
+
+class EmailsDaContaPostgres:
+    """E-mail de login para os avisos, por `privado.contas_auth`. Só é consultado com o canal de
+    e-mail ligado. Sem a função ou com falha: ninguém para receber (a caixa do app segue)."""
+
+    def __init__(self, banco: Banco) -> None:
+        self._banco = banco
+
+    def email_de(self, usuario_id: str) -> str | None:
+        usuario = como_uuid(usuario_id)
+        if usuario is None:
+            return None
+        try:
+            with self._banco.transacao() as con:
+                # Conferir antes: uma consulta que falha estragaria a transação em curso.
+                tem = con.execute(
+                    "select to_regprocedure('privado.contas_auth(uuid[])') is not null as tem"
+                ).fetchone()
+                if not tem["tem"]:
+                    return None
+                linha = con.execute(
+                    "select email from privado.contas_auth(%s::uuid[])", ([usuario],)
+                ).fetchone()
+        except Exception:  # noqa: BLE001 - aviso é secundário
+            log.warning("E-mail da conta não consultado", exc_info=True)
+            return None
+        return (linha["email"] or None) if linha else None

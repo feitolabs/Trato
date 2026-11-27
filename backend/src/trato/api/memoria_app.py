@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from trato.api.auth import PapelUsuario
@@ -24,9 +24,13 @@ from trato.persistencia.erros import Duplicado, NaoEncontrado
 class ConversasEmMemoria:
     def __init__(self, contratado: Callable[[str], bool] | None = None) -> None:
         self.contratado = contratado  # pedido_id -> já tem contrato? (o contexto liga)
+        # (pedido_id, profissional_id) -> endereço e telefone passam nesta conversa? (o contexto
+        # liga; sem isso vale `contratado`, usado em testes)
+        self.contato_liberado: Callable[[str, str], bool] | None = None
         self._conversas: dict[tuple[str, str], str] = {}
         self._mensagens: dict[str, list[Mensagem]] = {}
         self._pedido_da_conversa: dict[str, str] = {}
+        self._originais: dict[int, str] = {}
         self._ids = itertools.count(1)
 
     def abrir(self, pedido_id: str, profissional_id: str) -> str:
@@ -38,20 +42,45 @@ class ConversasEmMemoria:
             self._pedido_da_conversa[conversa] = pedido_id
         return self._conversas[chave]
 
+    def do_pedido(self, pedido_id: str) -> list[tuple[str, str]]:
+        return [(c, prof) for (pid, prof), c in self._conversas.items() if pid == pedido_id]
+
     def enviar(self, conversa_id: str, autor_id: str, corpo: str) -> int:
         if conversa_id not in self._mensagens:
             raise NaoEncontrado("Conversa não encontrada ou encerrada.")
-        pedido = self._pedido_da_conversa[conversa_id]
-        contratado = self.contratado(pedido) if self.contratado else False
-        exibido = mascarar_contatos(corpo, incluir_endereco=not contratado)
+        liberado = self._liberado(conversa_id)
+        exibido = mascarar_contatos(corpo, incluir_endereco=not liberado, liberar_telefone=liberado)
         nova = Mensagem(
             next(self._ids), autor_id, exibido, exibido != corpo, datetime.now(UTC), None
         )
         self._mensagens[conversa_id].append(nova)
+        self._originais[nova.id] = corpo
         return nova.id
 
+    def originais(self, conversa_id: str) -> dict[int, str]:
+        return {
+            m.id: self._originais.get(m.id, m.texto) for m in self._mensagens.get(conversa_id, ())
+        }
+
     def listar(self, conversa_id: str) -> Sequence[Mensagem]:
-        return tuple(self._mensagens.get(conversa_id, ()))
+        mensagens = self._mensagens.get(conversa_id, ())
+        if self._liberado(conversa_id):
+            return tuple(mensagens)
+        saida = []
+        for m in mensagens:  # deixou de valer (pedido cancelado): volta a esconder na leitura
+            texto = mascarar_contatos(m.texto)
+            saida.append(m if texto == m.texto else replace(m, texto=texto, mascarada=True))
+        return tuple(saida)
+
+    def _liberado(self, conversa_id: str) -> bool:
+        if self.contato_liberado is None and self.contratado is None:
+            return False
+        for (pedido_id, profissional_id), conversa in self._conversas.items():
+            if conversa == conversa_id:
+                if self.contato_liberado is None:
+                    return self.contratado(pedido_id)
+                return self.contato_liberado(pedido_id, profissional_id)
+        return False
 
 
 class NotificacoesEmMemoria:
@@ -96,9 +125,15 @@ class UsuariosEmMemoria:
         self.verificacoes: dict[str, str] = {}  # profissional_id -> status (testes preenchem)
         self.profissionais: set[str] = set()
         self.status_perfis: dict[str, str] = {}  # testes: recusado/suspenso (padrão em_analise)
+        self.nascimentos: dict[str, date] = {}
+        self.acessos: set[str] = set()  # contas que já entraram (`last_sign_in_at`)
+        self.criadas_em: dict[str, datetime] = {}
 
     def adicionar(self, perfil: PerfilDetalhe) -> None:
         self._perfis[perfil.id] = perfil
+
+    def ids_para_aviso(self, depois_de: str | None, limite: int) -> list[str]:
+        return sorted(i for i in self._perfis if depois_de is None or i > depois_de)[:limite]
 
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None:
         return self._perfis.get(usuario_id)
@@ -143,6 +178,8 @@ class UsuariosEmMemoria:
         data_nascimento: object | None = None,
     ) -> bool:
         novo = False
+        if isinstance(data_nascimento, date):
+            self.nascimentos.setdefault(usuario_id, data_nascimento)
         if cpf is not None:
             dono = self._cpfs.get(cpf)
             if dono is not None and dono != usuario_id:
@@ -157,6 +194,19 @@ class UsuariosEmMemoria:
             if digitos_tel:
                 self._telefones[digitos_tel] = usuario_id
         return novo
+
+    def data_nascimento(self, usuario_id: str) -> date | None:
+        return self.nascimentos.get(usuario_id)
+
+    def pode_vincular_sem_sessao(
+        self, usuario_id: str, email: str, agora: datetime, janela: timedelta
+    ) -> bool:
+        conhecido = self.emails.get(usuario_id)
+        if conhecido is not None and conhecido != email.strip().lower():
+            return False
+        if usuario_id in self.acessos:
+            return False
+        return agora - self.criadas_em.setdefault(usuario_id, agora) <= janela
 
     def email_por_identificador(self, digitos: str) -> str | None:
         uid = self._cpfs.get(digitos)
@@ -227,6 +277,14 @@ class AvaliacoesEmMemoria:
         self._itens[(achada.pedido_id, achada.direcao)] = atualizada
         return atualizada
 
+    def definir_status(self, avaliacao_id: str, status: str) -> Avaliacao | None:
+        achada = self.obter_por_id(avaliacao_id)
+        if achada is None:
+            return None
+        atualizada = replace(achada, status=status)
+        self._itens[(achada.pedido_id, achada.direcao)] = atualizada
+        return atualizada
+
     def recebidas(self, avaliado_id: str) -> Sequence[Avaliacao]:
         achadas = [
             a
@@ -265,6 +323,12 @@ class NotasMaterialEmMemoria:
         self._itens: list[NotaMaterial] = []
 
     def registrar(self, nota: NotaMaterial) -> NotaMaterial:
+        if not nota.id:
+            nota = replace(nota, id=f"nm-{len(self._itens) + 1}")
+        if not nota.item_ids:
+            nota = replace(
+                nota, item_ids=tuple(f"{nota.id}-i{n}" for n in range(1, len(nota.itens) + 1))
+            )
         self._itens.append(nota)
         return nota
 

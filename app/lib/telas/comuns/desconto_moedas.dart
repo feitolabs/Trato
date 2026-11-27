@@ -37,6 +37,19 @@ enum MotivoDescontoIndisponivel {
 const _explicacaoLimite =
     'O desconto é pago pelo Trato e tem limite por dia e por mês. Seus Tratinhos continuam guardados.';
 
+/// Limite de uso mostrado antes de usar (Anexo I). Os valores são os do servidor; sem o
+/// teto, a tela diz que não foi informado.
+String textoLimiteDoDesconto(int? tetoMesCentavos, int? usadoMesCentavos) {
+  if (tetoMesCentavos == null) {
+    return 'O limite mensal do desconto com Tratinhos não foi informado agora.';
+  }
+  final usado = usadoMesCentavos == null
+      ? ''
+      : ' Você já usou ${Dinheiro.formatar(usadoMesCentavos)} neste mês.';
+  return 'Limite de desconto com Tratinhos: ${Dinheiro.formatar(tetoMesCentavos)} por mês.'
+      '$usado';
+}
+
 /// Frase fixa aprovada pelo João. Não prometer mais nada além disso.
 const fraseSemTaxa = 'Sem taxa para você neste serviço.';
 

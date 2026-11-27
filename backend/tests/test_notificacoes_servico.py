@@ -126,11 +126,9 @@ def test_preferencia_desligada_nao_cria_notificacao(servico, push):
 
 def test_evento_essencial_sempre_entra_na_caixa_mas_push_obedece(servico, push):
     servico.repo.registrar_dispositivo(ANA, "token-aparelho-1", "android", T0)
-    servico.repo.salvar_preferencias(
-        ANA, {"pagamentos": {"app": False, "push": False, "email": False}}, T0
-    )
-    novas = servico.notificar(Evento.PAGAMENTO_CONFIRMADO, ANA, chave="p1", pedido_id="p1")
-    assert [n.canal for n in novas] == ["app"]
+    servico.repo.salvar_preferencias(ANA, {"agenda": {"app": False, "push": False}}, T0)
+    novas = servico.notificar(Evento.CODIGO_INICIO, ANA, chave="p1", pedido_id="p1")
+    assert "app" in [n.canal for n in novas] and "push" not in [n.canal for n in novas]
     assert push.enviados == []
 
 
@@ -185,14 +183,17 @@ def test_token_invalido_desativa_o_aparelho(servico, push):
     push.tokens_invalidos.add("token-morto-001")
     servico.notificar(Evento.AVALIACAO, ANA, chave="p1")
     assert servico.repo.tokens(ANA) == ("token-vivo-0001",)
-    assert servico.reenviar_pendentes() == 1
-    assert push.enviados[-1].destinos == ("token-vivo-0001",)
+    assert [m.destinos for m in push.enviados] == [("token-vivo-0001",)]
+    assert servico.repo.pendentes(T0, 10) == ()  # o válido já recebeu: sem reenvio
 
 
 def test_preferencias_efetivas_juntam_padrao_e_escolha(servico):
-    servico.repo.salvar_preferencias(ANA, {"disputas": {"push": False}}, T0)
+    servico.repo.salvar_preferencias(
+        ANA, {"agenda": {"push": False}, "disputas": {"push": False}}, T0
+    )
     efetivas = servico.preferencias_efetivas(ANA)
-    assert efetivas["disputas"] == {"app": True, "push": False, "email": True}
+    assert efetivas["agenda"] == {"app": True, "push": False, "email": True}
+    assert efetivas["disputas"] == {"app": True, "push": True, "email": True}  # obrigatória
     assert set(efetivas) == {
         "orcamentos",
         "pagamentos",

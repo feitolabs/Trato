@@ -13,6 +13,7 @@ TipoNotificacao tipoDaNotificacao(String? tipo) {
   if (t.startsWith('agenda') ||
       t.startsWith('execucao') ||
       t.startsWith('avaliacao') ||
+      t.startsWith('exclusividade') ||
       t == 'pedido' ||
       t.startsWith('pedido.')) {
     return TipoNotificacao.pedido;
@@ -43,6 +44,8 @@ class ServicoNotificacoesRepositorio implements ServicoNotificacoes {
           tela: n.tela,
           papel: n.papel,
           recorrenciaId: n.recorrenciaId,
+          chamadoId: n.chamadoId,
+          compensacaoId: n.compensacaoId,
           tipoApi: n.tipo,
           titulo: n.titulo,
           texto: n.texto,

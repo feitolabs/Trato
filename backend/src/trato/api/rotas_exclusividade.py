@@ -60,6 +60,10 @@ class ExclusividadeOut(BaseModel):
     expira_em: datetime | None = None
     encerrada_em: datetime | None = None
     saldo_restante: int | None = Field(None, description="Só na criação: saldo depois do débito.")
+    pagador: str = Field(
+        "profissional",
+        description="`cliente`: o profissional pode desistir em `.../{id}/desistir`.",
+    )
     bloqueado_ate: datetime | None = Field(
         None, description="Só na lista, se recusada: até quando não pode pedir este cliente."
     )
@@ -119,6 +123,7 @@ def _out(
         expira_em=item.expira_em,
         encerrada_em=item.encerrada_em,
         saldo_restante=saldo_restante,
+        pagador=item.pagador,
     )
 
 
@@ -141,6 +146,12 @@ def solicitar_exclusividade(
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ):
+    if not contexto.config.carregar().exclusividade_profissional_ofertada:
+        return _erro(
+            409,
+            "exclusividade_descontinuada",
+            "A prioridade paga pelo profissional não é mais oferecida.",
+        )
     pedido = contexto.pedidos.obter(corpo.pedido_id)
     if pedido is None:
         return _erro(404, "pedido_nao_encontrado", "Pedido não encontrado.")

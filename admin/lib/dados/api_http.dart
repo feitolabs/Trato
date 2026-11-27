@@ -13,7 +13,7 @@ import 'modelos.dart';
 /// - Login: senha no Supabase Auth (`/auth/v1/token`) com a chave pública (anon). O token fica só em
 ///   memória: não vai para o disco, para a URL nem para log.
 /// - Cada chamada leva `Authorization: Bearer`. O backend lê o papel da tabela `equipe` e responde 401/403.
-/// - Funções que o backend ainda não tem (chamados, categorias) respondem [ErroApi] em português.
+/// - Funções que o backend ainda não tem (categorias) respondem [ErroApi] em português.
 class ApiAdminHttp implements ApiAdmin {
   ApiAdminHttp({
     required String urlApi,
@@ -129,18 +129,23 @@ class ApiAdminHttp implements ApiAdmin {
   ErroApi _erro(_Resposta r) {
     final detalhe = r.json is Map ? (r.json as Map)['detail'] : null;
     final texto = detalhe is String ? detalhe : null;
+    final codigo = r.json is Map && (r.json as Map)['codigo'] is String ? (r.json as Map)['codigo'] as String : null;
+    final bruto = r.json is Map ? (r.json as Map)['maximo_centavos'] : null;
+    final maximo = bruto is int ? bruto : null;
     switch (r.status) {
       case 401:
         _token = null;
         return const ErroApi('Sua sessão acabou. Entre de novo.', sessao: true);
       case 403:
-        return ErroApi(texto ?? 'Seu papel não pode fazer isso.', proibido: true);
+        return ErroApi(texto ?? 'Seu papel não pode fazer isso.', proibido: true, status: 403, codigo: codigo);
       case 404:
-        return ErroApi(texto ?? 'Não encontrado.');
+        return ErroApi(texto ?? 'Não encontrado.', status: 404, codigo: codigo);
+      case 409:
+        return ErroApi(texto ?? 'O caso mudou ou já foi decidido. Atualize e confira.', status: 409, codigo: codigo);
       case 422:
-        return ErroApi(texto ?? 'Confira os campos: algum valor não foi aceito.');
+        return ErroApi(texto ?? 'Confira os campos: algum valor não foi aceito.', status: 422, codigo: codigo, maximoCentavos: maximo);
       case 503:
-        return ErroApi(texto ?? 'Este recurso ainda não está configurado no servidor.');
+        return ErroApi(texto ?? 'Este recurso ainda não está configurado no servidor.', status: 503, codigo: codigo);
       default:
         return ErroApi(texto ?? 'Algo deu errado no servidor (${r.status}).');
     }
@@ -360,6 +365,7 @@ class ApiAdminHttp implements ApiAdmin {
     'em_analise': StatusDisputa.emAnalise,
     'aguardando_aprovacao': StatusDisputa.aguardandoSegundaPessoa,
     'decidida': StatusDisputa.decidida,
+    'acordo': StatusDisputa.acordo,
   };
 
   static String _codigoEstadoDisputa(StatusDisputa s) => switch (s) {
@@ -367,6 +373,9 @@ class ApiAdminHttp implements ApiAdmin {
         StatusDisputa.emAnalise => 'em_analise',
         StatusDisputa.aguardandoSegundaPessoa => 'aguardando_aprovacao',
         StatusDisputa.decidida => 'decidida',
+        StatusDisputa.acordo => 'acordo',
+        // Nunca é enviado: sem ação nesse estado.
+        StatusDisputa.desconhecida => 'desconhecida',
       };
 
   /// Uma chamada por página (antes era uma por disputa): o detalhe vem só ao abrir o caso.
@@ -399,6 +408,992 @@ class ApiAdminHttp implements ApiAdmin {
     return (abertas: _int(c['abertas']), decididas: _int(c['decididas']));
   }
 
+  // ---------- exclusividade (Termos 13.6) ----------
+
+  @override
+  Future<({String resultado, int moedasDevolvidas})> registrarFalhaTrato(String exclusividadeId,
+      {required String motivo}) async {
+    final r = _mapa(await _chamar(
+        'POST', '/v1/admin/exclusividades/${Uri.encodeComponent(exclusividadeId)}/falha-trato',
+        corpo: {'motivo': motivo}));
+    return (resultado: r['resultado'] as String, moedasDevolvidas: _int(r['moedas_devolvidas']));
+  }
+
+  // ---------- contestação da decisão de disputa (Termos 8.7) ----------
+
+  static const _contestacoes = '/v1/admin/contestacoes-disputa';
+
+  @override
+  Future<PaginaRemota<ContestacaoDisputa>> listarContestacoesDisputa(FiltroContestacoes f,
+      {int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', _contestacoes, consulta: {
+      'status': f.status,
+      'efeito_financeiro': f.efeito,
+      'pedido_id': f.pedidoId,
+      'atrasadas': f.atrasadas ? 'true' : null,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _contestacaoDisputa(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<ContestacaoDisputa> obterContestacaoDisputa(String id) async =>
+      _contestacaoDisputa(_mapa(await _chamar('GET', '$_contestacoes/$id')));
+
+  @override
+  Future<({ContestacaoDisputa contestacao, bool repetida})> registrarContestacaoDisputa(
+      {required String pedidoId,
+      required String contestanteId,
+      required String chamadoId,
+      required String oQueFaltou,
+      List<String> anexos = const []}) async {
+    final token = _token;
+    if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
+    // 201 é nova; 200 é a mesma já registrada.
+    final r = await _enviar('POST', _uri(_contestacoes), cabecalhos: {
+      'Authorization': 'Bearer $token'
+    }, corpo: {
+      'pedido_id': pedidoId,
+      'contestante_id': contestanteId,
+      'chamado_id': chamadoId,
+      'o_que_faltou': oQueFaltou,
+      'anexos': anexos,
+    });
+    if (!r.ok) throw _erro(r);
+    return (contestacao: _contestacaoDisputa(_mapa(r.json)), repetida: r.status == 200);
+  }
+
+  @override
+  Future<ContestacaoDisputa> decidirContestacaoDisputa(String id,
+          {required String resultado,
+          required String resposta,
+          String? novaDecisao,
+          int? novoValorReembolsoCentavos}) async =>
+      _contestacaoDisputa(_mapa(await _chamar('POST', '$_contestacoes/$id/decisao', corpo: {
+        'resultado': resultado,
+        'resposta': resposta,
+        'nova_decisao': novaDecisao,
+        'novo_valor_reembolso_centavos': novoValorReembolsoCentavos,
+      })));
+
+  @override
+  Future<ContestacaoDisputa> aprovarContestacaoDisputa(String id,
+          {required bool aprovar, required String motivo}) async =>
+      _contestacaoDisputa(_mapa(
+          await _chamar('POST', '$_contestacoes/$id/aprovacao', corpo: {'aprovar': aprovar, 'motivo': motivo})));
+
+  ContestacaoDisputa _contestacaoDisputa(Map<String, dynamic> c) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    DecisaoResumida? decisao(Object? v) => v is Map
+        ? DecisaoResumida(_mapa(v)['resultado'] as String, _mapa(v)['reembolso_centavos'] as int)
+        : null;
+    return ContestacaoDisputa(
+      id: c['id'] as String,
+      protocolo: c['protocolo'] as String,
+      pedidoId: c['pedido_id'] as String,
+      disputaId: c['disputa_id'] as String,
+      contestanteId: c['contestante_id'] as String,
+      contestantePapel: c['contestante_papel'] as String?,
+      oQueFaltou: c['o_que_faltou'] as String,
+      anexos: [for (final a in (c['anexos'] as List? ?? const [])) '$a'],
+      canal: c['canal'] as String,
+      status: c['status'] as String,
+      abertaEm: _data(c['aberta_em']),
+      contestarAte: _data(c['contestar_ate']),
+      responderAte: _data(c['responder_ate']),
+      atrasada: c['atrasada'] == true,
+      analistaId: c['analista_id'] as String?,
+      resposta: c['resposta'] as String?,
+      novaDecisao: c['nova_decisao'] as String?,
+      novoValorReembolsoCentavos: c['novo_valor_reembolso_centavos'] as int?,
+      aprovadaPor: c['aprovada_por'] as String?,
+      decididaEm: data(c['decidida_em']),
+      efeitoFinanceiro: c['efeito_financeiro'] as String,
+      valorCongeladoCentavos: c['valor_congelado_centavos'] as int?,
+      decisaoOriginal: decisao(c['decisao_original']),
+      decisaoVigente: decisao(c['decisao_vigente']),
+      decididaPor: c['decidida_por'] as String?,
+      disputaAprovadaPor: c['disputa_aprovada_por'] as String?,
+    );
+  }
+
+  // ---------- regresso (Termos 17.4) ----------
+
+  static const _regressos = '/v1/admin/compensacoes/regressos';
+
+  @override
+  Future<PaginaRemota<Regresso>> listarRegressos({String? status, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', _regressos,
+        consulta: {'status': status, 'limite': '$limite', 'deslocamento': '$deslocamento'}));
+    return PaginaRemota([for (final x in _itens(corpo)) _regresso(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<({String resultado, Regresso proposta})> proporRegresso(
+          {required String pedidoId,
+          required String referencia,
+          required int valorCentavos,
+          required String motivo}) async =>
+      _resultadoRegresso(await _chamar('POST', _regressos, corpo: {
+        'pedido_id': pedidoId,
+        'referencia': referencia,
+        'valor_centavos': valorCentavos,
+        'motivo': motivo,
+      }));
+
+  @override
+  Future<({String resultado, Regresso proposta, bool avisado})> aprovarRegresso(String id) async {
+    final r = _mapa(await _chamar('POST', '$_regressos/$id/aprovacao'));
+    final base = _resultadoRegresso(r);
+    return (resultado: base.resultado, proposta: base.proposta, avisado: r['avisado'] == true);
+  }
+
+  @override
+  Future<({String resultado, Regresso proposta})> recusarRegresso(String id, {required String motivo}) async =>
+      _resultadoRegresso(await _chamar('POST', '$_regressos/$id/recusa', corpo: {'motivo': motivo}));
+
+  ({String resultado, Regresso proposta}) _resultadoRegresso(Object? corpo) {
+    final r = _mapa(corpo);
+    return (resultado: r['resultado'] as String, proposta: _regresso(_mapa(r['proposta'])));
+  }
+
+  Regresso _regresso(Map<String, dynamic> x) => Regresso(
+        id: x['id'] as String,
+        pedidoId: x['pedido_id'] as String,
+        profissionalId: x['profissional_id'] as String,
+        referencia: x['referencia'] as String,
+        valorCentavos: x['valor_centavos'] as int,
+        motivo: x['motivo'] as String,
+        status: x['status'] as String,
+        propostaPor: x['proposta_por'] as String,
+        propostaEm: _data(x['proposta_em']),
+        decididaEm: x['decidida_em'] == null ? null : _data(x['decidida_em']),
+        motivoDecisao: x['motivo_decisao'] as String?,
+        compensacaoId: x['compensacao_id'] as String?,
+      );
+
+  // ---------- incidentes de segurança (Termos 9) ----------
+
+  static const _incidentes = '/v1/admin/incidentes';
+
+  @override
+  Future<PaginaRemota<Incidente>> listarIncidentes(
+      {String? status, String? pedidoId, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', _incidentes, consulta: {
+      'status': status,
+      'pedido_id': pedidoId,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _incidente(x)], _int(corpo['total']));
+  }
+
+  Future<Incidente> _acaoIncidente(String metodo, String caminho, [Object? corpo]) async =>
+      _incidente(_mapa(await _chamar(metodo, '$_incidentes$caminho', corpo: corpo)));
+
+  @override
+  Future<Incidente> obterIncidente(String id) => _acaoIncidente('GET', '/$id');
+
+  @override
+  Future<({Incidente incidente, bool repetido})> registrarIncidente(
+      {required String tipo,
+      required String descricao,
+      required String contato,
+      required String canal,
+      String? pedidoId}) async {
+    final token = _token;
+    if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
+    // 201 é novo; 200 é o mesmo incidente de um toque repetido.
+    final r = await _enviar('POST', _uri(_incidentes), cabecalhos: {
+      'Authorization': 'Bearer $token'
+    }, corpo: {
+      'tipo': tipo,
+      'descricao': descricao,
+      'contato': contato,
+      'canal': canal,
+      'pedido_id': ?pedidoId,
+    });
+    if (!r.ok) throw _erro(r);
+    return (incidente: _incidente(_mapa(r.json)), repetido: r.status == 200);
+  }
+
+  @override
+  Future<Incidente> adicionarMedidaIncidente(String id, {required String tipo, required String descricao}) =>
+      _acaoIncidente('POST', '/$id/medidas', {'tipo': tipo, 'descricao': descricao});
+
+  @override
+  Future<Incidente> mudarStatusIncidente(String id, String status) =>
+      _acaoIncidente('POST', '/$id/status', {'status': status});
+
+  @override
+  Future<Incidente> encerrarIncidente(String id, {required String desfecho}) =>
+      _acaoIncidente('POST', '/$id/encerrar', {'desfecho': desfecho});
+
+  Incidente _incidente(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return Incidente(
+      id: x['id'] as String,
+      protocolo: x['protocolo'] as String,
+      canal: x['canal'] as String,
+      tipo: x['tipo'] as String,
+      descricao: (x['descricao'] as String?) ?? '',
+      contato: x['contato'] as String?,
+      pedidoId: x['pedido_id'] as String?,
+      status: x['status'] as String,
+      abertoEm: _data(x['aberto_em']),
+      cautelaAte: _data(x['cautela_ate']),
+      cautelaAdotadaEm: data(x['cautela_adotada_em']),
+      responsavelId: x['responsavel_id'] as String?,
+      desfecho: x['desfecho'] as String?,
+      encerradoEm: data(x['encerrado_em']),
+      cautelaAtrasada: x['cautela_atrasada'] == true,
+      medidas: [
+        for (final m in (x['medidas'] as List? ?? const []).map(_mapa))
+          MedidaIncidente(
+            id: m['id'] as String,
+            tipo: m['tipo'] as String,
+            descricao: m['descricao'] as String,
+            origem: m['origem'] as String,
+            aplicadaEm: _data(m['aplicada_em']),
+          ),
+      ],
+    );
+  }
+
+  // ---------- moderação de avaliações (Termos 12.6) ----------
+
+  static const _avaliacoes = '/v1/admin/avaliacoes';
+
+  @override
+  Future<PaginaRemota<RevisaoAvaliacao>> listarRevisoesAvaliacao(
+      {String? status, String? avaliacaoId, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', '$_avaliacoes/revisoes', consulta: {
+      'status': status,
+      'avaliacao_id': avaliacaoId,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _revisaoAvaliacao(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<RevisaoAvaliacao> analisarRevisaoAvaliacao(String revisaoId) async =>
+      _revisaoAvaliacao(_mapa(await _chamar('POST', '$_avaliacoes/revisoes/$revisaoId/analisar')));
+
+  @override
+  Future<RevisaoAvaliacao> decidirRevisaoAvaliacao(
+    String revisaoId, {
+    required String status,
+    required String resposta,
+    String? ocultarMotivo,
+    String? mesmoAnalistaJustificativa,
+  }) async =>
+      _revisaoAvaliacao(_mapa(await _chamar('POST', '$_avaliacoes/revisoes/$revisaoId/decidir', corpo: {
+        'status': status,
+        'resposta': resposta,
+        'ocultar_motivo': ?ocultarMotivo,
+        'mesmo_analista_justificativa': ?mesmoAnalistaJustificativa,
+      })));
+
+  @override
+  Future<OcultacaoAvaliacao> ocultarAvaliacao(
+    String avaliacaoId, {
+    required String motivo,
+    required String explicacao,
+  }) async =>
+      _ocultacaoAvaliacao(_mapa(await _chamar('POST', '$_avaliacoes/$avaliacaoId/ocultar', corpo: {
+        'motivo': motivo,
+        'explicacao': explicacao,
+      })));
+
+  @override
+  Future<OcultacaoAvaliacao> reverterOcultacaoAvaliacao(String avaliacaoId, {required String motivo}) async =>
+      _ocultacaoAvaliacao(_mapa(await _chamar('POST', '$_avaliacoes/$avaliacaoId/reverter-ocultacao', corpo: {
+        'motivo': motivo,
+      })));
+
+  RevisaoAvaliacao _revisaoAvaliacao(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return RevisaoAvaliacao(
+      id: x['id'] as String,
+      protocolo: x['protocolo'] as String,
+      avaliacaoId: x['avaliacao_id'] as String,
+      tipo: x['tipo'] as String,
+      ocultacaoId: x['ocultacao_id'] as String?,
+      solicitanteId: x['solicitante_id'] as String,
+      justificativa: (x['justificativa'] as String?) ?? '',
+      anexos: [for (final a in (x['anexos'] as List? ?? const [])) '$a'],
+      canal: (x['canal'] as String?) ?? 'app',
+      abertaEm: _data(x['aberta_em']),
+      responderAte: _data(x['responder_ate']),
+      status: x['status'] as String,
+      analistaId: x['analista_id'] as String?,
+      resposta: x['resposta'] as String?,
+      mesmoAnalistaJustificativa: x['mesmo_analista_justificativa'] as String?,
+      decididaEm: data(x['decidida_em']),
+      ocultacaoAplicadaId: x['ocultacao_aplicada_id'] as String?,
+    );
+  }
+
+  OcultacaoAvaliacao _ocultacaoAvaliacao(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return OcultacaoAvaliacao(
+      id: x['id'] as String,
+      avaliacaoId: x['avaliacao_id'] as String,
+      motivo: x['motivo'] as String,
+      explicacao: x['explicacao'] as String,
+      analistaId: x['analista_id'] as String,
+      ocultadaEm: _data(x['ocultada_em']),
+      statusAnterior: x['status_anterior'] as String,
+      autorAvisadoEm: data(x['autor_avisado_em']),
+      revertidaEm: data(x['revertida_em']),
+      revertidaPor: x['revertida_por'] as String?,
+    );
+  }
+
+  // ---------- pedidos de titular LGPD (Termos 14.9 e 14.10) ----------
+
+  static const _lgpdPedidos = '/v1/admin/lgpd/pedidos';
+
+  @override
+  Future<PaginaRemota<PedidoTitularLgpd>> listarPedidosLgpd(
+      {String? status, String? tipo, String? usuarioId, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', _lgpdPedidos, consulta: {
+      'status': status,
+      'tipo': tipo,
+      'usuario_id': usuarioId,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _pedidoLgpd(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<PedidoTitularLgpd> analisarPedidoLgpd(String pedidoId) async =>
+      _pedidoLgpd(_mapa(await _chamar('POST', '$_lgpdPedidos/$pedidoId/analisar')));
+
+  @override
+  Future<PedidoTitularLgpd> responderPedidoLgpd(
+    String pedidoId, {
+    required String status,
+    required String resposta,
+    String? motivoNaoAtendido,
+    String? criteriosInformados,
+  }) async =>
+      _pedidoLgpd(_mapa(await _chamar('POST', '$_lgpdPedidos/$pedidoId/responder', corpo: {
+        'status': status,
+        'resposta': resposta,
+        'motivo_nao_atendido': ?motivoNaoAtendido,
+        'criterios_informados': ?criteriosInformados,
+      })));
+
+  PedidoTitularLgpd _pedidoLgpd(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return PedidoTitularLgpd(
+      id: x['id'] as String,
+      protocolo: x['protocolo'] as String,
+      usuarioId: x['usuario_id'] as String?,
+      contato: x['contato'] as String?,
+      tipo: x['tipo'] as String,
+      decisaoAutomatizada: x['decisao_automatizada'] as String?,
+      referenciaTipo: x['referencia_tipo'] as String?,
+      referenciaId: x['referencia_id'] as String?,
+      descricao: (x['descricao'] as String?) ?? '',
+      canal: (x['canal'] as String?) ?? 'app',
+      exclusaoId: x['exclusao_id'] as String?,
+      abertoEm: _data(x['aberto_em']),
+      responderAte: _data(x['responder_ate']),
+      status: x['status'] as String,
+      analistaId: x['analista_id'] as String?,
+      resposta: x['resposta'] as String?,
+      motivoNaoAtendido: x['motivo_nao_atendido'] as String?,
+      criteriosInformados: x['criterios_informados'] as String?,
+      respondidoEm: data(x['respondido_em']),
+    );
+  }
+
+  // ---------- contestação de materiais (Termos 6.9) ----------
+
+  static const _materiais = '/v1/admin/materiais/contestacoes';
+
+  @override
+  Future<PaginaRemota<ContestacaoMaterial>> listarContestacoesMaterial(
+      {String? status, String? pedidoId, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', _materiais, consulta: {
+      'status': status,
+      'pedido_id': pedidoId,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _contestacaoMaterial(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<ContestacaoMaterial> analisarContestacaoMaterial(String contestacaoId) async =>
+      _contestacaoMaterial(_mapa(await _chamar('POST', '$_materiais/$contestacaoId/analisar')));
+
+  @override
+  Future<ContestacaoMaterial> decidirContestacaoMaterial(String contestacaoId,
+          {required String status, required String resposta, int? valorReconhecidoCentavos}) async =>
+      _contestacaoMaterial(_mapa(await _chamar('POST', '$_materiais/$contestacaoId/decidir', corpo: {
+        'status': status,
+        'resposta': resposta,
+        'valor_reconhecido_centavos': ?valorReconhecidoCentavos,
+      })));
+
+  @override
+  Future<List<AnexoMaterial>> abrirAnexosContestacaoMaterial(String contestacaoId, {required String motivo}) async => [
+        for (final a in _itens(await _chamar('POST', '$_materiais/$contestacaoId/anexos', corpo: {'motivo': motivo})))
+          AnexoMaterial(
+            tipo: a['tipo'] as String,
+            enviadoPor: a['enviado_por'] as String?,
+            url: a['url'] as String?,
+            tipoConteudo: a['content_type'] as String?,
+            expiraEmSegundos: (a['expira_em_segundos'] as num?)?.toInt(),
+          ),
+      ];
+
+  ContestacaoMaterial _contestacaoMaterial(Map<String, dynamic> x) {
+    return ContestacaoMaterial(
+      id: x['id'] as String,
+      protocolo: x['protocolo'] as String,
+      pedidoId: x['pedido_id'] as String,
+      notaId: x['nota_id'] as String,
+      itemId: x['item_id'] as String?,
+      clienteId: x['cliente_id'] as String,
+      motivo: x['motivo'] as String,
+      descricao: (x['descricao'] as String?) ?? '',
+      anexos: [for (final a in (x['anexos'] as List?) ?? const []) '$a'],
+      valorContestadoCentavos: _int(x['valor_contestado_centavos']),
+      abertaEm: _data(x['aberta_em']),
+      responderAte: _data(x['responder_ate']),
+      status: x['status'] as String,
+      analistaId: x['analista_id'] as String?,
+      resposta: x['resposta'] as String?,
+      // Ausente continua nulo: nunca vira zero.
+      valorReconhecidoCentavos:
+          x['valor_reconhecido_centavos'] == null ? null : _int(x['valor_reconhecido_centavos']),
+      decididaEm: x['decidida_em'] == null ? null : _data(x['decidida_em']),
+      efeitoFinanceiro: (x['efeito_financeiro'] as String?) ?? '',
+    );
+  }
+
+  // ---------- retorno de conta e impedimentos (Termos 20.9) ----------
+
+  static const _conta = '/v1/admin/conta';
+
+  @override
+  Future<PaginaRemota<PedidoRetornoConta>> listarRetornosConta(
+      {String? status, String? usuarioId, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', '$_conta/retornos', consulta: {
+      'status': status,
+      'usuario_id': usuarioId,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _retornoConta(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<PedidoRetornoConta> analisarRetornoConta(String retornoId) async =>
+      _retornoConta(_mapa(await _chamar('POST', '$_conta/retornos/$retornoId/analisar')));
+
+  @override
+  Future<PedidoRetornoConta> aprovarRetornoConta(String retornoId, {required String motivo}) async =>
+      _retornoConta(_mapa(await _chamar('POST', '$_conta/retornos/$retornoId/aprovar', corpo: {
+        'motivo': motivo,
+        'risco_identificado': false,
+      })));
+
+  @override
+  Future<PedidoRetornoConta> recusarRetornoConta(String retornoId,
+          {required String motivo, required bool riscoIdentificado}) async =>
+      _retornoConta(_mapa(await _chamar('POST', '$_conta/retornos/$retornoId/recusar', corpo: {
+        'motivo': motivo,
+        'risco_identificado': riscoIdentificado,
+      })));
+
+  @override
+  Future<PaginaRemota<ImpedimentoCadastro>> listarImpedimentosConta(
+      {String? medidaId, bool apenasAtivos = false, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', '$_conta/impedimentos', consulta: {
+      'medida_id': medidaId,
+      'apenas_ativos': apenasAtivos ? 'true' : 'false',
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _impedimentoCadastro(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<ImpedimentoCadastro> revogarImpedimentoConta(String impedimentoId, {required String motivo}) async =>
+      _impedimentoCadastro(_mapa(await _chamar('POST', '$_conta/impedimentos/$impedimentoId/revogar', corpo: {
+        'motivo': motivo,
+      })));
+
+  PedidoRetornoConta _retornoConta(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return PedidoRetornoConta(
+      id: x['id'] as String,
+      protocolo: x['protocolo'] as String,
+      usuarioId: x['usuario_id'] as String,
+      medidaId: x['medida_id'] as String,
+      justificativaUsuario: (x['justificativa_usuario'] as String?) ?? '',
+      canal: (x['canal'] as String?) ?? 'app',
+      status: x['status'] as String,
+      solicitadoEm: _data(x['solicitado_em']),
+      prazoDiasAplicado: _int(x['prazo_dias_aplicado']),
+      elegivelAPartirDe: _data(x['elegivel_a_partir_de']),
+      analistaId: x['analista_id'] as String?,
+      decisaoMotivo: x['decisao_motivo'] as String?,
+      riscoIdentificado: x['risco_identificado'] == true,
+      decididoEm: data(x['decidido_em']),
+    );
+  }
+
+  ImpedimentoCadastro _impedimentoCadastro(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return ImpedimentoCadastro(
+      id: x['id'] as String,
+      medidaId: x['medida_id'] as String,
+      tipoIdentificador: x['tipo_identificador'] as String,
+      criadoPor: x['criado_por'] as String,
+      criadoEm: _data(x['criado_em']),
+      revogadoEm: data(x['revogado_em']),
+      revogadoPor: x['revogado_por'] as String?,
+      motivoRevogacao: x['motivo_revogacao'] as String?,
+    );
+  }
+
+  // ---------- compensações (Termos 8.6) ----------
+
+  @override
+  Future<PaginaRemota<Compensacao>> listarCompensacoes(
+      {String? profissionalId, String? pedidoId, String? status, int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', '/v1/admin/compensacoes', consulta: {
+      'profissional_id': profissionalId,
+      'pedido_id': pedidoId,
+      'status': status,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _compensacao(x)], _int(corpo['total']));
+  }
+
+  @override
+  Future<({String resultado, Compensacao compensacao, bool avisado})> registrarCompensacao(
+      {required String pedidoId, String? contestacaoId, required int valorCentavos, required String motivo}) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/compensacoes', corpo: {
+      'pedido_id': pedidoId,
+      'contestacao_id': contestacaoId,
+      'valor_centavos': valorCentavos,
+      'motivo': motivo,
+    }));
+    return (
+      resultado: r['resultado'] as String,
+      compensacao: _compensacao(_mapa(r['compensacao'])),
+      avisado: r['avisado'] == true,
+    );
+  }
+
+  @override
+  Future<({Compensacao compensacao, bool avisado})> avisarCompensacao(String id) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/compensacoes/$id/avisar'));
+    return (compensacao: _compensacao(_mapa(r['compensacao'])), avisado: r['avisado'] == true);
+  }
+
+  @override
+  Future<({String resultado, int devolvidoCentavos, Compensacao compensacao})> cancelarCompensacao(String id,
+      {required String motivo}) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/compensacoes/$id/cancelar', corpo: {'motivo': motivo}));
+    return (
+      resultado: r['resultado'] as String,
+      devolvidoCentavos: r['devolvido_centavos'] as int,
+      compensacao: _compensacao(_mapa(r['compensacao'])),
+    );
+  }
+
+  /// Dinheiro só em centavos inteiros: valor ausente ou quebrado é erro, nunca vira zero.
+  Compensacao _compensacao(Map<String, dynamic> x) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    return Compensacao(
+      id: x['id'] as String,
+      pedidoId: x['pedido_id'] as String,
+      origem: x['origem'] as String,
+      valorCentavos: x['valor_centavos'] as int,
+      compensadoCentavos: x['compensado_centavos'] as int,
+      restanteCentavos: x['restante_centavos'] as int,
+      motivo: x['motivo'] as String,
+      status: x['status'] as String,
+      criadaEm: _data(x['criada_em']),
+      avisadoEm: data(x['avisado_em']),
+      canceladaEm: data(x['cancelada_em']),
+      motivoCancelamento: x['motivo_cancelamento'] as String?,
+    );
+  }
+
+  @override
+  Future<PaginaRemota<ExclusividadeCliente>> listarExclusividades(
+      {String? pedidoId, String? clienteId, String? status, int deslocamento = 0, int limite = 20}) async {
+    final corpo = _mapa(await _chamar('GET', '/v1/admin/exclusividades', consulta: {
+      'pedido_id': pedidoId,
+      'cliente_id': clienteId,
+      'status': status,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([
+      for (final e in _itens(corpo))
+        ExclusividadeCliente(
+          id: e['id'] as String,
+          pedidoId: e['pedido_id'] as String,
+          clienteId: e['cliente_id'] as String,
+          clienteNome: e['cliente_nome'] as String?,
+          profissionalId: e['profissional_id'] as String,
+          profissionalNome: e['profissional_nome'] as String?,
+          status: e['status'] as String,
+          moedas: _int(e['moedas']),
+          estornada: e['estornada'] == true,
+          criadaEm: _data(e['criada_em']),
+          encerradaEm: e['encerrada_em'] == null ? null : _data(e['encerrada_em']),
+          motivoEncerramento: e['motivo_encerramento'] as String?,
+        ),
+    ], _int(corpo['total']));
+  }
+
+  // ---------- medidas de conta (Termos 20) ----------
+
+  @override
+  Future<PaginaRemota<Medida>> listarMedidas(FiltroMedidas f, {int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', '/v1/admin/medidas', consulta: {
+      'usuario_id': f.usuarioId,
+      'tipo': f.tipo,
+      'vigentes': f.vigentes ? 'true' : null,
+      'contestacao_aberta': f.contestacaoAberta ? 'true' : null,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final x in _itens(corpo)) _medida(x)], _int(corpo['total']));
+  }
+
+  Future<Medida> _acaoMedida(String metodo, String caminho, [Object? corpo]) async =>
+      _medida(_mapa(await _chamar(metodo, '/v1/admin/medidas$caminho', corpo: corpo)));
+
+  @override
+  Future<Medida> obterMedida(String id) => _acaoMedida('GET', '/$id');
+
+  @override
+  Future<int> prazoMaximoTravaFraude() async {
+    final n = _mapa(await _chamar('GET', '/v1/admin/medidas/trava-fraude'))['prazo_maximo_dias'];
+    if (n is! int || n < 1) throw const ErroApi('O servidor não informou o prazo máximo da trava.');
+    return n;
+  }
+
+  @override
+  Future<({Medida medida, bool repetida})> aplicarMedida(NovaMedida n) async {
+    final token = _token;
+    if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
+    // Direto no transporte: 201 é medida nova e 200 é repetição, e a tela precisa saber.
+    final r = await _enviar('POST', _uri('/v1/admin/medidas'), cabecalhos: {
+      'Authorization': 'Bearer $token'
+    }, corpo: {
+      'usuario_id': n.usuarioId,
+      'tipo': n.tipo,
+      'motivo': n.motivo,
+      'clausulas': n.clausulas,
+      'dias': n.dias,
+      'detalhe_adiado': n.detalheAdiado,
+      // Campos com padrão no servidor só vão quando preenchidos.
+      'efeito_pedidos_valores': ?n.efeito,
+      'como_contestar': ?n.comoContestar,
+      'justificativa_adiamento': ?n.justificativaAdiamento,
+      'nota_interna': ?n.notaInterna,
+      if (n.infracaoGrave) 'infracao_grave': true,
+      'sem_falta': ?n.semFalta,
+      if (n.impedirNovaConta) 'impedir_nova_conta': true,
+      if (n.motivoFraude) ...{'motivo_fraude': true, 'limite_retencao_centavos': n.limiteRetencaoCentavos},
+    });
+    if (!r.ok) throw _erro(r);
+    return (medida: _medida(_mapa(r.json)), repetida: r.status == 200);
+  }
+
+  @override
+  Future<Medida> reverterMedida(String id, {required String motivo}) =>
+      _acaoMedida('POST', '/$id/reverter', {'motivo': motivo});
+
+  @override
+  Future<Medida> registrarContestacaoMedida(String id, {required String versao, List<String> anexos = const []}) =>
+      _acaoMedida('POST', '/$id/contestacao', {'versao': versao, 'anexos': anexos});
+
+  @override
+  Future<EnvioAssinado> pedirAnexoContestacao(String medidaId,
+      {required String nomeArquivo, required String tipoConteudo, required int tamanhoBytes}) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/medidas/$medidaId/contestacao/anexos',
+        corpo: {'nome_arquivo': nomeArquivo, 'content_type': tipoConteudo, 'tamanho_bytes': tamanhoBytes}));
+    return EnvioAssinado(
+        id: r['anexo_id'] as String, url: r['url'] as String, expiraEmSegundos: _int(r['expira_em_segundos']));
+  }
+
+  @override
+  Future<List<AnexoContestacao>> abrirAnexosContestacao(String medidaId, {required String motivo}) async => [
+        for (final a in _itens(await _chamar('POST', '/v1/admin/medidas/$medidaId/contestacao/anexos/abrir',
+            corpo: {'motivo': motivo})))
+          _anexoContestacao(a),
+      ];
+
+  AnexoContestacao _anexoContestacao(Map<String, dynamic> a) => AnexoContestacao(
+        anexoId: a['anexo_id'] as String,
+        tipoConteudo: a['content_type'] as String,
+        tamanhoBytes: _int(a['tamanho_bytes']),
+        url: a['url'] as String?,
+        expiraEmSegundos: (a['expira_em_segundos'] as num?)?.toInt(),
+      );
+
+  @override
+  Future<void> enviarArquivo(String url, {required String tipoConteudo, required List<int> bytes}) async {
+    final destino = Uri.tryParse(url);
+    if (destino == null || destino.scheme != 'https') {
+      throw const ErroApi('O servidor mandou um link de envio inválido. Nada foi enviado.');
+    }
+    // Direto ao armazenamento: o link já autoriza. O token de login não vai junto.
+    final pedido = http.Request('PUT', destino)
+      ..headers['Content-Type'] = tipoConteudo
+      ..headers['x-upsert'] = 'true'
+      ..bodyBytes = bytes;
+    try {
+      final r = await _cliente.send(pedido).timeout(const Duration(seconds: 60));
+      await r.stream.drain<void>();
+      if (r.statusCode < 200 || r.statusCode >= 300) {
+        throw ErroApi('O envio do arquivo foi recusado (${r.statusCode}). Tente de novo.');
+      }
+    } on TimeoutException {
+      throw const ErroApi('O envio do arquivo demorou demais. Tente de novo.');
+    } on http.ClientException {
+      throw const ErroApi('Não foi possível enviar o arquivo.');
+    }
+  }
+
+  ArquivoComprovante _comprovante(Map<String, dynamic> a) => ArquivoComprovante(
+        arquivoId: a['arquivo_id'] as String,
+        finalidade: a['finalidade'] as String,
+        enviadoPor: a['enviado_por'] as String,
+        tipoConteudo: a['content_type'] as String?,
+        tamanhoBytes: _int(a['tamanho_bytes']),
+        enviadoEm: _data(a['enviado_em']),
+        url: a['url'] as String,
+        expiraEmSegundos: _int(a['expira_em_segundos']),
+      );
+
+  @override
+  Future<List<ArquivoComprovante>> listarComprovantes(String pedidoId, {required String motivo}) async => [
+        for (final a in _itens(
+            await _chamar('POST', '/v1/admin/ausencias/$pedidoId/arquivos', corpo: {'motivo': motivo})))
+          _comprovante(a),
+      ];
+
+  @override
+  Future<EnvioAssinado> pedirEnvioComprovante(String pedidoId,
+      {required String motivo,
+      required String nomeArquivo,
+      required String tipoConteudo,
+      required int tamanhoBytes}) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/ausencias/$pedidoId/arquivos/envio', corpo: {
+      'motivo': motivo,
+      'nome_arquivo': nomeArquivo,
+      'content_type': tipoConteudo,
+      'tamanho_bytes': tamanhoBytes,
+    }));
+    return EnvioAssinado(
+        id: r['envio_id'] as String, url: r['url'] as String, expiraEmSegundos: _int(r['expira_em_segundos']));
+  }
+
+  @override
+  Future<ArquivoComprovante> concluirComprovante(String pedidoId, String envioId, {required String motivo}) async =>
+      _comprovante(_mapa(await _chamar(
+          'POST', '/v1/admin/ausencias/$pedidoId/arquivos/envio/$envioId/concluir',
+          corpo: {'motivo': motivo})));
+
+  @override
+  Future<Medida> decidirContestacaoMedida(String id,
+          {required String resultado,
+          required String resposta,
+          int? diasAPartirDeHoje,
+          String? mesmoAnalistaJustificativa}) =>
+      _acaoMedida('POST', '/$id/contestacao/decisao', {
+        'resultado': resultado,
+        'resposta': resposta,
+        'dias_a_partir_de_hoje': diasAPartirDeHoje,
+        'mesmo_analista_justificativa': mesmoAnalistaJustificativa,
+      });
+
+  Medida _medida(Map<String, dynamic> m) {
+    DateTime? data(Object? v) => v == null ? null : _data(v);
+    final c = m['contestacao'] is Map ? _mapa(m['contestacao']) : null;
+    return Medida(
+      id: m['id'] as String,
+      protocolo: m['protocolo'] as String?,
+      usuarioId: m['usuario_id'] as String,
+      usuarioNome: m['usuario_nome'] as String?,
+      tipo: m['tipo'] as String,
+      motivoAoUsuario: m['motivo'] as String,
+      motivoCompleto: m['motivo_completo'] as String,
+      clausulas: [for (final x in (m['clausulas'] as List)) '$x'],
+      inicioEm: _data(m['inicio_em']),
+      fimEm: data(m['fim_em']),
+      efeito: m['efeito_pedidos_valores'] as String,
+      comoContestar: m['como_contestar'] as String,
+      detalheAdiado: m['detalhe_adiado'] == true,
+      vigente: m['vigente'] == true,
+      revertidaEm: data(m['revertida_em']),
+      contestavelAte: data(m['contestavel_ate']),
+      origem: (m['origem'] as String?) ?? 'analista',
+      aplicadaPor: m['aplicada_por'] as String?,
+      notaInterna: m['nota_interna'] as String?,
+      justificativaAdiamento: m['justificativa_adiamento'] as String?,
+      aplicadaPorNome: m['aplicada_por_nome'] as String?,
+      contestacaoAnalistaNome: m['contestacao_analista_nome'] as String?,
+      motivoFraude: m['motivo_fraude'] == true,
+      limiteRetencaoCentavos: (m['limite_retencao_centavos'] as num?)?.toInt(),
+      infracaoGrave: m['infracao_grave'] == true,
+      semFalta: m['sem_falta'] is bool ? m['sem_falta'] as bool : null,
+      impedirNovaConta: m['impedir_nova_conta'] == true,
+      contestacao: c == null
+          ? null
+          : ContestacaoMedida(
+              status: c['status'] as String,
+              versao: c['versao'] as String,
+              canal: c['canal'] as String,
+              protocolo: c['protocolo'] as String?,
+              abertaEm: _data(c['aberta_em']),
+              responderAte: _data(c['responder_ate']),
+              resposta: c['resposta'] as String?,
+              decididaEm: data(c['decidida_em']),
+              anexos: [for (final x in (c['anexos'] as List? ?? const [])) _anexoContestacao(_mapa(x))],
+            ),
+    );
+  }
+
+  // ---------- cliente ausente (Termos 7.6) ----------
+
+  @override
+  Future<List<CasoAusencia>> listarAusencias() async =>
+      [for (final a in _itens(await _chamar('GET', '/v1/admin/ausencias'))) _ausencia(a)];
+
+  @override
+  Future<CasoAusencia> obterAusencia(String pedidoId) async =>
+      _ausencia(_mapa(await _chamar('GET', '/v1/admin/ausencias/$pedidoId')));
+
+  @override
+  Future<CasoAusencia> decidirAusencia(
+    String pedidoId, {
+    required bool aceitarJustificativa,
+    required String justificativa,
+    int retencaoCentavos = 0,
+    String? retencaoJustificativa,
+    List<String> retencaoComprovantes = const [],
+  }) async =>
+      _ausencia(_mapa(await _chamar('POST', '/v1/admin/ausencias/$pedidoId/decisao', corpo: {
+        'aceitar_justificativa': aceitarJustificativa,
+        'justificativa': justificativa,
+        'retencao_centavos': retencaoCentavos,
+        'retencao_justificativa': retencaoJustificativa,
+        'retencao_comprovantes': retencaoComprovantes,
+      })));
+
+  @override
+  Future<CasoAusencia> confirmarAusencia(String pedidoId,
+          {required bool retirarRetencao, required String motivo}) async =>
+      _ausencia(_mapa(await _chamar('POST', '/v1/admin/ausencias/$pedidoId/confirmar',
+          corpo: {'motivo': motivo, 'retirar_retencao': retirarRetencao})));
+
+  @override
+  Future<List<AnexoCaso>> anexosAusencia(String pedidoId, {required String motivo}) async => [
+        // POST de propósito: o motivo vai no corpo e não fica em log de URL.
+        for (final a in _itens(
+            await _chamar('POST', '/v1/admin/ausencias/$pedidoId/anexos', corpo: {'motivo': motivo})))
+          AnexoCaso(
+            tipo: a['tipo'] as String,
+            arquivoId: a['arquivo_id'] as String,
+            enviadoPor: a['enviado_por'] as String?,
+            url: a['url'] as String?,
+            tipoConteudo: a['content_type'] as String?,
+            expiraEmSegundos: (a['expira_em_segundos'] as num?)?.toInt(),
+          ),
+      ];
+
+  @override
+  Future<CasoAusencia> decidirContestacaoAusencia(String pedidoId,
+          {required String resultado, required String resposta, int? retencaoCentavos}) async =>
+      _ausencia(_mapa(await _chamar('POST', '/v1/admin/ausencias/$pedidoId/contestacao/decisao', corpo: {
+        'resultado': resultado,
+        'resposta': resposta,
+        'retencao_centavos': retencaoCentavos,
+      })));
+
+  // ---------- conversa do pedido (Termos 11.3) ----------
+
+  @override
+  Future<List<ConversaLida>> lerConversas(String pedidoId,
+      {required String motivo, required String base, String? referencia}) async {
+    final r = _mapa(await _chamar('POST', '/v1/admin/pedidos/$pedidoId/conversas/leitura',
+        corpo: {'motivo': motivo, 'base': base, 'referencia': referencia}));
+    return [
+      for (final c in (r['conversas'] as List? ?? const []).map(_mapa))
+        ConversaLida(
+          id: c['conversa_id'] as String,
+          profissionalId: c['profissional_id'] as String,
+          mensagens: [
+            for (final x in (c['mensagens'] as List? ?? const []).map(_mapa))
+              MensagemLida(
+                autorId: x['autor_id'] as String,
+                texto: x['texto'] as String,
+                textoExibido: x['texto_exibido'] as String,
+                mascarada: x['mascarada'] == true,
+                enviadaEm: _data(x['enviada_em']),
+              ),
+          ],
+        ),
+    ];
+  }
+
+  CasoAusencia _ausencia(Map<String, dynamic> a) {
+    DateTime? data(String chave) => a[chave] == null ? null : _data(a[chave]);
+    List<String> textos(String chave) => [for (final x in (a[chave] as List? ?? const [])) '$x'];
+    return CasoAusencia(
+      pedidoId: a['pedido_id'] as String,
+      status: a['status'] as String,
+      chegadaEm: _data(a['chegada_em']),
+      registradaEm: data('registrada_em'),
+      justificativaAte: data('justificativa_ate'),
+      justificativaTexto: a['justificativa_texto'] as String?,
+      anexos: textos('anexos'),
+      justificativaEnviadaEm: data('justificativa_enviada_em'),
+      decisao: a['decisao'] as String?,
+      retencaoCentavos: (a['retencao_centavos'] as num?)?.toInt(),
+      retencaoJustificativa: a['retencao_justificativa'] as String?,
+      retencaoComprovantes: textos('retencao_comprovantes'),
+      cancelamentoStatus: a['cancelamento_status'] as String?,
+      reembolsoCentavos: (a['reembolso_centavos'] as num?)?.toInt(),
+      contestarAte: data('contestar_ate'),
+      contestacao: a['contestacao'] is Map ? _contestacao(_mapa(a['contestacao'])) : null,
+      valorServicoCentavos: (a['valor_servico_centavos'] as num?)?.toInt(),
+      pedidoNumero: (a['pedido_numero'] as num?)?.toInt(),
+      clienteNome: a['cliente_nome'] as String?,
+      profissionalNome: a['profissional_nome'] as String?,
+    );
+  }
+
+  ContestacaoAusencia _contestacao(Map<String, dynamic> c) => ContestacaoAusencia(
+        status: c['status'] as String,
+        texto: c['texto'] as String,
+        abertaEm: _data(c['aberta_em']),
+        responderAte: _data(c['responder_ate']),
+        protocolo: c['protocolo'] as String?,
+        resposta: c['resposta'] as String?,
+        decididaEm: c['decidida_em'] == null ? null : _data(c['decidida_em']),
+      );
+
   Disputa _disputa(Map<String, dynamic> d) {
     final decisao = DecisaoDisputa.values.where((x) => x.codigo == d['decisao']).firstOrNull;
     final divisao = d['divisao'] is Map ? _mapa(d['divisao']) : null;
@@ -422,12 +1417,20 @@ class ApiAdminHttp implements ApiAdmin {
       respostaAte: d['resposta_ate'] == null ? null : _data(d['resposta_ate']),
       atrasada: d['atrasada'] == true,
       semResposta: d['sem_resposta'] == true,
-      status: _estadoDisputa[d['estado']] ?? StatusDisputa.emAnalise,
+      status: _estadoDisputa[d['estado']] ?? StatusDisputa.desconhecida,
       decisao: decisao,
       valorReembolsoCentavos: divisao == null ? null : _int(divisao['para_cliente_centavos']),
+      divisao: divisao == null
+          ? null
+          : DivisaoDisputa(
+              paraClienteCentavos: _int(divisao['para_cliente_centavos']),
+              paraProfissionalCentavos: _int(divisao['para_profissional_centavos']),
+              retidoCentavos: _int(divisao['retido_centavos']),
+            ),
       decididoPor: d['decidido_por'] as String?,
       responsavelId: d['responsavel_id'] as String?,
       responsavelNome: d['responsavel_nome'] as String?,
+      desistencia: d['desistencia'] == true,
       evidencias: [
         for (final e in (d['evidencias'] as List? ?? const []))
           EvidenciaDisputa(
@@ -467,9 +1470,12 @@ class ApiAdminHttp implements ApiAdmin {
         'decisao_registrada' => 'Decisão registrada',
         'decisao_aprovada' => 'Decisão aprovada por uma segunda pessoa',
         'concluir' => 'Serviço marcado como concluído',
+        'cancelar_pessoa_diferente' => 'Pedido cancelado: chegou uma pessoa diferente da verificada',
         'abrir_disputa' => 'Cliente relatou um problema',
         'responder_disputa' => 'Profissional respondeu',
         'decidir_disputa' => 'Disputa decidida pela equipe',
+        'proposta_retorno' => 'Proposta de acordo',
+        'encerrar_disputa_por_acordo' => 'Disputa encerrada por acordo entre as partes',
         final outro => _capitalizar(outro),
       };
 
@@ -502,7 +1508,7 @@ class ApiAdminHttp implements ApiAdmin {
       _resultado(await _chamar('POST', '/v1/admin/disputas/$id/aprovacao', corpo: {'justificativa': justificativa}));
 
   ResultadoDecisao _resultado(Object? corpo) {
-    final estado = _estadoDisputa[_mapa(corpo)['estado']] ?? StatusDisputa.emAnalise;
+    final estado = _estadoDisputa[_mapa(corpo)['estado']] ?? StatusDisputa.desconhecida;
     return ResultadoDecisao(
       status: estado,
       mensagem: estado == StatusDisputa.aguardandoSegundaPessoa
@@ -574,8 +1580,15 @@ class ApiAdminHttp implements ApiAdmin {
         final outro => '$outro',
       };
 
+  /// `trava_fraude_vigente`: ausente, null ou outro tipo = não informado.
+  static bool? _travaVigente(Map<String, dynamic> m) {
+    final v = m['trava_fraude_vigente'];
+    return v is bool ? v : null;
+  }
+
   UsuarioBusca _usuario(Map<String, dynamic> u) => UsuarioBusca(
         id: u['id'] as String,
+        travaFraudeVigente: _travaVigente(u),
         nome: (u['nome'] as String?) ?? '—',
         tipo: _tipoUsuario(u['tipo']),
         status: (u['status'] as String?) ?? '—',
@@ -642,11 +1655,11 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
-  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo}) async {
+  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo, String? motivoUsuario, List<String> clausulas = const []}) async {
     await _chamar(
       'POST',
       '/v1/admin/usuarios/$usuarioId/status',
-      corpo: {'status': status, 'motivo': motivo},
+      corpo: {'status': status, 'motivo': motivo, 'motivo_usuario': ?motivoUsuario, if (clausulas.isNotEmpty) 'clausulas': clausulas},
     );
   }
 
@@ -684,23 +1697,94 @@ class ApiAdminHttp implements ApiAdmin {
         final outro => _capitalizar(outro),
       };
 
+  // ---------- atendimento (Termos 25) ----------
+
   @override
-  Future<List<Chamado>> listarChamados() async {
-    final corpo = await _chamar('GET', '/v1/admin/chamados');
-    final itens = _itens(corpo);
-    return [
-      for (final c in itens)
-        Chamado(
-          id: c['id'] as String,
-          assunto: c['assunto'] as String,
-          solicitante: c['solicitante'] as String,
-          status: c['status'] as String,
-          aberto: _data(c['aberto_em'] ?? c['aberto']),
-          prioridade: (c['prioridade'] as String?) ?? 'normal',
-          responsavel: c['responsavel'] as String?,
-          prazo: c['prazo'] == null ? null : _data(c['prazo']),
-        ),
-    ];
+  Future<PaginaRemota<Chamado>> listarChamados(FiltroChamados filtro, {int deslocamento = 0, int limite = 50}) async {
+    final corpo = _mapa(await _chamar('GET', '/v1/admin/chamados', consulta: {
+      'status': filtro.status,
+      'categoria': filtro.categoria,
+      'prioridade': filtro.prioridade,
+      'responsavel_id': filtro.responsavelId,
+      'protocolo': filtro.protocolo,
+      'atrasados': filtro.atrasados ? 'true' : null,
+      'limite': '$limite',
+      'deslocamento': '$deslocamento',
+    }));
+    return PaginaRemota([for (final c in _itens(corpo)) _chamado(c)], _int(corpo['total']));
+  }
+
+  Future<Chamado> _acaoChamado(String metodo, String caminho, [Object? corpo]) async =>
+      _chamado(_mapa(await _chamar(metodo, '/v1/admin/chamados$caminho', corpo: corpo)));
+
+  @override
+  Future<Chamado> obterChamado(String id) => _acaoChamado('GET', '/$id');
+
+  @override
+  Future<Chamado> registrarContato(NovoContato c) => _acaoChamado('POST', '', {
+        'canal': c.canal,
+        'categoria': c.categoria,
+        'assunto': c.assunto,
+        'texto': c.texto,
+        'nome_contato': c.nomeContato,
+        'contato': c.contato,
+        'usuario_id': c.usuarioId,
+        'pedido_id': c.pedidoId,
+        'prioridade': c.prioridade,
+      });
+
+  @override
+  Future<Chamado> assumirChamado(String id, {bool substituir = false}) =>
+      _acaoChamado('POST', '/$id/assumir', {'substituir': substituir});
+
+  @override
+  Future<Chamado> responderChamado(String id,
+          {required String texto, bool interna = false, bool aguardarUsuario = false}) =>
+      _acaoChamado('POST', '/$id/mensagens', {'texto': texto, 'interna': interna, 'aguardar_usuario': aguardarUsuario});
+
+  @override
+  Future<Chamado> estenderPrazoChamado(String id, {required DateTime ate, required String motivo}) =>
+      _acaoChamado('POST', '/$id/prazo', {'novo_prazo_ate': ate.toUtc().toIso8601String(), 'motivo': motivo});
+
+  @override
+  Future<Chamado> encerrarChamado(String id, {required String mensagem}) =>
+      _acaoChamado('POST', '/$id/encerrar', {'mensagem': mensagem});
+
+  Chamado _chamado(Map<String, dynamic> c) {
+    DateTime? data(String k) => c[k] == null ? null : _data(c[k]);
+    return Chamado(
+      id: c['id'] as String,
+      protocolo: c['protocolo'] as String,
+      assunto: c['assunto'] as String,
+      solicitante: (c['solicitante'] as String?) ?? '',
+      status: c['status'] as String,
+      abertoEm: _data(c['aberto_em']),
+      categoria: c['categoria'] as String,
+      canal: c['canal'] as String,
+      responderAte: _data(c['responder_ate']),
+      prioridade: (c['prioridade'] as String?) ?? 'normal',
+      usuarioId: c['usuario_id'] as String?,
+      nomeContato: c['nome_contato'] as String?,
+      contato: c['contato'] as String?,
+      pedidoId: c['pedido_id'] as String?,
+      responsavelId: c['responsavel_id'] as String?,
+      responsavelNome: c['responsavel_nome'] as String?,
+      contestacaoRetencao: c['contestacao_retencao'] == true,
+      novoPrazoAte: data('novo_prazo_ate'),
+      motivoExtensao: c['motivo_extensao'] as String?,
+      primeiraRespostaEm: data('primeira_resposta_em'),
+      encerradoEm: data('encerrado_em'),
+      atrasado: c['atrasado'] == true,
+      mensagens: [
+        for (final x in (c['mensagens'] as List? ?? const []).map(_mapa))
+          MensagemChamado(
+            autor: x['autor'] as String,
+            texto: x['texto'] as String,
+            criadaEm: _data(x['criada_em']),
+            interna: x['interna'] == true,
+          ),
+      ],
+    );
   }
 
   @override
@@ -1174,10 +2258,12 @@ class ApiAdminHttp implements ApiAdmin {
       for (final a in itens)
         AlertaRisco(
           id: a['id'] as String,
+          travaFraudeVigente: _travaVigente(a),
           usuarioId: a['usuario_id'] as String?,
           usuarioNome: a['usuario_nome'] as String?,
           usuarioTipo: a['usuario_tipo'] as String?,
           usuarioStatus: a['usuario_status'] as String?,
+          pedidoId: a['pedido_id'] as String?,
           pedido: a['pedido_numero'] != null
               ? 'PED-${a['pedido_numero']}'
               : (a['pedido_id'] == null ? null : _codigoPedido(a['pedido_id'] as String, null)),
@@ -1194,8 +2280,8 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
-  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo}) async {
-    await _chamar('POST', '/v1/admin/risco/bloqueio-preventivo', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
+  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo, String? motivoUsuario, List<String> clausulas = const []}) async {
+    await _chamar('POST', '/v1/admin/risco/bloqueio-preventivo', corpo: {'usuario_id': usuarioId, 'motivo': motivo, 'motivo_usuario': ?motivoUsuario, if (clausulas.isNotEmpty) 'clausulas': clausulas});
   }
 
   @override
@@ -1204,13 +2290,30 @@ class ApiAdminHttp implements ApiAdmin {
   }
 
   @override
-  Future<void> travarSaque(String usuarioId, {required String motivo}) async {
-    await _chamar('POST', '/v1/admin/risco/travar-saque', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
-  }
+  Future<String?> travarSaque(String usuarioId,
+          {required String motivo,
+          String? motivoUsuario,
+          List<String> clausulas = const [],
+          bool motivoFraude = false,
+          int? limiteRetencaoCentavos,
+          int? dias}) async =>
+      _mensagemDe(await _chamar('POST', '/v1/admin/risco/travar-saque', corpo: {
+        'usuario_id': usuarioId,
+        'motivo': motivo,
+        'motivo_usuario': ?motivoUsuario,
+        if (clausulas.isNotEmpty) 'clausulas': clausulas,
+        // O limite só vai com fraude: sem ela o backend recusa o campo.
+        if (motivoFraude) ...{'motivo_fraude': true, 'limite_retencao_centavos': limiteRetencaoCentavos},
+        'dias': ?dias,
+      }));
 
   @override
-  Future<void> destravarSaque(String usuarioId, {required String motivo}) async {
-    await _chamar('POST', '/v1/admin/risco/destravar-saque', corpo: {'usuario_id': usuarioId, 'motivo': motivo});
+  Future<String?> destravarSaque(String usuarioId, {required String motivo}) async =>
+      _mensagemDe(await _chamar('POST', '/v1/admin/risco/destravar-saque', corpo: {'usuario_id': usuarioId, 'motivo': motivo}));
+
+  static String? _mensagemDe(Object? corpo) {
+    final texto = corpo is Map ? corpo['mensagem'] : null;
+    return texto is String && texto.trim().isNotEmpty ? texto.trim() : null;
   }
 
   @override

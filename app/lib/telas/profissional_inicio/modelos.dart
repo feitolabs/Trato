@@ -3,6 +3,7 @@
 /// Valores em centavos inteiros.
 library;
 
+import '../comuns/prazo_avaliacao.dart';
 import '../profissional/servico_orcamento.dart' show ItemMaterial;
 
 /// Atendimento já contratado, mostrado no cartão escuro do Início.
@@ -88,7 +89,11 @@ class PedidoContratado {
     this.consultaMapa,
     this.cliente,
     this.jaAvaliou = false,
+    this.prazoAvaliacao = PrazoAvaliacao.desconhecido,
   });
+
+  /// Termos 12.1: prazo para avaliar o cliente, do servidor.
+  final PrazoAvaliacao prazoAvaliacao;
 
   /// O profissional já avaliou o cliente (`ja_avaliou`): some "Avaliar cliente".
   final bool jaAvaliou;
@@ -295,7 +300,12 @@ class ExclusividadeProfissional {
     this.tituloPedido,
     this.bloqueadoRecusa = false,
     this.bloqueadoAte,
+    this.pagador = 'profissional',
   });
+
+  /// `cliente`: o cliente pagou e reservou o pedido para este profissional.
+  final String pagador;
+  bool get doCliente => pagador == 'cliente';
 
   final String id;
   final String pedidoId;
@@ -325,7 +335,8 @@ class ExclusividadeProfissional {
         'expirada_sem_resposta' => 'Tratinhos devolvidos',
         'concluida' => 'Concluída',
         'expirada_sem_atendimento' => 'Expirada sem orçamento',
-        'cancelada' => 'Cancelada (estornada)',
+        'cancelada' => doCliente ? 'Encerrada' : 'Cancelada (estornada)',
+        'expirada_sem_contratacao' => 'Terminou sem contratação',
         _ => status,
       };
 }

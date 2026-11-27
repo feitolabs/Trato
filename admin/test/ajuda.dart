@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trato_admin/app.dart';
+import 'package:trato_admin/telas/shell.dart' show ListaMenu;
 import 'apoio/api_fake.dart';
 
 /// Abre o painel numa janela [largura] x [altura] e entra com o papel [papel].
@@ -40,8 +41,27 @@ Future<void> entrar(WidgetTester tester, String papel, {bool esperar = true}) as
   }
 }
 
+/// A lista rolável do menu (lateral ou a da folha "Mais").
+Finder rolagemDoMenu() => find.descendant(of: find.byType(ListaMenu), matching: find.byType(Scrollable)).first;
+
+/// No menu "Mais" do celular, rola até a seção (a lista é maior que a tela) e toca nela.
+Future<void> tocarNoMais(WidgetTester tester, String id) async {
+  final item = find.byKey(ValueKey('menu-$id'));
+  final rolagem = find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first;
+  await tester.scrollUntilVisible(item, 120, scrollable: rolagem);
+  await tester.pumpAndSettle();
+  await tester.tap(item.last);
+  await tester.pumpAndSettle();
+}
+
 Future<void> irPara(WidgetTester tester, String id) async {
-  await tester.tap(find.byKey(ValueKey('menu-$id')));
+  final item = find.byKey(ValueKey('menu-$id'));
+  // Menu lateral maior que a janela: rola a própria lista do menu até o item.
+  if (find.byType(ListaMenu).evaluate().isNotEmpty) {
+    await tester.scrollUntilVisible(item, 120, scrollable: rolagemDoMenu());
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(item);
   await tester.pumpAndSettle();
 }
 

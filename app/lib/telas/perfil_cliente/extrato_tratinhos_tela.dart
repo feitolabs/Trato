@@ -20,8 +20,10 @@ class ExtratoTratinhosTela extends StatelessWidget {
         'desconto' || 'desconto_pedido' || 'uso_desconto' || 'resgate' => 'Desconto em pedido',
         'estorno' || 'estorno_desconto' || 'devolucao' => 'Devolução de Tratinhos',
         'expiracao' || 'expirado' => 'Tratinhos expirados',
-        'exclusividade' => 'Exclusividade em pedido',
+        'exclusividade' || 'exclusividade_uso' => 'Exclusividade em pedido',
+        'exclusividade_estorno' => 'Devolução de exclusividade',
         'bonus_indicacao' => 'Bônus de indicação',
+        'restauracao' => 'Devolução ao restabelecer a conta',
         _ => tipo.replaceAll('_', ' ').trim().isEmpty
             ? 'Movimentação de Tratinhos'
             : tipo.replaceAll('_', ' '),
@@ -65,11 +67,17 @@ class ExtratoTratinhosTela extends StatelessWidget {
                             '$disponiveis ${disponiveis == 1 ? 'Tratinho' : 'Tratinhos'}',
                             style: TipografiaTrato.tituloGrande,
                           ),
-                          if (valorCentavos != null)
+                          if (valorCentavos != null) ...[
                             Text(
                               textoTratinhosEmReais(disponiveis, valorCentavos),
                               style: secundario,
                             ),
+                            Text(
+                              'Valor: ${textoTratinhosEmReais(1, valorCentavos)}',
+                              key: const Key('valor-do-tratinho'),
+                              style: secundario,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -88,12 +96,25 @@ class ExtratoTratinhosTela extends StatelessWidget {
                     style: secundario,
                   ),
                 ],
-                if (perfil.moedasVenceEm != null) ...[
+                // Termos 13.4: o vencimento de cada crédito que ainda tem saldo.
+                if (perfil.moedasCreditos.isNotEmpty) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  Text('Validade do seu saldo', style: TipografiaTrato.corpoForte),
+                  for (final c in perfil.moedasCreditos)
+                    Text(
+                      '${textoTratinhosEmReais(c.moedas, valorCentavos)}: '
+                      '${c.expiraEm == null ? 'vencimento não informado' : 'vence em ${_dataCurta(c.expiraEm)}'}',
+                      style: secundario,
+                    ),
+                ] else if (perfil.moedasVenceEm != null) ...[
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
                     'Tratinhos vencem em ${formatarDiaMes(perfil.moedasVenceEm!)}',
                     style: secundario,
                   ),
+                ] else if (disponiveis > 0) ...[
+                  const SizedBox(height: EspacosTrato.x2),
+                  Text('Vencimento não informado agora.', style: secundario),
                 ],
                 if (perfil.descontoUsadoMesCentavos != null &&
                     perfil.tetoDescontoMesCentavos != null) ...[
@@ -180,6 +201,12 @@ class _LinhaLancamento extends StatelessWidget {
                     style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
                   ),
                 ],
+                // Termos 13.4: o vencimento de cada crédito, como o servidor informa.
+                if (item.quantidade > 0 && item.expiraEm != null)
+                  Text(
+                    'Vence em ${ExtratoTratinhosTela._dataCurta(item.expiraEm)}',
+                    style: TipografiaTrato.legenda.copyWith(color: context.cores.textoSecundario),
+                  ),
               ],
             ),
           ),

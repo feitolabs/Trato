@@ -14,16 +14,18 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from trato import disputas
+from trato.api import decisao_disputa
 from trato.api.admin.contexto import Operador, exigir, obter_admin
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
+from trato.api.cautela import exigir_contato_livre
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.maioridade import exigir_maioridade
 from trato.api.servicos import ator_de, carregar_pedido
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import Aditivo, CobrancaLocal
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
-from trato.pedidos import estados
-from trato.pedidos.estados import Acao, DecisaoDisputa, Estado, ResultadoDisputa
+from trato.pedidos.estados import Estado, ResultadoDisputa
 
 router = APIRouter(prefix="/v1/pedidos", tags=["pagamento"])
 
@@ -39,6 +41,13 @@ class CobrarIn(_Entrada):
         ge=1,
         le=12,
         description="Só cartão. Parcelado desligado até o custo do provedor estar configurado.",
+    )
+    consentimento_execucao_imediata: bool = Field(
+        False,
+        description=(
+            "Termos 7.3: o cliente marcou (nunca vem marcado) que quer o serviço antes do fim "
+            "dos 7 dias. Vale a escolha da cobrança paga, gravada na confirmação."
+        ),
     )
 
 
@@ -143,6 +152,7 @@ def _exigir_cpf(contexto: Contexto, usuario_id: str) -> JSONResponse | None:
 
 @router.post(
     "/{pedido_id}/cobranca",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=CobrancaOut,
     status_code=201,
     summary="Criar a cobrança do pedido (Pix ou cartão)",
@@ -165,7 +175,12 @@ def criar_cobranca(
     if contrato is None:
         raise ErroFluxo("Pedido sem contrato.", 409)
     cobranca = servico.cobrar(
-        contexto, pedido, contrato.valor_centavos, corpo.meio, parcelas=corpo.parcelas
+        contexto,
+        pedido,
+        contrato.valor_centavos,
+        corpo.meio,
+        parcelas=corpo.parcelas,
+        execucao_imediata=corpo.consentimento_execucao_imediata,
     )
     return _cobranca_out(cobranca)
 
@@ -207,6 +222,7 @@ def propor_aditivo(
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.profissional_id != usuario.id:
         raise HTTPException(403, "Só o profissional contratado neste pedido pode propor aditivo.")
+    exigir_contato_livre(contexto, pedido, usuario.id)  # 9.6
     return _aditivo_out(
         servico.propor_aditivo(contexto, pedido, corpo.descricao, corpo.valor_centavos)
     )
@@ -214,6 +230,7 @@ def propor_aditivo(
 
 @router.post(
     "/{pedido_id}/aditivos/{aditivo_id}/aprovacao",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=AditivoAprovadoOut,
     summary="Cliente aprova o aditivo; a cobrança é criada",
 )
@@ -308,7 +325,7 @@ def decidir_disputa(
         motivo=corpo.justificativa,
     )
     if nova.divisao is None:  # aguardando segunda pessoa
-        contexto.disputas.salvar(pedido.id, nova)
+        decisao_disputa.guardar_proposta(contexto, pedido.id, disputa, nova)
         return DecisaoOut(
             estado_disputa=nova.estado.value,
             estado_pedido=pedido.estado.value,
@@ -317,28 +334,19 @@ def decidir_disputa(
             retido_centavos=None,
         )
 
-    transicao = estados.transicionar(
-        pedido,
-        Acao.DECIDIR_DISPUTA,
+    gravado, _ = decisao_disputa.efetivar(
+        contexto,
+        servico,
+        pedido.id,
+        disputa,
+        nova,
         ator_de(usuario),
-        agora,
-        DecisaoDisputa(corpo.resultado, corpo.justificativa),
+        corpo.justificativa,
     )
     divisao = nova.divisao
-    with contexto.transacao():  # pedido + dinheiro + disputa: tudo ou nada; provedor só depois
-        servico.aplicar_dinheiro(
-            contexto,
-            transicao.pedido,
-            operacao=f"disputa/{int(disputa.aberta_em.timestamp())}",
-            devolver_ao_cliente=divisao.para_cliente,
-            repartir=transicao.pedido.estado is Estado.CONCLUIDO,
-            gatilho="decisao_disputa",
-        )
-        contexto.pedidos.salvar(transicao.pedido, transicao.evento)  # antes da disputa (histórico)
-        contexto.disputas.salvar(pedido.id, nova)
     return DecisaoOut(
         estado_disputa=nova.estado.value,
-        estado_pedido=transicao.pedido.estado.value,
+        estado_pedido=gravado.estado.value,
         para_profissional_centavos=divisao.para_profissional,
         para_cliente_centavos=divisao.para_cliente,
         retido_centavos=divisao.retido,

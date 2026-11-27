@@ -7,6 +7,7 @@ import '../../dados/servico_cep.dart';
 import '../../tema/tema.dart';
 import '../comuns/foco_rolagem.dart';
 import '../profissional_apoio/apoio.dart';
+import '../comuns/servicos_nao_cobertos.dart';
 import 'cadastro.dart';
 import 'componentes_cadastro.dart';
 
@@ -120,10 +121,6 @@ class _FormularioCadastroProfissionalState
   late int _raio = widget.opcoes.raiosKm.contains(_atual?.raioKm)
       ? _atual!.raioKm
       : (widget.opcoes.raiosKm.isEmpty ? 0 : widget.opcoes.raiosKm.first);
-  late final _modalidades = <String>{
-    if (_atual?.atendePresencial ?? true) 'Presencial',
-    if (_atual?.atendeRemoto ?? false) 'Remoto',
-  };
 
   /// Modo edição ativa quando `edicao` é true ou quando já existe cadastro preenchido.
   late final bool _modoEdicao = widget.edicao ||
@@ -177,10 +174,6 @@ class _FormularioCadastroProfissionalState
   String? get _erroCategorias =>
       _categorias.isEmpty ? 'Escolha pelo menos uma categoria.' : null;
 
-  String? get _erroModalidades => _modalidades.isEmpty
-      ? 'Escolha atender presencial, remoto ou os dois.'
-      : null;
-
   String? get _erroCidade =>
       _cidade == null ? 'Escolha a cidade onde você atende.' : null;
 
@@ -195,7 +188,6 @@ class _FormularioCadastroProfissionalState
 
   bool get _passo3Valido =>
       _erroCidade == null &&
-      _erroModalidades == null &&
       _erroDias == null &&
       _erroPeriodos == null;
 
@@ -311,8 +303,9 @@ class _FormularioCadastroProfissionalState
         dias: {..._dias},
         periodos: {..._periodos},
         portfolio: [..._portfolio],
-        atendePresencial: _modalidades.contains('Presencial'),
-        atendeRemoto: _modalidades.contains('Remoto'),
+        // Termos 3.7: só serviço no imóvel informado no pedido; não há atendimento remoto.
+        atendePresencial: true,
+        atendeRemoto: false,
       ));
       if (!mounted) return;
       setState(() => _enviando = false);
@@ -357,7 +350,7 @@ class _FormularioCadastroProfissionalState
       const SizedBox(height: EspacosTrato.x6),
       CampoTrato(
         rotulo: 'Nome completo',
-        dica: 'Como os clientes vão encontrar você',
+        dica: 'Nome que o cliente vê',
         controlador: _nome,
         foco: _focoNome,
         acaoTeclado: TextInputAction.next,
@@ -424,6 +417,8 @@ class _FormularioCadastroProfissionalState
         if (mostrarErro && _erroCategorias != null)
           _erroTexto(context, _erroCategorias!),
       ],
+      const SizedBox(height: EspacosTrato.x4),
+      const CartaoServicosNaoCobertos(),
     ];
   }
 
@@ -476,24 +471,6 @@ class _FormularioCadastroProfissionalState
           aoAlternar: (v) => setState(() => _raio = int.parse(v.split(' ').first)),
         ),
       ],
-      const SizedBox(height: EspacosTrato.x5),
-      Text(
-        'Como você atende',
-        style: TipografiaTrato.corpoForte.copyWith(color: c.texto),
-      ),
-      const SizedBox(height: EspacosTrato.x1),
-      Text(
-        'Presencial no local do cliente, remoto ou os dois.',
-        style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
-      ),
-      const SizedBox(height: EspacosTrato.x2),
-      PilulasSelecao(
-        opcoes: const ['Presencial', 'Remoto'],
-        selecionadas: _modalidades,
-        aoAlternar: (v) => _alternar(_modalidades, v),
-      ),
-      if (mostrarErro && _erroModalidades != null)
-        _erroTexto(context, _erroModalidades!),
       const SizedBox(height: EspacosTrato.x6),
       BlocoDisponibilidade(
         dias: o.dias,

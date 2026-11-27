@@ -1,3 +1,4 @@
+import '../comuns/textos_dos_termos.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ class CheckOutTela extends StatefulWidget {
     required this.servico,
     required this.tituloBarra,
     this.aoConcluir,
+    this.aoConcluirSemCodigo,
     this.permissao,
     this.remoto = false,
   });
@@ -33,6 +35,9 @@ class CheckOutTela extends StatefulWidget {
 
   /// Chamado quando o backend aceitou o código.
   final VoidCallback? aoConcluir;
+
+  /// Concluiu sem o código do cliente (Termos 5.7). Nulo: vale [aoConcluir].
+  final VoidCallback? aoConcluirSemCodigo;
 
   /// Se vier, explica e pede a câmera só na hora de usar.
   final ServicoPermissao? permissao;
@@ -88,7 +93,7 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
         _timerOffline?.cancel();
         _timerOffline = null;
         setState(() => _aviso = null);
-        widget.aoConcluir?.call();
+        _avisarConclusao();
       }
     } on Object {
       // Ainda sem sinal: a próxima tentativa do timer resolve.
@@ -159,6 +164,11 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
     }
   }
 
+  void _avisarConclusao() {
+    final aviso = _semCodigo ? widget.aoConcluirSemCodigo ?? widget.aoConcluir : widget.aoConcluir;
+    aviso?.call();
+  }
+
   Future<void> _concluir() async {
     if (_enviando) return;
     FocusScope.of(context).unfocus();
@@ -207,7 +217,7 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
     if (r == ResultadoFim.concluido) {
       _timerOffline?.cancel();
       _timerOffline = null;
-      widget.aoConcluir?.call();
+      _avisarConclusao();
     }
   }
 
@@ -347,6 +357,8 @@ class _CheckOutTelaState extends State<CheckOutTela> with WidgetsBindingObserver
             tipo: TipoStatus.alerta,
             icone: Icons.info_outline,
           ),
+          const SizedBox(height: EspacosTrato.x2),
+          Text(textoAnalistaDecide, style: TipografiaTrato.legenda),
         ] else
           TextField(
             controller: _codigo,

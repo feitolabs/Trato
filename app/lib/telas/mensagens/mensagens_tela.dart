@@ -150,8 +150,8 @@ class _PainelConversasState extends State<_PainelConversas> {
     return switch (chip) {
       _FiltroRapidoConversas.todas => true,
       _FiltroRapidoConversas.naoLidas => item.naoLidas > 0,
-      _FiltroRapidoConversas.emAndamento => !item.encerrada,
-      _FiltroRapidoConversas.finalizadas => item.encerrada,
+      _FiltroRapidoConversas.emAndamento => !item.finalizada,
+      _FiltroRapidoConversas.finalizadas => item.finalizada,
     };
   }
 

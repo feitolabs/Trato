@@ -20,7 +20,7 @@ class IlustracaoOnboardingCliente extends StatelessWidget {
     'Ilustração: conte o que você precisa pelo celular',
     'Ilustração: compare três orçamentos e escolha o melhor',
     'Ilustração: pague com segurança e proteção',
-    'Ilustração: avalie com cinco estrelas e ganhe Tratinhos',
+    'Ilustração: avalie o serviço e ganhe Tratinhos',
   ];
 
   @override

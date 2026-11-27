@@ -77,6 +77,24 @@ class ContestacoesPostgres:
             ).fetchall()
         return tuple(_montar(l) for l in linhas)  # noqa: E741
 
+    def perdidas_do_pedido(self, pedido_id: str) -> Sequence[Contestacao]:
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return ()
+        with self._banco.transacao() as con:
+            # Conferir antes: uma consulta que falha estragaria a transação do reembolso.
+            existe = con.execute(
+                "select to_regclass('public.contestacoes') is not null as existe"
+            ).fetchone()
+            if not existe["existe"]:
+                return ()
+            linhas = con.execute(
+                f"select {_COLUNAS} from public.contestacoes "
+                "where pedido_id = %s and status = 'perdida' order by aberta_em desc",
+                (pid,),
+            ).fetchall()
+        return tuple(_montar(l) for l in linhas)  # noqa: E741
+
     def abertas_do_pedido(self, pedido_id: str) -> Sequence[Contestacao]:
         pid = como_uuid(pedido_id)
         if pid is None:

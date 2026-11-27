@@ -82,7 +82,8 @@ class AbrirPedidoIn(_Entrada):
     endereco: EnderecoIn | None = None
     modalidade: Literal["presencial", "remoto"] = Field(
         default="presencial",
-        description="`remoto` só em categoria que aceita remoto. Presencial exige endereço "
+        description="Use `presencial`. `remoto` é recusado em pedido novo (Termos 3.7); só "
+        "pedidos antigos o trazem. Presencial exige endereço completo "
         "(rua, número, bairro e CEP).",
     )
     profissional_convidado_id: str | None = Field(
@@ -390,6 +391,29 @@ class SaldoProfissionalOut(BaseModel):
     liberacoes_previstas: list[LiberacaoPrevistaOut] = Field(default_factory=list)
 
 
+class AceitarPropostaIn(_Entrada):
+    """A proposta que o cliente está vendo: tem de bater com a atual."""
+
+    solucao: str = Field(min_length=1, max_length=40)
+    reembolso_centavos: int = Field(ge=0, strict=True)
+
+
+class PropostaDisputaOut(BaseModel):
+    solucao: str = Field(description="reembolso_parcial")
+    reembolso_centavos: int = Field(description="Valor a devolver ao cliente.")
+    respondida_em: datetime
+
+
+class AcordoDisputaOut(BaseModel):
+    solucao: str = Field(description="reembolso_parcial | liberar_tudo")
+    reembolso_centavos: int = Field(
+        description="Valor acordado para devolver; a devolução depende do provedor."
+    )
+    liberado_centavos: int = Field(
+        description="Parte do profissional; sai pela liberação normal, com as travas."
+    )
+
+
 class DisputaOut(BaseModel):
     pedido_id: str
     estado: str
@@ -403,6 +427,8 @@ class DisputaOut(BaseModel):
     descricao: str | None = Field(
         None, description="O relato do cliente ao abrir (só em `GET .../disputa`)."
     )
+    proposta: PropostaDisputaOut | None = None
+    acordo: AcordoDisputaOut | None = None
 
 
 class RetrabalhoOut(BaseModel):

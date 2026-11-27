@@ -464,3 +464,38 @@ def avisar_exclusividade_encerrada(
         )
     except Exception:  # noqa: BLE001 - aviso é secundário
         log.exception("Aviso de encerramento da exclusividade falhou")
+
+
+def avisar_partes(
+    contexto: Contexto,
+    evento: Evento,
+    usuarios: Sequence[str | None],
+    *,
+    pedido_id: str,
+    chave: str,
+    corpo: str | None = None,
+    dados: dict[str, str | None] | None = None,
+) -> None:
+    """Avisos obrigatórios (Termos 15.2) fora das transições. Usa o serviço montado com o app;
+    sem ele não há o que fazer. Aviso nunca desfaz nem derruba o que já foi gravado."""
+    notificador = contexto.extras.get("notificador")
+    if notificador is None:
+        return
+
+    def enviar() -> None:
+        for usuario in usuarios:
+            if not usuario:
+                continue
+            try:
+                notificador.notificar(
+                    evento,
+                    usuario,
+                    chave=chave,
+                    pedido_id=pedido_id,
+                    corpo=corpo,
+                    dados=dados,
+                )
+            except Exception:  # noqa: BLE001 - aviso é secundário
+                log.exception("Aviso %s falhou", evento.value)
+
+    contexto.depois_do_commit(enviar)

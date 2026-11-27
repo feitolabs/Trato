@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trato/dados/modelos_api.dart';
 import 'package:trato/telas/carteira/carteira_tela.dart';
 import 'package:trato/telas/carteira/modelos.dart';
 import 'package:trato/telas/perfil_cliente/modelos.dart';
 import 'package:trato/telas/perfil_cliente/perfil_cliente_tela.dart';
-import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
-import 'package:trato/telas/profissional_inicio/modelos.dart' hide ResumoCarteira;
 import 'package:trato/tema/tema.dart';
 
 Future<void> _abrir(WidgetTester tester, Widget tela) async {
@@ -26,32 +23,6 @@ PerfilCliente _perfil({DateTime? vence, int? teto, int? usado}) => PerfilCliente
       moedasVenceEm: vence,
       tetoDescontoMesCentavos: teto,
       descontoUsadoMesCentavos: usado,
-    );
-
-DetalhePedido _detalhe({DateTime? bloqueadoAte}) => DetalhePedido(
-      pedido: const PedidoAberto(
-        id: 'ped-1',
-        titulo: 'Instalar chuveiro',
-        bairro: 'Savassi',
-        prazo: 'até sexta',
-        urgente: false,
-        permiteExclusividade: true,
-        estado: 'aberto',
-      ),
-      fechaEm: 'Publicado agora',
-      clienteResumo: 'Para até 25/11',
-      legendasFotos: const [],
-      descricao: 'Trocar resistência.',
-      linhas: const [LinhaDetalhe('Modalidade', 'Presencial')],
-      exclusividades: const ResumoExclusividades(saldoProfissional: 200),
-      bloqueadoRecusa: bloqueadoAte != null && bloqueadoAte.isAfter(DateTime.now()),
-      bloqueadoAte: bloqueadoAte,
-    );
-
-Widget _detalheTela(DetalhePedido d) => DetalhePedidoTela(
-      dados: d,
-      aoPedirExclusividade: (_) async =>
-          const ExclusividadeProfissional(id: 'e', pedidoId: 'ped-1', status: 'ativa'),
     );
 
 ResumoCarteira _resumo({DateTime? proxima}) => ResumoCarteira(
@@ -110,40 +81,4 @@ void main() {
     });
   });
 
-  group('F12 — bloqueio de exclusividade (bloqueado_ate)', () {
-    test('ExclusividadeApi lê bloqueado_ate e tolera a ausência', () {
-      final base = {
-        'id': 'e1',
-        'pedido_id': 'p1',
-        'status': 'recusada',
-        'criada_em': '2026-11-20T10:00:00Z',
-      };
-      expect(ExclusividadeApi.deJson(base).bloqueadoAte, isNull);
-      expect(
-        ExclusividadeApi.deJson({...base, 'bloqueado_ate': null}).bloqueadoAte,
-        isNull,
-      );
-      expect(
-        ExclusividadeApi.deJson({...base, 'bloqueado_ate': '2026-11-25T15:30:00Z'}).bloqueadoAte,
-        DateTime.utc(2026, 11, 25, 15, 30),
-      );
-    });
-
-    testWidgets('bloqueio futuro: avisa quando poderá tentar de novo', (tester) async {
-      final fim = DateTime.now().add(const Duration(days: 3));
-      await _abrir(tester, _detalheTela(_detalhe(bloqueadoAte: fim)));
-      expect(find.textContaining('Você poderá tentar de novo em '), findsOneWidget);
-    });
-
-    testWidgets('bloqueio já passado ou nulo: sem aviso de bloqueio', (tester) async {
-      await _abrir(
-        tester,
-        _detalheTela(_detalhe(bloqueadoAte: DateTime.now().subtract(const Duration(days: 1)))),
-      );
-      expect(find.textContaining('Você poderá tentar de novo'), findsNothing);
-      await _abrir(tester, _detalheTela(_detalhe()));
-      expect(find.textContaining('Você poderá tentar de novo'), findsNothing);
-      expect(find.textContaining('oferta recusada por este cliente'), findsNothing);
-    });
-  });
 }

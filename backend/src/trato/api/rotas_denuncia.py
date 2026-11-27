@@ -22,7 +22,8 @@ from trato.seguranca.texto_livre import limpar_texto
 
 router = APIRouter(prefix="/v1", tags=["denuncias"])
 
-MOTIVOS_GRAVES = ("assedio", "fraude")
+# Graves retêm o valor ainda não liberado do pedido até a análise (8.8 e 9.6).
+MOTIVOS_GRAVES = ("assedio", "fraude", "dano")
 # Denúncia de PERFIL: 1 por alvo a cada 24 h e no máximo 10 por dia por denunciante.
 PERFIL_MAX_POR_DIA = 10
 JANELA_PERFIL = timedelta(hours=24)
@@ -34,7 +35,7 @@ class DenunciaIn(BaseModel):
     alvo_tipo: Literal["perfil", "chat"]
     denunciado_id: str = Field(min_length=1, max_length=64)
     pedido_id: str | None = Field(default=None, max_length=64)
-    motivo: Literal["assedio", "fraude", "cobranca_fora", "perfil_falso", "outro"]
+    motivo: Literal["assedio", "fraude", "dano", "cobranca_fora", "perfil_falso", "outro"]
     detalhes: str = Field(min_length=5, max_length=500)
 
 

@@ -8,6 +8,10 @@ class SessaoTrato {
   /// Chamado quando a API recusa o token (401). Quem monta o app liga isto ao login.
   void Function()? aoExpirar;
 
+  /// A API respondeu 403 `conta_bloqueada`: a pessoa continua logada, mas só entra no
+  /// atendimento e nas medidas. Pode ser chamado várias vezes (chamadas em paralelo).
+  void Function(String? mensagem)? aoBloquear;
+
   /// Pede um token novo ao login. Devolve o token novo ou nulo. Quem monta o app liga isto ao
   /// serviço de login; sem ele, um 401 expira a sessão direto.
   Future<String?> Function()? renovar;

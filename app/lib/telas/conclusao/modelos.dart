@@ -24,7 +24,19 @@ class ResumoConclusao {
     this.prazoConfirmacao,
     this.garantiaTexto,
     this.remoto = false,
+    this.podeConfirmar = true,
+    this.podeRelatarProblema = true,
+    this.concluido = false,
   });
+
+  /// A API permite `confirmar_conclusao`. Falso = a tela é só consulta (fotos e valores).
+  final bool podeConfirmar;
+
+  /// A API permite `abrir_disputa`.
+  final bool podeRelatarProblema;
+
+  /// O pedido está no estado `concluido` (só muda o título da consulta).
+  final bool concluido;
 
   /// Serviço remoto: texto do código muda (não há chegada).
   final bool remoto;
@@ -78,7 +90,13 @@ class DadosAvaliacao {
     this.bonusMoedas = 0,
     this.valorMoedaCentavos,
     this.jaAvaliou = false,
+    this.avaliarAte,
+    this.prazoEncerrado = false,
   });
+
+  /// Termos 12.1: até quando dá para avaliar e se o prazo já terminou (do servidor).
+  final DateTime? avaliarAte;
+  final bool prazoEncerrado;
 
   /// Verdadeiro quando o cliente já enviou avaliação para este pedido (ex.: após retrabalho).
   final bool jaAvaliou;
@@ -137,7 +155,11 @@ class DadosRelatoProblema {
     required this.solucoes,
     required this.prazoRespostaHoras,
     required this.nomeProfissional,
+    this.casoEmAnalise = false,
   });
+
+  /// Há um caso aberto de verdade neste pedido (estado `em_disputa`).
+  final bool casoEmAnalise;
 
   /// Ex.: "Vazamento na pia · Joana Ribeiro".
   final String titulo;
@@ -147,7 +169,7 @@ class DadosRelatoProblema {
   /// Opções de "O que resolveria para você?".
   final List<String> solucoes;
 
-  /// Prazo para o profissional responder (escopo: 48 h). Vem do backend.
+  /// Prazo para o profissional responder (Termos 8.2: 24 h). Vem do backend.
   final int prazoRespostaHoras;
   final String nomeProfissional;
 }

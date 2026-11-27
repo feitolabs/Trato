@@ -16,7 +16,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from trato.api.exclusividades import encerrar_na_contratacao
 from trato.api.repositorios import EventoWebhook
+from trato.api.validade import momento_da_confirmacao, orcamento_vencido
 from trato.financeiro.ledger import CLIENTE, CUSTODIA, Lancamento, TipoLancamento
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Estado, Papel, ProvaPagamento
@@ -59,6 +61,13 @@ def confirmar_pagamento(evento: EventoWebhook, contexto: Contexto) -> None:
         return
     if pedido.referencia_pagamento is not None:
         return  # já pago: reenvio por outro evento do mesmo pagamento não repete nada
+    if any(e.acao is Acao.EXPIRAR_PAGAMENTO for e in contexto.pedidos.eventos(pedido.id)):
+        # Sem o serviço de pagamento não há cobrança que diga de qual contrato é o dinheiro:
+        # não contrata e deixa para o financeiro.
+        contexto.eventos_webhook.marcar_revisao(
+            evento, f"pagamento em pedido que já perdeu um prazo de pagamento ({referencia})"
+        )
+        return
     if pedido.estado not in (Estado.ORCAMENTO_ACEITO, Estado.AGUARDANDO_CONFIRMACAO):
         raise EventoForaDeOrdem(f"Pedido {pedido_id} ainda não aceita pagamento.")
     if (
@@ -69,6 +78,13 @@ def confirmar_pagamento(evento: EventoWebhook, contexto: Contexto) -> None:
     ):
         return  # valor não confere com o contrato: não vira pago
     agora = contexto.agora()
+    confirmado_em = momento_da_confirmacao(evento.payload, agora)
+    if orcamento_vencido(contexto, contrato.orcamento_id, confirmado_em):
+        # Manipulador sem serviço de pagamento: não contrata e deixa para o financeiro devolver.
+        contexto.eventos_webhook.marcar_revisao(
+            evento, f"pagamento depois da validade do orçamento ({referencia}): devolver"
+        )
+        return
     transicao = estados.transicionar(
         pedido, Acao.CONFIRMAR_PAGAMENTO, SISTEMA, agora, ProvaPagamento(referencia)
     )
@@ -87,6 +103,7 @@ def confirmar_pagamento(evento: EventoWebhook, contexto: Contexto) -> None:
         ]
     )
     contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+    encerrar_na_contratacao(contexto, pedido_id, transicao.pedido.profissional_id)
 
 
 def recusar_pagamento(evento: EventoWebhook, contexto: Contexto) -> None:

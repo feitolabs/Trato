@@ -211,7 +211,8 @@ def test_pedido_estornado_ou_cancelado_nao_libera(amb):
     _dar(amb.contexto.moedas, "ped-1")
     quando = AGORA + timedelta(days=7)
     # Estorno total (cobrança devolvida por inteiro) dentro dos 7 dias.
-    exe = _executor(amb, cobrancas=[SimpleNamespace(status=EstadoCobranca.DEVOLVIDA)])
+    devolvida = SimpleNamespace(status=EstadoCobranca.DEVOLVIDA, contrato_encerrado=False)
+    exe = _executor(amb, cobrancas=[devolvida])
     exe.liberar_bonus_moedas(quando)
     assert saldo_profissional(amb.contexto.moedas, PROF, quando) == 0
     assert amb.contexto.moedas.pendentes_do_usuario(PROF, TIPO_BONUS_PROFISSIONAL) == []
@@ -399,6 +400,16 @@ class _Con:
         return self._linha
 
     def fetchall(self):
+        if self.sqls[-1].startswith("select tipo, quantidade, chave_idempotencia, expira_em"):
+            return [  # o saldo sai dos lançamentos: um crédito de 7 sem prazo
+                {
+                    "tipo": "ajuste",
+                    "quantidade": 7,
+                    "chave_idempotencia": "k",
+                    "expira_em": None,
+                    "criada_em": AGORA,
+                }
+            ]
         return []
 
 

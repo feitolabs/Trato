@@ -83,7 +83,7 @@ insert into seed_config (chave, valor, minimo, maximo, obrigatorio) values
   -- Disputa e retrabalho
   ('janela_chargeback_dias',            7,    1,    30,   true),
   ('prazo_congelar_disputa_horas',      null, 24,   168,  false),
-  ('prazo_resposta_disputa_horas',      48,   12,   168,  true),
+  ('prazo_resposta_disputa_horas',      24,   12,   168,  true),  -- Termos 8.2
   ('prazo_decisao_disputa_dias_uteis',  5,    1,    15,   true),
   ('prazo_retrabalho_atendimento_dias', 7,    1,    30,   true),
   ('garantia_retrabalho_dias_padrao',   30,   7,    365,  true),

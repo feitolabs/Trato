@@ -33,7 +33,12 @@ from trato.financeiro.ledger import Conta, Lancamento, Livro, SaldoPedido
 from trato.garantias import Garantia, Retrabalho
 from trato.pagamentos.idempotencia import RegistroEventosEmMemoria
 from trato.pedidos.estados import Estado, Evento, Pedido
-from trato.persistencia.erros import ConflitoDeEstado, DadosInvalidos
+from trato.persistencia.erros import (
+    ConflitoDeEstado,
+    DadosInvalidos,
+    Duplicado,
+    RegraDoBanco,
+)
 
 
 class PedidosEmMemoria:
@@ -413,6 +418,11 @@ class OrcamentosEmMemoria:
                 recusados.append((det.id, det.profissional_id))
         return tuple(recusados)
 
+    def expirar_aceito(self, orcamento_id: str) -> None:
+        det = self._detalhes.get(orcamento_id)
+        if det is not None and det.status == "aceito":
+            self._detalhes[orcamento_id] = replace(det, status="expirado")
+
     def recusar(self, pedido_id: str, orcamento_id: str) -> bool:
         det = self._detalhes.get(orcamento_id)
         if det is not None:
@@ -461,18 +471,42 @@ class OrcamentosEmMemoria:
 
 class ContratosEmMemoria:
     def __init__(self, orcamentos: OrcamentosEmMemoria | None = None) -> None:
-        self._itens: dict[str, Contrato] = {}
+        self._itens: dict[str, Contrato] = {}  # só o vigente de cada pedido
+        self._cancelados: list[Contrato] = []
         self._orcamentos = orcamentos
 
     def obter_do_pedido(self, pedido_id: str) -> Contrato | None:
         return self._itens.get(pedido_id)
 
+    def encerrar_por_pagamento_expirado(self, pedido_id: str) -> bool:
+        """Quem chama garante que não há dinheiro no contrato (o banco confere de novo)."""
+        atual = self._itens.pop(pedido_id, None)
+        if atual is None:
+            return False
+        self._cancelados.append(atual)
+        if self._orcamentos is not None:
+            self._orcamentos.expirar_aceito(atual.orcamento_id)
+        return True
+
     def salvar(self, contrato: Contrato) -> tuple[tuple[str, str], ...]:
-        ja_mesmo = (
-            existente := self._itens.get(contrato.pedido_id)
-        ) is not None and existente.orcamento_id == contrato.orcamento_id
+        """Como no banco: um contrato vigente por pedido, e só de orçamento enviado."""
+        existente = self._itens.get(contrato.pedido_id)
+        if existente is not None:
+            if existente.orcamento_id != contrato.orcamento_id:
+                raise Duplicado("Este pedido já tem contrato com outro orçamento.")
+            self._itens[contrato.pedido_id] = contrato
+            return ()
+        if self._orcamentos is not None:
+            detalhe = self._orcamentos.detalhe(contrato.orcamento_id)
+            # (os testes reaproveitam um id entre pedidos: só vale o detalhe deste pedido)
+            if (
+                detalhe is not None
+                and detalhe.pedido_id == contrato.pedido_id
+                and detalhe.status != "enviado"
+            ):
+                raise RegraDoBanco("Só um orçamento enviado pode ser aceito.")
         self._itens[contrato.pedido_id] = contrato
-        if ja_mesmo or self._orcamentos is None:
+        if self._orcamentos is None:
             return ()
         return self._orcamentos.aceitar_e_recusar_outros(contrato.pedido_id, contrato.orcamento_id)
 
@@ -520,9 +554,11 @@ class DisputasEmMemoria:
     def registrar_evidencias(
         self, pedido_id: str, autor_id: str, itens: list[tuple[str, str | None, str | None]]
     ) -> None:
+        atual = self._itens.get(pedido_id)
         for tipo, texto, midia in itens:
             self._evidencias.setdefault(pedido_id, []).append(
                 {
+                    "disputa_aberta_em": atual.aberta_em if atual else None,
                     "tipo": tipo,
                     "texto": texto,
                     "midia_id": midia,
@@ -533,6 +569,17 @@ class DisputasEmMemoria:
 
     def evidencias(self, pedido_id: str) -> list[dict[str, Any]]:
         return list(self._evidencias.get(pedido_id, []))
+
+    def propostas(self, pedido_id: str) -> list[str]:
+        """Textos de `proposta_retorno` da disputa atual, do mais antigo para o mais novo."""
+        atual = self._itens.get(pedido_id)
+        return [
+            e["texto"]
+            for e in self._evidencias.get(pedido_id, [])
+            if e["tipo"] == "proposta_retorno"
+            and atual is not None
+            and e["disputa_aberta_em"] == atual.aberta_em
+        ]
 
 
 class GarantiasEmMemoria:
@@ -584,9 +631,13 @@ class EventosWebhookEmMemoria(RegistroEventosEmMemoria):
 class ConfigEmMemoria:
     def __init__(self, config: ConfigApi) -> None:
         self._config = config
+        self.parametros: dict[str, int] = {}  # publicados que não estão em `ConfigApi`
 
     def carregar(self) -> ConfigApi:
         return self._config
+
+    def parametro_inteiro(self, chave: str) -> int | None:
+        return self.parametros.get(chave)
 
 
 class RepassesEmMemoria:

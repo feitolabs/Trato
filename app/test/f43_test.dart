@@ -4,6 +4,7 @@ import 'package:trato/telas/pedido_novo/checklists_categoria.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/endereco_pedido.dart';
 
 FormularioPedido _formulario({
   required String categoria,
@@ -53,8 +54,8 @@ Future<void> _abrir(
   await tester.pumpAndSettle();
 }
 
-Future<void> _marcarRemotoEEnviar(WidgetTester tester) async {
-  await tester.tap(find.text('Remoto'));
+Future<void> _preencherEnderecoEEnviar(WidgetTester tester) async {
+  await preencherEnderecoDoPedido(tester);
   await tester.pumpAndSettle();
   await tester.tap(find.text('Enviar pedido'));
   await tester.pumpAndSettle();
@@ -180,7 +181,7 @@ void main() {
       // Texto livre permanece intacto no campo.
       expect(find.text('Porta da sala travou por dentro'), findsOneWidget);
 
-      await _marcarRemotoEEnviar(tester);
+      await _preencherEnderecoEEnviar(tester);
       // Reenvio não duplica os itens.
       await tester.tap(find.text('Enviar pedido'));
       await tester.pumpAndSettle();
@@ -203,7 +204,7 @@ void main() {
       await tester.tap(find.text('Corte de grama e limpeza'));
       await tester.pumpAndSettle();
 
-      await _marcarRemotoEEnviar(tester);
+      await _preencherEnderecoEEnviar(tester);
       expect(enviado, isNotNull);
       expect(enviado!.descricao, 'Itens selecionados: Corte de grama e limpeza.');
     });

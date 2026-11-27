@@ -4,7 +4,7 @@ import pytest
 from admin_ambiente import AGORA, PEDIDO, PROFISSIONAL, adm, cab  # noqa: F401
 
 from trato.api.admin.repositorios import FiltroAuditoria
-from trato.financeiro.ledger import CUSTODIA
+from trato.financeiro.ledger import CUSTODIA, registrar_cobranca, separar_custo_parcelamento
 from trato.pedidos.estados import Estado
 
 URL = f"/v1/admin/disputas/{PEDIDO}"
@@ -299,3 +299,27 @@ def test_acao_sensivel_devolve_o_numero_do_registro_de_auditoria(adm):
     assert numero == ultimo[0].id
     # leitura não gera registro: sem cabeçalho
     assert "x-auditoria-id" not in adm.cliente.get(URL, headers=cab("t-mediador")).headers
+
+
+@pytest.mark.parametrize(
+    "resultado,extra,devolvido",
+    [
+        ("reembolso_total", {}, 105_000),
+        ("reembolso_parcial", {"valor_cliente_centavos": 20_000}, 20_000),
+    ],
+)
+def test_parcelado_no_painel_o_total_devolve_o_custo_e_o_parcial_nao(
+    adm, resultado, extra, devolvido
+):
+    adm.semear_disputa()
+    livro = adm.contexto.ledger.livro
+    registrar_cobranca(livro, PEDIDO, 5_000, "cob-juros", AGORA)
+    adm.cobranca_paga(5_000)
+    separar_custo_parcelamento(livro, PEDIDO, 5_000, "cob-juros", AGORA)
+
+    r = decidir(adm, resultado, **extra)
+
+    assert r.status_code == 200, r.text
+    saldos = adm.contexto.ledger.saldos_pedido(PEDIDO, PROFISSIONAL.id)
+    assert saldos.cliente_pagou == 105_000 - devolvido
+    assert saldos.retido == 0

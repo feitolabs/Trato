@@ -226,7 +226,7 @@ void main() {
           expect(t.takeException(), isNull);
         });
 
-        testWidgets('Carteira avisa dos 50 Tratinhos ($r)', (t) async {
+        testWidgets('Carteira avisa dos Tratinhos, sem número fixo ($r)', (t) async {
           await _janela(t, tamanho, fonte);
           await t.pumpWidget(_app(const Scaffold(
               body: CarteiraTela(
@@ -235,7 +235,7 @@ void main() {
           await t.scrollUntilVisible(
               find.byKey(const Key('aviso-avaliar-cliente')), 200,
               scrollable: find.byType(Scrollable).first);
-          expect(find.text('Você ganha 50 Tratinhos ao avaliar um cliente.'),
+          expect(find.text('Você pode ganhar Tratinhos ao avaliar um cliente.'),
               findsOneWidget);
         });
       }

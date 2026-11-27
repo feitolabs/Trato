@@ -32,9 +32,11 @@ from trato.api.avisos import (
     avisar_orcamento_recebido,
     servicos_de_notificacao,
 )
+from trato.api.cautela import exigir_contato_livre
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.elogios import validar_etiquetas_elogio
 from trato.api.exclusividades import profissional_exclusivo
+from trato.api.maioridade import exigir_maioridade
 from trato.api.moedas import (
     TIPO_BONUS_PROFISSIONAL,
     bonus_avaliacao_disponivel,
@@ -45,7 +47,8 @@ from trato.api.moedas import (
     resumo_pendentes,
     saldo_profissional,
 )
-from trato.api.repositorios import EtapaProposta, ItemOrcamento
+from trato.api.moedas_saldo import creditos_validos
+from trato.api.repositorios import PRAZO_AVALIACAO_PADRAO_DIAS, EtapaProposta, ItemOrcamento
 from trato.api.repositorios_app import (
     NIVEIS_VERIFICACAO,
     TIPOS_DOCUMENTO,
@@ -53,6 +56,7 @@ from trato.api.repositorios_app import (
     DocumentoVerificacao,
 )
 from trato.api.servicos import carregar_pedido, eh_participante, garantia_minima_do_pedido
+from trato.api.validade import venceu
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.config import obter_config
 from trato.financeiro import periodo
@@ -158,6 +162,11 @@ class PagamentoValoresOut(BaseModel):
     )
     pago_centavos: int = Field(description="O que o ledger mostra como pago (webhook assinado).")
     pagamento_confirmado: bool
+    validade_ate: datetime | None = Field(
+        None,
+        description="Validade do orçamento aceito (Termos 5.2): depois dela não há cobrança. "
+        "Null: sem validade ou sem contrato.",
+    )
     pix_disponivel: bool | None = Field(
         None,
         description="O Pix pode ser oferecido agora (config `TRATO_PIX_HABILITADO`; padrão false). "
@@ -323,6 +332,10 @@ class AvaliacaoDadosOut(BaseModel):
         "e valor mínimo já considerados). O app só promete o bônus se for verdadeiro."
     )
     bonus_moedas: int = Field(0, description="Quantas moedas o bônus daria agora (0 se nenhuma).")
+    avaliar_ate: datetime | None = Field(
+        None, description="Último instante para avaliar (Termos 12.1); null sem data de conclusão."
+    )
+    prazo_encerrado: bool = Field(False, description="O prazo para avaliar já terminou.")
 
 
 class MoedaLancamentoOut(BaseModel):
@@ -332,7 +345,16 @@ class MoedaLancamentoOut(BaseModel):
     expira_em: datetime | None
 
 
+class CreditoMoedaOut(BaseModel):
+    moedas: int = Field(description="Tratinhos que ainda restam deste crédito.")
+    expira_em: datetime | None = None
+
+
 class MoedasOut(BaseModel):
+    creditos: list[CreditoMoedaOut] = Field(
+        default_factory=list,
+        description="Carteira do cliente por validade (13.4), na ordem em que serão usados.",
+    )
     saldo: int = Field(description="Tratinhos da carteira do CLIENTE (a do desconto).")
     saldo_profissional: int = Field(
         0, description="Tratinhos da carteira do PROFISSIONAL (nunca viram desconto)."
@@ -645,6 +667,7 @@ def meus_orcamentos(
 
 @router.post(
     "/pedidos/{pedido_id}/orcamentos",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=CriarOrcamentoOut,
     status_code=status.HTTP_201_CREATED,
     summary="Enviar orçamento para um pedido",
@@ -677,6 +700,7 @@ def enviar_orcamento(
 
     if not servico_mei(request).liberado(usuario.id):
         raise HTTPException(422, MENSAGEM_BLOQUEIO)
+    exigir_contato_livre(contexto, pedido, usuario.id)  # 9.6: o orçamento leva texto livre
 
     agora = contexto.agora()
     total_estimado = sum(int(i.quantidade * i.valor_unitario_centavos) for i in dados.itens)
@@ -684,6 +708,8 @@ def enviar_orcamento(
         raise HTTPException(422, "O valor total do orçamento precisa ser maior que zero.")
     if total_estimado > TETO_ORCAMENTO_CENTAVOS:
         raise HTTPException(422, "O valor total do orçamento não pode passar de R$ 500.000,00.")
+    if venceu(dados.validade_ate, agora):
+        raise HTTPException(422, "A validade do orçamento precisa ser uma data futura.")
     minima = garantia_minima_do_pedido(request, contexto, pedido.id)
     if dados.garantia_dias is not None and minima is not None and dados.garantia_dias < minima:
         raise HTTPException(
@@ -861,7 +887,9 @@ def valores_do_pagamento(
         opcoes = [
             OpcaoParcelamentoOut(**vars(o)) for o in servico.config().parcelamento.opcoes(total)
         ]
+    orcamento = contexto.orcamentos.detalhe(contrato.orcamento_id) if contrato else None
     return PagamentoValoresOut(
+        validade_ate=orcamento.validade_ate if orcamento else None,
         pedido_id=pedido.id,
         estado=pedido.estado.value,
         valor_centavos=contrato.valor_centavos if contrato else None,
@@ -1018,7 +1046,8 @@ def _mensagens_out(contexto: Contexto, conversa: str, usuario: Usuario) -> list[
     summary="Mensagens do pedido",
     description=(
         "Para o cliente, `profissional_id` escolhe a conversa (sem ele, vale o profissional "
-        "contratado). Antes da contratação, e-mail e telefone saem ocultos."
+        "contratado). Antes da contratação, e-mail e telefone saem ocultos; com o pagamento "
+        "confirmado, o telefone passa na conversa com o profissional contratado."
     ),
 )
 def listar_mensagens(
@@ -1196,6 +1225,7 @@ def enviar_mensagem(
     pedido = _pedido_visivel(contexto, pedido_id, usuario)
     _exigir_profissional_do_pedido(contexto, pedido, usuario)
     alvo = _profissional_da_conversa(contexto, request, pedido, usuario, profissional_id)
+    exigir_contato_livre(contexto, pedido, alvo)
     conversa = contexto.conversas.abrir(pedido.id, alvo)
     nova = contexto.conversas.enviar(conversa, usuario.id, corpo.texto)
     avisar_mensagem_nova(
@@ -1417,7 +1447,16 @@ def minhas_moedas(
         )
     except Exception:  # noqa: BLE001 - campos opcionais: o saldo não quebra por eles
         log.warning("dados extras das moedas indisponíveis", exc_info=True)
+    try:
+        creditos = [
+            CreditoMoedaOut(moedas=p.quantidade, expira_em=p.expira_em)
+            for p in creditos_validos(contexto.moedas.lancamentos_da_carteira(usuario.id), agora)
+        ]
+    except Exception:  # noqa: BLE001 - sem o dado, a tela segue com o saldo
+        log.warning("créditos por validade indisponíveis", exc_info=True)
+        creditos = []
     return MoedasOut(
+        creditos=creditos,
         saldo_vence_em=vence_em,
         teto_desconto_mes_centavos=cfg_moedas.teto_desconto_cliente_mes_centavos,
         desconto_usado_mes_centavos=usado_mes,
@@ -1475,9 +1514,31 @@ def dados_da_avaliacao(
             profissional_id=avaliado,
             valor_servico_centavos=contrato.valor_centavos if contrato else 0,
         )
+    ate, _ = _limite_para_avaliar(contexto, pedido)
+    encerrado = ate is not None and contexto.agora() > ate
+    if encerrado:
+        moedas = 0
     return AvaliacaoDadosOut(
-        pedido_id=pedido.id, ja_avaliou=ja, bonus_disponivel=moedas > 0, bonus_moedas=moedas
+        pedido_id=pedido.id,
+        ja_avaliou=ja,
+        bonus_disponivel=moedas > 0,
+        bonus_moedas=moedas,
+        avaliar_ate=ate,
+        prazo_encerrado=encerrado,
     )
+
+
+def _limite_para_avaliar(contexto: Contexto, pedido: Any) -> tuple[datetime | None, int]:
+    """(até quando dá para avaliar, prazo em dias). Sem a data da conclusão, não há limite.
+    Configuração ausente, ilegível ou não positiva vale o padrão."""
+    try:
+        dias = contexto.config.carregar().prazo_avaliacao_dias
+    except Exception:  # noqa: BLE001 - avaliar não depende de a configuração estar publicada
+        dias = PRAZO_AVALIACAO_PADRAO_DIAS
+    if dias <= 0:
+        dias = PRAZO_AVALIACAO_PADRAO_DIAS
+    concluido = pedido.concluido_em
+    return (concluido + timedelta(days=dias) if concluido else None), dias
 
 
 def _moedas_ja_dadas(contexto: Contexto, usuario: Usuario, pedido: Any, direcao: str) -> int:
@@ -1608,6 +1669,11 @@ def avaliar(
         # duplo toque (mesmo corpo): o mesmo sucesso, sem novo registro nem novo bônus
         resposta.status_code = 200
         return _avaliacao_out(repetida, _moedas_ja_dadas(contexto, usuario, pedido, direcao))
+    ate, dias = _limite_para_avaliar(contexto, pedido)
+    if ate is not None and contexto.agora() > ate:
+        raise HTTPException(
+            409, f"O prazo para avaliar ({dias} dias após a conclusão do pedido) terminou."
+        )
     nova = Avaliacao(
         pedido_id=pedido.id,
         direcao=direcao,

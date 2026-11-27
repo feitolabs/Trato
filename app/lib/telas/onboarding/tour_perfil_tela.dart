@@ -63,7 +63,7 @@ List<PaginaTour> paginasTourDoPerfil(PerfilUso perfil) => switch (perfil) {
             icone: Icons.star_outline,
             titulo: 'Ganhe Tratinhos',
             texto:
-                'Avalie seus clientes e ganhe Tratinhos. Use para ter 48 horas de exclusividade em um pedido.',
+                'Avalie seus clientes e ganhe Tratinhos.',
           ),
         ],
     };

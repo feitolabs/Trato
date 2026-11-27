@@ -9,6 +9,7 @@ import '../comuns/formato_aparelho.dart' show diaMesDoAparelho;
 import '../profissional_apoio/apoio.dart' show AvisoFaixa;
 import 'excluir_conta_tela.dart';
 import 'modelos.dart';
+import 'pedidos_lgpd_tela.dart';
 
 /// F5.13 — Central de privacidade (LGPD). Sem protótipo da tela; o item "Meus dados (LGPD)"
 /// do Perfil (tela 22) abre esta. Ver consentimentos, pedir cópia dos dados e excluir a conta.
@@ -229,7 +230,12 @@ class _CorpoState extends State<_Corpo> {
               for (final c in widget.itens)
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(c.titulo, style: TipografiaTrato.corpoForte),
+                  // Cor explícita: no consentimento obrigatório (interruptor travado) o título
+                  // não pode ficar apagado, mais fraco que a descrição.
+                  title: Text(
+                    c.titulo,
+                    style: TipografiaTrato.corpoForte.copyWith(color: context.cores.texto),
+                  ),
                   subtitle: Text(
                     c.descricao,
                     style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
@@ -243,6 +249,17 @@ class _CorpoState extends State<_Corpo> {
         const SizedBox(height: EspacosTrato.x5),
         Text('SEUS DIREITOS', style: TipografiaTrato.sobretitulo),
         const SizedBox(height: EspacosTrato.x3),
+        if (widget.servico case final PedidosDoTitular pedidos) ...[
+          BotaoSecundario(
+            key: const ValueKey('botao-pedidos-lgpd'),
+            texto: 'Meus pedidos sobre dados',
+            icone: Icons.assignment_outlined,
+            aoTocar: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => PedidosLgpdTela(servico: pedidos)),
+            ),
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
         BotaoSecundario(
           texto: 'Exportar meus dados',
           icone: Icons.download_outlined,

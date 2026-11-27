@@ -8,6 +8,9 @@ import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
+import 'campos_ao_usuario.dart';
+import 'campos_trava.dart';
+import 'medidas_modais.dart';
 
 /// F7.4 — busca de usuários e pedidos, suporte, categorias e cidades. Cada aba depende do papel.
 class BuscaTela extends StatelessWidget {
@@ -18,7 +21,6 @@ class BuscaTela extends StatelessWidget {
     final abas = <AbaTrato>[
       if (context.pode(Permissao.usuariosBuscar)) const AbaTrato('Usuários', conteudo: _AbaUsuarios()),
       if (context.pode(Permissao.pedidosBuscar)) const AbaTrato('Pedidos', conteudo: _AbaPedidos()),
-      if (context.pode(Permissao.suporteVer)) const AbaTrato('Suporte', conteudo: _AbaSuporte()),
       if (context.pode(Permissao.categoriasEditar)) const AbaTrato('Categorias', conteudo: _AbaCategorias()),
       if (context.pode(Permissao.categoriasEditar)) const AbaTrato('Cidades', conteudo: _AbaCidades()),
     ];
@@ -216,34 +218,71 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
     });
   }
 
+  bool _abrindoStatus = false;
+
   Future<void> _alterarStatus() async {
+    if (_abrindoStatus) return;
+    _abrindoStatus = true;
     final u = widget.usuario;
+    // Lido antes de mudar o status; se a leitura falhar, fica "não informado".
+    bool? trava;
+    try {
+      trava = (await context.api.detalheUsuario(u.id)).travaFraudeVigente;
+    } catch (_) {
+      trava = null;
+    }
+    _abrindoStatus = false;
+    if (!mounted) return;
+    final avisoDaTrava = avisoAoAtivar(trava);
     var novo = u.status;
-    final r = await pedirFormulario<(String, String)>(
+    final aviso = CamposAoUsuario();
+    // Voltar para ativo só reverte medidas: o servidor não usa texto ao usuário nesse caso.
+    bool criaMedida() => novo != 'ativo' && novo != u.status;
+    final r = await pedirFormulario<(String, String, String?, List<String>)>(
       context,
       titulo: 'Alterar status de ${u.nome}?',
       consequencia: 'Restrito limita as atividades; bloqueado nega o acesso. Pedidos em andamento não são cancelados.',
       rotuloConfirmar: 'Alterar status',
-      campos: (ctx, rebuild) => SeletorTrato<String>(
-        rotulo: 'Novo status',
-        valor: novo,
-        opcoes: const [
-          ('ativo', 'Ativo (acesso normal)'),
-          ('restrito', 'Restrito (atividades limitadas)'),
-          ('bloqueado', 'Bloqueado (acesso negado)'),
+      rotuloMotivo: 'Motivo interno (o usuário não vê)',
+      campos: (ctx, rebuild) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SeletorTrato<String>(
+            rotulo: 'Novo status',
+            valor: novo,
+            opcoes: const [
+              ('ativo', 'Ativo (acesso normal)'),
+              ('restrito', 'Restrito (atividades limitadas)'),
+              ('bloqueado', 'Bloqueado (acesso negado)'),
+            ],
+            aoMudar: (v) {
+              novo = v;
+              rebuild();
+            },
+          ),
+          if (novo == 'ativo' && novo != u.status && avisoDaTrava != null) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            BannerInfo(avisoDaTrava, tom: Tom.alerta),
+          ],
+          if (criaMedida()) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            CamposAoUsuarioForm(aviso, aoMudar: rebuild),
+          ],
         ],
-        aoMudar: (v) {
-          novo = v;
-          rebuild();
-        },
       ),
-      camposValidos: () => novo != u.status,
-      resultado: (motivo) => (novo, motivo),
+      camposValidos: () => novo != u.status && (!criaMedida() || aviso.valido),
+      resultado: (motivo) => (
+        novo,
+        motivo,
+        criaMedida() ? aviso.motivo : null,
+        criaMedida() ? aviso.clausulas : const <String>[],
+      ),
     );
     if (r == null || !mounted) return;
     final ok = await executar(
       context,
-      () => context.api.alterarStatusUsuario(u.id, status: r.$1, motivo: r.$2),
+      () => context.api.alterarStatusUsuario(u.id,
+          status: r.$1, motivo: r.$2, motivoUsuario: r.$3, clausulas: r.$4),
       sucesso: 'Status alterado para ${_chipStatusUsuario(r.$1).$1.toLowerCase()}.',
     );
     if (ok) await widget.aoMudar();
@@ -346,6 +385,15 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
                   BotaoTrato.secundario('Revelar dados pessoais', aoPressionar: _revelar, icone: IconesTrato.revelar),
                 if (context.pode(Permissao.usuariosStatus))
                   BotaoTrato.secundario('Alterar status', aoPressionar: _alterarStatus),
+                if (context.pode(Permissao.medidasAplicar) && d.tipo != 'Equipe')
+                  BotaoTrato.secundario(
+                    'Aplicar medida',
+                    aoPressionar: () async {
+                      if (await abrirAplicarMedida(context, usuarioId: d.id, usuarioNome: d.nome)) {
+                        await widget.aoMudar();
+                      }
+                    },
+                  ),
                 if (d.tipo == 'Profissional' && context.pode(Permissao.relatoriosExportar))
                   BotaoTrato.secundario('Extrato em PDF', aoPressionar: _extrato, icone: Icons.picture_as_pdf_outlined),
               ],
@@ -583,48 +631,6 @@ class _AbaPedidos extends StatelessWidget {
 }
 
 // =============================================================================================
-// SUPORTE
-// =============================================================================================
-
-class _AbaSuporte extends StatelessWidget {
-  const _AbaSuporte();
-
-  @override
-  Widget build(BuildContext context) {
-    return CarregaDados<List<Chamado>>(
-      carregar: context.api.listarChamados,
-      estaVazio: (l) => l.isEmpty,
-      mensagemVazia: 'Nenhum chamado aberto.',
-      detalheVazio:
-          'Sem fila de chamados no painel no piloto (atendimento via suporte externo ou disputas).',
-      construir: (context, lista, _) => ListaPaginada<Chamado>(
-        itens: lista,
-        rotuloBusca: 'Buscar chamado',
-        rotuloItens: 'chamados',
-        textoBusca: (c) => '${c.id} ${c.assunto} ${c.solicitante}',
-        construirItem: (context, c) => CartaoLista(
-          titulo: '${c.id} · ${c.assunto}',
-          linhas: [
-            '${c.solicitante} · aberto em ${formatarData(c.aberto)}',
-            [
-              c.responsavel == null ? 'Sem responsável' : 'Responsável ${c.responsavel}',
-              if (c.prazo != null) 'prazo ${formatarData(c.prazo!)}',
-            ].join(' · '),
-          ],
-          chips: [
-            ChipEstado(c.status == 'aberto' ? 'Aberto' : 'Em atendimento', tom: c.status == 'aberto' ? Tom.alerta : Tom.info),
-            ChipEstado(
-              switch (c.prioridade) { 'alta' => 'Prioridade alta', 'baixa' => 'Prioridade baixa', _ => 'Prioridade normal' },
-              tom: c.prioridade == 'alta' ? Tom.erro : Tom.neutro,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================================
 // CATEGORIAS
 // =============================================================================================
 
@@ -639,7 +645,6 @@ class _AbaCategorias extends StatelessWidget {
       () => context.api.criarCategoria(
         nome: dados.nome,
         garantiaDias: dados.garantiaDias,
-        aceitaRemoto: dados.aceitaRemoto,
         motivo: dados.motivo,
       ),
       sucesso: 'Categoria "${dados.nome}" criada.',
@@ -661,7 +666,6 @@ class _AbaCategorias extends StatelessWidget {
         c.id,
         nome: dados.nome,
         garantiaDias: dados.garantiaDias,
-        aceitaRemoto: dados.aceitaRemoto,
         motivo: dados.motivo,
       ),
       sucesso: 'Categoria atualizada.',
@@ -738,8 +742,8 @@ class _AbaCategorias extends StatelessWidget {
               ChipEstado(c.ativa ? 'Ativa' : 'Inativa', tom: c.ativa ? Tom.ok : Tom.neutro),
               const SizedBox(width: EspacosTrato.x2),
               ChipEstado(
-                c.aceitaRemoto ? 'Presencial e remoto' : 'Só presencial',
-                tom: c.aceitaRemoto ? Tom.info : Tom.neutro,
+                c.aceitaRemoto ? 'Remoto marcado' : 'Só presencial',
+                tom: c.aceitaRemoto ? Tom.alerta : Tom.neutro,
               ),
             ],
           ),
@@ -774,10 +778,9 @@ class _AbaCategorias extends StatelessWidget {
 }
 
 class _DadosCategoria {
-  const _DadosCategoria(this.nome, this.garantiaDias, this.aceitaRemoto, this.motivo);
+  const _DadosCategoria(this.nome, this.garantiaDias, this.motivo);
   final String nome;
   final int? garantiaDias;
-  final bool aceitaRemoto;
   final String motivo;
 }
 
@@ -788,7 +791,6 @@ Future<_DadosCategoria?> _formCategoria(
 }) {
   final nome = TextEditingController(text: existente?.nome ?? '');
   final garantia = TextEditingController(text: existente?.garantiaDias?.toString() ?? '');
-  var aceitaRemoto = existente?.aceitaRemoto ?? false;
 
   /// RN-02: nome único, sem diferenciar maiúsculas e acentos.
   String? erroNome() {
@@ -833,15 +835,10 @@ Future<_DadosCategoria?> _formCategoria(
           contentPadding: EdgeInsets.zero,
           title: const Text('Aceita atendimento remoto'),
           subtitle: const Text(
-            'Desligado: só presencial, com endereço obrigatório (padrão). Ligado: o cliente '
-            'escolhe entre presencial e remoto, e o remoto não pede endereço. Use em serviços '
-            'como design, desenvolvimento e arquitetura.',
+            'Desativado: o Trato não tem serviço remoto (Termos 3.7). O valor já gravado não é alterado ao salvar.',
           ),
-          value: aceitaRemoto,
-          onChanged: (v) {
-            aceitaRemoto = v;
-            rebuild();
-          },
+          value: existente?.aceitaRemoto ?? false,
+          onChanged: null,
         ),
       ],
     ),
@@ -849,7 +846,6 @@ Future<_DadosCategoria?> _formCategoria(
     resultado: (motivo) => _DadosCategoria(
       nome.text.trim(),
       int.tryParse(garantia.text.trim()),
-      aceitaRemoto,
       motivo,
     ),
   );

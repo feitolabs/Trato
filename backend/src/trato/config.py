@@ -45,6 +45,8 @@ class Config(BaseSettings):
     supabase_jwks_url: str = ""
     # Segredo do servidor para os códigos de check-in/check-out (nunca vai ao banco em claro).
     trato_codigo_segredo: SecretStr = SecretStr("")
+    # Pepper (segredo) para HMAC-SHA256 de impedimento de cadastro (Termos 20.9).
+    conta_impedimento_pepper: SecretStr = SecretStr("")
 
     # fake (padrão) | stripe (modo teste). Ver `trato.pagamentos.montagem`.
     trato_provedor_pagamento: str = "fake"

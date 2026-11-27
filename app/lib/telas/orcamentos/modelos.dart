@@ -27,6 +27,7 @@ class ItemOrcamento {
 class DetalheOrcamento {
   const DetalheOrcamento({
     required this.validoAte,
+    this.venceEm,
     required this.itens,
     required this.notaMaterial,
     required this.agendaTitulo,
@@ -47,6 +48,9 @@ class DetalheOrcamento {
 
   /// Ex.: "31/10" (a barra mostra "Válido até 31/10").
   final String validoAte;
+
+  /// Instante exato da validade. Nulo: sem validade informada.
+  final DateTime? venceEm;
   final List<ItemOrcamento> itens;
 
   /// Texto pronto do total de horas ("5,5 h"); vazio se o orçamento não é por hora.

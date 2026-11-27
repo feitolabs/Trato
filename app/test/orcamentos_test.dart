@@ -237,7 +237,8 @@ void main() {
       expect(recebido!.endereco!.paraJson()['cep'], '35500-000');
     });
 
-    testWidgets('categoria que aceita remoto: escolhe remoto e não pede endereço', (tester) async {
+    testWidgets('mesmo em categoria que aceita remoto, não há opção remota (Termos 3.7)',
+        (tester) async {
       RascunhoPedido? recebido;
       await _abrir(
         tester,
@@ -246,18 +247,12 @@ void main() {
           aoEnviar: (r) => recebido = r,
         ),
       );
-      expect(find.text('Como será o serviço?'), findsOneWidget);
-      expect(find.text('Presencial'), findsOneWidget);
-      expect(find.text('Remoto'), findsOneWidget);
-      expect(find.text('Endereço do serviço'), findsOneWidget); // padrão: presencial
+      expect(find.text('Como será o serviço?'), findsNothing);
+      expect(find.text('Remoto'), findsNothing);
+      expect(find.text('Endereço do serviço'), findsOneWidget);
 
-      await _tocar(tester, find.text('Remoto'));
-      expect(find.text('Endereço do serviço'), findsNothing);
       await _tocar(tester, find.text('Enviar pedido'));
-
-      expect(recebido, isNotNull);
-      expect(recebido!.modalidade, Modalidade.remoto);
-      expect(recebido!.endereco, isNull);
+      expect(recebido, isNull); // sem endereço não envia
     });
 
     testWidgets('categoria que aceita remoto continua exigindo endereço no presencial',

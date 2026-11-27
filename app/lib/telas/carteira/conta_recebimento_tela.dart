@@ -59,7 +59,7 @@ class _ContaRecebimentoTelaState extends State<ContaRecebimentoTela> {
 
   static const _tiposPix = <String, String>{
     'cpf': 'CPF (titular)',
-    'cnpj': 'CNPJ',
+    'cnpj': 'CNPJ do MEI',
     'email': 'E-mail',
     'telefone': 'Celular com DDD',
     'aleatoria': 'Chave aleatória',

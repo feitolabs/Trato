@@ -233,7 +233,6 @@ void main() {
           CalculadoraOrcamentoTela(
             servico: ServicoOrcamentoFake(),
             tituloPedido: 'Trocar tomada',
-            mostrarForaDoEscopo: true,
             foraDoEscopoInicial: inicial,
           ),
         );
@@ -243,7 +242,7 @@ void main() {
             .descendant(
               of: find
                   .ancestor(
-                    of: find.text('Fora do escopo (opcional)'),
+                    of: find.text('O que não está incluído'),
                     matching: find.byType(Column),
                   )
                   .first,

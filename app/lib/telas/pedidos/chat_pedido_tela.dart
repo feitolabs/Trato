@@ -7,6 +7,7 @@ import '../../dados/erros.dart';
 import '../../dados/estado_conexao.dart';
 import '../../dados/repositorios.dart' show ResumoPerfilCliente;
 import '../../tema/tema.dart';
+import '../comuns/orcamento_vencido.dart';
 import '../comuns/denuncia_folha.dart' show MenuDenunciar;
 import '../comuns/formato_aparelho.dart';
 import 'modelos.dart';
@@ -406,6 +407,23 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     );
   }
 
+  /// Orçamentos que o servidor recusou por validade, com o texto dele.
+  final _vencidos = <String, String>{};
+
+  Future<void> _aceitarProposta(
+    ContrapropostaChat prop,
+    Future<void> Function(ContrapropostaChat) aceitar,
+  ) async {
+    try {
+      await aceitar(prop);
+    } on ErroTrato catch (e) {
+      if (!ehOrcamentoVencido(e)) rethrow;
+      if (mounted) setState(() => _vencidos[prop.orcamentoId] = e.mensagem);
+      return;
+    }
+    await _sincronizar();
+  }
+
   Widget _buildLinha(
     int indice,
     MensagemChat m,
@@ -423,21 +441,16 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
 
     return _LinhaMensagem(
       mensagem: m,
-      aguardandoConexao: _aguardando.containsKey(m) ||
-          (_emEnvio.contains(m) && !EstadoConexao.online.value),
+      aguardandoConexao:
+          _aguardando.containsKey(m) || (_emEnvio.contains(m) && !EstadoConexao.online.value),
       podeAceitarProposta: podeAceitar,
       aoAceitarContraproposta: widget.aoAceitarContraproposta == null
           ? null
-          : (prop) async {
-              await widget.aoAceitarContraproposta!(prop);
-              await _sincronizar();
-            },
+          : (prop) => _aceitarProposta(prop, widget.aoAceitarContraproposta!),
       aoAceitarProposta: widget.aoAceitarProposta == null
           ? null
-          : (prop) async {
-              await widget.aoAceitarProposta!(prop);
-              await _sincronizar();
-            },
+          : (prop) => _aceitarProposta(prop, widget.aoAceitarProposta!),
+      orcamentoVencido: c == null ? null : _vencidos[c.orcamentoId],
       aoAceitarAgenda: widget.aoAceitarAgenda == null
           ? null
           : (msg) async {
@@ -672,7 +685,11 @@ class _LinhaMensagem extends StatelessWidget {
     this.aoAceitarContraproposta,
     this.aoAceitarProposta,
     this.aoAceitarAgenda,
+    this.orcamentoVencido,
   });
+
+  /// Aviso no lugar dos botões da proposta de um orçamento vencido.
+  final String? orcamentoVencido;
 
   final MensagemChat mensagem;
   final bool podeAceitarProposta;
@@ -779,7 +796,16 @@ class _LinhaMensagem extends StatelessWidget {
                     aoTocar: () => aoAceitarAgenda!(mensagem),
                   ),
                 ],
-                if (prop != null && !minha) ...[
+                if (prop != null && !minha && orcamentoVencido != null) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  Text(
+                    orcamentoVencido!,
+                    key: const ValueKey('proposta-vencida'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(
+                      color: context.cores.vermelhoTexto,
+                    ),
+                  ),
+                ] else if (prop != null && !minha) ...[
                   if (prop.ehPropostaDoProfissional && aoAceitarProposta != null) ...[
                     const SizedBox(height: EspacosTrato.x3),
                     _BotaoProposta(
@@ -939,7 +965,11 @@ class _CampoEnvio extends StatelessWidget {
               IconButton.filled(
                 tooltip: 'Enviar',
                 onPressed: aoEnviar,
-                icon: const Icon(Icons.arrow_forward),
+                style: IconButton.styleFrom(
+                  backgroundColor: context.cores.petroleo,
+                  foregroundColor: context.cores.sobrePetroleo,
+                ),
+                icon: Icon(Icons.arrow_forward, color: context.cores.sobrePetroleo),
               ),
             ],
           ),

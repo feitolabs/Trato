@@ -11,8 +11,6 @@ import 'package:trato/dados/repositorios.dart';
 import 'package:trato/dados/repositorios_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/dados/sessao_expirada.dart';
-import 'package:trato/dispositivo/localizacao_do_pedido.dart';
-import 'package:trato/dispositivo/servico_localizacao.dart';
 import 'package:trato/componentes/componentes.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
@@ -77,17 +75,12 @@ PedidoAbertoTela _pedidoAberto({String? categoria, bool remoto = false, int orca
     );
 
 void main() {
-  group('T1: formulário remoto sem o cartão de cidade/endereço', () {
-    testWidgets('remoto esconde o cartão e o aviso; presencial mostra', (tester) async {
+  group('T1: sem pedido remoto no formulário (Termos 3.7)', () {
+    testWidgets('categoria que aceita remoto mostra só o endereço', (tester) async {
       await _abrir(tester, NovoPedidoTela(formulario: _formulario()));
-      expect(find.text('Belo Horizonte · MG'), findsOneWidget); // presencial (padrão)
+      expect(find.text('Remoto'), findsNothing);
+      expect(find.text('Belo Horizonte · MG'), findsOneWidget);
       expect(find.textContaining('só aparece para o profissional contratado'), findsOneWidget);
-
-      await tester.tap(find.text('Remoto'));
-      await tester.pumpAndSettle();
-      expect(find.text('Belo Horizonte · MG'), findsNothing);
-      expect(find.textContaining('só aparece para o profissional contratado'), findsNothing);
-      expect(find.text('Seu endereço atual'), findsNothing);
     });
   });
 
@@ -126,12 +119,9 @@ void main() {
     });
   });
 
-  group('T3: permissão de localização no envio', () {
-    tearDown(LocalizacaoDoPedido.zerar);
-
-    (RepositorioPedidosApi, List<String>, List<int>) repo() {
+  group('T3: sem localização no envio (Termos 14.12)', () {
+    (RepositorioPedidosApi, List<String>) repo() {
       final corpos = <String>[];
-      final posicaoChamadas = <int>[];
       final api = ClienteApi(
         urlBase: 'https://api.teste',
         sessao: SessaoTrato()..entrar('t'),
@@ -151,17 +141,7 @@ void main() {
           );
         }),
       );
-      return (
-        RepositorioPedidosApi(
-          api,
-          posicao: () async {
-            posicaoChamadas.add(1);
-            return const PosicaoAtual(latitude: -19.9, longitude: -43.9, precisaoMetros: 10);
-          },
-        ),
-        corpos,
-        posicaoChamadas,
-      );
+      return (RepositorioPedidosApi(api), corpos);
     }
 
     RascunhoPedido rascunho(Modalidade m) => RascunhoPedido(
@@ -177,31 +157,19 @@ void main() {
           bairro: 'Savassi',
         );
 
-    test('pedido remoto não pede a localização; presencial pede', () async {
-      final (r, corpos, chamadas) = repo();
+    test('nem o pedido presencial nem o remoto mandam posição', () async {
+      final (r, corpos) = repo();
       await r.criar(rascunho(Modalidade.remoto));
-      expect(chamadas, isEmpty);
-      expect(corpos.single, isNot(contains('local_aprox_lat')));
-
       await r.criar(rascunho(Modalidade.presencial));
-      expect(chamadas, hasLength(1));
+      expect(corpos, hasLength(2));
+      for (final corpo in corpos) {
+        expect(corpo, isNot(contains('local_aprox')));
+      }
     });
 
-    test('depois de 2 negações o app para de perguntar', () {
-      expect(LocalizacaoDoPedido.naoPerguntarMais, isFalse);
-      LocalizacaoDoPedido.registrarNegacao();
-      expect(LocalizacaoDoPedido.naoPerguntarMais, isFalse);
-      LocalizacaoDoPedido.registrarNegacao();
-      expect(LocalizacaoDoPedido.naoPerguntarMais, isTrue);
-    });
-
-    testWidgets('com 2 negações, o formulário presencial mostra a linha discreta', (tester) async {
+    testWidgets('o formulário presencial não fala em localização', (tester) async {
       await _abrir(tester, NovoPedidoTela(formulario: _formulario(remoto: false)));
-      expect(find.byKey(const ValueKey('sem-localizacao')), findsNothing);
-      LocalizacaoDoPedido.registrarNegacao();
-      LocalizacaoDoPedido.registrarNegacao();
-      await tester.pump();
-      expect(find.text('Sem localização: o profissional vê só o bairro.'), findsOneWidget);
+      expect(find.textContaining('localização', skipOffstage: false), findsNothing);
     });
   });
 
@@ -276,6 +244,5 @@ void main() {
     );
     expect(find.text('Preciso de ajuda com a planilha'), findsOneWidget);
     expect(find.text('Pedido #5577 · aberto em 21/11'), findsOneWidget);
-    expect(find.byKey(const ValueKey('descricao-do-pedido')), findsOneWidget);
   });
 }

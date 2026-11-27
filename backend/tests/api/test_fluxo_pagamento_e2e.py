@@ -464,7 +464,7 @@ def test_parcelado_desligado_sem_tabela_de_custo(fluxo: Fluxo):
     assert pix.status_code == 422
 
 
-def test_parcelado_repassa_o_custo_do_provedor_e_ele_nao_volta(fluxo: Fluxo):
+def test_parcelado_repassa_o_custo_e_ele_volta_no_cancelamento(fluxo: Fluxo):
     """Com a tabela preenchida (valores de TESTE, não do provedor), o custo é repassado ao cliente."""
     from trato.pagamentos.parcelamento import ConfigParcelamento
 
@@ -483,7 +483,8 @@ def test_parcelado_repassa_o_custo_do_provedor_e_ele_nao_volta(fluxo: Fluxo):
     fluxo.agendar(pid)
     assert fluxo.acao(pid, "cancelar", "t-cliente", {"motivo": "x"}).status_code == 200
     saldo = fluxo.saldo(pid)
-    assert saldo["cliente_pagou_centavos"] == 2_000  # o serviço voltou; o custo do parcelado não
+    assert saldo["cliente_pagou_centavos"] == 0  # Termos 7.4: volta o valor pago, com o parcelado
+    assert _taxa_trato(fluxo, pid) == 0
 
 
 # --- disputa -----------------------------------------------------------------------------------

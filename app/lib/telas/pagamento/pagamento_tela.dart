@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../comuns/textos_dos_termos.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
+import '../comuns/orcamento_vencido.dart';
 import '../auth/validacao.dart';
 import '../profissional/dinheiro.dart';
 import '../comuns/desconto_moedas.dart';
+import '../comuns/nota_preco.dart';
 import '../comuns/moeda_trato.dart';
 import 'modelos.dart';
 
@@ -22,7 +25,11 @@ class PagamentoTela extends StatefulWidget {
     this.aoVoltar,
     this.aoCadastrarCpf,
     this.aoTentarNovamente,
+    this.aoMarcarExecucaoImediata,
   });
+
+  /// Termos 7.3: com o retorno, aparece a caixa (nunca vem marcada).
+  final ValueChanged<bool>? aoMarcarExecucaoImediata;
 
   final DadosPagamento dados;
   final dynamic Function(MetodoPagamento)? aoPagar;
@@ -63,6 +70,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   int _parcelas = 1;
   final _cupomCtrl = TextEditingController();
   var _pagando = false;
+  var _execucaoImediata = false;
   var _aplicandoCupom = false;
   var _usarMoedas = false;
   var _trocandoMoedas = false;
@@ -71,11 +79,23 @@ class _PagamentoTelaState extends State<PagamentoTela> {
   String? _erroMoedas;
   String? _erroPagamento;
 
+  /// Orçamento vencido (já na abertura, pela data do servidor, ou na recusa dele): o pagamento
+  /// deixa de ser oferecido.
+  late String? _orcamentoVencido = _vencidoNaAbertura(widget.dados);
+
+  /// Pagamento já feito ou em confirmação segue como o servidor informa.
+  static String? _vencidoNaAbertura(DadosPagamento d) {
+    final ate = d.validadeAte;
+    if (ate == null || d.pagoOuEmConfirmacao || ate.isAfter(DateTime.now())) return null;
+    return textoOrcamentoVencido;
+  }
+
   @override
   void didUpdateWidget(covariant PagamentoTela oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.dados != oldWidget.dados) {
       _dados = widget.dados;
+      _orcamentoVencido ??= _vencidoNaAbertura(widget.dados);
       _metodo ??= _metodoInicial(_dados);
       if (_parcelas > 1 && !_dados.parcelamento.any((p) => p.parcelas == _parcelas)) {
         _parcelas = 1;
@@ -248,7 +268,14 @@ class _PagamentoTelaState extends State<PagamentoTela> {
       }
     } on ErroTrato catch (e) {
       // Quem chama (rotas.dart) já trata os erros dele; o que chegar até aqui aparece na tela.
-      if (mounted) setState(() => _erroPagamento = e.mensagem);
+      if (!mounted) return;
+      setState(() {
+        if (ehOrcamentoVencido(e)) {
+          _orcamentoVencido = e.mensagem;
+        } else {
+          _erroPagamento = e.mensagem;
+        }
+      });
     } on Object {
       if (mounted) setState(() => _erroPagamento = 'Não deu para pagar agora. Tente de novo.');
     } finally {
@@ -340,6 +367,15 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                     ),
                     const SizedBox(height: EspacosTrato.x3),
                     Text(valor, style: TipografiaTrato.marcaPequena.copyWith(fontSize: 36)),
+                    // Só mostra a validade que o servidor informa; quem recusa vencido é ele.
+                    if (dados.validadeAte ?? widget.dados.validadeAte case final ate?) ...[
+                      const SizedBox(height: EspacosTrato.x1),
+                      Text(
+                        textoOrcamentoValidoAte(ate),
+                        key: const Key('validade-orcamento'),
+                        style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.texto),
+                      ),
+                    ],
                     if (dados.rotuloValor != null) ...[
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
@@ -362,6 +398,17 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                     if (widget.aoAlternarMoedas != null &&
                         (dados.moedasSaldo > 0 || _usarMoedas)) ...[
                       const SizedBox(height: EspacosTrato.x4),
+                      Text(
+                        textoLimiteDoDesconto(
+                          widget.dados.tetoDescontoMesCentavos,
+                          widget.dados.descontoUsadoMesCentavos,
+                        ),
+                        key: const Key('limite-tratinhos'),
+                        style: TipografiaTrato.corpoPequeno.copyWith(
+                          color: context.cores.textoSecundario,
+                        ),
+                      ),
+                      const SizedBox(height: EspacosTrato.x2),
                       if (!dados.descontoDisponivel && !_usarMoedas)
                         _CartaoMoedasIndisponivel(
                           mensagem: mensagemDescontoIndisponivel(
@@ -419,6 +466,8 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         color: context.cores.textoSecundario,
                       ),
                     ),
+                    const SizedBox(height: EspacosTrato.x2),
+                    const NotaPrecoComTributos(),
                     const SizedBox(height: EspacosTrato.x6),
                     Text('Como você quer pagar?', style: TipografiaTrato.corpoForte),
                     const SizedBox(height: EspacosTrato.x3),
@@ -505,6 +554,36 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                       ),
                       const SizedBox(height: EspacosTrato.x3),
                     ],
+                    if (widget.aoMarcarExecucaoImediata != null) ...[
+                      CartaoTrato(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CheckboxListTile(
+                              key: const Key('execucao-imediata'),
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              value: _execucaoImediata,
+                              onChanged: _pagando
+                                  ? null
+                                  : (v) {
+                                      setState(() => _execucaoImediata = v ?? false);
+                                      widget.aoMarcarExecucaoImediata!(_execucaoImediata);
+                                    },
+                              title: Text(
+                                'Quero que o serviço seja executado antes do fim dos 7 dias',
+                                style: TipografiaTrato.corpoForte,
+                              ),
+                            ),
+                            Text(
+                              textoExecucaoImediata,
+                              style: TipografiaTrato.corpoPequeno
+                                  .copyWith(color: context.cores.textoSecundario),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: EspacosTrato.x3),
                     CartaoTrato(
                       child: Column(
@@ -568,11 +647,28 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         ),
                         const SizedBox(height: EspacosTrato.x2),
                       ],
-                      BotaoPrimario(
-                        texto: 'Pagar $valor $comoPagar',
-                        carregando: _pagando,
-                        aoTocar: _pagando ? null : _pagar,
-                      ),
+                      if (_orcamentoVencido != null) ...[
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _orcamentoVencido!,
+                            key: const Key('pagamento-orcamento-vencido'),
+                            textAlign: TextAlign.center,
+                            style: TipografiaTrato.corpoPequeno
+                                .copyWith(color: context.cores.vermelhoTexto),
+                          ),
+                        ),
+                        const SizedBox(height: EspacosTrato.x2),
+                        BotaoSecundario(
+                          texto: 'Voltar',
+                          aoTocar: widget.aoVoltar ?? () => Navigator.maybePop(context),
+                        ),
+                      ] else
+                        BotaoPrimario(
+                          texto: 'Pagar $valor $comoPagar',
+                          carregando: _pagando,
+                          aoTocar: _pagando ? null : _pagar,
+                        ),
                     ],
                   ),
                 ),

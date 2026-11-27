@@ -2,8 +2,10 @@
 
 Alertas com severidade, tipo, usuário, pedido, status (em aberto, em análise, resolvido) e
 responsável. Resolver exige motivo e resultado. Travar saques e Bloqueio preventivo exigem motivo e
-têm ação contrária (destravar, desbloquear), também com motivo. Os limites de detecção vêm de
-Configurações: sem limite aprovado, nada é detectado (nenhum número fica escrito no código).
+têm ação contrária (destravar, desbloquear), também com motivo. Atenção: só a trava POR FRAUDE
+(com limite e data final) adia a liberação no livro; pagamento manual ou no Stripe não é bloqueado.
+Os limites de detecção
+vêm de Configurações: sem limite aprovado, nada é detectado (nenhum número fica escrito no código).
 """
 
 from __future__ import annotations
@@ -11,9 +13,16 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool, StrictInt
 
-from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
+from trato.api import medidas
+from trato.api.admin.contexto import (
+    AdminContexto,
+    Operador,
+    exigir,
+    obter_admin,
+    proteger_conta_da_equipe,
+)
 from trato.api.admin.papeis import Permissao
 from trato.api.contexto import Contexto, obter_contexto
 from trato.persistencia.comum import como_uuid
@@ -27,6 +36,9 @@ class AlertaRiscoOut(BaseModel):
     usuario_nome: str | None = None
     usuario_tipo: str | None = None
     usuario_status: str | None = None
+    trava_fraude_vigente: bool = Field(
+        False, description="Há trava de saque por fraude em vigor para este usuário (20.6)."
+    )
     pedido_id: str | None = None
     pedido_numero: int | None = None
     tipo: str
@@ -42,6 +54,27 @@ class AlertaRiscoOut(BaseModel):
 class AcaoRiscoIn(BaseModel):
     usuario_id: str
     motivo: str = Field(min_length=10, max_length=500)
+    motivo_usuario: str | None = Field(None, max_length=2000, description="O usuário lê (20.4).")
+    clausulas: list[str] = Field(default_factory=list, max_length=20)
+
+
+# ação antiga -> (tipo da medida criada, tipos que ela encerra)
+_MEDIDA_DA_ACAO = {
+    "risco.bloqueio_preventivo": ("bloqueio_preventivo", ()),
+    "risco.desbloqueio": ("", ("bloqueio_preventivo", "suspensao", "encerramento")),
+    "risco.saque_travado": ("trava_saque", ()),
+    "risco.saque_destravado": ("", ("trava_saque",)),
+}
+
+
+class TravarSaqueIn(AcaoRiscoIn):
+    motivo_fraude: StrictBool = False
+    limite_retencao_centavos: StrictInt | None = Field(
+        None, gt=0, le=10**12, description="Obrigatório com fraude: o prejuízo apurado."
+    )
+    dias: StrictInt | None = Field(
+        None, ge=1, le=90, description="Com fraude, sem este campo vale o prazo máximo (30)."
+    )
 
 
 class ResolverAlertaIn(BaseModel):
@@ -94,7 +127,7 @@ def _detectar_valores_atipicos(con: Any) -> None:
         select p.id, p.cliente_id,
                coalesce(c.valor_total_centavos, p.faixa_preco_max_centavos, 0) as valor
         from public.pedidos p
-        left join public.contratos c on c.pedido_id = p.id
+        left join public.contratos c on c.pedido_id = p.id and c.status <> 'cancelado'
         where coalesce(c.valor_total_centavos, p.faixa_preco_max_centavos, 0) > %s
           and not exists (select 1 from public.alertas_risco a
                           where a.pedido_id = p.id and a.tipo = 'valor_atipico')
@@ -154,6 +187,9 @@ def listar_alertas(
             LIMIT 200
             """
         ).fetchall()
+    com_trava = contexto.medidas.usuarios_com_trava_fraude(
+        [str(r["usuario_id"]) for r in linhas if r["usuario_id"]], contexto.agora()
+    )
     return [
         AlertaRiscoOut(
             id=str(r["id"]),
@@ -161,6 +197,7 @@ def listar_alertas(
             usuario_nome=r["usuario_nome"],
             usuario_tipo=r["usuario_tipo"],
             usuario_status=r["usuario_status"],
+            trava_fraude_vigente=str(r["usuario_id"]).replace("-", "") in com_trava,
             pedido_id=str(r["pedido_id"]) if r["pedido_id"] else None,
             pedido_numero=r["pedido_numero"],
             tipo=r["tipo"],
@@ -248,6 +285,48 @@ def resolver_alerta(
     return {"mensagem": "Alerta resolvido com sucesso."}
 
 
+_SEM_BLOQUEIO = (
+    "Atenção: a liberação e os repasses NÃO são bloqueados automaticamente; confira à mão."
+)
+
+
+def _trava_registrada(contexto: Contexto, usuario_id: str) -> bool:
+    """Já há trava de analista, sem data final, em vigor (repetir não cria outra)."""
+    if not contexto.medidas.disponivel():
+        return False
+    vigentes, _ = contexto.medidas.listar(
+        usuario_id=usuario_id, tipo="trava_saque", vigentes_em=contexto.agora()
+    )
+    return any(m.origem == "analista" and m.fim_em is None for m in vigentes)
+
+
+def _resposta(
+    acao: str, nome: str, status: str, medida_registrada: bool, retido: int | None = None
+) -> str:
+    if acao == "risco.saque_travado" and retido is not None:
+        return (
+            f"A conta de {nome} tem trava de saques por fraude: a liberação no livro fica adiada, "
+            f"retendo no máximo {_reais(retido)}, até a trava vencer ou ser revertida. Pagamento "
+            "manual ou no Stripe continua sem trava; confira à mão."
+        )
+    if acao == "risco.saque_travado":
+        registro = (
+            "a trava de saques foi registrada"
+            if medida_registrada
+            else "a trava de saques não pôde ser registrada como medida"
+        )
+        return f"A conta de {nome} está restrita e {registro}. {_SEM_BLOQUEIO}"
+    if acao == "risco.saque_destravado":
+        if status == "ativo":
+            return f"Conta de {nome} reativada, sem trava de saques. Confira os repasses à mão."
+        return (
+            f"{nome} não tem mais trava de saques, mas a conta continua restrita por outra "
+            "medida em vigor."
+        )
+    verbo = "bloqueada" if acao == "risco.bloqueio_preventivo" else "desbloqueada"
+    return f"Conta de {nome} {verbo}."
+
+
 def _mudar_status_do_usuario(
     contexto: Contexto,
     admin: AdminContexto,
@@ -257,13 +336,14 @@ def _mudar_status_do_usuario(
     de: tuple[str, ...],
     para: str,
     acao: str,
-    mensagem: str,
     exige_profissional: bool = False,
 ) -> dict[str, str]:
     uid = como_uuid(corpo.usuario_id)
     if uid is None:
         raise HTTPException(404, "Usuário não encontrado.")
-    with _banco(contexto).transacao() as con:
+    proteger_conta_da_equipe(admin, operador, str(uid))
+    banco = _banco(contexto)
+    with contexto.transacao(), banco.transacao() as con:
         usr = con.execute(
             "select id, nome, status from public.usuarios where id = %s for update", (uid,)
         ).fetchone()
@@ -279,20 +359,56 @@ def _mudar_status_do_usuario(
             raise HTTPException(404, "Perfil profissional não encontrado.")
         if usr["status"] not in de:
             raise HTTPException(409, f"Nada a fazer: a conta está com status '{usr['status']}'.")
+        fraude = bool(getattr(corpo, "motivo_fraude", False))
+        limite = getattr(corpo, "limite_retencao_centavos", None)
+        dias = getattr(corpo, "dias", None)
+        if acao == "risco.saque_travado":
+            dias, erro = medidas.prazo_da_trava(contexto, "trava_saque", fraude, limite, dias)
+            if erro:
+                raise HTTPException(422, erro)
+        if (
+            acao == "risco.saque_travado"
+            and not fraude
+            and dias is None
+            and usr["status"] == para
+            and _trava_registrada(contexto, str(uid))
+        ):  # a linha está travada: dois pedidos juntos não criam duas medidas
+            retido = contexto.medidas.retencao_por_fraude(str(uid), contexto.agora())
+            return {"mensagem": _resposta(acao, usr["nome"], para, True, retido)}
         con.execute(
             "update public.usuarios set status = %s, atualizado_em = now() where id = %s",
             (para, uid),
         )
+        tipo, termina = _MEDIDA_DA_ACAO[acao]
+        protocolo = medidas.espelhar_status(
+            contexto,
+            str(uid),
+            operador.id,
+            para=para,
+            tipo=tipo,
+            termina=termina,
+            motivo=corpo.motivo,
+            motivo_usuario=corpo.motivo_usuario,
+            clausulas=tuple(corpo.clausulas),
+            dias=dias,
+            motivo_fraude=fraude,
+            limite_retencao_centavos=limite,
+        )
+        # Outra medida em vigor pode manter a restrição: vale o status que ficou gravado.
+        final = con.execute("select status from public.usuarios where id = %s", (uid,)).fetchone()
         admin.auditoria.registrar(
             ator_id=operador.id,
             acao=acao,
             entidade="usuarios",
             entidade_id=str(uid),
             antes={"status": usr["status"]},
-            depois={"status": para},
+            depois={"status": final["status"]},
             motivo=corpo.motivo,
         )
-        return {"mensagem": mensagem.format(nome=usr["nome"])}
+        retido = contexto.medidas.retencao_por_fraude(str(uid), contexto.agora())
+        return {
+            "mensagem": _resposta(acao, usr["nome"], final["status"], protocolo is not None, retido)
+        }
 
 
 @router.post("/bloqueio-preventivo", summary="Bloqueio preventivo da conta (reversível)")
@@ -305,7 +421,6 @@ def aplicar_bloqueio_preventivo(
     return _mudar_status_do_usuario(
         contexto, admin, operador, corpo,
         de=("ativo", "restrito"), para="bloqueado", acao="risco.bloqueio_preventivo",
-        mensagem="Conta de {nome} bloqueada.",
     )  # fmt: skip
 
 
@@ -319,25 +434,29 @@ def desbloquear(
     return _mudar_status_do_usuario(
         contexto, admin, operador, corpo,
         de=("bloqueado",), para="ativo", acao="risco.desbloqueio",
-        mensagem="Conta de {nome} desbloqueada.",
     )  # fmt: skip
 
 
-@router.post("/travar-saque", summary="Travar saques e repasses de um profissional (reversível)")
+@router.post(
+    "/travar-saque",
+    summary="Restringir o profissional e registrar trava de saques (reversível)",
+    description="Só com motivo_fraude (e limite) a liberação no livro é adiada; pagamento manual "
+    "ou no Stripe não é bloqueado. Aceita conta ativa ou restrita; conta bloqueada responde 409.",
+)
 def travar_saque(
-    corpo: AcaoRiscoIn,
+    corpo: TravarSaqueIn,
     operador: Operador = Depends(exigir(Permissao.RISCO_DECIDIR)),
     admin: AdminContexto = Depends(obter_admin),
     contexto: Contexto = Depends(obter_contexto),
 ) -> dict[str, str]:
     return _mudar_status_do_usuario(
         contexto, admin, operador, corpo,
-        de=("ativo",), para="restrito", acao="risco.saque_travado",
-        mensagem="Saques de {nome} travados.", exige_profissional=True,
+        de=("ativo", "restrito"), para="restrito", acao="risco.saque_travado",
+        exige_profissional=True,
     )  # fmt: skip
 
 
-@router.post("/destravar-saque", summary="Destrava os saques de um profissional")
+@router.post("/destravar-saque", summary="Remove a trava de saques de um profissional")
 def destravar_saque(
     corpo: AcaoRiscoIn,
     operador: Operador = Depends(exigir(Permissao.RISCO_DECIDIR)),
@@ -347,5 +466,5 @@ def destravar_saque(
     return _mudar_status_do_usuario(
         contexto, admin, operador, corpo,
         de=("restrito",), para="ativo", acao="risco.saque_destravado",
-        mensagem="Saques de {nome} liberados.", exige_profissional=True,
+        exige_profissional=True,
     )  # fmt: skip

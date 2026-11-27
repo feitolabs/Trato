@@ -51,8 +51,13 @@ class _CuponsTelaState extends State<CuponsTela> {
         return v == null || v < 1 || v > 100 ? 'Entre 1 e 100' : null;
       }
       final v = lerReaisEmCentavos(valor.text);
-      return v == null || v <= 0 ? 'Informe um valor em reais' : null;
+      if (v == null) return kErroReais;
+      return v <= 0 ? 'Informe um valor maior que zero' : null;
     }
+
+    /// Vazio = sem mínimo. Preenchido tem de ser um valor válido (zero também vale).
+    String? erroMinimo() =>
+        minimo.text.trim().isEmpty || lerReaisEmCentavos(minimo.text) != null ? null : kErroReais;
 
     String? erroFim() => inicio != null && fim != null && !fim!.isAfter(inicio!) ? 'O fim precisa ser depois do início' : null;
 
@@ -98,7 +103,7 @@ class _CuponsTelaState extends State<CuponsTela> {
           const SizedBox(height: EspacosTrato.x3),
           TextField(
             controller: valor,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => rebuild(),
             decoration: InputDecoration(
               labelText: 'Valor',
@@ -106,13 +111,21 @@ class _CuponsTelaState extends State<CuponsTela> {
               suffixText: tipo == 'percentual' ? '%' : null,
               helperText: tipo == 'percentual' ? 'Entre 1 e 100' : null,
               errorText: erroValor(),
+              errorMaxLines: 3,
             ),
           ),
           const SizedBox(height: EspacosTrato.x3),
           TextField(
             controller: minimo,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Pedido mínimo', prefixText: 'R\$ ', helperText: 'Vazio = sem mínimo'),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => rebuild(),
+            decoration: InputDecoration(
+              labelText: 'Pedido mínimo',
+              prefixText: 'R\$ ',
+              helperText: 'Vazio = sem mínimo',
+              errorText: erroMinimo(),
+              errorMaxLines: 3,
+            ),
           ),
           const SizedBox(height: EspacosTrato.x3),
           Row(
@@ -173,12 +186,13 @@ class _CuponsTelaState extends State<CuponsTela> {
           erroCodigo() == null &&
           valor.text.trim().isNotEmpty &&
           erroValor() == null &&
+          erroMinimo() == null &&
           erroFim() == null,
       resultado: (motivo) => {
         'codigo': codigo.text.trim().toUpperCase(),
         'tipo': tipo,
         'valor': tipo == 'percentual' ? int.parse(valor.text.trim()) : lerReaisEmCentavos(valor.text)!,
-        'minimo': lerReaisEmCentavos(minimo.text) ?? 0,
+        'minimo': minimo.text.trim().isEmpty ? 0 : lerReaisEmCentavos(minimo.text)!,
         'limite': int.tryParse(limite.text.trim()),
         'porUsuario': int.tryParse(porUsuario.text.trim()),
         'inicio': inicio?.toIso8601String().substring(0, 10),

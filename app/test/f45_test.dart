@@ -88,7 +88,6 @@ void main() {
         CalculadoraOrcamentoTela(
           servico: ServicoOrcamentoFake(),
           tituloPedido: 'Pintura de quarto',
-          mostrarForaDoEscopo: true,
           itensIniciais: const [ItemMaterial(nome: 'Tinta', centavos: 4000)],
         ),
       );

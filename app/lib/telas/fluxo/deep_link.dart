@@ -91,6 +91,28 @@ abstract final class DeepLinks {
       );
       return;
     }
+    if (RotasTrato.contaBloqueada) {
+      // Sem casca na conta bloqueada: só o atendimento, as medidas e o pedido contratado.
+      final link = LinkPendente.retirar();
+      final destino = link?.destino;
+      if (destino == DestinoApp.suporte || destino == DestinoApp.medidas) {
+        RotasTrato.abrirDestino(nav.context, destino!, link!.id, profissional: false);
+      } else if (destino == DestinoApp.contestacaoDecisao) {
+        // Conta bloqueada contesta a decisão do próprio pedido (sem o serviço, pelo
+        // atendimento).
+        final id = link!.id;
+        if (id == null || link.papel == 'profissional') {
+          RotasTrato.abrirAtendimento(nav.context, profissional: false, pedidoId: id);
+        } else {
+          RotasTrato.abrirContestacaoDecisao(nav.context, id, profissional: false);
+        }
+      } else if ((destino == DestinoApp.pedido || destino == DestinoApp.disputa) &&
+          link!.id != null &&
+          link.papel != 'profissional') {
+        RotasTrato.abrirPedidoContratado(nav.context, link.id!);
+      }
+      return;
+    }
     if (!ControladorCasca.ativa) return; // aoCascaPronta chama de novo
     if (_trocandoModo) return;
     final pendente = LinkPendente.atual;

@@ -79,11 +79,11 @@ def test_notificacao_antiga_do_contexto_continua_aparecendo(amb):
 def test_preferencias_leitura_e_troca_parcial(amb):
     servico_do(amb)
     padrao = get(amb, "/v1/notificacoes/preferencias").json()["categorias"]
-    assert padrao["disputas"] == {"app": True, "push": True, "email": False}
-    r = put(amb, "/v1/notificacoes/preferencias", {"categorias": {"disputas": {"push": False}}})
+    assert padrao["agenda"] == {"app": True, "push": True, "email": False}
+    r = put(amb, "/v1/notificacoes/preferencias", {"categorias": {"agenda": {"push": False}}})
     assert r.status_code == 200
-    assert r.json()["categorias"]["disputas"] == {"app": True, "push": False, "email": False}
-    assert r.json()["categorias"]["agenda"] == padrao["agenda"]  # o resto não mexe
+    assert r.json()["categorias"]["agenda"] == {"app": True, "push": False, "email": False}
+    assert r.json()["categorias"]["execucao"] == padrao["execucao"]  # o resto não mexe
     # preferência é por pessoa
     assert get(amb, "/v1/notificacoes/preferencias", "t-prof").json()["categorias"] == padrao
 

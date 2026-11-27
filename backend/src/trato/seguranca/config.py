@@ -249,6 +249,15 @@ class ConfigSeguranca(BaseSettings):
 
     # --- Mascaramento do chat -----------------------------------------------------------
     mascara_min_digitos: int = Field(default=8, gt=0)
+    # --- cadastro (Termos 4.1 e vínculo de dados antes do primeiro login) --------------
+    # Liga a recusa de pedido, orçamento, pagamento e cadastro de profissional para quem está
+    # sem data de nascimento ou é menor de 18. Desligada até o app novo.
+    exigir_maioridade: bool = False
+    # `POST /v1/cadastro/vincular` sem sessão: só conta nova e que nunca entrou.
+    vincular_janela_conta_minutos: int = Field(default=60, gt=0)
+    vincular_max_por_conta: int = Field(default=5, gt=0)
+    vincular_janela_tentativas_s: int = Field(default=3600, gt=0)
+
     mascara_min_digitos_com_canal: int = Field(default=4, gt=0)  # perto de "zap", "fone"...
     mascara_tlds: list[str] = Field(
         default_factory=lambda: [

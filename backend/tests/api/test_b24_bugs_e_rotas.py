@@ -3,9 +3,11 @@ recusar orcamento e responder avaliacao."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
 from conftest import AGORA, CLIENTE, PROFISSIONAL, cab
 from test_fluxo_pagamento_e2e import VALOR, Fluxo, fluxo  # noqa: F401
 from test_profissional_upload import _aprovar, e2  # noqa: F401
@@ -30,6 +32,14 @@ from trato.notificacoes.repositorio import RepositorioEmMemoria
 from trato.notificacoes.servico import ServicoNotificacoes
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.provedor import TipoEvento
+
+
+@pytest.fixture(autouse=True)
+def oferta_antiga_ligada(request):
+    """Estes testes cobrem a prioridade paga pelo profissional, hoje desligada por padrão."""
+    if "amb" in request.fixturenames:
+        config = request.getfixturevalue("amb").contexto.config
+        config._config = replace(config.carregar(), exclusividade_profissional_ofertada=True)
 
 
 def _habilitar_moedas(fluxo_obj: Fluxo, saldo: int = 500) -> MoedasEmMemoria:

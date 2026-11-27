@@ -10,9 +10,11 @@ from typing import Any
 
 from psycopg.types.json import Jsonb
 
+from trato.pedidos.estados import Estado
 from trato.persistencia.comum import como_uuid, exigir_uuid, para_json
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import NaoEncontrado, RegraDoBanco
+from trato.seguranca.contorno import pede_pagamento_por_fora
 from trato.seguranca.mascaramento import AVISO_MASCARA as _AVISO_MASCARA
 from trato.seguranca.mascaramento import mascarar as _mascarar
 
@@ -35,18 +37,53 @@ MARCADOR_CONTRAPROPOSTA = re.compile(
 MARCADOR_AGENDA = re.compile(r"^\[agenda:[^\]]+\]")
 
 
-def mascarar_contatos(texto: str, *, incluir_endereco: bool = True) -> str:
-    """Esconde telefone, e-mail, link e perfil SEMPRE (e o endereço antes da contratação:
-    `incluir_endereco`). O original fica em `corpo`; só o `corpo_exibido` é mascarado. A regra
-    mora em `trato.seguranca.mascaramento`."""
+# Termos 5.3: a contratação acontece quando o pagamento é confirmado. Nestes estados o endereço
+# (5.4) e o telefone (11.2) passam na conversa com o profissional contratado; nas demais conversas
+# e estados continuam escondidos.
+ESTADOS_COM_CONTATO = frozenset(
+    {
+        Estado.PAGO_E_RETIDO,
+        Estado.AGENDADO,
+        Estado.EM_ANDAMENTO,
+        Estado.EM_CONFIRMACAO,
+        Estado.RETRABALHO,
+        Estado.EM_DISPUTA,
+        Estado.CONCLUIDO,
+    }
+)
+# Os mesmos, como `pedidos.status` grava.
+_STATUS_COM_CONTATO = sorted(
+    "pago_retido" if e is Estado.PAGO_E_RETIDO else e.value for e in ESTADOS_COM_CONTATO
+)
+_CONTATO_LIBERADO = (
+    "exists (select 1 from public.contratos t join public.pedidos pd on pd.id = t.pedido_id "
+    "where t.pedido_id = cv.pedido_id and t.profissional_id = cv.profissional_id "
+    "and t.status <> 'cancelado' "
+    "and pd.status = any(%s))"
+)
+
+
+# O mesmo trecho para consultas com parâmetros nomeados (lista de conversas).
+CONTATO_LIBERADO_NOMEADO = _CONTATO_LIBERADO.replace("any(%s)", "any(%(estados)s)")
+
+
+def mascarar_contatos(
+    texto: str, *, incluir_endereco: bool = True, liberar_telefone: bool = False
+) -> str:
+    """Esconde e-mail, link e perfil SEMPRE, o telefone quando não está liberado
+    (`liberar_telefone`, nunca em mensagem que fala em pagamento por fora) e o endereço antes da
+    contratação (`incluir_endereco`). O original fica em `corpo`; só o `corpo_exibido` é
+    mascarado. A regra mora em `trato.seguranca.mascaramento`."""
     if MARCADOR_FOTO.match(texto.strip()):
         return texto
+    liberar = liberar_telefone and not pede_pagamento_por_fora(texto)
+    opcoes = {"incluir_endereco": incluir_endereco, "liberar_telefone": liberar}
     for padrao in (MARCADOR_CONTRAPROPOSTA, MARCADOR_AGENDA):
         marca = padrao.match(texto)
         if marca:
             resto = texto[marca.end() :]
-            return marca.group(0) + _mascarar(resto, incluir_endereco=incluir_endereco).exibido
-    return _mascarar(texto, incluir_endereco=incluir_endereco).exibido
+            return marca.group(0) + _mascarar(resto, **opcoes).exibido
+    return _mascarar(texto, **opcoes).exibido
 
 
 @dataclass(frozen=True)
@@ -100,6 +137,30 @@ class ConversasPostgres:
                 ).fetchone()
         return str(linha["id"])
 
+    def do_pedido(self, pedido_id: str) -> list[tuple[str, str]]:
+        """(conversa, profissional) de todas as conversas do pedido (leitura auditada, 11.3)."""
+        achado = como_uuid(pedido_id)
+        if achado is None:
+            return []
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select id, profissional_id from public.conversas where pedido_id = %s "
+                "order by criada_em, id",
+                (achado,),
+            ).fetchall()
+        return [(str(x["id"]), str(x["profissional_id"])) for x in linhas]
+
+    def originais(self, conversa_id: str) -> dict[int, str]:
+        """Texto como foi escrito (prova). Só a leitura auditada do painel usa (11.3)."""
+        achado = como_uuid(conversa_id)
+        if achado is None:
+            return {}
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select id, corpo from public.mensagens where conversa_id = %s", (achado,)
+            ).fetchall()
+        return {int(x["id"]): x["corpo"] for x in linhas}
+
     def partes(self, conversa_id: str) -> tuple[str, str] | None:
         """(cliente_id, profissional_id) da conversa, para a rota conferir quem pode ler."""
         achado = como_uuid(conversa_id)
@@ -117,14 +178,17 @@ class ConversasPostgres:
         conversa = exigir_uuid(conversa_id, "conversa")
         with self._banco.transacao() as con:
             linha = con.execute(
-                "select cv.pedido_id, exists (select 1 from public.contratos c "
-                "where c.pedido_id = cv.pedido_id) as contratado "
+                f"select {_CONTATO_LIBERADO} as liberado "  # noqa: S608
                 "from public.conversas cv where cv.id = %s and cv.encerrada_em is null",
-                (conversa,),
+                (_STATUS_COM_CONTATO, conversa),
             ).fetchone()
             if linha is None:
                 raise NaoEncontrado("Conversa não encontrada ou encerrada.")
-            exibido = mascarar_contatos(corpo, incluir_endereco=not linha["contratado"])
+            exibido = mascarar_contatos(
+                corpo,
+                incluir_endereco=not linha["liberado"],
+                liberar_telefone=linha["liberado"],
+            )
             nova = con.execute(
                 "insert into public.mensagens (conversa_id, autor_id, corpo, corpo_exibido, "
                 "mascarada) values (%s, %s, %s, %s, %s) returning id",
@@ -142,11 +206,19 @@ class ConversasPostgres:
                 "from public.mensagens where conversa_id = %s order by id",
                 (achado,),
             ).fetchall()
+            liberado = con.execute(
+                f"select {_CONTATO_LIBERADO} as liberado "  # noqa: S608
+                "from public.conversas cv where cv.id = %s",
+                (_STATUS_COM_CONTATO, achado),
+            ).fetchone()
+        contato = bool(liberado and liberado["liberado"])
         saida = []
         for l in linhas:  # noqa: E741
             # Mensagens antigas, gravadas em claro depois da contratação, também saem mascaradas
             # (só na leitura, nada é regravado). O endereço já veio tratado no `corpo_exibido`.
-            exibido = mascarar_contatos(l["corpo_exibido"], incluir_endereco=False)
+            exibido = mascarar_contatos(
+                l["corpo_exibido"], incluir_endereco=not contato, liberar_telefone=contato
+            )
             saida.append(
                 Mensagem(
                     int(l["id"]),

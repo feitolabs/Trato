@@ -41,6 +41,15 @@ usá-la, pede **motivo escrito** em tudo que é sensível e deixa **rastro na au
 | `config_propor` | financeiro, administrador |
 | `config_aprovar` (aprovar e publicar) | administrador |
 | `auditoria_ver`, `auditoria_verificar_cadeia` | seguranca, juridico, dpo, administrador |
+| `incidentes_ver`, `incidentes_tratar` | lider_suporte, mediador, seguranca, administrador |
+| `incidentes_encerrar` | lider_suporte, seguranca, administrador |
+| `avaliacoes_moderar` | lider_suporte, mediador, seguranca, administrador |
+| `lgpd_pedidos_gerenciar` | dpo, administrador |
+| `lgpd_revisao_automatizada` | seguranca, dpo, administrador |
+| `conta_retorno_analisar` | lider_suporte, mediador, seguranca, administrador |
+| `conta_retorno_aprovar` | lider_suporte, administrador |
+| `materiais_contestacao_analisar` | lider_suporte, mediador, seguranca, administrador |
+| `materiais_contestacao_aprovar` | lider_suporte, administrador |
 
 ## 0. Quem sou eu
 
@@ -193,7 +202,152 @@ passou a trazer `revisao` (o motivo, quando o evento está para revisar).
 Ações gravadas por esta API: `verificacao.aprovada|recusada`, `dado_pessoal.documento_revelado`,
 `dado_pessoal.revelado`, `financeiro.disputa_decisao_proposta|disputa_decidida`,
 `config.rascunho_criado|enviada_para_aprovacao|aprovada|publicada|reversao_proposta|rascunho_descartado`,
-`auditoria.cadeia_verificada`.
+`auditoria.cadeia_verificada`,
+`seguranca.incidente_lista_consultada|consultado|aberto|medida|andamento|encerrado`,
+`avaliacao.ocultada|ocultacao_revertida|revisao_em_analise|revisao_decidida`,
+`lgpd.pedido_titular_em_analise|respondido`,
+`conta.impedimento_revogado`, `conta.retorno_em_analise|aprovado|recusado`, `bloqueio.medida_aplicada`,
+`material.contestacao_em_analise|contestacao_decidida|contestacao_financeiro_aprovado`.
+
+## 7. Incidentes de segurança
+
+Prefixo `/v1/admin/incidentes` (Termos 9.3 a 9.6). Código em `backend/src/trato/api/admin/rotas_incidentes.py`
+e persistência em `backend/src/trato/persistencia/incidentes.py`.
+
+| Método e caminho | Permissão | Corpo | Resposta |
+|---|---|---|---|
+| `GET /v1/admin/incidentes?status=&pedido_id=&limite=&deslocamento=` | `incidentes_ver` | — | página de `Incidente` (`limite` 1–100 padrão 20, `deslocamento` ≥ 0, `pedido_id` até 64 chars; não encerrados primeiro, menor `cautela_ate` no topo) |
+| `GET /v1/admin/incidentes/{incidente_id}` | `incidentes_ver` | — | `Incidente` completo (`404` se inexistente) |
+| `POST /v1/admin/incidentes` | `incidentes_tratar` | `{tipo, descricao (1–4000), contato (1–320), canal, pedido_id? (≤64)}` | `Incidente` (`201` se novo; `200` se repetido em até 5 min) |
+| `POST /v1/admin/incidentes/{incidente_id}/medidas` | `incidentes_tratar` | `{tipo, descricao (1–1000)}` | `Incidente` atualizado (`200`) |
+| `POST /v1/admin/incidentes/{incidente_id}/status` | `incidentes_tratar` | `{status: cautela_adotada\|em_apuracao}` | `Incidente` atualizado (`200`) |
+| `POST /v1/admin/incidentes/{incidente_id}/encerrar` | `incidentes_encerrar` | `{desfecho (10–4000)}` | `Incidente` encerrado (`200`) |
+
+Valores aceitos (`extra="forbid"` em todos os corpos; strings com espaços das pontas removidos exceto em `/status`):
+- `tipo` (incidente): `furto_roubo`, `agressao_ameaca_assedio`, `acidente_dano`, `pessoa_diferente`, `comportamento_suspeito`, `pagamento_por_fora`, `outro`.
+- `canal`: `app`, `telefone`, `whatsapp`, `email`, `painel`.
+- `tipo` (medida): `bloquear_contato`, `preservar_registros`, `reter_valor`, `cancelar_pedido_reembolso`, `outro` (`suspender_conta` fica fora — exige medida de conta das cláusulas 20.2 e 20.4).
+- `status`: `aberto`, `cautela_adotada`, `em_apuracao`, `encerrado`.
+- `Incidente`: `id, protocolo, canal, tipo, descricao, contato?, pedido_id?, status, aberto_em, cautela_ate, cautela_adotada_em?, responsavel_id?, desfecho?, encerrado_em?, medidas[{id, tipo, descricao, origem (analista|automatica), aplicada_em}]`.
+
+Regras e códigos de erro:
+- **Tabelas ausentes (503):** todas as 6 rotas checam `contexto.incidentes.disponivel()`; sem as tabelas `incidentes_seguranca` e `incidente_medidas` no banco, respondem **503**.
+- **Abertura e validações:** `tipo = pessoa_diferente` exige `pedido_id` (**422** se ausente); `pedido_id` inexistente responde **404**. `cautela_ate` é calculado como `aberto_em + incidente_seguranca_cautela_horas` (configuração). Quando há `pedido_id`, a transação trava o pedido para não cruzar com liberação em andamento.
+- **Conflitos de estado (409):** registrar medida ou mudar status em incidente já `encerrado` responde **409**; mudar status para `cautela_adotada` sem nenhuma medida registrada responde **409**; encerrar novamente com outro `desfecho` responde **409**.
+- **Idempotência:** repetir `POST /v1/admin/incidentes` com os mesmos `tipo`, `descricao`, `canal`, `contato` e `pedido_id` em até **5 minutos** devolve **200** com o incidente já aberto (sem duplicar auditoria). Repetir medida idêntica `(tipo, descricao)`, status já atual ou `encerrar` com o mesmo `desfecho` devolve **200** sem duplicar registro nem auditoria.
+- **Escopo e auditoria:** nada aqui move dinheiro, cancela pedido ou suspende conta; enquanto houver incidente não encerrado vinculado ao `pedido_id`, o saldo do pedido permanece retido (`api/liberacao.py`), e encerrar pode soltar esse valor. Todas as rotas gravam na auditoria (`entidade = "incidentes_seguranca"`, ações `seguranca.incidente_*`) sem incluir `contato` nem `descricao` na trilha (no encerramento, `desfecho[:500]` vai no `motivo`).
+
+## 8. Moderação de avaliações
+
+Prefixo `/v1/admin/avaliacoes` (Termos 12.6, 12.7 e 20.5). Código em `backend/src/trato/api/admin/rotas_avaliacoes.py`. Todas as rotas exigem `avaliacoes_moderar` e respondem **503** quando as tabelas ainda não existem no banco (`disponivel() == False`).
+
+| Método e caminho | Permissão | Corpo | Resposta |
+|---|---|---|---|
+| `POST /v1/admin/avaliacoes/{avaliacao_id}/ocultar` | `avaliacoes_moderar` | `{motivo, explicacao (10–2000)}` | `OcultacaoOut` (`201`) |
+| `POST /v1/admin/avaliacoes/{avaliacao_id}/reverter-ocultacao` | `avaliacoes_moderar` | `{motivo (10–2000)}` | `OcultacaoOut` (`200`) |
+| `GET /v1/admin/avaliacoes/revisoes?status=&avaliacao_id=&limite=&deslocamento=` | `avaliacoes_moderar` | — | página de `RevisaoAvaliacaoAdminOut` (`limite` 1–200 padrão 50, `deslocamento` ≥ 0) |
+| `POST /v1/admin/avaliacoes/revisoes/{revisao_id}/analisar` | `avaliacoes_moderar` | — | `RevisaoAvaliacaoAdminOut` (`200`) |
+| `POST /v1/admin/avaliacoes/revisoes/{revisao_id}/decidir` | `avaliacoes_moderar` | `{status (aceita\|recusada), resposta (10–2000), ocultar_motivo?, mesmo_analista_justificativa? (10–1000)}` | `RevisaoAvaliacaoAdminOut` (`200`) |
+
+Valores aceitos (`extra="forbid"` e `str_strip_whitespace=True` em todos os corpos):
+- `motivo` / `ocultar_motivo`: `ofensa_ou_ilegal`, `dados_pessoais`, `sem_pedido_real_ou_falsa`, `nao_participou`, `ordem_judicial`.
+- `status` (revisão): `aberta`, `em_analise`, `aceita`, `recusada`.
+- `OcultacaoOut`: `id, avaliacao_id, motivo, explicacao, analista_id, ocultada_em, status_anterior, autor_avisado_em?, revertida_em?, revertida_por?`.
+- `RevisaoAvaliacaoAdminOut`: `id, protocolo, avaliacao_id, tipo, ocultacao_id?, solicitante_id, justificativa, anexos[], canal, aberta_em, responder_ate, status, analista_id?, resposta?, mesmo_analista_justificativa?, decidida_em?, ocultacao_aplicada_id?`.
+
+Regras, efeitos e códigos de erro:
+- **Ocultar (`201`):** `404` se a avaliação não existe; `409` se já possui ocultação ativa. Auditoria: `avaliacao.ocultada` (entidade `avaliacoes`).
+- **Reverter ocultação (`200`):** `404` se a avaliação não existe; `409` se não há ocultação ativa. Auditoria: `avaliacao.ocultacao_revertida` (entidade `avaliacoes`).
+- **Iniciar análise (`200`):** passa a revisão para `em_analise` (`404` se inexistente, `409` se já decidida). Só registra auditoria (`avaliacao.revisao_em_analise`, entidade `avaliacao_revisoes`) quando muda de fato (`cod == "ok"`).
+- **Decidir revisão (`200`, transacional):** `404` se inexistente; `409` se já decidida. Aceitar revisão `tipo = "revisao"` sem ocultação ativa exige `ocultar_motivo` (**422** se ausente) e aplica a ocultação na mesma transação; aceitar `tipo = "contestacao_ocultacao"` reverte a ocultação ativa na mesma transação. Contestação analisada pelo mesmo analista da ocultação exige `mesmo_analista_justificativa` (**422**, Termos 20.5). Repetição idempotente devolve `200` sem nova auditoria; quando decide (`cod == "ok"`), registra `avaliacao.revisao_decidida` (entidade `avaliacao_revisoes`, `motivo = resposta`).
+
+## 9. Pedidos de titular LGPD
+
+Prefixo `/v1/admin/lgpd/pedidos` (Termos 14.9 e 14.10). Código em `backend/src/trato/api/admin/rotas_lgpd_titular.py`. Todas as rotas respondem **503** quando a tabela ainda não existe no banco (`disponivel() == False`).
+
+| Método e caminho | Permissão | Corpo | Resposta |
+|---|---|---|---|
+| `GET /v1/admin/lgpd/pedidos?status=&tipo=&usuario_id=&limite=&deslocamento=` | `lgpd_revisao_automatizada` (todos os tipos exigem `lgpd_pedidos_gerenciar`) | — | página de `PedidoTitularAdminOut` (`limite` 1–200 padrão 50, `deslocamento` ≥ 0) |
+| `POST /v1/admin/lgpd/pedidos/{pedido_id}/analisar` | `lgpd_revisao_automatizada` (outros tipos exigem `lgpd_pedidos_gerenciar`) | — | `PedidoTitularAdminOut` (`200`) |
+| `POST /v1/admin/lgpd/pedidos/{pedido_id}/responder` | `lgpd_revisao_automatizada` (outros tipos exigem `lgpd_pedidos_gerenciar`) | `{status (atendido\|atendido_parcial\|negado), resposta (10–4000), motivo_nao_atendido? (10–2000), criterios_informados? (10–2000)}` | `PedidoTitularAdminOut` (`200`) |
+
+Valores aceitos (`extra="forbid"` e `str_strip_whitespace=True` em `ResponderPedidoTitularIn`):
+- `tipo`: `confirmacao`, `acesso`, `correcao`, `anonimizacao_bloqueio_eliminacao`, `portabilidade`, `eliminacao_consentimento`, `compartilhamento`, `nao_consentir`, `revogacao_consentimento`, `revisao_decisao_automatizada`.
+- `decisao_automatizada`: `ocultacao_contato`, `documentos_rosto`, `alerta_fraude`, `ordem_resultados`, `outra`.
+- `status` (pedido): `aberto`, `em_analise`, `aguardando_titular`, `atendido`, `atendido_parcial`, `negado`.
+- `PedidoTitularAdminOut`: `id, protocolo, usuario_id?, contato?, tipo, decisao_automatizada?, referencia_tipo?, referencia_id?, descricao, canal, exclusao_id?, aberto_em, responder_ate, status, analista_id?, resposta?, motivo_nao_atendido?, criterios_informados?, respondido_em?`.
+
+Regras, alcance e códigos de erro:
+- **Alcance por papel (403):** quem tem apenas `lgpd_revisao_automatizada` (ex.: `seguranca`) só consulta e trata pedidos de `tipo = revisao_decisao_automatizada` — no `GET` sem `tipo`, o filtro é forçado para `revisao_decisao_automatizada`; informar outro `tipo` no `GET` ou agir em pedido de outro `tipo` em `/analisar` ou `/responder` responde **403**. Todos os tipos exigem `lgpd_pedidos_gerenciar` (`dpo`, `administrador`).
+- **Validações em `/responder` (422):** `status` `atendido_parcial` ou `negado` exige `motivo_nao_atendido` (Termos 14.9); pedido de `tipo = revisao_decisao_automatizada` exige `criterios_informados` (Termos 14.10).
+- **Conflitos e idempotência:** `404` se inexistente; `409` se o pedido já foi respondido. Repetição sem mudança de estado (`cod != "ok"`) devolve `200` sem duplicar auditoria.
+- **Auditoria:** `lgpd.pedido_titular_em_analise` e `lgpd.pedido_titular_respondido` (entidade `lgpd_pedidos_titular`), gravando apenas metadados (`status`, `tipo`, `protocolo`), sem texto livre nem dados pessoais na trilha.
+
+## 10. Impedimentos de cadastro e retorno de conta
+
+Prefixo `/v1/admin/conta` (Termos 20.9) e extensão de encerramento em `/v1/admin/medidas`. Código em
+`backend/src/trato/api/admin/rotas_retorno_conta.py` e `backend/src/trato/api/admin/rotas_medidas.py`.
+Todas as rotas de `/v1/admin/conta` respondem **503** quando as tabelas ainda não existem no banco (`disponivel() == False`).
+
+### Encerramento com impedimento em `POST /v1/admin/medidas` (`medidas_aplicar`)
+- Novos campos de entrada (`AplicarIn`): `infracao_grave` (`bool`, padrão `false`), `impedir_nova_conta` (`bool`, padrão `false`) e `identificadores_impedimento` (`{cpf?, email?, telefone?}`, opcional). A saída (`MedidaAdminOut`) expõe `infracao_grave` e `impedir_nova_conta`.
+- Regras: `infracao_grave = true` exige `tipo = "encerramento"` (**422** `infracao_grave_invalida`); `impedir_nova_conta = true` exige `infracao_grave = true` (**422** `impedimento_exige_grave`) e tabela de impedimentos disponível (**503** `indisponivel`).
+- Os impedimentos são gravados como HMAC dos identificadores (`cpf`, `email`, `telefone`, lidos de `identificadores_impedimento` ou do cadastro do usuário) usando a variável de ambiente `CONTA_IMPEDIMENTO_PEPPER`; sem `CONTA_IMPEDIMENTO_PEPPER` configurada, responde **503** (`pepper_ausente`). Os identificadores brutos não são armazenados nem devolvidos.
+- A auditoria `bloqueio.medida_aplicada` registra `infracao_grave`, `impedir_nova_conta` e `impedimentos_registrados` em `depois`.
+
+### Rotas `/v1/admin/conta`
+
+| Método e caminho | Permissão | Corpo | Resposta |
+|---|---|---|---|
+| `GET /v1/admin/conta/impedimentos?medida_id=&apenas_ativos=false&limite=50&deslocamento=0` | `conta_retorno_analisar` | — | página de `ImpedimentoAdminOut` (`limite` 1–200, `deslocamento` ≥ 0) |
+| `POST /v1/admin/conta/impedimentos/{impedimento_id}/revogar` | `conta_retorno_aprovar` | `{motivo (10–1000)}` | `ImpedimentoAdminOut` (`200`) |
+| `GET /v1/admin/conta/retornos?status=&usuario_id=&limite=50&deslocamento=0` | `conta_retorno_analisar` | — | página de `PedidoRetornoAdminOut` (`limite` 1–200, `deslocamento` ≥ 0) |
+| `POST /v1/admin/conta/retornos/{retorno_id}/analisar` | `conta_retorno_analisar` | — | `PedidoRetornoAdminOut` (`200`) |
+| `POST /v1/admin/conta/retornos/{retorno_id}/aprovar` | `conta_retorno_aprovar` | `{motivo (10–2000), risco_identificado=false}` | `PedidoRetornoAdminOut` (`200`) |
+| `POST /v1/admin/conta/retornos/{retorno_id}/recusar` | `conta_retorno_analisar` | `{motivo (10–2000), risco_identificado=false}` | `PedidoRetornoAdminOut` (`200`) |
+
+Modelos e enums (`extra="forbid"` e `str_strip_whitespace=True` nos corpos):
+- `status` (retorno): `aberto`, `em_analise`, `aprovado`, `recusado`.
+- `ImpedimentoAdminOut`: `id, medida_id, tipo_identificador, criado_por, criado_em, revogado_em?, revogado_por?, motivo_revogacao?`.
+- `PedidoRetornoAdminOut`: `id, protocolo, usuario_id, medida_id, justificativa_usuario, canal, status, solicitado_em, prazo_dias_aplicado, elegivel_a_partir_de, analista_id?, decisao_motivo?, risco_identificado, decidido_em?`.
+
+Regras, erros e auditoria:
+- **Revogar impedimento:** `404` se inexistente, `409` se já revogado. Auditoria: `conta.impedimento_revogado` (entidade `conta_impedimentos_cadastro`).
+- **Analisar / aprovar / recusar retorno:** `404` se inexistente, `409` se já decidido. Em `/aprovar`, `risco_identificado = true` responde **422** (Termos 20.9). Repetições sem mudança (`cod != "ok"`) devolvem `200` sem duplicar auditoria.
+- **Auditoria de retornos (entidade `conta_pedidos_retorno`):** `conta.retorno_em_analise`, `conta.retorno_aprovado` e `conta.retorno_recusado` (esta última registra `risco_identificado` em `depois`).
+
+## 11. Contestações de nota de material
+
+Prefixo `/v1/admin/materiais/contestacoes` (Termos 6.9). Código em `backend/src/trato/api/admin/rotas_materiais_contestacao.py`
+e persistência em `backend/src/trato/persistencia/materiais_contestacao.py`. Todas as rotas respondem **503** quando a tabela
+`nota_material_contestacoes` ainda não existe no banco (`disponivel() == False`).
+
+**Nenhum dinheiro é movido por estas rotas.** `/aprovar-financeiro` só grava `aprovada_por` e marca
+`efeito_financeiro = pendente_financeiro`; não executa estorno, compensação nem lançamento. O painel **não terá** o botão
+dessa rota até decisão do João.
+
+| Método e caminho | Permissão | Corpo | Resposta |
+|---|---|---|---|
+| `GET /v1/admin/materiais/contestacoes?status=&pedido_id=&limite=50&deslocamento=0` | `materiais_contestacao_analisar` | — | página de `ContestacaoMaterialAdminOut` (`limite` 1–200, `deslocamento` ≥ 0; menor `responder_ate` primeiro) |
+| `POST /v1/admin/materiais/contestacoes/{contestacao_id}/analisar` | `materiais_contestacao_analisar` | — | `ContestacaoMaterialAdminOut` (`200`) |
+| `POST /v1/admin/materiais/contestacoes/{contestacao_id}/decidir` | `materiais_contestacao_analisar` | `{status (procedente\|parcial\|improcedente), resposta (10–4000), valor_reconhecido_centavos? (inteiro ≥ 0)}` | `ContestacaoMaterialAdminOut` (`200`) |
+| `POST /v1/admin/materiais/contestacoes/{contestacao_id}/aprovar-financeiro` | `materiais_contestacao_aprovar` | `{motivo (10–2000)}` | `ContestacaoMaterialAdminOut` (`200`) |
+
+Modelos e enums (`extra="forbid"` e `str_strip_whitespace=True` nos corpos; `valor_reconhecido_centavos` é estrito: texto ou float dão **422**):
+- `status` (contestação): `aberta`, `em_analise`, `procedente`, `parcial`, `improcedente`.
+- `motivo` (da contestação): `nao_comprovado`, `diferente_do_combinado`.
+- `efeito_financeiro`: `nenhum` (inicial), `pendente_financeiro`, `executado` (previsto no modelo; nenhuma destas rotas o grava).
+- `ContestacaoMaterialAdminOut`: `id, protocolo, pedido_id, nota_id, item_id?, cliente_id, motivo, descricao, anexos[], valor_contestado_centavos, aberta_em, responder_ate, status, analista_id?, resposta?, valor_reconhecido_centavos?, decidida_em?, aprovada_por?, efeito_financeiro`.
+
+Regras e códigos de erro (além de `401`, `403` e `503`; query, corpo ou limite inválido responde **422**):
+- **Analisar:** passa para `em_analise` e grava o operador em `analista_id`. `404` se inexistente; `409` se já decidida.
+- **Decidir:** pode partir de `aberta` ou `em_analise`; grava quem decidiu em `analista_id`, além de `resposta`, valor e `decidida_em`. Sem `valor_reconhecido_centavos`, `procedente` assume o valor contestado e `improcedente` assume zero; `parcial` exige valor maior que zero e menor que o contestado. `procedente` com valor diferente do contestado, `improcedente` diferente de zero ou `parcial` fora da faixa (ou sem valor): **422**. `404` se inexistente; `409` se já decidida com outro `status`, `resposta` ou valor.
+- **Aprovar financeiro (4 olhos):** `404` se inexistente; `409` se não está `procedente` nem `parcial`; `403` se o aprovador é o `analista_id` (vale também para o administrador).
+- **Idempotência:** repetições devolvem `200` sem nova auditoria: `/analisar` em contestação já `em_analise` (não troca o `analista_id`); `/decidir` com os mesmos `status`, `resposta` e valor (já com o padrão aplicado); `/aprovar-financeiro` em contestação que já tem `aprovada_por` (mantém o primeiro aprovador, mesmo que outra pessoa ou outro `motivo` seja enviado).
+- **Auditoria (entidade `nota_material_contestacoes`):**
+  - `material.contestacao_em_analise`: `depois = {status, protocolo}`; `motivo` automático com o protocolo.
+  - `material.contestacao_decidida`: `depois = {status, protocolo, valor_reconhecido_centavos}`; `motivo = resposta`.
+  - `material.contestacao_financeiro_aprovado`: `depois = {protocolo, efeito_financeiro, valor_reconhecido_centavos}`; `motivo` = o enviado no corpo.
 
 ## Pendências e limites conhecidos
 

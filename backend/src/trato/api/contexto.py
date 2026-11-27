@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from trato.api.auth import PapelUsuario, ProvedorAuth, Usuario
@@ -44,7 +45,19 @@ from trato.api.repositorios_app import (
     RepositorioVerificacoes,
 )
 from trato.config import obter_config
-from trato.pedidos.estados import Acao, Papel, Pedido
+from trato.pedidos.estados import Acao, Estado, Papel, Pedido
+from trato.persistencia.ausencias import AusenciasEmMemoria
+from trato.persistencia.avaliacoes_moderacao import ModeracaoAvaliacoesEmMemoria
+from trato.persistencia.cancelamentos import CancelamentosEmMemoria
+from trato.persistencia.chamados import ChamadosEmMemoria
+from trato.persistencia.compensacoes import CompensacoesIndisponiveis
+from trato.persistencia.contestacoes_decisao import ContestacoesDecisaoEmMemoria
+from trato.persistencia.incidentes import IncidentesEmMemoria
+from trato.persistencia.lgpd_titular import LgpdTitularEmMemoria
+from trato.persistencia.materiais_contestacao import ContestacaoMaterialEmMemoria
+from trato.persistencia.medidas import MedidasEmMemoria
+from trato.persistencia.retorno_conta import RetornoContaEmMemoria
+from trato.persistencia.sac import SacEmMemoria
 
 
 def agora_utc() -> datetime:
@@ -152,6 +165,26 @@ class Contexto:
     repasses: RepositorioRepasses = field(default_factory=_repasses_em_memoria)
     # Contestações de cartão (chargeback) avisadas pelo provedor (`financeiro/contestacoes.py`).
     contestacoes: Any = field(default_factory=lambda: _contestacoes_em_memoria())
+    # Desistência e consentimento de execução imediata (`persistencia/cancelamentos.py`).
+    cancelamentos: Any = field(default_factory=lambda: CancelamentosEmMemoria())
+    # Cliente ausente (`persistencia/ausencias.py`, Termos 7.6).
+    ausencias: Any = field(default_factory=lambda: AusenciasEmMemoria())
+    # Medidas de conta vigentes (`persistencia/medidas.py`).
+    medidas: Any = field(default_factory=lambda: MedidasEmMemoria())
+    # Contestações da ausência e vínculos de leitura de conversa (`persistencia/chamados.py`).
+    chamados: Any = field(default_factory=lambda: ChamadosEmMemoria())
+    # Incidentes de segurança (`persistencia/incidentes.py`, Termos 9.3 a 9.6).
+    incidentes: Any = field(default_factory=lambda: IncidentesEmMemoria())
+    materiais_contestacao: Any = field(default_factory=lambda: ContestacaoMaterialEmMemoria())
+    retorno_conta: Any = field(default_factory=lambda: RetornoContaEmMemoria())
+    lgpd_titular: Any = field(default_factory=lambda: LgpdTitularEmMemoria())
+    avaliacoes_moderacao: Any = field(default_factory=lambda: ModeracaoAvaliacoesEmMemoria())
+    # Chamados do atendimento (`persistencia/sac.py`).
+    sac: Any = field(default_factory=lambda: SacEmMemoria())
+    # Compensação em repasses (`persistencia/compensacoes.py`; regras no banco).
+    compensacoes: Any = field(default_factory=lambda: CompensacoesIndisponiveis())
+    # Contestação da decisão de disputa (`persistencia/contestacoes_decisao.py`).
+    contestacoes_decisao: Any = field(default_factory=lambda: ContestacoesDecisaoEmMemoria())
     # Fechamentos mensais do financeiro (`financeiro/fechamento.py`): imutáveis depois de gravados.
     fechamentos: Any = field(default_factory=lambda: _fechamentos_em_memoria())
     # Transação do armazenamento (reentrante). Em memória não faz nada; no Postgres é
@@ -192,7 +225,24 @@ class Contexto:
         else:
             pendentes.append(funcao)
 
+    def _contato_liberado(self, pedido_id: str, profissional_id: str) -> bool:
+        """Termos 5.4 e 11.2: pagamento confirmado e conversa com o profissional contratado."""
+        from trato.persistencia.conversas import ESTADOS_COM_CONTATO
+
+        contrato = self.contratos.obter_do_pedido(pedido_id)
+        pedido = self.pedidos.obter(pedido_id)
+        return (
+            contrato is not None
+            and pedido is not None
+            and contrato.profissional_id == profissional_id
+            and pedido.estado in ESTADOS_COM_CONTATO
+        )
+
     def __post_init__(self) -> None:
+        # Em memória, a retenção (9.6) enxerga os incidentes daqui; no Postgres é a tabela.
+        ligar_incidentes = getattr(self.chamados, "ligar_incidentes", None)
+        if ligar_incidentes is not None:
+            ligar_incidentes(self.incidentes)
         # Ao concluir um pedido, arma a indicação do indicado (bônus de Indique e Ganhe).
         if gancho_indicacoes not in self.apos_transicao:
             self.apos_transicao.append(gancho_indicacoes)
@@ -200,6 +250,12 @@ class Contexto:
         vincular = getattr(self.exclusividades, "vincular", None)
         if vincular is not None:
             vincular(self)
+        vincular_ret = getattr(self.retorno_conta, "vincular", None)
+        if vincular_ret is not None:
+            vincular_ret(self.medidas)
+        vincular_av = getattr(self.avaliacoes_moderacao, "vincular", None)
+        if vincular_av is not None:
+            vincular_av(self.avaliacoes)
         ligar_visitas = getattr(self.pedidos, "vincular_visitas_recorrentes", None)
         if ligar_visitas is not None:
             ligar_visitas(lambda pid: self.recorrencias.profissional_do_pedido_de_visita(pid))
@@ -218,7 +274,7 @@ class Contexto:
             )
         # Antes da contratação a conversa mascara contatos: a memória pergunta ao repositório.
         if isinstance(self.conversas, ConversasEmMemoria) and self.conversas.contratado is None:
-            self.conversas.contratado = lambda pid: self.contratos.obter_do_pedido(pid) is not None
+            self.conversas.contato_liberado = self._contato_liberado
 
 
 def obter_contexto(request: Request) -> Contexto:
@@ -229,6 +285,27 @@ def obter_contexto(request: Request) -> Contexto:
 
 
 _bearer = HTTPBearer(auto_error=False, description="Token do usuário (provedor de auth).")
+bearer_opcional = _bearer  # rotas em que o login é opcional
+
+
+class ContaBloqueada(HTTPException):
+    """Termos 20.5. É 403, e não 401: o app não pode tentar renovar o token e sair da conta
+    antes de chegar à Ajuda. Só o atendimento e as medidas continuam abertos ao bloqueado."""
+
+    codigo = "conta_bloqueada"
+
+    def __init__(self) -> None:
+        super().__init__(
+            403,
+            "Sua conta está bloqueada. Você ainda pode falar com o atendimento e ver ou "
+            "contestar a medida.",
+        )
+
+
+async def tratar_conta_bloqueada(_: Request, erro: ContaBloqueada) -> JSONResponse:
+    return JSONResponse(
+        status_code=erro.status_code, content={"detail": erro.detail, "codigo": erro.codigo}
+    )
 
 
 def usuario_atual(
@@ -240,9 +317,122 @@ def usuario_atual(
     token = credenciais.credentials if credenciais else None
     usuario = contexto.auth.autenticar(token) if token else None
     if usuario is None:
+        bloqueada = getattr(contexto.auth, "conta_bloqueada", None)
+        if token and bloqueada is not None and bloqueada(token):
+            raise ContaBloqueada
         raise HTTPException(
             401, "Faça login para continuar.", headers={"WWW-Authenticate": "Bearer"}
         )
+    return usuario
+
+
+def usuario_do_suporte(
+    credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Como o login normal, mas aceita conta bloqueada ou suspensa (20.5)."""
+    token = credenciais.credentials if credenciais else None
+    entrar = getattr(contexto.auth, "autenticar_para_suporte", contexto.auth.autenticar)
+    usuario = entrar(token) if token else None
+    if usuario is None:
+        raise HTTPException(
+            401, "Faça login para continuar.", headers={"WWW-Authenticate": "Bearer"}
+        )
+    if usuario.papel not in (PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL):
+        raise HTTPException(403, "A equipe atende pelo painel.")
+    return usuario
+
+
+# Pedido já contratado (pagamento confirmado, Termos 6.3). Antes disso, e no cancelado, o
+# bloqueado não entra.
+ESTADOS_CONTRATADOS = frozenset(
+    {
+        Estado.PAGO_E_RETIDO,
+        Estado.AGENDADO,
+        Estado.EM_ANDAMENTO,
+        Estado.EM_CONFIRMACAO,
+        Estado.EM_DISPUTA,
+        Estado.RETRABALHO,
+        Estado.CONCLUIDO,
+    }
+)
+
+
+def usuario_do_pedido_contratado(
+    request: Request,
+    credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Login normal. A conta bloqueada só passa como CLIENTE de pedido já contratado: lista,
+    detalhe, disputa e, entre as ações, `confirmar_conclusao`. Todo o resto segue 403
+    `conta_bloqueada` (inclusive pedido de outra pessoa, sem revelar se existe). Use apenas
+    nessas rotas."""
+    try:
+        return usuario_atual(request, credenciais, contexto)
+    except ContaBloqueada:
+        entrar = getattr(contexto.auth, "autenticar_para_suporte", None)
+        usuario = entrar(credenciais.credentials) if entrar and credenciais else None
+        if usuario is None or usuario.papel is PapelUsuario.EQUIPE:
+            raise
+        acao = request.path_params.get("acao")
+        if acao is not None and acao != Acao.CONFIRMAR_CONCLUSAO.value:
+            raise
+        pedido_id = request.path_params.get("pedido_id")
+        if pedido_id is None:  # lista "Meus pedidos", sempre como cliente
+            if request.query_params.get("como") not in (None, "", "cliente"):
+                raise
+            pedidos = contexto.pedidos.listar_do_usuario(usuario.id, True)
+        else:
+            pedidos = [contexto.pedidos.obter(pedido_id)]
+        if not any(bloqueado_pode_no_pedido(p, usuario.id) for p in pedidos):
+            raise
+        return replace(usuario, bloqueado=True)
+
+
+def bloqueado_pode_no_pedido(pedido: Pedido | None, usuario_id: str) -> bool:
+    """Pedido do próprio cliente que chegou a ser contratado (inclusive o cancelado depois do
+    pagamento, como no reembolso total decidido na disputa)."""
+    return (
+        pedido is not None
+        and pedido.cliente_id == usuario_id
+        and (
+            pedido.estado in ESTADOS_CONTRATADOS
+            or (pedido.estado is Estado.CANCELADO and pedido.referencia_pagamento is not None)
+        )
+    )
+
+
+def usuario_ou_bloqueado(
+    request: Request,
+    credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Cliente ou profissional. Conta bloqueada volta com `bloqueado=True` e a rota é OBRIGADA
+    a conferir o pedido (`bloqueado_pode_no_pedido`) antes de qualquer efeito."""
+    try:
+        usuario = usuario_atual(request, credenciais, contexto)
+    except ContaBloqueada:
+        entrar = getattr(contexto.auth, "autenticar_para_suporte", None)
+        usuario = entrar(credenciais.credentials) if entrar and credenciais else None
+        if usuario is None or usuario.papel is PapelUsuario.EQUIPE:
+            raise
+        return replace(usuario, bloqueado=True)
+    if usuario.papel not in (PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL):
+        raise HTTPException(403, "Seu perfil não pode fazer isso.")
+    return usuario
+
+
+def usuario_do_proprio_pedido(
+    request: Request,
+    usuario: Usuario = Depends(usuario_ou_bloqueado),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Ausência (7.6) e contestação da decisão (8.7): o cliente bloqueado age só no próprio
+    pedido contratado (20.6 e 20.10). Use apenas em rotas com `{pedido_id}`."""
+    if usuario.bloqueado and not bloqueado_pode_no_pedido(
+        contexto.pedidos.obter(request.path_params.get("pedido_id", "")), usuario.id
+    ):
+        raise ContaBloqueada
     return usuario
 
 

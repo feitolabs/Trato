@@ -49,6 +49,24 @@ class ServicoContaApi implements ServicoConta {
   Future<DadosPessoaisConta> dados() async =>
       _dadosDe(_mapa(await _api.get('/v1/me/dados-pessoais')));
 
+  /// Termos 4.1: grava a data de nascimento de quem entrou sem ela. O `PATCH` recusa conta sem
+  /// dados privados (Google, Apple); o vínculo do cadastro cria ou preenche só o que está vazio.
+  /// Responde 204 mesmo quando nada grava, por isso é a leitura logo depois que confirma.
+  Future<DadosPessoaisConta> informarNascimento({
+    required String usuarioId,
+    required String email,
+    String? nome,
+    required DateTime nascimento,
+  }) async {
+    await _api.post('/v1/cadastro/vincular', corpo: {
+      'usuario_id': usuarioId,
+      'email': email,
+      if ((nome ?? '').trim().isNotEmpty) 'nome': nome!.trim(),
+      'data_nascimento': _dia(nascimento),
+    });
+    return dados();
+  }
+
   @override
   Future<DadosPessoaisConta> registrarCpf(String cpf) async {
     await _api.post('/v1/me/dados-pessoais', corpo: {'cpf': cpf});

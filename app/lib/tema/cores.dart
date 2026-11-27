@@ -39,6 +39,9 @@ abstract final class CoresTrato {
   static const fundoModalFoto = Color(0xDE000000);
   static const fundoFotoPreto = Color(0xFF000000);
   static const overlayFoto = Color(0x8A000000);
+
+  /// Base das sombras no tema escuro (a opacidade vai em quem usa).
+  static const sombra = Color(0xFF000000);
   static const textoSobreFoto = Color(0xFFFFFFFF);
 
   /// Moeda do Trato (gamificação): ouro da borda, da face e do relevo.

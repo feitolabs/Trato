@@ -14,17 +14,17 @@ from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
-from trato.api.contexto import Contexto, exigir_papel, obter_contexto
+from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_do_suporte
 from trato.notificacoes.canais import CANAIS_DE_NOTIFICACAO, canais_da_config
 from trato.notificacoes.config import obter_config_notificacoes
-from trato.notificacoes.eventos import MODELOS
+from trato.notificacoes.eventos import CATEGORIAS_OBRIGATORIAS, MODELOS
 from trato.notificacoes.ganchos import criar_gancho
 from trato.notificacoes.mensagens import (
     ConversasAppEmMemoria,
     ConversasAppPostgres,
     ServicoMensagens,
 )
-from trato.notificacoes.postgres import NotificacoesServicoPostgres
+from trato.notificacoes.postgres import EmailsDaContaPostgres, NotificacoesServicoPostgres
 from trato.notificacoes.repositorio import PLATAFORMAS, RepositorioEmMemoria
 from trato.notificacoes.servico import ServicoNotificacoes
 from trato.persistencia.erros import DadosInvalidos
@@ -54,6 +54,13 @@ class PreferenciasIO(BaseModel):
 
     categorias: dict[str, dict[str, bool]] = Field(
         description="categoria -> canal (app, push, email) -> ligado."
+    )
+
+
+class PreferenciasOut(PreferenciasIO):
+    obrigatorias: list[str] = Field(
+        default_factory=lambda: sorted(c.value for c in CATEGORIAS_OBRIGATORIAS),
+        description="Categorias que não podem ser desligadas (sempre voltam ligadas).",
     )
 
 
@@ -125,7 +132,10 @@ def montar_servicos(
     banco = contexto.extras.get("banco")
     if servico is None:
         repo = NotificacoesServicoPostgres(banco) if banco is not None else RepositorioEmMemoria()
-        servico = ServicoNotificacoes(repo, canais_da_config(config), config, contexto.agora)
+        emails = EmailsDaContaPostgres(banco) if banco is not None else None
+        servico = ServicoNotificacoes(
+            repo, canais_da_config(config), config, contexto.agora, emails
+        )
     mensagens = ServicoMensagens(
         ConversasAppPostgres(banco) if banco is not None else ConversasAppEmMemoria(contexto)
     )
@@ -196,23 +206,23 @@ def listar_notificacoes(
 
 
 @router.get(
-    "/notificacoes/preferencias", response_model=PreferenciasIO, summary="Minhas preferências"
+    "/notificacoes/preferencias", response_model=PreferenciasOut, summary="Minhas preferências"
 )
 def ver_preferencias(
     usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
     servico: ServicoNotificacoes = Depends(_servico),
-) -> PreferenciasIO:
-    return PreferenciasIO(categorias=servico.preferencias_efetivas(usuario.id))
+) -> PreferenciasOut:
+    return PreferenciasOut(categorias=servico.preferencias_efetivas(usuario.id))
 
 
 @router.put(
-    "/notificacoes/preferencias", response_model=PreferenciasIO, summary="Mudar preferências"
+    "/notificacoes/preferencias", response_model=PreferenciasOut, summary="Mudar preferências"
 )
 def mudar_preferencias(
     corpo: PreferenciasIO,
     usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
     servico: ServicoNotificacoes = Depends(_servico),
-) -> PreferenciasIO:
+) -> PreferenciasOut:
     """Troca só o que veio; o resto continua como estava. SMS/WhatsApp não são preferência."""
     for categoria, canais in corpo.categorias.items():
         if categoria not in _CATEGORIAS:
@@ -224,7 +234,7 @@ def mudar_preferencias(
     for categoria, canais in corpo.categorias.items():
         atuais.setdefault(categoria, {}).update(canais)
     servico.repo.salvar_preferencias(usuario.id, atuais, servico.agora())
-    return PreferenciasIO(categorias=servico.preferencias_efetivas(usuario.id))
+    return PreferenciasOut(categorias=servico.preferencias_efetivas(usuario.id))
 
 
 @router.post(
@@ -241,7 +251,8 @@ def marcar_notificacao_lida(
 @router.post("/dispositivos", status_code=204, summary="Registrar token de push")
 def registrar_dispositivo(
     corpo: DispositivoIn,
-    usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
+    # Conta bloqueada também: recebe o aviso da medida e tira o token ao sair (20.5).
+    usuario: Usuario = Depends(usuario_do_suporte),
     servico: ServicoNotificacoes = Depends(_servico),
 ) -> None:
     if corpo.plataforma not in PLATAFORMAS:
@@ -254,7 +265,8 @@ def registrar_dispositivo(
 @router.delete("/dispositivos", status_code=204, summary="Remover token de push (sair/desligar)")
 def remover_dispositivo(
     corpo: RemoverDispositivoIn,
-    usuario: Usuario = Depends(exigir_papel(*_PESSOAS)),
+    # Conta bloqueada também: recebe o aviso da medida e tira o token ao sair (20.5).
+    usuario: Usuario = Depends(usuario_do_suporte),
     servico: ServicoNotificacoes = Depends(_servico),
 ) -> None:
     """Idempotente: token que não existe ou é de outra pessoa responde 204 do mesmo jeito (não

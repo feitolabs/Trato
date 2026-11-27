@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
+import '../ausencia/ausencia_tela.dart';
+import '../ausencia/modelos.dart';
 import '../../dados/erros.dart';
 import '../../dispositivo/explicacao_permissao.dart';
 import '../../dispositivo/permissao.dart';
@@ -55,6 +57,134 @@ class CheckInTela extends StatefulWidget {
 }
 
 class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
+  // Termos 7.6: chegada registrada e a espera antes de "Cliente ausente".
+  CasoAusencia? _caso;
+  Timer? _relogio;
+  var _registrandoChegada = false;
+  String? _erroAusencia;
+
+  ServicoChegadaAusencia? get _chegada {
+    final s = widget.servico;
+    return !widget.remoto && s is ServicoChegadaAusencia ? s as ServicoChegadaAusencia : null;
+  }
+
+  Future<void> _buscarCaso() async {
+    try {
+      final caso = await _chegada?.casoDeAusencia();
+      if (mounted && caso != null) _usarCaso(caso);
+    } on Object {
+      // Sem resposta: a tela segue como antes; o botão tenta de novo.
+    }
+  }
+
+  void _usarCaso(CasoAusencia caso) {
+    _relogio?.cancel();
+    _relogio = null;
+    setState(() => _caso = caso);
+    final libera = caso.podeRegistrarEm;
+    if (caso.esperando && libera != null && libera.isAfter(DateTime.now())) {
+      // Só a contagem na tela: quem decide se já vale é o servidor.
+      _relogio = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!libera.isAfter(DateTime.now())) timer.cancel();
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  Future<void> _clienteNaoEsta() async {
+    final chegada = _chegada;
+    if (chegada == null) return _confirmarClienteAusente();
+    if (_registrandoChegada) return;
+    setState(() {
+      _registrandoChegada = true;
+      _erroAusencia = null;
+      _erroPasso = null;
+      _aviso = null;
+    });
+    CasoAusencia? caso;
+    try {
+      caso = await chegada.registrarChegada();
+    } on Object catch (e) {
+      if (mounted) {
+        setState(() {
+          _registrandoChegada = false;
+          _erroAusencia =
+              e is ErroTrato ? e.mensagem : 'Não deu para registrar a chegada. Tente de novo.';
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _registrandoChegada = false);
+    // Servidor sem a chegada: vale o fluxo de antes.
+    if (caso == null) return _confirmarClienteAusente();
+    _usarCaso(caso);
+  }
+
+  List<Widget> _secaoDeAusencia(BuildContext context) {
+    final caso = _caso;
+    final libera = caso?.podeRegistrarEm;
+    final falta = libera?.difference(DateTime.now());
+    final erro = _erroAusencia == null
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(bottom: EspacosTrato.x2),
+            child: Text(
+              _erroAusencia!,
+              key: const Key('erro-ausencia'),
+              textAlign: TextAlign.center,
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
+            ),
+          );
+    if (caso == null) {
+      return [
+        if (erro != null) erro,
+        Center(
+          child: TextButton(
+            key: const Key('cliente-ausente'),
+            onPressed: _registrandoChegada ? null : _clienteNaoEsta,
+            style: TextButton.styleFrom(foregroundColor: context.cores.textoSecundario),
+            child: Text(
+                _registrandoChegada ? 'Registrando a chegada…' : 'Cliente não está no local'),
+          ),
+        ),
+      ];
+    }
+    return [
+      CartaoTrato(
+        key: const Key('espera-ausencia'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ResumoAusencia(caso: caso, profissional: true),
+            if (caso.esperando) ...[
+              const SizedBox(height: EspacosTrato.x2),
+              if (caso.chegadaEm != null)
+                Text('Você chegou em ${quandoAusencia(caso.chegadaEm!)}.',
+                    style: TipografiaTrato.corpo),
+              Text(
+                falta == null || falta <= Duration.zero
+                    ? 'A espera terminou: já dá para registrar.'
+                    : 'Falta ${falta.inMinutes}:'
+                        '${(falta.inSeconds % 60).toString().padLeft(2, '0')} para registrar '
+                        '"Cliente ausente".',
+                key: const Key('contagem-ausencia'),
+                style: TipografiaTrato.corpoForte,
+              ),
+              const SizedBox(height: EspacosTrato.x3),
+              if (erro != null) erro,
+              BotaoSecundario(
+                key: const Key('registrar-cliente-ausente'),
+                texto: 'Registrar cliente ausente',
+                aoTocar: _confirmarClienteAusente,
+              ),
+            ],
+          ],
+        ),
+      ),
+    ];
+  }
+
   final _codigo = TextEditingController();
   final _justificativa = TextEditingController();
   late FotoChegada? _foto = widget.fotoInicial;
@@ -71,6 +201,7 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _buscarCaso();
   }
 
   /// Ao voltar ao primeiro plano o "Sem internet" antigo sai: a conexão pode ter voltado.
@@ -113,6 +244,7 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
   @override
   void dispose() {
     _timerOffline?.cancel();
+    _relogio?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _codigo.dispose();
     _justificativa.dispose();
@@ -195,8 +327,10 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
       context: context,
       builder: (dialogo) => AlertDialog(
         title: const Text('Registrar cliente ausente?'),
-        content: const Text(
-          'Isso registra formalmente sua chegada no local e envia um aviso ao cliente no chat do pedido.',
+        content: Text(
+          _caso == null
+              ? 'Isso registra formalmente sua chegada no local e envia um aviso ao cliente no chat do pedido.'
+              : 'Isso registra a ausência e avisa o cliente, que terá um prazo para justificar.',
         ),
         actions: [
           TextButton(
@@ -222,6 +356,10 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
     });
     try {
       await widget.servico.avisarClienteAusente();
+      if (mounted && _caso != null) {
+        setState(() => _erroAusencia = null);
+        await _buscarCaso();
+      }
       if (mounted) {
         setState(
           () => _aviso =
@@ -229,10 +367,16 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
         );
       }
     } on ErroTrato catch (erro) {
-      if (mounted) setState(() => _erroPasso = erro.mensagem);
-    } on Object {
+      // O erro (ex.: "espere mais N min") fica junto do botão que o causou.
       if (mounted) {
-        setState(() => _erroPasso = 'Não deu para registrar a ausência agora. Tente de novo.');
+        setState(() => _caso != null
+            ? _erroAusencia = erro.mensagem
+            : _erroPasso = erro.mensagem);
+      }
+    } on Object {
+      const texto = 'Não deu para registrar a ausência agora. Tente de novo.';
+      if (mounted) {
+        setState(() => _caso != null ? _erroAusencia = texto : _erroPasso = texto);
       }
     }
   }
@@ -409,14 +553,7 @@ class _CheckInTelaState extends State<CheckInTela> with WidgetsBindingObserver {
           const SizedBox(height: EspacosTrato.x8),
           const Divider(),
           const SizedBox(height: EspacosTrato.x3),
-          Center(
-            child: TextButton(
-              key: const Key('cliente-ausente'),
-              onPressed: _confirmarClienteAusente,
-              style: TextButton.styleFrom(foregroundColor: context.cores.textoSecundario),
-              child: const Text('Cliente não está no local'),
-            ),
-          ),
+          ..._secaoDeAusencia(context),
         ],
       ],
     );

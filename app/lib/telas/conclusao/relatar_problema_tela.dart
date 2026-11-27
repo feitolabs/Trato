@@ -1,3 +1,4 @@
+import '../comuns/textos_dos_termos.dart';
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -87,7 +88,10 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
       children: [
         Text('Relatar problema', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x4),
-        _AvisoCongelado(valorCentavos: dados.valorCongeladoCentavos),
+        _AvisoCongelado(
+          valorCentavos: dados.valorCongeladoCentavos,
+          casoEmAnalise: dados.casoEmAnalise,
+        ),
         const SizedBox(height: EspacosTrato.x5),
         Text('O que aconteceu?', style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x3),
@@ -162,7 +166,8 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
         const SizedBox(height: EspacosTrato.x4),
         Text(
           '${primeiraMaiuscula(dados.nomeProfissional)} tem ${dados.prazoRespostaHoras} horas para responder. '
-          'Sem acordo, nosso suporte analisa o caso e decide com base no chat, nas fotos e no orçamento.',
+          'Sem acordo, nosso suporte analisa o caso e decide com base no chat, nas fotos e no orçamento. '
+          '$textoAtendimentoHumano',
           style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
       ],
@@ -171,9 +176,10 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
 }
 
 class _AvisoCongelado extends StatelessWidget {
-  const _AvisoCongelado({required this.valorCentavos});
+  const _AvisoCongelado({required this.valorCentavos, required this.casoEmAnalise});
 
   final int valorCentavos;
+  final bool casoEmAnalise;
 
   @override
   Widget build(BuildContext context) {
@@ -194,12 +200,13 @@ class _AvisoCongelado extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'Caso em análise. ',
+                    text: casoEmAnalise ? 'Caso em análise. ' : 'Relato ainda não enviado. ',
                     style: base.copyWith(fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
-                    text:
-                        'O suporte analisa o problema do serviço de ${formatarReais(valorCentavos)} e avisa a decisão.',
+                    text: casoEmAnalise
+                        ? 'O suporte analisa o problema do serviço de ${formatarReais(valorCentavos)} e avisa a decisão.'
+                        : 'Ao enviar, o suporte analisa o problema do serviço de ${formatarReais(valorCentavos)}.',
                   ),
                 ],
                 style: base,

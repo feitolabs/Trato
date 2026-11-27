@@ -18,7 +18,20 @@ enum DestinoApp {
   /// Avaliação: abre o pedido; para o profissional de um serviço concluído, a tela de avaliar
   /// o cliente.
   avaliacao,
-  indicacoes;
+  indicacoes,
+
+  /// "Falar com o Trato" (avisos do atendimento).
+  suporte,
+
+  /// Medidas da conta (avisos `conta.medida_*`).
+  medidas,
+
+  /// Compensações do profissional (avisos com `compensacao_id`).
+  compensacoes,
+
+  /// Contestação da decisão da disputa (avisos `disputa.contestada` e
+  /// `disputa.contestacao_decidida`).
+  contestacaoDecisao;
 
   /// O host do link (`br.com.feitolabs.trato://<host>/<id>`).
   static DestinoApp? doHost(String host) => switch (host) {
@@ -114,6 +127,8 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
     'mensagens' => DestinoApp.chat,
     'recorrencias' => DestinoApp.recorrencia,
     'indique-e-ganhe' => DestinoApp.indicacoes,
+    'suporte' => DestinoApp.suporte,
+    'medidas' => DestinoApp.medidas,
     _ => null,
   };
   if (destino == null) return ResultadoLink.ignorado;
@@ -123,7 +138,35 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
     'cliente' => 'cliente',
     _ => null,
   };
-  if (destino == DestinoApp.indicacoes) return ResultadoLink.valido(destino, null, papel: papel);
+  // Aviso de compensação: o backend manda `tela: pedido` com o `compensacao_id`. A tela é só
+  // do profissional; sem um id que sirva, abre a lista.
+  final compensacao = texto('compensacao_id');
+  if (destino == DestinoApp.pedido && compensacao != null) {
+    return ResultadoLink.valido(
+      DestinoApp.compensacoes,
+      idDeLinkValido(compensacao) ? compensacao : null,
+      papel: 'profissional',
+    );
+  }
+  // Avisos da contestação da decisão: `tela: pedido`, mas o ponto certo é a contestação.
+  final contestacao = const {'disputa.contestada', 'disputa.contestacao_decidida'}
+      .contains(texto('evento'));
+  if (destino == DestinoApp.pedido && contestacao) {
+    final pedido = texto('pedido_id');
+    if (pedido == null) return ResultadoLink.ignorado;
+    return idDeLinkValido(pedido)
+        ? ResultadoLink.valido(DestinoApp.contestacaoDecisao, pedido, papel: papel)
+        : ResultadoLink.invalido(DestinoApp.contestacaoDecisao, papel: papel);
+  }
+  // Atendimento: o chamado do aviso (`chamado_id`); sem um id que sirva, a lista.
+  if (destino == DestinoApp.suporte) {
+    final chamado = texto('chamado_id');
+    return ResultadoLink.valido(destino, idDeLinkValido(chamado) ? chamado : null, papel: papel);
+  }
+  // Telas sem id.
+  if (destino == DestinoApp.indicacoes || destino == DestinoApp.medidas) {
+    return ResultadoLink.valido(destino, null, papel: papel);
+  }
   // Recorrência: o id da série vem em `recorrencia_id`; sem ele, abre a lista.
   final bruto = destino == DestinoApp.recorrencia ? texto('recorrencia_id') : texto('pedido_id');
   if (bruto == null) {

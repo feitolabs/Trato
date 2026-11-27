@@ -1,3 +1,7 @@
+import 'package:trato/telas/exclusividade_cliente/modelos.dart';
+import 'package:trato/telas/ausencia/modelos.dart';
+import 'package:trato/telas/desistencia/modelos.dart';
+import 'package:trato/telas/comuns/prazo_avaliacao.dart';
 import 'package:trato/auth/servico_auth.dart';
 import '../telas/carteira/dados_exemplo.dart';
 import 'package:trato/telas/orcamentos/modelos.dart' show DadosContrato;
@@ -28,6 +32,38 @@ import 'package:trato/telas/conclusao/modelos.dart';
 const _idDemo = 'demo-4821';
 
 class RepositorioPedidosFake implements RepositorioPedidos {
+  @override
+  Future<List<AnexoAusencia>?> anexosDaAusencia(String pedidoId) async => null;
+
+  @override
+  Future<CasoAusencia> contestarAusencia(
+          String pedidoId, String texto, List<String> fotos) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<SituacaoExclusividadeCliente?> situacaoExclusividadeCliente(String pedidoId) async =>
+      null;
+
+  @override
+  Future<void> pedirExclusividadeCliente(
+          String pedidoId, EscolhaExclusividade escolha, String chaveIdempotencia) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<CasoAusencia?> casoDeAusencia(String pedidoId) async => null;
+
+  @override
+  Future<CasoAusencia> justificarAusencia(
+          String pedidoId, String texto, List<String> fotos) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<SituacaoDesistencia?> situacaoDesistencia(String pedidoId) async => null;
+
+  @override
+  Future<RegistroDesistencia> desistir(String pedidoId, String motivo) async =>
+      throw UnimplementedError();
+
   @override
   Future<DadosContrato> contrato(String pedidoId) async => const DadosContrato(
         numeroPedido: '#AAAA',
@@ -291,6 +327,7 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
     String pedidoId, {
     String? cupom,
     bool usarMoedas = false,
+    bool execucaoImediata = false,
   }) async {
     final base =
         (cupom ?? '').isEmpty ? pag.DadosExemplo.pagamento : await aplicarCupom(pedidoId, cupom!);
@@ -338,6 +375,7 @@ class RepositorioPagamentoFake implements RepositorioPagamento {
     int parcelas = 1,
     String? cupom,
     bool usarMoedas = false,
+    bool execucaoImediata = false,
   }) async {
     cobrancas.add(metodo);
     cobrancasDetalhadas.add((metodo, parcelas, cupom));
@@ -735,6 +773,9 @@ class RepositorioPerfilFake implements RepositorioPerfil {
 }
 
 class RepositorioProfissionalFake implements RepositorioProfissional {
+  @override
+  Future<void> desistirDaExclusividade(String exclusividadeId) async {}
+
   /// Taxa só de demonstração; a real é decidida pelo backend (progressiva, base 7,5%).
 
   final List<MotivoRecusa> recusas = [];
@@ -775,6 +816,9 @@ class RepositorioProfissionalFake implements RepositorioProfissional {
 
   @override
   Future<Map<String, String>> estadosDosPedidos() async => const {};
+
+  @override
+  Future<PrazoAvaliacao> prazoDaAvaliacao(String pedidoId) async => PrazoAvaliacao.desconhecido;
 
   @override
   Future<void> recusar(String pedidoId, MotivoRecusa motivo) async => recusas.add(motivo);

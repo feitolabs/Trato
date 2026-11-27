@@ -138,6 +138,9 @@ class RepositorioContestacoes(Protocol):
 
     def abertas_do_pedido(self, pedido_id: str) -> Sequence[Contestacao]: ...
 
+    def perdidas_do_pedido(self, pedido_id: str) -> Sequence[Contestacao]:
+        """As que o banco do cliente já devolveu. Sem a tabela no banco: nenhuma."""
+
 
 class ContestacoesEmMemoria:
     def __init__(self) -> None:
@@ -154,3 +157,12 @@ class ContestacoesEmMemoria:
 
     def abertas_do_pedido(self, pedido_id: str) -> Sequence[Contestacao]:
         return tuple(c for c in self.listar() if c.pedido_id == pedido_id and c.status.em_aberto)
+
+    def perdidas_do_pedido(self, pedido_id: str) -> Sequence[Contestacao]:
+        alvo = pedido_id.replace("-", "").lower()  # o banco grava o id com ou sem hífen
+        return tuple(
+            c
+            for c in self.listar()
+            if c.status is StatusContestacao.PERDIDA
+            and (c.pedido_id or "").replace("-", "").lower() == alvo
+        )

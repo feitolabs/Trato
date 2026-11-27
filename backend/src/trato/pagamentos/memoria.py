@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 
 from trato.pagamentos.modelos import (
@@ -26,6 +27,11 @@ class CobrancasEmMemoria:
     def do_pedido(self, pedido_id: str) -> Sequence[CobrancaLocal]:
         achadas = [c for c in self._itens.values() if c.pedido_id == pedido_id]
         return sorted(achadas, key=lambda c: c.criada_em)
+
+    def encerrar_contrato(self, pedido_id: str) -> None:
+        for chave, c in list(self._itens.items()):
+            if c.pedido_id == pedido_id:
+                self._itens[chave] = replace(c, contrato_encerrado=True)
 
     def aguardando_desde_antes(self, limite: datetime) -> Sequence[CobrancaLocal]:
         achadas = [

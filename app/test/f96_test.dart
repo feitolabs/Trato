@@ -17,6 +17,7 @@ import 'package:trato/telas/pedidos/modelos.dart';
 import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/tema/tema.dart';
 
+import 'apoio/entrar.dart';
 import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'apoio/exemplos/dados/repositorios_fake.dart';
 import 'apoio/exemplos/demo.dart';
@@ -80,7 +81,7 @@ void main() {
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final auth = ServicoAuthFake();
-    await auth.entrarComEmail(email: 'ana@exemplo.com', senha: '12345678');
+    await entrarNaContaDeTeste(auth, email: 'ana@exemplo.com');
     ServicoAuthPadrao.atual = auth;
     (RotasTrato.repos.perfilPublico! as ServicoPerfilPublicoFake)
         .definirTemPerfil(true);
@@ -237,7 +238,7 @@ void main() {
           reason: 'o push substituiu o link');
 
       final auth = ServicoAuthFake();
-      await auth.entrarComEmail(email: 'ana@exemplo.com', senha: '12345678');
+      await entrarNaContaDeTeste(auth, email: 'ana@exemplo.com');
       ServicoAuthPadrao.atual = auth;
       final chave = GlobalKey<NavigatorState>();
       DeepLinks.navegador = () => chave.currentState;

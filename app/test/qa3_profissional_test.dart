@@ -33,7 +33,6 @@ import 'package:trato/telas/profissional/servico_check_in.dart';
 import 'package:trato/telas/profissional/servico_orcamento.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro.dart';
 import 'package:trato/telas/profissional_cadastro/cadastro_profissional_tela.dart';
-import 'package:trato/telas/profissional_inicio/detalhe_pedido_tela.dart';
 import 'package:trato/telas/profissional_inicio/inicio_profissional_tela.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';
 import 'package:trato/telas/verificacao/verificacao.dart';
@@ -45,8 +44,8 @@ import 'apoio/exemplos/telas/disputa_profissional/disputa_fake.dart';
 import 'apoio/exemplos/telas/profissional/servico_check_in_fake.dart';
 import 'apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'apoio/exemplos/telas/profissional_cadastro/cadastro_fake.dart';
-import 'apoio/exemplos/telas/profissional_inicio/dados_exemplo.dart';
 import 'apoio/exemplos/telas/verificacao/verificacao_fake.dart';
+import 'apoio/orcamento.dart';
 
 const _textoGigante =
     'Texto gigante de teste adversarial sem quebra para estressar layout e validacao '
@@ -267,11 +266,13 @@ void main() {
           tituloPedido: 'Trocar tomada',
           modoInicial: ModoOrcamento.valorFechado,
           valorFechadoInicial: '0',
+          garantiaInicialDias: 90,
           prazoExecucaoInicialDias: 0,
           aoEnviar: (p) => enviado = p,
         ),
         tamanho: const Size(390, 1400),
       );
+      await completarOrcamento(tester);
       await tester.tap(find.byType(BotaoPrimario));
       await tester.pumpAndSettle();
       expect(enviado, isNull);
@@ -297,6 +298,8 @@ void main() {
           tituloPedido: 'Instalar chuveiro',
           modoInicial: ModoOrcamento.valorFechado,
           valorFechadoInicial: '200,00',
+          garantiaInicialDias: 90,
+          prazoExecucaoInicialDias: 3,
           aoEnviar: (_) {
             envios++;
             return c.future;
@@ -304,6 +307,7 @@ void main() {
         ),
         tamanho: const Size(390, 1400),
       );
+      await completarOrcamento(tester);
       await tester.tap(find.byType(BotaoPrimario));
       await tester.pump();
       await tester.tap(find.byType(BotaoPrimario));
@@ -334,7 +338,6 @@ void main() {
           CalculadoraOrcamentoTela(
             servico: ServicoOrcamentoFake(),
             tituloPedido: _textoGigante,
-            mostrarForaDoEscopo: true,
             foraDoEscopoInicial: '$_emojiRtl $_htmlSql',
           ),
           tamanho: size,
@@ -464,169 +467,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('exclusividade com saldo 0, bloqueio passado e bloqueio futuro', (tester) async {
-      await _abrir(
-        tester,
-        DetalhePedidoTela(
-          dados: const DetalhePedido(
-            pedido: pedidoTomadasExemplo,
-            fechaEm: '30h',
-            clienteResumo: 'Mariana',
-            legendasFotos: [],
-            descricao: 'Desc',
-            linhas: [],
-            exclusividades: ResumoExclusividades(saldoProfissional: 0),
-          ),
-          aoPedirExclusividade: (_) async => const ExclusividadeProfissional(
-            id: 'e1',
-            pedidoId: 'ped-tomadas',
-            status: 'aguardando_cliente',
-          ),
-        ),
-        tamanho: const Size(390, 1400),
-      );
-      expect(find.textContaining('100 Tratinhos'), findsWidgets);
 
-      var pediu = 0;
-      await _abrir(
-        tester,
-        DetalhePedidoTela(
-          dados: DetalhePedido(
-            pedido: pedidoTomadasExemplo,
-            fechaEm: '30h',
-            clienteResumo: 'Mariana',
-            legendasFotos: const [],
-            descricao: 'Desc',
-            linhas: const [],
-            bloqueadoAte: DateTime.now().subtract(const Duration(hours: 2)),
-            exclusividades: const ResumoExclusividades(saldoProfissional: 150),
-          ),
-          aoPedirExclusividade: (_) async {
-            pediu++;
-            return const ExclusividadeProfissional(
-              id: 'e1',
-              pedidoId: 'ped-tomadas',
-              status: 'aguardando_cliente',
-            );
-          },
-        ),
-        tamanho: const Size(390, 1400),
-      );
-      await tester.tap(find.text('Pedir exclusividade de 48 horas'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Confirmar por 100 Tratinhos'));
-      await tester.pumpAndSettle();
-      expect(pediu, 1);
 
-      await _abrir(
-        tester,
-        DetalhePedidoTela(
-          dados: DetalhePedido(
-            pedido: pedidoTomadasExemplo,
-            fechaEm: '30h',
-            clienteResumo: 'Mariana',
-            legendasFotos: const [],
-            descricao: 'Desc',
-            linhas: const [],
-            bloqueadoAte: DateTime.now().add(const Duration(hours: 12)),
-            exclusividades: const ResumoExclusividades(saldoProfissional: 150),
-          ),
-          aoPedirExclusividade: (_) async => const ExclusividadeProfissional(
-            id: 'e1',
-            pedidoId: 'ped-tomadas',
-            status: 'aguardando_cliente',
-          ),
-        ),
-        tamanho: const Size(390, 1400),
-      );
-      expect(find.textContaining('poderá tentar de novo'), findsOneWidget);
-    });
-
-    testWidgets('toque duplo rapido na confirmacao de exclusividade nao fecha a tela anterior', (tester) async {
-      tester.view.physicalSize = const Size(390, 1400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-
-      var pediu = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: TemaTrato.claro,
-          home: Builder(
-            builder: (ctx) => Scaffold(
-              body: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DetalhePedidoTela(
-                      dados: const DetalhePedido(
-                        pedido: pedidoTomadasExemplo,
-                        fechaEm: '30h',
-                        clienteResumo: 'Mariana',
-                        legendasFotos: [],
-                        descricao: 'Desc',
-                        linhas: [],
-                        exclusividades: ResumoExclusividades(saldoProfissional: 200),
-                      ),
-                      aoPedirExclusividade: (_) async {
-                        pediu++;
-                        return const ExclusividadeProfissional(
-                          id: 'e1',
-                          pedidoId: 'ped-tomadas',
-                          status: 'aguardando_cliente',
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                child: const Text('Abrir'),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('Abrir'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Pedir exclusividade de 48 horas'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Confirmar por 100 Tratinhos'));
-      await tester.tap(find.text('Confirmar por 100 Tratinhos'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      expect(pediu, 1);
-      expect(find.byType(DetalhePedidoTela), findsOneWidget);
-    });
-
-    testWidgets('voltar no meio da folha de exclusividade nao chama aoPedirExclusividade', (tester) async {
-      var pediu = 0;
-      await _abrir(
-        tester,
-        DetalhePedidoTela(
-          dados: const DetalhePedido(
-            pedido: pedidoTomadasExemplo,
-            fechaEm: '30h',
-            clienteResumo: 'Mariana',
-            legendasFotos: [],
-            descricao: 'Desc',
-            linhas: [],
-            exclusividades: ResumoExclusividades(saldoProfissional: 200),
-          ),
-          aoPedirExclusividade: (_) async {
-            pediu++;
-            return const ExclusividadeProfissional(
-              id: 'e1',
-              pedidoId: 'ped-tomadas',
-              status: 'aguardando_cliente',
-            );
-          },
-        ),
-        tamanho: const Size(390, 1400),
-      );
-      await tester.tap(find.text('Pedir exclusividade de 48 horas'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancelar'));
-      await tester.pumpAndSettle();
-      expect(pediu, 0);
-    });
   });
 
   group('Modelos API & Carregador', () {

@@ -27,6 +27,7 @@ import 'apoio/exemplos/telas/profissional/servico_check_in_fake.dart';
 import 'apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'apoio/exemplos/telas/profissional_inicio/dados_exemplo.dart';
 import 'apoio/fontes.dart';
+import 'apoio/orcamento.dart';
 
 final _png1x1 = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -328,6 +329,7 @@ void main() {
           decimosDeHora: 40,
           valorHoraCentavos: 12000,
           garantiaDias: 90,
+          validadeDias: 3,
           prazoExecucaoDias: 3,
           itens: [],
           materialPorMim: true,
@@ -360,7 +362,6 @@ void main() {
                     servico: ServicoOrcamentoFake(),
                     tituloPedido: det.tituloPedido,
                     edicao: true,
-                    mostrarForaDoEscopo: true,
                     deslocamentoInicial: '1',
                     horasInicial: '2,5',
                     valorHoraInicial: '100',
@@ -387,6 +388,7 @@ void main() {
       expect(find.text('Enviar nova versão'), findsOneWidget);
       expect(find.text('Fornecimento de disjuntor geral'), findsOneWidget);
 
+      await completarOrcamento(tester, naoIncluido: null);
       await tester.tap(find.text('Enviar nova versão'));
       await tester.pumpAndSettle();
       expect(reenviado, isNotNull);

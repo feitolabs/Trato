@@ -70,6 +70,12 @@ def montar(
             continue
         if item.tipo is TipoLancamento.REPASSE and dele(TipoConta.LIBERADO, item.credito):
             linhas.append(LinhaExtrato(item.data, item.pedido_id, "Recebido", item.valor))
+        elif item.tipo is TipoLancamento.REPASSE and dele(TipoConta.A_COMPENSAR, item.credito):
+            linhas.append(LinhaExtrato(item.data, item.pedido_id, "Compensação", -item.valor))
+        elif item.tipo is TipoLancamento.ESTORNO and dele(TipoConta.A_COMPENSAR, item.debito):
+            linhas.append(
+                LinhaExtrato(item.data, item.pedido_id, "Compensação devolvida", item.valor)
+            )
         elif item.tipo is TipoLancamento.ESTORNO and dele(TipoConta.LIBERADO, item.debito):
             linhas.append(LinhaExtrato(item.data, item.pedido_id, "Estorno", -item.valor))
         elif item.tipo is TipoLancamento.COBRANCA and dele(TipoConta.LIBERADO, item.credito):

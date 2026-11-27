@@ -118,16 +118,16 @@ void main() {
         };
         await t.pumpWidget(_app(MeuCnpjTela(servico: _Fake(const DadosMei()))));
         await t.pumpAndSettle();
-        expect(find.text('Meu CNPJ'), findsOneWidget);
-        expect(find.text('CNPJ não informado'), findsOneWidget);
-        expect(find.text('Sem CNPJ você não consegue enviar orçamentos.'),
+        expect(find.text('Meu MEI'), findsOneWidget);
+        expect(find.text('MEI não informado'), findsOneWidget);
+        expect(find.text('Sem MEI você não consegue enviar orçamentos.'),
             findsWidgets);
         await t.scrollUntilVisible(
             find.byKey(const Key('botao-abrir-mei')), 200,
             scrollable: find.byType(Scrollable).first);
         expect(find.text('Abrir o MEI é grátis e leva cerca de 10 minutos.'),
             findsOneWidget);
-        expect(find.text('Volte aqui para informar o número.'), findsOneWidget);
+        expect(find.text('Volte aqui para informar o CNPJ do MEI.'), findsOneWidget);
         await t.ensureVisible(find.byKey(const Key('botao-abrir-mei')));
         await t.pumpAndSettle();
         await t.tap(find.byKey(const Key('botao-abrir-mei')));
@@ -152,7 +152,7 @@ void main() {
         await t.tap(find.byKey(const Key('botao-validar-cnpj')));
         await t.pumpAndSettle();
         expect(f.enviados, ['11444777000161']);
-        expect(find.text('CNPJ verificado'), findsOneWidget);
+        expect(find.text('MEI verificado'), findsOneWidget);
         expect(find.text('Carlos Lima Eletricista ME'), findsOneWidget);
         expect(find.byKey(const Key('botao-abrir-mei')), findsNothing);
         expect(t.takeException(), isNull);
@@ -198,7 +198,7 @@ void main() {
               motivo: 'CNPJ baixado.')),
         )));
         await t.pumpAndSettle();
-        expect(find.text('CNPJ não validado'), findsOneWidget);
+        expect(find.text('MEI não validado'), findsOneWidget);
         expect(find.text('Motivo: CNPJ baixado.'), findsOneWidget);
         expect(t.takeException(), isNull);
       });
@@ -236,7 +236,7 @@ void main() {
   group('orçamento barrado por falta de CNPJ', () {
     for (final fonte in _fontes) {
       testWidgets(
-          '422 de CNPJ: texto do servidor e botão "Informar meu CNPJ" (x$fonte)',
+          '422 de CNPJ: texto do servidor e botão "Informar meu MEI" (x$fonte)',
           (t) async {
         await _janela(t, _tamanhos.first, fonte);
         RotasTrato.repos = repositoriosDemo(mei: _Fake(const DadosMei()));
@@ -281,7 +281,7 @@ void main() {
     });
   });
 
-  testWidgets('Configurações do profissional tem "Meu CNPJ"; a do cliente não',
+  testWidgets('Configurações do profissional tem "Meu MEI"; a do cliente não',
       (t) async {
     await _janela(t, _tamanhos.first, 1);
     RotasTrato.repos = repositoriosDemo(mei: _Fake(const DadosMei()));
@@ -295,9 +295,9 @@ void main() {
       RotasTrato.abrirConfiguracoes(ctx, profissional: profissional);
       await t.pumpAndSettle();
       expect(
-          find.text('Meu CNPJ'), profissional ? findsOneWidget : findsNothing);
+          find.text('Meu MEI'), profissional ? findsOneWidget : findsNothing);
       if (profissional) {
-        await t.tap(find.text('Meu CNPJ'));
+        await t.tap(find.text('Meu MEI'));
         await t.pumpAndSettle();
         expect(find.byType(MeuCnpjTela), findsOneWidget);
       }

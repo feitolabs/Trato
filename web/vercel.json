@@ -1,0 +1,21 @@
+{
+  "buildCommand": "sha256sum -c build/web/trato-config.sha256 || { echo 'ERRO: build sem configuracao. Rode python tool/build_web.py antes de publicar.'; exit 1; }",
+  "outputDirectory": "build/web",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+        }
+      ]
+    }
+  ]
+}

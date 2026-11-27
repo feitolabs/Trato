@@ -237,6 +237,10 @@ class ClienteApi {
       // A sessão é expirada (e o cache limpo) por quem chama, com await.
       throw ErroTrato.sessaoExpirada;
     }
+    if (codigo == 403 && sessao.logada && _codigoErro(resposta) == 'conta_bloqueada') {
+      // Conta bloqueada não é sessão vencida: sem logout. O erro segue para quem chamou.
+      sessao.aoBloquear?.call(_detalhe(resposta));
+    }
     if (codigo == 404) {
       throw ErroTrato(
         TipoErro.naoEncontrado,
@@ -255,6 +259,10 @@ class ClienteApi {
           codigoHttp: codigo,
           codigo: cod,
         );
+      }
+      // 503 sem código: "função ainda não disponível" em algumas rotas; guarda o número.
+      if (codigo == 503) {
+        throw ErroTrato(TipoErro.servidor, ErroTrato.servidor.mensagem, codigoHttp: codigo);
       }
       throw ErroTrato.servidor;
     }

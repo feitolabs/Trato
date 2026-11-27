@@ -9,11 +9,15 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 
+import psycopg
+
+from trato.api.moedas_saldo import parcelas_do_gasto, saldo_disponivel
 from trato.financeiro import periodo
 from trato.persistencia.comum import como_uuid
 
@@ -30,6 +34,15 @@ MARGEM_RESERVA_MINUTOS = 2  # a reserva dura um pouco mais que o Pix (que vence 
 _NS_RESERVA = uuid.UUID("6f1c2a52-7d0e-4f0b-9a57-3c6c1f4d2a10")
 
 log = logging.getLogger("trato.moedas")
+
+# Termos 13.4 e I.5: sem prazo na configuração, o crédito novo vale 90 dias.
+VALIDADE_PADRAO_DIAS = 90
+# Termos 13.8 e I.9: devolução de Tratinhos já vencidos vira crédito novo com este prazo.
+VALIDADE_DEVOLUCAO_VENCIDA_DIAS = 30
+
+
+def vencimento_de_credito_novo(cfg: ConfigMoedas, agora: datetime) -> datetime:
+    return agora + timedelta(days=cfg.validade_dias or VALIDADE_PADRAO_DIAS)
 
 
 @dataclass(frozen=True)
@@ -138,6 +151,16 @@ class RepositorioMoedas(Protocol):
 
     def existe(self, chave_idempotencia: str) -> bool: ...
 
+    def lancamentos_da_carteira(
+        self, usuario_id: str, carteira: str = "cliente"
+    ) -> list[LancamentoMoeda]:
+        """Todos os lançamentos da carteira (o saldo e o consumo por crédito saem deles)."""
+        ...
+
+    def trava(self, nome: str) -> AbstractContextManager[None]:
+        """Uma operação por vez para o mesmo `nome` (ler os lançamentos e gravar sem corrida)."""
+        ...
+
     def bonus_do_par(self, usuario_id: str, parceiro_id: str, desde: datetime) -> int: ...
 
     def extrato(
@@ -241,6 +264,7 @@ class MoedasEmMemoria:
         self._pendentes: dict[str, PendenteMoeda] = {}
         self._reservas: dict[str, ReservaMoeda] = {}
         self._trava = threading.Lock()  # a reserva em memória é atômica como a do banco
+        self._travas_nomeadas: dict[str, Any] = {}
 
     def config(self) -> ConfigMoedas:
         return self._config
@@ -255,13 +279,23 @@ class MoedasEmMemoria:
         return True
 
     def saldo(self, usuario_id: str, agora: datetime, carteira: str = "cliente") -> int:
-        return sum(
-            i.quantidade
-            for i in self._itens.values()
-            if i.usuario_id == usuario_id
-            and i.carteira == carteira
-            and (i.expira_em is None or i.expira_em > agora)
-        )
+        return saldo_disponivel(self.lancamentos_da_carteira(usuario_id, carteira), agora)
+
+    def lancamentos_da_carteira(
+        self, usuario_id: str, carteira: str = "cliente"
+    ) -> list[LancamentoMoeda]:
+        return [
+            i
+            for i in list(self._itens.values())
+            if i.usuario_id == usuario_id and i.carteira == carteira
+        ]
+
+    @contextmanager
+    def trava(self, nome: str) -> Iterator[None]:
+        with self._trava:
+            lock = self._travas_nomeadas.setdefault(nome, threading.RLock())
+        with lock:
+            yield
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int:
         return sum(
@@ -272,6 +306,20 @@ class MoedasEmMemoria:
 
     def existe(self, chave_idempotencia: str) -> bool:
         return chave_idempotencia in self._itens
+
+    def restauracao_disponivel(self) -> bool:
+        return True
+
+    def restauracao_devida(
+        self, medida_id: str, usuario_id: str, carteira: str, inicio: datetime, agora: datetime
+    ) -> int:
+        """Saldo válido no início do encerramento menos o válido agora (como no banco)."""
+        todos = self.lancamentos_da_carteira(usuario_id, carteira)
+        antes = saldo_disponivel([x for x in todos if x.criada_em <= inicio], inicio)
+        return max(0, antes - saldo_disponivel(todos, max(agora, inicio)))
+
+    def restaurar(self, lancamento: LancamentoMoeda) -> bool:
+        return self.lancar(lancamento)
 
     def bonus_do_par(self, usuario_id: str, parceiro_id: str, desde: datetime) -> int:
         return sum(
@@ -590,29 +638,52 @@ class MoedasPostgres:
         return linha is not None
 
     def saldo(self, usuario_id: str, agora: datetime, carteira: str = "cliente") -> int:
+        return saldo_disponivel(self.lancamentos_da_carteira(usuario_id, carteira), agora)
+
+    def lancamentos_da_carteira(
+        self, usuario_id: str, carteira: str = "cliente"
+    ) -> list[LancamentoMoeda]:
         uid = como_uuid(usuario_id)
         if uid is None:
-            return 0
+            return []
+        colunas = "tipo, quantidade, chave_idempotencia, expira_em, criada_em"
         try:
             with self._banco.transacao() as con:
-                l = con.execute(  # noqa: E741
-                    "select coalesce(sum(quantidade), 0) as total "
-                    "from public.moedas_lancamentos "
-                    "where usuario_id = %s and carteira = %s "
-                    "and (expira_em is null or expira_em > %s)",
-                    (uid, carteira, agora),
-                ).fetchone()
+                linhas = con.execute(
+                    f"select {colunas} from public.moedas_lancamentos "  # noqa: S608
+                    "where usuario_id = %s and carteira = %s",
+                    (uid, carteira),
+                ).fetchall()
         except Exception:  # noqa: BLE001 - coluna `carteira` ainda não existe: tudo é do cliente
             if carteira != CARTEIRA_CLIENTE:
-                return 0
+                return []
             with self._banco.transacao() as con:
-                l = con.execute(  # noqa: E741
-                    "select coalesce(sum(quantidade), 0) as total "
-                    "from public.moedas_lancamentos "
-                    "where usuario_id = %s and (expira_em is null or expira_em > %s)",
-                    (uid, agora),
-                ).fetchone()
-        return int(l["total"])
+                linhas = con.execute(
+                    f"select {colunas} from public.moedas_lancamentos "  # noqa: S608
+                    "where usuario_id = %s",
+                    (uid,),
+                ).fetchall()
+        return [
+            LancamentoMoeda(
+                usuario_id=usuario_id,
+                tipo=l["tipo"],
+                quantidade=int(l["quantidade"]),
+                chave_idempotencia=l["chave_idempotencia"],
+                criada_em=l["criada_em"],
+                expira_em=l["expira_em"],
+                carteira=carteira,
+            )
+            for l in linhas  # noqa: E741
+        ]
+
+    @contextmanager
+    def trava(self, nome: str) -> Iterator[None]:
+        # Trava só deste nome até o COMMIT: duas máquinas não devolvem a mesma moeda.
+        with self._banco.transacao() as con:
+            con.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"moedas|{nome}",)
+            )
+            yield
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int:
         uid = como_uuid(usuario_id)
@@ -625,6 +696,54 @@ class MoedasPostgres:
                 (uid, tipo, desde),
             ).fetchone()
         return int(l["total"])
+
+    def restauracao_disponivel(self) -> bool:
+        with self._banco.transacao() as con:
+            return con.execute(
+                "select to_regprocedure("
+                "'public.moedas_restauracao_devida(uuid,text,timestamptz)') is not null as tem"
+            ).fetchone()["tem"]
+
+    def restauracao_devida(
+        self, medida_id: str, usuario_id: str, carteira: str, inicio: datetime, agora: datetime
+    ) -> int:
+        mid = como_uuid(medida_id)
+        if mid is None:
+            return 0
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select public.moedas_restauracao_devida(%s, %s, %s) as q", (mid, carteira, agora)
+            ).fetchone()
+        return int(linha["q"] or 0)
+
+    def restaurar(self, lancamento: LancamentoMoeda) -> bool:
+        """Num ponto de retorno: se o banco recusar a regra, o resto da transação continua."""
+        with self._banco.transacao() as con:
+            try:
+                with con.transaction():
+                    linha = con.execute(
+                        "insert into public.moedas_lancamentos (usuario_id, tipo, quantidade, "
+                        "chave_idempotencia, referencia_id, expira_em, criada_em, carteira) "
+                        "values (%s, 'restauracao', %s, %s, %s, %s, %s, %s) "
+                        "on conflict (chave_idempotencia) do nothing returning id",
+                        (
+                            como_uuid(lancamento.usuario_id),
+                            lancamento.quantidade,
+                            lancamento.chave_idempotencia,
+                            como_uuid(lancamento.referencia_id),
+                            lancamento.expira_em,
+                            lancamento.criada_em,
+                            lancamento.carteira,
+                        ),
+                    ).fetchone()
+            except psycopg.errors.CheckViolation:
+                log.warning(
+                    "o banco recusou a restauração %s",
+                    lancamento.chave_idempotencia,
+                    exc_info=True,
+                )
+                return False
+        return linha is not None
 
     def existe(self, chave_idempotencia: str) -> bool:
         with self._banco.transacao() as con:
@@ -1049,7 +1168,7 @@ def conceder_bonus_avaliacao(
         else:
             # Já creditado antes desta mudança (mesma chave): não pendura de novo.
             return quantidade if gravou and not repo.existe(chave) else 0
-    expira = agora + timedelta(days=cfg.validade_dias) if cfg.validade_dias else None
+    expira = vencimento_de_credito_novo(cfg, agora)
     gravou = repo.lancar(
         LancamentoMoeda(
             usuario_id=cliente_id,
@@ -1147,7 +1266,7 @@ def liberar_bonus_pendentes(
         elif decisao is DecisaoBonus.CANCELAR:
             cancelados += int(repo.marcar_pendente(pend.chave_idempotencia, "cancelado"))
         else:
-            expira = agora + timedelta(days=cfg.validade_dias) if cfg.validade_dias else None
+            expira = vencimento_de_credito_novo(cfg, agora)
             do_profissional = pend.tipo_lancamento == TIPO_BONUS_PROFISSIONAL
             repo.lancar(  # idempotente pela chave: se o ciclo caiu no meio, só falta marcar
                 LancamentoMoeda(
@@ -1492,20 +1611,175 @@ def devolver_uso_moedas(
     pedido_id: str,
     moedas: int,
     agora: datetime,
+    devolvido_centavos: int | None = None,
+    base_centavos: int | None = None,
 ) -> bool:
-    """Devolve as moedas de uma cobrança estornada por inteiro. Idempotente por cobrança.
+    """Devolve as moedas de uma cobrança estornada (Termos 13.8 e I.9).
+
+    Sem `devolvido_centavos`/`base_centavos`, devolve tudo. Com eles, a proporção do total já
+    devolvido ao cliente (arredondada para baixo; tudo quando chega à base). Cada parte volta com a
+    validade do crédito de onde saiu; se ele já venceu, vira crédito novo de 30 dias. Idempotente:
+    só lança a diferença entre o que é devido e o que já voltou, uma operação por vez por cobrança.
 
     Só devolve se o débito (`uso:<cobrança>`) existiu: sem débito não há o que devolver.
     """
-    if moedas <= 0 or not repo.existe(f"uso:{cobranca_id}"):
+    if moedas <= 0:
         return False
-    return repo.lancar(
-        LancamentoMoeda(
-            usuario_id=usuario_id,
-            tipo="estorno",
-            quantidade=moedas,
-            chave_idempotencia=f"estorno-uso:{cobranca_id}",
-            criada_em=agora,
-            referencia_id=pedido_id,
+    devidas = moedas
+    if devolvido_centavos is not None and base_centavos is not None and base_centavos > 0:
+        devidas = moedas * max(0, min(devolvido_centavos, base_centavos)) // base_centavos
+    if devidas <= 0:
+        return False
+    uso, antiga = f"uso:{cobranca_id}", f"estorno-uso:{cobranca_id}"
+    with repo.trava(antiga):
+        if not repo.existe(uso):
+            return False
+        lancamentos = repo.lancamentos_da_carteira(usuario_id, CARTEIRA_CLIENTE)
+        ja = sum(
+            i.quantidade
+            for i in lancamentos
+            if i.chave_idempotencia == antiga or i.chave_idempotencia.startswith(f"{antiga}:")
         )
-    )
+        falta = devidas - ja
+        if falta <= 0:
+            return False
+        vencidas_ate = agora + timedelta(days=VALIDADE_DEVOLUCAO_VENCIDA_DIAS)
+        partes: dict[datetime | None, int] = {}
+        pular = ja  # o que já voltou saiu das primeiras parcelas do gasto
+        resta = falta
+        for parcela in parcelas_do_gasto(lancamentos, uso):
+            salto = min(pular, parcela.quantidade)
+            pular -= salto
+            tirar = min(parcela.quantidade - salto, resta)
+            if not tirar:
+                continue
+            valida = parcela.expira_em is None or parcela.expira_em > agora
+            validade = parcela.expira_em if valida else vencidas_ate
+            partes[validade] = partes.get(validade, 0) + tirar
+            resta -= tirar
+        if resta:  # gasto sem crédito de origem (dado antigo): trata como vencido
+            partes[vencidas_ate] = partes.get(vencidas_ate, 0) + resta
+        gravou = False
+        for n, (validade, quantidade) in enumerate(partes.items()):
+            gravou |= repo.lancar(
+                LancamentoMoeda(
+                    usuario_id=usuario_id,
+                    tipo="estorno",
+                    quantidade=quantidade,
+                    chave_idempotencia=f"{antiga}:{devidas}:{n}",
+                    criada_em=agora,
+                    referencia_id=pedido_id,
+                    expira_em=validade,
+                )
+            )
+        return gravou
+
+
+def saldo_total_disponivel(repo: RepositorioMoedas | None, usuario_id: str, agora: datetime) -> int:
+    """Soma dos Tratinhos disponíveis (carteiras cliente e profissional) que o usuário tem agora.
+
+    Degrada para 0 se o repositório/tabela ainda não estiver disponível no ambiente.
+    """
+    if repo is None:
+        return 0
+    try:
+        cliente = max(0, int(repo.saldo(usuario_id, agora, CARTEIRA_CLIENTE)))
+    except Exception:  # noqa: BLE001 - tabela/serviço indisponível em ambiente mínimo
+        log.warning("Leitura de saldo de Tratinhos (cliente) indisponível; tratando como 0.")
+        cliente = 0
+    profissional = max(0, saldo_profissional(repo, usuario_id, agora))
+    return cliente + profissional
+
+
+VALIDADE_MINIMA_RESTAURACAO_DIAS = 30  # igual à devolução da 13.8; o banco exige
+
+
+def restaurar_tratinhos(
+    repo: RepositorioMoedas | None,
+    medida_id: str,
+    usuario_id: str,
+    inicio: datetime,
+    agora: datetime,
+) -> int:
+    """Termos 13.10 e I.11: conta restabelecida recebe, por carteira, o que venceu desde o
+    encerramento. Chave única por medida e carteira: repetir não credita de novo. Banco sem a
+    migration: nada acontece."""
+    if repo is None or not repo.restauracao_disponivel():
+        return 0
+    dias = max(VALIDADE_MINIMA_RESTAURACAO_DIAS, repo.config().validade_dias or 0)
+    total = 0
+    for carteira in (CARTEIRA_CLIENTE, CARTEIRA_PROFISSIONAL):
+        chave = f"restauracao:{_com_hifens(medida_id)}:{carteira}"
+        with repo.trava(f"restauracao:{usuario_id}:{carteira}"):
+            if repo.existe(chave):
+                continue
+            devida = repo.restauracao_devida(medida_id, usuario_id, carteira, inicio, agora)
+            if devida <= 0:
+                continue
+            if repo.restaurar(
+                LancamentoMoeda(
+                    usuario_id=usuario_id,
+                    tipo="restauracao",
+                    quantidade=devida,
+                    chave_idempotencia=chave,
+                    criada_em=agora,
+                    referencia_id=medida_id,
+                    expira_em=agora + timedelta(days=dias),
+                    carteira=carteira,
+                )
+            ):
+                total += devida
+    return total
+
+
+def _com_hifens(valor: str) -> str:
+    """O banco confere a chave contra o uuid no formato com hífens."""
+    try:
+        return str(uuid.UUID(valor))
+    except ValueError:
+        return valor
+
+
+def zerar_tratinhos_encerramento_voluntario(
+    repo: RepositorioMoedas | None,
+    usuario_id: str,
+    pedido_exclusao_id: str,
+    agora: datetime,
+) -> int:
+    """Zera os Tratinhos válidos restantes no encerramento voluntário da conta (Termos 13.10).
+
+    Lança débito `ajuste` no livro imutável de moedas (nunca UPDATE/DELETE). Idempotente por
+    `(pedido_exclusao_id, carteira)` e atômico via `repo.trava` para impedir saldo negativo ou
+    lançamento duplicado em corrida. Se saldo for 0, não grava lançamento vazio.
+    """
+    if repo is None:
+        return 0
+    total_zerado = 0
+    for carteira in (CARTEIRA_CLIENTE, CARTEIRA_PROFISSIONAL):
+        chave = f"encerramento-voluntario:{pedido_exclusao_id}:{carteira}"
+        try:
+            with repo.trava(f"encerramento:{usuario_id}:{carteira}"):
+                if repo.existe(chave):
+                    continue
+                disponivel = max(0, int(repo.saldo(usuario_id, agora, carteira)))
+                if disponivel <= 0:
+                    continue
+                gravou = repo.lancar(
+                    LancamentoMoeda(
+                        usuario_id=usuario_id,
+                        tipo="ajuste",
+                        quantidade=-disponivel,
+                        chave_idempotencia=chave,
+                        criada_em=agora,
+                        referencia_id=pedido_exclusao_id,
+                        carteira=carteira,
+                    )
+                )
+                if gravou:
+                    total_zerado += disponivel
+        except Exception:  # noqa: BLE001 - tabela/coluna ausente em ambiente mínimo
+            log.warning(
+                "Não foi possível zerar Tratinhos (%s) no encerramento voluntário; seguindo.",
+                carteira,
+            )
+    return total_zerado

@@ -34,6 +34,8 @@ POR_HORA = {
 def _enviar(amb):
     amb.semear_pedido(Estado.ABERTO, orcamento_id=None, profissional_id=None)
     amb.contexto.contratos._itens.clear()
+    amb.contexto.orcamentos._itens.clear()
+    amb.contexto.orcamentos._detalhes.clear()
     r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=POR_HORA, headers=cab("t-prof"))
     assert r.status_code == 201, r.text
     return r.json()

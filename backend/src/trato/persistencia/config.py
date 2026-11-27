@@ -11,7 +11,7 @@ from typing import Any
 
 import psycopg
 
-from trato.api.repositorios import ConfigApi
+from trato.api.repositorios import PRAZO_AVALIACAO_PADRAO_DIAS, ConfigApi
 from trato.disputas import ConfigDisputa
 from trato.garantias import ConfigGarantia
 from trato.garantias.config import garantia_minima_do_slug
@@ -59,6 +59,18 @@ class ConfigPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
+    def parametro_inteiro(self, chave: str) -> int | None:
+        """Valor publicado (global) na versão vigente; `None` sem versão ou sem o parâmetro,
+        e quem chama usa o próprio padrão."""
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select p.valor from public.config_parametros p "
+                "join public.config_versoes v on v.id = p.versao_id "
+                "where v.status = 'vigente' and p.escopo_tipo = 'global' and p.chave = %s",
+                (chave,),
+            ).fetchone()
+        return None if linha is None else int(linha["valor"])
+
     def carregar(self) -> ConfigApi:
         with self._banco.transacao() as con:
             versao = versao_vigente(con)
@@ -100,4 +112,32 @@ class ConfigPostgres:
             valor_maximo_servico_centavos=p.get("valor_maximo_servico_centavos"),
             limite_orcamentos_por_pedido=p.get("limite_orcamentos_por_pedido"),
             prazo_liberacao_dias=p.get("prazo_liberacao_dias"),
+            lembrete_confirmacao_antecedencia_horas=p.get(
+                "lembrete_confirmacao_antecedencia_horas", 12
+            ),
+            lembrete_resposta_disputa_antecedencia_horas=p.get(
+                "lembrete_resposta_disputa_antecedencia_horas", 12
+            ),
+            prazo_avaliacao_dias=p.get("prazo_avaliacao_dias", PRAZO_AVALIACAO_PADRAO_DIAS),
+            arrependimento_dias=max(7, p.get("arrependimento_dias", 7)),
+            ausencia_espera_minutos=max(20, p.get("ausencia_espera_minutos", 20)),
+            ausencia_justificativa_horas=max(24, p.get("ausencia_justificativa_horas", 24)),
+            ausencia_retencao_max_bps=min(3000, p.get("ausencia_retencao_max_bps", 3000)),
+            ausencia_exigir_chegada=bool(p.get("ausencia_exigir_chegada", False)),
+            ausencia_contestacao_dias_uteis=max(5, p.get("ausencia_contestacao_dias_uteis", 5)),
+            ausencia_revisao_dias_uteis=p.get("ausencia_revisao_dias_uteis", 10),
+            sac_resposta_dias_uteis=min(5, p.get("sac_resposta_dias_uteis", 5)),
+            incidente_seguranca_cautela_horas=max(
+                1, min(24, p.get("incidente_seguranca_cautela_horas", 24))
+            ),
+            disputa_contestacao_prazo_dias_uteis=max(
+                5, p.get("disputa_contestacao_prazo_dias_uteis", 5)
+            ),
+            disputa_contestacao_resposta_dias_uteis=max(
+                1, min(10, p.get("disputa_contestacao_resposta_dias_uteis", 10))
+            ),
+            sac_dados_pessoais_dias=min(15, p.get("sac_dados_pessoais_dias", 15)),
+            exclusividade_profissional_ofertada=bool(
+                p.get("exclusividade_profissional_ofertada", False)
+            ),
         )

@@ -374,10 +374,11 @@ class _Indicador extends StatelessWidget {
 
 /// Uma avaliação recebida: cliente, serviço, nota, comentário e critérios.
 class CartaoAvaliacao extends StatelessWidget {
-  const CartaoAvaliacao({super.key, required this.avaliacao, this.aoResponder});
+  const CartaoAvaliacao({super.key, required this.avaliacao, this.aoResponder, this.rodape});
 
   final Avaliacao avaliacao;
   final VoidCallback? aoResponder;
+  final Widget? rodape;
 
   @override
   Widget build(BuildContext context) {
@@ -387,6 +388,7 @@ class CartaoAvaliacao extends StatelessWidget {
         avaliacao: avaliacao,
         rotuloResposta: 'Sua resposta',
         aoResponder: aoResponder,
+        rodape: rodape,
       ),
     );
   }

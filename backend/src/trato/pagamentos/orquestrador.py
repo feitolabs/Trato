@@ -21,11 +21,15 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import datetime
+from functools import partial
 
+from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto
+from trato.api.exclusividades import encerrar_na_contratacao
+from trato.api.liberacao import relato_de_seguranca
 from trato.api.moedas import (
     chave_reserva,
     confirmar_reserva_desconto,
@@ -36,20 +40,29 @@ from trato.api.moedas import (
     reservar_desconto,
     situacao_reserva,
 )
-from trato.api.repositorios import EventoWebhook
+from trato.api.repositorios import Contrato, EventoWebhook
+from trato.api.validade import (
+    OrcamentoVencido,
+    momento_da_confirmacao,
+    orcamento_vencido,
+)
 from trato.api.webhook_pagamento import EventoForaDeOrdem  # a rota do webhook responde 409
+from trato.disputas import Disputa, Resultado
 from trato.financeiro.contestacoes import (
     Contestacao,
     StatusContestacao,
     ler_disputa_stripe,
     mesclar,
 )
+from trato.financeiro.extrato_profissional import reais
 from trato.financeiro.ledger import (
     CUSTODIA,
     LedgerErro,
     Livro,
+    custo_parcelamento_em_aberto,
     estornar_pedido,
     liberar,
+    reembolso_total_com_custo,
     registrar_cobranca,
     repartir_custodia,
     separar_custo_parcelamento,
@@ -72,6 +85,7 @@ from trato.pagamentos.modelos import (
 )
 from trato.pagamentos.parcelamento import ParcelamentoIndisponivel
 from trato.pagamentos.provedor.base import (
+    EstornoProvedor,
     EventoProvedor,
     ProvedorPagamento,
     StatusCobranca,
@@ -99,6 +113,29 @@ class ErroFluxo(Exception):
 
 _SISTEMA = Ator(Papel.SISTEMA, "webhook")
 
+# Ações que cancelam o pedido devolvendo ao cliente TUDO o que está retido, com o nome estável da
+# operação (entra na chave de idempotência do estorno). Termos 7.7: ausência do profissional
+# devolve o valor inteiro, como o cancelamento.
+META_EXECUCAO = "execucao_imediata"  # Termos 7.3: caixa marcada pelo cliente nesta cobrança
+_CANCELAM_COM_REEMBOLSO = {
+    Acao.CANCELAR: "cancelamento",
+    Acao.REGISTRAR_AUSENCIA: "ausencia",
+    Acao.CANCELAR_ARREPENDIMENTO: "arrependimento",
+    Acao.CANCELAR_PESSOA_DIFERENTE: "pessoa_diferente",
+}
+
+
+def _aditivo_pago_a_tempo(pedido: Pedido, confirmado_em: datetime) -> bool:
+    """Termos 6.8: pago com o serviço em andamento, ou antes do check-out (aviso atrasado) e
+    com a confirmação ainda aberta, onde o valor ainda entra na repartição."""
+    if pedido.estado is Estado.EM_ANDAMENTO:
+        return True
+    return (
+        pedido.estado is Estado.EM_CONFIRMACAO
+        and pedido.check_out_em is not None
+        and confirmado_em <= pedido.check_out_em
+    )
+
 
 class ServicoPagamento:
     def __init__(
@@ -114,11 +151,13 @@ class ServicoPagamento:
         self.cobrancas = cobrancas
         self.aditivos = aditivos
         self.ordens = ordens if ordens is not None else OrdensEstornoEmMemoria()
+        self._contexto: Contexto | None = None  # `ligar` preenche (revisões e contestações)
 
     # --- ligação ao contexto da API ------------------------------------------------------
 
     def ligar(self, contexto: Contexto) -> None:
         """Registra os manipuladores de webhook e o gancho de transição no contexto."""
+        self._contexto = contexto
         contexto.segredo_webhook = self.provedor.segredo_webhook
         manipuladores = {
             TipoEvento.PAGAMENTO_CONFIRMADO: self._pagamento_confirmado,
@@ -179,6 +218,7 @@ class ServicoPagamento:
         cupom_codigo: str | None = None,
         desconto_centavos: int = 0,
         moedas_usadas: int = 0,
+        execucao_imediata: bool = False,
     ) -> CobrancaLocal:
         """Cria (ou devolve a pendente) a cobrança do pedido ou de um aditivo.
 
@@ -196,9 +236,16 @@ class ServicoPagamento:
         for antiga in antigas:
             if antiga.status is EstadoCobranca.PAGA:
                 raise ErroFluxo("Isto já foi pago.")
+        contrato = None
+        if aditivo_id is None:  # Termos 6.3: vencido não ganha cobrança (nem reaproveita)
+            contrato = contexto.contratos.obter_do_pedido(pedido.id)
+            if contrato is not None and orcamento_vencido(
+                contexto, contrato.orcamento_id, contexto.agora()
+            ):
+                raise OrcamentoVencido
         total = self.total_a_cobrar(contexto, pedido, servico_centavos, aditivo_id, parcelas)
         for antiga in antigas:
-            if antiga.status is EstadoCobranca.AGUARDANDO:
+            if antiga.status is EstadoCobranca.AGUARDANDO and not antiga.contrato_encerrado:
                 reserva_ativa = (
                     antiga.moedas_usadas <= 0
                     or situacao_reserva(contexto.moedas, cobranca_id=antiga.id) != "devolvida"
@@ -210,19 +257,13 @@ class ServicoPagamento:
                     and antiga.valor_centavos == total.cobrado_centavos
                     and (antiga.cupom_codigo or None) == cupom_norm
                     and antiga.moedas_usadas == moedas
+                    and self._escolheu_execucao(antiga.id) == execucao_imediata
                 ):
                     return antiga
                 self.cobrancas.salvar(replace(antiga, status=EstadoCobranca.CANCELADA))
                 self._liberar_reserva(contexto, antiga)
-                if antiga.moedas_usadas > 0:
-                    try:
-                        self.provedor.cancelar_cobranca(antiga.id)
-                    except Exception:  # noqa: BLE001 - melhor esforço; cobrança já cancelada localmente
-                        logging.getLogger("trato.pagamentos").warning(
-                            "cancelar cobrança %s no provedor ao substituir falhou",
-                            antiga.id,
-                            exc_info=True,
-                        )
+                # Substituída não pode continuar pagável (melhor esforço; se pagar, volta).
+                contexto.depois_do_commit(partial(self._cancelar_no_provedor, antiga.id))
         # A chave leva o que define a cobrança (meio, valor, parcelas, cliente, cupom): o Stripe
         # recusa a MESMA chave com parâmetros diferentes ("Keys for idempotent requests can only be
         # used with the same parameters").
@@ -235,7 +276,10 @@ class ServicoPagamento:
         )
         assinatura = hashlib.sha256(
             f"{meio.value}|{total.cobrado_centavos}|{parcelas}|{cliente_externo or ''}|"
-            f"{cupom_norm or ''}|{moedas}|{expira_pix or ''}".encode()
+            f"{cupom_norm or ''}|{moedas}|{expira_pix or ''}"
+            f"{'|execucao' if execucao_imediata else ''}"
+            # Contrato novo no mesmo pedido nunca recebe do provedor a cobrança do antigo.
+            f"{'|' + contrato.orcamento_id if contrato else ''}".encode()
         ).hexdigest()[:10]
         chave = f"cob/{pedido.id}/{aditivo_id or 'principal'}/{len(antigas) + 1}/{assinatura}"
         metadados = {"pedido_id": pedido.id}
@@ -245,6 +289,8 @@ class ServicoPagamento:
             metadados["cupom"] = cupom_norm
         if moedas:
             metadados["moedas"] = str(moedas)
+        if execucao_imediata:
+            metadados[META_EXECUCAO] = "1"
         criada = self.provedor.criar_cobranca(
             valor_centavos=total.cobrado_centavos,
             meio=meio,
@@ -282,12 +328,46 @@ class ServicoPagamento:
             moedas_usadas=moedas,
         )
         try:
-            self.cobrancas.salvar(local)
+            self._gravar_cobranca(contexto, pedido, local, contrato)
         except Exception:
             if moedas > 0:  # a cobrança não foi gravada: a reserva volta
                 devolver_reserva_desconto(contexto.moedas, cobranca_id=criada.id)
             raise
         return local
+
+    def _gravar_cobranca(
+        self,
+        contexto: Contexto,
+        pedido: Pedido,
+        cobranca: CobrancaLocal,
+        contrato: Contrato | None,
+    ) -> None:
+        """Grava a cobrança principal com o pedido travado, só se o contrato dela ainda for o
+        vigente: o prazo de pagamento pode vencer enquanto o provedor responde."""
+        if contrato is None:
+            self.cobrancas.salvar(cobranca)
+            return
+        try:
+            with contexto.transacao():
+                travar = getattr(contexto.pedidos, "travar", None)
+                if travar is not None:
+                    travar(pedido.id)
+                atual = contexto.contratos.obter_do_pedido(pedido.id)
+                agora_no = contexto.pedidos.obter(pedido.id)
+                if (
+                    atual is None
+                    or atual.orcamento_id != contrato.orcamento_id
+                    or agora_no is None
+                    or (
+                        agora_no.estado is not pedido.estado
+                        and agora_no.estado in (Estado.ABERTO, Estado.CANCELADO)
+                    )
+                ):
+                    raise ErroFluxo("O prazo deste pagamento acabou. Aceite um orçamento de novo.")
+                self.cobrancas.salvar(cobranca)
+        except ErroFluxo:
+            self._cancelar_no_provedor(cobranca.id)  # nunca foi entregue ao cliente
+            raise
 
     def reservas_pendentes_do_pedido(self, pedido_id: str) -> set[str]:
         """Chaves de reserva das cobranças com moedas ainda sem pagar deste pedido.
@@ -337,6 +417,12 @@ class ServicoPagamento:
         # Uma transação só: o banco exige o aditivo aprovado antes de aceitar a cobrança dele, e
         # se a cobrança falhar a aprovação volta junto (o cliente pode tentar de novo).
         with contexto.transacao():
+            travar = getattr(contexto.pedidos, "travar", None)
+            if travar is not None:  # check-out ao mesmo tempo: quem chega depois vê o estado
+                travar(pedido.id)
+            atual = contexto.pedidos.obter(pedido.id)
+            if atual is None or atual.estado is not Estado.EM_ANDAMENTO:
+                raise ErroFluxo("Só dá para aprovar aditivo com o serviço em andamento.")
             self.aditivos.salvar(aprovado)
             cobranca = self.cobrar(
                 contexto,
@@ -358,6 +444,14 @@ class ServicoPagamento:
         self.aditivos.salvar(recusado)
         return recusado
 
+    def _escolheu_execucao(self, cobranca_id: str) -> bool | None:
+        """O que a cobrança pendente levou (guardado no provedor). None: não deu para saber, e
+        então ela não é reaproveitada."""
+        try:
+            return self.provedor.consultar_cobranca(cobranca_id).metadados.get(META_EXECUCAO) == "1"
+        except Exception:  # noqa: BLE001 - provedor fora: cria outra com a escolha atual
+            return None
+
     # --- webhooks ----------------------------------------------------------------------------
 
     def _pagamento_confirmado(
@@ -378,12 +472,43 @@ class ServicoPagamento:
             )
             return
         agora = contexto.agora()
+        # A trava do pedido põe este pagamento e um cancelamento em fila: sem ela o valor poderia
+        # entrar em custódia de um pedido que acabou de ser cancelado.
+        travar = getattr(contexto.pedidos, "travar", None)
+        if travar is not None:
+            travar(cobranca.pedido_id)
+            cobranca = self.cobrancas.obter(cobranca.id) or cobranca
+            if cobranca.status in (EstadoCobranca.PAGA, EstadoCobranca.DEVOLVIDA):
+                return
+        if cobranca.contrato_encerrado:
+            # O contrato é o DESTA cobrança, nunca o que o pedido tem agora: pagamento atrasado
+            # do contrato que caiu não contrata o novo. Volta inteiro e o financeiro vê.
+            self._devolver_pagamento_orfao(cobranca)
+            contexto.eventos_webhook.marcar_revisao(
+                bruto,
+                f"pagamento de contrato cancelado por falta de pagamento no prazo "
+                f"({cobranca.id}): devolvido por inteiro",
+            )
+            return
         pedido = contexto.pedidos.obter(cobranca.pedido_id)
 
         if cobranca.aditivo_id:
             aditivo = self.aditivos.obter(cobranca.aditivo_id)
-            if aditivo is None or aditivo.estado is EstadoAditivo.PROPOSTO:
+            if (
+                aditivo is None
+                or aditivo.estado is EstadoAditivo.PROPOSTO
+                or pedido is None
+                or pedido.estado is Estado.CANCELADO
+            ):
                 return self._devolver_pagamento_orfao(cobranca)
+            if not _aditivo_pago_a_tempo(pedido, momento_da_confirmacao(evento.bruto, agora)):
+                self._devolver_pagamento_orfao(cobranca)
+                contexto.eventos_webhook.marcar_revisao(
+                    bruto,
+                    f"aditivo pago fora da execução do serviço (Termos 6.8) ({cobranca.id}): "
+                    "devolvido por inteiro",
+                )
+                return
             self.aditivos.salvar(replace(aditivo, estado=EstadoAditivo.PAGO))
             self._avisar_aditivo_pago(contexto, cobranca, aditivo.id)
         else:
@@ -397,6 +522,12 @@ class ServicoPagamento:
             if not ja_confirmado and (pedido.estado is not Estado.ORCAMENTO_ACEITO or outra_paga):
                 return self._devolver_pagamento_orfao(cobranca)
             if not ja_confirmado:
+                # Termos 5.2 e 6.3: confirmado depois da validade não contrata; volta inteiro.
+                contrato = contexto.contratos.obter_do_pedido(pedido.id)
+                if contrato is not None and orcamento_vencido(
+                    contexto, contrato.orcamento_id, momento_da_confirmacao(evento.bruto, agora)
+                ):
+                    return self._devolver_pagamento_orfao(cobranca)
                 transicao = estados.transicionar(
                     pedido,
                     Acao.CONFIRMAR_PAGAMENTO,
@@ -405,6 +536,11 @@ class ServicoPagamento:
                     ProvaPagamento(cobranca.id),
                 )
                 gravado = contexto.pedidos.salvar(transicao.pedido, transicao.evento)
+                # Contratação (13.6) e o pedido expresso de execução (7.3), que é a escolha
+                # feita NESTA cobrança paga: tudo na mesma transação do pedido.
+                encerrar_na_contratacao(contexto, gravado.id, gravado.profissional_id)
+                if evento.metadados.get(META_EXECUCAO) == "1":
+                    contexto.cancelamentos.registrar_consentimento(gravado.id, agora)
                 # Avisos (cliente e profissional). Não repete o gancho do dinheiro: este caminho
                 # já lança a cobrança logo abaixo. Falha de aviso nunca derruba o webhook.
                 for gancho in contexto.apos_transicao:
@@ -574,6 +710,15 @@ class ServicoPagamento:
         if total is None:
             contexto.eventos_webhook.marcar_revisao(bruto, "estorno sem valor inteiro")
             return
+        # Mesma fila do pagamento: o aviso que chega antes de a devolução ser gravada espera.
+        travar = getattr(contexto.pedidos, "travar", None)
+        if travar is not None:
+            travar(cobranca.pedido_id)
+            cobranca = self.cobrancas.obter(cobranca.id) or cobranca
+        if cobranca.status is EstadoCobranca.DEVOLVIDA:
+            return  # tudo já voltou: nada mais sai do livro por esta cobrança
+        if cobranca.status is not EstadoCobranca.PAGA:
+            return self._estorno_fora_do_livro(cobranca, total, contexto, bruto)
         por_fora = total - cobranca.estornado_centavos
         if por_fora <= 0:
             return  # o que o Trato mandou devolver: nada a fazer
@@ -582,6 +727,7 @@ class ServicoPagamento:
         if pedido is None:
             contexto.eventos_webhook.marcar_revisao(bruto, motivo)
             return
+        self._avisar_estorno(pedido.id, f"fora:{cobranca.id}:{total}", por_fora)
         try:
             novos = self._planejar(
                 contexto,
@@ -608,6 +754,37 @@ class ServicoPagamento:
         self.cobrancas.salvar(depois)
         self._devolver_moedas(contexto, depois)
         contexto.eventos_webhook.marcar_revisao(bruto, f"{motivo}; conciliado no ledger")
+
+    def _estorno_fora_do_livro(
+        self, cobranca: CobrancaLocal, total: int, contexto: Contexto, bruto: EventoWebhook
+    ) -> None:
+        """Estorno de cobrança que nunca entrou no livro (órfã ainda não gravada, trocada ou sem
+        pagamento processado). Nada sai da custódia: ela é de OUTRA cobrança."""
+        if total < cobranca.valor_centavos:
+            # Parte devolvida antes de o pagamento ser tratado: o provedor reenvia depois.
+            raise EventoForaDeOrdem("Estorno parcial antes de o pagamento ser processado.")
+        nosso = any(
+            e.chave == f"orfao/{cobranca.id}"
+            for e in self.provedor.estornos_da_cobranca(cobranca.id)
+        )
+        self._marcar_devolvida(contexto, cobranca)
+        if not nosso:
+            contexto.eventos_webhook.marcar_revisao(
+                bruto,
+                f"reembolso de {total} centavos feito por fora do Trato em cobrança que não "
+                f"entrou no livro ({cobranca.id}); nada lançado",
+            )
+
+    def _marcar_devolvida(self, contexto: Contexto | None, cobranca: CobrancaLocal) -> None:
+        self.cobrancas.salvar(
+            replace(
+                cobranca,
+                status=EstadoCobranca.DEVOLVIDA,
+                estornado_centavos=cobranca.valor_centavos,
+            )
+        )
+        if contexto is not None:
+            self._liberar_reserva(contexto, cobranca)
 
     def _liquidacao(self, evento: EventoProvedor, contexto: Contexto, bruto: EventoWebhook) -> None:
         """`payout.paid`: libera SÓ o repasse a que o aviso se refere (M5).
@@ -646,6 +823,10 @@ class ServicoPagamento:
             contexto.eventos_webhook.marcar_revisao(
                 bruto, f"repasse liberado com contestação de cartão aberta no pedido {pedido.id}"
             )
+        if relato_de_seguranca(contexto, pedido.id):
+            contexto.eventos_webhook.marcar_revisao(
+                bruto, f"repasse liberado com relato de segurança aberto no pedido {pedido.id}"
+            )
         agora = contexto.agora()
         novos = self._planejar(
             contexto,
@@ -661,6 +842,13 @@ class ServicoPagamento:
             ),
         )
         gravados = contexto.ledger.lancar_varios(novos) if novos else ()
+        if contexto.compensacoes.listar(
+            profissional_id=repasse.profissional_id, status="aberta", limite=1
+        )[1]:
+            # Aqui o provedor JÁ pagou: não dá para descontar antes. O financeiro precisa ver.
+            contexto.eventos_webhook.marcar_revisao(
+                bruto, f"repasse {repasse.id} pago com compensação aberta: nada foi descontado"
+            )
         if evento.objeto_id:
             repasses.vincular_transferencia(repasse.id, evento.objeto_id)
         if gravados:
@@ -703,24 +891,36 @@ class ServicoPagamento:
         bruto: EventoWebhook,
     ) -> None:
         valor = contestacao.valor_centavos
-        resta = cobranca.valor_centavos - cobranca.estornado_centavos
+        # Só cobrança que está no livro tem o que estornar (a órfã nunca entrou).
+        resta = (
+            cobranca.valor_centavos - cobranca.estornado_centavos
+            if cobranca.status is EstadoCobranca.PAGA
+            else 0
+        )
         motivo = (
             f"contestação {contestacao.provedor_contestacao_id} perdida: {valor} centavos "
             f"voltaram ao cliente ({cobranca.id})"
         )
-        if valor > resta:
+        parte = min(valor, resta)
+        if parte <= 0:
             contexto.eventos_webhook.marcar_revisao(
-                bruto, f"{motivo}; não foi lançado: só restavam {resta} centavos na cobrança"
+                bruto, f"{motivo}; não foi lançado: não restava nada na cobrança"
             )
             return
+        # No ledger entra o que é do serviço (o custo do parcelado não volta por aqui).
+        no_ledger = min(parte, self._servico_da_cobranca(contexto, cobranca))
+        # O ledger usa o id como está no pedido; o da cobrança vem sem hífen do banco e, usado
+        # direto, não acharia nenhum lançamento.
+        pedido = contexto.pedidos.obter(cobranca.pedido_id)
+        pedido_id = pedido.id if pedido is not None else cobranca.pedido_id
         try:
             novos = self._planejar(
                 contexto,
-                cobranca.pedido_id,
+                pedido_id,
                 lambda livro: estornar_pedido(
                     livro,
-                    cobranca.pedido_id,
-                    valor,
+                    pedido_id,
+                    no_ledger,
                     f"contest/{contestacao.provedor_contestacao_id}",
                     contexto.agora(),
                     bruto.evento_id,
@@ -728,10 +928,14 @@ class ServicoPagamento:
             )
             if novos:
                 contexto.ledger.lancar_varios(novos)
+            if no_ledger != valor:
+                contexto.eventos_webhook.marcar_revisao(
+                    bruto, f"{motivo}; no ledger entraram {no_ledger} centavos"
+                )
         except LedgerErro as erro:
             contexto.eventos_webhook.marcar_revisao(bruto, f"{motivo}; não foi lançado: {erro}")
-            return
-        devolvido = cobranca.estornado_centavos + valor
+        # Com ou sem lançamento, o dinheiro voltou ao cliente: a cobrança lembra (Termos 6.11).
+        devolvido = cobranca.estornado_centavos + parte
         situacao = (
             EstadoCobranca.DEVOLVIDA if devolvido >= cobranca.valor_centavos else cobranca.status
         )
@@ -768,7 +972,18 @@ class ServicoPagamento:
     def _devolver_pagamento_orfao(self, cobranca: CobrancaLocal) -> None:
         """Pagou depois de o pedido cancelar/expirar: o dinheiro volta, sem passar pelo ledger."""
         self.provedor.estornar(cobranca.id, None, f"orfao/{cobranca.id}")
-        self.cobrancas.salvar(replace(cobranca, status=EstadoCobranca.DEVOLVIDA))
+        # Grava o quanto voltou: o `charge.refunded` deste estorno não é reembolso por fora.
+        self._marcar_devolvida(self._contexto, cobranca)
+        self._avisar_estorno(cobranca.pedido_id, f"orfao/{cobranca.id}", cobranca.valor_centavos)
+
+    def _cancelar_no_provedor(self, cobranca_id: str) -> None:
+        """Melhor esforço: se falhar e o cliente pagar depois, o pagamento volta como órfão."""
+        try:
+            self.provedor.cancelar_cobranca(cobranca_id)
+        except Exception:  # noqa: BLE001 - a cobrança já está cancelada no Trato
+            logging.getLogger("trato.pagamentos").warning(
+                "cancelar cobrança %s no provedor falhou", cobranca_id, exc_info=True
+            )
 
     # --- depois de uma transição de estado ------------------------------------------------
 
@@ -778,6 +993,7 @@ class ServicoPagamento:
         if depois.estado is Estado.CONCLUIDO and acao in (
             Acao.CONFIRMAR_CONCLUSAO,
             Acao.ENCERRAR_DISPUTA_POR_ACORDO,
+            Acao.CONCLUIR_POR_PRAZO,  # Termos 5.8: o silêncio do cliente vale como confirmação
         ):
             self.aplicar_dinheiro(
                 contexto,
@@ -785,23 +1001,51 @@ class ServicoPagamento:
                 operacao="conclusao",
                 devolver_ao_cliente=0,
                 repartir=True,
-                gatilho="confirmacao_cliente",
+                gatilho="prazo" if acao is Acao.CONCLUIR_POR_PRAZO else "confirmacao_cliente",
             )
-        elif depois.estado is Estado.CANCELADO and acao is Acao.CANCELAR:
-            for c in self.cobrancas.do_pedido(depois.id):
-                if c.status in (EstadoCobranca.AGUARDANDO, EstadoCobranca.FALHOU):
-                    self.cobrancas.salvar(replace(c, status=EstadoCobranca.CANCELADA))
-                    self._liberar_reserva(contexto, c)  # idempotente: FALHOU já devolveu
+        if acao is Acao.FAZER_CHECK_OUT or depois.estado in (
+            Estado.CONCLUIDO,
+            Estado.RETRABALHO,
+        ):  # 6.8: acabada a execução, aditivo sem pagar não é mais cobrado
+            self._cancelar_cobrancas_abertas(contexto, depois.id, so_aditivos=True)
+        if acao is Acao.EXPIRAR_PAGAMENTO:
+            self._cancelar_cobrancas_abertas(contexto, depois.id)
+        elif depois.estado is Estado.CANCELADO and (
+            acao in _CANCELAM_COM_REEMBOLSO or acao is Acao.CANCELAR_CLIENTE_AUSENTE
+        ):
+            self._cancelar_cobrancas_abertas(contexto, depois.id)
+            if acao is Acao.CANCELAR_CLIENTE_AUSENTE:
+                return  # o valor sai da decisão do analista (7.6), com ou sem retenção
             retido = contexto.ledger.saldo_da_conta(CUSTODIA, depois.id)
-            if retido > 0:
+            # Termos 7.2, 7.4 e 7.7: cancelamento (sempre antes do check-in) e ausência do
+            # profissional devolvem o valor pago, com o custo do parcelamento.
+            livro = Livro()
+            antigos = contexto.ledger.lancamentos(depois.id)
+            if antigos:
+                livro.lancar_varios(antigos)
+            custo = custo_parcelamento_em_aberto(livro, depois.id)
+            if retido + custo > 0:
                 self.aplicar_dinheiro(
                     contexto,
                     depois,
-                    operacao="cancelamento",
-                    devolver_ao_cliente=retido,
+                    operacao=_CANCELAM_COM_REEMBOLSO[acao],
+                    devolver_ao_cliente=retido + custo,
                     repartir=False,
                     gatilho="confirmacao_cliente",
+                    incluir_custo=custo > 0,
                 )
+
+    def _cancelar_cobrancas_abertas(
+        self, contexto: Contexto, pedido_id: str, so_aditivos: bool = False
+    ) -> None:
+        """Cobranças sem pagar deixam de valer, no Trato já e no provedor depois do commit."""
+        for c in self.cobrancas.do_pedido(pedido_id):
+            if c.contrato_encerrado or (so_aditivos and not c.aditivo_id):
+                continue
+            if c.status in (EstadoCobranca.AGUARDANDO, EstadoCobranca.FALHOU):
+                self.cobrancas.salvar(replace(c, status=EstadoCobranca.CANCELADA))
+                self._liberar_reserva(contexto, c)  # idempotente: FALHOU já devolveu
+                contexto.depois_do_commit(partial(self._cancelar_no_provedor, c.id))
 
     # --- dinheiro ------------------------------------------------------------------------------
 
@@ -818,6 +1062,41 @@ class ServicoPagamento:
             servico = contrato.valor_centavos if contrato else cobranca.valor_centavos
         return min(servico, cobranca.valor_centavos)
 
+    def dinheiro_da_disputa(self, contexto: Contexto, pedido: Pedido, disputa: Disputa) -> None:
+        """O dinheiro de uma decisão final (Termos 6.10, 6.11 e 8.6): estorno ao cliente com
+        ordem ao provedor e, se o pedido conclui, a parte do profissional. Chamado só por
+        `api/decisao_disputa.py`, dentro da transação da decisão."""
+        divisao, decisao = disputa.divisao, disputa.decisao
+        if divisao is None or decisao is None:
+            raise ErroFluxo("A disputa ainda não tem decisão final.")
+        devolver, com_custo, total = divisao.para_cliente, False, None
+        if decisao.resultado is Resultado.REEMBOLSO_TOTAL:  # 6.10: o valor pago, com o parcelado
+            total = reembolso_total_com_custo(
+                contexto.ledger.lancamentos(pedido.id), pedido.id, pedido.profissional_id
+            )
+        if total is not None:
+            devolver, com_custo = total, True
+        elif devolver > 0:
+            # 6.11: o que já voltou ao cliente depois de aberta a disputa (emissora ou estorno
+            # por fora) conta na parte dele.
+            saldos = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
+            sumiu = disputa.valor_congelado - (saldos.retido + saldos.a_liberar)
+            pela_emissora = sum(
+                c.valor_centavos
+                for c in contexto.contestacoes.perdidas_do_pedido(pedido.id)
+                if c.encerrada_em is None or c.encerrada_em >= disputa.aberta_em
+            )
+            devolver = max(0, devolver - max(sumiu, pela_emissora, 0))
+        self.aplicar_dinheiro(
+            contexto,
+            pedido,
+            operacao=f"disputa/{int(disputa.aberta_em.timestamp())}",
+            devolver_ao_cliente=devolver,
+            repartir=pedido.estado is Estado.CONCLUIDO,
+            gatilho="decisao_disputa",
+            incluir_custo=com_custo,
+        )
+
     def aplicar_dinheiro(
         self,
         contexto: Contexto,
@@ -827,6 +1106,7 @@ class ServicoPagamento:
         devolver_ao_cliente: int,
         repartir: bool,
         gatilho: str = "decisao_disputa",
+        incluir_custo: bool = False,
     ) -> None:
         """Devolve `devolver_ao_cliente` ao cliente e/ou reparte o que resta na custódia.
 
@@ -844,7 +1124,7 @@ class ServicoPagamento:
         )
         if not ja_feito:
             self._registrar_intencao(
-                contexto, pedido, chave, devolver_ao_cliente, repartir, gatilho
+                contexto, pedido, chave, devolver_ao_cliente, repartir, gatilho, incluir_custo
             )
         contexto.depois_do_commit(lambda: self.reenviar_estornos(pedido.id))
 
@@ -856,13 +1136,33 @@ class ServicoPagamento:
         devolver_ao_cliente: int,
         repartir: bool,
         gatilho: str,
+        incluir_custo: bool = False,
     ) -> None:
         agora = contexto.agora()
         profissional = pedido.profissional_id or ""
+        if devolver_ao_cliente > 0 and contexto.contestacoes.perdidas_do_pedido(pedido.id):
+            # Termos 6.11: o que o banco já devolveu na contestação não é estornado de novo.
+            sobra = sum(
+                c.valor_centavos - c.estornado_centavos
+                for c in self.cobrancas.do_pedido(pedido.id)
+                if c.status is EstadoCobranca.PAGA
+            )
+            if sobra < devolver_ao_cliente:
+                # Já não é o reembolso inteiro: o custo do parcelado não entra nesta conta.
+                incluir_custo = False
+                saldos = contexto.ledger.saldos_pedido(pedido.id, pedido.profissional_id)
+                devolver_ao_cliente = min(sobra, saldos.retido + saldos.a_liberar)
 
         def operacao(livro: Livro) -> None:
             if devolver_ao_cliente > 0:
-                estornar_pedido(livro, pedido.id, devolver_ao_cliente, f"{chave}/est", agora)
+                estornar_pedido(
+                    livro,
+                    pedido.id,
+                    devolver_ao_cliente,
+                    f"{chave}/est",
+                    agora,
+                    incluir_custo=incluir_custo,
+                )
             restante = livro.saldo(CUSTODIA, pedido.id)
             if repartir and restante > 0:
                 repartir_custodia(livro, pedido.id, profissional, 0, f"{chave}/rep", agora)
@@ -883,13 +1183,29 @@ class ServicoPagamento:
                 if repasse is not None:
                     contexto.repasses.criar(repasse)
 
+    def ordenar_estorno_compensado(
+        self, contexto: Contexto, pedido_id: str, valor: int, divida_id: str
+    ) -> None:
+        """Ordem de estorno da dívida de compensação (o livro já foi lançado pelo banco, na
+        transação em curso). O provedor só é chamado depois do commit, com a chave da ordem."""
+        ordens = self._ordens_de_estorno(pedido_id, valor, f"comp/{divida_id}", contexto.agora())
+        with contexto.transacao():
+            for cobranca, ordem in ordens:
+                self.cobrancas.salvar(cobranca)
+                self.ordens.salvar(ordem)
+                self._devolver_moedas(contexto, cobranca)
+        contexto.depois_do_commit(lambda: self.reenviar_estornos(pedido_id))
+
     def _devolver_moedas(self, contexto: Contexto, cobranca: CobrancaLocal) -> None:
-        """Estorno TOTAL da cobrança devolve as moedas que ela usou (parcial não devolve)."""
-        if cobranca.moedas_usadas <= 0 or cobranca.estornado_centavos < cobranca.valor_centavos:
+        """Devolve as moedas na proporção do que já voltou ao cliente (Termos 13.8). A base é o
+        valor do serviço (o custo do parcelado não conta). Devolvido tudo, volta também a
+        reserva."""
+        if cobranca.moedas_usadas <= 0 or cobranca.estornado_centavos <= 0:
             return
         pedido = contexto.pedidos.obter(cobranca.pedido_id)
         if pedido is None:
             return
+        base = self._servico_da_cobranca(contexto, cobranca)
         devolver_uso_moedas(
             contexto.moedas,
             usuario_id=pedido.cliente_id,
@@ -897,16 +1213,21 @@ class ServicoPagamento:
             pedido_id=cobranca.pedido_id,
             moedas=cobranca.moedas_usadas,
             agora=contexto.agora(),
+            devolvido_centavos=cobranca.estornado_centavos,
+            base_centavos=base,
         )
-        self._liberar_reserva(contexto, cobranca)  # idempotente por status da reserva
+        if cobranca.estornado_centavos >= base:
+            self._liberar_reserva(contexto, cobranca)  # idempotente por status da reserva
 
     def _liberar_reserva(self, contexto: Contexto, cobranca: CobrancaLocal) -> None:
-        """Devolve a reserva de moedas desta cobrança (mês, dia e saldo) pelo valor GRAVADO nela.
+        """Devolve a reserva de moedas desta cobrança (mês, dia e saldo) pelo valor GRAVADO nela,
+        inclusive a reaberta por pagamento tardio.
 
         Estorno total, falha, cancelamento e troca de cobrança passam por aqui; a segunda chamada
         não faz nada."""
         if cobranca.moedas_usadas > 0:
             devolver_reserva_desconto(contexto.moedas, cobranca_id=cobranca.id)
+            devolver_reserva_desconto(contexto.moedas, cobranca_id=f"reabertura:{cobranca.id}")
 
     def _ordens_de_estorno(
         self, pedido_id: str, valor: int, chave: str, agora
@@ -929,19 +1250,124 @@ class ServicoPagamento:
                 return saida
         raise ErroFluxo("Não há pagamento confirmado suficiente para devolver.")
 
-    def reenviar_estornos(self, pedido_id: str | None = None) -> int:
-        """Manda ao provedor as ordens de estorno pendentes (a chave da ordem é a idempotência
-        dele). Falha do provedor não perde nada: a ordem continua pendente. Serve também de
-        rotina de reconciliação. Devolve quantas foram confirmadas."""
+    def reenviar_estornos(
+        self, pedido_id: str | None = None, *, criadas_ate: datetime | None = None
+    ) -> int:
+        """Manda ao provedor as ordens de estorno pendentes, CONSULTANDO antes o que ele já tem:
+        resposta perdida ou chave de idempotência vencida nunca viram um segundo estorno. Na
+        dúvida a ordem continua pendente e vai para revisão. `criadas_ate` deixa de fora as
+        ordens novas demais (o envio logo após o commit pode estar em andamento). Falha não perde
+        nada: a ordem continua pendente. Devolve quantas foram confirmadas."""
         confirmadas = 0
         for ordem in self.ordens.pendentes(pedido_id):
-            try:
-                feito = self.provedor.estornar(ordem.cobranca_id, ordem.valor_centavos, ordem.chave)
-            except Exception:  # noqa: BLE001, S112 - qualquer falha deixa a ordem pendente
+            if criadas_ate is not None and ordem.criada_em > criadas_ate:
                 continue
-            self.ordens.salvar(replace(ordem, estado="enviada", provedor_estorno_id=feito.id))
-            confirmadas += 1
+            try:
+                confirmadas += self._enviar_ordem(ordem)
+            except Exception:  # noqa: BLE001 - qualquer falha deixa a ordem pendente
+                logging.getLogger("trato.pagamentos").warning(
+                    "ordem de estorno %s continua pendente", ordem.chave, exc_info=True
+                )
         return confirmadas
+
+    def _enviar_ordem(self, ordem: OrdemEstorno) -> int:
+        no_provedor = self.provedor.estornos_da_cobranca(ordem.cobranca_id)
+        desta = [e for e in no_provedor if e.chave == ordem.chave]
+        if desta:
+            feito = desta[0]
+            if len(desta) > 1 or feito.falhou or feito.valor_centavos != ordem.valor_centavos:
+                self._revisar_ordem(ordem, "o estorno no provedor falhou, repetiu ou diverge")
+                return 0
+        else:
+            duvida = self._duvida_antes_de_enviar(ordem, no_provedor)
+            if duvida:
+                self._revisar_ordem(ordem, duvida)
+                return 0
+            feito = self.provedor.estornar(ordem.cobranca_id, ordem.valor_centavos, ordem.chave)
+        self.ordens.salvar(replace(ordem, estado="enviada", provedor_estorno_id=feito.id))
+        self._avisar_estorno(ordem.pedido_id, ordem.chave, ordem.valor_centavos)
+        return 1
+
+    def _avisar_estorno(self, pedido_id: str, chave: str, valor_centavos: int) -> None:
+        """Termos 15.2: o cliente é avisado de cada estorno, uma vez, depois de gravado."""
+        contexto = self._contexto
+        if contexto is None:
+            return
+
+        def avisar() -> None:
+            try:
+                pedido = contexto.pedidos.obter(pedido_id)
+            except Exception:  # noqa: BLE001 - aviso é secundário
+                logging.getLogger("trato.pagamentos").exception("Aviso de estorno falhou")
+                return
+            if pedido is None:
+                return
+            avisar_partes(
+                contexto,
+                Evento.ESTORNO_SOLICITADO,
+                (pedido.cliente_id,),
+                pedido_id=pedido.id,
+                chave=f"estorno:{chave}",
+                corpo=f"Pedimos ao parceiro de pagamento o estorno de {reais(valor_centavos)}. "
+                "O prazo para aparecer depende da forma de pagamento.",
+            )
+
+        contexto.depois_do_commit(avisar)
+
+    def _duvida_antes_de_enviar(
+        self, ordem: OrdemEstorno, no_provedor: Sequence[EstornoProvedor]
+    ) -> str | None:
+        validos = [e for e in no_provedor if not e.falhou]
+        conhecidos = {o.provedor_estorno_id for o in self.ordens.do_pedido(ordem.pedido_id)}
+        if any(e.chave is None and e.id not in conhecidos for e in validos):
+            return "há estorno no provedor que não é de nenhuma ordem (feito por fora ou antigo)"
+        cobranca = self.cobrancas.obter(ordem.cobranca_id)
+        if cobranca is None:
+            return "cobrança da ordem não encontrada"
+        contestado = 0
+        if self._contexto is not None:
+            contestado = sum(
+                c.valor_centavos
+                for c in self._contexto.contestacoes.perdidas_do_pedido(ordem.pedido_id)
+                if c.cobranca_id == ordem.cobranca_id
+            )
+        devolvido = sum(e.valor_centavos for e in validos)
+        if devolvido + contestado + ordem.valor_centavos > cobranca.valor_centavos:
+            return "passaria do valor da cobrança (estorno ou contestação já devolveu)"
+        return None
+
+    def _revisar_ordem(self, ordem: OrdemEstorno, motivo: str) -> None:
+        """Guarda a ordem na fila de revisão do financeiro (uma vez), junto dos eventos do
+        provedor. A ordem segue pendente e é conferida de novo nos próximos ciclos."""
+        logging.getLogger("trato.pagamentos").warning(
+            "ordem de estorno %s para revisão: %s", ordem.chave, motivo
+        )
+        contexto = self._contexto
+        if contexto is None:
+            return
+        evento_id = f"trato-revisao:{ordem.chave}"
+        if any(e.evento_id == evento_id for e, _ in contexto.eventos_webhook.em_revisao()):
+            return
+        evento = EventoWebhook(
+            "stripe",
+            evento_id,
+            "trato.ordem_estorno.revisao",
+            {  # no formato de um evento do provedor: o painel acha o pedido
+                "data": {
+                    "object": {
+                        "amount": ordem.valor_centavos,
+                        "metadata": {
+                            "pedido_id": ordem.pedido_id,
+                            "cobranca_id": ordem.cobranca_id,
+                        },
+                    }
+                }
+            },
+            contexto.agora(),
+        )
+        with contexto.transacao():
+            contexto.eventos_webhook.registrar(evento)
+            contexto.eventos_webhook.marcar_revisao(evento, f"{motivo} ({ordem.chave})")
 
     @staticmethod
     def _planejar(contexto: Contexto, pedido_id: str, operacao: Callable[[Livro], object]):

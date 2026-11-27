@@ -103,17 +103,18 @@ void main() {
       expect(find.byType(CriarContaTela), findsOneWidget);
     });
 
-    testWidgets('cadastro leve não exige CPF nem data de nascimento', (tester) async {
+    testWidgets('cadastro leve não exige CPF; pede a data de nascimento', (tester) async {
       final auth = ServicoAuthFake();
       await _abrir(tester, CriarContaTela(servico: auth));
 
       expect(find.text('CPF'), findsNothing);
-      expect(find.text('Nascimento'), findsNothing);
+      expect(find.text('Data de nascimento'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).at(0), 'Ana Souza');
-      await tester.enterText(find.byType(TextField).at(1), '31999998888');
-      await tester.enterText(find.byType(TextField).at(2), 'ana@teste.com');
-      await tester.enterText(find.byType(TextField).at(3), 'segredo123');
+      await tester.enterText(find.byType(TextField).at(1), '15031992');
+      await tester.enterText(find.byType(TextField).at(2), '31999998888');
+      await tester.enterText(find.byType(TextField).at(3), 'ana@teste.com');
+      await tester.enterText(find.byType(TextField).at(4), 'segredo123');
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
 

@@ -225,13 +225,973 @@ class ApiFake implements ApiAdmin {
     _registrar(aprovar ? 'verificacao.aprovada' : 'verificacao.recusada', 'verificacao:$id', motivo);
   }
 
+  // ---------- exclusividade ----------
+
+  ErroApi? falhaTratoErro;
+  String falhaTratoResultado = 'ok';
+  final chamadasFalhaTrato = <(String, String)>[];
+
+  @override
+  Future<({String resultado, int moedasDevolvidas})> registrarFalhaTrato(String exclusividadeId,
+      {required String motivo}) async {
+    chamadasFalhaTrato.add((exclusividadeId, motivo));
+    await Future<void>.delayed(atraso);
+    if (falhaTratoErro != null) throw falhaTratoErro!;
+    return (resultado: falhaTratoResultado, moedasDevolvidas: 150);
+  }
+
+  final acoesDeConta = <({String acao, String? motivoUsuario, List<String> clausulas})>[];
+
+  // ---------- contestação de disputa ----------
+
+  static ContestacaoDisputa contestacaoDeExemplo({
+    String status = 'aberta',
+    String efeito = 'nenhum',
+    String? analistaId,
+    String? decididaPor,
+    int original = 0,
+    int vigente = 0,
+    String? resposta,
+    String? novaDecisao,
+  }) =>
+      ContestacaoDisputa(
+        id: 'cd-1',
+        protocolo: 'CD-EXEMPLO-1',
+        pedidoId: 'ped-exemplo-1',
+        disputaId: 'disp-1',
+        contestanteId: 'cli-1',
+        contestantePapel: 'cliente',
+        oQueFaltou: 'A análise não viu as fotos (exemplo)',
+        anexos: const ['arq-1'],
+        canal: 'app',
+        status: status,
+        abertaEm: DateTime(2026, 11, 20),
+        contestarAte: DateTime(2026, 11, 27),
+        responderAte: DateTime(2026, 12, 4),
+        atrasada: true,
+        analistaId: analistaId,
+        resposta: resposta,
+        novaDecisao: novaDecisao,
+        efeitoFinanceiro: efeito,
+        valorCongeladoCentavos: 30000,
+        decisaoOriginal: DecisaoResumida('liberar_tudo', original),
+        decisaoVigente: DecisaoResumida('reembolso_parcial', vigente),
+        decididaPor: decididaPor,
+      );
+
+  List<ContestacaoDisputa> contestacoesDisputa = [contestacaoDeExemplo()];
+  ErroApi? falhaContestacao;
+  final chamadasContestacao = <(String, Map<String, Object?>)>[];
+  FiltroContestacoes? ultimoFiltroContestacoes;
+
+  Future<ContestacaoDisputa> _cont(String acao, Map<String, Object?> dados) async {
+    chamadasContestacao.add((acao, dados));
+    await Future<void>.delayed(atraso);
+    if (falhaContestacao != null) throw falhaContestacao!;
+    return contestacoesDisputa.first;
+  }
+
+  @override
+  Future<PaginaRemota<ContestacaoDisputa>> listarContestacoesDisputa(FiltroContestacoes filtro,
+      {int deslocamento = 0, int limite = 50}) {
+    ultimoFiltroContestacoes = filtro;
+    return _ler(() => _pagina(contestacoesDisputa, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<ContestacaoDisputa> obterContestacaoDisputa(String id) {
+    ContestacaoDisputa achar() => contestacoesDisputa.firstWhere((c) => c.id == id);
+    return _ler(achar, achar());
+  }
+
+  @override
+  Future<({ContestacaoDisputa contestacao, bool repetida})> registrarContestacaoDisputa(
+          {required String pedidoId,
+          required String contestanteId,
+          required String chamadoId,
+          required String oQueFaltou,
+          List<String> anexos = const []}) async =>
+      (
+        contestacao: await _cont('registrar', {
+          'pedido': pedidoId,
+          'contestante': contestanteId,
+          'chamado': chamadoId,
+          'texto': oQueFaltou,
+          'anexos': anexos,
+        }),
+        repetida: false,
+      );
+
+  @override
+  Future<ContestacaoDisputa> decidirContestacaoDisputa(String id,
+          {required String resultado,
+          required String resposta,
+          String? novaDecisao,
+          int? novoValorReembolsoCentavos}) =>
+      _cont('decidir', {
+        'resultado': resultado,
+        'resposta': resposta,
+        'nova': novaDecisao,
+        'valor': novoValorReembolsoCentavos,
+      });
+
+  @override
+  Future<ContestacaoDisputa> aprovarContestacaoDisputa(String id, {required bool aprovar, required String motivo}) =>
+      _cont('aprovacao', {'aprovar': aprovar, 'motivo': motivo});
+
+  // ---------- regresso ----------
+
+  static Regresso regressoDeExemplo({String status = 'proposta', String por = 'outra-pessoa'}) => Regresso(
+        id: 'reg-1',
+        pedidoId: 'ped-exemplo-1',
+        profissionalId: 'pro-1',
+        referencia: '0f8fad5b-d9cb-469f-a165-70867728950e',
+        valorCentavos: 20050,
+        motivo: 'Dano pago ao cliente (exemplo)',
+        status: status,
+        propostaPor: por,
+        propostaEm: DateTime(2026, 11, 25),
+      );
+
+  List<Regresso> regressos = [regressoDeExemplo()];
+  ErroApi? falhaRegresso;
+  final chamadasRegresso = <(String, Map<String, Object?>)>[];
+  String resultadoRegresso = 'ok';
+  String? ultimoStatusRegresso;
+
+  Future<Regresso> _reg(String acao, Map<String, Object?> dados) async {
+    chamadasRegresso.add((acao, dados));
+    await Future<void>.delayed(atraso);
+    if (falhaRegresso != null) throw falhaRegresso!;
+    return regressos.first;
+  }
+
+  @override
+  Future<PaginaRemota<Regresso>> listarRegressos({String? status, int deslocamento = 0, int limite = 50}) {
+    ultimoStatusRegresso = status;
+    return _ler(() => _pagina(regressos, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<({String resultado, Regresso proposta})> proporRegresso(
+          {required String pedidoId,
+          required String referencia,
+          required int valorCentavos,
+          required String motivo}) async =>
+      (
+        proposta: await _reg('propor',
+            {'pedido': pedidoId, 'referencia': referencia, 'valor': valorCentavos, 'motivo': motivo}),
+        resultado: resultadoRegresso,
+      );
+
+  @override
+  Future<({String resultado, Regresso proposta, bool avisado})> aprovarRegresso(String id) async =>
+      (proposta: await _reg('aprovar', {'id': id}), resultado: resultadoRegresso, avisado: avisoDaCompensacao);
+
+  @override
+  Future<({String resultado, Regresso proposta})> recusarRegresso(String id, {required String motivo}) async =>
+      (proposta: await _reg('recusar', {'id': id, 'motivo': motivo}), resultado: resultadoRegresso);
+
+  // ---------- incidentes ----------
+
+  static Incidente incidenteDeExemplo(
+          {String status = 'aberto', DateTime? cautelaAte, List<MedidaIncidente> medidas = const [], bool atrasada = false}) =>
+      Incidente(
+        id: 'inc-1',
+        protocolo: 'INC-2026-000001',
+        canal: 'telefone',
+        tipo: 'furto_roubo',
+        descricao: 'Sumiu um objeto (exemplo)',
+        contato: '31 0000-0000',
+        pedidoId: 'ped-exemplo-1',
+        status: status,
+        abertoEm: DateTime(2026, 11, 20),
+        cautelaAte: cautelaAte ?? DateTime(2099, 1, 1),
+        medidas: medidas,
+        cautelaAtrasada: atrasada,
+      );
+
+  List<Incidente> incidentes = [incidenteDeExemplo()];
+  ErroApi? falhaIncidente;
+  final chamadasIncidente = <(String, Map<String, Object?>)>[];
+  String? ultimoStatusIncidente;
+
+  Future<Incidente> _inc(String acao, Map<String, Object?> dados) async {
+    chamadasIncidente.add((acao, dados));
+    await Future<void>.delayed(atraso);
+    if (falhaIncidente != null) throw falhaIncidente!;
+    return incidentes.isEmpty ? incidenteDeExemplo() : incidentes.first;
+  }
+
+  @override
+  Future<PaginaRemota<Incidente>> listarIncidentes(
+      {String? status, String? pedidoId, int deslocamento = 0, int limite = 50}) {
+    ultimoStatusIncidente = status;
+    return _ler(() => _pagina(incidentes, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<Incidente> obterIncidente(String id) {
+    Incidente achar() => incidentes.firstWhere((i) => i.id == id);
+    return _ler(achar, achar());
+  }
+
+  bool incidenteRepetido = false;
+
+  @override
+  Future<({Incidente incidente, bool repetido})> registrarIncidente(
+          {required String tipo,
+          required String descricao,
+          required String contato,
+          required String canal,
+          String? pedidoId}) async =>
+      (
+        incidente: await _inc('registrar',
+            {'tipo': tipo, 'descricao': descricao, 'contato': contato, 'canal': canal, 'pedido': pedidoId}),
+        repetido: incidenteRepetido,
+      );
+
+  @override
+  Future<Incidente> adicionarMedidaIncidente(String id, {required String tipo, required String descricao}) =>
+      _inc('medida', {'tipo': tipo, 'descricao': descricao});
+
+  @override
+  Future<Incidente> mudarStatusIncidente(String id, String status) => _inc('status', {'status': status});
+
+  @override
+  Future<Incidente> encerrarIncidente(String id, {required String desfecho}) =>
+      _inc('encerrar', {'desfecho': desfecho});
+
+  // ---------- moderação de avaliações ----------
+
+  static RevisaoAvaliacao revisaoAvaliacaoDeExemplo({
+    String id = 'rev-1',
+    String protocolo = 'REV-2026-0001',
+    String avaliacaoId = 'aval-1',
+    String tipo = 'revisao',
+    String status = 'aberta',
+    String? ocultacaoId,
+    DateTime? responderAte,
+  }) =>
+      RevisaoAvaliacao(
+        id: id,
+        protocolo: protocolo,
+        avaliacaoId: avaliacaoId,
+        tipo: tipo,
+        ocultacaoId: ocultacaoId,
+        solicitanteId: 'usr-1',
+        justificativa: 'Avaliação contém ofensa sem relação com o serviço (exemplo).',
+        anexos: const ['print-1.png'],
+        canal: 'app',
+        abertaEm: DateTime(2026, 11, 20, 10),
+        responderAte: responderAte ?? DateTime(2027, 1, 10, 10),
+        status: status,
+      );
+
+  static OcultacaoAvaliacao ocultacaoAvaliacaoDeExemplo(
+          {String avaliacaoId = 'aval-1', String motivo = 'ofensa_ou_ilegal'}) =>
+      OcultacaoAvaliacao(
+        id: 'ocu-1',
+        avaliacaoId: avaliacaoId,
+        motivo: motivo,
+        explicacao: 'Explicação registrada pela moderação (exemplo).',
+        analistaId: 'u1',
+        ocultadaEm: DateTime(2026, 11, 21, 10),
+        statusAnterior: 'publicada',
+      );
+
+  late List<RevisaoAvaliacao> revisoesAvaliacao = [revisaoAvaliacaoDeExemplo()];
+  final List<(String, Map<String, Object?>)> chamadasAvaliacao = [];
+  Object? falhaAvaliacao;
+  Object? falhaListaAvaliacao;
+  String? ultimoStatusRevisaoAvaliacao;
+  String? ultimoAvaliacaoIdFiltro;
+
+  @override
+  Future<PaginaRemota<RevisaoAvaliacao>> listarRevisoesAvaliacao(
+      {String? status, String? avaliacaoId, int deslocamento = 0, int limite = 50}) async {
+    ultimoStatusRevisaoAvaliacao = status;
+    ultimoAvaliacaoIdFiltro = avaliacaoId;
+    await Future<void>.delayed(atraso);
+    if (falhaListaAvaliacao != null) throw falhaListaAvaliacao!;
+    if (erro) throw const ErroApi('Não foi possível falar com o servidor.');
+    return _pagina(revisoesAvaliacao, deslocamento, limite);
+  }
+
+  @override
+  Future<RevisaoAvaliacao> analisarRevisaoAvaliacao(String revisaoId) async {
+    chamadasAvaliacao.add(('analisar', {'id': revisaoId}));
+    await Future<void>.delayed(atraso);
+    if (falhaAvaliacao != null) throw falhaAvaliacao!;
+    return revisoesAvaliacao.isEmpty ? revisaoAvaliacaoDeExemplo(status: 'em_analise') : revisoesAvaliacao.first;
+  }
+
+  @override
+  Future<RevisaoAvaliacao> decidirRevisaoAvaliacao(
+    String revisaoId, {
+    required String status,
+    required String resposta,
+    String? ocultarMotivo,
+    String? mesmoAnalistaJustificativa,
+  }) async {
+    chamadasAvaliacao.add((
+      'decidir',
+      {
+        'id': revisaoId,
+        'status': status,
+        'resposta': resposta,
+        'ocultar_motivo': ocultarMotivo,
+        'mesmo_analista_justificativa': mesmoAnalistaJustificativa,
+      },
+    ));
+    await Future<void>.delayed(atraso);
+    if (falhaAvaliacao != null) throw falhaAvaliacao!;
+    return revisoesAvaliacao.isEmpty ? revisaoAvaliacaoDeExemplo(status: status) : revisoesAvaliacao.first;
+  }
+
+  @override
+  Future<OcultacaoAvaliacao> ocultarAvaliacao(
+    String avaliacaoId, {
+    required String motivo,
+    required String explicacao,
+  }) async {
+    chamadasAvaliacao.add(('ocultar', {'avaliacao_id': avaliacaoId, 'motivo': motivo, 'explicacao': explicacao}));
+    await Future<void>.delayed(atraso);
+    if (falhaAvaliacao != null) throw falhaAvaliacao!;
+    return ocultacaoAvaliacaoDeExemplo(avaliacaoId: avaliacaoId, motivo: motivo);
+  }
+
+  @override
+  Future<OcultacaoAvaliacao> reverterOcultacaoAvaliacao(String avaliacaoId, {required String motivo}) async {
+    chamadasAvaliacao.add(('reverter', {'avaliacao_id': avaliacaoId, 'motivo': motivo}));
+    await Future<void>.delayed(atraso);
+    if (falhaAvaliacao != null) throw falhaAvaliacao!;
+    return ocultacaoAvaliacaoDeExemplo(avaliacaoId: avaliacaoId);
+  }
+
+  // ---------- pedidos de titular LGPD ----------
+
+  static PedidoTitularLgpd pedidoLgpdDeExemplo({
+    String id = 'lgpd-1',
+    String protocolo = 'LGPD-2026-0001',
+    String tipo = 'acesso',
+    String status = 'aberto',
+    String? decisaoAutomatizada,
+    DateTime? responderAte,
+  }) =>
+      PedidoTitularLgpd(
+        id: id,
+        protocolo: protocolo,
+        usuarioId: 'usr-1',
+        contato: 'titular@teste.local',
+        tipo: tipo,
+        decisaoAutomatizada: decisaoAutomatizada,
+        descricao: 'Solicitação de cópia dos dados pessoais (exemplo).',
+        canal: 'app',
+        abertoEm: DateTime(2026, 11, 20, 10),
+        responderAte: responderAte ?? DateTime(2027, 1, 10, 10),
+        status: status,
+      );
+
+  late List<PedidoTitularLgpd> pedidosLgpd = [pedidoLgpdDeExemplo()];
+  final List<(String, Map<String, Object?>)> chamadasLgpd = [];
+  Object? falhaLgpd;
+  Object? falhaListaLgpd;
+  String? ultimoStatusLgpd;
+  String? ultimoTipoLgpd;
+  String? ultimoUsuarioLgpd;
+
+  @override
+  Future<PaginaRemota<PedidoTitularLgpd>> listarPedidosLgpd(
+      {String? status, String? tipo, String? usuarioId, int deslocamento = 0, int limite = 50}) async {
+    ultimoStatusLgpd = status;
+    ultimoTipoLgpd = tipo;
+    ultimoUsuarioLgpd = usuarioId;
+    await Future<void>.delayed(atraso);
+    if (falhaListaLgpd != null) throw falhaListaLgpd!;
+    if (erro) throw const ErroApi('Não foi possível falar com o servidor.');
+    return _pagina(pedidosLgpd, deslocamento, limite);
+  }
+
+  @override
+  Future<PedidoTitularLgpd> analisarPedidoLgpd(String pedidoId) async {
+    chamadasLgpd.add(('analisar', {'id': pedidoId}));
+    await Future<void>.delayed(atraso);
+    if (falhaLgpd != null) throw falhaLgpd!;
+    return pedidosLgpd.isEmpty ? pedidoLgpdDeExemplo(status: 'em_analise') : pedidosLgpd.first;
+  }
+
+  @override
+  Future<PedidoTitularLgpd> responderPedidoLgpd(
+    String pedidoId, {
+    required String status,
+    required String resposta,
+    String? motivoNaoAtendido,
+    String? criteriosInformados,
+  }) async {
+    chamadasLgpd.add((
+      'responder',
+      {
+        'id': pedidoId,
+        'status': status,
+        'resposta': resposta,
+        'motivo_nao_atendido': motivoNaoAtendido,
+        'criterios_informados': criteriosInformados,
+      },
+    ));
+    await Future<void>.delayed(atraso);
+    if (falhaLgpd != null) throw falhaLgpd!;
+    return pedidosLgpd.isEmpty ? pedidoLgpdDeExemplo(status: status) : pedidosLgpd.first;
+  }
+
+  // ---------- contestação de materiais ----------
+
+  static ContestacaoMaterial contestacaoMaterialDeExemplo({
+    String status = 'aberta',
+    int? valorReconhecidoCentavos,
+    String efeitoFinanceiro = 'nenhum',
+    DateTime? responderAte,
+  }) =>
+      ContestacaoMaterial(
+        id: 'cm-1',
+        protocolo: 'MAT-2026-0001',
+        pedidoId: 'ped-1',
+        notaId: 'nota-1',
+        clienteId: 'cli-1',
+        motivo: 'nao_comprovado',
+        descricao: 'Não recebi comprovante do material cobrado (exemplo).',
+        valorContestadoCentavos: 15000,
+        abertaEm: DateTime(2026, 11, 20, 10),
+        responderAte: responderAte ?? DateTime(2099, 1, 1, 10),
+        status: status,
+        valorReconhecidoCentavos: valorReconhecidoCentavos,
+        efeitoFinanceiro: efeitoFinanceiro,
+      );
+
+  late List<ContestacaoMaterial> contestacoesMaterial = [contestacaoMaterialDeExemplo()];
+  final List<(String, Map<String, Object?>)> chamadasMaterial = [];
+  Object? falhaMaterial;
+  Object? falhaListaMaterial;
+
+  @override
+  Future<PaginaRemota<ContestacaoMaterial>> listarContestacoesMaterial(
+      {String? status, String? pedidoId, int deslocamento = 0, int limite = 50}) async {
+    await Future<void>.delayed(atraso);
+    if (falhaListaMaterial != null) throw falhaListaMaterial!;
+    if (erro) throw const ErroApi('Não foi possível falar com o servidor.');
+    return _pagina(contestacoesMaterial, deslocamento, limite);
+  }
+
+  List<AnexoMaterial> anexosMaterial = const [
+    AnexoMaterial(
+      tipo: 'nota_material',
+      enviadoPor: 'profissional',
+      url: 'https://exemplo.supabase.co/ver/nota-1',
+      tipoConteudo: 'image/jpeg',
+      expiraEmSegundos: 300,
+    ),
+    AnexoMaterial(tipo: 'contestacao', enviadoPor: 'cliente'),
+  ];
+  Object? falhaAnexosMaterial;
+
+  @override
+  Future<List<AnexoMaterial>> abrirAnexosContestacaoMaterial(String contestacaoId, {required String motivo}) async {
+    chamadasMaterial.add(('anexos', {'id': contestacaoId, 'motivo': motivo}));
+    await Future<void>.delayed(atraso);
+    if (falhaAnexosMaterial != null) throw falhaAnexosMaterial!;
+    return anexosMaterial;
+  }
+
+  @override
+  Future<ContestacaoMaterial> analisarContestacaoMaterial(String contestacaoId) async {
+    chamadasMaterial.add(('analisar', {'id': contestacaoId}));
+    await Future<void>.delayed(atraso);
+    if (falhaMaterial != null) throw falhaMaterial!;
+    return contestacaoMaterialDeExemplo(status: 'em_analise');
+  }
+
+  @override
+  Future<ContestacaoMaterial> decidirContestacaoMaterial(String contestacaoId,
+      {required String status, required String resposta, int? valorReconhecidoCentavos}) async {
+    chamadasMaterial.add((
+      'decidir',
+      {'id': contestacaoId, 'status': status, 'resposta': resposta, 'valor': valorReconhecidoCentavos},
+    ));
+    await Future<void>.delayed(atraso);
+    if (falhaMaterial != null) throw falhaMaterial!;
+    return contestacaoMaterialDeExemplo(status: status, valorReconhecidoCentavos: valorReconhecidoCentavos);
+  }
+
+  // ---------- retorno de conta e impedimentos ----------
+
+  static PedidoRetornoConta retornoContaDeExemplo({
+    String id = 'ret-1',
+    String protocolo = 'RET-2026-0001',
+    String status = 'aberto',
+    bool riscoIdentificado = false,
+  }) =>
+      PedidoRetornoConta(
+        id: id,
+        protocolo: protocolo,
+        usuarioId: 'usr-1',
+        medidaId: 'med-1',
+        justificativaUsuario: 'Regularizei minha situação e peço reavaliação da conta (exemplo).',
+        canal: 'app',
+        status: status,
+        solicitadoEm: DateTime(2026, 11, 20, 10),
+        prazoDiasAplicado: 180,
+        elegivelAPartirDe: DateTime(2026, 11, 1, 10),
+        riscoIdentificado: riscoIdentificado,
+      );
+
+  static ImpedimentoCadastro impedimentoDeExemplo({
+    String id = 'imp-1',
+    String medidaId = 'med-1',
+    DateTime? revogadoEm,
+  }) =>
+      ImpedimentoCadastro(
+        id: id,
+        medidaId: medidaId,
+        tipoIdentificador: 'cpf',
+        criadoPor: 'u1',
+        criadoEm: DateTime(2026, 10, 1, 10),
+        revogadoEm: revogadoEm,
+      );
+
+  late List<PedidoRetornoConta> retornosConta = [retornoContaDeExemplo()];
+  late List<ImpedimentoCadastro> impedimentosConta = [impedimentoDeExemplo()];
+  final List<(String, Map<String, Object?>)> chamadasRetorno = [];
+  Object? falhaRetorno;
+  Object? falhaListaRetorno;
+  String? ultimoStatusRetorno;
+  String? ultimoUsuarioRetorno;
+  String? ultimaMedidaImpedimento;
+  bool? ultimoApenasAtivosImpedimento;
+
+  @override
+  Future<PaginaRemota<PedidoRetornoConta>> listarRetornosConta(
+      {String? status, String? usuarioId, int deslocamento = 0, int limite = 50}) async {
+    ultimoStatusRetorno = status;
+    ultimoUsuarioRetorno = usuarioId;
+    await Future<void>.delayed(atraso);
+    if (falhaListaRetorno != null) throw falhaListaRetorno!;
+    if (erro) throw const ErroApi('Não foi possível falar com o servidor.');
+    return _pagina(retornosConta, deslocamento, limite);
+  }
+
+  @override
+  Future<PedidoRetornoConta> analisarRetornoConta(String retornoId) async {
+    chamadasRetorno.add(('analisar', {'id': retornoId}));
+    await Future<void>.delayed(atraso);
+    if (falhaRetorno != null) throw falhaRetorno!;
+    return retornosConta.isEmpty ? retornoContaDeExemplo(status: 'em_analise') : retornosConta.first;
+  }
+
+  @override
+  Future<PedidoRetornoConta> aprovarRetornoConta(String retornoId, {required String motivo}) async {
+    chamadasRetorno.add(('aprovar', {'id': retornoId, 'motivo': motivo, 'risco_identificado': false}));
+    await Future<void>.delayed(atraso);
+    if (falhaRetorno != null) throw falhaRetorno!;
+    return retornosConta.isEmpty ? retornoContaDeExemplo(status: 'aprovado') : retornosConta.first;
+  }
+
+  @override
+  Future<PedidoRetornoConta> recusarRetornoConta(String retornoId,
+      {required String motivo, required bool riscoIdentificado}) async {
+    chamadasRetorno.add(('recusar', {'id': retornoId, 'motivo': motivo, 'risco_identificado': riscoIdentificado}));
+    await Future<void>.delayed(atraso);
+    if (falhaRetorno != null) throw falhaRetorno!;
+    return retornosConta.isEmpty ? retornoContaDeExemplo(status: 'recusado') : retornosConta.first;
+  }
+
+  @override
+  Future<PaginaRemota<ImpedimentoCadastro>> listarImpedimentosConta(
+      {String? medidaId, bool apenasAtivos = false, int deslocamento = 0, int limite = 50}) async {
+    ultimaMedidaImpedimento = medidaId;
+    ultimoApenasAtivosImpedimento = apenasAtivos;
+    await Future<void>.delayed(atraso);
+    if (falhaListaRetorno != null) throw falhaListaRetorno!;
+    if (erro) throw const ErroApi('Não foi possível falar com o servidor.');
+    return _pagina(impedimentosConta, deslocamento, limite);
+  }
+
+  @override
+  Future<ImpedimentoCadastro> revogarImpedimentoConta(String impedimentoId, {required String motivo}) async {
+    chamadasRetorno.add(('revogar', {'id': impedimentoId, 'motivo': motivo}));
+    await Future<void>.delayed(atraso);
+    if (falhaRetorno != null) throw falhaRetorno!;
+    return impedimentosConta.isEmpty ? impedimentoDeExemplo() : impedimentosConta.first;
+  }
+
+  // ---------- compensações ----------
+
+  static Compensacao compensacaoDeExemplo(
+          {String status = 'aberta', DateTime? avisadoEm, String origem = 'disputa'}) =>
+      Compensacao(
+        id: 'comp-div-1',
+        pedidoId: 'ped-exemplo-1',
+        origem: origem,
+        valorCentavos: 15050,
+        compensadoCentavos: 5000,
+        restanteCentavos: 10050,
+        motivo: 'Serviço refeito por terceiro (exemplo)',
+        status: status,
+        criadaEm: DateTime(2026, 11, 25),
+        avisadoEm: avisadoEm,
+      );
+
+  List<Compensacao> compensacoes = [compensacaoDeExemplo()];
+  ErroApi? falhaCompensacao;
+  final chamadasCompensacao = <(String, Map<String, Object?>)>[];
+  String resultadoCompensacao = 'ok';
+  bool avisoDaCompensacao = true;
+  String? ultimoStatusCompensacao;
+
+  Future<Compensacao> _comp(String acao, Map<String, Object?> dados) async {
+    chamadasCompensacao.add((acao, dados));
+    await Future<void>.delayed(atraso);
+    if (falhaCompensacao != null) throw falhaCompensacao!;
+    return compensacoes.first;
+  }
+
+  @override
+  Future<PaginaRemota<Compensacao>> listarCompensacoes(
+      {String? profissionalId, String? pedidoId, String? status, int deslocamento = 0, int limite = 50}) {
+    ultimoStatusCompensacao = status;
+    return _ler(() => _pagina(compensacoes, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<({String resultado, Compensacao compensacao, bool avisado})> registrarCompensacao(
+          {required String pedidoId, String? contestacaoId, required int valorCentavos, required String motivo}) async =>
+      (
+        compensacao: await _comp('registrar',
+            {'pedido': pedidoId, 'contestacao': contestacaoId, 'valor': valorCentavos, 'motivo': motivo}),
+        resultado: resultadoCompensacao,
+        avisado: avisoDaCompensacao,
+      );
+
+  @override
+  Future<({Compensacao compensacao, bool avisado})> avisarCompensacao(String id) async =>
+      (compensacao: await _comp('avisar', {'id': id}), avisado: avisoDaCompensacao);
+
+  @override
+  Future<({String resultado, int devolvidoCentavos, Compensacao compensacao})> cancelarCompensacao(String id,
+          {required String motivo}) async =>
+      (
+        compensacao: await _comp('cancelar', {'id': id, 'motivo': motivo}),
+        resultado: resultadoCompensacao,
+        devolvidoCentavos: 5000,
+      );
+
+  /// Faz a leitura de conversa voltar sem nenhuma conversa.
+  bool conversaVazia = false;
+
+  // ---------- exclusividades e medidas ----------
+
+  List<ExclusividadeCliente> exclusividades = [
+    ExclusividadeCliente(
+      id: '0f8fad5b-d9cb-469f-a165-70867728950e',
+      pedidoId: 'ped-exemplo-1',
+      clienteId: 'cli-1',
+      clienteNome: 'Ana (exemplo)',
+      profissionalId: 'pro-1',
+      profissionalNome: 'Beto (exemplo)',
+      status: 'cancelada',
+      moedas: 150,
+      estornada: false,
+      criadaEm: DateTime(2026, 11, 20),
+    ),
+  ];
+  ({String? pedidoId, String? clienteId, String? status})? ultimoFiltroExclusividades;
+
+  @override
+  Future<PaginaRemota<ExclusividadeCliente>> listarExclusividades(
+      {String? pedidoId, String? clienteId, String? status, int deslocamento = 0, int limite = 20}) {
+    ultimoFiltroExclusividades = (pedidoId: pedidoId, clienteId: clienteId, status: status);
+    return _ler(() => _pagina(exclusividades, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  List<Medida> medidas = [medidaDeExemplo()];
+  ErroApi? falhaMedida;
+  final chamadasMedida = <(String, Map<String, Object?>)>[];
+  NovaMedida? ultimaMedida;
+  bool medidaRepetida = false;
+
+  static Medida medidaDeExemplo({String? aplicadaPor, ContestacaoMedida? contestacao}) => Medida(
+        id: 'med-1',
+        protocolo: 'MED-EXEMPLO-1',
+        usuarioId: 'u-101',
+        usuarioNome: 'Paulo (exemplo)',
+        tipo: 'suspensao',
+        motivoAoUsuario: 'Texto que o usuário lê (exemplo)',
+        motivoCompleto: 'Texto que o usuário lê (exemplo)',
+        clausulas: const ['9.2'],
+        inicioEm: DateTime(2026, 11, 20),
+        fimEm: DateTime(2026, 12, 20),
+        efeito: 'Efeito (exemplo)',
+        comoContestar: 'Como contestar (exemplo)',
+        vigente: true,
+        notaInterna: 'Nota só da equipe (exemplo)',
+        aplicadaPor: aplicadaPor,
+        contestacao: contestacao,
+      );
+
+  Future<Medida> _med(String acao, Map<String, Object?> dados) async {
+    chamadasMedida.add((acao, dados));
+    await Future<void>.delayed(atraso);
+    if (falhaMedida != null) throw falhaMedida!;
+    return medidas.first;
+  }
+
+  @override
+  Future<PaginaRemota<Medida>> listarMedidas(FiltroMedidas filtro, {int deslocamento = 0, int limite = 50}) =>
+      _ler(() => _pagina(medidas, deslocamento, limite), const PaginaRemota([], 0));
+
+  @override
+  Future<Medida> obterMedida(String id) {
+    Medida achar() => medidas.firstWhere((m) => m.id == id);
+    return _ler(achar, achar());
+  }
+
+  @override
+  Future<({Medida medida, bool repetida})> aplicarMedida(NovaMedida nova) async {
+    ultimaMedida = nova;
+    return (medida: await _med('aplicar', {}), repetida: medidaRepetida);
+  }
+
+  @override
+  Future<Medida> reverterMedida(String id, {required String motivo}) => _med('reverter', {'motivo': motivo});
+
+  @override
+  Future<Medida> registrarContestacaoMedida(String id, {required String versao, List<String> anexos = const []}) =>
+      _med('contestacao', {'versao': versao, 'anexos': anexos});
+
+  /// Ordem das chamadas de arquivo, para conferir pedir -> PUT -> concluir.
+  final chamadasArquivo = <(String, Map<String, Object?>)>[];
+  ErroApi? falhaEnvio;
+  ErroApi? falhaConcluir;
+
+  List<ArquivoComprovante> comprovantes = [comprovanteDeExemplo('comp-1')];
+
+  static ArquivoComprovante comprovanteDeExemplo(String id, {String por = 'profissional'}) => ArquivoComprovante(
+        arquivoId: id,
+        finalidade: 'disputa',
+        enviadoPor: por,
+        tipoConteudo: 'image/jpeg',
+        tamanhoBytes: 2048,
+        enviadoEm: DateTime(2026, 11, 20),
+        url: 'https://exemplo.supabase.co/ver/$id',
+        expiraEmSegundos: 300,
+      );
+
+  @override
+  Future<List<ArquivoComprovante>> listarComprovantes(String pedidoId, {required String motivo}) async {
+    chamadasArquivo.add(('listar', {'pedido': pedidoId, 'motivo': motivo}));
+    return [...comprovantes];
+  }
+
+  @override
+  Future<EnvioAssinado> pedirEnvioComprovante(String pedidoId,
+      {required String motivo,
+      required String nomeArquivo,
+      required String tipoConteudo,
+      required int tamanhoBytes}) async {
+    chamadasArquivo.add(('pedir', {'motivo': motivo, 'tipo': tipoConteudo, 'tamanho': tamanhoBytes}));
+    return const EnvioAssinado(id: 'envio-1', url: 'https://exemplo.supabase.co/enviar', expiraEmSegundos: 300);
+  }
+
+  @override
+  Future<void> enviarArquivo(String url, {required String tipoConteudo, required List<int> bytes}) async {
+    chamadasArquivo.add(('put', {'url': url, 'tipo': tipoConteudo, 'tamanho': bytes.length}));
+    await Future<void>.delayed(atraso);
+    if (falhaEnvio != null) throw falhaEnvio!;
+  }
+
+  @override
+  Future<ArquivoComprovante> concluirComprovante(String pedidoId, String envioId, {required String motivo}) async {
+    chamadasArquivo.add(('concluir', {'envio': envioId, 'motivo': motivo}));
+    if (falhaConcluir != null) throw falhaConcluir!;
+    return comprovanteDeExemplo('comp-novo', por: 'equipe');
+  }
+
+  @override
+  Future<EnvioAssinado> pedirAnexoContestacao(String medidaId,
+      {required String nomeArquivo, required String tipoConteudo, required int tamanhoBytes}) async {
+    chamadasArquivo.add(('pedirAnexo', {'tipo': tipoConteudo, 'tamanho': tamanhoBytes}));
+    return const EnvioAssinado(id: 'anexo-1.pdf', url: 'https://exemplo.supabase.co/enviar', expiraEmSegundos: 300);
+  }
+
+  @override
+  Future<List<AnexoContestacao>> abrirAnexosContestacao(String medidaId, {required String motivo}) async {
+    chamadasArquivo.add(('abrirAnexos', {'medida': medidaId, 'motivo': motivo}));
+    return const [
+      AnexoContestacao(
+          anexoId: 'a.pdf',
+          tipoConteudo: 'application/pdf',
+          tamanhoBytes: 5000,
+          url: 'https://exemplo.supabase.co/prova',
+          expiraEmSegundos: 300),
+    ];
+  }
+
+  @override
+  Future<Medida> decidirContestacaoMedida(String id,
+          {required String resultado,
+          required String resposta,
+          int? diasAPartirDeHoje,
+          String? mesmoAnalistaJustificativa}) =>
+      _med('decisao', {
+        'resultado': resultado,
+        'resposta': resposta,
+        'dias': diasAPartirDeHoje,
+        'justificativa': mesmoAnalistaJustificativa,
+      });
+
+  // ---------- cliente ausente ----------
+
+  /// Casos de exemplo; o teste pode trocar a lista.
+  List<CasoAusencia> ausencias = [
+    CasoAusencia(
+      pedidoId: 'aus-analise-1',
+      status: CasoAusencia.emAnalise,
+      chegadaEm: DateTime(2026, 10, 28, 14),
+      justificativaAte: DateTime(2026, 10, 29, 14, 30),
+      justificativaTexto: 'Fiquei preso no trânsito (exemplo).',
+      anexos: const ['arquivo-exemplo-1'],
+    ),
+    CasoAusencia(
+      pedidoId: 'aus-espera-2',
+      status: CasoAusencia.aguardandoJustificativa,
+      chegadaEm: DateTime(2026, 10, 28, 10),
+      justificativaAte: DateTime(2099, 1, 1),
+    ),
+    CasoAusencia(
+      pedidoId: 'aus-proposta-3',
+      status: CasoAusencia.recusada,
+      chegadaEm: DateTime(2026, 10, 27, 10),
+      justificativaAte: DateTime(2026, 10, 28, 10),
+      retencaoCentavos: 4500,
+      retencaoJustificativa: 'Deslocamento já realizado (exemplo).',
+      retencaoComprovantes: const ['comprovante-exemplo'],
+      cancelamentoStatus: CasoAusencia.propostaRetencao,
+    ),
+  ];
+
+  /// Faz a próxima decisão ou confirmação falhar com esta recusa.
+  ErroApi? falhaAusencia;
+  Map<String, Object?>? ultimaDecisaoAusencia;
+  bool? ultimaRetirada;
+  String? ultimoMotivoConfirmacao;
+  final chamadasAnexos = <(String, String)>[];
+  List<AnexoCaso> anexosDeTeste = const [
+    AnexoCaso(
+        tipo: 'justificativa',
+        arquivoId: 'arquivo-exemplo-1',
+        enviadoPor: 'cliente',
+        url: 'https://exemplo.supabase.co/assinado',
+        tipoConteudo: 'image/jpeg',
+        expiraEmSegundos: 300),
+    AnexoCaso(tipo: 'registro_ausencia', arquivoId: 'arquivo-exemplo-2'),
+  ];
+  Map<String, Object?>? ultimaRevisao;
+  final chamadasConversa = <(String, String, String, String?)>[];
+  ErroApi? falhaConversa;
+
+  @override
+  Future<List<AnexoCaso>> anexosAusencia(String pedidoId, {required String motivo}) async {
+    chamadasAnexos.add((pedidoId, motivo));
+    await Future<void>.delayed(atraso);
+    return anexosDeTeste;
+  }
+
+  @override
+  Future<CasoAusencia> decidirContestacaoAusencia(String pedidoId,
+      {required String resultado, required String resposta, int? retencaoCentavos}) async {
+    await Future<void>.delayed(atraso);
+    if (falhaAusencia != null) throw falhaAusencia!;
+    ultimaRevisao = {'resultado': resultado, 'resposta': resposta, 'retencao': retencaoCentavos};
+    return ausencias.firstWhere((a) => a.pedidoId == pedidoId);
+  }
+
+  @override
+  Future<List<ConversaLida>> lerConversas(String pedidoId,
+      {required String motivo, required String base, String? referencia}) async {
+    chamadasConversa.add((pedidoId, motivo, base, referencia));
+    await Future<void>.delayed(atraso);
+    if (falhaConversa != null) throw falhaConversa!;
+    if (conversaVazia) return [];
+    return [
+      ConversaLida(id: 'c1', profissionalId: 'prof-1', mensagens: [
+        MensagemLida(
+            autorId: 'prof-1',
+            texto: 'Meu numero e 31 99999-0000 (exemplo)',
+            textoExibido: 'Meu numero e *** (exemplo)',
+            mascarada: true,
+            enviadaEm: DateTime(2026, 10, 28, 9)),
+      ]),
+    ];
+  }
+
+  @override
+  Future<List<CasoAusencia>> listarAusencias() => _ler(() => [...ausencias], <CasoAusencia>[]);
+
+  @override
+  Future<CasoAusencia> obterAusencia(String pedidoId) {
+    CasoAusencia achar() => ausencias.firstWhere((a) => a.pedidoId == pedidoId);
+    return _ler(achar, achar());
+  }
+
+  @override
+  Future<CasoAusencia> decidirAusencia(
+    String pedidoId, {
+    required bool aceitarJustificativa,
+    required String justificativa,
+    int retencaoCentavos = 0,
+    String? retencaoJustificativa,
+    List<String> retencaoComprovantes = const [],
+  }) async {
+    await Future<void>.delayed(atraso);
+    if (falhaAusencia != null) throw falhaAusencia!;
+    ultimaDecisaoAusencia = {
+      'pedido': pedidoId,
+      'aceitar': aceitarJustificativa,
+      'justificativa': justificativa,
+      'retencao': retencaoCentavos,
+      'retencaoJustificativa': retencaoJustificativa,
+      'comprovantes': retencaoComprovantes,
+    };
+    final antes = ausencias.firstWhere((a) => a.pedidoId == pedidoId);
+    _registrar('financeiro.ausencia_cliente_decidida', 'pedidos:$pedidoId', justificativa);
+    return CasoAusencia(
+      pedidoId: pedidoId,
+      status: aceitarJustificativa ? CasoAusencia.aceita : CasoAusencia.recusada,
+      chegadaEm: antes.chegadaEm,
+      decisao: justificativa,
+      retencaoCentavos: retencaoCentavos,
+      cancelamentoStatus: retencaoCentavos > 0 ? CasoAusencia.propostaRetencao : null,
+    );
+  }
+
+  @override
+  Future<CasoAusencia> confirmarAusencia(String pedidoId,
+      {required bool retirarRetencao, required String motivo}) async {
+    ultimoMotivoConfirmacao = motivo;
+    await Future<void>.delayed(atraso);
+    if (falhaAusencia != null) throw falhaAusencia!;
+    ultimaRetirada = retirarRetencao;
+    final antes = ausencias.firstWhere((a) => a.pedidoId == pedidoId);
+    ausencias = [for (final a in ausencias) if (a.pedidoId != pedidoId) a];
+    return CasoAusencia(pedidoId: pedidoId, status: antes.status, chegadaEm: antes.chegadaEm);
+  }
+
   // ---------- F7.2 ----------
   @override
   Future<PaginaRemota<Disputa>> listarDisputas({String situacao = 'abertas', int deslocamento = 0, int limite = 50}) {
     chamadasListaDisputas++;
     final achadas = [
       for (final d in _disputas)
-        if (situacao == 'todas' || (situacao == 'decididas') == (d.status == StatusDisputa.decidida)) d,
+        if (situacao == 'todas' || (situacao == 'decididas') == d.status.encerrada) d,
     ]..sort((a, b) => a.decisaoAte.compareTo(b.decisaoAte));
     return _ler(() => _pagina(achadas, deslocamento, limite), const PaginaRemota([], 0));
   }
@@ -244,7 +1204,7 @@ class ApiFake implements ApiAdmin {
 
   @override
   Future<({int abertas, int decididas})> contarDisputas() => _ler(() {
-        final decididas = _disputas.where((d) => d.status == StatusDisputa.decidida).length;
+        final decididas = _disputas.where((d) => d.status.encerrada).length;
         return (abertas: _disputas.length - decididas, decididas: decididas);
       }, (abertas: 0, decididas: 0));
 
@@ -261,13 +1221,56 @@ class ApiFake implements ApiAdmin {
   }
 
   /// Simula outra pessoa assumindo a disputa.
+  /// Marca a disputa como caso de desistência com o serviço iniciado.
+  void marcarDesistencia(String id) {
+    _disputas = [
+      for (final d in _disputas)
+        d.id == id
+            ? Disputa(
+                id: d.id,
+                pedido: d.pedido,
+                cliente: d.cliente,
+                profissional: d.profissional,
+                motivo: d.motivo,
+                descricao: d.descricao,
+                valorEmAnaliseCentavos: d.valorEmAnaliseCentavos,
+                decisaoAte: d.decisaoAte,
+                evidencias: d.evidencias,
+                linhaDoTempo: d.linhaDoTempo,
+                status: d.status,
+                titulo: d.titulo,
+                desistencia: true,
+              )
+            : d,
+    ];
+  }
+
+  Future<List<Disputa>> get disputasDeTeste async => [..._disputas];
+
   void assumirDisputaComo(String id, String membroId, String nome) {
     _disputas = [for (final x in _disputas) x.id == id ? x.assumidaPor(membroId, nome) : x];
   }
 
   /// Simula outra pessoa mexendo na disputa enquanto a tela está aberta.
-  void mudarEstadoDisputa(String id, StatusDisputa novo) {
-    _disputas = [for (final d in _disputas) d.id == id ? d.comDecisao(novo, d.decisao ?? DecisaoDisputa.liberarTudo, d.valorReembolsoCentavos) : d];
+  void mudarEstadoDisputa(
+    String id,
+    StatusDisputa novo, {
+    DecisaoDisputa? decisao,
+    DivisaoDisputa? divisao,
+    bool limparDecisao = false,
+  }) {
+    _disputas = [
+      for (final d in _disputas)
+        d.id == id
+            ? d.comDecisao(
+                novo,
+                limparDecisao ? null : (decisao ?? d.decisao ?? DecisaoDisputa.liberarTudo),
+                divisao?.paraClienteCentavos ?? d.valorReembolsoCentavos,
+                divisao: divisao,
+                manterDecididoPor: !limparDecisao && novo != StatusDisputa.acordo,
+              )
+            : d,
+    ];
   }
 
   @override
@@ -521,36 +1524,81 @@ class ApiFake implements ApiAdmin {
         ];
       }, const []);
 
+  // ---------- atendimento ----------
+
+  List<Chamado> chamados = [
+    Chamado(
+      id: 'ch-1',
+      protocolo: 'SAC-EXEMPLO-000031',
+      assunto: 'Não recebi o código (exemplo)',
+      solicitante: 'Paulo Lima',
+      status: 'aberto',
+      abertoEm: DateTime(2026, 10, 28),
+      categoria: 'duvida',
+      canal: 'app',
+      responderAte: DateTime(2026, 11, 4),
+      atrasado: true,
+      mensagens: [
+        MensagemChamado(autor: 'usuario', texto: 'Cadê o código? (exemplo)', criadaEm: DateTime(2026, 10, 28)),
+        MensagemChamado(autor: 'equipe', texto: 'Conferir cadastro (exemplo)', criadaEm: DateTime(2026, 10, 29), interna: true),
+      ],
+    ),
+  ];
+  ErroApi? falhaChamado;
+  final chamadasSac = <(String, Map<String, Object?>)>[];
+  FiltroChamados? ultimoFiltroChamados;
+
+  Future<Chamado> _sac(String acao, String id, Map<String, Object?> dados) async {
+    chamadasSac.add((acao, dados));
+    await Future<void>.delayed(atraso);
+    if (falhaChamado != null) throw falhaChamado!;
+    return chamados.firstWhere((c) => c.id == id, orElse: () => chamados.first);
+  }
+
   @override
-  Future<List<Chamado>> listarChamados() => _ler(
-        () => [
-          Chamado(
-            id: 'CH-31',
-            assunto: 'Não recebi o código de confirmação',
-            solicitante: 'Paulo Lima',
-            status: 'aberto',
-            aberto: _base.subtract(const Duration(hours: 3)),
-            prioridade: 'alta',
-            prazo: _base.add(const Duration(hours: 5)),
-          ),
-          Chamado(
-            id: 'CH-30',
-            assunto: 'Dúvida sobre o orçamento',
-            solicitante: 'Marina Souza',
-            status: 'em atendimento',
-            aberto: _base.subtract(const Duration(days: 1)),
-            responsavel: 'Bruna Teixeira',
-            prazo: _base.add(const Duration(hours: 20)),
-          ),
-        ],
-        const [],
-      );
+  Future<PaginaRemota<Chamado>> listarChamados(FiltroChamados filtro, {int deslocamento = 0, int limite = 50}) {
+    ultimoFiltroChamados = filtro;
+    return _ler(() => _pagina(chamados, deslocamento, limite), const PaginaRemota([], 0));
+  }
+
+  @override
+  Future<Chamado> obterChamado(String id) {
+    Chamado achar() => chamados.firstWhere((c) => c.id == id);
+    return _ler(achar, achar());
+  }
+
+  @override
+  Future<Chamado> registrarContato(NovoContato c) => _sac('registrar', 'ch-1', {
+        'canal': c.canal,
+        'categoria': c.categoria,
+        'assunto': c.assunto,
+        'texto': c.texto,
+        'contato': c.contato,
+        'usuario': c.usuarioId,
+      });
+
+  @override
+  Future<Chamado> assumirChamado(String id, {bool substituir = false}) =>
+      _sac('assumir', id, {'substituir': substituir});
+
+  @override
+  Future<Chamado> responderChamado(String id, {required String texto, bool interna = false, bool aguardarUsuario = false}) =>
+      _sac('responder', id, {'texto': texto, 'interna': interna, 'aguardar': aguardarUsuario});
+
+  @override
+  Future<Chamado> estenderPrazoChamado(String id, {required DateTime ate, required String motivo}) =>
+      _sac('prazo', id, {'ate': ate, 'motivo': motivo});
+
+  @override
+  Future<Chamado> encerrarChamado(String id, {required String mensagem}) =>
+      _sac('encerrar', id, {'mensagem': mensagem});
 
   @override
   Future<List<CategoriaAdmin>> listarCategorias() => _ler(() => _categorias, const []);
 
   @override
-  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo}) async {
+  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo, String? motivoUsuario, List<String> clausulas = const []}) async {
+    acoesDeConta.add((acao: 'alterarStatusUsuario', motivoUsuario: motivoUsuario, clausulas: clausulas));
     await Future<void>.delayed(atraso);
     _registrar('usuario.status_alterado', 'usuario:$usuarioId', motivo);
   }
@@ -729,7 +1777,7 @@ class ApiFake implements ApiAdmin {
       'prazo_pagamento_pendente_horas': 2,
       'garantia_retrabalho_dias_padrao': 30,
       'prazo_retrabalho_atendimento_dias': 7,
-      'prazo_resposta_disputa_horas': 48,
+      'prazo_resposta_disputa_horas': 24,
       'prazo_congelar_disputa_horas': 72,
       'prazo_decisao_disputa_dias_uteis': 5,
       'limite_orcamentos_por_pedido': 5,
@@ -1193,6 +2241,7 @@ class ApiFake implements ApiAdmin {
       usuarioTipo: 'cliente',
       usuarioStatus: 'ativo',
       pedido: 'PED-10498',
+      pedidoId: 'ped-exemplo-10498',
       tipo: 'valor_atipico',
       severidade: 'critica',
       detalhes: 'Pedido criado com valor de R\$ 3.000,00. O limite de atipicidade é R\$ 800,00 e o teto do pedido '
@@ -1206,6 +2255,7 @@ class ApiFake implements ApiAdmin {
       usuarioTipo: 'profissional',
       usuarioStatus: 'ativo',
       pedido: 'PED-10482',
+      pedidoId: 'ped-exemplo-10482',
       tipo: 'varios_pedidos_em_pouco_tempo',
       severidade: 'alta',
       detalhes: '3 pedidos de valor alto em 2 horas.',
@@ -1229,12 +2279,28 @@ class ApiFake implements ApiAdmin {
   @override
   Future<List<AlertaRisco>> listarAlertasRisco() => _ler(() => List.of(_alertasRisco), []);
 
+  /// `mensagem` devolvida pela trava e pela remoção; null = resposta sem o campo.
+  String? mensagemRisco;
+
+  /// Prazo máximo da trava por fraude; null = a rota falha.
+  int? prazoMaximoTrava = 30;
+  int leiturasDoPrazo = 0;
+
+  @override
+  Future<int> prazoMaximoTravaFraude() async {
+    leiturasDoPrazo++;
+    return prazoMaximoTrava ?? (throw const ErroApi('Indisponível (exemplo)', status: 503));
+  }
+
+  Map<String, Object?>? ultimaTrava;
+
   void _statusDoUsuario(String usuarioId, String status) {
     _alertasRisco = [for (final a in _alertasRisco) a.usuarioId == usuarioId ? a.comUsuarioStatus(status) : a];
   }
 
   @override
-  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo}) async {
+  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo, String? motivoUsuario, List<String> clausulas = const []}) async {
+    acoesDeConta.add((acao: 'aplicarBloqueioPreventivo', motivoUsuario: motivoUsuario, clausulas: clausulas));
     await Future<void>.delayed(atraso);
     _statusDoUsuario(usuarioId, 'bloqueado');
     _registrar('risco.bloqueio_preventivo', 'usuarios', motivo);
@@ -1248,17 +2314,27 @@ class ApiFake implements ApiAdmin {
   }
 
   @override
-  Future<void> travarSaque(String usuarioId, {required String motivo}) async {
+  Future<String?> travarSaque(String usuarioId,
+      {required String motivo,
+      String? motivoUsuario,
+      List<String> clausulas = const [],
+      bool motivoFraude = false,
+      int? limiteRetencaoCentavos,
+      int? dias}) async {
+    ultimaTrava = {'fraude': motivoFraude, 'limite': limiteRetencaoCentavos, 'dias': dias};
+    acoesDeConta.add((acao: 'travarSaque', motivoUsuario: motivoUsuario, clausulas: clausulas));
     await Future<void>.delayed(atraso);
     _statusDoUsuario(usuarioId, 'restrito');
     _registrar('risco.saque_travado', 'perfis_profissional', motivo);
+    return mensagemRisco;
   }
 
   @override
-  Future<void> destravarSaque(String usuarioId, {required String motivo}) async {
+  Future<String?> destravarSaque(String usuarioId, {required String motivo}) async {
     await Future<void>.delayed(atraso);
     _statusDoUsuario(usuarioId, 'ativo');
     _registrar('risco.saque_destravado', 'perfis_profissional', motivo);
+    return mensagemRisco;
   }
 
   @override
@@ -1274,6 +2350,7 @@ class ApiFake implements ApiAdmin {
             usuarioTipo: a.usuarioTipo,
             usuarioStatus: a.usuarioStatus,
             pedido: a.pedido,
+            pedidoId: a.pedidoId,
             tipo: a.tipo,
             severidade: a.severidade,
             detalhes: a.detalhes,

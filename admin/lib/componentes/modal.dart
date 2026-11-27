@@ -291,9 +291,11 @@ class ModalFormulario<T> extends StatefulWidget {
     required this.resultado,
     this.consequencia,
     this.destrutivo = false,
+    this.rotuloMotivo = 'Motivo',
   });
 
   final String titulo;
+  final String rotuloMotivo;
   final String? consequencia;
   final String rotuloConfirmar;
   final bool destrutivo;
@@ -326,7 +328,7 @@ class _ModalFormularioState<T> extends State<ModalFormulario<T>> {
       filhos: [
         widget.campos(context, () => setState(() {})),
         const SizedBox(height: EspacosTrato.x3),
-        CampoMotivo(controle: _motivo, aoMudar: () => setState(() {})),
+        CampoMotivo(controle: _motivo, aoMudar: () => setState(() {}), rotulo: widget.rotuloMotivo),
         const SizedBox(height: EspacosTrato.x3),
         const AvisoAuditoria(),
       ],
@@ -350,6 +352,7 @@ Future<T?> pedirFormulario<T>(
   required T Function(String motivo) resultado,
   String? consequencia,
   bool destrutivo = false,
+  String rotuloMotivo = 'Motivo',
 }) {
   return mostrarModal<T>(
     context,
@@ -358,6 +361,7 @@ Future<T?> pedirFormulario<T>(
       consequencia: consequencia,
       rotuloConfirmar: rotuloConfirmar,
       destrutivo: destrutivo,
+      rotuloMotivo: rotuloMotivo,
       campos: campos,
       camposValidos: camposValidos,
       resultado: resultado,

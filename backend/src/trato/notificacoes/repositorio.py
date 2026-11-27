@@ -55,8 +55,10 @@ class RepositorioServicoNotificacoes(Protocol):
     def marcar_lida(self, notificacao_id: str, usuario_id: str, agora: datetime) -> Registro:
         """Idempotente: marcar de novo devolve a mesma `lida_em`. Outra pessoa = NaoEncontrado."""
 
-    def pendentes(self, desde: datetime, limite: int) -> Sequence[Registro]:
-        """Canais externos criados desde `desde` e ainda sem `enviada_em`."""
+    def pendentes(
+        self, desde: datetime, limite: int, ate: datetime | None = None
+    ) -> Sequence[Registro]:
+        """Canais externos criados desde `desde` (e até `ate`, se vier) ainda sem `enviada_em`."""
 
     def marcar_enviada(self, notificacao_id: str, agora: datetime) -> None: ...
 
@@ -134,11 +136,16 @@ class RepositorioEmMemoria:
             self._trocar(atual)
         return atual
 
-    def pendentes(self, desde: datetime, limite: int) -> Sequence[Registro]:
+    def pendentes(
+        self, desde: datetime, limite: int, ate: datetime | None = None
+    ) -> Sequence[Registro]:
         return tuple(
             r
             for r in self._linhas
-            if r.canal != "app" and r.enviada_em is None and r.criada_em >= desde
+            if r.canal != "app"
+            and r.enviada_em is None
+            and r.criada_em >= desde
+            and (ate is None or r.criada_em <= ate)
         )[:limite]
 
     def marcar_enviada(self, notificacao_id: str, agora: datetime) -> None:

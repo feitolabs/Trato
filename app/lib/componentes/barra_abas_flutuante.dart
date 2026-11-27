@@ -31,21 +31,44 @@ class BarraAbasFlutuante extends StatelessWidget {
     return midia.padding.bottom > fora ? midia.padding.bottom : fora;
   }
 
+  /// Quanto reduzir para o rótulo mais largo caber em [largura]. Mede em negrito (a aba
+  /// escolhida), para o tamanho não mudar quando a pessoa troca de aba.
+  double _escalaDosRotulos(BuildContext context, double largura) {
+    var maior = 0.0;
+    for (final aba in abas) {
+      final medida = TextPainter(
+        text: TextSpan(
+          text: aba.rotulo,
+          style: DefaultTextStyle.of(context).style.merge(_estiloDoRotulo(selecionada: true)),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1),
+        maxLines: 1,
+      )..layout();
+      if (medida.width > maior) maior = medida.width;
+      medida.dispose();
+    }
+    return maior <= largura || largura <= 0 ? 1 : largura / maior;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.cores;
     final escuro = Theme.of(context).brightness == Brightness.dark;
     final midia = MediaQuery.of(context);
+    // Em tela estreita as margens encolhem para os rótulos continuarem legíveis.
+    final estreita = midia.size.width < 360;
+    final folgaDoItem = estreita ? EspacosTrato.x1 / 2 : EspacosTrato.x1;
 
     return MediaQuery(
       data: midia.copyWith(textScaler: midia.textScaler.clamp(maxScaleFactor: 1)),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            EspacosTrato.x4,
+          padding: EdgeInsets.fromLTRB(
+            estreita ? EspacosTrato.x2 : EspacosTrato.x4,
             EspacosTrato.x1,
-            EspacosTrato.x4,
+            estreita ? EspacosTrato.x2 : EspacosTrato.x4,
             EspacosTrato.x3,
           ),
           child: Center(
@@ -57,7 +80,7 @@ class BarraAbasFlutuante extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: [
                     BoxShadow(
-                      color: (escuro ? Colors.black : c.petroleo).withValues(
+                      color: (escuro ? CoresTrato.sombra : c.petroleo).withValues(
                         alpha: escuro ? 0.42 : 0.14,
                       ),
                       blurRadius: 22,
@@ -78,21 +101,33 @@ class BarraAbasFlutuante extends StatelessWidget {
                         ),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: EspacosTrato.x2,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: estreita ? EspacosTrato.x1 : EspacosTrato.x2,
                           vertical: EspacosTrato.x2 - 2,
                         ),
-                        child: Row(
-                          children: [
-                            for (var i = 0; i < abas.length; i++)
-                              Expanded(
-                                child: _ItemAbaFlutuante(
-                                  aba: abas[i],
-                                  selecionada: i == indiceAtual,
-                                  aoTocar: () => aoSelecionar(i),
-                                ),
-                              ),
-                          ],
+                        child: LayoutBuilder(
+                          builder: (context, limites) {
+                            // Uma escala só para os cinco rótulos: encolher cada um por conta
+                            // própria deixa tamanhos desiguais em tela estreita.
+                            final escala = _escalaDosRotulos(
+                              context,
+                              limites.maxWidth / abas.length - folgaDoItem * 2,
+                            );
+                            return Row(
+                              children: [
+                                for (var i = 0; i < abas.length; i++)
+                                  Expanded(
+                                    child: _ItemAbaFlutuante(
+                                      aba: abas[i],
+                                      selecionada: i == indiceAtual,
+                                      escala: escala,
+                                      folga: folgaDoItem,
+                                      aoTocar: () => aoSelecionar(i),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -107,15 +142,24 @@ class BarraAbasFlutuante extends StatelessWidget {
   }
 }
 
+TextStyle _estiloDoRotulo({required bool selecionada}) => TipografiaTrato.legenda.copyWith(
+      fontWeight: selecionada ? FontWeight.w700 : FontWeight.w500,
+      fontVariations: selecionada ? const [FontVariation('wght', 700)] : null,
+    );
+
 class _ItemAbaFlutuante extends StatelessWidget {
   const _ItemAbaFlutuante({
     required this.aba,
     required this.selecionada,
+    required this.escala,
+    required this.folga,
     required this.aoTocar,
   });
 
   final AbaTrato aba;
   final bool selecionada;
+  final double escala;
+  final double folga;
   final VoidCallback aoTocar;
 
   @override
@@ -123,10 +167,11 @@ class _ItemAbaFlutuante extends StatelessWidget {
     final c = context.cores;
     final corAtiva = c.texto;
     final corInativa = c.textoSecundario;
-    final estilo = TipografiaTrato.legenda.copyWith(
+    final base = _estiloDoRotulo(selecionada: selecionada);
+    final estilo = base.copyWith(
       color: selecionada ? corAtiva : corInativa,
-      fontWeight: selecionada ? FontWeight.w700 : FontWeight.w500,
-      fontVariations: selecionada ? const [FontVariation('wght', 700)] : null,
+      fontSize: base.fontSize! * escala,
+      letterSpacing: base.letterSpacing == null ? null : base.letterSpacing! * escala,
     );
     final icone = Icon(
       aba.icone,
@@ -155,8 +200,8 @@ class _ItemAbaFlutuante extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(
-              horizontal: EspacosTrato.x1,
+            padding: EdgeInsets.symmetric(
+              horizontal: folga,
               vertical: EspacosTrato.x2 - 2,
             ),
             decoration: BoxDecoration(

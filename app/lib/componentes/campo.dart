@@ -12,6 +12,7 @@ class CampoTrato extends StatelessWidget {
     this.dica,
     this.ajuda,
     this.erro,
+    this.linhasDoErro,
     this.prefixo,
     this.sufixo,
     this.iconeInicio,
@@ -36,6 +37,9 @@ class CampoTrato extends StatelessWidget {
   /// Texto pequeno abaixo do campo. Ex.: "Pelo menos 8 caracteres, com letra e número."
   final String? ajuda;
   final String? erro;
+
+  /// Em quantas linhas o erro pode quebrar; nulo = uma linha, cortando o que não couber.
+  final int? linhasDoErro;
 
   /// Texto fixo antes/depois do valor. Ex.: "R$ " e "h" na calculadora.
   final String? prefixo;
@@ -93,6 +97,7 @@ class CampoTrato extends StatelessWidget {
             hintText: dica,
             hintStyle: estiloDica,
             errorText: erro,
+            errorMaxLines: linhasDoErro,
             // prefixText/suffixText somem sem foco; no protótipo "R$" e "h" ficam sempre visíveis.
             prefixIcon: prefixo != null
                 ? _TextoFixo(prefixo!, inicio: true)

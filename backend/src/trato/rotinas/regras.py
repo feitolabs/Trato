@@ -90,6 +90,9 @@ class PedidoMonitorado:
     saldo_a_liberar_centavos: int = 0  # saldo do ledger (conta a liberar do pedido)
     disputa: DisputaMonitorada | None = None
     disputa_aberta: bool = False  # qualquer disputa ainda sem decisão
+    confirmado: bool = False  # 5.8: confirmado (expressa ou pelo silêncio), sem disputa
+    contestar_ate: datetime | None = None  # 8.7: fim do prazo para contestar a decisão
+    retencao_em: datetime | None = None  # cancelado com retenção de ausência confirmada
     aditivo_pendente_desde: datetime | None = None
 
 
@@ -219,18 +222,44 @@ def _marco_da_transicao(pedido: Pedido, acao: Acao) -> datetime:
     return marcos[acao] or pedido.aberto_em
 
 
-def instante_liberacao(concluido_em: datetime, config: ConfigRotinas) -> datetime | None:
+def regra_de_liberacao(
+    prazo_liberacao_dias: int | None, congelamento_horas: int
+) -> tuple[timedelta | None, timedelta]:
+    """(prazo de liberação, janela de congelamento) da configuração publicada.
+
+    É a mesma para o agendador e para as telas. Sem `prazo_liberacao_dias` não há liberação.
+    A liberação nunca sai antes da janela de congelamento da disputa.
+    """
+    prazo = None if prazo_liberacao_dias is None else timedelta(days=prazo_liberacao_dias)
+    return prazo, timedelta(hours=congelamento_horas)
+
+
+def instante_liberacao(
+    concluido_em: datetime,
+    config: ConfigRotinas,
+    confirmado: bool = False,
+    contestar_ate: datetime | None = None,
+) -> datetime | None:
     """Quando o saldo do pedido concluído passa de 'a liberar' para 'liberado'.
 
-    `concluido_em + prazo_liberacao`; com `liberacao_espera_congelamento`, o maior entre isso e
-    `concluido_em + janela_congelamento_repasse`. `None` se o prazo não está configurado.
+    `concluido_em + prazo_liberacao`. Com `liberacao_espera_congelamento`, nunca antes de
+    `concluido_em + janela_congelamento_repasse`, salvo pedido `confirmado`: a confirmação do
+    cliente, expressa ou tácita, encerra a retenção (Termos 5.8). Disputa decidida: só depois
+    de acabar o prazo para contestar (8.7). `None` se o prazo não está configurado.
     """
     if config.prazo_liberacao is None:
         return None
     espera = config.prazo_liberacao
-    if config.liberacao_espera_congelamento and config.janela_congelamento_repasse is not None:
+    if (
+        not confirmado
+        and config.liberacao_espera_congelamento
+        and config.janela_congelamento_repasse is not None
+    ):
         espera = max(espera, config.janela_congelamento_repasse)
-    return concluido_em + espera
+    quando = concluido_em + espera
+    if contestar_ate is not None:  # o último instante do prazo ainda é do prazo
+        quando = max(quando, contestar_ate + timedelta(microseconds=1))
+    return quando
 
 
 def liberacoes_por_prazo(
@@ -246,19 +275,19 @@ def liberacoes_por_prazo(
     saida = []
     for item in itens:
         pedido = item.pedido
-        if pedido.estado is not Estado.CONCLUIDO or pedido.concluido_em is None:
+        base = {Estado.CONCLUIDO: pedido.concluido_em, Estado.CANCELADO: item.retencao_em}.get(
+            pedido.estado
+        )
+        if base is None or item.disputa_aberta or item.saldo_a_liberar_centavos <= 0:
             continue
-        if item.disputa_aberta or item.saldo_a_liberar_centavos <= 0:
-            continue
-        liberacao = instante_liberacao(pedido.concluido_em, config)
+        liberacao = instante_liberacao(base, config, item.confirmado, item.contestar_ate)
         if liberacao is None or agora < liberacao:
             continue
         saida.append(
             AcaoRotina(
                 TipoAcaoRotina.LIBERAR_SALDO,
                 pedido.id,
-                f"liberacao:{pedido.id}:{item.saldo_a_liberar_centavos}:"
-                f"{pedido.concluido_em.isoformat()}",
+                f"liberacao:{pedido.id}:{item.saldo_a_liberar_centavos}:{base.isoformat()}",
                 valor_centavos=item.saldo_a_liberar_centavos,
                 profissional_id=pedido.profissional_id,
             )

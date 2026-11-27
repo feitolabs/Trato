@@ -1,6 +1,6 @@
-"""Verificação automática do Trato: segredos, backend (lint + testes) e app Flutter.
+"""Verificação automática do Trato: segredos, backend (lint + testes), app, painel e site web.
 
-Uso: python harness/verificar.py [--etapa segredos|backend|app|admin]   (ou harness/verificar.ps1 / harness/verificar.sh)
+Uso: python harness/verificar.py [--etapa segredos|backend|app|admin|web]   (ou harness/verificar.ps1 / harness/verificar.sh)
 Sai com código 1 se qualquer etapa falhar.
 """
 
@@ -18,6 +18,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 BACKEND = RAIZ / "backend"
 APP = RAIZ / "app"
 ADMIN = RAIZ / "admin"
+WEB = RAIZ / "web"
 PROJETOS_FLUTTER = (APP, ADMIN)
 
 # Padrões de segredo. Nomes de variáveis sozinhos (ex.: STRIPE_SECRET_KEY=) não disparam.
@@ -106,17 +107,17 @@ def checar_env_ignorado() -> bool:
     return False
 
 
-def _arquivos_dart() -> list[Path]:
-    """Dart de lib/ do app e do painel admin (build/ e .dart_tool/ ficam de fora)."""
-    return [a for pasta in PROJETOS_FLUTTER if (pasta / "lib").is_dir() for a in (pasta / "lib").rglob("*.dart")]
+def _arquivos_dart(projetos: tuple[Path, ...] = PROJETOS_FLUTTER) -> list[Path]:
+    """Dart de lib/ dos projetos pedidos; sem argumento, app e painel admin (build/ e .dart_tool/ ficam de fora)."""
+    return [a for pasta in projetos if (pasta / "lib").is_dir() for a in (pasta / "lib").rglob("*.dart")]
 
 
-def checar_cores_soltas() -> bool:
-    """Regra 7: cor só no tema. Color(0x...) e Colors.* fora de app/lib/tema/ falham."""
-    titulo("App e painel — cores fora do tema")
+def checar_cores_soltas(projetos: tuple[Path, ...] = PROJETOS_FLUTTER) -> bool:
+    """Regra 7: cor só no tema. Color(0x...) e Colors.* fora de lib/tema/ falham."""
+    titulo(f"{', '.join(p.name for p in projetos)} — cores fora do tema")
     padrao = re.compile(r"\bColor\(\s*0x|\bColor\.fromARGB\(|\bColor\.fromRGBO\(|\bColors\.(?!transparent\b)")
     ok = True
-    for arquivo in _arquivos_dart():
+    for arquivo in _arquivos_dart(projetos):
         if arquivo.parent.name == "tema" or "tema" in arquivo.relative_to(RAIZ).parts[:-1]:
             continue
         for numero, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), start=1):
@@ -135,12 +136,12 @@ TEXTOS_PROIBIDOS = re.compile(
 )
 
 
-def checar_textos_proibidos() -> bool:
+def checar_textos_proibidos(projetos: tuple[Path, ...] = PROJETOS_FLUTTER) -> bool:
     """D13: o app não pode exibir promessas proibidas. Comentários (//) são ignorados;
     `verificar: ignorar` na linha libera um caso justificado."""
-    titulo("App e painel — textos proibidos (D13)")
+    titulo(f"{', '.join(p.name for p in projetos)} — textos proibidos (D13)")
     ok = True
-    for arquivo in _arquivos_dart():
+    for arquivo in _arquivos_dart(projetos):
         for numero, linha in enumerate(arquivo.read_text(encoding="utf-8").splitlines(), start=1):
             codigo = linha.split("//", 1)[0] if linha.lstrip().startswith("//") else linha
             if linha.lstrip().startswith("//") or "verificar: ignorar" in linha:
@@ -199,14 +200,16 @@ def rodar_testes_flutter(flutter: str, pasta: Path) -> bool:
         linhas.append(linha.rstrip("\n"))
     proc.wait()
     if resumo:
-        escrever_resumo_testes(Path(resumo), linhas, proc.returncode)
+        escrever_resumo_testes(Path(resumo), linhas, proc.returncode, pasta.name)
     if proc.returncode != 0:
         print(f"FALHA: {pasta.name} — testes (flutter test)")
         return False
     return True
 
 
-def escrever_resumo_testes(destino: Path, linhas: list[str], codigo: int) -> None:
+def escrever_resumo_testes(
+    destino: Path, linhas: list[str], codigo: int, destino_projeto: str = ""
+) -> None:
     inicio = re.compile(r"^\d\d:\d\d \+\d+")
     falhos: list[str] = []
     blocos: list[str] = []
@@ -226,7 +229,8 @@ def escrever_resumo_testes(destino: Path, linhas: list[str], codigo: int) -> Non
     if atual is not None:
         blocos.append("\n".join(atual))
     ultima = next((ln for ln in reversed(linhas) if inicio.match(ln)), "")
-    saida = [f"### App — flutter test: {'OK' if codigo == 0 else 'FALHOU'}", "", f"`{ultima}`", ""]
+    projeto = destino_projeto or "App"
+    saida = [f"### {projeto} — flutter test: {'OK' if codigo == 0 else 'FALHOU'}", "", f"`{ultima}`", ""]
     if falhos:
         saida += [f"**{len(falhos)} teste(s) falharam**", "", "<details><summary>Nomes</summary>", ""]
         saida += [f"- {n}" for n in falhos] + ["", "</details>", ""]
@@ -265,7 +269,7 @@ def achar_flutter() -> str | None:
     return None
 
 
-def checar_flutter(nome: str, pasta: Path) -> bool:
+def checar_flutter(nome: str, pasta: Path, opcoes_pub: tuple[str, ...] = ()) -> bool:
     flutter = achar_flutter()
     if not flutter:
         titulo(nome)
@@ -273,7 +277,7 @@ def checar_flutter(nome: str, pasta: Path) -> bool:
         return True
     if not pasta.is_dir():
         return True
-    ok = rodar(f"{nome} — dependências", [flutter, "pub", "get"], pasta)
+    ok = rodar(f"{nome} — dependências", [flutter, "pub", "get", *opcoes_pub], pasta)
     ok = rodar(f"{nome} — análise (flutter analyze)", [flutter, "analyze"], pasta) and ok
     ok = rodar_testes_flutter(flutter, pasta) and ok
     return ok
@@ -287,11 +291,32 @@ def checar_admin() -> bool:
     return checar_flutter("Painel admin", ADMIN)
 
 
+def checar_web() -> bool:
+    """Site web: cores, textos, dependências travadas no pubspec.lock, analyze, testes e build web.
+
+    O build só prova que compila: vai sem --dart-define e sai em build/verificar_web, sem tocar no
+    build/web que a Vercel publica. O build para publicar é o web/tool/build_web.py.
+    """
+    if not (WEB / "pubspec.yaml").is_file():
+        titulo("Site web")
+        print("FALHA: web/pubspec.yaml não encontrado")
+        return False
+    ok = checar_cores_soltas((WEB,))
+    ok = checar_textos_proibidos((WEB,)) and ok
+    ok = checar_flutter("Site web", WEB, ("--enforce-lockfile",)) and ok
+    if flutter := achar_flutter():
+        saida = WEB / "build" / "verificar_web"
+        comando = [flutter, "build", "web", "--release", "--output", str(saida)]
+        ok = rodar("Site web — build (flutter build web)", comando, WEB) and ok
+    return ok
+
+
 ETAPAS = {
     "segredos": [checar_segredos, checar_env_ignorado, checar_defines],
     "backend": [checar_backend],
     "app": [checar_cores_soltas, checar_textos_proibidos, checar_app],
     "admin": [checar_cores_soltas, checar_textos_proibidos, checar_admin],
+    "web": [checar_web],
 }
 
 

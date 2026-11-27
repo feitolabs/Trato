@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
 import '../../tema/tema.dart';
+import '../comuns/prazo_avaliacao.dart';
 import 'atendimento.dart';
 import 'modelos.dart';
 import 'pecas.dart';
@@ -24,6 +25,12 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoVerContrato,
     this.aoAbrirProblema,
     this.aoCancelarPedido,
+    this.aoDesistir,
+    this.secaoAusencia,
+    this.secaoContestacao,
+    this.secaoAcordo,
+    this.secaoDocumentos,
+    this.textoDesistir = 'Desistir do pedido',
     this.aoRemarcarVisita,
     this.aoPagar,
     this.aoAvaliar,
@@ -91,6 +98,22 @@ class PedidoExecucaoTela extends StatefulWidget {
   final VoidCallback? aoVerContrato;
   final VoidCallback? aoAbrirProblema;
   final VoidCallback? aoCancelarPedido;
+
+  /// Termos 7.2: "Desistir do pedido" (ou ver o comprovante), quando o servidor tem a rota.
+  final VoidCallback? aoDesistir;
+
+  /// Termos 7.6: o registro de cliente ausente deste pedido.
+  final Widget? secaoAusencia;
+
+  /// Decisão da disputa e contestação (a seção some sozinha quando não há decisão).
+  final Widget? secaoContestacao;
+
+  /// Proposta de devolução ou acordo da disputa (Termos 8.2).
+  final Widget? secaoAcordo;
+
+  /// Comprovante e cópia dos Termos (5.3), só para o cliente com pagamento confirmado.
+  final Widget? secaoDocumentos;
+  final String textoDesistir;
   final VoidCallback? aoRemarcarVisita;
   final bool atualizarAditivoLocalmente;
 
@@ -148,31 +171,8 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
     );
   }
 
-  Future<void> _abrirConfirmacaoSos(PedidoEmExecucao pedido) async {
-    final resumo = _textoResumoAtendimento(pedido);
-    await showDialog<void>(
-      context: context,
-      builder: (dialogo) => AlertDialog(
-        title: const Text('SOS / Emergência'),
-        content: Text(
-          'Se você estiver em risco, ligue para a polícia (190) ou copie os dados do atendimento para enviar a um contato de confiança.\n\n$resumo',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogo).pop(),
-            child: const Text('Fechar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: resumo));
-              if (dialogo.mounted) Navigator.of(dialogo).pop();
-            },
-            child: const Text('Copiar dados'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _abrirConfirmacaoSos(PedidoEmExecucao pedido) =>
+      mostrarEmergencia(context, _textoResumoAtendimento(pedido));
 
   void _decidir(EstadoAditivo estado, VoidCallback? aviso) {
     if (widget.atualizarAditivoLocalmente) {
@@ -187,6 +187,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
       widget.aoVerGarantia != null &&
       pedido.estadoApi == 'concluido' &&
       !pedido.jaAvaliou &&
+      !pedido.prazoAvaliacao.encerrado &&
       widget.aoAvaliar != null;
 
   /// UMA ação principal por estado (o que o cliente faz agora). Sem callback, sem botão.
@@ -208,7 +209,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
               );
       case 'concluido':
         final avaliar = widget.aoAvaliar;
-        if (!pedido.jaAvaliou && avaliar != null) {
+        if (!pedido.jaAvaliou && !pedido.prazoAvaliacao.encerrado && avaliar != null) {
           return BotaoPrimario(
             key: const ValueKey('acao-principal'),
             texto: widget.textoAvaliar,
@@ -332,6 +333,9 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
               style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
         ],
+        if (widget.secaoAusencia != null) widget.secaoAusencia!,
+        if (widget.secaoAcordo != null) widget.secaoAcordo!,
+        if (widget.secaoContestacao != null) widget.secaoContestacao!,
         if (pedido.codigoInicio != null) ...[
           const SizedBox(height: EspacosTrato.x4),
           CartaoTrato(
@@ -391,6 +395,21 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
         if (_acaoPrincipal(pedido) case final principal?) ...[
           const SizedBox(height: EspacosTrato.x4),
           principal,
+        ],
+        // Termos 12.1: até quando dá para avaliar (ou que o prazo terminou).
+        if (pedido.estadoApi == 'concluido' &&
+            !pedido.jaAvaliou &&
+            widget.aoAvaliar != null &&
+            (pedido.prazoAvaliacao.encerrado || pedido.prazoAvaliacao.ate != null)) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          Text(
+            pedido.prazoAvaliacao.encerrado
+                ? textoPrazoEncerrado
+                : textoAvaliarAte(pedido.prazoAvaliacao.ate!),
+            key: const ValueKey('prazo-avaliacao'),
+            textAlign: TextAlign.center,
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+          ),
         ],
         if (!pedido.remoto && pedido.estadoApi == 'em_andamento') ...[
           const SizedBox(height: EspacosTrato.x4),
@@ -457,7 +476,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
               if (widget.aoBaixarComprovante != null && pedido.estadoApi == 'concluido')
                 BotaoLink(
                   key: const ValueKey('baixar-comprovante'),
-                  texto: 'Baixar comprovante (PDF)',
+                  texto: 'Baixar recibo (PDF)',
                   aoTocar: widget.aoBaixarComprovante!,
                 ),
               if (widget.aoVerContrato != null)
@@ -478,6 +497,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             ],
           ),
         ],
+        if (widget.secaoDocumentos != null) widget.secaoDocumentos!,
         if (pedido.aditivos.isNotEmpty ||
             pedido.notas.isNotEmpty ||
             pedido.orcamentoCentavos != null) ...[
@@ -498,7 +518,9 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
             ],
           ),
         ],
-        if (widget.aoAbrirProblema != null || widget.aoCancelarPedido != null) ...[
+        if (widget.aoAbrirProblema != null ||
+            widget.aoCancelarPedido != null ||
+            widget.aoDesistir != null) ...[
           const SizedBox(height: EspacosTrato.x5),
           const Divider(),
           Wrap(
@@ -516,6 +538,13 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                   texto: 'Cancelar pedido',
                   destrutivo: true,
                   aoTocar: widget.aoCancelarPedido!,
+                ),
+              if (widget.aoDesistir != null)
+                BotaoLink(
+                  key: const ValueKey('desistir-do-pedido'),
+                  texto: widget.textoDesistir,
+                  destrutivo: true,
+                  aoTocar: widget.aoDesistir!,
                 ),
             ],
           ),
@@ -537,9 +566,7 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
               BarraAtendimento(
                 aoChat: widget.aoConversar ?? () {},
                 aoAjuda: widget.aoAjuda ?? widget.aoAbrirProblema ?? () {},
-                aoSos: pedido.remoto
-                    ? null
-                    : widget.aoSosEmergencia ?? () => _abrirConfirmacaoSos(pedido),
+                aoSos: widget.aoSosEmergencia ?? () => _abrirConfirmacaoSos(pedido),
               )
             else
               _Rodape(

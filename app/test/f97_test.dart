@@ -22,6 +22,7 @@ import 'package:trato/telas/pedidos/pedido_execucao_tela.dart';
 import 'package:trato/telas/profissional_inicio/modelos.dart';
 import 'package:trato/tema/tema.dart';
 
+import 'apoio/entrar.dart';
 import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'apoio/exemplos/dados/repositorios_fake.dart';
 import 'apoio/exemplos/demo.dart';
@@ -128,7 +129,7 @@ void main() {
     Future<void> abrirPedidos(WidgetTester t, RepositorioProfissionalFake prof,
         {RepositorioPedidosFake? pedidos}) async {
       final auth = ServicoAuthFake();
-      await auth.entrarComEmail(email: 'carlos@exemplo.com', senha: '12345678');
+      await entrarNaContaDeTeste(auth, email: 'carlos@exemplo.com');
       ServicoAuthPadrao.atual = auth;
       RotasTrato.repos = repositoriosDemo(profissional: prof, pedidos: pedidos);
       (RotasTrato.repos.perfilPublico! as ServicoPerfilPublicoFake)

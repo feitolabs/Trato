@@ -20,12 +20,17 @@ def _abertos(c, quem="profissional") -> set[str]:
 
 
 def _remoto(c) -> str:
-    corpo = corpo_pedido(c, modalidade="remoto", titulo="Montar o site")
-    corpo.pop("endereco")  # remoto não precisa de endereço
+    """Pedido remoto ANTIGO (Termos 3.7: a rota não cria mais): semeado direto no banco."""
+    corpo = corpo_pedido(c, titulo="Montar o site")
     r = c.cliente.post("/v1/pedidos", json=corpo, headers=c.token("cliente"))
     assert r.status_code == 201, r.text
-    assert r.json()["modalidade"] == "remoto"
-    return r.json()["id"]
+    pid = r.json()["id"]
+    with c.local.admin() as con:
+        con.execute("set session_replication_role = replica")  # só para montar o cenário
+        con.execute("update public.pedidos set modalidade = 'remoto' where id = %s", (pid,))
+    visto = c.cliente.get(f"/v1/pedidos/{pid}", headers=c.token("cliente")).json()
+    assert visto["modalidade"] == "remoto"
+    return pid
 
 
 @pytest.fixture
@@ -58,11 +63,11 @@ def categoria_remota(cenario):
         )
 
 
-def test_remoto_recusado_enquanto_a_categoria_nao_aceita(cenario):
+def test_remoto_novo_e_recusado(cenario):
     corpo = corpo_pedido(cenario, modalidade="remoto")
     corpo.pop("endereco")
     r = cenario.cliente.post("/v1/pedidos", json=corpo, headers=cenario.token("cliente"))
-    assert r.status_code == 422 and "não atende de forma remota" in r.json()["detail"]
+    assert r.status_code == 422 and "3.7" in r.json()["detail"], r.text
 
 
 def test_presencial_sem_endereco_completo_e_recusado(cenario):

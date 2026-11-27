@@ -8,8 +8,11 @@ class ItemNota {
     this.quantidade = 1,
     int? valorUnitarioCentavos,
     int? centavos,
+    this.id,
   }) : valorUnitarioCentavos = valorUnitarioCentavos ?? centavos ?? 0;
 
+  /// `itens[].id` do servidor. Nulo (servidor antigo): só dá para contestar a nota inteira.
+  final String? id;
   final String descricao;
   final int quantidade;
   final int valorUnitarioCentavos;
@@ -44,8 +47,10 @@ class NotaMaterial {
     required this.enviadaEm,
     required this.itens,
     this.fotoNota,
+    this.id,
   });
 
+  final String? id;
   final String pedidoTitulo;
   final String profissional;
   final DateTime enviadaEm;

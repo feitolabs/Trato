@@ -255,7 +255,7 @@ void main() {
 
       await tester.enterText(campo, 'abc');
       await tester.pumpAndSettle();
-      expect(find.text('Digite um número válido'), findsOneWidget);
+      expect(find.textContaining('Percentual inválido'), findsOneWidget);
 
       await tester.enterText(campo, '999');
       await tester.pumpAndSettle();

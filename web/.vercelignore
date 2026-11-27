@@ -1,0 +1,8 @@
+# O site publicado é só o build/web feito na máquina (tool/build_web.py).
+dart-defines*.json
+.env*
+.dart_tool
+build/verificar_web
+build/native_assets
+build/test_cache
+build/unit_test_assets

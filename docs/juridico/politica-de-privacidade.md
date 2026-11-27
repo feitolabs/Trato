@@ -1,9 +1,9 @@
 # Política de privacidade do Trato
 
 **Versão 1.1 — rascunho para revisão do advogado — 22/11/2026**
-*(Versão anterior: 1.0, de 31/10/2026.)*
+(Versão anterior: 1.0, de 31/10/2026.)
 **Controlador dos dados:** Feito Labs Tecnologia Ltda., Belo Horizonte/MG.
-**Encarregado pelo tratamento de dados (DPO):** Encarregado de Proteção de Dados Feito Labs — `privacidade@trato.app.br`.
+**Encarregado pelo tratamento de dados (DPO):** Encarregado de Proteção de Dados Feito Labs — `privacidade@tratofeitolabs.com.br`.
 
 Esta política explica, em linguagem simples e conforme a **Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD)**, quais dados pessoais coletamos no aplicativo **Trato**, por que precisamos deles, com quem são compartilhados e como você exerce seus direitos.
 
@@ -18,7 +18,7 @@ Esta política explica, em linguagem simples e conforme a **Lei Geral de Proteç
 | **Avisos por WhatsApp ou notificações promocionais** | Quem optar por receber | Enviar comunicações opcionais pelo WhatsApp ou avisos sobre novidades do Trato. | Consentimento (art. 7º, I) — pode ser desligado a qualquer momento em *Perfil → Meus dados*. |
 | **Endereço do serviço (rua, número, bairro, cidade, CEP)** | Clientes | Encontrar profissionais da região (que veem apenas o bairro antes da contratação) e permitir que o profissional contratado chegue ao local após o pagamento. | Execução de contrato (art. 7º, V). |
 | **Fotos do documento de identidade e selfie de verificação** | Profissionais | Conferir a identidade de quem vai prestar serviços nas residências dos clientes e atribuir o selo de verificação. | Prevenção à fraude e segurança do titular e de terceiros (art. 7º, IX e art. 11, II, g), mediante ciência e aceite na tela de verificação. |
-| **Localização do aparelho (GPS)** | Clientes (ao buscar) e profissionais (no check-in) | Mostrar profissionais próximos e registrar a prova de chegada do profissional no endereço do pedido. Nunca rastreamos localização em segundo plano fora do uso ativo. | Execução de contrato (art. 7º, V) e prevenção à fraude. |
+| **Localização do aparelho (GPS)** | Profissionais (no check-in e no check-out) | Registrar a prova de chegada e de saída do profissional no endereço do pedido. A localização é coletada só nesses dois momentos. Nunca rastreamos localização em segundo plano fora do uso ativo. | Execução de contrato (art. 7º, V) e prevenção à fraude. |
 | **Fotos do pedido, de check-in/check-out, de notas de material e de portfólio** | Clientes e profissionais | Formar o orçamento, comprovar a execução do serviço, registrar materiais e analisar eventuais disputas. Metadados de localização (EXIF) são removidos das fotos antes do envio. | Execução de contrato (art. 7º, V) e exercício regular de direitos (art. 7º, VI). |
 | **Mensagens trocadas no chat do pedido** | Clientes e profissionais | Permitir a combinação do serviço e servir de prova caso haja divergência ou disputa. | Execução de contrato (art. 7º, V) e exercício regular de direitos (art. 7º, VI). |
 | **Dados de pagamento e repasse** | Clientes e profissionais | Processar cobranças por Pix ou cartão e transferir valores aos profissionais. Os dados completos de cartão são tratados diretamente pelo parceiro de pagamento; o Trato recebe apenas identificadores e status da transação. | Execução de contrato (art. 7º, V) e obrigação legal/regulatória (art. 7º, II). |
@@ -80,7 +80,7 @@ Você pode, a qualquer momento e sem custo:
 
 - **Confirmar e acessar** os dados que temos sobre você;
 - **Corrigir** dados incompletos, inexatos ou desatualizados;
-- **Exportar uma cópia** dos seus dados (*portabilidade*);
+- **Exportar uma cópia** dos seus dados (portabilidade);
 - **Rever e desligar consentimentos** opcionais (como avisos promocionais e WhatsApp);
 - **Pedir revisão humana** de decisões automatizadas que afetem sua conta;
 - **Solicitar a exclusão da sua conta** e dos dados tratados com base em consentimento ou desnecessários.
@@ -89,7 +89,7 @@ Você pode, a qualquer momento e sem custo:
 
 Vá em **Perfil → Meus dados (LGPD)**. Nessa tela você consulta e altera seus consentimentos, solicita a **exportação dos seus dados** e pode pedir a **exclusão da sua conta** com confirmação em duas etapas.
 
-Se preferir, fale diretamente com nosso Encarregado de Dados (DPO) pelo e-mail `privacidade@trato.app.br` ou com nossa equipe de atendimento (das **08:00 às 20:00**). Respondemos às solicitações dentro dos prazos previstos na LGPD (até 15 dias para relatórios completos, conforme o art. 19, II).
+Se preferir, fale diretamente com nosso Encarregado de Dados (DPO) pelo e-mail `privacidade@tratofeitolabs.com.br` ou com nossa equipe de atendimento (das **08:00 às 20:00**). Respondemos às solicitações dentro dos prazos previstos na LGPD (até 15 dias para relatórios completos, conforme o art. 19, II).
 
 ---
 

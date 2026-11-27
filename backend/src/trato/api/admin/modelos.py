@@ -131,6 +131,8 @@ class DisputaResumoOut(BaseModel):
     decisao_ate: datetime
     atrasada: bool
     sem_resposta: bool
+    # Caso aberto pela desistência com o serviço iniciado (Termos 7.3): decidir o proporcional.
+    desistencia: bool = False
     # Para a lista leve não precisar abrir o detalhe de cada disputa.
     cliente_nome: str | None = None
     profissional_nome: str | None = None
@@ -270,6 +272,8 @@ class UsuarioOut(Saida):
     email_mascarado: str | None = None
     telefone_mascarado: str | None = None
     cidade: str | None = None
+    # Trava de saque por fraude em vigor (20.6). Null: o seu papel não vê essa informação.
+    trava_fraude_vigente: bool | None = None
 
 
 class CategoriaProfissionalOut(BaseModel):

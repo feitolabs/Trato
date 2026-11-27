@@ -131,8 +131,7 @@ void main() {
       await abrirPainel(tester, largura: 390, altura: 800, api: ApiFake(moedasUsadoCentavos: 5000000));
       await tester.tap(find.byKey(const ValueKey('menu-mais')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('menu-moedas')));
-      await tester.pumpAndSettle();
+      await tocarNoMais(tester, 'moedas');
       expect(find.text('Desconto fechado'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

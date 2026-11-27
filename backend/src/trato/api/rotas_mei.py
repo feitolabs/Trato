@@ -55,7 +55,11 @@ class MeiOut(BaseModel):
     motivo: str = Field(description="Frase curta em português para mostrar ao profissional.")
     razao_social: str | None = None
     tipo_cnpj: str | None = Field(
-        None, description='"mei" (optante MEI) ou "outro"; null se não valido.'
+        None,
+        description=(
+            '"mei" quando valido; "outro" só em cadastro antigo de empresa que não é MEI (não '
+            "vale mais); null nos demais."
+        ),
     )
     validado_em: datetime | None = None
     pode_orcar_e_receber: bool = Field(description="True quando o MEI está válido.")

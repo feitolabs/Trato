@@ -5,6 +5,7 @@ import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
 
 import 'apoio/exemplos/telas/pedido_novo/dados_exemplo.dart';
+import 'apoio/endereco_pedido.dart';
 
 FormularioPedido _formularioSemFaixas() => FormularioPedido(
       categoria: formularioExemplo.categoria,
@@ -51,7 +52,7 @@ void main() {
     expect(find.text('Escolha uma faixa'), findsNothing);
     expect(find.text('Valor que pretende gastar'), findsOneWidget);
 
-    await tester.tap(find.text('Remoto'));
+    await preencherEnderecoDoPedido(tester);
     await tester.pumpAndSettle();
 
     await tester.enterText(

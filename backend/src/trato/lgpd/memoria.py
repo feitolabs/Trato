@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import itertools
+import threading
 from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager
 from datetime import datetime
 from typing import Any
 
@@ -31,8 +33,12 @@ class ExclusoesEmMemoria:
     def novo_id(self) -> str:
         return f"excl-{next(self._ids)}"
 
-    def salvar(self, pedido: PedidoExclusao) -> None:
+    def salvar(self, pedido: PedidoExclusao) -> bool:
+        atual = self._pedidos.get(pedido.id)
+        if atual is not None and atual.status not in STATUS_ATIVOS:
+            return False
         self._pedidos[pedido.id] = pedido
+        return True
 
     def ativo_do_usuario(self, usuario_id: str) -> PedidoExclusao | None:
         return next(
@@ -68,8 +74,10 @@ class FonteDadosEmMemoria:
         self.auditoria: list[dict[str, Any]] = []
         self.mensagens: list[dict[str, Any]] = []
         self.anonimizados: set[str] = set()
+        self.a_remover: dict[str, list[tuple[str, str]]] = {}
         self._leitores = leitores or {}
         self._pendencias = pendencias or (lambda _uid: [])
+        self._trava = threading.RLock()
 
     def exportar(self, usuario_id: str) -> dict[str, Any]:
         dados: dict[str, Any] = {
@@ -81,13 +89,31 @@ class FonteDadosEmMemoria:
             dados[nome] = leitor(usuario_id)
         return dados
 
+    def exclusivo(self, usuario_id: str) -> AbstractContextManager[None]:
+        return self._trava  # um processo só: uma exclusão de cada vez
+
     def pendencias(self, usuario_id: str) -> list[str]:
         return self._pendencias(usuario_id)
+
+    def arquivos_a_remover(self, usuario_id: str) -> list[tuple[str, str]]:
+        return list(self.a_remover.get(usuario_id, []))
+
+    def pastas_temporarias(self, usuario_id: str) -> list[tuple[str, str]]:
+        return [("verificacao", f"contestacao-medida/{usuario_id}/")]
+
+    def limpeza_concluida(self, usuario_id: str, removidos: int) -> None:
+        self.a_remover.pop(usuario_id, None)
+
+    def limpezas_pendentes(self) -> list[str]:
+        return list(self.a_remover)
 
     def anonimizar(self, usuario_id: str) -> dict[str, list[str]]:
         if usuario_id in self.perfis:
             self.perfis[usuario_id] = {"nome": "Usuário anonimizado", "status": "anonimizado"}
-        self.documentos.pop(usuario_id, None)
+        documentos = self.documentos.pop(usuario_id, None) or []
+        self.a_remover.setdefault(usuario_id, []).extend(
+            ("verificacao", d) for d in documentos if isinstance(d, str)
+        )
         self.anonimizados.add(usuario_id)
         return {
             "anonimizado": ["perfil", "contato", "documentos_verificacao"],

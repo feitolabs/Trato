@@ -342,13 +342,14 @@ void main() {
         ],
       );
       s.respostas['PATCH /v1/admin/categorias/cat-1'] = (200, {'id': 'cat-1', 'ativa': false});
-      s.respostas['GET /v1/admin/chamados'] = (200, <Map<String, dynamic>>[]);
+      s.respostas['GET /v1/admin/chamados'] =
+          (200, {'itens': <Map<String, dynamic>>[], 'total': 0, 'limite': 50, 'deslocamento': 0});
 
       final cats = await api.listarCategorias();
       expect(cats.single.nome, 'Pintura');
       await api.alterarCategoria('cat-1', ativa: false, motivo: 'motivo qualquer');
-      final chamados = await api.listarChamados();
-      expect(chamados, isEmpty);
+      final chamados = await api.listarChamados(const FiltroChamados());
+      expect(chamados.itens, isEmpty);
     });
 
     test('categoria: aceita_remoto vem da lista e vai no criar e no editar', () async {

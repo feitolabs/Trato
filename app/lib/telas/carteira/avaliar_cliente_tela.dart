@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
+import '../comuns/prazo_avaliacao.dart';
 import '../conclusao/campo_longo.dart';
 import '../conclusao/estrelas_nota.dart';
 import '../profissional_apoio/apoio.dart';
@@ -10,9 +11,17 @@ import '../profissional_apoio/apoio.dart';
 /// O profissional avalia o cliente depois do serviço concluído (uma vez por pedido). Só pede e
 /// manda: quem aceita, recusa e guarda é o servidor.
 class AvaliarClienteTela extends StatefulWidget {
-  const AvaliarClienteTela({super.key, required this.pedidoNumero, required this.aoEnviar});
+  const AvaliarClienteTela({
+    super.key,
+    required this.pedidoNumero,
+    required this.aoEnviar,
+    this.prazo = PrazoAvaliacao.desconhecido,
+  });
 
   final String pedidoNumero;
+
+  /// Termos 12.1: até quando dá para avaliar (do servidor).
+  final PrazoAvaliacao prazo;
 
   /// Manda a avaliação e devolve os Tratinhos ganhos (0 ou null se nenhum). Lança erro se o servidor recusar.
   final Future<Object?> Function(int nota, String comentario) aoEnviar;
@@ -22,10 +31,13 @@ class AvaliarClienteTela extends StatefulWidget {
 }
 
 class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
-  /// Data (dd/mm) 7 dias depois de hoje, o prazo que o app já informa para os Tratinhos.
-  String _dataLiberacao() {
-    final d = DateTime.now().add(const Duration(days: 7));
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  static String _tratinhos(int n) => '+$n ${n == 1 ? 'Tratinho' : 'Tratinhos'}';
+
+  /// Quantidade só quando o servidor informa; prazo de liberação nunca é fixado aqui.
+  String get _textoDoBonus {
+    final n = widget.prazo.bonusMoedas;
+    final premio = n == null ? 'pode render Tratinhos' : 'rende ${_tratinhos(n)}';
+    return 'Avaliar o cliente $premio, com qualquer nota, positiva ou negativa.';
   }
 
   final _comentario = TextEditingController();
@@ -61,13 +73,36 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        _erro = e is ErroTrato ? e.mensagem : 'Não foi possível enviar. Tente de novo.';
+        if (e is ErroTrato && e.codigoHttp == 409) {
+          _recusa = e.mensagem;
+        } else {
+          _erro = e is ErroTrato ? e.mensagem : 'Não foi possível enviar. Tente de novo.';
+        }
       });
     }
   }
 
+  /// O servidor recusou o envio (409): prazo terminado, já avaliado...
+  String? _recusa;
+
   @override
   Widget build(BuildContext context) {
+    final fechada = _recusa ?? (widget.prazo.encerrado ? textoPrazoEncerrado : null);
+    if (fechada != null) {
+      return PaginaTrato(
+        titulo: 'Avaliar o cliente',
+        rodape: BotaoPrimario(texto: 'Voltar', aoTocar: () => Navigator.of(context).maybePop()),
+        children: [
+          Text('Não dá para avaliar', style: TipografiaTrato.tituloGrande),
+          const SizedBox(height: EspacosTrato.x3),
+          Text(
+            fechada,
+            key: const ValueKey('avaliacao-fechada'),
+            style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
+          ),
+        ],
+      );
+    }
     return PaginaTrato(
       titulo: 'Avaliar o cliente',
       rodape: Column(
@@ -84,11 +119,19 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
             )
           else ...[
             Text(
-              'Avaliar o cliente vale +50 Tratinhos (1 por cliente). '
-              'Tratinhos liberados: ${_dataLiberacao()} (7 dias, se não houver disputa).',
+              _textoDoBonus,
               textAlign: TextAlign.center,
               style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
+            if (widget.prazo.ate != null) ...[
+              const SizedBox(height: EspacosTrato.x2),
+              Text(
+                textoAvaliarAte(widget.prazo.ate!),
+                key: const ValueKey('avaliar-ate'),
+                textAlign: TextAlign.center,
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+              ),
+            ],
             const SizedBox(height: EspacosTrato.x3),
             BotaoPrimario(
               texto: 'Enviar avaliação',
@@ -121,8 +164,7 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
         if (_moedasGanhas != null && _moedasGanhas! > 0) ...[
           const SizedBox(height: EspacosTrato.x4),
           AvisoFaixa(
-            texto: '+$_moedasGanhas Tratinhos a liberar em 7 dias (se não houver disputa). '
-                'Tratinhos liberados: ${_dataLiberacao()}',
+            texto: '${_tratinhos(_moedasGanhas!)} a liberar (se não houver disputa).',
             tipo: TipoStatus.sucesso,
             icone: Icons.stars_outlined,
           ),

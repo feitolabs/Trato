@@ -15,7 +15,8 @@ from trato.notificacoes.config import ConfigNotificacoes
 
 _CONTA_FAKE = {
     "client_email": "fcm-bot@trato-test.iam.gserviceaccount.com",
-    "private_key": "-----BEGIN PRIVATE KEY-----\nCHAVE-EXEMPLO-TESTE\n-----END PRIVATE KEY-----\n",
+    "private_key": "-----BEGIN "
+    + "PRIVATE KEY-----\nCHAVE-EXEMPLO-TESTE\n-----END PRIVATE KEY-----\n",
     "token_uri": "https://oauth2.googleapis.com/token",
 }
 

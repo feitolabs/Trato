@@ -31,6 +31,7 @@ class Estado(StrEnum):
     EM_ANALISE = "em_analise"  # aguardando o analista
     AGUARDANDO_APROVACAO = "aguardando_aprovacao"  # decisão acima da alçada
     DECIDIDA = "decidida"  # final
+    ACORDO = "acordo"  # final: encerrada por acordo entre as partes (8.2)
 
 
 class Ator(StrEnum):
@@ -135,9 +136,29 @@ class Disputa:
             divisao=dividir_valor(self.valor_congelado, self.decisao),
         )
 
+    @property
+    def encerrada(self) -> bool:
+        """Nada mais a decidir: houve decisão ou acordo."""
+        return self.estado in (Estado.DECIDIDA, Estado.ACORDO)
+
+    def encerrar_por_acordo(self) -> Disputa:
+        """As partes se acertaram antes da decisão: proposta ainda não aprovada é descartada."""
+        if self.encerrada:
+            raise TransicaoInvalida("a disputa já foi encerrada")
+        return replace(
+            self,
+            estado=Estado.ACORDO,
+            decisao=None,
+            decidido_por=None,
+            decidido_em=None,
+            aprovado_por=None,
+            aprovado_em=None,
+            divisao=None,
+        )
+
     def atrasada(self, agora: datetime) -> bool:
         """Prazo de decisão estourado sem decisão final."""
-        return self.estado is not Estado.DECIDIDA and agora > self.prazos.decisao_ate
+        return not self.encerrada and agora > self.prazos.decisao_ate
 
 
 def abrir(

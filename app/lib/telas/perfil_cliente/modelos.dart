@@ -48,6 +48,14 @@ class LancamentoTratinho {
   final DateTime? expiraEm;
 }
 
+/// Um crédito que ainda tem saldo e quando vence (Termos 13.4), como o servidor informa.
+class CreditoPorValidade {
+  const CreditoPorValidade({required this.moedas, this.expiraEm});
+
+  final int moedas;
+  final DateTime? expiraEm;
+}
+
 class PerfilCliente {
   const PerfilCliente({
     required this.nome,
@@ -66,8 +74,12 @@ class PerfilCliente {
     this.tetoDescontoMesCentavos,
     this.descontoUsadoMesCentavos,
     this.moedasExtrato = const [],
+    this.moedasCreditos = const [],
     this.exclusaoAgendadaEm,
   });
+
+  /// Saldo separado por vencimento, na ordem de uso. Vazio = o servidor não informou.
+  final List<CreditoPorValidade> moedasCreditos;
 
   /// Lançamentos recentes de Tratinhos do cliente.
   final List<LancamentoTratinho> moedasExtrato;

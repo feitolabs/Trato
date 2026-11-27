@@ -17,24 +17,39 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 from trato import disputas
-from trato.api import offline
+from trato.api import acordo_disputa, offline
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import (
     avisar_check_in_sem_codigo,
     avisar_exclusividade_encerrada,
     avisar_orcamentos_nao_escolhidos,
+    avisar_partes,
     avisar_pedido_direcionado,
     avisar_pedido_novo,
     avisar_pedido_urgente,
 )
-from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
-from trato.api.exclusividades import encerrar_exclusividade_do_pedido
+from trato.api.cautela import RELATO_RETIDO, contato_bloqueado, exigir_contato_livre
+from trato.api.contexto import (
+    Contexto,
+    bloqueado_pode_no_pedido,
+    exigir_papel,
+    obter_contexto,
+    usuario_atual,
+    usuario_do_pedido_contratado,
+)
+from trato.api.exclusividades import (
+    encerrar_exclusividade_do_pedido,
+    encerrar_na_contratacao,
+)
+from trato.api.maioridade import exigir_maioridade
 from trato.api.modelos import (
     AbrirDisputaIn,
     AbrirPedidoIn,
     AcaoPedidoIn,
     AceitarOrcamentoIn,
+    AceitarPropostaIn,
+    AcordoDisputaOut,
     AtenderRetrabalhoIn,
     CancelarIn,
     CheckInIn,
@@ -48,10 +63,12 @@ from trato.api.modelos import (
     EventoOut,
     PedidoOut,
     PedirRetrabalhoIn,
+    PropostaDisputaOut,
     RespostaDisputaIn,
     RespostaPedidoOut,
     RetrabalhoOut,
 )
+from trato.api.recorrencias import SEM_REMOTO
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import (
@@ -61,6 +78,7 @@ from trato.api.servicos import (
     pedido_out,
     pedido_out_completo,
 )
+from trato.api.validade import OrcamentoVencido, orcamento_vencido
 from trato.financeiro.ledger import taxa_descontada
 from trato.garantias import (
     ErroRetrabalho,
@@ -71,6 +89,7 @@ from trato.garantias import (
     transicionar,
 )
 from trato.garantias.retrabalho import EM_CURSO
+from trato.notificacoes.eventos import Evento as EventoAviso
 from trato.pedidos import estados
 from trato.pedidos.estados import (
     Acao,
@@ -137,6 +156,8 @@ def _montar_prova(
         orcamento = contexto.orcamentos.obter(entrada.orcamento_id)
         if orcamento is None or orcamento.pedido_id != pedido.id:
             raise estados.ProvaInvalida("Esse orçamento não existe neste pedido.")
+        if orcamento_vencido(contexto, orcamento.id, contexto.agora()):
+            raise OrcamentoVencido
         return entrada.para_regra(orcamento.profissional_id)
     por_acao = {
         Acao.CONFIRMAR_AGENDA: ConfirmarAgendaIn,
@@ -220,14 +241,10 @@ def _exigir_respostas(dados: Any, contexto: Contexto) -> None:
 
 
 def _exigir_modalidade_e_endereco(dados: Any, contexto: Contexto) -> None:
-    """Remoto só onde o admin liberou. Presencial exige endereço completo: sem ele o profissional
-    contratado não sabe aonde ir."""
+    """Termos 3.7: não há pedido remoto novo (os antigos seguem). O pedido exige o endereço
+    completo: sem ele o profissional contratado não sabe aonde ir."""
     if dados.modalidade == "remoto":
-        if not contexto.pedidos.categoria_aceita_remoto(dados.categoria_id):
-            raise HTTPException(
-                422, "Esta categoria não atende de forma remota. Escolha atendimento presencial."
-            )
-        return
+        raise HTTPException(422, SEM_REMOTO)
     e = dados.endereco
     faltam = [
         nome
@@ -248,7 +265,13 @@ def _exigir_modalidade_e_endereco(dados: Any, contexto: Contexto) -> None:
         )
 
 
-@router.post("", response_model=PedidoOut, status_code=201, summary="Abrir pedido")
+@router.post(
+    "",
+    response_model=PedidoOut,
+    status_code=201,
+    summary="Abrir pedido",
+    dependencies=[Depends(exigir_maioridade)],
+)
 def abrir_pedido(
     request: Request,
     corpo: AbrirPedidoIn | None = None,
@@ -266,8 +289,6 @@ def abrir_pedido(
         _exigir_modalidade_e_endereco(dados, contexto)
         _exigir_respostas(dados, contexto)
         _exigir_dentro_do_teto(dados, contexto)
-        if dados.modalidade == "remoto":
-            pedido = replace(pedido, remoto=True)
     if dados is not None:  # M9: limite e mascaramento de contato no texto livre
         cfg = obter_config_seguranca()
         dados = replace(
@@ -325,11 +346,17 @@ def abrir_pedido(
 def listar_pedidos(
     request: Request,
     como: str | None = None,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(usuario_do_pedido_contratado),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[PedidoOut]:
+    if usuario.papel is PapelUsuario.EQUIPE:
+        raise HTTPException(403, "Seu perfil não pode fazer isso.")
     como_cliente = (como == "cliente") if como else (usuario.papel is PapelUsuario.CLIENTE)
+    if usuario.bloqueado:  # só os pedidos contratados em que é o cliente
+        como_cliente = True
     achados = contexto.pedidos.listar_do_usuario(usuario.id, como_cliente)
+    if usuario.bloqueado:
+        achados = [p for p in achados if bloqueado_pode_no_pedido(p, usuario.id)]
     categorias = nomes_de_categorias(request)
     return [pedido_out_completo(contexto, p, usuario, categorias=categorias) for p in achados]
 
@@ -338,7 +365,7 @@ def listar_pedidos(
 def ver_pedido(
     pedido_id: str,
     request: Request,
-    usuario: Usuario = Depends(usuario_atual),
+    usuario: Usuario = Depends(usuario_do_pedido_contratado),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
     pedido = carregar_pedido(
@@ -497,9 +524,11 @@ def mudar_estado(
     acao: Acao,
     request: Request,
     corpo: AcaoPedidoIn | None = None,
-    usuario: Usuario = Depends(usuario_atual),
+    usuario: Usuario = Depends(usuario_do_pedido_contratado),
     contexto: Contexto = Depends(obter_contexto),
 ) -> PedidoOut:
+    from trato.api import ausencia, desistencia  # eles importam este módulo
+
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if _so_sistema(acao):
         raise HTTPException(403, "Esta ação é feita só pelo sistema.")
@@ -549,6 +578,11 @@ def mudar_estado(
         raise
     if com_codigo:
         contexto.limite_codigo.acertou(pedido.id)
+    espera = None
+    if acao is Acao.REGISTRAR_CLIENTE_AUSENTE:  # 7.6: 20 min sem resposta depois da chegada
+        espera = ausencia.conferir_espera(contexto, pedido)
+    if acao is Acao.CANCELAR and usuario.id == pedido.cliente_id:
+        ausencia.barrar_cancelamento(contexto, pedido, desistencia.prazo(contexto, pedido)[2])
     # Uma transação só: contrato + pedido + garantia + efeitos no dinheiro (tudo ou nada).
     encerramentos = []
     perdedores: tuple[tuple[str, str], ...] = ()
@@ -564,6 +598,8 @@ def mudar_estado(
                 pedido.id,
                 transicao.pedido.profissional_id if acao is Acao.ACEITAR_ORCAMENTO else None,
             )
+        if acao is Acao.CANCELAR:  # exclusividade do cliente: encerra sem devolver (13.6)
+            encerrar_na_contratacao(contexto, pedido.id, None)
         if acao is Acao.ACEITAR_ORCAMENTO:
             # Contrato antes do pedido: se o contrato falhar (ex.: taxa não publicada), o pedido
             # continua aberto. Gravar o contrato de novo com os mesmos dados não duplica.
@@ -598,10 +634,15 @@ def mudar_estado(
                 return pedido_out(atual, usuario)
             raise
         _concluir_efeitos(contexto, gravado)
+        if acao is Acao.ENCERRAR_DISPUTA_POR_ACORDO:  # 8.2: o registro fecha junto
+            disputa = contexto.disputas.obter(pedido.id)
+            if disputa is not None and not disputa.encerrada:
+                contexto.disputas.salvar(pedido.id, disputa.encerrar_por_acordo())
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, acao, contexto)
         if acao is Acao.REGISTRAR_CLIENTE_AUSENTE:
             with contextlib.suppress(Exception):
+                exigir_contato_livre(contexto, gravado, usuario.id)  # 9.6: sem mensagem
                 conversa = contexto.conversas.abrir(gravado.id, usuario.id)
                 contexto.conversas.enviar(
                     conversa,
@@ -609,6 +650,8 @@ def mudar_estado(
                     "Cheguei ao local no horário agendado, mas não encontrei o cliente. "
                     "Registrei a ocorrência com comprovação no aplicativo.",
                 )
+        if espera is not None:
+            ausencia.abrir_justificativa(contexto, espera)
         if offline_em is not None:
             offline.registrar(contexto, usuario, pedido, acao, offline_em, contexto.agora())
     if acao is Acao.FAZER_CHECK_IN and getattr(prova, "sem_codigo", False):
@@ -641,8 +684,26 @@ def mudar_estado(
 # --- Disputa ----------------------------------------------------------------------------
 
 
-def _disputa_out(pedido_id: str, d: disputas.Disputa) -> DisputaOut:
+def _disputa_out(contexto: Contexto, pedido_id: str, d: disputas.Disputa) -> DisputaOut:
+    proposto = acordo_disputa.proposta_de_reembolso(contexto, pedido_id, d)
+    proposta = acordo = None
+    if proposto is not None:
+        proposta = PropostaDisputaOut(
+            solucao=acordo_disputa.PARCIAL,
+            reembolso_centavos=proposto,
+            respondida_em=d.respondida_em,
+        )
+    if d.estado is disputas.Estado.ACORDO:
+        # Sem decisão gravada é o acordo que libera tudo ao profissional.
+        devolver = d.divisao.para_cliente if d.divisao else 0
+        acordo = AcordoDisputaOut(
+            solucao=d.decisao.resultado.value if d.decisao else "liberar_tudo",
+            reembolso_centavos=devolver,
+            liberado_centavos=d.valor_congelado - devolver,
+        )
     return DisputaOut(
+        proposta=proposta,
+        acordo=acordo,
         pedido_id=pedido_id,
         estado=d.estado.value,
         motivo=d.motivo.value,
@@ -668,9 +729,11 @@ def _disputa_out(pedido_id: str, d: disputas.Disputa) -> DisputaOut:
 def abrir_disputa(
     pedido_id: str,
     corpo: AbrirDisputaIn,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(usuario_do_pedido_contratado),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaOut:
+    if usuario.papel is PapelUsuario.EQUIPE:
+        raise HTTPException(403, "Seu perfil não pode fazer isso.")
     pedido = carregar_pedido(contexto, pedido_id, usuario)
     if pedido.cliente_id != usuario.id:
         raise HTTPException(403, "Só o cliente do pedido pode abrir disputa.")
@@ -697,14 +760,21 @@ def abrir_disputa(
     with contexto.transacao():  # o pedido primeiro: a disputa lê a descrição do histórico dele
         contexto.pedidos.salvar(transicao.pedido, transicao.evento)
         contexto.disputas.salvar(pedido.id, disputa)
-    return _disputa_out(pedido.id, disputa)
+    avisar_partes(
+        contexto,
+        EventoAviso.DISPUTA_ABERTA,
+        (pedido.cliente_id, pedido.profissional_id),
+        pedido_id=pedido.id,
+        chave=f"{pedido.id}:disputa:{int(disputa.aberta_em.timestamp())}",
+    )
+    return _disputa_out(contexto, pedido.id, disputa)
 
 
 @router.get("/{pedido_id}/disputa", response_model=DisputaOut, summary="Ver disputa")
 def ver_disputa(
     pedido_id: str,
     request: Request,
-    usuario: Usuario = Depends(usuario_atual),
+    usuario: Usuario = Depends(usuario_do_pedido_contratado),
     contexto: Contexto = Depends(obter_contexto),
 ) -> DisputaOut:
     carregar_pedido(
@@ -718,9 +788,53 @@ def ver_disputa(
     disputa = contexto.disputas.obter(pedido_id)
     if disputa is None:
         raise HTTPException(404, "Este pedido não tem disputa.")
+    completa = _disputa_completa(contexto, pedido_id, disputa)
+    pedido = contexto.pedidos.obter(pedido_id)
+    # 9.6: o relato do cliente não segue à outra parte com o contato bloqueado; o Trato lê.
+    if (
+        completa.descricao
+        and usuario.id == pedido.profissional_id
+        and contato_bloqueado(contexto, pedido.cliente_id, usuario.id)
+    ):
+        return completa.model_copy(update={"descricao": RELATO_RETIDO})
+    return completa
+
+
+def _disputa_completa(contexto: Contexto, pedido_id: str, d: disputas.Disputa) -> DisputaOut:
     ler_descricao = getattr(contexto.disputas, "descricao", None)
     descricao = ler_descricao(pedido_id) if ler_descricao else None
-    return _disputa_out(pedido_id, disputa).model_copy(update={"descricao": descricao})
+    return _disputa_out(contexto, pedido_id, d).model_copy(update={"descricao": descricao})
+
+
+@router.post(
+    "/{pedido_id}/disputa/aceitar-proposta",
+    response_model=DisputaOut,
+    summary="Cliente aceita a devolução proposta pelo profissional (8.2)",
+    description=(
+        "Corpo igual à `proposta` atual, senão 409. Repetir o mesmo aceite devolve 200 sem "
+        "mover dinheiro de novo."
+    ),
+)
+def aceitar_proposta(
+    pedido_id: str,
+    corpo: AceitarPropostaIn,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> DisputaOut:
+    pedido = carregar_pedido(contexto, pedido_id, usuario)
+    if pedido.cliente_id != usuario.id:
+        raise HTTPException(403, "Só o cliente do pedido pode aceitar a proposta.")
+    servico = getattr(request.app.state, "servico_pagamento", None)
+    disputa, mudou = acordo_disputa.aceitar(
+        contexto, servico, pedido.id, usuario.id, corpo.solucao, corpo.reembolso_centavos
+    )
+    if mudou is not None:  # depois do commit: avisos e indicações
+        for gancho in contexto.apos_transicao:
+            # o dinheiro já foi lançado junto com o acordo: o gancho de pagamento fica de fora
+            if gancho != getattr(servico, "_apos_transicao", None):
+                gancho(*mudou, Acao.ENCERRAR_DISPUTA_POR_ACORDO, contexto)
+    return _disputa_completa(contexto, pedido.id, disputa)
 
 
 @router.post(
@@ -754,7 +868,14 @@ def responder_disputa(
         registrar = getattr(contexto.disputas, "registrar_evidencias", None)
         if registrar is not None and itens:
             registrar(pedido_id, usuario.id, itens)
-    return _disputa_out(pedido_id, nova)
+    avisar_partes(
+        contexto,
+        EventoAviso.DISPUTA_RESPONDIDA,
+        (pedido.cliente_id,),
+        pedido_id=pedido.id,
+        chave=f"{pedido.id}:disputa-resposta:{int(nova.aberta_em.timestamp())}",
+    )
+    return _disputa_out(contexto, pedido_id, nova)
 
 
 def _evidencias_da_resposta(
@@ -770,8 +891,8 @@ def _evidencias_da_resposta(
     if corpo.solucao == "retrabalho":
         itens.append(("proposta_retorno", "Propõe atender o retrabalho sem custo.", None))
     elif corpo.solucao == "reembolso_parcial" and corpo.reembolso_parcial_centavos:
-        reais = f"{corpo.reembolso_parcial_centavos / 100:.2f}".replace(".", ",")
-        itens.append(("proposta_retorno", f"Propõe reembolso parcial de R$ {reais}.", None))
+        texto = acordo_disputa.texto_da_proposta(corpo.reembolso_parcial_centavos)
+        itens.append(("proposta_retorno", texto, None))
     elif corpo.solucao == "discordar":
         itens.append(("proposta_retorno", "Discorda do relato e pede análise.", None))
     itens += [("foto", None, f.arquivo_id) for f in corpo.fotos]
@@ -843,6 +964,16 @@ def _retrabalho_out(pedido_id: str, r) -> RetrabalhoOut:  # type: ignore[no-unty
     )
 
 
+def _retrabalho_visivel(contexto: Contexto, pedido, usuario: Usuario, r) -> RetrabalhoOut:  # type: ignore[no-untyped-def]
+    """9.6: com o contato bloqueado, o texto do cliente não segue ao profissional."""
+    saida = _retrabalho_out(pedido.id, r)
+    if usuario.id == pedido.profissional_id and contato_bloqueado(
+        contexto, pedido.cliente_id, usuario.id
+    ):
+        return saida.model_copy(update={"descricao": RELATO_RETIDO})
+    return saida
+
+
 @router.get(
     "/{pedido_id}/retrabalho",
     response_model=list[RetrabalhoOut],
@@ -854,7 +985,10 @@ def ver_retrabalhos(
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[RetrabalhoOut]:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
-    return [_retrabalho_out(pedido.id, r) for r in contexto.garantias.retrabalhos(pedido.id)]
+    return [
+        _retrabalho_visivel(contexto, pedido, usuario, r)
+        for r in contexto.garantias.retrabalhos(pedido.id)
+    ]
 
 
 _ETAPAS = {
@@ -889,10 +1023,10 @@ def atender_retrabalho(
     if atual is None:
         ultimo = existentes[-1] if existentes else None
         if ultimo is not None and ultimo.estado is destino:
-            return _retrabalho_out(pedido.id, ultimo)  # repetir é seguro
+            return _retrabalho_visivel(contexto, pedido, usuario, ultimo)  # repetir é seguro
         raise HTTPException(409, "Este pedido não tem retrabalho em curso.")
     if atual.estado is destino:
-        return _retrabalho_out(pedido.id, atual)
+        return _retrabalho_visivel(contexto, pedido, usuario, atual)
     agora = contexto.agora()
     if atual.estado not in origens:
         raise ErroRetrabalho(f"Não dá para {corpo.etapa} um retrabalho {atual.estado.value}.")
@@ -920,4 +1054,4 @@ def atender_retrabalho(
     if transicao is not None:
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, Acao.RESOLVER_RETRABALHO, contexto)
-    return _retrabalho_out(pedido.id, novo)
+    return _retrabalho_visivel(contexto, pedido, usuario, novo)

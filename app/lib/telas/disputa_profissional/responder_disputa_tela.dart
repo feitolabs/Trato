@@ -4,6 +4,7 @@ import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto, LinhaValor, formatarReais;
 import '../conclusao/campo_longo.dart';
+import '../disputa_acordo/secao_acordo.dart';
 import '../comuns/foco_rolagem.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional_apoio/apoio.dart';
@@ -35,12 +36,59 @@ class ResponderDisputaTela extends StatelessWidget {
       iconeVazio: Icons.task_alt,
       tituloVazio: 'Nenhum problema aberto',
       textoVazio: 'Não há disputa esperando a sua resposta.',
-      construir: (context, d) => _Corpo(
-        disputa: d!,
-        servico: servico,
-        aoAdicionarEvidencia: aoAdicionarEvidencia,
-        aoRespondida: aoRespondida,
-      ),
+      construir: (context, d) => d!.esperaResposta
+          ? _Corpo(
+              disputa: d,
+              servico: servico,
+              aoAdicionarEvidencia: aoAdicionarEvidencia,
+              aoRespondida: aoRespondida,
+            )
+          : _SoLeitura(disputa: d),
+    );
+  }
+}
+
+/// Disputa que não espera resposta: só a situação e o relato.
+class _SoLeitura extends StatelessWidget {
+  const _SoLeitura({required this.disputa});
+
+  final DetalheDisputa disputa;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = disputa;
+    return CorpoRolavel(
+      children: [
+        Text(d.titulo, style: TipografiaTrato.tituloGrande),
+        const SizedBox(height: EspacosTrato.x3),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: ChipStatus(
+            key: const Key('situacao-disputa'),
+            texto: d.situacaoTexto,
+            tipo: TipoStatus.info,
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x3),
+        Text('Não há resposta para enviar agora.', style: TipografiaTrato.corpo),
+        const SizedBox(height: EspacosTrato.x4),
+        if (d.acordo != null) ...[
+          CartaoTrato(child: ValoresAcordo(acordo: d.acordo!)),
+          const SizedBox(height: EspacosTrato.x4),
+        ],
+        CartaoTrato(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(d.motivo, style: TipografiaTrato.corpoForte),
+              const SizedBox(height: EspacosTrato.x1),
+              Text(d.descricao, style: TipografiaTrato.corpo),
+              const SizedBox(height: EspacosTrato.x3),
+              LinhaValor(rotulo: 'O cliente pediu', valor: d.solucaoPedida),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

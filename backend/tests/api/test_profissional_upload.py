@@ -341,7 +341,7 @@ def test_nivel_de_verificacao_proporcional_ao_risco_da_categoria(e2, monkeypatch
     docs = enviar_docs(e2, "t-prof")
     corpo = {"consentimento_lgpd": True, "documentos": docs}
     r = e2.post("/v1/profissional/verificacao", "t-prof", corpo)
-    assert r.status_code == 422 and "verificado_plus" in r.json()["detail"]
+    assert r.status_code == 422 and "verificação reforçada" in r.json()["detail"]
     mais = enviar_docs(e2, "t-prof", ("documento_frente", "selfie", "antecedentes"))
     r = e2.post("/v1/profissional/verificacao", "t-prof",
                 {**corpo, "nivel_solicitado": "verificado_plus", "documentos": mais})  # fmt: skip
@@ -675,7 +675,7 @@ def test_perfil_publico_traz_portfolio_e_avaliacoes_anonimas(e2):
     )
     recentes = corpo["avaliacoes_recentes"]
     assert len(recentes) == 5
-    assert set(recentes[0]) == {"nota", "comentario", "data", "resposta"}
+    assert set(recentes[0]) == {"nota", "comentario", "data", "resposta", "criterios"}
     assert recentes[0]["data"] == "2026-11-04"  # a mais nova primeiro
     # Sem moderação ainda: o comentário fica null mesmo quando a avaliação tem texto.
     assert all(a["comentario"] is None for a in recentes)

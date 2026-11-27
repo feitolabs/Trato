@@ -67,6 +67,9 @@ class EstornoProvedor:
     cobranca_id: str
     valor_centavos: int
     confirmado: bool
+    # A chave da ordem do Trato que pediu este estorno (None: feito por fora ou antes disto).
+    chave: str | None = None
+    falhou: bool = False  # o provedor recusou ou cancelou: o dinheiro não voltou
 
 
 @dataclass(frozen=True)
@@ -139,6 +142,9 @@ class ProvedorPagamento(Protocol):
         self, cobranca_id: str, valor_centavos: int | None, chave_idempotencia: str
     ) -> EstornoProvedor:
         """Devolve ao cliente `valor_centavos` (ou tudo, se `None`). Idempotente pela chave."""
+
+    def estornos_da_cobranca(self, cobranca_id: str) -> Sequence[EstornoProvedor]:
+        """Todos os estornos que o provedor conhece desta cobrança. Só consulta."""
 
     def segredo_webhook(self) -> str:
         """Segredo com que o provedor assina os webhooks (vem do .env, nunca do código)."""

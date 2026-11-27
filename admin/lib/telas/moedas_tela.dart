@@ -25,9 +25,6 @@ String diaDeReferencia(String diaRef) {
   return m == null ? diaRef : '${m.group(3)}/${m.group(2)}/${m.group(1)}';
 }
 
-/// 1050 -> "10,50" (para preencher o campo em reais).
-String centavosParaCampo(int centavos) => '${centavos ~/ 100},${(centavos % 100).toString().padLeft(2, '0')}';
-
 /// Tratinhos (moedas): uso do orçamento de desconto do mês e configuração do programa.
 class MoedasTela extends StatefulWidget {
   const MoedasTela({super.key});
@@ -246,7 +243,7 @@ class _CampoConfig {
     final t = texto.text.trim();
     if (t.isEmpty) return opcional ? null : (reais ? 'Informe um valor em reais' : 'Informe um número inteiro');
     final v = valor;
-    if (v == null) return reais ? 'Informe um valor em reais' : 'Informe um número inteiro';
+    if (v == null) return reais ? kErroReais : 'Informe um número inteiro';
     if (minimo != null && v < minimo!) return 'Informe um número a partir de $minimo';
     return null;
   }
@@ -350,9 +347,10 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
       key: ValueKey('moedas-campo-${c.chave}'),
       controller: c.texto,
       enabled: editavel,
-      keyboardType: TextInputType.number,
+      keyboardType: c.reais ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
+        errorMaxLines: 3,
         labelText: c.rotulo,
         prefixText: c.reais ? 'R\$ ' : null,
         suffixText: c.sufixo,

@@ -82,7 +82,7 @@ def test_passo_1_mostra_o_que_some_e_o_que_fica_com_prazos_da_configuracao():
     assert passo1["status"] == "aguardando_confirmacao" and passo1["token_confirmacao"]
     assert passo1["carencia_dias"] == 7 and passo1["pendencias"] == []
     mantido = {m["categoria"]: m["prazo_dias"] for m in passo1["sera_mantido"]}
-    assert mantido["ledger_financeiro"] == 1825 and mantido["logs_acesso"] == 180
+    assert mantido["ledger_financeiro"] == 1825 and mantido["logs_acesso"] == 184
     assert "perfil" in passo1["sera_anonimizado"]
     # nada foi apagado ainda
     assert amb.fonte.anonimizados == set()
@@ -119,7 +119,10 @@ def test_fluxo_completo_confirma_espera_a_carencia_e_anonimiza_sem_tocar_nos_imu
         auditoria,
         mensagens,
     )
-    assert amb.cliente.get(URL, headers=cab("t-cli")).json() == {"pedido": None}  # concluída
+    assert amb.cliente.get(URL, headers=cab("t-cli")).json() == {
+        "pedido": None,
+        "tratinhos_a_perder": 0,
+    }  # concluída
     for acao in (
         "dado_pessoal.exclusao_solicitada",
         "dado_pessoal.exclusao_agendada",

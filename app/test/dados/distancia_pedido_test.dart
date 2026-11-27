@@ -60,7 +60,7 @@ void main() {
     expect(lista.single.distanciaKm, isNull);
   });
 
-  test('cliente manda a região aproximada (arredondada) ao criar o pedido', () async {
+  test('criar o pedido não manda posição do aparelho (Termos 14.12)', () async {
     final pedidas = <http.Request>[];
     final api = _api(pedidas, {
       'id': 'ab12cd34',
@@ -70,7 +70,7 @@ void main() {
       'aberto_em': '2026-11-01T10:00:00Z',
       'acoes_permitidas': <String>[],
     }, status: 201);
-    await RepositorioPedidosApi(api, posicao: () async => _bh).criar(
+    await RepositorioPedidosApi(api).criar(
       const RascunhoPedido(
         servicos: ['Limpeza'],
         quantidade: 1,
@@ -83,7 +83,6 @@ void main() {
       ),
     );
     final corpo = jsonDecode(pedidas.first.body) as Map<String, dynamic>;
-    expect(corpo['local_aprox_lat'], -19.92);
-    expect(corpo['local_aprox_lng'], -43.93);
+    expect(corpo.keys.where((k) => k.startsWith('local_aprox')), isEmpty);
   });
 }

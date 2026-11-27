@@ -6,11 +6,14 @@ from __future__ import annotations
 import json
 import threading
 import uuid
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
 
+from trato.api.fabrica import montar_servico_pagamento
+from trato.config import Config
 from trato.financeiro.ledger import (
     CLIENTE,
     CUSTODIA,
@@ -22,7 +25,10 @@ from trato.financeiro.ledger import (
     estornar_pedido,
     repartir_custodia,
 )
+from trato.pagamentos.custo import MeioPagamento
+from trato.pagamentos.modelos import CobrancaLocal, EstadoCobranca
 from trato.pagamentos.provedor import ProvedorFake
+from trato.pagamentos.provedor.base import CobrancaProvedor, StatusCobranca
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Papel
 from trato.persistencia.erros import ConflitoDeEstado, RegraDoBanco
@@ -350,6 +356,46 @@ def _mediador(c) -> None:
         )
 
 
+@contextmanager
+def _pagamento_ligado(c, pedido_id: str):
+    """Liga o serviço de pagamento neste app, com a cobrança do pedido paga no provedor falso, e
+    desfaz tudo ao sair (as migrations dele são só deste trecho)."""
+    from .test_pagamento_postgres import _aplicar
+
+    with c.local.admin() as con:
+        desfazer = _aplicar(
+            con,
+            "20261030120000_ordens_estorno.sql",
+            "ordens_estorno_rollback.sql",
+            "select to_regclass('public.ordens_estorno') is not null",
+        )
+        desfazer += _aplicar(
+            con,
+            "20261031000000_pagamentos_instrucao.sql",
+            "pagamentos_instrucao_rollback.sql",
+            "select exists (select 1 from information_schema.columns where "
+            "table_name = 'pagamentos' and column_name = 'instrucao')",
+        )
+    try:
+        servico = montar_servico_pagamento(c.banco, Config(_env_file=None))
+        cobranca = f"pi_{pedido_id[:8]}"  # a mesma de `pagar_pelo_webhook`
+        servico.provedor._cobrancas[cobranca] = CobrancaProvedor(
+            cobranca, VALOR, MeioPagamento.PIX, StatusCobranca.PAGA, {}, "x"
+        )
+        servico.cobrancas.salvar(
+            CobrancaLocal(
+                cobranca, pedido_id, VALOR, MeioPagamento.PIX, EstadoCobranca.PAGA, agora()
+            )
+        )
+        c.cliente.app.state.servico_pagamento = servico
+        yield servico
+    finally:
+        c.cliente.app.state.servico_pagamento = None
+        with c.local.admin() as con:
+            for sql in reversed(desfazer):
+                con.execute(sql)
+
+
 def test_disputa_persiste_e_a_decisao_nao_cobra_taxa(cenario):
     c = cenario
     _mediador(c)
@@ -389,8 +435,11 @@ def test_disputa_persiste_e_a_decisao_nao_cobra_taxa(cenario):
         "percentual_cliente_bps": 2_500,
     }
     url = f"/v1/admin/disputas/{pedido_id}/decisao"
-    r = c.cliente.post(url, json=corpo, headers=c.token("mediador"))
-    assert r.status_code == 200, r.text
+    with _pagamento_ligado(c, pedido_id) as servico:
+        r = c.cliente.post(url, json=corpo, headers=c.token("mediador"))
+        assert r.status_code == 200, r.text
+        (ordem,) = servico.ordens.do_pedido(pedido_id)
+        assert ordem.valor_centavos == VALOR * 2_500 // 10_000 and ordem.estado == "enviada"
 
     ledger = c.contexto.ledger
     saldo = ledger.saldos_pedido(pedido_id, c.ids["profissional"])

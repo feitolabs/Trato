@@ -11,7 +11,7 @@ class ConfigPublica {
     this.validadePedidoHoras = 48,
     this.prazoConfirmacaoHoras = 48,
     this.prazoRetrabalhoDias = 7,
-    this.prazoRespostaDisputaHoras = 48,
+    this.prazoRespostaDisputaHoras = 24,
     this.prazoLiberacaoDias = 0,
     this.suporteEmail,
   });

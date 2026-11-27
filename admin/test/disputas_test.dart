@@ -49,7 +49,7 @@ void main() {
     await rolar(tester, find.text('Reembolsar em parte'));
     await tester.tap(find.text('Reembolsar em parte'));
     await tester.pumpAndSettle();
-    expect(find.text('Decididas 1'), findsOneWidget);
+    expect(find.text('Encerradas 1'), findsOneWidget);
   });
 
   testWidgets('valor acima da alçada fica aguardando outra pessoa', (tester) async {

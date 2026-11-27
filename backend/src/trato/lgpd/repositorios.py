@@ -8,6 +8,7 @@ Eles entram pelo contexto: `contexto.extras["lgpd"] = RepositoriosLgpd(...)`.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -43,6 +44,10 @@ class FonteDadosPessoais(Protocol):
         """Tudo que se sabe do titular, em estruturas JSON."""
         ...
 
+    def exclusivo(self, usuario_id: str) -> AbstractContextManager[None]:
+        """Dentro dele, o que for lido nas pendências não muda até a anonimização gravar."""
+        ...
+
     def pendencias(self, usuario_id: str) -> list[str]:
         """Motivos que impedem encerrar agora (pedido em andamento, disputa, valor retido)."""
         ...
@@ -52,6 +57,20 @@ class FonteDadosPessoais(Protocol):
         contratos (imutáveis). Devolve {"anonimizado": [...], "mantido": [...]} (só categorias)."""
         ...
 
+    def arquivos_a_remover(self, usuario_id: str) -> list[tuple[str, str]]:
+        """(bucket, caminho) dos documentos anonimizados e ainda não confirmados como apagados."""
+        ...
+
+    def pastas_temporarias(self, usuario_id: str) -> list[tuple[str, str]]:
+        """(bucket, pasta) de envios sem valor de prova: apaga tudo dentro."""
+        ...
+
+    def limpeza_concluida(self, usuario_id: str, removidos: int) -> None: ...
+
+    def limpezas_pendentes(self) -> list[str]:
+        """Contas anonimizadas cujos arquivos ainda não foram todos apagados."""
+        ...
+
 
 class RepositorioConsentimentos(Protocol):
     def registrar(self, consentimento: Consentimento) -> None: ...
@@ -59,7 +78,10 @@ class RepositorioConsentimentos(Protocol):
 
 
 class RepositorioExclusoes(Protocol):
-    def salvar(self, pedido: PedidoExclusao) -> None: ...
+    def salvar(self, pedido: PedidoExclusao) -> bool:
+        """Grava só pedido em aberto (ou novo). `False`: já estava encerrado, nada mudou."""
+        ...
+
     def ativo_do_usuario(self, usuario_id: str) -> PedidoExclusao | None:
         """Pedido em `aguardando_confirmacao` ou `agendada` (no máximo um)."""
         ...

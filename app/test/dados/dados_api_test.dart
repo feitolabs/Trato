@@ -600,6 +600,8 @@ void main() {
           decimosDeHora: 25,
           valorHoraCentavos: 8000,
           garantiaDias: 90,
+          prazoExecucaoDias: 3,
+          validadeDias: 3,
           itens: [
             ItemMaterial(nome: 'Tomadas', centavos: 4500),
           ],
@@ -647,6 +649,8 @@ void main() {
             decimosDeHora: 10,
             valorHoraCentavos: 5000,
             garantiaDias: 30,
+            prazoExecucaoDias: 3,
+            validadeDias: 3,
             itens: [],
             materialPorMim: false,
             pedirSinalMaterial: false,

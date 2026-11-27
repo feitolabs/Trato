@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
 from trato.api.elogios import etiquetas_top
+from trato.api.maioridade import exigir_maioridade
 from trato.api.repositorios_app import NIVEIS_VERIFICACAO, PerfilDetalhe
 from trato.api.resposta_real import responde_em_faixa
 from trato.garantias.config import garantia_minima_do_slug
@@ -423,6 +424,7 @@ def _perfil_out(modulo: Modulo, p: PerfilProfissional) -> PerfilProfissionalOut:
     "/profissional/cadastro",
     response_model=PerfilProfissionalOut,
     status_code=201,
+    dependencies=[Depends(exigir_maioridade)],
     summary="Cadastrar-se como profissional",
     description=(
         "Categorias e cidades precisam estar ativas. O perfil nasce `em_analise`; a verificação "
@@ -446,8 +448,10 @@ def cadastrar(
         disponibilidade=_disponibilidade(modulo, corpo.disponibilidade),
         portfolio=_portfolio(modulo, corpo.portfolio),
         criado_em=contexto.agora(),
-        atende_presencial=corpo.atende_presencial,
-        atende_remoto=corpo.atende_remoto,
+        # Termos 3.7: `atende_remoto` é ignorado (app antigo que só marcava remoto continua
+        # cadastrando, como presencial).
+        atende_presencial=corpo.atende_presencial or corpo.atende_remoto,
+        atende_remoto=False,
     )
     _exigir_alguma_modalidade(perfil)
     modulo.repo.salvar(perfil)
@@ -514,11 +518,14 @@ def editar_perfil(
         atende_presencial=atual.atende_presencial
         if corpo.atende_presencial is None
         else corpo.atende_presencial,
-        atende_remoto=atual.atende_remoto if corpo.atende_remoto is None else corpo.atende_remoto,
+        # Termos 3.7: ninguém passa a atender remoto; quem já atendia só pode desligar.
+        atende_remoto=atual.atende_remoto and corpo.atende_remoto is not False,
         disponivel_agora=atual.disponivel_agora
         if corpo.disponivel_agora is None
         else corpo.disponivel_agora,
     )
+    if corpo.atende_remoto and not (novo.atende_presencial or novo.atende_remoto):
+        novo = replace(novo, atende_presencial=atual.atende_presencial)  # o pedido foi ignorado
     _exigir_alguma_modalidade(novo)
     modulo.repo.salvar(novo)
     return _perfil_out(modulo, novo)

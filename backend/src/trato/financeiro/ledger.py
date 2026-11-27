@@ -54,12 +54,16 @@ class TipoConta(StrEnum):
     A_LIBERAR = "a_liberar"  # do profissional, ainda não liberado
     LIBERADO = "liberado"  # do profissional, disponível para saque
     TAXA_TRATO = "taxa_trato"
+    # Dívida do profissional por reembolso decidido depois do repasse (Termos 8.6 e 17.4).
+    A_COMPENSAR = "a_compensar"
 
 
 SUFIXO_PARCELAMENTO = "/parcelamento"  # chave do lançamento TAXA que é custo de parcelamento
 
 _EXTERNAS = frozenset({TipoConta.CLIENTE_EXTERNO, TipoConta.PROFISSIONAL_EXTERNO})
-_COM_TITULAR = frozenset({TipoConta.A_LIBERAR, TipoConta.LIBERADO})
+_COM_TITULAR = frozenset({TipoConta.A_LIBERAR, TipoConta.LIBERADO, TipoConta.A_COMPENSAR})
+# Podem ficar com saldo negativo: a dívida nasce devedora e o Trato pode assumir uma.
+_SEM_EXIGIR_SALDO = frozenset({TipoConta.A_COMPENSAR, TipoConta.TAXA_TRATO})
 
 
 class TipoLancamento(StrEnum):
@@ -68,6 +72,7 @@ class TipoLancamento(StrEnum):
     TAXA = "taxa"
     REPASSE = "repasse"
     ESTORNO = "estorno"
+    REEMBOLSO = "reembolso"  # lançado pelas funções de compensação do banco
 
 
 # tipo -> pares (conta debitada, conta creditada) válidos. ESTORNO é validado contra o original.
@@ -81,6 +86,11 @@ _CONTAS_DO_TIPO = {
     TipoLancamento.REPASSE: (
         (TipoConta.A_LIBERAR, TipoConta.LIBERADO),  # liberação
         (TipoConta.LIBERADO, TipoConta.PROFISSIONAL_EXTERNO),  # pagamento ao profissional
+        (TipoConta.LIBERADO, TipoConta.A_COMPENSAR),  # compensação no repasse
+    ),
+    TipoLancamento.REEMBOLSO: (
+        (TipoConta.A_COMPENSAR, TipoConta.CLIENTE_EXTERNO),  # dívida: o cliente recebe de volta
+        (TipoConta.TAXA_TRATO, TipoConta.A_COMPENSAR),  # contestação aceita: o Trato assume
     ),
 }
 
@@ -123,6 +133,10 @@ CLIENTE = Conta(TipoConta.CLIENTE_EXTERNO)
 CUSTODIA = Conta(TipoConta.CUSTODIA)
 TAXA_TRATO = Conta(TipoConta.TAXA_TRATO)
 PROFISSIONAL_EXTERNO = Conta(TipoConta.PROFISSIONAL_EXTERNO)
+
+
+def a_compensar(profissional_id: str) -> Conta:
+    return Conta(TipoConta.A_COMPENSAR, profissional_id)
 
 
 def a_liberar(profissional_id: str) -> Conta:
@@ -243,7 +257,7 @@ def _validar(itens: Sequence[Lancamento], novo: Lancamento) -> None:
             raise EstornoInvalido(
                 f"O estorno inverte o lançamento inteiro ({original.valor} centavos)."
             )
-    if novo.debito.tipo not in _EXTERNAS:
+    if novo.debito.tipo not in _EXTERNAS and novo.debito.tipo not in _SEM_EXIGIR_SALDO:
         disponivel = _saldo(itens, novo.debito, novo.pedido_id)
         if disponivel < novo.valor:
             raise SaldoInsuficiente(
@@ -546,6 +560,29 @@ def _em_aberto(
     ]
 
 
+def custo_parcelamento_em_aberto(livro: Livro, pedido_id: str) -> int:
+    """Custo de parcelamento do pedido que ainda não voltou ao cliente."""
+    taxas = _em_aberto(livro, pedido_id, TipoLancamento.TAXA, None)
+    return sum(i.valor for i in taxas if eh_custo_parcelamento(i))
+
+
+def reembolso_total_com_custo(
+    lancamentos: Sequence[Lancamento], pedido_id: str, profissional_id: str | None
+) -> int | None:
+    """Num reembolso TOTAL, tudo o que o cliente pagou e ainda não voltou, com o custo do
+    parcelamento (Termos 6.10: devolve o valor pago). `None` quando não há custo a devolver ou
+    quando algo já foi liberado ao profissional: aí vale a divisão decidida, como antes."""
+    livro = Livro()
+    if lancamentos:
+        livro.lancar_varios(list(lancamentos))
+    if custo_parcelamento_em_aberto(livro, pedido_id) <= 0:
+        return None
+    if profissional_id and livro.saldo(liberado(profissional_id), pedido_id) != 0:
+        return None
+    abertas = _em_aberto(livro, pedido_id, TipoLancamento.COBRANCA, TipoConta.CUSTODIA)
+    return sum(i.valor for i in abertas)
+
+
 def estornar_pedido(
     livro: Livro,
     pedido_id: str,
@@ -553,8 +590,13 @@ def estornar_pedido(
     chave: str,
     data: datetime,
     evento_webhook_id: str | None = None,
+    incluir_custo: bool = False,
 ) -> tuple[Lancamento, ...]:
     """Devolve `valor` ao cliente (parcial ou total) a partir do valor do SERVIÇO.
+
+    `incluir_custo` (cancelamentos, ausência e reembolso total por disputa; Termos 6.10, 7.2,
+    7.4, 7.6 e 7.7): o custo do parcelamento também volta. `valor` pode ir até tudo o que foi
+    cobrado; num valor parcial (retenção do 7.4) o que fica é só a retenção.
 
     `valor` pode ir até o que foi cobrado menos o custo de parcelamento, que não volta. A divisão é
     proporcional entre custódia, parte do profissional e taxa já descontada: se o cliente recebe
@@ -575,7 +617,7 @@ def estornar_pedido(
     cobrado = sum(i.valor for i in cobrancas)
     custo_parcelamento = sum(i.valor for i in taxas if eh_custo_parcelamento(i))
     taxa_servico = sum(i.valor for i in taxas) - custo_parcelamento
-    maximo = cobrado - custo_parcelamento
+    maximo = cobrado if incluir_custo else cobrado - custo_parcelamento
     if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= maximo:
         raise EstornoInvalido(
             f"O valor do estorno deve ficar entre 1 e {maximo} centavos "
@@ -586,8 +628,10 @@ def estornar_pedido(
         sum(i.valor for i in retencoes),
         taxa_servico,
     ]
-    devolvidos = repartir_proporcional(valor, pesos)
     mantido = cobrado - valor
+    # Só a parte do serviço é repartida entre as contas; o que passar dela é custo do parcelado
+    # (só possível com `incluir_custo`), que não pesa em nenhuma.
+    devolvidos = repartir_proporcional(min(valor, sum(pesos)), pesos) if mantido else []
 
     estornos = [
         _estorno_de(i, f"{chave}/{i.tipo.value}/{i.id}", data, evento_webhook_id)
@@ -611,7 +655,8 @@ def estornar_pedido(
                 TipoLancamento.TAXA,
                 CUSTODIA,
                 TAXA_TRATO,
-                custo_parcelamento,
+                # Devolvendo o custo, o que fica é só a retenção, inteira para o profissional.
+                0 if incluir_custo else custo_parcelamento,
             ),
         )
         for nome, tipo, conta_debito, conta_credito, quanto in mantidos:

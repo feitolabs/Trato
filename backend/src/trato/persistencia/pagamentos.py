@@ -4,7 +4,8 @@ O serviço de pagamento (`pagamentos/orquestrador.py`) fala em PEDIDO e no id do
 fala em CONTRATO e uuid próprio. Aqui a ponte:
 
   * `CobrancaLocal.id` = `pagamentos.stripe_payment_intent_id` (o uuid da linha fica interno);
-  * o pedido acha o contrato por `contratos.pedido_id`; o pagador é o cliente do contrato;
+  * o pedido acha o contrato VIGENTE (não cancelado) por `contratos.pedido_id`; a cobrança
+    acha o dela por `pagamentos.contrato_id`; o pagador é o cliente do contrato;
   * a cobrança principal é o tipo `saldo` (valor total do contrato, que fica retido); a de aditivo
     é o tipo `aditivo`. A chave de idempotência da linha é `cob/<id do provedor>`;
   * estados: aguardando=pendente, paga=confirmado (ou reembolsado_parcial se algo já foi
@@ -66,7 +67,8 @@ def _contrato_do_pedido(con: psycopg.Connection[Any], pedido_id: str) -> dict[st
     pedido = como_uuid(pedido_id)
     linha = (
         con.execute(
-            "select id, cliente_id, profissional_id from public.contratos where pedido_id = %s",
+            "select id, cliente_id, profissional_id from public.contratos "
+            "where pedido_id = %s and status <> 'cancelado'",
             (pedido,),
         ).fetchone()
         if pedido
@@ -80,7 +82,7 @@ def _contrato_do_pedido(con: psycopg.Connection[Any], pedido_id: str) -> dict[st
 _SELECT_COBRANCA = (
     "select p.stripe_payment_intent_id, c.pedido_id, p.aditivo_id, p.valor_centavos, p.meio, "
     "p.parcelas, p.status, p.criado_em, p.instrucao, p.confirmado_em, p.estornado_centavos, "
-    "p.cupom_codigo, p.desconto_centavos, p.moedas_usadas "
+    "p.cupom_codigo, p.desconto_centavos, p.moedas_usadas, c.status as contrato_status "
     "from public.pagamentos p join public.contratos c on c.id = p.contrato_id "
 )
 
@@ -102,6 +104,7 @@ def _cobranca(linha: dict[str, Any]) -> CobrancaLocal:
         cupom_codigo=linha.get("cupom_codigo"),
         desconto_centavos=int(linha.get("desconto_centavos") or 0),
         moedas_usadas=int(linha.get("moedas_usadas") or 0),
+        contrato_encerrado=linha.get("contrato_status") == "cancelado",
     )
 
 
@@ -132,6 +135,7 @@ class CobrancasPostgres:
             cupom_codigo=base.cupom_codigo,
             desconto_centavos=base.desconto_centavos,
             moedas_usadas=base.moedas_usadas,
+            contrato_encerrado=base.contrato_encerrado,
         )
 
     def obter(self, cobranca_id: str) -> CobrancaLocal | None:
@@ -154,6 +158,9 @@ class CobrancasPostgres:
                 (pedido,),
             ).fetchall()
         return [self._montar_cobranca(linha) for linha in linhas]
+
+    def encerrar_contrato(self, pedido_id: str) -> None:
+        """Nada a gravar: a marca vem do contrato de cada cobrança (`contratos.status`)."""
 
     def aguardando_desde_antes(self, limite: datetime) -> Sequence[CobrancaLocal]:
         with self._banco.transacao() as con:
@@ -261,7 +268,9 @@ class AditivosPostgres:
             return ()
         with self._banco.transacao() as con:
             linhas = con.execute(
-                self._SELECT + "where c.pedido_id = %s order by a.criado_em, a.id", (pedido,)
+                self._SELECT + "where c.pedido_id = %s and c.status <> 'cancelado' "
+                "order by a.criado_em, a.id",
+                (pedido,),
             ).fetchall()
         return [self._aditivo(linha) for linha in linhas]
 

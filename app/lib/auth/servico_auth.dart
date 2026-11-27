@@ -96,6 +96,7 @@ enum TipoErroAuth {
   cpfNaoVerificado,
   dadosInvalidos,
   cadastroDesativado,
+  cadastroNaoVinculado,
   cancelado,
   desconhecido,
 }
@@ -125,6 +126,8 @@ class ErroAuth implements Exception {
     TipoErroAuth.cpfNaoVerificado: 'Não foi possível verificar o CPF agora. Tente de novo.',
     TipoErroAuth.dadosInvalidos: 'Confira os dados e tente de novo.',
     TipoErroAuth.cadastroDesativado: 'O cadastro está indisponível no momento.',
+    TipoErroAuth.cadastroNaoVinculado:
+        'Sua conta foi criada, mas não salvamos seus dados. Toque em "Tentar de novo".',
     TipoErroAuth.cancelado: 'Entrada cancelada.',
     TipoErroAuth.desconhecido: 'Algo deu errado. Tente de novo.',
   };

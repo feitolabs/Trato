@@ -14,7 +14,11 @@ from typing import Any, Protocol
 
 from trato.persistencia.comum import como_uuid
 from trato.persistencia.conexao import Banco
-from trato.persistencia.conversas import mascarar_contatos
+from trato.persistencia.conversas import (
+    _STATUS_COM_CONTATO,
+    CONTATO_LIBERADO_NOMEADO,
+    mascarar_contatos,
+)
 from trato.persistencia.erros import DadosInvalidos, NaoEncontrado
 
 
@@ -41,6 +45,8 @@ class ResumoConversa:
     ultima_minha: bool | None
     # Quem vê é o CLIENTE do pedido (falso: é o profissional). A mesma conta pode ser os dois.
     sou_cliente: bool = True
+    # Endereço e telefone passam nesta conversa (Termos 5.4 e 11.2).
+    liberada: bool = False
 
 
 class RepositorioConversasApp(Protocol):
@@ -63,9 +69,10 @@ class ServicoMensagens:
         self.mascarador = mascarador or MascaradorSimples()
 
     def conversas(self, usuario_id: str) -> list[ResumoConversa]:
-        # Antes da contratação a prévia passa de novo pelo mascarador (defesa em profundidade).
+        # Fora da conversa liberada a prévia passa de novo pelo mascarador (defesa em
+        # profundidade).
         return [
-            c if c.contratado or c.ultima_texto is None
+            c if c.liberada or c.ultima_texto is None
             else replace(c, ultima_texto=self.mascarador.mascarar(c.ultima_texto))
             for c in self.repo.da_pessoa(usuario_id)
         ]  # fmt: skip
@@ -111,6 +118,7 @@ class ConversasAppEmMemoria:
                     ultima.enviada_em if ultima else None,
                     ultima.autor_id == usuario_id if ultima else None,
                     usuario_id == cliente,
+                    self._contexto._contato_liberado(pedido_id, profissional),
                 )  # fmt: skip
             )
         return sorted(
@@ -173,10 +181,12 @@ class ConversasAppPostgres:
             return ()
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select cv.id, cv.pedido_id, cv.cliente_id, cv.profissional_id, "
+                "select cv.id, cv.pedido_id, cv.cliente_id, cv.profissional_id, "  # noqa: S608
                 "cv.encerrada_em is not null as encerrada, "
-                "exists (select 1 from public.contratos c where c.pedido_id = cv.pedido_id) "
+                "exists (select 1 from public.contratos c where c.pedido_id = cv.pedido_id "
+                " and c.status <> 'cancelado') "
                 "as contratado, "
+                f"{CONTATO_LIBERADO_NOMEADO} as liberada, "  # noqa: S608
                 "(select count(*) from public.mensagens m where m.conversa_id = cv.id "
                 " and m.autor_id <> %(u)s and m.lida_em is null) as nao_lidas, "
                 "u.corpo_exibido as ultima_texto, u.enviada_em as ultima_em, "
@@ -188,7 +198,7 @@ class ConversasAppPostgres:
                 "where (cv.cliente_id = %(u)s or cv.profissional_id = %(u)s) "
                 "and cv.cliente_id <> cv.profissional_id "
                 "order by u.enviada_em desc nulls last, cv.id",
-                {"u": usuario},
+                {"u": usuario, "estados": _STATUS_COM_CONTATO},
             ).fetchall()
         return tuple(
             ResumoConversa(
@@ -202,6 +212,7 @@ class ConversasAppPostgres:
                 l["ultima_em"],
                 l["ultima_minha"],
                 str(l["cliente_id"]) == usuario,
+                l["liberada"],
             )  # fmt: skip
             for l in linhas  # noqa: E741
         )

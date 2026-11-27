@@ -20,11 +20,15 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
     required this.avaliacao,
     this.rotuloResposta = 'Resposta do profissional',
     this.aoResponder,
+    this.rodape,
   });
 
   final Avaliacao avaliacao;
   final String rotuloResposta;
   final VoidCallback? aoResponder;
+
+  /// Conteúdo extra no fim do cartão. Ex.: o pedido de revisão, só para quem foi avaliado.
+  final Widget? rodape;
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +176,7 @@ class CartaoAvaliacaoVisual extends StatelessWidget {
               ),
             ),
           ],
+          if (rodape != null) rodape!,
         ],
       ),
     );

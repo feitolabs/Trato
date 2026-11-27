@@ -2,7 +2,8 @@
 
 Uso:  python harness/subir-backend-teste.py [--porta 8765] [--host 127.0.0.1]
 
-- Nada de banco real, nenhuma chave real. O login é um Supabase Auth de mentira (`/auth/v1/token`)
+- Nada de banco real, nenhuma chave real. O pagamento é o `ProvedorFake` (não fala com a rede),
+  então a decisão de disputa funciona. O login é um Supabase Auth de mentira (`/auth/v1/token`)
   servido pelo próprio processo: e-mail `<papel>@teste.trato.local` + a senha de teste abaixo.
 - Dados: uma conta de equipe por papel, 2 verificações pendentes, 2 disputas abertas (uma dentro da
   alçada do mediador, outra acima), pagamentos (um sem pedido = divergente), configuração vigente + um
@@ -61,6 +62,11 @@ from trato.api.repositorios import ConfigApi, Contrato, EventoWebhook  # noqa: E
 from trato.disputas import ConfigDisputa  # noqa: E402
 from trato.financeiro.ledger import registrar_cobranca  # noqa: E402
 from trato.garantias import ConfigGarantia  # noqa: E402
+from trato.pagamentos.custo import MeioPagamento  # noqa: E402
+from trato.pagamentos.memoria import AditivosEmMemoria, CobrancasEmMemoria  # noqa: E402
+from trato.pagamentos.modelos import CobrancaLocal, ConfigPagamento, EstadoCobranca  # noqa: E402
+from trato.pagamentos.orquestrador import ServicoPagamento  # noqa: E402
+from trato.pagamentos.provedor import ProvedorFake  # noqa: E402
 from trato.pedidos.estados import (  # noqa: E402
     Acao,
     Ator,
@@ -159,6 +165,30 @@ def _semear_disputa(ctx: Contexto, pedido_id: str, valor: int, cliente: Usuario,
     ctx.disputas.salvar(pedido_id, d)
 
 
+def _ligar_pagamento_falso(app: FastAPI, ctx: Contexto, pedidos: tuple[str, ...]) -> None:
+    """Pagamento de mentira (`ProvedorFake`: sem rede, sem Stripe, sem chave), para o painel
+    decidir disputas. Cada pedido recebe a cobrança paga que o estorno da decisão precisa."""
+    servico = ServicoPagamento(
+        ProvedorFake(), lambda: ConfigPagamento(10**9), CobrancasEmMemoria(), AditivosEmMemoria()
+    )
+    for pedido_id in pedidos:
+        valor = ctx.ledger.saldos_pedido(pedido_id, None).cliente_pagou
+        criada = servico.provedor.criar_cobranca(
+            valor_centavos=valor,
+            meio=MeioPagamento.PIX,
+            chave_idempotencia=f"painel/{pedido_id}",
+            metadados={"pedido_id": pedido_id},
+        )
+        servico.provedor.marcar_paga(criada.id)
+        servico.cobrancas.salvar(
+            CobrancaLocal(
+                criada.id, pedido_id, valor, MeioPagamento.PIX, EstadoCobranca.PAGA, ctx.agora()
+            )
+        )
+    servico.ligar(ctx)
+    app.state.servico_pagamento = servico
+
+
 def _instalar_login_falso(app: FastAPI, papeis_por_email: dict[str, str]) -> None:
     """Supabase Auth de mentira: só o suficiente para `POST /auth/v1/token?grant_type=password`."""
 
@@ -254,6 +284,7 @@ def montar() -> Ambiente:
     registrar_cobranca(contexto.ledger.livro, "ped-orfao", 5_000, "cob-orfao", AGORA)  # divergente
     app = criar_app(contexto)
     instalar_admin(app, admin)
+    _ligar_pagamento_falso(app, contexto, ("ped-1", "ped-2"))
     _instalar_login_falso(app, papeis_por_email)
     # O painel (Flutter Web) roda em outra porta: sem CORS o navegador bloqueia. Só origens locais.
     from starlette.middleware.cors import CORSMiddleware

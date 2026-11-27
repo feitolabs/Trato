@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import struct
 import threading
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -76,6 +77,14 @@ from trato.uploads import ArmazenamentoFake
 from trato.uploads.armazenamento import ArquivoNaoEncontrado
 from trato.uploads.config import ConfigUploads
 from trato.uploads.servico import ServicoUploads, UploadsEmMemoria
+
+
+@pytest.fixture(autouse=True)
+def oferta_antiga_ligada(request):
+    """Estes testes cobrem a prioridade paga pelo profissional, hoje desligada por padrão."""
+    if "amb" in request.fixturenames:
+        config = request.getfixturevalue("amb").contexto.config
+        config._config = replace(config.carregar(), exclusividade_profissional_ofertada=True)
 
 
 def _seg_jpeg(marca: int, corpo: bytes) -> bytes:

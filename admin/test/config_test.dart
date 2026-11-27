@@ -29,7 +29,7 @@ void main() {
     await tester.tap(find.text('Disputas'));
     await tester.pumpAndSettle();
     expect(find.text('Prazo de resposta da disputa'), findsOneWidget);
-    expect(find.text('48 horas'), findsOneWidget);
+    expect(find.text('24 horas'), findsOneWidget);
     expect(find.text('1 a 720 horas'), findsWidgets);
     expect(find.text('Prazo de decisão da disputa'), findsOneWidget);
     expect(find.text('5 dias úteis'), findsOneWidget);
@@ -54,6 +54,22 @@ void main() {
     await tester.pump();
     expect(find.text('Fora da faixa: 0% a 100%'), findsOneWidget);
     expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Propor').first).onPressed, isNull);
+  });
+
+  testWidgets('percentual recusa ponto e 3 casas junto do campo e não deixa propor', (tester) async {
+    await abrirPainel(tester, papel: 'financeiro', secao: 'config');
+    OutlinedButton propor() => tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Propor').first);
+    for (final ruim in ['7.50', '7,505']) {
+      await tester.enterText(campo('adiantamento_bps'), ruim);
+      await tester.pump();
+      expect(find.textContaining('Percentual inválido'), findsOneWidget, reason: ruim);
+      expect(find.textContaining('Fora da faixa'), findsNothing, reason: ruim);
+      expect(propor().onPressed, isNull, reason: ruim);
+    }
+    await tester.enterText(campo('adiantamento_bps'), '7,50');
+    await tester.pump();
+    expect(find.textContaining('Percentual inválido'), findsNothing);
+    expect(propor().onPressed, isNotNull);
   });
 
   testWidgets('prazo de resposta da disputa precisa ser menor que o de decisão', (tester) async {

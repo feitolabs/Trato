@@ -33,6 +33,8 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
   Timer? _timer;
   String? _erro;
   var _falhou = false;
+  var _devolvido = false;
+  var _semContrato = false;
   var _consultando = false;
 
   @override
@@ -63,6 +65,12 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
         case StatusPagamento.falhou:
           _timer?.cancel();
           setState(() => _falhou = true);
+        case StatusPagamento.devolvido:
+          _timer?.cancel();
+          setState(() => _falhou = _devolvido = true);
+        case StatusPagamento.semContrato:
+          _timer?.cancel();
+          setState(() => _falhou = _semContrato = true);
         case StatusPagamento.aguardando:
           if (_erro != null) setState(() => _erro = null);
       }
@@ -84,15 +92,25 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
           child: ListView(
             children: [
               Text(
-                _falhou ? 'O pagamento não foi concluído' : 'Aguardando confirmação do pagamento',
+                _semContrato
+                    ? 'Este pagamento não está mais em andamento'
+                    : _devolvido
+                        ? 'Pagamento devolvido'
+                        : _falhou
+                            ? 'O pagamento não foi concluído'
+                            : 'Aguardando confirmação do pagamento',
                 style: TipografiaTrato.tituloGrande,
               ),
               const SizedBox(height: EspacosTrato.x3),
               Text(
-                _falhou
-                    ? 'Nada foi cobrado. Volte e tente de novo.'
-                    : 'Assim que o pagamento for confirmado, avisamos você por aqui. '
-                        'Isso leva apenas alguns instantes.',
+                _semContrato
+                    ? 'Volte ao pedido e peça um orçamento novo ao profissional.'
+                    : _devolvido
+                        ? 'A cobrança consta como devolvida.'
+                        : _falhou
+                            ? 'Nada foi cobrado. Volte e tente de novo.'
+                            : 'Assim que o pagamento for confirmado, avisamos você por aqui. '
+                                'Isso leva apenas alguns instantes.',
                 style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
               ),
               if (!_falhou) ...[
@@ -134,7 +152,8 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
                 const SizedBox(height: EspacosTrato.x4),
                 Text(
                   _erro!,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                  style:
+                      TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
               if (_falhou) ...[

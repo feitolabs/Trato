@@ -153,11 +153,9 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
     final bairros = [for (final b in (j['bairros'] as List? ?? const [])) '$b']
         .where((b) => b.trim().isNotEmpty)
         .toList();
-    final atendeRemoto = j['atende_remoto'] == true;
     final regiao = [
       if (bairros.isNotEmpty) bairros.first,
       if (cidades.isNotEmpty) cidades.first,
-      if (bairros.isEmpty && cidades.isEmpty && atendeRemoto) 'Atende remoto',
     ].join(' · ');
     return Profissional(
       id: id,

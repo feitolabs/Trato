@@ -114,17 +114,30 @@ def test_stripe_manda_expires_after_seconds_so_quando_pedido():
 # --- 2) webhook tardio: não debita em silêncio -----------------------------------------------------------
 
 
-def test_webhook_tardio_com_reserva_devolvida_nao_debita_e_vai_para_revisao(fluxo: Fluxo):
-    repo = _ligar(fluxo)
+def test_webhook_tardio_com_reserva_devolvida_e_sem_espaco_vai_para_revisao(fluxo: Fluxo):
+    repo = _ligar(fluxo, orcamento_mensal_desconto_centavos=5_000)
     pid = fluxo.aceitar()
     cob = _cobrar(fluxo, pid).json()
     repo.devolver_reserva(chave_reserva(cob["cobranca_id"]))  # a reserva expirou antes do pagamento
+    repo.reservar_orcamento(MES, AGORA.date(), 5_000, 5_000, 1_000_000)  # outros levaram o mês
     _pagar(fluxo, cob["cobranca_id"])
     assert fluxo.servico.cobrancas.obter(cob["cobranca_id"]).status is EstadoCobranca.PAGA
     assert repo.saldo(CLIENTE.id, AGORA) == 5_000  # NÃO debitou em silêncio
     revisoes = fluxo.ctx.eventos_webhook.em_revisao()
     assert len(revisoes) == 1 and "sem reserva válida" in revisoes[0][1]
-    assert repo.orcamento_usado(MES) == 0  # e o orçamento continua devolvido
+    assert repo.orcamento_usado(MES) == 5_000  # só a reserva dos outros
+
+
+def test_webhook_tardio_com_reserva_devolvida_reabre_e_debita_se_couber(fluxo: Fluxo):
+    repo = _ligar(fluxo)
+    pid = fluxo.aceitar()
+    cob = _cobrar(fluxo, pid).json()
+    repo.devolver_reserva(chave_reserva(cob["cobranca_id"]))
+    _pagar(fluxo, cob["cobranca_id"])
+    reaberta = chave_reserva(f"reabertura:{cob['cobranca_id']}")
+    assert repo.reserva_status(reaberta) == "confirmada" and repo.orcamento_usado(MES) == 5_000
+    assert repo.saldo(CLIENTE.id, AGORA) == 0
+    assert fluxo.ctx.eventos_webhook.em_revisao() == ()
 
 
 def test_webhook_tardio_sem_reserva_reabre_se_couber(fluxo: Fluxo):

@@ -9,6 +9,7 @@ from trato.api.admin.papeis import MATRIZ, PapelEquipe, Permissao
 
 # (método, caminho, corpo, permissão exigida)
 ROTAS = [
+    ("GET", "/v1/admin/medidas/trava-fraude", None, Permissao.MEDIDAS_APLICAR),
     ("GET", "/v1/admin/verificacoes", None, Permissao.VERIFICACOES_VER),
     ("GET", "/v1/admin/verificacoes/ver-1", None, Permissao.VERIFICACOES_VER),
     (
@@ -69,6 +70,106 @@ ROTAS = [
     ),
     ("GET", "/v1/admin/auditoria", None, Permissao.AUDITORIA_VER),
     ("POST", "/v1/admin/auditoria/verificar-cadeia", None, Permissao.AUDITORIA_VERIFICAR_CADEIA),
+    ("GET", "/v1/admin/incidentes", None, Permissao.INCIDENTES_VER),
+    ("GET", "/v1/admin/incidentes/inc-1", None, Permissao.INCIDENTES_VER),
+    (
+        "POST",
+        "/v1/admin/incidentes",
+        {"tipo": "outro", "descricao": "Relato.", "contato": "x@y.test", "canal": "email"},
+        Permissao.INCIDENTES_TRATAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/incidentes/inc-1/medidas",
+        {"tipo": "outro", "descricao": "Medida."},
+        Permissao.INCIDENTES_TRATAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/incidentes/inc-1/status",
+        {"status": "em_apuracao"},
+        Permissao.INCIDENTES_TRATAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/incidentes/inc-1/encerrar",
+        {"desfecho": "Apurado e resolvido."},
+        Permissao.INCIDENTES_ENCERRAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/avaliacoes/av-1/ocultar",
+        {"motivo": "ofensa_ou_ilegal", "explicacao": "Conteúdo ofensivo comprovado."},
+        Permissao.AVALIACOES_MODERAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/avaliacoes/av-1/reverter-ocultacao",
+        {"motivo": "Revisão procedente após análise."},
+        Permissao.AVALIACOES_MODERAR,
+    ),
+    ("GET", "/v1/admin/avaliacoes/revisoes", None, Permissao.AVALIACOES_MODERAR),
+    ("POST", "/v1/admin/avaliacoes/revisoes/rev-1/analisar", None, Permissao.AVALIACOES_MODERAR),
+    (
+        "POST",
+        "/v1/admin/avaliacoes/revisoes/rev-1/decidir",
+        {"status": "recusada", "resposta": "Avaliação dentro das regras dos Termos."},
+        Permissao.AVALIACOES_MODERAR,
+    ),
+    ("GET", "/v1/admin/lgpd/pedidos", None, Permissao.LGPD_REVISAO_AUTOMATIZADA),
+    ("POST", "/v1/admin/lgpd/pedidos/lgpd-1/analisar", None, Permissao.LGPD_REVISAO_AUTOMATIZADA),
+    (
+        "POST",
+        "/v1/admin/lgpd/pedidos/lgpd-1/responder",
+        {"status": "atendido", "resposta": "Pedido atendido conforme LGPD."},
+        Permissao.LGPD_REVISAO_AUTOMATIZADA,
+    ),
+    ("GET", "/v1/admin/conta/impedimentos", None, Permissao.CONTA_RETORNO_ANALISAR),
+    (
+        "POST",
+        "/v1/admin/conta/impedimentos/imp-1/revogar",
+        {"motivo": "Erro comprovado na análise."},
+        Permissao.CONTA_RETORNO_APROVAR,
+    ),
+    ("GET", "/v1/admin/conta/retornos", None, Permissao.CONTA_RETORNO_ANALISAR),
+    ("POST", "/v1/admin/conta/retornos/ret-1/analisar", None, Permissao.CONTA_RETORNO_ANALISAR),
+    (
+        "POST",
+        "/v1/admin/conta/retornos/ret-1/aprovar",
+        {"motivo": "Sem risco identificado.", "risco_identificado": False},
+        Permissao.CONTA_RETORNO_APROVAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/conta/retornos/ret-1/recusar",
+        {"motivo": "Risco identificado na revisão.", "risco_identificado": True},
+        Permissao.CONTA_RETORNO_ANALISAR,
+    ),
+    ("GET", "/v1/admin/materiais/contestacoes", None, Permissao.MATERIAIS_CONTESTACAO_ANALISAR),
+    (
+        "POST",
+        "/v1/admin/materiais/contestacoes/cnm-1/anexos",
+        {"motivo": "Conferir a prova para decidir."},
+        Permissao.MATERIAIS_CONTESTACAO_ANALISAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/materiais/contestacoes/cnm-1/analisar",
+        None,
+        Permissao.MATERIAIS_CONTESTACAO_ANALISAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/materiais/contestacoes/cnm-1/decidir",
+        {"status": "improcedente", "resposta": "Nota compatível com o combinado."},
+        Permissao.MATERIAIS_CONTESTACAO_ANALISAR,
+    ),
+    (
+        "POST",
+        "/v1/admin/materiais/contestacoes/cnm-1/aprovar-financeiro",
+        {"motivo": "Aprovação em quatro olhos."},
+        Permissao.MATERIAIS_CONTESTACAO_APROVAR,
+    ),
 ]
 IDS = [f"{m} {c}" for m, c, _, _ in ROTAS]
 

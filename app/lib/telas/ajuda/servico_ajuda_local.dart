@@ -1,3 +1,4 @@
+import '../comuns/textos_dos_termos.dart';
 import 'modelos.dart';
 
 /// Perguntas frequentes embutidas no app (conteúdo de ajuda, não dado de usuário).
@@ -25,14 +26,19 @@ class ServicoAjudaLocal implements ServicoAjuda {
       resposta: 'Abra o pedido em "Seus pedidos" e veja as opções disponíveis para o momento dele.',
     ),
     PerguntaFrequente(
+      pergunta: 'Posso falar com uma pessoa?',
+      resposta:
+          'Sim. $textoAtendimentoHumano Use "Falar com o suporte" ou escreva para suporte@tratofeitolabs.com.br.',
+    ),
+    PerguntaFrequente(
       pergunta: 'O que são Tratinhos?',
       resposta:
-          'São a moeda de desconto do Trato: 50 Tratinhos = R\$ 0,50. Você ganha ao avaliar serviços e usa no próximo pedido.',
+          'São pontos promocionais do Trato, não são dinheiro. Exemplo de conversão: 50 Tratinhos = R\$ 0,50. Campanhas informadas no app podem dar Tratinhos, e o app mostra quando dá para usá-los.',
     ),
     PerguntaFrequente(
       pergunta: 'Como funciona a exclusividade de 48h?',
       resposta:
-          'Quando um profissional pede exclusividade de 48h, você decide sem compromisso se quer reservar o horário dele.',
+          'Num pedido aberto, você pode usar Tratinhos para reservar o pedido a um profissional. O custo, o prazo e quando os Tratinhos voltam aparecem antes de confirmar.',
     ),
     PerguntaFrequente(
       pergunta: 'O Trato cobra alguma taxa?',

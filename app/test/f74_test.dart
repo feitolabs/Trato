@@ -59,12 +59,13 @@ void main() {
       await tester.tap(find.text('abrir'));
       await tester.pumpAndSettle();
 
-      // Os 5 motivos pedidos.
+      // Os 6 motivos pedidos.
       for (final rotulo in [
         'Assédio ou desrespeito',
         'Tentativa de golpe/fraude',
         'Cobrança fora do app',
         'Perfil falso',
+        'Dano ou prejuízo',
         'Outro',
       ]) {
         expect(find.text(rotulo), findsOneWidget);
@@ -146,6 +147,52 @@ void main() {
       await tester.pumpAndSettle();
       expect(tentativas, 2);
       expect(resultado, isTrue);
+    });
+
+    testWidgets('"Dano ou prejuízo": servidor recusa o código, mostra o erro e mantém o texto',
+        (tester) async {
+      http.Request? pedida;
+      final api = ClienteApi(
+        urlBase: 'https://api.teste/',
+        sessao: SessaoTrato()..entrar('t'),
+        cliente: MockClient((req) async {
+          pedida = req;
+          return http.Response.bytes(
+            utf8.encode(jsonEncode({'detail': 'Motivo inválido.'})),
+            422,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      bool? resultado;
+      await _abrir(
+        tester,
+        _comBotao(
+          (m, d) => ServicoContaApi(api).enviarDenuncia(
+            alvoTipo: 'perfil',
+            denunciadoId: 'usr-9',
+            motivo: m.codigo,
+            detalhes: d,
+          ),
+          (r) => resultado = r,
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+      // Nada na folha promete reter dinheiro.
+      expect(find.textContaining(RegExp('retid|reten|reembols', caseSensitive: false)),
+          findsNothing);
+      await tester.tap(find.text('Dano ou prejuízo'));
+      await tester.enterText(find.byKey(const ValueKey('detalhes-denuncia')), 'Quebrou a pia');
+      await tester.tap(find.text('Enviar denúncia'));
+      await tester.pumpAndSettle();
+
+      expect((jsonDecode(pedida!.body) as Map)['motivo'], 'dano');
+      expect(find.byKey(const ValueKey('erro-denuncia')), findsOneWidget);
+      expect(find.text('Quebrou a pia'), findsOneWidget);
+      expect(find.text('Enviar denúncia'), findsOneWidget);
+      expect(resultado, isNull);
+      expect(tester.takeException(), isNull);
     });
   });
 

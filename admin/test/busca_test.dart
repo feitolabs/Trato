@@ -51,7 +51,7 @@ void main() {
     expect(find.text('Revelar dados pessoais'), findsNothing);
     expect(find.text('Categorias'), findsNothing);
     expect(find.text('Usuários'), findsOneWidget);
-    expect(find.text('Suporte'), findsOneWidget);
+    expect(find.text('Suporte'), findsNothing); // virou a seção Atendimento
   });
 
   testWidgets('aba de pedidos mostra código e título legíveis, nunca só o UUID', (tester) async {
@@ -61,15 +61,6 @@ void main() {
     expect(find.textContaining('PED-10482 · Troca de chuveiro'), findsOneWidget);
     expect(find.textContaining('Cliente Marina Souza · profissional Carlos Pereira'), findsOneWidget);
     expect(find.text('Eletricista · Belo Horizonte'), findsOneWidget);
-  });
-
-  testWidgets('aba de suporte mostra prioridade, responsável e prazo', (tester) async {
-    await abrirPainel(tester, papel: 'atendente_n1', secao: 'busca');
-    await tester.tap(find.text('Suporte'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('CH-31'), findsOneWidget);
-    expect(find.text('Prioridade alta'), findsOneWidget);
-    expect(find.textContaining('Responsável Bruna Teixeira'), findsOneWidget);
   });
 
   testWidgets('moderador desativa categoria com motivo', (tester) async {
@@ -94,20 +85,16 @@ void main() {
     expect(find.text('Já existe uma categoria com esse nome.'), findsOneWidget);
   });
 
-  testWidgets('nova categoria: padrão só presencial e interruptor do remoto', (tester) async {
+  testWidgets('nova categoria: remoto desativado (Termos 3.7)', (tester) async {
     await abrirPainel(tester, papel: 'moderador', secao: 'busca');
     await tester.tap(find.text('Categorias'));
     await tester.pumpAndSettle();
     expect(find.text('Só presencial'), findsWidgets);
     await tester.tap(find.text('Nova categoria'));
     await tester.pumpAndSettle();
-    final chave = find.byKey(const ValueKey('aceita-remoto'));
-    expect(chave, findsOneWidget);
-    expect(find.text('Aceita atendimento remoto'), findsOneWidget);
-    expect(tester.widget<SwitchListTile>(chave).value, isFalse); // padrão presencial
-    await tester.tap(chave);
-    await tester.pump();
-    expect(tester.widget<SwitchListTile>(chave).value, isTrue);
+    final chave = tester.widget<SwitchListTile>(find.byKey(const ValueKey('aceita-remoto')));
+    expect((chave.value, chave.onChanged), (false, null));
+    expect(find.textContaining('Termos 3.7'), findsOneWidget);
   });
 
   testWidgets('cidades: ativar e desativar com motivo', (tester) async {

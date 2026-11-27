@@ -23,6 +23,10 @@ class Categoria(StrEnum):
     MENSAGENS = "mensagens"
 
 
+# Termos 15.2: avisos de disputa e de pagamento/estorno não podem ser desligados.
+CATEGORIAS_OBRIGATORIAS = frozenset({Categoria.DISPUTAS, Categoria.PAGAMENTOS})
+
+
 class Evento(StrEnum):
     ORCAMENTO_RECEBIDO = "orcamento.recebido"
     PEDIDO_NOVO = "pedido.novo"
@@ -32,6 +36,26 @@ class Evento(StrEnum):
     ORCAMENTO_RECUSADO = "orcamento.recusado"
     ORCAMENTO_NAO_ESCOLHIDO = "orcamento.nao_escolhido"
     PAGAMENTO_CONFIRMADO = "pagamento.confirmado"
+    ESTORNO_SOLICITADO = "pagamento.estorno"
+    DESISTENCIA_RECEBIDA = "pagamento.desistencia"
+    PROFISSIONAL_CHEGOU = "agenda.profissional_chegou"
+    SAC_ABERTO = "suporte.chamado_aberto"
+    COMPENSACAO_REGISTRADA = "pagamento.compensacao_registrada"
+    COMPENSACAO_CANCELADA = "pagamento.compensacao_cancelada"
+    INCIDENTE_CAUTELA_ATRASADA = "seguranca.cautela_atrasada"  # 9.6, para a equipe
+    AVISO_MUDANCA_TERMOS = "conta.mudanca_termos"  # 23.2
+    AVISO_MUDANCA_TRATINHOS = "conta.mudanca_tratinhos"  # 13.11 e I.12
+    AVISO_INATIVACAO = "conta.inativacao_prevista"  # 4.9
+    PEDIDO_CANCELADO_SEGURANCA = "pagamento.cancelado_seguranca"  # 9.5
+    MEDIDA_APLICADA = "conta.medida_aplicada"
+    MEDIDA_ENCERRADA = "conta.medida_encerrada"
+    SAC_RESPOSTA = "suporte.chamado_resposta"
+    SAC_PRAZO = "suporte.chamado_prazo"
+    EXCLUSIVIDADE_CLIENTE_NOVA = "exclusividade.cliente_reservou"
+    EXCLUSIVIDADE_CLIENTE_FIM = "exclusividade.cliente_fim"
+    EXCLUSIVIDADE_CLIENTE_DEVOLVIDA = "exclusividade.cliente_devolvida"
+    AUSENCIA_JUSTIFICAR = "pagamento.ausencia_justificar"
+    AUSENCIA_DECIDIDA = "pagamento.ausencia_decidida"
     LEMBRETE_AGENDAMENTO = "agenda.lembrete"
     CODIGO_INICIO = "agenda.codigo_inicio"
     CHECK_IN_SEM_CODIGO = "agenda.check_in_sem_codigo"
@@ -54,6 +78,8 @@ class Evento(StrEnum):
     DISPUTA_ABERTA = "disputa.aberta"
     DISPUTA_RESPONDIDA = "disputa.respondida"
     DISPUTA_DECIDIDA = "disputa.decidida"
+    DISPUTA_CONTESTADA = "disputa.contestada"
+    DISPUTA_CONTESTACAO_DECIDIDA = "disputa.contestacao_decidida"
     LEMBRETE_RESPOSTA_DISPUTA = "disputa.lembrete_resposta"
     RETRABALHO = "garantia.retrabalho"
     AVALIACAO = "avaliacao.recebida"
@@ -75,6 +101,7 @@ class ModeloEvento:
     tela: str  # tela do app: vira o deep link
     essencial: bool = False  # sempre aparece na caixa de entrada, mesmo com a categoria desligada
     somente_app: bool = False  # só a lista do app: sem push nem e-mail
+    email_obrigatorio: bool = False  # os Termos pedem e-mail: a preferência não desliga
 
 
 MODELOS: dict[Evento, ModeloEvento] = {
@@ -123,6 +150,162 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Cliente escolheu outro orçamento",
         "Desta vez não foi o seu orçamento. Veja outros pedidos abertos.",
         "pedido_aberto",
+    ),
+    Evento.EXCLUSIVIDADE_CLIENTE_NOVA: ModeloEvento(
+        Categoria.AGENDA,
+        "Pedido reservado para você",
+        "Um cliente reservou este pedido para você por tempo limitado. Veja no aplicativo.",
+        "pedido",
+    ),
+    Evento.EXCLUSIVIDADE_CLIENTE_FIM: ModeloEvento(
+        Categoria.AGENDA,
+        "Exclusividade encerrada",
+        "O prazo terminou sem contratação. O pedido voltou a receber orçamentos.",
+        "pedido",
+    ),
+    Evento.EXCLUSIVIDADE_CLIENTE_DEVOLVIDA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Tratinhos devolvidos",
+        "A exclusividade foi encerrada e os seus Tratinhos voltaram ao saldo.",
+        "pedido",
+        essencial=True,
+    ),
+    # Atendimento: categoria que não se desliga (protocolo e prazo por escrito, 25.3).
+    # Medidas de conta (20.4): o aviso sai sempre, por app e e-mail.
+    Evento.DISPUTA_CONTESTADA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Decisão contestada",
+        "A decisão da reclamação foi contestada. Outra pessoa vai analisar. Veja no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.DISPUTA_CONTESTACAO_DECIDIDA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Contestação analisada",
+        "A contestação da decisão foi analisada. Veja a resposta no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.MEDIDA_APLICADA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Medida na sua conta",
+        "Uma medida foi aplicada à sua conta. Veja o motivo e como contestar.",
+        "medidas",
+        essencial=True,
+    ),
+    Evento.MEDIDA_ENCERRADA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Atualização da medida",
+        "Uma medida da sua conta mudou. Veja no aplicativo.",
+        "medidas",
+        essencial=True,
+    ),
+    Evento.COMPENSACAO_REGISTRADA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Desconto em repasses futuros",
+        "Um reembolso decidido será descontado dos próximos repasses. Veja o motivo.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.COMPENSACAO_CANCELADA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Compensação cancelada",
+        "O desconto foi cancelado. Veja no aplicativo.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.SAC_ABERTO: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Recebemos o seu contato",
+        "O seu chamado foi aberto. Veja o protocolo no aplicativo.",
+        "suporte",
+        essencial=True,
+    ),
+    Evento.SAC_RESPOSTA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Resposta do atendimento",
+        "Há novidade no seu chamado.",
+        "suporte",
+        essencial=True,
+    ),
+    Evento.SAC_PRAZO: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Novo prazo do atendimento",
+        "O prazo do seu chamado mudou. Veja o motivo no aplicativo.",
+        "suporte",
+        essencial=True,
+    ),
+    Evento.PROFISSIONAL_CHEGOU: ModeloEvento(
+        Categoria.AGENDA,
+        "O profissional chegou",
+        "O profissional está no local. Responda pelo chat do pedido.",
+        "pedido",
+    ),
+    Evento.AUSENCIA_JUSTIFICAR: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Justifique a ausência",
+        "Foi registrado que você não estava no local. Justifique no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.PEDIDO_CANCELADO_SEGURANCA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Pedido cancelado por segurança",
+        "O pedido foi cancelado por um relato de segurança. Veja no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.INCIDENTE_CAUTELA_ATRASADA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Incidente sem cautela no prazo",
+        "Um incidente passou do prazo de 24 horas sem cautela adotada.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.AVISO_MUDANCA_TERMOS: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Os Termos de uso vão mudar",
+        "Veja o que muda nos Termos de uso.",
+        "notificacoes",
+        essencial=True,
+        email_obrigatorio=True,
+    ),
+    Evento.AVISO_MUDANCA_TRATINHOS: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Mudança nos Tratinhos",
+        "Veja o que muda no programa.",
+        "notificacoes",
+        essencial=True,
+        somente_app=True,
+    ),
+    Evento.AVISO_INATIVACAO: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Sua conta está sem uso",
+        "Veja o aviso sobre a sua conta.",
+        "notificacoes",
+        essencial=True,
+        email_obrigatorio=True,
+    ),
+    Evento.AUSENCIA_DECIDIDA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Ausência analisada",
+        "O registro de cliente ausente foi analisado. Veja no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.DESISTENCIA_RECEBIDA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Desistência recebida",
+        "A desistência deste pedido foi recebida. Veja a situação no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.ESTORNO_SOLICITADO: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Estorno solicitado",
+        "Pedimos ao parceiro de pagamento o estorno deste pedido.",
+        "pedido",
+        essencial=True,
     ),
     Evento.PAGAMENTO_CONFIRMADO: ModeloEvento(
         Categoria.PAGAMENTOS,
@@ -261,7 +444,6 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "O profissional informou que resolveu o problema. Confirme se está tudo certo.",
         "pedido",
         essencial=True,
-        somente_app=True,
     ),
     Evento.ADITIVO_PENDENTE: ModeloEvento(
         Categoria.EXECUCAO,

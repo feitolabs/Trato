@@ -1,7 +1,8 @@
-"""Mascaramento de contato no chat (F8.1): SEMPRE, antes e depois da contratação.
+"""Mascaramento de contato no chat (F8.1): antes e depois da contratação.
 
-Depois da contratação o endereço passa (o profissional precisa dele); telefone, e-mail, perfil
-(@usuário) e link continuam escondidos.
+Depois da contratação passam o endereço e, na conversa com o profissional contratado (pagamento
+confirmado, Termos 11.2), o telefone; e-mail, perfil (@usuário), link e número em mensagem que
+fala em pagamento por fora continuam escondidos.
 
 O texto original fica guardado (`corpo`, evidência para disputa); o que o outro lado lê é o
 `corpo_exibido`, com `mascarada = verdadeiro` quando algo foi escondido. Esconde telefone (inclusive
@@ -68,6 +69,10 @@ _MILHAR = re.compile(r"\d{1,3}(?:\.\d{3})+")
 _DATA = re.compile(r"\d{1,2}[.\-]\d{1,2}[.\-]\d{2,4}")
 _CEP_NUMERO = re.compile(r"\d{5}-\d{3}")
 _DECIMAL_DEPOIS = re.compile(r"\s?,\d{1,2}(?!\d)")
+# Com o telefone liberado, estes continuam escondidos: mais dígitos que um telefone com +55
+# (CNPJ, cartão) e CPF formatado.
+_MAXIMO_DIGITOS_TELEFONE = 13
+_CPF_FORMATADO = re.compile(r"\d{3}\.\d{3}\.\d{3}-\d{2}")
 
 _EMAIL = re.compile(
     r"[\w.+-]{2,64}\s*(?:@|[(\[{]\s*(?:at|arroba)\s*[)\]}]|\barroba\b)\s*"
@@ -158,7 +163,9 @@ def _eh_dinheiro_ou_data(texto: str, ini: int, fim: int) -> bool:
     return bool(_DECIMAL_DEPOIS.match(texto, fim)) and "," in texto[fim : fim + 4]
 
 
-def _mascarar_telefones(texto: str, minimo: int, minimo_canal: int) -> tuple[str, bool]:
+def _mascarar_telefones(
+    texto: str, minimo: int, minimo_canal: int, liberar_telefone: bool = False
+) -> tuple[str, bool]:
     achou = False
 
     def trocar(m: re.Match[str]) -> str:
@@ -172,6 +179,12 @@ def _mascarar_telefones(texto: str, minimo: int, minimo_canal: int) -> tuple[str
         limite = minimo_canal if com_canal else minimo
         isolados = _maior_bloco_isolado(m.group(0)) >= _MINIMO_ISOLADOS
         if (digitos < limite and not isolados) or _eh_dinheiro_ou_data(texto, m.start(), m.end()):
+            return m.group(0)
+        if (
+            liberar_telefone
+            and digitos <= _MAXIMO_DIGITOS_TELEFONE
+            and not _CPF_FORMATADO.search(m.group(0))
+        ):
             return m.group(0)
         achou = True
         return AVISO_MASCARA
@@ -207,9 +220,14 @@ def _perfil_suspeito(m: re.Match[str]) -> str:
 
 
 def mascarar(
-    texto: str, config: ConfigSeguranca | None = None, *, incluir_endereco: bool = True
+    texto: str,
+    config: ConfigSeguranca | None = None,
+    *,
+    incluir_endereco: bool = True,
+    liberar_telefone: bool = False,
 ) -> ResultadoMascara:
-    """`incluir_endereco=False`: pedido já contratado (o endereço pode ser combinado)."""
+    """`incluir_endereco=False`: pedido já contratado (o endereço pode ser combinado).
+    `liberar_telefone=True`: o telefone passa (quem chama confere a contratação)."""
     config = config or obter_config_seguranca()
     atual = texto
     categorias: set[str] = set()
@@ -232,10 +250,14 @@ def mascarar(
     passo("link", link)
     passo("rede_social", _PERFIL, _perfil_suspeito)
     passo("rede_social", _ARROBA)
-    passo("telefone", _PICADO)
-    passo("telefone", _BARRA)
+    if not liberar_telefone:
+        passo("telefone", _PICADO)
+        passo("telefone", _BARRA)
     atual, telefone = _mascarar_telefones(
-        atual, config.mascara_min_digitos, config.mascara_min_digitos_com_canal
+        atual,
+        config.mascara_min_digitos,
+        config.mascara_min_digitos_com_canal,
+        liberar_telefone,
     )
     if telefone:
         categorias.add("telefone")
@@ -245,6 +267,10 @@ def mascarar(
     return ResultadoMascara(texto, atual, frozenset(categorias))
 
 
-def mascarar_contatos(texto: str, *, incluir_endereco: bool = True) -> str:
+def mascarar_contatos(
+    texto: str, *, incluir_endereco: bool = True, liberar_telefone: bool = False
+) -> str:
     """Só o texto exibido (compatível com o uso antigo em `persistencia/conversas.py`)."""
-    return mascarar(texto, incluir_endereco=incluir_endereco).exibido
+    return mascarar(
+        texto, incluir_endereco=incluir_endereco, liberar_telefone=liberar_telefone
+    ).exibido

@@ -45,7 +45,11 @@ class ItemExtrato {
     required this.liquidoCentavos,
     required this.status,
     this.pedidoId,
+    this.rodape,
   });
+
+  /// Texto no pé da linha, no lugar de "Sem taxa"/"Estorno".
+  final String? rodape;
 
   /// Para abrir o detalhe dos valores do pedido ao tocar na linha.
   final String? pedidoId;
@@ -86,12 +90,16 @@ class DetalheValoresPedido {
     this.aditivos = const [],
     this.notas = const [],
     this.podeAvaliarCliente = false,
+    this.avaliarAte,
   });
 
   final String pedidoNumero;
 
   /// Pedido concluído que o profissional ainda não avaliou.
   final bool podeAvaliarCliente;
+
+  /// Termos 12.1: até quando dá para avaliar o cliente (do servidor).
+  final DateTime? avaliarAte;
 
   /// O valor inteiro que o cliente pagou.
   final int pagoPeloClienteCentavos;

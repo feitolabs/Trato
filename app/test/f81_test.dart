@@ -228,7 +228,10 @@ void main() {
       await _tela(t, tamanho: const Size(390, 1600));
       await t.pumpWidget(MaterialApp(
         theme: TemaTrato.claro,
-        home: CalculadoraOrcamentoTela(servico: ServicoOrcamentoFake(), tituloPedido: 'Tomadas'),
+        home: CalculadoraOrcamentoTela(
+            servico: ServicoOrcamentoFake(),
+            tituloPedido: 'Tomadas',
+            garantiaInicialDias: 90),
       ));
       await t.pumpAndSettle();
       final texto = find.text('90 dias');

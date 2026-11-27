@@ -26,7 +26,11 @@ class ArmazenamentoArquivos(Protocol):
     def gravar(self, bucket: str, caminho: str, dados: bytes, content_type: str) -> None:
         """Grava (sobrescreve) o arquivo já revalidado e limpo."""
 
-    def remover(self, bucket: str, caminho: str) -> None: ...
+    def remover(self, bucket: str, caminho: str) -> None:
+        """Apagar o que já não existe não é erro (a remoção pode ser repetida)."""
+
+    def listar(self, bucket: str, prefixo: str) -> list[str]:
+        """Caminhos de todos os arquivos dentro da pasta `prefixo` (termina em `/`)."""
 
 
 class ArmazenamentoFake:
@@ -56,6 +60,9 @@ class ArmazenamentoFake:
 
     def remover(self, bucket: str, caminho: str) -> None:
         self.arquivos.pop((bucket, caminho), None)
+
+    def listar(self, bucket: str, prefixo: str) -> list[str]:
+        return sorted(c for b, c in self.arquivos if b == bucket and c.startswith(prefixo))
 
 
 class ArmazenamentoSupabase:
@@ -104,7 +111,31 @@ class ArmazenamentoSupabase:
         resp.raise_for_status()
 
     def remover(self, bucket: str, caminho: str) -> None:
-        self._http.delete(f"{self._base}/object/{bucket}/{caminho}").raise_for_status()
+        resp = self._http.delete(f"{self._base}/object/{bucket}/{caminho}")
+        ausente = resp.status_code == 404 or (
+            resp.status_code == 400 and "not_found" in resp.text.lower().replace(" ", "_")
+        )
+        if not ausente:
+            resp.raise_for_status()
+
+    def listar(self, bucket: str, prefixo: str) -> list[str]:
+        pasta, achados, inicio = prefixo.rstrip("/"), [], 0
+        while True:
+            resp = self._http.post(
+                f"{self._base}/object/list/{bucket}",
+                json={"prefix": pasta, "limit": 100, "offset": inicio},
+            )
+            resp.raise_for_status()
+            itens = resp.json()
+            for item in itens:
+                caminho = f"{pasta}/{item['name']}"
+                if item.get("id") is None:  # subpasta
+                    achados += self.listar(bucket, caminho + "/")
+                else:
+                    achados.append(caminho)
+            if len(itens) < 100:
+                return achados
+            inicio += len(itens)
 
 
 def armazenamento_da_config() -> ArmazenamentoArquivos | None:

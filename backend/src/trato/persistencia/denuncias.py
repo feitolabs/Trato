@@ -13,6 +13,7 @@ from typing import Any
 import psycopg.errors
 
 from trato.api.denuncias import SEPARADOR, TETO_DETALHES
+from trato.persistencia.comum import como_uuid
 
 _NOVO = (
     "insert into public.alertas_risco (usuario_id, pedido_id, tipo, severidade, detalhes, "
@@ -77,6 +78,19 @@ class DenunciasPostgres:
                 ),
             ).fetchone()
             return str(linha["id"])
+
+    def grave_aberta(self, pedido_id: str) -> bool:
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return False
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select 1 from public.alertas_risco where starts_with(tipo, 'denuncia_') "
+                "and severidade in ('alta', 'critica') and not resolvido "
+                "and (pedido_id = %s or position(%s in detalhes) > 0) limit 1",
+                (pid, f"Pedido {pedido_id}:"),
+            ).fetchone()
+        return linha is not None
 
     def contar(self, tipo: str, trecho: str, desde: datetime) -> int:
         with self._banco.transacao() as con:

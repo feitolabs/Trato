@@ -79,6 +79,11 @@ class Acao(StrEnum):
     FAZER_CHECK_IN = "fazer_check_in"
     REGISTRAR_CLIENTE_AUSENTE = "registrar_cliente_ausente"
     REGISTRAR_AUSENCIA = "registrar_ausencia"
+    # Termos 7.2: desistência nos 7 dias, depois do check-in, sem pedido expresso de execução.
+    CANCELAR_ARREPENDIMENTO = "cancelar_arrependimento"
+    # Termos 7.6: o analista não aceitou (ou não houve) justificativa do cliente ausente.
+    CANCELAR_CLIENTE_AUSENTE = "cancelar_cliente_ausente"
+    CANCELAR_PESSOA_DIFERENTE = "cancelar_pessoa_diferente"  # 9.5
     FAZER_CHECK_OUT = "fazer_check_out"
     CONFIRMAR_CONCLUSAO = "confirmar_conclusao"
     CONCLUIR_POR_PRAZO = "concluir_por_prazo"
@@ -357,6 +362,19 @@ REGRAS: dict[Acao, _Regra] = {
     ),
     Acao.REGISTRAR_AUSENCIA: _Regra(
         "registrar ausência do profissional", {Papel.SISTEMA: _de(E.AGENDADO)}, None
+    ),
+    Acao.CANCELAR_ARREPENDIMENTO: _Regra(
+        "cancelar por arrependimento",
+        {Papel.SISTEMA: _de(E.EM_ANDAMENTO, E.EM_CONFIRMACAO)},
+        None,
+    ),
+    Acao.CANCELAR_CLIENTE_AUSENTE: _Regra(
+        "cancelar por cliente ausente", {Papel.SISTEMA: _de(E.AGENDADO)}, None
+    ),
+    Acao.CANCELAR_PESSOA_DIFERENTE: _Regra(
+        "cancelar por pessoa diferente da verificada",
+        {Papel.SISTEMA: _de(E.PAGO_E_RETIDO, E.AGENDADO)},
+        None,
     ),
     Acao.FAZER_CHECK_OUT: _Regra(
         "fazer check-out",
@@ -663,6 +681,10 @@ def _registrar_ausencia(pedido, ator, agora, prova, prazos, gerar):
     return replace(pedido, estado=Estado.CANCELADO)
 
 
+def _cancelar_pelo_sistema(pedido, ator, agora, prova, prazos, gerar):
+    return replace(pedido, estado=Estado.CANCELADO)
+
+
 def _fazer_check_out(pedido, ator, agora, prova: ProvaCheckOut, prazos, gerar):
     if not pedido.remoto:
         if prova.foto_final is None:
@@ -778,6 +800,9 @@ _APLICAR = {
     Acao.CONFIRMAR_CONCLUSAO: _confirmar_conclusao,
     Acao.CONCLUIR_POR_PRAZO: _concluir_por_prazo,
     Acao.CANCELAR: _cancelar,
+    Acao.CANCELAR_ARREPENDIMENTO: _cancelar_pelo_sistema,
+    Acao.CANCELAR_CLIENTE_AUSENTE: _cancelar_pelo_sistema,
+    Acao.CANCELAR_PESSOA_DIFERENTE: _cancelar_pelo_sistema,
     Acao.ABRIR_DISPUTA: _abrir_disputa,
     Acao.ENCERRAR_DISPUTA_POR_ACORDO: _encerrar_disputa_por_acordo,
     Acao.DECIDIR_DISPUTA: _decidir_disputa,

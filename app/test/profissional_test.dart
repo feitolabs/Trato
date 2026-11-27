@@ -8,6 +8,7 @@ import 'package:trato/telas/profissional/dinheiro.dart';
 import 'apoio/exemplos/telas/profissional/servico_check_in_fake.dart';
 import 'apoio/exemplos/telas/profissional/servico_orcamento_fake.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/orcamento.dart';
 
 Future<void> _abrir(
   WidgetTester tester,
@@ -47,6 +48,8 @@ CalculadoraOrcamentoTela _calculadora(
       horasInicial: horas,
       valorHoraInicial: valorHora,
       itensIniciais: itens,
+      garantiaInicialDias: 90,
+      prazoExecucaoInicialDias: 3,
       faixaRegiaoCentavos: (30000, 45000),
       aoEnviar: aoEnviar,
     );
@@ -208,6 +211,7 @@ void main() {
       await tester.tap(find.text('Pedir sinal para o material'));
       await tester.pump();
 
+      await completarOrcamento(tester);
       await tester.tap(find.text('Enviar orçamento'));
       await tester.pump();
 
@@ -231,6 +235,7 @@ void main() {
       final completer = Completer<void>();
       await _abrir(tester, _calculadora(servico, aoEnviar: (o) => completer.future));
 
+      await completarOrcamento(tester);
       await tester.tap(find.text('Enviar orçamento'));
       await tester.pump();
 

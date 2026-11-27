@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/repositorios.dart' show Cobranca;
 import '../../tema/tema.dart';
+import '../comuns/nota_preco.dart';
 import '../conclusao/apoio_conclusao.dart' show LinhaValor, formatarReais;
 import '../profissional_apoio/apoio.dart';
 import 'aditivo.dart';
@@ -174,6 +175,8 @@ class _CorpoState extends State<_Corpo> {
           'de pagamento do pedido.',
           style: TipografiaTrato.legenda,
         ),
+        const SizedBox(height: EspacosTrato.x2),
+        const NotaPrecoComTributos(),
       ],
     );
   }

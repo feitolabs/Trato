@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from conftest import CLIENTE, PROFISSIONAL
 from test_fluxo_pagamento_e2e import Fluxo, fluxo  # noqa: F401
 
@@ -98,6 +100,8 @@ def test_conclusao_para_confirmar_traz_o_prazo_da_configuracao(fluxo: Fluxo):  #
 
 
 def test_cliente_confirmou_avisa_o_profissional_com_a_data_de_liberacao(fluxo: Fluxo):  # noqa: F811
+    config = fluxo.ctx.config
+    config._config = replace(config.carregar(), prazo_liberacao_dias=0)
     notif = _ligar(fluxo)
     pid = fluxo.ate_em_confirmacao()
     fluxo.concluir(pid)
@@ -174,9 +178,10 @@ def test_novos_eventos_aparecem_so_na_lista_do_app():
         Evento.CLIENTE_CONFIRMOU,
         Evento.ADITIVO_APROVADO,
         Evento.NOTA_MATERIAL,
-        Evento.RETRABALHO_RESOLVIDO,
     ):
         assert MODELOS[evento].somente_app and MODELOS[evento].essencial
+    # Termos 15.2: o que trata de reclamação ou garantia sai também por e-mail.
+    assert not MODELOS[Evento.RETRABALHO_RESOLVIDO].somente_app
 
 
 # --- RET-1: o ciclo do retrabalho ----------------------------------------------------------

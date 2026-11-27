@@ -186,9 +186,9 @@ void main() {
       expect(lista.toSet(), {'90 dias'});
     });
 
-    testWidgets('garantia antiga de 7 dias sobe para o mínimo', (t) async {
+    testWidgets('garantia antiga abaixo do mínimo fica sem escolha', (t) async {
       await abrir(t, inicial: 7);
-      expect(find.text('30 dias'), findsWidgets);
+      expect(find.text('Escolha'), findsOneWidget);
       expect(find.text('7 dias'), findsNothing);
     });
   });

@@ -9,6 +9,16 @@ const _secoes = [
   'verificacao',
   'disputas',
   'busca',
+  'ausencias',
+  'incidentes',
+  'avaliacoes',
+  'lgpd',
+  'contestacoes',
+  'atendimento',
+  'medidas',
+  'retorno_conta',
+  'materiais',
+  'compensacoes',
   'risco',
   'pagamentos',
   'relatorios',
@@ -28,11 +38,19 @@ void main() {
       testWidgets('$secao em ${largura.toInt()} px não estoura o layout', (tester) async {
         await abrirPainel(tester, largura: largura, altura: 900);
         final direto = find.byKey(ValueKey('menu-$secao'));
-        if (direto.evaluate().isEmpty) {
-          await tester.tap(find.byKey(const ValueKey('menu-mais')));
+        final mais = find.byKey(const ValueKey('menu-mais'));
+        if (direto.evaluate().isNotEmpty) {
+          await tester.tap(direto.last);
+        } else if (mais.evaluate().isNotEmpty) {
+          await tester.tap(mais); // celular
           await tester.pumpAndSettle();
+          await tocarNoMais(tester, secao);
+        } else {
+          // Menu lateral maior que a janela: rola até o item.
+          await tester.scrollUntilVisible(direto, 120, scrollable: rolagemDoMenu());
+          await tester.pumpAndSettle();
+          await tester.tap(direto.last);
         }
-        await tester.tap(find.byKey(ValueKey('menu-$secao')).last);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       });

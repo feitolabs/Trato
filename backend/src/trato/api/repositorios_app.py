@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Protocol
 
 from trato.api.auth import PapelUsuario
@@ -111,6 +111,8 @@ class NotaMaterial:
     itens: tuple[tuple[str, str, int, int], ...]  # (descricao, quantidade, unitario, total)
     total_centavos: int
     enviada_em: datetime
+    # Mesma ordem de `itens`; usado para contestar um item (Termos 6.9).
+    item_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -207,6 +209,8 @@ class RepositorioNotificacoes(Protocol):
 class RepositorioUsuarios(Protocol):
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None: ...
 
+    def ids_para_aviso(self, depois_de: str | None, limite: int) -> list[str]: ...
+
     def garantir(self, usuario_id: str, nome: object = None) -> object | None:
         """Cria a linha em `usuarios` se faltar (idempotente)."""
 
@@ -235,6 +239,16 @@ class RepositorioUsuarios(Protocol):
         data_nascimento: object | None = None,
     ) -> bool:
         """Grava CPF (e telefone) uma única vez; falso se a pessoa já tinha a linha."""
+
+    def data_nascimento(self, usuario_id: str) -> date | None:
+        """Data de nascimento gravada, ou None."""
+        ...
+
+    def pode_vincular_sem_sessao(
+        self, usuario_id: str, email: str, agora: datetime, janela: timedelta
+    ) -> bool:
+        """Sem login, só vale para conta que confere com o e-mail, é recente e nunca entrou."""
+        ...
 
     def email_por_identificador(self, digitos: str) -> str | None:
         """Busca o e-mail de login da conta pelo CPF (11 dígitos) ou telefone (10 a 13 dígitos)."""

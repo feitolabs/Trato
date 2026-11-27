@@ -144,6 +144,17 @@ Derivada de `docs/v2-impacto.md`. Não depende de aplicar migrations.
 - [x] **F24** (`cdc7e28`) App Profissional: correção de `QA5P-1..9` (check-out, nota de material com tetos, retrabalho e perfil público).
 - [x] **A4** (`6163cbb`) Painel Admin: correção de `QA5P-10..13` (travas em verificação/assumir, lista mobile `1.3x` em `MestreDetalhe` e guarda contra duplo clique em auditoria).
 
+## Termos v1.2 — rodada de 26/11/2026 (só código local: sem commit, push, deploy nem migration aplicada)
+
+- [~] **T5.3** Comprovante e cópia dos Termos após a contratação. *(Backend e app prontos no local; não testado com servidor real nem aparelho. Envio por e-mail depende de SMTP.)*
+- [~] **T1.7/23.4** Novo aceite quando os Termos mudam. *(Backend pronto no local, sem bloquear rotas; tela do app em andamento. Versão vigente segue 1.1.)*
+- [~] **T6.9** Contestação de material. *(Backend, painel com abertura de anexos e app prontos no local; sem teste com armazenamento real. App usa só o envio conferido da nota. Migrations 20261126231800 (PDF) e 231900 (acesso n2) só em arquivo, não aplicadas; anexo com finalidade pedido segue visível ao n2. Efeito financeiro não definido: nada move dinheiro; depende de decisão do João.)*
+- [~] **T12.6** Moderação e revisão de avaliações. *(Backend e painel prontos no local; banco real não testado.)*
+- [~] **T13.10** Aviso de perda de Tratinhos no encerramento voluntário. *(Backend e app prontos no local.)*
+- [~] **T14.9/14.10** Pedidos LGPD e revisão de decisão automatizada. *(Backend, painel e app prontos no local; banco real não testado.)*
+- [~] **T20.9** Impedimento de cadastro e retorno de conta. *(Backend, painel e app prontos no local, com a correção que libera a conta bloqueada nas 2 rotas de retorno; não testado com o login real do Supabase.)*
+- [~] **T-VISUAL** Comparações visuais do app. *(Lotes fechados no local; `navegacao_sem_placeholder` 10/10 (relato do Flutter; é lento, cerca de 9 min); barra inferior ajustada em telas estreitas.)*
+
 ## Dúvidas (sem evidência conclusiva — mantidas conservadoramente)
 
 - **F2.5 / F5.1**: Não há registro explícito no `PROGRESSO.md` da aprovação lado a lado final do Splash + Onboarding pelo João após a entrada leve (`e0886b1`). Mantidas em `[~]`.

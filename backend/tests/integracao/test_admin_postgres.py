@@ -202,7 +202,8 @@ def test_papel_errado_e_403_com_jwt_real(amb):
 
 def test_cliente_e_conta_bloqueada_ou_sem_token_nao_entram(amb):
     assert amb.cliente.get(BASE + "/usuarios", headers=amb.h("Maria Cliente")).status_code == 403
-    assert amb.cliente.get(BASE + "/usuarios", headers=amb.h("bloqueado")).status_code == 401
+    r = amb.cliente.get(BASE + "/usuarios", headers=amb.h("bloqueado"))
+    assert r.status_code == 403 and r.json()["codigo"] == "conta_bloqueada"  # 20.5
     assert amb.cliente.get(BASE + "/usuarios").status_code == 401
 
 
@@ -420,8 +421,22 @@ def criar(amb, quem="financeiro", **corpo):
 def test_config_ciclo_completo_e_regras_do_banco(amb):
     fin = amb.h("financeiro")
     assert amb.cliente.get(BASE + "/config/vigente", headers=fin).status_code == 404
-    # 5 do teste + 2 do painel v2 + o prazo do alerta de pagamento parado (financeiro, 08/11).
-    assert len(amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()) == 8
+    # As do teste mais as que cada migration do banco local cria: nome por nome, para uma
+    # definição nova ou perdida aparecer na falha.
+    definicoes = amb.cliente.get(BASE + "/config/definicoes", headers=fin).json()
+    assert sorted(d["chave"] for d in definicoes) == sorted(
+        [d[0] for d in DEFINICOES]
+        + [
+            "limite_valor_atipico_centavos",  # painel v2
+            "valor_maximo_servico_centavos",
+            "alerta_pagamento_parado_minutos",  # financeiro, 08/11
+            "prazo_avaliacao_dias",  # Termos 12.1
+            "lembrete_confirmacao_antecedencia_horas",  # 20261126204500
+            "lembrete_resposta_disputa_antecedencia_horas",
+            "conta_retorno_prazo_dias",  # Termos 20.9, 20261126213500
+            "trava_fraude_prazo_maximo_dias",  # Termos 20.6, 20261127001000
+        ]
+    )
 
     # Valores fora dos limites do catálogo são recusados, sem deixar lixo.
     assert (

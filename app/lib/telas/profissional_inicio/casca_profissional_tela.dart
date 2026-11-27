@@ -44,7 +44,7 @@ class CascaProfissionalTela extends StatefulWidget {
     this.abaConversas,
     this.carregarDetalhe,
     this.recusarPedido,
-    this.pedirExclusividade,
+    this.desistirExclusividade,
     this.carregarPedidos,
     this.carregarCategorias,
     this.aoAbrirNotificacoes,
@@ -63,6 +63,9 @@ class CascaProfissionalTela extends StatefulWidget {
   });
 
   /// Busca os dados da trilha dos primeiros passos; nulo = a trilha não aparece.
+  /// Desistir da exclusividade pedida pelo cliente.
+  final Future<void> Function(String exclusividadeId)? desistirExclusividade;
+
   final Future<DadosPrimeirosPassos> Function()? carregarPrimeirosPassos;
 
   /// Abre a conta de recebimento (passo 1 da trilha, quando é o que falta).
@@ -99,11 +102,6 @@ class CascaProfissionalTela extends StatefulWidget {
   /// Recusa o pedido tocado. Sem isso, usa [aoRecusar].
   final Future<void> Function(PedidoAberto pedido, MotivoRecusa motivo)? recusarPedido;
 
-  /// Pede exclusividade de 48h no pedido tocado.
-  final Future<ExclusividadeProfissional> Function(
-    PedidoAberto pedido,
-    String chaveIdempotencia,
-  )? pedirExclusividade;
 
   /// Pede ao backend os pedidos abertos com o filtro escolhido. Sem isso, o filtro não muda a lista.
   final Future<List<PedidoAberto>> Function(FiltroPedidosAbertos filtro)? carregarPedidos;
@@ -281,12 +279,11 @@ class _CascaProfissionalTelaState extends State<CascaProfissionalTela> {
           aoPerguntar: widget.aoPerguntarDoPedido != null
               ? () => widget.aoPerguntarDoPedido!(pedido)
               : widget.aoPerguntar,
-          aoPedirExclusividade: widget.pedirExclusividade == null
+          aoDesistirExclusividade: widget.desistirExclusividade == null
               ? null
-              : (chave) async {
-                  final nova = await widget.pedirExclusividade!(pedido, chave);
+              : (id) async {
+                  await widget.desistirExclusividade!(id);
                   await _atualizarEmSilencio();
-                  return nova;
                 },
           aoRecusar: (motivo) async {
             final navegador = Navigator.of(context);

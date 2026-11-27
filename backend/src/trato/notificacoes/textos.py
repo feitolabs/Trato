@@ -85,7 +85,7 @@ def _liberacao(contexto: Any, depois: Pedido) -> datetime | None:
     try:
         from trato.api.rotas_financeiro import liberacao_prevista  # import tardio: evita ciclo
 
-        return liberacao_prevista(contexto, depois.concluido_em)
+        return liberacao_prevista(contexto, depois)
     except Exception:  # noqa: BLE001
         return None
 

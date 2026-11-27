@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -8,7 +9,10 @@ import '../apoio/exemplos/auth/servico_auth_fake.dart';
 import 'package:trato/dados/cliente_api.dart';
 import 'package:trato/dados/erros.dart';
 import 'package:trato/dados/repositorios.dart';
+import 'package:trato/componentes/imagem_trato.dart';
 import 'package:trato/dados/repositorios_api.dart';
+import 'package:trato/dados/servico_upload.dart';
+import 'package:trato/dispositivo/servico_camera.dart';
 import 'package:trato/dados/servicos_api.dart';
 import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/aditivo/aditivo.dart';
@@ -804,7 +808,8 @@ void main() {
           ],
         ),
       });
-      final s = ServicoNotaMaterialApi(api);
+      final s = ServicoNotaMaterialApi(api, upload: _UploadDaNota());
+      registrarImagemEmMemoria('u1/nota.jpg', bytes: Uint8List.fromList([0xFF, 0xD8, 0xFF, 1]));
 
       await s.enviar(
         const EnvioNota(
@@ -816,7 +821,7 @@ void main() {
       final n = await s.carregar('ab12cd34');
 
       expect(chamadas.first.corpo, {
-        'foto_storage_path': 'u1/nota.jpg',
+        'midia_id': 'midia-nota',
         'itens': [
           {'descricao': 'Tomada', 'quantidade': 1, 'valor_unitario_centavos': 2300},
         ],
@@ -953,4 +958,11 @@ void main() {
       );
     });
   });
+}
+
+class _UploadDaNota implements ServicoUpload {
+  @override
+  Future<ArquivoEnviado> enviar(ArquivoCapturado arquivo, FinalidadeArquivo finalidade,
+          {String? pedidoId}) async =>
+      const ArquivoEnviado(arquivoId: 'midia-nota');
 }

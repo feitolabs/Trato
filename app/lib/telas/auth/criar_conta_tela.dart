@@ -31,16 +31,19 @@ class CriarContaTela extends StatefulWidget {
 
 class _CriarContaTelaState extends State<CriarContaTela> {
   final _nome = TextEditingController();
+  final _nascimento = TextEditingController();
   final _celular = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
   final _scrollController = ScrollController();
   final _keyNome = GlobalKey();
+  final _keyNascimento = GlobalKey();
   final _keyCelular = GlobalKey();
   final _keyEmail = GlobalKey();
   final _keySenha = GlobalKey();
   final _keyTermos = GlobalKey();
   final _focoNome = FocusNode();
+  final _focoNascimento = FocusNode();
   final _focoCelular = FocusNode();
   final _focoEmail = FocusNode();
   final _focoSenha = FocusNode();
@@ -53,15 +56,19 @@ class _CriarContaTelaState extends State<CriarContaTela> {
   var _carregando = false;
   String? _erroServico;
 
+  /// A conta foi criada, mas os dados não foram salvos: o botão vira "Tentar de novo".
+  var _repetirVinculo = false;
+
   ServicoAuth get _servico => widget.servico ?? ServicoAuthPadrao.atual;
 
   @override
   void dispose() {
-    for (final c in [_nome, _celular, _email, _senha]) {
+    for (final c in [_nome, _nascimento, _celular, _email, _senha]) {
       c.dispose();
     }
     for (final f in [
       _focoNome,
+      _focoNascimento,
       _focoCelular,
       _focoEmail,
       _focoSenha,
@@ -82,6 +89,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
 
   bool get _valido =>
       ValidacaoAuth.nome(_nome.text) == null &&
+      ValidacaoAuth.nascimento(_nascimento.text) == null &&
       ValidacaoAuth.celular(_celular.text) == null &&
       ValidacaoAuth.email(_email.text) == null &&
       ValidacaoAuth.senhaNova(_senha.text) == null &&
@@ -96,6 +104,11 @@ class _CriarContaTelaState extends State<CriarContaTela> {
           key: _keyNome,
           focusNode: _focoNome,
           temErro: () => ValidacaoAuth.nome(_nome.text) != null,
+        ),
+        EntradaCampoErro(
+          key: _keyNascimento,
+          focusNode: _focoNascimento,
+          temErro: () => ValidacaoAuth.nascimento(_nascimento.text) != null,
         ),
         EntradaCampoErro(
           key: _keyCelular,
@@ -124,6 +137,7 @@ class _CriarContaTelaState extends State<CriarContaTela> {
       _erroServico = null;
     });
     String? erro;
+    var repetir = false;
     ResultadoCadastro? resultado;
     try {
       resultado = await _servico.criarConta(DadosCadastro(
@@ -131,16 +145,19 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         email: _email.text.trim(),
         senha: _senha.text,
         celular: _celular.text,
+        nascimento: _nascimento.text,
         perfil: widget.perfil.name,
         termosAceitos: _aceitouTermos,
       ));
     } on ErroAuth catch (e) {
       erro = e.mensagem;
+      repetir = e.tipo == TipoErroAuth.cadastroNaoVinculado;
     }
     if (!mounted) return;
     setState(() {
       _carregando = false;
       _erroServico = erro;
+      _repetirVinculo = repetir;
     });
     if (erro != null) {
       if (_scrollController.hasClients) {
@@ -199,7 +216,11 @@ class _CriarContaTelaState extends State<CriarContaTela> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           MensagemErroAuth(_erroServico),
-          BotaoPrimario(texto: 'Criar conta', aoTocar: _criar, carregando: _carregando),
+          BotaoPrimario(
+            texto: _repetirVinculo ? 'Tentar de novo' : 'Criar conta',
+            aoTocar: _criar,
+            carregando: _carregando,
+          ),
           const SizedBox(height: EspacosTrato.x2),
           Center(
             child: Wrap(
@@ -235,6 +256,21 @@ class _CriarContaTelaState extends State<CriarContaTela> {
             controlador: _nome,
             foco: _focoNome,
             erro: _erro(() => ValidacaoAuth.nome(_nome.text)),
+            aoMudar: atualizar,
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x4),
+        KeyedSubtree(
+          key: _keyNascimento,
+          child: CampoTrato(
+            rotulo: 'Data de nascimento',
+            controlador: _nascimento,
+            foco: _focoNascimento,
+            dica: 'dd/mm/aaaa',
+            teclado: TextInputType.number,
+            formatadores: const [MascaraNumerica.data],
+            ajuda: 'O Trato é para maiores de 18 anos.',
+            erro: _erro(() => ValidacaoAuth.nascimento(_nascimento.text)),
             aoMudar: atualizar,
           ),
         ),

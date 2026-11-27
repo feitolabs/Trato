@@ -1,3 +1,7 @@
+import '../telas/exclusividade_cliente/modelos.dart';
+import '../telas/ausencia/modelos.dart';
+import '../telas/desistencia/modelos.dart';
+import '../telas/comuns/prazo_avaliacao.dart';
 import '../telas/carteira/modelos.dart';
 import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
@@ -162,6 +166,34 @@ abstract interface class RepositorioPedidos {
   /// devolve o dinheiro quando já houve pagamento.
   Future<void> cancelar(String pedidoId, String motivo);
 
+  /// Termos 7.2: posso desistir e o que acontece? Nulo: o servidor não tem a desistência (404).
+  Future<SituacaoDesistencia?> situacaoDesistencia(String pedidoId);
+
+  /// Termos 13.6. Nulo: o servidor não tem a função (404/503).
+  Future<SituacaoExclusividadeCliente?> situacaoExclusividadeCliente(String pedidoId);
+
+  /// Usa Tratinhos pela exclusividade de um orçamento ou profissional.
+  Future<void> pedirExclusividadeCliente(
+    String pedidoId,
+    EscolhaExclusividade escolha,
+    String chaveIdempotencia,
+  );
+
+  /// Termos 7.6: o registro de chegada/ausência. Nulo: não há (ou o servidor não tem a função).
+  Future<CasoAusencia?> casoDeAusencia(String pedidoId);
+
+  /// Justificativa do cliente (texto e até 10 fotos).
+  Future<CasoAusencia> justificarAusencia(String pedidoId, String texto, List<String> fotos);
+
+  /// Provas do caso com link curto. Nulo: o servidor não tem a função (404/503).
+  Future<List<AnexoAusencia>?> anexosDaAusencia(String pedidoId);
+
+  /// Termos 8.7: contestação da retenção.
+  Future<CasoAusencia> contestarAusencia(String pedidoId, String texto, List<String> fotos);
+
+  /// "Desistir do pedido" (motivo opcional). Devolve o comprovante.
+  Future<RegistroDesistencia> desistir(String pedidoId, String motivo);
+
   /// Propostas de nova data do pedido, da mais recente para a mais antiga
   /// (`GET /v1/pedidos/{id}/reagendamentos`).
   Future<List<Reagendamento>> reagendamentos(String pedidoId);
@@ -239,7 +271,7 @@ abstract interface class RepositorioOrcamentos {
       throw UnimplementedError();
 }
 
-enum StatusPagamento { aguardando, pago, falhou }
+enum StatusPagamento { aguardando, pago, falhou, devolvido, semContrato }
 
 class Cobranca {
   const Cobranca({
@@ -290,6 +322,7 @@ abstract interface class RepositorioPagamento {
     int parcelas = 1,
     String? cupom,
     bool usarMoedas = false,
+    bool execucaoImediata = false,
   });
 
   Future<StatusPagamento> status(String pedidoId);
@@ -355,6 +388,8 @@ class Notificacao {
     this.tela,
     this.papel,
     this.recorrenciaId,
+    this.chamadoId,
+    this.compensacaoId,
   });
 
   final String id;
@@ -367,6 +402,12 @@ class Notificacao {
   /// `profissional` ou `cliente`: em que modo a tela abre. Ausente = o modo atual.
   final String? papel;
   final String? recorrenciaId;
+
+  /// Chamado do atendimento (`dados.chamado_id`), nos avisos `suporte.*`.
+  final String? chamadoId;
+
+  /// Compensação (`dados.compensacao_id`), nos avisos `pagamento.compensacao_*`.
+  final String? compensacaoId;
 
   /// Quando o backend informa: `disputa` ou `retrabalho` (abrem a tela do profissional).
   final String? tipo;
@@ -385,7 +426,11 @@ class PreferenciaNotificacao {
     this.app = true,
     this.push = true,
     this.email = true,
+    this.obrigatoria,
   });
+
+  /// O servidor diz se a categoria não pode ser desligada. Nulo: servidor sem esse campo.
+  final bool? obrigatoria;
 
   final String categoria;
   final bool app;
@@ -397,6 +442,7 @@ class PreferenciaNotificacao {
         app: app ?? this.app,
         push: push ?? this.push,
         email: email ?? this.email,
+        obrigatoria: obrigatoria,
       );
 }
 
@@ -468,6 +514,9 @@ abstract interface class RepositorioProfissional {
   /// Estado (`concluido`, `cancelado`...) de cada pedido do profissional, por id. Servidor ou
   /// demonstração sem isso = vazio.
   Future<Map<String, String>> estadosDosPedidos() async => const {};
+
+  /// Termos 12.1: até quando dá para avaliar o cliente deste pedido.
+  Future<PrazoAvaliacao> prazoDaAvaliacao(String pedidoId) async => PrazoAvaliacao.desconhecido;
   Future<DetalhePedido> detalhe(String pedidoId);
   Future<void> recusar(String pedidoId, MotivoRecusa motivo);
 
@@ -525,6 +574,10 @@ abstract interface class RepositorioProfissional {
 
   /// Exclusividades de 48h e saldo de Tratinhos do profissional (`GET /v1/profissional/exclusividades`).
   Future<ResumoExclusividades> minhasExclusividades() async => const ResumoExclusividades();
+
+  /// Profissional desiste da exclusividade que o cliente pediu (os Tratinhos voltam a ele).
+  Future<void> desistirDaExclusividade(String exclusividadeId) async =>
+      throw UnimplementedError();
 
   /// Pede exclusividade de 48h num pedido aberto (`POST /v1/profissional/exclusividades`).
   Future<ExclusividadeProfissional> solicitarExclusividade(

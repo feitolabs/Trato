@@ -131,7 +131,25 @@ enum DecisaoDisputa {
   final String rotulo;
 }
 
-enum StatusDisputa { aberta, aguardandoProfissional, emAnalise, aguardandoSegundaPessoa, decidida }
+enum StatusDisputa {
+  aberta,
+  aguardandoProfissional,
+  emAnalise,
+  aguardandoSegundaPessoa,
+  decidida,
+
+  /// Final: as partes se acertaram (Termos 8.2). Não há o que decidir.
+  acordo,
+
+  /// Estado que este painel ainda não conhece: só mostra, sem nenhuma ação.
+  desconhecida;
+
+  /// Nada mais a decidir.
+  bool get encerrada => this == decidida || this == acordo;
+
+  /// Só estes estados aceitam assumir e decidir (o backend confere de novo).
+  bool get aceitaDecisao => this == aberta || this == aguardandoProfissional || this == emAnalise;
+}
 
 class EventoDisputa {
   const EventoDisputa(this.quando, this.autor, this.texto);
@@ -157,6 +175,19 @@ class EvidenciaDisputa {
   final bool nota;
 }
 
+/// Divisão do dinheiro na disputa (decisão da equipe ou acordo entre as partes).
+class DivisaoDisputa {
+  const DivisaoDisputa({
+    required this.paraClienteCentavos,
+    required this.paraProfissionalCentavos,
+    required this.retidoCentavos,
+  });
+
+  final int paraClienteCentavos;
+  final int paraProfissionalCentavos;
+  final int retidoCentavos;
+}
+
 class Disputa {
   const Disputa({
     required this.id,
@@ -172,6 +203,7 @@ class Disputa {
     this.status = StatusDisputa.emAnalise,
     this.decisao,
     this.valorReembolsoCentavos,
+    this.divisao,
     this.decididoPor,
     this.titulo = '',
     this.respostaAte,
@@ -179,9 +211,13 @@ class Disputa {
     this.semResposta = false,
     this.responsavelId,
     this.responsavelNome,
+    this.desistencia = false,
   });
 
   final String id;
+
+  /// Caso aberto por desistência com o serviço iniciado (Termos 7.3). Só vem no detalhe.
+  final bool desistencia;
 
   /// Quem assumiu a análise. Só essa pessoa decide (o backend confere).
   final String? responsavelId;
@@ -208,11 +244,20 @@ class Disputa {
   final StatusDisputa status;
   final DecisaoDisputa? decisao;
   final int? valorReembolsoCentavos;
+  final DivisaoDisputa? divisao;
 
   /// Id de quem decidiu (a segunda pessoa precisa ser outra).
   final String? decididoPor;
 
-  Disputa comDecisao(StatusDisputa novo, DecisaoDisputa d, int? reembolso, {String? por}) => Disputa(
+  Disputa comDecisao(
+    StatusDisputa novo,
+    DecisaoDisputa? d,
+    int? reembolso, {
+    String? por,
+    DivisaoDisputa? divisao,
+    bool manterDecididoPor = true,
+  }) =>
+      Disputa(
         id: id,
         pedido: pedido,
         cliente: cliente,
@@ -226,13 +271,15 @@ class Disputa {
         status: novo,
         decisao: d,
         valorReembolsoCentavos: reembolso,
-        decididoPor: por ?? decididoPor,
+        divisao: divisao ?? this.divisao,
+        decididoPor: manterDecididoPor ? (por ?? decididoPor) : por,
         titulo: titulo,
         respostaAte: respostaAte,
         atrasada: atrasada,
         semResposta: semResposta,
-        responsavelId: novo == StatusDisputa.decidida ? null : responsavelId,
-        responsavelNome: novo == StatusDisputa.decidida ? null : responsavelNome,
+        responsavelId: novo.encerrada ? null : responsavelId,
+        responsavelNome: novo.encerrada ? null : responsavelNome,
+        desistencia: desistencia,
       );
 
   Disputa assumidaPor(String id, String nome) => Disputa(
@@ -249,6 +296,7 @@ class Disputa {
         status: status,
         decisao: decisao,
         valorReembolsoCentavos: valorReembolsoCentavos,
+        divisao: divisao,
         decididoPor: decididoPor,
         titulo: titulo,
         respostaAte: respostaAte,
@@ -256,7 +304,792 @@ class Disputa {
         semResposta: semResposta,
         responsavelId: id,
         responsavelNome: nome,
+        desistencia: desistencia,
       );
+}
+
+/// Caso de "Cliente ausente" (Termos 7.6), como o backend manda. Os valores já vêm calculados.
+class CasoAusencia {
+  const CasoAusencia({
+    required this.pedidoId,
+    required this.status,
+    required this.chegadaEm,
+    this.registradaEm,
+    this.justificativaAte,
+    this.justificativaTexto,
+    this.anexos = const [],
+    this.justificativaEnviadaEm,
+    this.decisao,
+    this.retencaoCentavos,
+    this.retencaoJustificativa,
+    this.retencaoComprovantes = const [],
+    this.cancelamentoStatus,
+    this.reembolsoCentavos,
+    this.contestarAte,
+    this.contestacao,
+    this.valorServicoCentavos,
+    this.pedidoNumero,
+    this.clienteNome,
+    this.profissionalNome,
+  });
+
+  /// Até quando o cliente contesta a retenção. Calculado pelo backend.
+  final DateTime? contestarAte;
+  final ContestacaoAusencia? contestacao;
+  final int? valorServicoCentavos;
+  final int? pedidoNumero;
+  final String? clienteNome;
+  final String? profissionalNome;
+
+  bool get contestacaoAberta => contestacao?.status == ContestacaoAusencia.aberta;
+
+  static const aguardandoEspera = 'aguardando_espera';
+  static const aguardandoJustificativa = 'aguardando_justificativa';
+  static const emAnalise = 'em_analise';
+  static const aceita = 'justificativa_aceita';
+  static const recusada = 'justificativa_recusada';
+  static const expirada = 'expirada_sem_justificativa';
+  static const propostaRetencao = 'proposta_retencao_enviada';
+
+  final String pedidoId;
+  final String status;
+  final DateTime chegadaEm;
+  final DateTime? registradaEm;
+  final DateTime? justificativaAte;
+  final String? justificativaTexto;
+  final List<String> anexos;
+  final DateTime? justificativaEnviadaEm;
+
+  /// Motivo escrito pelo analista.
+  final String? decisao;
+  final int? retencaoCentavos;
+  final String? retencaoJustificativa;
+  final List<String> retencaoComprovantes;
+  final String? cancelamentoStatus;
+  final int? reembolsoCentavos;
+
+  String get pedido {
+    if (pedidoNumero != null) return 'PED-$pedidoNumero';
+    final limpo = pedidoId.replaceAll('-', '').toUpperCase();
+    return 'PED-${limpo.length > 8 ? limpo.substring(0, 8) : limpo}';
+  }
+
+  bool get esperaConfirmacao =>
+      cancelamentoStatus == propostaRetencao && (status == recusada || status == expirada);
+
+  /// O prazo do cliente passou sem justificativa. Só orienta a tela: o backend confere.
+  bool semResposta(DateTime agora) =>
+      status == aguardandoJustificativa && justificativaAte != null && agora.isAfter(justificativaAte!);
+}
+
+/// Contestação da retenção (Termos 8.7).
+class ContestacaoAusencia {
+  const ContestacaoAusencia({
+    required this.status,
+    required this.texto,
+    required this.abertaEm,
+    required this.responderAte,
+    this.protocolo,
+    this.resposta,
+    this.decididaEm,
+  });
+
+  static const aberta = 'aberta';
+
+  /// `aberta`, `mantida`, `alterada` ou `revertida`.
+  final String status;
+  final String texto;
+  final DateTime abertaEm;
+  final DateTime responderAte;
+  final String? protocolo;
+  final String? resposta;
+  final DateTime? decididaEm;
+}
+
+/// Prova de um caso, com link assinado curto. `url` nula = arquivo que o servidor não liberou.
+class AnexoCaso {
+  const AnexoCaso(
+      {required this.tipo, required this.arquivoId, this.enviadoPor, this.url, this.expiraEmSegundos, this.tipoConteudo});
+
+  /// `content_type` do arquivo (ex.: image/jpeg), quando o servidor informa.
+  final String? tipoConteudo;
+  final String tipo;
+  final String arquivoId;
+  final String? enviadoPor;
+  final String? url;
+  final int? expiraEmSegundos;
+}
+
+class MensagemLida {
+  const MensagemLida({
+    required this.autorId,
+    required this.texto,
+    required this.textoExibido,
+    required this.mascarada,
+    required this.enviadaEm,
+  });
+  final String autorId;
+
+  /// Original, como foi escrito.
+  final String texto;
+
+  /// O que a outra parte viu no app.
+  final String textoExibido;
+  final bool mascarada;
+  final DateTime enviadaEm;
+}
+
+class ConversaLida {
+  const ConversaLida({required this.id, required this.profissionalId, required this.mensagens});
+  final String id;
+  final String profissionalId;
+  final List<MensagemLida> mensagens;
+}
+
+/// Medida de conta (Termos 20), como o backend manda.
+class Medida {
+  const Medida({
+    this.semFalta,
+    this.motivoFraude = false,
+    this.limiteRetencaoCentavos,
+    required this.id,
+    required this.usuarioId,
+    required this.tipo,
+    required this.motivoAoUsuario,
+    required this.motivoCompleto,
+    required this.clausulas,
+    required this.inicioEm,
+    required this.efeito,
+    required this.comoContestar,
+    required this.vigente,
+    this.protocolo,
+    this.usuarioNome,
+    this.fimEm,
+    this.detalheAdiado = false,
+    this.revertidaEm,
+    this.contestavelAte,
+    this.contestacao,
+    this.origem = 'analista',
+    this.aplicadaPor,
+    this.notaInterna,
+    this.justificativaAdiamento,
+    this.aplicadaPorNome,
+    this.contestacaoAnalistaNome,
+    this.infracaoGrave = false,
+    this.impedirNovaConta = false,
+  });
+
+  final String? aplicadaPorNome;
+  final String? contestacaoAnalistaNome;
+
+  /// Encerramento sem falta do usuário (Termos 13.10). Null = não informado.
+  final bool? semFalta;
+
+  /// Trava de saques por fraude (Termos 20.6) e o limite que o backend registrou.
+  final bool motivoFraude;
+  final int? limiteRetencaoCentavos;
+  final bool infracaoGrave;
+  final bool impedirNovaConta;
+  final String id;
+  final String? protocolo;
+  final String usuarioId;
+  final String? usuarioNome;
+  final String tipo;
+
+  /// O texto que o usuário lê (genérico quando o detalhe foi adiado).
+  final String motivoAoUsuario;
+
+  /// O motivo escrito pelo analista.
+  final String motivoCompleto;
+  final List<String> clausulas;
+  final DateTime inicioEm;
+  final DateTime? fimEm;
+  final String efeito;
+  final String comoContestar;
+  final bool detalheAdiado;
+  final bool vigente;
+  final DateTime? revertidaEm;
+  final DateTime? contestavelAte;
+  final ContestacaoMedida? contestacao;
+  final String origem;
+  final String? aplicadaPor;
+  final String? notaInterna;
+  final String? justificativaAdiamento;
+
+  bool get contestacaoAberta => contestacao?.status == 'aberta' || contestacao?.status == 'em_analise';
+}
+
+class ContestacaoMedida {
+  const ContestacaoMedida({
+    required this.status,
+    required this.versao,
+    required this.canal,
+    required this.abertaEm,
+    required this.responderAte,
+    this.protocolo,
+    this.resposta,
+    this.decididaEm,
+    this.anexos = const [],
+  });
+  final List<AnexoContestacao> anexos;
+  final String status;
+  final String versao;
+  final String canal;
+  final DateTime abertaEm;
+  final DateTime responderAte;
+  final String? protocolo;
+  final String? resposta;
+  final DateTime? decididaEm;
+}
+
+class FiltroMedidas {
+  const FiltroMedidas({this.usuarioId, this.tipo, this.vigentes = false, this.contestacaoAberta = false});
+  final String? usuarioId;
+  final String? tipo;
+  final bool vigentes;
+  final bool contestacaoAberta;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FiltroMedidas &&
+      other.usuarioId == usuarioId &&
+      other.tipo == tipo &&
+      other.vigentes == vigentes &&
+      other.contestacaoAberta == contestacaoAberta;
+
+  @override
+  int get hashCode => Object.hash(usuarioId, tipo, vigentes, contestacaoAberta);
+}
+
+/// Pedido de nova medida. Textos opcionais nulos usam o padrão do servidor.
+class NovaMedida {
+  const NovaMedida({
+    this.semFalta,
+    this.motivoFraude = false,
+    this.limiteRetencaoCentavos,
+    required this.usuarioId,
+    required this.tipo,
+    required this.motivo,
+    required this.clausulas,
+    this.dias,
+    this.efeito,
+    this.comoContestar,
+    this.detalheAdiado = false,
+    this.justificativaAdiamento,
+    this.notaInterna,
+    this.infracaoGrave = false,
+    this.impedirNovaConta = false,
+  });
+  final String usuarioId;
+  final String tipo;
+  final String motivo;
+  final List<String> clausulas;
+  final int? dias;
+  final String? efeito;
+  final String? comoContestar;
+  final bool detalheAdiado;
+  final String? justificativaAdiamento;
+  final String? notaInterna;
+  final bool infracaoGrave;
+  final bool impedirNovaConta;
+  final bool motivoFraude;
+  final int? limiteRetencaoCentavos;
+
+  /// Só em encerramento; a tela obriga a escolher.
+  final bool? semFalta;
+}
+
+/// Exclusividade paga pelo cliente (Termos 13.6).
+class ExclusividadeCliente {
+  const ExclusividadeCliente({
+    required this.id,
+    required this.pedidoId,
+    required this.clienteId,
+    required this.profissionalId,
+    required this.status,
+    required this.moedas,
+    required this.estornada,
+    required this.criadaEm,
+    this.clienteNome,
+    this.profissionalNome,
+    this.encerradaEm,
+    this.motivoEncerramento,
+  });
+  final String id;
+  final String pedidoId;
+  final String clienteId;
+  final String profissionalId;
+  final String? clienteNome;
+  final String? profissionalNome;
+  final String status;
+  final int moedas;
+  final bool estornada;
+  final DateTime criadaEm;
+  final DateTime? encerradaEm;
+  final String? motivoEncerramento;
+}
+
+/// Arquivo do pedido que serve de comprovante da retenção. [url] vale pouco tempo.
+class ArquivoComprovante {
+  const ArquivoComprovante({
+    required this.arquivoId,
+    required this.finalidade,
+    required this.enviadoPor,
+    required this.tamanhoBytes,
+    required this.enviadoEm,
+    required this.url,
+    required this.expiraEmSegundos,
+    this.tipoConteudo,
+  });
+  final String arquivoId;
+  final String finalidade;
+
+  /// `profissional` ou `equipe`.
+  final String enviadoPor;
+  final String? tipoConteudo;
+  final int tamanhoBytes;
+  final DateTime enviadoEm;
+  final String url;
+  final int expiraEmSegundos;
+}
+
+/// Link curto para enviar um arquivo (PUT). [id] é o `envio_id` ou o `anexo_id`.
+class EnvioAssinado {
+  const EnvioAssinado({required this.id, required this.url, required this.expiraEmSegundos});
+  final String id;
+  final String url;
+  final int expiraEmSegundos;
+}
+
+/// Prova de contestação de medida. [url] só vem quando a pessoa abre, com motivo.
+class AnexoContestacao {
+  const AnexoContestacao(
+      {required this.anexoId, required this.tipoConteudo, required this.tamanhoBytes, this.url, this.expiraEmSegundos});
+  final String anexoId;
+  final String tipoConteudo;
+  final int tamanhoBytes;
+  final String? url;
+  final int? expiraEmSegundos;
+}
+
+/// Compensação: reembolso descontado de repasses futuros (Termos 8.6). Todos os valores, em
+/// centavos, vêm calculados do backend.
+class Compensacao {
+  const Compensacao({
+    required this.id,
+    required this.pedidoId,
+    required this.origem,
+    required this.valorCentavos,
+    required this.compensadoCentavos,
+    required this.restanteCentavos,
+    required this.motivo,
+    required this.status,
+    required this.criadaEm,
+    this.avisadoEm,
+    this.canceladaEm,
+    this.motivoCancelamento,
+  });
+  final String id;
+  final String pedidoId;
+
+  /// `disputa`, `disputa_contestacao` ou `regresso`.
+  final String origem;
+  final int valorCentavos;
+  final int compensadoCentavos;
+  final int restanteCentavos;
+
+  /// O profissional lê.
+  final String motivo;
+
+  /// `aberta`, `quitada` ou `cancelada`.
+  final String status;
+  final DateTime criadaEm;
+
+  /// Sem aviso registrado, nada é descontado.
+  final DateTime? avisadoEm;
+  final DateTime? canceladaEm;
+  final String? motivoCancelamento;
+}
+
+/// Decisão de disputa em um momento: resultado e quanto volta ao cliente, vindos do backend.
+class DecisaoResumida {
+  const DecisaoResumida(this.resultado, this.reembolsoCentavos);
+  final String resultado;
+  final int reembolsoCentavos;
+}
+
+/// Contestação da decisão de uma disputa (Termos 8.7).
+class ContestacaoDisputa {
+  const ContestacaoDisputa({
+    required this.id,
+    required this.protocolo,
+    required this.pedidoId,
+    required this.disputaId,
+    required this.contestanteId,
+    required this.oQueFaltou,
+    required this.canal,
+    required this.status,
+    required this.abertaEm,
+    required this.contestarAte,
+    required this.responderAte,
+    required this.efeitoFinanceiro,
+    this.contestantePapel,
+    this.anexos = const [],
+    this.atrasada = false,
+    this.analistaId,
+    this.resposta,
+    this.novaDecisao,
+    this.novoValorReembolsoCentavos,
+    this.aprovadaPor,
+    this.decididaEm,
+    this.valorCongeladoCentavos,
+    this.decisaoOriginal,
+    this.decisaoVigente,
+    this.decididaPor,
+    this.disputaAprovadaPor,
+  });
+
+  static const aguardandoAprovacao = 'aguardando_aprovacao';
+  static const pendenteFinanceiro = 'pendente_financeiro';
+
+  final String id;
+  final String protocolo;
+  final String pedidoId;
+  final String disputaId;
+  final String contestanteId;
+
+  /// `cliente` ou `profissional`.
+  final String? contestantePapel;
+  final String oQueFaltou;
+  final List<String> anexos;
+  final String canal;
+
+  /// `aberta`, `em_analise`, `aguardando_aprovacao`, `mantida`, `alterada` ou `revertida`.
+  final String status;
+  final DateTime abertaEm;
+  final DateTime contestarAte;
+  final DateTime responderAte;
+  final bool atrasada;
+  final String? analistaId;
+  final String? resposta;
+  final String? novaDecisao;
+  final int? novoValorReembolsoCentavos;
+  final String? aprovadaPor;
+  final DateTime? decididaEm;
+
+  /// `nenhum`, `pendente_financeiro` ou `executado`.
+  final String efeitoFinanceiro;
+
+  // Só no detalhe.
+  final int? valorCongeladoCentavos;
+  final DecisaoResumida? decisaoOriginal;
+  final DecisaoResumida? decisaoVigente;
+  final String? decididaPor;
+  final String? disputaAprovadaPor;
+
+  bool get paraDecidir => status == 'aberta' || status == 'em_analise';
+}
+
+class FiltroContestacoes {
+  const FiltroContestacoes({this.status, this.efeito, this.pedidoId, this.atrasadas = false});
+  final String? status;
+  final String? efeito;
+  final String? pedidoId;
+  final bool atrasadas;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FiltroContestacoes &&
+      other.status == status &&
+      other.efeito == efeito &&
+      other.pedidoId == pedidoId &&
+      other.atrasadas == atrasadas;
+
+  @override
+  int get hashCode => Object.hash(status, efeito, pedidoId, atrasadas);
+}
+
+/// Pedido de volta ao profissional (regresso, Termos 17.4): um propõe, outra pessoa decide.
+class Regresso {
+  const Regresso({
+    required this.id,
+    required this.pedidoId,
+    required this.profissionalId,
+    required this.referencia,
+    required this.valorCentavos,
+    required this.motivo,
+    required this.status,
+    required this.propostaPor,
+    required this.propostaEm,
+    this.decididaEm,
+    this.motivoDecisao,
+    this.compensacaoId,
+  });
+  final String id;
+  final String pedidoId;
+  final String profissionalId;
+  final String referencia;
+  final int valorCentavos;
+
+  /// O profissional lê.
+  final String motivo;
+
+  /// `proposta`, `aprovada` ou `recusada`.
+  final String status;
+  final String propostaPor;
+  final DateTime propostaEm;
+  final DateTime? decididaEm;
+  final String? motivoDecisao;
+  final String? compensacaoId;
+}
+
+/// Incidente de segurança (Termos 9.3 a 9.6), como o backend manda.
+class Incidente {
+  const Incidente({
+    required this.id,
+    required this.protocolo,
+    required this.canal,
+    required this.tipo,
+    required this.descricao,
+    required this.status,
+    required this.abertoEm,
+    required this.cautelaAte,
+    this.contato,
+    this.pedidoId,
+    this.cautelaAdotadaEm,
+    this.responsavelId,
+    this.desfecho,
+    this.encerradoEm,
+    this.medidas = const [],
+    this.cautelaAtrasada = false,
+  });
+
+  /// O backend diz que passou o prazo sem cautela adotada. Ausente = falso: nada a mostrar.
+  final bool cautelaAtrasada;
+  final String id;
+  final String protocolo;
+  final String canal;
+  final String tipo;
+  final String descricao;
+  final String? contato;
+  final String? pedidoId;
+
+  /// `aberto`, `cautela_adotada`, `em_apuracao` ou `encerrado`.
+  final String status;
+  final DateTime abertoEm;
+
+  /// Prazo das 24 h para a cautela (calculado pelo backend).
+  final DateTime cautelaAte;
+  final DateTime? cautelaAdotadaEm;
+  final String? responsavelId;
+  final String? desfecho;
+  final DateTime? encerradoEm;
+  final List<MedidaIncidente> medidas;
+
+  bool get encerrado => status == 'encerrado';
+}
+
+class MedidaIncidente {
+  const MedidaIncidente(
+      {required this.id, required this.tipo, required this.descricao, required this.origem, required this.aplicadaEm});
+  final String id;
+  final String tipo;
+  final String descricao;
+
+  /// `analista` ou `automatica`.
+  final String origem;
+  final DateTime aplicadaEm;
+}
+
+/// Ocultação de avaliação aplicada ou revertida (Termos 12.6).
+class OcultacaoAvaliacao {
+  const OcultacaoAvaliacao({
+    required this.id,
+    required this.avaliacaoId,
+    required this.motivo,
+    required this.explicacao,
+    required this.analistaId,
+    required this.ocultadaEm,
+    required this.statusAnterior,
+    this.autorAvisadoEm,
+    this.revertidaEm,
+    this.revertidaPor,
+  });
+
+  final String id;
+  final String avaliacaoId;
+  final String motivo;
+  final String explicacao;
+  final String analistaId;
+  final DateTime ocultadaEm;
+  final String statusAnterior;
+  final DateTime? autorAvisadoEm;
+  final DateTime? revertidaEm;
+  final String? revertidaPor;
+}
+
+/// Pedido de revisão ou contestação de ocultação de avaliação (Termos 12.6, 12.7 e 20.5).
+class RevisaoAvaliacao {
+  const RevisaoAvaliacao({
+    required this.id,
+    required this.protocolo,
+    required this.avaliacaoId,
+    required this.tipo,
+    required this.solicitanteId,
+    required this.justificativa,
+    required this.canal,
+    required this.abertaEm,
+    required this.responderAte,
+    required this.status,
+    this.ocultacaoId,
+    this.anexos = const [],
+    this.analistaId,
+    this.resposta,
+    this.mesmoAnalistaJustificativa,
+    this.decididaEm,
+    this.ocultacaoAplicadaId,
+  });
+
+  final String id;
+  final String protocolo;
+  final String avaliacaoId;
+
+  /// `revisao` ou `contestacao_ocultacao`.
+  final String tipo;
+  final String? ocultacaoId;
+  final String solicitanteId;
+  final String justificativa;
+  final List<String> anexos;
+  final String canal;
+  final DateTime abertaEm;
+  final DateTime responderAte;
+
+  /// `aberta`, `em_analise`, `aceita` ou `recusada`.
+  final String status;
+  final String? analistaId;
+  final String? resposta;
+  final String? mesmoAnalistaJustificativa;
+  final DateTime? decididaEm;
+  final String? ocultacaoAplicadaId;
+
+  bool get decidida => status == 'aceita' || status == 'recusada';
+  bool atrasada(DateTime agora) => !decidida && agora.isAfter(responderAte);
+}
+
+/// Pedido de titular LGPD ou revisão de decisão automatizada (Termos 14.9 e 14.10).
+class PedidoTitularLgpd {
+  const PedidoTitularLgpd({
+    required this.id,
+    required this.protocolo,
+    required this.tipo,
+    required this.descricao,
+    required this.canal,
+    required this.abertoEm,
+    required this.responderAte,
+    required this.status,
+    this.usuarioId,
+    this.contato,
+    this.decisaoAutomatizada,
+    this.referenciaTipo,
+    this.referenciaId,
+    this.exclusaoId,
+    this.analistaId,
+    this.resposta,
+    this.motivoNaoAtendido,
+    this.criteriosInformados,
+    this.respondidoEm,
+  });
+
+  final String id;
+  final String protocolo;
+  final String? usuarioId;
+  final String? contato;
+  final String tipo;
+  final String? decisaoAutomatizada;
+  final String? referenciaTipo;
+  final String? referenciaId;
+  final String descricao;
+  final String canal;
+  final String? exclusaoId;
+  final DateTime abertoEm;
+  final DateTime responderAte;
+
+  /// `aberto`, `em_analise`, `aguardando_titular`, `atendido`, `atendido_parcial` ou `negado`.
+  final String status;
+  final String? analistaId;
+  final String? resposta;
+  final String? motivoNaoAtendido;
+  final String? criteriosInformados;
+  final DateTime? respondidoEm;
+
+  bool get respondido => status == 'atendido' || status == 'atendido_parcial' || status == 'negado';
+
+  /// Prazo legal vencido. O relógio local serve apenas para destacar na tela.
+  bool atrasado(DateTime agora) => !respondido && agora.isAfter(responderAte);
+}
+
+/// Impedimento de novo cadastro por infração grave (Termos 20.9).
+class ImpedimentoCadastro {
+  const ImpedimentoCadastro({
+    required this.id,
+    required this.medidaId,
+    required this.tipoIdentificador,
+    required this.criadoPor,
+    required this.criadoEm,
+    this.revogadoEm,
+    this.revogadoPor,
+    this.motivoRevogacao,
+  });
+
+  final String id;
+  final String medidaId;
+  final String tipoIdentificador;
+  final String criadoPor;
+  final DateTime criadoEm;
+  final DateTime? revogadoEm;
+  final String? revogadoPor;
+  final String? motivoRevogacao;
+
+  bool get ativo => revogadoEm == null;
+}
+
+/// Pedido de retorno de conta após encerramento (Termos 20.9).
+class PedidoRetornoConta {
+  const PedidoRetornoConta({
+    required this.id,
+    required this.protocolo,
+    required this.usuarioId,
+    required this.medidaId,
+    required this.justificativaUsuario,
+    required this.canal,
+    required this.status,
+    required this.solicitadoEm,
+    required this.prazoDiasAplicado,
+    required this.elegivelAPartirDe,
+    this.analistaId,
+    this.decisaoMotivo,
+    this.riscoIdentificado = false,
+    this.decididoEm,
+  });
+
+  final String id;
+  final String protocolo;
+  final String usuarioId;
+  final String medidaId;
+  final String justificativaUsuario;
+  final String canal;
+
+  /// `aberto`, `em_analise`, `aprovado` ou `recusado`.
+  final String status;
+  final DateTime solicitadoEm;
+  final int prazoDiasAplicado;
+  final DateTime elegivelAPartirDe;
+  final String? analistaId;
+  final String? decisaoMotivo;
+  final bool riscoIdentificado;
+  final DateTime? decididoEm;
+
+  bool get decidido => status == 'aprovado' || status == 'recusado';
 }
 
 /// Resposta de `decidirDisputa`: o backend diz se ficou decidida ou esperando a segunda pessoa.
@@ -336,6 +1169,7 @@ class EventoUsuario {
 
 class UsuarioBusca {
   const UsuarioBusca({
+    this.travaFraudeVigente,
     required this.id,
     required this.nome,
     required this.tipo,
@@ -359,6 +1193,9 @@ class UsuarioBusca {
   /// "PRO-2281": o identificador curto que a equipe fala em voz alta.
   final String idPublico;
   final String? cidade;
+
+  /// Trava de saques por fraude em vigor. Null = não informado (nunca "sem trava").
+  final bool? travaFraudeVigente;
 
   /// Só para profissional: as categorias cadastradas no perfil (RF-BUS-03).
   final List<CategoriaProfissional> categorias;
@@ -421,25 +1258,126 @@ class PedidoBusca {
   final int valorCentavos;
 }
 
+/// Filtros da fila do atendimento (todos opcionais).
+class FiltroChamados {
+  const FiltroChamados({this.status, this.categoria, this.prioridade, this.responsavelId, this.protocolo, this.atrasados = false});
+  final String? status;
+  final String? categoria;
+  final String? prioridade;
+  final String? responsavelId;
+  final String? protocolo;
+  final bool atrasados;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FiltroChamados &&
+      other.status == status &&
+      other.categoria == categoria &&
+      other.prioridade == prioridade &&
+      other.responsavelId == responsavelId &&
+      other.protocolo == protocolo &&
+      other.atrasados == atrasados;
+
+  @override
+  int get hashCode => Object.hash(status, categoria, prioridade, responsavelId, protocolo, atrasados);
+}
+
+/// Contato recebido fora do app, registrado pela equipe.
+class NovoContato {
+  const NovoContato({
+    required this.canal,
+    required this.categoria,
+    required this.assunto,
+    required this.texto,
+    this.nomeContato,
+    this.contato,
+    this.usuarioId,
+    this.pedidoId,
+    this.prioridade = 'normal',
+  });
+  final String canal;
+  final String categoria;
+  final String assunto;
+  final String texto;
+  final String? nomeContato;
+  final String? contato;
+  final String? usuarioId;
+  final String? pedidoId;
+  final String prioridade;
+}
+
+/// Chamado do atendimento (Termos 25), como o backend manda.
 class Chamado {
   const Chamado({
     required this.id,
+    required this.protocolo,
     required this.assunto,
     required this.solicitante,
     required this.status,
-    required this.aberto,
+    required this.abertoEm,
+    required this.categoria,
+    required this.canal,
+    required this.responderAte,
     this.prioridade = 'normal',
-    this.responsavel,
-    this.prazo,
+    this.usuarioId,
+    this.nomeContato,
+    this.contato,
+    this.pedidoId,
+    this.responsavelId,
+    this.responsavelNome,
+    this.contestacaoRetencao = false,
+    this.novoPrazoAte,
+    this.motivoExtensao,
+    this.primeiraRespostaEm,
+    this.encerradoEm,
+    this.atrasado = false,
+    this.mensagens = const [],
   });
+
   final String id;
+  final String protocolo;
   final String assunto;
   final String solicitante;
+
+  /// `aberto`, `em_atendimento`, `aguardando_usuario`, `respondido` ou `encerrado`.
   final String status;
-  final DateTime aberto;
+  final DateTime abertoEm;
+  final String categoria;
+  final String canal;
+  final DateTime responderAte;
   final String prioridade;
-  final String? responsavel;
-  final DateTime? prazo;
+  final String? usuarioId;
+  final String? nomeContato;
+  final String? contato;
+  final String? pedidoId;
+  final String? responsavelId;
+  final String? responsavelNome;
+
+  /// Contestação de retenção: não se encerra pelo atendimento (quem marca é o backend).
+  final bool contestacaoRetencao;
+  final DateTime? novoPrazoAte;
+  final String? motivoExtensao;
+  final DateTime? primeiraRespostaEm;
+  final DateTime? encerradoEm;
+
+  /// Calculado pelo backend.
+  final bool atrasado;
+
+  /// Só vem no detalhe.
+  final List<MensagemChamado> mensagens;
+
+  DateTime get prazo => novoPrazoAte ?? responderAte;
+  bool get encerrado => status == 'encerrado';
+}
+
+class MensagemChamado {
+  const MensagemChamado({required this.autor, required this.texto, required this.criadaEm, this.interna = false});
+
+  /// `usuario`, `equipe` ou `sistema`.
+  final String autor;
+  final String texto;
+  final DateTime criadaEm;
+  final bool interna;
 }
 
 class CategoriaAdmin {
@@ -630,7 +1568,16 @@ class ResultadoCadeia {
 
 /// Erro de chamada admin. `proibido` = 403 (papel sem permissão); `sessao` = 401.
 class ErroApi implements Exception {
-  const ErroApi(this.mensagem, {this.proibido = false, this.sessao = false});
+  const ErroApi(this.mensagem, {this.proibido = false, this.sessao = false, this.status, this.codigo, this.maximoCentavos});
+
+  /// Só em `acima_do_devido`: o máximo que o servidor aceita compensar.
+  final int? maximoCentavos;
+
+  /// Código estável da recusa (`{detail, codigo}`), quando o servidor manda.
+  final String? codigo;
+
+  /// Código HTTP da recusa, quando veio do servidor.
+  final int? status;
   final String mensagem;
   final bool proibido;
   final bool sessao;
@@ -739,12 +1686,14 @@ class PerguntaCategoriaAdmin {
 
 class AlertaRisco {
   const AlertaRisco({
+    this.travaFraudeVigente,
     required this.id,
     this.usuarioId,
     this.usuarioNome,
     this.usuarioTipo,
     this.usuarioStatus,
     this.pedido,
+    this.pedidoId,
     required this.tipo,
     required this.severidade,
     required this.detalhes,
@@ -762,11 +1711,18 @@ class AlertaRisco {
   /// "cliente", "profissional" ou "equipe".
   final String? usuarioTipo;
 
-  /// Status da conta do usuário: "restrito" = saques travados; "bloqueado" = bloqueio preventivo.
+  /// Status da conta do usuário: "restrito" (trava de saques ou outra restrição; sozinho não retém dinheiro) ou
+  /// "bloqueado".
   final String? usuarioStatus;
+
+  /// Trava de saques por fraude em vigor. Null = não informado (nunca "sem trava").
+  final bool? travaFraudeVigente;
 
   /// Código do pedido ("PED-10498"), quando o alerta nasce de um pedido.
   final String? pedido;
+
+  /// Id completo do pedido (o [pedido] é só o código curto).
+  final String? pedidoId;
   final String tipo;
 
   /// "baixa", "media", "alta" ou "critica".
@@ -782,11 +1738,12 @@ class AlertaRisco {
   final bool resolvido;
   final String criadoEm;
 
-  bool get saquesTravados => usuarioStatus == 'restrito';
+  bool get contaRestrita => usuarioStatus == 'restrito';
   bool get contaBloqueada => usuarioStatus == 'bloqueado';
 
   AlertaRisco comResolucao(String resultado) => AlertaRisco(
         id: id,
+        travaFraudeVigente: travaFraudeVigente,
         usuarioId: usuarioId,
         usuarioNome: usuarioNome,
         usuarioTipo: usuarioTipo,
@@ -804,6 +1761,7 @@ class AlertaRisco {
 
   AlertaRisco comUsuarioStatus(String? novo) => AlertaRisco(
         id: id,
+        travaFraudeVigente: travaFraudeVigente,
         usuarioId: usuarioId,
         usuarioNome: usuarioNome,
         usuarioTipo: usuarioTipo,
@@ -1252,4 +2210,69 @@ class ArquivoPronto {
   const ArquivoPronto({required this.url, required this.nomeArquivo});
   final String url;
   final String nomeArquivo;
+}
+
+/// Arquivo de uma contestação de materiais. [url] é curta e só vive na tela; nula = indisponível.
+class AnexoMaterial {
+  const AnexoMaterial({required this.tipo, this.enviadoPor, this.url, this.tipoConteudo, this.expiraEmSegundos});
+
+  /// `nota_material` ou `contestacao`.
+  final String tipo;
+  final String? enviadoPor;
+  final String? url;
+  final String? tipoConteudo;
+  final int? expiraEmSegundos;
+}
+
+/// Contestação de nota de material (Termos 6.9). Nenhum campo daqui significa dinheiro movido.
+class ContestacaoMaterial {
+  const ContestacaoMaterial({
+    required this.id,
+    required this.protocolo,
+    required this.pedidoId,
+    required this.notaId,
+    required this.clienteId,
+    required this.motivo,
+    required this.descricao,
+    required this.valorContestadoCentavos,
+    required this.abertaEm,
+    required this.responderAte,
+    required this.status,
+    this.itemId,
+    this.anexos = const [],
+    this.analistaId,
+    this.resposta,
+    this.valorReconhecidoCentavos,
+    this.decididaEm,
+    this.efeitoFinanceiro = 'nenhum',
+  });
+
+  final String id;
+  final String protocolo;
+  final String pedidoId;
+  final String notaId;
+  final String? itemId;
+  final String clienteId;
+
+  /// `nao_comprovado` ou `diferente_do_combinado`.
+  final String motivo;
+  final String descricao;
+  final List<String> anexos;
+  final int valorContestadoCentavos;
+  final DateTime abertaEm;
+  final DateTime responderAte;
+
+  /// `aberta`, `em_analise`, `procedente`, `parcial` ou `improcedente`.
+  final String status;
+  final String? analistaId;
+  final String? resposta;
+  final int? valorReconhecidoCentavos;
+  final DateTime? decididaEm;
+  final String efeitoFinanceiro;
+
+  bool get pendenteDeDecisao => status == 'aberta' || status == 'em_analise';
+  bool get decidida => status == 'procedente' || status == 'parcial' || status == 'improcedente';
+
+  /// Prazo vencido sem decisão. O relógio local serve apenas para destacar na tela.
+  bool atrasada(DateTime agora) => pendenteDeDecisao && agora.isAfter(responderAte);
 }

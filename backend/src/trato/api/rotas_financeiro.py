@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.liberacao import fatos_da_liberacao
 from trato.api.modelos import (
     ContaOut,
     ExtratoOut,
@@ -22,9 +23,9 @@ from trato.api.modelos import (
 from trato.api.servicos import carregar_pedido
 from trato.financeiro import extrato_profissional, periodo, recibo_pedido
 from trato.financeiro.ledger import CUSTODIA, Conta, Lancamento, a_liberar, liberado
-from trato.pedidos.estados import Estado
+from trato.pedidos.estados import Estado, Pedido
 from trato.persistencia.comum import como_uuid
-from trato.rotinas.regras import ConfigRotinas, instante_liberacao
+from trato.rotinas.regras import ConfigRotinas, instante_liberacao, regra_de_liberacao
 
 router = APIRouter(prefix="/v1", tags=["financeiro"])
 
@@ -81,7 +82,7 @@ def saldo_do_pedido(
         retido_centavos=saldo.retido,
         a_liberar_centavos=saldo.a_liberar,
         liberado_centavos=saldo.liberado,
-        liberacao_prevista_em=liberacao_prevista(contexto, pedido.concluido_em),
+        liberacao_prevista_em=liberacao_prevista(contexto, pedido),
     )
 
 
@@ -151,11 +152,8 @@ def _retido_do_profissional(contexto: Contexto, profissional_id: str) -> int:
 
 def _regra_liberacao(contexto: Contexto) -> ConfigRotinas:
     cfg = contexto.config.carregar()
-    congelamento = timedelta(hours=cfg.disputas.prazo_congelar_repasse_horas)
-    prazo = (
-        timedelta(days=cfg.prazo_liberacao_dias)
-        if cfg.prazo_liberacao_dias is not None
-        else congelamento
+    prazo, congelamento = regra_de_liberacao(
+        cfg.prazo_liberacao_dias, cfg.disputas.prazo_congelar_repasse_horas
     )
     return ConfigRotinas(
         prazo_liberacao=prazo,
@@ -164,12 +162,22 @@ def _regra_liberacao(contexto: Contexto) -> ConfigRotinas:
     )
 
 
-def liberacao_prevista(contexto: Contexto, concluido_em: datetime | None) -> datetime | None:
-    """Quando o valor do pedido concluído é liberado (mesma regra da rotina). Nunca levanta."""
-    if concluido_em is None:
+def _quando_libera(contexto: Contexto, pedido: Pedido, regra: ConfigRotinas) -> datetime | None:
+    """Sem data enquanto a decisão está contestada (ou sem prazo conhecido)."""
+    cancelado = pedido.estado is Estado.CANCELADO
+    if pedido.concluido_em is None and not cancelado:
         return None
+    fatos = fatos_da_liberacao(contexto, pedido)
+    base = fatos.retencao_em if cancelado else pedido.concluido_em
+    if base is None or fatos.relato or fatos.contestacao_pendente or fatos.prazo_desconhecido:
+        return None
+    return instante_liberacao(base, regra, fatos.confirmado, fatos.contestar_ate)
+
+
+def liberacao_prevista(contexto: Contexto, pedido: Pedido) -> datetime | None:
+    """Quando o valor do pedido concluído é liberado (mesma regra da rotina). Nunca levanta."""
     try:
-        return instante_liberacao(concluido_em, _regra_liberacao(contexto))
+        return _quando_libera(contexto, pedido, _regra_liberacao(contexto))
     except Exception:  # noqa: BLE001 - texto de aviso: sem data, o aviso sai sem ela
         return None
 
@@ -177,23 +185,11 @@ def liberacao_prevista(contexto: Contexto, concluido_em: datetime | None) -> dat
 def _liberacoes_previstas(contexto: Contexto, profissional_id: str) -> list[LiberacaoPrevistaOut]:
     """Um item por pedido com valor 'a liberar'. Só leitura: nunca falha a carteira.
 
-    Data = `instante_liberacao` (a mesma regra da rotina de liberação): conclusão + o prazo da
-    configuração (`prazo_liberacao_dias`; sem ele, a janela de congelamento da disputa), e nunca
-    antes da janela de congelamento. Pedido ainda não concluído: data `None`.
+    Data = `instante_liberacao` (a mesma regra da rotina de liberação). Pedido ainda não
+    concluído, decisão contestada ou prazo não publicado: data `None`.
     """
     try:
-        cfg = contexto.config.carregar()
-        congelamento = timedelta(hours=cfg.disputas.prazo_congelar_repasse_horas)
-        prazo = (
-            timedelta(days=cfg.prazo_liberacao_dias)
-            if cfg.prazo_liberacao_dias is not None
-            else congelamento
-        )
-        regra = ConfigRotinas(
-            prazo_liberacao=prazo,
-            janela_congelamento_repasse=congelamento,
-            liberacao_espera_congelamento=True,
-        )
+        regra = _regra_liberacao(contexto)
         conta = a_liberar(profissional_id)
         por_pedido: dict[str, int] = {}
         for item in contexto.ledger.lancamentos():
@@ -206,11 +202,7 @@ def _liberacoes_previstas(contexto: Contexto, profissional_id: str) -> list[Libe
             if valor <= 0:
                 continue
             pedido = contexto.pedidos.obter(pedido_id)
-            quando = (
-                instante_liberacao(pedido.concluido_em, regra)
-                if pedido is not None and pedido.concluido_em is not None
-                else None
-            )
+            quando = None if pedido is None else _quando_libera(contexto, pedido, regra)
             saida.append(
                 LiberacaoPrevistaOut(
                     pedido_id=pedido_id, valor_centavos=valor, liberacao_prevista_em=quando

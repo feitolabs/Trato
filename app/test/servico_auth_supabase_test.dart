@@ -55,6 +55,7 @@ http.Response _apiPadrao(http.Request pedido) {
     return _json(200, {'disponivel': true});
   }
   if (pedido.url.path == '/v1/me/dados-pessoais') return http.Response('', 204);
+  if (pedido.url.path == '/v1/cadastro/vincular') return http.Response('', 204);
   return _json(404, {'detail': 'rota de teste não configurada'});
 }
 
@@ -158,6 +159,27 @@ void main() {
       await m.cliente.dispose();
     });
 
+    test('vínculo falhou: erro claro; tentar de novo não cria outra conta', () async {
+      var falha = true;
+      final m = _montar(
+        (_) => _json(200, _usuario()),
+        api: (r) => r.url.path == '/v1/cadastro/vincular' && falha
+            ? _json(500, {'detail': 'erro interno'})
+            : _apiPadrao(r),
+      );
+      await expectLater(
+        m.servico.criarConta(_dados),
+        throwsA(_erroAuth(TipoErroAuth.cadastroNaoVinculado)),
+      );
+      falha = false;
+      final r = await m.servico.criarConta(_dados);
+
+      expect(r, isA<CadastroAguardandoEmail>());
+      expect(m.pedidos.where((p) => p.url.path == '/auth/v1/signup'), hasLength(1));
+      expect(m.apiPedidos.where((p) => p.url.path == '/v1/cadastro/vincular'), hasLength(2));
+      await m.cliente.dispose();
+    });
+
     test('CPF de outra conta nem chega a criar a conta', () async {
       final m = _montar(
         (_) => _json(200, _usuario()),
@@ -168,6 +190,26 @@ void main() {
         throwsA(_erroAuth(TipoErroAuth.cpfJaUsado)),
       );
       expect(m.pedidos, isEmpty);
+      await m.cliente.dispose();
+    });
+
+    test('conta bloqueada ao gravar o CPF não faz logout', () async {
+      final m = _montar(
+        (r) => _json(200, {
+          'access_token': 'a.b.c',
+          'token_type': 'bearer',
+          'expires_in': 3600,
+          'refresh_token': 'r',
+          'user': _usuario(),
+        }),
+        api: (r) => r.url.path == '/v1/me/dados-pessoais'
+            ? _json(403, {'detail': 'Conta bloqueada.', 'codigo': 'conta_bloqueada'})
+            : _apiPadrao(r),
+      );
+      final r = await m.servico.criarConta(_dados);
+      expect(r, isA<CadastroComSessao>());
+      expect(m.pedidos.any((p) => p.url.path == '/auth/v1/logout'), isFalse);
+      expect(m.servico.sessaoAtual, isNotNull);
       await m.cliente.dispose();
     });
 

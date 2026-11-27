@@ -109,7 +109,11 @@ def test_stripe_monta_chamadas_e_le_respostas_simuladas():
     }
 
     estorno = stripe.estornar("pi_1", 2_000, "est/1")
-    assert estorno.confirmado and chamadas[1][2] == {"payment_intent": "pi_1", "amount": "2000"}
+    assert estorno.confirmado and chamadas[1][2] == {
+        "payment_intent": "pi_1",
+        "amount": "2000",
+        "metadata[trato_ordem]": "est/1",  # para conferir antes de reenviar (Termos 6.10)
+    }
     assert stripe.consultar_cobranca("pi_2").status is StatusCobranca.FALHOU
     with pytest.raises(ErroProvedor, match="recusado"):
         stripe.consultar_cobranca("pi_x")
@@ -188,3 +192,41 @@ def test_stripe_cartao_acha_ou_cria_cliente_e_gera_chave_efemera():
     )
     campos = next(c for c in chamadas if c[1] == "/v1/payment_intents")[2]
     assert campos["customer"] == "cus_1" and campos["setup_future_usage"] == "on_session"
+
+
+def test_stripe_consulta_os_estornos_paginando_e_le_a_chave_da_ordem():
+    paginas = [
+        {
+            "data": [
+                {
+                    "id": "re_1",
+                    "amount": 100,
+                    "status": "succeeded",
+                    "metadata": {"trato_ordem": "din/a"},
+                },
+                {"id": "re_2", "amount": 50, "status": "failed", "metadata": {}},
+            ],
+            "has_more": True,
+        },
+        {"data": [{"id": "re_3", "amount": 25, "status": "pending"}], "has_more": False},
+    ]
+    chamadas = []
+
+    def transporte(metodo, caminho, campos, cabecalhos):
+        chamadas.append((metodo, caminho, dict(campos)))
+        return 200, paginas[len(chamadas) - 1]
+
+    stripe = ProvedorStripeTeste("sk_test_" + "x" * 12, "segredo", transporte)
+    estornos = stripe.estornos_da_cobranca("pi_1")
+    assert [(e.id, e.chave, e.falhou) for e in estornos] == [
+        ("re_1", "din/a", False),
+        ("re_2", None, True),
+        ("re_3", None, False),
+    ]
+    assert chamadas[0][:2] == ("GET", "/v1/refunds") and chamadas[1][2]["starting_after"] == "re_2"
+
+
+def test_stripe_sem_a_lista_de_estornos_e_erro_e_nao_vazio():
+    stripe = ProvedorStripeTeste("sk_test_" + "x" * 12, "segredo", lambda *a: (200, {}))
+    with pytest.raises(ErroProvedor):
+        stripe.estornos_da_cobranca("pi_1")

@@ -4,7 +4,7 @@ primeiro login válido, de forma idempotente (M11). O papel NUNCA vem do token."
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from trato.api.auth import PapelUsuario
 from trato.api.repositorios_app import PerfilDetalhe
@@ -131,6 +131,46 @@ class UsuariosPostgres:
                 )
         return criada is not None or gravou_cpf
 
+    def data_nascimento(self, usuario_id: str) -> date | None:
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            return None
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select data_nascimento from public.usuarios_privados where usuario_id = %s",
+                (achado,),
+            ).fetchone()
+        return linha["data_nascimento"] if linha else None
+
+    def pode_vincular_sem_sessao(
+        self, usuario_id: str, email: str, agora: datetime, janela: timedelta
+    ) -> bool:
+        """E-mail confere, a conta nunca entrou e a linha em `usuarios` (se já existe) é nova."""
+        achado = como_uuid(usuario_id)
+        if achado is None:
+            raise DadosInvalidos("Usuário inválido.")
+        with self._banco.transacao() as con:
+            confere = con.execute(
+                "select privado.confirmar_email_do_usuario(%s, %s) as ok",
+                (achado, email.strip()),
+            ).fetchone()
+            if not (confere and confere["ok"]):
+                return False
+            # Conferir antes de chamar: sem a função (migration antiga) vale só a idade.
+            tem = con.execute(
+                "select to_regprocedure('privado.contas_auth(uuid[])') is not null as tem"
+            ).fetchone()
+            if tem["tem"]:
+                conta = con.execute(
+                    "select ultimo_acesso from privado.contas_auth(%s::uuid[])", ([achado],)
+                ).fetchone()
+                if conta is not None and conta["ultimo_acesso"] is not None:
+                    return False
+            linha = con.execute(
+                "select criado_em from public.usuarios where id = %s", (achado,)
+            ).fetchone()
+        return linha is None or agora - linha["criado_em"] <= janela
+
     def email_por_identificador(self, digitos: str) -> str | None:
         """Resolve o e-mail de login pelo CPF (11 dígitos) ou telefone (10 a 13 dígitos)."""
         with self._banco.transacao() as con:
@@ -247,6 +287,17 @@ class UsuariosPostgres:
             ).fetchone()
         return linha["status"] if linha else None
 
+    def ids_para_aviso(self, depois_de: str | None, limite: int) -> list[str]:
+        """Contas não anonimizadas, em ordem de id, para os avisos prévios."""
+        marca = como_uuid(depois_de) if depois_de else None
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select id from public.usuarios where status <> 'anonimizado' "
+                "and (%s::uuid is null or id > %s::uuid) order by id limit %s",
+                (marca, marca, limite),
+            ).fetchall()
+        return [str(x["id"]) for x in linhas]
+
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None:
         """O que o app mostra no Perfil. Sem documento, telefone ou e-mail (ficam fora daqui)."""
         base = self.perfil(usuario_id)
@@ -297,7 +348,7 @@ class UsuariosPostgres:
                 "select count(*) filter (where p.status = 'concluido') as feitos, "
                 "count(*) filter (where p.status = 'cancelado') as cancelados "
                 "from public.contratos c join public.pedidos p on p.id = c.pedido_id "
-                "where c.profissional_id = %s",
+                "where c.profissional_id = %s and c.status <> 'cancelado'",
                 (profissional_id,),
             ).fetchone()
         encerrados = int(linha["feitos"]) + int(linha["cancelados"])

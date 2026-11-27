@@ -40,10 +40,16 @@ from trato.pagamentos.montagem import escolher_provedor
 from trato.pagamentos.orquestrador import ServicoPagamento
 from trato.persistencia.app_extras import VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
+from trato.persistencia.ausencias import AusenciasPostgres
+from trato.persistencia.avaliacoes_moderacao import ModeracaoAvaliacoesPostgres
+from trato.persistencia.cancelamentos import CancelamentosPostgres
+from trato.persistencia.chamados import ChamadosPostgres
+from trato.persistencia.compensacoes import CompensacoesPostgres
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
 from trato.persistencia.conta import ContaPostgres
 from trato.persistencia.contestacoes import ContestacoesPostgres
+from trato.persistencia.contestacoes_decisao import ContestacoesDecisaoPostgres
 from trato.persistencia.contratos import ContratosPostgres
 from trato.persistencia.conversas import ConversasPostgres, NotificacoesPostgres
 from trato.persistencia.denuncias import DenunciasPostgres
@@ -57,9 +63,13 @@ from trato.persistencia.dinheiro import (
 from trato.persistencia.exclusividades import ExclusividadesPostgres
 from trato.persistencia.execucao import ExecucaoPostgres
 from trato.persistencia.fechamentos import FechamentosPostgres
+from trato.persistencia.incidentes import IncidentesPostgres
 from trato.persistencia.indicacoes import IndicacoesPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
+from trato.persistencia.lgpd_titular import LgpdTitularPostgres
+from trato.persistencia.materiais_contestacao import ContestacaoMaterialPostgres
+from trato.persistencia.medidas import MedidasPostgres
 from trato.persistencia.orcamentos import OrcamentosPostgres
 from trato.persistencia.pagamentos import (
     AditivosPostgres,
@@ -71,6 +81,8 @@ from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostg
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.reagendamentos import ReagendamentosPostgres
 from trato.persistencia.recorrencias import RecorrenciasPostgres
+from trato.persistencia.retorno_conta import RetornoContaPostgres
+from trato.persistencia.sac import SacPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
 from trato.profissional.ranking import RankingPostgres
 from trato.seguranca.config import parametros_docs
@@ -154,6 +166,18 @@ def criar_contexto_postgres(
         contestacoes=ContestacoesPostgres(banco),
         fechamentos=FechamentosPostgres(banco),
         recusas=RecusasPostgres(banco),
+        cancelamentos=CancelamentosPostgres(banco),
+        ausencias=AusenciasPostgres(banco),
+        medidas=MedidasPostgres(banco),
+        chamados=ChamadosPostgres(banco),
+        sac=SacPostgres(banco),
+        incidentes=IncidentesPostgres(banco),
+        materiais_contestacao=ContestacaoMaterialPostgres(banco),
+        retorno_conta=RetornoContaPostgres(banco),
+        lgpd_titular=LgpdTitularPostgres(banco),
+        avaliacoes_moderacao=ModeracaoAvaliacoesPostgres(banco),
+        compensacoes=CompensacoesPostgres(banco),
+        contestacoes_decisao=ContestacoesDecisaoPostgres(banco),
         notas_material=NotasMaterialPostgres(banco, execucao),
         conta=ContaPostgres(banco),
         transacao_banco=banco.transacao,

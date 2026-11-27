@@ -101,7 +101,7 @@ void main() {
             'cliente_id': 'c1',
             'profissional_id': 'me',
             'aberto_em': '2026-11-07T12:00:00Z',
-            'acoes_permitidas': <String>[],
+            'acoes_permitidas': <String>['abrir_disputa', 'confirmar_conclusao'],
           };
         } else if (r.url.path == '/v1/pedidos/p1/saldo') {
           corpo = {

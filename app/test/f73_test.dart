@@ -39,15 +39,15 @@ void main() {
     RotasTrato.compartilharArquivo = (_) async {};
   });
 
-  group('Tela do pedido: botão "Baixar comprovante (PDF)"', () {
+  group('Tela do pedido: botão "Baixar recibo (PDF)"', () {
     testWidgets('aparece no pedido concluído e chama o callback', (tester) async {
       var baixou = 0;
       await _abrir(
         tester,
         PedidoExecucaoTela(pedido: _pedido('concluido'), aoBaixarComprovante: () => baixou++),
       );
-      expect(find.text('Baixar comprovante (PDF)'), findsOneWidget);
-      await tester.tap(find.text('Baixar comprovante (PDF)'));
+      expect(find.text('Baixar recibo (PDF)'), findsOneWidget);
+      await tester.tap(find.text('Baixar recibo (PDF)'));
       expect(baixou, 1);
     });
 
@@ -57,13 +57,13 @@ void main() {
           tester,
           PedidoExecucaoTela(pedido: _pedido(estado), aoBaixarComprovante: () {}),
         );
-        expect(find.text('Baixar comprovante (PDF)'), findsNothing);
+        expect(find.text('Baixar recibo (PDF)'), findsNothing);
       });
     }
 
     testWidgets('sem o callback o botão não aparece mesmo concluído', (tester) async {
       await _abrir(tester, PedidoExecucaoTela(pedido: _pedido('concluido')));
-      expect(find.text('Baixar comprovante (PDF)'), findsNothing);
+      expect(find.text('Baixar recibo (PDF)'), findsNothing);
     });
   });
 
@@ -122,7 +122,7 @@ void main() {
       final repo = RotasTrato.repos.pedidos as RepositorioPedidosFake;
       expect(repo.recibosBaixados, ['ped-7']);
       expect(salvo, '/tmp/trato_comprovante_ped-7.pdf');
-      expect(find.text('Comprovante em PDF salvo.'), findsOneWidget);
+      expect(find.text('Recibo em PDF salvo.'), findsOneWidget);
       await tester.tap(find.text('Compartilhar'));
       await tester.pumpAndSettle();
       expect(compartilhado, '/tmp/trato_comprovante_ped-7.pdf');

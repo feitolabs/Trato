@@ -29,6 +29,8 @@ class Notificacao {
     this.tela,
     this.papel,
     this.recorrenciaId,
+    this.chamadoId,
+    this.compensacaoId,
     this.tipoApi,
   });
 
@@ -36,6 +38,8 @@ class Notificacao {
   final String? tela;
   final String? papel;
   final String? recorrenciaId;
+  final String? chamadoId;
+  final String? compensacaoId;
 
   /// O tipo do evento no backend (`pedido.novo`...), usado quando `tela` não veio.
   final String? tipoApi;
@@ -61,6 +65,8 @@ class Notificacao {
         tela: tela,
         papel: papel,
         recorrenciaId: recorrenciaId,
+        chamadoId: chamadoId,
+        compensacaoId: compensacaoId,
         tipoApi: tipoApi,
       );
 }

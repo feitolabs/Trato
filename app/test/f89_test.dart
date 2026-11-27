@@ -84,7 +84,7 @@ void main() {
 
       final uri = uriDoRelato(emailRelatoBug, r.assunto, r.corpo);
       expect(uri.scheme, 'mailto');
-      expect(uri.path, 'suporte@tratofeito.com.br');
+      expect(uri.path, 'suporte@tratofeitolabs.com.br');
       expect(uri.queryParameters['subject'], r.assunto);
       expect(uri.queryParameters['body'], r.corpo);
       expect(uri.toString(), isNot(contains('+')),
@@ -152,10 +152,10 @@ void main() {
       await t.tap(find.text('bug'));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('dialogo-relato-bug')), findsOneWidget);
-      expect(find.text('suporte@tratofeito.com.br'), findsOneWidget);
+      expect(find.text('suporte@tratofeitolabs.com.br'), findsOneWidget);
       await t.tap(find.byKey(const Key('copiar-email-bug')));
       await t.pumpAndSettle();
-      expect(copiado, 'suporte@tratofeito.com.br');
+      expect(copiado, 'suporte@tratofeitolabs.com.br');
       expect(find.byKey(const Key('dialogo-relato-bug')), findsNothing);
     });
 
@@ -178,10 +178,10 @@ void main() {
   });
 
   group('2. E-mail de suporte', () {
-    test('os textos legais usam suporte@tratofeito.com.br', () {
+    test('os textos legais usam suporte@tratofeitolabs.com.br', () {
       final termos = File('assets/legal/termos-de-uso.md').readAsStringSync();
       expect(termos, isNot(contains('suporte@trato.app.br')));
-      expect(termos, contains('suporte@tratofeito.com.br'));
+      expect(termos, contains('suporte@tratofeitolabs.com.br'));
     });
   });
 

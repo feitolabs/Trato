@@ -30,8 +30,6 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>O Trato usa a câmera para registrar as fotos de início e fim do serviço.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>O Trato usa sua localização para confirmar que o profissional chegou ao local do serviço.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O Trato acessa suas fotos para anexar imagens ao pedido, à nota de materiais ou à disputa.</string>
 	<key>CFBundleURLTypes</key>

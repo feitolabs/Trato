@@ -1,0 +1,858 @@
+# Termos de Uso do Trato — Versão 1.2
+
+Versão 1.2. Vigência a partir de 12/12/2026. Substitui a versão 1.1, de 22/11/2026. O histórico de versões está no Anexo III.
+
+Responsável pelo Trato: Feito Labs Tecnologia Ltda., CNPJ [PREENCHER: CNPJ da Feito Labs], com sede na Rua Araripe, [PREENCHER: Nº], apto 1001, bairro Floresta, CEP 31015-260, Belo Horizonte/MG. Contato: suporte@tratofeitolabs.com.br.
+
+Estes Termos têm linguagem direta de propósito. Leia a seção "Resumo antes de aceitar" e, se tiver dúvida, fale com o suporte antes de contratar. Ao criar uma conta ou usar o Trato, você declara que leu e aceita estes Termos. Estes Termos podem ser atualizados, e você será avisado antes de qualquer mudança relevante passar a valer (seção 23).
+
+## Resumo antes de aceitar
+
+Este resumo não substitui o texto completo. Ele aponta onde está cada regra que mais afeta seus direitos e seu dinheiro.
+
+| Tema | O que vale | Seção |
+|---|---|---|
+| Papel do Trato | O Trato aproxima cliente e profissional e cuida de pedido, pagamento, provas e análise de problemas. Não executa o serviço e não é empregador do profissional. | 3 |
+| Preço | Quem define o preço é o profissional, no orçamento. Nesta fase o Trato não cobra taxa. Qualquer mudança só vale com 30 dias de aviso e não atinge pedidos já feitos. | 6 |
+| Pagamento | Valor único e integral dentro do app, por Pix ou cartão. O valor fica retido até a conclusão e a confirmação do serviço. | 5 e 6 |
+| Código de início e de término | O profissional só começa e só encerra o pedido com o código que você informa. Isso cria a prova de que o serviço aconteceu. | 5 |
+| Confirmação | Você tem 48 horas após o término para confirmar o serviço ou relatar um problema. Sem relato, o valor é liberado ao profissional. Isso não reduz seus direitos legais. | 5 e 8 |
+| Arrependimento | Até 7 dias depois de contratar. Se o serviço ainda não começou, o reembolso é integral. | 7 |
+| Cancelamento | Mais de 24 horas antes: reembolso integral. Menos de 24 horas: pode haver retenção de custos comprovados, limitada e mostrada antes de você confirmar. | 7 |
+| Problemas e garantia | Você relata pelo app. Um analista humano decide com base nas provas, e você pode contestar. A garantia segue os prazos do Código de Defesa do Consumidor, no mínimo. | 8 |
+| Segurança | Há um canal de segurança para furto, agressão, assédio e acidente. Em emergência, ligue 190, 192 ou 193. | 9 |
+| Responsabilidade | O profissional responde pela execução. O Trato responde pela plataforma e pelo que prometeu fazer, e a responsabilidade prevista em lei não é afastada. | 17 |
+| Seus dados | A Política de Privacidade explica o uso dos dados. A selfie de verificação do profissional é biometria, dado sensível. | 14 |
+| Mudança nestes Termos | Mudança relevante só vale após 30 dias de aviso. Você pode recusar e encerrar a conta sem custo. | 23 |
+| Foro | Para o consumidor, o foro é o do seu domicílio. Não há arbitragem obrigatória. | 24 |
+
+Cláusulas que limitam direitos, em destaque (CDC art. 54, §4º): confirmação tácita após 48 horas (5.8 e 8.2), retenção por cancelamento tardio (7.4), cálculo do reembolso em serviço já iniciado (7.3), regras de suspensão (20) e limites de responsabilidade (17).
+
+## 1. Quem somos e como ler estes Termos
+
+**1.1 Identificação.** O Trato é um aplicativo operado pela Feito Labs Tecnologia Ltda., pessoa jurídica de direito privado, CNPJ [PREENCHER: CNPJ da Feito Labs], com sede na Rua Araripe, [PREENCHER: Nº], apto 1001, bairro Floresta, CEP 31015-260, Belo Horizonte/MG. Endereço eletrônico: suporte@tratofeitolabs.com.br. Nestes Termos, "Trato", "nós" e "Feito Labs" significam essa empresa.
+
+**1.2 Documentos que formam o contrato.** O uso do Trato é regido por:
+
+- estes Termos de Uso, com os Anexos I a III;
+- a Política de Privacidade, disponível no aplicativo e em [PREENCHER: URL da Política de Privacidade];
+- os Termos do Profissional, que valem apenas para quem se cadastra como Profissional;
+- as condições de cada pedido, ou seja, o orçamento aceito, com valor, prazo, validade, garantia e o que está ou não incluído.
+
+**1.3 Conflito entre documentos.** Se houver conflito entre estes Termos e outro documento, vale a regra mais favorável ao Consumidor. Entre o orçamento e estes Termos, vale o orçamento no que diz respeito ao serviço (escopo, prazo, preço e garantia oferecida), e valem estes Termos no que diz respeito ao pagamento, à retenção, à disputa e à proteção do usuário.
+
+**1.4 Aceite.** O aceite é registrado quando você marca a caixa de aceite no cadastro ou no primeiro uso depois de uma nova versão. O Trato guarda a versão aceita, a data, a hora e o endereço de IP do aceite, e você pode consultar esse registro na central de ajuda.
+
+**1.5 Onde ler.** Estes Termos ficam disponíveis no aplicativo e no site do Trato, em formato que permite guardar e imprimir. Uma cópia da versão vigente é enviada ao seu e-mail depois do cadastro e depois de cada aceite de nova versão.
+
+**1.6 Idioma.** Os documentos do Trato são redigidos em português do Brasil.
+
+**1.7 Atualização destes Termos.** O Trato pode atualizar estes Termos e os demais documentos citados na cláusula 1.2 quando o serviço, a lei ou as regras dos parceiros mudarem. Toda atualização recebe um novo número de versão e uma data de vigência, e fica registrada no Anexo III. As regras de aviso, de aceite e de direito de recusa estão na seção 23.
+
+## 2. Definições
+
+As palavras abaixo têm o mesmo significado em todo o documento, no singular e no plural.
+
+| Termo | Significado |
+|---|---|
+| Aplicativo ou Trato | O aplicativo móvel, o site e os serviços digitais do Trato, operados pela Feito Labs. |
+| Usuário | Qualquer pessoa com conta no Trato, seja Cliente ou Profissional. |
+| Cliente | Usuário que pede um serviço. |
+| Consumidor | O Cliente pessoa física que contrata o serviço como destinatário final, nos termos do art. 2º do Código de Defesa do Consumidor (CDC). |
+| Profissional | Usuário autônomo que oferece orçamentos e executa serviços por conta própria, com seus próprios meios. |
+| Conta | Perfil pessoal e intransferível de um Usuário, protegido por credenciais de acesso. |
+| Pedido | A solicitação do Cliente, com categoria, descrição, endereço e fotos opcionais. |
+| Orçamento | A proposta do Profissional para um Pedido, com valor, prazo, validade, garantia e o que está ou não incluído. |
+| Contratação | O momento em que o Parceiro de Pagamento confirma o pagamento de um Orçamento aceito. É dele que contam os prazos de arrependimento. |
+| Parceiro de Pagamento | A instituição que processa pagamentos e repasses no Trato: Stripe Brasil Soluções de Pagamento Ltda. ou outra que o Trato indicar com aviso prévio. |
+| Valor Retido | O valor pago pelo Cliente que fica retido pelo Parceiro de Pagamento até a liberação ao Profissional ou o reembolso ao Cliente. |
+| Código de Início | Código que o Cliente recebe depois da Contratação e informa ao Profissional na chegada. |
+| Código Final | Código que o Cliente informa ao Profissional ao fim do serviço. |
+| Check-in e Check-out | Registros de chegada e de término feitos pelo Profissional no aplicativo, com foto e localização. |
+| Janela de Confirmação | Prazo de 48 horas, contado do Check-out, para o Cliente confirmar o serviço ou relatar um problema. |
+| Relato de Problema | Aviso do Cliente, pelo aplicativo, de que algo saiu diferente do combinado. |
+| Disputa | Relato de Problema que não foi resolvido por acordo entre as partes e vai para análise do Trato. |
+| Garantia do Serviço | O direito do Cliente de pedir correção, retrabalho ou reembolso por defeito na execução, nos prazos da seção 8. |
+| Aditivo | Registro, no aplicativo, de trabalho extra durante o serviço, com descrição e valor, que o Cliente aprova e paga antes da execução. |
+| Tratinhos | Pontos promocionais do Trato, regidos pelo Anexo I. |
+| Selo de Verificação | Indicação no perfil do Profissional de uma conferência feita pelo Trato, com o alcance descrito na seção 10. |
+| Analista | Pessoa da equipe do Trato que analisa Relatos, Disputas, denúncias e contestações. |
+| Canal de Segurança | Canal do Trato para incidentes de segurança, descrito na seção 9. |
+| Dia útil | Dia que não seja sábado, domingo ou feriado nacional ou em Belo Horizonte/MG ou Divinópolis/MG. |
+| Piloto | Fase inicial de operação do Trato, hoje em Belo Horizonte/MG e Divinópolis/MG. |
+
+## 3. O que o Trato é e o que não é
+
+**3.1 O que o Trato é.** O Trato é uma plataforma digital que aproxima Clientes que precisam de um serviço doméstico e Profissionais autônomos que executam esse serviço.
+
+**3.2 O que o Trato faz.** O Trato intermedia:
+
+- o Pedido e os Orçamentos;
+- a conversa entre Cliente e Profissional dentro do aplicativo;
+- o pagamento, por meio do Parceiro de Pagamento, e a retenção do valor até a conclusão e a confirmação do serviço;
+- a prova de início e de fim do serviço, por Check-in, Check-out e códigos;
+- a verificação de identidade dos Profissionais, nos termos da seção 10;
+- a análise de problemas e disputas, nos termos da seção 8;
+- o canal de segurança e o atendimento (SAC).
+
+**3.3 O que o Trato não faz.** O Trato não executa o serviço, não escolhe o Profissional por você, não fixa o preço do serviço e não é empregador, sócio ou representante dos Profissionais. Isso não diminui as responsabilidades que o Trato assume nestes Termos e na lei (seção 17).
+
+**3.4 Independência do Profissional.** Cada Profissional atua por conta própria. Ele define o seu preço, o seu prazo e a sua garantia no Orçamento, escolhe quais Pedidos aceita, decide como executa o serviço e usa seus próprios meios de trabalho. O Trato não impõe horário, número mínimo de Pedidos ou exclusividade. O Cliente indica o que precisa e pode orientar a tarefa contratada, mas não exerce sobre o Profissional poder de direção de empregador.
+
+**3.5 Relação de consumo.** A relação entre o Cliente Consumidor, o Trato e o Profissional é uma relação de consumo, regida pelo CDC (Lei 8.078/1990), pelo Decreto 7.962/2013 (comércio eletrônico), pelo Marco Civil da Internet (Lei 12.965/2014) e pela Lei Geral de Proteção de Dados (Lei 13.709/2018), no que couberem.
+
+**3.6 Categorias e localidade.** O Trato atende, na fase de Piloto, em Belo Horizonte/MG e Divinópolis/MG, nas categorias ativas no catálogo do aplicativo, como limpeza residencial, montagem de móveis e pintura de interiores. As categorias e as cidades podem mudar. Cada categoria mostra no aplicativo o que costuma estar incluído e o que não está. O que o Orçamento diz expressamente vale para aquele Pedido.
+
+**3.7 Serviços não cobertos.** Não podem ser pedidos nem oferecidos pelo Trato:
+
+- serviços fora do catálogo do aplicativo;
+- serviços ilegais ou que exponham alguém a risco grave;
+- serviços que exijam habilitação, registro ou responsabilidade técnica (por exemplo, obra estrutural, instalação de gás ou elétrica de maior porte), salvo em categoria que informe essa exigência e conferida pelo Trato;
+- serviços a serem prestados fora do imóvel informado no Pedido ou em local diferente do endereço cadastrado.
+
+**3.8 Aplicativo e terceiros.** O Trato pode exibir ou usar serviços de terceiros, como o Parceiro de Pagamento e provedores de mensagens. As regras desses terceiros valem para o serviço deles. Isso não afasta a responsabilidade do Trato pelo que ele mesmo oferece.
+
+## 4. Cadastro e conta
+
+**4.1 Quem pode usar.** Para criar uma conta você precisa ter 18 anos ou mais e capacidade para contratar. O Trato não é destinado a menores de 18 anos. Se o Trato descobrir que uma conta pertence a menor de idade, poderá encerrá-la, com aviso e devolução de
+
+valores que estejam retidos.
+
+**4.2 Dados do cadastro.** Você informa nome, data de nascimento, celular e e-mail. Os dados devem ser verdadeiros, completos e atualizados. A confirmação da conta é feita por e-mail (a confirmação do celular por WhatsApp ou SMS foi dispensada; [PREENCHER: revisão final de redação pelo João na cláusula 4.2]).
+
+**4.3 CPF.** Para Clientes, o CPF é opcional no cadastro. Ele pode ser solicitado quando necessário para pagamento, recebimento de valores, verificação de identidade, prevenção a fraude ou cumprimento de obrigação legal. Para Profissionais, o CPF e o CNPJ ativo de MEI (Microempreendedor Individual), de qualquer tipo de atividade, são exigidos — outras empresas (ME, LTDA) não entram —, e o Parceiro de Pagamento precisa identificar quem recebe.
+
+**4.4 Uma conta por pessoa.** Cada pessoa mantém uma única conta. A conta é pessoal e intransferível: não pode ser vendida, emprestada ou usada por outra pessoa. Se o aplicativo permitir os perfis de Cliente e de Profissional na mesma conta, o Usuário não pode contratar a si mesmo.
+
+**4.5 Segurança da conta.** Você é responsável pelo uso da sua conta e por guardar suas credenciais e os códigos que receber. Se notar acesso estranho, avise o suporte pelo aplicativo ou em suporte@tratofeitolabs.com.br o quanto antes. O Trato nunca pede por mensagem, telefone ou e-mail a sua senha, o seu Código de Início ou Final, o número ou a senha do seu cartão.
+
+**4.6 Cadastro de Profissional.** Quem se cadastra como Profissional também informa CNPJ ativo de MEI (de qualquer tipo de atividade; outras empresas como ME e LTDA não entram), envia documento de identidade com foto, uma selfie e os dados de recebimento exigidos pelo Parceiro de Pagamento, e aceita os Termos do Profissional. Os Profissionais só recebem Pedidos depois de concluir a verificação descrita na seção 10.
+
+**4.7 Dados falsos.** Dados falsos, documentos de terceiros ou contas duplicadas podem levar à suspensão ou ao encerramento da conta (seção 20).
+
+**4.8 Exclusão da conta pelo Usuário.** Você pode pedir a exclusão da conta a qualquer momento, pelo aplicativo ou pelo SAC, sem custo e sem precisar justificar. A exclusão só é concluída depois que os Pedidos em andamento forem encerrados ou cancelados, e os valores retidos forem liberados ou reembolsados. Depois da exclusão:
+
+- os Tratinhos não utilizados são perdidos, exceto se a exclusão resultar de erro do Trato;
+- os dados que o Trato deve ou pode guardar por obrigação legal ou para defesa em processos são mantidos pelo prazo descrito na Política de Privacidade;
+- as avaliações já feitas podem permanecer exibidas sem identificação pessoal quando isso for necessário para a integridade das notas.
+
+**4.9 Conta inativa.** Contas sem uso por longo período podem ser inativadas, com aviso de 30 dias por e-mail ou mensagem. A reativação é gratuita e feita pelo SAC ou pelo aplicativo.
+
+## 5. Como funciona um pedido
+
+O Anexo II reúne todos os prazos em uma tabela.
+
+**5.1 Pedido.** O Cliente descreve o que precisa, escolhe a categoria, informa o endereço e a data desejada e pode anexar fotos. Quanto mais claro o Pedido, mais fiel será o Orçamento. Pedir orçamento é gratuito e não obriga a contratar. O Cliente pode cancelar o Pedido a qualquer momento antes de aceitar um Orçamento, sem custo.
+
+**5.2 Orçamentos.** Profissionais da categoria e da região enviam Orçamentos com valor, prazo, validade, garantia e o que está ou não incluído. O Cliente compara e pode conversar com os Profissionais pelo chat do Pedido. Depois da validade, o Orçamento perde o efeito e o Profissional pode enviar outro.
+
+**5.3 Escolha e pagamento.** O Cliente aceita um Orçamento e paga o valor integral dentro do aplicativo (seção 6). A Contratação ocorre quando o Parceiro de Pagamento confirma o pagamento. O Trato confirma a Contratação imediatamente, no aplicativo, e envia ao Cliente o comprovante e uma cópia destes Termos.
+
+**5.4 Endereço e Código de Início.** Só depois da Contratação o endereço completo é liberado ao Profissional contratado, e o Cliente recebe o Código de Início (seção 15). Antes disso, o Profissional vê apenas informações gerais do Pedido.
+
+**5.5 Chegada e Check-in.** Ao chegar, o Profissional registra a presença no aplicativo, com foto e localização, e informa o Código de Início dito pelo Cliente. O Profissional não deve começar o serviço sem esse registro. Se o Cliente não estiver presente, deve avisar quem receberá o Profissional e comunicar o Código de Início a essa pessoa.
+
+**5.6 Execução.** O Profissional executa o serviço conforme o Orçamento. Fotos de antes e depois são recomendadas e passam a integrar as provas do Pedido. Se surgir trabalho extra, vale a regra dos Aditivos (6.8).
+
+**5.7 Conclusão e Check-out.** Ao terminar, o Profissional registra a conclusão com foto e o Código Final. Se o Profissional concluir sem o código do Cliente, o Pedido exige confirmação explícita do Cliente: nesse caso não há confirmação tácita, o valor segue retido, o Trato contata o Cliente e, se não houver resposta em 5 dias úteis, um Analista decide com base nas provas do Pedido.
+
+**5.8 Janela de Confirmação e liberação do valor.** Depois do Check-out, o Cliente tem 48 horas para confirmar o serviço ou relatar um problema. O aplicativo avisa o Cliente quando a Janela de Confirmação começa e novamente antes de terminar.
+
+- Se o Cliente confirmar, o valor é liberado ao Profissional.
+- Se o Cliente nada disser até o fim das 48 horas, o serviço é considerado confirmado e o valor é liberado ao Profissional.
+- Se o Cliente relatar um problema, o valor permanece retido e o caso segue a seção 8.
+
+A confirmação, expressa ou tácita, encerra apenas o prazo interno do Trato para reter o valor. Ela não reduz os direitos que a lei garante ao Consumidor, inclusive a garantia contra vícios de serviço (seção 8).
+
+**5.9 Avaliação.** Depois do serviço, Cliente e Profissional podem se avaliar (seção 12).
+
+**5.10 Ausências e atrasos.** Se o Profissional não chegar, ou se o Cliente não liberar o acesso, aplica-se a seção 7. Atrasos relevantes devem ser comunicados pelo chat, e o Cliente pode cancelar sem custo se o atraso for superior a 30 minutos sem aviso e antes do Check-in.
+
+## 6. Preços, pagamento, retenção e repasse
+
+**6.1 Preço.** Quem define o preço do serviço é o Profissional, no Orçamento. O valor mostrado ao Cliente já inclui os tributos que incidam sobre ele e todas as despesas conhecidas. Qualquer custo adicional (materiais, deslocamento, taxa de parcelamento) é informado antes do pagamento.
+
+**6.2 Pagamento integral dentro do aplicativo.** O pagamento é feito em valor único e integral, dentro do aplicativo, por Pix ou cartão de crédito (à vista ou parcelado), e é processado pelo Parceiro de Pagamento (Stripe Brasil Soluções de Pagamento Ltda.). O Trato não armazena o número completo do seu cartão. Ao pagar, você também aceita os termos do Parceiro de Pagamento no que se refere ao processamento.
+
+**6.3 Prazo para pagar.** O aplicativo mostra o prazo para concluir o pagamento (por exemplo, o tempo de validade do QR Code do Pix). Sem pagamento confirmado dentro do prazo, o Orçamento não é contratado, o endereço não é liberado e nada é cobrado.
+
+**6.4 Parcelamento.** Se o parcelamento tiver custo financeiro, ele fica por conta do Cliente e aparece com clareza antes da confirmação do pagamento: número de parcelas, valor de cada parcela, taxa de juros aplicada, total a pagar e a diferença em relação ao pagamento à vista (CDC art. 52). O parcelamento sem juros, quando houver, é identificado como tal.
+
+**6.5 Sem taxa do Trato nesta fase.** O Trato é gratuito e não cobra taxa de Clientes nem de Profissionais nesta fase. O Trato absorve o custo do Parceiro de Pagamento no Pix e no cartão de crédito à vista.
+
+**6.6 Cobrança futura.** O Trato poderá passar a cobrar taxas pelo uso do serviço. Nesse caso:
+
+- o aviso será dado no aplicativo e por mensagem, com pelo menos 30 dias de antecedência;
+- a taxa nova não vale para Pedidos já contratados nem para Orçamentos já enviados antes do fim do aviso;
+- o valor e quem paga serão mostrados antes de o Orçamento ser enviado ou aceito;
+
+- quem não concordar pode encerrar a conta sem custo (4.8).
+
+**6.7 Valor Retido e repasse.** O valor pago fica retido pelo Parceiro de Pagamento até a conclusão do serviço e a confirmação, nos termos da cláusula 5.8. Até a liberação, o Valor Retido não pertence ao Profissional e não fica disponível para o Trato usar. O Trato não é instituição financeira nem instituição de pagamento e não guarda dinheiro de Clientes ou de Profissionais em conta própria. A liberação ao Profissional ocorre pelo Parceiro de Pagamento, no prazo e nas condições dele.
+
+**6.8 Aditivos.** Se surgir trabalho extra durante o serviço, o Profissional deve registrar um Aditivo no aplicativo, com descrição e valor. O Cliente precisa aprovar e pagar o Aditivo antes da execução do trabalho extra. O Cliente não é obrigado a aceitar o Aditivo, e a recusa não autoriza o Profissional a abandonar o serviço já contratado. O Aditivo segue as mesmas regras de retenção, confirmação e garantia do Pedido.
+
+**6.9 Materiais.** Quando o Orçamento prevê compra de materiais pelo Profissional, ele anexa a nota fiscal ou o comprovante no aplicativo. O Cliente pode contestar materiais não comprovados ou diferentes dos combinados.
+
+**6.10 Estornos.** Quando houver reembolso, o Trato solicita o estorno ao Parceiro de Pagamento em até 2 dias úteis depois da aprovação. O estorno volta pelo mesmo meio de pagamento. No Pix, ele retorna à conta de origem. No cartão, ele pode aparecer na fatura seguinte ou na subsequente, conforme a emissora. O aplicativo mostra o prazo estimado e o status do estorno. O estorno devolve o valor pago, atualizado quando a lei exigir (CDC art. 49, parágrafo único).
+
+**6.11 Contestação na emissora do cartão.** O Cliente pode contestar uma cobrança diretamente com a emissora do cartão. O Trato colabora com as provas do Pedido. Se o Cliente receber o estorno pela emissora, o Trato não devolve o mesmo valor uma segunda vez.
+
+**6.12 Pagamentos por fora.** Combinar pagamento fora do aplicativo para burlar a plataforma é proibido (seção 11). Nada combinado ou pago fora do aplicativo tem Valor Retido, Garantia do Serviço do Trato ou análise de Disputa, o que não impede o Cliente de exercer seus direitos pelos meios legais.
+
+**6.13 Comprovante, nota fiscal e tributos.** O Trato envia ao Cliente o comprovante de pagamento. A emissão de nota fiscal do serviço, quando exigida, é responsabilidade do Profissional, que responde pelos seus tributos (como ISS, INSS, imposto de renda e obrigações de MEI).
+
+## 7. Cancelamento, reagendamento e arrependimento
+
+**7.1 Antes de aceitar um Orçamento.** O Cliente pode cancelar o Pedido a qualquer momento, sem custo.
+
+**7.2 Direito de arrependimento.** Como a Contratação acontece fora de estabelecimento comercial, o Consumidor pode desistir dela em até 7 dias corridos, contados da Contratação, sem precisar explicar o motivo (CDC art. 49). O pedido é feito pelo mesmo aplicativo em que o Cliente contratou, na opção "Desistir do pedido", e o Trato confirma o recebimento imediatamente. Se o serviço ainda não começou, ou seja, se não houve Check-in, o reembolso é integral, sem desconto de custos, taxas ou multas, mesmo que a data marcada esteja a menos de 24 horas.
+
+**7.3 Serviço iniciado dentro do prazo de arrependimento.** Se o Consumidor pediu expressamente que o serviço fosse executado antes de terminarem os 7 dias, por meio de uma opção que ele marca por conta própria no momento do pagamento (a caixa nunca vem marcada), e depois desiste, vale o seguinte:
+
+- se o serviço foi iniciado mas não concluído, o Consumidor recebe reembolso proporcional à parte não executada, calculado por um Analista com base no Orçamento, no Check-in e nas provas do Pedido;
+- o Profissional só recebe a parte efetivamente executada;
+- se o serviço foi integralmente executado, não há o que desfazer pelo arrependimento.
+- O Consumidor mantém a Garantia do Serviço (seção 8) e os direitos de reclamar de defeitos.
+
+O Trato não cobra nada do Consumidor pelo exercício do arrependimento. O reembolso proporcional se limita ao trabalho de fato realizado.
+
+**7.4 Cancelamento depois do prazo de arrependimento e antes do início.** O Cliente pode cancelar pelo aplicativo. O estorno segue o meio de pagamento usado e a seção 6.10.
+
+- Com mais de 24 horas de antecedência da data e hora marcadas, o reembolso é integral.
+- Com menos de 24 horas de antecedência, o Trato pode reter, em favor do Profissional, apenas os custos comprovados que ele já teve por causa do Pedido (como deslocamento já realizado e materiais já comprados e não reaproveitáveis). Essa retenção nunca passa de 30% do valor do serviço, é mostrada ao Cliente, com o valor e a justificativa, antes da confirmação do cancelamento, e o restante é reembolsado.
+- A retenção não se aplica se o cancelamento ocorrer dentro dos 7 dias do arrependimento (7.2) ou se o motivo for atraso ou falha do Profissional ou do Trato.
+
+**7.5 Reagendamento.** O Cliente pode reagendar sem custo com mais de 24 horas de antecedência, se o Profissional estiver disponível na nova data. O Profissional também pode propor nova data, e a mudança só vale se a outra parte aceitar no aplicativo. Reagendamento com menos de 24 horas segue 7.4, salvo se o Profissional aceitar a nova data sem custo.
+
+**7.6 Cliente ausente.** Se o Profissional chegar e não conseguir acesso ao local, ele registra o Check-in e tenta contato pelo aplicativo. Depois de 20 minutos de espera sem resposta, ele pode registrar "Cliente ausente". O Cliente é avisado e tem 24 horas para justificar. Se não houver justificativa aceita por um Analista, aplica-se 7.4 como cancelamento com menos de 24 horas, com a mesma limitação de custos comprovados e de 30%.
+
+**7.7 Cancelamento ou falta do Profissional.** Se o Profissional cancelar ou não comparecer, o Cliente recebe reembolso integral, e o Trato ajuda a encontrar outro Profissional para o mesmo Pedido, sem custo adicional. Cancelar com motivo válido (como doença, emergência ou imprevisto comprovado) não gera penalidade automática para o Profissional. Faltas repetidas e sem motivo passam por análise humana, com chance de resposta (seção 20).
+
+**7.8 Eventos fora do controle das partes.** Chuva forte, calamidade, falta de energia ou água, impedimento do condomínio ou outro evento fora do controle das partes que impeça o serviço permitem reagendar sem custo ou cancelar com reembolso integral, a critério do Cliente.
+
+**7.9 Resumo dos cenários.**
+
+| Cenário | Reembolso ao Cliente | Retenção em favor do Profissional |
+|---|---|---|
+| Cancelamento antes de aceitar o Orçamento | Nada foi cobrado | Nenhuma |
+| Arrependimento em até 7 dias, serviço não iniciado | Integral | Nenhuma |
+| Arrependimento em até 7 dias, serviço iniciado a pedido do Cliente | Proporcional à parte não executada | Parte executada |
+| Cancelamento após 7 dias, com mais de 24 horas de antecedência | Integral | Nenhuma |
+| Cancelamento após 7 dias, com menos de 24 horas | Valor pago menos a retenção | Custos comprovados, no máximo 30% |
+| Cliente ausente sem justificativa aceita | Valor pago menos a retenção | Custos comprovados, no máximo 30% |
+| Cancelamento ou falta do Profissional | Integral | Nenhuma |
+| Evento fora do controle das partes | Integral ou reagendamento sem custo | Nenhuma |
+
+## 8. Garantia, problemas e disputas
+
+**8.1 Duas fases.** O Trato trata problemas em duas fases. Na Fase 1, enquanto o valor ainda está retido (durante a execução e na Janela de Confirmação), o valor fica congelado até a solução. Na Fase 2, depois da liberação do valor, o Cliente conta com a Garantia do Serviço. Em ambas, o Cliente pode relatar o problema pelo aplicativo, e a decisão final não impede o Cliente de buscar seus direitos pelos meios legais.
+
+**8.2 Fase 1: Relato durante a execução ou a Janela de Confirmação.** Se algo saiu diferente do combinado no Orçamento, o Cliente abre um Relato de Problema pelo aplicativo durante a execução ou dentro das 48 horas da Janela de Confirmação. Enquanto o Relato está aberto, o Trato mantém o valor retido, por meio do Parceiro de Pagamento, e o serviço não é considerado confirmado. O Profissional é avisado na hora e tem 24 horas para responder e propor uma solução (retrabalho, desconto ou reembolso). Se as partes chegarem a acordo, ele é registrado no aplicativo e o valor é liberado ou devolvido conforme o acordo. Sem acordo, o caso vira Disputa e segue as cláusulas 8.5 a 8.7.
+
+**8.3 Fase 2: Garantia do Serviço.** Depois que o valor foi liberado, o Cliente pode pedir correção, retrabalho ou reembolso por defeito de execução no prazo mais longo entre:
+
+- o prazo legal para reclamar de vícios do serviço, que é de 30 dias para serviços não duráveis (em regra, limpeza) e de 90 dias para serviços duráveis (em regra, pintura e montagem de móveis), contado do fim do serviço, ou, se o vício for oculto, do momento em que ele ficar evidente (CDC art. 26); e o prazo de garantia que o Profissional informou no Orçamento, se for maior.
+
+Em caso de dúvida sobre a classificação do serviço, vale o prazo maior. A reclamação feita pelo Cliente ao Trato ou ao Profissional impede o prazo legal de correr até a resposta negativa clara (CDC art. 26, §2º, I).
+
+**8.4 Como relatar.** O Cliente descreve o problema, anexa fotos ou vídeos e indica o que espera (retrabalho, reembolso parcial ou total). O Trato pode pedir informações adicionais, e o Cliente tem 10 dias úteis para responder. Sem resposta nesse prazo, o Relato pode ser encerrado, e o Cliente pode abrir outro dentro do prazo da Garantia do Serviço.
+
+**8.5 Como o Trato analisa.** Um Analista, pessoa da equipe do Trato, analisa as provas do Pedido: Orçamento, conversa do Pedido, fotos de antes e depois, Check-in e Check-out, Aditivos, notas de material e o que as duas partes enviarem. O Analista ouve os dois lados e registra uma decisão justificada, com os motivos e as provas consideradas. O Trato decide em até 5 dias úteis depois de receber as informações necessárias e informa as duas partes pelo aplicativo.
+
+**8.6 Decisões possíveis.** Sem acordo entre as partes, o Trato decide, com base nas provas do Pedido, por uma ou mais destas medidas:
+
+- liberar o valor ao Profissional, se o serviço foi entregue como combinado;
+- determinar retrabalho pelo mesmo Profissional, sem custo ao Cliente, em até 7 dias corridos, a combinar com o Cliente;
+- reembolsar o Cliente, total ou parcialmente, pelo Parceiro de Pagamento, se o valor ainda estiver retido, ou por compensação de valores futuros do Profissional, se já tiver sido liberado (conforme os Termos do Profissional);
+- reembolsar o Cliente se o Profissional se recusar ou deixar de refazer o serviço no prazo.
+
+**8.7 Contestação.** Qualquer das partes pode contestar a decisão em 5 dias úteis, informando o que a análise não considerou. A contestação é examinada por outro Analista, que responde de forma fundamentada em até 10 dias úteis. A contestação não suspende o prazo legal do Cliente.
+
+**8.8 Danos ao imóvel ou aos bens.** Se houver dano ao imóvel ou a objetos, o Cliente deve relatar o quanto antes, com fotos e uma descrição do que aconteceu. O Trato fornece os registros do Pedido ao Cliente, mantém retidos os valores ainda não liberados, analisa o
+
+caso pelas regras desta seção e colabora com o Cliente e com as autoridades competentes. O Profissional responde pelo dano que causar, e o Trato responde nos termos da seção 17. Danos graves, furto ou lesão corporal seguem também a seção 9.
+
+**8.9 Situações que podem afastar a garantia.** O Analista pode negar garantia ou reembolso, com justificativa, quando as provas mostrarem que o problema não decorre do serviço, por exemplo:
+
+- defeito já existente antes do serviço (como móvel de fábrica com peça faltando ou parede com infiltração anterior);
+- uso inadequado depois do serviço ou desgaste natural;
+- intervenção de outra pessoa no trabalho feito;
+- informação incorreta dada pelo Cliente no Pedido que levou o Profissional a erro.
+
+Essa lista não transfere ao Cliente o ônus de provar o que o Trato pode verificar, e nenhum desses casos afasta direitos que a lei garante ao Consumidor.
+
+**8.10 Sem garantia financeira própria.** O Trato não oferece fundo ou garantia financeira própria para cobrir serviços mal executados, salvo o que estiver expresso no aplicativo e o que a lei exigir. Isso não afasta as responsabilidades do Trato descritas na seção 17.
+
+**8.11 Outros caminhos.** A decisão do Trato não substitui o Judiciário nem órgãos de defesa do consumidor. O Cliente pode, a qualquer momento, usar o consumidor.gov.br, o Procon ou os Juizados Especiais (seção 24).
+
+## 9. Segurança e incidentes na residência
+
+**9.1 Por que esta seção existe.** O serviço acontece dentro da casa do Cliente, e isso exige cuidado dos dois lados. Esta seção diz como relatar um incidente e o que o Trato faz depois.
+
+**9.2 Emergência.** Em risco imediato, ligue primeiro para 190 (polícia militar), 192 (SAMU) ou 193 (bombeiros). Depois, avise o Trato.
+
+**9.3 Canal de Segurança.** O Cliente e o Profissional podem relatar incidentes pelo botão de segurança do aplicativo, pelo telefone ou WhatsApp [PREENCHER: NÚMERO DO CANAL DE SEGURANÇA], disponível [PREENCHER: HORÁRIO DE FUNCIONAMENTO DO CANAL DE SEGURANÇA], e por suporte@tratofeitolabs.com.br. O Trato confirma o recebimento imediatamente.
+
+**9.4 Quais incidentes devem ser relatados.**
+
+- furto, roubo ou desaparecimento de objetos;
+- agressão, ameaça, assédio, discriminação ou constrangimento;
+- acidente com pessoa ou dano grave ao imóvel;
+
+- chegada de pessoa diferente do Profissional verificado no Pedido (nome ou foto não conferem);
+- comportamento que pareça suspeito ou perigoso;
+- pedido de pagamento por fora, de códigos ou de dados sensíveis.
+
+**9.5 Pessoa diferente da verificada.** Se quem chegar não for o Profissional que aparece no aplicativo, o Cliente não precisa abrir a porta nem informar o Código de Início. Basta relatar pelo Canal de Segurança. O Trato cancela o Pedido com reembolso integral, sem retenção, e investiga.
+
+**9.6 O que o Trato faz depois de um relato.**
+- Em até 24 horas, adota medidas de cautela, como suspender a conta do Usuário envolvido, bloquear o contato entre as partes, preservar os registros do Pedido e manter retido qualquer valor ainda não liberado.
+- Entra em contato com quem relatou, orienta a registrar boletim de ocorrência e fornece os registros do Pedido que a pessoa precisar.
+- Colabora com as autoridades e fornece registros mediante requisição ou ordem judicial, e, sem ordem, quando for necessário para proteger a vida ou a integridade de alguém ou para prevenir fraude, nos limites da LGPD.
+- Apura o caso, ouve as partes e, conforme a gravidade, aplica as medidas da seção 20, informando a quem relatou o desfecho que for compatível com a privacidade dos envolvidos.
+
+O Canal de Segurança não substitui a polícia nem o Judiciário.
+
+**9.7 Cuidados recomendados ao Cliente.** Confira nome, foto e Selo de Verificação do Profissional antes de abrir a porta. Guarde objetos de valor e documentos. Informe quem estará em casa. Só diga o Código de Início depois de conferir a pessoa. Mantenha a conversa e o pagamento dentro do aplicativo. Se houver câmeras, avise o Profissional antes do início (cláusula 18.7). Essas recomendações não reduzem as responsabilidades do Trato.
+
+**9.8 Direito do Profissional de se retirar.** O Profissional pode interromper o serviço e deixar o local, sem penalidade, se se sentir em risco, e deve relatar o fato em seguida. O valor proporcional ao trabalho já feito será analisado nos termos da seção 8.
+
+**9.9 Antecedentes criminais.** [PREENCHER: CLÁUSULA OPCIONAL 9.9 — decidir se adota ou apaga: o Trato poderá pedir ao Profissional, com o consentimento dele, certidão de antecedentes criminais, que será usada apenas para avaliar a elegibilidade para o Trato, com selo próprio que descreva exatamente o que foi conferido.]
+
+**9.10 Seguro.** [PREENCHER: CLÁUSULA OPCIONAL 9.10 — decidir se contrata seguro ou apaga: seguradora NOME, apólice Nº, TIPO DE DANO, limite R$ VALOR, ENDEREÇO das condições.]
+
+**9.11 Denúncias falsas.** Denúncias feitas de má-fé, para prejudicar alguém ou obter vantagem, podem levar às medidas da seção 20. Isso não alcança quem relatar de boa-fé um fato que depois não foi comprovado.
+
+## 10. Verificação de profissionais e selos
+
+**10.1 O que o Trato confere.** Antes de liberar Pedidos a um Profissional, o Trato confere:
+- o documento oficial de identidade com foto;
+- uma selfie, comparada com a foto do documento;
+- os dados cadastrais informados (nome, CPF, CNPJ ativo de MEI de qualquer tipo de atividade, data de nascimento, celular e e-mail), verificando se são coerentes entre si.
+
+**10.2 O que significa o selo "Identidade conferida".** O selo indica que, na data mostrada no perfil, o documento e a selfie do Profissional eram compatíveis e os dados cadastrais eram coerentes. O selo não diz que o Profissional tem boa conduta, qualificação técnica, experiência ou ausência de antecedentes, salvo se o aplicativo exibir outro selo que diga isso expressamente e descreva o que foi conferido.
+
+**10.3 Conferências repetidas.** O Trato pode refazer a conferência, inclusive por selfie no momento do Check-in, para confirmar que quem chega é o Profissional cadastrado. Se a conferência falhar ou houver suspeita de fraude, o Trato pode suspender a conta e retirar o selo até a regularização.
+
+**10.4 Dados de biometria.** A selfie usada para comparação facial é dado biométrico, considerado dado pessoal sensível pela LGPD. Ela é tratada apenas para identificar o Profissional e prevenir fraudes e riscos à segurança dos Usuários, e não para outras finalidades. Os detalhes (base legal, prazo de guarda, compartilhamento) estão na Política de Privacidade.
+
+**10.5 Limites e responsabilidade.** A conferência aumenta a transparência, mas não torna ninguém infalível nem elimina o cuidado normal ao receber alguém em casa (seção 9.7). Isso não diminui a responsabilidade do Trato pela conferência que ele afirma realizar, nem cria promessa de resultado além das regras de garantia, de disputa e de segurança destes Termos. A conferência também não cria vínculo trabalhista entre o Trato e o Profissional.
+
+**10.6 Perfil do Profissional.** O perfil mostra os selos, a data de cadastro, a nota média, o número de serviços concluídos, as categorias em que atua e as avaliações recebidas (seção 12). Dados de contato, endereço e documentos não aparecem no perfil público.
+
+## 11. Conduta, conversa no aplicativo e moderação
+
+**11.1 Chat do Pedido.** As mensagens trocadas no chat do Pedido ficam guardadas e servem de prova para os dois lados (seção 16). O chat é o canal para combinar detalhes do serviço. Recomendamos manter toda a negociação por ele, para que ela fique protegida pelas regras destes Termos.
+
+**11.2 Ocultação automática de contatos.** Antes da Contratação, números de telefone, e-mails e links externos são ocultados automaticamente pelo sistema, para proteger a negociação e evitar que o pagamento seja desviado para fora do aplicativo. Essa análise é automática, feita sobre o texto das mensagens, e você aceita que ela aconteça ao usar o chat. Se uma mensagem foi ocultada por engano, você pode pedir a revisão ao SAC. Depois da Contratação, as partes podem trocar o contato estritamente necessário para a execução do serviço, como avisar sobre chegada ou atraso.
+
+**11.3 Quem pode ler as mensagens.** O Trato não lê as conversas de forma rotineira. Um Analista pode acessar as mensagens de um Pedido apenas quando houver Relato de Problema, Disputa, denúncia, incidente de segurança, suspeita de fraude, ordem judicial ou autorização do Usuário. Esses acessos são registrados. As mensagens não são usadas para publicidade nem vendidas a terceiros.
+
+**11.4 Condutas proibidas.** É proibido usar o Trato para:
+
+- combinar pagamento por fora para burlar a plataforma;
+- enviar conteúdo ofensivo, discriminatório, ameaçador, sexualmente explícito ou ilegal;
+- assediar, intimidar ou agredir qualquer pessoa;
+- criar Pedidos, Orçamentos ou avaliações falsos ou combinados para manipular notas ou Tratinhos;
+- usar conta de outra pessoa, ceder a sua ou criar contas duplicadas;
+- tentar acessar dados de outros Usuários, ou do sistema, por meio não autorizado;
+- usar robôs, automações, engenharia reversa ou qualquer meio para copiar ou sobrecarregar o aplicativo;
+- publicar ou compartilhar, fora do Trato, imagens, áudios, vídeos, endereço ou dados pessoais de outro Usuário, ou do interior do imóvel, sem consentimento;
+- pedir ou oferecer serviços não cobertos (cláusula 3.7).
+
+**11.5 Discriminação.** O Trato não aceita discriminação por raça, cor, etnia, origem, religião, gênero, orientação sexual, idade, deficiência ou qualquer outra condição. Recusar um Pedido ou um Profissional por esses motivos, ou tratar alguém de forma ofensiva por causa deles, é violação destes Termos, sem prejuízo das medidas legais.
+
+**11.6 Como denunciar.** Qualquer Usuário pode denunciar uma conduta ou um conteúdo pelo aplicativo ou pelo SAC. O Trato analisa a denúncia e pode pedir mais informações.
+
+**11.7 Medidas.** Contas que descumprirem estas regras podem passar por análise humana, advertência, suspensão ou encerramento, na forma da seção 20, sem prejuízo das medidas legais cabíveis.
+
+**11.8 Aviso de remoção ou restrição.** Quando o Trato remover um conteúdo, ocultar uma avaliação ou restringir uma conta, ele informa o Usuário, indica o motivo e explica como contestar (cláusula 20.5). O aviso pode ser adiado se informar o Usuário atrapalhar investigação de crime ou colocar alguém em risco.
+
+## 12. Avaliações e reputação
+
+**12.1 Quem avalia e quando.** Concluído o Pedido (ou encerrada a Janela de Confirmação), o Cliente pode avaliar o Profissional e o Profissional pode avaliar o Cliente, com nota de 1 a 5 estrelas e comentário opcional. Só pode avaliar quem de fato participou de um Pedido concluído pelo Trato. A avaliação pode ser feita em até 30 dias após a conclusão do Pedido.
+
+**12.2 Avaliação é opinião do Usuário.** A avaliação expressa a opinião de quem a escreveu, não a do Trato. O Trato não a edita nem altera seu conteúdo. Cada Usuário responde pelo que escreve, e deve escrever com base em fatos, de boa-fé e respeitando a cláusula 11.4.
+
+**12.3 Como a nota é calculada.** A nota exibida no perfil do Profissional é a média das avaliações recebidas, com peso maior para as mais recentes. Avaliações removidas na forma da cláusula 12.6 não entram no cálculo. O perfil mostra também o número de Pedidos concluídos e o número de avaliações, para que a nota seja lida no contexto. Um Profissional novo, com poucas avaliações, aparece identificado como "novo no Trato", sem nota média enquanto não tiver o número mínimo de avaliações definido no aplicativo.
+
+**12.4 Avaliação incentivada.** O Trato pode oferecer Tratinhos ou outro benefício para estimular o Usuário a avaliar. Quando houver incentivo:
+
+- o benefício é concedido pelo ato de avaliar, nunca pelo conteúdo ou pela nota dada;
+- o incentivo é o mesmo para qualquer nota, positiva ou negativa;
+- o aplicativo informa, na tela da avaliação, que existe incentivo;
+- o Profissional não pode oferecer pagamento, desconto, brinde ou qualquer vantagem em troca de avaliação ou de nota.
+
+**12.5 A nota não depende dos Tratinhos.** A nota e a posição do Profissional na reputação não são alteradas pelos Tratinhos, nem pela quantidade de Tratinhos que o Cliente gaste ou que o Profissional receba. Tratinhos são pontos promocionais (seção 13 e Anexo I) e não compram nota, selo ou avaliação.
+
+**12.6 Avaliações que podem ser removidas ou ocultadas.** O Trato pode remover ou ocultar uma avaliação, depois de análise, apenas quando ela:
+
+- violar a cláusula 11.4 (ofensa, discriminação, ameaça, conteúdo ilegal);
+
+- expuser dados pessoais, endereço ou imagens do interior do imóvel;
+- não se referir a um Pedido real concluído, ou for comprovadamente falsa, combinada ou comprada;
+- tiver sido escrita por quem não participou do Pedido;
+- por decisão judicial.
+
+O Trato não remove uma avaliação só porque ela é negativa ou desagradou ao Profissional ou ao Cliente. Quando uma avaliação for removida ou ocultada, o Usuário que a escreveu é avisado, com o motivo, e pode contestar (cláusula 20.5).
+
+**12.7 Resposta e pedido de revisão.** O Usuário avaliado pode publicar uma resposta pública e curta à avaliação, respeitando a cláusula 11.4, e pode pedir a revisão de uma avaliação que acredite se enquadrar na cláusula 12.6, pelo aplicativo ou pelo SAC. O Trato responde ao pedido de revisão no prazo do Anexo II.
+
+**12.8 Avaliação sobre problema já resolvido.** Se o Pedido teve Relato de Problema resolvido pelo Trato (seção 8), o Usuário pode mencionar isso na avaliação. O Trato não remove a avaliação por esse motivo.
+
+**12.9 Destaque patrocinado (opcional).** [PREENCHER: CLÁUSULA OPCIONAL 12.9 — manter somente se o Trato passar a oferecer destaque pago.] O Trato pode oferecer ao Profissional a opção de pagar por destaque nos resultados de busca. Se oferecer:
+
+- o resultado destacado será sempre identificado como "Patrocinado", de forma visível;
+- o destaque só é oferecido a Profissionais que tenham a nota mínima e os requisitos de verificação informados no aplicativo;
+- o pagamento por destaque não altera a nota, as avaliações, os selos nem a ordem dos resultados não patrocinados;
+- o preço e a duração do destaque são informados antes da contratação, e o Profissional pode cancelar a qualquer momento, sem multa, com efeito a partir do fim do período já pago.
+
+**12.10 Manipulação de reputação.** Criar Pedidos falsos, trocar avaliações combinadas, usar contas duplicadas ou qualquer outro meio para inflar ou reduzir notas é infração grave, sujeita às medidas da seção 20, inclusive a anulação das avaliações e dos Tratinhos obtidos dessa forma.
+
+## 13. Tratinhos e exclusividade
+
+**13.1 O que são Tratinhos.** Tratinhos são pontos promocionais do Trato, concedidos como benefício de uso do aplicativo. Cada Tratinho vale, para fins de uso dentro do aplicativo, o equivalente a um centavo de real (1 Tratinho = R$ 0,01). As regras completas estão no Regulamento dos Tratinhos (Anexo I), que integra estes Termos.
+
+**13.2 O que Tratinhos não são.** Tratinhos não são moeda, dinheiro eletrônico, conta de pagamento, investimento ou valor mobiliário. Não podem ser convertidos em dinheiro, sacados, vendidos, emprestados ou transferidos para outra conta, e não rendem juros. Não existe saldo em dinheiro guardado em Tratinhos.
+
+**13.3 Como se ganha.** O Trato pode conceder Tratinhos em campanhas, por avaliação concluída (cláusula 12.4), por indicação ou por outras ações informadas no aplicativo. Cada campanha informa, antes da participação, como o benefício é obtido, seu valor e sua validade.
+
+**13.4 Validade.** Os Tratinhos têm validade de 90 dias, contados da data em que foram creditados, salvo prazo diferente informado na campanha antes de a pessoa participar. O aplicativo mostra o saldo e a data de vencimento de cada crédito. Os Tratinhos que vencem primeiro são usados primeiro. O Trato envia aviso, pelo aplicativo, antes do vencimento, na antecedência indicada no Anexo I.
+
+**13.5 Para que servem.** Os Tratinhos podem ser usados nas finalidades listadas no Anexo I, entre elas a exclusividade de 48 horas descrita na cláusula 13.6. O Trato pode incluir ou retirar finalidades, para o futuro, por aviso prévio (cláusula 23); a retirada de uma finalidade não cancela o que o Usuário já tenha contratado com ela.
+
+**13.6 Exclusividade de 48 horas.** O Cliente pode usar 100 Tratinhos (R$ 1,00 em valor de referência) para pedir a exclusividade de 48 horas em um Orçamento ou Profissional [PREENCHER: efeito exato da exclusividade de 48h — exemplo do texto: reservar o horário ou impedir que o Pedido seja enviado a outros Profissionais durante o prazo]. Durante as 48 horas, o efeito descrito no aplicativo vale para a negociação. Findo o prazo sem Contratação, a exclusividade termina e os Tratinhos usados não são devolvidos, salvo se o encerramento ocorrer por falha do Trato ou por desistência do Profissional, caso em que os Tratinhos são devolvidos com a validade original.
+
+**13.7 Tratinhos não alteram preço, nota nem garantia.** O uso de Tratinhos não aumenta o preço do serviço, não altera a nota ou os selos do Profissional (cláusula 12.5) e não reduz a Garantia do Trato nem qualquer direito do Usuário previsto em lei ou nestes Termos.
+
+**13.8 Cancelamento, estorno e Tratinhos.** Se um Pedido pago com ajuda de Tratinhos for cancelado ou estornado, os Tratinhos usados voltam ao saldo do Usuário com a validade original, se ainda estiverem dentro dela. Se já tiverem vencido, o Trato concede novo crédito equivalente, com validade de 30 dias. Tratinhos obtidos por avaliação ou campanha vinculada a um Pedido que seja estornado por fraude podem ser cancelados (cláusula 12.10).
+
+**13.9 Fraude e uso indevido.** Uso de Tratinhos obtido por fraude, contas duplicadas, avaliações combinadas ou qualquer manipulação (cláusulas 11.4 e 12.10) leva ao cancelamento dos Tratinhos envolvidos e às medidas da seção 20.
+
+**13.10 Encerramento da conta.** Ao encerrar a conta por vontade própria, o Usuário perde os Tratinhos que ainda tiver, o que é informado antes da confirmação do encerramento. Se o Trato encerrar a conta sem falta do Usuário, os Tratinhos não usados são mantidos por 90 dias, para uso caso a conta seja restabelecida.
+
+**13.11 Alterações no programa.** O Trato pode alterar as regras do programa de Tratinhos ou encerrá-lo, com aviso prévio de pelo menos 30 dias no aplicativo, mantendo o direito de uso até o vencimento dos Tratinhos já creditados, no prazo de validade que tinham quando foram creditados. A mudança não atinge benefícios já contratados.
+
+## 14. Privacidade e proteção de dados pessoais
+
+**14.1 Relação com a Política de Privacidade.** Esta seção resume como o Trato trata dados pessoais, em cumprimento da Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018). A Política de Privacidade, publicada em [PREENCHER: URL DA POLÍTICA DE PRIVACIDADE], detalha cada tratamento e faz parte destes Termos. Em caso de conflito sobre dados pessoais, vale a regra mais protetora ao titular.
+
+**14.2 Controlador e Encarregado.** O controlador dos dados é a Feito Labs Tecnologia Ltda. (cláusula 1.1). O Encarregado pelo tratamento de dados pessoais é [PREENCHER: NOME DO ENCARREGADO DE DADOS], que atende pelo e-mail privacidade@tratofeitolabs.com.br. Esse é o canal para exercer direitos e tirar dúvidas sobre dados.
+
+**14.3 Quais dados tratamos.** Conforme o uso do aplicativo, o Trato trata:
+- dados de cadastro: nome, CPF, data de nascimento, e-mail, telefone, endereço do Cliente e área de atuação do Profissional;
+- dados de verificação do Profissional: documento de identificação, foto do documento, imagem do rosto para comparação (autoverificação facial), resultado da conferência e, se adotada a cláusula 9.9, antecedentes criminais;
+- dados do Pedido: descrição do serviço, fotos, endereço de execução, datas, valores, Orçamentos, mensagens do chat e Relatos de Problema;
+- dados de execução do serviço: fotos e localização do Check-in e do Check-out, Código de Início e Código de Final, e horários;
+- dados de pagamento: forma de pagamento, últimos dígitos do cartão, status das transações. Dados completos do cartão e da conta bancária são tratados pelo Parceiro de Pagamento e não ficam guardados pelo Trato;
+- dados de uso e do dispositivo: endereço IP, data e hora de acesso, tipo de aparelho, sistema operacional, identificadores do dispositivo e registros de acesso;
+- dados de avaliações e reputação: notas, comentários e selos;
+- dados de comunicação com o SAC e com o Analista.
+
+**14.4 Dados sensíveis e biometria.** A imagem do rosto usada para comparar com o documento do Profissional é dado pessoal sensível (LGPD, art. 5º, II). O Trato a trata somente para confirmar a identidade e prevenir fraude, com base na garantia da prevenção à fraude e da segurança do titular em processos de identificação e autenticação de cadastro (LGPD, art. 11, II, "g"), e não a usa para publicidade, nem a compartilha para outras finalidades. A verificação facial é descrita na cláusula 10.4, e o prazo de retenção da imagem está na Política de Privacidade. Os dados de antecedentes, se coletados, seguem a cláusula 9.9.
+
+**14.5 Para que usamos os dados e em que base legal.**
+
+| Finalidade | Base legal principal |
+|---|---|
+| Criar e manter a conta, conectar Cliente e Profissional, executar o Pedido | Execução de contrato (art. 7º, V) |
+| Processar pagamentos, retenção e repasse | Execução de contrato e cumprimento de obrigação legal (art. 7º, V e II) |
+| Verificar a identidade e prevenir fraude e incidentes | Legítimo interesse e, para biometria, art. 11, II, "g" |
+| Guardar registros de acesso e de transações | Obrigação legal (Marco Civil, art. 15; legislação fiscal) |
+| Resolver Relatos de Problema e Disputas, e exercer direitos em processos | Exercício regular de direitos (art. 7º, VI) |
+| Enviar avisos do serviço e comunicações sobre o Pedido | Execução de contrato |
+| Enviar ofertas e novidades | Consentimento ou legítimo interesse, com direito de recusar a qualquer tempo |
+| Melhorar o aplicativo e medir desempenho | Legítimo interesse |
+
+**14.6 Com quem compartilhamos.** O Trato compartilha dados apenas quando necessário:
+
+- com a outra parte do Pedido, o mínimo para o serviço: o nome e a área do Profissional ao Cliente; o primeiro nome do Cliente, a região e, depois da Contratação, o endereço de execução ao Profissional;
+- com o Parceiro de Pagamento (Stripe Brasil Soluções de Pagamento Ltda. e demais empresas do grupo, quando for o caso), para pagamentos, repasses e prevenção a fraude;
+- com fornecedores de tecnologia, como hospedagem, envio de mensagens e verificação de identidade, que tratam os dados em nosso nome e sob contrato;
+
+- com autoridades, por ordem judicial ou obrigação legal;
+- em caso de reorganização societária, com garantia de que as regras de privacidade continuem valendo.
+
+O Trato não vende dados pessoais.
+
+**14.7 Transferência internacional.** Alguns fornecedores podem tratar dados fora do Brasil. Quando isso ocorrer, o Trato adota as garantias da LGPD (art. 33) e informa na Política de Privacidade os países e as salvaguardas.
+
+**14.8 Por quanto tempo guardamos.** O Trato guarda os dados pelo tempo necessário para a finalidade e para cumprir obrigações legais:
+
+- registros de acesso ao aplicativo: no mínimo 6 meses (Marco Civil, art. 15);
+- registros de Pedidos, pagamentos, mensagens e provas: por [PREENCHER: 5] anos após a conclusão do Pedido, para defesa em disputas e prazos prescricionais e fiscais (cláusula 16.3);
+- imagem facial e documentos de verificação: conforme a Política de Privacidade, pelo menor prazo possível;
+- dados de conta: enquanto a conta existir e, depois, pelos prazos acima.
+
+Vencidos os prazos, os dados são excluídos ou anonimizados.
+
+**14.9 Seus direitos.** O titular pode pedir, a qualquer momento e gratuitamente (LGPD, art. 18): confirmação de que seus dados são tratados; acesso; correção; anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade; portabilidade; eliminação dos dados tratados com consentimento; informação sobre com quem os dados são compartilhados; informação sobre a possibilidade de não consentir e suas consequências; e revogação do consentimento. O pedido é feito ao Encarregado (cláusula 14.2) e respondido no prazo do Anexo II. Alguns dados não podem ser eliminados quando a lei exige que o Trato os guarde; nesse caso, o Trato explica o motivo.
+
+**14.10 Decisões automatizadas.** Algumas decisões do Trato usam análise automática, como a ocultação de contatos no chat (cláusula 11.2), a conferência de documentos e do rosto, os alertas de fraude e a ordem dos resultados. O titular pode pedir a revisão por pessoa de decisão tomada unicamente por tratamento automatizado que afete seus interesses (LGPD, art. 20), e o Trato informa os critérios usados, respeitado o segredo comercial e industrial. A suspensão ou o encerramento de conta nunca é decidido apenas por máquina (cláusula 20.2).
+
+**14.11 Segurança.** O Trato adota medidas técnicas e administrativas para proteger os dados, como criptografia, controle de acesso por perfil, registro dos acessos e treinamento da equipe. Em caso de incidente de segurança que possa causar risco ou dano relevante aos titulares, o Trato comunica a Autoridade Nacional de Proteção de Dados (ANPD) e os titulares afetados, no prazo e na forma da lei (LGPD, art. 48).
+
+**14.12 Localização, câmera e fotos.** O aplicativo só usa a localização, a câmera e a galeria quando o Usuário permite no aparelho, e somente nas funções que dependem delas: Check-in e Check-out, fotos do Pedido, verificação de identidade e Relato de Problema. A localização é coletada no momento do Check-in e do Check-out, e não de forma contínua. O Usuário pode retirar a permissão no aparelho, e as funções que dependem dela deixam de estar disponíveis.
+
+**14.13 Crianças e adolescentes.** O Trato é destinado a maiores de 18 anos (seção 4). Se o Trato identificar conta de menor de idade, a conta é encerrada e os dados são eliminados, ressalvadas as exigências legais.
+
+**14.14 Dados de terceiros.** O Usuário que enviar fotos ou informações que mostrem outras pessoas, como moradores ou familiares, deve ter o direito de fazê-lo e evitar imagens desnecessárias das pessoas e do interior do imóvel (cláusula 18.7).
+
+**14.15 Reclamações.** Além do Encarregado, o titular pode reclamar à ANPD e aos órgãos de defesa do consumidor.
+
+## 15. Comunicações
+
+**15.1 Canais oficiais.** O Trato se comunica com o Usuário por notificações no aplicativo, e-mail e telefone cadastrados e, quando o Usuário autorizar, mensagem de texto ou aplicativo de mensagens. O Usuário deve manter esses dados atualizados, e a comunicação enviada para o contato cadastrado considera-se recebida, salvo prova de falha do Trato.
+
+**15.2 Avisos obrigatórios.** Avisos que afetam direitos do Usuário, como mudança nestes Termos, suspensão, encerramento, estorno, Disputa e decisão do Analista, são sempre enviados pelo aplicativo e também por e-mail. O Usuário não pode desligar esses avisos enquanto tiver conta ativa.
+
+**15.3 Avisos do Pedido.** O Usuário recebe avisos sobre Orçamentos, Contratação, chegada do Profissional, início e fim do serviço, abertura e encerramento da Janela de Confirmação, e Relato de Problema. Esses avisos são parte do serviço. As notificações do aplicativo podem ser desligadas no aparelho, mas o Usuário deve abrir o aplicativo para acompanhar prazos, em especial os da cláusula 5.8.
+
+**15.4 Ofertas e novidades.** O Trato só envia ofertas e novidades quando o Usuário concordar, ou quando permitido pelo legítimo interesse na lei. O Usuário pode deixar de recebê-las a qualquer momento, pelo link de cancelamento ou pelas configurações do aplicativo. Cancelar ofertas não interrompe os avisos das cláusulas 15.2 e 15.3.
+
+**15.5 Comunicações falsas.** O Trato não pede senha, código de verificação, número completo de cartão nem pagamento por fora do aplicativo. Se o Usuário receber mensagem com esse tipo de pedido em nome do Trato, não deve atender e deve avisar o
+
+SAC pelo canal da seção 25.
+
+**15.6 Comunicação do Usuário com o Trato.** O Usuário fala com o Trato pelo SAC, nos canais da seção 25, e pelos fluxos do aplicativo para Relato de Problema, Disputa e denúncia. Comunicações por outros canais, como redes sociais, podem não ser registradas e não têm garantia de resposta nos prazos do Anexo II.
+
+## 16. Registros e prova
+
+**16.1 O que o Trato registra.** Para proteger Clientes e Profissionais, o Trato guarda os registros de cada Pedido: Orçamentos e Contratação; mensagens do chat; datas e horários; Código de Início e Código de Final; fotos e localização do Check-in e do Check-out; pagamentos, retenção, repasses e estornos; Relatos de Problema, Disputas e decisões; avaliações; e registros de acesso à conta.
+
+**16.2 Valor dos registros.** Esses registros servem de prova entre as partes e perante o Trato. O Usuário reconhece que os registros eletrônicos do aplicativo, incluindo os códigos digitados e as fotos com data e hora, comprovam os atos praticados na sua conta. A regra é uma presunção: o Usuário pode apresentar prova em sentido contrário, no Trato ou em juízo, e o Trato não se recusa a examiná-la. Esta cláusula não inverte o ônus da prova contra o consumidor quando isso for vedado pelo Código de Defesa do Consumidor.
+
+**16.3 Por quanto tempo.** Os registros de Pedidos, pagamentos, mensagens e provas são guardados por [PREENCHER: 5] anos contados da conclusão do Pedido, e os registros de acesso por no mínimo 6 meses (cláusula 14.8). Se houver Disputa, processo ou investigação em andamento, a guarda dura até o fim deles.
+
+**16.4 Acesso do Usuário aos registros.** O Usuário pode ver no aplicativo o histórico dos seus Pedidos e pedir cópia dos registros que lhe digam respeito, pelo SAC ou pelo Encarregado (cláusula 14.9). O Trato não entrega dados pessoais da outra parte além do necessário, salvo ordem judicial.
+
+**16.5 Falha técnica.** Se um registro faltar ou for considerado não confiável por falha do sistema, essa falta não prejudica o Usuário na análise de Relato de Problema ou Disputa, e o Analista decide com os demais elementos disponíveis, como mensagens, fotos, pagamentos e relatos das partes.
+
+**16.6 Fotos e imagens do Pedido.** As fotos do Check-in, do Check-out e do Relato de Problema servem para comprovar o serviço. Quem as faz deve evitar mostrar pessoas, documentos e objetos pessoais que não sejam necessários (cláusula 18.7). O Trato usa essas imagens apenas para os fins desta seção, para a Garantia e para a segurança, e não para publicidade.
+
+**16.7 Pedido de autoridade.** O Trato entrega registros a autoridades quando houver ordem judicial ou obrigação legal, na medida exigida, e avisa o Usuário, quando a lei permitir.
+
+## 17. Responsabilidade do Trato
+
+**17.1 Pelo que o Trato responde.** O Trato responde, nos termos da lei, pelos serviços que ele mesmo presta e promete neste documento, entre eles:
+
+- a intermediação: o funcionamento do aplicativo, o registro correto de Pedidos, Orçamentos, códigos, Check-in e Check-out, e a entrega das informações que o Usuário precisa para decidir;
+- o cadastro: a guarda e o tratamento de dados pessoais conforme a seção 14 e a lei;
+- o pagamento: a retenção, o repasse e o estorno dos valores na forma da seção 6, com a ressalva de que o processamento é feito pelo Parceiro de Pagamento;
+- a verificação: a realização, com o cuidado devido, das conferências descritas na seção 10, nos limites ali informados, e a veracidade do que o Trato afirma sobre elas (como o selo "Identidade conferida");
+- a Garantia do Trato e o atendimento: o cumprimento da seção 8 e dos prazos do Anexo II;
+- a segurança do aplicativo e a resposta a incidentes, conforme a seção 9.
+
+**17.2 Pelo que o Profissional responde.** O Profissional é responsável pela execução do serviço: qualidade, prazo, materiais que ele fornecer, segurança no trabalho, cumprimento do que ofereceu no Orçamento e eventuais danos que causar ao Cliente, à casa ou a terceiros (cláusula 19). O Profissional é autônomo e não é empregado, preposto ou sócio do Trato (cláusula 3.4).
+
+**17.3 Responsabilidade solidária e direitos do consumidor.** Estes Termos não excluem nem reduzem a responsabilidade que a lei atribui ao Trato perante o consumidor, inclusive a responsabilidade solidária prevista no Código de Defesa do Consumidor para quem integra a cadeia de fornecimento e a responsabilidade pelos serviços que o próprio Trato presta. Qualquer cláusula destes Termos que, em um caso concreto, seja lida como exoneração dessa responsabilidade não produz esse efeito para o consumidor, e o restante dos Termos continua valendo. Os limites das cláusulas 17.5 a 17.7 só se aplicam até onde a lei permitir.
+
+**17.4 Direito de regresso.** Quando o Trato indenizar ou ressarcir um Cliente por dano causado pela execução do serviço, ou quando pagar um valor que, entre as partes, caberia ao Profissional, o Trato pode cobrar do Profissional o que pagou, por compensação de repasses futuros (cláusula 8.6) ou por outros meios legais, sempre com aviso ao Profissional, indicação do motivo e possibilidade de contestar (cláusula 20.5). Essa cobrança não diminui o direito do Cliente de ser ressarcido.
+
+**17.5 Danos entre as partes.** Quanto à execução do serviço, o Trato não é o executor. Por isso, na relação entre Cliente e Profissional, o Trato age como intermediador e a Garantia do Trato (seção 8) é o mecanismo de reparação, dentro dos limites e valores ali previstos.
+
+O que exceder esses limites pode ser cobrado diretamente do Profissional ou, quando a lei assim estabelecer, do Trato.
+
+**17.6 Limites de valor.** [PREENCHER: CLÁUSULA 17.6 A REVISAR PELO ADVOGADO] Quando a lei permitir a limitação, a responsabilidade do Trato por danos materiais não ultrapassa o valor do Pedido a que o dano se refere, somado à devolução dos valores pagos por ele. Esse limite não vale para: dano causado por dolo ou culpa grave do Trato; dano a pessoa (vida, saúde e integridade física); violação de dados pessoais; fraude no próprio sistema do Trato; e qualquer hipótese em que a lei proibir a limitação, em especial perante o consumidor.
+
+**17.7 Danos indiretos.** O Trato não responde por lucros cessantes ou danos indiretos que dependam de circunstâncias que não conhece nem controla, salvo quando a lei determinar que responda, e salvo nos casos da parte final da cláusula 17.6.
+
+**17.8 O que o Trato não garante.** O Trato não garante que o Usuário terá Orçamentos, que a disponibilidade do Profissional será mantida, nem que uma verificação de identidade elimina todo risco. Ele também não responde por atos de terceiros que o Trato não controla e que não decorram de falha sua, como a quebra de acordo feito fora do aplicativo (cláusula 11.4), a falha da rede de internet do Usuário ou o mau funcionamento do aparelho do Usuário.
+
+**17.9 Culpa exclusiva.** O Trato não responde por danos que decorram de culpa exclusiva do Usuário ou de terceiro, ou de força maior (seção 22), na forma da lei.
+
+**17.10 Conteúdo de Usuários.** O Trato não é autor das avaliações, das mensagens e dos Orçamentos dos Usuários (cláusula 12.2). Ele responde pelo conteúdo de terceiros nos casos e nas condições do Marco Civil da Internet (Lei 12.965/2014, art. 19), inclusive removendo conteúdo após ordem judicial específica, e removendo por conta própria o conteúdo das cláusulas 11.4 e 12.6 e o conteúdo íntimo divulgado sem consentimento, mediante notificação.
+
+## 18. Obrigações do Cliente
+
+**18.1 Dados verdadeiros.** O Cliente informa dados corretos e atualizados no cadastro e no Pedido, e mantém um meio de contato funcionando.
+
+**18.2 Descrição fiel do serviço.** O Cliente descreve o serviço com clareza e honestidade: tamanho do imóvel ou da tarefa, estado do local, riscos conhecidos (como fiação elétrica ruim ou animais), número de pessoas e necessidades especiais. Informação omitida que torne o serviço muito mais difícil pode levar ao ajuste de preço pela cláusula 6.8 (Aditivo), sempre com a concordância do Cliente.
+
+**18.3 Estar disponível e dar acesso.** O Cliente, ou pessoa indicada por ele, deve estar no local no horário combinado e dar o acesso necessário ao serviço (chave, portão, portaria, água, energia). Se não for possível iniciar o serviço por causa do Cliente, aplica-se a espera
+
+de 20 minutos e a cláusula 7.6 (Cliente ausente).
+
+**18.4 Pagar e negociar pelo aplicativo.** O Cliente paga somente pelo aplicativo e não combina nem aceita pagamento por fora para o mesmo serviço (cláusula 11.4). Gorjeta voluntariamente dada ao Profissional é permitida e não conta como pagamento por fora, desde que o serviço contratado tenha sido pago pelo aplicativo.
+
+**18.5 Local seguro e respeito.** O Cliente garante, na medida do que lhe cabe, que o local é seguro para o trabalho: sem risco evidente à integridade do Profissional, animais contidos quando necessário, e tratamento respeitoso, sem assédio, discriminação ou humilhação. O Profissional pode recusar ou interromper o serviço diante de risco grave ou desrespeito, na forma da cláusula 19.6 e da seção 9.
+
+**18.6 Materiais e condições combinadas.** Se o Cliente ficou de fornecer materiais, ferramentas, produtos ou condições (por exemplo, escada, ponto de água ou local de estacionamento), deve tê-los disponíveis no horário. A falta, quando impedir ou atrasar o serviço, é tratada como indisponibilidade do Cliente.
+
+**18.7 Câmeras e gravações.** O Cliente que tiver câmeras ou outros equipamentos de gravação no imóvel deve:
+
+- avisar o Profissional, antes da Contratação ou pelo menos antes do início do serviço, que existem câmeras e onde elas estão;
+- nunca instalar ou manter câmeras, ou gravar áudio ou vídeo, em banheiros, vestiários ou locais onde o Profissional troque de roupa ou faça suas necessidades, nem em quartos de dormir quando o Profissional estiver ali em local de intimidade;
+- não divulgar gravações do Profissional em redes sociais ou grupos, nem as usar para outro fim que não a segurança do imóvel ou a defesa de direitos;
+- respeitar o direito do Profissional de recusar ou encerrar o serviço se não aceitar a gravação, sem punição por isso, aplicando-se a cláusula 7 conforme o caso.
+
+O descumprimento é infração grave (seção 20), sem prejuízo das medidas legais, inclusive pela Lei Geral de Proteção de Dados.
+
+**18.8 Confirmar ou relatar o problema.** Ao fim do serviço, o Cliente deve conferir o resultado, confirmar o serviço ou abrir um Relato de Problema dentro da Janela de Confirmação de 48 horas (cláusula 5.8). Se não fizer nem uma coisa nem outra, aplica-se a confirmação tácita da cláusula 5.8, sem prejuízo dos direitos legais do consumidor, em especial os prazos do art. 26 do CDC e a Garantia do Trato.
+
+**18.9 Chaves, códigos e objetos de valor.** O Cliente deve guardar dinheiro, joias, documentos e objetos de valor ou de especial estimação antes do serviço. Se entregar chave ou código de acesso ao Profissional, faz isso por sua conta e risco, e deve trocá-los se tiver motivo para desconfiar.
+
+**18.10 Relação de trabalho doméstico.** O Trato é para serviços contratados caso a caso. O Cliente não deve usá-lo para manter, de fato, trabalhador doméstico a seu serviço de modo contínuo, subordinado e por mais de dois dias por semana, pois isso pode caracterizar vínculo de emprego doméstico (Lei Complementar 150/2015, art. 1º), com obrigações próprias do empregador que não são do Trato. O Trato não assume essas obrigações, e o Cliente responde por elas se o vínculo existir. Quando o aplicativo identificar repetição frequente do mesmo Cliente com o mesmo Profissional, pode enviar aviso sobre essa regra.
+
+**18.11 Serviços fora do escopo e pedidos ilícitos.** O Cliente não pode pedir serviços fora do escopo da cláusula 3.7 nem qualquer atividade ilegal, perigosa sem equipamento adequado ou que exija habilitação que o Profissional não declarou ter.
+
+**18.12 Responsável por quem está no local.** O Cliente responde pelos atos de pessoas que estejam no local e que sejam sob seu cuidado (moradores, visitas, animais), quando estes causarem dano ou risco ao Profissional.
+
+## 19. Obrigações do Profissional
+
+**19.1 Autônomo e responsável por si.** O Profissional atua por conta própria, escolhe quais Pedidos aceita, decide como executar o serviço e define seus horários, sem exclusividade e sem subordinação ao Trato (cláusula 3.4). Ele é responsável pelos seus tributos, contribuições, licenças, registros e seguros, e pelo que a lei exigir da sua atividade. Para atuar como Profissional no Trato é exigido CNPJ ativo de MEI (Microempreendedor Individual), de qualquer tipo de atividade; outras empresas (ME, LTDA) não entram. O Trato pode informar, no aplicativo, orientações sobre formalização como MEI, sem que isso constitua aconselhamento tributário.
+
+**19.2 Perfil verdadeiro.** O Profissional informa dados verdadeiros, inclusive suas habilidades, experiência, área de atuação e habilitações, e não afirma ter qualificação, registro profissional ou certificado que não possui. Serviços que a lei reserve a profissionais habilitados só podem ser anunciados por quem tiver a habilitação. O Profissional deve atualizar o perfil quando algo mudar e passar pelas verificações da seção 10.
+
+**19.3 Orçamento honesto e cumprimento.** O Profissional faz Orçamentos realistas, com preço, escopo, materiais e prazo claros (cláusula 5.3), e cumpre o que prometeu. Mudanças de preço depois da Contratação só por Aditivo aceito pelo Cliente pelo aplicativo (cláusula 6.8).
+
+**19.4 Pontualidade.** O Profissional chega no horário combinado. Se for atrasar, avisa o Cliente pelo chat assim que souber. Atraso superior a 30 minutos sem aviso e sem acordo com o Cliente permite ao Cliente cancelar sem custo, na forma da cláusula 5.10, e pode gerar as medidas da seção 20 se for repetido.
+
+**19.5 Check-in, Check-out e códigos.** O Profissional faz o Check-in ao chegar e o Check-out ao terminar, com as fotos e a localização pedidas pelo aplicativo, e usa corretamente o Código de Início e o Código de Final (seção 5). Não pode fazer Check-in sem estar no local, nem Check-out de serviço não concluído. Registro falso é fraude.
+
+**19.6 Direito de recusar ou interromper por segurança.** O Profissional pode recusar ou interromper o serviço, sem punição, quando houver risco grave à sua integridade, desrespeito, assédio, discriminação, câmeras proibidas (cláusula 18.7) ou pedido ilícito, avisando o Trato pelo aplicativo ou pelo canal de segurança (seção 9). Nesses casos, o cancelamento não conta como falta do Profissional, e o Trato analisa o valor devido pelo que já foi feito.
+
+**19.7 Respeito e sigilo.** O Profissional trata o Cliente, os moradores e o imóvel com respeito e cuidado. Mantém sigilo sobre o endereço, a rotina, as fotos e as informações do imóvel e das pessoas, e só os usa para executar o serviço. Não pode fotografar ou gravar o interior do imóvel e as pessoas para outro fim, nem divulgar essas imagens sem consentimento, além das fotos de Check-in e Check-out.
+
+**19.8 Pagamento só pelo aplicativo e sem aliciar.** O Profissional recebe o preço do serviço pelo aplicativo e não cobra a mais por fora do Pedido, nem pede ao Cliente que pague ou combine serviços futuros fora do Trato para burlar a plataforma (cláusula 11.4). Gorjeta dada voluntariamente pelo Cliente é permitida.
+
+**19.9 Execução pessoal.** O serviço é executado pelo Profissional verificado. Ele não pode mandar substituto, ajudante ou terceiro sem aviso prévio ao Cliente e consentimento dele pelo aplicativo, e responde pelos atos da pessoa que autorizou. O Trato não verifica ajudantes do Profissional.
+
+**19.10 Equipamento, materiais e segurança no trabalho.** O Profissional usa equipamentos de proteção adequados e ferramentas em bom estado, e não executa serviço que não saiba fazer com segurança. Se o Orçamento incluir materiais, informa o que é e o preço. Nota ou recibo de material, quando houver, deve ser mostrado ao Cliente se ele pedir.
+
+**19.11 Reparar falha na execução.** Se o Cliente abrir Relato de Problema por falha na execução, o Profissional coopera com a solução: refazer, corrigir, justificar ou aceitar a decisão do Analista (seção 8). Danos que causar ao Cliente, ao imóvel ou a terceiros são de sua responsabilidade, nos termos da lei e da cláusula 17.4.
+
+**19.12 Indisponibilidade e cancelamento.** O Profissional só aceita Pedidos que possa cumprir. Cancelar depois da Contratação fora das hipóteses da cláusula 19.6 segue a cláusula 7.7, e cancelamentos repetidos podem levar às medidas da seção 20.
+
+**19.13 Antecedentes e seguro (opcionais).** [PREENCHER: CLÁUSULA OPCIONAL 19.13 — manter apenas se o Trato adotar 9.9 e 9.10] O Profissional apresenta antecedentes criminais e, se aplicável, contrata o seguro, conforme essas cláusulas.
+
+## 20. Suspensão, encerramento e contestação
+
+**20.1 Medidas gradativas.** Diante de descumprimento destes Termos, o Trato aplica medida proporcional à gravidade e ao histórico, em geral nesta ordem: (a) aviso ou orientação; (b) restrição temporária de funções (por exemplo, não poder enviar Orçamentos ou usar Tratinhos); (c) suspensão temporária da conta; (d) encerramento da conta. O Trato pode pular etapas em casos graves.
+
+**20.2 Decisão humana.** A suspensão por prazo superior a 7 dias e o encerramento de conta são decididos por Analista, e não apenas por sistema automático. Alertas automáticos podem iniciar uma análise e podem restringir funções por até 72 horas para evitar dano, mas a decisão final é humana (cláusula 14.10).
+
+**20.3 Casos que justificam suspensão imediata.** Podem levar à suspensão imediata, antes de qualquer contestação: suspeita fundada de fraude ou de uso de documento ou identidade falsa; violação grave da seção 9 (segurança), como agressão, assédio, ameaça ou câmera em local proibido; ordem judicial ou de autoridade; risco à segurança de outras pessoas; e ataque ou tentativa de acesso indevido ao sistema. A suspensão imediata dura só o tempo necessário à análise.
+
+**20.4 Aviso e motivo.** Toda restrição, suspensão ou encerramento é comunicado ao Usuário por escrito (cláusula 15.2), com: o motivo, as cláusulas envolvidas, a data de início, o que acontece com Pedidos e valores em andamento, e como contestar. O Trato pode adiar o detalhe do motivo se revelá-lo comprometer investigação ou colocar alguém em risco, mas informa, ao menos, a cláusula violada em termos gerais.
+
+**20.5 Contestação.** O Usuário pode contestar a medida, pelo aplicativo ou pelo SAC, em até 30 dias do aviso, apresentando sua versão e provas. Um Analista que não tenha tomado a decisão inicial, sempre que possível, reanalisa o caso e responde por escrito no prazo do Anexo II, mantendo, alterando ou revertendo a medida, com explicação. Se a medida for revertida, o Trato restabelece a conta e corrige, na medida do possível, o efeito (reputação, Tratinhos e valores).
+
+**20.6 Pedidos e dinheiro em andamento.** Quando a conta for suspensa ou encerrada:
+
+- Pedidos futuros são cancelados ou reagendados com aviso à outra parte. O Cliente é reembolsado integralmente se a causa for do Profissional, e sem custo de cancelamento em qualquer caso;
+- Pedidos em andamento podem ser concluídos se houver segurança para isso, ou encerrados com o pagamento do que foi comprovadamente executado, conforme a seção 8;
+- valores devidos ao Profissional por serviços já confirmados são pagos, descontados os estornos e as compensações da cláusula 17.4, salvo se houver fraude, caso em que o Trato pode retê-los pelo tempo necessário à apuração e ao que a lei permitir, sem
+
+- confiscá-los além do prejuízo apurado;
+- valores devidos ao Cliente (estornos, Garantia) continuam sendo pagos mesmo após o encerramento.
+
+**20.7 Encerramento pelo Usuário.** O Usuário pode encerrar a conta a qualquer momento pelo aplicativo ou pelo SAC, sem custo. O encerramento não cancela Pedidos já contratados nem apaga as obrigações pendentes: os Pedidos futuros seguem a seção 7, e os valores devidos são acertados. Os dados são tratados conforme as cláusulas 14.8 e 16.3, e os Tratinhos, conforme a cláusula 13.10.
+
+**20.8 Encerramento pelo Trato sem falta do Usuário.** O Trato pode encerrar a conta de um Usuário sem que ele tenha violado estes Termos (por exemplo, por encerramento do serviço ou por inatividade longa), mediante aviso com pelo menos 30 dias de antecedência, pagando o que for devido e atendendo às regras para Pedidos e Tratinhos já previstas.
+
+**20.9 Reincidência e retorno.** Quem teve a conta encerrada por infração grave pode ser impedido de criar nova conta. Em outros casos, o Usuário pode pedir o retorno depois de [PREENCHER: 90] dias, e o Trato analisa o pedido caso a caso, sem obrigação de aceitar quando houver risco a outras pessoas.
+
+**20.10 Direitos preservados.** A suspensão ou o encerramento não impede o Usuário de buscar seus direitos no Trato, nos órgãos de defesa do consumidor ou na Justiça, nem o Trato de tomar as medidas legais cabíveis.
+
+## 21. Propriedade intelectual e conteúdo do Usuário
+
+**21.1 Propriedade do Trato.** O aplicativo, o nome "Trato" e "Trato Feito", as marcas, os logotipos, o design, os textos, o código-fonte, as bases de dados e os demais elementos do serviço pertencem à Feito Labs Tecnologia Ltda. ou a quem lhe licenciou, e são protegidos pela lei. Estes Termos não transferem ao Usuário nenhum direito sobre eles.
+
+**21.2 Licença de uso do aplicativo.** O Trato concede ao Usuário uma licença pessoal, gratuita, não exclusiva, intransferível e revogável para usar o aplicativo, nos termos destes Termos e para os fins aqui previstos.
+
+**21.3 O que é proibido.** É proibido copiar, modificar, vender, alugar, sublicenciar, descompilar, fazer engenharia reversa, extrair dados em massa (scraping) ou criar obra derivada do aplicativo ou de seu conteúdo, e usar as marcas do Trato sem autorização escrita, salvo nos limites da lei.
+
+**21.4 Conteúdo do Usuário.** O Usuário continua dono do conteúdo que cria, como textos do perfil, fotos de trabalhos, descrições, mensagens e avaliações. Ele declara ter o direito de publicá-lo e que o conteúdo não viola direitos de terceiros (direitos autorais, imagem,
+
+privacidade).
+
+**21.5 Licença ao Trato sobre o conteúdo.** Para operar o serviço, o Usuário concede ao Trato uma licença gratuita, não exclusiva e limitada, válida enquanto o conteúdo estiver no aplicativo, para armazenar, exibir, reproduzir e adaptar tecnicamente (por exemplo, redimensionar fotos) o conteúdo, apenas para: mostrar o perfil do Profissional e as avaliações no aplicativo; executar Pedidos; e analisar Relatos de Problema e Disputas. O Trato não usa fotos de Pedidos e do interior de imóveis em publicidade, nem vende o conteúdo a terceiros.
+
+**21.6 Fotos de portfólio.** Se o Profissional publicar fotos de trabalhos anteriores, deve ter autorização de quem aparece ou do dono do imóvel, e não mostrar rostos, endereços, números de imóveis ou objetos que identifiquem o Cliente, sem consentimento.
+
+**21.7 Uso em divulgação, só com autorização.** O Trato só usa nome, imagem ou depoimento de um Usuário em divulgação do Trato (site, redes sociais, anúncios) se o Usuário autorizar de forma específica e destacada, e pode revogar a autorização a qualquer momento, com efeito para o futuro.
+
+**21.8 Sugestões.** Sugestões e ideias enviadas ao Trato sobre o aplicativo podem ser usadas sem pagamento, mas isso não transfere ao Trato dados pessoais nem conteúdo protegido do Usuário.
+
+**21.9 Denúncia de violação.** Quem acreditar que um conteúdo no Trato viola seus direitos autorais ou de imagem pode notificar o Trato pelo canal da seção 25, indicando o conteúdo, a identificação do titular e a explicação. O Trato analisa e, quando cabível, remove o conteúdo, avisando o Usuário que o publicou, que pode contestar (cláusula 20.5).
+
+## 22. Disponibilidade do aplicativo e força maior
+
+**22.1 Disponibilidade.** O Trato se esforça para manter o aplicativo disponível de forma contínua, mas não garante funcionamento sem interrupções ou erros. Podem ocorrer paradas para manutenção, atualização, falha de fornecedores (como hospedagem, mapas, mensagens ou pagamentos), ataques ou problemas de internet.
+
+**22.2 Manutenção programada.** Sempre que possível, o Trato avisa com antecedência as manutenções programadas e as faz em horários de menor uso.
+
+**22.3 Prazos durante falhas.** Se uma falha do aplicativo ou do Parceiro de Pagamento impedir o Usuário de praticar um ato com prazo nestes Termos, como confirmar o serviço, abrir Relato de Problema, fazer Check-in ou Check-out, ou contestar uma medida, o prazo é prorrogado pelo tempo da falha, e o Trato não aplica a confirmação tácita (cláusula 5.8) nem encargos de cancelamento ou de não comparecimento se ficar comprovado que a
+
+causa foi a falha. Se o Check-in ou o Check-out não puderem ser feitos pelo aplicativo, o Usuário deve avisar o SAC assim que puder, e o Analista decide com outras provas (cláusula 16.5).
+
+**22.4 Pedidos em andamento.** Se uma falha impedir a conclusão de um Pedido, o Trato ajuda as partes a concluí-lo por outro meio ou a cancelá-lo sem custo para o Cliente, preservando o pagamento do que já foi executado.
+
+**22.5 Força maior e caso fortuito.** Nenhuma das partes responde por descumprimento causado por evento imprevisível ou inevitável, que não tenha dado causa, como desastre natural, chuva forte, greve geral, epidemia, ato de autoridade, guerra, grave falha de energia ou de telecomunicações. A parte afetada deve avisar a outra e o Trato assim que possível, e retomar o cumprimento quando o evento acabar.
+
+**22.6 Efeitos nos Pedidos.** Se a força maior impedir o serviço, o Cliente pode reagendar ou cancelar sem custo, e o Profissional não recebe penalidade. O Cliente recebe o reembolso do que foi pago pelo serviço não executado, nos prazos da seção 6.
+
+**22.7 Mudanças e fim do serviço.** O Trato pode alterar, suspender ou encerrar funções do aplicativo ou o próprio serviço. Se o encerrar por completo, avisa os Usuários com pelo menos 60 dias de antecedência, cumpre os Pedidos já pagos ou os reembolsa, devolve valores devidos e permite exportar o histórico, e trata os dados conforme a seção 14.
+
+**22.8 Responsabilidade do Usuário pelo seu ambiente.** O uso do aplicativo depende de aparelho compatível, sistema atualizado e conexão à internet, que são de responsabilidade do Usuário, e o Trato não responde por falhas que venham exclusivamente deles (cláusula 17.8).
+
+## 23. Alterações destes Termos
+
+**23.1 Os Termos podem ser atualizados.** O Trato pode atualizar estes Termos, a Política de Privacidade e os anexos a qualquer momento, para acompanhar mudanças na lei, no aplicativo, nos parceiros, nos riscos e no negócio. A versão em vigor é sempre a mais recente publicada no aplicativo e em [PREENCHER: URL DOS TERMOS], com a data de vigência no início.
+
+**23.2 Mudanças relevantes: aviso prévio.** Mudanças que afetem direitos ou obrigações do Usuário, como preços e taxas, regras de cancelamento, retenção e repasse, Garantia, tratamento de dados ou responsabilidade, são avisadas pelo aplicativo e por e-mail com pelo menos 30 dias de antecedência da vigência, com um resumo do que mudou e o link para a versão completa. O aviso explica o motivo da mudança.
+
+**23.3 Mudanças urgentes.** Quando uma mudança for exigida por lei, ordem de autoridade ou necessidade de segurança, ela pode valer em prazo menor, com aviso assim que possível e explicação do motivo. As mudanças que só corrigem erro de digitação,
+
+esclarecem texto ou beneficiam o Usuário podem valer na publicação.
+
+**23.4 Aceitação.** Depois da data de vigência, a continuidade do uso do aplicativo, ou o aceite pedido na tela quando o Trato assim exigir, significa concordância com a nova versão. Para mudanças relevantes que dependam de consentimento pela lei, como novo uso de dados pessoais, o Trato pede o consentimento de forma específica.
+
+**23.5 Direito de não aceitar.** O Usuário que não concordar com a mudança pode encerrar a conta, sem custo e sem multa, antes da vigência ou depois dela, na forma da cláusula 20.7, e os Pedidos já contratados são tratados conforme a cláusula 23.6. Se a mudança o prejudicar, o Usuário pode também pedir o cancelamento sem custo dos Pedidos futuros ainda não iniciados.
+
+**23.6 Pedidos já contratados.** Pedidos contratados antes da vigência da nova versão continuam regidos, quanto a preço, cancelamento e Garantia, pela versão em vigor na Contratação, salvo se a nova versão for mais favorável ao Usuário ou se a lei mandar o contrário.
+
+**23.7 Histórico de versões.** O Trato mantém, no Anexo III e no aplicativo, o histórico das versões anteriores, para que o Usuário possa consultar qual versão valia em cada Pedido.
+
+**23.8 Limites.** A atualização dos Termos não pode retirar direitos que a lei garante ao consumidor nem criar obrigação abusiva, e não tem efeito retroativo contra o Usuário.
+
+## 24. Disposições gerais, lei aplicável e foro
+
+**24.1 Documentos que formam o contrato.** Fazem parte do contrato entre o Usuário e o Trato: estes Termos, os Anexos I, II e III, a Política de Privacidade e as informações de preço e de campanha mostradas no aplicativo no momento do uso. Em caso de conflito, prevalece o que for mais favorável ao consumidor, e, entre os documentos, valem primeiro estes Termos, depois os Anexos e depois a Política de Privacidade, exceto em matéria de dados pessoais (cláusula 14.1).
+
+**24.2 Interpretação em favor do consumidor.** As cláusulas que gerarem dúvida são interpretadas da maneira mais favorável ao consumidor (Código de Defesa do Consumidor, art. 47). Os títulos e o resumo no início servem para facilitar a leitura e não alteram o sentido das cláusulas.
+
+**24.3 Aceite eletrônico.** O aceite destes Termos é dado pelo meio eletrônico, ao se cadastrar ou ao usar o aplicativo, e o Trato guarda o registro com data, hora e versão aceita (cláusula 16.1). O Usuário pode pedir cópia dos Termos aceitos e baixá-los no aplicativo a qualquer momento.
+
+**24.4 Lei aplicável.** Estes Termos são regidos pelas leis da República Federativa do Brasil, em especial o Código de Defesa do Consumidor, o Marco Civil da Internet, a Lei Geral de Proteção de Dados e o Decreto 7.962/2013.
+
+**24.5 Tentativa de solução amigável.** Antes de ir a juízo, o Usuário é convidado, mas não obrigado, a procurar o SAC (seção 25) e, se quiser, os canais de solução de conflitos como o Procon e o consumidor.gov.br. Procurar esses canais não impede nem adia o direito de ir à Justiça, e não interrompe prazos que a lei estabelece, salvo quando a própria lei assim dispõe.
+
+**24.6 Foro.** Quando o Usuário for consumidor, o foro competente é o do domicílio do consumidor, e o Usuário pode também propor a ação no foro de Belo Horizonte/MG, se preferir. Para disputas entre o Trato e um Profissional que não seja consumidor, ou entre o Trato e qualquer pessoa jurídica que use o aplicativo para atividade profissional, fica eleito o foro da Comarca de Belo Horizonte/MG, com renúncia a qualquer outro, por mais privilegiado que seja. Essa eleição não se aplica ao consumidor e não o prejudica. Quando o Profissional for tratado como consumidor ou hipossuficiente pela lei, vale o foro do seu domicílio.
+
+**24.7 Disposições nulas.** Se uma cláusula for declarada nula ou ineficaz, as demais continuam valendo, e a cláusula afetada é substituída, na medida do possível, por outra que tenha o efeito mais próximo permitido pela lei.
+
+**24.8 Tolerância.** O fato de o Trato não exigir imediatamente um direito ou uma regra destes Termos não significa renúncia a ele.
+
+**24.9 Cessão.** O Trato pode transferir seus direitos e obrigações a outra empresa, em caso de reorganização societária, mediante aviso, sem reduzir os direitos do Usuário. O Usuário não pode ceder sua conta nem seus direitos sem autorização do Trato.
+
+**24.10 Relação entre as partes.** Estes Termos não criam sociedade, agência, mandato, franquia ou vínculo de emprego entre o Trato e o Usuário, nem entre o Cliente e o Profissional, que contratam diretamente entre si o serviço (cláusula 3.4).
+
+**24.11 Idioma.** Estes Termos são escritos em português do Brasil, que é o idioma que vale em caso de qualquer tradução.
+
+**24.12 Sobrevivência.** Continuam valendo após o fim da relação as cláusulas que, por sua natureza, devam continuar, como as de pagamentos devidos, Garantia, registros, dados pessoais, propriedade intelectual, responsabilidade e foro.
+
+## 25. Contato, SAC e prazos de resposta
+
+**25.1 Canais de atendimento (SAC).** Para dúvidas, reclamações, Relatos de Problema, pedidos de revisão e contestações, o Usuário fala com o Trato por:
+
+| Canal | Dados | Para quê |
+|---|---|---|
+| Aplicativo (Ajuda) | Menu Ajuda > Falar com o Trato | Canal principal, com protocolo e histórico |
+| E-mail do SAC | suporte@tratofeitolabs.com.br | Dúvidas, reclamações e contestações |
+| Telefone / WhatsApp | [PREENCHER: TELEFONE DO SAC], [PREENCHER: HORÁRIO DE ATENDIMENTO] | Atendimento em horário comercial |
+| Canal de segurança | [PREENCHER: NÚMERO OU LINK DO CANAL DE SEGURANÇA], [PREENCHER: HORÁRIO] | Emergências e incidentes durante o serviço (cláusula 9.3) |
+| Encarregado de dados | privacidade@tratofeitolabs.com.br | Direitos sobre dados pessoais (cláusula 14.2) |
+| Correspondência | Feito Labs Tecnologia Ltda., Rua Araripe, [PREENCHER: Nº], apto 1001, Floresta, CEP 31015-260, Belo Horizonte/MG | Notificações formais |
+
+**25.2 Em emergência, chame ajuda primeiro.** Em caso de risco à vida ou à integridade, o Usuário deve chamar os serviços de emergência (190, 192, 193) antes de falar com o Trato. O canal de segurança do Trato complementa, e não substitui, os serviços públicos.
+
+**25.3 Protocolo.** Cada contato gera um número de protocolo, informado ao Usuário na hora, por escrito, que permite acompanhar o atendimento. O Usuário pode pedir a cópia da conversa com o SAC.
+
+**25.4 Prazos de resposta.** O Trato responde nos prazos do Anexo II, que resume os principais prazos destes Termos. Quando o caso precisar de mais tempo para apurar, o Trato avisa o motivo, informa o novo prazo e mantém o Usuário atualizado.
+
+**25.5 Atendimento humano.** O Usuário pode pedir, a qualquer momento, para falar com uma pessoa, e o atendimento automático, quando houver, não impede esse pedido.
+
+**25.6 Linguagem acessível.** O Trato procura responder em linguagem clara e oferece, quando possível, atendimento acessível a pessoas com deficiência, como texto compatível com leitores de tela e canal alternativo ao telefônico.
+
+**25.7 Reclamação fora do Trato.** Se o Usuário não ficar satisfeito, pode procurar o Procon do seu município, o consumidor.gov.br, o Juizado Especial ou a Justiça, conforme a cláusula 24.5.
+
+## Anexo I. Regulamento dos Tratinhos
+
+Este Regulamento integra os Termos (seção 13) e vale para todos os Tratinhos.
+
+**I.1 Natureza.** Tratinhos são pontos promocionais, sem valor em dinheiro, usados apenas dentro do Trato. Não são moeda nem conta de pagamento (cláusula 13.2).
+
+**I.2 Valor de referência.** 1 Tratinho = R$ 0,01 (um centavo), apenas como valor de referência para o uso dentro do aplicativo. O valor de referência não cria direito a troca por dinheiro.
+
+**I.3 Como ganhar.**
+
+| Forma | Como funciona |
+|---|---|
+| Campanhas e promoções | Informadas no aplicativo, com valor e validade |
+| Avaliação concluída | Pelo ato de avaliar, igual para qualquer nota (cláusula 12.4) |
+| Indicação | Conforme regras da campanha de indicação, quando houver |
+| Ajuste do Trato | Concedidos pelo Trato como compensação em atendimento (cláusula 13.8) |
+
+**I.4 Como usar.**
+
+| Uso | Custo | Observação |
+|---|---|---|
+| Exclusividade de 48 horas | 100 Tratinhos | Cláusula 13.6 |
+| Outros usos | Conforme informado no aplicativo | O Trato pode incluir ou retirar usos, por aviso prévio (cláusula 13.5) |
+
+**I.5 Validade.** 90 dias contados do crédito, salvo prazo diferente informado na campanha antes da participação. O aplicativo mostra o saldo e o vencimento de cada crédito, e avisa o Usuário com [PREENCHER: 7] dias de antecedência do vencimento. Os Tratinhos que vencem primeiro são usados primeiro.
+
+**I.6 Limites.** O Trato pode limitar, por Usuário e por período, a quantidade de Tratinhos concedidos em uma campanha, informando o limite na própria campanha antes da participação.
+
+**I.7 Intransferível.** Tratinhos pertencem à conta que os recebeu. Não podem ser vendidos, trocados, emprestados, doados ou transferidos, e ofertas de compra e venda de Tratinhos fora do aplicativo não têm valor nem validade.
+
+**I.8 Não afetam a reputação.** Tratinhos não alteram nota, selo, posição em buscas nem Garantia (cláusulas 12.5 e 13.7).
+
+**I.9 Estorno e cancelamento.** Se um Pedido pago com Tratinhos for cancelado ou estornado, os Tratinhos voltam ao saldo com a validade original, ou, se vencidos, geram novo crédito de 30 dias (cláusula 13.8).
+
+**I.10 Fraude.** Tratinhos obtidos por fraude, manipulação ou conta duplicada são cancelados, sem prejuízo das medidas da seção 20 (cláusula 13.9).
+
+**I.11 Encerramento da conta.** Tratinhos não usados são perdidos no encerramento por vontade do Usuário, depois de aviso, e mantidos por 90 dias no encerramento pelo Trato sem falta do Usuário (cláusula 13.10).
+
+**I.12 Alteração ou fim do programa.** Aviso prévio de pelo menos 30 dias no aplicativo, com direito de usar os Tratinhos já creditados até o fim da validade (cláusula 13.11).
+
+**I.13 Dúvidas.** Falar com o SAC (seção 25). Em caso de dúvida na interpretação deste Regulamento, vale o sentido mais favorável ao consumidor (cláusula 24.2).
+
+## Anexo II. Quadro de prazos
+
+Este quadro resume os principais prazos dos Termos. Se houver diferença entre o quadro e a cláusula indicada, vale a cláusula, ou a regra mais favorável ao consumidor. "Dias úteis" são segunda a sexta-feira, exceto feriados nacionais ou de Belo Horizonte/MG e Divinópolis/MG.
+
+| Assunto | Prazo | Cláusula |
+|---|---|---|
+| Cancelar o Pedido antes de aceitar um Orçamento | A qualquer momento, sem custo | 7.1 |
+| Direito de arrependimento | 7 dias corridos da Contratação | 7.2 |
+| Reembolso integral por cancelamento | Com mais de 24 horas de antecedência | 7.4 |
+| Retenção por cancelamento tardio (só custos comprovados) | Menos de 24 horas, máximo de 30% do valor | 7.4 |
+| Reagendamento sem custo | Com mais de 24 horas de antecedência | 7.5 |
+| Espera pelo Cliente antes de registrar "Cliente ausente" | 20 minutos | 7.6 |
+| Prazo do Cliente para justificar a ausência | 24 horas | 7.6 |
+| Atraso do Profissional que permite cancelar sem custo | Mais de 30 minutos, sem aviso e antes do Check-in | 5.10 |
+| Janela de Confirmação | 48 horas após o Check-out | 5.8 |
+| Check-out sem o Código Final: prazo para o Cliente responder ao Trato | 5 dias úteis | 5.7 |
+| Resposta do Profissional a um Relato de Problema | 24 horas | 8.2 |
+| Resposta do Cliente a pedido de informações do Trato | 10 dias úteis | 8.4 |
+| Decisão do Analista | Até 5 dias úteis após receber as informações necessárias | 8.5 |
+| Retrabalho determinado pelo Trato | Até 7 dias corridos, a combinar com o Cliente | 8.6 |
+| Contestação da decisão do Analista | 5 dias úteis para contestar; resposta em até 10 dias úteis | 8.7 |
+| Garantia do Serviço | 30 dias (não duráveis) ou 90 dias (duráveis), ou o prazo do Orçamento se maior | 8.3 |
+| Pedido de estorno ao Parceiro de Pagamento | Até 2 dias úteis após a aprovação | 6.10 |
+| Medidas de cautela após relato de incidente de segurança | Até 24 horas | 9.6 |
+| Avaliação após o Pedido | Até 30 dias da conclusão | 12.1 |
+| Resposta a pedido de revisão de avaliação | 5 dias úteis | 12.7 |
+| Validade dos Tratinhos | 90 dias do crédito | 13.4 |
+| Resposta a pedido de direitos sobre dados pessoais | 15 dias | 14.9 |
+| Prazo mínimo de guarda dos registros de acesso | 6 meses | 14.8 |
+| Guarda dos registros de Pedidos e provas | [PREENCHER: 5] anos da conclusão do Pedido | 16.3 |
+| Suspensão por mais de 7 dias ou encerramento | Decisão de Analista | 20.2 |
+| Contestação de suspensão ou encerramento | 30 dias do aviso; resposta em até 10 dias úteis | 20.5 |
+| Aviso de encerramento da conta pelo Trato sem falta do Usuário | 30 dias | 20.8 |
+| Aviso de mudança relevante nos Termos | 30 dias | 23.2 |
+| Aviso de nova taxa | 30 dias | 6.6 |
+| Aviso de fim do serviço | 60 dias | 22.7 |
+| Resposta geral do SAC | Protocolo imediato; resposta em até 5 dias úteis | 25.3 e 25.4 |
+
+## Anexo III. Histórico de versões
+
+| Versão | Data de vigência | Resumo das mudanças |
+|---|---|---|
+| 1.0 | 31/10/2026 | Primeira versão dos Termos de Uso. |
+| 1.1 | 22/11/2026 | Revisão do rascunho, com ajustes de texto. Documento não publicado. |
+| 1.2 | 12/12/2026 | Reescrita completa e detalhada: identificação da empresa e sede; resumo antes do aceite; definições; retenção, Janela de Confirmação e repasse; cancelamento e direito de arrependimento (CDC, art. 49); Garantia do Serviço e disputas com decisão humana; segurança e canal de incidentes; verificação de Profissionais e selos; conduta, avaliações e Tratinhos; privacidade e LGPD; responsabilidade do Trato sem exclusão da responsabilidade legal; suspensão com aviso e contestação; foro do consumidor; cláusula de atualização dos Termos; Anexos I a III. |

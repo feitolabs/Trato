@@ -347,7 +347,7 @@ void main() {
       await tester.tap(find.text('Fechar'));
       await tester.pumpAndSettle();
 
-      // Remoto não mostra
+      // Remoto: sem compartilhar, com SOS
       await _abrir(
         tester,
         const PedidoExecucaoTela(
@@ -362,7 +362,8 @@ void main() {
         ),
       );
       expect(find.byKey(const ValueKey('botao-compartilhar-atendimento')), findsNothing);
-      expect(find.byKey(const ValueKey('botao-sos-emergencia')), findsNothing);
+      // Termos 9.2: a emergência vale também no serviço remoto.
+      expect(find.byKey(const ValueKey('botao-sos-emergencia')), findsOneWidget);
     });
 
     testWidgets('6. EventoApi converte para horário local e ConclusaoTela remota oculta fotos',

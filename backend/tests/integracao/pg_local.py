@@ -117,8 +117,35 @@ class BancoLocal:
                 "*moedas_tipo_indicacao.sql",
                 "*profissional_mei.sql",
                 "*perfis_profissional_tipo_cnpj.sql",
+                "*termos_v12_cancelamento_ausencia_exclusividade.sql",
+                "*moedas_saldo_e_estorno_validade.sql",
+                "*exclusividade_cliente.sql",
+                "*sac_chamados.sql",
+                "*medidas_conta.sql",
+                "*disputa_contestacoes.sql",
+                "*aceites_termos_imutaveis.sql",
+                "*nota_material_contestacoes.sql",
+                "*incidentes_seguranca.sql",
+                "*avaliacoes_moderacao.sql",
+                "*lgpd_pedidos_titular.sql",
+                "*compensacao_repasses.sql",
+                "*ausencia_foto_chegada.sql",
+                "*compensacao_regresso_proposta.sql",
+                "*anonimizacao_contestacao_medida.sql",
+                "*config_lembretes.sql",
+                "*retorno_e_impedimento_conta.sql",
+                "*trava_saque_fraude.sql",
+                "*contrato_vigente_por_pedido.sql",
+                "*tratinhos_guarda_restauracao.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
+                    if "contrato_vigente" in arquivo.name:
+                        # A migration redefine funções de acesso que usam `eh_equipe` (F3.8a,
+                        # que não roda aqui): no banco local ninguém é da equipe por RLS.
+                        con.execute(
+                            "create or replace function privado.eh_equipe(variadic papeis "
+                            "text[]) returns boolean language sql stable as 'select false'"
+                        )
                     con.execute(arquivo.read_text(encoding="utf-8"))
             # Tabelas do painel (admin_sugestoes_*, painel_admin_*): no Supabase o service_role as
             # recebe por privilégio padrão; no banco local precisamos conceder.

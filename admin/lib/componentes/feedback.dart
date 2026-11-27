@@ -194,7 +194,13 @@ void mostrarErro(BuildContext context, Object erro) {
 
 /// Executa uma chamada e mostra o aviso de sucesso (com o registro de auditoria) ou o erro.
 /// Devolve true se deu certo.
-Future<bool> executar(BuildContext context, Future<void> Function() acao, {String? sucesso}) async {
+Future<bool> executar(
+  BuildContext context,
+  Future<void> Function() acao, {
+  String? sucesso,
+  // Texto que o backend devolveu na ação; quando vier, vale no lugar de [sucesso].
+  String? Function()? mensagemDoServidor,
+}) async {
   // Uma ação de escrita por vez: um segundo clique/toque enquanto a primeira está em voo é ignorado.
   if (_executando) return false;
   _executando = true;
@@ -203,7 +209,7 @@ Future<bool> executar(BuildContext context, Future<void> Function() acao, {Strin
     await acao();
     if (context.mounted && sucesso != null) {
       final n = api.ultimoRegistroAuditoria;
-      mostrarAviso(context, sucesso, detalhe: n == null ? null : 'Registro de auditoria nº ${_milhar(n)}');
+      mostrarAviso(context, mensagemDoServidor?.call() ?? sucesso, detalhe: n == null ? null : 'Registro de auditoria nº ${_milhar(n)}');
     }
     return true;
   } catch (e) {

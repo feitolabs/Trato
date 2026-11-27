@@ -23,11 +23,16 @@ class PapelUsuario(StrEnum):
 class Usuario:
     id: str
     papel: PapelUsuario
+    # Só nas rotas do pedido contratado: cliente com a conta bloqueada (Termos 20.6 e 20.10).
+    bloqueado: bool = False
 
 
 class ProvedorAuth(Protocol):
     def autenticar(self, token: str) -> Usuario | None:
         """Devolve o usuário do token, ou `None` se o token não vale."""
+
+    def conta_bloqueada(self, token: str) -> bool:
+        """O token é válido, mas a conta está bloqueada (para recusar com 403, não 401)."""
 
 
 class ProvedorAuthFalso:
@@ -35,6 +40,13 @@ class ProvedorAuthFalso:
 
     def __init__(self, usuarios: Mapping[str, Usuario]) -> None:
         self._usuarios = dict(usuarios)
+        self.bloqueados: set[str] = set()  # tokens de contas bloqueadas
 
     def autenticar(self, token: str) -> Usuario | None:
+        return None if token in self.bloqueados else self._usuarios.get(token)
+
+    def autenticar_para_suporte(self, token: str) -> Usuario | None:
         return self._usuarios.get(token)
+
+    def conta_bloqueada(self, token: str) -> bool:
+        return token in self.bloqueados and token in self._usuarios

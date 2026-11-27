@@ -43,6 +43,14 @@ class IndiqueEGanheTela extends StatelessWidget {
             'você ganha Tratinhos.',
             style: TipografiaTrato.corpo,
           ),
+          if (valorMoedaCentavos != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'Valor: ${textoTratinhosEmReais(1, valorMoedaCentavos)}',
+              key: const ValueKey('indicacao-valor-do-tratinho'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x4),
           _CartaoCodigo(codigo: dados.codigo, compartilhar: compartilhar),
           const SizedBox(height: EspacosTrato.x4),

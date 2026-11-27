@@ -115,7 +115,8 @@ def test_conta_bloqueada_continua_barrada_e_nao_e_recriada(cenario):
     assert c.cliente.get("/v1/me", headers=h).status_code == 200
     with c.local.admin() as con:
         con.execute("update public.usuarios set status = 'bloqueado' where id = %s", (uid,))
-    assert c.cliente.get("/v1/me", headers=h).status_code == 401
+    r = c.cliente.get("/v1/me", headers=h)
+    assert r.status_code == 403 and r.json()["codigo"] == "conta_bloqueada"  # 20.5
     assert _linhas(c, uid) == [("Novo usuário", "bloqueado")]
 
 

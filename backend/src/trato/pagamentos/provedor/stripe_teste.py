@@ -74,6 +74,10 @@ Resposta = tuple[int, Mapping[str, Any]]
 Transporte = Callable[[str, str, Mapping[str, str], Mapping[str, str]], Resposta]
 
 
+# Metadado do estorno no Stripe com a chave da ordem do Trato (para conferir antes de reenviar).
+_META_ORDEM = "trato_ordem"
+
+
 def transporte_urllib(
     chave_secreta: str, url_base: str = URL_BASE, tempo: float = 20.0
 ) -> Transporte:
@@ -214,15 +218,37 @@ class ProvedorStripeTeste:
     def estornar(
         self, cobranca_id: str, valor_centavos: int | None, chave_idempotencia: str
     ) -> EstornoProvedor:
-        campos = {"payment_intent": cobranca_id}
+        campos = {"payment_intent": cobranca_id, f"metadata[{_META_ORDEM}]": chave_idempotencia}
         if valor_centavos is not None:
             campos["amount"] = str(valor_centavos)
         corpo = self._chamar("POST", "/v1/refunds", campos, chave_idempotencia)
+        return self._estorno(corpo, cobranca_id)
+
+    def estornos_da_cobranca(self, cobranca_id: str) -> Sequence[EstornoProvedor]:
+        """`GET /v1/refunds?payment_intent=...`, página por página."""
+        campos = {"payment_intent": cobranca_id, "limit": "100"}
+        saida: list[EstornoProvedor] = []
+        for _ in range(_PAGINAS_MAXIMAS):
+            corpo = self._chamar("GET", "/v1/refunds", campos)
+            linhas = corpo.get("data")
+            if not isinstance(linhas, list):  # sem a lista não dá para afirmar que não existe
+                raise ErroProvedor("resposta do Stripe sem a lista de estornos")
+            saida += [self._estorno(linha, cobranca_id) for linha in linhas]
+            if not corpo.get("has_more") or not linhas:
+                return saida
+            campos = {**campos, "starting_after": str(linhas[-1]["id"])}
+        raise ErroProvedor("estornos demais para conferir")
+
+    @staticmethod
+    def _estorno(corpo: Mapping[str, Any], cobranca_id: str) -> EstornoProvedor:
+        chave = (corpo.get("metadata") or {}).get(_META_ORDEM)
         return EstornoProvedor(
             str(corpo["id"]),
             cobranca_id,
             int(corpo["amount"]),
             confirmado=corpo.get("status") == "succeeded",
+            chave=str(chave) if chave else None,
+            falhou=corpo.get("status") in ("failed", "canceled"),
         )
 
     def segredo_webhook(self) -> str:

@@ -7,13 +7,18 @@ import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
+import 'conversa_modal.dart';
+import 'falha_trato_modal.dart';
 
 /// F7.2 — fila de disputas (RF-DIS-01 a RF-DIS-04).
 class DisputasTela extends StatefulWidget {
   const DisputasTela({super.key});
 
   static (String, Tom) chip(Disputa d) {
+    // Estados sem prazo a vencer vêm antes: o selo de atraso não vale para eles.
     if (d.status == StatusDisputa.decidida) return ('Decidida', Tom.ok);
+    if (d.status == StatusDisputa.acordo) return ('Encerrada por acordo', Tom.ok);
+    if (d.status == StatusDisputa.desconhecida) return ('Situação não reconhecida', Tom.neutro);
     if (d.status == StatusDisputa.aguardandoSegundaPessoa) return ('Aguardando segunda pessoa', Tom.alerta);
     if (d.atrasada) return ('Prazo vencendo', Tom.erro);
     final perto = d.decisaoAte.difference(DateTime.now()).inHours < 24;
@@ -22,13 +27,15 @@ class DisputasTela extends StatefulWidget {
       StatusDisputa.aberta => ('Aberta', Tom.info),
       StatusDisputa.aguardandoProfissional => ('Aguardando resposta', Tom.alerta),
       StatusDisputa.emAnalise => ('Em análise', Tom.info),
-      _ => ('Em análise', Tom.info),
+      _ => ('Situação não reconhecida', Tom.neutro),
     };
   }
 
   /// "Resposta em 31 h" enquanto o profissional não respondeu; depois, "Decisão em 3 dias".
   static String prazo(Disputa d) {
     if (d.status == StatusDisputa.decidida) return 'Decidida';
+    if (d.status == StatusDisputa.acordo) return 'Encerrada por acordo';
+    if (d.status == StatusDisputa.desconhecida) return 'Prazo não exibido';
     if (d.status == StatusDisputa.aguardandoProfissional && d.respostaAte != null) {
       return 'Resposta em ${formatarRestante(d.respostaAte!)}';
     }
@@ -37,7 +44,7 @@ class DisputasTela extends StatefulWidget {
 
   static String tituloDe(Disputa d) => d.titulo.isNotEmpty ? d.titulo : d.motivo;
 
-  /// "Prazos vigentes em Configurações: resposta em 48 horas, decisão em 5 dias úteis."
+  /// "Prazos vigentes em Configurações: resposta em 24 horas, decisão em 5 dias úteis."
   static Future<String?> _prazosVigentes(ApiAdmin api) async {
     try {
       final c = await api.carregarConfig();
@@ -90,10 +97,23 @@ class _DisputasTelaState extends State<DisputasTela> {
   @override
   Widget build(BuildContext context) {
     final c = _contagem;
+    // Só quem decide vê a ação; ela não depende de haver disputa aberta.
+    final acoes = [
+      if (context.pode(Permissao.disputasDecidir))
+        BotaoTrato.secundario('Registrar falha do Trato', aoPressionar: () => abrirFalhaTrato(context)),
+    ];
     if (c != null && c.abertas + c.decididas == 0) {
-      return const EstadoVazio(
-        'Nenhuma disputa aberta.',
-        detalhe: 'Quando um cliente relatar problema, ele aparece aqui com o prazo de resposta.',
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CabecalhoPagina('Disputas', subtitulo: _prazos ?? 'Problemas relatados em serviços', acoes: acoes),
+          const Expanded(
+            child: EstadoVazio(
+              'Nenhuma disputa aberta.',
+              detalhe: 'Quando um cliente relatar problema, ele aparece aqui com o prazo de resposta.',
+            ),
+          ),
+        ],
       );
     }
     final abertas = c?.abertas ?? 0;
@@ -101,7 +121,7 @@ class _DisputasTelaState extends State<DisputasTela> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CabecalhoPagina('Disputas', subtitulo: _prazos ?? 'Problemas relatados em serviços'),
+        CabecalhoPagina('Disputas', subtitulo: _prazos ?? 'Problemas relatados em serviços', acoes: acoes),
         Expanded(
           child: FilaRemota<Disputa>(
             filtro: _filtro,
@@ -119,7 +139,8 @@ class _DisputasTelaState extends State<DisputasTela> {
               topo: FiltroStatus(
                 opcoes: [
                   ('abertas', 'Abertas', abertas),
-                  ('decididas', 'Decididas', decididas),
+                  // No servidor, este filtro inclui as encerradas por acordo.
+                  ('decididas', 'Encerradas', decididas),
                   ('todas', 'Todas', abertas + decididas),
                 ],
                 selecionado: _filtro,
@@ -135,7 +156,10 @@ class _DisputasTelaState extends State<DisputasTela> {
                     'Retido ${formatarReais(d.valorEmAnaliseCentavos)}',
                     if (d.responsavelNome != null) 'Com ${d.responsavelNome}',
                   ],
-                  chips: [ChipEstado(texto, tom: tom)],
+                  chips: [
+                    ChipEstado(texto, tom: tom),
+                    if (d.desistencia) const ChipEstado('Desistência', tom: Tom.erro),
+                  ],
                   selecionado: sel,
                 );
               },
@@ -200,6 +224,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
   String? get _erroValor {
     if (_decisao != DecisaoDisputa.reembolsoParcial) return null;
     final v = lerReaisEmCentavos(_valor.text);
+    if (v == null && _valor.text.trim().isNotEmpty) return kErroReais;
     if (v == null || v <= 0) return 'Informe o valor do reembolso.';
     if (v > widget.disputa.valorEmAnaliseCentavos) return 'O valor passa do que está em análise.';
     return null;
@@ -285,7 +310,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
     final d = widget.disputa;
     final (textoChip, tomChip) = DisputasTela.chip(d);
     final eu = context.eu?.id;
-    final aberta = d.status != StatusDisputa.decidida && d.status != StatusDisputa.aguardandoSegundaPessoa;
+    final aberta = d.status.aceitaDecisao;
     final comOutro = aberta && d.responsavelId != null && d.responsavelId != eu;
     final comigo = aberta && d.responsavelId != null && d.responsavelId == eu;
     final podeAgir = context.pode(Permissao.disputasDecidir) && aberta;
@@ -307,7 +332,31 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
           style: TipografiaTrato.subtitulo,
         ),
         const SizedBox(height: EspacosTrato.x4),
-        if (d.status != StatusDisputa.decidida)
+        if (d.desistencia && !d.status.encerrada && d.status != StatusDisputa.desconhecida) ...[
+          const BannerInfo(
+            'O cliente desistiu dentro dos 7 dias com o serviço já iniciado (Termos 7.3). Decida o '
+            'reembolso aqui: o sistema pede a devolução ao pagamento. Não devolva à mão no Stripe, '
+            'para o cliente não receber duas vezes.',
+            titulo: 'Desistência em análise.',
+            tom: Tom.erro,
+            icone: Icons.warning_amber_outlined,
+          ),
+          const SizedBox(height: EspacosTrato.x2),
+        ],
+        if (d.status == StatusDisputa.acordo)
+          const BannerInfo(
+            'As partes se acertaram. Não há o que decidir nesta disputa.',
+            titulo: 'Encerrada por acordo.',
+            tom: Tom.ok,
+          )
+        else if (d.status == StatusDisputa.desconhecida)
+          const BannerInfo(
+            'Este painel não conhece a situação enviada pelo servidor, por isso não oferece ações. '
+            'Atualize a página; se continuar, avise quem cuida do painel.',
+            titulo: 'Situação não reconhecida.',
+            tom: Tom.alerta,
+          )
+        else if (d.status != StatusDisputa.decidida)
           BannerInfo(
             'O repasse de ${formatarReais(d.valorEmAnaliseCentavos)} ao profissional só sai depois que a '
             'disputa for resolvida.',
@@ -343,10 +392,34 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
         const SizedBox(height: EspacosTrato.x4),
         Linha('Motivo', d.motivo),
         Linha('Retido', formatarReais(d.valorEmAnaliseCentavos)),
-        Linha('Decisão até', formatarData(d.decisaoAte)),
-        if (d.respostaAte != null) Linha('Resposta até', formatarData(d.respostaAte!)),
+        if (d.status != StatusDisputa.acordo) ...[
+          Linha('Decisão até', formatarData(d.decisaoAte)),
+          if (d.respostaAte != null) Linha('Resposta até', formatarData(d.respostaAte!)),
+        ],
         if (d.descricao.isNotEmpty && d.descricao != d.motivo) Linha('Relato', d.descricao),
-        if (d.decisao != null) Linha('Decisão', d.decisao!.rotulo),
+        if (d.status == StatusDisputa.acordo) ...[
+          if (d.divisao != null || d.decisao == DecisaoDisputa.reembolsoParcial)
+            Linha(
+              'Decisão',
+              d.decisao == DecisaoDisputa.reembolsoParcial
+                  ? 'Acordo entre as partes (${d.decisao!.rotulo})'
+                  : 'Acordo entre as partes',
+            ),
+          if (d.divisao != null) ...[
+            Linha('Devolvido ao cliente', formatarReais(d.divisao!.paraClienteCentavos)),
+            Linha('Liberado ao profissional', formatarReais(d.divisao!.paraProfissionalCentavos)),
+            if (d.divisao!.retidoCentavos > 0)
+              Linha('Retido no acordo', formatarReais(d.divisao!.retidoCentavos)),
+            if (d.divisao!.paraClienteCentavos > 0) ...[
+              const SizedBox(height: EspacosTrato.x2),
+              const BannerInfo(
+                'A devolução ao cliente depende do retorno do provedor de pagamento.',
+                tom: Tom.info,
+              ),
+            ],
+          ],
+        ] else if (d.decisao != null)
+          Linha('Decisão', d.decisao!.rotulo),
         const SizedBox(height: EspacosTrato.x5),
         Text('Linha do tempo', style: TipografiaTrato.secao),
         const SizedBox(height: EspacosTrato.x2),
@@ -375,6 +448,13 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
                 ],
               ),
             ),
+        if (context.pode(Permissao.conversasLer)) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: BotaoTrato.secundario('Ver conversa', aoPressionar: () => abrirConversa(context, d.id, d.pedido)),
+          ),
+        ],
         const SizedBox(height: EspacosTrato.x5),
         Text('Evidências', style: TipografiaTrato.secao),
         const SizedBox(height: EspacosTrato.x2),
@@ -393,7 +473,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
             padding: const EdgeInsets.only(top: EspacosTrato.x4),
             child: _AprovacaoSegundaPessoa(disputa: d, aoMudar: widget.aoMudar),
           )
-        else if (comOutro)
+        else if (comOutro || !aberta)
           const SizedBox.shrink()
         else if (!context.pode(Permissao.disputasDecidir))
           const Padding(
@@ -416,7 +496,9 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
         spacing: EspacosTrato.x2,
         runSpacing: EspacosTrato.x2,
         children: [
+          // Na desistência o backend recusa "nova visita": só se decide o reembolso.
           for (final op in DecisaoDisputa.values)
+            if (!d.desistencia || op != DecisaoDisputa.novaVisita)
             ChoiceChip(
               label: Text(op.rotulo),
               selected: _decisao == op,
@@ -435,13 +517,14 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
         const SizedBox(height: EspacosTrato.x3),
         TextField(
           controller: _valor,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: 'Valor do reembolso (R\$)',
             prefixText: 'R\$ ',
             helperText: 'Até ${formatarReais(d.valorEmAnaliseCentavos)}.',
-            errorText: _tentou ? _erroValor : null,
+            errorText: _tentou || _erroValor == kErroReais ? _erroValor : null,
+            errorMaxLines: 3,
           ),
         ),
       ],

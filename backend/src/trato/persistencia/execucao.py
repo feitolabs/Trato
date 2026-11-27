@@ -79,7 +79,7 @@ class ExecucaoPostgres:
             linhas = con.execute(
                 "select e.id, e.ordem, e.descricao, e.valor_centavos, e.status "
                 "from public.etapas e join public.contratos c on c.id = e.contrato_id "
-                "where c.pedido_id = %s order by e.ordem",
+                "where c.pedido_id = %s and c.status <> 'cancelado' order by e.ordem",
                 (achado,),
             ).fetchall()
         return tuple(
@@ -105,7 +105,7 @@ class ExecucaoPostgres:
     ) -> str:
         with self._banco.transacao() as con:
             contrato = con.execute(
-                "select id from public.contratos where pedido_id = %s",
+                "select id from public.contratos where pedido_id = %s and status <> 'cancelado'",
                 (exigir_uuid(pedido_id, "pedido"),),
             ).fetchone()
             if contrato is None:
@@ -144,7 +144,8 @@ class ExecucaoPostgres:
             linhas = con.execute(
                 "select a.id, a.motivo, a.valor_centavos, a.status, a.decidido_em "
                 "from public.aditivos a join public.contratos c on c.id = a.contrato_id "
-                "where c.pedido_id = %s order by a.criado_em, a.id",
+                "where c.pedido_id = %s and c.status <> 'cancelado' "
+                "order by a.criado_em, a.id",
                 (achado,),
             ).fetchall()
         return tuple(
@@ -169,7 +170,8 @@ class ExecucaoPostgres:
         profissional = exigir_uuid(profissional_id, "profissional")
         with self._banco.transacao() as con:
             contrato = con.execute(
-                "select id from public.contratos where pedido_id = %s", (pedido,)
+                "select id from public.contratos where pedido_id = %s and status <> 'cancelado'",
+                (pedido,),
             ).fetchone()
             if contrato is None:
                 raise NaoEncontrado("Este pedido ainda não tem contrato.")
@@ -216,7 +218,8 @@ class ExecucaoPostgres:
             linhas = con.execute(
                 "select a.id, a.status, a.janela_inicio, a.janela_fim, a.remarcado_de "
                 "from public.agendamentos a join public.contratos c on c.id = a.contrato_id "
-                "where c.pedido_id = %s order by a.criado_em, a.id",
+                "where c.pedido_id = %s and c.status <> 'cancelado' "
+                "order by a.criado_em, a.id",
                 (achado,),
             ).fetchall()
         return tuple(
@@ -239,7 +242,8 @@ class ExecucaoPostgres:
                 "select pr.tipo, pr.registrada_por, pr.registrada_em, pr.codigo_validado "
                 "from public.presencas pr join public.agendamentos a on a.id = pr.agendamento_id "
                 "join public.contratos c on c.id = a.contrato_id "
-                "where c.pedido_id = %s order by pr.registrada_em, pr.tipo",
+                "where c.pedido_id = %s and c.status <> 'cancelado' "
+                "order by pr.registrada_em, pr.tipo",
                 (achado,),
             ).fetchall()
         return tuple(

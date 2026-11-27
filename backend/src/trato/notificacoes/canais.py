@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import importlib.util
 import json
 import re
 import smtplib
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Protocol
@@ -37,11 +38,14 @@ class FalhaEnvio(Exception):
 
 
 class TokenInvalido(FalhaEnvio):
-    """O provedor disse que o token do aparelho não existe mais."""
+    """O provedor disse que um ou mais tokens não existem mais. `entregues` conta os outros
+    aparelhos que receberam mesmo assim (maior que zero: não se reenvia)."""
 
-    def __init__(self, token: str) -> None:
+    def __init__(self, token: str, *outros: str, entregues: int = 0) -> None:
         super().__init__("Token de push inválido.")
         self.token = token
+        self.tokens = (token, *outros)
+        self.entregues = entregues
 
 
 @dataclass(frozen=True)
@@ -95,10 +99,14 @@ class CanalFake:
         if self._falhas > 0:
             self._falhas -= 1
             raise FalhaEnvio("Provedor fora do ar (simulado).")
-        for destino in mensagem.destinos:
-            if destino in self.tokens_invalidos:
-                raise TokenInvalido(destino)
-        self.enviados.append(mensagem)
+        invalidos = [d for d in mensagem.destinos if d in self.tokens_invalidos]
+        if not invalidos:
+            self.enviados.append(mensagem)
+            return
+        validos = tuple(d for d in mensagem.destinos if d not in self.tokens_invalidos)
+        if validos:
+            self.enviados.append(replace(mensagem, destinos=validos))
+        raise TokenInvalido(*invalidos, entregues=len(validos))
 
 
 # --- Push ---------------------------------------------------------------------------------
@@ -111,6 +119,44 @@ def _dados_texto(dados: dict[str, Any]) -> dict[str, str]:
     """Dados do push (FCM `data`, APNs) só aceitam texto. Valor ausente (None) e chave vazia ficam
     de fora: "None" como texto seria lido pelo app como um id de pedido válido."""
     return {str(k): str(v) for k, v in dados.items() if v is not None and str(k)}
+
+
+_LIMITE_TAG_BYTES = 64  # máximo aceito pelo `apns-collapse-id`
+
+
+def tag_do_push(dados: dict[str, Any]) -> str | None:
+    """Identificador que faz um push substituir o anterior na bandeja (`tag` no Android,
+    `apns-collapse-id` no iOS): a conversa, nas mensagens; no resto, a chave da notificação.
+    Assim uma entrega repetida não aparece duas vezes."""
+    conversa = dados.get("conversa_id")
+    base = f"conversa:{conversa}" if conversa else str(dados.get("chave") or "")
+    if not base:
+        return None
+    if len(base.encode()) <= _LIMITE_TAG_BYTES:
+        return base
+    return hashlib.sha256(base.encode()).hexdigest()  # 64 caracteres, estável
+
+
+@dataclass
+class _Entrega:
+    """O que aconteceu, aparelho por aparelho, num envio de push."""
+
+    entregues: int = 0
+    invalidos: list[str] = field(default_factory=list)
+    falhas: int = 0
+
+    def somar(self, outra: _Entrega) -> None:
+        self.entregues += outra.entregues
+        self.invalidos += outra.invalidos
+        self.falhas += outra.falhas
+
+    def concluir(self, motivo: str) -> None:
+        """Token inválido sempre sobe (o serviço precisa desligá-lo). Falha passageira só sobe
+        se ninguém recebeu: reenviar repetiria o push em quem já recebeu."""
+        if self.invalidos:
+            raise TokenInvalido(*self.invalidos, entregues=self.entregues)
+        if self.falhas and not self.entregues:
+            raise FalhaEnvio(motivo)
 
 
 class PushFcm:
@@ -138,28 +184,40 @@ class PushFcm:
         return bool(c.push_ativo and c.fcm_projeto_id and self._transporte and self._token_acesso)
 
     def carga(self, token: str, mensagem: Mensagem) -> dict[str, Any]:
-        return {
-            "message": {
-                "token": token,
-                "notification": {"title": mensagem.titulo, "body": mensagem.corpo or ""},
-                "data": _dados_texto(mensagem.dados),
-            }
+        corpo: dict[str, Any] = {
+            "token": token,
+            "notification": {"title": mensagem.titulo, "body": mensagem.corpo or ""},
+            "data": _dados_texto(mensagem.dados),
         }
+        tag = tag_do_push(mensagem.dados)
+        if tag:
+            corpo["android"] = {"notification": {"tag": tag}}
+            corpo["apns"] = {"headers": {"apns-collapse-id": tag}}  # iOS atendido pelo FCM
+        return {"message": corpo}
 
     def enviar(self, mensagem: Mensagem) -> None:
+        self.tentar(mensagem).concluir("FCM recusou o envio.")
+
+    def tentar(self, mensagem: Mensagem) -> _Entrega:
+        """Manda a todos os aparelhos; a falha de um não impede os outros."""
         if not (self.disponivel and self._transporte and self._token_acesso):
             raise FalhaEnvio("Push desligado.")
         url = f"https://fcm.googleapis.com/v1/projects/{self._config.fcm_projeto_id}/messages:send"
         cab = {"Authorization": f"Bearer {self._token_acesso()}"}
-        falhou = False
+        entrega = _Entrega()
         for token in mensagem.destinos:
-            status = self._transporte(url, cab, self.carga(token, mensagem))
+            try:
+                status = self._transporte(url, cab, self.carga(token, mensagem))
+            except FalhaEnvio:
+                entrega.falhas += 1
+                continue
             if status in (400, 404):
-                raise TokenInvalido(token)
-            if status >= 300:
-                falhou = True
-        if falhou:
-            raise FalhaEnvio("FCM recusou o envio.")
+                entrega.invalidos.append(token)
+            elif status >= 300:
+                entrega.falhas += 1
+            else:
+                entrega.entregues += 1
+        return entrega
 
 
 class PushApns:
@@ -191,22 +249,42 @@ class PushApns:
         }
 
     def enviar(self, mensagem: Mensagem) -> None:
+        self.tentar(mensagem).concluir("APNs recusou o envio.")
+
+    def tentar(self, mensagem: Mensagem) -> _Entrega:
+        """Manda a todos os aparelhos; a falha de um não impede os outros."""
         if not (self.disponivel and self._transporte and self._jwt):
             raise FalhaEnvio("APNs desligado.")
         cab = {
             "authorization": f"bearer {self._jwt()}",
             "apns-topic": self._config.apns_bundle_id,
         }
+        tag = tag_do_push(mensagem.dados)
+        if tag:
+            cab["apns-collapse-id"] = tag
+        entrega = _Entrega()
         for token in mensagem.destinos:
             url = f"https://api.push.apple.com/3/device/{token}"
-            status = self._transporte(url, cab, self.carga(mensagem))
+            try:
+                status = self._transporte(url, cab, self.carga(mensagem))
+            except FalhaEnvio:
+                entrega.falhas += 1
+                continue
             if status == 410:
-                raise TokenInvalido(token)
-            if status >= 300:
-                raise FalhaEnvio("APNs recusou o envio.")
+                entrega.invalidos.append(token)
+            elif status >= 300:
+                entrega.falhas += 1
+            else:
+                entrega.entregues += 1
+        return entrega
 
 
 # --- E-mail -------------------------------------------------------------------------------
+
+
+def _smtp_com_limite(servidor: str, porta: int) -> smtplib.SMTP:
+    """O envio acontece dentro da requisição: servidor mudo não pode segurá-la sem fim."""
+    return smtplib.SMTP(servidor, porta, timeout=10)
 
 
 class EmailSmtp:
@@ -217,7 +295,7 @@ class EmailSmtp:
     def __init__(
         self,
         config: ConfigNotificacoes,
-        fabrica_smtp: Callable[[str, int], smtplib.SMTP] = smtplib.SMTP,
+        fabrica_smtp: Callable[[str, int], smtplib.SMTP] = _smtp_com_limite,
     ) -> None:
         self._config = config
         self._fabrica = fabrica_smtp
@@ -312,28 +390,20 @@ class PushPorPlataforma:
         pares = mensagem.destinos_plataforma or tuple((t, "android") for t in mensagem.destinos)
         tokens_ios = tuple(t for t, plat in pares if plat == "ios")
         tokens_outros = tuple(t for t, plat in pares if plat != "ios")
+        grupos: list[tuple[PushFcm | PushApns, tuple[str, ...]]] = []
         if self.apns.disponivel and tokens_ios:
-            self.apns.enviar(
-                Mensagem(
-                    mensagem.usuario_id,
-                    mensagem.titulo,
-                    mensagem.corpo,
-                    mensagem.dados,
-                    destinos=tokens_ios,
-                )
-            )
+            grupos.append((self.apns, tokens_ios))
         elif tokens_ios:
             tokens_outros = (*tokens_outros, *tokens_ios)
         if self.fcm.disponivel and tokens_outros:
-            self.fcm.enviar(
-                Mensagem(
-                    mensagem.usuario_id,
-                    mensagem.titulo,
-                    mensagem.corpo,
-                    mensagem.dados,
-                    destinos=tokens_outros,
-                )
-            )
+            grupos.append((self.fcm, tokens_outros))
+        entrega = _Entrega()
+        for canal, tokens in grupos:  # um provedor fora do ar não segura o outro
+            try:
+                entrega.somar(canal.tentar(replace(mensagem, destinos=tokens)))
+            except FalhaEnvio:
+                entrega.falhas += len(tokens)
+        entrega.concluir("Provedores de push recusaram o envio.")
 
 
 def _transporte_httpx(url: str, cabecalhos: dict[str, str], corpo: dict[str, Any]) -> int:

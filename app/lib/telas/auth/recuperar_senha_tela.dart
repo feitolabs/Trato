@@ -1,3 +1,4 @@
+import '../comuns/textos_dos_termos.dart';
 import 'package:flutter/material.dart';
 
 import '../../auth/servico_auth.dart';
@@ -84,6 +85,11 @@ class _RecuperarSenhaTelaState extends State<RecuperarSenhaTela> {
             style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
           ),
           BotaoLink(texto: 'Fale com o suporte', aoTocar: _abrirAjuda),
+          Text(
+            textoAtendimentoHumano,
+            textAlign: TextAlign.center,
+            style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+          ),
         ],
       ),
       children: [

@@ -168,7 +168,7 @@ void main() {
       expect(c.validadePedidoHoras, 24);
       expect(c.prazoConfirmacaoHoras, 72);
       expect(c.prazoRetrabalhoDias, 10);
-      expect(c.prazoRespostaDisputaHoras, 48); // padrão
+      expect(c.prazoRespostaDisputaHoras, 24); // padrão
       expect(c.textoLiberacao, contains('em até 2 dias'));
       expect(const ConfigPublica().textoLiberacao, isNot(contains('em até')));
     });

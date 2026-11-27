@@ -15,7 +15,8 @@ from trato.pedidos.estados import Estado as E
 def test_1_cliente_consegue_pedir_upload_de_portfolio_e_equipe_continua_bloqueada(
     e2: Any,  # noqa: F811
 ) -> None:
-    # Conta com papel CLIENTE ativando modo profissional consegue enviar foto de portfólio
+    # Conta com papel CLIENTE e perfil de profissional (conta dupla) envia foto de portfólio
+    e2.amb.contexto.usuarios.profissionais.add(CLIENTE.id)
     pedir, concluir = e2.enviar("t-cliente", "portfolio", JPEG_COM_EXIF)
     assert pedir.status_code == 201, pedir.text
     assert concluir.status_code == 200, concluir.text

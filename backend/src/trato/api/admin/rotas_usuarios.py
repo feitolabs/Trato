@@ -5,7 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
+from trato.api import medidas
+from trato.api.admin.contexto import (
+    AdminContexto,
+    Operador,
+    exigir,
+    obter_admin,
+    proteger_conta_da_equipe,
+)
 from trato.api.admin.modelos import (
     CategoriaProfissionalOut,
     ComMotivo,
@@ -22,7 +29,7 @@ from trato.api.admin.modelos import (
     UsuarioDetalheOut,
     UsuarioOut,
 )
-from trato.api.admin.papeis import Permissao
+from trato.api.admin.papeis import Permissao, pode
 from trato.api.contexto import Contexto, obter_contexto
 from trato.persistencia.comum import como_uuid
 
@@ -56,19 +63,34 @@ def _usuario_out(u: object, extras: dict) -> UsuarioOut:
     return saida
 
 
+# Só quem pode reativar a conta ou mexer em medidas e risco sabe da trava por fraude.
+_VEEM_A_TRAVA = (Permissao.USUARIOS_STATUS, Permissao.MEDIDAS_APLICAR, Permissao.RISCO_VER)
+
+
+def _marcar_trava(contexto: Contexto, operador: Operador, itens: list[UsuarioOut]) -> None:
+    if not any(pode(operador.membro.papel, p) for p in _VEEM_A_TRAVA):
+        return
+    com_trava = contexto.medidas.usuarios_com_trava_fraude([u.id for u in itens], contexto.agora())
+    for u in itens:
+        u.trava_fraude_vigente = u.id.replace("-", "") in com_trava
+
+
 @router.get("/usuarios", response_model=Pagina[UsuarioOut], summary="Buscar usuários")
 def buscar_usuarios(
     q: str | None = Query(None, min_length=2, max_length=100, description="Nome ou id."),
     status: str | None = Query(None, pattern="^(ativo|restrito|bloqueado|anonimizado)$"),
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
-    _: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
+    operador: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
     admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
 ) -> Pagina[UsuarioOut]:
     itens, total = admin.usuarios.buscar(q, status, limite, deslocamento)
     extras = admin.usuarios.complementos(itens)
+    saidas = [_usuario_out(u, extras) for u in itens]
+    _marcar_trava(contexto, operador, saidas)
     return Pagina(
-        itens=[_usuario_out(u, extras) for u in itens],
+        itens=saidas,
         total=total,
         limite=limite,
         deslocamento=deslocamento,
@@ -82,13 +104,15 @@ def buscar_usuarios(
 )
 def detalhe_usuario(
     usuario_id: str,
-    _: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
+    operador: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
     admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
 ) -> UsuarioDetalheOut:
     achado = admin.usuarios.obter(usuario_id)
     if achado is None:
         raise HTTPException(404, "Usuário não encontrado.")
     base = _usuario_out(achado, admin.usuarios.complementos([achado]))
+    _marcar_trava(contexto, operador, [base])
     return UsuarioDetalheOut(
         **base.model_dump(),
         categorias=[
@@ -136,6 +160,8 @@ def diagnostico_pedido(
 class AlterarStatusUsuarioIn(BaseModel):
     status: str = Field(pattern="^(ativo|restrito|bloqueado)$")
     motivo: str = Field(min_length=10, max_length=500)
+    motivo_usuario: str | None = Field(None, max_length=2000, description="O usuário lê (20.4).")
+    clausulas: list[str] = Field(default_factory=list, max_length=20)
 
 
 @router.post(
@@ -156,9 +182,10 @@ def alterar_status_usuario(
     uid = como_uuid(usuario_id)
     if uid is None:
         raise HTTPException(404, "Usuário não encontrado.")
-    with banco.transacao() as con:
+    proteger_conta_da_equipe(admin, operador, str(uid))
+    with contexto.transacao(), banco.transacao() as con:
         usuario = con.execute(
-            "SELECT id, nome, status FROM public.usuarios WHERE id = %s", (uid,)
+            "SELECT id, nome, status FROM public.usuarios WHERE id = %s for update", (uid,)
         ).fetchone()
         if usuario is None:
             raise HTTPException(404, "Usuário não encontrado.")
@@ -174,8 +201,28 @@ def alterar_status_usuario(
             depois={"status": corpo.status, "nome": usuario["nome"]},
             motivo=corpo.motivo,
         )
+        termina = {
+            "ativo": ("suspensao", "encerramento", "bloqueio_preventivo", "restricao",
+                      "trava_saque"),
+            "restrito": ("suspensao", "encerramento", "bloqueio_preventivo"),
+            "bloqueado": (),
+        }[corpo.status]  # fmt: skip
+        if corpo.status != usuario["status"]:
+            medidas.espelhar_status(
+                contexto,
+                str(uid),
+                operador.id,
+                para=corpo.status,
+                tipo="suspensao" if corpo.status == "bloqueado" else "restricao",
+                termina=termina,
+                motivo=corpo.motivo,
+                motivo_usuario=corpo.motivo_usuario,
+                clausulas=tuple(corpo.clausulas),
+            )
     achado = admin.usuarios.obter(usuario_id)
-    return UsuarioOut.model_validate(achado)
+    saida = UsuarioOut.model_validate(achado)
+    _marcar_trava(contexto, operador, [saida])
+    return saida
 
 
 @router.post(

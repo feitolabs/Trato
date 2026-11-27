@@ -30,6 +30,7 @@ import 'package:trato/tema/tema.dart';
 import 'apoio/exemplos/auth/servico_auth_fake.dart';
 import 'apoio/exemplos/dados/repositorios_fake.dart';
 import 'apoio/exemplos/telas/pedido_novo/dados_exemplo.dart' as expn;
+import 'apoio/endereco_pedido.dart';
 
 Widget _app(Widget home) => MaterialApp(
       theme: TemaTrato.claro,
@@ -229,6 +230,9 @@ void main() {
         ),
       );
 
+      // A lista monta o campo só quando chega perto dele.
+      await t.scrollUntilVisible(find.byKey(const Key('campo-cupom')), 200,
+          scrollable: find.byType(Scrollable).first);
       await t.ensureVisible(find.byKey(const Key('campo-cupom')));
       await t.enterText(find.byKey(const Key('campo-cupom')), 'trato10');
       await t.pump();
@@ -306,9 +310,7 @@ void main() {
       expect(find.byKey(const Key('banner-profissional-convidado')), findsOneWidget);
       expect(find.text('Pedido direto para Carlos Mendes. Ele será avisado primeiro.'), findsOneWidget);
 
-      await t.ensureVisible(find.text(Modalidade.remoto.rotulo));
-      await t.tap(find.text(Modalidade.remoto.rotulo));
-      await t.pump();
+      await preencherEnderecoDoPedido(t);
 
       await t.tap(find.text('Enviar pedido'));
       await t.pumpAndSettle();

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import timedelta
 
 from conftest import AGORA, cab
@@ -56,6 +57,8 @@ def test_carteira_do_profissional(amb):
 
 def test_carteira_traz_a_data_prevista_de_repasse_pelo_prazo_da_configuracao(amb):
     # Concluído em AGORA; a janela de congelamento da configuração de teste é 72 h.
+    config = amb.contexto.config
+    config._config = replace(config.carregar(), prazo_liberacao_dias=0)
     amb.semear_pedido(Estado.CONCLUIDO, concluido_em=AGORA)
     amb.semear_dinheiro(100_000, taxa=7_500)
 

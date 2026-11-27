@@ -177,6 +177,8 @@ class LancamentoApi {
     required this.valorCentavos,
     required this.data,
     required this.estornoDe,
+    this.contaDebito,
+    this.contaCredito,
   });
 
   factory LancamentoApi.deJson(Map<String, dynamic> j) => LancamentoApi(
@@ -186,7 +188,12 @@ class LancamentoApi {
         valorCentavos: j['valor_centavos'] as int,
         data: _data(j['data']),
         estornoDe: j['estorno_de'] as String?,
+        contaDebito: _tipoDaConta(j['debito']),
+        contaCredito: _tipoDaConta(j['credito']),
       );
+
+  static String? _tipoDaConta(Object? conta) =>
+      conta is Map && conta['tipo'] is String ? conta['tipo'] as String : null;
 
   final String id;
   final String pedidoId;
@@ -194,6 +201,16 @@ class LancamentoApi {
   final int valorCentavos;
   final DateTime data;
   final String? estornoDe;
+
+  /// Tipo das contas do lançamento (`debito.tipo` e `credito.tipo`).
+  final String? contaDebito;
+  final String? contaCredito;
+
+  /// Desconto de uma compensação no repasse (Termos 8.6 e 17.4).
+  bool get ehCompensacao => contaCredito == 'a_compensar';
+
+  /// Devolução de um desconto, quando a compensação é cancelada.
+  bool get ehCompensacaoDevolvida => contaDebito == 'a_compensar';
 }
 
 class ExclusividadeApi {
@@ -210,6 +227,7 @@ class ExclusividadeApi {
     this.encerradaEm,
     this.saldoRestante,
     this.bloqueadoAte,
+    this.pagador = 'profissional',
   });
 
   factory ExclusividadeApi.deJson(Map<String, dynamic> j) => ExclusividadeApi(
@@ -225,7 +243,11 @@ class ExclusividadeApi {
         encerradaEm: _dataOuNulo(j['encerrada_em']),
         saldoRestante: (j['saldo_restante'] as num?)?.toInt(),
         bloqueadoAte: DateTime.tryParse('${j['bloqueado_ate'] ?? ''}'),
+        pagador: (j['pagador'] as String?) ?? 'profissional',
       );
+
+  /// `cliente` (Termos 13.6) ou `profissional` (modelo antigo).
+  final String pagador;
 
   final String id;
   final String pedidoId;

@@ -130,7 +130,7 @@ def test_estorno_total_devolve_as_moedas(fluxo: Fluxo):
     assert paga.moedas_usadas == 5_000
     parcial = replace(paga, estornado_centavos=paga.valor_centavos - 1)
     fluxo.servico._devolver_moedas(fluxo.ctx, parcial)
-    assert fluxo.ctx.moedas.saldo(CLIENTE.id, AGORA) == 0  # parcial não devolve
+    assert fluxo.ctx.moedas.saldo(CLIENTE.id, AGORA) == 4_999  # parcial: na proporção (13.8)
     total = replace(paga, estornado_centavos=paga.valor_centavos)
     fluxo.servico._devolver_moedas(fluxo.ctx, total)
     fluxo.servico._devolver_moedas(fluxo.ctx, total)  # idempotente

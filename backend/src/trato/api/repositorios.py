@@ -157,6 +157,10 @@ class Repasse:
     liberado_em: datetime | None = None
 
 
+# Termos 12.1: a avaliação vale até N dias após a conclusão (chave `prazo_avaliacao_dias`).
+PRAZO_AVALIACAO_PADRAO_DIAS = 30
+
+
 @dataclass(frozen=True)
 class ConfigApi:
     """Valores da tabela de configuração versionada. Nenhum número fixo nas rotas."""
@@ -169,10 +173,38 @@ class ConfigApi:
     # Quantos orçamentos um pedido recebe e em quantos dias o valor é liberado (só exibição).
     limite_orcamentos_por_pedido: int | None = None
     prazo_liberacao_dias: int | None = None
+    # Lembretes (5.8): quantas horas antes do fim do prazo; 0 desliga.
+    lembrete_confirmacao_antecedencia_horas: int = 12
+    lembrete_resposta_disputa_antecedencia_horas: int = 12
+    prazo_avaliacao_dias: int = PRAZO_AVALIACAO_PADRAO_DIAS
+    # Direito de arrependimento (Termos 7.2; CDC art. 49): nunca menos que 7 dias.
+    arrependimento_dias: int = 7
+    # Cliente ausente (Termos 7.6 e 7.4): pisos de 20 min e 24 h, teto de 30%.
+    ausencia_espera_minutos: int = 20
+    ausencia_justificativa_horas: int = 24
+    ausencia_retencao_max_bps: int = 3000
+    # Ligar depois que o app registrar a chegada: sem ela a ação antiga passa a ser recusada.
+    ausencia_exigir_chegada: bool = False
+    # Contestação da retenção (Termos 8.7): prazo do cliente e da resposta, em dias úteis.
+    ausencia_contestacao_dias_uteis: int = 5
+    ausencia_revisao_dias_uteis: int = 10
+    # Atendimento (Termos 25.4 e Anexo II): nunca mais que estes prazos.
+    sac_resposta_dias_uteis: int = 5
+    # Prazo das medidas de cautela de um incidente (9.6): nunca mais que 24 h.
+    incidente_seguranca_cautela_horas: int = 24
+    # Contestação da decisão da disputa (8.7), em dias úteis.
+    disputa_contestacao_prazo_dias_uteis: int = 5
+    disputa_contestacao_resposta_dias_uteis: int = 10
+    sac_dados_pessoais_dias: int = 15
+    # A exclusividade passou a ser do cliente (13.6): a paga pelo profissional não é oferecida.
+    exclusividade_profissional_ofertada: bool = False
 
 
 class ProvedorConfig(Protocol):
     def carregar(self) -> ConfigApi: ...
+
+    def parametro_inteiro(self, chave: str) -> int | None:
+        """Parâmetro publicado que não faz parte de `ConfigApi`; `None` se não houver."""
 
 
 class RepositorioPedidos(Protocol):
@@ -249,6 +281,10 @@ class RepositorioContratos(Protocol):
     def salvar(self, contrato: Contrato) -> Sequence[tuple[str, str]]:
         """Aceita o orçamento, gera o contrato e recusa os demais orçamentos `enviado` do pedido
         na mesma transação. Devolve `(orcamento_id, profissional_id)` dos recusados agora."""
+
+    def encerrar_por_pagamento_expirado(self, pedido_id: str) -> bool:
+        """Cancela o contrato vigente sem dinheiro e vence o orçamento dele. False: nada
+        mudou (sem contrato, com dinheiro ou banco ainda sem a migration)."""
 
 
 class RepositorioLedger(Protocol):

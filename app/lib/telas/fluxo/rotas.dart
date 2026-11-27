@@ -2,18 +2,20 @@ import 'dart:async';
 import 'dart:io' show Directory, File, Platform;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../comuns/textos_dos_termos.dart';
 import '../agenda/modelos.dart' show EstadoAgendamento;
 import '../../componentes/componentes.dart';
+import '../../dados/servico_conta_api.dart';
 import '../../dados/carregador.dart';
 import '../auth/criar_conta_tela.dart';
 import '../pedido_novo/modelos.dart' show RascunhoPedido;
 import '../../dados/erros.dart';
 import '../../dados/config_publica.dart';
 import '../../dados/relogio_de_atualizacao.dart';
+import '../../dispositivo/seletor_pdf.dart';
 import '../../dispositivo/mapa.dart';
 import '../../dispositivo/servico_push.dart';
 import '../../dispositivo/servico_push_firebase.dart';
@@ -23,6 +25,7 @@ import '../orcamentos/folha_contraproposta.dart';
 import '../../auth/servico_auth.dart';
 import '../../dados/repositorios_trato.dart';
 import '../../dados/sessao.dart';
+import '../auth/completar_cadastro.dart';
 import '../auth/login_tela.dart';
 import '../onboarding/escolha_perfil_tela.dart' show PerfilUso;
 import '../onboarding/tour_perfil_tela.dart';
@@ -42,6 +45,12 @@ import '../catalogo/categoria_tela.dart';
 import '../catalogo/todas_categorias_tela.dart';
 import '../cliente/inicio_tela.dart';
 import '../cliente/modelos.dart' show CategoriaServico, DadosInicio, Profissional;
+import '../comuns/orcamento_vencido.dart';
+import '../atendimento/modelos.dart'
+    show ServicoPessoaDiferente, casoPessoaDiferente;
+import '../conta_bloqueada/pedidos_contratados.dart';
+import '../legal/aceite_dos_termos.dart';
+import '../legal/registro_do_aceite.dart';
 import '../legal/texto_legal_tela.dart';
 import '../mensagens/modelos.dart' show ConversaResumo, ServicoMensagens;
 import '../mensagens/servico_conversas.dart' show ServicoConversasApi;
@@ -51,6 +60,7 @@ import '../orcamentos/modelos.dart' show DadosContrato, Orcamento;
 import '../pedido_novo/modelos.dart' show FormularioPedido;
 import '../servicos/servicos_recentes_tela.dart';
 import '../cliente/perfil_profissional_tela.dart';
+import '../disputa_acordo/secao_acordo.dart';
 import '../disputa_profissional/atender_retrabalho_tela.dart';
 import '../disputa_profissional/disputa.dart';
 import '../disputa_profissional/responder_disputa_tela.dart';
@@ -104,7 +114,19 @@ import '../cliente/casca_cliente_tela.dart';
 import '../carteira/avaliar_cliente_tela.dart';
 import '../configuracoes/configuracoes_tela.dart';
 import '../carteira/detalhe_valores_tela.dart';
+import '../ausencia/ausencia_tela.dart';
+import '../ausencia/modelos.dart';
 import '../conclusao/avaliacao_tela.dart';
+import '../desistencia/desistir_tela.dart';
+import '../desistencia/modelos.dart';
+import '../medidas/medidas_tela.dart';
+import '../medidas/modelos.dart';
+import '../medidas/retorno_conta.dart';
+import '../compensacoes/compensacoes_tela.dart';
+import '../contestacao_decisao/contestacao_decisao_tela.dart';
+import '../atendimento/atendimento_tela.dart';
+import '../exclusividade_cliente/modelos.dart';
+import '../exclusividade_cliente/secao_exclusividade.dart';
 import '../conclusao/conclusao_tela.dart';
 import '../conclusao/modelos.dart';
 import '../conclusao/garantia_tela.dart';
@@ -123,6 +145,7 @@ import '../pagamento/pagamento_tela.dart';
 import '../pedido_novo/novo_pedido_tela.dart';
 import '../perfil_cliente/modelos.dart';
 import '../perfil_cliente/perfil_cliente_tela.dart';
+import '../pedidos/documentos_contratacao.dart';
 import '../pedidos/chat_pedido_tela.dart';
 import '../pedidos/modelos.dart';
 import '../pedidos/pedido_aberto_tela.dart';
@@ -339,18 +362,72 @@ abstract final class RotasTrato {
     }
   }
 
+  /// Como [_tentar], mas o orçamento vencido sobe para a tela mostrar o aviso junto da ação.
+  static Future<bool> _tentarOrcamentoValido(
+    BuildContext context,
+    Future<void> Function() acao,
+  ) async {
+    try {
+      await acao();
+      return true;
+    } on Object catch (erro) {
+      if (ehOrcamentoVencido(erro)) rethrow;
+      if (context.mounted) _aviso(context, erro);
+      return false;
+    }
+  }
+
   /// Depois do login ou do cadastro de cliente: casca do cliente, sem voltar às telas de acesso.
   static void irParaCliente(BuildContext context) {
+    if (contaBloqueada) {
+      _mostrarBloqueio(Navigator.of(context));
+      return;
+    }
     final pendente = rascunhoPendente;
     if (pendente != null) {
       rascunhoPendente = null;
       unawaited(_enviarRascunhoPendente(context, pendente));
       return;
     }
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
-      (rota) => false,
+    _abrirCascaCliente(Navigator.of(context));
+  }
+
+  static void _abrirCascaCliente(NavigatorState navegador, {int abaInicial = 0}) {
+    final casca = MaterialPageRoute<void>(
+      builder: (_) => CascaClienteTela(abaInicial: abaInicial),
     );
+    navegador.pushAndRemoveUntil(casca, (rota) => false);
+    unawaited(_oferecerAceiteDosTermos(navegador, casca));
+  }
+
+  /// Usuário a quem o aceite já foi oferecido neste login ("depois" não insiste).
+  static String? _aceiteOferecidoA;
+
+  /// Termos 23.4: com a tela inicial já aberta, pergunta ao servidor se há aceite pendente. Não
+  /// segura o login, não cobre o que foi aberto por cima e falha em silêncio.
+  static Future<void> _oferecerAceiteDosTermos(
+    NavigatorState navegador,
+    Route<void> casca,
+  ) async {
+    try {
+      final servico = repos.privacidade;
+      final usuario = ServicoAuthPadrao.atual.sessaoAtual?.id;
+      if (servico is! ServicoAceiteDosTermos || usuario == null) return;
+      if (_aceiteOferecidoA == usuario) return;
+      final termos = servico as ServicoAceiteDosTermos;
+      final pendente = await termos.aceitePendente();
+      if (pendente == null || contaBloqueada || !navegador.mounted || !casca.isCurrent) return;
+      if (ServicoAuthPadrao.atual.sessaoAtual?.id != usuario) return;
+      if (_aceiteOferecidoA == usuario) return;
+      _aceiteOferecidoA = usuario;
+      await navegador.push(
+        MaterialPageRoute<bool>(
+          builder: (_) => AceiteDosTermosTela(servico: termos, pendente: pendente),
+        ),
+      );
+    } on Object {
+      // Sem a resposta, o app segue normal; a próxima abertura pergunta de novo.
+    }
   }
 
   static Future<void> _enviarRascunhoPendente(
@@ -368,25 +445,16 @@ abstract final class RotasTrato {
             subtitulo:
                 'Os profissionais de ${rascunho.modalidade.name == 'remoto' ? 'qualquer região' : 'sua região'} foram notificados e você já pode acompanhar os orçamentos.',
             textoBotaoPrimario: 'Ver pedidos',
-            aoTocarPrimario: () => Navigator.of(ctxSucesso).pushAndRemoveUntil(
-              MaterialPageRoute<void>(builder: (_) => const CascaClienteTela(abaInicial: 2)),
-              (rota) => false,
-            ),
+            aoTocarPrimario: () => _abrirCascaCliente(Navigator.of(ctxSucesso), abaInicial: 2),
             textoBotaoSecundario: 'Voltar ao início',
-            aoVoltarInicio: () => Navigator.of(ctxSucesso).pushAndRemoveUntil(
-              MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
-              (rota) => false,
-            ),
+            aoVoltarInicio: () => _abrirCascaCliente(Navigator.of(ctxSucesso)),
           ),
         ),
         (rota) => false,
       );
     } on Object catch (erro) {
       if (!context.mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(builder: (_) => const CascaClienteTela()),
-        (rota) => false,
-      );
+      _abrirCascaCliente(Navigator.of(context));
       _aviso(context, erro);
     }
   }
@@ -394,6 +462,7 @@ abstract final class RotasTrato {
   /// Depois do cadastro (com sessão aberta): cliente vai à casca; profissional ao cadastro dele.
   static void irParaDepoisDoCadastro(BuildContext context, PerfilUso perfil) {
     modoVisitante = false;
+    cadastroMudou.value++;
     if (perfil == PerfilUso.cliente) {
       irParaCliente(context);
     } else {
@@ -416,6 +485,210 @@ abstract final class RotasTrato {
     }
   }
 
+  /// A API disse `conta_bloqueada`. Vale até sair da conta.
+  static var contaBloqueada = false;
+  static Route<void>? _rotaDoBloqueio;
+
+  static void esquecerBloqueio() {
+    contaBloqueada = false;
+    _rotaDoBloqueio = null;
+  }
+
+  /// Troca tudo pela tela de bloqueio, sem logout. Várias respostas juntas abrem uma só.
+  static void contaFoiBloqueada(
+    NavigatorState? Function() navegador,
+    String? mensagem, [
+    int tentativa = 0,
+  ]) {
+    contaBloqueada = true;
+    final nav = navegador();
+    if (nav == null) {
+      // Partida a frio: o navegador ainda não existe.
+      if (tentativa < 60) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => contaFoiBloqueada(navegador, mensagem, tentativa + 1),
+        );
+      }
+      return;
+    }
+    _mostrarBloqueio(nav, mensagem);
+  }
+
+  static void _mostrarBloqueio(NavigatorState nav, [String? mensagem]) {
+    if (_rotaDoBloqueio?.isActive ?? false) return;
+    final medidas = repos.medidas;
+    final retorno = medidas is ServicoRetornoConta ? medidas as ServicoRetornoConta : null;
+    final contratados = _pedidosDaContaBloqueada();
+    final rota = MaterialPageRoute<void>(
+      builder: (_) => Builder(
+        builder: (context) => ContaBloqueadaTela(
+          mensagem: mensagem,
+          aoFalar: () => abrirAtendimento(context, profissional: false),
+          temMedidas: medidas == null ? null : () async => await medidas.listar() != null,
+          aoVerMedidas: medidas == null ? null : () => abrirMedidas(context),
+          contaEncerrada: retorno == null
+              ? null
+              : () async => (await medidas!.listar())
+                      ?.any((m) => m.tipo == 'encerramento' && m.revertidaEm == null) ??
+                  false,
+          aoPedirRetorno: retorno == null
+              ? null
+              : () => _abrir<void>(context, RetornoContaTela(servico: retorno)),
+          temPedidos: contratados == null
+              ? null
+              : () async => (await contratados.pedidosContratados()).isNotEmpty,
+          aoVerPedidos: contratados == null
+              ? null
+              : () => _abrir<void>(
+                    context,
+                    PedidosContratadosTela(
+                      servico: contratados,
+                      aoFalar: _falarSobrePedido,
+                      secoes: _secoesDoBloqueado,
+                      capturarFoto: _fotografar,
+                    ),
+                  ),
+          aoSair: () => sair(context),
+        ),
+      ),
+    );
+    _rotaDoBloqueio = rota;
+    nav.pushAndRemoveUntil(rota, (_) => false);
+    // Um aviso de medida ou do atendimento que esperava a casca abre por cima.
+    WidgetsBinding.instance.addPostFrameCallback((_) => DeepLinks.processar());
+  }
+
+  static PedidosComContaBloqueada? _pedidosDaContaBloqueada() {
+    final pedidos = repos.pedidos;
+    return pedidos is PedidosComContaBloqueada ? pedidos as PedidosComContaBloqueada : null;
+  }
+
+  static void _falarSobrePedido(BuildContext context, String? pedidoId) =>
+      abrirAtendimento(context, profissional: false, pedidoId: pedidoId);
+
+  /// Termos 20.6 e 20.10: no próprio pedido, o bloqueado vê e justifica a ausência, contesta a
+  /// retenção e a decisão da disputa. Cada seção some quando o servidor não tem o que mostrar.
+  static List<Widget> _secoesDoBloqueado(BuildContext context, PedidoDeContaBloqueada pedido) {
+    final id = pedido.id;
+    Future<CasoAusencia?> carregar() => repos.pedidos.casoDeAusencia(id);
+    final contestacao = repos.contestacaoDecisao;
+    final chegada = _relatarSeguranca(
+      context,
+      id,
+      orientarChegada: true,
+      cliente: true,
+      casoInicial: casoPessoaDiferente,
+    );
+    return [
+      if (chegada != null && !const {'concluido', 'cancelado'}.contains(pedido.estado))
+        BotaoSecundario(
+          key: const ValueKey('contratado-pessoa-diferente'),
+          texto: 'Quem chegou não é a pessoa do app',
+          aoTocar: chegada,
+        ),
+      if (const {'agendado', 'cancelado'}.contains(pedido.estado))
+        SecaoAusencia(
+          key: ValueKey('ausencia-$id'),
+          carregar: carregar,
+          profissional: false,
+          atualizarQuando: pedidosMudaram,
+          aoAbrir: () => _abrir<void>(
+            context,
+            AusenciaTela(
+              carregar: carregar,
+              profissional: false,
+              enviar: (texto, fotos) => repos.pedidos.justificarAusencia(id, texto, fotos),
+              capturarFoto: _fotografar,
+              aoEnviar: () => pedidosMudaram.value++,
+              carregarAnexos: () => repos.pedidos.anexosDaAusencia(id),
+              contestar: (texto, fotos) => repos.pedidos.contestarAusencia(id, texto, fotos),
+            ),
+          ),
+        ),
+      if (contestacao != null &&
+          const {'em_confirmacao', 'em_disputa', 'retrabalho', 'concluido', 'cancelado'}
+              .contains(pedido.estado))
+        SecaoContestacaoDecisao(
+          key: ValueKey('contestacao-$id-${pedido.estado}'),
+          carregar: () => contestacao.ver(id),
+          atualizarQuando: pedidosMudaram,
+          aoAbrir: () => abrirContestacaoDecisao(context, id, profissional: false),
+        ),
+    ];
+  }
+
+  /// Aviso tocado com a conta bloqueada: o pedido contratado, na tela reduzida.
+  static void abrirPedidoContratado(BuildContext context, String pedidoId) {
+    final contratados = _pedidosDaContaBloqueada();
+    if (contratados == null) return;
+    _abrir<void>(
+      context,
+      PedidoContratadoTela(
+        servico: contratados,
+        pedidoId: pedidoId,
+        aoFalar: _falarSobrePedido,
+        secoes: _secoesDoBloqueado,
+        capturarFoto: _fotografar,
+      ),
+    );
+  }
+
+  static void abrirMedidas(BuildContext context) {
+    final medidas = repos.medidas;
+    if (medidas != null) {
+      _abrir<void>(
+        context,
+        MedidasTela(
+          servico: medidas,
+          escolherProva: _escolherProva,
+          escolherPdf: escolherPdfDoAparelho,
+        ),
+      );
+    }
+  }
+
+  /// Foto da câmera para a contestação (o PDF vem do seletor de arquivos).
+  static Future<ProvaEscolhida?> _escolherProva() async {
+    final caminho = await dispositivo.camera.fotografar();
+    if (caminho == null) return null;
+    return ProvaEscolhida(
+      nome: caminho.split(RegExp(r'[/\\]')).last,
+      bytes: await File(caminho).readAsBytes(),
+    );
+  }
+
+  /// Cobre o app com "Completar cadastro" enquanto faltar a data de nascimento (Termos 4.1).
+  /// [navegador] é o contexto do navegador raiz, usado para sair da conta.
+  static Widget portaoCadastro(Widget filho, BuildContext? Function() navegador) {
+    final conta = repos.conta;
+    if (!repos.modoApi || conta == null) return filho;
+    return PortaoCadastro(
+      auth: ServicoAuthPadrao.atual,
+      ler: conta.dados,
+      gravar: (nascimento) {
+        final quem = ServicoAuthPadrao.atual.sessaoAtual;
+        if (conta is ServicoContaApi && quem != null && quem.email.isNotEmpty) {
+          return conta.informarNascimento(
+            usuarioId: quem.id,
+            email: quem.email,
+            nome: quem.nome,
+            nascimento: nascimento,
+          );
+        }
+        return conta.salvarDados(nascimento: nascimento);
+      },
+      sair: () async {
+        final context = navegador();
+        if (context != null) await sair(context);
+      },
+      conferirDeNovo: Listenable.merge([pedidosMudaram, cadastroMudou]),
+      child: filho,
+    );
+  }
+
+  /// O cadastro acabou de ser gravado: o portão confere de novo.
+  static final cadastroMudou = ValueNotifier<int>(0);
+
   /// Sair da conta: remove o token de push, encerra o login, limpa o token e volta ao login.
   static Future<void> sair(BuildContext context) async {
     final navegador = Navigator.of(context);
@@ -435,7 +708,9 @@ abstract final class RotasTrato {
     }
     PerfilClienteTela.limparFotoSessao();
     PerfilPublicoTela.limparFotoSessao();
-    await sessao?.sair(); // espera apagar o cache de leitura antes de voltar ao login
+    await sessao?.sair();
+    esquecerBloqueio(); // espera apagar o cache de leitura antes de voltar ao login
+    _aceiteOferecidoA = null;
     DeepLinks.esquecer(); // um link guardado é de quem saiu: não abre para a próxima pessoa
     navegador.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginTela()),
@@ -693,12 +968,20 @@ abstract final class RotasTrato {
   }
 
   /// Termos de uso e política de privacidade (rascunhos; a tela avisa que serão revisados).
-  static void abrirTermos(BuildContext context) => _abrir<void>(
-        context,
-        Builder(
-          builder: (context) => TermosEPoliticaTela(aoAbrir: (t) => abrirTextoLegal(context, t)),
+  static void abrirTermos(BuildContext context) {
+    final servico = repos.privacidade;
+    final consulta =
+        temSessao && servico is ConsultaDoAceite ? servico as ConsultaDoAceite : null;
+    _abrir<void>(
+      context,
+      Builder(
+        builder: (context) => TermosEPoliticaTela(
+          aoAbrir: (t) => abrirTextoLegal(context, t),
+          consultaDoAceite: consulta,
         ),
-      );
+      ),
+    );
+  }
 
   static void abrirTextoLegal(BuildContext context, TextoLegal texto) =>
       _abrir<void>(context, TextoLegalTela.de(texto));
@@ -780,10 +1063,16 @@ abstract final class RotasTrato {
 
   /// Depois do cadastro de profissional (e em "Usar como profissional"): casca do profissional.
   static Future<void> irParaProfissional(BuildContext context) async {
+    if (contaBloqueada) {
+      _mostrarBloqueio(Navigator.of(context));
+      return;
+    }
     final tem = repos.modoApi
         ? (await repos.perfilPublico?.temPerfilProfissional() ?? false)
         : ((ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true) ||
             (await repos.perfilPublico?.temPerfilProfissional() ?? false));
+    // O bloqueio pode ter chegado durante a consulta: nada abre por cima dele.
+    if (contaBloqueada) return;
     if (tem && context.mounted) {
       if (repos.modoApi && repos.verificacao != null) {
         SituacaoVerificacao? sit;
@@ -840,10 +1129,14 @@ abstract final class RotasTrato {
   static Future<List<String>> _selecionarFotos() => dispositivo.fotografarMultiplasEEnviar();
 
   static void _entrarNaCascaProfissional(BuildContext context) {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => _cascaProfissional()),
-      (rota) => false,
-    );
+    if (contaBloqueada) {
+      _mostrarBloqueio(Navigator.of(context));
+      return;
+    }
+    final navegador = Navigator.of(context);
+    final casca = MaterialPageRoute<void>(builder: (_) => _cascaProfissional());
+    navegador.pushAndRemoveUntil(casca, (rota) => false);
+    unawaited(_oferecerAceiteDosTermos(navegador, casca));
   }
 
   /// Cadastro → verificação (documento e selfie) → casca do profissional.
@@ -930,8 +1223,7 @@ abstract final class RotasTrato {
           abaInicial: abaInicial,
           inicio: inicio,
           carregarDetalhe: (pedido) => repos.profissional.detalhe(pedido.id),
-          pedirExclusividade: (pedido, chave) =>
-              repos.profissional.solicitarExclusividade(pedido.id, chave),
+          desistirExclusividade: repos.profissional.desistirDaExclusividade,
           recusarPedido: (pedido, motivo) => _tentar(
             context,
             () => repos.profissional.recusar(pedido.id, motivo),
@@ -1150,7 +1442,7 @@ abstract final class RotasTrato {
     );
   }
 
-  /// "Meu CNPJ" (Configurações do profissional e aviso ao tentar orçar sem CNPJ).
+  /// "Meu MEI" (Configurações do profissional e aviso ao tentar orçar sem MEI).
   static void abrirMeuCnpj(BuildContext context) {
     final servico = repos.mei;
     if (servico == null) return;
@@ -1158,7 +1450,7 @@ abstract final class RotasTrato {
   }
 
   /// Como [_tentar], mas se o servidor barra o orçamento por falta de CNPJ/MEI, mostra o texto dele
-  /// com o botão "Informar meu CNPJ" em vez de um aviso que some.
+  /// com o botão "Informar meu MEI" em vez de um aviso que some.
   static Future<bool> tentarOrcamento(BuildContext context, Future<void> Function() acao) async {
     try {
       await acao();
@@ -1181,7 +1473,7 @@ abstract final class RotasTrato {
       context: context,
       builder: (dialogo) => AlertDialog(
         key: const Key('dialogo-cnpj-necessario'),
-        title: const Text('Falta o seu CNPJ'),
+        title: const Text('Falta o seu MEI'),
         content: Text(texto),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogo).pop(), child: const Text('Fechar')),
@@ -1192,7 +1484,7 @@ abstract final class RotasTrato {
                 Navigator.of(dialogo).pop();
                 abrirMeuCnpj(context);
               },
-              child: const Text('Informar meu CNPJ'),
+              child: const Text('Informar meu MEI'),
             ),
         ],
       ),
@@ -1253,13 +1545,12 @@ abstract final class RotasTrato {
           tituloPedido: titulo,
           edicao: inicial != null,
           remoto: remoto,
-          mostrarForaDoEscopo: true,
           deslocamentoInicial: inicial == null ? null : _textoDecimos(inicial.decimosDeslocamento),
           horasInicial: inicial == null ? null : _textoDecimos(inicial.decimosTrabalhadas),
           valorHoraInicial: inicial == null ? null : _textoCentavosCampo(inicial.valorHoraCentavos),
-          garantiaInicialDias: inicial?.garantiaDias ?? 90,
+          garantiaInicialDias: inicial?.garantiaDias,
           garantiaMinimaDias: minima,
-          prazoExecucaoInicialDias: inicial?.prazoExecucaoDias ?? 3,
+          prazoExecucaoInicialDias: inicial?.prazoExecucaoDias,
           itensIniciais: inicial?.materiais ?? const [],
           foraDoEscopoInicial: inicial?.foraDoEscopo,
           observacoesInicial: inicial?.observacoes,
@@ -1444,6 +1735,21 @@ abstract final class RotasTrato {
     );
   }
 
+  static void _checkOutFeito(BuildContext tela, String subtitulo) {
+    pedidosMudaram.value++;
+    _abrirSucesso<void>(
+      tela,
+      (ctxSucesso) => SucessoAcaoTela(
+        titulo: 'Serviço concluído!',
+        subtitulo: subtitulo,
+        aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
+        textoBotaoSecundario: 'Ir para pedidos',
+        aoTocarSecundario: () => _voltarAoInicio(ctxSucesso, aba: 1),
+      ),
+      substituirAtual: true,
+    );
+  }
+
   /// Check-out: foto final e o código de conclusão que o cliente informa. Quem confere o código
   /// é o backend; ao ser aceito o serviço vai para "em confirmação" e o cliente é avisado.
   static void _abrirCheckOut(BuildContext context, String pedidoId, String titulo,
@@ -1456,21 +1762,11 @@ abstract final class RotasTrato {
           permissao: permissao,
           remoto: remoto,
           tituloBarra: titulo,
-          aoConcluir: () {
-            pedidosMudaram.value++;
-            _abrirSucesso<void>(
-              tela,
-              (ctxSucesso) => SucessoAcaoTela(
-                titulo: 'Serviço concluído!',
-                subtitulo:
-                    'O cliente tem até ${ConfigPublica.horas(ConfigPublica.atual.prazoConfirmacaoHoras)} para confirmar a conclusão.',
-                aoVoltarInicio: () => _voltarAoInicio(ctxSucesso),
-                textoBotaoSecundario: 'Ir para pedidos',
-                aoTocarSecundario: () => _voltarAoInicio(ctxSucesso, aba: 1),
-              ),
-              substituirAtual: true,
-            );
-          },
+          aoConcluir: () => _checkOutFeito(
+            tela,
+            'O cliente tem até ${ConfigPublica.horas(ConfigPublica.atual.prazoConfirmacaoHoras)} para confirmar a conclusão.',
+          ),
+          aoConcluirSemCodigo: () => _checkOutFeito(tela, textoEncerradoSemCodigo),
         ),
       ),
     );
@@ -1482,9 +1778,12 @@ abstract final class RotasTrato {
   /// "Avaliar o cliente": a tela de nota e, ao enviar, a confirmação (+Tratinhos quem decide é o
   /// servidor). Usada na tela de valores, no pedido concluído e no menu do pedido.
   static Future<void> _avaliarCliente(BuildContext context, String pedidoId) async {
+    final prazo = await repos.profissional.prazoDaAvaliacao(pedidoId);
+    if (!context.mounted) return;
     final enviou = await _abrir<bool>(
       context,
       AvaliarClienteTela(
+        prazo: prazo,
         pedidoNumero: PedidoApi.numeroDe(pedidoId),
         aoEnviar: (nota, comentario) =>
             repos.profissional.avaliarCliente(pedidoId, nota, comentario),
@@ -1667,17 +1966,33 @@ abstract final class RotasTrato {
                       _abrir<void>(context, _criarAditivo(pedidoId, titulo));
                     },
                   ),
+                if (_secaoAcordo(estadoApi, profissional: true, id: pedidoId) case final secao?)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                    child: secao,
+                  ),
+                if (repos.contestacaoDecisao != null &&
+                    (estadoApi == 'concluido' || estadoApi == 'em_confirmacao' || emRetrabalho))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                    child: SecaoContestacaoDecisao(
+                      carregar: () => repos.contestacaoDecisao!.ver(pedidoId),
+                      aoAbrir: () =>
+                          abrirContestacaoDecisao(context, pedidoId, profissional: true),
+                    ),
+                  ),
                 if (estadoApi == 'concluido')
                   ListTile(
                     key: const ValueKey('baixar-comprovante'),
                     leading: const Icon(Icons.picture_as_pdf_outlined),
-                    title: const Text('Baixar comprovante (PDF)'),
+                    title: const Text('Baixar recibo (PDF)'),
                     onTap: () {
                       Navigator.of(folha).pop();
                       _baixarReciboPdf(context, pedidoId);
                     },
                   ),
-                if (estadoApi == 'concluido')
+                // Repetir um serviço remoto criaria pedidos remotos novos (Termos 3.7).
+                if (estadoApi == 'concluido' && !remoto)
                   ListTile(
                     key: const ValueKey('repetir-servico'),
                     leading: const Icon(Icons.event_repeat_outlined),
@@ -1766,7 +2081,12 @@ abstract final class RotasTrato {
             child: BarraAtendimento(
               aoChat: () => _abrir<void>(folha, _chat(pedidoId, comoProfissional: true)),
               aoAjuda: () => _abrir<void>(folha, _telaAjuda(folha, comoCliente: false)),
-              aoSos: remoto ? null : () => _abrirSosEmergencia(folha, resumo),
+              // A orientação sobre quem chega é para o cliente: aqui não aparece.
+              aoSos: () => mostrarEmergencia(
+                folha,
+                resumo,
+                aoRelatar: _relatarSeguranca(folha, pedidoId),
+              ),
             ),
           ),
         ),
@@ -1874,6 +2194,15 @@ abstract final class RotasTrato {
         aoAbrirItem: (context, pedidoId) => _abrirValoresEAvaliar(context, pedidoId),
         aoConfigurarRecebimento: _abrirContaRecebimento,
         aoBaixarExtratoPdf: _baixarExtratoPdf,
+        entradaCompensacoes: switch (repos.compensacoes) {
+          null => null,
+          final servico => Builder(
+              builder: (context) => EntradaDeCompensacoes(
+                servico: servico,
+                aoAbrir: () => abrirCompensacoes(context),
+              ),
+            ),
+        },
       );
 
   static Future<void> _abrirContaRecebimento(
@@ -2011,28 +2340,13 @@ abstract final class RotasTrato {
     final mensagens = ScaffoldMessenger.of(context);
     try {
       final bytes = await repos.pedidos.baixarReciboPdf(pedidoId);
-      final arquivo = 'trato_comprovante_${pedidoId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf';
-      final caminho = await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
       if (!context.mounted) return;
-      mensagens
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Comprovante em PDF salvo.'),
-            duration: const Duration(seconds: 4),
-            persist: false,
-            action: SnackBarAction(
-              label: 'Compartilhar',
-              onPressed: () async {
-                try {
-                  await compartilharArquivo(caminho);
-                } on Object {
-                  // Sem compartilhamento: fica só o aviso de salvo.
-                }
-              },
-            ),
-          ),
-        );
+      await _salvarEAvisarPdf(
+        context,
+        bytes,
+        'trato_comprovante_${_nomeSeguro(pedidoId)}.pdf',
+        'Recibo em PDF salvo.',
+      );
     } on ErroTrato catch (e) {
       if (!context.mounted) return;
       mensagens
@@ -2043,9 +2357,71 @@ abstract final class RotasTrato {
       mensagens
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Não foi possível baixar o comprovante agora.')),
+          const SnackBar(content: Text('Não foi possível baixar o recibo agora.')),
         );
     }
+  }
+
+  static String _nomeSeguro(String id) => id.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+
+  /// Salva o PDF no aparelho e avisa, com "Compartilhar". Lança se não der para salvar.
+  static Future<void> _salvarEAvisarPdf(
+    BuildContext context,
+    List<int> bytes,
+    String arquivo,
+    String aviso,
+  ) async {
+    final mensagens = ScaffoldMessenger.of(context);
+    final caminho = await (salvarPdfParaTeste ?? _salvarPdfNoAparelho)(bytes, arquivo);
+    if (!context.mounted) return;
+    mensagens
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(aviso),
+          duration: const Duration(seconds: 4),
+          persist: false,
+          action: SnackBarAction(
+            label: 'Compartilhar',
+            onPressed: () async {
+              try {
+                await compartilharArquivo(caminho);
+              } on Object {
+                // Sem compartilhamento: fica só o aviso de salvo.
+              }
+            },
+          ),
+        ),
+      );
+  }
+
+  /// Documentos da contratação (5.3), no pedido do cliente. Antes do pagamento nem pergunta.
+  static Widget? _secaoDocumentos(
+    BuildContext context,
+    PedidoEmExecucao pedido,
+    String pedidoId,
+  ) {
+    final pedidos = repos.pedidos;
+    if (pedidos is! ServicoContratacao) return null;
+    if (pedido.estadoApi == 'orcamento_aceito' && !pedido.pagamentoConfirmado) return null;
+    final servico = pedidos as ServicoContratacao;
+    return SecaoDocumentosContratacao(
+      key: ValueKey('contratacao-$pedidoId-${pedido.estadoApi}-${pedido.pagamentoConfirmado}'),
+      carregar: () => servico.contratacao(pedidoId),
+      atualizarQuando: pedidosMudaram,
+      baixar: (documento) async {
+        final bytes = await servico.baixarDocumentoContratacao(pedidoId, documento);
+        if (!context.mounted) return;
+        await _salvarEAvisarPdf(
+          context,
+          bytes,
+          'trato_contratacao_${documento.arquivo}_${_nomeSeguro(pedidoId)}.pdf',
+          documento == DocumentoContratacao.termos
+              ? 'Cópia dos Termos em PDF salva.'
+              : 'Comprovante em PDF salvo.',
+        );
+      },
+    );
   }
 
   static Future<String> _salvarPdfNoAparelho(
@@ -2264,8 +2640,13 @@ abstract final class RotasTrato {
   /// atendimento; "Relatar um problema" leva o cliente aos serviços, onde ele abre o relato.
   static Widget _telaAjuda(BuildContext context, {bool comoCliente = true, String? pedidoId}) {
     final email = ConfigPublica.atual.suporteEmail;
+    final sac = repos.sac;
     return AjudaTela(
       servico: const ServicoAjudaLocal(),
+      verificarAtendimento: sac == null ? null : () async => await sac.listar() != null,
+      aoFalarComOTrato: sac == null
+          ? null
+          : () => abrirAtendimento(context, profissional: !comoCliente, pedidoId: pedidoId),
       aoFalarComSuporte: email == null
           ? null
           : () async {
@@ -2281,6 +2662,7 @@ abstract final class RotasTrato {
               ? () => abrirServicos(context)
               : () => _abrir<void>(context, _relatarProblema(pedidoId)),
       aoRelatarBug: () => relatarBug(context, tela: 'Central de ajuda'),
+      aoVerTermos: () => abrirTermos(context),
       aoVerTour: () => _abrir<void>(
         context,
         TourPerfilTela(
@@ -2290,6 +2672,153 @@ abstract final class RotasTrato {
         ),
       ),
     );
+  }
+
+  /// Compensações do profissional; [compensacaoId] é a do aviso.
+  static void abrirCompensacoes(BuildContext context, {String? compensacaoId}) {
+    final servico = repos.compensacoes;
+    if (servico == null) return;
+    _abrir<void>(
+      context,
+      CompensacoesTela(
+        servico: servico,
+        compensacaoId: compensacaoId,
+        aoFalarComOTrato: (tela, pedidoId) =>
+            abrirAtendimento(tela, profissional: true, pedidoId: pedidoId),
+      ),
+    );
+  }
+
+  /// Contestar a decisão da disputa do pedido (Termos 8.7), cliente ou profissional.
+  static Future<void> abrirContestacaoDecisao(
+    BuildContext context,
+    String pedidoId, {
+    required bool profissional,
+  }) async {
+    final servico = repos.contestacaoDecisao;
+    if (servico == null) {
+      abrirAtendimento(context, profissional: profissional, pedidoId: pedidoId);
+      return;
+    }
+    await _abrir<void>(
+      context,
+      ContestacaoDecisaoTela(
+        servico: servico,
+        pedidoId: pedidoId,
+        escolherFoto: _escolherProva,
+        aoFalarComOTrato: (tela) =>
+            abrirAtendimento(tela, profissional: profissional, pedidoId: pedidoId),
+      ),
+    );
+  }
+
+  /// Proposta de devolução e acordo (Termos 8.2): só nos estados que uma disputa alcança.
+  static Widget? _secaoAcordo(String? estadoApi, {required bool profissional, required String id}) {
+    final servico = repos.acordoDisputa;
+    const estados = {'em_disputa', 'concluido', 'cancelado', 'retrabalho', 'em_confirmacao'};
+    if (servico == null || !estados.contains(estadoApi)) return null;
+    return SecaoAcordoDisputa(
+      key: ValueKey('acordo-$id-$estadoApi'),
+      servico: servico,
+      pedidoId: id,
+      profissional: profissional,
+      atualizarQuando: pedidosMudaram,
+      aoMudar: () => pedidosMudaram.value++,
+    );
+  }
+
+  /// A entrada da contestação no pedido: só nos estados que uma decisão de disputa alcança.
+  static Widget? _secaoContestacao(
+    BuildContext context,
+    PedidoEmExecucao pedido, {
+    required bool profissional,
+    required String id,
+  }) {
+    final servico = repos.contestacaoDecisao;
+    const estados = {'concluido', 'cancelado', 'retrabalho', 'em_confirmacao'};
+    if (servico == null || !estados.contains(pedido.estadoApi)) return null;
+    return SecaoContestacaoDecisao(
+      key: ValueKey('contestacao-$id-${pedido.estadoApi}'),
+      carregar: () => servico.ver(id),
+      atualizarQuando: pedidosMudaram,
+      aoAbrir: () => abrirContestacaoDecisao(context, id, profissional: profissional),
+    );
+  }
+
+  /// "Falar com o Trato": chamados com protocolo. Sem o serviço, abre a Central de ajuda.
+  /// Atalho da emergência do pedido para o chamado de segurança (Termos 9.3). Nulo sem o
+  /// atendimento pelo app. Só abre o formulário: o chamado é criado quando a pessoa envia.
+  static VoidCallback? _relatarSeguranca(
+    BuildContext context,
+    String pedidoId, {
+    bool orientarChegada = false,
+    bool cliente = false,
+    String? casoInicial,
+  }) {
+    final sac = repos.sac;
+    if (sac == null) return null;
+    return () => _abrir<void>(
+          context,
+          NovoChamadoTela(
+            servico: sac,
+            pedidoInicial: pedidoId,
+            seguranca: true,
+            orientarChegada: orientarChegada,
+            casoInicial: casoInicial,
+            pessoaDiferente: cliente && sac is ServicoPessoaDiferente
+                ? sac as ServicoPessoaDiferente
+                : null,
+            aoRelatarPessoaDiferente: () => pedidosMudaram.value++,
+          ),
+        );
+  }
+
+  static void abrirAtendimento(
+    BuildContext context, {
+    required bool profissional,
+    String? pedidoId,
+  }) {
+    final sac = repos.sac;
+    if (sac == null) {
+      _abrir<void>(context, _telaAjuda(context, comoCliente: !profissional));
+      return;
+    }
+    final email = ConfigPublica.atual.suporteEmail;
+    _abrir<void>(
+      context,
+      Builder(
+        builder: (tela) => AtendimentoTela(
+          servico: sac,
+          pedidoInicial: pedidoId,
+          carregarPedidos: contaBloqueada
+              ? null
+              : () => _pedidosParaChamado(profissional: profissional),
+          aoEscreverEmail: email == null
+              ? null
+              : () async {
+                  final abriu = await abrirEmail(email, 'Ajuda com o Trato');
+                  if (!abriu && tela.mounted) {
+                    _avisoSimples(tela, 'Não achamos um app de e-mail. Escreva para $email.');
+                  }
+                },
+        ),
+      ),
+    );
+  }
+
+  static Future<List<PedidoDoChamado>> _pedidosParaChamado({required bool profissional}) async {
+    if (profissional) {
+      final inicio = await repos.profissional.inicio();
+      return [
+        for (final c in [...inicio.contratados, ...inicio.finalizados])
+          (id: c.pedidoId, rotulo: c.titulo),
+      ];
+    }
+    final pedidos = await repos.pedidos.listar();
+    return [
+      for (final p in [...pedidos.emAndamento, ...pedidos.finalizados])
+        if (p.id != null) (id: p.id!, rotulo: p.titulo),
+    ];
   }
 
   static final ServicoConta _contaDemo = ServicoContaFake();
@@ -2386,6 +2915,11 @@ abstract final class RotasTrato {
       moedasPendentes: p.moedasPendentes,
       moedasProximaLiberacao: p.moedasProximaLiberacao,
       moedasValorCentavos: p.moedasValorCentavos,
+      moedasVenceEm: p.moedasVenceEm,
+      tetoDescontoMesCentavos: p.tetoDescontoMesCentavos,
+      descontoUsadoMesCentavos: p.descontoUsadoMesCentavos,
+      moedasExtrato: p.moedasExtrato,
+      moedasCreditos: p.moedasCreditos,
       exclusaoAgendadaEm: p.exclusaoAgendadaEm,
       grupos: itens.isEmpty ? const [] : [GrupoPerfil(titulo: 'CONTA', itens: itens)],
     );
@@ -2396,8 +2930,11 @@ abstract final class RotasTrato {
   static void abrirConfiguracoes(BuildContext context, {required bool profissional}) =>
       _abrir<void>(
         context,
-        Builder(
-          builder: (context) => ConfiguracoesTela(
+        EntradaDeMedidas(
+          verificar: repos.medidas == null
+              ? null
+              : () async => await repos.medidas!.listar() != null,
+          construir: (context, temMedidas) => ConfiguracoesTela(
             grupos: [
               GrupoConfiguracao(
                 titulo: 'CONTA',
@@ -2418,7 +2955,7 @@ abstract final class RotasTrato {
                   if (profissional && repos.mei != null)
                     ItemContaPerfil(
                       icone: Icons.badge_outlined,
-                      titulo: 'Meu CNPJ',
+                      titulo: 'Meu MEI',
                       aoTocar: () => abrirMeuCnpj(context),
                     ),
                   ItemContaPerfil(
@@ -2460,6 +2997,12 @@ abstract final class RotasTrato {
                     titulo: 'Relatar bug',
                     aoTocar: () => relatarBug(context, tela: 'Configurações'),
                   ),
+                  if (temMedidas)
+                    ItemContaPerfil(
+                      icone: Icons.gavel_outlined,
+                      titulo: 'Medidas da conta',
+                      aoTocar: () => abrirMedidas(context),
+                    ),
                   ItemContaPerfil(
                     icone: Icons.description_outlined,
                     titulo: 'Termos e políticas',
@@ -2481,13 +3024,22 @@ abstract final class RotasTrato {
         )
       : Builder(
           builder: (context) => MensagensTela(
-            servico: _servicoMensagens,
+            // O estado real do pedido no selo e nos filtros (o chat segue no serviço original).
+            servico: ServicoMensagensComEstado(_servicoMensagens, _estadosDosPedidosDoCliente),
             atualizarACada: _intervalo,
             atualizarQuando: pedidosMudaram,
             aoContarNaoLidas: (n) => mensagensNaoLidas.value = n,
             aoAbrirConversa: (conversa) => _abrirConversa(context, conversa, _servicoMensagens),
           ),
         );
+
+  static Future<Map<String, String>> _estadosDosPedidosDoCliente() async {
+    final pedidos = await repos.pedidos.listar();
+    return {
+      for (final p in [...pedidos.emAndamento, ...pedidos.finalizados])
+        if (p.id != null && p.estadoApi != null) p.id!: p.estadoApi!,
+    };
+  }
 
   /// Abre o chat e, ao voltar, marca a conversa como lida e atualiza a lista na hora (o contador
   /// de não lidas não pode ficar parado depois de ler).
@@ -2545,6 +3097,9 @@ abstract final class RotasTrato {
         'tela': tela,
         'pedido_id': id,
         'recorrencia_id': n.recorrenciaId,
+        'chamado_id': n.chamadoId,
+        'compensacao_id': n.compensacaoId,
+        'evento': n.tipoApi,
         'papel': n.papel,
       });
       if (r.situacao != SituacaoLink.ignorado) return r;
@@ -2563,7 +3118,19 @@ abstract final class RotasTrato {
         'orcamento.nao_escolhido' ||
         'exclusividade.aceita' =>
           'pedido_aberto',
+        'exclusividade.cliente_reservou' ||
+        'exclusividade.cliente_fim' ||
+        'exclusividade.cliente_devolvida' =>
+          'pedido',
         'avaliacao.recebida' => 'avaliacao',
+        'suporte.chamado_aberto' ||
+        'suporte.chamado_resposta' ||
+        'suporte.chamado_prazo' =>
+          'suporte',
+        'conta.medida_aplicada' || 'conta.medida_encerrada' => 'medidas',
+        'pagamento.compensacao_registrada' || 'pagamento.compensacao_cancelada' => 'pedido',
+        'pagamento.cancelado_seguranca' => 'pedido',
+        'disputa.contestada' || 'disputa.contestacao_decidida' => 'pedido',
         _ => null,
       };
 
@@ -2589,6 +3156,24 @@ abstract final class RotasTrato {
       abrirIndicacoes(context);
       return;
     }
+    if (destino == DestinoApp.suporte) {
+      final sac = repos.sac;
+      // Com o id do aviso, o chamado certo; sem ele, a lista.
+      if (id != null && sac != null) {
+        _abrir<void>(context, ChamadoTela(servico: sac, id: id));
+      } else {
+        abrirAtendimento(context, profissional: profissional);
+      }
+      return;
+    }
+    if (destino == DestinoApp.medidas) {
+      abrirMedidas(context);
+      return;
+    }
+    if (destino == DestinoApp.compensacoes) {
+      abrirCompensacoes(context, compensacaoId: id);
+      return;
+    }
     if (destino == DestinoApp.recorrencia) {
       id == null
           ? abrirRecorrencias(context)
@@ -2604,6 +3189,10 @@ abstract final class RotasTrato {
       return;
     }
     if (id == null) return;
+    if (destino == DestinoApp.contestacaoDecisao) {
+      unawaited(abrirContestacaoDecisao(context, id, profissional: profissional));
+      return;
+    }
     switch (destino) {
       case DestinoApp.disputa:
         profissional ? abrirDisputa(context, id) : abrirServico(context, id);
@@ -2628,7 +3217,12 @@ abstract final class RotasTrato {
         profissional
             ? _abrir<void>(context, _pedidoDoProfissional(id))
             : abrirServico(context, id);
-      case DestinoApp.recorrencia || DestinoApp.indicacoes:
+      case DestinoApp.recorrencia ||
+            DestinoApp.indicacoes ||
+            DestinoApp.suporte ||
+            DestinoApp.medidas ||
+            DestinoApp.compensacoes ||
+            DestinoApp.contestacaoDecisao:
         break;
     }
   }
@@ -2651,8 +3245,10 @@ abstract final class RotasTrato {
             context,
             _chat(pedidoId, comoProfissional: true, categoriaNome: dados.pedido.titulo),
           ),
-          aoPedirExclusividade: (chave) =>
-              repos.profissional.solicitarExclusividade(pedidoId, chave),
+          aoDesistirExclusividade: (id) async {
+            await repos.profissional.desistirDaExclusividade(id);
+            pedidosMudaram.value++;
+          },
           aoRecusar: (motivo) async {
             final navegador = Navigator.of(context);
             final ok = await _tentar(context, () => repos.profissional.recusar(pedidoId, motivo));
@@ -2686,6 +3282,11 @@ abstract final class RotasTrato {
             ),
             aoAjuda: () => _abrir<void>(context, _telaAjuda(context, comoCliente: false)),
             aoVerContrato: () => abrirContrato(context, pedidoId),
+            secaoAusencia:
+                _secaoAusencia(context, pedido, profissional: true, id: pedidoId),
+            secaoAcordo: _secaoAcordo(pedido.estadoApi, profissional: true, id: pedidoId),
+            secaoContestacao:
+                _secaoContestacao(context, pedido, profissional: true, id: pedidoId),
             // Serviço concluído e ainda não avaliado: "Avaliar cliente" como ação principal.
             aoAvaliar: () => _avaliarCliente(context, pedidoId),
             textoAvaliar: 'Avaliar cliente',
@@ -2904,6 +3505,41 @@ abstract final class RotasTrato {
   }
 
   /// Pedido aguardando orçamentos: o que foi descrito (editável) e a porta para os orçamentos.
+  static Widget _secaoExclusividadeCliente(String pedidoId, DadosDoPedido dados) =>
+      SecaoExclusividadeCliente(
+        key: ValueKey('exclusividade-cliente-$pedidoId'),
+        atualizarQuando: pedidosMudaram,
+        aoPedir: () => pedidosMudaram.value++,
+        pedir: (escolha, chave) =>
+            repos.pedidos.pedirExclusividadeCliente(pedidoId, escolha, chave),
+        carregar: () async {
+          final situacao = await repos.pedidos.situacaoExclusividadeCliente(pedidoId);
+          final escolhas = <EscolhaExclusividade>[];
+          if (situacao != null) {
+            try {
+              final recebidos = await repos.orcamentos.listar(pedidoId);
+              for (final o in recebidos.orcamentos) {
+                escolhas.add(EscolhaExclusividade(
+                  rotulo: '${o.profissional} · ${formatarReais(o.totalCentavos)}',
+                  orcamentoId: o.id,
+                  profissionalId: o.profissionalId,
+                ));
+              }
+            } on Object {
+              // Sem os orçamentos agora: sobra o convidado, se houver.
+            }
+            final convidado = dados.profissionalConvidadoId;
+            if (convidado != null && !escolhas.any((e) => e.profissionalId == convidado)) {
+              escolhas.add(EscolhaExclusividade(
+                rotulo: 'Profissional que você convidou',
+                profissionalId: convidado,
+              ));
+            }
+          }
+          return (situacao: situacao, escolhas: escolhas);
+        },
+      );
+
   static Widget _pedidoAberto(String pedidoId) => Carregador<DadosDoPedido>(
         textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.dados(pedidoId),
@@ -2917,6 +3553,7 @@ abstract final class RotasTrato {
             cepInicial: dados.cep ?? '',
             aoVerOrcamentos: () => _abrir<void>(context, _orcamentosRecebidos(pedidoId)),
             aoCancelar: () => _cancelarPedido(context, pedidoId),
+            secaoExclusividadeCliente: _secaoExclusividadeCliente(pedidoId, dados),
             aoResponderExclusividade: (eid, decisao) async {
               final resp = await repos.pedidos.responderExclusividade(pedidoId, eid, decisao);
               pedidosMudaram.value++;
@@ -3015,7 +3652,7 @@ abstract final class RotasTrato {
                                   atualCentavos: o.totalCentavos,
                                 );
                                 if (proposta == null || !context.mounted) return;
-                                final ok = await _tentar(
+                                final ok = await _tentarOrcamentoValido(
                                   context,
                                   () => repos.orcamentos.contraproporValor(
                                     pedidoId,
@@ -3061,7 +3698,7 @@ abstract final class RotasTrato {
                               },
                               aoAceitar: (o) async {
                                 // Só pede ao backend; taxa e líquido são dele.
-                                final ok = await _tentar(
+                                final ok = await _tentarOrcamentoValido(
                                   context,
                                   () => repos.orcamentos.aceitar(pedidoId, o.id),
                                 );
@@ -3125,6 +3762,8 @@ abstract final class RotasTrato {
       _tentar(context, acao);
 
   @visibleForTesting
+  static Widget pedidoDoClienteParaTeste(String pedidoId) => _pedidoEmExecucao(pedidoId);
+
   static Future<void> baixarReciboPdfParaTeste(BuildContext context, String pedidoId) =>
       _baixarReciboPdf(context, pedidoId);
 
@@ -3133,9 +3772,21 @@ abstract final class RotasTrato {
     final recarregar = ValueNotifier<int>(0);
     var iniciandoPagamento = false;
     var usarMoedas = false; // o que o cliente escolheu; quantas moedas entram, o backend decide
+    var execucaoImediata = false; // Termos 7.3: nunca começa marcada
+    var temDesistencia = true; // só o 404 (servidor antigo) esconde a caixa
     return Carregador<DadosPagamento>(
       textoNaoEncontrado: TextosNaoEncontrado.pedido,
-      carregar: () => repos.pagamento.dados(pedidoId),
+      carregar: () async {
+        final (dados, tem) = await emParalelo2(
+          repos.pagamento.dados(pedidoId),
+          repos.pedidos
+              .situacaoDesistencia(pedidoId)
+              .then((s) => s != null)
+              .catchError((Object _) => true),
+        );
+        temDesistencia = tem;
+        return dados;
+      },
       atualizarQuando: recarregar,
       construir: (context, dados) => PagamentoTela(
         aoTentarNovamente: () => recarregar.value++,
@@ -3147,6 +3798,7 @@ abstract final class RotasTrato {
           return repos.pagamento.recalcular(pedidoId, cupom: cupom, usarMoedas: usar);
         },
         aoCadastrarCpf: repos.pagamento.cadastrarCpf,
+        aoMarcarExecucaoImediata: temDesistencia ? (v) => execucaoImediata = v : null,
         aoPagarDetalhado: (metodo, parcelas, cupom) async {
           if (iniciandoPagamento) return;
           iniciandoPagamento = true;
@@ -3160,10 +3812,11 @@ abstract final class RotasTrato {
                 parcelas: parcelas,
                 cupom: cupom,
                 usarMoedas: usarMoedas,
+                execucaoImediata: execucaoImediata,
               );
               ok = true;
             } on ErroTrato catch (erro) {
-              if (erro.codigo == 'cpf_obrigatorio') rethrow;
+              if (erro.codigo == 'cpf_obrigatorio' || ehOrcamentoVencido(erro)) rethrow;
               if (context.mounted) _aviso(context, erro);
             } on Object catch (erro) {
               if (context.mounted) _aviso(context, erro);
@@ -3333,9 +3986,29 @@ abstract final class RotasTrato {
     }
   }
 
-  static Widget _pedidoEmExecucao(String pedidoId) => Carregador<PedidoEmExecucao>(
+  /// Estados em que "Desistir do pedido" aparece mesmo sem poder, para explicar o motivo.
+  static const _explicaDesistencia = {
+    'aguardando_confirmacao',
+    'em_andamento',
+    'em_confirmacao',
+  };
+
+  static Widget _pedidoEmExecucao(String pedidoId) {
+    // Nulo: servidor sem a desistência (ou ainda sem resposta): vale o "Cancelar pedido".
+    SituacaoDesistencia? desistencia;
+    return Carregador<PedidoEmExecucao>(
         textoNaoEncontrado: TextosNaoEncontrado.pedido,
-        carregar: () => repos.pedidos.acompanhar(pedidoId),
+        carregar: () async {
+          final pedido = await repos.pedidos.acompanhar(pedidoId);
+          if (!const {'aberto', 'reservado'}.contains(pedido.estadoApi)) {
+            try {
+              desistencia = await repos.pedidos.situacaoDesistencia(pedidoId);
+            } on Object {
+              // Falha passageira: fica o que já se sabia.
+            }
+          }
+          return pedido;
+        },
         atualizarQuando: pedidosMudaram,
         atualizarACada: _intervalo,
         // Aguardando orçamentos continua na tela do pedido aberto (editar, exclusividade).
@@ -3344,15 +4017,23 @@ abstract final class RotasTrato {
             : PedidoExecucaoTela(
                 pedido: pedido,
                 atualizarAditivoLocalmente: false,
+                secaoAcordo: _secaoAcordo(pedido.estadoApi, profissional: false, id: pedidoId),
+                secaoDocumentos: _secaoDocumentos(context, pedido, pedidoId),
+                secaoContestacao:
+                    _secaoContestacao(context, pedido, profissional: false, id: pedidoId),
                 aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
                 aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
                 aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
                 aoBaixarComprovante: () => _baixarReciboPdf(context, pedidoId),
-                aoRepetirServico: () => _repetirServico(
-                  context,
-                  pedidoId,
-                  valorCentavos: pedido.totalAtualizadoCentavos ?? pedido.orcamentoCentavos,
-                ),
+                // Repetir um serviço remoto criaria pedidos remotos novos (Termos 3.7).
+                aoRepetirServico: pedido.remoto
+                    ? null
+                    : () => _repetirServico(
+                          context,
+                          pedidoId,
+                          valorCentavos:
+                              pedido.totalAtualizadoCentavos ?? pedido.orcamentoCentavos,
+                        ),
                 secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
                     ? _secaoReagendamento(pedidoId, semHorario: pedido.estadoApi == 'pago_e_retido')
                     : null,
@@ -3376,7 +4057,11 @@ abstract final class RotasTrato {
                     : null,
                 aoVerNota: () => _abrir<void>(
                   context,
-                  VerNotaTela(servico: servicoNota, pedidoId: pedidoId),
+                  VerNotaTela(
+                    servico: servicoNota,
+                    pedidoId: pedidoId,
+                    escolherFoto: _escolherProva,
+                  ),
                 ),
                 // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
                 aoVerAditivo: () => _abrir<void>(
@@ -3391,12 +4076,73 @@ abstract final class RotasTrato {
                 aoVerContrato: () => abrirContrato(context, pedidoId),
                 aoAbrirProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
                 aoCompartilharAtendimento: () => _compartilharAtendimento(context, pedido),
-                aoSosEmergencia: () => _abrirSosEmergencia(context, _resumoAtendimento(pedido)),
+                aoSosEmergencia: () => mostrarEmergencia(
+                  context,
+                  _resumoAtendimento(pedido),
+                  orientarChegada: !pedido.remoto,
+                  aoRelatar: _relatarSeguranca(
+                    context,
+                    pedidoId,
+                    orientarChegada: !pedido.remoto,
+                    cliente: true,
+                  ),
+                ),
                 // Ajuda no atendimento: direto no "Relatar problema" deste pedido (sem escolher serviço).
                 aoAjuda: () => _abrir<void>(context, _relatarProblema(pedidoId)),
-                aoCancelarPedido:
-                    pedido.podeVerConclusao ? null : () => _cancelarPedido(context, pedidoId),
+                aoCancelarPedido: desistencia != null || pedido.podeVerConclusao
+                    ? null
+                    : () => _cancelarPedido(context, pedidoId),
+                aoDesistir: desistencia != null &&
+                        (desistencia!.podeDesistir ||
+                            desistencia!.registro != null ||
+                            _explicaDesistencia.contains(pedido.estadoApi))
+                    ? () => _abrir<void>(context, _desistir(pedidoId))
+                    : null,
+                secaoAusencia: _secaoAusencia(context, pedido, profissional: false, id: pedidoId),
+                textoDesistir: desistencia?.mostraComprovante == true
+                    ? 'Ver comprovante da desistência'
+                    : 'Desistir do pedido',
               ),
+      );
+  }
+
+  /// Termos 7.6: só o pedido agendado (caso em curso) ou cancelado (decisão) tem o que mostrar.
+  static Widget? _secaoAusencia(
+    BuildContext context,
+    PedidoEmExecucao pedido, {
+    required bool profissional,
+    required String id,
+  }) {
+    if (!const {'agendado', 'cancelado'}.contains(pedido.estadoApi)) return null;
+    Future<CasoAusencia?> carregar() => repos.pedidos.casoDeAusencia(id);
+    return SecaoAusencia(
+      key: ValueKey('ausencia-$id'),
+      carregar: carregar,
+      profissional: profissional,
+      atualizarQuando: pedidosMudaram,
+      aoAbrir: () => _abrir<void>(
+        context,
+        AusenciaTela(
+          carregar: carregar,
+          profissional: profissional,
+          enviar: profissional
+              ? null
+              : (texto, fotos) => repos.pedidos.justificarAusencia(id, texto, fotos),
+          capturarFoto: profissional ? null : _fotografar,
+          aoEnviar: () => pedidosMudaram.value++,
+          carregarAnexos: () => repos.pedidos.anexosDaAusencia(id),
+          contestar: profissional
+              ? null
+              : (texto, fotos) => repos.pedidos.contestarAusencia(id, texto, fotos),
+        ),
+      ),
+    );
+  }
+
+  static Widget _desistir(String pedidoId) => DesistirTela(
+        carregar: () => repos.pedidos.situacaoDesistencia(pedidoId),
+        desistir: (motivo) => repos.pedidos.desistir(pedidoId, motivo),
+        aoDesistir: () => pedidosMudaram.value++,
       );
 
   static String _resumoAtendimento(PedidoEmExecucao pedido) => [
@@ -3442,44 +4188,6 @@ abstract final class RotasTrato {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  static Future<void> _abrirSosEmergencia(BuildContext context, String resumo) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogo) => AlertDialog(
-        title: const Text('SOS / Emergência'),
-        content: Text(
-          'Em caso de risco, ligue para 190 ou copie os dados do atendimento para enviar a um contato de confiança.\n\n$resumo',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogo).pop(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: resumo));
-              if (dialogo.mounted) Navigator.of(dialogo).pop();
-              if (context.mounted) {
-                _avisoSimples(context, 'Dados do atendimento copiados.');
-              }
-            },
-            child: const Text('Copiar dados'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(dialogo).pop();
-              await launchUrl(
-                Uri(scheme: 'tel', path: '190'),
-                mode: LaunchMode.externalApplication,
-              );
-            },
-            child: const Text('Ligar 190'),
-          ),
-        ],
       ),
     );
   }
@@ -3614,7 +4322,7 @@ abstract final class RotasTrato {
             }
           },
           aoAceitarContraproposta: (c) async {
-            final ok = await _tentar(
+            final ok = await _tentarOrcamentoValido(
               context,
               () => repos.orcamentos.aceitarContraproposta(
                 pedidoId,
@@ -3629,13 +4337,15 @@ abstract final class RotasTrato {
             }
           },
           aoAceitarProposta: (c) async {
-            final ok = await _tentar(
+            final ok = await _tentarOrcamentoValido(
               context,
               () async {
                 try {
                   await repos.orcamentos.aceitar(pedidoId, c.orcamentoId);
                 } on ErroTrato catch (e) {
-                  if (!e.mensagem.toLowerCase().contains('aceit')) rethrow;
+                  if (ehOrcamentoVencido(e) || !e.mensagem.toLowerCase().contains('aceit')) {
+                    rethrow;
+                  }
                 }
               },
             );
@@ -3726,9 +4436,20 @@ abstract final class RotasTrato {
           dados: dados,
           aoEnviar: (envio) async {
             var moedas = 0;
+            ErroTrato? recusa;
             final ok = await _tentar(context, () async {
-              moedas = await repos.pedidos.avaliar(pedidoId, envio);
+              try {
+                moedas = await repos.pedidos.avaliar(pedidoId, envio);
+              } on ErroTrato catch (e) {
+                if (e.codigoHttp != 409) rethrow;
+                recusa = e;
+              }
             });
+            // 409 (ex.: prazo terminado): a própria tela mostra o motivo e tira o botão.
+            if (recusa != null) {
+              pedidosMudaram.value++;
+              throw recusa!;
+            }
             if (ok && context.mounted) {
               pedidosMudaram.value++;
               // Tratinhos em espera e valor de cada um: extras; se falhar, só não mostra a linha.
@@ -4128,8 +4849,10 @@ class _AbaCarteiraPaginada extends StatefulWidget {
     required this.aoAbrirItem,
     required this.aoConfigurarRecebimento,
     required this.aoBaixarExtratoPdf,
+    this.entradaCompensacoes,
   });
 
+  final Widget? entradaCompensacoes;
   final void Function(BuildContext context, String pedidoId) aoAbrirItem;
   final Future<void> Function(BuildContext context, ContaRecebimento atual) aoConfigurarRecebimento;
   final Future<void> Function(BuildContext context) aoBaixarExtratoPdf;
@@ -4298,6 +5021,7 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
     return RefreshIndicator(
       onRefresh: () => _carregarInicial(silencioso: true),
       child: CarteiraTela(
+        entradaCompensacoes: widget.entradaCompensacoes,
         soExtrato: false,
         dados: DadosCarteira(
           resumo: _saldo == null

@@ -3,17 +3,20 @@
 ATENÇÃO: os prazos de retenção abaixo são PROPOSTA para o jurídico/contador validar (ver
 `docs/advogado-e-contador.md`, N10). Nada é apagado por prazo automático enquanto o João/DPO não
 confirmar. Trocar no .env, por exemplo:
-  TRATO_LGPD_RETENCAO_DIAS='{"ledger_financeiro":1825,"logs_acesso":180}'
+  TRATO_LGPD_RETENCAO_DIAS='{"ledger_financeiro":1825,"logs_acesso":365}'
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from trato.config import RAIZ_PROJETO
+
+# Termos 14.8 / Marco Civil, art. 15: registros de acesso por no mínimo 6 meses.
+MINIMO_LOGS_ACESSO_DIAS = 184
 
 
 class Finalidade(BaseModel):
@@ -26,7 +29,7 @@ def _retencao_padrao() -> dict[str, int]:
         "auditoria": 1825,
         "contratos_e_pedidos": 1825,  # defesa em processo (proposta)
         "mensagens_e_disputas": 1825,
-        "logs_acesso": 180,  # Marco Civil, art. 15 (6 meses) — confirmar com o jurídico
+        "logs_acesso": MINIMO_LOGS_ACESSO_DIAS,  # piso legal: valor menor é elevado
         "documentos_verificacao": 90,  # proposta; pendente N10
     }
 
@@ -54,7 +57,16 @@ class ConfigLgpd(BaseSettings):
     # Tempo para o titular desistir antes de a anonimização rodar.
     carencia_exclusao_dias: int = Field(default=7, ge=0)
     confirmacao_validade_min: int = Field(default=30, gt=0)
+    # Termos 13.10 e I.11: encerrada pelo Trato sem falta, os Tratinhos ficam guardados (o
+    # prazo pode ser maior que o dos Termos, nunca menor).
+    tratinhos_guarda_encerramento_dias: int = Field(default=90, ge=90)
     finalidades: dict[str, Finalidade] = Field(default_factory=_finalidades_padrao)
+
+    @field_validator("retencao_dias")
+    @classmethod
+    def _piso_dos_registros_de_acesso(cls, valor: dict[str, int]) -> dict[str, int]:
+        atual = valor.get("logs_acesso", MINIMO_LOGS_ACESSO_DIAS)
+        return {**valor, "logs_acesso": max(atual, MINIMO_LOGS_ACESSO_DIAS)}
 
 
 @lru_cache

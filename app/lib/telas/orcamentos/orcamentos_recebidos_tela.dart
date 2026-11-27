@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../cliente/avatar_iniciais.dart';
+import '../comuns/nota_preco.dart';
 import '../conclusao/apoio_conclusao.dart' show formatarReais;
 import '../pedido_novo/pecas_pedido.dart';
 import 'detalhe_orcamento_tela.dart';
@@ -104,6 +105,7 @@ class _OrcamentosRecebidosTelaState extends State<OrcamentosRecebidosTela> {
           _CartaoOrcamento(orcamento: o, aoVer: () => _ver(o)),
           const SizedBox(height: EspacosTrato.x4),
         ],
+        const NotaPrecoComTributos(),
       ],
     );
   }

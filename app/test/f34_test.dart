@@ -10,6 +10,7 @@ import 'package:trato/dados/sessao.dart';
 import 'package:trato/telas/pedido_novo/modelos.dart';
 import 'package:trato/telas/pedido_novo/novo_pedido_tela.dart';
 import 'package:trato/tema/tema.dart';
+import 'apoio/endereco_pedido.dart';
 
 const _formulario = FormularioPedido(
   categoria: 'Eletricista',
@@ -74,9 +75,7 @@ Future<Map<String, dynamic>> _enviarPelaTela(
     ),
   );
   await t.pumpAndSettle();
-  await t.ensureVisible(find.text(Modalidade.remoto.rotulo));
-  await t.tap(find.text(Modalidade.remoto.rotulo));
-  await t.pump();
+  await preencherEnderecoDoPedido(t);
   await marcar();
   await t.ensureVisible(find.text('Enviar pedido'));
   await t.tap(find.text('Enviar pedido'));
@@ -94,7 +93,7 @@ void main() {
     expect(corpo['urgente'], isTrue);
   });
 
-  testWidgets('urgente depois de trocar de prazo e de modalidade: continua urgente=true',
+  testWidgets('urgente depois de trocar de prazo: continua urgente=true',
       (t) async {
     final corpo = await _enviarPelaTela(t, () async {
       await t.ensureVisible(find.text('Tenho data limite'));
@@ -102,12 +101,6 @@ void main() {
       await t.pump();
       await t.ensureVisible(find.text('É urgente (para hoje)'));
       await t.tap(find.text('É urgente (para hoje)'));
-      await t.pump();
-      await t.ensureVisible(find.text(Modalidade.presencial.rotulo));
-      await t.tap(find.text(Modalidade.presencial.rotulo));
-      await t.pump();
-      await t.ensureVisible(find.text(Modalidade.remoto.rotulo));
-      await t.tap(find.text(Modalidade.remoto.rotulo));
       await t.pump();
     });
     expect(corpo['urgente'], isTrue);

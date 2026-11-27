@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import pytest
 
+from trato.api.contexto import ESTADOS_CONTRATADOS
 from trato.api.repositorios import Contrato
 from trato.pedidos import estados
 from trato.pedidos.estados import Ator, Papel, ProvaPagamento
@@ -209,26 +210,28 @@ def test_fluxo_completo(cenario):
     ]  # fmt: skip
     assert historico[1]["ator_papel"] == "sistema"
 
-    # 7) conversa e mensagem (contato mascarado sempre; depois da contratação o endereço passa)
+    # 7) conversa e mensagem (depois da contratação passam endereço e telefone, Termos 11.2)
     conversas = c.contexto.extras["conversas"]
     conversa = conversas.abrir(pedido_id, c.ids["profissional"])
     assert conversas.abrir(pedido_id, c.ids["profissional"]) == conversa
     conversas.enviar(conversa, c.ids["cliente"], "Oi! Pode chegar às 9h?")
-    conversas.enviar(conversa, c.ids["profissional"], "Posso sim. Meu zap 31 99999-8888")
+    conversas.enviar(
+        conversa, c.ids["profissional"], "Posso sim. Meu zap 31 99999-8888, a@exemplo.com"
+    )
     textos = [m.texto for m in conversas.listar(conversa)]
     assert textos[0] == "Oi! Pode chegar às 9h?"
-    assert "99999" not in textos[1] and "contato oculto" in textos[1]  # mesmo já contratado
+    assert "99999-8888" in textos[1] and "exemplo.com" not in textos[1]
     conversas.enviar(conversa, c.ids["cliente"], "Rua das Flores, 123")
     assert conversas.listar(conversa)[-1].texto == "Rua das Flores, 123"
-    # mensagem antiga gravada em claro (antes desta regra) sai mascarada na leitura
+    # mensagem antiga gravada em claro: o que continua proibido sai mascarado na leitura
     with c.local.admin() as con:
         con.execute(
             "insert into public.mensagens (conversa_id, autor_id, corpo, corpo_exibido, "
             "mascarada) values (%s, %s, %s, %s, false)",
-            (conversa, c.ids["cliente"], "zap 31 98888-7777", "zap 31 98888-7777"),
+            (conversa, c.ids["cliente"], "mail a@exemplo.com", "mail a@exemplo.com"),
         )
     antiga = conversas.listar(conversa)[-1]
-    assert "98888" not in antiga.texto and antiga.mascarada is True
+    assert "exemplo.com" not in antiga.texto and antiga.mascarada is True
     with pytest.raises(Exception, match="partes"):  # quem não é parte não escreve
         conversas.enviar(conversa, c.ids["cliente2"], "intruso")
 
@@ -299,8 +302,14 @@ def test_autenticacao_jwt_do_supabase(cenario):
     # conta bloqueada não entra, mesmo com token válido
     with c.local.admin() as con:
         con.execute("update public.usuarios set status = 'bloqueado' where id = %s", (quem,))
-    try:
-        assert c.cliente.get(rota, headers=ok).status_code == 401
+    try:  # 20.5: não entra; só a lista dos contratados em que é cliente fica aberta (20.6)
+        r = c.cliente.post(rota, json=corpo_pedido(c), headers=ok)
+        assert r.status_code == 403 and r.json()["codigo"] == "conta_bloqueada"
+        lista = c.cliente.get(rota, headers=ok)
+        if lista.status_code == 200:
+            assert {p["estado"] for p in lista.json()} <= {e.value for e in ESTADOS_CONTRATADOS}
+        else:
+            assert lista.status_code == 403 and lista.json()["codigo"] == "conta_bloqueada"
     finally:
         with c.local.admin() as con:
             con.execute("update public.usuarios set status = 'ativo' where id = %s", (quem,))

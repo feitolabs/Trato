@@ -4,6 +4,9 @@ name: Verificar
 #   segredos   - busca de segredos e .env ignorado (só Python, sem dependências)
 #   backend    - venv + pip install do backend, ruff e pytest
 #   app        - Flutter (versão fixa), cores fora do tema, textos proibidos, analyze e test
+#   admin      - o mesmo para o painel admin
+#   web        - Flutter: cores fora do tema, textos proibidos, analyze, test e build web.
+#                O build só compila (sem --dart-define) e não publica; ver web/README.md.
 #   integracao - testes com Postgres embutido (pgserver); só em develop/main ou manual
 #
 # Não usa nenhum segredo: os testes rodam sem .env, sem Supabase e sem Stripe.
@@ -117,6 +120,30 @@ jobs:
 
       - name: Verificar o painel admin
         run: python harness/verificar.py --etapa admin
+
+  web:
+    name: Site web (Flutter)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Python (roda o verificar.py)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # analyze, testes e build web. Só compila: não publica nada.
+      - name: Verificar o site web
+        run: python harness/verificar.py --etapa web
 
   integracao:
     name: Integração (Postgres embutido)

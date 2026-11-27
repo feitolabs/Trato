@@ -66,6 +66,8 @@ def traduzir(erro: psycopg.Error) -> ErroPersistencia:
         return DadosInvalidos("Referência inexistente (usuário, categoria, cidade ou pedido).")
     if isinstance(erro, pg.NotNullViolation):
         return DadosInvalidos("Falta um dado obrigatório.")
+    if "Pedido em exclusividade" in (getattr(erro.diag, "message_primary", None) or ""):
+        return RegraDoBanco("Este pedido está reservado para outro profissional.")
     if isinstance(erro, pg.CheckViolation | pg.RestrictViolation):
         if erro.diag.constraint_name:  # CHECK da tabela: a mensagem do Postgres cita colunas
             return RegraDoBanco("O valor informado não é permitido.")

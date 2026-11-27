@@ -71,6 +71,178 @@ abstract interface class ApiAdmin {
   /// Segunda pessoa (outra, não quem decidiu) aprova uma decisão acima da alçada.
   Future<ResultadoDecisao> aprovarDisputa(String id, {required String justificativa});
 
+  /// Falha do Trato numa exclusividade paga pelo cliente (Termos 13.6): o backend devolve os
+  /// Tratinhos. `resultado` é `ok` ou `ja_devolvida`. Pede `disputas_decidir`.
+  Future<({String resultado, int moedasDevolvidas})> registrarFalhaTrato(String exclusividadeId,
+      {required String motivo});
+
+  /// Contestação da decisão de disputa (Termos 8.7). Ver: `disputas_ver`; registrar:
+  /// `sac_responder`; decidir: `disputas_decidir`; aprovar: `disputas_segunda_pessoa`.
+  Future<PaginaRemota<ContestacaoDisputa>> listarContestacoesDisputa(FiltroContestacoes filtro,
+      {int deslocamento = 0, int limite = 50});
+  Future<ContestacaoDisputa> obterContestacaoDisputa(String id);
+
+  /// `repetida` = o servidor devolveu a mesma contestação já registrada.
+  Future<({ContestacaoDisputa contestacao, bool repetida})> registrarContestacaoDisputa(
+      {required String pedidoId,
+      required String contestanteId,
+      required String chamadoId,
+      required String oQueFaltou,
+      List<String> anexos = const []});
+  Future<ContestacaoDisputa> decidirContestacaoDisputa(String id,
+      {required String resultado, required String resposta, String? novaDecisao, int? novoValorReembolsoCentavos});
+  Future<ContestacaoDisputa> aprovarContestacaoDisputa(String id, {required bool aprovar, required String motivo});
+
+  /// Pedidos de volta ao profissional (17.4). Ver e propor: `regresso_propor`; aprovar e
+  /// recusar: `regresso_aprovar`. `resultado`: `ok` ou `ja_proposta`/`ja_aprovada`/`ja_recusada`.
+  Future<PaginaRemota<Regresso>> listarRegressos({String? status, int deslocamento = 0, int limite = 50});
+  Future<({String resultado, Regresso proposta})> proporRegresso(
+      {required String pedidoId, required String referencia, required int valorCentavos, required String motivo});
+  Future<({String resultado, Regresso proposta, bool avisado})> aprovarRegresso(String id);
+  Future<({String resultado, Regresso proposta})> recusarRegresso(String id, {required String motivo});
+
+  /// Incidentes de segurança (Termos 9.3 a 9.6). Ver: `incidentes_ver`; registrar, medida e
+  /// situação: `incidentes_tratar`; encerrar: `incidentes_encerrar`.
+  Future<PaginaRemota<Incidente>> listarIncidentes(
+      {String? status, String? pedidoId, int deslocamento = 0, int limite = 50});
+  Future<Incidente> obterIncidente(String id);
+  /// `repetido` = o servidor devolveu o incidente de um toque repetido (5 minutos).
+  Future<({Incidente incidente, bool repetido})> registrarIncidente(
+      {required String tipo, required String descricao, required String contato, required String canal, String? pedidoId});
+  Future<Incidente> adicionarMedidaIncidente(String id, {required String tipo, required String descricao});
+
+  /// [status]: `cautela_adotada` ou `em_apuracao`.
+  Future<Incidente> mudarStatusIncidente(String id, String status);
+  Future<Incidente> encerrarIncidente(String id, {required String desfecho});
+
+  /// Moderação e revisão de avaliações (Termos 12.6, 12.7 e 20.5). Tudo pede `avaliacoes_moderar`.
+  Future<PaginaRemota<RevisaoAvaliacao>> listarRevisoesAvaliacao(
+      {String? status, String? avaliacaoId, int deslocamento = 0, int limite = 50});
+  Future<RevisaoAvaliacao> analisarRevisaoAvaliacao(String revisaoId);
+  Future<RevisaoAvaliacao> decidirRevisaoAvaliacao(
+    String revisaoId, {
+    required String status,
+    required String resposta,
+    String? ocultarMotivo,
+    String? mesmoAnalistaJustificativa,
+  });
+  Future<OcultacaoAvaliacao> ocultarAvaliacao(
+    String avaliacaoId, {
+    required String motivo,
+    required String explicacao,
+  });
+  Future<OcultacaoAvaliacao> reverterOcultacaoAvaliacao(String avaliacaoId, {required String motivo});
+
+  /// Pedidos de titular LGPD e revisão automatizada (Termos 14.9 e 14.10).
+  Future<PaginaRemota<PedidoTitularLgpd>> listarPedidosLgpd(
+      {String? status, String? tipo, String? usuarioId, int deslocamento = 0, int limite = 50});
+  Future<PedidoTitularLgpd> analisarPedidoLgpd(String pedidoId);
+  Future<PedidoTitularLgpd> responderPedidoLgpd(
+    String pedidoId, {
+    required String status,
+    required String resposta,
+    String? motivoNaoAtendido,
+    String? criteriosInformados,
+  });
+
+  /// Contestação de materiais (Termos 6.9). Permissão `materiais_contestacao_analisar`.
+  /// A aprovação financeira não é chamada pelo painel.
+  Future<PaginaRemota<ContestacaoMaterial>> listarContestacoesMaterial(
+      {String? status, String? pedidoId, int deslocamento = 0, int limite = 50});
+  Future<ContestacaoMaterial> analisarContestacaoMaterial(String contestacaoId);
+
+  /// Links curtos da foto da nota e das provas. O acesso é auditado com o motivo (10 a 2000).
+  Future<List<AnexoMaterial>> abrirAnexosContestacaoMaterial(String contestacaoId, {required String motivo});
+
+  /// `valorReconhecidoCentavos` só vai na decisão `parcial`; nas outras o backend define.
+  Future<ContestacaoMaterial> decidirContestacaoMaterial(String contestacaoId,
+      {required String status, required String resposta, int? valorReconhecidoCentavos});
+
+  /// Retorno de conta e impedimentos de cadastro (Termos 20.9).
+  Future<PaginaRemota<PedidoRetornoConta>> listarRetornosConta(
+      {String? status, String? usuarioId, int deslocamento = 0, int limite = 50});
+  Future<PedidoRetornoConta> analisarRetornoConta(String retornoId);
+  Future<PedidoRetornoConta> aprovarRetornoConta(String retornoId, {required String motivo});
+  Future<PedidoRetornoConta> recusarRetornoConta(String retornoId,
+      {required String motivo, required bool riscoIdentificado});
+  Future<PaginaRemota<ImpedimentoCadastro>> listarImpedimentosConta(
+      {String? medidaId, bool apenasAtivos = false, int deslocamento = 0, int limite = 50});
+  Future<ImpedimentoCadastro> revogarImpedimentoConta(String impedimentoId, {required String motivo});
+
+  /// Compensações (Termos 8.6). Ver, registrar e avisar: `disputas_decidir`; cancelar:
+  /// `compensacoes_cancelar`.
+  Future<PaginaRemota<Compensacao>> listarCompensacoes(
+      {String? profissionalId, String? pedidoId, String? status, int deslocamento = 0, int limite = 50});
+
+  /// `resultado`: `ok` ou `ja_registrada`.
+  Future<({String resultado, Compensacao compensacao, bool avisado})> registrarCompensacao(
+      {required String pedidoId, String? contestacaoId, required int valorCentavos, required String motivo});
+  Future<({Compensacao compensacao, bool avisado})> avisarCompensacao(String id);
+
+  /// `resultado`: `ok` ou `ja_cancelada`.
+  Future<({String resultado, int devolvidoCentavos, Compensacao compensacao})> cancelarCompensacao(String id,
+      {required String motivo});
+
+  Future<PaginaRemota<ExclusividadeCliente>> listarExclusividades(
+      {String? pedidoId, String? clienteId, String? status, int deslocamento = 0, int limite = 20});
+
+  /// Medidas de conta (Termos 20). Tudo pede `medidas_aplicar`.
+  Future<PaginaRemota<Medida>> listarMedidas(FiltroMedidas filtro, {int deslocamento = 0, int limite = 50});
+  Future<Medida> obterMedida(String id);
+
+  /// Prazo máximo (dias) configurado para a trava de saque por fraude. Pede `medidas_aplicar`.
+  Future<int> prazoMaximoTravaFraude();
+
+  /// `repetida` = o servidor devolveu a medida igual criada há menos de 5 minutos.
+  Future<({Medida medida, bool repetida})> aplicarMedida(NovaMedida nova);
+  Future<Medida> reverterMedida(String id, {required String motivo});
+
+  /// Contestação recebida pelo atendimento. [anexos]: ids já enviados por [pedirAnexoContestacao].
+  Future<Medida> registrarContestacaoMedida(String id, {required String versao, List<String> anexos = const []});
+  Future<EnvioAssinado> pedirAnexoContestacao(String medidaId,
+      {required String nomeArquivo, required String tipoConteudo, required int tamanhoBytes});
+
+  /// Links curtos das provas. O backend grava o acesso na auditoria com o [motivo].
+  Future<List<AnexoContestacao>> abrirAnexosContestacao(String medidaId, {required String motivo});
+
+  /// Envia os bytes para o link assinado (PUT), sem o token de login. Só aceita https.
+  Future<void> enviarArquivo(String url, {required String tipoConteudo, required List<int> bytes});
+
+  /// Comprovantes da retenção por ausência. Pede `disputas_decidir`; o [motivo] vai no corpo.
+  Future<List<ArquivoComprovante>> listarComprovantes(String pedidoId, {required String motivo});
+  Future<EnvioAssinado> pedirEnvioComprovante(String pedidoId,
+      {required String motivo, required String nomeArquivo, required String tipoConteudo, required int tamanhoBytes});
+  Future<ArquivoComprovante> concluirComprovante(String pedidoId, String envioId, {required String motivo});
+  Future<Medida> decidirContestacaoMedida(String id,
+      {required String resultado, required String resposta, int? diasAPartirDeHoje, String? mesmoAnalistaJustificativa});
+
+  /// Fila de "Cliente ausente" (Termos 7.6). Ver pede `disputas_ver`; decidir, `disputas_decidir`.
+  Future<List<CasoAusencia>> listarAusencias();
+  Future<CasoAusencia> obterAusencia(String pedidoId);
+  Future<CasoAusencia> decidirAusencia(
+    String pedidoId, {
+    required bool aceitarJustificativa,
+    required String justificativa,
+    int retencaoCentavos = 0,
+    String? retencaoJustificativa,
+    List<String> retencaoComprovantes = const [],
+  });
+
+  /// Cancela com a retenção já mostrada ao cliente, ou sem ela ([retirarRetencao]).
+  Future<CasoAusencia> confirmarAusencia(String pedidoId,
+      {required bool retirarRetencao, required String motivo});
+
+  /// Provas do caso com links de 300 s. O backend grava o acesso na auditoria com o [motivo].
+  Future<List<AnexoCaso>> anexosAusencia(String pedidoId, {required String motivo});
+
+  /// Responde a contestação da retenção. [resultado]: `mantida`, `alterada` ou `revertida`.
+  Future<CasoAusencia> decidirContestacaoAusencia(String pedidoId,
+      {required String resultado, required String resposta, int? retencaoCentavos});
+
+  /// Mensagens de um pedido (Termos 11.3). Pede `conversas_ler`; o acesso fica na auditoria.
+  Future<List<ConversaLida>> lerConversas(String pedidoId,
+      {required String motivo, required String base, String? referencia});
+
   // F7.3 pagamentos (somente leitura)
   /// [dias] limita ao período (7, 30, 90…); nulo = tudo.
   Future<ResumoConciliacao> resumoConciliacao({int? dias});
@@ -88,9 +260,19 @@ abstract interface class ApiAdmin {
   /// RN-01: por que este pedido aparece (ou não) para este profissional.
   Future<DiagnosticoPedido> diagnosticarPedido(String usuarioId, String pedido);
   Future<DadosPessoais> revelarDadosPessoais(String usuarioId, String motivo);
-  Future<void> alterarStatusUsuario(String usuarioId, {required String status, required String motivo});
+  /// [motivoUsuario] e [clausulas] vão para a medida criada: é o que o usuário lê (20.4).
+  Future<void> alterarStatusUsuario(String usuarioId,
+      {required String status, required String motivo, String? motivoUsuario, List<String> clausulas = const []});
   Future<List<PedidoBusca>> buscarPedidos(String termo);
-  Future<List<Chamado>> listarChamados();
+  /// Fila do atendimento, na ordem do servidor (prazo mais próximo; encerrados no fim).
+  /// Ver pede `suporte_ver`; as demais ações, `sac_responder`.
+  Future<PaginaRemota<Chamado>> listarChamados(FiltroChamados filtro, {int deslocamento = 0, int limite = 50});
+  Future<Chamado> obterChamado(String id);
+  Future<Chamado> registrarContato(NovoContato contato);
+  Future<Chamado> assumirChamado(String id, {bool substituir = false});
+  Future<Chamado> responderChamado(String id, {required String texto, bool interna = false, bool aguardarUsuario = false});
+  Future<Chamado> estenderPrazoChamado(String id, {required DateTime ate, required String motivo});
+  Future<Chamado> encerrarChamado(String id, {required String mensagem});
   Future<List<CategoriaAdmin>> listarCategorias();
   Future<CategoriaAdmin> criarCategoria({
     required String nome,
@@ -181,10 +363,20 @@ abstract interface class ApiAdmin {
 
   // Módulo 3: Central Antifraude e Risco
   Future<List<AlertaRisco>> listarAlertasRisco();
-  Future<void> aplicarBloqueioPreventivo(String usuarioId, {required String motivo});
+  Future<void> aplicarBloqueioPreventivo(String usuarioId,
+      {required String motivo, String? motivoUsuario, List<String> clausulas = const []});
   Future<void> desbloquearConta(String usuarioId, {required String motivo});
-  Future<void> travarSaque(String usuarioId, {required String motivo});
-  Future<void> destravarSaque(String usuarioId, {required String motivo});
+  /// A trava registra a medida e restringe a conta. Só a trava por fraude (com limite) adia a
+  /// liberação no livro; pagamento manual ou no Stripe não é bloqueado.
+  /// As duas ações devolvem a `mensagem` do backend (null se não vier), para mostrar na tela.
+  Future<String?> travarSaque(String usuarioId,
+      {required String motivo,
+      String? motivoUsuario,
+      List<String> clausulas = const [],
+      bool motivoFraude = false,
+      int? limiteRetencaoCentavos,
+      int? dias});
+  Future<String?> destravarSaque(String usuarioId, {required String motivo});
 
   /// Assume o alerta: ele vai para "Em análise" com a pessoa como responsável.
   Future<void> assumirAlertaRisco(String alertaId, {required String motivo});

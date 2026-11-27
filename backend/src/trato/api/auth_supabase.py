@@ -59,6 +59,28 @@ class ProvedorAuthSupabase:
             options={"require": ["exp", "sub", *(["iss"] if self._emissor else [])]},
         )
 
+    def conta_bloqueada(self, token: str) -> bool:
+        """Só com token válido (assinatura, prazo, audiência) de conta com status `bloqueado`.
+        Token ruim ou vencido, conta anonimizada ou inexistente seguem como 401."""
+        try:
+            sub = str(self._decodificar(token)["sub"])
+        except jwt.PyJWTError:
+            return False
+        perfil = self._usuarios.perfil(sub)
+        return perfil is not None and perfil.status == "bloqueado"
+
+    def autenticar_para_suporte(self, token: str) -> Usuario | None:
+        """Atendimento (Termos 20.5): conta bloqueada ou suspensa abre e acompanha chamados.
+        Só conta que já existe; a anonimizada continua fora."""
+        try:
+            sub = str(self._decodificar(token)["sub"])
+        except jwt.PyJWTError:
+            return None
+        perfil = self._usuarios.perfil(sub)
+        if perfil is None or perfil.status not in (*STATUS_QUE_ENTRAM, "bloqueado"):
+            return None
+        return Usuario(perfil.id, perfil.papel)
+
     def autenticar(self, token: str) -> Usuario | None:
         try:
             claims = self._decodificar(token)

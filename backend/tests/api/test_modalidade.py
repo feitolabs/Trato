@@ -56,14 +56,21 @@ def test_presencial_exige_endereco_completo(amb):
     assert ok.json()["modalidade"] == "presencial"
 
 
-def test_remoto_so_em_categoria_que_o_admin_liberou(amb):
-    recusado = abrir(amb, modalidade="remoto")
-    assert recusado.status_code == 422 and "não atende de forma remota" in recusado.json()["detail"]
-    amb.contexto.pedidos.categorias_remotas = {"cat-ti"}
-    ok = abrir(amb, modalidade="remoto")  # sem endereço: não precisa
-    assert ok.status_code == 201, ok.text
-    assert ok.json()["modalidade"] == "remoto"
-    visto = amb.cliente.get(f"/v1/pedidos/{ok.json()['id']}", headers=cab("t-cliente")).json()
+def test_pedido_remoto_novo_e_recusado_mesmo_na_categoria_liberada(amb):
+    for liberadas in (set(), {"cat-ti"}):
+        amb.contexto.pedidos.categorias_remotas = liberadas
+        for extra in ({}, {"endereco": ENDERECO}):
+            r = abrir(amb, modalidade="remoto", **extra)
+            assert r.status_code == 422 and "3.7" in r.json()["detail"], r.text
+    assert not amb.contexto.pedidos.listar_do_usuario("cli-1", True)
+
+
+def test_pedido_remoto_antigo_continua_na_leitura(amb):
+    ok = abrir(amb, endereco=ENDERECO)
+    pid = ok.json()["id"]
+    antigo = replace(amb.contexto.pedidos.obter(pid), remoto=True)
+    amb.contexto.pedidos.salvar(antigo)
+    visto = amb.cliente.get(f"/v1/pedidos/{pid}", headers=cab("t-cliente")).json()
     assert visto["modalidade"] == "remoto"
 
 

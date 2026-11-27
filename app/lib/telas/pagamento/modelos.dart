@@ -47,8 +47,23 @@ class DadosPagamento {
     this.moedaValorCentavos,
     this.descontoPossivelCentavos,
     this.descontoVoltaEm,
+    this.tetoDescontoMesCentavos,
+    this.descontoUsadoMesCentavos,
     this.cpfCadastrado = true,
+    this.validadeAte,
+    this.pagoOuEmConfirmacao = false,
   });
+
+  /// O servidor diz que o pagamento já foi feito ou está sendo confirmado.
+  final bool pagoOuEmConfirmacao;
+
+  /// `validade_ate`: validade do orçamento aceito. Nula: o servidor não informou.
+  final DateTime? validadeAte;
+
+  /// Teto mensal do desconto com Tratinhos e quanto já foi usado (`/v1/me/moedas`).
+  /// Nulo: o servidor não informou.
+  final int? tetoDescontoMesCentavos;
+  final int? descontoUsadoMesCentavos;
 
   /// Quanto o cliente pode abater neste serviço, em centavos (decidido pelo backend). Null: sem linha.
   final int? descontoPossivelCentavos;
@@ -111,8 +126,12 @@ class DadosPagamento {
     bool? cpfCadastrado,
     int? descontoPossivelCentavos,
     DateTime? descontoVoltaEm,
+    int? tetoDescontoMesCentavos,
+    int? descontoUsadoMesCentavos,
     String? rotuloValor,
     List<OpcaoPagamento>? opcoes,
+    DateTime? validadeAte,
+    bool? pagoOuEmConfirmacao,
   }) =>
       DadosPagamento(
         subtitulo: subtitulo ?? this.subtitulo,
@@ -129,8 +148,12 @@ class DadosPagamento {
         moedaValorCentavos: moedaValorCentavos ?? this.moedaValorCentavos,
         descontoPossivelCentavos: descontoPossivelCentavos ?? this.descontoPossivelCentavos,
         descontoVoltaEm: descontoVoltaEm ?? this.descontoVoltaEm,
+        tetoDescontoMesCentavos: tetoDescontoMesCentavos ?? this.tetoDescontoMesCentavos,
+        descontoUsadoMesCentavos: descontoUsadoMesCentavos ?? this.descontoUsadoMesCentavos,
         cpfCadastrado: cpfCadastrado ?? this.cpfCadastrado,
         rotuloValor: rotuloValor ?? this.rotuloValor,
         opcoes: opcoes ?? this.opcoes,
+        validadeAte: validadeAte ?? this.validadeAte,
+        pagoOuEmConfirmacao: pagoOuEmConfirmacao ?? this.pagoOuEmConfirmacao,
       );
 }

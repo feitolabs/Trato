@@ -99,6 +99,10 @@ Future<void> main() async {
     );
   }
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
+  // 403 `conta_bloqueada`: tela de bloqueio, sem logout. Sair da conta esquece o bloqueio.
+  sessaoTrato.aoBloquear =
+      (mensagem) => RotasTrato.contaFoiBloqueada(() => navegadorTrato.currentState, mensagem);
+  sessaoTrato.aoSair.add(() async => RotasTrato.esquecerBloqueio());
   abrirLoginPorSessaoExpiradaHook = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);
@@ -152,7 +156,10 @@ Future<void> main() async {
     aoInicial: (m) => DeepLinks.receberPush(m.dados, inicial: true),
     aoChegar: AvisoPush.mostrar,
   ));
-  runApp(const TratoApp());
+  runApp(TratoApp(
+    // Termos 4.1: sem data de nascimento, completar o cadastro antes de usar o app.
+    portao: (filho) => RotasTrato.portaoCadastro(filho, () => navegadorTrato.currentContext),
+  ));
 }
 
 /// Fila de check-in/check-out sem internet, guardada no aparelho. Se o armazenamento falhar, o
@@ -182,9 +189,12 @@ void _abrirNovaSenha([int tentativa = 0]) {
 }
 
 class TratoApp extends StatelessWidget {
-  const TratoApp({super.key, this.themeMode});
+  const TratoApp({super.key, this.themeMode, this.portao});
 
   final ThemeMode? themeMode;
+
+  /// Envolve o navegador inteiro (o `main` liga o portão do cadastro).
+  final Widget Function(Widget filho)? portao;
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +215,7 @@ class TratoApp extends StatelessWidget {
           // Faixa de "sem conexão" no topo, empurrando o app para baixo (não cobre a AppBar).
           child: MoldeConexao(
             aoTentarNovamente: () => RotasTrato.pedidosMudaram.value++,
-            child: filho!,
+            child: portao?.call(filho!) ?? filho!,
           ),
         ),
         // Com deep link ligado, o Android entrega o endereço do link como rota inicial. O app

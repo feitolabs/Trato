@@ -48,6 +48,11 @@ from trato.api.repositorios import ConfigApi, Contrato
 from trato.disputas import ConfigDisputa
 from trato.financeiro.ledger import registrar_cobranca
 from trato.garantias import ConfigGarantia
+from trato.pagamentos.custo import MeioPagamento
+from trato.pagamentos.memoria import AditivosEmMemoria, CobrancasEmMemoria
+from trato.pagamentos.modelos import CobrancaLocal, ConfigPagamento, EstadoCobranca
+from trato.pagamentos.orquestrador import ServicoPagamento
+from trato.pagamentos.provedor import ProvedorFake
 from trato.pedidos.estados import (
     Acao,
     Ator,
@@ -140,6 +145,7 @@ class AmbienteAdmin:
         self.contexto.pedidos.salvar(pedido, evento)
         self.contexto.contratos.salvar(Contrato(PEDIDO, "orc-1", PROFISSIONAL.id, valor, "pintura"))
         registrar_cobranca(self.contexto.ledger.livro, PEDIDO, valor, "cob-ped-1", AGORA)
+        self.cobranca_paga(valor)
         cfg = self.contexto.config.carregar().disputas
         d = disputas.abrir(
             disputas.Ator.CLIENTE, valor, disputas.Motivo.MAL_FEITO,
@@ -148,6 +154,35 @@ class AmbienteAdmin:
         if responder:
             d = d.responder(disputas.Ator.PROFISSIONAL, AGORA - timedelta(hours=1))
         self.contexto.disputas.salvar(PEDIDO, d)
+
+    @property
+    def pagamento(self) -> ServicoPagamento:
+        """O serviço de pagamento do app (ligado na primeira vez, com o provedor falso)."""
+        servico = getattr(self.cliente.app.state, "servico_pagamento", None)
+        if servico is None:
+            servico = ServicoPagamento(
+                ProvedorFake(),
+                lambda: ConfigPagamento(10**9),
+                CobrancasEmMemoria(),
+                AditivosEmMemoria(),
+            )
+            servico.ligar(self.contexto)
+            self.cliente.app.state.servico_pagamento = servico
+        return servico
+
+    def cobranca_paga(self, valor: int, parcelas: int = 1) -> str:
+        servico = self.pagamento
+        criada = servico.provedor.criar_cobranca(
+            valor_centavos=valor,
+            meio=MeioPagamento.PIX,
+            chave_idempotencia=f"teste/{PEDIDO}/{len(servico.cobrancas.do_pedido(PEDIDO))}",
+            metadados={"pedido_id": PEDIDO},
+        )
+        servico.provedor.marcar_paga(criada.id)
+        servico.cobrancas.salvar(
+            CobrancaLocal(criada.id, PEDIDO, valor, MeioPagamento.PIX, EstadoCobranca.PAGA, AGORA)
+        )
+        return criada.id
 
     def pedido(self) -> Pedido:
         return self.contexto.pedidos.obter(PEDIDO)

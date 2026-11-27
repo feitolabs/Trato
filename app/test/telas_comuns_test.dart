@@ -189,13 +189,21 @@ void main() {
       expect(find.textContaining('obrigação legal'), findsOneWidget);
       expect(servico.exclusoes, 0);
 
+      // O aviso dos Tratinhos alonga a tela: rola até o botão.
+      await tester.scrollUntilVisible(find.text('Continuar'), 200,
+          scrollable: find.byType(Scrollable).last);
+      await tester.ensureVisible(find.text('Continuar'));
+      await tester.pump();
       await tester.tap(find.text('Continuar'));
       await tester.pump();
       expect(find.text('PASSO 2 DE 2'), findsOneWidget);
       final botao = find.widgetWithText(FilledButton, 'Excluir minha conta');
+      await tester.scrollUntilVisible(botao, 200, scrollable: find.byType(Scrollable).first);
       expect(tester.widget<FilledButton>(botao).onPressed, isNull);
 
       await tester.enterText(find.byType(TextField), ExcluirContaTela.palavraConfirmacao);
+      await tester.pump();
+      await tester.ensureVisible(botao);
       await tester.pump();
       await tester.tap(botao);
       await tester.pump();
@@ -210,9 +218,18 @@ void main() {
         tester,
         ExcluirContaTela(servico: servico, aoContaExcluida: () => excluida = true),
       );
+      // O aviso dos Tratinhos alonga a tela: rola até o botão.
+      await tester.scrollUntilVisible(find.text('Continuar'), 200,
+          scrollable: find.byType(Scrollable).last);
+      await tester.ensureVisible(find.text('Continuar'));
+      await tester.pump();
       await tester.tap(find.text('Continuar'));
       await tester.pump();
       await tester.enterText(find.byType(TextField), 'excluir');
+      await tester.pump();
+      await tester.scrollUntilVisible(find.widgetWithText(FilledButton, 'Excluir minha conta'), 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Excluir minha conta'));
       await tester.pump();
       await tester.tap(find.widgetWithText(FilledButton, 'Excluir minha conta'));
       await tester.pump();

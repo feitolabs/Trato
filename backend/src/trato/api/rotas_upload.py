@@ -14,7 +14,14 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from trato.api.auth import PapelUsuario, Usuario
-from trato.api.contexto import Contexto, exigir_papel, obter_contexto
+from trato.api.contexto import (
+    ContaBloqueada,
+    Contexto,
+    bloqueado_pode_no_pedido,
+    exigir_papel,
+    obter_contexto,
+    usuario_ou_bloqueado,
+)
 from trato.api.repositorios_app import TIPOS_DOCUMENTO
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.pedidos.estados import Estado, Pedido
@@ -296,6 +303,29 @@ def _pedido_do_envio(contexto: Contexto, corpo: PedirUploadIn, usuario: Usuario)
     return pedido
 
 
+def _usuario_do_envio(
+    usuario: Usuario = Depends(usuario_ou_bloqueado),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Conta bloqueada sem pedido próprio já contratado recebe 403 antes de qualquer outra
+    resposta; com um, a rota ainda confere o destino e o pedido do envio."""
+    if usuario.bloqueado and not any(
+        bloqueado_pode_no_pedido(p, usuario.id)
+        for p in contexto.pedidos.listar_do_usuario(usuario.id, True, limite=200)
+    ):
+        raise ContaBloqueada
+    return usuario
+
+
+def _exigir_envio_do_bloqueado(
+    contexto: Contexto, usuario: Usuario, destino: str, pedido_id: str | None
+) -> None:
+    """Termos 20.6 e 20.10: conta bloqueada só envia a prova (`disputa`) do próprio pedido."""
+    pedido = contexto.pedidos.obter(pedido_id) if pedido_id else None
+    if destino != "disputa" or not bloqueado_pode_no_pedido(pedido, usuario.id):
+        raise ContaBloqueada
+
+
 @router.post(
     "",
     response_model=PedirUploadOut,
@@ -308,18 +338,23 @@ def _pedido_do_envio(contexto: Contexto, corpo: PedirUploadIn, usuario: Usuario)
 )
 def pedir_upload(
     corpo: PedirUploadIn,
-    usuario: Usuario = Depends(_usuario),
+    usuario: Usuario = Depends(_usuario_do_envio),
     contexto: Contexto = Depends(obter_contexto),
     servico: ServicoUploads = Depends(obter_servico),
 ) -> PedirUploadOut:
+    if usuario.bloqueado:
+        _exigir_envio_do_bloqueado(contexto, usuario, corpo.destino, corpo.pedido_id)
     regra = DESTINOS.get(corpo.destino)
     if regra is None:
         raise HTTPException(422, "Destino de arquivo desconhecido.")
-    if regra.registro == "portfolio" and usuario.papel not in (
-        PapelUsuario.PROFISSIONAL,
-        PapelUsuario.CLIENTE,
+    if (
+        regra.registro == "portfolio"
+        and usuario.papel is not PapelUsuario.PROFISSIONAL
+        and not contexto.usuarios.tem_perfil_profissional(usuario.id)
     ):
-        raise HTTPException(403, "Só profissionais enviam fotos de portfólio.")
+        raise HTTPException(
+            403, "Faça o cadastro de profissional antes de enviar fotos de portfólio."
+        )
     pedido_id = None
     if regra.registro == "midia":
         pedido_id = _pedido_do_envio(contexto, corpo, usuario).id
@@ -360,9 +395,15 @@ def pedir_upload(
 def concluir_upload(
     upload_id: str,
     corpo: ConcluirUploadIn | None = None,
-    usuario: Usuario = Depends(_usuario),
+    usuario: Usuario = Depends(_usuario_do_envio),
+    contexto: Contexto = Depends(obter_contexto),
     servico: ServicoUploads = Depends(obter_servico),
 ) -> ConcluirUploadOut:
+    if usuario.bloqueado:
+        envio = servico.repo.solicitacao(upload_id)
+        if envio is None or str(envio.dono_id).replace("-", "") != usuario.id.replace("-", ""):
+            raise ContaBloqueada
+        _exigir_envio_do_bloqueado(contexto, usuario, envio.destino, envio.pedido_id)
     try:
         sol = servico.concluir(
             usuario.id,

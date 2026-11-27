@@ -11,6 +11,7 @@ enum MotivoDenuncia {
   fraude('fraude', 'Tentativa de golpe/fraude'),
   cobrancaFora('cobranca_fora', 'Cobrança fora do app'),
   perfilFalso('perfil_falso', 'Perfil falso'),
+  dano('dano', 'Dano ou prejuízo'),
   outro('outro', 'Outro');
 
   const MotivoDenuncia(this.codigo, this.rotulo);

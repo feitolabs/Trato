@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import timedelta
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from trato.config import RAIZ_PROJETO
@@ -32,6 +32,9 @@ class ConfigNotificacoes(BaseSettings):
     # Reenvio: só tenta de novo notificações mais novas que isto (horas) e no máximo N por ciclo.
     reenvio_janela_horas: int = 24
     reenvio_lote: int = 100
+    # Só reenvia o que foi criado há pelo menos isto: antes, o primeiro envio (10 s de limite por
+    # aparelho) pode estar em andamento e o agendador mandaria em dobro.
+    reenvio_idade_minima_segundos: int = Field(120, ge=0)
 
     # Push (FCM para Android/web; APNs direto para iOS é opcional).
     push_ativo: bool = False
@@ -61,6 +64,10 @@ class ConfigNotificacoes(BaseSettings):
     @property
     def reenvio_janela(self) -> timedelta:
         return timedelta(hours=self.reenvio_janela_horas)
+
+    @property
+    def reenvio_idade_minima(self) -> timedelta:
+        return timedelta(seconds=self.reenvio_idade_minima_segundos)
 
 
 @lru_cache

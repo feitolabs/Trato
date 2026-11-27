@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -95,19 +94,6 @@ class CriarCidadeIn(BaseModel):
     centro_lat: float | None = None
     centro_lng: float | None = None
     motivo: str = Field(min_length=10, max_length=500)
-
-
-# =============================================================================
-# MODELOS DE SUPORTE
-# =============================================================================
-
-
-class ChamadoOut(BaseModel):
-    id: str
-    assunto: str
-    solicitante: str
-    status: str
-    aberto_em: datetime
 
 
 # =============================================================================
@@ -602,23 +588,6 @@ class EditarPerguntaIn(BaseModel):
     ordem: int | None = None
     ativa: bool | None = None
     motivo: str = Field(min_length=10, max_length=500)
-
-
-# =============================================================================
-# ROTAS: SUPORTE
-# =============================================================================
-
-
-@router.get(
-    "/chamados",
-    response_model=list[ChamadoOut],
-    summary="Listar chamados de suporte abertos",
-)
-def listar_chamados(
-    operador: Operador = Depends(exigir(Permissao.SUPORTE_VER)),
-    contexto: Contexto = Depends(obter_contexto),
-) -> list[ChamadoOut]:
-    return []
 
 
 # =============================================================================

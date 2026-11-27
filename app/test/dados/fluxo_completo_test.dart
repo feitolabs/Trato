@@ -93,6 +93,7 @@ class _Pagamento extends RepositorioPagamentoFake {
     int parcelas = 1,
     String? cupom,
     bool usarMoedas = false,
+    bool execucaoImediata = false,
   }) async {
     b.chamadas.add('cobranca:${metodo.name}');
     return const Cobranca(id: 'cb1', pixCopiaECola: '00020126-teste');

@@ -18,13 +18,13 @@ from trato.notificacoes import ligar_ao_contexto
 from trato.notificacoes.canais import Canais, CanalApp, CanalFake
 from trato.notificacoes.config import ConfigNotificacoes
 from trato.notificacoes.eventos import Evento
-from trato.notificacoes.postgres import NotificacoesServicoPostgres
+from trato.notificacoes.postgres import EmailsDaContaPostgres, NotificacoesServicoPostgres
 from trato.notificacoes.servico import ServicoNotificacoes
 from trato.pedidos.estados import Estado
 from trato.rotinas.regras import ConfigRotinas
 
 from .pg_local import RAIZ
-from .test_fluxo_postgres import abrir_pedido, corpo_pedido
+from .test_fluxo_postgres import abrir_pedido, acao, corpo_pedido, enviar_orcamento
 
 pytestmark = pytest.mark.integracao
 
@@ -177,6 +177,9 @@ def test_dispositivo_move_de_dono_e_reenvio_no_banco(c, servico, push):
     ]
     assert len(pendentes) == 1 and pendentes[0].enviada_em is None
     antes = len(push.enviados)
+    servico.reenviar_pendentes()  # nova demais: o primeiro envio ainda poderia estar em curso
+    assert len(push.enviados) == antes
+    servico.agora = lambda: agora() + servico.config.reenvio_idade_minima
     assert servico.reenviar_pendentes() >= 1
     assert len(push.enviados) == antes + 1
     assert servico.reenviar_pendentes() == 0
@@ -210,6 +213,70 @@ def test_token_invalido_desativa_no_banco(c, servico, push):
     push.tokens_invalidos.add("token-morto-pg-01")
     servico.notificar(Evento.AVALIACAO, c.ids["ana"], chave=chave())
     assert "token-morto-pg-01" not in servico.repo.tokens(c.ids["ana"])
+
+
+def test_telefone_so_passa_com_pagamento_confirmado_no_banco(c, servico):
+    pedido_id = abrir_pedido(c)
+    conversas = c.contexto.conversas
+    conversa = conversas.abrir(pedido_id, c.ids["profissional"])
+    fone = "(31) 98765-4321"
+
+    def dizer(onde: str, texto: str) -> str:
+        nova = conversas.enviar(onde, c.ids["profissional"], texto)
+        return next(m.texto for m in conversas.listar(onde) if m.id == nova)
+
+    assert fone not in dizer(conversa, f"liga {fone}")  # sem contratação
+    orcamento_id = enviar_orcamento(c, pedido_id)
+    r = acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orcamento_id})
+    assert r.status_code == 200, r.text
+    assert fone not in dizer(conversa, f"aceito, liga {fone}")  # aceito, ainda sem pagamento
+
+    def status(valor: str) -> None:
+        with c.local.admin() as con:
+            con.execute("update public.pedidos set status = %s where id = %s", (valor, pedido_id))
+
+    status("pago_retido")
+    assert fone in dizer(conversa, f"chego já, {fone}")
+    assert fone not in dizer(conversa, f"meu pix é {fone}")
+    textos = [m.texto for m in conversas.listar(conversa)]
+    assert fone not in textos[0] and fone not in textos[1] and fone in textos[2]
+    status("cancelado")
+    assert all(fone not in m.texto for m in conversas.listar(conversa))
+
+
+def test_email_da_conta_vem_do_banco_e_sem_conta_nao_quebra(c):
+    uid = str(uuid.uuid4())
+    with c.local.admin() as con:
+        con.execute("insert into auth.users (id, email) values (%s, 'pessoa@exemplo.test')", (uid,))
+    emails = EmailsDaContaPostgres(c.banco)
+    assert emails.email_de(uid) == "pessoa@exemplo.test"
+    assert emails.email_de(str(uuid.uuid4())) is None and emails.email_de("nao-e-uuid") is None
+    with c.banco.transacao():  # dentro de uma transação em curso também funciona
+        assert emails.email_de(uid) == "pessoa@exemplo.test"
+
+
+def test_endereco_so_na_conversa_do_contratado_no_banco(c, servico):
+    pedido_id = abrir_pedido(c)
+    conversas = c.contexto.conversas
+    conversa = conversas.abrir(pedido_id, c.ids["profissional"])
+    outra = conversas.abrir(pedido_id, c.ids["profissional2"])
+    orcamento_id = enviar_orcamento(c, pedido_id)
+    r = acao(c, "cliente", pedido_id, "aceitar_orcamento", {"orcamento_id": orcamento_id})
+    assert r.status_code == 200, r.text
+    rua = "Pode vir na Rua das Flores, 123"
+
+    def dizer(onde: str) -> str:
+        nova = conversas.enviar(onde, c.ids["cliente"], rua)
+        return next(m.texto for m in conversas.listar(onde) if m.id == nova)
+
+    assert "Flores" not in dizer(conversa)  # aceito, ainda sem pagamento
+    with c.local.admin() as con:
+        con.execute("update public.pedidos set status = 'pago_retido' where id = %s", (pedido_id,))
+    assert dizer(conversa) == rua
+    assert "Flores" not in dizer(outra)
+    lista = c.cliente.get("/v1/conversas", headers=c.token("cliente")).json()
+    previas = {x["id"]: x["ultima_mensagem"] for x in lista}
+    assert previas[conversa] == rua and "Flores" not in previas[outra]
 
 
 def test_conversas_e_leitura_no_banco(c, servico):

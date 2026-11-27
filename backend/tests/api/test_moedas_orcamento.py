@@ -264,7 +264,7 @@ def test_cobranca_substituida_devolve_a_reserva_antiga(fluxo: Fluxo):
     assert repo.orcamento_usado(MES) == 0
 
 
-def test_estorno_total_devolve_a_reserva_e_parcial_nao(fluxo: Fluxo):
+def test_estorno_total_devolve_a_reserva_e_parcial_so_as_moedas_na_proporcao(fluxo: Fluxo):
     repo = _ligar(fluxo)
     repo.reservar_orcamento(MES, DIA, 700, 1_000_000, 1_000_000_000)
     pid = fluxo.aceitar()
@@ -275,8 +275,8 @@ def test_estorno_total_devolve_a_reserva_e_parcial_nao(fluxo: Fluxo):
     paga = fluxo.servico.cobrancas.obter(cob["cobranca_id"])
     parcial = replace(paga, estornado_centavos=paga.valor_centavos - 1)
     fluxo.servico._devolver_moedas(fluxo.ctx, parcial)
-    assert repo.orcamento_usado(MES) == 5_700  # parcial não devolve (igual às moedas)
-    assert repo.saldo(CLIENTE.id, AGORA) == 0
+    assert repo.orcamento_usado(MES) == 5_700  # parcial não devolve a reserva
+    assert repo.saldo(CLIENTE.id, AGORA) == 4_999  # as moedas, na proporção (13.8)
 
     total = replace(paga, estornado_centavos=paga.valor_centavos)
     fluxo.servico._devolver_moedas(fluxo.ctx, total)

@@ -23,6 +23,9 @@ class ConfigAgendador(BaseSettings):
     # 0 = sem lembrete de agendamento; N = avisa quando faltam N horas para a janela do serviço.
     # Padrão 2 h; TRATO_AGENDADOR_LEMBRETE_AGENDA_HORAS=0 desliga.
     lembrete_agenda_horas: int = 2
+    # Só reenvia ordem de estorno criada há pelo menos isto (o envio logo após o commit pode
+    # estar em andamento).
+    estorno_idade_minima_segundos: int = 120
 
 
 @lru_cache

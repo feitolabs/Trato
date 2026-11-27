@@ -1,4 +1,5 @@
 import '../../componentes/componentes.dart';
+import '../comuns/prazo_avaliacao.dart';
 import '../profissional/dinheiro.dart';
 
 /// Modelos simples das telas de pedidos. Só descrevem o que é mostrado:
@@ -204,6 +205,7 @@ class PedidoEmExecucao {
     this.categoriaNome,
     this.descricao,
     this.jaAvaliou = false,
+    this.prazoAvaliacao = PrazoAvaliacao.desconhecido,
     this.urgente = false,
     this.profissionalNome,
     this.profissionalId,
@@ -221,6 +223,9 @@ class PedidoEmExecucao {
 
   /// O cliente já avaliou: a ação "Avaliar" some.
   final bool jaAvaliou;
+
+  /// Termos 12.1: prazo para avaliar, do servidor (só vem no concluído ainda não avaliado).
+  final PrazoAvaliacao prazoAvaliacao;
 
   /// Pedido urgente (para hoje).
   final bool urgente;

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../atendimento/modelos.dart' show orientacaoPessoaDiferente;
 import '../cliente/avatar_de_usuario.dart';
 
 /// Estados em que o atendimento está de pé: a tela mostra status, a outra parte e Chat/Ajuda/SOS.
@@ -105,8 +108,96 @@ class CabecalhoAtendimento extends StatelessWidget {
   }
 }
 
-/// Barra fixa com os botões grandes Chat, Ajuda e SOS (sem [aoSos], como no serviço remoto, só os
-/// dois primeiros).
+/// Números de emergência (Termos 9.2).
+const numerosDeEmergencia = [('190', 'Polícia'), ('192', 'SAMU'), ('193', 'Bombeiros')];
+
+Future<bool> _discar(String numero) async {
+  try {
+    return await launchUrl(Uri(scheme: 'tel', path: numero), mode: LaunchMode.externalApplication);
+  } on Object {
+    return false;
+  }
+}
+
+/// Diálogo do botão SOS, igual para cliente e profissional, presencial ou remoto.
+Future<void> mostrarEmergencia(
+  BuildContext context,
+  String resumo, {
+  Future<bool> Function(String numero) ligar = _discar,
+  VoidCallback? aoRelatar,
+  bool orientarChegada = false,
+}) async {
+  await showDialog<void>(
+    context: context,
+    builder: (dialogo) => AlertDialog(
+      title: const Text('SOS / Emergência'),
+      scrollable: true,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Em risco imediato, ligue primeiro. Depois, avise o Trato.'),
+          for (final (numero, nome) in numerosDeEmergencia) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            FilledButton.icon(
+              key: ValueKey('ligar-$numero'),
+              icon: const Icon(Icons.phone),
+              label: Text('Ligar $numero ($nome)'),
+              onPressed: () async {
+                final avisos = ScaffoldMessenger.maybeOf(context);
+                Navigator.of(dialogo).pop();
+                if (!await ligar(numero)) {
+                  avisos?.showSnackBar(SnackBar(
+                    content: Text('Não foi possível abrir o telefone. Disque $numero.'),
+                  ));
+                }
+              },
+            ),
+          ],
+          if (orientarChegada) ...[
+            const SizedBox(height: EspacosTrato.x4),
+            const Text(orientacaoPessoaDiferente, key: ValueKey('sos-pessoa-diferente')),
+          ],
+          if (aoRelatar != null) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            OutlinedButton.icon(
+              key: const ValueKey('sos-relatar'),
+              icon: const Icon(Icons.shield_outlined),
+              label: const Text('Relatar um problema de segurança'),
+              onPressed: () {
+                Navigator.of(dialogo).pop();
+                aoRelatar();
+              },
+            ),
+          ],
+          const SizedBox(height: EspacosTrato.x4),
+          const Text('Você também pode copiar os dados do atendimento para um contato de confiança.'),
+          const SizedBox(height: EspacosTrato.x2),
+          Text(resumo),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogo).pop(),
+          child: const Text('Fechar'),
+        ),
+        TextButton(
+          onPressed: () async {
+            final avisos = ScaffoldMessenger.maybeOf(context);
+            await Clipboard.setData(ClipboardData(text: resumo));
+            if (dialogo.mounted) Navigator.of(dialogo).pop();
+            avisos?.showSnackBar(
+              const SnackBar(content: Text('Dados do atendimento copiados.')),
+            );
+          },
+          child: const Text('Copiar dados'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Barra fixa com os botões grandes Chat, Ajuda e SOS (sem [aoSos], só os dois primeiros).
 class BarraAtendimento extends StatelessWidget {
   const BarraAtendimento({super.key, required this.aoChat, required this.aoAjuda, this.aoSos});
 

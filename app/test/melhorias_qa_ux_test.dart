@@ -304,6 +304,7 @@ void main() {
 
     // Alterna para Cliente fornece: oculta itens e mostra resumo sem cobrança
     await tester.ensureVisible(find.text('Cliente fornece'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Cliente fornece'));
     await tester.pumpAndSettle();
     expect(find.text('Cabo PP'), findsNothing);
@@ -313,6 +314,8 @@ void main() {
     await tester.tap(find.text('Eu forneço'));
     await tester.pumpAndSettle();
     expect(find.text('Cabo PP'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('Remover item'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Remover item'));
     await tester.pumpAndSettle();
     expect(find.text('Cabo PP'), findsNothing);

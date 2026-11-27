@@ -5,19 +5,30 @@ import 'package:flutter/material.dart';
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
+import '../nucleo/navegacao.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
+import 'atendimento_tela.dart';
 import 'auditoria_tela.dart';
+import 'ausencias_tela.dart';
+import 'avaliacoes_tela.dart';
 import 'busca_tela.dart';
+import 'regressos_tela.dart';
 import 'config_tela.dart';
+import 'contestacoes_disputa_tela.dart';
 import 'cupons_tela.dart';
 import 'dashboard_tela.dart';
 import 'disputas_tela.dart';
 import 'equipe_tela.dart';
+import 'incidentes_tela.dart';
+import 'lgpd_pedidos_tela.dart';
+import 'medidas_tela.dart';
 import 'moedas_tela.dart';
 import 'notificacoes_tela.dart';
 import 'pagamentos_tela.dart';
 import 'relatorios_tela.dart';
+import 'materiais_contestacao_tela.dart';
+import 'retorno_conta_tela.dart';
 import 'risco_tela.dart';
 import 'verificacao_tela.dart';
 
@@ -52,18 +63,38 @@ final List<Secao> todasSecoes = [
       () => const VerificacaoTela()),
   Secao('disputas', 'Disputas', IconesTrato.disputas, GrupoMenu.operacao, [Permissao.disputasVer],
       () => const DisputasTela()),
+  Secao('contestacoes', 'Contestação de decisão', IconesTrato.contestacoes, GrupoMenu.operacao,
+      [Permissao.disputasVer], () => const ContestacoesDisputaTela()),
+  Secao('ausencias', 'Cliente ausente', IconesTrato.ausencias, GrupoMenu.operacao, [Permissao.disputasVer],
+      () => const AusenciasTela()),
   Secao(
     'busca',
     'Busca e suporte',
     IconesTrato.buscaSuporte,
     GrupoMenu.operacao,
-    [Permissao.usuariosBuscar, Permissao.pedidosBuscar, Permissao.suporteVer, Permissao.categoriasEditar],
+    [Permissao.usuariosBuscar, Permissao.pedidosBuscar, Permissao.categoriasEditar],
     () => const BuscaTela(),
   ),
+  Secao('atendimento', 'Atendimento', IconesTrato.atendimento, GrupoMenu.operacao, [Permissao.suporteVer],
+      () => const AtendimentoTela()),
+  Secao('medidas', 'Medidas de conta', IconesTrato.medidas, GrupoMenu.operacao, [Permissao.medidasAplicar],
+      () => const MedidasTela()),
+  Secao('materiais', 'Contestação de materiais', IconesTrato.materiais, GrupoMenu.operacao,
+      [Permissao.materiaisContestacaoAnalisar], () => const MateriaisContestacaoTela()),
+  Secao('retorno_conta', 'Retorno de conta', IconesTrato.retornoConta, GrupoMenu.operacao,
+      [Permissao.contaRetornoAnalisar], () => const RetornoContaTela()),
+  Secao('incidentes', 'Incidentes de segurança', IconesTrato.incidentes, GrupoMenu.operacao,
+      [Permissao.incidentesVer], () => const IncidentesTela()),
+  Secao('avaliacoes', 'Avaliações', IconesTrato.avaliacoes, GrupoMenu.operacao,
+      [Permissao.avaliacoesModerar], () => const AvaliacoesTela()),
+  Secao('lgpd', 'Pedidos LGPD', IconesTrato.lgpd, GrupoMenu.administracao,
+      [Permissao.lgpdPedidosGerenciar, Permissao.lgpdRevisaoAutomatizada], () => const LgpdPedidosTela()),
   Secao('risco', 'Risco e antifraude', IconesTrato.risco, GrupoMenu.operacao, [Permissao.riscoVer],
       () => const RiscoTela()),
   Secao('pagamentos', 'Pagamentos', IconesTrato.pagamentos, GrupoMenu.financeiro, [Permissao.pagamentosVer],
       () => const PagamentosTela()),
+  Secao('compensacoes', 'Compensações', IconesTrato.compensacoes, GrupoMenu.financeiro,
+      [Permissao.disputasDecidir, Permissao.regressoPropor], () => const SecaoCompensacoes()),
   Secao('relatorios', 'Relatórios fiscais', IconesTrato.relatorios, GrupoMenu.financeiro,
       [Permissao.relatoriosExportar], () => const RelatoriosTela()),
   Secao('dashboard', 'Painel', IconesTrato.painel, GrupoMenu.crescimento, [Permissao.dashboardVer],
@@ -177,7 +208,10 @@ class _ShellPainelState extends State<ShellPainel> {
     final atual = secoes.firstWhere((s) => s.id == _idAtual, orElse: () => secoes.first);
     if (context.pode(Permissao.verificacoesVer)) _pendentes ??= _contarPendentes();
     final widgetConteudo = atual.id == 'dashboard' ? DashboardTela(aoAbrirSecao: _ir) : atual.construir();
-    final conteudo = KeyedSubtree(key: ValueKey(atual.id), child: widgetConteudo);
+    final conteudo = NavegacaoPainel(
+      irPara: _ir,
+      child: KeyedSubtree(key: ValueKey(atual.id), child: widgetConteudo),
+    );
 
     return Listener(
       behavior: HitTestBehavior.translucent,

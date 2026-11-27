@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../comuns/textos_dos_termos.dart';
 import '../../dispositivo/relato_bug.dart';
 import '../../tema/tema.dart';
 
@@ -31,7 +32,8 @@ Future<void> relatarBug(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Escreva para o endereço abaixo, contando o que aconteceu:'),
+          const Text('Escreva para o endereço abaixo, contando o que aconteceu. '
+              '$textoAtendimentoHumano'),
           const SizedBox(height: EspacosTrato.x3),
           SelectableText(emailRelatoBug, style: TipografiaTrato.corpoForte),
         ],

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
 from conftest import AGORA, CLIENTE, OUTRO_PROFISSIONAL, PROFISSIONAL, cab
 
 from trato.agendador import Agendador
@@ -18,6 +21,15 @@ from trato.notificacoes.eventos import MODELOS, Evento
 from trato.notificacoes.repositorio import RepositorioEmMemoria
 from trato.notificacoes.servico import ServicoNotificacoes
 from trato.pedidos.estados import Estado as E
+
+
+@pytest.fixture(autouse=True)
+def oferta_antiga_ligada(request):
+    """Estes testes cobrem a prioridade paga pelo profissional, hoje desligada por padrão."""
+    if "amb" in request.fixturenames:
+        config = request.getfixturevalue("amb").contexto.config
+        config._config = replace(config.carregar(), exclusividade_profissional_ofertada=True)
+
 
 PRO, OUTRO_PRO = PROFISSIONAL.id, OUTRO_PROFISSIONAL.id
 
@@ -41,6 +53,7 @@ def _ligar(amb, saldo=300, outro_saldo=0):
 
 def _pedido(amb, pid="ped-1"):
     amb.semear_pedido(E.ABERTO, id=pid)
+    amb.contexto.contratos._itens.pop(pid, None)  # pedido aberto não tem contrato
     amb.contexto.pedidos._dados[pid] = DadosPedido("cat-1", "cid", "Pintar", "Sala")
     return pid
 
@@ -264,6 +277,9 @@ def test_chave_idempotente_nao_duplica_notificacao_mesmo_se_linha_repetir(amb):
     _, notif, executor = _montar_agendador(amb)
 
     class RepoRepetido:
+        def expirar_cliente(self, agora):
+            return []
+
         def expirar(self, agora):
             return [Expirada("exc-1", "sem_resposta", PRO, CLIENTE.id, "ped-1")]
 
@@ -283,6 +299,8 @@ def test_falha_na_notificacao_nao_impede_estorno_nem_acao(amb):
     _pedido(amb)
 
     class NotifQuebrada:
+        pedidos = convidado = None  # `montar_servicos` liga as consultas do `papel`
+
         def notificar(self, *args, **kwargs):
             raise RuntimeError("push fora do ar")
 

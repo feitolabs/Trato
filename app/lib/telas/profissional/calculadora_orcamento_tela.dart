@@ -15,7 +15,7 @@ export 'servico_orcamento.dart' show ItemMaterial, OrcamentoPronto;
 
 enum ModoOrcamento { porHora, valorFechado }
 
-/// Sugestões para o campo "Fora do escopo": acrescentam o texto, nunca são obrigatórias.
+/// Sugestões para "O que não está incluído": acrescentam o texto, não precisam ser usadas.
 const sugestoesNaoInclui = [
   'Material',
   'Limpeza e retirada de entulho',
@@ -35,14 +35,12 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
     this.deslocamentoInicial,
     this.horasInicial,
     this.valorHoraInicial,
-    this.garantiaInicialDias = 90,
-    this.prazoExecucaoInicialDias = 3,
+    this.garantiaInicialDias,
+    this.prazoExecucaoInicialDias,
     this.itensIniciais = const [],
     this.faixaRegiaoCentavos,
     this.opcoesGarantiaDias = const [30, 60, 90],
     this.garantiaMinimaDias = 30,
-    this.validadeDias = 3,
-    this.mostrarForaDoEscopo = false,
     this.foraDoEscopoInicial,
     this.observacoesInicial,
     this.edicao = false,
@@ -60,12 +58,12 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
   final String? deslocamentoInicial;
   final String? horasInicial;
   final String? valorHoraInicial;
-  final int garantiaInicialDias;
-  final int prazoExecucaoInicialDias;
+
+  /// Nulos num orçamento novo: o app não escolhe pelo profissional (Termos 5.2).
+  final int? garantiaInicialDias;
+  final int? prazoExecucaoInicialDias;
   final List<ItemMaterial> itensIniciais;
 
-  /// Exibe campos de "Fora do escopo" e "Observações" (oculto por padrão nos goldens).
-  final bool mostrarForaDoEscopo;
   final String? foraDoEscopoInicial;
   final String? observacoesInicial;
 
@@ -77,7 +75,7 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
   /// "Serviços parecidos na região" (mínimo, máximo), vindo do backend. Sem dado, a linha some.
   final (int, int)? faixaRegiaoCentavos;
 
-  /// Opções de garantia e validade do orçamento: configuração, não número fixo da tela.
+  /// Opções de garantia: configuração, não número fixo da tela.
   final List<int> opcoesGarantiaDias;
 
   /// Garantia mínima (CDC): 30 dias para serviço não durável e 90 para durável. O backend
@@ -93,7 +91,6 @@ class CalculadoraOrcamentoTela extends StatefulWidget {
       ..sort();
     return lista;
   }
-  final int validadeDias;
 
   @override
   State<CalculadoraOrcamentoTela> createState() => _CalculadoraOrcamentoTelaState();
@@ -105,7 +102,10 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   late final _horas = TextEditingController(text: widget.horasInicial);
   late final _valorHora = TextEditingController(text: widget.valorHoraInicial);
   late final _valorFechado = TextEditingController(text: widget.valorFechadoInicial);
-  late final _diasExecucao = TextEditingController(text: '${widget.prazoExecucaoInicialDias}');
+  late final _diasExecucao =
+      TextEditingController(text: widget.prazoExecucaoInicialDias?.toString());
+  // Sempre em branco, também na edição: cada versão enviada tem a validade escolhida na hora.
+  final _diasValidade = TextEditingController();
   late final _foraDoEscopo = TextEditingController(text: widget.foraDoEscopoInicial);
   final _sugestoesForaUsadas = <String>{};
   late final _observacoes = TextEditingController(text: widget.observacoesInicial);
@@ -114,14 +114,22 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
   final _keyValorHora = GlobalKey();
   final _keyValorFechado = GlobalKey();
   final _keyDias = GlobalKey();
+  final _keyGarantia = GlobalKey();
+  final _keyValidade = GlobalKey();
+  final _keyForaDoEscopo = GlobalKey();
   final _focoDeslocamento = FocusNode();
   final _focoHoras = FocusNode();
   final _focoValorHora = FocusNode();
   final _focoValorFechado = FocusNode();
   final _focoDias = FocusNode();
+  final _focoGarantia = FocusNode();
+  final _focoValidade = FocusNode();
+  final _focoForaDoEscopo = FocusNode();
   late ModoOrcamento _modo = widget.remoto ? ModoOrcamento.valorFechado : widget.modoInicial;
-  late int _garantia = widget.garantiaInicialDias < widget.garantiaMinimaDias
-      ? widget.garantiaMinimaDias
+
+  /// Garantia antiga abaixo do mínimo fica sem escolha: o profissional escolhe de novo.
+  late int? _garantia = (widget.garantiaInicialDias ?? -1) < widget.garantiaMinimaDias
+      ? null
       : widget.garantiaInicialDias;
   late final List<ItemMaterial> _itens = [...widget.itensIniciais];
   bool _materialPorMim = true;
@@ -145,6 +153,9 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
     LengthLimitingTextInputFormatter(8),
   ];
+
+  /// Mesmo limite do servidor.
+  static final _formatadoresForaDoEscopo = [LengthLimitingTextInputFormatter(1000)];
   static final _formatadoresDias = [
     FilteringTextInputFormatter.digitsOnly,
     LengthLimitingTextInputFormatter(3),
@@ -180,6 +191,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _valorHora.dispose();
     _valorFechado.dispose();
     _diasExecucao.dispose();
+    _diasValidade.dispose();
     _foraDoEscopo.dispose();
     _observacoes.dispose();
     _focoDeslocamento.dispose();
@@ -187,6 +199,9 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     _focoValorHora.dispose();
     _focoValorFechado.dispose();
     _focoDias.dispose();
+    _focoGarantia.dispose();
+    _focoValidade.dispose();
+    _focoForaDoEscopo.dispose();
     super.dispose();
   }
 
@@ -308,6 +323,21 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     return null;
   }
 
+  String? _erroGarantia() => _garantia == null ? 'Escolha o prazo da garantia.' : null;
+
+  int? get _validadeEscolhida {
+    final dias = int.tryParse(_diasValidade.text.trim());
+    return dias == null || dias < 1 ? null : dias;
+  }
+
+  String? _erroValidade() => _validadeEscolhida == null
+      ? 'Informe por quantos dias o orçamento vale (mínimo 1 dia).'
+      : null;
+
+  String? _erroForaDoEscopo() => _foraDoEscopo.text.trim().isEmpty
+      ? 'Diga o que não está incluído. Se nada ficar de fora, escreva isso.'
+      : null;
+
   Future<void> _adicionarItem() async {
     final item = await showModalBottomSheet<ItemMaterial>(
       context: context,
@@ -342,43 +372,24 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
     if (_enviando) return;
     setState(() => _mostrarErros = true);
     final fechado = _modo == ModoOrcamento.valorFechado;
-    final temErro = fechado
-        ? (_erroValorFechado() != null || _erroDiasExecucao() != null || _erroTotal() != null)
-        : (_erroDeslocamento() != null ||
-            _erroHoras() != null ||
-            _erroValorHora() != null ||
-            _erroDiasExecucao() != null ||
-            _erroTotal() != null);
-    if (temErro) {
+    // Na ordem em que os campos aparecem na tela: o foco vai ao primeiro com erro.
+    final campos = [
+      if (fechado)
+        (_keyValorFechado, _focoValorFechado, _erroValorFechado)
+      else ...[
+        (_keyDeslocamento, _focoDeslocamento, _erroDeslocamento),
+        (_keyHoras, _focoHoras, _erroHoras),
+        (_keyValorHora, _focoValorHora, _erroValorHora),
+      ],
+      (_keyGarantia, _focoGarantia, _erroGarantia),
+      (_keyDias, _focoDias, _erroDiasExecucao),
+      (_keyValidade, _focoValidade, _erroValidade),
+      (_keyForaDoEscopo, _focoForaDoEscopo, _erroForaDoEscopo),
+    ];
+    if (_erroTotal() != null || campos.any((campo) => campo.$3() != null)) {
       focarPrimeiroErro([
-        if (fechado)
-          EntradaCampoErro(
-            key: _keyValorFechado,
-            focusNode: _focoValorFechado,
-            temErro: () => _erroValorFechado() != null,
-          )
-        else ...[
-          EntradaCampoErro(
-            key: _keyDeslocamento,
-            focusNode: _focoDeslocamento,
-            temErro: () => _erroDeslocamento() != null,
-          ),
-          EntradaCampoErro(
-            key: _keyHoras,
-            focusNode: _focoHoras,
-            temErro: () => _erroHoras() != null,
-          ),
-          EntradaCampoErro(
-            key: _keyValorHora,
-            focusNode: _focoValorHora,
-            temErro: () => _erroValorHora() != null,
-          ),
-        ],
-        EntradaCampoErro(
-          key: _keyDias,
-          focusNode: _focoDias,
-          temErro: () => _erroDiasExecucao() != null,
-        ),
+        for (final (chave, foco, erro) in campos)
+          EntradaCampoErro(key: chave, focusNode: foco, temErro: () => erro() != null),
       ]);
       return;
     }
@@ -386,14 +397,15 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       decimosDeslocamento: fechado ? 0 : _decimosDeslocamento,
       decimosDeHora: fechado ? 0 : Dinheiro.lerDecimosDeHora(_horas.text)!,
       valorHoraCentavos: fechado ? 0 : Dinheiro.lerCentavos(_valorHora.text)!,
-      garantiaDias: _garantia,
+      garantiaDias: _garantia!,
       prazoExecucaoDias: int.parse(_diasExecucao.text.trim()),
+      validadeDias: _validadeEscolhida!,
       itens: List.unmodifiable(_itens),
       materialPorMim: _materialPorMim,
       pedirSinalMaterial: _materialPorMim && _pedirSinal,
       totalCentavos: _total,
       valorFechadoCentavos: fechado ? Dinheiro.lerCentavos(_valorFechado.text)! : null,
-      foraDoEscopo: _foraDoEscopo.text.trim().isEmpty ? null : _foraDoEscopo.text.trim(),
+      foraDoEscopo: _foraDoEscopo.text.trim(),
       observacoes: _observacoes.text.trim().isEmpty ? null : _observacoes.text.trim(),
     );
     if (widget.aoEnviar == null) return;
@@ -429,7 +441,10 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
           ),
           const SizedBox(height: EspacosTrato.x3),
           Text(
-            'Válido por ${widget.validadeDias} dias · você pode editar até o cliente aceitar',
+            _validadeEscolhida == null
+                ? 'Você pode editar até o cliente aceitar'
+                : 'Válido por $_validadeEscolhida ${_validadeEscolhida == 1 ? 'dia' : 'dias'}'
+                    ' · você pode editar até o cliente aceitar',
             style: TipografiaTrato.legenda,
             textAlign: TextAlign.center,
           ),
@@ -478,13 +493,19 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
               formatadores: _formatadoresValorHora,
               aoMudar: (_) => _mudou(),
               erro: _mostrarErros ? _erroValorFechado() : null,
+              linhasDoErro: 10,
             ),
           ),
           const SizedBox(height: EspacosTrato.x4),
-          _CampoGarantia(
-            valor: _garantia,
-            opcoes: widget._opcoesGarantia,
-            aoMudar: (dias) => setState(() => _garantia = dias),
+          KeyedSubtree(
+            key: _keyGarantia,
+            child: _CampoGarantia(
+              valor: _garantia,
+              opcoes: widget._opcoesGarantia,
+              foco: _focoGarantia,
+              erro: _mostrarErros ? _erroGarantia() : null,
+              aoMudar: (dias) => setState(() => _garantia = dias),
+            ),
           ),
         ] else ...[
           Row(
@@ -502,6 +523,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                     formatadores: _formatadoresDeslocamento,
                     aoMudar: (_) => _mudou(),
                     erro: _mostrarErros ? _erroDeslocamento() : null,
+                    linhasDoErro: 10,
                   ),
                 ),
               ),
@@ -518,6 +540,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                     formatadores: _formatadoresHoras,
                     aoMudar: (_) => _mudou(),
                     erro: _mostrarErros ? _erroHoras() : null,
+                    linhasDoErro: 10,
                   ),
                 ),
               ),
@@ -539,16 +562,23 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
                     formatadores: _formatadoresValorHora,
                     aoMudar: (_) => _mudou(),
                     erro: _mostrarErros ? _erroValorHora() : null,
+                    linhasDoErro: 10,
                   ),
                 ),
               ),
               const SizedBox(width: EspacosTrato.x4),
               Expanded(
+                child: KeyedSubtree(
+                  key: _keyGarantia,
                   child: _CampoGarantia(
-                valor: _garantia,
-                opcoes: widget._opcoesGarantia,
-                aoMudar: (dias) => setState(() => _garantia = dias),
-              )),
+                    valor: _garantia,
+                    opcoes: widget._opcoesGarantia,
+                    foco: _focoGarantia,
+                    erro: _mostrarErros ? _erroGarantia() : null,
+                    aoMudar: (dias) => setState(() => _garantia = dias),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -567,6 +597,7 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             formatadores: _formatadoresDias,
             aoMudar: (_) => _mudou(),
             erro: _mostrarErros ? _erroDiasExecucao() : null,
+            linhasDoErro: 10,
           ),
         ),
         const SizedBox(height: EspacosTrato.x2),
@@ -581,6 +612,23 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
               _mudou();
               setState(() {});
             },
+          ),
+        ),
+        const SizedBox(height: EspacosTrato.x4),
+        KeyedSubtree(
+          key: _keyValidade,
+          child: CampoTrato(
+            rotulo: 'Validade do orçamento',
+            controlador: _diasValidade,
+            foco: _focoValidade,
+            sufixo: 'dias',
+            dica: 'Ex.: 7',
+            ajuda: 'Por quantos dias, a partir do envio, o orçamento vale.',
+            teclado: TextInputType.number,
+            formatadores: _formatadoresDias,
+            aoMudar: (_) => setState(() {}),
+            erro: _mostrarErros ? _erroValidade() : null,
+            linhasDoErro: 10,
           ),
         ),
         if (_modo == ModoOrcamento.porHora) ...[
@@ -617,44 +665,48 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
             },
             aoMarcarSinal: (marcado) => setState(() => _pedirSinal = marcado),
           ),
-        if (widget.mostrarForaDoEscopo ||
-            (widget.foraDoEscopoInicial ?? '').isNotEmpty ||
-            (widget.observacoesInicial ?? '').isNotEmpty) ...[
-          const SizedBox(height: EspacosTrato.x5),
-          CampoTrato(
-            rotulo: 'Fora do escopo (opcional)',
+        const SizedBox(height: EspacosTrato.x5),
+        KeyedSubtree(
+          key: _keyForaDoEscopo,
+          child: CampoTrato(
+            rotulo: 'O que não está incluído',
             controlador: _foraDoEscopo,
+            foco: _focoForaDoEscopo,
             dica: 'Ex.: quebra de alvenaria, pintura ou peças extras',
+            formatadores: _formatadoresForaDoEscopo,
+            aoMudar: (_) => setState(() {}),
+            erro: _mostrarErros ? _erroForaDoEscopo() : null,
+            linhasDoErro: 10,
           ),
-          if (_sugestoesForaUsadas.length < sugestoesNaoInclui.length) ...[
-            const SizedBox(height: EspacosTrato.x2),
-            Wrap(
-              key: const Key('sugestoes-nao-incluso'),
-              spacing: EspacosTrato.x2,
-              runSpacing: EspacosTrato.x2,
-              children: [
-                for (final s in sugestoesNaoInclui)
-                  if (!_sugestoesForaUsadas.contains(s))
-                    Builder(
-                      builder: (_) {
-                        final rotulo = _rotuloSugestaoFora(s);
-                        return ActionChip(
-                          key: ValueKey('sugestao-nao-incluso-$rotulo'),
-                          label: Text(rotulo),
-                          onPressed: () => _acrescentarForaDoEscopo(s, rotulo),
-                        );
-                      },
-                    ),
-              ],
-            ),
-          ],
-          const SizedBox(height: EspacosTrato.x4),
-          CampoTrato(
-            rotulo: 'Observações (opcional)',
-            controlador: _observacoes,
-            dica: 'Condições de execução, horários ou recomendações',
+        ),
+        if (_sugestoesForaUsadas.length < sugestoesNaoInclui.length) ...[
+          const SizedBox(height: EspacosTrato.x2),
+          Wrap(
+            key: const Key('sugestoes-nao-incluso'),
+            spacing: EspacosTrato.x2,
+            runSpacing: EspacosTrato.x2,
+            children: [
+              for (final s in sugestoesNaoInclui)
+                if (!_sugestoesForaUsadas.contains(s))
+                  Builder(
+                    builder: (_) {
+                      final rotulo = _rotuloSugestaoFora(s);
+                      return ActionChip(
+                        key: ValueKey('sugestao-nao-incluso-$rotulo'),
+                        label: Text(rotulo),
+                        onPressed: () => _acrescentarForaDoEscopo(s, rotulo),
+                      );
+                    },
+                  ),
+            ],
           ),
         ],
+        const SizedBox(height: EspacosTrato.x4),
+        CampoTrato(
+          rotulo: 'Observações (opcional)',
+          controlador: _observacoes,
+          dica: 'Condições de execução, horários ou recomendações',
+        ),
         const SizedBox(height: EspacosTrato.x5),
         _ResumoEscuro(totalCentavos: _total, resumo: _resumo),
         if (_resumoFalhou)
@@ -672,10 +724,18 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
 }
 
 class _CampoGarantia extends StatelessWidget {
-  const _CampoGarantia({required this.valor, required this.opcoes, required this.aoMudar});
+  const _CampoGarantia({
+    required this.valor,
+    required this.opcoes,
+    required this.foco,
+    required this.erro,
+    required this.aoMudar,
+  });
 
-  final int valor;
+  final int? valor;
   final List<int> opcoes;
+  final FocusNode foco;
+  final String? erro;
   final ValueChanged<int> aoMudar;
 
   @override
@@ -692,7 +752,10 @@ class _CampoGarantia extends StatelessWidget {
         const SizedBox(height: EspacosTrato.x2),
         DropdownButtonFormField<int>(
           initialValue: opcoes.contains(valor) ? valor : null,
+          focusNode: foco,
           isExpanded: true,
+          hint: const Text('Escolha', maxLines: 1),
+          decoration: InputDecoration(errorText: erro, errorMaxLines: 3),
           style: TipografiaTrato.corpo.copyWith(color: context.cores.texto),
           icon: const Icon(Icons.keyboard_arrow_down),
           items: [

@@ -331,6 +331,11 @@ class RecorrenciasEmMemoria:
         return None
 
 
+SEM_REMOTO = (
+    "O Trato não aceita serviço remoto: o serviço é feito no imóvel informado no pedido "
+    "(Termos 3.7)."
+)
+
 # --- Rotinas do agendador -----------------------------------------------------------------
 
 
@@ -343,11 +348,8 @@ def _pedido_da_visita(contexto: Any, rec: Recorrencia, visita: Visita, agora: da
     from trato.pedidos import estados
     from trato.pedidos.estados import Ator, Papel
 
-    origem = contexto.pedidos.obter(rec.pedido_origem_id)
     dados = contexto.pedidos.dados_do_pedido(rec.pedido_origem_id)
     pedido = estados.abrir_pedido(uuid.uuid4().hex, Ator(Papel.CLIENTE, rec.cliente_id), agora)
-    if origem is not None and origem.remoto:
-        pedido = replace(pedido, remoto=True)
     if dados is not None:
         dia = visita.data_prevista_em.astimezone(periodo.BRASILIA)
         dados = replace(
@@ -382,8 +384,16 @@ def _partes_aptas(contexto: Any, rec: Recorrencia) -> bool:
     )
 
 
+def origem_remota(contexto: Any, rec: Recorrencia) -> bool:
+    origem = contexto.pedidos.obter(rec.pedido_origem_id)
+    return origem is not None and origem.remoto
+
+
 def gerar_visitas(
-    contexto: Any, agora: datetime, avisar: Callable[[Recorrencia, Visita], None] | None = None
+    contexto: Any,
+    agora: datetime,
+    avisar: Callable[[Recorrencia, Visita], None] | None = None,
+    avisar_remota: Callable[[Recorrencia], None] | None = None,
 ) -> int:
     """Rotina: cria a visita (e o pedido dela) das séries ativas na antecedência configurada.
 
@@ -393,6 +403,12 @@ def gerar_visitas(
     repo = contexto.recorrencias
     criadas = 0
     for rec in repo.prontas_para_gerar(agora):
+        if origem_remota(contexto, rec):  # Termos 3.7: não nasce visita remota nova
+            if repo.mudar_status(rec.id, (ST_ATIVA,), ST_PAUSADA, agora):
+                log.warning("Recorrência %s pausada: origem remota", rec.id)
+                if avisar_remota is not None:
+                    avisar_remota(rec)
+            continue
         if not _partes_aptas(contexto, rec):
             # Profissional fora (inativo ou sem aprovação) ou cliente inativo: sem visita nova;
             # a série pausa e quem voltar a ficar apto a retoma pelo app.

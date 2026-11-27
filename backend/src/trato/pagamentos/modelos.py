@@ -52,6 +52,8 @@ class CobrancaLocal:
     desconto_centavos: int = 0
     # Moedas do Trato usadas nesta cobrança (o desconto delas já está em `desconto_centavos`).
     moedas_usadas: int = 0
+    # O contrato desta cobrança caiu (pagamento expirado): ela não vale para o contrato novo.
+    contrato_encerrado: bool = False
 
 
 @dataclass(frozen=True)

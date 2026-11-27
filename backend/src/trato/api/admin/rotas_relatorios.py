@@ -187,7 +187,7 @@ def _gerar(
             LEFT JOIN public.categorias cat ON cat.id = pe.categoria_id
             LEFT JOIN public.cidades cid ON cid.id = pe.cidade_id
             LEFT JOIN public.usuarios uc ON uc.id = pe.cliente_id
-            LEFT JOIN public.contratos ct ON ct.pedido_id = pe.id
+            LEFT JOIN public.contratos ct ON ct.pedido_id = pe.id AND ct.status <> 'cancelado'
             LEFT JOIN public.usuarios upr ON upr.id = ct.profissional_id
             WHERE (%(de)s::timestamptz IS NULL OR pe.criado_em >= %(de)s)
               AND (%(ate)s::timestamptz IS NULL OR pe.criado_em < %(ate)s)

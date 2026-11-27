@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from fastapi import Depends, HTTPException, Request
 
-from trato.api.admin.papeis import Permissao, pode
+from trato.api.admin.papeis import PapelEquipe, Permissao, pode
 from trato.api.admin.repositorios import (
     AssinadorUrl,
     MembroEquipe,
@@ -92,3 +92,14 @@ def exigir(*permissoes: Permissao) -> Callable[..., Operador]:
         return Operador(usuario, membro)
 
     return dependencia
+
+
+def proteger_conta_da_equipe(admin: AdminContexto, operador: Operador, usuario_id: str) -> None:
+    """Medida, bloqueio ou reversão contra alguém da equipe: só um administrador."""
+    alvo = admin.equipe.obter(usuario_id)
+    if (
+        alvo is not None
+        and alvo.revogado_em is None
+        and operador.membro.papel is not PapelEquipe.ADMINISTRADOR
+    ):
+        raise HTTPException(403, "Conta da equipe: só um administrador pode fazer isto.")

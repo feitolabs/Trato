@@ -72,7 +72,7 @@ select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
            and h.prova ->> 'acao' in ('fazer_check_out', 'resolver_retrabalho')
          order by h.id desc limit 1), false) as check_out_sem_codigo
   from public.pedidos p
-  left join public.contratos c on c.pedido_id = p.id
+  left join public.contratos c on c.pedido_id = p.id and c.status <> 'cancelado'
   left join lateral (
       select a.id, a.janela_inicio, a.janela_fim from public.agendamentos a
        where a.contrato_id = c.id and a.status <> 'remarcado'
@@ -103,6 +103,15 @@ class PedidosPostgres:
             return None
         with self._banco.transacao() as con:
             return self._carregar(con, achado)
+
+    def travar(self, pedido_id: str) -> None:
+        """Trava a linha do pedido até o fim da transação em curso (a mesma trava de `salvar`).
+        Só serve dentro de `contexto.transacao()`: quem for gravar o pedido espera."""
+        achado = como_uuid(pedido_id)
+        if achado is None:
+            return
+        with self._banco.transacao() as con:
+            con.execute("select 1 from public.pedidos where id = %s for update", (achado,))
 
     def eventos(self, pedido_id: str) -> Sequence[Evento]:
         achado = como_uuid(pedido_id)
@@ -621,7 +630,8 @@ class PedidosPostgres:
         if pedido.janela is None:
             return
         contrato = con.execute(
-            "select id from public.contratos where pedido_id = %s", (pid,)
+            "select id from public.contratos where pedido_id = %s and status <> 'cancelado'",
+            (pid,),
         ).fetchone()
         if contrato is None:
             raise RegraDoBanco("O pedido ainda não tem contrato para agendar.")

@@ -60,8 +60,21 @@ class RepositorioDenuncias(Protocol):
         """Quantos alertas do tipo, criados desde `desde`, trazem `trecho` no texto."""
         ...
 
+    def grave_aberta(self, pedido_id: str) -> bool:
+        """Denúncia grave (alta ou crítica) ainda não resolvida que cita o pedido?"""
+        ...
+
 
 class DenunciasEmMemoria:
+    def grave_aberta(self, pedido_id: str) -> bool:
+        return any(
+            a.tipo.startswith("denuncia_")
+            and a.severidade in ("alta", "critica")
+            and not a.resolvido
+            and (a.pedido_id == pedido_id or f"Pedido {pedido_id}:" in a.detalhes)
+            for a in list(self.alertas.values())
+        )
+
     def __init__(self) -> None:
         self.alertas: dict[str, AlertaDenuncia] = {}
         self._trava = threading.Lock()

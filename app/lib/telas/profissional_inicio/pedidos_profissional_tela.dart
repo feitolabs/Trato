@@ -302,7 +302,9 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
         itemBuilder: (_, i) {
           final c = widget.finalizados[i];
           final concluido = c.estadoApi == 'concluido';
-          final avaliar = concluido && !c.jaAvaliou;
+          final prazo = c.prazoAvaliacao;
+          final avaliar = concluido && !c.jaAvaliou && !prazo.encerrado;
+          final ate = prazo.ate;
           return CartaoTrato(
             key: ValueKey('finalizado-${c.pedidoId}'),
             aoTocar: widget.aoAbrirFinalizado == null ? null : () => widget.aoAbrirFinalizado!(c),
@@ -328,7 +330,10 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                 if (avaliar) ...[
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
-                    'Avalie o cliente: ganhe Tratinhos',
+                    ate == null
+                        ? 'Avalie o cliente: ganhe Tratinhos'
+                        : 'Avalie o cliente até ${ate.day.toString().padLeft(2, '0')}/'
+                            '${ate.month.toString().padLeft(2, '0')}: ganhe Tratinhos',
                     key: const ValueKey('avaliar-cliente-na-lista'),
                     style: TipografiaTrato.corpoPequeno.copyWith(
                       color: context.cores.petroleo,
@@ -338,7 +343,7 @@ class _PedidosProfissionalTelaState extends State<PedidosProfissionalTela> {
                 ] else if (concluido) ...[
                   const SizedBox(height: EspacosTrato.x2),
                   Text(
-                    'Cliente avaliado',
+                    c.jaAvaliou ? 'Cliente avaliado' : 'Prazo para avaliar encerrado',
                     style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                   ),
                 ],

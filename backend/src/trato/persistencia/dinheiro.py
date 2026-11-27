@@ -35,7 +35,10 @@ def _contrato(con: psycopg.Connection[Any], pedido_id: str, travar: bool = False
     pid = como_uuid(pedido_id)
     if pid is None:
         return None
-    consulta = "select id, cliente_id, profissional_id from public.contratos where pedido_id = %s"
+    consulta = (
+        "select id, cliente_id, profissional_id from public.contratos "
+        "where pedido_id = %s and status <> 'cancelado'"
+    )
     if travar:
         consulta += " for update"
     return con.execute(consulta, (pid,)).fetchone()  # noqa: S608 - só texto fixo do código
@@ -224,9 +227,11 @@ class DisputasPostgres:
         congelado = int(linha["valor_congelado_centavos"])
         if status == "decidida":
             estado = Estado.DECIDIDA
-        elif status in ("em_analise", "acordo") and decisao is not None:
+        elif status == "acordo":
+            estado = Estado.ACORDO
+        elif status == "em_analise" and decisao is not None:
             estado = Estado.AGUARDANDO_APROVACAO
-        elif status in ("em_analise", "acordo"):
+        elif status == "em_analise":
             estado = Estado.EM_ANALISE
         else:
             estado = Estado.ABERTA
@@ -249,7 +254,7 @@ class DisputasPostgres:
             # O banco não guarda a hora da aprovação à parte: vale a da decisão registrada.
             aprovado_em=linha["decidida_em"] if linha["aprovada_por"] else None,
             divisao=dividir_valor(congelado, decisao)
-            if estado is Estado.DECIDIDA and decisao
+            if estado in (Estado.DECIDIDA, Estado.ACORDO) and decisao
             else None,
         )
 
@@ -275,6 +280,22 @@ class DisputasPostgres:
                         exigir_uuid(midia, "mídia") if midia else None,
                     ),
                 )
+
+    def propostas(self, pedido_id: str) -> list[str]:
+        """Textos de `proposta_retorno` da disputa atual, do mais antigo para o mais novo."""
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return []
+        with self._banco.transacao() as con:
+            disputa = con.execute(_SELECT_DISPUTA, (pid,)).fetchone()
+            if disputa is None:
+                return []
+            linhas = con.execute(
+                "select texto from public.disputa_evidencias where disputa_id = %s "
+                "and tipo = 'proposta_retorno' order by criado_em, id",
+                (disputa["id"],),
+            ).fetchall()
+        return [r["texto"] for r in linhas]
 
     def evidencias(self, pedido_id: str) -> list[dict[str, Any]]:
         """As provas da disputa, da mais antiga para a mais nova (sem notas internas)."""
@@ -329,6 +350,7 @@ class DisputasPostgres:
                 Estado.EM_ANALISE: "em_analise",
                 Estado.AGUARDANDO_APROVACAO: "em_analise",
                 Estado.DECIDIDA: "decidida",
+                Estado.ACORDO: "acordo",
             }[disputa.estado]
             decisao = disputa.decisao
             reembolso = None
@@ -400,7 +422,8 @@ class GarantiasPostgres:
         with self._banco.transacao() as con:
             linha = con.execute(
                 "select g.inicio_em, g.dias from public.garantias g "
-                "join public.contratos c on c.id = g.contrato_id where c.pedido_id = %s",
+                "join public.contratos c on c.id = g.contrato_id where c.pedido_id = %s "
+                "and c.status <> 'cancelado'",
                 (pid,),
             ).fetchone()
         return Garantia(linha["inicio_em"], int(linha["dias"])) if linha else None
@@ -424,7 +447,7 @@ class GarantiasPostgres:
                 "r.outro_profissional_id from public.retrabalhos r "
                 "join public.garantias g on g.id = r.garantia_id "
                 "join public.contratos c on c.id = g.contrato_id "
-                "where c.pedido_id = %s order by r.aberto_em, r.id",
+                "where c.pedido_id = %s and c.status <> 'cancelado' order by r.aberto_em, r.id",
                 (pid,),
             ).fetchall()
         return tuple(
@@ -493,11 +516,12 @@ class AvaliacoesPostgres:
     _COLS_COM_CRITERIOS = (
         "a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
         "a.nota_geral, a.nota_decimal, a.criterios, a.comentario, a.etiquetas, "
-        "a.criada_em, a.resposta"
+        "a.criada_em, a.resposta, a.status"
     )
     _COLS_SEM_CRITERIOS = (
         "a.id, c.pedido_id, a.direcao, a.avaliador_id, a.avaliado_id, "
-        "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta"
+        "a.nota_geral, a.nota_decimal, a.comentario, a.etiquetas, a.criada_em, a.resposta, "
+        "a.status"
     )
 
     def __init__(self, banco: Banco) -> None:
@@ -525,6 +549,7 @@ class AvaliacoesPostgres:
             etiquetas=tuple(l["etiquetas"] or ()),
             criada_em=l["criada_em"],
             resposta=l["resposta"],
+            status=l.get("status") or "publicada",
         )
 
     @staticmethod
@@ -548,7 +573,7 @@ class AvaliacoesPostgres:
         where = (
             "from public.avaliacoes a "
             "join public.contratos c on c.id = a.contrato_id "
-            "where c.pedido_id = %s and a.direcao = %s"
+            "where c.pedido_id = %s and c.status <> 'cancelado' and a.direcao = %s"
         )
         with self._banco.transacao() as con:
             l = self._executar_com_fallback_criterios(  # noqa: E741
@@ -613,6 +638,21 @@ class AvaliacoesPostgres:
                 (uid,),
             ).fetchall()
         return [self._de_linha(l) for l in linhas]  # noqa: E741
+
+    def media_recebida(self, avaliado_id: str) -> float | None:
+        """Média das avaliações PUBLICADAS de clientes para este profissional, 2 casas."""
+        uid = como_uuid(avaliado_id)
+        if uid is None:
+            return None
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select round(avg(coalesce(nota_decimal, nota_geral::numeric)), 2) as media "
+                "from public.avaliacoes "
+                "where avaliado_id = %s and direcao = 'cliente_para_profissional' "
+                "and status = 'publicada'",
+                (uid,),
+            ).fetchone()
+        return float(l["media"]) if l and l["media"] is not None else None
 
     def salvar(self, avaliacao: Avaliacao) -> None:
         with self._banco.transacao() as con:

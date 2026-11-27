@@ -209,18 +209,27 @@ def test_servico_padrao_em_producao_usa_o_postgres(cenario):
     assert isinstance(app.state.servico_mei.repo, MeiPostgres)
 
 
-def test_tipo_cnpj_mei_e_outro_persistem_e_saem_na_api(cenario):
+def test_so_mei_vale_e_o_outro_antigo_deixa_de_valer_sem_regravar(cenario):
     c = cenario
     mei, outro = novo_profissional(c), novo_profissional(c)
     liga_http(c, (200, corpo(mei=True)))
     assert put(c, mei, cnpj_novo()).json()["tipo_cnpj"] == "mei"
     liga_http(c, (200, corpo(mei=False)))
-    r = put(c, outro, cnpj_novo())
-    assert r.status_code == 200 and r.json()["tipo_cnpj"] == "outro"
-    assert linha(c, mei)["tipo_cnpj"] == "mei" and linha(c, outro)["tipo_cnpj"] == "outro"
-    depois = servico(c, TimeoutError("fora")).status(outro)  # "reinício"
-    assert depois.tipo_cnpj == "outro" and depois.mei_status is StatusMei.VALIDO
-    assert get(c, outro).json()["tipo_cnpj"] == "outro"
+    assert put(c, outro, cnpj_novo()).status_code == 422
+    assert linha(c, outro)["mei_status"] == "invalido" and linha(c, outro)["cnpj"] is None
+    # cadastro validado pela regra antiga (empresa que não é MEI)
+    antigo = novo_profissional(c)
+    liga_http(c, (200, corpo(mei=True)))
+    assert put(c, antigo, cnpj_novo()).status_code == 200
+    with c.local.admin() as con:
+        con.execute(
+            "update public.perfis_profissional set tipo_cnpj = 'outro' where usuario_id = %s",
+            (antigo,),
+        )
+    svc = servico(c, TimeoutError("fora"))  # "reinício"
+    assert svc.status(antigo).mei_status is StatusMei.INVALIDO and not svc.liberado(antigo)
+    assert get(c, antigo).json()["pode_orcar_e_receber"] is False
+    assert linha(c, antigo)["mei_status"] == "valido"  # a leitura não escreve
 
 
 def test_tipo_cnpj_fica_nulo_quando_nao_valido(cenario):
@@ -233,7 +242,7 @@ def test_tipo_cnpj_fica_nulo_quando_nao_valido(cenario):
 def test_profissional_em_analise_informa_cnpj_mas_so_o_proprio(cenario):
     c = cenario
     em_analise, outro = novo_profissional(c, aprovado=False), novo_profissional(c)
-    liga_http(c, (200, corpo(mei=False)))
+    liga_http(c, (200, corpo()))
     cnpj = cnpj_novo()
     r = put(c, em_analise, cnpj)
     assert r.status_code == 200 and r.json()["mei_status"] == "valido"

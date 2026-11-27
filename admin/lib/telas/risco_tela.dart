@@ -6,6 +6,9 @@ import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
+import 'campos_ao_usuario.dart';
+import 'campos_trava.dart';
+import 'conversa_modal.dart';
 
 /// Risco e antifraude (RF-RIS-01 a RF-RIS-04).
 class RiscoTela extends StatefulWidget {
@@ -36,7 +39,7 @@ class _RiscoTelaState extends State<RiscoTela> {
         'troca_de_chave_pix' => 'Troca de chave PIX',
         'cupom_reutilizado' => 'Cupom reutilizado',
         'mesmo_aparelho_em_2_contas' => 'Mesmo aparelho em 2 contas',
-        'saque_travado' => 'Repasses retidos',
+        'saque_travado' => 'Trava de saques',
         'denuncia_perfil' => 'Denúncia de perfil',
         'denuncia_chat' => 'Denúncia no chat',
         final t => '${t[0].toUpperCase()}${t.substring(1).replaceAll('_', ' ')}',
@@ -190,6 +193,7 @@ class _DetalheAlerta extends StatefulWidget {
 
 class _DetalheAlertaState extends State<_DetalheAlerta> {
   String _resultado = 'procedente';
+  bool _abrindoTrava = false;
   final _motivo = TextEditingController();
   bool _enviando = false;
 
@@ -235,6 +239,7 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
     required String verbo,
     required Future<void> Function(String motivo) executarAcao,
     required String sucesso,
+    String? Function()? mensagemDoServidor,
     bool destrutivo = false,
   }) async {
     final motivo = await pedirMotivo(
@@ -245,7 +250,43 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
       destrutivo: destrutivo,
     );
     if (motivo == null || !mounted) return;
-    final ok = await executar(context, () => executarAcao(motivo), sucesso: sucesso);
+    final ok = await executar(context, () => executarAcao(motivo),
+        sucesso: sucesso, mensagemDoServidor: mensagemDoServidor);
+    if (ok) widget.aoMudar();
+  }
+
+  /// A trava de saques e o bloqueio criam uma medida: pede também o texto ao usuário e as cláusulas.
+  Future<void> _acaoComAviso({
+    required String titulo,
+    required String descricao,
+    required String verbo,
+    required Future<void> Function(String motivo, String aoUsuario, List<String> clausulas) executarAcao,
+    required String sucesso,
+    String? Function()? mensagemDoServidor,
+    CamposTrava? trava,
+    bool destrutivo = false,
+  }) async {
+    final aviso = CamposAoUsuario();
+    final r = await pedirFormulario<(String, String, List<String>)>(
+      context,
+      titulo: titulo,
+      consequencia: descricao,
+      rotuloConfirmar: verbo,
+      destrutivo: destrutivo,
+      rotuloMotivo: 'Motivo interno (o usuário não vê)',
+      campos: (ctx, rebuild) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (trava != null) CamposTravaForm(trava, aoMudar: rebuild),
+          CamposAoUsuarioForm(aviso, aoMudar: rebuild),
+        ],
+      ),
+      camposValidos: () => aviso.valido && (trava?.valido ?? true),
+      resultado: (m) => (m, aviso.motivo, aviso.clausulas),
+    );
+    if (r == null || !mounted) return;
+    final ok = await executar(context, () => executarAcao(r.$1, r.$2, r.$3),
+        sucesso: sucesso, mensagemDoServidor: mensagemDoServidor);
     if (ok) widget.aoMudar();
   }
 
@@ -258,6 +299,8 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
     final podeDecidir = context.pode(Permissao.riscoDecidir);
     final nome = a.usuarioNome ?? 'o usuário';
     final motivoValido = _motivo.text.trim().length >= kMotivoMinimo;
+    // Resposta do backend à trava ou à remoção dela, mostrada no aviso de sucesso.
+    String? mensagem;
 
     return ListView(
       padding: const EdgeInsets.all(EspacosTrato.x6),
@@ -280,13 +323,33 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
         ),
         const SizedBox(height: EspacosTrato.x4),
         Text(a.detalhes, style: TipografiaTrato.corpo),
-        if (a.saquesTravados || a.contaBloqueada) ...[
+        // O backend confere o vínculo entre a base escolhida e o pedido.
+        if (a.pedidoId != null && context.pode(Permissao.conversasLer)) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: BotaoTrato.secundario(
+              'Ver conversa',
+              aoPressionar: () => abrirConversa(context, a.pedidoId!, a.pedido ?? 'pedido',
+                  baseInicial: a.tipo.startsWith('denuncia_') ? 'denuncia' : 'incidente'),
+            ),
+          ),
+        ],
+        if (a.contaRestrita || a.contaBloqueada || a.travaFraudeVigente == true) ...[
           const SizedBox(height: EspacosTrato.x3),
           BannerInfo(
             a.contaBloqueada
                 ? 'A conta não cria nem recebe pedidos novos. Reversível com motivo.'
-                : 'Novos repasses ficam retidos até alguém liberar. Pedidos em andamento continuam.',
-            titulo: a.contaBloqueada ? 'Conta bloqueada.' : 'Repasses retidos.',
+                    '${a.travaFraudeVigente == true ? ' Há trava por fraude em vigor. $kTravaComFraude' : ''}'
+                : switch (a.travaFraudeVigente) {
+                    true => 'Há trava por fraude em vigor. $kTravaComFraude',
+                    false => 'Não há trava por fraude em vigor. $kTravaSemFraude',
+                    null => 'Só a trava por fraude adia a liberação no livro, e não foi informado se há uma: confira '
+                        'em Medidas. Pagamento manual ou no Stripe: confira à mão.',
+                  },
+            titulo: a.contaBloqueada
+                ? 'Conta bloqueada.'
+                : (a.contaRestrita ? 'Conta restrita.' : 'Trava por fraude.'),
             tom: Tom.alerta,
             icone: IconesTrato.travar,
           ),
@@ -336,25 +399,59 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
           const SizedBox(height: EspacosTrato.x5),
           Text('Ações preventivas', style: TipografiaTrato.secao),
           const SizedBox(height: EspacosTrato.x3),
-          _AcaoPreventiva(
-            titulo: a.saquesTravados ? 'Liberar repasses' : 'Reter repasses',
-            descricao: a.saquesTravados
-                ? 'Os repasses voltam a seguir o fluxo normal. Exige motivo.'
-                : 'Novos repasses ficam retidos. Pedidos em andamento continuam. Reversível com motivo.',
-            verbo: a.saquesTravados ? 'Liberar repasses' : 'Reter repasses',
-            icone: a.saquesTravados ? IconesTrato.destravar : IconesTrato.travar,
-            aoPressionar: () => _acao(
-              titulo: a.saquesTravados ? 'Liberar repasses de $nome?' : 'Reter repasses de $nome?',
-              descricao: a.saquesTravados
-                  ? 'Os repasses de $nome voltam a seguir o fluxo normal.'
-                  : 'Novos repasses ficam retidos até alguém liberar. Pedidos em andamento continuam normalmente.',
-              verbo: a.saquesTravados ? 'Liberar repasses' : 'Reter repasses',
-              executarAcao: (m) => a.saquesTravados
-                  ? api.destravarSaque(a.usuarioId!, motivo: m)
-                  : api.travarSaque(a.usuarioId!, motivo: m),
-              sucesso: a.saquesTravados ? 'Repasses liberados.' : 'Repasses retidos.',
+          if (a.contaBloqueada)
+            const BannerInfo('Conta bloqueada: para registrar uma trava de saques, use a seção Medidas.')
+          else
+            _AcaoPreventiva(
+              titulo: 'Registrar trava de saques',
+              descricao: 'Restringe a conta. Só a trava por fraude, com limite, adia a liberação no livro; pagamento '
+                  'manual ou no Stripe continua sem trava. Reversível com motivo.',
+              verbo: 'Registrar trava',
+              icone: IconesTrato.travar,
+              aoPressionar: () async {
+                if (_abrindoTrava) return;
+                _abrindoTrava = true;
+                // Só quem tem a permissão da rota pergunta o prazo máximo.
+                final prazo = context.pode(Permissao.medidasAplicar) ? await lerPrazoMaximoDaTrava(api) : null;
+                _abrindoTrava = false;
+                if (!context.mounted) return;
+                final trava = CamposTrava()..prazoMaximo = prazo;
+                await _acaoComAviso(
+                  titulo: 'Registrar trava de saques de $nome?',
+                  descricao: 'A trava é registrada e a conta fica restrita.',
+                  verbo: 'Registrar trava',
+                  trava: trava,
+                  executarAcao: (m, u, c) async => mensagem = await api.travarSaque(a.usuarioId!,
+                      motivo: m,
+                      motivoUsuario: u,
+                      clausulas: c,
+                      motivoFraude: trava.fraude,
+                      limiteRetencaoCentavos: trava.limiteCentavos,
+                      dias: trava.dias),
+                  sucesso: 'Trava de saques enviada. Confira a medida em Medidas.',
+                  mensagemDoServidor: () => mensagem,
+                );
+              },
             ),
-          ),
+          if (a.contaRestrita) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            _AcaoPreventiva(
+              titulo: 'Remover trava de saques',
+              descricao: '${avisoAoDestravar(a.travaFraudeVigente)} A conta continua restrita se houver outra medida '
+                  'em vigor. Exige motivo.',
+              verbo: 'Remover trava',
+              icone: IconesTrato.destravar,
+              aoPressionar: () => _acao(
+                titulo: 'Remover a trava de saques de $nome?',
+                descricao: '${avisoAoDestravar(a.travaFraudeVigente)} A conta continua restrita se houver outra '
+                    'medida em vigor.',
+                verbo: 'Remover trava',
+                executarAcao: (m) async => mensagem = await api.destravarSaque(a.usuarioId!, motivo: m),
+                sucesso: 'Trava de saques removida. Confira a liberação e os repasses à mão.',
+                mensagemDoServidor: () => mensagem,
+              ),
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x3),
           _AcaoPreventiva(
             titulo: a.contaBloqueada ? 'Desbloquear conta' : 'Bloqueio preventivo',
@@ -364,18 +461,23 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
             verbo: a.contaBloqueada ? 'Desbloquear conta' : 'Bloquear conta',
             destrutivo: !a.contaBloqueada,
             icone: Icons.shield_outlined,
-            aoPressionar: () => _acao(
-              titulo: a.contaBloqueada ? 'Desbloquear a conta de $nome?' : 'Bloquear a conta de $nome?',
-              descricao: a.contaBloqueada
-                  ? '$nome volta a criar e receber pedidos.'
-                  : '$nome não cria nem recebe pedidos novos. Pedidos em andamento continuam.',
-              verbo: a.contaBloqueada ? 'Desbloquear conta' : 'Bloquear conta',
-              destrutivo: !a.contaBloqueada,
-              executarAcao: (m) => a.contaBloqueada
-                  ? api.desbloquearConta(a.usuarioId!, motivo: m)
-                  : api.aplicarBloqueioPreventivo(a.usuarioId!, motivo: m),
-              sucesso: a.contaBloqueada ? 'Conta desbloqueada.' : 'Conta bloqueada.',
-            ),
+            aoPressionar: () => a.contaBloqueada
+                ? _acao(
+                    titulo: 'Desbloquear a conta de $nome?',
+                    descricao: '$nome volta a criar e receber pedidos.',
+                    verbo: 'Desbloquear conta',
+                    executarAcao: (m) => api.desbloquearConta(a.usuarioId!, motivo: m),
+                    sucesso: 'Conta desbloqueada.',
+                  )
+                : _acaoComAviso(
+                    titulo: 'Bloquear a conta de $nome?',
+                    descricao: '$nome não cria nem recebe pedidos novos. Pedidos em andamento continuam.',
+                    verbo: 'Bloquear conta',
+                    destrutivo: true,
+                    executarAcao: (m, u, c) =>
+                        api.aplicarBloqueioPreventivo(a.usuarioId!, motivo: m, motivoUsuario: u, clausulas: c),
+                    sucesso: 'Conta bloqueada.',
+                  ),
           ),
         ],
         if (!podeDecidir)

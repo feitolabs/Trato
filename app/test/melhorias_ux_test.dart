@@ -29,6 +29,7 @@ import 'package:trato/telas/profissional/servico_orcamento.dart';
 import 'package:trato/tema/tema.dart';
 
 import 'apoio/exemplos/telas/pedido_novo/dados_exemplo.dart';
+import 'apoio/orcamento.dart';
 
 Widget _wrap(Widget tela) => MaterialApp(
       theme: TemaTrato.claro,
@@ -104,6 +105,7 @@ void main() {
           tituloPedido: 'Instalar tomadas',
           horasInicial: '2',
           valorHoraInicial: '100,00',
+          garantiaInicialDias: 90,
           aoEnviar: (p) => enviado = p,
         ),
       ),
@@ -118,6 +120,7 @@ void main() {
     expect(enviado, isNull);
 
     await tester.enterText(campoDias, '6');
+    await completarOrcamento(tester);
     await tester.tap(find.text('Enviar orçamento'));
     await tester.pumpAndSettle();
     expect(enviado?.prazoExecucaoDias, 6);

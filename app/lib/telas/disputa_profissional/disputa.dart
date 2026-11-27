@@ -2,6 +2,8 @@
 /// Prazos e valores vêm do backend; o app só mostra e envia a resposta. Valores em centavos.
 library;
 
+import '../disputa_acordo/acordo.dart';
+
 class DetalheDisputa {
   const DetalheDisputa({
     required this.id,
@@ -12,9 +14,29 @@ class DetalheDisputa {
     required this.solucaoPedida,
     required this.prazoRespostaHoras,
     required this.valorCongeladoCentavos,
+    this.estado = 'aberta',
+    this.acordo,
   });
 
   final String id;
+
+  /// `aberta` (esperando o profissional), `em_analise`, `aguardando_aprovacao`, `decidida`
+  /// ou `acordo`. Só a `aberta` aceita resposta (quem decide é o servidor).
+  final String estado;
+
+  /// Valores do acordo, quando o servidor informar.
+  final AcordoDisputa? acordo;
+
+  bool get esperaResposta => estado == 'aberta';
+
+  /// Valor novo do servidor não quebra a tela.
+  String get situacaoTexto => switch (estado) {
+        'aberta' => 'Aguardando a sua resposta',
+        'em_analise' || 'aguardando_aprovacao' => 'Em análise',
+        'decidida' => 'Disputa decidida',
+        'acordo' => 'Encerrada por acordo',
+        _ => 'Em acompanhamento',
+      };
 
   /// Ex.: "Vazamento na pia".
   final String titulo;

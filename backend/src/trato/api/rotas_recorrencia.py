@@ -17,7 +17,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
+from trato.api.maioridade import exigir_maioridade
 from trato.api.recorrencias import (
+    SEM_REMOTO,
     ST_ATIVA,
     ST_CANCELADA,
     ST_PAUSADA,
@@ -29,6 +31,7 @@ from trato.api.recorrencias import (
     Recorrencia,
     Visita,
     cancelar_pedido_da_visita,
+    origem_remota,
     proxima_data_futura,
     somar_frequencia,
 )
@@ -178,6 +181,7 @@ def _cancelar_visitas_abertas(contexto: Contexto, r: Recorrencia, novo_status: s
 
 @router.post(
     "",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=RecorrenciaOut,
     status_code=201,
     summary="Propor um serviço recorrente a partir de um serviço concluído",
@@ -193,6 +197,8 @@ def propor(
         raise HTTPException(
             409, "O serviço recorrente só pode ser combinado depois que o serviço for concluído."
         )
+    if pedido.remoto:
+        raise HTTPException(422, SEM_REMOTO)
     repo = contexto.recorrencias
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     valor = corpo.valor_centavos or (contrato.valor_centavos if contrato else 0)
@@ -263,6 +269,7 @@ def _devolver(contexto: Contexto, recorrencia_id: str, usuario: Usuario) -> Reco
 
 @router.post(
     "/{recorrencia_id}/aceitar",
+    dependencies=[Depends(exigir_maioridade)],
     response_model=RecorrenciaDetalheOut,
     summary="Aceitar a proposta (só a outra parte): a série fica ativa",
 )
@@ -275,6 +282,9 @@ def aceitar(
     r = _da_serie(contexto, recorrencia_id, usuario)
     if r.proposto_por == usuario.id:
         raise HTTPException(403, "Apenas a outra parte pode aceitar o serviço recorrente.")
+    if origem_remota(contexto, r):
+        _avisar(request, contexto, r, r.proposto_por, SEM_REMOTO, "remota")
+        raise HTTPException(409, SEM_REMOTO)
     agora = contexto.agora()
     primeira = proxima_data_futura(r.proxima_visita_em, r.frequencia, agora)
     if not contexto.recorrencias.mudar_status(
@@ -344,6 +354,8 @@ def retomar(
     contexto: Contexto = Depends(obter_contexto),
 ) -> RecorrenciaDetalheOut:
     r = _da_serie(contexto, recorrencia_id, usuario)
+    if origem_remota(contexto, r):
+        raise HTTPException(409, SEM_REMOTO)
     agora = contexto.agora()
     proxima = proxima_data_futura(r.proxima_visita_em, r.frequencia, agora)
     if not contexto.recorrencias.mudar_status(

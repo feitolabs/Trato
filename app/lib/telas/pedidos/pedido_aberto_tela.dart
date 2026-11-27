@@ -40,7 +40,11 @@ class PedidoAbertoTela extends StatefulWidget {
     this.servicoCep,
     this.cepInicial = '',
     this.aoResponderExclusividade,
+    this.secaoExclusividadeCliente,
   });
+
+  /// Termos 13.6: a exclusividade pedida pelo cliente.
+  final Widget? secaoExclusividadeCliente;
 
   final String numero;
   final DadosDoPedido dados;
@@ -298,6 +302,8 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
           ),
         ],
         if (!_editando) ..._cartaoExclusividade(),
+        if (!_editando && widget.secaoExclusividadeCliente != null)
+          widget.secaoExclusividadeCliente!,
         const SizedBox(height: EspacosTrato.x5),
         if (_editando) ..._formulario() else ..._resumo(),
       ],

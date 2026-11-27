@@ -40,6 +40,7 @@ _NATUREZA = {
     TipoConta.A_LIBERAR: "passivo",
     TipoConta.LIBERADO: "passivo",
     TipoConta.TAXA_TRATO: "receita",
+    TipoConta.A_COMPENSAR: "ativo",
 }
 
 
@@ -65,7 +66,9 @@ class LedgerPostgres:
                 pid = como_uuid(pedido)
                 linha = (
                     con.execute(
-                        "select id from public.contratos where pedido_id = %s for update", (pid,)
+                        "select id from public.contratos where pedido_id = %s "
+                        "and status <> 'cancelado' for update",
+                        (pid,),
                     ).fetchone()
                     if pid
                     else None
