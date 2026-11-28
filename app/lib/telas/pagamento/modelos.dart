@@ -57,21 +57,37 @@ class OpcaoPagamento {
 /// Termos 6.4: título da opção de parcelamento ("2x de R$ 50,00 sem juros" ou "2x de R$ 51,50").
 String textoTituloParcela(OpcaoParcelamento p) {
   final base = '${p.parcelas}x de ${Dinheiro.formatar(p.valorParcelaCentavos)}';
-  return p.semJuros == true ? '$base sem juros' : base;
+  return opcaoSemJuros(p) ? '$base sem juros' : base;
+}
+
+/// Termos 6.4: só é "sem juros" se o servidor disser e não mandar uma taxa que contradiga.
+bool opcaoSemJuros(OpcaoParcelamento p) => p.semJuros == true && (p.jurosMensalBps ?? 0) <= 0;
+
+/// Termos 6.4: taxa de juros aplicada, só formatada ("1,99% ao mês"). Nulo se o servidor não
+/// mandar a taxa, ou se ela vier junto de `sem_juros` verdadeiro (dados contraditórios).
+String? textoJurosMensal(OpcaoParcelamento p) {
+  final bps = p.jurosMensalBps;
+  if (p.semJuros == true || bps == null || bps <= 0) return null;
+  return 'Juros de ${Dinheiro.formatarBps(bps)} ao mês.';
 }
 
 /// Termos 6.4: detalhe da opção de parcelamento com os valores prontos do servidor.
-/// Nunca inventa taxa mensal: `custoTotalBps` é custo único sobre o valor à vista.
+/// Nunca inventa taxa mensal: a taxa é só `jurosMensalBps`; `custoTotalBps` é custo único
+/// sobre o valor à vista.
 String textoDetalheParcela(OpcaoParcelamento p) {
-  final partes = <String>['Total ${Dinheiro.formatar(p.totalCentavos)}.'];
+  final juros = textoJurosMensal(p);
+  final partes = <String>[
+    if (juros != null) juros,
+    'Total ${Dinheiro.formatar(p.totalCentavos)}.',
+  ];
   final ultima = p.ultimaParcelaCentavos;
   if (p.parcelas > 1 && ultima != null && ultima != p.valorParcelaCentavos) {
     partes.add('Última parcela de ${Dinheiro.formatar(ultima)} (fecha o total exato).');
   }
   final diferenca = p.diferencaAVistaCentavos ?? p.custoCentavos;
   final bps = p.custoTotalBps;
-  if (p.semJuros == true) {
-    partes.add('Sem diferença em relação ao à vista.');
+  if (opcaoSemJuros(p)) {
+    partes.add(textoDiferencaDoAVista(diferenca));
   } else if (bps != null && bps > 0) {
     if (diferenca > 0) {
       partes.add(
@@ -100,6 +116,7 @@ class OpcaoParcelamento {
     this.custoTotalBps,
     this.diferencaAVistaCentavos,
     this.semJuros,
+    this.jurosMensalBps,
   });
 
   final int parcelas;
@@ -121,6 +138,9 @@ class OpcaoParcelamento {
 
   /// `true`: opção sem juros/custo; `false`: tem custo. Null em resposta antiga.
   final bool? semJuros;
+
+  /// `juros_mensal_bps`: juros ao mês em pontos-base (199 = 1,99%). Null: o servidor não informou.
+  final int? jurosMensalBps;
 }
 
 class DadosPagamento {

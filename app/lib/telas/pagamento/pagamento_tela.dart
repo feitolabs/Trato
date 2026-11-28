@@ -531,7 +531,7 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         _OpcaoParcela(
                           key: Key('parcela-${p.parcelas}'),
                           titulo: textoTituloParcela(p),
-                          // 6.4: exibe sem juros, custo total único e última parcela vindos do servidor.
+                          // 6.4: exibe juros ou "sem juros", total, diferença e última parcela do servidor.
                           detalhe: textoDetalheParcela(p),
                           selecionada: _parcelas == p.parcelas,
                           aoTocar: () => setState(() => _parcelas = p.parcelas),

@@ -115,6 +115,121 @@ void main() {
     });
   });
 
+  group('Taxa de juros do parcelamento (6.4)', () {
+    Future<List<OpcaoParcelamento>> ler(List<Map<String, Object?>> extras) async {
+      final api = _apiSimulado((req) async {
+        if (req.url.path == '/v1/me') return _json({'cpf_cadastrado': true});
+        return _json({
+          'valor_centavos': 10000,
+          'total_a_pagar_centavos': 10000,
+          'meios_disponiveis': ['cartao'],
+          'opcoes_parcelamento': [
+            for (final extra in extras)
+              {
+                'parcelas': 2,
+                'custo_centavos': 300,
+                'total_centavos': 10300,
+                'valor_parcela_centavos': 5150,
+                ...extra,
+              },
+          ],
+        });
+      });
+      return (await RepositorioPagamentoApi(api).dados('p1')).parcelamento;
+    }
+
+    test('lê juros_mensal_bps e só formata a taxa do servidor', () async {
+      final p = (await ler([
+        {'juros_mensal_bps': 199, 'sem_juros': false, 'diferenca_a_vista_centavos': 300},
+      ]))
+          .single;
+      expect(p.jurosMensalBps, 199);
+      expect(textoTituloParcela(p), '2x de R\$ 51,50');
+      expect(
+        textoDetalheParcela(p),
+        'Juros de 1,99% ao mês. Total R\$ 103,00. '
+        'R\$ 3,00 a mais que à vista (custo do parcelamento).',
+      );
+    });
+
+    test('campos ausentes, nulos ou inválidos: sem taxa e sem "sem juros"', () async {
+      final opcoes = await ler([
+        {},
+        {'juros_mensal_bps': null, 'sem_juros': null},
+        {'juros_mensal_bps': '199', 'sem_juros': 'true'},
+      ]);
+      for (final p in opcoes) {
+        final texto = '${textoTituloParcela(p)} ${textoDetalheParcela(p)}';
+        expect(texto, isNot(contains('juros')));
+        expect(texto, isNot(contains('ao mês')));
+      }
+    });
+
+    test('sem_juros mostra "sem juros"; com taxa junto, não afirma nenhum dos dois', () async {
+      final opcoes = await ler([
+        {'juros_mensal_bps': 0, 'sem_juros': true, 'diferenca_a_vista_centavos': 0},
+        {'juros_mensal_bps': 199, 'sem_juros': true},
+      ]);
+      expect(textoTituloParcela(opcoes[0]), endsWith('sem juros'));
+      expect(textoDetalheParcela(opcoes[0]), isNot(contains('ao mês')));
+      expect(textoTituloParcela(opcoes[1]), isNot(contains('juros')));
+      expect(textoDetalheParcela(opcoes[1]), isNot(contains('ao mês')));
+    });
+
+    testWidgets('a tela mostra a taxa antes de confirmar (320 px, fonte 1,3x)', (t) async {
+      t.view.physicalSize = const Size(320, 640);
+      t.view.devicePixelRatio = 1;
+      t.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(t.view.reset);
+      addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await t.pumpWidget(
+        MaterialApp(
+          theme: TemaTrato.claro,
+          home: PagamentoTela(
+            dados: const DadosPagamento(
+              subtitulo: 'Pedido de exemplo',
+              valorAgoraCentavos: 10000,
+              opcoes: [
+                OpcaoPagamento(
+                  metodo: MetodoPagamento.cartao,
+                  titulo: 'Cartão',
+                  descricao: 'Crédito',
+                ),
+              ],
+              parcelamento: [
+                OpcaoParcelamento(
+                  parcelas: 2,
+                  custoCentavos: 300,
+                  totalCentavos: 10300,
+                  valorParcelaCentavos: 5150,
+                  diferencaAVistaCentavos: 300,
+                  semJuros: false,
+                  jurosMensalBps: 199,
+                ),
+              ],
+            ),
+            aoPagarDetalhado: (_, __, ___) async {},
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      final lista = find.byType(Scrollable).first;
+      final cartao = find.text('Cartão');
+      await t.scrollUntilVisible(cartao, 150, scrollable: lista);
+      await t.ensureVisible(cartao);
+      await t.pumpAndSettle();
+      await t.tap(cartao);
+      await t.pumpAndSettle();
+      await t.scrollUntilVisible(find.byKey(const Key('parcela-2')), 100, scrollable: lista);
+
+      expect(find.text('2x de R\$ 51,50'), findsOneWidget);
+      expect(find.textContaining('Juros de 1,99% ao mês. Total R\$ 103,00.'), findsOneWidget);
+      expect(find.textContaining('R\$ 3,00 a mais que à vista'), findsOneWidget);
+      expect(t.takeException(), isNull);
+    });
+  });
+
   group('PagamentoTela — exibição de parcelamento (6.4)', () {
     testWidgets(
       'mostra sem juros, custo total único (sem taxa mensal) e última parcela diferente',

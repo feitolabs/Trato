@@ -1662,6 +1662,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
     final custoBps = o['custo_total_bps'];
     final diferenca = o['diferenca_a_vista_centavos'];
     final semJuros = o['sem_juros'];
+    final jurosMensal = o['juros_mensal_bps'];
     return OpcaoParcelamento(
       parcelas: (o['parcelas'] as num).toInt(),
       custoCentavos: (o['custo_centavos'] as num).toInt(),
@@ -1672,6 +1673,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
       custoTotalBps: custoBps is num ? custoBps.toInt() : null,
       diferencaAVistaCentavos: diferenca is num ? diferenca.toInt() : null,
       semJuros: semJuros is bool ? semJuros : null,
+      jurosMensalBps: jurosMensal is num ? jurosMensal.toInt() : null,
     );
   }
 

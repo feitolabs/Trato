@@ -179,10 +179,15 @@ class OpcaoParcelamentoOut(BaseModel):
     ultima_parcela_centavos: int
     custo_total_bps: int = Field(
         description="Custo do provedor em pontos-base (100 = 1%) sobre o valor à vista, cobrado "
-        "UMA vez no total. NÃO é taxa de juros ao mês (não temos esse dado)."
+        "UMA vez no total. NÃO é taxa de juros ao mês (use `juros_mensal_bps`)."
     )
     diferenca_a_vista_centavos: int = Field(description="Quanto custa a mais que à vista (6.4).")
     sem_juros: bool = Field(description="true: esta opção não tem custo nenhum.")
+    juros_mensal_bps: int = Field(
+        ge=0,
+        description="Taxa de juros efetiva ao mês aplicada (6.4), em centésimos de ponto "
+        "percentual: 199 = 1,99% a.m. 0 quando `sem_juros`. Calculada pelas parcelas cobradas.",
+    )
 
 
 class PagamentoValoresOut(BaseModel):
