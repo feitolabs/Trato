@@ -345,8 +345,7 @@ MODELOS: dict[Evento, ModeloEvento] = {
     Evento.SERIE_PAUSADA_CONTA: ModeloEvento(
         Categoria.PAGAMENTOS,
         "Serviço recorrente pausado",
-        "O serviço recorrente foi pausado porque a conta da outra parte foi suspensa ou "
-        "encerrada.",
+        "O serviço recorrente foi pausado porque a conta da outra parte foi suspensa ou encerrada.",
         "pedido",
         essencial=True,
     ),

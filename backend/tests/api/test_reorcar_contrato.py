@@ -152,7 +152,10 @@ def test_memoria_imita_um_contrato_vigente_por_pedido(fluxo):
     with pytest.raises(RegraDoBanco):
         fluxo.ctx.contratos.salvar(Contrato(pid, "orc-e2e", PROFISSIONAL.id, VALOR))
     fluxo.ctx.contratos.salvar(outro)
-    assert fluxo.ctx.contratos.obter_do_pedido(pid) == outro
+    # como o banco (`regras_aplicadas`), o aceite grava o retrato das regras
+    regras = fluxo.ctx.contratos.regras_no_aceite()
+    assert regras
+    assert fluxo.ctx.contratos.obter_do_pedido(pid) == replace(outro, regras=regras)
 
 
 def test_cobranca_que_volta_depois_do_prazo_nao_e_entregue(fluxo):

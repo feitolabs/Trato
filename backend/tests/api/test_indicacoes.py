@@ -103,6 +103,7 @@ def test_meu_codigo_lista_so_nome_curto_e_resumo(ind):
         "liberadas": 0,
         "limite_mensal": 3,
         "limite_mensal_restante": 3,
+        "validade_dias": 90,  # validade dos Tratinhos (Termos 13.3)
     }
     (item,) = r["indicacoes"]
     assert item["indicado_nome"] == "João S."

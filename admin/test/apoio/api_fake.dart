@@ -896,6 +896,95 @@ class ApiFake implements ApiAdmin {
     return anexosMaterial;
   }
 
+  // ---------- guarda de retenção ----------
+
+  static GuardaPedido guardaDeExemplo({String id = 'g-1', bool aberta = true}) => GuardaPedido(
+        id: id,
+        pedidoId: 'ped-1',
+        tipo: 'processo',
+        motivo: 'Processo judicial em andamento (exemplo).',
+        aberta: aberta,
+        criadaPor: 'usr-dpo',
+        criadaEm: DateTime.utc(2026, 11, 20, 13),
+        encerradaEm: aberta ? null : DateTime.utc(2026, 11, 25, 13),
+        encerradaPor: aberta ? null : 'usr-dpo',
+      );
+
+  List<GuardaPedido> guardasPedido = [guardaDeExemplo()];
+  RetencaoPedido retencaoPedido = const RetencaoPedido(
+      pedidoId: 'ped-1', situacao: 'bloqueado', prazoAnos: 5, bloqueios: ['guarda_pedido', 'disputa_aberta']);
+  final List<(String, Map<String, Object?>)> chamadasGuarda = [];
+  Object? falhaGuarda;
+  Object? falhaListaGuardas;
+  Object? falhaRetencao;
+  bool guardaRepetida = false;
+
+  @override
+  Future<List<GuardaPedido>> listarGuardasPedido(String pedidoId) async {
+    await Future<void>.delayed(atraso);
+    if (falhaListaGuardas != null) throw falhaListaGuardas!;
+    return guardasPedido;
+  }
+
+  @override
+  Future<RetencaoPedido> obterRetencaoPedido(String pedidoId) async {
+    await Future<void>.delayed(atraso);
+    if (falhaRetencao != null) throw falhaRetencao!;
+    return retencaoPedido;
+  }
+
+  @override
+  Future<({GuardaPedido guarda, bool repetida})> abrirGuardaPedido(String pedidoId,
+      {required String tipo, required String motivo}) async {
+    chamadasGuarda.add(('abrir', {'pedido': pedidoId, 'tipo': tipo, 'motivo': motivo}));
+    await Future<void>.delayed(atraso);
+    if (falhaGuarda != null) throw falhaGuarda!;
+    return (guarda: guardaDeExemplo(), repetida: guardaRepetida);
+  }
+
+  @override
+  Future<GuardaPedido> encerrarGuardaPedido(String pedidoId, String guardaId, {required String motivo}) async {
+    chamadasGuarda.add(('encerrar', {'pedido': pedidoId, 'guarda': guardaId, 'motivo': motivo}));
+    await Future<void>.delayed(atraso);
+    if (falhaGuarda != null) throw falhaGuarda!;
+    return guardaDeExemplo(id: guardaId, aberta: false);
+  }
+
+  @override
+  Future<ContestacaoMaterial> aprovarFinanceiroContestacaoMaterial(String contestacaoId,
+      {required String motivo}) async {
+    chamadasMaterial.add(('aprovar-financeiro', {'id': contestacaoId, 'motivo': motivo}));
+    await Future<void>.delayed(atraso);
+    if (falhaMaterial != null) throw falhaMaterial!;
+    return contestacaoMaterialDeExemplo(
+        status: 'parcial', valorReconhecidoCentavos: 5000, efeitoFinanceiro: 'pendente_financeiro');
+  }
+
+  /// Valores de exemplo: o painel só mostra o que a API devolve.
+  EstornoMaterial? estornoMaterial;
+
+  @override
+  Future<EstornoMaterial> executarEstornoMaterial(String contestacaoId,
+      {required String motivo, required bool materialPagoNoApp}) async {
+    chamadasMaterial.add(
+        ('executar-estorno', {'id': contestacaoId, 'motivo': motivo, 'pago_no_app': materialPagoNoApp}));
+    await Future<void>.delayed(atraso);
+    if (falhaMaterial != null) throw falhaMaterial!;
+    return estornoMaterial ??
+        EstornoMaterial(
+          resultado: 'ok',
+          contestacao: contestacaoMaterialDeExemplo(
+              status: 'parcial', valorReconhecidoCentavos: 5000, efeitoFinanceiro: 'executado'),
+          valorReconhecidoCentavos: 5000,
+          valorRetidoCentavos: 3000,
+          valorCompensacaoCentavos: 2000,
+          custoParcelamentoCentavos: 150,
+          totalEstornadoCentavos: 5150,
+          compensacaoId: 'comp-1',
+          profissionalAvisado: true,
+        );
+  }
+
   @override
   Future<ContestacaoMaterial> analisarContestacaoMaterial(String contestacaoId) async {
     chamadasMaterial.add(('analisar', {'id': contestacaoId}));

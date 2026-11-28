@@ -20,6 +20,7 @@ from trato.api.admin.papeis import Permissao, pode
 from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto, obter_contexto
 from trato.financeiro.extrato_profissional import reais
+from trato.financeiro.ledger import reembolso_retido_direto
 from trato.notificacoes.eventos import Evento
 from trato.persistencia.compensacoes import Proposta
 
@@ -83,6 +84,12 @@ _ERROS = {
         "Este pedido já teve uma compensação cancelada com estorno ordenado ao cliente. "
         "Registrar de novo devolveria o dinheiro outra vez: nada foi gravado.",
     ),
+    "reembolso_direto_na_disputa": (
+        409,
+        "Parte retida desta disputa foi devolvida depois de uma liberação parcial e o banco "
+        "ainda não a desconta do teto: registrar agora poderia devolver duas vezes. Nada foi "
+        "gravado.",
+    ),
     "ja_registrada": (409, "Esta referência já virou compensação."),
     "ja_aprovada": (409, "Esta proposta já foi aprovada."),
     "ja_recusada": (409, "Esta proposta já foi recusada."),
@@ -110,6 +117,10 @@ def _erro(codigo: str, **extra: int) -> JSONResponse:
 
 
 class _EstornoJaOrdenado(Exception):
+    """Desfaz a transação do registro (dívida e livro)."""
+
+
+class _ReembolsoDiretoNaDisputa(Exception):
     """Desfaz a transação do registro (dívida e livro)."""
 
 
@@ -157,11 +168,24 @@ def registrar(
                 pedido.id, corpo.contestacao_id, corpo.valor_centavos, motivo, operador.id
             )
             if r.resultado == "ok":
+                disputa = contexto.disputas.obter(pedido.id)
+                if (
+                    disputa is not None
+                    and reembolso_retido_direto(
+                        contexto.ledger.lancamentos(pedido.id), pedido.id, disputa.aberta_em
+                    )
+                    and not contexto.compensacoes.conta_reembolso_retido()
+                ):
+                    # Sem a 20261128040000 o teto do banco não enxerga o reembolso direto:
+                    # registrar poderia devolver duas vezes. Desfaz tudo.
+                    raise _ReembolsoDiretoNaDisputa
                 _ordenar_estorno(
                     contexto, servico, pedido.id, corpo.valor_centavos, r.divida_id or ""
                 )
     except _EstornoJaOrdenado:
         return _erro("estorno_ja_ordenado")
+    except _ReembolsoDiretoNaDisputa:
+        return _erro("reembolso_direto_na_disputa")
     if r.resultado not in ("ok", "ja_registrada"):
         extra = {"maximo_centavos": r.maximo_centavos} if r.resultado == "acima_do_devido" else {}
         return _erro(r.resultado, **extra)

@@ -28,6 +28,8 @@ from trato.notificacoes.postgres import EmailsDaContaPostgres, NotificacoesServi
 from trato.notificacoes.servico import ServicoNotificacoes
 from trato.persistencia.acessos import AcessosPostgres
 from trato.persistencia.conexao import Banco
+from trato.persistencia.verificacao_expurgo import ExpurgoVerificacaoPostgres
+from trato.uploads.armazenamento import armazenamento_da_config
 
 
 def rotina_de_expurgo(banco: Banco, cfg: ConfigAgendador):  # type: ignore[no-untyped-def]
@@ -36,6 +38,22 @@ def rotina_de_expurgo(banco: Banco, cfg: ConfigAgendador):  # type: ignore[no-un
         return None
     repo = AcessosPostgres(banco)
     return lambda _agora: repo.expurgar(cfg.expurgo_acessos_limite)
+
+
+def rotina_de_expurgo_verificacao(banco: Banco, cfg: ConfigAgendador, armazenamento=None):  # type: ignore[no-untyped-def]
+    """None enquanto a configuração não ligar (padrão) ou sem acesso ao Storage."""
+    if not cfg.expurgo_verificacao_ligado:
+        return None
+    arquivos = armazenamento or armazenamento_da_config()
+    if arquivos is None:
+        logging.getLogger("trato.agendador").warning(
+            "expurgo de documentos de verificação ligado, mas sem Storage: nada será apagado"
+        )
+        return None
+    repo = ExpurgoVerificacaoPostgres(banco, arquivos)
+    return lambda agora: repo.expurgar(
+        agora, cfg.expurgo_verificacao_prazo_dias, cfg.expurgo_verificacao_limite
+    )
 
 
 def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
@@ -98,6 +116,7 @@ def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
         executor.encerrar_medidas,
         executor.avisar_tratinhos_vencendo,
         rotina_de_expurgo(banco, cfg),
+        rotina_de_expurgo_verificacao(banco, cfg),
     )
     return agendador, banco, cfg.intervalo_segundos
 

@@ -24,6 +24,7 @@ import 'incidentes_tela.dart';
 import 'checkout_sem_codigo_tela.dart';
 import 'faltas_repetidas_tela.dart';
 import 'forca_maior_tela.dart';
+import 'guardas_pedido_tela.dart';
 import 'indisponibilidades_tela.dart';
 import 'lgpd_pedidos_tela.dart';
 import 'medidas_tela.dart';
@@ -123,6 +124,8 @@ final List<Secao> todasSecoes = [
       () => const ConfigTela()),
   Secao('auditoria', 'Auditoria', IconesTrato.registroAuditoria, GrupoMenu.administracao, [Permissao.auditoriaVer],
       () => const AuditoriaTela()),
+  Secao('guardas', 'Guarda de retenção', IconesTrato.guardas, GrupoMenu.administracao,
+      [Permissao.pedidoGuardasGerenciar], () => const GuardasPedidoTela()),
 ];
 
 /// Os cinco módulos mais usados que ficam na barra inferior no celular (os demais vão em "Mais").

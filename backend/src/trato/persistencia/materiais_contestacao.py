@@ -3,8 +3,9 @@
 Tabela: `public.nota_material_contestacoes`
 (migration 20261125225400_nota_material_contestacoes.sql).
 Esta tabela não move dinheiro sozinha: a aprovação financeira por segunda pessoa (4 olhos)
-avança `efeito_financeiro` para `pendente_financeiro`, para execução pelo caminho de estorno/
-compensação sem duplicação. Sem a tabela, `disponivel()` é False e as rotas respondem 503 limpo.
+avança `efeito_financeiro` para `pendente_financeiro`. A execução (migration 20261128030000,
+`nota_material_executar_estorno`) grava `executado`; só existe no Postgres. Sem a tabela,
+`disponivel()` é False e as rotas respondem 503 limpo.
 """
 
 # ruff: noqa: S608 - só trechos fixos de SQL são concatenados; valores vão por parâmetro
@@ -47,6 +48,15 @@ class ContestacaoNotaMaterial:
     decidida_em: datetime | None = None
     aprovada_por: str | None = None
     efeito_financeiro: str = "nenhum"  # nenhum | pendente_financeiro | executado
+
+
+@dataclass(frozen=True)
+class ExecucaoEstornoMaterial:
+    valor_reconhecido_centavos: int
+    valor_divida_centavos: int
+    custo_parcelamento_centavos: int
+    total_estornado_centavos: int
+    divida_id: str | None = None
 
 
 def valor_coerente(status_final: str, reconhecido: int | None, contestado: int) -> bool:
@@ -116,6 +126,9 @@ class RepositorioContestacaoMaterial(Protocol):
 
 
 class ContestacaoMaterialEmMemoria:
+    def execucao_disponivel(self) -> bool:
+        return False  # a regra de execução vive no banco
+
     def __init__(self, *, disponivel: bool = True) -> None:
         self._disponivel = disponivel
         self._itens: dict[str, ContestacaoNotaMaterial] = {}
@@ -581,3 +594,61 @@ class ContestacaoMaterialPostgres:
                 f"select {self._COLS} {self._FROM} where x.id = %s", (cid,)
             ).fetchone()
         return self._de_linha(linha), "ok"
+
+    # --- execução do estorno (migration 20261128030000) --------------------------------------
+
+    def execucao_disponivel(self) -> bool:
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select to_regprocedure('public.nota_material_executar_estorno("
+                "uuid,bigint,bigint,text,uuid)') is not null as tem"
+            ).fetchone()
+        return bool(l and l["tem"])
+
+    def travar_contrato(self, pedido_id: str) -> None:
+        """Mesma trava do livro e da compensação; chamar na transação da execução."""
+        with self._banco.transacao() as con:
+            con.execute(
+                "select id from public.contratos where pedido_id = %s "
+                "and status <> 'cancelado' for update",
+                (exigir_uuid(pedido_id, "pedido"),),
+            )
+
+    def execucao(self, contestacao_id: str) -> ExecucaoEstornoMaterial | None:
+        cid = como_uuid(contestacao_id)
+        if cid is None:
+            return None
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select valor_reconhecido_centavos, valor_divida_centavos, "
+                "custo_parcelamento_centavos, total_estornado_centavos, divida_id "
+                "from public.nota_material_execucoes where contestacao_id = %s",
+                (cid,),
+            ).fetchone()
+        if l is None:
+            return None
+        return ExecucaoEstornoMaterial(
+            int(l["valor_reconhecido_centavos"]),
+            int(l["valor_divida_centavos"]),
+            int(l["custo_parcelamento_centavos"]),
+            int(l["total_estornado_centavos"]),
+            str(l["divida_id"]) if l["divida_id"] else None,
+        )
+
+    def executar_estorno(
+        self, contestacao_id: str, divida: int, custo: int, motivo: str, operador_id: str
+    ) -> str:
+        """Confere, cria a dívida e marca `executado`. Resultado fora de ok/ja_executada: quem
+        chama desfaz a transação (o livro e as ordens já gravados nela)."""
+        with self._banco.transacao() as con:
+            l = con.execute(  # noqa: E741
+                "select resultado from public.nota_material_executar_estorno(%s, %s, %s, %s, %s)",
+                (
+                    exigir_uuid(contestacao_id, "contestação"),
+                    divida,
+                    custo,
+                    motivo,
+                    exigir_uuid(operador_id, "operador"),
+                ),
+            ).fetchone()
+        return str(l["resultado"])

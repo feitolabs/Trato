@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from trato.config import RAIZ_PROJETO
@@ -30,6 +31,11 @@ class ConfigAgendador(BaseSettings):
     # TRATO_AGENDADOR_EXPURGO_ACESSOS_LIGADO=true (em produção é decisão do João).
     expurgo_acessos_ligado: bool = False
     expurgo_acessos_limite: int = 1000  # linhas por ciclo (transação curta); 1 a 100000
+    # Documentos de verificação recusados ou substituídos (Privacidade 5). DESLIGADO: só liga com
+    # TRATO_AGENDADOR_EXPURGO_VERIFICACAO_LIGADO=true (em produção é decisão do João).
+    expurgo_verificacao_ligado: bool = False
+    expurgo_verificacao_prazo_dias: int = Field(90, ge=1, le=90)  # a Política diz "até 90"
+    expurgo_verificacao_limite: int = Field(100, ge=1, le=1000)  # documentos por ciclo
 
 
 @lru_cache

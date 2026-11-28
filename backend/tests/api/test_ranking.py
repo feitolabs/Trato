@@ -197,6 +197,7 @@ def _detalhe(uid):
         "nivel_verificacao": "verificado",
         "nota_publica": 4.0,
         "servicos_concluidos": 1,
+        "n_avaliacoes": 10,
         "atende_remoto": False,
         "disponivel_agora": False,
         "categorias": [],

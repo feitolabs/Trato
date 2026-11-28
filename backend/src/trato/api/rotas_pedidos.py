@@ -1133,9 +1133,7 @@ def substituir_pedido(
             if original is None:
                 raise HTTPException(404, "Pedido não encontrado.")
             if original.cliente_id != usuario.id:
-                raise HTTPException(
-                    403, "Só o cliente dono do pedido pode solicitar substituição."
-                )
+                raise HTTPException(403, "Só o cliente dono do pedido pode solicitar substituição.")
             if not _cancelado_por_profissional(contexto, original):
                 raise HTTPException(
                     409,

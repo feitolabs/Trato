@@ -94,9 +94,10 @@ class Ambiente:
         )
         pedido = replace(base, **campos)
         self.contexto.pedidos.salvar(pedido)
-        self.contexto.contratos.salvar(
-            Contrato(pedido.id, "orc-1", PROFISSIONAL.id, 100_000, "pintura")
-        )
+        if pedido.estado is not Estado.ABERTO:  # pedido aberto ainda não tem contrato
+            self.contexto.contratos.salvar(
+                Contrato(pedido.id, "orc-1", PROFISSIONAL.id, 100_000, "pintura")
+            )
         return pedido
 
     def semear_dinheiro(self, cobrado: int = 100_000, taxa: int | None = None) -> None:

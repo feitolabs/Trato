@@ -61,8 +61,10 @@ class Agendador:
         rotina_medidas: Callable[[datetime], int] | None = None,
         rotina_vencimento_moedas: Callable[[datetime], int] | None = None,
         rotina_expurgo_acessos: Callable[[datetime], int] | None = None,
+        rotina_expurgo_verificacao: Callable[[datetime], int] | None = None,
     ) -> None:
         self._rotina_expurgo_acessos = rotina_expurgo_acessos  # None = desligado (padrão)
+        self._rotina_expurgo_verificacao = rotina_expurgo_verificacao  # None = desligado
         self._rotina_vencimento_moedas = rotina_vencimento_moedas  # None = sem aviso (13.4)
         self._rotina_medidas = rotina_medidas  # None = sem encerrar medidas vencidas
         self._rotina_estornos = rotina_estornos  # None = sem reenvio de estornos
@@ -154,6 +156,13 @@ class Agendador:
                     log.info("Registros de acesso expurgados: %s", apagados)
             except Exception:  # sem a função ou banco fora: o resto do ciclo segue
                 log.exception("Expurgo de acessos falhou")
+        if self._rotina_expurgo_verificacao is not None:
+            try:
+                eliminados = self._rotina_expurgo_verificacao(agora)
+                if eliminados:
+                    log.info("Documentos de verificação eliminados: %s", eliminados)
+            except Exception as erro:  # sem as tabelas ou banco fora: o resto do ciclo segue
+                log.error("Expurgo de documentos de verificação falhou (%s)", type(erro).__name__)
         if self._rotina_medidas is not None:
             try:
                 self._rotina_medidas(agora)

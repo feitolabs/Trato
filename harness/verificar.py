@@ -241,7 +241,18 @@ def escrever_resumo_testes(
         f.write("\n".join(saida) + "\n")
 
 
-def checar_backend() -> bool:
+def interpretar_shard(valor: str) -> tuple[int, int]:
+    """Aceita 'I/N' com 1 <= I <= N."""
+    partes = valor.split("/")
+    if len(partes) != 2 or not all(p.isdigit() for p in partes):
+        raise argparse.ArgumentTypeError("use o formato I/N, ex.: 1/4")
+    indice, total = int(partes[0]), int(partes[1])
+    if total < 1 or not (1 <= indice <= total):
+        raise argparse.ArgumentTypeError("shard inválido: precisa ser 1 <= I <= N")
+    return indice, total
+
+
+def checar_backend(shard: tuple[int, int] | None = None) -> bool:
     py = python_do_backend()
     # fastapi/psycopg/jwt: dependências de execução; ruff/pytest/httpx: extras `dev`.
     if faltam := faltam_modulos(py, ["ruff", "pytest", "httpx", "fastapi", "psycopg", "jwt"]):
@@ -252,11 +263,33 @@ def checar_backend() -> bool:
         print(r"  Windows:       .\harness\preparar-ambiente.ps1")
         print("  macOS/Linux:   ./harness/preparar-ambiente.sh")
         return False
-    ok = rodar("Backend — lint (ruff)", [py, "-m", "ruff", "check", "."], BACKEND)
-    ok = rodar("Backend — formatação (ruff)", [py, "-m", "ruff", "format", "--check", "."], BACKEND) and ok
-    ok = rodar("Backend — testes (pytest)", [py, "-m", "pytest", "-q"], BACKEND) and ok
+    ok = True
+    if shard is None or shard[0] == 1:
+        ok = rodar("Backend — lint (ruff)", [py, "-m", "ruff", "check", "."], BACKEND) and ok
+        ok = (
+            rodar("Backend — formatação (ruff)", [py, "-m", "ruff", "format", "--check", "."], BACKEND)
+            and ok
+        )
+    if shard is None:
+        ok = rodar("Backend — testes (pytest)", [py, "-m", "pytest", "-q"], BACKEND) and ok
+    else:
+        indice, total = shard
+        env = os.environ.copy()
+        harness_dir = str(RAIZ / "harness")
+        env["PYTHONPATH"] = (
+            f"{harness_dir}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else harness_dir
+        )
+        env["TRATO_PYTEST_SHARD"] = f"{indice}/{total}"
+        ok = (
+            rodar(
+                f"Backend — testes (pytest {indice}/{total})",
+                [py, "-m", "pytest", "-q", "-p", "pytest_shard"],
+                BACKEND,
+                env=env,
+            )
+            and ok
+        )
     return ok
-
 
 def achar_flutter() -> str | None:
     """Flutter no PATH, em $FLUTTER_ROOT ou na instalação padrão C:\\flutter."""
@@ -329,9 +362,20 @@ def main() -> int:
         default="todas",
         help="roda só um grupo de checagens (o CI usa um job por grupo); padrão: todas",
     )
-    escolha = parser.parse_args().etapa
-    grupos = list(ETAPAS) if escolha == "todas" else [escolha]
-    resultados = [checar() for grupo in grupos for checar in ETAPAS[grupo]]
+    parser.add_argument(
+        "--backend-shard",
+        type=interpretar_shard,
+        default=None,
+        metavar="I/N",
+        help="divide os arquivos de teste do backend em N partes e roda só a parte I (ruff roda só na 1/N)",
+    )
+    args = parser.parse_args()
+    grupos = list(ETAPAS) if args.etapa == "todas" else [args.etapa]
+    resultados = [
+        checar(args.backend_shard) if checar is checar_backend else checar()
+        for grupo in grupos
+        for checar in ETAPAS[grupo]
+    ]
     titulo("Resultado")
     if all(resultados):
         print("TUDO OK")

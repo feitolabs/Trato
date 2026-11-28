@@ -83,6 +83,7 @@ from trato.persistencia.pagamentos import (
     OrdensEstornoPostgres,
 )
 from trato.persistencia.pedido_extras import NotasMaterialPostgres, RecusasPostgres
+from trato.persistencia.pedido_guardas import PedidoGuardasPostgres
 from trato.persistencia.pedidos import PedidosPostgres
 from trato.persistencia.reagendamentos import ReagendamentosPostgres
 from trato.persistencia.recorrencias import RecorrenciasPostgres
@@ -181,6 +182,7 @@ def criar_contexto_postgres(
         checkout_sem_codigo=CheckoutSemCodigoPostgres(banco),
         disputa_pedidos_info=DisputaPedidosInfoPostgres(banco),
         forca_maior=ForcaMaiorPostgres(banco),
+        pedido_guardas=PedidoGuardasPostgres(banco),
         selos=SelosPostgres(banco),
         indisponibilidades=IndisponibilidadesPostgres(banco),
         materiais_contestacao=ContestacaoMaterialPostgres(banco),

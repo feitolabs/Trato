@@ -84,9 +84,7 @@ class CheckoutSemCodigoEmMemoria:
     def em_aberto(self) -> list[Caso]:
         with self._trava:
             return [
-                c
-                for c in self._itens.values()
-                if c.respondido_em is None and c.decidido_em is None
+                c for c in self._itens.values() if c.respondido_em is None and c.decidido_em is None
             ]
 
     def registrar_contato(

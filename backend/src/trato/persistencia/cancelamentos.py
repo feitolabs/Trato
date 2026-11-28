@@ -167,7 +167,6 @@ class CancelamentosEmMemoria:
                     )
                     self.decisoes[pedido_id] = (analista_id, decisao, agora)
 
-
     def faltas_repetidas(self, desde: datetime, minimo: int) -> list[FaltaRepetida]:
         with self._trava:
             grupos: dict[str, list[datetime]] = {}
@@ -195,6 +194,7 @@ _COLUNAS = (
     "retencao_valor_centavos, retencao_valor_base_centavos, retencao_justificativa, "
     "retencao_comprovantes, retencao_mostrada_cliente_em"
 )
+
 
 def _montar(linha: dict[str, Any]) -> Cancelamento:
     reembolso = linha["reembolso_centavos"]

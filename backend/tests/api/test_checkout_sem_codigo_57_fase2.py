@@ -226,6 +226,7 @@ def test_bloqueios_resposta_disputa_permissao_alcada_e_fase2(fluxo):
     )
     assert fluxo.ctx.pedidos.obter(pid3).estado is E.EM_CONFIRMACAO
 
+
 def test_bloqueia_decisao_sem_contato_ou_antes_do_prazo(fluxo):
     fluxo.ctx.extras.pop("notificador", None)
     pid = fluxo.aceitar()

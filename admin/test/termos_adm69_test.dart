@@ -105,7 +105,7 @@ void main() {
       await rolarListaAte(tester, contem('a decisão não pode ser mudada'));
       expect(find.text('Decidir contestação'), findsNothing);
       expect(find.text('Iniciar análise'), findsNothing);
-      expect(contem(RegExp('aprovar', caseSensitive: false)), findsNothing);
+      expect(find.text('Aprovar efeito financeiro'), efeito == 'nenhum' ? findsOneWidget : findsNothing);
       expect(contem(RegExp(r'devolvid|estornad|\bpago', caseSensitive: false)), findsNothing);
       expect(contem('Efeito financeiro pendente'), efeito == 'pendente_financeiro' ? findsWidgets : findsNothing);
     });

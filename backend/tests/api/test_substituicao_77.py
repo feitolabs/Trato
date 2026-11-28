@@ -43,7 +43,10 @@ def test_substituir_pedido_cancelado_pelo_profissional_e_bloqueios(amb):
     _semear_agendado_com_dados(amb, "ped-orig")
 
     # Pedido ainda agendado -> 409
-    assert amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-cliente")).status_code == 409
+    assert (
+        amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-cliente")).status_code
+        == 409
+    )
 
     # Profissional cancela
     r_can = amb.cliente.post(
@@ -54,8 +57,16 @@ def test_substituir_pedido_cancelado_pelo_profissional_e_bloqueios(amb):
     assert r_can.status_code == 200, r_can.text
 
     # Outro cliente ou o profissional não podem substituir -> 403
-    assert amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-outro-cliente")).status_code == 403
-    assert amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-prof")).status_code == 403
+    assert (
+        amb.cliente.post(
+            "/v1/pedidos/ped-orig/substituir", headers=cab("t-outro-cliente")
+        ).status_code
+        == 403
+    )
+    assert (
+        amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-prof")).status_code
+        == 403
+    )
 
     # Cliente dono cria pedido de substituição -> 201 com vínculo e dados copiados
     r_sub = amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-cliente"))
@@ -72,7 +83,10 @@ def test_substituir_pedido_cancelado_pelo_profissional_e_bloqueios(amb):
     assert copiado.profissional_convidado_id is None
 
     # Já substituído -> 409
-    assert amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-cliente")).status_code == 409
+    assert (
+        amb.cliente.post("/v1/pedidos/ped-orig/substituir", headers=cab("t-cliente")).status_code
+        == 409
+    )
     # Cancelamento do profissional foi gravado automaticamente em cancelamentos_pedido
     reg = amb.contexto.cancelamentos.do_pedido("ped-orig")
     assert reg is not None and reg.tipo == "cancelamento_profissional"
@@ -87,7 +101,10 @@ def test_substituir_pedido_cancelado_pelo_profissional_e_bloqueios(amb):
         ).status_code
         == 200
     )
-    assert amb.cliente.post("/v1/pedidos/ped-cli/substituir", headers=cab("t-cliente")).status_code == 409
+    assert (
+        amb.cliente.post("/v1/pedidos/ped-cli/substituir", headers=cab("t-cliente")).status_code
+        == 409
+    )
 
 
 def test_admin_faltas_repetidas_filtra_periodo_minimo_e_permissao(amb):
@@ -128,10 +145,20 @@ def test_admin_faltas_repetidas_filtra_periodo_minimo_e_permissao(amb):
     )
 
     # Sem permissão -> 403
-    assert amb.cliente.get("/v1/admin/profissionais/faltas-repetidas", headers=cab("t-cliente")).status_code == 403
-    assert amb.cliente.get("/v1/admin/profissionais/faltas-repetidas", headers=cab("t-n1")).status_code == 403
+    assert (
+        amb.cliente.get(
+            "/v1/admin/profissionais/faltas-repetidas", headers=cab("t-cliente")
+        ).status_code
+        == 403
+    )
+    assert (
+        amb.cliente.get("/v1/admin/profissionais/faltas-repetidas", headers=cab("t-n1")).status_code
+        == 403
+    )
 
-    r = amb.cliente.get("/v1/admin/profissionais/faltas-repetidas?dias=90&minimo=2", headers=cab("t-mediador"))
+    r = amb.cliente.get(
+        "/v1/admin/profissionais/faltas-repetidas?dias=90&minimo=2", headers=cab("t-mediador")
+    )
     assert r.status_code == 200, r.text
     itens = r.json()
     assert len(itens) == 1

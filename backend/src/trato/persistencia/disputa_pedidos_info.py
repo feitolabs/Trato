@@ -104,9 +104,7 @@ class DisputaPedidosInfoEmMemoria:
                 or encerrado_em < atual.responder_ate
             ):
                 return None
-            self._itens[pedido_info_id] = replace(
-                atual, encerrado_sem_resposta_em=encerrado_em
-            )
+            self._itens[pedido_info_id] = replace(atual, encerrado_sem_resposta_em=encerrado_em)
             return self._itens[pedido_info_id]
 
 

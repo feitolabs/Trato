@@ -1,4 +1,4 @@
-﻿"""BE-CHECKOUT-SEM-CODIGO-57 no Postgres local (20261127230000_checkout_sem_codigo_casos.sql):
+"""BE-CHECKOUT-SEM-CODIGO-57 no Postgres local (20261127230000_checkout_sem_codigo_casos.sql):
 função checkout_sem_codigo_vigente, abertura idempotente, prazo com trigger de 5 dias úteis,
 prorrogação 22.3 na leitura, confirmação/disputa, contato manual auditado, retrabalho fora e
 comportamento limpo sem a tabela."""
@@ -119,11 +119,15 @@ def test_fluxo_completo_confirmacao_e_prorrogacao_223_no_postgres(ambiente_57):
         fila = http.get(URL_FILA, headers=c.token("med_a"))
         assert fila.status_code == 200, fila.text
         item = next(i for i in fila.json()["itens"] if i["pedido_id"] == pid)
-        assert datetime.fromisoformat(item["responder_ate"]) == caso.responder_ate + timedelta(hours=3)
+        assert datetime.fromisoformat(item["responder_ate"]) == caso.responder_ate + timedelta(
+            hours=3
+        )
         assert contexto.checkout_sem_codigo.obter(caso.id).responder_ate == caso.responder_ate
 
         # Confirmação registra resposta e tira da fila
-        r_conf = http.post(f"/v1/pedidos/{pid}/acoes/confirmar_conclusao", headers=c.token("cliente"))
+        r_conf = http.post(
+            f"/v1/pedidos/{pid}/acoes/confirmar_conclusao", headers=c.token("cliente")
+        )
         assert r_conf.status_code == 200, r_conf.text
         depois = contexto.checkout_sem_codigo.obter(caso.id)
         assert depois.resposta == CONFIRMOU and depois.respondido_em is not None
@@ -159,11 +163,14 @@ def test_contato_manual_disputa_retrabalho_e_sem_tabela_no_postgres(ambiente_57,
         )
         assert r_man.status_code == 200, r_man.text
         assert r_man.json()["canal"] == "telefone" and r_man.json()["responder_ate"] is not None
-        assert http.post(
-            f"{URL_FILA}/{item['id']}/contato",
-            json={"canal": "whatsapp", "motivo": "Tentativa repetida de contato."},
-            headers=c.token("med_a"),
-        ).status_code == 409
+        assert (
+            http.post(
+                f"{URL_FILA}/{item['id']}/contato",
+                json={"canal": "whatsapp", "motivo": "Tentativa repetida de contato."},
+                headers=c.token("med_a"),
+            ).status_code
+            == 409
+        )
 
         # Abrir disputa registra resposta e tira da fila
         r_disp = http.post(
@@ -174,7 +181,10 @@ def test_contato_manual_disputa_retrabalho_e_sem_tabela_no_postgres(ambiente_57,
         assert r_disp.status_code == 201, r_disp.text
         depois = contexto.checkout_sem_codigo.obter(item["id"])
         assert depois.resposta == RELATOU and depois.respondido_em is not None
-        assert all(i["pedido_id"] != pid for i in http.get(URL_FILA, headers=c.token("med_a")).json()["itens"])
+        assert all(
+            i["pedido_id"] != pid
+            for i in http.get(URL_FILA, headers=c.token("med_a")).json()["itens"]
+        )
 
         # Retrabalho resolvido não é caso vigente no banco
         pid2, _ = agendado(c)
@@ -186,7 +196,7 @@ def test_contato_manual_disputa_retrabalho_e_sem_tabela_no_postgres(ambiente_57,
             con.execute(
                 "insert into public.pedido_historico (pedido_id, de_status, para_status, "
                 "ator_id, ocorrida_em, prova) values (%s, 'em_retrabalho', 'em_confirmacao', "
-                "%s, %s, '{\"acao\": \"resolver_retrabalho\", \"dados\": {}}'::jsonb)",
+                '%s, %s, \'{"acao": "resolver_retrabalho", "dados": {}}\'::jsonb)',
                 (pid2, c.ids["profissional"], datetime.now(UTC)),
             )
         assert contexto.checkout_sem_codigo.vigente(pid2) is None

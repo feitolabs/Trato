@@ -60,6 +60,7 @@ from trato.persistencia.indisponibilidades import IndisponibilidadesEmMemoria
 from trato.persistencia.lgpd_titular import LgpdTitularEmMemoria
 from trato.persistencia.materiais_contestacao import ContestacaoMaterialEmMemoria
 from trato.persistencia.medidas import MedidasEmMemoria
+from trato.persistencia.pedido_guardas import PedidoGuardasEmMemoria
 from trato.persistencia.retorno_conta import RetornoContaEmMemoria
 from trato.persistencia.sac import SacEmMemoria
 from trato.persistencia.selos import SelosEmMemoria
@@ -188,6 +189,8 @@ class Contexto:
     checkout_sem_codigo: Any = field(default_factory=lambda: CheckoutSemCodigoEmMemoria())
     disputa_pedidos_info: Any = field(default_factory=lambda: DisputaPedidosInfoEmMemoria())
     forca_maior: Any = field(default_factory=lambda: ForcaMaiorEmMemoria())
+    # Guarda de Pedido e retenção (`persistencia/pedido_guardas.py`, Termos 16.3).
+    pedido_guardas: Any = field(default_factory=lambda: PedidoGuardasEmMemoria())
     materiais_contestacao: Any = field(default_factory=lambda: ContestacaoMaterialEmMemoria())
     retorno_conta: Any = field(default_factory=lambda: RetornoContaEmMemoria())
     lgpd_titular: Any = field(default_factory=lambda: LgpdTitularEmMemoria())
@@ -268,9 +271,7 @@ class Contexto:
         return detalhe.nivel_verificacao or "basico"
 
     def _gravar_nivel_do_perfil(self, usuario_id: str, nivel: str) -> None:
-        self.usuarios.adicionar(
-            replace(self.usuarios.detalhe(usuario_id), nivel_verificacao=nivel)
-        )
+        self.usuarios.adicionar(replace(self.usuarios.detalhe(usuario_id), nivel_verificacao=nivel))
 
     def __post_init__(self) -> None:
         from trato.api.regra_contratada import regras_do_aceite  # evita ciclo

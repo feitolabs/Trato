@@ -1664,6 +1664,17 @@ def _mesma_avaliacao(
     )
 
 
+def _avaliacao_repetida(
+    contexto: Contexto, usuario: Usuario, pedido: Pedido, direcao: str, avaliacao: Avaliacao
+) -> AvaliacaoOut:
+    """Reenvio da mesma avaliação: a mesma resposta do primeiro envio."""
+    ganhas = _moedas_ja_dadas(contexto, usuario, pedido, direcao)
+    saida = _avaliacao_out(avaliacao, ganhas)
+    if ganhas > 0:
+        saida.bonus_validade_dias = validade_do_credito_novo(contexto)
+    return saida
+
+
 def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
     return AvaliacaoOut(
         id=nova.id,
@@ -1800,7 +1811,7 @@ def avaliar(
             raise HTTPException(409, "Você já avaliou este serviço.")
         # duplo toque (mesmo corpo): o mesmo sucesso, sem novo registro nem novo bônus
         resposta.status_code = 200
-        return _avaliacao_out(repetida, _moedas_ja_dadas(contexto, usuario, pedido, direcao))
+        return _avaliacao_repetida(contexto, usuario, pedido, direcao, repetida)
     ate, dias = _limite_para_avaliar(contexto, pedido)
     if ate is not None and contexto.agora() > ate:
         raise HTTPException(
@@ -1827,7 +1838,7 @@ def avaliar(
         ):
             raise
         resposta.status_code = 200
-        return _avaliacao_out(repetida, _moedas_ja_dadas(contexto, usuario, pedido, direcao))
+        return _avaliacao_repetida(contexto, usuario, pedido, direcao, repetida)
     ganhas = 0
     if direcao == "cliente_para_profissional":
         try:

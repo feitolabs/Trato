@@ -283,9 +283,7 @@ def calcular_nota_publica(
     pesos = Decimal(0)
     for pos, av in enumerate(ordenadas, start=1):
         nota = (
-            Decimal(str(av.nota_decimal))
-            if av.nota_decimal is not None
-            else Decimal(av.nota_geral)
+            Decimal(str(av.nota_decimal)) if av.nota_decimal is not None else Decimal(av.nota_geral)
         )
         peso = Decimal(recentes_peso if pos <= recentes_quantidade else 1)
         soma += nota * peso

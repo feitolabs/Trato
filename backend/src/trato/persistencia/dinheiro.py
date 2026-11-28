@@ -394,11 +394,14 @@ class DisputasPostgres:
             extra_coluna, extra_marca, extra_valor = "", "", ()
             # 8.4: só na abertura, e só se a coluna existir (consultar antes: um erro no INSERT
             # abortaria a abertura inteira).
-            if disputa.resultado_esperado is not None and con.execute(
-                "select exists (select 1 from information_schema.columns where "
-                "table_schema = 'public' and table_name = 'disputas' "
-                "and column_name = 'resultado_esperado') as tem"
-            ).fetchone()["tem"]:
+            if (
+                disputa.resultado_esperado is not None
+                and con.execute(
+                    "select exists (select 1 from information_schema.columns where "
+                    "table_schema = 'public' and table_name = 'disputas' "
+                    "and column_name = 'resultado_esperado') as tem"
+                ).fetchone()["tem"]
+            ):
                 extra_coluna, extra_marca = ", resultado_esperado", ", %s"
                 extra_valor = (disputa.resultado_esperado,)
             con.execute(  # só o nome fixo da coluna opcional entra no SQL

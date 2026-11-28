@@ -10,6 +10,146 @@ import 'materiais_contestacao_tela.dart';
 Future<bool> abrirDecidirContestacaoMaterial(BuildContext context, ContestacaoMaterial c) async =>
     await mostrarModal<bool>(context, largura: 560, construir: (_) => _ModalDecidirMaterial(c)) ?? false;
 
+const kSegundaPessoaMaterial = 'Precisa ser uma pessoa diferente de quem analisou. O servidor confere.';
+
+const kRepetirAprovacaoMaterial = 'A aprovação pode ter sido gravada. Repetir é seguro: o servidor não aprova duas '
+    'vezes.';
+
+/// [aoEnviar] avisa que houve um envio, para a fila ser relida mesmo se o modal for fechado.
+Future<void> abrirAprovacaoFinanceiraDoMaterial(BuildContext context, ContestacaoMaterial c,
+        {required VoidCallback aoEnviar}) =>
+    mostrarModal<void>(context, largura: 560, construir: (_) => _ModalAprovarFinanceiro(c, aoEnviar));
+
+class _ModalAprovarFinanceiro extends StatefulWidget {
+  const _ModalAprovarFinanceiro(this.contestacao, this.aoEnviar);
+  final ContestacaoMaterial contestacao;
+  final VoidCallback aoEnviar;
+
+  @override
+  State<_ModalAprovarFinanceiro> createState() => _ModalAprovarFinanceiroState();
+}
+
+class _ModalAprovarFinanceiroState extends State<_ModalAprovarFinanceiro> {
+  final _motivo = TextEditingController();
+  bool _revisando = false;
+  bool _enviando = false;
+  String? _erro;
+
+  @override
+  void dispose() {
+    _motivo.dispose();
+    super.dispose();
+  }
+
+  bool get _valido {
+    final n = _motivo.text.trim().length;
+    return n >= kMotivoMinimo && n <= 2000;
+  }
+
+  Future<void> _aprovar() async {
+    if (_enviando) return;
+    setState(() {
+      _enviando = true;
+      _erro = null;
+    });
+    widget.aoEnviar();
+    try {
+      final r = await context.api
+          .aprovarFinanceiroContestacaoMaterial(widget.contestacao.id, motivo: _motivo.text.trim());
+      if (!mounted) return;
+      final pendente = r.efeitoFinanceiro == 'pendente_financeiro';
+      mostrarAviso(
+        context,
+        pendente
+            ? 'Efeito financeiro aprovado. Falta executar o estorno.'
+            : 'O servidor respondeu sem deixar o efeito pendente. Confira a situação na fila.',
+        erro: !pendente,
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          // Sem código HTTP: a resposta se perdeu ou o servidor falhou no meio.
+          _erro = e is ErroApi && (e.status != null || e.proibido || e.sessao)
+              ? e.mensagem
+              : '${e is ErroApi ? e.mensagem : 'Não deu para ler a resposta do servidor.'} $kRepetirAprovacaoMaterial';
+          _enviando = false;
+          _revisando = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.contestacao;
+    return PopScope(
+      canPop: !_enviando,
+      child: CorpoModal(
+        titulo: _revisando ? 'Confirmar a aprovação?' : 'Aprovar efeito financeiro · ${c.protocolo}',
+        consequencia: 'A contestação fica com o efeito financeiro pendente. A aprovação não movimenta dinheiro: o '
+            'estorno é um passo separado. Não dá para desfazer por esta tela.',
+        filhos: [
+          if (_erro != null) ...[
+            BannerInfo(_erro!, titulo: 'Não foi concluído.', tom: Tom.erro),
+            const SizedBox(height: EspacosTrato.x3),
+          ],
+          const BannerInfo(kSegundaPessoaMaterial, tom: Tom.info),
+          const SizedBox(height: EspacosTrato.x3),
+          Linha('Pedido', c.pedidoId),
+          Linha('Decisão da análise', kStatusContestacaoMaterial[c.status] ?? c.status),
+          if (c.valorReconhecidoCentavos case final v?) Linha('Valor reconhecido na análise', formatarReais(v)),
+          if (_revisando)
+            Linha('Motivo', _motivo.text.trim())
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: EspacosTrato.x3),
+              child: TextField(
+                controller: _motivo,
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 2000,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Motivo',
+                  helperText: 'Pelo menos $kMotivoMinimo caracteres',
+                  counterText: '',
+                ),
+              ),
+            ),
+          const SizedBox(height: EspacosTrato.x3),
+          const AvisoAuditoria(),
+        ],
+        acoes: [
+          BotaoTrato.secundario(
+            _revisando ? 'Voltar' : 'Cancelar',
+            aoPressionar: _enviando
+                ? null
+                : () => _revisando ? setState(() => _revisando = false) : Navigator.of(context).pop(),
+          ),
+          if (_revisando)
+            BotaoTrato.primario(
+              'Confirmar aprovação',
+              carregando: _enviando,
+              rotuloCarregando: 'Enviando',
+              aoPressionar: _enviando ? null : _aprovar,
+            )
+          else
+            BotaoTrato.primario(
+              'Revisar',
+              aoPressionar: _valido
+                  ? () => setState(() {
+                        _erro = null;
+                        _revisando = true;
+                      })
+                  : null,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModalDecidirMaterial extends StatefulWidget {
   const _ModalDecidirMaterial(this.contestacao);
   final ContestacaoMaterial contestacao;

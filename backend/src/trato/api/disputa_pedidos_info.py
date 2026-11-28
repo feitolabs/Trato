@@ -20,9 +20,7 @@ from trato.persistencia.disputa_pedidos_info import PedidoInformacao
 log = logging.getLogger("trato.disputa_pedidos_info")
 DIAS_MINIMO = 10  # Termos 8.4: mínimo 10 dias úteis em Brasília
 
-StatusPedidoInfo = Literal[
-    "aguardando_resposta", "vencido", "respondido", "encerrado_sem_resposta"
-]
+StatusPedidoInfo = Literal["aguardando_resposta", "vencido", "respondido", "encerrado_sem_resposta"]
 
 
 class PedidoInfoOut(BaseModel):
@@ -80,9 +78,7 @@ def exigir_tabela(contexto: Any) -> None:
 def prazo_original(contexto: Any, solicitado_em: datetime) -> datetime:
     """Fim do 10º dia útil seguinte em Brasília (o dia da solicitação não conta)."""
     local = solicitado_em.astimezone(periodo.BRASILIA)
-    ultimo = adicionar_dias_uteis(
-        local, DIAS_MINIMO, contexto.config.carregar().disputas.feriados
-    )
+    ultimo = adicionar_dias_uteis(local, DIAS_MINIMO, contexto.config.carregar().disputas.feriados)
     return datetime.combine(ultimo.date(), time(23, 59, 59), periodo.BRASILIA)
 
 

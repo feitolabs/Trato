@@ -596,6 +596,7 @@ def test_perfil_publico_sem_token_devolve_so_o_que_e_seguro(e2):
         "id", "nome", "foto_url", "categorias", "nota_media", "avaliacoes_total",
         "servicos_concluidos", "identidade_verificada", "cidades", "sobre",
         "portfolio", "avaliacoes_recentes",
+        "selo_conferido_em", "nota_minimo_avaliacoes",  # Termos 10.2 e 12.3
     }  # fmt: skip
     assert corpo["portfolio"] == [] and corpo["avaliacoes_recentes"] == []  # opcionais, vazios
     assert corpo["id"] == "pro-1" and corpo["nome"] == "João C."

@@ -370,12 +370,12 @@ def test_visita_recorrente_herda_prazo_validade_e_garantia_da_origem(rec):
         fora_do_escopo="Produtos químicos especiais",
     )
     rec.contexto.contratos._itens["ped-1"] = Contrato(
-            pedido_id="ped-1",
-            orcamento_id=orc_id,
-            profissional_id="pro-1",
-            valor_centavos=20_000,
-            prazo_execucao_dias=2,
-            garantia_dias=60,
+        pedido_id="ped-1",
+        orcamento_id=orc_id,
+        profissional_id="pro-1",
+        valor_centavos=20_000,
+        prazo_execucao_dias=2,
+        garantia_dias=60,
     )
     rid = _ativa(rec, em=7 * D)
     agora_geracao = AGORA + 5 * D
@@ -398,12 +398,12 @@ def test_visita_recorrente_usa_fallback_quando_origem_nao_tem_campos_52(rec):
 
     # Contrato antigo sem prazo_execucao_dias, sem garantia_dias e sem orçamento detalhado
     rec.contexto.contratos._itens["ped-1"] = Contrato(
-            pedido_id="ped-1",
-            orcamento_id="orc-antigo-ausente",
-            profissional_id="pro-1",
-            valor_centavos=20_000,
-            prazo_execucao_dias=None,
-            garantia_dias=None,
+        pedido_id="ped-1",
+        orcamento_id="orc-antigo-ausente",
+        profissional_id="pro-1",
+        valor_centavos=20_000,
+        prazo_execucao_dias=None,
+        garantia_dias=None,
     )
     rid = _ativa(rec, em=7 * D)
     agora_geracao = AGORA + 5 * D

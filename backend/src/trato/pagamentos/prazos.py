@@ -66,9 +66,7 @@ def dados_estorno(
     Status possíveis: `solicitado`, `em_processamento`, `concluido`, `falhou` (ou `None` se não
     houver estorno)."""
     relevantes = (
-        [o for o in ordens if cobranca is None or o.cobranca_id == cobranca.id]
-        if ordens
-        else []
+        [o for o in ordens if cobranca is None or o.cobranca_id == cobranca.id] if ordens else []
     )
     status: str | None = None
     if any(o.estado == "pendente" for o in relevantes):

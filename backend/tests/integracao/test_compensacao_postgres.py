@@ -117,6 +117,8 @@ def zerar(c):
     """Dívidas de um teste não podem descontar o seguinte."""
     with c.local.admin() as con:
         con.execute("set session_replication_role = replica")
+        if con.execute("select to_regclass('public.compensacao_propostas_regresso')").fetchone()[0]:
+            con.execute("delete from public.compensacao_propostas_regresso")
         con.execute("delete from public.compensacoes_aplicadas")
         con.execute("delete from public.compensacoes_dividas")
 

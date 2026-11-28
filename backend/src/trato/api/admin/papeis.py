@@ -34,6 +34,7 @@ class Permissao(StrEnum):
     COMPENSACOES_CANCELAR = "compensacoes_cancelar"  # só líder de suporte e administrador
     REGRESSO_PROPOR = "regresso_propor"  # propor regresso e reenviar o aviso (17.4)
     REGRESSO_APROVAR = "regresso_aprovar"  # aprovar ou recusar: líder e administrador
+    PEDIDO_GUARDAS_GERENCIAR = "pedido_guardas_gerenciar"  # guarda e retenção (14.8, 16.3)
     LGPD_APAGAR_PROVAS = "lgpd_apagar_provas"  # DPO e administrador
     LGPD_PEDIDOS_GERENCIAR = "lgpd_pedidos_gerenciar"  # pedidos de titular LGPD (14.9)
     LGPD_REVISAO_AUTOMATIZADA = "lgpd_revisao_automatizada"  # revisão automatizada (14.10)
@@ -164,6 +165,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
     ),
     P.SEGURANCA: frozenset(
         {
+            X.PEDIDO_GUARDAS_GERENCIAR,
             X.SELO_RETIRAR,
             X.INCIDENTES_VER,
             X.MATERIAIS_CONTESTACAO_ANALISAR,
@@ -184,9 +186,12 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.REGRESSO_PROPOR,
         }
     ),
-    P.JURIDICO: frozenset({X.CONFIG_VER, X.AUDITORIA_VER, X.AUDITORIA_VERIFICAR_CADEIA}),
+    P.JURIDICO: frozenset(
+        {X.CONFIG_VER, X.AUDITORIA_VER, X.AUDITORIA_VERIFICAR_CADEIA, X.PEDIDO_GUARDAS_GERENCIAR}
+    ),
     P.DPO: frozenset(
         {
+            X.PEDIDO_GUARDAS_GERENCIAR,
             X.LGPD_APAGAR_PROVAS,
             X.LGPD_PEDIDOS_GERENCIAR,
             X.LGPD_REVISAO_AUTOMATIZADA,

@@ -954,6 +954,57 @@ class ApiAdminHttp implements ApiAdmin {
     );
   }
 
+  // ---------- guarda de retenção do pedido (Termos 14.8 e 16.3) ----------
+
+  static String _doPedido(String id) => '/v1/admin/pedidos/${Uri.encodeComponent(id)}';
+
+  @override
+  Future<List<GuardaPedido>> listarGuardasPedido(String pedidoId) async =>
+      [for (final g in _itens(await _chamar('GET', '${_doPedido(pedidoId)}/guardas'))) _guardaPedido(g)];
+
+  @override
+  Future<({GuardaPedido guarda, bool repetida})> abrirGuardaPedido(String pedidoId,
+      {required String tipo, required String motivo}) async {
+    final token = _token;
+    if (token == null) throw const ErroApi('Entre de novo para continuar.', sessao: true);
+    // 201 é nova; 200 é a mesma guarda que já estava aberta.
+    final r = await _enviar('POST', _uri('${_doPedido(pedidoId)}/guardas'),
+        cabecalhos: {'Authorization': 'Bearer $token'}, corpo: {'tipo': tipo, 'motivo': motivo});
+    if (!r.ok) throw _erro(r);
+    return (guarda: _guardaPedido(_mapa(r.json)), repetida: r.status == 200);
+  }
+
+  @override
+  Future<GuardaPedido> encerrarGuardaPedido(String pedidoId, String guardaId, {required String motivo}) async =>
+      _guardaPedido(_mapa(await _chamar(
+          'POST', '${_doPedido(pedidoId)}/guardas/${Uri.encodeComponent(guardaId)}/encerrar',
+          corpo: {'motivo': motivo})));
+
+  @override
+  Future<RetencaoPedido> obterRetencaoPedido(String pedidoId) async {
+    final r = _mapa(await _chamar('GET', '${_doPedido(pedidoId)}/retencao'));
+    return RetencaoPedido(
+      pedidoId: r['pedido_id'] as String,
+      situacao: r['situacao'] as String,
+      prazoAnos: r['prazo_anos'] as int,
+      concluidoEm: r['concluido_em'] == null ? null : _data(r['concluido_em']),
+      guardaAte: r['guarda_ate'] == null ? null : _data(r['guarda_ate']),
+      bloqueios: [for (final b in r['bloqueios'] as List) '$b'],
+    );
+  }
+
+  GuardaPedido _guardaPedido(Map<String, dynamic> g) => GuardaPedido(
+        id: g['id'] as String,
+        pedidoId: g['pedido_id'] as String,
+        tipo: g['tipo'] as String,
+        motivo: g['motivo'] as String,
+        aberta: g['aberta'] as bool,
+        criadaPor: g['criada_por'] as String,
+        criadaEm: _data(g['criada_em']),
+        encerradaEm: g['encerrada_em'] == null ? null : _data(g['encerrada_em']),
+        encerradaPor: g['encerrada_por'] as String?,
+      );
+
   // ---------- contestação de materiais (Termos 6.9) ----------
 
   static const _materiais = '/v1/admin/materiais/contestacoes';
@@ -982,6 +1033,32 @@ class ApiAdminHttp implements ApiAdmin {
         'resposta': resposta,
         'valor_reconhecido_centavos': ?valorReconhecidoCentavos,
       })));
+
+  @override
+  Future<ContestacaoMaterial> aprovarFinanceiroContestacaoMaterial(String contestacaoId,
+          {required String motivo}) async =>
+      _contestacaoMaterial(_mapa(await _chamar(
+          'POST', '$_materiais/${Uri.encodeComponent(contestacaoId)}/aprovar-financeiro',
+          corpo: {'motivo': motivo})));
+
+  @override
+  Future<EstornoMaterial> executarEstornoMaterial(String contestacaoId,
+      {required String motivo, required bool materialPagoNoApp}) async {
+    final r = _mapa(await _chamar('POST', '$_materiais/${Uri.encodeComponent(contestacaoId)}/executar-estorno',
+        corpo: {'motivo': motivo, 'material_pago_no_app': materialPagoNoApp}));
+    // Dinheiro só em centavos inteiros: valor ausente ou quebrado é erro, nunca vira zero.
+    return EstornoMaterial(
+      resultado: r['resultado'] as String,
+      contestacao: _contestacaoMaterial(_mapa(r['contestacao'])),
+      valorReconhecidoCentavos: r['valor_reconhecido_centavos'] as int,
+      valorRetidoCentavos: r['valor_retido_centavos'] as int,
+      valorCompensacaoCentavos: r['valor_compensacao_centavos'] as int,
+      custoParcelamentoCentavos: r['custo_parcelamento_centavos'] as int,
+      totalEstornadoCentavos: r['total_estornado_centavos'] as int,
+      compensacaoId: r['compensacao_id'] as String?,
+      profissionalAvisado: r['profissional_avisado'] as bool?,
+    );
+  }
 
   @override
   Future<List<AnexoMaterial>> abrirAnexosContestacaoMaterial(String contestacaoId, {required String motivo}) async => [

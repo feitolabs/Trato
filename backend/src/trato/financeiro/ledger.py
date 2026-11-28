@@ -59,6 +59,8 @@ class TipoConta(StrEnum):
 
 
 SUFIXO_PARCELAMENTO = "/parcelamento"  # chave do lançamento TAXA que é custo de parcelamento
+# chave do lançamento REEMBOLSO que devolve parte do custo de parcelamento (6.9, já liberado)
+SUFIXO_CUSTO_DEVOLVIDO = "/custo-devolvido"
 
 _EXTERNAS = frozenset({TipoConta.CLIENTE_EXTERNO, TipoConta.PROFISSIONAL_EXTERNO})
 _COM_TITULAR = frozenset({TipoConta.A_LIBERAR, TipoConta.LIBERADO, TipoConta.A_COMPENSAR})
@@ -93,6 +95,13 @@ _CONTAS_DO_TIPO = {
         (TipoConta.TAXA_TRATO, TipoConta.A_COMPENSAR),  # contestação aceita: o Trato assume
     ),
 }
+
+
+# Com parte já liberada, o livro não permite estornar a cobrança inteira: o saldo ainda retido
+# e o custo do parcelamento saem em REEMBOLSO direto para o cliente. Cada par só vale no
+# lançamento cuja chave termina no sufixo da própria conta.
+SUFIXO_RETIDO_CUSTODIA = "/retido/custodia"
+SUFIXO_RETIDO_A_LIBERAR = "/retido/a-liberar"
 
 
 class LedgerErro(Exception):
@@ -187,7 +196,18 @@ class Lancamento:
         else:
             if self.estorno_de is not None:
                 raise LancamentoInvalido("Só estorno aponta para um lançamento original.")
-            if (self.debito.tipo, self.credito.tipo) not in _CONTAS_DO_TIPO[self.tipo]:
+            pares = _CONTAS_DO_TIPO[self.tipo]
+            if self.tipo is TipoLancamento.REEMBOLSO:
+                pares += tuple(
+                    (conta, TipoConta.CLIENTE_EXTERNO)
+                    for sufixo, conta in (
+                        (SUFIXO_RETIDO_CUSTODIA, TipoConta.CUSTODIA),
+                        (SUFIXO_RETIDO_A_LIBERAR, TipoConta.A_LIBERAR),
+                        (SUFIXO_CUSTO_DEVOLVIDO, TipoConta.TAXA_TRATO),
+                    )
+                    if self.chave.endswith(sufixo)
+                )
+            if (self.debito.tipo, self.credito.tipo) not in pares:
                 raise LancamentoInvalido(
                     f"Contas incompatíveis com o tipo {self.tipo.value}: "
                     f"{self.debito.tipo.value} -> {self.credito.tipo.value}."
@@ -496,6 +516,100 @@ def registrar_repasse(
     )
 
 
+# --- Estorno de material (Termos 6.9) -------------------------------------------------
+
+PREFIXO_ESTORNO_MATERIAL = "nota-material/"
+
+
+def ha_liberacao(livro: Livro, pedido_id: str) -> bool:
+    """Alguma parte do serviço já passou de 'a liberar' para 'liberado' (e segue assim)."""
+    return any(
+        i.debito.tipo is TipoConta.A_LIBERAR
+        for i in _em_aberto(livro, pedido_id, TipoLancamento.REPASSE, TipoConta.LIBERADO)
+    )
+
+
+def estornar_material(
+    livro: Livro,
+    pedido_id: str,
+    profissional_id: str,
+    retido: int,
+    custo: int,
+    chave: str,
+    data: datetime,
+) -> None:
+    """Lança a devolução da parte ainda RETIDA (`retido`) e do custo do parcelamento
+    proporcional ao total reconhecido (`custo`). A parte já liberada não passa por aqui: quem
+    lança é a função de compensação do banco.
+
+    Sem nada liberado, usa o estorno de sempre (os próximos cancelamentos, disputas e
+    liberações continuam valendo). Com parte liberada, lança reembolsos diretos."""
+    if not ha_liberacao(livro, pedido_id):
+        if retido > 0:
+            estornar_pedido(livro, pedido_id, retido, chave, data, custo_devolvido=custo)
+        elif custo > 0:
+            raise EstornoInvalido("Custo sem parte retida nem liberada para devolver.")
+        return
+    _reembolsar_direto(livro, pedido_id, profissional_id, retido, custo, chave, data)
+
+
+def _reembolsar_direto(
+    livro: Livro,
+    pedido_id: str,
+    profissional_id: str,
+    retido: int,
+    custo: int,
+    chave: str,
+    data: datetime,
+    evento_webhook_id: str | None = None,
+) -> tuple[Lancamento, ...]:
+    """Devolve `retido` (da custódia, depois do 'a liberar') e `custo` do parcelamento. O que já
+    foi liberado ao profissional não é tocado. Grava tudo ou nada."""
+    conta_do_prof = a_liberar(profissional_id)
+    na_custodia = min(retido, max(livro.saldo(CUSTODIA, pedido_id), 0))
+    if retido - na_custodia > max(livro.saldo(conta_do_prof, pedido_id), 0):
+        raise EstornoInvalido("O valor passa do que ainda está retido (sem o que já foi liberado).")
+    if custo > max(custo_parcelamento_em_aberto(livro, pedido_id), 0):
+        raise EstornoInvalido("O custo a devolver passa do custo ainda não devolvido.")
+    saidas = (
+        (SUFIXO_RETIDO_CUSTODIA, CUSTODIA, na_custodia),
+        (SUFIXO_RETIDO_A_LIBERAR, conta_do_prof, retido - na_custodia),
+        (SUFIXO_CUSTO_DEVOLVIDO, TAXA_TRATO, custo),
+    )
+    return livro.lancar_varios(
+        [
+            Lancamento(
+                f"{chave}{sufixo}",
+                pedido_id,
+                TipoLancamento.REEMBOLSO,
+                conta,
+                CLIENTE,
+                valor,
+                data,
+                evento_webhook_id=evento_webhook_id,
+            )
+            for sufixo, conta, valor in saidas
+            if valor > 0
+        ]
+    )
+
+
+def reembolso_retido_direto(
+    lancamentos: Sequence[Lancamento], pedido_id: str, desde: datetime
+) -> int:
+    """Saldo retido devolvido por REEMBOLSO direto desde `desde`, fora o estorno de material.
+    As funções de compensação do banco ainda não contam esses lançamentos como devolvidos."""
+    return sum(
+        i.valor
+        for i in lancamentos
+        if i.pedido_id == pedido_id
+        and i.tipo is TipoLancamento.REEMBOLSO
+        and i.chave.endswith((SUFIXO_RETIDO_CUSTODIA, SUFIXO_RETIDO_A_LIBERAR))
+        and not i.chave.startswith(PREFIXO_ESTORNO_MATERIAL)
+        and i.data >= desde
+    )
+
+
 # --- Estorno --------------------------------------------------------------------------
 
 
@@ -563,7 +677,12 @@ def _em_aberto(
 def custo_parcelamento_em_aberto(livro: Livro, pedido_id: str) -> int:
     """Custo de parcelamento do pedido que ainda não voltou ao cliente."""
     taxas = _em_aberto(livro, pedido_id, TipoLancamento.TAXA, None)
-    return sum(i.valor for i in taxas if eh_custo_parcelamento(i))
+    devolvido = sum(
+        i.valor
+        for i in _em_aberto(livro, pedido_id, TipoLancamento.REEMBOLSO, None)
+        if i.chave.endswith(SUFIXO_CUSTO_DEVOLVIDO)
+    )
+    return sum(i.valor for i in taxas if eh_custo_parcelamento(i)) - devolvido
 
 
 def reembolso_total_com_custo(
@@ -577,7 +696,10 @@ def reembolso_total_com_custo(
         livro.lancar_varios(list(lancamentos))
     if custo_parcelamento_em_aberto(livro, pedido_id) <= 0:
         return None
-    if profissional_id and livro.saldo(liberado(profissional_id), pedido_id) != 0:
+    if profissional_id and (
+        livro.saldo(liberado(profissional_id), pedido_id) != 0
+        or ha_liberacao(livro, pedido_id)  # inclusive o liberado que já foi pago
+    ):
         return None
     abertas = _em_aberto(livro, pedido_id, TipoLancamento.COBRANCA, TipoConta.CUSTODIA)
     return sum(i.valor for i in abertas)
@@ -591,6 +713,7 @@ def estornar_pedido(
     data: datetime,
     evento_webhook_id: str | None = None,
     incluir_custo: bool = False,
+    custo_devolvido: int | None = None,
 ) -> tuple[Lancamento, ...]:
     """Devolve `valor` ao cliente (parcial ou total) a partir do valor do SERVIÇO.
 
@@ -605,12 +728,54 @@ def estornar_pedido(
     Estorna por INTEIRO os lançamentos em aberto de TAXA, RETENCAO e COBRANCA (a que foi para a
     custódia; a gorjeta não entra) e, se o valor for parcial, lança de novo (COBRANCA, RETENCAO e
     TAXA novas, chaves `<chave>/mantida/...`) a parte que o cliente NÃO recebeu. Grava tudo ou
-    nada e devolve só os estornos. Se parte do valor já foi liberada ou paga ao profissional,
-    falta saldo e o ledger recusa com `SaldoInsuficiente` (regra pendente, ver F4.8).
+    nada e devolve só os estornos.
+
+    Se parte já foi liberada ao profissional (paga ou não), nada é estornado por inteiro: sai
+    REEMBOLSO direto, limitado à custódia mais o 'a liberar' (mais o custo, quando devolvido),
+    e devolve os lançamentos feitos. O liberado não é tocado.
+
+    `custo_devolvido` (6.9): devolve exatamente essa parte do custo do parcelamento, além de
+    `valor` do serviço, e mantém o resto do custo no livro.
     """
     ja_feitos = [i for i in livro.lancamentos if i.chave.startswith(f"{chave}/")]
     if ja_feitos:  # reenvio da mesma operação: devolve o que já foi gravado
-        return tuple(i for i in ja_feitos if i.tipo is TipoLancamento.ESTORNO)
+        return tuple(
+            i for i in ja_feitos if i.tipo in (TipoLancamento.ESTORNO, TipoLancamento.REEMBOLSO)
+        )
+    if ha_liberacao(livro, pedido_id):
+        profissional = next(
+            i.debito.titular
+            for i in livro.lancamentos
+            if i.pedido_id == pedido_id
+            and i.tipo is TipoLancamento.REPASSE
+            and i.debito.tipo is TipoConta.A_LIBERAR
+        )
+        retido = max(livro.saldo(CUSTODIA, pedido_id), 0) + max(
+            livro.saldo(a_liberar(profissional), pedido_id), 0
+        )
+        custo = max(custo_parcelamento_em_aberto(livro, pedido_id), 0)
+        if custo_devolvido is not None:
+            if incluir_custo or not 0 <= custo_devolvido <= custo:
+                raise EstornoInvalido("Custo do parcelamento a devolver fora do que foi cobrado.")
+        maximo = retido + (custo if incluir_custo else 0)
+        if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
+            raise EstornoInvalido("O valor do estorno deve ser inteiro e maior que zero.")
+        if valor > maximo:
+            raise SaldoInsuficiente(
+                f"Saldo retido insuficiente: dá para estornar até {maximo} centavos "
+                "(o que já foi liberado ao profissional não é estornado)."
+            )
+        do_servico = min(valor, retido)
+        return _reembolsar_direto(
+            livro,
+            pedido_id,
+            profissional,
+            do_servico,
+            custo_devolvido if custo_devolvido is not None else valor - do_servico,
+            chave,
+            data,
+            evento_webhook_id,
+        )
     cobrancas = _em_aberto(livro, pedido_id, TipoLancamento.COBRANCA, TipoConta.CUSTODIA)
     retencoes = _em_aberto(livro, pedido_id, TipoLancamento.RETENCAO, None)
     taxas = _em_aberto(livro, pedido_id, TipoLancamento.TAXA, None)
@@ -618,6 +783,10 @@ def estornar_pedido(
     custo_parcelamento = sum(i.valor for i in taxas if eh_custo_parcelamento(i))
     taxa_servico = sum(i.valor for i in taxas) - custo_parcelamento
     maximo = cobrado if incluir_custo else cobrado - custo_parcelamento
+    if custo_devolvido is not None:
+        if incluir_custo or not 0 <= custo_devolvido <= custo_parcelamento:
+            raise EstornoInvalido("Custo do parcelamento a devolver fora do que foi cobrado.")
+        maximo = cobrado - custo_parcelamento
     if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= maximo:
         raise EstornoInvalido(
             f"O valor do estorno deve ficar entre 1 e {maximo} centavos "
@@ -628,7 +797,8 @@ def estornar_pedido(
         sum(i.valor for i in retencoes),
         taxa_servico,
     ]
-    mantido = cobrado - valor
+    mantido = cobrado - valor - (custo_devolvido or 0)
+    custo_mantido = 0 if incluir_custo else custo_parcelamento - (custo_devolvido or 0)
     # Só a parte do serviço é repartida entre as contas; o que passar dela é custo do parcelado
     # (só possível com `incluir_custo`), que não pesa em nenhuma.
     devolvidos = repartir_proporcional(min(valor, sum(pesos)), pesos) if mantido else []
@@ -656,7 +826,7 @@ def estornar_pedido(
                 CUSTODIA,
                 TAXA_TRATO,
                 # Devolvendo o custo, o que fica é só a retenção, inteira para o profissional.
-                0 if incluir_custo else custo_parcelamento,
+                custo_mantido,
             ),
         )
         for nome, tipo, conta_debito, conta_credito, quanto in mantidos:

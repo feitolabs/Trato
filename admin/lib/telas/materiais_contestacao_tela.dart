@@ -4,8 +4,10 @@ import '../componentes/base.dart';
 import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
+import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
 import 'atendimento_modais.dart' show confirmarAtendimento;
+import 'materiais_contestacao_estorno.dart';
 import 'materiais_contestacao_modais.dart';
 import 'provas_modal.dart';
 
@@ -31,7 +33,8 @@ Tom _tom(String status) => switch (status) {
       _ => Tom.neutro,
     };
 
-/// Fila e decisão das contestações de materiais (Termos 6.9). A tela não move dinheiro.
+/// Fila, decisão, aprovação financeira e execução do estorno das contestações de materiais (Termos 6.9). A tela só pede
+/// e mostra: quem calcula e move dinheiro é o backend.
 class MateriaisContestacaoTela extends StatefulWidget {
   const MateriaisContestacaoTela({super.key});
 
@@ -123,7 +126,7 @@ class _MateriaisContestacaoTelaState extends State<MateriaisContestacaoTela> {
                         selecionado: sel,
                       ),
                       detalheBuilder: (context, c) => _DetalheContestacao(
-                        key: ValueKey('${c.id}-${c.status}'),
+                        key: ValueKey('${c.id}-${c.status}-${c.efeitoFinanceiro}'),
                         contestacao: c,
                         aoMudar: () => fila.recarregar(),
                       ),
@@ -182,7 +185,22 @@ class _DetalheContestacaoState extends State<_DetalheContestacao> {
     }
   }
 
-  /// Texto do efeito financeiro. O painel nunca afirma devolução, estorno ou pagamento.
+  Future<void> _aprovarFinanceiro() async {
+    var enviou = false;
+    final recarregar = widget.aoMudar;
+    await abrirAprovacaoFinanceiraDoMaterial(context, widget.contestacao, aoEnviar: () => enviou = true);
+    if (enviou) await recarregar();
+  }
+
+  Future<void> _executarEstorno() async {
+    // Depois de qualquer envio, com ou sem sucesso, a fila é relida: o servidor sabe o que ficou.
+    var enviou = false;
+    final recarregar = widget.aoMudar;
+    await abrirExecucaoDoEstornoMaterial(context, widget.contestacao, aoEnviar: () => enviou = true);
+    if (enviou) await recarregar();
+  }
+
+  /// Texto do efeito financeiro. Só afirma execução quando o servidor marca `executado`.
   Widget? _efeito(ContestacaoMaterial c) => switch (c.efeitoFinanceiro) {
         'nenhum' => c.status == 'procedente' || c.status == 'parcial'
             ? const BannerInfo(
@@ -190,8 +208,13 @@ class _DetalheContestacaoState extends State<_DetalheContestacao> {
                 tom: Tom.info,
               )
             : null,
+        'executado' => const BannerInfo(
+            'O servidor registrou a execução. Isso não confirma que o valor já chegou ao cliente.',
+            titulo: 'Estorno executado.',
+            tom: Tom.info,
+          ),
         'pendente_financeiro' => const BannerInfo(
-            'Nada deve ser informado como concluído.',
+            'Nada deve ser informado como concluído. $kPrazoDoEstornoMaterial',
             titulo: 'Efeito financeiro pendente.',
             tom: Tom.alerta,
           ),
@@ -253,6 +276,24 @@ class _DetalheContestacaoState extends State<_DetalheContestacao> {
           ),
         ),
         if (efeito != null) ...[const SizedBox(height: EspacosTrato.x3), efeito],
+        if ((c.status == 'procedente' || c.status == 'parcial') &&
+            c.efeitoFinanceiro == 'nenhum' &&
+            context.pode(Permissao.materiaisContestacaoAprovar)) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: BotaoTrato.primario('Aprovar efeito financeiro', aoPressionar: _aprovarFinanceiro),
+          ),
+        ],
+        if ((c.status == 'procedente' || c.status == 'parcial') &&
+            c.efeitoFinanceiro == 'pendente_financeiro' &&
+            context.pode(Permissao.materiaisContestacaoAprovar)) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: BotaoTrato.primario('Executar estorno', aoPressionar: _executarEstorno),
+          ),
+        ],
         if (_erro != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           BannerInfo(_erro!, titulo: 'Não foi feito.', tom: Tom.erro),

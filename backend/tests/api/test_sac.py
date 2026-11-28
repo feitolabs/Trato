@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 
 import pytest
-from conftest import AGORA, CLIENTE, PROFISSIONAL, cab
+from conftest import AGORA, CLIENTE, MEMBROS_EQUIPE, PROFISSIONAL, cab
 from test_exclusividade_cliente import ligar
 from test_termos_be2 import enviados, ouvir
 
@@ -171,7 +171,6 @@ def test_contato_por_telefone_filtros_e_paginacao(amb):
 
 
 def test_dois_analistas_assumem_so_um(amb):
-    from conftest import MEMBROS_EQUIPE
 
     from trato.api.admin.memoria import EquipeEmMemoria
     from trato.api.admin.papeis import PapelEquipe
@@ -212,7 +211,6 @@ def test_leitura_devolve_o_original_marcando_o_mascarado(amb):
     amb.semear_pedido(Estado.PAGO_E_RETIDO)
     conversa = amb.contexto.conversas.abrir("ped-1", PROFISSIONAL.id)
     amb.contexto.conversas.enviar(conversa, CLIENTE.id, "me paga por fora no joao@gmail.com")
-    from conftest import MEMBROS_EQUIPE
 
     from trato.api.admin.memoria import EquipeEmMemoria
     from trato.api.admin.papeis import PapelEquipe

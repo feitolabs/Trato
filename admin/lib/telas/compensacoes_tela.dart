@@ -15,6 +15,8 @@ const _origens = {
   'disputa': 'Decisão de disputa',
   'disputa_contestacao': 'Decisão mudada por contestação',
   'regresso': 'Regresso',
+  // Termos 6.9: a parte do material já liberada ao profissional. Não tem disputa.
+  'nota_material_contestacao': 'Estorno de material contestado',
 };
 
 /// Textos da dívida que o servidor marca como `suspensa` (Termos 8.7). O que fazer vem de `revisao`.

@@ -934,7 +934,7 @@ class Compensacao {
   final String id;
   final String pedidoId;
 
-  /// `disputa`, `disputa_contestacao` ou `regresso`.
+  /// `disputa`, `disputa_contestacao`, `regresso` ou `nota_material_contestacao`.
   final String origem;
   final int valorCentavos;
   final int compensadoCentavos;
@@ -2605,6 +2605,35 @@ class AnexoMaterial {
   final int? expiraEmSegundos;
 }
 
+/// Resposta da execução do estorno de material contestado (Termos 6.9). Os valores, em centavos,
+/// vêm todos do backend.
+class EstornoMaterial {
+  const EstornoMaterial({
+    required this.resultado,
+    required this.contestacao,
+    required this.valorReconhecidoCentavos,
+    required this.valorRetidoCentavos,
+    required this.valorCompensacaoCentavos,
+    required this.custoParcelamentoCentavos,
+    required this.totalEstornadoCentavos,
+    this.compensacaoId,
+    this.profissionalAvisado,
+  });
+
+  /// `ok` ou `ja_executada`.
+  final String resultado;
+  final ContestacaoMaterial contestacao;
+  final int valorReconhecidoCentavos;
+  final int valorRetidoCentavos;
+  final int valorCompensacaoCentavos;
+  final int custoParcelamentoCentavos;
+  final int totalEstornadoCentavos;
+  final String? compensacaoId;
+
+  /// Null quando não há dívida; false: o aviso não saiu.
+  final bool? profissionalAvisado;
+}
+
 /// Contestação de nota de material (Termos 6.9). Nenhum campo daqui significa dinheiro movido.
 class ContestacaoMaterial {
   const ContestacaoMaterial({
@@ -2656,4 +2685,52 @@ class ContestacaoMaterial {
 
   /// Prazo vencido sem decisão. O relógio local serve apenas para destacar na tela.
   bool atrasada(DateTime agora) => pendenteDeDecisao && agora.isAfter(responderAte);
+}
+
+/// Guarda de retenção de um pedido (Termos 14.8 e 16.3).
+class GuardaPedido {
+  const GuardaPedido({
+    required this.id,
+    required this.pedidoId,
+    required this.tipo,
+    required this.motivo,
+    required this.aberta,
+    required this.criadaPor,
+    required this.criadaEm,
+    this.encerradaEm,
+    this.encerradaPor,
+  });
+
+  final String id;
+  final String pedidoId;
+
+  /// `processo` ou `investigacao`.
+  final String tipo;
+  final String motivo;
+  final bool aberta;
+  final String criadaPor;
+  final DateTime criadaEm;
+  final DateTime? encerradaEm;
+  final String? encerradaPor;
+}
+
+/// Situação da retenção, só leitura: prazo e bloqueios são calculados pelo backend.
+class RetencaoPedido {
+  const RetencaoPedido({
+    required this.pedidoId,
+    required this.situacao,
+    required this.prazoAnos,
+    this.concluidoEm,
+    this.guardaAte,
+    this.bloqueios = const [],
+  });
+
+  final String pedidoId;
+
+  /// `sem_marco`, `no_prazo`, `bloqueado` ou `vencido`.
+  final String situacao;
+  final int prazoAnos;
+  final DateTime? concluidoEm;
+  final DateTime? guardaAte;
+  final List<String> bloqueios;
 }

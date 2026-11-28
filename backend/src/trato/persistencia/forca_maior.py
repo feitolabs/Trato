@@ -206,8 +206,7 @@ class ForcaMaiorPostgres:
             if not self._existe(con):
                 return None
             linha = con.execute(
-                f"select {_COLUNAS} from public.eventos_forca_maior "
-                "where chave_idempotencia = %s",
+                f"select {_COLUNAS} from public.eventos_forca_maior where chave_idempotencia = %s",
                 (chave_idempotencia,),
             ).fetchone()
         return _item(linha) if linha else None

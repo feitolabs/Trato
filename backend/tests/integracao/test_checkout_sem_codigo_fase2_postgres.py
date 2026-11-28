@@ -106,9 +106,9 @@ def test_decidir_liberar_idempotencia_e_imutabilidade_no_postgres(ambiente_f2):
     try:
         # Decisão liberar por administrador (alçada irrestrita)
         r = http.post(
-        f"{URL_FILA}/{caso.id}/decisao",
-        json={"decisao": "liberar", "motivo": MOTIVO, "chave_idempotencia": chave},
-        headers=c.token("adm_a"),
+            f"{URL_FILA}/{caso.id}/decisao",
+            json={"decisao": "liberar", "motivo": MOTIVO, "chave_idempotencia": chave},
+            headers=c.token("adm_a"),
         )
         assert r.status_code == 200, r.text
         corpo = r.json()
@@ -118,24 +118,24 @@ def test_decidir_liberar_idempotencia_e_imutabilidade_no_postgres(ambiente_f2):
 
         # Idempotência com a mesma chave -> 200 idempotente=True
         r2 = http.post(
-        f"{URL_FILA}/{caso.id}/decisao",
-        json={"decisao": "liberar", "motivo": MOTIVO, "chave_idempotencia": chave},
-        headers=c.token("adm_a"),
+            f"{URL_FILA}/{caso.id}/decisao",
+            json={"decisao": "liberar", "motivo": MOTIVO, "chave_idempotencia": chave},
+            headers=c.token("adm_a"),
         )
         assert r2.status_code == 200 and r2.json()["idempotente"] is True
 
         # Nova chave no mesmo caso -> 409
         assert (
-        http.post(
-            f"{URL_FILA}/{caso.id}/decisao",
-            json={
-                "decisao": "estornar",
-                "motivo": MOTIVO,
-                "chave_idempotencia": f"chave-pg-dup-{uuid.uuid4().hex}",
-            },
-            headers=c.token("adm_a"),
-        ).status_code
-        == 409
+            http.post(
+                f"{URL_FILA}/{caso.id}/decisao",
+                json={
+                    "decisao": "estornar",
+                    "motivo": MOTIVO,
+                    "chave_idempotencia": f"chave-pg-dup-{uuid.uuid4().hex}",
+                },
+                headers=c.token("adm_a"),
+            ).status_code
+            == 409
         )
 
         # responder() filtra decidido_em is null e não altera caso já decidido

@@ -13,7 +13,6 @@ from trato.api.contexto import (
     Contexto,
     obter_contexto,
     usuario_atual,
-    usuario_do_pedido_contratado,
 )
 from trato.api.forca_maior import EventoForcaMaiorAppOut
 from trato.pedidos.estados import Estado
@@ -93,7 +92,7 @@ def solicitar_forca_maior(
 )
 def listar_forca_maior_pedido(
     pedido_id: str,
-    usuario: Usuario = Depends(usuario_do_pedido_contratado),
+    usuario: Usuario = Depends(usuario_atual),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[EventoForcaMaiorAppOut]:
     regras.exigir_tabela(contexto)
@@ -101,7 +100,5 @@ def listar_forca_maior_pedido(
     if pedido is None:
         raise HTTPException(404, "Pedido não encontrado.")
     if usuario.id not in (pedido.cliente_id, pedido.profissional_id):
-        raise HTTPException(
-            403, "Só as partes do pedido podem ver as solicitações de força maior."
-        )
+        raise HTTPException(403, "Só as partes do pedido podem ver as solicitações de força maior.")
     return [regras.saida_app(x) for x in contexto.forca_maior.listar_do_pedido(pedido.id)]

@@ -26,7 +26,9 @@ def _ligar_notificador(adm) -> None:
 
 
 def _enviar_aviso_inatividade(adm, dias: int = 30, ref: str = "inat-cli-1"):
-    vigencia = (adm.relogio().astimezone(periodo.BRASILIA).date() + timedelta(days=dias)).isoformat()
+    vigencia = (
+        adm.relogio().astimezone(periodo.BRASILIA).date() + timedelta(days=dias)
+    ).isoformat()
     return adm.cliente.post(
         "/v1/admin/avisos-previos",
         json={

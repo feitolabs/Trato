@@ -553,11 +553,14 @@ class PedidosPostgres:
                 cidade = str(cid_padrao["id"]) if cid_padrao else exigir_uuid(d.cidade_id, "cidade")
 
         extra_col, extra_ph, extra_val = "", "", ()
-        if pedido.substitui_pedido_id is not None and con.execute(
-            "select exists (select 1 from information_schema.columns where "
-            "table_schema = 'public' and table_name = 'pedidos' "
-            "and column_name = 'substitui_pedido_id') as tem"
-        ).fetchone()["tem"]:
+        if (
+            pedido.substitui_pedido_id is not None
+            and con.execute(
+                "select exists (select 1 from information_schema.columns where "
+                "table_schema = 'public' and table_name = 'pedidos' "
+                "and column_name = 'substitui_pedido_id') as tem"
+            ).fetchone()["tem"]
+        ):
             extra_col, extra_ph = ", substitui_pedido_id", ", %s"
             extra_val = (exigir_uuid(pedido.substitui_pedido_id, "pedido substituído"),)
         con.execute(

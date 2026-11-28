@@ -65,7 +65,9 @@ def test_solicitar_prazo_10_dias_uteis_223_notificar_e_responder(fluxo):
         == 403
     )
     assert (
-        fluxo.chamar("GET", f"/v1/admin/disputas/{pid}/pedidos-informacao", "t-mediador").status_code
+        fluxo.chamar(
+            "GET", f"/v1/admin/disputas/{pid}/pedidos-informacao", "t-mediador"
+        ).status_code
         == 200
     )
 
@@ -116,7 +118,9 @@ def test_solicitar_prazo_10_dias_uteis_223_notificar_e_responder(fluxo):
     # Outro papel (profissional) tentando responder pedido do cliente -> 403
     url_resp = f"/v1/disputas/{pid}/pedidos-informacao/{info['id']}/responder"
     assert (
-        fluxo.chamar("POST", url_resp, "t-prof", {"resposta_texto": "Tentativa indevida"}).status_code
+        fluxo.chamar(
+            "POST", url_resp, "t-prof", {"resposta_texto": "Tentativa indevida"}
+        ).status_code
         == 403
     )
 
@@ -130,7 +134,9 @@ def test_solicitar_prazo_10_dias_uteis_223_notificar_e_responder(fluxo):
 
     # Segunda resposta -> 409; encerrar sem resposta após respondido -> 409
     assert (
-        fluxo.chamar("POST", url_resp, "t-cliente", {"resposta_texto": "Segunda resposta"}).status_code
+        fluxo.chamar(
+            "POST", url_resp, "t-cliente", {"resposta_texto": "Segunda resposta"}
+        ).status_code
         == 409
     )
     fluxo.amb.relogio.avancar(days=30)
@@ -199,7 +205,9 @@ def test_encerrar_sem_resposta_so_apos_prazo_e_bloqueios_sem_tabela(fluxo):
     # Sem a tabela -> 503 sem quebrar o restante da disputa
     fluxo.ctx.disputa_pedidos_info.disponivel = lambda: False
     assert (
-        fluxo.chamar("GET", f"/v1/admin/disputas/{pid}/pedidos-informacao", "t-mediador").status_code
+        fluxo.chamar(
+            "GET", f"/v1/admin/disputas/{pid}/pedidos-informacao", "t-mediador"
+        ).status_code
         == 503
     )
     assert fluxo.chamar("GET", f"/v1/pedidos/{pid}/disputa", "t-cliente").status_code == 200

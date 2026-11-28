@@ -44,6 +44,7 @@ abstract final class IconesTrato {
   static const checkoutSemCodigo = Icons.fact_check_outlined;
   static const faltasRepetidas = Icons.event_busy_outlined;
   static const forcaMaior = Icons.thunderstorm_outlined;
+  static const guardas = Icons.lock_clock_outlined;
   static const moedas = Icons.toll_outlined;
   static const equipe = Icons.badge_outlined;
   static const configuracoes = Icons.tune;

@@ -17,9 +17,7 @@ from trato.pagamentos.prazos import PRAZO_ESTORNO_CARTAO, PRAZO_ESTORNO_PIX
 def test_cobranca_pix_expoe_prazo_e_cartao_fica_nulo(fluxo):
     pid = fluxo.aceitar()
     # Pix em /v1/contratos/{id}/cobranca
-    r_pix = fluxo.chamar(
-        "POST", f"/v1/contratos/{pid}/cobranca", "t-cliente", json={"meio": "pix"}
-    )
+    r_pix = fluxo.chamar("POST", f"/v1/contratos/{pid}/cobranca", "t-cliente", json={"meio": "pix"})
     assert r_pix.status_code == 201, r_pix.text
     d = r_pix.json()
     assert d["pix_validade_minutos"] == 30
@@ -44,9 +42,7 @@ def test_cobranca_pix_expoe_prazo_e_cartao_fica_nulo(fluxo):
 
 def test_cobranca_em_rotas_pagamento_expoe_pix_e_estorno(fluxo):
     pid = fluxo.aceitar()
-    r = fluxo.chamar(
-        "POST", f"/v1/pedidos/{pid}/cobranca", "t-cliente", json={"meio": "pix"}
-    )
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/cobranca", "t-cliente", json={"meio": "pix"})
     assert r.status_code == 201, r.text
     c = r.json()
     assert c["pix_validade_minutos"] == 30

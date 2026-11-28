@@ -50,9 +50,7 @@ def test_pedido_info_fluxo_completo_imutabilidade_e_sem_tabela_no_postgres(
 
     with c.local.admin() as con:
         disputa_id = str(
-            con.execute(
-                "select id from public.disputas where pedido_id = %s", (pid,)
-            ).fetchone()[0]
+            con.execute("select id from public.disputas where pedido_id = %s", (pid,)).fetchone()[0]
         )
 
     # 1. Solicitar informação ao cliente usando disputa_id real
@@ -99,7 +97,9 @@ def test_pedido_info_fluxo_completo_imutabilidade_e_sem_tabela_no_postgres(
     )
     assert r_sol2.status_code == 201, r_sol2.text
     info2 = r_sol2.json()
-    url_enc2 = f"/v1/admin/disputas/{disputa_id}/pedidos-informacao/{info2['id']}/encerrar-sem-resposta"
+    url_enc2 = (
+        f"/v1/admin/disputas/{disputa_id}/pedidos-informacao/{info2['id']}/encerrar-sem-resposta"
+    )
     assert (
         http.post(
             url_enc2,

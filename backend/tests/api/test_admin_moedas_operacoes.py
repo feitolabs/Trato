@@ -61,14 +61,18 @@ def test_conceder_consultar_idempotencia_e_auditoria(adm):
         "chave_idempotencia": "comp-001",
         "referencia_id": "chamado-42",
     }
-    r1 = adm.cliente.post(f"{BASE}/{CLIENTE.id}/conceder", json=body, headers=_headers("t-administrador"))
+    r1 = adm.cliente.post(
+        f"{BASE}/{CLIENTE.id}/conceder", json=body, headers=_headers("t-administrador")
+    )
     assert r1.status_code == 200, r1.text
     d1 = r1.json()
     assert (d1["quantidade"], d1["saldo_atual"], d1["idempotente"]) == (120, 120, False)
     assert d1["expira_em"] == (AGORA + timedelta(days=90)).isoformat().replace("+00:00", "Z")
 
     # Repetição com mesma chave é idempotente: não dobra o saldo nem grava nova auditoria
-    r2 = adm.cliente.post(f"{BASE}/{CLIENTE.id}/conceder", json=body, headers=_headers("t-administrador"))
+    r2 = adm.cliente.post(
+        f"{BASE}/{CLIENTE.id}/conceder", json=body, headers=_headers("t-administrador")
+    )
     assert r2.status_code == 200, r2.text
     d2 = r2.json()
     assert (d2["saldo_atual"], d2["idempotente"]) == (120, True)

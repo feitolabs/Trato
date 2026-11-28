@@ -180,13 +180,29 @@ abstract interface class ApiAdmin {
   });
 
   /// Contestação de materiais (Termos 6.9). Permissão `materiais_contestacao_analisar`.
-  /// A aprovação financeira não é chamada pelo painel.
   Future<PaginaRemota<ContestacaoMaterial>> listarContestacoesMaterial(
       {String? status, String? pedidoId, int deslocamento = 0, int limite = 50});
   Future<ContestacaoMaterial> analisarContestacaoMaterial(String contestacaoId);
 
   /// Links curtos da foto da nota e das provas. O acesso é auditado com o motivo (10 a 2000).
   Future<List<AnexoMaterial>> abrirAnexosContestacaoMaterial(String contestacaoId, {required String motivo});
+
+  /// Guarda de retenção do pedido (Termos 14.8 e 16.3). Permissão `pedido_guardas_gerenciar`.
+  /// Guardas vêm da mais nova para a mais antiga. `repetida`: já havia uma aberta igual (200).
+  Future<List<GuardaPedido>> listarGuardasPedido(String pedidoId);
+  Future<({GuardaPedido guarda, bool repetida})> abrirGuardaPedido(String pedidoId,
+      {required String tipo, required String motivo});
+  Future<GuardaPedido> encerrarGuardaPedido(String pedidoId, String guardaId, {required String motivo});
+  Future<RetencaoPedido> obterRetencaoPedido(String pedidoId);
+
+  /// Aprovação financeira por segunda pessoa (motivo de 10 a 2000). Permissão
+  /// `materiais_contestacao_aprovar`. Não move dinheiro; se já aprovada, devolve o estado atual.
+  Future<ContestacaoMaterial> aprovarFinanceiroContestacaoMaterial(String contestacaoId, {required String motivo});
+
+  /// Executa o estorno aprovado. Permissão `materiais_contestacao_aprovar` e alçada, conferidas
+  /// pelo backend. Repetir é seguro: devolve `ja_executada`.
+  Future<EstornoMaterial> executarEstornoMaterial(String contestacaoId,
+      {required String motivo, required bool materialPagoNoApp});
 
   /// `valorReconhecidoCentavos` só vai na decisão `parcial`; nas outras o backend define.
   Future<ContestacaoMaterial> decidirContestacaoMaterial(String contestacaoId,

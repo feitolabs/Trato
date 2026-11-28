@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
+from trato.financeiro.ledger import SUFIXO_RETIDO_A_LIBERAR, SUFIXO_RETIDO_CUSTODIA
 from trato.persistencia.comum import como_uuid
 from trato.persistencia.conexao import Banco
 
@@ -21,7 +22,7 @@ class Divida:
     contrato_id: str
     pedido_id: str
     profissional_id: str
-    origem_tipo: str  # disputa | disputa_contestacao | regresso
+    origem_tipo: str  # disputa | disputa_contestacao | regresso | nota_material_contestacao
     valor_centavos: int
     compensado_centavos: int
     motivo: str
@@ -175,6 +176,9 @@ class CompensacoesIndisponiveis:
     """Memória: as regras vivem no banco; aqui nada é compensado."""
 
     def disponivel(self) -> bool:
+        return False
+
+    def conta_reembolso_retido(self) -> bool:
         return False
 
     def registrar_disputa(
@@ -443,6 +447,21 @@ class CompensacoesPostgres:
     def disponivel(self) -> bool:
         with self._banco.transacao() as con:
             return self._tem(con)
+
+    def conta_reembolso_retido(self) -> bool:
+        """As DUAS funções que somam o já devolvido contam o reembolso direto do saldo retido
+        (20261128040000)? Lê o corpo vigente: se uma migration antiga for rodada de novo por
+        cima, volta a responder falso."""
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select count(*) as n from pg_catalog.pg_proc p where p.oid in ("
+                "to_regprocedure('public.compensacao_estornado_ao_cliente(uuid)'), "
+                "to_regprocedure('public.compensacao_criar_divida(text,uuid,uuid,uuid,bigint,"
+                "bigint,text,uuid,uuid,uuid)')) "
+                "and strpos(p.prosrc, %s) > 0 and strpos(p.prosrc, %s) > 0",
+                (SUFIXO_RETIDO_CUSTODIA, SUFIXO_RETIDO_A_LIBERAR),
+            ).fetchone()
+        return int(linha["n"]) == 2
 
     @staticmethod
     def _contrato(con: Any, pedido_id: str) -> Any:

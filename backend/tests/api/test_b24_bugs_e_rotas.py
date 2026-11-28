@@ -577,7 +577,9 @@ def test_cliente_avaliado_pode_responder_avaliacao_uma_vez(fluxo):  # noqa: F811
     assert corpo["direcao"] == "profissional_para_cliente"
     assert corpo["resposta"] == "Obrigado pelo ótimo atendimento!"
     recebidas = fluxo.ctx.avaliacoes.recebidas(fluxo.ctx.pedidos.obter(pid).cliente_id)
-    assert any(a.id == av_id and a.resposta == "Obrigado pelo ótimo atendimento!" for a in recebidas)
+    assert any(
+        a.id == av_id and a.resposta == "Obrigado pelo ótimo atendimento!" for a in recebidas
+    )
 
     # Segunda resposta é recusada (409)
     assert (

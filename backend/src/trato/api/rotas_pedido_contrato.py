@@ -189,9 +189,7 @@ class CobrancaContratoOut(BaseModel):
     pix_expira_em: datetime | None = Field(
         None, description="6.3: instante em que o QR code Pix expira (ISO8601)."
     )
-    pix_validade_minutos: int | None = Field(
-        None, description="6.3: validade do Pix em minutos."
-    )
+    pix_validade_minutos: int | None = Field(None, description="6.3: validade do Pix em minutos.")
     estorno_status: str | None = Field(
         None,
         description="6.10: `solicitado`, `em_processamento`, `concluido` ou `falhou`.",
@@ -219,9 +217,7 @@ class PagamentoContratoOut(BaseModel):
     pix_expira_em: datetime | None = Field(
         None, description="6.3: instante em que o QR code Pix expira (ISO8601)."
     )
-    pix_validade_minutos: int | None = Field(
-        None, description="6.3: validade do Pix em minutos."
-    )
+    pix_validade_minutos: int | None = Field(None, description="6.3: validade do Pix em minutos.")
     estorno_status: str | None = Field(
         None,
         description="6.10: `solicitado`, `em_processamento`, `concluido` ou `falhou`.",

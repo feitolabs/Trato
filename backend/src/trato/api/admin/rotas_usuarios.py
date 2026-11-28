@@ -86,9 +86,7 @@ def _marcar_trava(contexto: Contexto, operador: Operador, itens: list[UsuarioOut
 @router.get("/usuarios", response_model=Pagina[UsuarioOut], summary="Buscar usuários")
 def buscar_usuarios(
     q: str | None = Query(None, min_length=2, max_length=100, description="Nome ou id."),
-    status: str | None = Query(
-        None, pattern="^(ativo|restrito|bloqueado|inativo|anonimizado)$"
-    ),
+    status: str | None = Query(None, pattern="^(ativo|restrito|bloqueado|inativo|anonimizado)$"),
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
     operador: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
@@ -324,9 +322,7 @@ def detalhe_pedido(
 # --- Conta inativa (Termos 4.9): inativar após aviso prévio >= 30 dias e reativar ---------------
 
 
-def _aviso_inatividade_cumprido(
-    admin: AdminContexto, contexto: Contexto, usuario_id: str
-) -> bool:
+def _aviso_inatividade_cumprido(admin: AdminContexto, contexto: Contexto, usuario_id: str) -> bool:
     dias = antecedencia_dias(contexto, "inatividade")
     agora = contexto.agora()
     hoje = agora.astimezone(periodo.BRASILIA).date()

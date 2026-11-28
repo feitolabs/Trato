@@ -28,9 +28,7 @@ def test_substituicao_e_faltas_repetidas_no_postgres(pg, equipe):
 
     # Outro usuário não pode substituir -> 403
     assert (
-        http.post(
-            f"/v1/pedidos/{pid}/substituir", headers=pg.token("profissional")
-        ).status_code
+        http.post(f"/v1/pedidos/{pid}/substituir", headers=pg.token("profissional")).status_code
         == 403
     )
 

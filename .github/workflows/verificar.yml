@@ -47,9 +47,13 @@ jobs:
         run: python harness/verificar.py --etapa segredos
 
   backend:
-    name: Backend (ruff + pytest)
+    name: Backend ${{ matrix.shard }}/4 (ruff + pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Baixar o código
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -68,8 +72,8 @@ jobs:
           backend/.venv/bin/python -m pip install --upgrade pip
           backend/.venv/bin/python -m pip install -e "backend[dev]"
 
-      - name: Verificar o backend
-        run: python harness/verificar.py --etapa backend
+      - name: Verificar o backend (parte ${{ matrix.shard }}/4)
+        run: python harness/verificar.py --etapa backend --backend-shard ${{ matrix.shard }}/4
 
   app:
     name: App (Flutter)

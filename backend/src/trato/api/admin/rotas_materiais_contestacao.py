@@ -5,7 +5,8 @@ Permissões:
   listar, passar para `em_analise` e decidir (`procedente` | `parcial` | `improcedente`).
 - `materiais_contestacao_aprovar` (`lider_suporte`, `administrador`):
   aprovar o efeito financeiro em 4 olhos (`aprovada_por != analista_id`), avançando
-  `efeito_financeiro` para `pendente_financeiro` (idempotente, sem mover dinheiro duas vezes).
+  `efeito_financeiro` para `pendente_financeiro` (idempotente, sem mover dinheiro duas vezes);
+  e executar o estorno (`/executar-estorno`), com alçada sobre o total devolvido.
 Todas as escritas e a abertura de anexos são auditadas; sem tabela, responde 503 limpo.
 """
 
@@ -16,13 +17,16 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import Pagina
-from trato.api.admin.papeis import Permissao
+from trato.api.admin.papeis import PapelEquipe, Permissao
 from trato.api.ausencia_base import URL_SEGUNDOS, midia_do_pedido
+from trato.api.compensacoes import avisar_divida
 from trato.api.contexto import Contexto, obter_contexto
+from trato.financeiro.ledger import LedgerErro
 from trato.persistencia.materiais_contestacao import ContestacaoNotaMaterial
 
 router = APIRouter(
@@ -246,6 +250,178 @@ def aprovar_financeiro(
             motivo=corpo.motivo,
         )
     return _out(cont)
+
+
+class ExecutarEstornoMaterialIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    motivo: str = Field(min_length=10, max_length=2000)
+    material_pago_no_app: bool = Field(
+        strict=True,
+        description="Quem executa confirma que o material foi pago pelo app (o sistema não "
+        "sabe). false: nada é estornado; o caso segue em análise manual.",
+    )
+
+
+class EstornoMaterialOut(BaseModel):
+    resultado: Literal["ok", "ja_executada"]
+    contestacao: ContestacaoMaterialAdminOut
+    valor_reconhecido_centavos: int
+    valor_retido_centavos: int = Field(description="Saiu do que não tinha sido liberado.")
+    valor_compensacao_centavos: int = Field(description="Dívida do profissional.")
+    custo_parcelamento_centavos: int
+    total_estornado_centavos: int = Field(description="O que o cliente recebe de volta.")
+    compensacao_id: str | None = None
+    profissional_avisado: bool | None = Field(
+        None, description="null sem dívida. false: usar o reenvio de aviso da compensação."
+    )
+
+
+def _recusa(status: int, codigo: str, mensagem: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"detail": mensagem, "codigo": codigo})
+
+
+_RECUSAS_DO_BANCO = {
+    "conflito": (409, "Esta contestação já foi executada com outros valores."),
+    "analista_invalido": (403, "Só líder de suporte ou administrador ativo executa."),
+    "nao_encontrada": (404, "Contestação de nota de material não encontrada."),
+    "nao_elegivel": (409, "A contestação não está aprovada e pendente de execução."),
+    "valor_invalido": (422, "O valor a compensar não é válido."),
+    "custo_invalido": (422, "O custo do parcelamento não confere com o cobrado."),
+    "ordens_divergentes": (409, "As ordens de estorno não somam o valor a devolver."),
+    "acima_do_devido": (422, "A parte liberada passa do que pode ser compensado."),
+}
+
+
+class _Recusada(Exception):
+    """Desfaz a transação inteira (livro e ordens)."""
+
+    def __init__(self, status: int, codigo: str, mensagem: str) -> None:
+        super().__init__(mensagem)
+        self.resposta = _recusa(status, codigo, mensagem)
+
+
+def _executado(
+    contexto: Contexto, contestacao_id: str, resultado: str, operador_id: str
+) -> EstornoMaterialOut:
+    cont = contexto.materiais_contestacao.obter(contestacao_id)
+    feita = contexto.materiais_contestacao.execucao(contestacao_id)
+    avisado = None
+    if feita.divida_id:  # depois do commit; pode repetir
+        avisado = avisar_divida(contexto, feita.divida_id, operador_id)
+    return EstornoMaterialOut(
+        resultado=resultado,  # type: ignore[arg-type]
+        contestacao=_out(cont),
+        valor_reconhecido_centavos=feita.valor_reconhecido_centavos,
+        valor_retido_centavos=feita.valor_reconhecido_centavos - feita.valor_divida_centavos,
+        valor_compensacao_centavos=feita.valor_divida_centavos,
+        custo_parcelamento_centavos=feita.custo_parcelamento_centavos,
+        total_estornado_centavos=feita.total_estornado_centavos,
+        compensacao_id=feita.divida_id,
+        profissional_avisado=avisado,
+    )
+
+
+@router.post(
+    "/{contestacao_id}/executar-estorno",
+    response_model=EstornoMaterialOut,
+    summary="Executar o estorno de uma contestação de material aprovada (6.9)",
+    description="Idempotente pela contestação: repetir devolve `ja_executada` sem mover "
+    "dinheiro. Recusas trazem `codigo`.",
+)
+def executar_estorno(
+    contestacao_id: str,
+    corpo: ExecutarEstornoMaterialIn,
+    request: Request,
+    operador: Operador = Depends(exigir(Permissao.MATERIAIS_CONTESTACAO_APROVAR)),
+    contexto: Contexto = Depends(obter_contexto),
+):
+    _exigir_tabela(contexto)
+    repo = contexto.materiais_contestacao
+    servico = getattr(request.app.state, "servico_pagamento", None)
+    if servico is None or not repo.execucao_disponivel():
+        return _recusa(503, "indisponivel", "A execução do estorno ainda não está disponível.")
+    cont = repo.obter(contestacao_id)
+    if cont is None:
+        return _recusa(*_com_codigo("nao_encontrada"))
+    travar = getattr(contexto.pedidos, "travar", None)
+    resultado = "ok"
+    try:
+        with contexto.transacao():  # livro, ordens, dívida e `executado`: tudo ou nada
+            if travar is not None:  # ordem das travas: pedido, contrato
+                travar(cont.pedido_id)
+            repo.travar_contrato(cont.pedido_id)
+            cont = repo.obter(contestacao_id)  # relê com as travas
+            if cont.efeito_financeiro == "executado":
+                resultado = "ja_executada"
+            else:
+                _executar_travado(contexto, servico, repo, cont, corpo, operador)
+    except _Recusada as recusa:
+        return recusa.resposta
+    return _executado(contexto, contestacao_id, resultado, operador.id)
+
+
+def _com_codigo(codigo: str) -> tuple[int, str, str]:
+    status, mensagem = _RECUSAS_DO_BANCO.get(codigo, (409, "O banco recusou a execução."))
+    return status, codigo, mensagem
+
+
+def _executar_travado(
+    contexto: Contexto,
+    servico: Any,
+    repo: Any,
+    cont: ContestacaoNotaMaterial,
+    corpo: ExecutarEstornoMaterialIn,
+    operador: Operador,
+) -> None:
+    if cont.efeito_financeiro != "pendente_financeiro" or not cont.valor_reconhecido_centavos:
+        raise _Recusada(*_com_codigo("nao_elegivel"))
+    if not corpo.material_pago_no_app:
+        raise _Recusada(
+            409,
+            "analise_manual",
+            "Material pago fora do app não tem estorno automático: trate em análise manual.",
+        )
+    pedido = contexto.pedidos.obter(cont.pedido_id)
+    if pedido is None:
+        raise _Recusada(404, "nao_encontrada", "Pedido da contestação não encontrado.")
+    disputa = contexto.disputas.obter(pedido.id)
+    if disputa is not None and not disputa.encerrada:
+        raise _Recusada(409, "disputa_aberta", "Há uma disputa aberta: o valor está congelado.")
+    if contexto.contestacoes.perdidas_do_pedido(pedido.id):
+        raise _Recusada(
+            409,
+            "analise_manual",
+            "A emissora do cartão já devolveu valor deste pedido (6.11): análise manual.",
+        )
+    plano = servico.planejar_estorno_material(contexto, pedido, cont.valor_reconhecido_centavos)
+    if plano is None:
+        raise _Recusada(
+            409,
+            "analise_manual",
+            "O que foi pago no app e ainda não voltou não cobre o valor: análise manual.",
+        )
+    alcada = operador.membro.alcada_centavos
+    if operador.membro.papel == PapelEquipe.ADMINISTRADOR:
+        alcada = alcada or 100_000_000_00
+    if plano.total_centavos > (alcada or 0):
+        raise _Recusada(
+            403,
+            "acima_da_alcada",
+            f"Valor do estorno ({plano.total_centavos} centavos) acima da sua alçada "
+            f"({alcada or 0} centavos).",
+        )
+    try:
+        servico.gravar_estorno_material(contexto, pedido, plano, f"nota-material/{cont.id}")
+    except LedgerErro as erro:
+        raise _Recusada(
+            409, "analise_manual", f"O livro não comporta este estorno: {erro}"
+        ) from erro
+    resultado = repo.executar_estorno(
+        cont.id, plano.liberado_centavos, plano.custo_centavos, corpo.motivo, operador.id
+    )
+    if resultado != "ok":
+        raise _Recusada(*_com_codigo(resultado))
 
 
 class AbrirAnexosMaterialIn(BaseModel):

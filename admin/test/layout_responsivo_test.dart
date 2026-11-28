@@ -12,6 +12,7 @@ const _secoes = [
   'ausencias',
   'faltas_repetidas',
   'forca_maior',
+  'guardas',
   'checkout_sem_codigo',
   'incidentes',
   'indisponibilidades',

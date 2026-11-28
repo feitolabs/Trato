@@ -320,7 +320,6 @@ class ConsentimentosPostgres(RepositorioConsentimentos):
             for r in linhas
         )
 
-
     def ultimos(self, usuario_ids: Sequence[str], finalidade: str) -> dict[str, bool]:
         pedidos = {como_uuid(i): i for i in usuario_ids if como_uuid(i) is not None}
         if not pedidos:

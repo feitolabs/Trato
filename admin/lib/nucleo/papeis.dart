@@ -48,6 +48,8 @@ enum Permissao {
   contaRetornoAnalisar,
   contaRetornoAprovar,
   materiaisContestacaoAnalisar,
+  materiaisContestacaoAprovar,
+  pedidoGuardasGerenciar,
   disputasVer,
   disputasDecidir,
   disputasSegundaPessoa,
@@ -110,6 +112,7 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.avaliacoesModerar,
     Permissao.contaRetornoAnalisar,
     Permissao.materiaisContestacaoAnalisar,
+    Permissao.materiaisContestacaoAprovar,
     Permissao.contaRetornoAprovar,
     Permissao.regressoPropor,
     Permissao.regressoAprovar,
@@ -159,6 +162,7 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.relatoriosExportar,
   },
   Papel.seguranca: {
+    Permissao.pedidoGuardasGerenciar,
     Permissao.seloRetirar,
     Permissao.incidentesVer,
     Permissao.incidentesTratar,
@@ -179,11 +183,13 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.riscoDecidir,
   },
   Papel.juridico: {
+    Permissao.pedidoGuardasGerenciar,
     Permissao.configVer,
     Permissao.auditoriaVer,
     Permissao.auditoriaVerificarCadeia,
   },
   Papel.dpo: {
+    Permissao.pedidoGuardasGerenciar,
     Permissao.lgpdPedidosGerenciar,
     Permissao.lgpdRevisaoAutomatizada,
     Permissao.usuariosBuscar,

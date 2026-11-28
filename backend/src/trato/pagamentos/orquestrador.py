@@ -24,7 +24,7 @@ import threading
 import uuid
 from collections.abc import Callable, Sequence
 from contextlib import nullcontext
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime
 from functools import partial
 
@@ -59,9 +59,11 @@ from trato.financeiro.contestacoes import (
 from trato.financeiro.extrato_profissional import reais
 from trato.financeiro.ledger import (
     CUSTODIA,
+    SUFIXO_PARCELAMENTO,
     LedgerErro,
     Livro,
     custo_parcelamento_em_aberto,
+    estornar_material,
     estornar_pedido,
     liberar,
     reembolso_total_com_custo,
@@ -107,6 +109,18 @@ def _mesmo_id(a: str, b: str) -> bool:
 
 # Em memória não há trava de linha: este cadeado faz o papel dela no aditivo.
 _TRAVA_DO_ADITIVO = threading.RLock()
+
+
+@dataclass(frozen=True)
+class PlanoEstornoMaterial:
+    retido_centavos: int  # sai do que ainda não foi liberado
+    liberado_centavos: int  # vira dívida do profissional (compensação)
+    custo_centavos: int  # custo do parcelamento proporcional
+    partes: tuple[tuple[str, int], ...]  # (cobrança, valor da ordem de estorno)
+
+    @property
+    def total_centavos(self) -> int:
+        return self.retido_centavos + self.liberado_centavos + self.custo_centavos
 
 
 class ErroFluxo(Exception):
@@ -870,19 +884,27 @@ class ServicoPagamento:
                 bruto, f"repasse liberado com relato de segurança aberto no pedido {pedido.id}"
             )
         agora = contexto.agora()
-        novos = self._planejar(
-            contexto,
-            pedido.id,
-            lambda livro: liberar(
-                livro,
+        try:
+            novos = self._planejar(
+                contexto,
                 pedido.id,
-                repasse.profissional_id,
-                f"liq/{repasse.id}",
-                agora,
-                repasse.valor_liquido_centavos,
-                bruto.evento_id,
-            ),
-        )
+                lambda livro: liberar(
+                    livro,
+                    pedido.id,
+                    repasse.profissional_id,
+                    f"liq/{repasse.id}",
+                    agora,
+                    repasse.valor_liquido_centavos,
+                    bruto.evento_id,
+                ),
+            )
+        except LedgerErro as erro:
+            # Ex.: parte do valor já voltou ao cliente ou já foi liberada, e o registro de
+            # repasse (imutável) ainda diz o valor antigo. Nada é lançado; 2xx, sem reenvio.
+            contexto.eventos_webhook.marcar_revisao(
+                bruto, f"repasse {repasse.id} não foi lançado: {erro}"
+            )
+            return
         gravados = contexto.ledger.lancar_varios(novos) if novos else ()
         if contexto.compensacoes.listar(
             profissional_id=repasse.profissional_id, status="aberta", limite=1
@@ -1238,6 +1260,94 @@ class ServicoPagamento:
                 )
                 if repasse is not None:
                     contexto.repasses.criar(repasse)
+
+    # --- material contestado (Termos 6.9) ---------------------------------------------------
+
+    def planejar_estorno_material(
+        self, contexto: Contexto, pedido: Pedido, reconhecido: int
+    ) -> PlanoEstornoMaterial | None:
+        """Quanto sai de onde para devolver `reconhecido`, sem gravar. Chamar com o pedido e o
+        contrato travados. `None`: o que foi pago no app (e ainda não voltou) não cobre o valor.
+
+        O custo do parcelamento volta na proporção do que se devolve de cada cobrança (a mais
+        nova primeiro), arredondado meio para cima, sem passar do que sobra dela."""
+        livro = Livro()
+        antigos = contexto.ledger.lancamentos(pedido.id)
+        if antigos:
+            livro.lancar_varios(antigos)
+        saldos = livro.saldos_pedido(pedido.id, pedido.profissional_id)
+        retido = min(reconhecido, max(saldos.retido, 0) + max(saldos.a_liberar, 0))
+        custo_em_aberto = max(custo_parcelamento_em_aberto(livro, pedido.id), 0)
+        falta, custo_total = reconhecido, 0
+        partes: list[tuple[str, int]] = []
+        pagas = [c for c in self.cobrancas.do_pedido(pedido.id) if c.status is EstadoCobranca.PAGA]
+        for cobranca in reversed(pagas):
+            entrada = livro.da_chave(f"cob/{cobranca.id}")
+            if entrada is None or entrada.credito != CUSTODIA:  # gorjeta ou fora do livro
+                continue
+            taxa = livro.da_chave(f"cob/{cobranca.id}{SUFIXO_PARCELAMENTO}")
+            custo = taxa.valor if taxa else 0
+            servico = cobranca.valor_centavos - custo
+            sobra = cobranca.valor_centavos - cobranca.estornado_centavos
+            if servico <= 0 or sobra <= 0:
+                continue
+            parte = min(falta, servico, sobra * servico // cobranca.valor_centavos)
+            if parte <= 0:
+                continue
+            parte_custo = min(
+                (parte * custo + servico // 2) // servico,
+                sobra - parte,
+                custo_em_aberto - custo_total,
+            )
+            partes.append((cobranca.id, parte + parte_custo))
+            custo_total += parte_custo
+            falta -= parte
+            if falta == 0:
+                break
+        if falta > 0:
+            return None
+        return PlanoEstornoMaterial(retido, reconhecido - retido, custo_total, tuple(partes))
+
+    def gravar_estorno_material(
+        self,
+        contexto: Contexto,
+        pedido: Pedido,
+        plano: PlanoEstornoMaterial,
+        chave: str,
+    ) -> None:
+        """Livro (parte retida e custo) e ordens de estorno, na transação em curso: quem chama
+        confirma no banco DEPOIS, e qualquer recusa desfaz tudo. O provedor só é chamado
+        depois do commit."""
+        agora = contexto.agora()
+        novos = self._planejar(
+            contexto,
+            pedido.id,
+            lambda livro: estornar_material(
+                livro,
+                pedido.id,
+                pedido.profissional_id or "",
+                plano.retido_centavos,
+                plano.custo_centavos,
+                f"{chave}/est",
+                agora,
+            ),
+        )
+        with contexto.transacao():
+            if novos:
+                contexto.ledger.lancar_varios(novos)
+            for cobranca_id, valor in plano.partes:
+                cobranca = self.cobrancas.obter(cobranca_id)
+                if cobranca is None:
+                    raise ErroFluxo("Cobrança do estorno não encontrada.")
+                atualizada = replace(
+                    cobranca, estornado_centavos=cobranca.estornado_centavos + valor
+                )
+                self.cobrancas.salvar(atualizada)
+                self.ordens.salvar(
+                    OrdemEstorno(f"{chave}/{cobranca_id}", pedido.id, cobranca_id, valor, agora)
+                )
+                self._devolver_moedas(contexto, atualizada)
+        contexto.depois_do_commit(lambda: self.reenviar_estornos(pedido.id))
 
     def ordenar_estorno_compensado(
         self, contexto: Contexto, pedido_id: str, valor: int, divida_id: str

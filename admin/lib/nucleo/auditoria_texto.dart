@@ -1,4 +1,5 @@
 import '../dados/modelos.dart';
+import 'formato.dart';
 
 /// Frase legível de uma entrada da auditoria (RF-AUD-02): "aprovou o profissional Marcos Vinícius Lima"
 /// em vez de `verificacao.aprovada` e UUID. O código técnico continua no detalhe expansível.
@@ -54,6 +55,13 @@ String descreverAcao(EntradaAuditoria e) {
     'disputa.pedido_informacao_encerrado_sem_resposta' => nome.isEmpty
         ? 'encerrou sem resposta um pedido de informação na disputa'
         : 'encerrou sem resposta um pedido de informação no pedido $nome',
+    'retencao.guarda_pedido_aberta' => 'abriu uma guarda de retenção${_daGuarda(d)}',
+    'retencao.guarda_pedido_encerrada' => 'encerrou uma guarda de retenção${_daGuarda(d)}',
+    'material.contestacao_financeiro_aprovado' => nome.isEmpty
+        ? 'aprovou o efeito financeiro de uma contestação de material'
+        : 'aprovou o efeito financeiro da contestação de material de $nome',
+    'financeiro.material_estorno_executado' =>
+      '${nome.isEmpty ? 'executou o estorno de material contestado' : 'executou o estorno de material contestado de $nome'}${_totalEstornado(d['total_estornado_centavos'])}',
     'financeiro.checkout_sem_codigo_decidido' =>
       '${nome.isEmpty ? 'decidiu o check-out sem código' : 'decidiu o check-out sem código do pedido $nome'}${_decisaoCheckout(d['decisao'] as String?)}',
     'pagamento.divergencia_conciliada' => 'conciliou uma divergência de pagamento',
@@ -93,6 +101,14 @@ String _canalDoContato(String? canal) => switch (canal) {
       final c? when c.trim().isNotEmpty => ' ($c)',
       _ => '',
     };
+
+String _daGuarda(Map<String, dynamic> d) {
+  final tipo = switch (d['tipo']) { 'processo' => ' (Processo)', 'investigacao' => ' (Investigação)', _ => '' };
+  final pedido = d['pedido_id'];
+  return '${pedido is String && pedido.isNotEmpty ? ' no pedido $pedido' : ''}$tipo';
+}
+
+String _totalEstornado(Object? centavos) => centavos is int ? ' (total de ${formatarReais(centavos)})' : '';
 
 String _decisaoCheckout(String? decisao) => switch (decisao) {
       'liberar' => ' (Liberar pagamento)',
@@ -167,6 +183,7 @@ const filtrosDeAcao = <(String, String)>[
   ('checkout_sem_codigo.', 'Check-out sem código'),
   ('equipe.', 'Equipe'),
   ('config.', 'Configurações'),
+  ('retencao.', 'Guarda de retenção'),
   ('relatorio.', 'Relatórios'),
   ('auditoria.', 'Auditoria'),
 ];
