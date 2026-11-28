@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 from zoneinfo import ZoneInfo
 
+from trato.profissional.nota import MINIMO_PADRAO, nota_visivel
 from trato.profissional.ranking import ConfigRanking, pontuacao
 
 _FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
@@ -101,6 +102,8 @@ class CategoriaPublica:
     icone: str | None = None
     pai_id: str | None = None
     aceita_remoto: bool = False  # o admin liga por categoria; padrão: só presencial
+    incluido: tuple[str, ...] = ()
+    nao_incluido: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -130,6 +133,8 @@ class FiltroBusca:
     deslocamento: int = 0
     # Pesos do ranking (vêm da tabela `ranking_config`, lida pela rota).
     ranking: ConfigRanking = field(default_factory=ConfigRanking)
+    # Termos 12.3: abaixo disto a nota não aparece, não filtra e não ordena.
+    nota_minimo_avaliacoes: int = MINIMO_PADRAO
 
 
 @dataclass(frozen=True)
@@ -149,6 +154,7 @@ class ResultadoBusca:
     disponivel_agora: bool = False
     _regioes_ids: tuple[Regiao, ...] = ()
     _portfolio_texto: str = ""
+    avaliacoes_total: int = 0
 
 
 class RepositorioProfissionais(Protocol):
@@ -251,6 +257,7 @@ class ProfissionaisEmMemoria:
         excluir_usuario_ids: tuple[str, ...] = (),
         limite: int = 20,
         detalhe: Callable[[str], PerfilDetalhe | None] | None = None,
+        nota_minimo_avaliacoes: int = MINIMO_PADRAO,
     ) -> list[str]:
         """Profissionais aprovados e ativos elegíveis para aviso de pedido comum.
 
@@ -272,7 +279,11 @@ class ProfissionaisEmMemoria:
             d = detalhe(p.usuario_id) if detalhe is not None else None
             if d is not None and d.status != "ativo":
                 continue
-            nota = d.nota_publica if d is not None else None
+            nota = (
+                nota_visivel(d.nota_publica, d.avaliacoes_total, nota_minimo_avaliacoes)
+                if d is not None
+                else None
+            )
             candidatos.append(((nota is None, -(nota or 0.0), p.usuario_id), p.usuario_id))
         candidatos.sort(key=lambda item: item[0])
         return [uid for _, uid in candidatos[:limite]]
@@ -302,7 +313,11 @@ class ProfissionaisEmMemoria:
             pontos_texto = _correspondencia_texto(p, nome, filtro)
             if pontos_texto < 0:
                 continue
-            nota = d.nota_publica if d else None
+            nota = (
+                nota_visivel(d.nota_publica, d.avaliacoes_total, filtro.nota_minimo_avaliacoes)
+                if d
+                else None
+            )
             if filtro.nota_minima is not None and (nota is None or nota < filtro.nota_minima):
                 continue
             bairros = tuple(
@@ -320,6 +335,7 @@ class ProfissionaisEmMemoria:
                 atende_remoto=p.atende_remoto,
                 disponivel_agora=p.disponivel_agora,
                 _regioes_ids=p.regioes,
+                avaliacoes_total=d.avaliacoes_total if d else 0,
             )
             concluidos = d.servicos_concluidos if d and d.servicos_concluidos else 0
             nota_composta = pontuacao(
@@ -365,6 +381,8 @@ class CatalogoEmMemoria:
     # Opcionais (a demonstração local): nome e UF; sem eles usa o slug / o id.
     nomes: dict[str, str] = field(default_factory=dict)
     ufs: dict[str, str] = field(default_factory=dict)
+    incluido: dict[str, Sequence[str]] = field(default_factory=dict)
+    nao_incluido: dict[str, Sequence[str]] = field(default_factory=dict)
 
     def categorias_ativas(self) -> dict[str, str]:
         return dict(self.categorias)
@@ -374,7 +392,13 @@ class CatalogoEmMemoria:
 
     def categorias_publicas(self) -> list[CategoriaPublica]:
         return [
-            CategoriaPublica(i, self.nomes.get(i, slug), slug)
+            CategoriaPublica(
+                i,
+                self.nomes.get(i, slug),
+                slug,
+                incluido=tuple(self.incluido.get(i, ())),
+                nao_incluido=tuple(self.nao_incluido.get(i, ())),
+            )
             for i, slug in sorted(
                 self.categorias.items(),
                 key=lambda kv: (normalizar_busca(self.nomes.get(kv[0], kv[1])), kv[0]),

@@ -33,11 +33,19 @@ from trato.api.avisos import (
     servicos_de_notificacao,
 )
 from trato.api.cautela import exigir_contato_livre
-from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.contexto import (
+    Contexto,
+    exigir_papel,
+    obter_contexto,
+    usuario_atual,
+    usuario_para_reativacao,
+)
 from trato.api.elogios import validar_etiquetas_elogio
 from trato.api.exclusividades import profissional_exclusivo
+from trato.api.indisponibilidade import APP, prazo_vigente
 from trato.api.maioridade import exigir_maioridade
 from trato.api.moedas import (
+    CARTEIRA_PROFISSIONAL,
     TIPO_BONUS_PROFISSIONAL,
     bonus_avaliacao_disponivel,
     calcular_uso_moedas,
@@ -46,6 +54,7 @@ from trato.api.moedas import (
     disponibilidade_desconto,
     resumo_pendentes,
     saldo_profissional,
+    vencimento_de_credito_novo,
 )
 from trato.api.moedas_saldo import creditos_validos
 from trato.api.repositorios import PRAZO_AVALIACAO_PADRAO_DIAS, EtapaProposta, ItemOrcamento
@@ -55,8 +64,16 @@ from trato.api.repositorios_app import (
     Avaliacao,
     DocumentoVerificacao,
 )
-from trato.api.servicos import carregar_pedido, eh_participante, garantia_minima_do_pedido
-from trato.api.validade import venceu
+from trato.api.rotas_profissional_cadastro import AvaliacaoRecebidaOut
+from trato.api.selo import exigir_selo_para_orcar
+from trato.api.servicos import (
+    carregar_pedido,
+    eh_participante,
+    garantia_minima_do_pedido,
+    nome_abreviado,
+    nomes_de_categorias,
+)
+from trato.api.validade import validade_vigente, venceu
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.config import obter_config
 from trato.financeiro import periodo
@@ -66,6 +83,7 @@ from trato.pagamentos.custo import ConfigCustoPagamento, MeioPagamento, calcular
 from trato.pedidos.estados import Estado, Pedido
 from trato.persistencia.erros import Duplicado, RegraDoBanco
 from trato.profissional.config import ORDEM_NIVEIS, obter_config_profissional
+from trato.profissional.nota import minimo_de_avaliacoes, nota_visivel
 from trato.profissional.repositorio import slugs
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_texto
@@ -98,6 +116,8 @@ class OrcamentoOut(BaseModel):
         None, description="Selo do profissional (basico, verificado, verificado_plus)."
     )
     profissional_nota: float | None = None
+    profissional_avaliacoes_total: int = 0
+    nota_minimo_avaliacoes: int = Field(1, description="Abaixo disto a nota vem null (12.3).")
     profissional_servicos_concluidos: int | None = None
 
 
@@ -119,10 +139,18 @@ class EtapaPropostaIn(BaseModel):
 
 class CriarOrcamentoIn(BaseModel):
     itens: list[ItemOrcamentoIn] = Field(min_length=1)
-    prazo_execucao_dias: int | None = Field(default=None, ge=1, le=365)
-    validade_ate: datetime | None = None
-    garantia_dias: int | None = Field(default=None, ge=0, le=730)
-    fora_do_escopo: str | None = Field(default=None, max_length=1000)
+    # Termos 5.2: valor (itens), prazo, validade e garantia são obrigatórios no envio. O que
+    # está incluído são os itens; o que não está incluído vai em `fora_do_escopo`.
+    prazo_execucao_dias: int = Field(ge=1, le=365, description="Prazo de execução, em dias.")
+    validade_ate: datetime = Field(description="Até quando o orçamento vale (data futura).")
+    garantia_dias: int = Field(
+        ge=0, le=730, description="Garantia oferecida, em dias (respeita a mínima do serviço)."
+    )
+    fora_do_escopo: str = Field(
+        min_length=2,
+        max_length=1000,
+        description='Obrigatório (5.2): o que NÃO está incluído ("não incluído").',
+    )
     sinal_material_centavos: int | None = Field(default=None, ge=0)
     observacoes: str | None = Field(default=None, max_length=1000)
     etapas: list[EtapaPropostaIn] = Field(default_factory=list)
@@ -142,7 +170,19 @@ class OpcaoParcelamentoOut(BaseModel):
     parcelas: int
     custo_centavos: int = Field(description="Custo do provedor repassado ao cliente.")
     total_centavos: int = Field(description="Serviço + custo, em centavos.")
-    valor_parcela_centavos: int
+    valor_parcela_centavos: int = Field(
+        description="Valor de todas as parcelas menos a última (use `valores_parcelas_centavos`)."
+    )
+    valores_parcelas_centavos: list[int] = Field(
+        description="Uma por parcela, na ordem; a soma é `total_centavos`."
+    )
+    ultima_parcela_centavos: int
+    custo_total_bps: int = Field(
+        description="Custo do provedor em pontos-base (100 = 1%) sobre o valor à vista, cobrado "
+        "UMA vez no total. NÃO é taxa de juros ao mês (não temos esse dado)."
+    )
+    diferenca_a_vista_centavos: int = Field(description="Quanto custa a mais que à vista (6.4).")
+    sem_juros: bool = Field(description="true: esta opção não tem custo nenhum.")
 
 
 class PagamentoValoresOut(BaseModel):
@@ -227,6 +267,10 @@ class NotificacaoOut(BaseModel):
 
 
 class PerfilOut(BaseModel):
+    avaliacoes_total: int = Field(0, description="Avaliações publicadas recebidas (12.3).")
+    nota_minimo_avaliacoes: int = Field(
+        1, description="Abaixo disto a nota vem null (mostre 'novo no Trato')."
+    )
     id: str
     nome: str | None
     papel: str
@@ -318,6 +362,9 @@ class AvaliacaoOut(BaseModel):
     etiquetas: list[str]
     criada_em: datetime
     moedas_ganhas: int = Field(0, description="Moedas de bônus por esta avaliação (0 se nenhuma).")
+    bonus_validade_dias: int | None = Field(
+        None, description="13.3: validade, em dias a partir do crédito, do bônus ganho."
+    )
 
 
 class ResponderAvaliacaoIn(_Entrada):
@@ -326,6 +373,11 @@ class ResponderAvaliacaoIn(_Entrada):
 
 class AvaliacaoDadosOut(BaseModel):
     pedido_id: str
+    bonus_validade_dias: int | None = Field(
+        None,
+        description="Termos 13.3: validade, em dias a partir do crédito, do bônus anunciado. "
+        "Null: sem bônus.",
+    )
     ja_avaliou: bool = Field(description="Esta pessoa já avaliou este serviço.")
     bonus_disponivel: bool = Field(
         description="Avaliar agora rende Tratinhos de bônus (teto do mês, limite por profissional "
@@ -354,6 +406,10 @@ class MoedasOut(BaseModel):
     creditos: list[CreditoMoedaOut] = Field(
         default_factory=list,
         description="Carteira do cliente por validade (13.4), na ordem em que serão usados.",
+    )
+    creditos_profissional: list[CreditoMoedaOut] = Field(
+        default_factory=list,
+        description="O mesmo para a carteira do PROFISSIONAL (13.3 e 13.4).",
     )
     saldo: int = Field(description="Tratinhos da carteira do CLIENTE (a do desconto).")
     saldo_profissional: int = Field(
@@ -592,7 +648,15 @@ def listar_orcamentos(
             profissional_nivel_verificacao=getattr(
                 detalhes[o.profissional_id], "nivel_verificacao", None
             ),
-            profissional_nota=getattr(detalhes[o.profissional_id], "nota_publica", None),
+            profissional_nota=nota_visivel(
+                getattr(detalhes[o.profissional_id], "nota_publica", None),
+                getattr(detalhes[o.profissional_id], "avaliacoes_total", 0),
+                minimo_de_avaliacoes(contexto.config),
+            ),
+            profissional_avaliacoes_total=getattr(
+                detalhes[o.profissional_id], "avaliacoes_total", 0
+            ),
+            nota_minimo_avaliacoes=minimo_de_avaliacoes(contexto.config),
             profissional_servicos_concluidos=getattr(
                 detalhes[o.profissional_id], "servicos_concluidos", None
             ),
@@ -702,6 +766,7 @@ def enviar_orcamento(
         raise HTTPException(422, MENSAGEM_BLOQUEIO)
     exigir_contato_livre(contexto, pedido, usuario.id)  # 9.6: o orçamento leva texto livre
 
+    exigir_selo_para_orcar(contexto, usuario.id)  # 10.3
     agora = contexto.agora()
     total_estimado = sum(int(i.quantidade * i.valor_unitario_centavos) for i in dados.itens)
     if total_estimado <= 0:
@@ -717,6 +782,9 @@ def enviar_orcamento(
             f"A garantia mínima para este serviço é de {minima} dias "
             "(Código de Defesa do Consumidor).",
         )
+    fora_do_escopo = limpar_texto(dados.fora_do_escopo, "fora_do_escopo", 1000)
+    if len((fora_do_escopo or "").strip()) < 2:
+        raise HTTPException(422, "Escreva o que não está incluído no orçamento (Termos 5.2).")
     itens = [
         ItemOrcamento(
             tipo=i.tipo.strip().lower(),
@@ -743,11 +811,7 @@ def enviar_orcamento(
             prazo_execucao_dias=dados.prazo_execucao_dias,
             validade_ate=dados.validade_ate,
             garantia_dias=dados.garantia_dias,
-            fora_do_escopo=(
-                limpar_texto(dados.fora_do_escopo, "fora_do_escopo", 1000)
-                if dados.fora_do_escopo
-                else None
-            ),
+            fora_do_escopo=fora_do_escopo,
             sinal_material_centavos=dados.sinal_material_centavos,
             observacoes=(
                 limpar_texto(dados.observacoes, "observacoes", 1000) if dados.observacoes else None
@@ -889,7 +953,7 @@ def valores_do_pagamento(
         ]
     orcamento = contexto.orcamentos.detalhe(contrato.orcamento_id) if contrato else None
     return PagamentoValoresOut(
-        validade_ate=orcamento.validade_ate if orcamento else None,
+        validade_ate=validade_vigente(contexto, orcamento) if orcamento else None,
         pedido_id=pedido.id,
         estado=pedido.estado.value,
         valor_centavos=contrato.valor_centavos if contrato else None,
@@ -1413,6 +1477,16 @@ def minhas_verificacoes(
 # --- Moedas ----------------------------------------------------------------------------
 
 
+def validade_do_credito_novo(contexto: Contexto) -> int | None:
+    """Dias de validade de um crédito feito agora (a mesma conta de quem credita)."""
+    try:
+        agora = contexto.agora()
+        return (vencimento_de_credito_novo(contexto.moedas.config(), agora) - agora).days
+    except Exception:  # noqa: BLE001 - campo informativo: a avaliação não quebra por ele
+        log.warning("validade do bônus indisponível", exc_info=True)
+        return None
+
+
 @router.get(
     "/me/moedas",
     response_model=MoedasOut,
@@ -1455,8 +1529,19 @@ def minhas_moedas(
     except Exception:  # noqa: BLE001 - sem o dado, a tela segue com o saldo
         log.warning("créditos por validade indisponíveis", exc_info=True)
         creditos = []
+    try:
+        creditos_profissional = [
+            CreditoMoedaOut(moedas=p.quantidade, expira_em=p.expira_em)
+            for p in creditos_validos(
+                contexto.moedas.lancamentos_da_carteira(usuario.id, CARTEIRA_PROFISSIONAL), agora
+            )
+        ]
+    except Exception:  # noqa: BLE001 - sem o dado, a tela segue com o saldo
+        log.warning("créditos do profissional por validade indisponíveis", exc_info=True)
+        creditos_profissional = []
     return MoedasOut(
         creditos=creditos,
+        creditos_profissional=creditos_profissional,
         saldo_vence_em=vence_em,
         teto_desconto_mes_centavos=cfg_moedas.teto_desconto_cliente_mes_centavos,
         desconto_usado_mes_centavos=usado_mes,
@@ -1523,6 +1608,7 @@ def dados_da_avaliacao(
         ja_avaliou=ja,
         bonus_disponivel=moedas > 0,
         bonus_moedas=moedas,
+        bonus_validade_dias=validade_do_credito_novo(contexto) if moedas > 0 else None,
         avaliar_ate=ate,
         prazo_encerrado=encerrado,
     )
@@ -1538,7 +1624,8 @@ def _limite_para_avaliar(contexto: Contexto, pedido: Any) -> tuple[datetime | No
     if dias <= 0:
         dias = PRAZO_AVALIACAO_PADRAO_DIAS
     concluido = pedido.concluido_em
-    return (concluido + timedelta(days=dias) if concluido else None), dias
+    ate = concluido + timedelta(days=dias) if concluido else None
+    return prazo_vigente(contexto, APP, concluido, ate), dias  # 22.3
 
 
 def _moedas_ja_dadas(contexto: Contexto, usuario: Usuario, pedido: Any, direcao: str) -> int:
@@ -1588,23 +1675,63 @@ def _avaliacao_out(nova: Avaliacao, ganhas: int) -> AvaliacaoOut:
     )
 
 
+@router.get(
+    "/me/avaliacoes/recebidas",
+    response_model=list[AvaliacaoRecebidaOut],
+    summary="Avaliações publicadas recebidas pela pessoa autenticada (Termos 12.7)",
+)
+def minhas_avaliacoes_recebidas(
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> list[AvaliacaoRecebidaOut]:
+    categorias = nomes_de_categorias(request)
+    saida: list[AvaliacaoRecebidaOut] = []
+    for a in contexto.avaliacoes.recebidas(usuario.id):
+        quem = contexto.usuarios.detalhe(a.avaliador_id)
+        dados = contexto.pedidos.dados_do_pedido(a.pedido_id)
+        saida.append(
+            AvaliacaoRecebidaOut(
+                id=a.id,
+                nota_geral=a.nota_geral,
+                nota_decimal=a.nota_decimal,
+                criterios=dict(a.criterios) if a.criterios else None,
+                comentario=a.comentario or None,
+                resposta=a.resposta,
+                etiquetas=list(a.etiquetas),
+                criada_em=a.criada_em,
+                cliente_nome=nome_abreviado(quem.nome) if quem else None,
+                categoria=categorias.get(str(dados.categoria_id)) if dados else None,
+            )
+        )
+    return saida
+
+
 @router.post(
     "/avaliacoes/{avaliacao_id}/responder",
     response_model=AvaliacaoOut,
-    summary="Profissional responde uma avaliação recebida",
-    description="Somente o profissional avaliado pode responder, uma única vez por avaliação.",
+    summary="Responder uma avaliação recebida",
+    description=(
+        "Somente a parte avaliada (cliente ou profissional) pode responder, "
+        "uma única vez por avaliação (Termos 12.7)."
+    ),
 )
 def responder_avaliacao(
     avaliacao_id: str,
     corpo: ResponderAvaliacaoIn,
-    usuario: Usuario = Depends(exigir_papel(PapelUsuario.PROFISSIONAL)),
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> AvaliacaoOut:
     av = contexto.avaliacoes.obter_por_id(avaliacao_id)
     if av is None:
         raise HTTPException(404, "Avaliação não encontrada.")
-    if av.direcao != "cliente_para_profissional" or av.avaliado_id != usuario.id:
-        raise HTTPException(403, "Só o profissional avaliado pode responder esta avaliação.")
+    if (
+        av.direcao not in ("cliente_para_profissional", "profissional_para_cliente")
+        or av.avaliado_id != usuario.id
+    ):
+        raise HTTPException(403, "Só quem foi avaliado pode responder esta avaliação.")
+    if av.status != "publicada":
+        raise HTTPException(409, "Esta avaliação não está publicada.")
     if av.resposta is not None:
         raise HTTPException(409, "Esta avaliação já foi respondida.")
     cfg_seg = obter_config_seguranca()
@@ -1736,4 +1863,49 @@ def avaliar(
         ),
     )
     salva = contexto.avaliacoes.obter(pedido.id, direcao) or nova
-    return _avaliacao_out(salva, ganhas)
+    saida = _avaliacao_out(salva, ganhas)
+    if ganhas > 0:
+        saida.bonus_validade_dias = validade_do_credito_novo(contexto)
+    return saida
+
+
+class ReativarContaOut(BaseModel):
+    usuario_id: str
+    status: str
+    reativada: bool
+
+
+@router.post(
+    "/me/reativar",
+    response_model=ReativarContaOut,
+    summary="Reativar a própria conta inativa gratuitamente (Termos 4.9)",
+)
+def reativar_minha_conta(
+    usuario: Usuario = Depends(usuario_para_reativacao),
+    contexto: Contexto = Depends(obter_contexto),
+) -> ReativarContaOut:
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    reativada = False
+    if banco is not None:
+        from trato.persistencia.comum import como_uuid
+
+        uid = como_uuid(usuario.id)
+        if uid is not None:
+            with contexto.transacao(), banco.transacao() as con:
+                linha = con.execute(
+                    "UPDATE public.usuarios SET status = 'ativo', atualizado_em = now() "
+                    "WHERE id = %s AND status = 'inativo' RETURNING id",
+                    (uid,),
+                ).fetchone()
+                reativada = linha is not None
+    else:
+        definir_auth = getattr(contexto.auth, "definir_inativo", None)
+        if definir_auth is not None:
+            estava_inativa = any(
+                u.id == usuario.id and tok in contexto.auth.inativos
+                for tok, u in getattr(contexto.auth, "_usuarios", {}).items()
+            )
+            if estava_inativa:
+                definir_auth(usuario.id, False)
+                reativada = True
+    return ReativarContaOut(usuario_id=usuario.id, status="ativo", reativada=reativada)

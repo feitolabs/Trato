@@ -25,6 +25,10 @@ String _dois(int n) => n.toString().padLeft(2, '0');
 /// "02/11/2026 14:32".
 String formatarData(DateTime d) => '${formatarDia(d)} ${_dois(d.hour)}:${_dois(d.minute)}';
 
+/// O mesmo instante em horário de Brasília (UTC-3, sem horário de verão), com a indicação.
+String formatarDataBrasilia(DateTime d) =>
+    '${formatarData(d.toUtc().subtract(const Duration(hours: 3)))} (horário de Brasília)';
+
 /// "02/11/2026".
 String formatarDia(DateTime d) => '${_dois(d.day)}/${_dois(d.month)}/${d.year}';
 
@@ -85,6 +89,7 @@ String formatarConfig(int valor, String unidade) => switch (unidade) {
       'bps' => '${(valor / 100).toStringAsFixed(2).replaceAll('.', ',')}%',
       'centavos' => formatarReais(valor),
       'horas' => valor == 1 ? '1 hora' : '$valor horas',
+      'minutos' => valor == 1 ? '1 minuto' : '$valor minutos',
       'dias' => valor == 1 ? '1 dia' : '$valor dias',
       'dias_uteis' => valor == 1 ? '1 dia útil' : '$valor dias úteis',
       _ => '$valor',

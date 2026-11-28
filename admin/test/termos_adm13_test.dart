@@ -8,6 +8,7 @@ import 'package:trato_admin/dados/api_http.dart';
 import 'package:trato_admin/dados/modelos.dart';
 import 'package:trato_admin/nucleo/formato.dart';
 import 'package:trato_admin/nucleo/papeis.dart';
+import 'package:trato_admin/telas/regressos_tela.dart';
 
 import 'ajuda.dart';
 import 'apoio/api_fake.dart';
@@ -107,6 +108,8 @@ void main() {
         maximoCentavos: 5000), 'O máximo é R\$ 50,00.'),
     (const ErroApi('Quem propôs não está mais apto: proponha de novo.', status: 409, codigo: 'proponente_invalido'),
         'proponha de novo'),
+    (const ErroApi('Recusa do servidor (exemplo).', status: 409, codigo: 'estorno_ja_ordenado'),
+        'Recusa do servidor (exemplo). $kRegressoPendenteNoFinanceiro'),
   ]) {
     testWidgets('aprovação recusada: ${erro.codigo}', (tester) async {
       await abrir(tester, api: ApiFake()..falhaRegresso = erro);

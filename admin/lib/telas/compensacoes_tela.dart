@@ -17,6 +17,47 @@ const _origens = {
   'regresso': 'Regresso',
 };
 
+/// Textos da dívida que o servidor marca como `suspensa` (Termos 8.7). O que fazer vem de `revisao`.
+const kDividaSuspensa = 'Uma decisão posterior baixou o reembolso: por enquanto nada é descontado desta dívida.';
+
+const kRevisaoReducao = 'Uma decisão posterior baixou o reembolso e esta dívida precisa ser reduzida. O caminho '
+    'é "Reduzir": não cancele para registrar de novo.';
+
+const kReducaoNaoLiberada = 'O servidor não libera a redução agora, para você ou para esta dívida. Não cancele '
+    'para registrar de novo.';
+
+const kRevisaoReversao = 'A decisão posterior não deixa valor para esta dívida. O caminho é cancelar: o Trato '
+    'assume o valor inteiro.';
+
+const kRevisaoAnalisar = 'A decisão baixou, mas esta dívida ainda cabe na nova decisão: não há redução '
+    'obrigatória. Precisa de análise do financeiro. Cancelar faz o Trato assumir tudo.';
+
+const kRevisaoDesconhecida = 'O servidor marcou uma revisão que este painel não reconhece. Leve ao financeiro.';
+
+/// Suspensa sem `revisao`: o servidor não indica redução nem cancelamento.
+const kTituloSuspensaSemRevisao = 'Suspensa: analisar com o financeiro';
+
+const kSuspensaSemRevisao = 'Por enquanto nada é descontado desta dívida. Cancelar faz o Trato assumir tudo.';
+
+bool _suspensaSemRevisao(Compensacao c) => c.suspensa && c.revisao == null;
+
+String textoDaRevisao(Compensacao c) => switch (c.revisao) {
+      'reducao' => c.podeReduzir ? kRevisaoReducao : '$kRevisaoReducao $kReducaoNaoLiberada',
+      'reversao' => kRevisaoReversao,
+      'analisar' => kRevisaoAnalisar,
+      _ => kRevisaoDesconhecida,
+    };
+
+const kCancelarComReducaoPendente = 'ATENÇÃO: a revisão indica reduzir, não cancelar. Ao cancelar, o Trato assume '
+    'o valor INTEIRO e depois não dá para registrar o valor menor.';
+
+const kEfeitoDoCancelamento = 'O Trato assume o valor inteiro desta compensação. O estorno ao cliente não é '
+    'desfeito e nenhuma dívida menor é criada.';
+
+const kEfeitoDaReducao = 'Não há novo estorno ao cliente. O Trato assume a diferença e o profissional passa a '
+    'dever o novo valor. Se já foi descontado mais que isso, o excesso volta a ele, que é avisado. '
+    'Não dá para desfazer.';
+
 (String, Tom) _chip(String s) => (
       _status[s] ?? s,
       switch (s) { 'aberta' => Tom.alerta, 'quitada' => Tom.ok, _ => Tom.neutro },
@@ -35,6 +76,7 @@ class _CompensacoesTelaState extends State<CompensacoesTela> {
   String _profissional = '';
   String _pedido = '';
   String? _situacao;
+  bool _revisaoPendente = false;
   int _versao = 0;
 
   Future<void> _registrar() async {
@@ -75,6 +117,11 @@ class _CompensacoesTelaState extends State<CompensacoesTela> {
               onChanged: (v) => setState(() => _situacao = v),
             ),
           ),
+          FilterChip(
+            label: const Text('Revisão pendente'),
+            selected: _revisaoPendente,
+            onSelected: (v) => setState(() => _revisaoPendente = v),
+          ),
         ],
       ),
     );
@@ -89,13 +136,14 @@ class _CompensacoesTelaState extends State<CompensacoesTela> {
         Expanded(
           child: FilaRemota<Compensacao>(
             key: ValueKey('fila-compensacoes-$_versao'),
-            filtro: (_profissional, _pedido, _situacao),
+            filtro: (_profissional, _pedido, _situacao, _revisaoPendente),
             esqueleto: const EsqueletoPagina(),
             chave: (c) => c.id,
             carregar: (deslocamento, limite) => context.api.listarCompensacoes(
               profissionalId: _profissional.isEmpty ? null : _profissional,
               pedidoId: _pedido.isEmpty ? null : _pedido,
               status: _situacao,
+              revisaoPendente: _revisaoPendente,
               deslocamento: deslocamento,
               limite: limite,
             ),
@@ -120,6 +168,10 @@ class _CompensacoesTelaState extends State<CompensacoesTela> {
                           linhas: ['Pedido ${c.pedidoId}', 'Criada em ${formatarData(c.criadaEm)}'],
                           chips: [
                             ChipEstado(texto, tom: tom),
+                            if (c.suspensa)
+                              ChipEstado(_suspensaSemRevisao(c) ? kTituloSuspensaSemRevisao : 'Desconto suspenso',
+                                  tom: Tom.erro),
+                            if (c.revisao != null) const ChipEstado('Revisão pendente', tom: Tom.alerta),
                             if (c.avisadoEm == null && c.status == 'aberta')
                               const ChipEstado('Sem aviso', tom: Tom.erro),
                           ],
@@ -205,12 +257,82 @@ class _DetalheCompensacaoState extends State<_DetalheCompensacao> {
     });
   }
 
+  Future<void> _reduzir(Compensacao c) async {
+    final contestacao = c.revisaoContestacaoId!;
+    final maximo = c.reducaoMaximaCentavos!;
+    final valor = TextEditingController();
+    int? centavos() {
+      final v = lerReaisEmCentavos(valor.text);
+      return v == null || v <= 0 || v > maximo ? null : v;
+    }
+
+    // O máximo é o que o servidor informou; ele confere de novo ao gravar.
+    final dados = await pedirFormulario<(String, int, String)>(
+      context,
+      titulo: 'Reduzir a compensação?',
+      consequencia: '$kEfeitoDaReducao Valor que vale hoje: ${formatarReais(c.valorCentavos)}. '
+          'Já descontado: ${formatarReais(c.compensadoCentavos)}.',
+      rotuloConfirmar: 'Reduzir compensação',
+      campos: (ctx, rebuild) => Column(
+        children: [
+          Linha('Contestação (informada pelo servidor)', contestacao),
+          Linha('Novo valor máximo', formatarReais(maximo)),
+          const SizedBox(height: EspacosTrato.x3),
+          TextField(
+            controller: valor,
+            maxLength: 16,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => rebuild(),
+            decoration: InputDecoration(
+              labelText: 'Novo valor da compensação',
+              prefixText: 'R\$ ',
+              counterText: '',
+              helperText: centavos() == null ? 'Use vírgula nos centavos.' : 'Vai como ${formatarReais(centavos()!)}',
+              errorText: valor.text.trim().isEmpty || centavos() != null
+                  ? null
+                  : (lerReaisEmCentavos(valor.text) ?? 0) > maximo
+                      ? 'Passa do máximo de ${formatarReais(maximo)}'
+                      : 'Informe um valor válido maior que zero',
+              errorMaxLines: 2,
+            ),
+          ),
+        ],
+      ),
+      camposValidos: () => centavos() != null,
+      resultado: (motivo) => (contestacao, centavos()!, motivo),
+    );
+    if (dados == null || !mounted) return;
+    final api = context.api;
+    await _enviar(() async {
+      final r = await api.reduzirCompensacao(c.id,
+          contestacaoId: dados.$1, novoValorCentavos: dados.$2, motivo: dados.$3);
+      final devolvido = 'Devolvido ao profissional: ${formatarReais(r.devolvidoCentavos)}.';
+      return (
+        r.compensacao,
+        r.resultado == 'ja_reduzida'
+            ? 'Esta redução já tinha sido feita. Nada novo foi gravado. $devolvido'
+            : 'Compensação reduzida para ${formatarReais(r.compensacao.valorCentavos)}, sem novo estorno ao cliente. $devolvido',
+        false,
+      );
+    });
+  }
+
   Future<void> _cancelar(Compensacao c) async {
     final motivo = await pedirMotivo(
       context,
       titulo: 'Cancelar a compensação?',
-      descricao: 'Use quando a contestação do profissional foi aceita. O que já foi descontado '
-          '(${formatarReais(c.compensadoCentavos)} até agora) volta a ele, que é avisado. Não dá para desfazer.',
+      descricao: [
+        if (c.revisao == 'reducao') kCancelarComReducaoPendente,
+        if (c.revisao == 'analisar') kRevisaoAnalisar,
+        if (c.revisao == 'reversao') kRevisaoReversao,
+        if (_suspensaSemRevisao(c)) '$kTituloSuspensaSemRevisao. $kSuspensaSemRevisao',
+        if (c.revisao == null && !c.suspensa) 'Use quando a contestação do profissional foi aceita.',
+        'O que já foi descontado (${formatarReais(c.compensadoCentavos)} até agora) volta ao profissional, que é avisado.',
+        kEfeitoDoCancelamento,
+        'Valor desta compensação: ${formatarReais(c.valorCentavos)}.',
+        kRecusaDepoisDoCancelamento,
+        'Não dá para desfazer.',
+      ].join(' '),
       rotuloConfirmar: 'Cancelar compensação',
       destrutivo: true,
     );
@@ -238,8 +360,17 @@ class _DetalheCompensacaoState extends State<_DetalheCompensacao> {
       children: [
         Text(formatarReais(c.valorCentavos), style: TipografiaTrato.titulo),
         const SizedBox(height: EspacosTrato.x2),
-        Wrap(spacing: EspacosTrato.x2, children: [ChipEstado(texto, tom: tom)]),
+        Wrap(spacing: EspacosTrato.x2, children: [
+          ChipEstado(texto, tom: tom),
+          if (c.suspensa && !_suspensaSemRevisao(c)) const ChipEstado('Desconto suspenso', tom: Tom.erro),
+        ]),
         const SizedBox(height: EspacosTrato.x3),
+        if (c.reduzidoCentavos > 0) ...[
+          if (c.valorOriginalCentavos case final original?) Linha('Valor original', formatarReais(original)),
+          Linha('Reduzido', formatarReais(c.reduzidoCentavos)),
+          Linha('Vale hoje', formatarReais(c.valorCentavos)),
+          Linha('Devolvido ao profissional pela redução', formatarReais(c.devolvidoReducaoCentavos)),
+        ],
         Linha('Já descontado', formatarReais(c.compensadoCentavos)),
         Linha('Falta descontar', formatarReais(c.restanteCentavos)),
         Linha('Pedido', c.pedidoId),
@@ -253,6 +384,22 @@ class _DetalheCompensacaoState extends State<_DetalheCompensacao> {
           const SizedBox(height: EspacosTrato.x3),
           const BannerInfo('Sem aviso, nada é descontado.', tom: Tom.alerta),
         ],
+        if (c.suspensa) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          BannerInfo(
+            _suspensaSemRevisao(c) ? kSuspensaSemRevisao : kDividaSuspensa,
+            titulo: _suspensaSemRevisao(c) ? '$kTituloSuspensaSemRevisao.' : 'Desconto suspenso.',
+            tom: Tom.alerta,
+          ),
+        ],
+        if (c.revisao != null) ...[
+          const SizedBox(height: EspacosTrato.x3),
+          BannerInfo(textoDaRevisao(c), titulo: 'Revisão pendente.', tom: Tom.alerta),
+        ],
+        if (c.status == 'cancelada') ...[
+          const SizedBox(height: EspacosTrato.x3),
+          const BannerInfo(kRecusaDepoisDoCancelamento, titulo: 'Depois do cancelamento.', tom: Tom.alerta),
+        ],
         if (_erro != null) ...[
           const SizedBox(height: EspacosTrato.x3),
           BannerInfo(_erro!, titulo: 'Não foi feito.', tom: Tom.erro),
@@ -264,14 +411,16 @@ class _DetalheCompensacaoState extends State<_DetalheCompensacao> {
           children: [
             if (semAviso && context.pode(Permissao.regressoPropor))
               BotaoTrato.primario('Avisar profissional', aoPressionar: _enviando ? null : () => _avisar(c)),
-            if (c.status != 'cancelada' && context.pode(Permissao.compensacoesCancelar))
+            if (!_suspensaSemRevisao(c) && c.podeReduzir && c.revisaoContestacaoId != null && c.reducaoMaximaCentavos != null)
+              BotaoTrato.primario('Reduzir', aoPressionar: _enviando ? null : () => _reduzir(c)),
+            if (c.podeCancelar)
               BotaoTrato.destrutivo('Cancelar compensação', aoPressionar: _enviando ? null : () => _cancelar(c)),
           ],
         ),
-        if (c.status != 'cancelada' && !context.pode(Permissao.compensacoesCancelar))
+        if (c.status != 'cancelada' && !c.podeCancelar)
           Padding(
             padding: const EdgeInsets.only(top: EspacosTrato.x2),
-            child: Text('Cancelar é só para líder de suporte e administrador.', style: TipografiaTrato.legenda),
+            child: Text('O servidor não libera cancelar para você. Reduzir e cancelar são só para líder de suporte e administrador.', style: TipografiaTrato.legenda),
           ),
       ],
     );

@@ -191,6 +191,8 @@ class _IncidentesTelaState extends State<IncidentesTela> {
                           chips: [
                             if (i.cautelaAtrasada)
                               const ChipEstado('Cautela vencida', tom: Tom.erro),
+                            if (i.sinaisAntifraude.isNotEmpty)
+                              const ChipEstado('Sinal para análise', tom: Tom.alerta),
                             ChipEstado(texto, tom: tom),
                           ],
                           selecionado: sel,
@@ -220,6 +222,20 @@ class _IncidentesTelaState extends State<IncidentesTela> {
       ],
     );
   }
+}
+
+const kSinalNaoEProva = 'É um sinal para análise, não é prova de fraude.';
+
+/// Termos 9.5: texto de cada código de `sinais_antifraude`; o desconhecido ganha texto genérico.
+String textoDoSinalAntifraude(String codigo) {
+  if (codigo == 'relato_durante_espera_de_ausencia') {
+    return 'O pedido tem uma ausência registrada ainda no tempo de espera.';
+  }
+  final repetido = RegExp(r'^relato_repetido_do_cliente:(\d+)$').firstMatch(codigo);
+  if (repetido != null) {
+    return 'O cliente tem relato de pessoa diferente em ${repetido.group(1)} pedidos (contando este).';
+  }
+  return 'O sistema marcou outro ponto para conferir neste incidente.';
 }
 
 class _Detalhe extends StatefulWidget {
@@ -289,6 +305,15 @@ class _DetalheState extends State<_Detalhe> {
             titulo: 'Cautela vencida.',
             tom: Tom.erro,
             icone: Icons.warning_amber_outlined,
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
+        if (i.sinaisAntifraude.isNotEmpty) ...[
+          BannerInfo(
+            [for (final s in i.sinaisAntifraude) textoDoSinalAntifraude(s), kSinalNaoEProva].join('\n'),
+            titulo: 'Sinal para análise.',
+            tom: Tom.alerta,
+            icone: Icons.flag_outlined,
           ),
           const SizedBox(height: EspacosTrato.x3),
         ],

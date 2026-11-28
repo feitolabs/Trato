@@ -117,6 +117,14 @@ class _CartaoMedida extends StatelessWidget {
             [m.situacaoTexto, if (m.protocolo != null) 'Protocolo ${m.protocolo}'].join(' · '),
             style: secundario,
           ),
+          if (m.agendada(DateTime.now())) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'Até essa data a conta continua funcionando.',
+              key: ValueKey('agendada-${m.id}'),
+              style: TipografiaTrato.corpoForte,
+            ),
+          ],
           ...bloco('Motivo', m.motivo),
           ...bloco('Cláusulas dos Termos', m.clausulas.isEmpty ? null : m.clausulas.join(', ')),
           ...bloco('Início', m.inicioEm == null ? null : _quando(m.inicioEm!)),

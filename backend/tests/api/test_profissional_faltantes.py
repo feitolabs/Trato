@@ -168,6 +168,7 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
     r1 = amb.cliente.post(
         "/v1/pedidos/ped-orc/orcamentos",
         json={
+            "validade_ate": "2099-01-01T00:00:00Z",
             "itens": [
                 {
                     "tipo": "deslocamento",
@@ -213,6 +214,7 @@ def test_3_ver_detalhe_e_editar_orcamento_enviado_antes_do_aceite(amb):
     r2 = amb.cliente.post(
         "/v1/pedidos/ped-orc/orcamentos",
         json={
+            "validade_ate": "2099-01-01T00:00:00Z",
             "itens": [
                 {
                     "tipo": "horas",

@@ -5,10 +5,16 @@
 
 begin;
 
--- Versões dos Termos já publicadas (fonte: backend/src/trato/legal/__init__.py).
--- ATENÇÃO: versão cuja data já chegou não muda mais. Conferir a data antes de rodar.
-insert into public.termos_versoes (versao, vigente_desde) values ('1.1', date '2026-11-22')
-on conflict (versao) do nothing;
+-- VERSÕES DOS TERMOS: este seed NÃO grava nenhuma. A vigência não foi confirmada pelo João.
+-- ATENÇÃO, IRREVERSÍVEL: versão com data de hoje ou passada não muda nem se apaga, e passa a
+-- ser gravada nos contratos confirmados. Datas só INDICADAS no repositório, a confirmar:
+--   1.0 = 31/10/2026 (Anexo III dos Termos e rotas_legal.py; sem texto em backend/src/trato/legal)
+--   1.1 = 22/11/2026 (backend/src/trato/legal/__init__.py; o Anexo III diz "documento não publicado")
+-- Só com OK do João para cada data, rodar à parte (descomentar e conferir):
+--   insert into public.termos_versoes (versao, vigente_desde)
+--   values ('1.0', date '2026-10-31'), ('1.1', date '2026-11-22')
+--   on conflict (versao) do nothing;
+-- Enquanto não houver versão cadastrada, contratos.termos_versao fica nulo.
 -- Quando a 1.2 for publicada (trocar a data pela real):
 --   insert into public.termos_versoes (versao, vigente_desde) values ('1.2', date 'AAAA-MM-DD');
 

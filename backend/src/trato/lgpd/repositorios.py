@@ -75,6 +75,9 @@ class FonteDadosPessoais(Protocol):
 class RepositorioConsentimentos(Protocol):
     def registrar(self, consentimento: Consentimento) -> None: ...
     def historico(self, usuario_id: str) -> Sequence[Consentimento]: ...
+    def ultimos(self, usuario_ids: Sequence[str], finalidade: str) -> dict[str, bool]:
+        """usuario_id -> `aceito` da última linha da finalidade; sem linha, fica fora."""
+        ...
 
 
 class RepositorioExclusoes(Protocol):

@@ -43,6 +43,10 @@ Future<int?> lerPrazoMaximoDaTrava(ApiAdmin api) async {
   }
 }
 
+/// Rotas antigas de status e risco (Termos 20.8).
+const kAcoesImediatas = 'As ações daqui valem na hora e não cancelam um encerramento agendado (nem voltar para ativo): '
+    'para cancelar, reverta a medida em Medidas de conta. Encerramento sem falta do usuário é feito em Medidas de conta.';
+
 /// Limite digitado em reais -> centavos inteiros. Null se vazio, inválido ou zero.
 int? lerLimiteDaTrava(String texto) {
   final v = lerReaisEmCentavos(texto);

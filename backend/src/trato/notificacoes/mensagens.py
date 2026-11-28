@@ -17,6 +17,7 @@ from trato.persistencia.conexao import Banco
 from trato.persistencia.conversas import (
     _STATUS_COM_CONTATO,
     CONTATO_LIBERADO_NOMEADO,
+    contato_liberado_sql,
     mascarar_contatos,
 )
 from trato.persistencia.erros import DadosInvalidos, NaoEncontrado
@@ -186,7 +187,7 @@ class ConversasAppPostgres:
                 "exists (select 1 from public.contratos c where c.pedido_id = cv.pedido_id "
                 " and c.status <> 'cancelado') "
                 "as contratado, "
-                f"{CONTATO_LIBERADO_NOMEADO} as liberada, "  # noqa: S608
+                f"{contato_liberado_sql(con, CONTATO_LIBERADO_NOMEADO)} as liberada, "  # noqa: S608
                 "(select count(*) from public.mensagens m where m.conversa_id = cv.id "
                 " and m.autor_id <> %(u)s and m.lida_em is null) as nao_lidas, "
                 "u.corpo_exibido as ultima_texto, u.enviada_em as ultima_em, "

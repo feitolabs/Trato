@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 import uuid
 from collections.abc import Callable, Sequence
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import datetime
 from functools import partial
@@ -103,6 +105,10 @@ def _mesmo_id(a: str, b: str) -> bool:
     return str(a).replace("-", "").lower() == str(b).replace("-", "").lower()
 
 
+# Em memória não há trava de linha: este cadeado faz o papel dela no aditivo.
+_TRAVA_DO_ADITIVO = threading.RLock()
+
+
 class ErroFluxo(Exception):
     """Pedido de pagamento que não vale agora. `status` é o HTTP que a rota devolve."""
 
@@ -122,6 +128,7 @@ _CANCELAM_COM_REEMBOLSO = {
     Acao.REGISTRAR_AUSENCIA: "ausencia",
     Acao.CANCELAR_ARREPENDIMENTO: "arrependimento",
     Acao.CANCELAR_PESSOA_DIFERENTE: "pessoa_diferente",
+    Acao.CANCELAR_MEDIDA_CONTA: "medida_conta",  # Termos 20.6
 }
 
 
@@ -406,23 +413,22 @@ class ServicoPagamento:
         meio: MeioPagamento,
         cliente_externo: str | None = None,
     ) -> tuple[Aditivo, CobrancaLocal]:
-        aditivo = self.aditivos.obter(aditivo_id)
-        if aditivo is None or not _mesmo_id(aditivo.pedido_id, pedido.id):
-            raise ErroFluxo("Aditivo não encontrado.", 404)
-        if aditivo.estado is not EstadoAditivo.PROPOSTO:
-            raise ErroFluxo("Este aditivo já foi aprovado.")
-        if pedido.estado is not Estado.EM_ANDAMENTO:
-            raise ErroFluxo("Só dá para aprovar aditivo com o serviço em andamento.")
-        aprovado = replace(aditivo, estado=EstadoAditivo.APROVADO, aprovado_em=contexto.agora())
+        travar = getattr(contexto.pedidos, "travar", None)
         # Uma transação só: o banco exige o aditivo aprovado antes de aceitar a cobrança dele, e
-        # se a cobrança falhar a aprovação volta junto (o cliente pode tentar de novo).
-        with contexto.transacao():
-            travar = getattr(contexto.pedidos, "travar", None)
+        # se a cobrança falhar a aprovação volta junto (o cliente pode tentar de novo). O estado
+        # do aditivo é lido DEPOIS da trava: duas aprovações não criam duas cobranças.
+        with _TRAVA_DO_ADITIVO if travar is None else nullcontext(), contexto.transacao():
             if travar is not None:  # check-out ao mesmo tempo: quem chega depois vê o estado
                 travar(pedido.id)
+            aditivo = self.aditivos.obter(aditivo_id)
+            if aditivo is None or not _mesmo_id(aditivo.pedido_id, pedido.id):
+                raise ErroFluxo("Aditivo não encontrado.", 404)
+            if aditivo.estado is not EstadoAditivo.PROPOSTO:
+                raise ErroFluxo("Este aditivo já foi aprovado.")
             atual = contexto.pedidos.obter(pedido.id)
             if atual is None or atual.estado is not Estado.EM_ANDAMENTO:
                 raise ErroFluxo("Só dá para aprovar aditivo com o serviço em andamento.")
+            aprovado = replace(aditivo, estado=EstadoAditivo.APROVADO, aprovado_em=contexto.agora())
             self.aditivos.salvar(aprovado)
             cobranca = self.cobrar(
                 contexto,
@@ -435,13 +441,17 @@ class ServicoPagamento:
         return aprovado, cobranca
 
     def recusar_aditivo(self, contexto: Contexto, pedido: Pedido, aditivo_id: str) -> Aditivo:
-        aditivo = self.aditivos.obter(aditivo_id)
-        if aditivo is None or not _mesmo_id(aditivo.pedido_id, pedido.id):
-            raise ErroFluxo("Aditivo não encontrado.", 404)
-        if aditivo.estado is not EstadoAditivo.PROPOSTO:
-            raise ErroFluxo("Este aditivo já foi decidido.")
-        recusado = replace(aditivo, estado=EstadoAditivo.RECUSADO)
-        self.aditivos.salvar(recusado)
+        travar = getattr(contexto.pedidos, "travar", None)
+        with _TRAVA_DO_ADITIVO if travar is None else nullcontext(), contexto.transacao():
+            if travar is not None:  # a mesma fila da aprovação
+                travar(pedido.id)
+            aditivo = self.aditivos.obter(aditivo_id)
+            if aditivo is None or not _mesmo_id(aditivo.pedido_id, pedido.id):
+                raise ErroFluxo("Aditivo não encontrado.", 404)
+            if aditivo.estado is not EstadoAditivo.PROPOSTO:
+                raise ErroFluxo("Este aditivo já foi decidido.")
+            recusado = replace(aditivo, estado=EstadoAditivo.RECUSADO)
+            self.aditivos.salvar(recusado)
         return recusado
 
     def _escolheu_execucao(self, cobranca_id: str) -> bool | None:
@@ -501,6 +511,17 @@ class ServicoPagamento:
                 or pedido.estado is Estado.CANCELADO
             ):
                 return self._devolver_pagamento_orfao(cobranca)
+            # Um aditivo se paga uma vez. "Já pago" sai das cobranças (no banco, pago e
+            # aprovado são o mesmo status do aditivo), lidas com o pedido travado.
+            outra_do_aditivo = any(
+                c.status is EstadoCobranca.PAGA
+                and c.id != cobranca.id
+                and c.aditivo_id
+                and _mesmo_id(c.aditivo_id, cobranca.aditivo_id)
+                for c in self.cobrancas.do_pedido(cobranca.pedido_id)
+            )
+            if aditivo.estado is EstadoAditivo.RECUSADO or outra_do_aditivo:
+                return self._devolver_aditivo_repetido(contexto, cobranca, bruto)
             if not _aditivo_pago_a_tempo(pedido, momento_da_confirmacao(evento.bruto, agora)):
                 self._devolver_pagamento_orfao(cobranca)
                 contexto.eventos_webhook.marcar_revisao(
@@ -509,6 +530,12 @@ class ServicoPagamento:
                     "devolvido por inteiro",
                 )
                 return
+            # Última barreira, no banco (20261127185000): grava antes de tocar no livro. Se
+            # outro pagamento do aditivo já vale, este volta; o evento conclui, sem reenvio.
+            gravar = getattr(self.cobrancas, "confirmar_de_aditivo", None)
+            paga = replace(cobranca, status=EstadoCobranca.PAGA, pago_em=agora)
+            if gravar is not None and not gravar(paga):
+                return self._devolver_aditivo_repetido(contexto, cobranca, bruto)
             self.aditivos.salvar(replace(aditivo, estado=EstadoAditivo.PAGO))
             self._avisar_aditivo_pago(contexto, cobranca, aditivo.id)
         else:
@@ -594,6 +621,21 @@ class ServicoPagamento:
                 confirmado_em=agora,
                 forcar_limite_usuario=True,  # desconto já dado: o uso nunca se perde
             )
+
+    def _devolver_aditivo_repetido(
+        self, contexto: Contexto, cobranca: CobrancaLocal, bruto: EventoWebhook
+    ) -> None:
+        """Devolve por inteiro (chave `orfao/<cobrança>`: no provedor, uma vez só) e marca
+        para a equipe conferir."""
+        logging.getLogger("trato.pagamentos").warning(
+            "Pagamento repetido ou de aditivo recusado devolvido (%s)", cobranca.id
+        )
+        self._devolver_pagamento_orfao(cobranca)
+        contexto.eventos_webhook.marcar_revisao(
+            bruto,
+            f"segunda cobrança de aditivo pago, ou aditivo recusado ({cobranca.id}): "
+            "devolvido por inteiro",
+        )
 
     @staticmethod
     def _avisar_aditivo_pago(contexto: Contexto, cobranca: CobrancaLocal, aditivo_id: str) -> None:
@@ -879,6 +921,20 @@ class ServicoPagamento:
         if cobranca is None:
             contexto.eventos_webhook.marcar_revisao(bruto, "contestação de cobrança desconhecida")
             return
+        if cobranca.status is EstadoCobranca.DEVOLVIDA and cobranca.aditivo_id:
+            # Contestou a cobrança já devolvida enquanto outra do mesmo aditivo vale: risco de
+            # o dinheiro voltar duas vezes. A contestação fica gravada e a equipe confere.
+            if any(
+                c.status is EstadoCobranca.PAGA
+                and c.aditivo_id
+                and _mesmo_id(c.aditivo_id, cobranca.aditivo_id)
+                for c in self.cobrancas.do_pedido(cobranca.pedido_id)
+            ):
+                contexto.eventos_webhook.marcar_revisao(
+                    bruto,
+                    f"contestação {atual.provedor_contestacao_id} de cobrança de aditivo já "
+                    f"devolvida, com outra paga ({cobranca.id}): conferir",
+                )
         ja_perdida = antiga is not None and antiga.status is StatusContestacao.PERDIDA
         if atual.status is StatusContestacao.PERDIDA and not ja_perdida:
             self._contestacao_perdida(atual, cobranca, contexto, bruto)
@@ -1284,7 +1340,14 @@ class ServicoPagamento:
                 self._revisar_ordem(ordem, duvida)
                 return 0
             feito = self.provedor.estornar(ordem.cobranca_id, ordem.valor_centavos, ordem.chave)
-        self.ordens.salvar(replace(ordem, estado="enviada", provedor_estorno_id=feito.id))
+        self.ordens.salvar(
+            replace(
+                ordem,
+                estado="enviada",
+                provedor_estorno_id=feito.id,
+                enviada_em=self._contexto.agora() if self._contexto else None,
+            )
+        )
         self._avisar_estorno(ordem.pedido_id, ordem.chave, ordem.valor_centavos)
         return 1
 

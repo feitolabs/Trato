@@ -1,3 +1,4 @@
+import '../telas/comuns/contagem_avaliacoes.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,8 +13,10 @@ import '../telas/aditivo/aditivo.dart';
 import '../telas/comuns/foco_rolagem.dart';
 import 'repositorios.dart' show Cobranca, StatusPagamento;
 import '../telas/disputa_acordo/acordo.dart';
+import '../telas/comuns/resultado_esperado.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/legal/aceite_dos_termos.dart';
+import '../telas/legal/historico_versoes.dart';
 import '../telas/legal/registro_do_aceite.dart';
 import '../telas/lgpd/modelos.dart';
 import '../telas/contestacao_decisao/modelos.dart' show ErroDeArquivo;
@@ -126,6 +129,15 @@ class ServicoAditivoApi implements ServicoAditivo {
       'recusado' => EstadoAditivo.recusado,
       _ => EstadoAditivo.aguardando,
     };
+    String? estadoDoPedido;
+    if (const {'proposto', 'aprovado'}.contains(a['estado'])) {
+      try {
+        final p = await _api.get('/v1/pedidos/$aditivoId');
+        if (p is Map && p['estado'] is String) estadoDoPedido = p['estado'] as String;
+      } on Object {
+        estadoDoPedido = null; // sem o estado, o servidor recusa se não valer mais
+      }
+    }
     // Quem pediu e qual pedido: sem rede para isso, o texto cai no genérico.
     var nome = nomeProfissional;
     if (nome.isEmpty) {
@@ -145,6 +157,7 @@ class ServicoAditivoApi implements ServicoAditivo {
       motivo: a['descricao'] as String,
       valorCentavos: a['valor_centavos'] as int,
       estado: estado,
+      semValor: aditivoSemValor(a['estado'] as String?, estadoDoPedido),
     );
   }
 
@@ -171,6 +184,14 @@ class ServicoAditivoApi implements ServicoAditivo {
           c['tipo_instrucao'] == 'cartao_segredo_do_cliente' ? c['instrucao'] as String? : null,
       clienteCartaoId: c['cliente_externo_id'] as String?,
       chaveEfemera: c['chave_efemera'] as String?,
+      pixExpiraEm: DateTime.tryParse('${c['pix_expira_em'] ?? ''}')?.toLocal(),
+      pixValidadeMinutos: (c['pix_validade_minutos'] as num?)?.toInt(),
+      estornoStatus: (c['estorno_status'] as String?)?.trim().isEmpty == true
+          ? null
+          : c['estorno_status'] as String?,
+      estornoPrazoEstimado: (c['estorno_prazo_estimado'] as String?)?.trim().isEmpty == true
+          ? null
+          : c['estorno_prazo_estimado'] as String?,
     );
   }
 
@@ -868,6 +889,7 @@ class ServicoPerfilPublicoApi
     String? respondeEmFaixa;
     var cidades = <String>[];
     var noTratoDesde = DateTime.now().year;
+    DateTime? seloConferidoEm;
     if (usuarioId.isNotEmpty) {
       try {
         final pub = _mapa(await _api.get('/v1/profissionais/$usuarioId'));
@@ -875,6 +897,7 @@ class ServicoPerfilPublicoApi
           noTratoDesde = DateTime.parse(pub['no_trato_desde'] as String).year;
         }
         cidades = [for (final c in (pub['cidades'] as List? ?? const [])) '$c'];
+        seloConferidoEm = DateTime.tryParse('${pub['selo_conferido_em'] ?? ''}');
         avaliacoes = _converterAvaliacoes(pub['avaliacoes'] as List? ?? const []);
         etiquetasTop = EtiquetaTop.listaDeJson(pub['etiquetas_top']);
         respondeEmFaixa = DetalhePerfil.lerFaixaResposta(pub['responde_em_faixa']);
@@ -942,9 +965,11 @@ class ServicoPerfilPublicoApi
       iniciais: _iniciaisNome(nomeExibicao),
       categoria: categoriasNomes.isEmpty ? 'Profissional' : categoriasNomes.join(' · '),
       verificacao: verificacao,
+      seloConferidoEm: seloConferidoEm,
       noTratoDesde: noTratoDesde,
       nota: nota,
-      totalAvaliacoes: avaliacoes.length,
+      contagem: ContagemAvaliacoes.deJson(me),
+      totalAvaliacoes: ContagemAvaliacoes.deJson(me)?.total ?? avaliacoes.length,
       servicosConcluidos: concluidos,
       sobre: (prof?['bio'] as String?) ?? 'Perfil profissional cadastrado no Trato.',
       cidade: cidades.isNotEmpty ? cidades.first : '',
@@ -1015,12 +1040,8 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
   Future<DetalheDisputa?> carregarDisputa(String disputaId) async {
     try {
       final j = _mapa(await _api.get('/v1/pedidos/$disputaId/disputa'));
-      // O relato do cliente leva a solução preferida no fim (é como o app do cliente envia).
-      const marca = 'Solução que o cliente prefere:';
-      final relato = ((j['descricao'] as String?) ?? '').trim();
-      final corte = relato.lastIndexOf(marca);
-      final descricao = corte < 0 ? relato : relato.substring(0, corte).trim();
-      final solucao = corte < 0 ? '' : relato.substring(corte + marca.length).trim();
+      // Termos 8.4: `resultado_esperado`; disputa antiga só tem a linha no fim do relato.
+      final (:descricao, :pedido) = separarRelato(j['descricao'], j['resultado_esperado']);
       // Prazo real desta disputa (resposta_ate - aberta_em); sem as datas, o da configuração.
       final aberta = DateTime.tryParse('${j['aberta_em']}');
       final ate = DateTime.tryParse('${j['resposta_ate']}');
@@ -1042,7 +1063,7 @@ class ServicoDisputaProfissionalApi implements ServicoDisputaProfissional {
         cliente: cliente,
         motivo: _motivoDisputa(j['motivo'] as String?),
         descricao: descricao,
-        solucaoPedida: solucao.isEmpty ? 'Não informada' : solucao,
+        solucaoPedida: pedido ?? 'Não informada',
         prazoRespostaHoras: prazo,
         valorCongeladoCentavos: (j['valor_congelado_centavos'] as int?) ?? 0,
         // Sem o campo (servidor antigo), como antes: espera a resposta.
@@ -1139,7 +1160,8 @@ class ServicoPrivacidadeApi
         ConsultaDeTratinhos,
         PedidosDoTitular,
         ServicoAceiteDosTermos,
-        ConsultaDoAceite {
+        ConsultaDoAceite,
+        ConsultaDeVersoes {
   ServicoPrivacidadeApi(this._api);
 
   final ClienteApi _api;
@@ -1150,6 +1172,32 @@ class ServicoPrivacidadeApi
       return AceitePendente.deJson(await _api.get('/v1/me/termos'));
     } on ErroTrato catch (e) {
       if (const {403, 404, 503}.contains(e.codigoHttp)) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<VersaoDosTermosPublicada>?> versoesDosTermos() async {
+    try {
+      final j = await _api.get('/v1/termos/versoes');
+      if (j is! Map || j['itens'] is! List) return null;
+      return [
+        for (final i in j['itens'] as List)
+          if (VersaoDosTermosPublicada.deJson(i) case final v?) v,
+      ];
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<String?> textoDaVersao(String versao) async {
+    try {
+      final j = await _api.get('/v1/termos/versoes/${Uri.encodeComponent(versao)}');
+      return j is Map && j['texto'] is String ? j['texto'] as String : null;
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp == 404) return null;
       rethrow;
     }
   }

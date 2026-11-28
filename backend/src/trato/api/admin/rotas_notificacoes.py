@@ -6,20 +6,27 @@ respeita a preferência de cada usuário. Antes de enviar, a tela pede a estimat
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.papeis import Permissao
 from trato.api.contexto import Contexto, obter_contexto
+from trato.notificacoes.config import obter_config_notificacoes
+from trato.notificacoes.eventos import deep_link
+from trato.notificacoes.marketing import separar_marketing
 from trato.persistencia.comum import como_uuid
 
 router = APIRouter(prefix="/v1/admin/notificacoes", tags=["admin: notificacoes e campanhas"])
 
 _SEGMENTOS = "^(todos|clientes|profissionais|categoria|cidade)$"
 _TIPOS = "^(operacional|marketing)$"
+TELA_PRIVACIDADE = "privacidade"
+log = logging.getLogger("trato.campanhas")
 
 
 class CampanhaOut(BaseModel):
@@ -40,7 +47,11 @@ class CampanhaOut(BaseModel):
 
 class EstimativaOut(BaseModel):
     destinatarios: int
-    desativaram: int = 0
+    desativaram: int = Field(
+        0,
+        description="Marketing: ficam de fora quem não consentiu (ou revogou) e quem desligou "
+        "o push, cada pessoa contada uma vez.",
+    )
 
 
 class DispararCampanhaIn(BaseModel):
@@ -64,10 +75,15 @@ def _iso(valor: Any) -> str:
     return valor.isoformat() if hasattr(valor, "isoformat") else str(valor)
 
 
+def _consentimentos(contexto: Contexto) -> Any:
+    repos = contexto.extras.get("lgpd") if contexto.extras else None
+    return repos.consentimentos if repos is not None else None
+
+
 def _destinatarios(
-    con: Any, segmento: str, tipo: str, categoria_id: Any, cidade_id: Any
+    con: Any, segmento: str, tipo: str, categoria_id: Any, cidade_id: Any, consentimentos: Any
 ) -> tuple[list[Any], int]:
-    """(ids que recebem, quantos ficaram de fora por terem desligado o marketing)."""
+    """(ids que recebem, quantos ficam de fora do marketing). Operacional não filtra."""
     if segmento == "categoria" and categoria_id is None:
         raise HTTPException(422, "Escolha a categoria do segmento.")
     if segmento == "cidade" and cidade_id is None:
@@ -99,16 +115,24 @@ def _destinatarios(
     todos = [r["id"] for r in con.execute(f"{base} {onde}", params).fetchall()]  # noqa: S608
     if tipo != "marketing" or not todos:
         return todos, 0
-    # Marketing respeita a preferência: quem desligou o push de marketing não recebe.
-    fora = {
-        r["usuario_id"]
-        for r in con.execute(
-            "select usuario_id from public.notificacao_preferencias "
-            "where usuario_id = any(%s) and preferencias->'marketing'->>'push' = 'false'",
-            (todos,),
-        ).fetchall()
-    }
-    return [i for i in todos if i not in fora], len(fora)
+    try:
+        if consentimentos is None:
+            raise RuntimeError("repositório de consentimentos ausente")
+        desligados = {
+            r["usuario_id"]
+            for r in con.execute(
+                "select usuario_id from public.notificacao_preferencias "
+                "where usuario_id = any(%s) and preferencias->'marketing'->>'push' = 'false'",
+                (todos,),
+            ).fetchall()
+        }
+        return separar_marketing(todos, consentimentos, desligados)
+    except Exception:
+        # Sem saber quem consentiu, ninguém recebe.
+        log.exception("Não foi possível conferir o consentimento de marketing")
+        raise HTTPException(
+            503, "Não foi possível conferir o consentimento de marketing. Nada foi enviado."
+        ) from None
 
 
 @router.get(
@@ -129,6 +153,7 @@ def estimar(
             tipo,
             como_uuid(categoria_id) if categoria_id else None,
             como_uuid(cidade_id) if cidade_id else None,
+            _consentimentos(contexto),
         )
     return EstimativaOut(destinatarios=len(ids), desativaram=fora)
 
@@ -189,7 +214,9 @@ def disparar_campanha(
     cid_uid = como_uuid(corpo.cidade_id) if corpo.cidade_id else None
 
     with _banco(contexto).transacao() as con:
-        ids, fora = _destinatarios(con, corpo.segmento, corpo.tipo, cat_uid, cid_uid)
+        ids, fora = _destinatarios(
+            con, corpo.segmento, corpo.tipo, cat_uid, cid_uid, _consentimentos(contexto)
+        )
         if not ids:
             raise HTTPException(422, "Nenhuma pessoa receberia esta campanha. Revise o segmento.")
         camp = con.execute(
@@ -212,14 +239,20 @@ def disparar_campanha(
                 operador.id,
             ),
         ).fetchone()
+        dados = {"campanha_id": str(camp["id"])}
+        if corpo.tipo == "marketing":  # o app abre a privacidade, onde se revoga
+            base_do_link = obter_config_notificacoes().deep_link_base
+            dados |= {
+                "tela": TELA_PRIVACIDADE,
+                "link": deep_link(base_do_link, TELA_PRIVACIDADE, None),
+            }
         for uid in ids:
             con.execute(
                 """
                 INSERT INTO public.notificacoes (usuario_id, tipo, canal, titulo, corpo, dados)
-                VALUES (%s, 'aviso_campanha', 'push', %s, %s,
-                        jsonb_build_object('campanha_id', %s::text))
+                VALUES (%s, 'aviso_campanha', 'push', %s, %s, %s)
                 """,
-                (uid, corpo.titulo, corpo.mensagem, str(camp["id"])),
+                (uid, corpo.titulo, corpo.mensagem, Jsonb(dados)),
             )
         admin.auditoria.registrar(
             ator_id=operador.id,

@@ -32,3 +32,8 @@ def vigente_em(instante: datetime) -> VersaoDosTermos | None:
     """Versão em vigor no instante (23.6). None: não temos o texto daquela época."""
     dia = instante.astimezone(periodo.BRASILIA).date()
     return next((v for v in reversed(VERSOES) if v.vigente_desde <= dia), None)
+
+
+def por_versao(versao: str) -> VersaoDosTermos | None:
+    """Versão específica dos Termos guardada no servidor (23.6). None se não existir."""
+    return next((v for v in VERSOES if v.versao == versao), None)

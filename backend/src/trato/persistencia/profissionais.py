@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 
 from trato.persistencia.comum import como_uuid, exigir_uuid, para_json
 from trato.persistencia.conexao import Banco
+from trato.profissional.nota import MINIMO_PADRAO, SQL_PUBLICADA, nota_visivel
 from trato.profissional.ranking import pontuacao
 from trato.profissional.repositorio import (
     CategoriaPublica,
@@ -53,14 +54,30 @@ _NOME_PUBLICO_SQL = (
 )
 
 
+# Avaliações publicadas de clientes sobre o profissional `p` (as que entram na nota).
+_TOTAL_PUBLICADAS = (
+    "(select count(*) from public.avaliacoes a where a.avaliado_id = p.usuario_id "  # noqa: S608
+    f"and a.direcao = 'cliente_para_profissional' and {SQL_PUBLICADA})"
+)
+
+
+def _lista_textos(bruto: Any) -> tuple[str, ...]:
+    if not isinstance(bruto, list | tuple):
+        return ()
+    return tuple(str(x) for x in bruto if x is not None)
+
+
 class CatalogoPostgres:
     def __init__(self, banco: Banco) -> None:
         self._banco = banco
 
     def categorias_publicas(self) -> list[CategoriaPublica]:
         sql = (
-            "select id, nome, slug, icone, pai_id, aceita_remoto from public.categorias "  # noqa: S608
-            "where ativa order by " + _sem_acento_sql("nome") + ", lower(nome), id"
+            "select c.id, c.nome, c.slug, c.icone, c.pai_id, c.aceita_remoto, "
+            "to_jsonb(c) -> 'incluido' as incluido, "
+            "to_jsonb(c) -> 'nao_incluido' as nao_incluido "
+            "from public.categorias c "  # noqa: S608
+            "where c.ativa order by " + _sem_acento_sql("c.nome") + ", lower(c.nome), c.id"
         )
         with self._banco.transacao() as con:
             linhas = con.execute(sql).fetchall()
@@ -72,6 +89,8 @@ class CatalogoPostgres:
                 l["icone"],
                 str(l["pai_id"]) if l["pai_id"] else None,
                 bool(l["aceita_remoto"]),
+                incluido=_lista_textos(l.get("incluido")),
+                nao_incluido=_lista_textos(l.get("nao_incluido")),
             )  # fmt: skip
             for l in linhas  # noqa: E741
         ]
@@ -200,6 +219,7 @@ class ProfissionaisPostgres:
         excluir_usuario_ids: tuple[str, ...] = (),
         limite: int = 20,
         detalhe: Callable[[str], Any] | None = None,
+        nota_minimo_avaliacoes: int = MINIMO_PADRAO,
     ) -> list[str]:
         """Profissionais aprovados e ativos da categoria/cidade (ou remoto), por nota desc."""
         del detalhe  # no Postgres a nota e o status vêm direto do banco
@@ -240,12 +260,16 @@ class ProfissionaisPostgres:
             if excluidos:
                 onde.append("not (p.usuario_id = any(%s::uuid[]))")
                 params.append(excluidos)
+            ordem = "p.nota_publica"
+            if nota_minimo_avaliacoes > MINIMO_PADRAO:  # 12.3: nota oculta não ordena
+                ordem = f"case when {_TOTAL_PUBLICADAS} >= %s then p.nota_publica end"
+                params.append(nota_minimo_avaliacoes)
             params.append(limite)
             linhas = con.execute(
                 "select p.usuario_id from public.perfis_profissional p "  # noqa: S608
                 "join public.usuarios u on u.id = p.usuario_id "
                 "where " + " and ".join(onde) + " "
-                "order by p.nota_publica desc nulls last, p.usuario_id asc "
+                f"order by {ordem} desc nulls last, p.usuario_id asc "
                 "limit %s",
                 params,
             ).fetchall()
@@ -412,6 +436,9 @@ class ProfissionaisPostgres:
         if filtro.nota_minima is not None:
             onde.append("p.nota_publica is not null and p.nota_publica >= %s")
             params.append(filtro.nota_minima)
+            if filtro.nota_minimo_avaliacoes > MINIMO_PADRAO:  # 12.3: nota oculta não filtra
+                onde.append(f"{_TOTAL_PUBLICADAS} >= %s")
+                params.append(filtro.nota_minimo_avaliacoes)
         if filtro.atende_hoje:
             onde.append(
                 "exists (select 1 from jsonb_array_elements(coalesce(p.disponibilidade, "
@@ -457,8 +484,7 @@ class ProfissionaisPostgres:
             candidatos = con.execute(
                 "select p.usuario_id, p.nota_publica, p.servicos_concluidos, "  # noqa: S608
                 "p.nivel_verificacao, p.disponivel_agora, "
-                "(select count(*) from public.avaliacoes a where a.avaliado_id = p.usuario_id "
-                "and a.direcao = 'cliente_para_profissional') as n_avaliacoes, "
+                f"{_TOTAL_PUBLICADAS} as n_avaliacoes, "
                 "case when btrim(coalesce(p.bio, '')) <> '' then 0 else 1 end as sem_bio, "
                 f"{sel_texto} as ordem_texto, {sel_bairro} as ordem_bairro "
                 f"{base}",
@@ -467,7 +493,11 @@ class ProfissionaisPostgres:
         peso_nivel = {"verificado_plus": 0, "verificado": 1}
         ordenados: list[tuple[tuple[Any, ...], str]] = []
         for c in candidatos:
-            nota = float(c["nota_publica"]) if c["nota_publica"] is not None else None
+            nota = nota_visivel(
+                float(c["nota_publica"]) if c["nota_publica"] is not None else None,
+                int(c["n_avaliacoes"]),
+                filtro.nota_minimo_avaliacoes,
+            )
             concluidos = int(c["servicos_concluidos"])
             nota_composta = pontuacao(
                 nota=nota,
@@ -501,6 +531,7 @@ class ProfissionaisPostgres:
             linhas = con.execute(
                 "select p.usuario_id, u.nome, p.bio, p.nivel_verificacao, p.nota_publica, "  # noqa: S608
                 "p.servicos_concluidos, p.atende_remoto, p.disponivel_agora, "
+                f"{_TOTAL_PUBLICADAS} as n_avaliacoes, "
                 "coalesce((select array_agg(pc.categoria_id::text "
                 "order by pc.categoria_id) from public.profissional_categorias pc "
                 "where pc.profissional_id = p.usuario_id and pc.suspensa_em is null), '{}') "
@@ -524,15 +555,20 @@ class ProfissionaisPostgres:
                 por_id[uid]["nome"],
                 por_id[uid]["bio"],
                 por_id[uid]["nivel_verificacao"],
-                float(por_id[uid]["nota_publica"])
-                if por_id[uid]["nota_publica"] is not None
-                else None,
+                nota_visivel(
+                    float(por_id[uid]["nota_publica"])
+                    if por_id[uid]["nota_publica"] is not None
+                    else None,
+                    int(por_id[uid]["n_avaliacoes"]),
+                    filtro.nota_minimo_avaliacoes,
+                ),
                 int(por_id[uid]["servicos_concluidos"]),
                 tuple(por_id[uid]["categorias"]),
                 cidades=tuple(por_id[uid]["cidades"]),
                 bairros=tuple(por_id[uid]["bairros"]),
                 atende_remoto=bool(por_id[uid]["atende_remoto"]),
                 disponivel_agora=bool(por_id[uid]["disponivel_agora"]),
+                avaliacoes_total=int(por_id[uid]["n_avaliacoes"]),
             )
             for uid in pagina
             if uid in por_id

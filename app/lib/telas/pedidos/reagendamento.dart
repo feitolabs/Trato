@@ -452,6 +452,14 @@ class _CartaoProposta extends StatelessWidget {
               style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
             ),
           ],
+          if (proposta.avisoPrazo != null) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              proposta.avisoPrazo!,
+              key: const ValueKey('aviso-prazo-reagendamento'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+            ),
+          ],
           const SizedBox(height: EspacosTrato.x3),
           if (minha)
             BotaoSecundario(

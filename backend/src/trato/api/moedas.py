@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 import psycopg
 
-from trato.api.moedas_saldo import parcelas_do_gasto, saldo_disponivel
+from trato.api.moedas_saldo import parcelas_do_gasto, saldo_disponivel, vencido_sem_uso
 from trato.financeiro import periodo
 from trato.persistencia.comum import como_uuid
 
@@ -149,7 +149,16 @@ class RepositorioMoedas(Protocol):
 
     def creditado_no_mes(self, usuario_id: str, tipo: str, desde: datetime) -> int: ...
 
+    def ha_saldo_vivo(self, agora: datetime) -> bool:
+        """Alguém, em qualquer carteira, ainda tem Tratinhos válidos."""
+        ...
+
     def existe(self, chave_idempotencia: str) -> bool: ...
+
+    def carteiras_vencendo(self, agora: datetime, ate: datetime) -> list[tuple[str, str]]:
+        """(usuário, carteira) com algum crédito que vence depois de `agora` e até `ate`.
+        É só a triagem: quanto ainda sobra do crédito sai de `creditos_validos`."""
+        ...
 
     def lancamentos_da_carteira(
         self, usuario_id: str, carteira: str = "cliente"
@@ -290,6 +299,19 @@ class MoedasEmMemoria:
             if i.usuario_id == usuario_id and i.carteira == carteira
         ]
 
+    def carteiras_vencendo(self, agora: datetime, ate: datetime) -> list[tuple[str, str]]:
+        return sorted(
+            {
+                (i.usuario_id, i.carteira)
+                for i in list(self._itens.values())
+                if i.quantidade > 0 and i.expira_em is not None and agora < i.expira_em <= ate
+            }
+        )
+
+    def ha_saldo_vivo(self, agora: datetime) -> bool:
+        donos = {(i.usuario_id, i.carteira) for i in list(self._itens.values())}
+        return any(self.saldo(u, agora, c) > 0 for u, c in donos)
+
     @contextmanager
     def trava(self, nome: str) -> Iterator[None]:
         with self._trava:
@@ -313,10 +335,8 @@ class MoedasEmMemoria:
     def restauracao_devida(
         self, medida_id: str, usuario_id: str, carteira: str, inicio: datetime, agora: datetime
     ) -> int:
-        """Saldo válido no início do encerramento menos o válido agora (como no banco)."""
-        todos = self.lancamentos_da_carteira(usuario_id, carteira)
-        antes = saldo_disponivel([x for x in todos if x.criada_em <= inicio], inicio)
-        return max(0, antes - saldo_disponivel(todos, max(agora, inicio)))
+        """O que venceu sem uso, desde o encerramento, dos créditos que já existiam nele."""
+        return vencido_sem_uso(self.lancamentos_da_carteira(usuario_id, carteira), inicio, agora)
 
     def restaurar(self, lancamento: LancamentoMoeda) -> bool:
         return self.lancar(lancamento)
@@ -513,6 +533,10 @@ class MoedasEmMemoria:
         return True
 
 
+def _coluna_ausente(erro: Exception) -> bool:
+    return isinstance(erro.__cause__ or erro, psycopg.errors.UndefinedColumn)
+
+
 class MoedasPostgres:
     def __init__(self, banco: Any) -> None:
         self._banco = banco
@@ -654,7 +678,9 @@ class MoedasPostgres:
                     "where usuario_id = %s and carteira = %s",
                     (uid, carteira),
                 ).fetchall()
-        except Exception:  # noqa: BLE001 - coluna `carteira` ainda não existe: tudo é do cliente
+        except Exception as erro:  # coluna `carteira` ainda não existe: tudo é do cliente
+            if not _coluna_ausente(erro):
+                raise
             if carteira != CARTEIRA_CLIENTE:
                 return []
             with self._banco.transacao() as con:
@@ -675,6 +701,51 @@ class MoedasPostgres:
             )
             for l in linhas  # noqa: E741
         ]
+
+    def carteira_disponivel(self, carteira: str) -> bool:
+        """Há onde ler e gravar esta carteira (tabela e, na do profissional, a coluna)."""
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select to_regclass('public.moedas_lancamentos') is not null as tabela, "
+                "exists (select 1 from information_schema.columns where table_schema = 'public' "
+                "and table_name = 'moedas_lancamentos' and column_name = 'carteira') as coluna"
+            ).fetchone()
+        return bool(linha["tabela"] and (carteira == CARTEIRA_CLIENTE or linha["coluna"]))
+
+    def carteiras_vencendo(self, agora: datetime, ate: datetime) -> list[tuple[str, str]]:
+        filtro = (
+            " from public.moedas_lancamentos "
+            "where quantidade > 0 and expira_em > %s and expira_em <= %s"
+        )
+        try:
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select distinct usuario_id, carteira" + filtro,  # noqa: S608
+                    (agora, ate),
+                ).fetchall()
+            return [(str(x["usuario_id"]), x["carteira"]) for x in linhas]
+        except Exception as erro:  # coluna `carteira` ainda não existe: tudo é do cliente
+            if not _coluna_ausente(erro):
+                raise
+            with self._banco.transacao() as con:
+                linhas = con.execute(
+                    "select distinct usuario_id" + filtro,  # noqa: S608
+                    (agora, ate),
+                ).fetchall()
+            return [(str(x["usuario_id"]), CARTEIRA_CLIENTE) for x in linhas]
+
+    def ha_saldo_vivo(self, agora: datetime) -> bool:
+        with self._banco.transacao() as con:
+            donos = con.execute(
+                "select distinct usuario_id from public.moedas_lancamentos "
+                "where quantidade > 0 and (expira_em is null or expira_em > %s)",
+                (agora,),
+            ).fetchall()
+        return any(
+            self.saldo(str(d["usuario_id"]), agora, carteira) > 0
+            for d in donos
+            for carteira in (CARTEIRA_CLIENTE, CARTEIRA_PROFISSIONAL)
+        )
 
     @contextmanager
     def trava(self, nome: str) -> Iterator[None]:
@@ -707,14 +778,10 @@ class MoedasPostgres:
     def restauracao_devida(
         self, medida_id: str, usuario_id: str, carteira: str, inicio: datetime, agora: datetime
     ) -> int:
-        mid = como_uuid(medida_id)
-        if mid is None:
+        if como_uuid(medida_id) is None:
             return 0
-        with self._banco.transacao() as con:
-            linha = con.execute(
-                "select public.moedas_restauracao_devida(%s, %s, %s) as q", (mid, carteira, agora)
-            ).fetchone()
-        return int(linha["q"] or 0)
+        # Mesma regra da função SQL da 20261127133600, que o gatilho da restauração usa.
+        return vencido_sem_uso(self.lancamentos_da_carteira(usuario_id, carteira), inicio, agora)
 
     def restaurar(self, lancamento: LancamentoMoeda) -> bool:
         """Num ponto de retorno: se o banco recusar a regra, o resto da transação continua."""
@@ -780,7 +847,9 @@ class MoedasPostgres:
                     "where usuario_id = %s and carteira = %s order by criada_em desc limit %s",
                     (uid, carteira, limite),
                 ).fetchall()
-        except Exception:  # noqa: BLE001 - coluna `carteira` ainda não existe: tudo é do cliente
+        except Exception as erro:  # coluna `carteira` ainda não existe: tudo é do cliente
+            if not _coluna_ausente(erro):
+                raise
             if carteira != CARTEIRA_CLIENTE:
                 return []
             with self._banco.transacao() as con:
@@ -1333,6 +1402,21 @@ class UsoMoedas:
     volta_em: date | None = None
 
 
+def _desligado_sem_saldo(
+    repo: RepositorioMoedas, cfg: ConfigMoedas, usuario_id: str, agora: datetime
+) -> bool:
+    """Termos 13.11 e I.12: desligar o programa para de creditar, mas não impede o uso do que já
+    foi creditado e ainda vale. Verdadeiro só com o programa desligado e nada a usar (ou sem como
+    ler o saldo: sem desconto)."""
+    if cfg.ativo:
+        return False
+    try:
+        return repo.saldo(usuario_id, agora) <= 0
+    except Exception:  # noqa: BLE001 - tabela ainda não existe ou banco fora
+        log.warning("saldo de moedas indisponível: sem desconto", exc_info=True)
+        return True
+
+
 def disponibilidade_desconto(
     repo: RepositorioMoedas,
     *,
@@ -1346,12 +1430,13 @@ def disponibilidade_desconto(
     `ignorar`: chaves de reserva (`chave_reserva`) que não contam, as das cobranças pendentes do
     MESMO pedido (serão reaproveitadas ou trocadas), para a simulação não se bloquear sozinha.
 
-    Recurso desligado: indisponível sem motivo. Ordem do motivo: orçamento do mês, limite do dia,
+    Programa desligado e sem saldo: indisponível sem motivo.
+    Ordem do motivo: orçamento do mês, limite do dia,
     teto do cliente, reservas abertas. Se o armazenamento falhar (tabela ainda não existe, banco
     fora), a empresa não paga desconto: indisponível como `orcamento_esgotado` (fail-closed).
     """
     cfg = repo.config()
-    if not cfg.ativo:
+    if _desligado_sem_saldo(repo, cfg, usuario_id, agora):
         return Disponibilidade(False, None, 0)
     try:
         sobra_mes = cfg.orcamento_mensal_desconto_centavos - repo.orcamento_usado(mes_ref(agora))
@@ -1403,14 +1488,17 @@ def calcular_uso_moedas(
 
     Usa o que for MENOR entre o saldo livre (saldo menos o preso em cobranças pendentes), o teto por
     serviço (percentual do valor, em tabela) e o que sobra do orçamento do mês, do dia e do teto do
-    cliente. O desconto nunca zera o serviço (sobra pelo menos R$ 1,00). Sem moedas ou recurso
-    desligado: `UsoMoedas(0, 0)`. Sem orçamento, no teto, sem saldo livre ou com reservas demais:
+    cliente. O desconto nunca zera o serviço (sobra pelo menos R$ 1,00). Sem moedas:
+    `UsoMoedas(0, 0)`; programa desligado e sem saldo: `UsoMoedas(0, 0, False)`. Sem orçamento,
+    no teto, sem saldo livre ou com reservas demais:
     `UsoMoedas(0, 0, False, motivo)` (as moedas continuam guardadas).
     """
     nada = UsoMoedas(0, 0)
     cfg = repo.config()
-    if not cfg.ativo or cfg.valor_moeda_centavos <= 0:
-        return UsoMoedas(0, 0, False if not cfg.ativo else True)
+    if _desligado_sem_saldo(repo, cfg, usuario_id, agora):
+        return UsoMoedas(0, 0, False)
+    if cfg.valor_moeda_centavos <= 0:
+        return nada
     disp = disponibilidade_desconto(repo, usuario_id=usuario_id, agora=agora, ignorar=ignorar)
     if not disp.disponivel:
         return UsoMoedas(0, 0, False, disp.motivo, disp.volta_em)
@@ -1757,29 +1845,29 @@ def zerar_tratinhos_encerramento_voluntario(
     total_zerado = 0
     for carteira in (CARTEIRA_CLIENTE, CARTEIRA_PROFISSIONAL):
         chave = f"encerramento-voluntario:{pedido_exclusao_id}:{carteira}"
-        try:
-            with repo.trava(f"encerramento:{usuario_id}:{carteira}"):
-                if repo.existe(chave):
-                    continue
-                disponivel = max(0, int(repo.saldo(usuario_id, agora, carteira)))
-                if disponivel <= 0:
-                    continue
-                gravou = repo.lancar(
-                    LancamentoMoeda(
-                        usuario_id=usuario_id,
-                        tipo="ajuste",
-                        quantidade=-disponivel,
-                        chave_idempotencia=chave,
-                        criada_em=agora,
-                        referencia_id=pedido_exclusao_id,
-                        carteira=carteira,
-                    )
+        # Só a ausência da tabela/coluna, conferida ANTES, é ignorada. Qualquer outra falha
+        # sobe e desfaz a transação da exclusão (a conta não sai com o livro pela metade).
+        tem_carteira = getattr(repo, "carteira_disponivel", None)
+        if tem_carteira is not None and not tem_carteira(carteira):
+            log.warning("Sem estrutura de Tratinhos (%s); nada a zerar.", carteira)
+            continue
+        with repo.trava(f"encerramento:{usuario_id}:{carteira}"):
+            if repo.existe(chave):
+                continue
+            disponivel = max(0, int(repo.saldo(usuario_id, agora, carteira)))
+            if disponivel <= 0:
+                continue
+            gravou = repo.lancar(
+                LancamentoMoeda(
+                    usuario_id=usuario_id,
+                    tipo="ajuste",
+                    quantidade=-disponivel,
+                    chave_idempotencia=chave,
+                    criada_em=agora,
+                    referencia_id=pedido_exclusao_id,
+                    carteira=carteira,
                 )
-                if gravou:
-                    total_zerado += disponivel
-        except Exception:  # noqa: BLE001 - tabela/coluna ausente em ambiente mínimo
-            log.warning(
-                "Não foi possível zerar Tratinhos (%s) no encerramento voluntário; seguindo.",
-                carteira,
             )
+            if gravou:
+                total_zerado += disponivel
     return total_zerado

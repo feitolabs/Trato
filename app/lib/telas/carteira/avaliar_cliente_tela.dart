@@ -33,11 +33,13 @@ class AvaliarClienteTela extends StatefulWidget {
 class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
   static String _tratinhos(int n) => '+$n ${n == 1 ? 'Tratinho' : 'Tratinhos'}';
 
-  /// Quantidade só quando o servidor informa; prazo de liberação nunca é fixado aqui.
+  /// Quantidade e validade só quando o servidor informa; prazo de liberação nunca é fixado aqui.
   String get _textoDoBonus {
     final n = widget.prazo.bonusMoedas;
     final premio = n == null ? 'pode render Tratinhos' : 'rende ${_tratinhos(n)}';
-    return 'Avaliar o cliente $premio, com qualquer nota, positiva ou negativa.';
+    final base = 'Avaliar o cliente $premio, com qualquer nota, positiva ou negativa.';
+    final dias = widget.prazo.bonusValidadeDias;
+    return dias != null && dias > 0 ? '$base ${textoValidadeBonusDias(dias)}' : base;
   }
 
   final _comentario = TextEditingController();
@@ -164,7 +166,10 @@ class _AvaliarClienteTelaState extends State<AvaliarClienteTela> {
         if (_moedasGanhas != null && _moedasGanhas! > 0) ...[
           const SizedBox(height: EspacosTrato.x4),
           AvisoFaixa(
-            texto: '${_tratinhos(_moedasGanhas!)} a liberar (se não houver disputa).',
+            texto: widget.prazo.bonusValidadeDias != null && widget.prazo.bonusValidadeDias! > 0
+                ? '${_tratinhos(_moedasGanhas!)} a liberar (se não houver disputa). '
+                    '${textoValidadeBonusDias(widget.prazo.bonusValidadeDias!)}'
+                : '${_tratinhos(_moedasGanhas!)} a liberar (se não houver disputa).',
             tipo: TipoStatus.sucesso,
             icone: Icons.stars_outlined,
           ),

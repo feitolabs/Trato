@@ -65,6 +65,24 @@ class ExclusividadesPostgres:
     def __init__(self, banco: Any) -> None:
         self._banco = banco
 
+    def prazo_de_resposta(self, item: Exclusividade) -> datetime | None:
+        """22.3: o prazo que o banco aplica. Sem a função (migration 20261127213000), o banco
+        ainda usa o prazo gravado, e é ele que se mostra: mostrar um prazo maior faria a pessoa
+        perder a oferta. `None`: suspenso por falha ativa."""
+        if item.responder_ate is None:
+            return None
+        with self._banco.transacao() as con:
+            tem = con.execute(
+                "select to_regprocedure('public.exclusividade_prazo_resposta("
+                "timestamptz,timestamptz)') is not null as tem"
+            ).fetchone()["tem"]
+            if not tem:
+                return item.responder_ate
+            return con.execute(
+                "select public.exclusividade_prazo_resposta(%s, %s) as ate",
+                (item.criada_em, item.responder_ate),
+            ).fetchone()["ate"]
+
     def solicitar(
         self,
         profissional_id: str,

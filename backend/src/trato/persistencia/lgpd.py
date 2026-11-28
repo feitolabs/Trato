@@ -321,6 +321,23 @@ class ConsentimentosPostgres(RepositorioConsentimentos):
         )
 
 
+    def ultimos(self, usuario_ids: Sequence[str], finalidade: str) -> dict[str, bool]:
+        pedidos = {como_uuid(i): i for i in usuario_ids if como_uuid(i) is not None}
+        if not pedidos:
+            return {}
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                """
+                select distinct on (usuario_id) usuario_id, aceito
+                  from public.lgpd_consentimentos
+                 where usuario_id = any(%s) and finalidade = %s
+                 order by usuario_id, registrado_em desc, id desc
+                """,
+                (list(pedidos), finalidade),
+            ).fetchall()
+        return {pedidos[como_uuid(str(r["usuario_id"]))]: r["aceito"] for r in linhas}
+
+
 class ExclusoesPostgres(RepositorioExclusoes):
     def __init__(self, banco: Banco) -> None:
         self._banco = banco

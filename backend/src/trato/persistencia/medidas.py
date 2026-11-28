@@ -121,7 +121,7 @@ class RepositorioMedidas(Protocol):
     def definir_status(self, usuario_id: str, de: Sequence[str], para: str) -> bool: ...
 
     def retencao_por_fraude(self, usuario_id: str, agora: datetime) -> int | None:
-        """Limite da trava por fraude vigente mais recente (não somam). `None`: nada segura.
+        """Maior limite entre as travas por fraude vigentes (não somam). `None`: nada segura.
         Dentro de uma transação, trava a linha do usuário até o fim dela."""
 
     def prazo_maximo_trava_fraude_dias(self) -> int: ...
@@ -290,7 +290,7 @@ class MedidasEmMemoria:
             ]
             if not travas:
                 return None
-            return max(travas, key=lambda m: (m.inicio_em, m.protocolo)).limite_retencao_centavos
+            return max(m.limite_retencao_centavos or 0 for m in travas)
 
     def prazo_maximo_trava_fraude_dias(self) -> int:
         return PRAZO_FRAUDE_PADRAO_DIAS
@@ -523,7 +523,7 @@ class MedidasPostgres:
                 "select limite_retencao_centavos as limite from public.medidas_conta "
                 "where usuario_id = %s and tipo = 'trava_saque' and motivo_fraude "
                 "and revertida_em is null and inicio_em <= %s and fim_em > %s "
-                "order by criado_em desc, protocolo desc limit 1",
+                "order by limite_retencao_centavos desc limit 1",
                 (uid, agora, agora),
             ).fetchone()
         return None if linha is None else int(linha["limite"])

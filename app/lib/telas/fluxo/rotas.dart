@@ -46,10 +46,12 @@ import '../catalogo/todas_categorias_tela.dart';
 import '../cliente/inicio_tela.dart';
 import '../cliente/modelos.dart' show CategoriaServico, DadosInicio, Profissional;
 import '../comuns/orcamento_vencido.dart';
-import '../atendimento/modelos.dart'
-    show ServicoPessoaDiferente, casoPessoaDiferente;
+import '../avaliacao_ocultada/revisao_ocultacao.dart';
+import '../atendimento/modelos.dart' show ServicoPessoaDiferente, casoPessoaDiferente;
 import '../conta_bloqueada/pedidos_contratados.dart';
+import '../conta_inativa/conta_inativa_tela.dart';
 import '../legal/aceite_dos_termos.dart';
+import '../legal/historico_versoes.dart';
 import '../legal/registro_do_aceite.dart';
 import '../legal/texto_legal_tela.dart';
 import '../mensagens/modelos.dart' show ConversaResumo, ServicoMensagens;
@@ -61,6 +63,7 @@ import '../pedido_novo/modelos.dart' show FormularioPedido;
 import '../servicos/servicos_recentes_tela.dart';
 import '../cliente/perfil_profissional_tela.dart';
 import '../disputa_acordo/secao_acordo.dart';
+import '../disputa_acordo/secao_pedidos_info.dart';
 import '../disputa_profissional/atender_retrabalho_tela.dart';
 import '../disputa_profissional/disputa.dart';
 import '../disputa_profissional/responder_disputa_tela.dart';
@@ -97,6 +100,8 @@ import '../lgpd/central_privacidade_tela.dart';
 import '../lgpd/modelos.dart' show CancelamentoExclusao;
 import '../mensagens/mensagens_tela.dart';
 import '../perfil_publico/avaliacoes_recebidas_tela.dart';
+import '../perfil_publico/perfil_publico.dart'
+    show Avaliacao, PerfilPublico, RespostaAvaliacao, ServicoPerfilPublico;
 import '../perfil_publico/perfil_publico_tela.dart';
 import 'deep_link.dart';
 import 'deep_link_modelo.dart';
@@ -140,20 +145,25 @@ import '../notificacoes/servico_repositorio.dart';
 import '../orcamentos/detalhe_orcamento_tela.dart';
 import '../orcamentos/orcamentos_recebidos_tela.dart';
 import '../pagamento/aguardando_pagamento_tela.dart';
+import '../pagamento/estorno_pedido.dart';
 import '../pagamento/modelos.dart';
 import '../pagamento/pagamento_tela.dart';
 import '../pedido_novo/novo_pedido_tela.dart';
 import '../perfil_cliente/modelos.dart';
 import '../perfil_cliente/perfil_cliente_tela.dart';
+import '../perfil_cliente/extrato_tratinhos_tela.dart';
+import '../profissional_inicio/tratinhos_profissional_tela.dart';
 import '../pedidos/documentos_contratacao.dart';
 import '../pedidos/chat_pedido_tela.dart';
 import '../pedidos/modelos.dart';
 import '../pedidos/pedido_aberto_tela.dart';
 import '../pedidos/atendimento.dart';
 import '../pedidos/pedido_execucao_tela.dart';
+import '../pedidos/secao_forca_maior.dart';
 import '../pedidos/reagendamento.dart';
 import '../pedidos/seus_pedidos_tela.dart';
 import '../profissional/calculadora_orcamento_tela.dart';
+import '../profissional/selo_tela.dart';
 import '../profissional/dinheiro.dart';
 import '../profissional/check_in_tela.dart';
 import '../profissional/check_out_tela.dart';
@@ -371,8 +381,12 @@ abstract final class RotasTrato {
       await acao();
       return true;
     } on Object catch (erro) {
-      if (ehOrcamentoVencido(erro)) rethrow;
-      if (context.mounted) _aviso(context, erro);
+      if (ehRecusaDoOrcamento(erro)) rethrow;
+      if (context.mounted && erro is ErroTrato && erro.codigo == 'selo_retirado') {
+        await _avisoSeloRetirado(context, erro.mensagem);
+      } else if (context.mounted) {
+        _aviso(context, erro);
+      }
       return false;
     }
   }
@@ -494,6 +508,58 @@ abstract final class RotasTrato {
     _rotaDoBloqueio = null;
   }
 
+  /// Termos 4.9: a API disse `conta_inativa`. Vale até reativar ou sair da conta.
+  static var contaInativa = false;
+  static Route<void>? _rotaDaInatividade;
+
+  static void esquecerInatividade() {
+    contaInativa = false;
+    _rotaDaInatividade = null;
+  }
+
+  /// Troca tudo pela tela de conta inativa, sem logout. Várias respostas juntas abrem uma só.
+  static void contaFoiInativada(
+    NavigatorState? Function() navegador,
+    String? mensagem, [
+    int tentativa = 0,
+  ]) {
+    contaInativa = true;
+    final nav = navegador();
+    if (nav == null) {
+      if (tentativa < 60) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => contaFoiInativada(navegador, mensagem, tentativa + 1),
+        );
+      }
+      return;
+    }
+    _mostrarInatividade(nav, mensagem);
+  }
+
+  static void _mostrarInatividade(NavigatorState nav, [String? mensagem]) {
+    if (_rotaDaInatividade?.isActive ?? false) return;
+    final reativacao = repos.perfil is ReativacaoConta ? repos.perfil as ReativacaoConta : null;
+    final rota = MaterialPageRoute<void>(
+      builder: (_) => Builder(
+        builder: (context) => ContaInativaTela(
+          mensagem: mensagem,
+          aoReativar: () async {
+            if (reativacao == null) throw ErroTrato.indisponivel;
+            await reativacao.reativarConta();
+          },
+          aoReativada: () {
+            esquecerInatividade();
+            irParaInicio(context);
+          },
+          aoFalar: () => abrirAtendimento(context, profissional: false),
+          aoSair: () => sair(context),
+        ),
+      ),
+    );
+    _rotaDaInatividade = rota;
+    nav.pushAndRemoveUntil(rota, (_) => false);
+  }
+
   /// Troca tudo pela tela de bloqueio, sem logout. Várias respostas juntas abrem uma só.
   static void contaFoiBloqueada(
     NavigatorState? Function() navegador,
@@ -528,8 +594,13 @@ abstract final class RotasTrato {
           aoVerMedidas: medidas == null ? null : () => abrirMedidas(context),
           contaEncerrada: retorno == null
               ? null
-              : () async => (await medidas!.listar())
-                      ?.any((m) => m.tipo == 'encerramento' && m.revertidaEm == null) ??
+              : () async =>
+                  (await medidas!.listar())
+                      // Encerramento só agendado (20.8) ainda não encerrou a conta.
+                      ?.any((m) =>
+                          m.tipo == 'encerramento' &&
+                          m.revertidaEm == null &&
+                          !m.agendada(DateTime.now())) ??
                   false,
           aoPedirRetorno: retorno == null
               ? null
@@ -614,6 +685,8 @@ abstract final class RotasTrato {
           atualizarQuando: pedidosMudaram,
           aoAbrir: () => abrirContestacaoDecisao(context, id, profissional: false),
         ),
+      // Termos 6.10: o bloqueado só acompanha o que foi mandado devolver (consulta, sem ação).
+      if (_secaoEstorno(pedido.estado, id) case final estorno?) estorno,
     ];
   }
 
@@ -632,6 +705,50 @@ abstract final class RotasTrato {
       ),
     );
   }
+
+  static void abrirSelo(BuildContext context) => _abrir<void>(
+        context,
+        SeloTela(
+          carregar: repos.notificacoes.listar,
+          aoFalar: (tela) => abrirAtendimento(tela, profissional: true),
+        ),
+      );
+
+  /// Termos 10.3: orçar com o selo retirado. A mensagem é do servidor; aqui só a orientação.
+  static Future<void> _avisoSeloRetirado(BuildContext context, String mensagem) => showDialog<void>(
+        context: context,
+        builder: (dialogo) => AlertDialog(
+          key: const Key('dialogo-selo-retirado'),
+          scrollable: true,
+          title: const Text('Orçamento não enviado'),
+          content: Text(
+            '$mensagem\n\nToque em "Ver o aviso do selo" para ler o motivo, ou em '
+            '"Falar com o Trato" para contestar.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogo).pop(),
+              child: const Text('Fechar'),
+            ),
+            TextButton(
+              key: const Key('selo-ver-aviso'),
+              onPressed: () {
+                Navigator.of(dialogo).pop();
+                abrirSelo(context);
+              },
+              child: const Text('Ver o aviso do selo'),
+            ),
+            FilledButton(
+              key: const Key('selo-contestar'),
+              onPressed: () {
+                Navigator.of(dialogo).pop();
+                abrirAtendimento(context, profissional: true);
+              },
+              child: const Text('Falar com o Trato'),
+            ),
+          ],
+        ),
+      );
 
   static void abrirMedidas(BuildContext context) {
     final medidas = repos.medidas;
@@ -701,6 +818,8 @@ abstract final class RotasTrato {
       }
       push.ultimoTokenRegistrado = null;
     }
+    // Termos 14.3: avisa a saída enquanto ainda há token (tempo curto; falha não segura).
+    await sessao?.avisarAcesso('logout');
     try {
       await ServicoAuthPadrao.atual.sair();
     } on Object {
@@ -732,6 +851,7 @@ abstract final class RotasTrato {
           especialidade: '',
           servicosConcluidos: o.servicosConcluidos,
           nota: o.nota,
+          contagem: o.contagem,
           distanciaKm: 0,
         ),
       );
@@ -840,6 +960,7 @@ abstract final class RotasTrato {
       especialidade: '',
       servicosConcluidos: f.servicos ?? 0,
       nota: f.nota ?? 0,
+      contagem: f.contagem,
       distanciaKm: 0,
     );
     List<CategoriaServico>? dele;
@@ -970,14 +1091,15 @@ abstract final class RotasTrato {
   /// Termos de uso e política de privacidade (rascunhos; a tela avisa que serão revisados).
   static void abrirTermos(BuildContext context) {
     final servico = repos.privacidade;
-    final consulta =
-        temSessao && servico is ConsultaDoAceite ? servico as ConsultaDoAceite : null;
+    final consulta = temSessao && servico is ConsultaDoAceite ? servico as ConsultaDoAceite : null;
     _abrir<void>(
       context,
       Builder(
         builder: (context) => TermosEPoliticaTela(
           aoAbrir: (t) => abrirTextoLegal(context, t),
           consultaDoAceite: consulta,
+          // O histórico é público: aparece também sem conta aberta.
+          consultaDeVersoes: servico is ConsultaDeVersoes ? servico as ConsultaDeVersoes : null,
         ),
       ),
     );
@@ -1067,12 +1189,16 @@ abstract final class RotasTrato {
       _mostrarBloqueio(Navigator.of(context));
       return;
     }
+    if (contaInativa) {
+      _mostrarInatividade(Navigator.of(context));
+      return;
+    }
     final tem = repos.modoApi
         ? (await repos.perfilPublico?.temPerfilProfissional() ?? false)
         : ((ServicoAuthPadrao.atual.sessaoAtual?.ehProfissional == true) ||
             (await repos.perfilPublico?.temPerfilProfissional() ?? false));
-    // O bloqueio pode ter chegado durante a consulta: nada abre por cima dele.
-    if (contaBloqueada) return;
+    // O bloqueio ou inatividade pode ter chegado durante a consulta: nada abre por cima.
+    if (contaBloqueada || contaInativa) return;
     if (tem && context.mounted) {
       if (repos.modoApi && repos.verificacao != null) {
         SituacaoVerificacao? sit;
@@ -1131,6 +1257,10 @@ abstract final class RotasTrato {
   static void _entrarNaCascaProfissional(BuildContext context) {
     if (contaBloqueada) {
       _mostrarBloqueio(Navigator.of(context));
+      return;
+    }
+    if (contaInativa) {
+      _mostrarInatividade(Navigator.of(context));
       return;
     }
     final navegador = Navigator.of(context);
@@ -1365,9 +1495,8 @@ abstract final class RotasTrato {
             _abrirOrcamento(context, id, titulo,
                 remoto: pedido?.remoto ?? false, categoriaId: pedido?.categoriaId);
           },
-          aoFazerOrcamentoDoPedido: (pedido) =>
-              _abrirOrcamento(context, pedido.id, pedido.titulo,
-                  remoto: pedido.remoto, categoriaId: pedido.categoriaId),
+          aoFazerOrcamentoDoPedido: (pedido) => _abrirOrcamento(context, pedido.id, pedido.titulo,
+              remoto: pedido.remoto, categoriaId: pedido.categoriaId),
           aoPerguntar: () {
             final pedido = inicio.pedidos.isNotEmpty ? inicio.pedidos.first : null;
             _abrir<void>(
@@ -1456,7 +1585,9 @@ abstract final class RotasTrato {
       await acao();
       return true;
     } on ErroTrato catch (erro) {
-      if (context.mounted && erro.codigoHttp == 422 && mensagemDeCnpj(erro.mensagem)) {
+      if (context.mounted && erro.codigo == 'selo_retirado') {
+        await _avisoSeloRetirado(context, erro.mensagem);
+      } else if (context.mounted && erro.codigoHttp == 422 && mensagemDeCnpj(erro.mensagem)) {
         await _avisoCnpjNecessario(context, erro.mensagem);
       } else if (context.mounted) {
         _aviso(context, erro);
@@ -1674,7 +1805,8 @@ abstract final class RotasTrato {
       await proporNovaDataDoPedido(context, pedidoId, inicio, fim, remoto: remoto);
       return;
     }
-    final ok = await _tentar(context, () => repos.profissional.confirmarAgenda(pedidoId, inicio, fim));
+    final ok =
+        await _tentar(context, () => repos.profissional.confirmarAgenda(pedidoId, inicio, fim));
     if (ok) pedidosMudaram.value++;
     if (ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1700,19 +1832,26 @@ abstract final class RotasTrato {
     DateTime fim, {
     bool remoto = false,
   }) async {
-    final ok = await _tentar(
-      context,
-      () => repos.pedidos.proporReagendamento(pedidoId, inicio: inicio, fim: fim),
-    );
+    // Termos 7.5: o aviso vem na própria resposta da proposta.
+    String? aviso;
+    final ok = await _tentar(context, () async {
+      final pedidos = repos.pedidos;
+      if (pedidos is PropostaComAviso) {
+        aviso = await (pedidos as PropostaComAviso)
+            .proporReagendamentoComAviso(pedidoId, inicio: inicio, fim: fim);
+      } else {
+        await pedidos.proporReagendamento(pedidoId, inicio: inicio, fim: fim);
+      }
+    });
     if (ok) pedidosMudaram.value++;
     if (ok && context.mounted) {
+      final enviada = remoto
+          ? 'Proposta de novo início enviada. Aguardando a outra parte aceitar.'
+          : 'Proposta de nova data enviada. Aguardando a outra parte aceitar.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            remoto
-                ? 'Proposta de novo início enviada. Aguardando a outra parte aceitar.'
-                : 'Proposta de nova data enviada. Aguardando a outra parte aceitar.',
-          ),
+          content: Text(aviso == null ? enviada : '$enviada\n$aviso'),
+          duration: Duration(seconds: aviso == null ? 4 : 12),
         ),
       );
     }
@@ -1856,176 +1995,179 @@ abstract final class RotasTrato {
     // Agendado ou em andamento: a tela do atendimento, com Chat, Ajuda e SOS sempre à mão.
     final emAtendimento = emAndamento || podeCheckIn;
     Widget acoes(BuildContext folha) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!emAtendimento)
-                  ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
-                if (estadoApi == 'pago_e_retido' || estadoApi == 'agendado')
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-                    child: _secaoReagendamento(pedidoId, semHorario: precisaAgendar),
-                  ),
-                if (!remoto && consultaMapa != null)
-                  ListTile(
-                    leading: const Icon(Icons.map_outlined),
-                    title: const Text('Abrir o endereço no mapa'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      abrirNoMapa(consultaMapa);
-                    },
-                  ),
-                if (precisaAgendar)
-                  ListTile(
-                    leading: const Icon(Icons.event_available_outlined),
-                    title: Text(remoto ? 'Combinar início' : 'Marcar data da visita'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _marcarVisita(context, pedidoId, remoto: remoto);
-                    },
-                  ),
-                if (agendado && !precisaAgendar && !remoto)
-                  ListTile(
-                    leading: const Icon(Icons.edit_calendar_outlined),
-                    title: const Text('Remarcar data da visita'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _marcarVisita(context, pedidoId, remarcar: true);
-                    },
-                  ),
-                if (podeCheckIn)
-                  ListTile(
-                    leading: Icon(remoto ? Icons.play_circle_outline : Icons.place_outlined),
-                    title: Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      aoCheckIn();
-                    },
-                  ),
-                if (emAndamento)
-                  ListTile(
-                    leading: const Icon(Icons.task_alt_outlined),
-                    title: const Text('Concluir serviço (check-out)'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _abrirCheckOut(context, pedidoId, titulo, remoto: remoto);
-                    },
-                  ),
-                if (emDisputa)
-                  ListTile(
-                    leading: const Icon(Icons.gavel_outlined),
-                    title: const Text('Responder disputa'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      abrirDisputa(context, pedidoId);
-                    },
-                  ),
-                if (emRetrabalho)
-                  ListTile(
-                    leading: const Icon(Icons.build_outlined),
-                    title: const Text('Atender retrabalho'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      abrirRetrabalho(context, pedidoId);
-                    },
-                  ),
-                ListTile(
-                  leading: const Icon(Icons.chat_bubble_outline),
-                  title: const Text('Conversar com o cliente'),
-                  onTap: () {
-                    Navigator.of(folha).pop();
-                    _abrir<void>(context, _chat(pedidoId, comoProfissional: true));
-                  },
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!emAtendimento) ListTile(title: Text(titulo, style: TipografiaTrato.titulo)),
+            if (estadoApi == 'pago_e_retido' || estadoApi == 'agendado')
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                child: _secaoReagendamento(pedidoId, semHorario: precisaAgendar),
+              ),
+            if (!remoto && consultaMapa != null)
+              ListTile(
+                leading: const Icon(Icons.map_outlined),
+                title: const Text('Abrir o endereço no mapa'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  abrirNoMapa(consultaMapa);
+                },
+              ),
+            if (precisaAgendar)
+              ListTile(
+                leading: const Icon(Icons.event_available_outlined),
+                title: Text(remoto ? 'Combinar início' : 'Marcar data da visita'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _marcarVisita(context, pedidoId, remoto: remoto);
+                },
+              ),
+            if (agendado && !precisaAgendar && !remoto)
+              ListTile(
+                leading: const Icon(Icons.edit_calendar_outlined),
+                title: const Text('Remarcar data da visita'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _marcarVisita(context, pedidoId, remarcar: true);
+                },
+              ),
+            if (podeCheckIn)
+              ListTile(
+                leading: Icon(remoto ? Icons.play_circle_outline : Icons.place_outlined),
+                title: Text(remoto ? 'Iniciar atendimento' : 'Fazer check-in'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  aoCheckIn();
+                },
+              ),
+            if (emAndamento)
+              ListTile(
+                leading: const Icon(Icons.task_alt_outlined),
+                title: const Text('Concluir serviço (check-out)'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _abrirCheckOut(context, pedidoId, titulo, remoto: remoto);
+                },
+              ),
+            if (emDisputa)
+              ListTile(
+                leading: const Icon(Icons.gavel_outlined),
+                title: const Text('Responder disputa'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  abrirDisputa(context, pedidoId);
+                },
+              ),
+            if (emRetrabalho)
+              ListTile(
+                leading: const Icon(Icons.build_outlined),
+                title: const Text('Atender retrabalho'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  abrirRetrabalho(context, pedidoId);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Conversar com o cliente'),
+              onTap: () {
+                Navigator.of(folha).pop();
+                _abrir<void>(context, _chat(pedidoId, comoProfissional: true));
+              },
+            ),
+            if (agendado)
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined),
+                title: const Text('Cancelar o atendimento'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _cancelarPedido(context, pedidoId);
+                },
+              ),
+            if ((agendado || emAndamento) && !remoto)
+              ListTile(
+                leading: const Icon(Icons.receipt_long_outlined),
+                title: const Text('Enviar nota de materiais'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _abrir<void>(
+                    context,
+                    _enviarNota(pedidoId, titulo, servicoEmAndamento: emAndamento),
+                  );
+                },
+              ),
+            if (emAndamento)
+              ListTile(
+                leading: const Icon(Icons.add_task_outlined),
+                title: const Text('Criar aditivo'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _abrir<void>(context, _criarAditivo(pedidoId, titulo));
+                },
+              ),
+            if (_secaoAcordo(estadoApi, profissional: true, id: pedidoId) case final secao?)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                child: secao,
+              ),
+            if (_secaoPedidosInfo(estadoApi, profissional: true, id: pedidoId) case final info?)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                child: info,
+              ),
+            if (repos.contestacaoDecisao != null &&
+                (estadoApi == 'concluido' || estadoApi == 'em_confirmacao' || emRetrabalho))
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
+                child: SecaoContestacaoDecisao(
+                  carregar: () => repos.contestacaoDecisao!.ver(pedidoId),
+                  aoAbrir: () => abrirContestacaoDecisao(context, pedidoId, profissional: true),
                 ),
-                if (agendado)
-                  ListTile(
-                    leading: const Icon(Icons.cancel_outlined),
-                    title: const Text('Cancelar o atendimento'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _cancelarPedido(context, pedidoId);
-                    },
-                  ),
-                if ((agendado || emAndamento) && !remoto)
-                  ListTile(
-                    leading: const Icon(Icons.receipt_long_outlined),
-                    title: const Text('Enviar nota de materiais'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _abrir<void>(
-                        context,
-                        _enviarNota(pedidoId, titulo, servicoEmAndamento: emAndamento),
-                      );
-                    },
-                  ),
-                if (emAndamento)
-                  ListTile(
-                    leading: const Icon(Icons.add_task_outlined),
-                    title: const Text('Criar aditivo'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _abrir<void>(context, _criarAditivo(pedidoId, titulo));
-                    },
-                  ),
-                if (_secaoAcordo(estadoApi, profissional: true, id: pedidoId) case final secao?)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-                    child: secao,
-                  ),
-                if (repos.contestacaoDecisao != null &&
-                    (estadoApi == 'concluido' || estadoApi == 'em_confirmacao' || emRetrabalho))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: EspacosTrato.x4),
-                    child: SecaoContestacaoDecisao(
-                      carregar: () => repos.contestacaoDecisao!.ver(pedidoId),
-                      aoAbrir: () =>
-                          abrirContestacaoDecisao(context, pedidoId, profissional: true),
-                    ),
-                  ),
-                if (estadoApi == 'concluido')
-                  ListTile(
-                    key: const ValueKey('baixar-comprovante'),
-                    leading: const Icon(Icons.picture_as_pdf_outlined),
-                    title: const Text('Baixar recibo (PDF)'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _baixarReciboPdf(context, pedidoId);
-                    },
-                  ),
-                // Repetir um serviço remoto criaria pedidos remotos novos (Termos 3.7).
-                if (estadoApi == 'concluido' && !remoto)
-                  ListTile(
-                    key: const ValueKey('repetir-servico'),
-                    leading: const Icon(Icons.event_repeat_outlined),
-                    title: const Text('Repetir este serviço'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _repetirServico(context, pedidoId);
-                    },
-                  ),
-                if ((estadoApi == 'concluido' ||
-                        (estadoApi == null && estado == EstadoAgendamento.concluido)) &&
-                    !jaAvaliou)
-                  ListTile(
-                    key: const ValueKey('avaliar-cliente'),
-                    leading: const Icon(Icons.star_outline),
-                    title: const Text('Avaliar cliente'),
-                    subtitle: const Text('Sua nota ajuda outros profissionais.'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _avaliarCliente(context, pedidoId);
-                    },
-                  ),
-                if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
-                  ListTile(
-                    leading: const Icon(Icons.receipt_outlined),
-                    title: const Text('Ver valores do pedido'),
-                    onTap: () {
-                      Navigator.of(folha).pop();
-                      _abrirValoresEAvaliar(context, pedidoId);
-                    },
-                  ),
-              ],
-            );
+              ),
+            if (estadoApi == 'concluido')
+              ListTile(
+                key: const ValueKey('baixar-comprovante'),
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('Baixar recibo (PDF)'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _baixarReciboPdf(context, pedidoId);
+                },
+              ),
+            // Repetir um serviço remoto criaria pedidos remotos novos (Termos 3.7).
+            if (estadoApi == 'concluido' && !remoto)
+              ListTile(
+                key: const ValueKey('repetir-servico'),
+                leading: const Icon(Icons.event_repeat_outlined),
+                title: const Text('Repetir este serviço'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _repetirServico(context, pedidoId);
+                },
+              ),
+            if ((estadoApi == 'concluido' ||
+                    (estadoApi == null && estado == EstadoAgendamento.concluido)) &&
+                !jaAvaliou)
+              ListTile(
+                key: const ValueKey('avaliar-cliente'),
+                leading: const Icon(Icons.star_outline),
+                title: const Text('Avaliar cliente'),
+                subtitle: const Text('Sua nota ajuda outros profissionais.'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _avaliarCliente(context, pedidoId);
+                },
+              ),
+            if (agendado || emAndamento || finalizado || emRetrabalho || emDisputa)
+              ListTile(
+                leading: const Icon(Icons.receipt_outlined),
+                title: const Text('Ver valores do pedido'),
+                onTap: () {
+                  Navigator.of(folha).pop();
+                  _abrirValoresEAvaliar(context, pedidoId);
+                },
+              ),
+          ],
+        );
     if (!emAtendimento) {
       showModalBottomSheet<void>(
         context: context,
@@ -2149,6 +2291,7 @@ abstract final class RotasTrato {
           builder: (context) => ResponderDisputaTela(
             servico: servicoDisputa,
             disputaId: disputaId,
+            secaoPedidosInfo: _secaoPedidosInfoDisputa(disputaId, profissional: true),
             aoAdicionarEvidencia: _fotografar,
             aoRespondida: (_) {
               pedidosMudaram.value++;
@@ -2325,8 +2468,8 @@ abstract final class RotasTrato {
       SecaoReagendamento(
         semHorario: semHorario,
         carregar: () => repos.pedidos.reagendamentos(pedidoId),
-        propor: (inicio, fim, motivo) => repos.pedidos
-            .proporReagendamento(pedidoId, inicio: inicio, fim: fim, motivo: motivo),
+        propor: (inicio, fim, motivo) =>
+            repos.pedidos.proporReagendamento(pedidoId, inicio: inicio, fim: fim, motivo: motivo),
         aceitar: (rid) => repos.pedidos.aceitarReagendamento(pedidoId, rid),
         recusar: (rid) => repos.pedidos.recusarReagendamento(pedidoId, rid),
         meuId: ServicoAuthPadrao.atual.sessaoAtual?.id,
@@ -2589,6 +2732,7 @@ abstract final class RotasTrato {
                           especialidade: '',
                           servicosConcluidos: f.servicos ?? 0,
                           nota: f.nota ?? 0,
+                          contagem: f.contagem,
                           distanciaKm: 0,
                         ),
                       ),
@@ -2598,6 +2742,8 @@ abstract final class RotasTrato {
                   _abrir<void>(context, ContatosConfiancaTela(servico: _conta));
                 case AcaoPerfil.servicosRecorrentes:
                   abrirRecorrencias(context);
+                case AcaoPerfil.avaliacoesRecebidas:
+                  abrirAvaliacoesRecebidasCliente(context);
                 case AcaoPerfil.indiqueEGanhe:
                   abrirIndicacoes(context, valorMoedaCentavos: perfil.moedasValorCentavos);
                 default:
@@ -2727,6 +2873,71 @@ abstract final class RotasTrato {
     );
   }
 
+  /// Termos 8.4: pedidos de informação adicional na disputa.
+  static Widget? _secaoPedidosInfo(
+    String? estadoApi, {
+    required bool profissional,
+    required String id,
+  }) {
+    const estados = {'em_disputa', 'concluido', 'cancelado', 'retrabalho', 'em_confirmacao'};
+    if (!estados.contains(estadoApi)) return null;
+    return _secaoPedidosInfoDisputa(id, profissional: profissional, chaveExtra: estadoApi);
+  }
+
+  static Widget? _secaoPedidosInfoDisputa(
+    String id, {
+    required bool profissional,
+    String? chaveExtra,
+  }) {
+    final servico = repos.pedidosInfoDisputa;
+    if (servico == null) return null;
+    return SecaoPedidosInfoDisputa(
+      key: ValueKey('pedidos-info-$id-$chaveExtra'),
+      servico: servico,
+      disputaOuPedidoId: id,
+      profissional: profissional,
+      atualizarQuando: pedidosMudaram,
+      aoResponder: () => pedidosMudaram.value++,
+    );
+  }
+
+  /// Termos 7.8 e 22.6: solicitações de evento externo (força maior) no pedido.
+  static Widget? _secaoForcaMaior(String? estadoApi, String id) {
+    final servico = repos.forcaMaior;
+    if (servico == null) return null;
+    const ativos = {
+      'orcamento_aceito',
+      'pago_e_retido',
+      'agendado',
+      'em_andamento',
+      'em_confirmacao',
+      'em_disputa',
+      'retrabalho',
+    };
+    return SecaoForcaMaior(
+      key: ValueKey('forca-maior-$id-$estadoApi'),
+      servico: servico,
+      pedidoId: id,
+      pedidoAtivo: ativos.contains(estadoApi),
+      atualizarQuando: pedidosMudaram,
+      aoCriar: () => pedidosMudaram.value++,
+    );
+  }
+
+  /// Termos 6.10: status e prazo do estorno no pedido do cliente. A seção só aparece quando o
+  /// servidor informa um estorno.
+  static Widget? _secaoEstorno(String? estado, String id) {
+    final pedidos = repos.pedidos;
+    if (pedidos is! EstornosDoPedido) return null;
+    final servico = pedidos as EstornosDoPedido;
+    return SecaoEstorno(
+      key: ValueKey('estorno-$id-$estado'),
+      carregar: () => servico.estornosDoPedido(id),
+      atualizarQuando: pedidosMudaram,
+      mostrarCarregando: estado == 'cancelado',
+    );
+  }
+
   /// A entrada da contestação no pedido: só nos estados que uma decisão de disputa alcança.
   static Widget? _secaoContestacao(
     BuildContext context,
@@ -2765,9 +2976,8 @@ abstract final class RotasTrato {
             seguranca: true,
             orientarChegada: orientarChegada,
             casoInicial: casoInicial,
-            pessoaDiferente: cliente && sac is ServicoPessoaDiferente
-                ? sac as ServicoPessoaDiferente
-                : null,
+            pessoaDiferente:
+                cliente && sac is ServicoPessoaDiferente ? sac as ServicoPessoaDiferente : null,
             aoRelatarPessoaDiferente: () => pedidosMudaram.value++,
           ),
         );
@@ -2790,7 +3000,7 @@ abstract final class RotasTrato {
         builder: (tela) => AtendimentoTela(
           servico: sac,
           pedidoInicial: pedidoId,
-          carregarPedidos: contaBloqueada
+          carregarPedidos: (contaBloqueada || contaInativa)
               ? null
               : () => _pedidosParaChamado(profissional: profissional),
           aoEscreverEmail: email == null
@@ -2831,7 +3041,8 @@ abstract final class RotasTrato {
         context,
         ServicosRecorrentesTela(
           servico: _recorrencias,
-          aoAbrirPedido: (pedidoId, souCliente) => _abrirPedidoDaVisita(context, pedidoId, souCliente),
+          aoAbrirPedido: (pedidoId, souCliente) =>
+              _abrirPedidoDaVisita(context, pedidoId, souCliente),
         ),
       );
 
@@ -2854,10 +3065,12 @@ abstract final class RotasTrato {
     if (_propondoRecorrencia) return;
     _propondoRecorrencia = true;
     try {
-      final proposta = await mostrarFolhaRepetirServico(context, valorInicialCentavos: valorCentavos);
+      final proposta =
+          await mostrarFolhaRepetirServico(context, valorInicialCentavos: valorCentavos);
       if (proposta == null || !context.mounted) return;
       Recorrencia? criada;
-      final ok = await _tentar(context, () async => criada = await _recorrencias.propor(pedidoId, proposta));
+      final ok = await _tentar(
+          context, () async => criada = await _recorrencias.propor(pedidoId, proposta));
       final serie = criada;
       if (!ok || serie == null || !context.mounted) return;
       _avisoSimples(context, 'Proposta enviada. A outra pessoa precisa aceitar.');
@@ -2878,6 +3091,21 @@ abstract final class RotasTrato {
   static final ServicoIndicacoes _indicacoesDemo = ServicoIndicacoesFake();
   static ServicoIndicacoes get _indicacoes => repos.indicacoes ?? _indicacoesDemo;
 
+  /// "Avaliações recebidas" do cliente (Termos 12.7): lista publicadas e permite resposta única.
+  static void abrirAvaliacoesRecebidasCliente(BuildContext context) {
+    final fonte = repos.perfil is AvaliacoesRecebidasCliente
+        ? repos.perfil as AvaliacoesRecebidasCliente
+        : null;
+    _abrir<void>(
+      context,
+      AvaliacoesRecebidasTela(
+        servico: _ServicoAvaliacoesRecebidasCliente(fonte),
+        textoVazio: 'Depois do primeiro serviço concluído, as avaliações recebidas aparecem aqui.',
+        dicaResposta: 'Escreva sua resposta',
+      ),
+    );
+  }
+
   /// "Indique e ganhe": meu código, resumo, lista e o campo de código de quem chegou por convite.
   static void abrirIndicacoes(BuildContext context, {int? valorMoedaCentavos}) => _abrir<void>(
         context,
@@ -2889,6 +3117,7 @@ abstract final class RotasTrato {
   static const _acoesNoPerfil = {
     AcaoPerfil.enderecos,
     AcaoPerfil.favoritos,
+    AcaoPerfil.avaliacoesRecebidas,
     AcaoPerfil.indiqueEGanhe,
     AcaoPerfil.servicosRecorrentes,
     AcaoPerfil.usarComoProfissional,
@@ -2931,9 +3160,8 @@ abstract final class RotasTrato {
       _abrir<void>(
         context,
         EntradaDeMedidas(
-          verificar: repos.medidas == null
-              ? null
-              : () async => await repos.medidas!.listar() != null,
+          verificar:
+              repos.medidas == null ? null : () async => await repos.medidas!.listar() != null,
           construir: (context, temMedidas) => ConfiguracoesTela(
             grupos: [
               GrupoConfiguracao(
@@ -3099,6 +3327,7 @@ abstract final class RotasTrato {
         'recorrencia_id': n.recorrenciaId,
         'chamado_id': n.chamadoId,
         'compensacao_id': n.compensacaoId,
+        'avaliacao_id': n.avaliacaoId,
         'evento': n.tipoApi,
         'papel': n.papel,
       });
@@ -3128,9 +3357,16 @@ abstract final class RotasTrato {
         'suporte.chamado_prazo' =>
           'suporte',
         'conta.medida_aplicada' || 'conta.medida_encerrada' => 'medidas',
+        'conta.selo_retirado' ||
+        'conta.selo_reconferencia' ||
+        'conta.selo_regularizado' =>
+          'perfil',
         'pagamento.compensacao_registrada' || 'pagamento.compensacao_cancelada' => 'pedido',
-        'pagamento.cancelado_seguranca' => 'pedido',
+        'pagamento.cancelado_seguranca' || 'pagamento.checkout_sem_codigo' => 'pedido',
+        'conta.avaliacao_ocultada' || 'execucao.janela_encerrada' => 'pedido',
+        'pagamento.tratinhos_vencendo' => 'notificacoes',
         'disputa.contestada' || 'disputa.contestacao_decidida' => 'pedido',
+        'disputa.pedido_informacao' => 'disputa',
         _ => null,
       };
 
@@ -3170,6 +3406,37 @@ abstract final class RotasTrato {
       abrirMedidas(context);
       return;
     }
+    if (destino == DestinoApp.selo) {
+      abrirSelo(context);
+      return;
+    }
+    // Termos 15.4: a mesma Central nos dois modos (a conta é uma só).
+    if (destino == DestinoApp.privacidade) {
+      if (repos.privacidade != null) _abrirPrivacidade(context);
+      return;
+    }
+    if (destino == DestinoApp.tratinhos) {
+      _abrir<void>(
+        context,
+        profissional
+            ? Carregador<ResumoExclusividades>(
+                carregar: () => repos.profissional.minhasExclusividades(),
+                construir: (_, resumo) => TratinhosProfissionalTela(resumo: resumo),
+              )
+            : Carregador<PerfilCliente>(
+                carregar: repos.perfil.carregar,
+                construir: (_, perfil) => ExtratoTratinhosTela(perfil: perfil),
+              ),
+      );
+      return;
+    }
+    if (destino == DestinoApp.contestarOcultacao) {
+      final servico = repos.revisaoOcultacao;
+      if (servico != null && id != null) {
+        _abrir<void>(context, RevisaoOcultacaoTela(servico: servico, avaliacaoId: id));
+      }
+      return;
+    }
     if (destino == DestinoApp.compensacoes) {
       abrirCompensacoes(context, compensacaoId: id);
       return;
@@ -3205,24 +3472,24 @@ abstract final class RotasTrato {
       case DestinoApp.chat:
         _abrir<void>(context, _chat(id, comoProfissional: profissional));
       case DestinoApp.pedido:
-        profissional
-            ? _abrir<void>(context, _pedidoDoProfissional(id))
-            : abrirServico(context, id);
+        profissional ? _abrir<void>(context, _pedidoDoProfissional(id)) : abrirServico(context, id);
       case DestinoApp.pedidoAberto:
         // Pedido novo, direcionado ou urgente: o profissional vê o pedido aberto para orçar.
         profissional
             ? _abrir<void>(context, _detalhePedidoAbertoProfissional(id))
             : abrirServico(context, id);
       case DestinoApp.avaliacao:
-        profissional
-            ? _abrir<void>(context, _pedidoDoProfissional(id))
-            : abrirServico(context, id);
+        profissional ? _abrir<void>(context, _pedidoDoProfissional(id)) : abrirServico(context, id);
       case DestinoApp.recorrencia ||
             DestinoApp.indicacoes ||
             DestinoApp.suporte ||
             DestinoApp.medidas ||
+            DestinoApp.selo ||
+            DestinoApp.privacidade ||
             DestinoApp.compensacoes ||
-            DestinoApp.contestacaoDecisao:
+            DestinoApp.contestacaoDecisao ||
+            DestinoApp.tratinhos ||
+            DestinoApp.contestarOcultacao:
         break;
     }
   }
@@ -3262,8 +3529,7 @@ abstract final class RotasTrato {
   /// O pedido contratado do lado do profissional (abre pela notificação). Pedido ainda aberto vai
   /// para o detalhe de orçar; serviço concluído e sem avaliar, com [avaliar], para avaliar o
   /// cliente. Nunca a visão do cliente (pagar, avaliar o profissional).
-  static Widget _pedidoDoProfissional(String pedidoId) =>
-      Carregador<PedidoEmExecucao>(
+  static Widget _pedidoDoProfissional(String pedidoId) => Carregador<PedidoEmExecucao>(
         textoNaoEncontrado: TextosNaoEncontrado.pedido,
         carregar: () => repos.pedidos.acompanhar(pedidoId),
         atualizarQuando: pedidosMudaram,
@@ -3278,15 +3544,16 @@ abstract final class RotasTrato {
             atualizarAditivoLocalmente: false,
             aoConversar: () => _abrir<void>(
               context,
-              _chat(pedidoId, comoProfissional: true, categoriaNome: pedido.categoriaNome ?? pedido.titulo),
+              _chat(pedidoId,
+                  comoProfissional: true, categoriaNome: pedido.categoriaNome ?? pedido.titulo),
             ),
             aoAjuda: () => _abrir<void>(context, _telaAjuda(context, comoCliente: false)),
             aoVerContrato: () => abrirContrato(context, pedidoId),
-            secaoAusencia:
-                _secaoAusencia(context, pedido, profissional: true, id: pedidoId),
+            secaoAusencia: _secaoAusencia(context, pedido, profissional: true, id: pedidoId),
             secaoAcordo: _secaoAcordo(pedido.estadoApi, profissional: true, id: pedidoId),
-            secaoContestacao:
-                _secaoContestacao(context, pedido, profissional: true, id: pedidoId),
+            secaoPedidosInfo: _secaoPedidosInfo(pedido.estadoApi, profissional: true, id: pedidoId),
+            secaoContestacao: _secaoContestacao(context, pedido, profissional: true, id: pedidoId),
+            secaoForcaMaior: _secaoForcaMaior(pedido.estadoApi, pedidoId),
             // Serviço concluído e ainda não avaliado: "Avaliar cliente" como ação principal.
             aoAvaliar: () => _avaliarCliente(context, pedidoId),
             textoAvaliar: 'Avaliar cliente',
@@ -3997,113 +4264,127 @@ abstract final class RotasTrato {
     // Nulo: servidor sem a desistência (ou ainda sem resposta): vale o "Cancelar pedido".
     SituacaoDesistencia? desistencia;
     return Carregador<PedidoEmExecucao>(
-        textoNaoEncontrado: TextosNaoEncontrado.pedido,
-        carregar: () async {
-          final pedido = await repos.pedidos.acompanhar(pedidoId);
-          if (!const {'aberto', 'reservado'}.contains(pedido.estadoApi)) {
-            try {
-              desistencia = await repos.pedidos.situacaoDesistencia(pedidoId);
-            } on Object {
-              // Falha passageira: fica o que já se sabia.
-            }
+      textoNaoEncontrado: TextosNaoEncontrado.pedido,
+      carregar: () async {
+        final pedido = await repos.pedidos.acompanhar(pedidoId);
+        if (!const {'aberto', 'reservado'}.contains(pedido.estadoApi)) {
+          try {
+            desistencia = await repos.pedidos.situacaoDesistencia(pedidoId);
+          } on Object {
+            // Falha passageira: fica o que já se sabia.
           }
-          return pedido;
-        },
-        atualizarQuando: pedidosMudaram,
-        atualizarACada: _intervalo,
-        // Aguardando orçamentos continua na tela do pedido aberto (editar, exclusividade).
-        construir: (context, pedido) => const {'aberto', 'reservado'}.contains(pedido.estadoApi)
-            ? _pedidoAberto(pedidoId)
-            : PedidoExecucaoTela(
-                pedido: pedido,
-                atualizarAditivoLocalmente: false,
-                secaoAcordo: _secaoAcordo(pedido.estadoApi, profissional: false, id: pedidoId),
-                secaoDocumentos: _secaoDocumentos(context, pedido, pedidoId),
-                secaoContestacao:
-                    _secaoContestacao(context, pedido, profissional: false, id: pedidoId),
-                aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
-                aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
-                aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
-                aoBaixarComprovante: () => _baixarReciboPdf(context, pedidoId),
-                // Repetir um serviço remoto criaria pedidos remotos novos (Termos 3.7).
-                aoRepetirServico: pedido.remoto
-                    ? null
-                    : () => _repetirServico(
-                          context,
-                          pedidoId,
-                          valorCentavos:
-                              pedido.totalAtualizadoCentavos ?? pedido.orcamentoCentavos,
-                        ),
-                secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
-                    ? _secaoReagendamento(pedidoId, semHorario: pedido.estadoApi == 'pago_e_retido')
-                    : null,
-                aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
-                aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
-                aoConversar: () => _abrir<void>(
-                  context,
-                  _chat(
-                    pedidoId,
-                    comoProfissional: false,
-                    categoriaNome: pedido.categoriaNome ?? pedido.titulo,
-                  ),
+        }
+        return pedido;
+      },
+      atualizarQuando: pedidosMudaram,
+      atualizarACada: _intervalo,
+      // Aguardando orçamentos continua na tela do pedido aberto (editar, exclusividade).
+      construir: (context, pedido) => const {'aberto', 'reservado'}.contains(pedido.estadoApi)
+          ? _pedidoAberto(pedidoId)
+          : PedidoExecucaoTela(
+              pedido: pedido,
+              atualizarAditivoLocalmente: false,
+              secaoAcordo: _secaoAcordo(pedido.estadoApi, profissional: false, id: pedidoId),
+              secaoPedidosInfo:
+                  _secaoPedidosInfo(pedido.estadoApi, profissional: false, id: pedidoId),
+              secaoDocumentos: _secaoDocumentos(context, pedido, pedidoId),
+              secaoContestacao:
+                  _secaoContestacao(context, pedido, profissional: false, id: pedidoId),
+              secaoEstorno: _secaoEstorno(pedido.estadoApi, pedidoId),
+              secaoForcaMaior: _secaoForcaMaior(pedido.estadoApi, pedidoId),
+              aoBuscarOutroProfissional: repos.pedidos is SubstituicaoDePedido
+                  ? () async {
+                      final novoId =
+                          await (repos.pedidos as SubstituicaoDePedido).substituir(pedidoId);
+                      pedidosMudaram.value++;
+                      if (!context.mounted) return;
+                      await Navigator.of(context).pushReplacement(
+                        MaterialPageRoute<void>(builder: (_) => _pedidoAberto(novoId)),
+                      );
+                    }
+                  : null,
+              aoPagar: () => _abrir<void>(context, _pagamento(pedidoId)),
+              aoAvaliar: () => _abrir<void>(context, _avaliacao(pedidoId)),
+              aoVerGarantia: () => abrirGarantia(context, pedidoId: pedidoId),
+              aoBaixarComprovante: () => _baixarReciboPdf(context, pedidoId),
+              // Repetir um serviço remoto criaria pedidos remotos novos (Termos 3.7).
+              aoRepetirServico: pedido.remoto
+                  ? null
+                  : () => _repetirServico(
+                        context,
+                        pedidoId,
+                        valorCentavos: pedido.totalAtualizadoCentavos ?? pedido.orcamentoCentavos,
+                      ),
+              secaoReagendamento: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
+                  ? _secaoReagendamento(pedidoId, semHorario: pedido.estadoApi == 'pago_e_retido')
+                  : null,
+              aoAprovarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: true),
+              aoRecusarAditivo: () => _responderAditivoInline(context, pedidoId, aprovar: false),
+              aoConversar: () => _abrir<void>(
+                context,
+                _chat(
+                  pedidoId,
+                  comoProfissional: false,
+                  categoriaNome: pedido.categoriaNome ?? pedido.titulo,
                 ),
-                aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
-                aoRemarcarVisita: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
-                    ? () => _sugerirOuRemarcarVisitaCliente(
-                          context,
-                          pedidoId,
-                          jaAgendado: pedido.estadoApi == 'agendado',
-                        )
-                    : null,
-                aoVerNota: () => _abrir<void>(
-                  context,
-                  VerNotaTela(
-                    servico: servicoNota,
-                    pedidoId: pedidoId,
-                    escolherFoto: _escolherProva,
-                  ),
-                ),
-                // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
-                aoVerAditivo: () => _abrir<void>(
-                  context,
-                  ResponderAditivoTela(
-                    servico: servicoAditivo,
-                    aditivoId: pedidoId,
-                    // Aprovou: o cliente paga a cobrança do aditivo (a do pedido já foi paga).
-                    aoCobrancaCriada: (cobranca) => _pagarAditivo(context, pedidoId, cobranca),
-                  ),
-                ),
-                aoVerContrato: () => abrirContrato(context, pedidoId),
-                aoAbrirProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
-                aoCompartilharAtendimento: () => _compartilharAtendimento(context, pedido),
-                aoSosEmergencia: () => mostrarEmergencia(
-                  context,
-                  _resumoAtendimento(pedido),
-                  orientarChegada: !pedido.remoto,
-                  aoRelatar: _relatarSeguranca(
-                    context,
-                    pedidoId,
-                    orientarChegada: !pedido.remoto,
-                    cliente: true,
-                  ),
-                ),
-                // Ajuda no atendimento: direto no "Relatar problema" deste pedido (sem escolher serviço).
-                aoAjuda: () => _abrir<void>(context, _relatarProblema(pedidoId)),
-                aoCancelarPedido: desistencia != null || pedido.podeVerConclusao
-                    ? null
-                    : () => _cancelarPedido(context, pedidoId),
-                aoDesistir: desistencia != null &&
-                        (desistencia!.podeDesistir ||
-                            desistencia!.registro != null ||
-                            _explicaDesistencia.contains(pedido.estadoApi))
-                    ? () => _abrir<void>(context, _desistir(pedidoId))
-                    : null,
-                secaoAusencia: _secaoAusencia(context, pedido, profissional: false, id: pedidoId),
-                textoDesistir: desistencia?.mostraComprovante == true
-                    ? 'Ver comprovante da desistência'
-                    : 'Desistir do pedido',
               ),
-      );
+              aoVerConclusao: () => _abrir<void>(context, _conclusao(pedidoId)),
+              aoRemarcarVisita: const {'pago_e_retido', 'agendado'}.contains(pedido.estadoApi)
+                  ? () => _sugerirOuRemarcarVisitaCliente(
+                        context,
+                        pedidoId,
+                        jaAgendado: pedido.estadoApi == 'agendado',
+                      )
+                  : null,
+              aoVerNota: () => _abrir<void>(
+                context,
+                VerNotaTela(
+                  servico: servicoNota,
+                  pedidoId: pedidoId,
+                  escolherFoto: _escolherProva,
+                ),
+              ),
+              // Sem rota de aditivo por pedido: o id do pedido faz de id do aditivo na demonstração.
+              aoVerAditivo: () => _abrir<void>(
+                context,
+                ResponderAditivoTela(
+                  servico: servicoAditivo,
+                  aditivoId: pedidoId,
+                  // Aprovou: o cliente paga a cobrança do aditivo (a do pedido já foi paga).
+                  aoCobrancaCriada: (cobranca) => _pagarAditivo(context, pedidoId, cobranca),
+                ),
+              ),
+              aoVerContrato: () => abrirContrato(context, pedidoId),
+              aoAbrirProblema: () => _abrir<void>(context, _relatarProblema(pedidoId)),
+              aoCompartilharAtendimento: () => _compartilharAtendimento(context, pedido),
+              aoSosEmergencia: () => mostrarEmergencia(
+                context,
+                _resumoAtendimento(pedido),
+                orientarChegada: !pedido.remoto,
+                aoRelatar: _relatarSeguranca(
+                  context,
+                  pedidoId,
+                  orientarChegada: !pedido.remoto,
+                  cliente: true,
+                ),
+              ),
+              // Ajuda no atendimento: direto no "Relatar problema" deste pedido (sem escolher serviço).
+              aoAjuda: () => _abrir<void>(context, _relatarProblema(pedidoId)),
+              aoCancelarPedido: desistencia != null || pedido.podeVerConclusao
+                  ? null
+                  : () => _cancelarPedido(context, pedidoId),
+              aoDesistir: desistencia != null &&
+                      (desistencia!.podeDesistir ||
+                          desistencia!.registro != null ||
+                          _explicaDesistencia.contains(pedido.estadoApi))
+                  ? () => _abrir<void>(context, _desistir(pedidoId))
+                  : null,
+              secaoAusencia: _secaoAusencia(context, pedido, profissional: false, id: pedidoId),
+              textoDesistir: desistencia?.mostraComprovante == true
+                  ? 'Ver comprovante da desistência'
+                  : 'Desistir do pedido',
+            ),
+    );
   }
 
   /// Termos 7.6: só o pedido agendado (caso em curso) ou cancelado (decisão) tem o que mostrar.
@@ -4358,7 +4639,7 @@ abstract final class RotasTrato {
               ? () async {
                   final prop = await pedirNovaPropostaProfissional(context);
                   if (prop == null || !context.mounted) return;
-                  final ok = await _tentar(
+                  final ok = await _tentarOrcamentoValido(
                     context,
                     () => repos.orcamentos.proporNovaCondicao(
                       pedidoId,
@@ -4470,6 +4751,7 @@ abstract final class RotasTrato {
                         pendentes: saldo?.moedasPendentes ?? 0,
                         proximaLiberacao: saldo?.moedasProximaLiberacao,
                         valorMoedaCentavos: saldo?.moedasValorCentavos,
+                        validadeDias: dados.bonusValidadeDias,
                         aoContinuar: () => _voltarAoInicio(ctxSucesso),
                         acaoExtra: dados.profissionalId == null
                             ? null
@@ -5047,4 +5329,25 @@ class _AbaCarteiraPaginadaState extends State<_AbaCarteiraPaginada> {
       ),
     );
   }
+}
+
+/// Adapta [AvaliacoesRecebidasCliente] para reutilizar [AvaliacoesRecebidasTela] no perfil do cliente.
+class _ServicoAvaliacoesRecebidasCliente implements ServicoPerfilPublico, RespostaAvaliacao {
+  const _ServicoAvaliacoesRecebidasCliente(this._fonte);
+
+  final AvaliacoesRecebidasCliente? _fonte;
+
+  @override
+  Future<List<Avaliacao>> carregarAvaliacoes() async =>
+      _fonte == null ? const [] : _fonte.avaliacoesRecebidas();
+
+  @override
+  Future<String?> responderAvaliacao(String avaliacaoId, String resposta) =>
+      _fonte == null ? Future.value(null) : _fonte.responderAvaliacao(avaliacaoId, resposta);
+
+  @override
+  Future<PerfilPublico> carregarPerfil() => throw UnimplementedError();
+
+  @override
+  Future<bool> temPerfilProfissional() async => false;
 }

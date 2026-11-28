@@ -8,6 +8,7 @@ estorno ao cliente é pedido ao provedor (Termos 6.10). Não devolver de novo à
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -31,6 +32,7 @@ from trato.api.admin.papeis import PapelEquipe, Permissao
 from trato.api.admin.repositorios import ResponsavelDisputa
 from trato.api.admin.rotas_pagamentos import lancamento_admin_out
 from trato.api.contexto import Contexto, obter_contexto
+from trato.api.indisponibilidade import disputa_vigente
 from trato.disputas import Ator, Decisao, Disputa, Estado, Resultado
 from trato.financeiro.ledger import (
     Lancamento,
@@ -77,10 +79,11 @@ def _resumo(
         motivo=d.motivo.value,
         valor_congelado_centavos=d.valor_congelado,
         aberta_em=d.aberta_em,
-        resposta_ate=d.prazos.resposta_ate,
+        resposta_ate=disputa_vigente(contexto, d).prazos.resposta_ate,
         decisao_ate=d.prazos.decisao_ate,
         atrasada=d.atrasada(contexto.agora()),
         sem_resposta=d.sem_resposta,
+        resultado_esperado=d.resultado_esperado,
     )
 
 
@@ -389,8 +392,10 @@ def decidir(
             "Assuma a análise antes de decidir.",
         )
     agora = contexto.agora()
-    if disputa.estado is Estado.ABERTA and agora > disputa.prazos.resposta_ate:
-        disputa = disputa.encerrar_sem_resposta(Ator.SISTEMA, agora)  # profissional não respondeu
+    vigente = disputa_vigente(contexto, disputa)  # 22.3
+    if disputa.estado is Estado.ABERTA and agora > vigente.prazos.resposta_ate:
+        sem = vigente.encerrar_sem_resposta(Ator.SISTEMA, agora)  # profissional não respondeu
+        disputa = replace(sem, prazos=disputa.prazos)  # grava o prazo original
     decisao = Decisao(
         Resultado(corpo.resultado.value), corpo.percentual_cliente_bps, corpo.valor_cliente_centavos
     )

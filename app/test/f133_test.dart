@@ -241,6 +241,7 @@ class _RepoComFotos extends RepositorioPedidosApi {
     required String motivo,
     required String descricao,
     List<String> fotos = const [],
+    String? resultadoEsperado,
   }) async {
     enviados.add({'motivo': motivo, 'fotos': fotos});
   }

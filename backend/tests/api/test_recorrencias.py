@@ -348,3 +348,74 @@ def test_reajuste_so_em_serie_ativa_ou_pausada(rec):
     rid = _propor(rec).json()["id"]
     r = _acao(rec, rid, "reajuste", "t-prof", json={"valor_centavos": 90_000})
     assert r.status_code == 409
+
+
+# --- Termos 5.2: orçamento da visita recorrente com prazo, validade e garantia ------------------
+
+
+def test_visita_recorrente_herda_prazo_validade_e_garantia_da_origem(rec):
+    from decimal import Decimal
+
+    from trato.api.recorrencias import gerar_visitas
+    from trato.api.repositorios import Contrato, ItemOrcamento
+
+    orc_id = rec.contexto.orcamentos.enviar(
+        pedido_id="ped-1",
+        profissional_id="pro-1",
+        itens=[ItemOrcamento("outro", "Limpeza", Decimal(1), 20_000)],
+        agora=AGORA - 10 * D,
+        prazo_execucao_dias=2,
+        validade_ate=AGORA - 10 * D + timedelta(hours=48),
+        garantia_dias=60,
+        fora_do_escopo="Produtos químicos especiais",
+    )
+    rec.contexto.contratos._itens["ped-1"] = Contrato(
+            pedido_id="ped-1",
+            orcamento_id=orc_id,
+            profissional_id="pro-1",
+            valor_centavos=20_000,
+            prazo_execucao_dias=2,
+            garantia_dias=60,
+    )
+    rid = _ativa(rec, em=7 * D)
+    agora_geracao = AGORA + 5 * D
+    assert gerar_visitas(rec.contexto, agora_geracao) == 1
+    visitas = rec.contexto.recorrencias.visitas(rid)
+    assert len(visitas) == 1 and visitas[0].pedido_id is not None
+    orcs = rec.contexto.orcamentos.do_pedido(visitas[0].pedido_id)
+    assert len(orcs) == 1
+    det = rec.contexto.orcamentos.detalhe(orcs[0].id)
+    assert det is not None
+    assert det.prazo_execucao_dias == 2
+    assert det.garantia_dias == 60
+    assert det.validade_ate == agora_geracao + timedelta(hours=48)
+    assert det.fora_do_escopo == "Produtos químicos especiais"
+
+
+def test_visita_recorrente_usa_fallback_quando_origem_nao_tem_campos_52(rec):
+    from trato.api.recorrencias import PRAZO_EXECUCAO_PADRAO_VISITA_DIAS, gerar_visitas
+    from trato.api.repositorios import Contrato
+
+    # Contrato antigo sem prazo_execucao_dias, sem garantia_dias e sem orçamento detalhado
+    rec.contexto.contratos._itens["ped-1"] = Contrato(
+            pedido_id="ped-1",
+            orcamento_id="orc-antigo-ausente",
+            profissional_id="pro-1",
+            valor_centavos=20_000,
+            prazo_execucao_dias=None,
+            garantia_dias=None,
+    )
+    rid = _ativa(rec, em=7 * D)
+    agora_geracao = AGORA + 5 * D
+    assert gerar_visitas(rec.contexto, agora_geracao) == 1
+    visitas = rec.contexto.recorrencias.visitas(rid)
+    orcs = rec.contexto.orcamentos.do_pedido(visitas[0].pedido_id)
+    det = rec.contexto.orcamentos.detalhe(orcs[0].id)
+    assert det is not None
+    assert det.prazo_execucao_dias == PRAZO_EXECUCAO_PADRAO_VISITA_DIAS
+    assert det.garantia_dias == rec.contexto.config.carregar().garantias.garantia_dias_padrao
+    assert det.validade_ate == visitas[0].data_prevista_em
+    assert det.validade_ate > agora_geracao
+    from trato.api.validade import FORA_DO_ESCOPO_NAO_INFORMADO
+
+    assert det.fora_do_escopo == FORA_DO_ESCOPO_NAO_INFORMADO

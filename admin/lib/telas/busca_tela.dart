@@ -11,6 +11,8 @@ import '../tema/tema.dart';
 import 'campos_ao_usuario.dart';
 import 'campos_trava.dart';
 import 'medidas_modais.dart';
+import 'resumo_pedidos.dart';
+import 'selo_profissional.dart';
 
 /// F7.4 — busca de usuários e pedidos, suporte, categorias e cidades. Cada aba depende do papel.
 class BuscaTela extends StatelessWidget {
@@ -56,6 +58,7 @@ String normalizarNome(String texto) {
       'ativo' => ('Ativo', Tom.ok),
       'restrito' => ('Restrito', Tom.alerta),
       'bloqueado' => ('Bloqueado', Tom.erro),
+      'inativo' => ('Inativo', Tom.neutro),
       'anonimizado' => ('Anonimizado', Tom.neutro),
       final outro => (outro, Tom.neutro),
     };
@@ -143,6 +146,7 @@ class _UsuariosListaState extends State<_UsuariosLista> {
                 DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
                 DropdownMenuItem(value: 'restrito', child: Text('Restrito')),
                 DropdownMenuItem(value: 'bloqueado', child: Text('Bloqueado')),
+                DropdownMenuItem(value: 'inativo', child: Text('Inativo')),
               ],
               onChanged: (v) => setState(() => _status = v),
             ),
@@ -178,7 +182,7 @@ class _DetalheUsuario extends StatefulWidget {
 class _DetalheUsuarioState extends State<_DetalheUsuario> {
   DadosPessoais? _dados;
   Timer? _escondeDados;
-  late final Future<UsuarioBusca> _detalhe = _carregar();
+  late Future<UsuarioBusca> _detalhe = _carregar();
   final _pedido = TextEditingController();
   Future<DiagnosticoPedido>? _diagnostico;
 
@@ -260,9 +264,16 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
               rebuild();
             },
           ),
+          const SizedBox(height: EspacosTrato.x3),
+          const BannerInfo(kAcoesImediatas, tom: Tom.alerta),
           if (novo == 'ativo' && novo != u.status && avisoDaTrava != null) ...[
             const SizedBox(height: EspacosTrato.x3),
             BannerInfo(avisoDaTrava, tom: Tom.alerta),
+          ],
+          // Bloquear cria uma suspensão (20.6).
+          if (novo == 'bloqueado' && novo != u.status) ...[
+            const SizedBox(height: EspacosTrato.x3),
+            avisoPedidosCancelados,
           ],
           if (criaMedida()) ...[
             const SizedBox(height: EspacosTrato.x3),
@@ -279,12 +290,89 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
       ),
     );
     if (r == null || !mounted) return;
+    final api = context.api;
+    ResumoPedidos? pedidos;
     final ok = await executar(
       context,
-      () => context.api.alterarStatusUsuario(u.id,
-          status: r.$1, motivo: r.$2, motivoUsuario: r.$3, clausulas: r.$4),
+      () async {
+        pedidos = await api.alterarStatusUsuario(u.id,
+            status: r.$1, motivo: r.$2, motivoUsuario: r.$3, clausulas: r.$4);
+      },
       sucesso: 'Status alterado para ${_chipStatusUsuario(r.$1).$1.toLowerCase()}.',
     );
+    if (!ok) return;
+    if (r.$1 == 'bloqueado' && u.status != 'bloqueado' && mounted) {
+      await mostrarResumoDosPedidos(context, pedidos);
+    }
+    await widget.aoMudar();
+  }
+
+  String? _erroInatividade;
+
+  Future<void> _inativarConta() async {
+    final u = widget.usuario;
+    final motivo = await pedirMotivo(
+      context,
+      titulo: 'Inativar a conta de ${u.nome}?',
+      descricao: 'Inativação por falta de uso (Termos 4.9), sem medida punitiva. O servidor só permite '
+          'após aviso prévio de inatividade enviado há pelo menos 30 dias e data de vigência atingida. '
+          'A ação fica registrada na auditoria.',
+      rotuloConfirmar: 'Inativar conta',
+    );
+    if (motivo == null || !mounted) return;
+    setState(() => _erroInatividade = null);
+    String? erro409;
+    UsuarioBusca? atualizado;
+    final ok = await executar(
+      context,
+      () async {
+        try {
+          atualizado = await context.api.inativarUsuario(u.id, motivo: motivo);
+        } on ErroApi catch (e) {
+          if (e.status == 409) erro409 = e.mensagem;
+          rethrow;
+        }
+      },
+      sucesso: 'Conta inativada.',
+    );
+    if (!mounted) return;
+    setState(() {
+      _erroInatividade = erro409;
+      if (atualizado != null) _detalhe = Future.value(atualizado!);
+    });
+    if (ok) await widget.aoMudar();
+  }
+
+  Future<void> _reativarConta() async {
+    final u = widget.usuario;
+    final motivo = await pedirMotivo(
+      context,
+      titulo: 'Reativar a conta de ${u.nome}?',
+      descricao: 'Reativação gratuita de conta inativa (Termos 4.9), sem medida punitiva. '
+          'A ação fica registrada na auditoria.',
+      rotuloConfirmar: 'Reativar conta',
+    );
+    if (motivo == null || !mounted) return;
+    setState(() => _erroInatividade = null);
+    String? erro409;
+    UsuarioBusca? atualizado;
+    final ok = await executar(
+      context,
+      () async {
+        try {
+          atualizado = await context.api.reativarUsuario(u.id, motivo: motivo);
+        } on ErroApi catch (e) {
+          if (e.status == 409) erro409 = e.mensagem;
+          rethrow;
+        }
+      },
+      sucesso: 'Conta reativada.',
+    );
+    if (!mounted) return;
+    setState(() {
+      _erroInatividade = erro409;
+      if (atualizado != null) _detalhe = Future.value(atualizado!);
+    });
     if (ok) await widget.aoMudar();
   }
 
@@ -383,8 +471,12 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
               children: [
                 if (_dados == null && podeRevelar)
                   BotaoTrato.secundario('Revelar dados pessoais', aoPressionar: _revelar, icone: IconesTrato.revelar),
-                if (context.pode(Permissao.usuariosStatus))
+                if (context.pode(Permissao.usuariosStatus) && d.status != 'inativo')
                   BotaoTrato.secundario('Alterar status', aoPressionar: _alterarStatus),
+                if (context.pode(Permissao.usuariosStatus) && (d.status == 'ativo' || d.status == 'restrito'))
+                  BotaoTrato.secundario('Inativar conta', aoPressionar: _inativarConta),
+                if (context.pode(Permissao.usuariosStatus) && d.status == 'inativo')
+                  BotaoTrato.primario('Reativar conta', aoPressionar: _reativarConta),
                 if (context.pode(Permissao.medidasAplicar) && d.tipo != 'Equipe')
                   BotaoTrato.secundario(
                     'Aplicar medida',
@@ -398,6 +490,10 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
                   BotaoTrato.secundario('Extrato em PDF', aoPressionar: _extrato, icone: Icons.picture_as_pdf_outlined),
               ],
             ),
+            if (_erroInatividade case final erro?) ...[
+              const SizedBox(height: EspacosTrato.x3),
+              BannerInfo(erro, tom: Tom.erro),
+            ],
             const SizedBox(height: EspacosTrato.x4),
             if (_dados != null) ...[
               if (_dados!.email != null) Linha('E-mail', _dados!.email!),
@@ -408,6 +504,11 @@ class _DetalheUsuarioState extends State<_DetalheUsuario> {
               if (d.emailMascarado != null) Linha('E-mail', d.emailMascarado!),
               if (d.telefoneMascarado != null) Linha('Telefone', d.telefoneMascarado!),
               if (d.cpfMascarado != null) Linha('CPF', d.cpfMascarado!),
+            ],
+            if (d.tipo == 'Profissional' &&
+                (context.pode(Permissao.seloRetirar) || context.pode(Permissao.seloRegularizar))) ...[
+              const SizedBox(height: EspacosTrato.x5),
+              CartaoSelo(usuarioId: d.id, nome: d.nome, nivel: d.nivelVerificacao),
             ],
             if (d.tipo == 'Profissional') ...[
               const SizedBox(height: EspacosTrato.x5),

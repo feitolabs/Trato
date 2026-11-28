@@ -89,8 +89,8 @@ class _InicioProfissionalTelaState extends State<InicioProfissionalTela> {
                   children: [
                     Text(
                       'Olá, ${dados.nome}',
-                      style:
-                          TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                      style: TipografiaTrato.corpoPequeno
+                          .copyWith(color: context.cores.textoSecundario),
                     ),
                     const SizedBox(height: EspacosTrato.x1),
                     Text('Pedidos perto de você', style: TipografiaTrato.tituloGrande),
@@ -239,7 +239,8 @@ class _CartaoDisponivel extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   'Você recebe pedidos urgentes da sua região',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                  style:
+                      TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
             ),
@@ -466,6 +467,15 @@ class _CartaoExclusividades extends StatelessWidget {
                   '${textoTratinhos(resumo.moedasPendentesProfissional)} a liberar',
               style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
             ),
+          ],
+          if (resumo.creditosProfissional.isNotEmpty) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text('Validade do seu saldo', style: TipografiaTrato.corpoForte),
+            for (final c in resumo.creditosProfissional)
+              Text(
+                textoValidadeCreditoProfissional(c),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+              ),
           ],
           if (recentes.isNotEmpty) ...[
             const SizedBox(height: EspacosTrato.x2),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../comuns/resultado_esperado.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
@@ -143,7 +144,8 @@ class _SecaoAcordoDisputaState extends State<SecaoAcordoDisputa> {
     final acordo = d?.acordo;
     final proposta = d?.propostaAberta;
     final encerrada = acordo != null || d?.estado == 'acordo';
-    if (!_falhou && !encerrada && proposta == null && _erro == null) {
+    final pedido = d?.pedidoDoCliente;
+    if (!_falhou && !encerrada && proposta == null && _erro == null && pedido == null) {
       return const SizedBox.shrink();
     }
     return Padding(
@@ -153,6 +155,18 @@ class _SecaoAcordoDisputaState extends State<SecaoAcordoDisputa> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (!_falhou && pedido != null) ...[
+              Text(
+                widget.profissional ? 'O cliente pediu: $pedido' : 'Você pediu: $pedido',
+                key: const Key('pedido-do-cliente'),
+                style: TipografiaTrato.corpoForte,
+              ),
+              Text(
+                widget.profissional ? avisoPedidoDoCliente : avisoEscolhaDoCliente,
+                style: TipografiaTrato.corpoPequeno,
+              ),
+              if (encerrada || proposta != null) const SizedBox(height: EspacosTrato.x3),
+            ],
             if (_falhou) ...[
               Text('Não deu para conferir a disputa agora.', style: TipografiaTrato.corpo),
               const SizedBox(height: EspacosTrato.x3),

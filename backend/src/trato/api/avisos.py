@@ -18,6 +18,7 @@ from trato.api.contexto import Contexto
 from trato.api.exclusividades import Encerramento, Exclusividade
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
+from trato.profissional.nota import minimo_de_avaliacoes
 
 log = logging.getLogger("trato.notificacoes")
 _FUSO_BR = ZoneInfo("America/Sao_Paulo")
@@ -238,6 +239,7 @@ def avisar_pedido_novo(
             excluir_usuario_ids=excluir,
             limite=limite,
             detalhe=contexto.usuarios.detalhe,
+            nota_minimo_avaliacoes=minimo_de_avaliacoes(contexto.config),
         )
         if not elegiveis:
             return
@@ -388,15 +390,19 @@ def avisar_exclusividade_oferta(
     """Avisa o cliente sobre a oferta de prioridade (sem compromisso)."""
     try:
         servico, _ = servicos_de_notificacao(request, contexto)
-        hora = _hora_local(exclusividade.responder_ate)
+        ate = contexto.exclusividades.prazo_de_resposta(exclusividade)
+        prazo = (
+            f"Você tem até {_hora_local(ate)} para responder."
+            if ate is not None
+            else "O prazo para responder está suspenso enquanto o aplicativo está instável."
+        )
         servico.notificar(
             Evento.EXCLUSIVIDADE_OFERTA,
             exclusividade.cliente_id,
             chave=exclusividade.id,
             pedido_id=exclusividade.pedido_id,
             corpo=(
-                "Um profissional quer fazer seu serviço com prioridade. "
-                f"Sem compromisso. Você tem até {hora} para responder."
+                f"Um profissional quer fazer seu serviço com prioridade. Sem compromisso. {prazo}"
             ),
             dados={"exclusividade_id": exclusividade.id},
         )

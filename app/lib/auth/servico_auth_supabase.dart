@@ -240,8 +240,8 @@ class ServicoAuthSupabase implements ServicoAuth {
         token: acesso,
       );
     } on ErroTrato catch (e) {
-      // Conta bloqueada continua logada: a tela de bloqueio assume (sem logout).
-      if (e.codigo == 'conta_bloqueada') return;
+      // Conta bloqueada ou inativa continua logada: a tela correspondente assume (sem logout).
+      if (e.codigo == 'conta_bloqueada' || e.codigo == 'conta_inativa') return;
       try {
         await _auth.signOut();
       } catch (_) {

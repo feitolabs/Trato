@@ -4,6 +4,7 @@ equipe). Depois do check-in, ou com ausência do cliente registrada, quem decide
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,9 +22,10 @@ from trato.api.contexto import (
 from trato.notificacoes.eventos import Evento
 from trato.pedidos import estados
 from trato.pedidos.estados import Acao, Ator, Estado, Papel, Pedido
-from trato.persistencia.ausencias import PENDENTES
+from trato.persistencia.ausencias import AGUARDANDO_ESPERA, PENDENTES
 from trato.persistencia.incidentes import ENCERRADO, Incidente
 
+log = logging.getLogger("trato.seguranca")
 TIPO = "pessoa_diferente"
 # Antes do check-in: o serviço ainda não começou.
 CANCELAVEIS = (Estado.PAGO_E_RETIDO, Estado.AGENDADO)
@@ -36,6 +38,48 @@ def cancelado_por_pessoa_diferente(contexto: Contexto, pedido_id: str) -> bool:
     return any(
         e.acao is Acao.CANCELAR_PESSOA_DIFERENTE for e in contexto.pedidos.eventos(pedido_id)
     )
+
+
+def sinais_antifraude(contexto: Contexto, incidente: Incidente) -> list[str]:
+    """Só para a equipe olhar: não bloqueia, não retém nem atrasa o reembolso (9.5 basta
+    relatar). Calculado na leitura, dos incidentes e da ausência do pedido."""
+    if incidente.tipo != TIPO or incidente.pedido_id is None:
+        return []
+    pedido = contexto.pedidos.obter(incidente.pedido_id)
+    if pedido is None:
+        return []
+    sinais: list[str] = []
+    achados, _ = contexto.incidentes.listar(None, None, 500, 0)
+    pedidos = {i.pedido_id for i in achados if i.tipo == TIPO and i.pedido_id}
+    do_cliente = 0
+    for pid in pedidos:
+        outro = contexto.pedidos.obter(pid)
+        do_cliente += outro is not None and outro.cliente_id == pedido.cliente_id
+    if do_cliente > 1:
+        sinais.append(f"relato_repetido_do_cliente:{do_cliente}")
+    ausencia = ausencia_do_pedido(contexto, pedido)
+    if ausencia is not None and ausencia.status == AGUARDANDO_ESPERA:
+        sinais.append("relato_durante_espera_de_ausencia")
+    return sinais
+
+
+def _avisar_equipe_dos_sinais(contexto: Contexto, pedido_id: str) -> None:
+    """Aviso é secundário: nunca derruba nem desfaz o relato e o reembolso."""
+    try:
+        notificador = contexto.extras.get("notificador")
+        achados, _ = contexto.incidentes.listar(None, pedido_id, 100, 0)
+        item = next((i for i in achados if i.tipo == TIPO), None)
+        if notificador is None or item is None or not sinais_antifraude(contexto, item):
+            return
+        for pessoa in contexto.incidentes.equipe_de_seguranca():
+            notificador.notificar(
+                Evento.INCIDENTE_SINAL_FRAUDE,
+                pessoa,
+                chave=f"incidente:{item.id}:sinal",
+                corpo=f"O incidente {item.protocolo} tem sinal para conferir. Veja no painel.",
+            )
+    except Exception:  # noqa: BLE001
+        log.exception("Aviso de sinal antifraude falhou (%s)", pedido_id)
 
 
 def cancelar_com_reembolso_integral(contexto: Contexto, pedido: Pedido) -> None:
@@ -140,6 +184,7 @@ def relatar(
                 cancelar_com_reembolso_integral(contexto, pedido)
                 feito = True
         atual = contexto.pedidos.obter(pedido.id)
+    _avisar_equipe_dos_sinais(contexto, pedido_id)  # depois de gravado
     return RelatoOut(
         protocolo=protocolo,
         cancelado=feito,

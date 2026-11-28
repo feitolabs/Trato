@@ -57,7 +57,8 @@ def _temporario(medida: Medida, anexo_id: str) -> str:
 
 
 def _exigir_prazo(contexto: Contexto, medida: Medida) -> None:
-    if medida.contestavel_ate is None or contexto.agora() > medida.contestavel_ate:
+    ate = regras.contestavel_ate(contexto, medida)
+    if ate is None or contexto.agora() > ate:
         raise ErroDeContestacao(
             409, "prazo_encerrado", "O prazo de 30 dias para contestar terminou."
         )

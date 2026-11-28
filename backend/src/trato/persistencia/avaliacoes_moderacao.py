@@ -87,6 +87,9 @@ class RepositorioModeracaoAvaliacoes(Protocol):
     ) -> tuple[OcultacaoAvaliacao | None, str]:
         """(ocultacao, status): ok | sem_ocultacao_ativa | nao_encontrada"""
 
+    def marcar_autor_avisado(self, ocultacao_id: str, agora: datetime) -> OcultacaoAvaliacao | None:
+        """Grava a data do aviso ao autor (11.8) uma única vez; devolve a ocultação atual."""
+
     def abrir_revisao(
         self,
         *,
@@ -210,6 +213,14 @@ class ModeracaoAvaliacoesEmMemoria:
             self._ocultacoes[ativa.id] = revertida
             self._avaliacoes.definir_status(avaliacao_id, ativa.status_anterior)
             return revertida, "ok"
+
+    def marcar_autor_avisado(self, ocultacao_id: str, agora: datetime) -> OcultacaoAvaliacao | None:
+        with self._trava:
+            atual = self._ocultacoes.get(ocultacao_id)
+            if atual is not None and atual.autor_avisado_em is None:
+                atual = replace(atual, autor_avisado_em=agora)
+                self._ocultacoes[ocultacao_id] = atual
+            return atual
 
     def abrir_revisao(
         self,
@@ -487,6 +498,18 @@ class ModeracaoAvaliacoesPostgres:
                 (agora, op_id, ativa["id"]),
             ).fetchone()
         return self._ocu(rev), "ok"
+
+    def marcar_autor_avisado(self, ocultacao_id: str, agora: datetime) -> OcultacaoAvaliacao | None:
+        oid = como_uuid(ocultacao_id)
+        if oid is None:
+            return None
+        with self._banco.transacao() as con:
+            con.execute(
+                "update public.avaliacao_ocultacoes set autor_avisado_em = %s "
+                "where id = %s and autor_avisado_em is null",
+                (agora, oid),
+            )
+        return self.obter_ocultacao(ocultacao_id)
 
     def abrir_revisao(
         self,

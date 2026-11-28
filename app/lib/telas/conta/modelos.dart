@@ -1,6 +1,8 @@
 // Dados da conta do cliente: dados pessoais, endereços, favoritos e contatos de confiança.
 // O app só pede e mostra; validação e limites são do backend (`/v1/me/...`).
 
+import '../comuns/contagem_avaliacoes.dart';
+
 class DadosPessoaisConta {
   const DadosPessoaisConta({
     this.nome,
@@ -46,12 +48,17 @@ class EnderecoSalvo {
   final String uf;
   final bool principal;
 
-  String get linha1 => '$logradouro, $numero${(complemento ?? '').isEmpty ? '' : ' — $complemento'}';
+  String get linha1 =>
+      '$logradouro, $numero${(complemento ?? '').isEmpty ? '' : ' — $complemento'}';
   String get linha2 => '$bairro · $cidade/$uf';
 }
 
 class FavoritoConta {
-  const FavoritoConta({required this.profissionalId, this.nome, this.nota, this.servicos});
+  const FavoritoConta(
+      {required this.profissionalId, this.nome, this.nota, this.servicos, this.contagem});
+
+  /// Termos 12.3. Nulo: servidor antigo.
+  final ContagemAvaliacoes? contagem;
 
   final String profissionalId;
   final String? nome;

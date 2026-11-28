@@ -27,6 +27,7 @@ class Compensacao {
     this.avisadoEm,
     this.canceladaEm,
     this.motivoCancelamento,
+    this.suspensa = false,
   });
 
   factory Compensacao.deJson(Map<String, dynamic> j) => Compensacao(
@@ -41,6 +42,7 @@ class Compensacao {
         avisadoEm: _data(j['avisado_em']),
         canceladaEm: _data(j['cancelada_em']),
         motivoCancelamento: _texto(j['motivo_cancelamento']),
+        suspensa: j['suspensa'] == true,
       );
 
   final String id;
@@ -59,7 +61,14 @@ class Compensacao {
   final DateTime? canceladaEm;
   final String? motivoCancelamento;
 
-  String get situacaoTexto => switch (status) {
+  /// `suspensa`: compensação aberta com a decisão em revisão. Ausente (servidor antigo) = não.
+  final bool suspensa;
+
+  bool get emRevisao => suspensa && status == 'aberta';
+
+  String get situacaoTexto => emRevisao
+      ? 'Em revisão: desconto suspenso'
+      : switch (status) {
         'aberta' => 'Aberta',
         'quitada' => 'Quitada',
         'cancelada' => 'Cancelada',

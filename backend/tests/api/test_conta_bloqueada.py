@@ -19,7 +19,8 @@ ABERTAS = ("/v1/sac/", "/v1/me/medidas")
 
 
 def _aberta(caminho: str) -> bool:
-    exatas = ("/v1/sac/chamados", "/v1/dispositivos", "/v1/me/conta/retorno")
+    # /v1/me/acessos: o registro do próprio acesso vale para o bloqueado (14.3 e 16.1).
+    exatas = ("/v1/sac/chamados", "/v1/dispositivos", "/v1/me/conta/retorno", "/v1/me/acessos")
     return caminho in exatas or caminho.startswith(ABERTAS)
 
 
@@ -62,6 +63,7 @@ def test_em_todas_as_rotas_so_atendimento_medidas_retorno_e_aparelho_ficam_abert
         "GET /v1/sac/chamados",
         "GET /v1/sac/chamados/{chamado_id}",
         "POST /v1/dispositivos",
+        "POST /v1/me/acessos",
         "POST /v1/me/conta/retorno",
         "POST /v1/me/medidas/{medida_id}/contestacao",
         "POST /v1/me/medidas/{medida_id}/contestacao/anexos",

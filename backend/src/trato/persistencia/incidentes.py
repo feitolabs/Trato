@@ -228,6 +228,22 @@ class IncidentesPostgres:
             ).fetchall()
         return [str(x["pedido_id"]) for x in linhas]
 
+    def usuario_preservado(self, usuario_id: str) -> bool | None:
+        """`usuario_com_registros_preservados` (122500); None se a função não existe."""
+        usuario = como_uuid(usuario_id)
+        if usuario is None:
+            return None
+        with self._banco.transacao() as con:
+            if not con.execute(
+                "select to_regprocedure('public.usuario_com_registros_preservados(uuid)') "
+                "is not null as tem"
+            ).fetchone()["tem"]:
+                return None
+            linha = con.execute(
+                "select public.usuario_com_registros_preservados(%s) as p", (usuario,)
+            ).fetchone()
+        return bool(linha["p"])
+
     def equipe_de_seguranca(self) -> list[str]:
         with self._banco.transacao() as con:
             linhas = con.execute(

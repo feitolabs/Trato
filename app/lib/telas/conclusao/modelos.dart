@@ -88,6 +88,7 @@ class DadosAvaliacao {
     this.profissionalId,
     this.bonusDisponivel = false,
     this.bonusMoedas = 0,
+    this.bonusValidadeDias,
     this.valorMoedaCentavos,
     this.jaAvaliou = false,
     this.avaliarAte,
@@ -106,6 +107,9 @@ class DadosAvaliacao {
 
   /// Quantidade de Tratinhos do bônus quando [bonusDisponivel] for verdadeiro.
   final int bonusMoedas;
+
+  /// Termos 13.3: validade em dias do bônus após o crédito. Nulo = servidor não informou.
+  final int? bonusValidadeDias;
 
   /// Valor de 1 Tratinho em centavos (opcional; padrão 1 centavo quando ausente).
   final int? valorMoedaCentavos;

@@ -22,6 +22,8 @@ from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admi
 from trato.api.admin.papeis import Permissao
 from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto, obter_contexto
+from trato.api.indisponibilidade import falha_cobre_presenca
+from trato.api.regra_contratada import regra_do_contrato
 from trato.financeiro.ledger import CUSTODIA, Livro, custo_parcelamento_em_aberto
 from trato.notificacoes.eventos import Evento
 from trato.pedidos import estados
@@ -126,7 +128,14 @@ def detalhe(
 
 def _barrar_retencao_de_bloqueado(contexto: Contexto, pedido: Pedido, saida: str) -> None:
     """Termos 20.6: cliente com a conta bloqueada não paga custo de cancelamento. Dentro da
-    transação do caso, a leitura segura a conta até o fim (bloqueio e decisão não se cruzam)."""
+    transação do caso, a leitura segura a conta até o fim (bloqueio e decisão não se cruzam).
+    Termos 22.3: também não há retenção se o app falhou durante o atendimento."""
+    if falha_cobre_presenca(contexto, pedido):
+        raise HTTPException(
+            409,
+            "O aplicativo ficou indisponível durante este atendimento: não há retenção por "
+            f"ausência (Termos 22.3). {saida}",
+        )
     if contexto.medidas.conta_bloqueada_travada(pedido.cliente_id):
         raise HTTPException(
             409,
@@ -139,7 +148,9 @@ def _teto_retencao(contexto: Contexto, pedido: Pedido) -> tuple[int, int]:
     """(valor do serviço, retenção máxima): nunca mais que 30% nem que o dinheiro retido."""
     contrato = contexto.contratos.obter_do_pedido(pedido.id)
     base = contrato.valor_centavos if contrato else 0
-    bps = min(3000, contexto.config.carregar().ausencia_retencao_max_bps)
+    vigente = contexto.config.carregar().ausencia_retencao_max_bps
+    # 23.6: a menor entre a do aceite e a vigente, nunca acima do teto de 30% (7.4).
+    bps = min(3000, regra_do_contrato(contrato, "ausencia_retencao_max_bps", "menor", vigente))
     retido = contexto.ledger.saldo_da_conta(CUSTODIA, pedido.id)
     return base, min(base * bps // 10_000, retido)
 
@@ -230,7 +241,9 @@ def decidir(
         agora = contexto.agora()
         if pedido.estado is not Estado.AGENDADO:
             raise HTTPException(409, "O pedido não está mais agendado: nada a decidir.")
-        sem_resposta = item.status == AGUARDANDO_JUSTIFICATIVA and agora > item.justificativa_ate
+        sem_resposta = item.status == AGUARDANDO_JUSTIFICATIVA and agora > (
+            ausencia.justificativa_ate(contexto, item)
+        )
         if item.status != EM_ANALISE and not sem_resposta:
             raise HTTPException(
                 409, "Caso já decidido ou ainda dentro do prazo do cliente para justificar."

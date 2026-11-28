@@ -20,6 +20,7 @@ from trato.api.conta import (
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import ErroPersistencia, RegraDoBanco
+from trato.profissional.nota import SQL_PUBLICADA
 
 _COLS_END = "id, apelido, cep, logradouro, numero, complemento, bairro, cidade, uf, principal"
 
@@ -180,7 +181,10 @@ class ContaPostgres:
             return []
         with self._banco.transacao() as con:
             linhas = con.execute(
-                "select f.profissional_id, u.nome, p.nota_publica, p.servicos_concluidos "
+                "select f.profissional_id, u.nome, p.nota_publica, p.servicos_concluidos, "  # noqa: S608
+                "(select count(*) from public.avaliacoes a where a.avaliado_id = "
+                "f.profissional_id and a.direcao = 'cliente_para_profissional' "
+                f"and {SQL_PUBLICADA}) as avaliacoes_total "
                 "from public.profissionais_favoritos f "
                 "join public.usuarios u on u.id = f.profissional_id "
                 "join public.perfis_profissional p on p.usuario_id = f.profissional_id "
@@ -193,6 +197,7 @@ class ContaPostgres:
                 x["nome"],
                 float(x["nota_publica"]) if x["nota_publica"] is not None else None,
                 int(x["servicos_concluidos"]) if x["servicos_concluidos"] is not None else None,
+                int(x["avaliacoes_total"]),
             )
             for x in linhas
         ]

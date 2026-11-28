@@ -10,20 +10,28 @@ import 'campos_trava.dart';
 import 'medidas_tela.dart';
 import 'modal_sigiloso.dart';
 import 'provas_modal.dart' show tamanhoLegivel;
+import 'resumo_pedidos.dart';
 import 'seletor_arquivo.dart';
 
 /// Aplicar uma medida (Termos 20.4): preencher, conferir o que o usuário lê e confirmar.
 /// Devolve true se o backend aceitou. [usuarioId] preenchido vem da busca de usuários.
-Future<bool> abrirAplicarMedida(BuildContext context, {String? usuarioId, String? usuarioNome}) async =>
-    await mostrarModal<bool>(
-      context,
-      largura: 600,
-      construir: (_) => _ModalAplicar(usuarioId: usuarioId, usuarioNome: usuarioNome),
-    ) ??
-    false;
+Future<bool> abrirAplicarMedida(BuildContext context, {String? usuarioId, String? usuarioNome}) async {
+  final aplicada = await mostrarModal<Medida>(
+    context,
+    largura: 600,
+    construir: (_) => _ModalAplicar(usuarioId: usuarioId, usuarioNome: usuarioNome),
+  );
+  if (aplicada == null) return false;
+  // Agendada ainda não cancelou nada: o resumo aparece no detalhe quando entrar em vigor.
+  if (medidaCancelaPedidos(aplicada.tipo) && aplicada.vigente && context.mounted) {
+    await mostrarResumoDosPedidos(context, aplicada.pedidos);
+  }
+  return true;
+}
 
-/// Termos 20.6: o backend não trata pedidos nem valores; a única exceção é a trava de saques por
-/// fraude, que adia a liberação no livro. Só informa: nenhuma ação sai daqui.
+/// Termos 20.6, para as demais medidas (suspensão e encerramento usam [avisoPedidosCancelados]):
+/// o backend não trata pedidos nem valores; a exceção é a trava de saques por fraude, que adia a
+/// liberação no livro. Só informa: nenhuma ação sai daqui.
 const _avisoConferenciaManual = BannerInfo(
   'Pedidos em andamento e valores não são tratados automaticamente por esta medida. '
   'Confira cada caso manualmente (Termos 20.6).',
@@ -35,6 +43,9 @@ const kEfeitoSemFalta = 'Sem falta do usuário: os Tratinhos não usados ficam g
     'for restabelecida (Termos 13.10).';
 const kEfeitoComFalta = 'Por falta do usuário: os Tratinhos não ficam guardados por essa regra (Termos 13.10).';
 const kSemFaltaDefinitivo = 'Depois de aplicar, não há como trocar de "por falta" para "sem falta". Confira antes.';
+
+const kSemFaltaAgendado = 'Não vale na hora: o encerramento fica agendado para pelo menos 30 dias depois do aviso e a '
+    'conta segue ativa até lá. O usuário é avisado agora. Para cancelar, reverta a medida.';
 
 const _avisoTravaPorFraude = BannerInfo(
   '$kTravaComFraude Pedidos em andamento também precisam de conferência manual (Termos 20.6).',
@@ -158,18 +169,25 @@ class _ModalAplicarState extends State<_ModalAplicar> {
       final semConfirmacao = nova.motivoFraude && !r.medida.motivoFraude;
       // Escolha enviada e não devolvida igual (inclui repetição de uma medida anterior).
       final semFaltaDiferente = nova.semFalta != null && r.medida.semFalta != nova.semFalta;
+      // Sem falta deveria vir agendado; se não veio, não dizer que a conta segue ativa.
+      final naoAgendou = nova.semFalta == true && !r.medida.agendada;
       mostrarAviso(
         context,
         semFaltaDiferente
             ? 'O servidor não confirmou a resposta "sem falta" ($protocolo). Confira a medida.'
+            : naoAgendou
+            ? 'O servidor não confirmou o agendamento ($protocolo). Confira a medida e a situação da conta.'
             : semConfirmacao
             ? 'O servidor não confirmou a trava por fraude ($protocolo). Não conte com a retenção: confira a medida.'
             : r.repetida
                 ? 'Uma medida igual já tinha sido criada há menos de 5 minutos ($protocolo). Nada novo foi criado.'
-                : 'Medida aplicada. Protocolo $protocolo.',
-        erro: semConfirmacao || semFaltaDiferente,
+                : r.medida.agendada
+                    ? 'Encerramento agendado para ${formatarDataBrasilia(r.medida.inicioEm)}. Protocolo $protocolo. '
+                        'A conta segue ativa até lá.'
+                    : 'Medida aplicada. Protocolo $protocolo.',
+        erro: semConfirmacao || semFaltaDiferente || naoAgendou,
       );
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(r.medida);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -204,6 +222,12 @@ class _ModalAplicarState extends State<_ModalAplicar> {
         padding: const EdgeInsets.only(top: EspacosTrato.x4),
         child: Text(t, style: TipografiaTrato.secao),
       );
+
+  Widget get _avisoDosPedidos => _porFraude
+      ? _avisoTravaPorFraude
+      : medidaCancelaPedidos(_tipo)
+          ? avisoPedidosCancelados
+          : _avisoConferenciaManual;
 
   List<Widget> _formulario() => [
         if (widget.usuarioNome != null) Linha('Conta', widget.usuarioNome!),
@@ -266,7 +290,7 @@ class _ModalAplicarState extends State<_ModalAplicar> {
                       : 'Vazio = prazo máximo configurado ($_prazoMaximo dias).',
               erro: _diasValidos ? null : 'Use de 1 a $_maximoDeDias dias'),
         const SizedBox(height: EspacosTrato.x3),
-        _porFraude ? _avisoTravaPorFraude : _avisoConferenciaManual,
+        _avisoDosPedidos,
         _campo('Pedidos e valores em andamento (opcional)', _efeito,
             linhas: 2,
             ajuda: 'Vazio = texto padrão do servidor.',
@@ -307,6 +331,10 @@ class _ModalAplicarState extends State<_ModalAplicar> {
           ),
           const SizedBox(height: EspacosTrato.x2),
           Text('$kEfeitoSemFalta $kSemFaltaDefinitivo', style: TipografiaTrato.legenda),
+          if (_semFalta == true) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            const BannerInfo(kSemFaltaAgendado, tom: Tom.info),
+          ],
           Material(
             type: MaterialType.transparency,
             child: CheckboxListTile(
@@ -359,7 +387,7 @@ class _ModalAplicarState extends State<_ModalAplicar> {
       Linha('Pedidos e valores', n.efeito ?? 'Texto padrão do servidor'),
       Linha('Como contestar', n.comoContestar ?? 'Texto padrão do servidor'),
       const SizedBox(height: EspacosTrato.x3),
-      n.motivoFraude ? _avisoTravaPorFraude : _avisoConferenciaManual,
+      _avisoDosPedidos,
       _titulo('Só a equipe vê'),
       if (n.detalheAdiado) Linha('Motivo registrado', n.motivo),
       if (n.justificativaAdiamento != null) Linha('Por que adiar', n.justificativaAdiamento!),
@@ -380,7 +408,9 @@ class _ModalAplicarState extends State<_ModalAplicar> {
       child: CorpoModal(
         titulo: _revisando ? 'Confirmar a medida?' : 'Aplicar medida',
         consequencia: _revisando
-            ? 'A conta muda na hora e o usuário é avisado por escrito. Confira o que ele vai ler.'
+            ? (_nova.semFalta == true
+                ? '$kSemFaltaAgendado Confira o que ele vai ler.'
+                : 'A conta muda na hora e o usuário é avisado por escrito. Confira o que ele vai ler.')
             : 'O usuário é avisado por escrito com motivo, cláusulas e como contestar.',
         filhos: [
           if (_erro != null) ...[
@@ -397,7 +427,7 @@ class _ModalAplicarState extends State<_ModalAplicar> {
             _revisando ? 'Voltar' : 'Cancelar',
             aoPressionar: _enviando
                 ? null
-                : () => _revisando ? setState(() => _revisando = false) : Navigator.of(context).pop(false),
+                : () => _revisando ? setState(() => _revisando = false) : Navigator.of(context).pop(),
           ),
           _revisando
               ? BotaoTrato.destrutivo(

@@ -41,12 +41,26 @@ class ProvedorAuthFalso:
     def __init__(self, usuarios: Mapping[str, Usuario]) -> None:
         self._usuarios = dict(usuarios)
         self.bloqueados: set[str] = set()  # tokens de contas bloqueadas
+        self.inativos: set[str] = set()  # tokens de contas inativas (Termos 4.9)
 
     def autenticar(self, token: str) -> Usuario | None:
-        return None if token in self.bloqueados else self._usuarios.get(token)
+        if token in self.bloqueados or token in self.inativos:
+            return None
+        return self._usuarios.get(token)
 
     def autenticar_para_suporte(self, token: str) -> Usuario | None:
         return self._usuarios.get(token)
 
     def conta_bloqueada(self, token: str) -> bool:
         return token in self.bloqueados and token in self._usuarios
+
+    def conta_inativa(self, token: str) -> bool:
+        return token in self.inativos and token in self._usuarios
+
+    def definir_inativo(self, usuario_id: str, inativo: bool) -> None:
+        for tok, u in self._usuarios.items():
+            if u.id == usuario_id:
+                if inativo:
+                    self.inativos.add(tok)
+                else:
+                    self.inativos.discard(tok)

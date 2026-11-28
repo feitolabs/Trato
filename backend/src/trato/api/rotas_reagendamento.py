@@ -20,6 +20,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.cautela import exigir_contato_livre
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
 from trato.api.reagendamentos import PropostaPendente, Reagendamento
+from trato.api.regra_contratada import regra_do_contrato
 from trato.api.servicos import ator_de, carregar_pedido
 from trato.notificacoes.eventos import Evento
 from trato.pedidos import estados as pedidos_estados
@@ -44,6 +45,19 @@ _NAO_PODE = "Este pedido não pode ser reagendado no momento."
 # Limites de abuso (a janela nova é de até 60 dias à frente; 5 propostas por pedido a cada 24 h).
 MAX_DIAS_A_FRENTE = 60
 MAX_PROPOSTAS_POR_DIA = 5
+# Termos 7.5: antecedência mínima para reagendamento direto sem ressalva de 7.4 (configurável).
+ANTECEDENCIA_MINIMA_HORAS = 24
+# O texto é lido pelas duas partes: fala delas na terceira pessoa, conforme quem propôs.
+AVISO_MENOS_24H = (
+    "Reagendamento pedido pelo cliente com menos de 24 horas de antecedência (Termos 7.5): "
+    "a nova data só vale sem custo se o profissional aceitar; sem esse aceite, um "
+    "cancelamento pelo cliente segue a cláusula 7.4."
+)
+AVISO_MENOS_24H_DO_PROFISSIONAL = (
+    "Nova data proposta pelo profissional com menos de 24 horas de antecedência (Termos 7.5): "
+    "ela só vale se o cliente aceitar no aplicativo; sem o aceite, o horário combinado "
+    "continua o mesmo."
+)
 _JA_RESPONDIDO = "Este pedido de reagendamento já foi respondido."
 
 
@@ -66,10 +80,59 @@ class ReagendamentoOut(BaseModel):
     respondido_por: str | None = None
     respondido_em: datetime | None = None
     criado_em: datetime
+    com_menos_de_24h: bool = Field(
+        False,
+        description="Termos 7.5: true quando solicitado a menos de 24h da janela agendada.",
+    )
+    sem_custo: bool = Field(
+        True,
+        description="Termos 7.5: reagendamento aceito pela outra parte não tem taxa adicional.",
+    )
+    aviso_prazo: str | None = Field(
+        None,
+        description="Termos 7.5: aviso exibido quando o pedido tem menos de 24h de antecedência.",
+    )
 
 
-def _out(r: Reagendamento) -> ReagendamentoOut:
-    return ReagendamentoOut(**r.__dict__)
+def _antecedencia_horas(contexto: Contexto, pedido_id: str) -> int:
+    """23.6: a menor antecedência entre a do aceite e a vigente."""
+    contrato = contexto.contratos.obter_do_pedido(pedido_id)
+    vigente = _antecedencia_vigente(contexto)
+    horas = regra_do_contrato(contrato, "reagendamento_antecedencia_horas", "menor", vigente)
+    return horas if horas > 0 else min(vigente, ANTECEDENCIA_MINIMA_HORAS)  # teto da 7.5
+
+
+def _antecedencia_vigente(contexto: Contexto) -> int:
+    try:
+        valor = contexto.config.parametro_inteiro("reagendamento_antecedencia_horas")
+        if valor and valor > 0:
+            return int(valor)
+    except Exception:  # noqa: BLE001, S110 - cai no padrão dos Termos (24h)
+        pass
+    return ANTECEDENCIA_MINIMA_HORAS
+
+
+def _menos_de_24h(pedido: Any, criado_em: datetime, horas: int) -> bool:
+    """Termos 7.5: só conta quando já existe janela agendada e falta menos de `horas` para ela."""
+    if pedido.janela is None:
+        return False
+    return (pedido.janela.inicio - criado_em) < timedelta(hours=horas)
+
+
+def _out(
+    r: Reagendamento,
+    *,
+    menos_de_24h: bool = False,
+    pedido: Any = None,
+) -> ReagendamentoOut:
+    do_profissional = pedido is not None and r.proposto_por == pedido.profissional_id
+    aviso = AVISO_MENOS_24H_DO_PROFISSIONAL if do_profissional else AVISO_MENOS_24H
+    return ReagendamentoOut(
+        **r.__dict__,
+        com_menos_de_24h=menos_de_24h,
+        sem_custo=True,
+        aviso_prazo=aviso if menos_de_24h else None,
+    )
 
 
 def _avisar(
@@ -181,6 +244,17 @@ def propor_reagendamento(
         raise HTTPException(
             409, "Já existe um pedido de reagendamento aguardando resposta."
         ) from None
+    horas = _antecedencia_horas(contexto, pedido.id)
+    menos_24h = _menos_de_24h(pedido, nova.criado_em, horas)
+    textos_aviso = _textos(pedido, "proposto")
+    if menos_24h and usuario.id == pedido.cliente_id:
+        textos_aviso = {
+            "titulo": "Reagendamento com menos de 24h",
+            "corpo": (
+                "O cliente propôs nova data com menos de 24 horas de antecedência (Termos 7.5). "
+                "Aceitar confirma a nova data sem custo."
+            ),
+        }
     _avisar(
         request,
         contexto,
@@ -188,9 +262,9 @@ def propor_reagendamento(
         _outra_parte(pedido, usuario.id),
         chave=f"reagendamento:{nova.id}:proposto",
         pedido_id=pedido.id,
-        **_textos(pedido, "proposto"),
+        **textos_aviso,
     )
-    return _out(nova)
+    return _out(nova, menos_de_24h=menos_24h, pedido=pedido)
 
 
 @router.get(
@@ -204,7 +278,11 @@ def listar_reagendamentos(
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[ReagendamentoOut]:
     pedido = carregar_pedido(contexto, pedido_id, usuario)
-    return [_out(r) for r in contexto.reagendamentos.listar(pedido.id)]
+    horas = _antecedencia_horas(contexto, pedido.id)
+    return [
+        _out(r, menos_de_24h=_menos_de_24h(pedido, r.criado_em, horas), pedido=pedido)
+        for r in contexto.reagendamentos.listar(pedido.id)
+    ]
 
 
 @router.post(
@@ -261,6 +339,7 @@ def aceitar_reagendamento(
         gravado = contexto.pedidos.salvar(transicao.pedido, evento)
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, evento.acao, contexto)
+    menos_24h = _menos_de_24h(pedido, r.criado_em, _antecedencia_horas(contexto, pedido.id))
     _avisar(
         request,
         contexto,
@@ -270,7 +349,7 @@ def aceitar_reagendamento(
         pedido_id=pedido.id,
         **_textos(pedido, "aceito"),
     )
-    return _out(respondido)
+    return _out(respondido, menos_de_24h=menos_24h, pedido=pedido)
 
 
 @router.post(
@@ -304,4 +383,5 @@ def recusar_reagendamento(
         pedido_id=pedido.id,
         **_textos(pedido, "cancelado" if cancelando else "recusado"),
     )
-    return _out(respondido)
+    menos_24h = _menos_de_24h(pedido, r.criado_em, _antecedencia_horas(contexto, pedido.id))
+    return _out(respondido, menos_de_24h=menos_24h, pedido=pedido)

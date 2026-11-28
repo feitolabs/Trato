@@ -3,7 +3,9 @@
 /// Valores em centavos inteiros.
 library;
 
+import '../comuns/desconto_moedas.dart' show textoTratinhos;
 import '../comuns/prazo_avaliacao.dart';
+import '../perfil_cliente/modelos.dart' show CreditoPorValidade;
 import '../profissional/servico_orcamento.dart' show ItemMaterial;
 
 /// Atendimento já contratado, mostrado no cartão escuro do Início.
@@ -295,6 +297,7 @@ class ExclusividadeProfissional {
     this.clienteId = '',
     this.moedasCobradas = 100,
     this.responderAte,
+    this.prazoSuspenso = false,
     this.expiraEm,
     this.saldoRestante,
     this.tituloPedido,
@@ -316,6 +319,9 @@ class ExclusividadeProfissional {
   final String status;
   final int moedasCobradas;
   final DateTime? responderAte;
+
+  /// Termos 22.3: falha da plataforma ativa; não mostrar contagem.
+  final bool prazoSuspenso;
   final DateTime? expiraEm;
   final int? saldoRestante;
   final String? tituloPedido;
@@ -343,6 +349,15 @@ class ExclusividadeProfissional {
 
 /// Resumo da carteira de Tratinhos do profissional e suas exclusividades.
 /// Moeda de profissional não tem valor em dinheiro (nunca converter em reais).
+/// Termos 13.3/13.4: linha de validade de um crédito de Tratinhos do profissional.
+String textoValidadeCreditoProfissional(CreditoPorValidade c) {
+  final d = c.expiraEm;
+  final quando = d == null
+      ? 'vencimento não informado'
+      : 'vence em ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  return '${textoTratinhos(c.moedas)}: $quando';
+}
+
 class ResumoExclusividades {
   const ResumoExclusividades({
     this.itens = const [],
@@ -352,6 +367,7 @@ class ResumoExclusividades {
     this.moedasPendentesProfissional = 0,
     this.moedasPendentesLiberacao,
     this.moedaValorCentavos,
+    this.creditosProfissional = const [],
   });
 
   final List<ExclusividadeProfissional> itens;
@@ -366,6 +382,9 @@ class ResumoExclusividades {
   /// Valor de 1 Tratinho em centavos (`valor_moeda_centavos`), só para mostrar em reais; opcional.
   final int? moedaValorCentavos;
 
+  /// Créditos da carteira do profissional por validade (`creditos_profissional`). Vazia em API antiga.
+  final List<CreditoPorValidade> creditosProfissional;
+
   ResumoExclusividades comPendentes(int pendentes) => ResumoExclusividades(
         itens: itens,
         ativasOuPendentes: ativasOuPendentes,
@@ -374,6 +393,7 @@ class ResumoExclusividades {
         moedasPendentesProfissional: pendentes,
         moedasPendentesLiberacao: moedasPendentesLiberacao,
         moedaValorCentavos: moedaValorCentavos,
+        creditosProfissional: creditosProfissional,
       );
 
   ResumoExclusividades comNovaOferta(ExclusividadeProfissional oferta) {
@@ -389,6 +409,7 @@ class ResumoExclusividades {
       moedasPendentesProfissional: moedasPendentesProfissional,
       moedasPendentesLiberacao: moedasPendentesLiberacao,
       moedaValorCentavos: moedaValorCentavos,
+      creditosProfissional: creditosProfissional,
     );
   }
 }

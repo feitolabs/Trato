@@ -11,6 +11,12 @@ from conftest import CLIENTE, PROFISSIONAL, cab
 from trato.api.repositorios import Orcamento
 from trato.pedidos.estados import Estado
 
+OBRIGATORIOS = {
+    "prazo_execucao_dias": 3,
+    "validade_ate": "2099-01-01T00:00:00Z",
+    "fora_do_escopo": "Materiais não incluídos.",
+    "garantia_dias": 90,
+}
 ITEM = {
     "tipo": "horas",
     "descricao": "Mão de obra",
@@ -42,7 +48,9 @@ def test_profissional_ve_todos_os_orcamentos_do_proprio_pedido(amb):
 def test_profissional_nao_orca_o_proprio_pedido(amb):
     _meu_pedido(amb)
     r = amb.cliente.post(
-        "/v1/pedidos/ped-1/orcamentos", json={"itens": [ITEM]}, headers=cab("t-prof")
+        "/v1/pedidos/ped-1/orcamentos",
+        json={**OBRIGATORIOS, "itens": [ITEM]},
+        headers=cab("t-prof"),
     )
     assert r.status_code == 403
 
@@ -80,7 +88,7 @@ def test_tipo_de_item_fora_do_banco_e_recusado_com_422(amb):
     amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
     r = amb.cliente.post(
         "/v1/pedidos/ped-1/orcamentos",
-        json={"itens": [{**ITEM, "tipo": "mao_de_obra"}]},
+        json={**OBRIGATORIOS, "itens": [{**ITEM, "tipo": "mao_de_obra"}]},
         headers=cab("t-prof"),
     )
     assert r.status_code == 422

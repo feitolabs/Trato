@@ -24,6 +24,7 @@ from trato.api.repositorios_app import NIVEIS_VERIFICACAO, PerfilDetalhe
 from trato.api.resposta_real import responde_em_faixa
 from trato.garantias.config import garantia_minima_do_slug
 from trato.profissional.config import ConfigProfissional, obter_config_profissional
+from trato.profissional.nota import minimo_de_avaliacoes, nota_visivel
 from trato.profissional.repositorio import (
     CatalogoEmMemoria,
     CatalogoProfissional,
@@ -115,6 +116,12 @@ class PerfilEditarIn(_Entrada):
     portfolio: list[PortfolioIO] | None = Field(None, max_length=100)
 
 
+DESCRICAO_DATA_DO_SELO = (
+    "Termos 10.2: data em que a identidade foi conferida (selo). Null: sem selo ou sem data "
+    "registrada; não mostrar data."
+)
+
+
 class PerfilProfissionalOut(BaseModel):
     usuario_id: str
     status: str
@@ -152,10 +159,15 @@ class EtiquetaTopOut(BaseModel):
 
 
 class PerfilPublicoOut(BaseModel):
+    avaliacoes_total: int = Field(0, description="Avaliações publicadas recebidas (12.3).")
+    nota_minimo_avaliacoes: int = Field(
+        1, description="Abaixo disto a nota vem null (mostre 'novo no Trato')."
+    )
     id: str
     nome: str | None
     bio: str | None
     nivel_verificacao: str
+    selo_conferido_em: datetime | None = Field(None, description=DESCRICAO_DATA_DO_SELO)
     nota_publica: float | None
     servicos_concluidos: int | None
     taxa_conclusao: int | None = Field(
@@ -596,6 +608,14 @@ class CategoriaOut(BaseModel):
     garantia_minima_dias: int = Field(
         30, description="Garantia mínima (CDC) que o orçamento desta categoria precisa dar."
     )
+    incluido: list[str] = Field(
+        default_factory=list,
+        description="Itens incluídos nesta categoria (Termos 3.6; vazio se não configurado).",
+    )
+    nao_incluido: list[str] = Field(
+        default_factory=list,
+        description="Itens não incluídos nesta categoria (Termos 3.6; vazio se não configurado).",
+    )
 
 
 class CidadeOut(BaseModel):
@@ -604,11 +624,25 @@ class CidadeOut(BaseModel):
     uf: str
 
 
+def _datas_dos_selos(contexto: Contexto, perfis: dict[str, str]) -> dict[str, datetime]:
+    """{id: data} só de quem exibe o selo. `perfis`: id -> nível de verificação."""
+    buscar = getattr(contexto.usuarios, "selos_conferidos_em", None)
+    com_selo = [i for i, nivel in perfis.items() if nivel in NIVEIS_VERIFICACAO]
+    if buscar is None or not com_selo:
+        return {}
+    return buscar(com_selo)
+
+
 class ProfissionalBuscaOut(BaseModel):
+    avaliacoes_total: int = Field(0, description="Avaliações publicadas recebidas (12.3).")
+    nota_minimo_avaliacoes: int = Field(
+        1, description="Abaixo disto a nota vem null (mostre 'novo no Trato')."
+    )
     id: str
     nome: str | None = Field(description="Abreviado (primeiro nome e inicial do último).")
     bio: str | None
     nivel_verificacao: str
+    selo_conferido_em: datetime | None = Field(None, description=DESCRICAO_DATA_DO_SELO)
     nota_publica: float | None
     servicos_concluidos: int | None
     categorias: list[str] = Field(description="Ids das categorias em que atua (não suspensas).")
@@ -756,8 +790,10 @@ def buscar_profissionais(
         limite=limite,
         deslocamento=(pagina - 1) * limite,
         ranking=contexto.ranking.config(),
+        nota_minimo_avaliacoes=minimo_de_avaliacoes(contexto.config),
     )
     achados, total = modulo.repo.buscar(filtro, contexto.usuarios.detalhe)
+    selos = _datas_dos_selos(contexto, {r.usuario_id: r.nivel_verificacao for r in achados})
     mapa_cidades = _cidades_nomes_map(modulo)
     return BuscaProfissionaisOut(
         itens=[
@@ -766,7 +802,10 @@ def buscar_profissionais(
                 nome=_nome_abreviado(r.nome),
                 bio=r.bio,
                 nivel_verificacao=r.nivel_verificacao,
+                selo_conferido_em=selos.get(r.usuario_id),
                 nota_publica=r.nota_publica,
+                avaliacoes_total=r.avaliacoes_total,
+                nota_minimo_avaliacoes=filtro.nota_minimo_avaliacoes,
                 servicos_concluidos=r.servicos_concluidos,
                 categorias=list(r.categorias),
                 cidades=list(
@@ -839,6 +878,9 @@ def perfil_publico(
     nota_publica = detalhe.nota_publica
     if nota_publica is None and hasattr(contexto.avaliacoes, "media_recebida"):
         nota_publica = contexto.avaliacoes.media_recebida(profissional_id)
+    minimo = minimo_de_avaliacoes(contexto.config)
+    # Depois do cálculo de reserva: abaixo do mínimo nenhuma média sai (12.3).
+    nota_publica = nota_visivel(nota_publica, detalhe.avaliacoes_total, minimo)
 
     return PerfilPublicoOut(
         no_trato_desde=perfil.criado_em,
@@ -849,7 +891,12 @@ def perfil_publico(
         nome=_nome_abreviado(detalhe.nome),
         bio=base.bio,
         nivel_verificacao=perfil.nivel_verificacao,
+        selo_conferido_em=_datas_dos_selos(
+            contexto, {perfil.usuario_id: perfil.nivel_verificacao}
+        ).get(perfil.usuario_id),
         nota_publica=nota_publica,
+        avaliacoes_total=detalhe.avaliacoes_total,
+        nota_minimo_avaliacoes=minimo,
         servicos_concluidos=detalhe.servicos_concluidos,
         taxa_conclusao=detalhe.taxa_conclusao,
         atende_presencial=perfil.atende_presencial,
@@ -900,8 +947,10 @@ class PerfilSitePublicoOut(BaseModel):
     categorias: list[str] = Field(description="Nomes dos serviços oferecidos.")
     nota_media: float | None = Field(description="Nota média (null sem avaliações).")
     avaliacoes_total: int
+    nota_minimo_avaliacoes: int = Field(1, description="Abaixo disto `nota_media` vem null.")
     servicos_concluidos: int
     identidade_verificada: bool = Field(description='Selo "Identidade verificada".')
+    selo_conferido_em: datetime | None = Field(None, description=DESCRICAO_DATA_DO_SELO)
     cidades: list[str] = Field(description='Cidades que atende ("Belo Horizonte/MG").')
     sobre: str | None = Field(description='Texto "Sobre", se existir.')
     portfolio: list[str] = Field(
@@ -1006,10 +1055,18 @@ def perfil_publico_site(
         nome=_nome_abreviado(detalhe.nome),
         foto_url=_foto_publica(request, profissional_id),
         categorias=[nomes_categorias[c] for c in perfil.categorias if c in nomes_categorias],
-        nota_media=detalhe.nota_publica,
+        nota_media=nota_visivel(
+            detalhe.nota_publica,
+            detalhe.avaliacoes_total,
+            minimo_de_avaliacoes(contexto.config),
+        ),
         avaliacoes_total=detalhe.avaliacoes_total,
+        nota_minimo_avaliacoes=minimo_de_avaliacoes(contexto.config),
         servicos_concluidos=detalhe.servicos_concluidos or 0,
         identidade_verificada=perfil.nivel_verificacao in NIVEIS_VERIFICACAO,
+        selo_conferido_em=_datas_dos_selos(
+            contexto, {perfil.usuario_id: perfil.nivel_verificacao}
+        ).get(perfil.usuario_id),
         cidades=list(
             dict.fromkeys(
                 nomes_cidades[r.cidade_id] for r in perfil.regioes if r.cidade_id in nomes_cidades

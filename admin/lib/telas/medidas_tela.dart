@@ -9,6 +9,7 @@ import 'atendimento_modais.dart' show confirmarAtendimento;
 import 'campos_trava.dart';
 import 'medidas_modais.dart';
 import 'provas_modal.dart';
+import 'resumo_pedidos.dart';
 
 const kTiposMedida = {
   'aviso': 'Aviso',
@@ -26,6 +27,7 @@ String nomeDaMedida(String tipo) => kTiposMedida[tipo] ?? tipo;
 
 (String, Tom) chipDaMedida(Medida m) {
   if (m.revertidaEm != null) return ('Revertida', Tom.neutro);
+  if (m.agendada) return ('Agendado', Tom.info);
   return m.vigente ? ('Em vigor', Tom.alerta) : ('Encerrada', Tom.neutro);
 }
 
@@ -131,7 +133,9 @@ class _MedidasTelaState extends State<MedidasTela> {
                             if (m.protocolo != null) m.protocolo!,
                             m.contestacaoAberta
                                 ? 'Responder contestação até ${formatarData(m.contestacao!.responderAte)}'
-                                : 'Desde ${formatarDia(m.inicioEm)}',
+                                : m.agendada
+                                    ? 'Começa em ${formatarDataBrasilia(m.inicioEm)}'
+                                    : 'Desde ${formatarDia(m.inicioEm)}',
                           ],
                           chips: [
                             ChipEstado(texto, tom: tom),
@@ -233,9 +237,13 @@ class _DetalheMedidaState extends State<_DetalheMedida> {
     final motivo = await pedirMotivo(
       context,
       titulo: 'Reverter a medida?',
-      descricao: '${_travaPorFraude ? '$kFimDaTravaAoReverter ' : ''}'
-          'A conta volta ao que as outras medidas em vigor permitem. O usuário é avisado da reversão; '
-          'o motivo abaixo é interno.',
+      descricao: widget.medida.agendada
+          ? 'Cancela o encerramento agendado: ele não chega a começar e a conta não muda agora. O usuário é avisado '
+              'da reversão; o motivo abaixo é interno.'
+          : '${_travaPorFraude ? '$kFimDaTravaAoReverter ' : ''}'
+              '${medidaCancelaPedidos(widget.medida.tipo) ? '$kReverterNaoRestauraPedidos ' : ''}'
+              'A conta volta ao que as outras medidas em vigor permitem. O usuário é avisado da reversão; '
+              'o motivo abaixo é interno.',
       rotuloConfirmar: 'Reverter medida',
     );
     if (motivo == null || !mounted) return;
@@ -269,6 +277,7 @@ class _DetalheMedidaState extends State<_DetalheMedida> {
           'O usuário vai ler:\n$resposta'
           '${comJustificativa ? '\n\nSó a equipe vê:\n$justificativa' : ''}'
           '${resultado == 'revertida' && _travaPorFraude ? '\n\n$kFimDaTravaAoReverter' : ''}'
+          '${resultado == 'revertida' && medidaCancelaPedidos(widget.medida.tipo) && !widget.medida.agendada ? '\n\n$kReverterNaoRestauraPedidos' : ''}'
           '${resultado == 'alterada' && _travaPorFraude ? '\n\n$kFimDaTravaAoEncurtar' : ''}',
       verbo: 'Enviar decisão',
     );
@@ -306,13 +315,30 @@ class _DetalheMedidaState extends State<_DetalheMedida> {
           ],
         ),
         const SizedBox(height: EspacosTrato.x3),
+        if (m.agendada) ...[
+          BannerInfo(
+            'Começa em ${formatarDataBrasilia(m.inicioEm)}. Até lá a conta segue ativa. Para cancelar, use '
+            '"Reverter medida". Reativar o usuário pela mudança de status não cancela.',
+            titulo: 'Encerramento agendado.',
+            tom: Tom.info,
+          ),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
         if (m.protocolo != null) Linha('Protocolo', m.protocolo!),
         Linha('Código da conta', m.usuarioId),
+        if (medidaCancelaPedidos(m.tipo) && m.vigente) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          Text('Pedidos da conta (Termos 20.6)', style: TipografiaTrato.secao),
+          const SizedBox(height: EspacosTrato.x2),
+          avisoPedidosCancelados,
+          const SizedBox(height: EspacosTrato.x2),
+          ResumoDosPedidos(m.pedidos),
+        ],
         const SizedBox(height: EspacosTrato.x4),
         Text('O que o usuário lê', style: TipografiaTrato.secao),
         Linha('Motivo', m.motivoAoUsuario),
         Linha('Cláusulas', m.clausulas.join(', ')),
-        Linha('Início', formatarData(m.inicioEm)),
+        Linha('Início', m.agendada ? formatarDataBrasilia(m.inicioEm) : formatarData(m.inicioEm)),
         Linha('Fim', m.fimEm == null ? 'Sem data final' : formatarData(m.fimEm!)),
         Linha('Pedidos e valores', m.efeito),
         Linha('Como contestar', m.comoContestar),

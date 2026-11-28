@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
 from trato.persistencia.erros import Duplicado
+from trato.profissional.nota import minimo_de_avaliacoes, nota_visivel
 
 LIMITE_ENDERECOS = 10
 LIMITE_CONTATOS = 5
@@ -52,6 +53,7 @@ class Favorito:
     nome: str | None
     nota_publica: float | None
     servicos_concluidos: int | None
+    avaliacoes_total: int = 0
 
 
 @dataclass(frozen=True)
@@ -297,6 +299,10 @@ class EnderecoOut(BaseModel):
 
 
 class FavoritoOut(BaseModel):
+    avaliacoes_total: int = Field(0, description="Avaliações publicadas recebidas (12.3).")
+    nota_minimo_avaliacoes: int = Field(
+        1, description="Abaixo disto a nota vem null (mostre 'novo no Trato')."
+    )
     profissional_id: str
     nome: str | None
     nota_publica: float | None
@@ -414,8 +420,16 @@ def listar_favoritos(
     # o sobrenome completo do profissional nunca sai nesta lista (LGPD).
     from trato.api.rotas_profissional_cadastro import _nome_abreviado
 
+    minimo = minimo_de_avaliacoes(contexto.config)
     return [
-        FavoritoOut(**{**vars(f), "nome": _nome_abreviado(f.nome)})
+        FavoritoOut(
+            **{
+                **vars(f),
+                "nome": _nome_abreviado(f.nome),
+                "nota_publica": nota_visivel(f.nota_publica, f.avaliacoes_total, minimo),
+                "nota_minimo_avaliacoes": minimo,
+            }
+        )
         for f in _conta(contexto).favoritos(usuario.id)
     ]
 

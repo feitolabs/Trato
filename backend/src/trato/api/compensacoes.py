@@ -12,7 +12,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
@@ -28,7 +28,12 @@ class DividaOut(BaseModel):
     id: str
     pedido_id: str
     origem: str
-    valor_centavos: int
+    valor_centavos: int = Field(description="O que vale hoje (já com as reduções).")
+    valor_original_centavos: int
+    reduzido_centavos: int = 0
+    devolvido_reducao_centavos: int = Field(
+        0, description="Quanto voltou ao profissional por causa de reduções."
+    )
     compensado_centavos: int
     restante_centavos: int
     motivo: str
@@ -37,6 +42,40 @@ class DividaOut(BaseModel):
     avisado_em: Any = None
     cancelada_em: Any = None
     motivo_cancelamento: str | None = None
+    suspensa: bool = Field(
+        False,
+        description="Dívida aberta cuja decisão foi depois revertida ou reduzida (8.7): nada é "
+        "descontado. Cancelar faz o Trato assumir o valor INTEIRO.",
+    )
+
+
+class DividaAdminOut(DividaOut):
+    """Só no painel. O profissional recebe `DividaOut`, sem nada disto."""
+
+    revisao: str | None = Field(
+        None,
+        description="Decisão posterior mais baixa ainda sem tratamento, inclusive em quitada: "
+        "reducao (usar Reduzir) | reversao (usar Cancelar) | analisar (a dívida ainda cabe na "
+        "nova decisão; não há redução obrigatória). null: nada pendente.",
+    )
+    revisao_contestacao_id: str | None = None
+    pode_reduzir: bool = Field(False, description="Há redução aplicável E este operador pode.")
+    reducao_maxima_centavos: int | None = Field(
+        None, description="Maior novo valor aceito; só vem com `pode_reduzir`."
+    )
+    pode_cancelar: bool = Field(False, description="Não cancelada E este operador pode.")
+
+
+def saida_admin(d: Divida, pode_mexer: bool) -> DividaAdminOut:
+    maximo = d.reducao_maxima_centavos if pode_mexer else None
+    return DividaAdminOut(
+        **saida(d).model_dump(),
+        revisao=d.revisao,
+        revisao_contestacao_id=d.revisao_contestacao_id,
+        pode_reduzir=maximo is not None,
+        reducao_maxima_centavos=maximo,
+        pode_cancelar=pode_mexer and d.status != "cancelada",
+    )
 
 
 def saida(d: Divida) -> DividaOut:
@@ -46,6 +85,9 @@ def saida(d: Divida) -> DividaOut:
         pedido_id=d.pedido_id,
         origem=d.origem_tipo,
         valor_centavos=d.valor_centavos,
+        valor_original_centavos=d.valor_centavos + d.reduzido_centavos,
+        reduzido_centavos=d.reduzido_centavos,
+        devolvido_reducao_centavos=d.devolvido_reducao_centavos,
         compensado_centavos=d.compensado_centavos,
         restante_centavos=restante,
         motivo=d.motivo,
@@ -54,6 +96,7 @@ def saida(d: Divida) -> DividaOut:
         avisado_em=d.avisado_em,
         cancelada_em=d.cancelada_em,
         motivo_cancelamento=d.motivo_cancelamento,
+        suspensa=d.suspensa,
     )
 
 

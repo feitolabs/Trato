@@ -94,18 +94,38 @@ def test_ausencia_do_profissional_devolve_tudo_que_esta_retido(fluxo: Fluxo):  #
     fluxo.ctx.ledger.livro.verificar_partidas()
 
 
-def test_ausencia_devolve_principal_e_aditivo_pago(fluxo: Fluxo):  # noqa: F811
+def test_ausencia_devolve_principal_e_o_aditivo_pago_fora_da_execucao_ja_voltou(
+    fluxo: Fluxo,  # noqa: F811
+):
+    """Termos 6.8: aditivo é trabalho extra surgido DURANTE o serviço. Com o pedido ainda
+    agendado ele nem pode ser proposto, e nenhum caminho volta do serviço iniciado para
+    agendado. A cobrança aqui é forçada (defesa): paga fora da execução, volta inteira."""
     pid, principal = pedido_pago_e_agendado(fluxo)
+    corpo = {"descricao": "Peça extra", "valor_centavos": ADITIVO}
+    r = fluxo.chamar("POST", f"/v1/pedidos/{pid}/aditivos", "t-prof", corpo)
+    assert r.status_code == 409, r.text
+
     extra = aditivo_aprovado(fluxo, pid, pago=True)
-    assert fluxo.ctx.ledger.saldo_da_conta(CUSTODIA, pid) == VALOR + ADITIVO
+    assert fluxo.ctx.ledger.saldo_da_conta(CUSTODIA, pid) == VALOR  # o extra não entrou
+    devolvida = fluxo.servico.cobrancas.obter(extra.id)
+    assert devolvida.status is EstadoCobranca.DEVOLVIDA
+    assert devolvida.estornado_centavos == ADITIVO
+    assert estornos_no_provedor(fluxo) == [f"orfao/{extra.id}"]
+    assert [e.valor_centavos for e in fluxo.fake.estornos_da_cobranca(extra.id)] == [ADITIVO]
+    assert fluxo.webhook(TipoEvento.PAGAMENTO_CONFIRMADO, extra.id).status_code == 200
+    assert estornos_no_provedor(fluxo) == [f"orfao/{extra.id}"]  # repetir não devolve de novo
     vencer_a_tolerancia(fluxo)
 
     agendador(fluxo).rodar_uma_vez()
 
+    assert fluxo.ctx.pedidos.obter(pid).estado is Estado.CANCELADO
     assert fluxo.ctx.ledger.saldo_da_conta(CUSTODIA, pid) == 0
+    assert fluxo.ctx.ledger.saldo_da_conta(a_liberar(PROFISSIONAL.id), pid) == 0
     ordens = {o.cobranca_id: o.valor_centavos for o in fluxo.servico.ordens.do_pedido(pid)}
-    assert ordens == {principal["id"]: VALOR, extra.id: ADITIVO}
-    assert len(estornos_no_provedor(fluxo)) == 2
+    assert ordens == {principal["id"]: VALOR}
+    assert len(estornos_no_provedor(fluxo)) == 2  # a órfã do extra e o principal
+    assert fluxo.servico.cobrancas.obter(principal["id"]).estornado_centavos == VALOR
+    fluxo.ctx.ledger.livro.verificar_partidas()
 
 
 def test_ausencia_cancela_cobranca_pendente_sem_estornar_ela(fluxo: Fluxo):  # noqa: F811

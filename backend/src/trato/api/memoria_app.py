@@ -6,6 +6,7 @@ import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from trato.api.auth import PapelUsuario
@@ -123,6 +124,7 @@ class UsuariosEmMemoria:
         self._telefones: dict[str, str] = {}  # telefone (dígitos) -> usuario_id
         self.emails: dict[str, str] = {}  # usuario_id -> email
         self.verificacoes: dict[str, str] = {}  # profissional_id -> status (testes preenchem)
+        self.selos: dict[str, datetime] = {}  # profissional_id -> data da verificação aprovada
         self.profissionais: set[str] = set()
         self.status_perfis: dict[str, str] = {}  # testes: recusado/suspenso (padrão em_analise)
         self.nascimentos: dict[str, date] = {}
@@ -135,8 +137,15 @@ class UsuariosEmMemoria:
     def ids_para_aviso(self, depois_de: str | None, limite: int) -> list[str]:
         return sorted(i for i in self._perfis if depois_de is None or i > depois_de)[:limite]
 
+    # O contexto liga: quantas avaliações publicadas a pessoa recebeu (no Postgres, consulta).
+    contar_avaliacoes: Callable[[str], int] | None = None
+
     def detalhe(self, usuario_id: str) -> PerfilDetalhe | None:
-        return self._perfis.get(usuario_id)
+        achado = self._perfis.get(usuario_id)
+        if achado is None or self.contar_avaliacoes is None:
+            return achado
+        total = self.contar_avaliacoes(usuario_id)
+        return replace(achado, avaliacoes_total=total) if total else achado
 
     def garantir(self, usuario_id: str, nome: object = None) -> PerfilDetalhe | None:
         if usuario_id not in self._perfis:
@@ -149,6 +158,9 @@ class UsuariosEmMemoria:
         atual = self.garantir(usuario_id)
         if atual is not None:
             self._perfis[usuario_id] = replace(atual, nome=nome)
+
+    def selos_conferidos_em(self, ids: Sequence[str]) -> dict[str, datetime]:
+        return {i: self.selos[i] for i in ids if i in self.selos}
 
     def status_verificacao(self, usuario_id: str) -> str | None:
         return self.verificacoes.get(usuario_id)
@@ -251,10 +263,44 @@ class VerificacoesEmMemoria:
         return tuple(v for v in reversed(self._itens) if v.profissional_id == profissional_id)
 
 
+def calcular_nota_publica(
+    avaliacoes: Sequence[Avaliacao],
+    *,
+    recentes_quantidade: int = 5,
+    recentes_peso: int = 2,
+) -> float | None:
+    """Espelho em memória de `public.nota_publica_profissional` (migration 20261127061100, 12.3):
+    as N avaliações publicadas mais recentes pesam P; as demais pesam 1; 2 casas (half-up)."""
+    validas = [
+        a
+        for a in avaliacoes
+        if a.direcao == "cliente_para_profissional" and a.status == "publicada"
+    ]
+    if not validas:
+        return None
+    ordenadas = sorted(validas, key=lambda a: (a.criada_em, a.id or ""), reverse=True)
+    soma = Decimal(0)
+    pesos = Decimal(0)
+    for pos, av in enumerate(ordenadas, start=1):
+        nota = (
+            Decimal(str(av.nota_decimal))
+            if av.nota_decimal is not None
+            else Decimal(av.nota_geral)
+        )
+        peso = Decimal(recentes_peso if pos <= recentes_quantidade else 1)
+        soma += nota * peso
+        pesos += peso
+    if pesos == 0:
+        return None
+    return float((soma / pesos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
 class AvaliacoesEmMemoria:
-    def __init__(self) -> None:
+    def __init__(self, *, recentes_quantidade: int = 5, recentes_peso: int = 2) -> None:
         self._itens: dict[tuple[str, str], Avaliacao] = {}
         self._seq = 0
+        self.recentes_quantidade = recentes_quantidade
+        self.recentes_peso = recentes_peso
 
     def obter(self, pedido_id: str, direcao: str) -> Avaliacao | None:
         return self._itens.get((pedido_id, direcao))
@@ -294,17 +340,13 @@ class AvaliacoesEmMemoria:
         return tuple(sorted(achadas, key=lambda a: a.criada_em, reverse=True))
 
     def media_recebida(self, avaliado_id: str) -> float | None:
-        """Média das avaliações de clientes usando coalesce(nota_decimal, nota_geral), 2 casas."""
-        notas = [
-            a.nota_decimal if a.nota_decimal is not None else float(a.nota_geral)
-            for a in self._itens.values()
-            if a.avaliado_id == avaliado_id
-            and a.direcao == "cliente_para_profissional"
-            and a.status == "publicada"
-        ]
-        if not notas:
-            return None
-        return round(sum(notas) / len(notas), 2)
+        """Nota pública (12.3): peso nas N recentes, como `nota_publica_profissional`."""
+        recebidas = [a for a in self._itens.values() if a.avaliado_id == avaliado_id]
+        return calcular_nota_publica(
+            recebidas,
+            recentes_quantidade=self.recentes_quantidade,
+            recentes_peso=self.recentes_peso,
+        )
 
 
 class RecusasEmMemoria:

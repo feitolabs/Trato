@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
@@ -60,6 +60,10 @@ class PedidosEmMemoria:
 
     def vincular_visitas_recorrentes(self, quem: Any) -> None:
         self._visita_de = quem
+
+    def ja_substituido(self, pedido_id: str) -> bool:
+        with self._trava:
+            return any(p.substitui_pedido_id == pedido_id for p in self._pedidos.values())
 
     def obter(self, pedido_id: str) -> Pedido | None:
         return self._pedidos.get(pedido_id)
@@ -474,9 +478,14 @@ class ContratosEmMemoria:
         self._itens: dict[str, Contrato] = {}  # só o vigente de cada pedido
         self._cancelados: list[Contrato] = []
         self._orcamentos = orcamentos
+        # O contexto liga: retrato das regras no aceite (o Postgres grava `regras_aplicadas`).
+        self.regras_no_aceite: Callable[[], Mapping[str, Any]] | None = None
 
     def obter_do_pedido(self, pedido_id: str) -> Contrato | None:
         return self._itens.get(pedido_id)
+
+    def pode_encerrar_por_pagamento_expirado(self, pedido_id: str) -> bool:
+        return pedido_id in self._itens
 
     def encerrar_por_pagamento_expirado(self, pedido_id: str) -> bool:
         """Quem chama garante que não há dinheiro no contrato (o banco confere de novo)."""
@@ -494,7 +503,7 @@ class ContratosEmMemoria:
         if existente is not None:
             if existente.orcamento_id != contrato.orcamento_id:
                 raise Duplicado("Este pedido já tem contrato com outro orçamento.")
-            self._itens[contrato.pedido_id] = contrato
+            self._itens[contrato.pedido_id] = replace(contrato, regras=existente.regras)
             return ()
         if self._orcamentos is not None:
             detalhe = self._orcamentos.detalhe(contrato.orcamento_id)
@@ -505,6 +514,8 @@ class ContratosEmMemoria:
                 and detalhe.status != "enviado"
             ):
                 raise RegraDoBanco("Só um orçamento enviado pode ser aceito.")
+        if contrato.regras is None and self.regras_no_aceite is not None:
+            contrato = replace(contrato, regras=self.regras_no_aceite())
         self._itens[contrato.pedido_id] = contrato
         if self._orcamentos is None:
             return ()

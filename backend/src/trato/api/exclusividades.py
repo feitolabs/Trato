@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from trato.api.moedas_saldo import parcelas_do_gasto
+from trato.api.validade import orcamento_vencido
+from trato.disputas.indisponibilidade import prorrogar
 from trato.pedidos.estados import Acao, Ator, Estado, Evento, Papel
 
 CARTEIRA = "profissional"
@@ -224,6 +226,21 @@ class ExclusividadesEmMemoria:
         if pedido is not None:
             self._contexto.pedidos.salvar(replace(pedido, estado=estado))
 
+    def prazo_de_resposta(self, item: Exclusividade) -> datetime | None:
+        """22.3 (só 'app'): `responder_ate` prorrogado. `None`: suspenso por falha ativa."""
+        if item.responder_ate is None:
+            return None
+        falhas = [
+            (j.inicio_em, j.fim_em)
+            for j in self._contexto.indisponibilidades.listar(desde=item.criada_em)
+            if j.origem == "app"
+        ]
+        return prorrogar(item.criada_em, item.responder_ate - item.criada_em, falhas)
+
+    def _passou_o_prazo(self, item: Exclusividade, agora: datetime) -> bool:
+        limite = self.prazo_de_resposta(item)
+        return limite is not None and limite < agora
+
     # --- funções --------------------------------------------------------------------------------
 
     def solicitar(
@@ -324,7 +341,7 @@ class ExclusividadesEmMemoria:
                 return ResultadoResposta("prazo_vencido")  # a rotina já expirou e estornou
             if item.status != "aguardando_cliente":
                 return ResultadoResposta("ja_respondida")
-            if item.responder_ate is not None and item.responder_ate < agora:
+            if self._passou_o_prazo(item, agora):
                 self._mudar(item, status="expirada_sem_resposta", encerrada_em=agora)
                 self._estornar(item, agora)
                 return ResultadoResposta("prazo_vencido")
@@ -348,11 +365,7 @@ class ExclusividadesEmMemoria:
             for item in list(self._itens.values()):
                 if item.pagador == "cliente":
                     continue
-                if (
-                    item.status == "aguardando_cliente"
-                    and item.responder_ate
-                    and item.responder_ate < agora
-                ):
+                if item.status == "aguardando_cliente" and self._passou_o_prazo(item, agora):
                     self._mudar(item, status="expirada_sem_resposta", encerrada_em=agora)
                     self._estornar(item, agora)
                     motivo = "sem_resposta"
@@ -489,6 +502,8 @@ class ExclusividadesEmMemoria:
                     or orcamento.pedido_id != pedido_id
                     or profissional_id not in (None, orcamento.profissional_id)
                 ):
+                    return nega("orcamento_invalido")
+                if orcamento_vencido(self._contexto, orcamento_id, agora):  # 5.2 e 22.3
                     return nega("orcamento_invalido")
                 profissional_id = orcamento.profissional_id
             if not profissional_id or not apto(profissional_id):

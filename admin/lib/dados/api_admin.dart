@@ -52,6 +52,35 @@ abstract interface class ApiAdmin {
   /// O caso completo, com evidências e linha do tempo.
   Future<Disputa> obterDisputa(String id);
 
+  // Pedidos de informação adicional em disputas (Termos 8.4).
+  Future<List<PedidoInfoDisputa>> listarPedidosInfoDisputa(String disputaId);
+  Future<PedidoInfoDisputa> solicitarInfoDisputa(
+    String disputaId, {
+    required String destinatarioPapel,
+    required String mensagem,
+  });
+  Future<PedidoInfoDisputa> encerrarPedidoInfoSemResposta(
+    String disputaId,
+    String pedidoInfoId, {
+    required String motivo,
+  });
+
+  // Faltas e cancelamentos repetidos de profissionais (Termos 7.7). Pede `disputas_ver`.
+  Future<List<FaltaRepetidaProfissional>> listarFaltasRepetidas({int dias = 90, int minimo = 2});
+
+  // Eventos externos / força maior (Termos 7.8 e 22.6).
+  Future<PaginaRemota<EventoForcaMaior>> listarForcaMaior({
+    String? status = 'pendente',
+    int deslocamento = 0,
+    int limite = 20,
+  });
+  Future<EventoForcaMaior> decidirForcaMaior(
+    String eventoId, {
+    required String decisao,
+    required String justificativa,
+    required String chaveIdempotencia,
+  });
+
   Future<({int abertas, int decididas})> contarDisputas();
 
   /// Assume a análise da disputa. Se outra pessoa já assumiu, o backend recusa (409), a menos que
@@ -125,12 +154,17 @@ abstract interface class ApiAdmin {
     required String resposta,
     String? ocultarMotivo,
     String? mesmoAnalistaJustificativa,
+    String? justificativaAdiamento,
   });
   Future<OcultacaoAvaliacao> ocultarAvaliacao(
     String avaliacaoId, {
     required String motivo,
     required String explicacao,
+    String? justificativaAdiamento,
   });
+
+  /// Envia o aviso adiado (ou que falhou) ao autor da avaliação oculta (Termos 11.8).
+  Future<OcultacaoAvaliacao> avisarAutorAvaliacao(String avaliacaoId);
   Future<OcultacaoAvaliacao> reverterOcultacaoAvaliacao(String avaliacaoId, {required String motivo});
 
   /// Pedidos de titular LGPD e revisão automatizada (Termos 14.9 e 14.10).
@@ -172,7 +206,12 @@ abstract interface class ApiAdmin {
   /// Compensações (Termos 8.6). Ver, registrar e avisar: `disputas_decidir`; cancelar:
   /// `compensacoes_cancelar`.
   Future<PaginaRemota<Compensacao>> listarCompensacoes(
-      {String? profissionalId, String? pedidoId, String? status, int deslocamento = 0, int limite = 50});
+      {String? profissionalId,
+      String? pedidoId,
+      String? status,
+      bool revisaoPendente = false,
+      int deslocamento = 0,
+      int limite = 50});
 
   /// `resultado`: `ok` ou `ja_registrada`.
   Future<({String resultado, Compensacao compensacao, bool avisado})> registrarCompensacao(
@@ -180,6 +219,10 @@ abstract interface class ApiAdmin {
   Future<({Compensacao compensacao, bool avisado})> avisarCompensacao(String id);
 
   /// `resultado`: `ok` ou `ja_cancelada`.
+  /// Contestação reduziu a decisão: baixa a dívida sem novo estorno. Mesma permissão do cancelar.
+  Future<({String resultado, int devolvidoCentavos, Compensacao compensacao})> reduzirCompensacao(String id,
+      {required String contestacaoId, required int novoValorCentavos, required String motivo});
+
   Future<({String resultado, int devolvidoCentavos, Compensacao compensacao})> cancelarCompensacao(String id,
       {required String motivo});
 
@@ -261,8 +304,20 @@ abstract interface class ApiAdmin {
   Future<DiagnosticoPedido> diagnosticarPedido(String usuarioId, String pedido);
   Future<DadosPessoais> revelarDadosPessoais(String usuarioId, String motivo);
   /// [motivoUsuario] e [clausulas] vão para a medida criada: é o que o usuário lê (20.4).
-  Future<void> alterarStatusUsuario(String usuarioId,
+  /// Selo do profissional (Termos 10.3). [operacao]: `retirar`, `reconferencia` (pedem
+  /// `selo_retirar`) ou `regularizar` (pede `selo_regularizar`).
+  Future<ResultadoSeloAdmin> mudarSelo(String usuarioId, String operacao,
+      {required String motivo, required String chaveIdempotencia});
+
+  /// Devolve o resumo dos pedidos (vale quando a conta passa a bloqueada); null se não vier.
+  Future<ResumoPedidos?> alterarStatusUsuario(String usuarioId,
       {required String status, required String motivo, String? motivoUsuario, List<String> clausulas = const []});
+
+  /// Inativa conta por falta de uso após aviso prévio de 30 dias (Termos 4.9). Pede `usuarios_status`.
+  Future<UsuarioBusca> inativarUsuario(String usuarioId, {required String motivo});
+
+  /// Reativa conta inativa gratuitamente, sem medida punitiva (Termos 4.9). Pede `usuarios_status`.
+  Future<UsuarioBusca> reativarUsuario(String usuarioId, {required String motivo});
   Future<List<PedidoBusca>> buscarPedidos(String termo);
   /// Fila do atendimento, na ordem do servidor (prazo mais próximo; encerrados no fim).
   /// Ver pede `suporte_ver`; as demais ações, `sac_responder`.
@@ -402,6 +457,31 @@ abstract interface class ApiAdmin {
     required String motivo,
   });
 
+  // Falhas da plataforma (Termos 22.3). Pede `indisponibilidades_gerenciar`. Datas vão em ISO com fuso.
+  Future<PaginaRemota<JanelaIndisponibilidade>> listarIndisponibilidades(
+      {String? origem, bool abertas = false, int deslocamento = 0, int limite = 20});
+
+  /// [repetida]: o servidor respondeu 200 (registro idêntico já existia).
+  Future<({JanelaIndisponibilidade janela, bool repetida})> registrarIndisponibilidade(
+      {required String origem, required String inicioEm, String? fimEm, required String motivo});
+
+  /// [fimEm] nulo = agora.
+  Future<JanelaIndisponibilidade> encerrarIndisponibilidade(String id, {String? fimEm, required String motivo});
+
+  // Fila de check-out sem o Código Final (Termos 5.7, fase 1). Pede `checkout_sem_codigo_tratar`.
+  Future<PaginaRemota<CasoCheckoutSemCodigo>> listarCheckoutSemCodigo({int deslocamento = 0, int limite = 20});
+  Future<CasoCheckoutSemCodigo> registrarContatoCheckoutSemCodigo(
+    String casoId, {
+    required String canal,
+    required String motivo,
+  });
+  Future<ResultadoDecisaoCheckoutSemCodigo> decidirCheckoutSemCodigo(
+    String casoId, {
+    required String decisao,
+    required String motivo,
+    required String chaveIdempotencia,
+  });
+
   // Módulo 5: Gestão de Cupons
   Future<List<CupomAdmin>> listarCupons();
   Future<CupomAdmin> criarCupom({
@@ -424,7 +504,53 @@ abstract interface class ApiAdmin {
   Future<MoedasConfig> carregarMoedasConfig();
 
   /// Grava a configuração. O backend valida, decide e audita; [motivo] é obrigatório.
-  Future<MoedasConfig> salvarMoedasConfig(MoedasConfig config, {required String motivo});
+  Future<MoedasConfig> salvarMoedasConfig(MoedasConfig config, {required String motivo, String? avisoReferencia});
+
+  /// Saldo, pendentes e extrato de Tratinhos de um usuário (Termos I.3, 12.10, 13.9 e I.10).
+  /// Pede `moedas_configurar`.
+  Future<MoedasUsuario> consultarMoedasUsuario(String usuarioId, {int limite = 30});
+
+  /// Concede Tratinhos como compensação (Termos I.3). Pede `moedas_configurar`.
+  Future<ResultadoConcederMoedas> concederMoedasUsuario(
+    String usuarioId, {
+    required String carteira,
+    required int quantidade,
+    int? validadeDias,
+    required String motivo,
+    String? chaveIdempotencia,
+    String? referenciaId,
+  });
+
+  /// Cancela Tratinhos por fraude (Termos 12.10, 13.9 e I.10). Pede `moedas_configurar`.
+  Future<ResultadoCancelarFraudeMoedas> cancelarFraudeMoedasUsuario(
+    String usuarioId, {
+    required String carteira,
+    required int quantidade,
+    required bool cancelarPendentes,
+    required String motivo,
+    String? chaveIdempotencia,
+    String? referenciaId,
+  });
+
+  /// Aviso prévio dos Tratinhos aos usuários (Termos 13.11). Pede `notificacoes_enviar`.
+  Future<ResultadoAvisoPrevio> enviarAvisoTratinhos(
+      {required String referencia,
+      required DateTime vigencia,
+      required String resumo,
+      required String motivo,
+      Map<String, Object> mudancas = const {}});
+
+  /// Aviso de mudança dos Termos (23.2). Pede `notificacoes_enviar`.
+  Future<ResultadoAvisoPrevio> enviarAvisoTermos(
+      {required String referencia,
+      required DateTime vigencia,
+      required String resumo,
+      required String motivo,
+      required String link});
+
+  /// Aviso manual de conta sem uso (4.9): só avisa, não inativa. Pede `notificacoes_enviar`.
+  Future<ResultadoAvisoPrevio> enviarAvisoInatividade(
+      {required String usuarioId, required String referencia, required DateTime vigencia});
 
   // Módulo 6: Equipe Interna
   Future<List<MembroEquipeAdmin>> listarEquipe();

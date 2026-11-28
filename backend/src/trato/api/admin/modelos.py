@@ -131,6 +131,7 @@ class DisputaResumoOut(BaseModel):
     decisao_ate: datetime
     atrasada: bool
     sem_resposta: bool
+    resultado_esperado: str | None = None  # 8.4: o que o cliente pediu ao abrir
     # Caso aberto pela desistência com o serviço iniciado (Termos 7.3): decidir o proporcional.
     desistencia: bool = False
     # Para a lista leve não precisar abrir o detalhe de cada disputa.
@@ -274,6 +275,11 @@ class UsuarioOut(Saida):
     cidade: str | None = None
     # Trava de saque por fraude em vigor (20.6). Null: o seu papel não vê essa informação.
     trava_fraude_vigente: bool | None = None
+    # 20.6: preenchidos só na resposta do bloqueio (POST .../status com `bloqueado`).
+    pedidos_futuros_cancelados: int = 0
+    pedidos_em_andamento: int = 0
+    pedidos_em_andamento_ids: list[str] = []
+    pedidos_futuros_pendentes_ids: list[str] = []
 
 
 class CategoriaProfissionalOut(BaseModel):

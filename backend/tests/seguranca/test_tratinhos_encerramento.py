@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from datetime import timedelta
 
+import pytest
 from ambiente_seg import AGORA, CLIENTE, cab, montar
 
 from trato.api.moedas import (
@@ -197,4 +198,12 @@ def test_degradacao_segura_sem_servico_de_moedas():
 
     quebrado = RepoQuebrado()
     assert saldo_total_disponivel(quebrado, "u-1", AGORA) == 0  # type: ignore[arg-type]
-    assert zerar_tratinhos_encerramento_voluntario(quebrado, "u-1", "ped-1", AGORA) == 0  # type: ignore[arg-type]
+    # A4: falha que não é ausência conferida da estrutura sobe (aborta a exclusão).
+    with pytest.raises(RuntimeError):
+        zerar_tratinhos_encerramento_voluntario(quebrado, "u-1", "ped-1", AGORA)  # type: ignore[arg-type]
+
+    class SemEstrutura(RepoQuebrado):
+        def carteira_disponivel(self, _carteira):
+            return False
+
+    assert zerar_tratinhos_encerramento_voluntario(SemEstrutura(), "u-1", "ped-1", AGORA) == 0  # type: ignore[arg-type]

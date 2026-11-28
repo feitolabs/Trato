@@ -6,9 +6,11 @@ import hashlib
 import json
 from datetime import UTC, datetime
 
+import psycopg
 from psycopg.types.json import Jsonb
 
 from trato.api.repositorios import Contrato
+from trato.disputas.indisponibilidade import estender
 from trato.persistencia.auditoria import registrar_na_transacao
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
@@ -18,6 +20,7 @@ from trato.persistencia.config import (
     versao_vigente,
 )
 from trato.persistencia.erros import Duplicado, NaoEncontrado, RegraDoBanco
+from trato.persistencia.indisponibilidades import IndisponibilidadesPostgres
 
 BPS = 10_000
 
@@ -36,14 +39,27 @@ class ContratosPostgres:
         if achado is None:
             return None
         with self._banco.transacao() as con:
-            linha = con.execute(
-                "select c.pedido_id, c.orcamento_id, c.profissional_id, c.valor_total_centavos, "
-                "c.aceito_em, c.prazo_execucao_dias, c.garantia_dias, "
-                "p.categoria_id from public.contratos c "
-                "join public.pedidos p on p.id = c.pedido_id where c.pedido_id = %s "
-                "and c.status <> 'cancelado'",
-                (achado,),
-            ).fetchone()
+            try:
+                with con.transaction():
+                    linha = con.execute(
+                        "select c.pedido_id, c.orcamento_id, c.profissional_id, "
+                        "c.valor_total_centavos, c.aceito_em, c.prazo_execucao_dias, "
+                        "c.garantia_dias, c.termos_versao, c.regras_aplicadas, p.categoria_id "
+                        "from public.contratos c "
+                        "join public.pedidos p on p.id = c.pedido_id where c.pedido_id = %s "
+                        "and c.status <> 'cancelado'",
+                        (achado,),
+                    ).fetchone()
+            except psycopg.errors.UndefinedColumn:
+                linha = con.execute(
+                    "select c.pedido_id, c.orcamento_id, c.profissional_id, "
+                    "c.valor_total_centavos, c.aceito_em, c.prazo_execucao_dias, "
+                    "c.garantia_dias, c.regras_aplicadas, p.categoria_id "
+                    "from public.contratos c "
+                    "join public.pedidos p on p.id = c.pedido_id where c.pedido_id = %s "
+                    "and c.status <> 'cancelado'",
+                    (achado,),
+                ).fetchone()
         if linha is None:
             return None
         return Contrato(
@@ -55,7 +71,24 @@ class ContratosPostgres:
             aceito_em=linha["aceito_em"],
             prazo_execucao_dias=linha["prazo_execucao_dias"],
             garantia_dias=linha["garantia_dias"],
+            termos_versao=linha.get("termos_versao"),
+            regras=linha["regras_aplicadas"],
         )
+
+    def pode_encerrar_por_pagamento_expirado(self, pedido_id: str) -> bool:
+        """O banco permite um segundo contrato no pedido (20261127004000) e o vigente ainda
+        espera pagamento."""
+        pedido = como_uuid(pedido_id)
+        if pedido is None:
+            return False
+        with self._banco.transacao() as con:
+            linha = con.execute(
+                "select to_regclass('public.contratos_um_vigente_por_pedido_idx') is not null "
+                "and exists (select 1 from public.contratos where pedido_id = %s "
+                "and status = 'aguardando_pagamento') as pode",
+                (pedido,),
+            ).fetchone()
+        return bool(linha["pode"])
 
     def encerrar_por_pagamento_expirado(self, pedido_id: str) -> bool:
         """Termos 5.2 e 6.3: sem pagamento no prazo, o contrato vigente é cancelado e o
@@ -130,7 +163,7 @@ class ContratosPostgres:
 
             orc = con.execute(
                 "select id, profissional_id, status, valor_total_centavos, prazo_execucao_dias, "
-                "garantia_dias, fora_do_escopo, validade_ate from public.orcamentos "
+                "garantia_dias, fora_do_escopo, validade_ate, enviado_em from public.orcamentos "
                 "where id = %s and pedido_id = %s for update",
                 (orcamento, pedido),
             ).fetchone()
@@ -138,7 +171,15 @@ class ContratosPostgres:
                 raise NaoEncontrado("Esse orçamento não existe neste pedido.")
             if orc["status"] != "enviado":
                 raise RegraDoBanco("Só um orçamento enviado pode ser aceito.")
-            if orc["validade_ate"] is not None and orc["validade_ate"] <= aceito_em:
+            validade = orc["validade_ate"]
+            if validade is not None and orc["enviado_em"] is not None and validade <= aceito_em:
+                # 22.3: falha do app ou do pagamento prorroga a validade pelo tempo dela.
+                falhas = [
+                    (j.inicio_em, j.fim_em)
+                    for j in IndisponibilidadesPostgres(self._banco).listar(desde=orc["enviado_em"])
+                ]
+                validade = estender(falhas, orc["enviado_em"], validade, aceito_em)
+            if validade is not None and validade <= aceito_em:
                 raise RegraDoBanco("Este orçamento venceu e não pode ser aceito (Termos 5.2).")
             ped = con.execute(
                 "select cliente_id, titulo, descricao from public.pedidos where id = %s", (pedido,)

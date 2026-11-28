@@ -6,6 +6,7 @@ enum AcaoPerfil {
   enderecos,
   formasPagamento,
   favoritos,
+  avaliacoesRecebidas,
   indiqueEGanhe,
   servicosRecorrentes,
   contatosConfianca,

@@ -71,6 +71,8 @@ def _pedido_aberto(amb, categoria: str):
 
 def _orcar(amb, garantia):
     corpo = {
+        "fora_do_escopo": "Materiais não incluídos.",
+        "prazo_execucao_dias": 3, "validade_ate": "2099-01-01T00:00:00Z", "garantia_dias": 90,
         "itens": [
             {"tipo": "horas", "descricao": "Mão de obra", "quantidade": 1,
              "valor_unitario_centavos": 10_000}
@@ -95,10 +97,19 @@ def test_orcamento_com_garantia_abaixo_do_minimo_da_422(amb, categoria, abaixo, 
     assert _orcar(amb, minimo).status_code == 201
 
 
-def test_orcamento_sem_garantia_informada_e_aceito(amb):
+def test_orcamento_sem_garantia_informada_e_recusado(amb):
     _catalogo(amb)
     _pedido_aberto(amb, "c-pint")
-    assert _orcar(amb, None).status_code == 201
+    corpo = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "itens": [
+            {"tipo": "horas", "descricao": "Mão de obra", "quantidade": 1,
+             "valor_unitario_centavos": 10_000}
+        ],
+    }  # fmt: skip
+    r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=corpo, headers=cab("t-prof"))
+    assert r.status_code == 422 and "garantia_dias" in r.text  # Termos 5.2
 
 
 def test_garantia_aberta_nunca_fica_abaixo_do_piso():

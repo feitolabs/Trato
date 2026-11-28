@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../profissional_apoio/apoio.dart';
 import 'perfil_publico.dart';
@@ -9,9 +10,17 @@ import 'revisao_avaliacao.dart';
 
 /// Lista das avaliações que o profissional recebeu, com filtro rápido por estrelas (Todas, ★ 5 .. ★ 1).
 class AvaliacoesRecebidasTela extends StatefulWidget {
-  const AvaliacoesRecebidasTela({super.key, required this.servico});
+  const AvaliacoesRecebidasTela({
+    super.key,
+    required this.servico,
+    this.textoVazio =
+        'Depois do primeiro serviço concluído, as avaliações dos clientes aparecem aqui.',
+    this.dicaResposta = 'Escreva sua resposta para o cliente',
+  });
 
   final ServicoPerfilPublico servico;
+  final String textoVazio;
+  final String dicaResposta;
 
   @override
   State<AvaliacoesRecebidasTela> createState() => _AvaliacoesRecebidasTelaState();
@@ -81,6 +90,7 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
       context: context,
       isScrollControlled: true,
       builder: (_) => _FolhaRespostaAvaliacao(
+        dica: widget.dicaResposta,
         aoEnviar: (texto) => (servico as RespostaAvaliacao).responderAvaliacao(id, texto),
       ),
     );
@@ -154,7 +164,7 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
       estaVazio: (l) => l.isEmpty,
       iconeVazio: Icons.star_border,
       tituloVazio: 'Nenhuma avaliação ainda',
-      textoVazio: 'Depois do primeiro serviço concluído, as avaliações dos clientes aparecem aqui.',
+      textoVazio: widget.textoVazio,
       construir: (context, lista) {
         final filtradas = _estrelaFiltro == null
             ? lista
@@ -251,9 +261,10 @@ class _AvaliacoesRecebidasTelaState extends State<AvaliacoesRecebidasTela> {
 }
 
 class _FolhaRespostaAvaliacao extends StatefulWidget {
-  const _FolhaRespostaAvaliacao({required this.aoEnviar});
+  const _FolhaRespostaAvaliacao({required this.aoEnviar, required this.dica});
 
   final Future<String?> Function(String texto) aoEnviar;
+  final String dica;
 
   @override
   State<_FolhaRespostaAvaliacao> createState() => _FolhaRespostaAvaliacaoState();
@@ -283,11 +294,11 @@ class _FolhaRespostaAvaliacaoState extends State<_FolhaRespostaAvaliacao> {
     try {
       await widget.aoEnviar(texto);
       if (mounted) Navigator.of(context).pop(true);
-    } on Object {
+    } on Object catch (e) {
       if (mounted) {
         setState(() {
           _enviando = false;
-          _erro = 'Não foi possível enviar agora. Tente de novo.';
+          _erro = e is ErroTrato ? e.mensagem : 'Não foi possível enviar agora. Tente de novo.';
         });
       }
     }
@@ -314,7 +325,7 @@ class _FolhaRespostaAvaliacaoState extends State<_FolhaRespostaAvaliacao> {
               controller: _ctrl,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText: 'Escreva sua resposta para o cliente',
+                hintText: widget.dica,
                 errorText: _erro,
               ),
             ),

@@ -145,6 +145,8 @@ def test_nenhuma_outra_rota_nem_acao_abre(fluxo):
     assert abertas == {
         "GET /v1/pedidos",
         "GET /v1/pedidos/{pedido_id}",
+        # 6.10: acompanhar o que foi pago e devolvido (sem o código de pagamento)
+        "GET /v1/pedidos/{pedido_id}/cobrancas",
         "GET /v1/pedidos/{pedido_id}/disputa",
         "POST /v1/pedidos/{pedido_id}/disputa",
         # 20.10: defender-se no próprio pedido (ausência 7.6 e contestação da decisão 8.7)

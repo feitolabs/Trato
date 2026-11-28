@@ -1,5 +1,5 @@
 /// Termos 1.4: a pessoa consulta o registro do próprio aceite. Só mostra o que o servidor manda
-/// (versão, data e hora); o endereço de IP não vem nessa consulta.
+/// (versão, data, hora e o endereço de IP, quando vier).
 library;
 
 import 'package:flutter/material.dart';
@@ -9,7 +9,10 @@ import '../../tema/tema.dart';
 import '../comuns/formato_aparelho.dart';
 
 class RegistroDoAceite {
-  const RegistroDoAceite({this.versao, this.aceitoEm});
+  const RegistroDoAceite({this.versao, this.aceitoEm, this.ip});
+
+  /// `aceito_ip`: nulo se o servidor não informou.
+  final String? ip;
 
   /// Nula: não há aceite registrado.
   final String? versao;
@@ -23,9 +26,11 @@ class RegistroDoAceite {
     if (versao == null) return const RegistroDoAceite();
     if (versao is! String || versao.trim().isEmpty) return null;
     final quando = json['aceita_em'];
+    final ip = json['aceito_ip'];
     return RegistroDoAceite(
       versao: versao.trim(),
       aceitoEm: quando is String ? DateTime.tryParse(quando) : null,
+      ip: ip is String && ip.trim().isNotEmpty ? ip.trim() : null,
     );
   }
 }
@@ -117,6 +122,8 @@ class _CartaoRegistroDoAceiteState extends State<CartaoRegistroDoAceite> {
                     : 'Aceito em ${_dataEHora(registro.aceitoEm!)}',
                 style: corpo,
               ),
+              if (registro.ip != null)
+                Text('Endereço de IP do aceite: ${registro.ip}', style: corpo),
             ],
           ],
         ),

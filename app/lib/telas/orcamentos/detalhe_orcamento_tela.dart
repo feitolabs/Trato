@@ -1,3 +1,4 @@
+import '../comuns/contagem_avaliacoes.dart';
 import '../cliente/avatar_de_usuario.dart';
 import 'package:flutter/material.dart';
 
@@ -120,6 +121,10 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
     try {
       await widget.aoAceitar?.call(widget.orcamento);
     } on ErroTrato catch (e) {
+      if (ehOrcamentoIncompleto(e)) {
+        if (mounted) setState(() => _recusaDaNegociacao = textoDaRecusa(e, profissional: false));
+        return;
+      }
       if (!ehOrcamentoVencido(e)) rethrow;
       if (mounted) setState(() => _recusaPorValidade = e.mensagem);
     } finally {
@@ -130,10 +135,17 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
   /// Preenchido quando o servidor recusa a ação porque o orçamento venceu.
   String? _recusaPorValidade;
 
+  /// Orçamento antigo incompleto (5.2): o servidor não deixa negociar.
+  String? _recusaDaNegociacao;
+
   Future<void> _contraproposta() async {
     try {
       await widget.aoFazerContraproposta!(widget.orcamento);
     } on ErroTrato catch (e) {
+      if (ehOrcamentoIncompleto(e)) {
+        if (mounted) setState(() => _recusaDaNegociacao = textoDaRecusa(e, profissional: false));
+        return;
+      }
       if (!ehOrcamentoVencido(e)) rethrow;
       if (mounted) setState(() => _recusaPorValidade = e.mensagem);
     }
@@ -185,7 +197,17 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                     carregando: _aceitando,
                     aoTocar: _aceitando ? null : _aceitar,
                   ),
-                  if (widget.aoFazerContraproposta != null)
+                  if (_recusaDaNegociacao != null)
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _recusaDaNegociacao!,
+                        key: const ValueKey('orcamento-incompleto'),
+                        textAlign: TextAlign.center,
+                        style: TipografiaTrato.corpo.copyWith(color: context.cores.vermelhoTexto),
+                      ),
+                    )
+                  else if (widget.aoFazerContraproposta != null)
                     BotaoLink(texto: 'Fazer contraproposta', aoTocar: _contraproposta),
                 ],
                 if (widget.aoRecusar != null)
@@ -220,7 +242,9 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   const SizedBox(height: EspacosTrato.x1),
                   Builder(
                     builder: (_) {
-                      final iniciante = o.servicosConcluidos == 0 && o.notaResumo == semAvaliacoes;
+                      final contagem = o.contagem;
+                      final iniciante = contagem?.novoNoTrato ??
+                          (o.servicosConcluidos == 0 && o.notaResumo == semAvaliacoes);
                       final selo = o.verificacao.isNotEmpty
                           ? o.verificacao
                           : (iniciante ? 'Identidade verificada' : '');
@@ -229,12 +253,17 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                         children: [
                           if (selo.isNotEmpty) SeloVerificacao(selo),
                           Text(
-                            iniciante
-                                ? '${selo.isNotEmpty ? ' · ' : ''}Novo no Trato'
-                                : '${selo.isNotEmpty ? ' · ' : ''}'
-                                    '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
-                                    ' · ${o.servicosConcluidos} '
-                                    '${o.servicosConcluidos == 1 ? 'serviço' : 'serviços'}',
+                            contagem != null
+                                ? '${selo.isNotEmpty ? ' · ' : ''}'
+                                    '${iniciante || o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${o.notaResumo}'}'
+                                    ' · ${textoServicosConcluidos(o.servicosConcluidos)}'
+                                    ' · ${contagem.textoAvaliacoes}'
+                                : iniciante
+                                    ? '${selo.isNotEmpty ? ' · ' : ''}Novo no Trato'
+                                    : '${selo.isNotEmpty ? ' · ' : ''}'
+                                        '${o.notaResumo == semAvaliacoes ? semAvaliacoes : 'Nota ${formatarNota(o.nota)}'}'
+                                        ' · ${o.servicosConcluidos} '
+                                        '${o.servicosConcluidos == 1 ? 'serviço' : 'serviços'}',
                             style: secundario,
                           ),
                         ],
@@ -388,7 +417,8 @@ class _DetalheOrcamentoTelaState extends State<DetalheOrcamentoTela> {
                   padding: const EdgeInsets.only(left: EspacosTrato.x3, top: EspacosTrato.x1),
                   child: Text(
                     'Cancelar antes de o serviço começar não gera cobrança do profissional.',
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                    style:
+                        TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                   ),
                 ),
                 if (_tentou && !_leu)
@@ -429,7 +459,8 @@ class _BlocoRegra extends StatelessWidget {
                 const SizedBox(height: EspacosTrato.x1),
                 Text(
                   texto,
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                  style:
+                      TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
             ),

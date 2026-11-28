@@ -26,7 +26,21 @@ class OpcaoParcelamento:
     parcelas: int
     custo_centavos: int
     total_centavos: int
-    valor_parcela_centavos: int  # a última parcela absorve o resto da divisão
+    valor_parcela_centavos: int  # as primeiras; a última absorve o resto da divisão
+    valores_parcelas_centavos: tuple[int, ...]  # uma por parcela; a soma é o total
+    ultima_parcela_centavos: int
+    # 6.4: o único dado que existe é o custo repassado (percentual ÚNICO sobre a base, não é
+    # taxa ao mês). `sem_juros`: não há custo nenhum nesta opção.
+    custo_total_bps: int
+    diferenca_a_vista_centavos: int
+    sem_juros: bool
+
+
+def dividir_em_parcelas(total_centavos: int, parcelas: int) -> tuple[int, ...]:
+    """Parcelas iguais, com o resto na última: a soma é sempre o total. Regra do Trato: a
+    integração com o provedor ainda não cobra parcelado, então falta confirmar com ele."""
+    base = total_centavos // parcelas
+    return (base,) * (parcelas - 1) + (total_centavos - base * (parcelas - 1),)
 
 
 @dataclass(frozen=True)
@@ -61,7 +75,20 @@ class ConfigParcelamento:
         for parcelas in sorted(self.custo_bps_por_parcelas):
             custo = self.custo_centavos(base_centavos, parcelas)
             total = base_centavos + custo
-            saida.append(OpcaoParcelamento(parcelas, custo, total, total // parcelas))
+            valores = dividir_em_parcelas(total, parcelas)
+            saida.append(
+                OpcaoParcelamento(
+                    parcelas,
+                    custo,
+                    total,
+                    valores[0],
+                    valores,
+                    valores[-1],
+                    self.custo_bps_por_parcelas[parcelas],
+                    custo,
+                    custo == 0,
+                )
+            )
         return saida
 
 

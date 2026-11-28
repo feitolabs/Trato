@@ -24,6 +24,15 @@ class ConsentimentosEmMemoria:
     def historico(self, usuario_id: str) -> Sequence[Consentimento]:
         return tuple(c for c in self._linhas if c.usuario_id == usuario_id)
 
+    def ultimos(self, usuario_ids: Sequence[str], finalidade: str) -> dict[str, bool]:
+        pedidos = set(usuario_ids)
+        achados: dict[str, bool] = {}
+        # Ordenação estável: no mesmo instante vale a linha gravada por último (o "id").
+        for linha in sorted(self._linhas, key=lambda c: c.registrado_em):
+            if linha.finalidade == finalidade and linha.usuario_id in pedidos:
+                achados[linha.usuario_id] = linha.aceito
+        return achados
+
 
 class ExclusoesEmMemoria:
     def __init__(self) -> None:

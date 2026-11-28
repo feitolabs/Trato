@@ -37,6 +37,7 @@ MIGRATIONS = (
     "indicacoes",
     "conta_enderecos_favoritos_contatos",
     "recorrencias",
+    "janelas_indisponibilidade",
     # moedas_tipo_indicacao fica só no bloco abaixo: precisa de moedas_lancamentos.
 )
 
@@ -120,6 +121,9 @@ class BancoLocal:
                 "*termos_v12_cancelamento_ausencia_exclusividade.sql",
                 "*moedas_saldo_e_estorno_validade.sql",
                 "*exclusividade_cliente.sql",
+                # 22.3: recriam funções da exclusividade; vêm depois dela.
+                "*exclusividade_prazo_falha.sql",
+                "*orcamento_validade_falha.sql",
                 "*sac_chamados.sql",
                 "*medidas_conta.sql",
                 "*disputa_contestacoes.sql",
@@ -136,7 +140,27 @@ class BancoLocal:
                 "*retorno_e_impedimento_conta.sql",
                 "*trava_saque_fraude.sql",
                 "*contrato_vigente_por_pedido.sql",
+                # Ordem de docs/ordem-publicacao-banco.md (22 a 28).
+                "*contrato_versao_termos.sql",
+                "*nota_peso_recente.sql",
+                "*acessos_conta.sql",
                 "*tratinhos_guarda_restauracao.sql",
+                "*preservar_registros_incidente.sql",
+                "*bloquear_conta_anonimizada.sql",
+                "*restauracao_so_lotes_do_encerramento.sql",
+                "*aditivo_pago_uma_vez.sql",
+                "*expurgo_serializado.sql",
+                "*trava_fraude_reversao.sql",
+                "*fuso_e_desempate.sql",
+                "*retencao_registros.sql",
+                "*compensacao_reduzir.sql",
+                "*selo_eventos.sql",
+                "*disputa_resultado_esperado.sql",
+                "*checkout_sem_codigo_casos.sql",
+                "*checkout_sem_codigo_fase2.sql",
+                "*disputa_pedidos_informacao.sql",
+                "*pedidos_substituicao_77.sql",
+                "*eventos_forca_maior.sql",
             ):
                 for arquivo in sorted((RAIZ / "supabase" / "migrations").glob(padrao)):
                     if "contrato_vigente" in arquivo.name:

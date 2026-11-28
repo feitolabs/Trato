@@ -86,6 +86,10 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                   style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
                 ),
               ],
+              if (c.incluido.isNotEmpty || c.naoIncluido.isNotEmpty) ...[
+                const SizedBox(height: EspacosTrato.x3),
+                _BlocoEscopoCategoria(incluido: c.incluido, naoIncluido: c.naoIncluido),
+              ],
               const SizedBox(height: EspacosTrato.x4),
               Align(
                 alignment: Alignment.centerLeft,
@@ -166,6 +170,63 @@ class _CategoriaTelaState extends State<CategoriaTela> {
                 aoTocar: () => widget.aoPedirOrcamento!(null),
               ),
             ),
+    );
+  }
+}
+
+/// Termos 3.6: mostra "O que está incluído" e "O que não está incluído" da categoria.
+class _BlocoEscopoCategoria extends StatelessWidget {
+  const _BlocoEscopoCategoria({required this.incluido, required this.naoIncluido});
+
+  final List<String> incluido;
+  final List<String> naoIncluido;
+
+  @override
+  Widget build(BuildContext context) {
+    final cores = context.cores;
+    return Card(
+      key: const ValueKey('categoria-escopo'),
+      margin: EdgeInsets.zero,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 200),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(EspacosTrato.x3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (incluido.isNotEmpty) ...[
+                Text(
+                  'O que está incluído',
+                  key: const ValueKey('categoria-incluido'),
+                  style: TipografiaTrato.corpoForte,
+                ),
+                const SizedBox(height: EspacosTrato.x1),
+                for (final item in incluido)
+                  Text(
+                    '• $item',
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: cores.textoSecundario),
+                  ),
+              ],
+              if (incluido.isNotEmpty && naoIncluido.isNotEmpty)
+                const SizedBox(height: EspacosTrato.x3),
+              if (naoIncluido.isNotEmpty) ...[
+                Text(
+                  'O que não está incluído',
+                  key: const ValueKey('categoria-nao-incluido'),
+                  style: TipografiaTrato.corpoForte,
+                ),
+                const SizedBox(height: EspacosTrato.x1),
+                for (final item in naoIncluido)
+                  Text(
+                    '• $item',
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: cores.textoSecundario),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

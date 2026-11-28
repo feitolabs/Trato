@@ -6,6 +6,19 @@ import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../tema/tema.dart';
 
+/// Todo registro aceito manda um estorno ao cliente, e cancelar não desfaz estorno anterior.
+const kRegistroCriaEstorno = 'Registrar também manda um novo estorno desse valor ao cliente.';
+
+/// O que o servidor faz no 409 `estorno_ja_ordenado` (registro e aprovação de regresso).
+const kRecusaDepoisDoCancelamento = 'Se o pedido já tem compensação cancelada com estorno ordenado ao cliente, o '
+    'servidor recusa novo registro e aprovação de regresso, com qualquer valor, e nada é gravado. O caso vai ao '
+    'financeiro.';
+
+const kUseReduzir = 'Se já existe compensação desta disputa e a decisão reduziu o valor, não registre outra nem '
+    'cancele: confira a revisão pendente na compensação já registrada.';
+
+const kEstornoJaOrdenado = 'Nada foi gravado. Leve o caso ao financeiro (vale também para decisão aumentada).';
+
 /// Registrar uma compensação: preencher, revisar e confirmar. Quem diz o máximo é o backend.
 /// [pedidoId] e [contestacaoId] vêm preenchidos pelo atalho da contestação; o valor, nunca.
 Future<void> abrirRegistroDeCompensacao(BuildContext context, {String? pedidoId, String? contestacaoId}) =>
@@ -51,6 +64,7 @@ class _ModalRegistroState extends State<_ModalRegistro> {
 
   static String _mensagemDeErro(Object e) {
     if (e is! ErroApi) return 'Algo deu errado. Confira a lista antes de repetir.';
+    if (e.codigo == 'estorno_ja_ordenado') return '${e.mensagem} $kEstornoJaOrdenado';
     final maximo = e.maximoCentavos;
     if (e.codigo == 'acima_do_devido' && maximo != null) {
       return '${e.mensagem} O máximo é ${formatarReais(maximo)}.';
@@ -131,7 +145,8 @@ class _ModalRegistroState extends State<_ModalRegistro> {
       child: CorpoModal(
         titulo: _revisando ? 'Confirmar a compensação?' : 'Registrar compensação',
         consequencia: _revisando
-            ? 'O valor passa a ser descontado dos próximos repasses depois que o profissional for avisado.'
+            ? '$kRegistroCriaEstorno O valor passa a ser descontado dos próximos repasses depois que o '
+                'profissional for avisado.'
             : 'Reembolso ao cliente descontado de repasses futuros do profissional (Termos 8.6).',
         filhos: [
           if (_erro != null) ...[
@@ -143,6 +158,12 @@ class _ModalRegistroState extends State<_ModalRegistro> {
             Linha('Origem', contestacao.isEmpty ? 'Decisão original' : 'Contestação $contestacao'),
             Linha('Valor', formatarReais(centavos)),
             Linha('Motivo (o profissional lê)', _motivo.text.trim()),
+            const SizedBox(height: EspacosTrato.x3),
+            if (contestacao.isNotEmpty) ...[
+              const BannerInfo(kUseReduzir, tom: Tom.alerta),
+              const SizedBox(height: EspacosTrato.x3),
+            ],
+            const BannerInfo(kRecusaDepoisDoCancelamento, tom: Tom.alerta),
           ] else ...[
             _campo('Código do pedido', _pedido),
             _campo('Código da contestação (opcional)', _contestacao,

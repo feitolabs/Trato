@@ -55,6 +55,9 @@ class ResumoIndicacoesOut(BaseModel):
     liberadas: int
     limite_mensal: int
     limite_mensal_restante: int
+    validade_dias: int = Field(
+        description="13.3: validade, em dias a partir do crédito, dos Tratinhos de indicação."
+    )
 
 
 class MeuCodigoOut(BaseModel):
@@ -152,6 +155,7 @@ def meu_codigo(
             liberadas=sum(1 for i in lista if i.status == STATUS_LIBERADO),
             limite_mensal=limite,
             limite_mensal_restante=max(limite - usadas, 0),
+            validade_dias=cfg.validade_dias,
         ),
         indicacoes=[_item(contexto, i) for i in lista],
     )

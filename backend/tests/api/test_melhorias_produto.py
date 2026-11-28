@@ -149,6 +149,7 @@ def test_negociacao_de_dias_no_orcamento_contraproposta_e_proposta_do_profission
     criado = amb.cliente.post(
         "/v1/pedidos/ped-1/orcamentos",
         json={
+            "validade_ate": "2099-01-01T00:00:00Z",
             "itens": [
                 {
                     "tipo": "horas",
@@ -158,6 +159,7 @@ def test_negociacao_de_dias_no_orcamento_contraproposta_e_proposta_do_profission
                 }
             ],
             "prazo_execucao_dias": 5,
+            "fora_do_escopo": "Materiais não incluídos.",
             "garantia_dias": 90,
         },
         headers=cab("t-prof"),

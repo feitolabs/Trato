@@ -88,9 +88,19 @@ class AvatarIniciais extends StatelessWidget {
 
 /// Linha "escudo + Verificado Plus" do protótipo.
 class SeloVerificacao extends StatelessWidget {
-  const SeloVerificacao(this.texto, {super.key});
+  const SeloVerificacao(this.texto, {super.key, this.conferidoEm});
 
   final String texto;
+
+  /// Termos 10.2 (`selo_conferido_em`): nula não mostra a data.
+  final DateTime? conferidoEm;
+
+  static String _comData(String texto, DateTime? quando) {
+    if (quando == null) return texto;
+    final d = quando.toLocal();
+    String dois(int n) => n.toString().padLeft(2, '0');
+    return '$texto\nConferido em ${dois(d.day)}/${dois(d.month)}/${d.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +112,7 @@ class SeloVerificacao extends StatelessWidget {
         const SizedBox(width: EspacosTrato.x1),
         Flexible(
           child: Text(
-            texto,
+            _comData(texto, conferidoEm),
             style: TipografiaTrato.corpoPequeno.copyWith(
               color: c.azulTexto,
               fontWeight: FontWeight.w700,

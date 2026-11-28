@@ -21,6 +21,10 @@ import 'dashboard_tela.dart';
 import 'disputas_tela.dart';
 import 'equipe_tela.dart';
 import 'incidentes_tela.dart';
+import 'checkout_sem_codigo_tela.dart';
+import 'faltas_repetidas_tela.dart';
+import 'forca_maior_tela.dart';
+import 'indisponibilidades_tela.dart';
 import 'lgpd_pedidos_tela.dart';
 import 'medidas_tela.dart';
 import 'moedas_tela.dart';
@@ -67,6 +71,12 @@ final List<Secao> todasSecoes = [
       [Permissao.disputasVer], () => const ContestacoesDisputaTela()),
   Secao('ausencias', 'Cliente ausente', IconesTrato.ausencias, GrupoMenu.operacao, [Permissao.disputasVer],
       () => const AusenciasTela()),
+  Secao('faltas_repetidas', 'Faltas repetidas', IconesTrato.faltasRepetidas, GrupoMenu.operacao,
+      [Permissao.disputasVer], () => const FaltasRepetidasTela()),
+  Secao('forca_maior', 'Força maior', IconesTrato.forcaMaior, GrupoMenu.operacao,
+      [Permissao.disputasVer], () => const ForcaMaiorTela()),
+  Secao('checkout_sem_codigo', 'Check-out sem código', IconesTrato.checkoutSemCodigo, GrupoMenu.operacao,
+      [Permissao.checkoutSemCodigoTratar], () => const CheckoutSemCodigoTela()),
   Secao(
     'busca',
     'Busca e suporte',
@@ -85,6 +95,8 @@ final List<Secao> todasSecoes = [
       [Permissao.contaRetornoAnalisar], () => const RetornoContaTela()),
   Secao('incidentes', 'Incidentes de segurança', IconesTrato.incidentes, GrupoMenu.operacao,
       [Permissao.incidentesVer], () => const IncidentesTela()),
+  Secao('indisponibilidades', 'Falhas da plataforma', IconesTrato.indisponibilidades, GrupoMenu.operacao,
+      [Permissao.indisponibilidadesGerenciar], () => const IndisponibilidadesTela()),
   Secao('avaliacoes', 'Avaliações', IconesTrato.avaliacoes, GrupoMenu.operacao,
       [Permissao.avaliacoesModerar], () => const AvaliacoesTela()),
   Secao('lgpd', 'Pedidos LGPD', IconesTrato.lgpd, GrupoMenu.administracao,

@@ -157,7 +157,9 @@ _MOTIVO_PARA_BANCO = {Motivo.DIFERENTE_DO_COMBINADO: "diferente_combinado"}
 _MOTIVO_DO_BANCO = {v: k for k, v in _MOTIVO_PARA_BANCO.items()}
 _SELECT_DISPUTA = (
     "select id, motivo, status, valor_congelado_centavos, resposta_ate, decisao_ate, decisao, "
-    "valor_reembolso_centavos, decidida_por, aprovada_por, aberta_em, decidida_em "
+    "valor_reembolso_centavos, decidida_por, aprovada_por, aberta_em, decidida_em, "
+    # via jsonb: a leitura funciona antes da coluna existir (20261127223100)
+    "to_jsonb(disputas) ->> 'resultado_esperado' as resultado_esperado "
     "from public.disputas where pedido_id = %s order by aberta_em desc, id limit 1"
 )
 
@@ -251,6 +253,7 @@ class DisputasPostgres:
             decidido_por=str(linha["decidida_por"]) if linha["decidida_por"] else None,
             decidido_em=linha["decidida_em"],
             aprovado_por=str(linha["aprovada_por"]) if linha["aprovada_por"] else None,
+            resultado_esperado=linha.get("resultado_esperado"),
             # O banco não guarda a hora da aprovação à parte: vale a da decisão registrada.
             aprovado_em=linha["decidida_em"] if linha["aprovada_por"] else None,
             divisao=dividir_valor(congelado, decisao)
@@ -326,13 +329,15 @@ class DisputasPostgres:
                 "select d.id, d.pedido_id, d.motivo, d.status, d.valor_congelado_centavos, "
                 "d.resposta_ate, d.decisao_ate, d.decisao, d.valor_reembolso_centavos, "
                 "d.decidida_por, d.aprovada_por, d.aberta_em, d.decidida_em, "
+                "to_jsonb(d) ->> 'resultado_esperado' as resultado_esperado, "
                 "min(e.criado_em) as respondeu_em "
                 "from public.disputas d "
                 "left join public.disputa_evidencias e "
                 "  on e.disputa_id = d.id and e.tipo = 'resposta' "
                 "group by d.id, d.pedido_id, d.motivo, d.status, d.valor_congelado_centavos, "
                 "d.resposta_ate, d.decisao_ate, d.decisao, d.valor_reembolso_centavos, "
-                "d.decidida_por, d.aprovada_por, d.aberta_em, d.decidida_em "
+                "d.decidida_por, d.aprovada_por, d.aberta_em, d.decidida_em, "
+                "to_jsonb(d) ->> 'resultado_esperado' "
                 "order by d.aberta_em desc"
             ).fetchall()
             return [
@@ -386,12 +391,25 @@ class DisputasPostgres:
             descricao = (
                 _historico(con, pid, "abrir_disputa", "descricao") or "Disputa aberta pelo cliente."
             )
-            con.execute(
-                "insert into public.disputas (contrato_id, pedido_id, aberta_por, motivo, "
+            extra_coluna, extra_marca, extra_valor = "", "", ()
+            # 8.4: só na abertura, e só se a coluna existir (consultar antes: um erro no INSERT
+            # abortaria a abertura inteira).
+            if disputa.resultado_esperado is not None and con.execute(
+                "select exists (select 1 from information_schema.columns where "
+                "table_schema = 'public' and table_name = 'disputas' "
+                "and column_name = 'resultado_esperado') as tem"
+            ).fetchone()["tem"]:
+                extra_coluna, extra_marca = ", resultado_esperado", ", %s"
+                extra_valor = (disputa.resultado_esperado,)
+            con.execute(  # só o nome fixo da coluna opcional entra no SQL
+                "insert into public.disputas "  # noqa: S608
+                "(contrato_id, pedido_id, aberta_por, motivo, "
                 "descricao, valor_congelado_centavos, aberta_em, status, decisao, "
                 "valor_reembolso_centavos, decidida_por, aprovada_por, justificativa, "
-                "decidida_em, resposta_ate, decisao_ate) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "decidida_em, resposta_ate, decisao_ate"
+                f"{extra_coluna}) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
+                f"{extra_marca})",
                 (
                     contrato["id"],
                     pid,
@@ -401,6 +419,7 @@ class DisputasPostgres:
                     disputa.valor_congelado,
                     disputa.aberta_em,
                     *campos,
+                    *extra_valor,
                 ),
             )
 
@@ -640,18 +659,26 @@ class AvaliacoesPostgres:
         return [self._de_linha(l) for l in linhas]  # noqa: E741
 
     def media_recebida(self, avaliado_id: str) -> float | None:
-        """Média das avaliações PUBLICADAS de clientes para este profissional, 2 casas."""
+        """Nota pública (12.3): usa `nota_publica_profissional` (061100); cai na média simples
+        se a função ainda não existir no banco."""
         uid = como_uuid(avaliado_id)
         if uid is None:
             return None
         with self._banco.transacao() as con:
-            l = con.execute(  # noqa: E741
-                "select round(avg(coalesce(nota_decimal, nota_geral::numeric)), 2) as media "
-                "from public.avaliacoes "
-                "where avaliado_id = %s and direcao = 'cliente_para_profissional' "
-                "and status = 'publicada'",
-                (uid,),
-            ).fetchone()
+            try:
+                with con.transaction():
+                    l = con.execute(  # noqa: E741
+                        "select public.nota_publica_profissional(%s) as media",
+                        (uid,),
+                    ).fetchone()
+            except psycopg.errors.UndefinedFunction:
+                l = con.execute(  # noqa: E741
+                    "select round(avg(coalesce(nota_decimal, nota_geral::numeric)), 2) as media "
+                    "from public.avaliacoes "
+                    "where avaliado_id = %s and direcao = 'cliente_para_profissional' "
+                    "and status = 'publicada'",
+                    (uid,),
+                ).fetchone()
         return float(l["media"]) if l and l["media"] is not None else None
 
     def salvar(self, avaliacao: Avaliacao) -> None:

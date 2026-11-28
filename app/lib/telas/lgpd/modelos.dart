@@ -201,7 +201,7 @@ const consentimentosPadrao = [
   Consentimento(
     id: 'avisos',
     titulo: 'Avisos e novidades',
-    descricao: 'Mensagens sobre novidades do Trato, por push ou WhatsApp.',
+    descricao: 'Mensagens sobre novidades do Trato, por notificação no celular.',
     ativo: false,
   ),
 ];

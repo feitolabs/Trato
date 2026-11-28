@@ -8,17 +8,21 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timedelta
+from functools import partial
 
 from pydantic import BaseModel, Field
 
 from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto
+from trato.api.indisponibilidade import APP, prazo_vigente
 from trato.api.moedas import restaurar_tratinhos
+from trato.api.pedidos_conta import TIPOS_QUE_CANCELAM, tratar_pedidos
 from trato.disputas.prazos import adicionar_dias_uteis
 from trato.financeiro import periodo
 from trato.notificacoes.eventos import Evento
 from trato.persistencia.medidas import (
     GRAVIDADE,
+    JANELA_DE_FIM,
     STATUS_IMPOSTO,
     ContestacaoMedida,
     Medida,
@@ -29,6 +33,8 @@ GUARDA_TRATINHOS_DIAS = 90
 DIAS_PARA_CONTESTAR = 30
 DIAS_UTEIS_PARA_RESPONDER = 10
 HORAS_AUTOMATICA = 72
+# 20.8: "pelo menos 30 dias"; a configuração só pode aumentar.
+AVISO_ENCERRAMENTO_MINIMO_DIAS = 30
 EFEITO_PADRAO = (
     "Pedidos e valores em andamento seguem a cláusula 20.6; o que é devido continua sendo pago."
 )
@@ -91,6 +97,11 @@ def motivo_para_o_usuario(m: Medida) -> str:
     )
 
 
+def contestavel_ate(contexto: Contexto, m: Medida) -> datetime | None:
+    """22.3: falha do app prorroga o prazo para contestar."""
+    return prazo_vigente(contexto, APP, m.avisado_em, m.contestavel_ate)
+
+
 def saida(contexto: Contexto, m: Medida) -> MedidaOut:
     c = contexto.medidas.contestacao(m.id or "")
     return MedidaOut(
@@ -107,7 +118,7 @@ def saida(contexto: Contexto, m: Medida) -> MedidaOut:
         vigente=m.vigente(contexto.agora()),
         revertida_em=m.revertida_em,
         avisado_em=m.avisado_em,
-        contestavel_ate=m.contestavel_ate,
+        contestavel_ate=contestavel_ate(contexto, m),
         contestacao=ContestacaoMedidaOut(
             **{n: getattr(c, n) for n in ContestacaoMedidaOut.model_fields if n != "anexos"},
             anexos=[
@@ -173,10 +184,26 @@ def _devolver_conta(contexto: Contexto, m: Medida, agora: datetime | None = None
     return contexto.medidas.definir_status(m.usuario_id, (imposto,), devido)
 
 
+def aviso_de_encerramento_dias(contexto: Contexto) -> int:
+    publicado = contexto.config.parametro_inteiro("aviso_previo_encerramento_dias")
+    return max(AVISO_ENCERRAMENTO_MINIMO_DIAS, publicado or 0)
+
+
+def agendada(m: Medida) -> bool:
+    """Avisada antes de começar (20.8): só o encerramento sem falta nasce assim."""
+    return m.avisado_em is not None and m.inicio_em > m.avisado_em
+
+
 def aplicar(contexto: Contexto, medida: Medida) -> tuple[Medida, bool]:
-    """Grava a medida, ajusta a conta e avisa por app e e-mail (depois do commit)."""
+    """Grava a medida, ajusta a conta e avisa por app e e-mail (depois do commit).
+
+    Encerramento sem falta (20.8): `inicio_em` recebido é o momento do aviso; a medida só começa
+    depois do prazo, e até lá a conta segue como estava."""
     with contexto.transacao():
         agora = medida.inicio_em
+        if medida.tipo == "encerramento" and medida.sem_falta is True:
+            dias = aviso_de_encerramento_dias(contexto)
+            medida = replace(medida, inicio_em=agora + timedelta(days=dias))
         nova, criada = contexto.medidas.criar(
             replace(
                 medida,
@@ -187,7 +214,8 @@ def aplicar(contexto: Contexto, medida: Medida) -> tuple[Medida, bool]:
         if not criada:
             return nova, False
         imposto = STATUS_IMPOSTO.get(nova.tipo)
-        if imposto is not None:
+        futura = nova.inicio_em > agora
+        if imposto is not None and not futura:
             menores = [s for s, g in GRAVIDADE.items() if g < GRAVIDADE[imposto]]
             contexto.medidas.definir_status(nova.usuario_id, menores, imposto)
         ate = f" até {_data(nova.fim_em)}" if nova.fim_em else ", sem data final definida"
@@ -196,10 +224,14 @@ def aplicar(contexto: Contexto, medida: Medida) -> tuple[Medida, bool]:
             nova,
             Evento.MEDIDA_APLICADA,
             "aplicada",
-            f"Medida: {_NOMES[nova.tipo]}, desde {_data(nova.inicio_em)}{ate}. "
-            f"Motivo: {motivo_para_o_usuario(nova)} Cláusulas: {', '.join(nova.clausulas)}. "
+            f"Medida: {_NOMES[nova.tipo]}, {'a partir de' if futura else 'desde'} "
+            f"{_data(nova.inicio_em)}{ate}. "
+            + ("Até essa data a conta continua funcionando. " if futura else "")
+            + f"Motivo: {motivo_para_o_usuario(nova)} Cláusulas: {', '.join(nova.clausulas)}. "
             f"{nova.efeito} {nova.como_contestar}",
         )
+        if nova.tipo in TIPOS_QUE_CANCELAM and not futura:  # 20.6: com a medida já gravada
+            contexto.depois_do_commit(partial(tratar_pedidos, contexto, nova.usuario_id))
     return nova, True
 
 
@@ -237,9 +269,10 @@ def reverter(contexto: Contexto, medida: Medida, analista_id: str) -> bool:
             medida.id or "", {"revertida_em": contexto.agora(), "revertida_por": analista_id}
         ):
             return False
-        _devolver_conta(contexto, medida)
-        if medida.tipo == "encerramento":  # desfeito: devolve em qualquer data (13.10)
-            _restaurar_tratinhos(contexto, medida)
+        if medida.inicio_em <= contexto.agora():  # ainda não começou: nada a desfazer
+            _devolver_conta(contexto, medida)
+            if medida.tipo == "encerramento":  # desfeito: devolve em qualquer data (13.10)
+                _restaurar_tratinhos(contexto, medida)
         _avisar(
             contexto,
             medida,
@@ -263,7 +296,13 @@ def _restaurar_tratinhos(contexto: Contexto, medida: Medida) -> int:
             if r.status == "aprovado"
         }
     atual = _sem_hifens(medida.id)
-    if any(o.revertida_em is None and _sem_hifens(o.id) not in {atual, *aprovados} for o in outros):
+    agora = contexto.agora()
+    if any(
+        o.revertida_em is None
+        and o.inicio_em <= agora  # o que só está avisado ainda não encerrou nada
+        and _sem_hifens(o.id) not in {atual, *aprovados}
+        for o in outros
+    ):
         return 0
     return restaurar_tratinhos(
         contexto.moedas, medida.id or "", medida.usuario_id, medida.inicio_em, contexto.agora()
@@ -312,6 +351,40 @@ def encerrar_vencidas(contexto: Contexto, agora: datetime) -> int:
                     f"O prazo da medida ({_NOMES[medida.tipo]}) terminou.",
                 )
     return devolvidas
+
+
+def iniciar_agendadas(contexto: Contexto, agora: datetime) -> int:
+    """Agendador (20.8): chegou o dia do encerramento avisado, a conta é bloqueada. Só olha o
+    que começou há pouco, para não bloquear de novo quem voltou depois. Repetir não faz nada.
+
+    20.6: também trata os pedidos futuros das suspensões e encerramentos em vigor há pouco
+    (os que começam agora e os que falharam na hora de aplicar)."""
+    bloqueadas = 0
+    for tipo in TIPOS_QUE_CANCELAM:
+        deslocamento = 0
+        while True:
+            medidas, total = contexto.medidas.listar(
+                tipo=tipo, vigentes_em=agora, limite=500, deslocamento=deslocamento
+            )
+            for medida in medidas:
+                if agora - medida.inicio_em > JANELA_DE_FIM:
+                    continue
+                with contexto.transacao():
+                    atual = contexto.medidas.obter(medida.id or "")  # pode ter sido revertida
+                    if atual is None or not atual.vigente(agora):
+                        continue
+                    if tipo == "encerramento" and agendada(atual):
+                        bloqueadas += contexto.medidas.definir_status(
+                            atual.usuario_id, ("ativo", "restrito"), "bloqueado"
+                        )
+                    if contexto.medidas.conta_bloqueada_travada(atual.usuario_id):
+                        contexto.depois_do_commit(
+                            partial(tratar_pedidos, contexto, atual.usuario_id)
+                        )
+            deslocamento += len(medidas)
+            if not medidas or deslocamento >= total:
+                break
+    return bloqueadas
 
 
 def contestar(

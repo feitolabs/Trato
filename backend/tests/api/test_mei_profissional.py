@@ -23,6 +23,8 @@ from trato.profissional.mei import (
 CNPJ_OK = "11222333000181"  # dígitos verificadores corretos (exemplo de teste)
 CNPJ_DV_ERRADO = "11222333000182"
 ORCAMENTO = {
+    "prazo_execucao_dias": 3,
+    "validade_ate": "2099-01-01T00:00:00Z",
     "itens": [
         {
             "tipo": "horas",
@@ -31,6 +33,7 @@ ORCAMENTO = {
             "valor_unitario_centavos": 5000,
         }
     ],
+    "fora_do_escopo": "Materiais não incluídos.",
     "garantia_dias": 90,
 }
 

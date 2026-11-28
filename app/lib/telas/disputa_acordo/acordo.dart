@@ -4,6 +4,7 @@ library;
 
 import '../../dados/cliente_api.dart';
 import '../../dados/erros.dart';
+import '../comuns/resultado_esperado.dart';
 
 int? _centavos(Object? v) => v is int && v >= 0 ? v : null;
 
@@ -40,7 +41,10 @@ class AcordoDisputa {
 }
 
 class SituacaoDisputa {
-  const SituacaoDisputa({this.estado, this.proposta, this.acordo});
+  const SituacaoDisputa({this.estado, this.proposta, this.acordo, this.pedidoDoCliente});
+
+  /// Termos 8.4: o texto do que o cliente pediu. Nulo: não informado.
+  final String? pedidoDoCliente;
 
   final String? estado;
 
@@ -58,6 +62,7 @@ class SituacaoDisputa {
         estado: j['estado'] is String ? j['estado'] as String : null,
         proposta: PropostaDisputa.deJson(j['proposta']),
         acordo: AcordoDisputa.deJson(j['acordo']),
+        pedidoDoCliente: separarRelato(j['descricao'], j['resultado_esperado']).pedido,
       );
 }
 

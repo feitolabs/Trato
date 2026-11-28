@@ -42,11 +42,20 @@ class Evento(StrEnum):
     SAC_ABERTO = "suporte.chamado_aberto"
     COMPENSACAO_REGISTRADA = "pagamento.compensacao_registrada"
     COMPENSACAO_CANCELADA = "pagamento.compensacao_cancelada"
+    COMPENSACAO_REDUZIDA = "pagamento.compensacao_reduzida"
     INCIDENTE_CAUTELA_ATRASADA = "seguranca.cautela_atrasada"  # 9.6, para a equipe
     AVISO_MUDANCA_TERMOS = "conta.mudanca_termos"  # 23.2
+    TERMOS_ACEITOS = "conta.termos_aceitos"  # 1.5: cópia dos Termos por e-mail
     AVISO_MUDANCA_TRATINHOS = "conta.mudanca_tratinhos"  # 13.11 e I.12
     AVISO_INATIVACAO = "conta.inativacao_prevista"  # 4.9
+    INCIDENTE_SINAL_FRAUDE = "seguranca.sinal_antifraude"  # 9.5, para a equipe
     PEDIDO_CANCELADO_SEGURANCA = "pagamento.cancelado_seguranca"  # 9.5
+    PEDIDO_CANCELADO_CONTA = "pagamento.cancelado_medida_conta"  # 20.6
+    CHECKOUT_SEM_CODIGO = "pagamento.checkout_sem_codigo"  # 5.7
+    SERIE_PAUSADA_CONTA = "pagamento.serie_pausada_medida_conta"  # 20.6
+    SELO_RETIRADO = "conta.selo_retirado"  # 10.3
+    SELO_RECONFERENCIA = "conta.selo_reconferencia"
+    SELO_REGULARIZADO = "conta.selo_regularizado"
     MEDIDA_APLICADA = "conta.medida_aplicada"
     MEDIDA_ENCERRADA = "conta.medida_encerrada"
     SAC_RESPOSTA = "suporte.chamado_resposta"
@@ -78,11 +87,15 @@ class Evento(StrEnum):
     DISPUTA_ABERTA = "disputa.aberta"
     DISPUTA_RESPONDIDA = "disputa.respondida"
     DISPUTA_DECIDIDA = "disputa.decidida"
+    DISPUTA_PEDIDO_INFORMACAO = "disputa.pedido_informacao"
     DISPUTA_CONTESTADA = "disputa.contestada"
     DISPUTA_CONTESTACAO_DECIDIDA = "disputa.contestacao_decidida"
     LEMBRETE_RESPOSTA_DISPUTA = "disputa.lembrete_resposta"
     RETRABALHO = "garantia.retrabalho"
     AVALIACAO = "avaliacao.recebida"
+    AVALIACAO_OCULTADA = "conta.avaliacao_ocultada"  # 11.8, para o autor
+    JANELA_ENCERRADA = "execucao.janela_encerrada"  # 15.3, conclusão por prazo
+    TRATINHOS_VENCENDO = "pagamento.tratinhos_vencendo"  # 13.4 e I.5
     MENSAGEM_NOVA = "mensagem.nova"
     EXCLUSIVIDADE_OFERTA = "exclusividade.oferta"
     EXCLUSIVIDADE_ACEITA = "exclusividade.aceita"
@@ -186,6 +199,27 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "pedido",
         essencial=True,
     ),
+    Evento.SELO_RETIRADO: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Selo de verificação retirado",
+        "O seu selo foi retirado até a regularização. Veja o motivo e como contestar.",
+        "perfil",
+        essencial=True,
+    ),
+    Evento.SELO_RECONFERENCIA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Nova conferência de identidade",
+        "O Trato pediu uma nova conferência da sua identidade.",
+        "perfil",
+        essencial=True,
+    ),
+    Evento.SELO_REGULARIZADO: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Selo regularizado",
+        "O seu selo de verificação foi regularizado.",
+        "perfil",
+        essencial=True,
+    ),
     Evento.MEDIDA_APLICADA: ModeloEvento(
         Categoria.DISPUTAS,
         "Medida na sua conta",
@@ -200,10 +234,47 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "medidas",
         essencial=True,
     ),
+    Evento.TERMOS_ACEITOS: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Cópia dos Termos de Uso aceitos",
+        "Seu aceite dos Termos de Uso do Trato foi registrado.",
+        "termos",
+        essencial=True,
+        email_obrigatorio=True,
+    ),
+    Evento.AVALIACAO_OCULTADA: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Sua avaliação foi ocultada",
+        "Uma avaliação que você escreveu foi ocultada. Veja o motivo e como contestar.",
+        "pedido",
+        essencial=True,
+        email_obrigatorio=True,
+    ),
+    Evento.JANELA_ENCERRADA: ModeloEvento(
+        Categoria.EXECUCAO,
+        "Prazo de confirmação encerrado",
+        "O prazo de confirmação terminou e o serviço foi concluído. Veja no pedido.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.TRATINHOS_VENCENDO: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Tratinhos perto de vencer",
+        "Você tem Tratinhos perto de vencer. Veja o saldo no aplicativo.",
+        "notificacoes",
+        essencial=True,
+    ),
     Evento.COMPENSACAO_REGISTRADA: ModeloEvento(
         Categoria.PAGAMENTOS,
         "Desconto em repasses futuros",
         "Um reembolso decidido será descontado dos próximos repasses. Veja o motivo.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.COMPENSACAO_REDUZIDA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Compensação reduzida",
+        "O valor a descontar diminuiu. Veja no aplicativo.",
         "pedido",
         essencial=True,
     ),
@@ -255,6 +326,37 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "pedido",
         essencial=True,
     ),
+    Evento.CHECKOUT_SEM_CODIGO: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Confirme o serviço ou relate um problema",
+        "O profissional encerrou o serviço sem o seu Código Final. Confirme ou relate um "
+        "problema no pedido.",
+        "pedido",
+        essencial=True,
+        email_obrigatorio=True,
+    ),
+    Evento.PEDIDO_CANCELADO_CONTA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Pedido cancelado",
+        "O pedido foi cancelado porque a conta da outra parte foi suspensa ou encerrada.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.SERIE_PAUSADA_CONTA: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Serviço recorrente pausado",
+        "O serviço recorrente foi pausado porque a conta da outra parte foi suspensa ou "
+        "encerrada.",
+        "pedido",
+        essencial=True,
+    ),
+    Evento.INCIDENTE_SINAL_FRAUDE: ModeloEvento(
+        Categoria.PAGAMENTOS,
+        "Relato de segurança com sinal",
+        "Um relato de segurança tem sinal para conferir no painel.",
+        "pedido",
+        essencial=True,
+    ),
     Evento.INCIDENTE_CAUTELA_ATRASADA: ModeloEvento(
         Categoria.PAGAMENTOS,
         "Incidente sem cautela no prazo",
@@ -276,7 +378,7 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "Veja o que muda no programa.",
         "notificacoes",
         essencial=True,
-        somente_app=True,
+        email_obrigatorio=True,  # 13.11 pede o app; 15.2 (aviso que afeta direitos) pede e-mail
     ),
     Evento.AVISO_INATIVACAO: ModeloEvento(
         Categoria.PAGAMENTOS,
@@ -465,6 +567,14 @@ MODELOS: dict[Evento, ModeloEvento] = {
         "A outra parte respondeu à reclamação.",
         "disputa",
         essencial=True,
+    ),
+    Evento.DISPUTA_PEDIDO_INFORMACAO: ModeloEvento(
+        Categoria.DISPUTAS,
+        "Pedido de informação na disputa",
+        "A equipe do Trato pediu informações adicionais na disputa do seu pedido.",
+        "disputa",
+        essencial=True,
+        email_obrigatorio=True,
     ),
     Evento.DISPUTA_DECIDIDA: ModeloEvento(
         Categoria.DISPUTAS,

@@ -188,8 +188,17 @@ class DivisaoDisputa {
   final int retidoCentavos;
 }
 
+/// Resposta de uma ação sobre o selo do profissional (Termos 10.3).
+class ResultadoSeloAdmin {
+  const ResultadoSeloAdmin({required this.jaExistia, required this.nivelVerificacao, required this.retiradaAberta});
+  final bool jaExistia;
+  final String nivelVerificacao;
+  final bool retiradaAberta;
+}
+
 class Disputa {
   const Disputa({
+    this.resultadoEsperado,
     required this.id,
     required this.pedido,
     required this.cliente,
@@ -213,6 +222,10 @@ class Disputa {
     this.responsavelNome,
     this.desistencia = false,
   });
+
+  /// O que o cliente pediu ao abrir (Termos 8.4): `retrabalho`, `reembolso_parcial` ou
+  /// `reembolso_total`. Null = não informado.
+  final String? resultadoEsperado;
 
   final String id;
 
@@ -280,6 +293,7 @@ class Disputa {
         responsavelId: novo.encerrada ? null : responsavelId,
         responsavelNome: novo.encerrada ? null : responsavelNome,
         desistencia: desistencia,
+        resultadoEsperado: resultadoEsperado,
       );
 
   Disputa assumidaPor(String id, String nome) => Disputa(
@@ -305,6 +319,7 @@ class Disputa {
         responsavelId: id,
         responsavelNome: nome,
         desistencia: desistencia,
+        resultadoEsperado: resultadoEsperado,
       );
 }
 
@@ -446,9 +461,192 @@ class ConversaLida {
   final List<MensagemLida> mensagens;
 }
 
+/// O que aconteceu com os pedidos da conta suspensa, encerrada ou bloqueada (Termos 20.6).
+class ResumoPedidos {
+  const ResumoPedidos({
+    this.futurosCancelados = 0,
+    this.emAndamento = 0,
+    this.emAndamentoIds = const [],
+    this.futurosPendentesIds = const [],
+  });
+  final int futurosCancelados;
+  final int emAndamento;
+  final List<String> emAndamentoIds;
+
+  /// Futuros que o servidor não cancelou.
+  final List<String> futurosPendentesIds;
+}
+
+/// Falha da plataforma que pode adiar prazos (Termos 22.3). [origem]: `app` ou `pagamento`.
+class JanelaIndisponibilidade {
+  const JanelaIndisponibilidade({
+    required this.id,
+    required this.origem,
+    required this.inicioEm,
+    required this.ativa,
+    required this.motivo,
+    required this.criadaPor,
+    this.fimEm,
+    this.encerradaPor,
+  });
+  final String id;
+  final String origem;
+  final DateTime inicioEm;
+  final DateTime? fimEm;
+  final bool ativa;
+  final String motivo;
+  final String criadaPor;
+  final String? encerradaPor;
+}
+
+/// Caso aberto de check-out sem o Código Final (Termos 5.7, fase 1).
+/// Nenhum campo daqui libera ou estorna dinheiro.
+class CasoCheckoutSemCodigo {
+  const CasoCheckoutSemCodigo({
+    required this.id,
+    required this.pedidoId,
+    required this.clienteId,
+    this.profissionalId,
+    required this.checkOutEm,
+    this.contatadoEm,
+    this.canal,
+    this.responderAte,
+    this.vencido = false,
+  });
+
+  final String id;
+  final String pedidoId;
+  final String clienteId;
+  final String? profissionalId;
+  final DateTime checkOutEm;
+  final DateTime? contatadoEm;
+  final String? canal;
+  final DateTime? responderAte;
+  final bool vencido;
+
+  bool get semContato => contatadoEm == null;
+}
+
+/// Retorno da decisão administrativa no check-out sem Código Final (Termos 5.7, fase 2).
+class ResultadoDecisaoCheckoutSemCodigo {
+  const ResultadoDecisaoCheckoutSemCodigo({
+    required this.id,
+    required this.pedidoId,
+    required this.estadoPedido,
+    required this.decisao,
+    required this.analistaId,
+    required this.justificativa,
+    required this.decididoEm,
+    required this.chaveIdempotencia,
+    this.idempotente = false,
+  });
+
+  final String id;
+  final String pedidoId;
+  final String estadoPedido;
+  final String decisao;
+  final String analistaId;
+  final String justificativa;
+  final DateTime decididoEm;
+  final String chaveIdempotencia;
+  final bool idempotente;
+}
+
+/// Pedido de informação adicional em uma disputa (Termos 8.4).
+class PedidoInfoDisputa {
+  const PedidoInfoDisputa({
+    required this.id,
+    required this.disputaId,
+    required this.pedidoId,
+    required this.solicitanteId,
+    required this.destinatarioPapel,
+    required this.mensagem,
+    required this.solicitadoEm,
+    required this.responderAte,
+    required this.status,
+    this.respondidoEm,
+    this.respostaTexto,
+    this.encerradoSemRespostaEm,
+  });
+
+  final String id;
+  final String disputaId;
+  final String pedidoId;
+  final String solicitanteId;
+
+  /// `cliente` ou `profissional`.
+  final String destinatarioPapel;
+  final String mensagem;
+  final DateTime solicitadoEm;
+  final DateTime responderAte;
+  final DateTime? respondidoEm;
+  final String? respostaTexto;
+  final DateTime? encerradoSemRespostaEm;
+
+  /// `aguardando_resposta`, `vencido`, `respondido` ou `encerrado_sem_resposta`.
+  final String status;
+}
+
+/// Profissional com faltas ou cancelamentos repetidos no período (Termos 7.7).
+class FaltaRepetidaProfissional {
+  const FaltaRepetidaProfissional({
+    required this.profissionalId,
+    required this.totalCancelamentos,
+    required this.ultimoCancelamentoEm,
+    required this.periodoDias,
+  });
+
+  final String profissionalId;
+  final int totalCancelamentos;
+  final DateTime ultimoCancelamentoEm;
+  final int periodoDias;
+}
+
+/// Solicitação de isenção por evento externo / força maior (Termos 7.8 e 22.6).
+class EventoForcaMaior {
+  const EventoForcaMaior({
+    required this.id,
+    required this.pedidoId,
+    required this.solicitanteId,
+    required this.solicitantePapel,
+    required this.acaoSolicitada,
+    required this.descricao,
+    this.comprovantes = const [],
+    required this.status,
+    this.criadoEm,
+    this.analistaId,
+    this.justificativaDecisao,
+    this.decididoEm,
+    this.chaveIdempotencia,
+    this.idempotente = false,
+  });
+
+  final String id;
+  final String pedidoId;
+  final String solicitanteId;
+
+  /// `cliente` ou `profissional`.
+  final String solicitantePapel;
+
+  /// `reagendar` ou `cancelar`.
+  final String acaoSolicitada;
+  final String descricao;
+  final List<String> comprovantes;
+
+  /// `pendente`, `aprovado` ou `recusado`.
+  final String status;
+  final DateTime? criadoEm;
+  final String? analistaId;
+  final String? justificativaDecisao;
+  final DateTime? decididoEm;
+  final String? chaveIdempotencia;
+  final bool idempotente;
+}
+
 /// Medida de conta (Termos 20), como o backend manda.
 class Medida {
   const Medida({
+    this.avisadoEm,
     this.semFalta,
     this.motivoFraude = false,
     this.limiteRetencaoCentavos,
@@ -477,10 +675,26 @@ class Medida {
     this.contestacaoAnalistaNome,
     this.infracaoGrave = false,
     this.impedirNovaConta = false,
+    this.pedidos,
   });
+
+  /// Null = o servidor não mandou os campos. Só vale em suspensão ou encerramento em vigor.
+  final ResumoPedidos? pedidos;
 
   final String? aplicadaPorNome;
   final String? contestacaoAnalistaNome;
+
+  /// Quando o usuário foi avisado.
+  final DateTime? avisadoEm;
+
+  /// Encerramento avisado que ainda não começou (Termos 20.8): a conta segue ativa.
+  bool get agendada =>
+      tipo == 'encerramento' &&
+      revertidaEm == null &&
+      !vigente &&
+      fimEm == null &&
+      avisadoEm != null &&
+      inicioEm.isAfter(avisadoEm!);
 
   /// Encerramento sem falta do usuário (Termos 13.10). Null = não informado.
   final bool? semFalta;
@@ -675,7 +889,35 @@ class AnexoContestacao {
 /// Compensação: reembolso descontado de repasses futuros (Termos 8.6). Todos os valores, em
 /// centavos, vêm calculados do backend.
 class Compensacao {
+  /// Decisão posterior mais baixa sem tratamento: `reducao`, `reversao`, `analisar` ou null.
+  final String? revisao;
+  final String? revisaoContestacaoId;
+
+  /// O servidor decide o que esta pessoa pode fazer; o painel não deduz.
+  final bool podeReduzir;
+  final int? reducaoMaximaCentavos;
+  final bool podeCancelar;
+
+  /// Valor registrado antes das reduções; null se o servidor não informa. [valorCentavos] é o que vale hoje.
+  final int? valorOriginalCentavos;
+  final int reduzidoCentavos;
+
+  /// O que voltou ao profissional por causa de reduções.
+  final int devolvidoReducaoCentavos;
+
+  /// Informado pelo servidor: dívida aberta com a decisão revertida ou reduzida; nada é descontado.
+  final bool suspensa;
+
   const Compensacao({
+    this.suspensa = false,
+    this.revisao,
+    this.revisaoContestacaoId,
+    this.podeReduzir = false,
+    this.reducaoMaximaCentavos,
+    this.podeCancelar = false,
+    this.valorOriginalCentavos,
+    this.reduzidoCentavos = 0,
+    this.devolvidoReducaoCentavos = 0,
     required this.id,
     required this.pedidoId,
     required this.origem,
@@ -862,7 +1104,11 @@ class Incidente {
     this.encerradoEm,
     this.medidas = const [],
     this.cautelaAtrasada = false,
+    this.sinaisAntifraude = const [],
   });
+
+  /// Códigos de sinal para a equipe conferir (9.5). Não são prova de fraude.
+  final List<String> sinaisAntifraude;
 
   /// O backend diz que passou o prazo sem cautela adotada. Ausente = falso: nada a mostrar.
   final bool cautelaAtrasada;
@@ -1170,6 +1416,7 @@ class EventoUsuario {
 class UsuarioBusca {
   const UsuarioBusca({
     this.travaFraudeVigente,
+    this.nivelVerificacao,
     required this.id,
     required this.nome,
     required this.tipo,
@@ -1196,6 +1443,9 @@ class UsuarioBusca {
 
   /// Trava de saques por fraude em vigor. Null = não informado (nunca "sem trava").
   final bool? travaFraudeVigente;
+
+  /// `nivel_verificacao` como o servidor manda. Null = não informado.
+  final String? nivelVerificacao;
 
   /// Só para profissional: as categorias cadastradas no perfil (RF-BUS-03).
   final List<CategoriaProfissional> categorias;
@@ -1439,6 +1689,7 @@ enum UnidadeConfig {
   centavos('centavos'),
   bps('bps'),
   horas('horas'),
+  minutos('minutos'),
   dias('dias'),
   diasUteis('dias_uteis'),
   quantidade('quantidade');
@@ -1567,8 +1818,29 @@ class ResultadoCadeia {
 }
 
 /// Erro de chamada admin. `proibido` = 403 (papel sem permissão); `sessao` = 401.
+/// Resposta do aviso prévio. Com [falhas] acima de zero o envio não libera mudança.
+class ResultadoAvisoPrevio {
+  const ResultadoAvisoPrevio(
+      {required this.antecedenciaMinimaDias, required this.destinatarios, required this.avisosNovos, required this.falhas});
+  final int antecedenciaMinimaDias;
+  final int destinatarios;
+  final int avisosNovos;
+  final int falhas;
+}
+
 class ErroApi implements Exception {
-  const ErroApi(this.mensagem, {this.proibido = false, this.sessao = false, this.status, this.codigo, this.maximoCentavos});
+  const ErroApi(this.mensagem,
+      {this.proibido = false,
+      this.sessao = false,
+      this.status,
+      this.codigo,
+      this.maximoCentavos,
+      this.campos = const [],
+      this.podeValerEm});
+
+  /// Recusa de mudança dos Tratinhos: campos afetados e, no prazo do aviso, quando pode valer.
+  final List<String> campos;
+  final String? podeValerEm;
 
   /// Só em `acima_do_devido`: o máximo que o servidor aceita compensar.
   final int? maximoCentavos;
@@ -1808,7 +2080,8 @@ class CampanhaNotificacao {
   final int totalDestinatarios;
   final String criadoEm;
 
-  /// "operacional" (andamento de serviço) ou "marketing" (respeita a preferência de cada pessoa).
+  /// "operacional" (andamento de serviço e avisos de conta, sem oferta nem propaganda) ou
+  /// "marketing" (só quem aceitou receber avisos e novidades e não desligou o push; Termos 15.4).
   final String tipo;
   final String? autor;
   final int enviados;
@@ -1819,6 +2092,9 @@ class CampanhaNotificacao {
 /// Quantas pessoas receberiam a campanha e quantas ficaram de fora por terem desligado o marketing.
 class EstimativaCampanha {
   const EstimativaCampanha({required this.destinatarios, this.desativaram = 0});
+
+  /// No marketing, quem fica de fora: sem consentimento, com ele revogado ou com o push
+  /// desligado, sem contar a mesma pessoa duas vezes.
   final int destinatarios;
   final int desativaram;
 }
@@ -1964,6 +2240,111 @@ class MoedasConfig {
   final int tetoDescontoClienteMesCentavos;
   final int tetoDiarioDescontoCentavos;
   final int diasLiberacaoBonus;
+}
+
+/// Bônus de Tratinhos ainda aguardando liberação para um usuário.
+class PendenteMoedaUsuario {
+  const PendenteMoedaUsuario({
+    required this.chaveIdempotencia,
+    this.pedidoId,
+    required this.quantidade,
+    required this.liberarEm,
+    required this.criadaEm,
+    required this.tipoLancamento,
+    required this.status,
+  });
+
+  final String chaveIdempotencia;
+  final String? pedidoId;
+  final int quantidade;
+  final DateTime liberarEm;
+  final DateTime criadaEm;
+  final String tipoLancamento;
+  final String status;
+}
+
+/// Um lançamento no extrato de Tratinhos de um usuário.
+class LancamentoMoedaUsuario {
+  const LancamentoMoedaUsuario({
+    required this.tipo,
+    required this.quantidade,
+    required this.carteira,
+    required this.chaveIdempotencia,
+    required this.criadaEm,
+    this.expiraEm,
+    this.referenciaId,
+  });
+
+  final String tipo;
+  final int quantidade;
+  final String carteira;
+  final String chaveIdempotencia;
+  final DateTime criadaEm;
+  final DateTime? expiraEm;
+  final String? referenciaId;
+}
+
+/// Saldo, pendentes e extrato de Tratinhos de um usuário (carteiras cliente e profissional).
+class MoedasUsuario {
+  const MoedasUsuario({
+    required this.usuarioId,
+    required this.saldoCliente,
+    required this.saldoProfissional,
+    this.pendentesCliente = const [],
+    this.pendentesProfissional = const [],
+    this.extratoCliente = const [],
+    this.extratoProfissional = const [],
+  });
+
+  final String usuarioId;
+  final int saldoCliente;
+  final int saldoProfissional;
+  final List<PendenteMoedaUsuario> pendentesCliente;
+  final List<PendenteMoedaUsuario> pendentesProfissional;
+  final List<LancamentoMoedaUsuario> extratoCliente;
+  final List<LancamentoMoedaUsuario> extratoProfissional;
+}
+
+/// Retorno da concessão de Tratinhos como compensação (Termos I.3).
+class ResultadoConcederMoedas {
+  const ResultadoConcederMoedas({
+    required this.usuarioId,
+    required this.carteira,
+    required this.quantidade,
+    required this.expiraEm,
+    required this.chaveIdempotencia,
+    required this.idempotente,
+    required this.saldoAtual,
+  });
+
+  final String usuarioId;
+  final String carteira;
+  final int quantidade;
+  final DateTime expiraEm;
+  final String chaveIdempotencia;
+  final bool idempotente;
+  final int saldoAtual;
+}
+
+/// Retorno do cancelamento de Tratinhos por fraude (Termos 12.10, 13.9 e I.10).
+class ResultadoCancelarFraudeMoedas {
+  const ResultadoCancelarFraudeMoedas({
+    required this.usuarioId,
+    required this.carteira,
+    required this.quantidadeDebitada,
+    required this.pendentesCancelados,
+    required this.chaveIdempotencia,
+    required this.idempotente,
+    required this.saldoAtual,
+  });
+
+  final String usuarioId;
+  final String carteira;
+  final int quantidadeDebitada;
+  final int pendentesCancelados;
+  final String chaveIdempotencia;
+  final bool idempotente;
+  final int saldoAtual;
 }
 
 // =============================================================================

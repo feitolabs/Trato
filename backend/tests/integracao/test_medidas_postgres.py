@@ -6,7 +6,7 @@ from __future__ import annotations
 import threading
 from datetime import UTC, datetime, timedelta
 
-from trato.api.medidas import aplicar_automatica, encerrar_vencidas
+from trato.api.medidas import aplicar_automatica, encerrar_vencidas, iniciar_agendadas
 
 from .test_disputa_painel_postgres import equipe  # noqa: F401 - fixture
 from .test_exclusividade_cliente_postgres import dar_moedas, pedir
@@ -152,3 +152,25 @@ def test_lista_de_exclusividades_do_cliente(pg, equipe):  # noqa: F811
     (item,) = r.json()["itens"]
     assert item["id"].replace("-", "") == eid.replace("-", "") and item["moedas"] == 100
     assert item["estornada"] is False and item["cliente_nome"]
+
+
+def test_encerramento_sem_falta_so_bloqueia_no_dia_avisado(pg, equipe):  # noqa: F811
+    limpar(pg)
+    try:
+        r = aplicar(pg, tipo="encerramento", dias=None, sem_falta=True, clausulas=["20.8"])
+        assert r.status_code == 201, r.text
+        assert r.json()["vigente"] is False and status(pg) == "ativo"
+        contexto = pg.pagto[1]
+        dia = datetime.fromisoformat(r.json()["inicio_em"])
+        assert dia - datetime.fromisoformat(r.json()["avisado_em"]) == timedelta(days=30)
+        assert iniciar_agendadas(contexto, dia - timedelta(seconds=1)) == 0
+        assert iniciar_agendadas(contexto, dia) == 1 and status(pg) == "bloqueado"
+        assert iniciar_agendadas(contexto, dia) == 0
+    finally:
+        limpar(pg)
+
+
+def test_historico_dos_termos_responde_com_o_banco_local(pg):  # noqa: F811
+    r = pg.pagto[0].get("/v1/termos/versoes")
+    assert r.status_code == 200, r.text
+    assert "1.1" in [v["versao"] for v in r.json()["itens"]]

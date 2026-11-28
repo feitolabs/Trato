@@ -9,7 +9,7 @@ Valores sempre em centavos inteiros.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -76,6 +76,9 @@ class Contrato:
     aceite_dispositivo: str | None = None
     prazo_execucao_dias: int | None = None
     garantia_dias: int | None = None  # prometido no orçamento aceito (vence a da categoria)
+    termos_versao: str | None = None  # 23.6: versão dos Termos gravada na confirmação (061000)
+    # 23.6: retrato das regras no aceite (`regras_aplicadas`). Ler só por `api/regra_contratada`.
+    regras: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -176,6 +179,8 @@ class ConfigApi:
     # Lembretes (5.8): quantas horas antes do fim do prazo; 0 desliga.
     lembrete_confirmacao_antecedencia_horas: int = 12
     lembrete_resposta_disputa_antecedencia_horas: int = 12
+    # Termos 13.4 e I.5: antecedência do aviso de vencimento dos Tratinhos (mínimo 7).
+    tratinhos_aviso_vencimento_dias: int = 7
     prazo_avaliacao_dias: int = PRAZO_AVALIACAO_PADRAO_DIAS
     # Direito de arrependimento (Termos 7.2; CDC art. 49): nunca menos que 7 dias.
     arrependimento_dias: int = 7

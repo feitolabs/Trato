@@ -17,6 +17,8 @@ from trato.api.admin.modelos import (
 )
 from trato.api.admin.papeis import Permissao
 from trato.api.admin.repositorios import VerificacaoAdmin
+from trato.api.contexto import Contexto, obter_contexto
+from trato.api.selo import APROVACAO_BLOQUEADA, SeloRetiradoErro, selo_retirado
 
 router = APIRouter(prefix="/v1/admin/verificacoes", tags=["admin: verificação"])
 
@@ -152,8 +154,14 @@ def decidir(
     corpo: DecisaoVerificacaoIn,
     operador: Operador = Depends(exigir(Permissao.VERIFICACOES_DECIDIR)),
     admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
 ) -> VerificacaoOut:
-    if admin.verificacoes.obter(verificacao_id) is None:
+    atual = admin.verificacoes.obter(verificacao_id)
+    if atual is None:
         raise HTTPException(404, "Verificação não encontrada.")
+    # 10.3: aprovar não devolve selo retirado; regularizar é ação à parte. O banco também
+    # recusa (a decisão inteira volta atrás).
+    if corpo.aprovar and selo_retirado(contexto, atual.profissional_id):
+        raise SeloRetiradoErro(APROVACAO_BLOQUEADA)
     admin.verificacoes.decidir(verificacao_id, operador.id, corpo.aprovar, corpo.motivo)
     return _saida(admin.verificacoes.obter(verificacao_id))  # type: ignore[arg-type]

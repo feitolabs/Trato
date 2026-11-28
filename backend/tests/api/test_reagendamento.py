@@ -207,3 +207,73 @@ def test_aceite_pela_parte_errada_nao_remarca(amb):
         assert r.status_code in (403, 404), (quem, r.status_code)
     depois = amb.contexto.pedidos.obter("ped-1")
     assert depois.janela == antes.janela and depois.codigo_inicio == "1234"
+
+
+# --- Termos 7.5: regra de antecedência de 24 horas -------------------------------------------
+
+
+def test_reagendamento_com_24h_ou_mais_nao_marca_ressalva(amb):
+    _agendado(amb)  # janela começa em AGORA + 24h
+    r = _propor(amb)
+    assert r.status_code == 201, r.text
+    corpo = r.json()
+    assert corpo["com_menos_de_24h"] is False
+    assert corpo["sem_custo"] is True
+    assert corpo["aviso_prazo"] is None
+
+
+def test_reagendamento_com_menos_de_24h_sinaliza_75_e_aceite_profissional_vale_sem_custo(amb):
+    # Janela agendada a apenas 12h do momento atual (< 24h)
+    amb.semear_pedido(Estado.AGENDADO, janela=Janela(AGORA + 12 * H, AGORA + 14 * H))
+    r = _propor(amb, inicio_h=48)
+    assert r.status_code == 201, r.text
+    proposta = r.json()
+    assert proposta["com_menos_de_24h"] is True
+    assert proposta["sem_custo"] is True
+    assert proposta["aviso_prazo"] is not None and "7.5" in proposta["aviso_prazo"]
+
+    # Listagem preserva a sinalização de < 24h
+    lista = amb.cliente.get(URL, headers=cab("t-prof")).json()
+    assert lista[0]["com_menos_de_24h"] is True
+
+    # Profissional aceita a nova data sem custo (7.5): janela muda
+    ok = amb.cliente.post(f"{URL}/{proposta['id']}/aceitar", headers=cab("t-prof"))
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["com_menos_de_24h"] is True
+    assert ok.json()["sem_custo"] is True
+    assert amb.contexto.pedidos.obter("ped-1").janela.inicio == AGORA + 48 * H
+
+
+def test_reagendamento_menos_de_24h_recusado_mantem_janela_original(amb):
+    amb.semear_pedido(Estado.AGENDADO, janela=Janela(AGORA + 6 * H, AGORA + 8 * H))
+    pid = _propor(amb, inicio_h=48).json()["id"]
+    rec = amb.cliente.post(f"{URL}/{pid}/recusar", headers=cab("t-prof"))
+    assert rec.status_code == 200, rec.text
+    assert rec.json()["status"] == "recusado"
+    assert rec.json()["com_menos_de_24h"] is True
+    assert amb.contexto.pedidos.obter("ped-1").janela.inicio == AGORA + 6 * H
+
+
+def test_aviso_de_menos_de_24h_fala_conforme_quem_propos(amb):
+    from trato.api.rotas_reagendamento import (
+        AVISO_MENOS_24H,
+        AVISO_MENOS_24H_DO_PROFISSIONAL,
+    )
+
+    for quem, esperado in (
+        ("t-cliente", AVISO_MENOS_24H),
+        ("t-prof", AVISO_MENOS_24H_DO_PROFISSIONAL),
+    ):
+        amb.contexto.reagendamentos.__init__()
+        amb.semear_pedido(
+            Estado.AGENDADO,
+            janela=Janela(AGORA + timedelta(hours=10), AGORA + timedelta(hours=12)),
+        )
+        r = _propor(amb, quem)
+        assert r.status_code == 201, r.text
+        assert r.json()["aviso_prazo"] == esperado and r.json()["sem_custo"] is True
+        for leitor in ("t-cliente", "t-prof"):
+            (item,) = amb.cliente.get(
+                "/v1/pedidos/ped-1/reagendamentos", headers=cab(leitor)
+            ).json()
+            assert item["aviso_prazo"] == esperado and "você" not in esperado.lower()

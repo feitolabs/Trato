@@ -31,6 +31,7 @@ class Notificacao {
     this.recorrenciaId,
     this.chamadoId,
     this.compensacaoId,
+    this.avaliacaoId,
     this.tipoApi,
   });
 
@@ -40,6 +41,9 @@ class Notificacao {
   final String? recorrenciaId;
   final String? chamadoId;
   final String? compensacaoId;
+
+  /// `dados.avaliacao_id`, no aviso `conta.avaliacao_ocultada`.
+  final String? avaliacaoId;
 
   /// O tipo do evento no backend (`pedido.novo`...), usado quando `tela` não veio.
   final String? tipoApi;
@@ -67,6 +71,7 @@ class Notificacao {
         recorrenciaId: recorrenciaId,
         chamadoId: chamadoId,
         compensacaoId: compensacaoId,
+        avaliacaoId: avaliacaoId,
         tipoApi: tipoApi,
       );
 }

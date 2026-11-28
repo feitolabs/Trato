@@ -73,6 +73,10 @@ enum Permissao {
   moedasConfigurar,
   equipeGerenciar,
   relatoriosExportar,
+  indisponibilidadesGerenciar,
+  checkoutSemCodigoTratar,
+  seloRetirar,
+  seloRegularizar,
 }
 
 const _matriz = <Papel, Set<Permissao>>{
@@ -109,9 +113,12 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.contaRetornoAprovar,
     Permissao.regressoPropor,
     Permissao.regressoAprovar,
+    Permissao.indisponibilidadesGerenciar,
+    Permissao.checkoutSemCodigoTratar,
     Permissao.dashboardVer,
   },
   Papel.mediador: {
+    Permissao.checkoutSemCodigoTratar,
     Permissao.incidentesVer,
     Permissao.incidentesTratar,
     Permissao.avaliacoesModerar,
@@ -125,6 +132,8 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.disputasDecidir,
   },
   Papel.cadastro: {
+    Permissao.seloRetirar,
+    Permissao.seloRegularizar,
     Permissao.verificacoesVer,
     Permissao.verificacoesDecidir,
     Permissao.documentosRevelar,
@@ -150,6 +159,7 @@ const _matriz = <Papel, Set<Permissao>>{
     Permissao.relatoriosExportar,
   },
   Papel.seguranca: {
+    Permissao.seloRetirar,
     Permissao.incidentesVer,
     Permissao.incidentesTratar,
     Permissao.incidentesEncerrar,

@@ -68,6 +68,8 @@ class Disputa:
     # False = aberta depois da janela de congelamento: o repasse pode já ter sido liberado.
     # A reclamação continua valendo (suporte e análise); só o congelamento automático some.
     abertura_dentro_da_janela_de_congelamento: bool = True
+    # 8.4: o que o cliente espera no Relato. Gravado só na abertura; não decide nada.
+    resultado_esperado: str | None = None
 
     def _exigir(self, estado: Estado, ator: Ator, esperado: Ator) -> None:
         if ator is not esperado:

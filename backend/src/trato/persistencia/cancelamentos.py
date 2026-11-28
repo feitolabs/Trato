@@ -43,6 +43,13 @@ class Cancelamento:
     retencao_mostrada_em: datetime | None = None
 
 
+@dataclass(frozen=True)
+class FaltaRepetida:
+    profissional_id: str
+    total_cancelamentos: int
+    ultimo_cancelamento_em: datetime
+
+
 class RepositorioCancelamentos(Protocol):
     def contestar_retencao(self, pedido_id: str, agora: datetime) -> None:
         """O cliente não aceitou a retenção mostrada."""
@@ -161,13 +168,33 @@ class CancelamentosEmMemoria:
                     self.decisoes[pedido_id] = (analista_id, decisao, agora)
 
 
+    def faltas_repetidas(self, desde: datetime, minimo: int) -> list[FaltaRepetida]:
+        with self._trava:
+            grupos: dict[str, list[datetime]] = {}
+            for item in self._itens:
+                if item.tipo == "cancelamento_profissional" and item.recebido_em >= desde:
+                    grupos.setdefault(item.solicitado_por, []).append(item.recebido_em)
+        saida = [
+            FaltaRepetida(pid, len(datas), max(datas))
+            for pid, datas in grupos.items()
+            if len(datas) >= minimo
+        ]
+        saida.sort(
+            key=lambda x: (
+                -x.total_cancelamentos,
+                -x.ultimo_cancelamento_em.timestamp(),
+                x.profissional_id,
+            )
+        )
+        return saida
+
+
 _COLUNAS = (
     "id, pedido_id, solicitado_por, tipo, status, recebimento_confirmado_em, motivo, "
     "servico_iniciado, dentro_arrependimento_7d, reembolso_centavos, papel_solicitante, "
     "retencao_valor_centavos, retencao_valor_base_centavos, retencao_justificativa, "
     "retencao_comprovantes, retencao_mostrada_cliente_em"
 )
-
 
 def _montar(linha: dict[str, Any]) -> Cancelamento:
     reembolso = linha["reembolso_centavos"]
@@ -355,3 +382,26 @@ class CancelamentosPostgres:
                 "as id) e where c.pedido_id = %s and c.status = 'aguardando_analise'",
                 (status, decisao, agora, reembolso_centavos, analista, pid),
             )
+
+    def faltas_repetidas(self, desde: datetime, minimo: int) -> list[FaltaRepetida]:
+        with self._banco.transacao() as con:
+            if not self._tem_tabela(con):
+                return []
+            linhas = con.execute(
+                "select solicitado_por as profissional_id, "
+                "count(*)::int as total_cancelamentos, "
+                "max(criado_em) as ultimo_cancelamento_em "
+                "from public.cancelamentos_pedido "
+                "where tipo = 'cancelamento_profissional' and criado_em >= %s "
+                "group by solicitado_por having count(*) >= %s "
+                "order by total_cancelamentos desc, ultimo_cancelamento_em desc, solicitado_por",
+                (desde, minimo),
+            ).fetchall()
+        return [
+            FaltaRepetida(
+                profissional_id=str(l["profissional_id"]),
+                total_cancelamentos=int(l["total_cancelamentos"]),
+                ultimo_cancelamento_em=l["ultimo_cancelamento_em"],
+            )
+            for l in linhas  # noqa: E741
+        ]

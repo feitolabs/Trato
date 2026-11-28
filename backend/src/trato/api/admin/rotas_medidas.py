@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from trato.api import medidas as regras
 from trato.api import medidas_anexos as provas
+from trato.api import pedidos_conta
 from trato.api.admin.contexto import (
     AdminContexto,
     Operador,
@@ -131,6 +132,21 @@ class MedidaAdminOut(regras.MedidaOut):
     sem_falta: bool | None = None
     motivo_fraude: bool = False
     limite_retencao_centavos: int | None = None
+    # 20.6: só em suspensão ou encerramento já em vigor.
+    pedidos_futuros_cancelados: int = 0
+    pedidos_em_andamento: int = 0
+    pedidos_em_andamento_ids: list[str] = Field(default_factory=list)
+    pedidos_futuros_pendentes_ids: list[str] = Field(default_factory=list)
+
+
+def campos_de_pedidos(contexto: Contexto, usuario_id: str, desde) -> dict:
+    r = pedidos_conta.resumo(contexto, usuario_id, desde)
+    return {
+        "pedidos_futuros_cancelados": r.futuros_cancelados,
+        "pedidos_em_andamento": len(r.em_andamento),
+        "pedidos_em_andamento_ids": list(r.em_andamento),
+        "pedidos_futuros_pendentes_ids": list(r.futuros_pendentes),
+    }
 
 
 def _chave(valor: str | None) -> str:
@@ -159,7 +175,9 @@ def _out(
     c = contexto.medidas.contestacao(m.id or "")
     if nomes is None:
         nomes = nomes_de(admin, [m.usuario_id, m.aplicada_por, c.analista_id if c else None])
+    em_vigor = m.tipo in pedidos_conta.TIPOS_QUE_CANCELAM and m.vigente(contexto.agora())
     return MedidaAdminOut(
+        **(campos_de_pedidos(contexto, m.usuario_id, m.inicio_em) if em_vigor else {}),
         **regras.saida(contexto, m).model_dump(),
         usuario_id=m.usuario_id,
         usuario_nome=nomes.get(_chave(m.usuario_id)),

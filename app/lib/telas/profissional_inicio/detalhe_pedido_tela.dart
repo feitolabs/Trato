@@ -160,8 +160,12 @@ class _DetalhePedidoTelaState extends State<DetalhePedidoTela> {
     }
     if (ex?.aguardandoCliente ?? false) {
       final ate = ex?.responderAte?.toLocal();
-      final prazo =
-          ate == null ? ' (prazo de 6h)' : ' (responde em até 6h · até ${horaDoAparelho(ate)})';
+      final prazo = ex!.prazoSuspenso
+          ? '. Prazo suspenso: o Trato está com uma falha, e o tempo de resposta não está '
+              'correndo.'
+          : ate == null
+              ? ' (prazo de 6h)'
+              : ' (responde em até 6h · até ${horaDoAparelho(ate)})';
       return AvisoFaixa(
         texto: 'Oferta enviada, aguardando o cliente$prazo',
         tipo: TipoStatus.info,

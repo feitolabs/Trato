@@ -81,3 +81,64 @@ def test_nota_decimal_grava_recalcula_media_e_aceita_ausente_no_postgres(cenario
 
     perfil_2 = get(c, f"/v1/profissionais/{c.ids['profissional']}", "cliente").json()
     assert perfil_2["nota_publica"] == 4.4
+
+
+def test_media_recebida_usa_nota_publica_profissional_e_fallback_sem_funcao(cenario):
+    """BE-NOTA-12.3: AvaliacoesPostgres.media_recebida chama public.nota_publica_profissional
+    (peso 2 nas 5 mais recentes) e cai na média simples se a função ainda não existir."""
+    from datetime import UTC, datetime, timedelta
+
+    from trato.persistencia.dinheiro import AvaliacoesPostgres
+
+    c = cenario
+    prof_id = c.ids["profissional"]
+    cli_id = c.ids["cliente"]
+
+    def _limpar() -> None:
+        with c.local.admin() as con, con.transaction():
+            con.execute("set local session_replication_role = replica")
+            con.execute("delete from public.avaliacoes where avaliado_id = %s", (prof_id,))
+            con.execute("select public.recalcular_perfil_profissional(%s)", (prof_id,))
+
+    _limpar()
+    try:
+        # Cria 6 pedidos concluídos para gerar contratos reais e inserir 6 avaliações publicadas
+        base = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+        notas = [1, 5, 5, 5, 5, 5]
+        for idx, nota in enumerate(notas):
+            pedido_id = _concluir(c)
+            with c.local.admin() as con, con.transaction():
+                (contrato_id,) = con.execute(
+                    "select id from public.contratos where pedido_id = %s", (pedido_id,)
+                ).fetchone()
+                con.execute(
+                    "insert into public.avaliacoes "
+                    "(contrato_id, direcao, avaliador_id, avaliado_id, nota_geral, criada_em, "
+                    "status) values (%s, 'cliente_para_profissional', %s, %s, %s, %s, 'publicada')",
+                    (contrato_id, cli_id, prof_id, nota, base + timedelta(minutes=idx)),
+                )
+        with c.local.admin() as con, con.transaction():
+            con.execute("select public.recalcular_perfil_profissional(%s)", (prof_id,))
+
+        avs = AvaliacoesPostgres(c.banco)
+        # Com N=5 e P=2: (1*1 + 5*5*2) / (1 + 10) = 51/11 = 4.64 (média simples seria 4.33)
+        assert avs.media_recebida(prof_id) == 4.64
+        perfil = get(c, f"/v1/profissionais/{prof_id}", "cliente").json()
+        assert perfil["nota_publica"] == 4.64
+
+        # Sem a função no banco (migration 061100 ainda não aplicada): cai na média simples
+        with c.local.admin() as con:
+            con.execute(
+                "alter function public.nota_publica_profissional(uuid) "
+                "rename to nota_publica_profissional_escondida"
+            )
+        try:
+            assert avs.media_recebida(prof_id) == 4.33
+        finally:
+            with c.local.admin() as con:
+                con.execute(
+                    "alter function public.nota_publica_profissional_escondida(uuid) "
+                    "rename to nota_publica_profissional"
+                )
+    finally:
+        _limpar()

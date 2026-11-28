@@ -1,3 +1,4 @@
+import '../telas/comuns/contagem_avaliacoes.dart';
 import 'package:flutter/material.dart';
 
 import '../auth/servico_auth.dart';
@@ -103,6 +104,8 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
             final num n when n >= 1 => n.toInt(),
             _ => 30,
           },
+          incluido: CategoriaServico.lerListaTexto(item['incluido']),
+          naoIncluido: CategoriaServico.lerListaTexto(item['nao_incluido']),
         ),
     ];
     lista.sort((a, b) => compararAlfabeticoPtBr(a.nome, b.nome));
@@ -162,9 +165,11 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       nome: nome,
       iniciais: _iniciais(nome),
       verificacao: seloDeVerificacao(nivel),
+      seloConferidoEm: DateTime.tryParse('${j['selo_conferido_em'] ?? ''}'),
       especialidade: _especialidade(categorias),
       servicosConcluidos: servicosConcluidos,
       nota: notaPublica,
+      contagem: ContagemAvaliacoes.deJson(j),
       distanciaKm: 0,
       regiao: regiao.isEmpty ? null : regiao,
       categoriaId: categorias.isEmpty ? null : '${categorias.first}',
@@ -354,16 +359,18 @@ class RepositorioCatalogoApi implements RepositorioCatalogo {
       nome: nome,
       iniciais: _iniciais(nome),
       verificacao: seloDeVerificacao(nivel),
+      seloConferidoEm: DateTime.tryParse('${j['selo_conferido_em'] ?? ''}'),
       especialidade: _especialidade(categoriasIds),
       servicosConcluidos: (j['servicos_concluidos'] as int?) ?? 0,
       nota: notaPublica ?? 0,
+      contagem: ContagemAvaliacoes.deJson(j),
       distanciaKm: 0,
       regiao: regioes.join(', '),
       categoriaId: categoriasIds.isEmpty ? null : '${categoriasIds.first}',
       categoriasIds: [for (final c in categoriasIds) '$c'],
       detalhe: DetalhePerfil(
         noTratoDesde: (desde ?? DateTime.now()).year,
-        totalAvaliacoes: avaliacoes.length,
+        totalAvaliacoes: ContagemAvaliacoes.deJson(j)?.total ?? avaliacoes.length,
         taxaConclusao: (j['taxa_conclusao'] as num?)?.toInt() ?? 0,
         temHistorico: j['taxa_conclusao'] != null,
         respondeEmFaixa: DetalhePerfil.lerFaixaResposta(j['responde_em_faixa']),

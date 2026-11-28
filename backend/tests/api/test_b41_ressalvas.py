@@ -69,6 +69,10 @@ def test_pedido_de_visita_recorrente_so_aparece_para_o_profissional_da_serie(amb
     orcar = amb.cliente.post(
         f"/v1/pedidos/{pedido_visita}/orcamentos",
         json={
+            "prazo_execucao_dias": 3,
+            "validade_ate": "2099-01-01T00:00:00Z",
+            "fora_do_escopo": "Materiais não incluídos.",
+            "garantia_dias": 90,
             "itens": [
                 {
                     "tipo": "horas",
@@ -76,7 +80,7 @@ def test_pedido_de_visita_recorrente_so_aparece_para_o_profissional_da_serie(amb
                     "quantidade": 1,
                     "valor_unitario_centavos": 5_000,
                 }
-            ]
+            ],
         },
         headers=cab("t-outro-prof"),
     )

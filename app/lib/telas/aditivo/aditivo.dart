@@ -24,7 +24,11 @@ class DetalheAditivo {
     required this.motivo,
     required this.valorCentavos,
     this.estado = EstadoAditivo.aguardando,
+    this.semValor = false,
   });
+
+  /// Termos 6.8: não foi pago e a execução acabou; não há o que aprovar nem pagar.
+  final bool semValor;
 
   final String id;
   final String pedidoTitulo;
@@ -33,6 +37,14 @@ class DetalheAditivo {
   final int valorCentavos;
   final EstadoAditivo estado;
 }
+
+/// [estado] do aditivo e do pedido como a API manda. Pedido sem estado: o servidor decide.
+bool aditivoSemValor(String? estado, String? estadoDoPedido) =>
+    const {'cancelado', 'expirado'}.contains(estado) ||
+    (const {'proposto', 'aprovado'}.contains(estado) &&
+        estadoDoPedido != null &&
+        estadoDoPedido.isNotEmpty &&
+        estadoDoPedido != 'em_andamento');
 
 abstract interface class ServicoAditivo {
   Future<void> criar(NovoAditivo aditivo);

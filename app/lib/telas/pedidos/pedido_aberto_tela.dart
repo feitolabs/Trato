@@ -342,6 +342,7 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
           profissionalId: anterior?.profissionalId ?? resposta.profissionalId,
           profissionalNome: resposta.profissionalNome ?? anterior?.profissionalNome,
           notaPublica: resposta.notaPublica ?? anterior?.notaPublica,
+          contagem: resposta.contagem ?? anterior?.contagem,
           expiraEm: resposta.expiraEm,
           texto: anterior?.texto ?? resposta.texto,
           outrosOrcamentosContinuamVisiveis: resposta.outrosOrcamentosContinuamVisiveis,
@@ -429,12 +430,25 @@ class _PedidoAbertoTelaState extends State<PedidoAbertoTela> {
             ),
             const SizedBox(height: EspacosTrato.x2),
             Text(
-              nota == null
-                  ? nomeExibicao
-                  : '$nomeExibicao · nota ${nota.toStringAsFixed(1).replaceAll('.', ',')}',
+              oferta.contagem?.novoNoTrato ?? false
+                  ? '$nomeExibicao · Novo no Trato'
+                  : nota == null
+                      ? nomeExibicao
+                      : '$nomeExibicao · nota ${nota.toStringAsFixed(1).replaceAll('.', ',')}',
               style: TipografiaTrato.corpoForte,
             ),
-            if (responderAte != null) ...[
+            // 12.3: a oferta não traz serviços concluídos; mostra só as avaliações.
+            if (oferta.contagem case final c?)
+              Text(c.textoAvaliacoes, style: TipografiaTrato.corpoPequeno),
+            if (oferta.prazoSuspenso) ...[
+              const SizedBox(height: EspacosTrato.x1),
+              Text(
+                'Prazo suspenso: o Trato está com uma falha, e o tempo para responder não '
+                'está correndo.',
+                key: const ValueKey('prazo-exclusividade-suspenso'),
+                style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+              ),
+            ] else if (responderAte != null) ...[
               const SizedBox(height: EspacosTrato.x1),
               Text(
                 'Responda até ${diaMesDoAparelho(responderAte)} às ${horaDoAparelho(responderAte)}',

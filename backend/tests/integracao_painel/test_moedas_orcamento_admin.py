@@ -71,7 +71,7 @@ def test_config_traz_os_campos_novos_e_put_audita(painel):
         "aviso_percentual": 70,
         "teto_desconto_cliente_mes_centavos": 800,
         "teto_diario_desconto_centavos": 1_200,
-        "dias_liberacao_bonus": 10,
+        "dias_liberacao_bonus": 5,  # menos dias: melhora, vale na hora
         "motivo": "Ajuste do orçamento do mês",
     }
     r = painel.chamar("administrador", "PUT", "/v1/admin/moedas/config", json=corpo)
@@ -79,7 +79,7 @@ def test_config_traz_os_campos_novos_e_put_audita(painel):
     assert r.json()["orcamento_mensal_desconto_centavos"] == 50_000
     assert painel.ambiente.contexto.moedas.config().teto_desconto_cliente_mes_centavos == 800
     assert r.json()["teto_diario_desconto_centavos"] == 1_200
-    assert r.json()["dias_liberacao_bonus"] == 10
+    assert r.json()["dias_liberacao_bonus"] == 5
 
     # Sem os campos novos o PUT mantém o valor atual (não volta ao padrão).
     for campo in (
@@ -96,7 +96,7 @@ def test_config_traz_os_campos_novos_e_put_audita(painel):
     assert r.json()["orcamento_mensal_desconto_centavos"] == 50_000
     assert r.json()["aviso_percentual"] == 70
     assert r.json()["teto_diario_desconto_centavos"] == 1_200
-    assert r.json()["dias_liberacao_bonus"] == 10
+    assert r.json()["dias_liberacao_bonus"] == 5
 
     # Valor inválido é recusado e sem motivo também.
     ruim = {**corpo, "aviso_percentual": 101}
@@ -145,7 +145,7 @@ def test_config_traz_os_6_campos_da_etapa_b_e_put_altera_com_auditoria(painel):
 
     novos = {
         "bonus_avaliacao_profissional_moedas": 60,
-        "exclusividade_custo_moedas": 120,
+        "exclusividade_custo_moedas": 80,  # mais barato: vale na hora
         "exclusividade_duracao_horas": 72,
         "exclusividade_max_simultaneas": 5,
         "exclusividade_prazo_resposta_horas": 12,
@@ -154,7 +154,7 @@ def test_config_traz_os_6_campos_da_etapa_b_e_put_altera_com_auditoria(painel):
     r = painel.chamar("administrador", "PUT", url, json={**_corpo_base(), **novos})
     assert r.status_code == 200, r.text
     assert {k: r.json()[k] for k in SEIS} == novos
-    assert painel.ambiente.contexto.moedas.config().exclusividade_custo_moedas == 120
+    assert painel.ambiente.contexto.moedas.config().exclusividade_custo_moedas == 80
 
     # Sem os campos no PUT: mantém o valor atual, não volta ao padrão.
     r = painel.chamar("administrador", "PUT", url, json=_corpo_base())

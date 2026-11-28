@@ -4,14 +4,17 @@ inativado. O texto do que muda é de quem envia; o prazo mínimo é do sistema."
 
 from __future__ import annotations
 
+import json
 import logging
+import zlib
 from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
+from trato.api.admin.mudanca_moedas import ACAO_AVISO, CAMPOS
 from trato.api.admin.papeis import Permissao
 from trato.api.contexto import Contexto, obter_contexto
 from trato.financeiro import periodo
@@ -43,6 +46,11 @@ class AvisoPrevioIn(BaseModel):
     motivo: str | None = Field(None, min_length=10, max_length=1000)
     link: str | None = Field(None, max_length=500, pattern=r"^https://\S+$")
     usuario_id: str | None = Field(None, max_length=64, description="Só em `inatividade`.")
+    mudancas: dict[str, StrictBool | StrictInt] | None = Field(
+        None,
+        description="Só em `tratinhos`: campo da configuração e o novo valor. Sem isto, o aviso "
+        "não libera mudança desfavorável.",
+    )
 
 
 class AvisoPrevioOut(BaseModel):
@@ -71,6 +79,12 @@ def _conferir(corpo: AvisoPrevioIn) -> None:
         raise HTTPException(422, "Informe: " + ", ".join(faltam) + ".")
     if corpo.tipo != "inatividade" and corpo.usuario_id:
         raise HTTPException(422, "`usuario_id` só vale no aviso de conta inativa.")
+    if corpo.mudancas is not None:
+        if corpo.tipo != "tratinhos":
+            raise HTTPException(422, "`mudancas` só vale no aviso dos Tratinhos.")
+        estranhos = sorted(set(corpo.mudancas) - set(CAMPOS))
+        if estranhos or not corpo.mudancas:
+            raise HTTPException(422, "Campos inválidos em `mudancas`: " + ", ".join(estranhos))
 
 
 def _texto(corpo: AvisoPrevioIn) -> str:
@@ -81,8 +95,11 @@ def _texto(corpo: AvisoPrevioIn) -> str:
             f"Motivo: {corpo.motivo} Versão completa: {corpo.link}"
         )
     if corpo.tipo == "tratinhos":
+        novos = "; ".join(f"{CAMPOS[c][1]}: {int(v)}" for c, v in (corpo.mudancas or {}).items())
         return (
-            f"O programa de Tratinhos muda em {dia}. {corpo.resumo} Os Tratinhos já creditados "
+            f"O programa de Tratinhos muda em {dia}. {corpo.resumo} "
+            + (f"Novos valores: {novos}. " if novos else "")
+            + "Os Tratinhos já creditados "
             "valem até o fim da validade que tinham quando foram creditados."
         )
     return (
@@ -114,6 +131,9 @@ def avisar(
         raise HTTPException(404, "Usuário não encontrado.")
 
     destinatarios = novos = falhas = 0
+    chave = f"previo:{corpo.referencia}:{corpo.vigencia.isoformat()}"
+    if corpo.mudancas:  # outros valores são outro aviso: todos precisam receber de novo
+        chave += f":{zlib.crc32(json.dumps(corpo.mudancas, sort_keys=True).encode()):08x}"
     ultimo: str | None = None
     while True:
         lote = (
@@ -129,7 +149,7 @@ def avisar(
                         _EVENTOS[corpo.tipo],
                         pessoa,
                         # a data faz parte da chave: mudar a vigência gera aviso novo
-                        chave=f"previo:{corpo.referencia}:{corpo.vigencia.isoformat()}",
+                        chave=chave,
                         corpo=_texto(corpo),
                     )
                 )
@@ -139,18 +159,23 @@ def avisar(
         if corpo.usuario_id or len(lote) < _LOTE:
             break
         ultimo = lote[-1]
+    depois_auditoria = {
+        "tipo": corpo.tipo,
+        "referencia": corpo.referencia,
+        "vigencia": corpo.vigencia.isoformat(),
+        "destinatarios": destinatarios,
+        "falhas": falhas,
+        "mudancas": corpo.mudancas,
+        "emitido_em": contexto.agora().isoformat(),
+    }
+    if corpo.tipo == "inatividade" and corpo.usuario_id:
+        depois_auditoria["usuario_id"] = corpo.usuario_id
     admin.auditoria.registrar(
         ator_id=operador.id,
-        acao="notificacao.aviso_previo",
+        acao=ACAO_AVISO,
         entidade="aviso_previo",
-        entidade_id=None,
-        depois={
-            "tipo": corpo.tipo,
-            "referencia": corpo.referencia,
-            "vigencia": corpo.vigencia.isoformat(),
-            "destinatarios": destinatarios,
-            "falhas": falhas,
-        },
+        entidade_id=corpo.usuario_id if corpo.tipo == "inatividade" else None,
+        depois=depois_auditoria,
         motivo=corpo.motivo or f"Aviso prévio: {corpo.tipo}",
     )
     return AvisoPrevioOut(

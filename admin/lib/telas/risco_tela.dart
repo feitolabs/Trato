@@ -399,6 +399,8 @@ class _DetalheAlertaState extends State<_DetalheAlerta> {
           const SizedBox(height: EspacosTrato.x5),
           Text('Ações preventivas', style: TipografiaTrato.secao),
           const SizedBox(height: EspacosTrato.x3),
+          const BannerInfo(kAcoesImediatas, tom: Tom.alerta),
+          const SizedBox(height: EspacosTrato.x3),
           if (a.contaBloqueada)
             const BannerInfo('Conta bloqueada: para registrar uma trava de saques, use a seção Medidas.')
           else

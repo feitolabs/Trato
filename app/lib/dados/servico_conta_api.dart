@@ -1,3 +1,4 @@
+import '../telas/comuns/contagem_avaliacoes.dart';
 import '../telas/conta/modelos.dart';
 import 'cliente_api.dart';
 
@@ -123,6 +124,7 @@ class ServicoContaApi implements ServicoConta {
             nome: j['nome'] as String?,
             nota: (j['nota_publica'] as num?)?.toDouble(),
             servicos: j['servicos_concluidos'] as int?,
+            contagem: ContagemAvaliacoes.deJson(j),
           ),
       ];
 

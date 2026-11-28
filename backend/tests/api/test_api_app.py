@@ -70,6 +70,7 @@ def test_orcamentos_de_pedido_alheio_dao_404(amb):
 def test_profissional_envia_orcamento_com_sucesso(amb):
     amb.semear_pedido(Estado.ABERTO, profissional_id=None, orcamento_id=None)
     corpo = {
+        "validade_ate": "2099-01-01T00:00:00Z",
         "itens": [
             {
                 "tipo": "horas",
@@ -85,6 +86,7 @@ def test_profissional_envia_orcamento_com_sucesso(amb):
             },
         ],
         "prazo_execucao_dias": 3,
+        "fora_do_escopo": "Materiais não incluídos.",
         "garantia_dias": 90,
         "observacoes": "Levo escada e lonas.",
     }
@@ -107,6 +109,10 @@ def test_profissional_envia_orcamento_com_sucesso(amb):
 def test_cliente_nao_pode_enviar_orcamento(amb):
     amb.semear_pedido(Estado.ABERTO)
     corpo = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "horas",
@@ -114,7 +120,7 @@ def test_cliente_nao_pode_enviar_orcamento(amb):
                 "quantidade": "1",
                 "valor_unitario_centavos": 1000,
             }
-        ]
+        ],
     }
     r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-cliente", corpo)
     assert r.status_code == 403
@@ -123,6 +129,10 @@ def test_cliente_nao_pode_enviar_orcamento(amb):
 def test_enviar_orcamento_para_pedido_fechado_da_409(amb):
     amb.semear_pedido(Estado.ORCAMENTO_ACEITO)
     corpo = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "horas",
@@ -130,7 +140,7 @@ def test_enviar_orcamento_para_pedido_fechado_da_409(amb):
                 "quantidade": "1",
                 "valor_unitario_centavos": 1000,
             }
-        ]
+        ],
     }
     r = post(amb, "/v1/pedidos/ped-1/orcamentos", "t-prof", corpo)
     assert r.status_code == 409
@@ -268,6 +278,8 @@ def test_me_devolve_o_perfil_sem_dados_pessoais(amb):
     assert corpo.pop("disponivel_agora") is False
     assert corpo.pop("cpf_cadastrado") is False
     assert corpo.pop("exclusao_agendada_em") is None
+    assert corpo.pop("avaliacoes_total") == 0  # 12.3
+    assert corpo.pop("nota_minimo_avaliacoes") == 1
     assert corpo == {
         "id": "pro-1", "nome": "Ana", "papel": "profissional", "status": "ativo",
         "nivel_verificacao": "verificado", "nota_publica": 4.8, "servicos_concluidos": 12,

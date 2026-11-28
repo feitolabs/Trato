@@ -149,6 +149,16 @@ void main() {
 
       await tester.enterText(find.byType(TextField), 'Ficou torto');
       await tester.pump();
+      // Termos 8.4: sem escolher o que espera, não envia e o erro fica no campo.
+      await tester.tap(find.text('Enviar relato'));
+      await tester.pumpAndSettle();
+      expect(envio, isNull);
+      expect(find.text('Escolha o que você espera.'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('relato-resultado-esperado')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Retrabalho sem custo').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Escolha o que você espera.'), findsNothing);
       await tester.tap(find.text('Enviar relato'));
       expect(envio!.motivo, 'Qualidade abaixo do combinado');
       expect(envio!.descricao, 'Ficou torto');

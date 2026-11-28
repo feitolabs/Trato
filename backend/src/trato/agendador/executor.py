@@ -16,6 +16,11 @@ from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 
 from trato.api.contexto import Contexto
+from trato.api.indisponibilidade import (
+    corte_das_reservas,
+    fim_do_congelamento,
+    impedimento_por_falha,
+)
 from trato.api.liberacao import Fatos, fatos_da_liberacao
 from trato.api.medidas import desbloqueada_em
 from trato.disputas import Estado as EstadoDisputa
@@ -25,7 +30,7 @@ from trato.notificacoes.eventos import Evento
 from trato.notificacoes.servico import ServicoNotificacoes
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pedidos.estados import Acao, Estado, Pedido, TransicaoInvalida, transicionar
-from trato.persistencia.cancelamentos import EM_ANALISE, PROPOSTA
+from trato.persistencia.cancelamentos import EM_ANALISE, PROPOSTA, Cancelamento
 from trato.persistencia.conexao import Banco
 from trato.rotinas.regras import (
     SISTEMA,
@@ -43,7 +48,12 @@ log = logging.getLogger("trato.agendador")
 _ENCERRADAS = (EstadoDisputa.DECIDIDA, EstadoDisputa.ACORDO)
 _REABREM = (Acao.EXPIRAR_EXCLUSIVIDADE, Acao.EXPIRAR_PAGAMENTO)
 # Estas mexem em dinheiro ou no contrato: rodam numa transação, com o pedido travado.
-_COM_TRAVA = (Acao.REGISTRAR_AUSENCIA, Acao.CONCLUIR_POR_PRAZO, Acao.EXPIRAR_PAGAMENTO)
+_COM_TRAVA = (
+    Acao.REGISTRAR_AUSENCIA,
+    Acao.CONCLUIR_POR_PRAZO,
+    Acao.EXPIRAR_PAGAMENTO,
+    Acao.EXPIRAR_PEDIDO,
+)
 # Em memória não há trava de linha: este cadeado faz o papel dela na liberação.
 _TRAVA_DA_LIBERACAO = threading.RLock()
 
@@ -225,7 +235,9 @@ class ExecutorContexto:
         provedor: Any = None,
         pagamento: Any = None,
         estorno_idade_minima: timedelta = timedelta(seconds=120),
+        validade_urgente: timedelta | None = None,
     ) -> None:
+        self._validade_urgente = validade_urgente  # o mesmo de `ConfigRotinas`, se houver
         self._pagamento = pagamento  # `ServicoPagamento` (reenvio de estornos)
         self._estorno_idade_minima = estorno_idade_minima
         self._c = contexto
@@ -254,7 +266,11 @@ class ExecutorContexto:
             return 0
         from trato.api.moedas import expirar_reservas_moedas
 
-        return expirar_reservas_moedas(self._c.moedas, self._cobrancas, agora, self._provedor)
+        corte = agora
+        if self._c.indisponibilidades.listar():  # 22.3
+            validade = timedelta(minutes=self._c.moedas.config().reserva_minutos)
+            corte = corte_das_reservas(self._c, validade, agora)
+        return expirar_reservas_moedas(self._c.moedas, self._cobrancas, corte, self._provedor)
 
     def expirar_exclusividades(self, agora: datetime) -> int:
         """Expira ofertas sem resposta (estorna) e exclusividades de 48h vencidas (reabre).
@@ -303,15 +319,16 @@ class ExecutorContexto:
         return len(expiradas) + len(do_cliente)
 
     def encerrar_medidas(self, agora: datetime) -> int:
-        """Medida de conta com prazo vencido devolve a conta (Termos 20)."""
+        """Medida de conta com prazo vencido devolve a conta; encerramento avisado que chegou ao
+        dia bloqueia (Termos 20)."""
         from trato.api.cautela import avisar_cautela_atrasada
-        from trato.api.medidas import encerrar_vencidas
+        from trato.api.medidas import encerrar_vencidas, iniciar_agendadas
 
         try:  # 9.6: o aviso do prazo não pode derrubar a rotina das medidas
             avisar_cautela_atrasada(self._c, self._notif, agora)
         except Exception:  # noqa: BLE001
             log.exception("Rotina do prazo de cautela falhou")
-        return encerrar_vencidas(self._c, agora)
+        return iniciar_agendadas(self._c, agora) + encerrar_vencidas(self._c, agora)
 
     def liberar_bonus_moedas(self, agora: datetime) -> int:
         """Libera (ou cancela) os bônus de moedas pendentes vencidos. Devolve quantos liberou.
@@ -470,10 +487,21 @@ class ExecutorContexto:
         # commit. A trava vem ANTES da leitura: uma chegada registrada pelo profissional ou uma
         # remarcação gravada no meio do caminho é vista e a ausência deixa de valer.
         reaberta: tuple[Pedido, datetime, datetime] | None = None
+        concluido = False
         with self._c.transacao():
             travar = getattr(self._c.pedidos, "travar", None)
             if travar is not None:
                 travar(acao.pedido_id)
+            if acao.acao is not Acao.CONCLUIR_POR_PRAZO:
+                alvo = self._c.pedidos.obter(acao.pedido_id)
+                if alvo is not None and acao.acao is Acao.EXPIRAR_PEDIDO:
+                    alvo = _aberto_desde(self._c, alvo)  # reaberto conta da reabertura
+                if alvo is not None and (
+                    motivo := impedimento_por_falha(
+                        self._c, alvo, acao.acao, agora, prazos=self._prazos(alvo)
+                    )
+                ):
+                    raise Adiada(motivo)  # 22.3: o prazo corre de novo pelo tempo da falha
             if acao.acao is Acao.EXPIRAR_PAGAMENTO:
                 self._expirar_pagamento(acao, agora)
                 return
@@ -492,13 +520,20 @@ class ExecutorContexto:
                     janela = self._janela_reaberta(pedido, agora)
                     if janela is not None and agora < janela[1]:
                         reaberta = (pedido, *janela)
+                    elif motivo := impedimento_por_falha(
+                        self._c, pedido, acao.acao, agora, janela[0] if janela else None
+                    ):
+                        raise Adiada(motivo)  # 22.3: sem confirmação pelo silêncio
             if reaberta is None and acao.acao is Acao.REGISTRAR_AUSENCIA:
                 pedido = self._c.pedidos.obter(acao.pedido_id)
                 if pedido is not None and pedido.janela is not None:
                     if self._c.ausencias.obter(pedido.id, pedido.janela.inicio) is not None:
                         return  # Termos 7.6: o profissional registrou a chegada
             if reaberta is None:
-                self._aplicar_transicao(acao, agora)
+                aplicou = self._aplicar_transicao(acao, agora)
+                concluido = aplicou and acao.acao is Acao.CONCLUIR_POR_PRAZO
+        if concluido:
+            self._avisar_janela_encerrada(acao.pedido_id)  # só depois de gravado
         if reaberta is not None:
             self._avisar_janela_reaberta(*reaberta)  # fora da transação: nada foi gravado
             raise Adiada("janela_reaberta")
@@ -513,6 +548,29 @@ class ExecutorContexto:
             return None
         desde = desbloqueada_em(self._c, pedido.cliente_id, pedido.check_out_em, agora)
         return (desde, desde + prazo) if desde is not None else None
+
+    def _avisar_janela_encerrada(self, pedido_id: str) -> None:
+        """Termos 15.3: as duas partes sabem que a Janela de Confirmação acabou."""
+        pedido = self._c.pedidos.obter(pedido_id)
+        if self._notif is None or pedido is None:
+            return
+        marca = int(pedido.check_out_em.timestamp()) if pedido.check_out_em else 0
+        for usuario in filter(None, (pedido.cliente_id, pedido.profissional_id)):
+            try:
+                self._notif.notificar(
+                    Evento.JANELA_ENCERRADA,
+                    usuario,
+                    chave=f"{pedido_id}:janela_encerrada:{marca}",
+                    pedido_id=pedido_id,
+                )
+            except Exception:  # noqa: BLE001 - aviso é secundário
+                log.exception("Aviso do fim da janela falhou (%s)", pedido_id)
+
+    def avisar_tratinhos_vencendo(self, agora: datetime) -> int:
+        """Termos 13.4 e I.5: aviso antes do vencimento. Devolve quantos avisos novos saíram."""
+        from trato.api.tratinhos_vencimento import avisar_vencimentos
+
+        return avisar_vencimentos(self._c, self._notif, agora)
 
     def _avisar_janela_reaberta(self, pedido: Pedido, desde: datetime, fim: datetime) -> None:
         if self._notif is None:
@@ -544,10 +602,28 @@ class ExecutorContexto:
         )
         if com_dinheiro:
             raise Adiada("pagamento_recebido")
+        # Reabrir e encerrar o contrato são uma coisa só: pedido aberto com contrato vigente não
+        # aceita outro orçamento. Sem como encerrar (banco sem a 20261127004000), nada muda.
+        tem_contrato = c.contratos.obter_do_pedido(acao.pedido_id) is not None
+        pode = getattr(c.contratos, "pode_encerrar_por_pagamento_expirado", None)
+        if tem_contrato and pode is not None and not pode(acao.pedido_id):
+            log.warning("Pagamento expirado sem como encerrar o contrato (%s)", acao.pedido_id)
+            raise Adiada("contrato_nao_encerrado")
         if not self._aplicar_transicao(acao, agora):
             return
-        if c.contratos.encerrar_por_pagamento_expirado(acao.pedido_id) and self._cobrancas:
-            self._cobrancas.encerrar_contrato(acao.pedido_id)
+        if c.contratos.encerrar_por_pagamento_expirado(acao.pedido_id):
+            if self._cobrancas:
+                self._cobrancas.encerrar_contrato(acao.pedido_id)
+        elif tem_contrato:
+            raise Adiada("contrato_nao_encerrado")  # desfaz a reabertura (mesma transação)
+
+    def _prazos(self, pedido: Pedido):  # type: ignore[no-untyped-def]
+        prazos = self._c.config.carregar().prazos_pedido
+        if self._validade_urgente is not None:
+            dados = self._c.pedidos.dados_do_pedido(pedido.id)
+            if dados is not None and dados.urgente:
+                return replace(prazos, receber_orcamentos=self._validade_urgente)
+        return prazos
 
     def _aplicar_transicao(self, acao: AcaoRotina, agora: datetime) -> bool:
         c = self._c
@@ -556,13 +632,23 @@ class ExecutorContexto:
             return False
         base = _aberto_desde(c, antes) if acao.acao is Acao.EXPIRAR_PEDIDO else antes
         try:
-            t = transicionar(
-                base, acao.acao, SISTEMA, agora, prazos=c.config.carregar().prazos_pedido
-            )
+            t = transicionar(base, acao.acao, SISTEMA, agora, prazos=self._prazos(antes))
             t = replace(t, pedido=replace(t.pedido, aberto_em=antes.aberto_em))
         except TransicaoInvalida:
             return False  # outra instância ou o usuário já mudou o pedido: nada a fazer
         depois = c.pedidos.salvar(t.pedido, t.evento)
+        if acao.acao is Acao.REGISTRAR_AUSENCIA and antes.profissional_id:
+            c.cancelamentos.registrar(
+                Cancelamento(
+                    pedido_id=depois.id,
+                    solicitado_por=antes.profissional_id,
+                    tipo="cancelamento_profissional",
+                    status="cancelado_sem_retencao",
+                    recebido_em=agora,
+                    motivo="Ausência do profissional registrada automaticamente.",
+                    papel="profissional",
+                )
+            )
         for gancho in c.apos_transicao:
             gancho(antes, depois, acao.acao, c)
         return True
@@ -575,6 +661,11 @@ class ExecutorContexto:
             return "pedido_nao_concluido"
         if pedido.profissional_id != acao.profissional_id:
             return "profissional_mudou"
+        if pedido.concluido_em and c.indisponibilidades.listar(desde=pedido.concluido_em):
+            horas = c.config.carregar().disputas.prazo_congelar_repasse_horas
+            fim = fim_do_congelamento(c, pedido.concluido_em)
+            if fim > pedido.concluido_em + timedelta(hours=horas) and agora <= fim:
+                return "indisponibilidade"  # 22.3: o prazo de reclamar ainda corre
         fatos = fatos_da_liberacao(c, pedido)
         if pedido.estado is Estado.CANCELADO:
             if fatos.retencao_em is None:

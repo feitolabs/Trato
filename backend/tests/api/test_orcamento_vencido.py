@@ -94,6 +94,9 @@ def test_contraproposta_aceite_e_proposta_recusam_vencido_sem_nova_versao(fluxo)
 def test_orcamento_novo_nao_nasce_vencido(fluxo):
     pid = fluxo.chamar("POST", "/v1/pedidos", "t-cliente").json()["id"]
     corpo = {
+        "prazo_execucao_dias": 3,
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "outro",

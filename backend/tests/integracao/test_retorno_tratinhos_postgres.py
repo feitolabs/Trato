@@ -36,6 +36,9 @@ def cenario(c, sem_falta):
         inicio - timedelta(days=10),
         expira_em=inicio + timedelta(days=10),
     )
+    # No encerramento sem falta, a data passada a `aplicar` é a do AVISO e a medida começa 30
+    # dias depois (20.8). Para um encerramento já iniciado em `inicio`, o aviso é 30 dias antes.
+    aviso = inicio - timedelta(days=30) if sem_falta is True else inicio
     medida, _ = aplicar(
         contexto,
         Medida(
@@ -43,13 +46,14 @@ def cenario(c, sem_falta):
             tipo="encerramento",
             motivo="Encerramento administrativo para teste de retorno.",
             clausulas=("20.9",),
-            inicio_em=inicio,
+            inicio_em=aviso,
             efeito="Conta encerrada.",
             como_contestar="Canal oficial.",
             aplicada_por=analista,
             sem_falta=sem_falta,
         ),
     )
+    assert (medida.inicio_em, medida.avisado_em) == (inicio, aviso)
     return contexto, usuario, medida, lider
 
 

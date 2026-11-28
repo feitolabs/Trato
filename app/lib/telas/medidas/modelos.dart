@@ -210,11 +210,21 @@ class MedidaDeConta {
         _ => 'Medida na conta',
       };
 
-  String get situacaoTexto => revertidaEm != null
-      ? 'Revertida'
-      : vigente
-          ? 'Em vigor'
-          : 'Encerrada';
+  /// Termos 20.8: encerramento avisado que ainda não começou.
+  bool agendada(DateTime agora) =>
+      tipo == 'encerramento' &&
+      revertidaEm == null &&
+      !vigente &&
+      (inicioEm?.isAfter(agora) ?? false);
+
+  String get situacaoTexto {
+    if (revertidaEm != null) return 'Revertida';
+    if (vigente) return 'Em vigor';
+    if (!agendada(DateTime.now())) return 'Encerrada';
+    final d = inicioEm!;
+    String dois(int n) => n.toString().padLeft(2, '0');
+    return 'Agendada para ${dois(d.day)}/${dois(d.month)}/${d.year}';
+  }
 
   /// O botão "Contestar" aparece; quem decide se vale é o servidor.
   bool podeContestar(DateTime agora) =>

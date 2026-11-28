@@ -3,6 +3,7 @@ primeiro login válido, de forma idempotente (M11). O papel NUNCA vem do token."
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -11,6 +12,7 @@ from trato.api.repositorios_app import PerfilDetalhe
 from trato.persistencia.comum import como_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.erros import DadosInvalidos
+from trato.profissional.nota import SQL_PUBLICADA
 
 STATUS_QUE_ENTRAM = ("ativo", "restrito")
 NOME_PADRAO = "Novo usuário"
@@ -274,6 +276,20 @@ class UsuariosPostgres:
             ).fetchone()
         return linha["status"] if linha else None
 
+    def selos_conferidos_em(self, ids: Sequence[str]) -> dict[str, datetime]:
+        """Termos 10.2: data da última verificação aprovada de cada profissional."""
+        pares = {str(a): i for i in ids if (a := como_uuid(i)) is not None}
+        if not pares:
+            return {}
+        with self._banco.transacao() as con:
+            linhas = con.execute(
+                "select profissional_id, max(decidida_em) as em from public.verificacoes "
+                "where status = 'aprovada' and decidida_em is not null "
+                "and profissional_id = any(%s::uuid[]) group by profissional_id",
+                (list(pares),),
+            ).fetchall()
+        return {pares[str(x["profissional_id"])]: x["em"] for x in linhas}
+
     def status_verificacao(self, usuario_id: str) -> str | None:
         """Status da verificação mais recente (enviada, em_analise, aprovada, recusada)."""
         achado = como_uuid(usuario_id)
@@ -335,8 +351,9 @@ class UsuariosPostgres:
         """Avaliações de clientes que entram na nota pública (mesmo filtro de `nota_publica`)."""
         with self._banco.transacao() as con:
             linha = con.execute(
-                "select count(*) as n from public.avaliacoes "
-                "where avaliado_id = %s and direcao = 'cliente_para_profissional'",
+                "select count(*) as n from public.avaliacoes a "  # noqa: S608
+                "where a.avaliado_id = %s and a.direcao = 'cliente_para_profissional' "
+                f"and {SQL_PUBLICADA}",
                 (profissional_id,),
             ).fetchone()
         return int(linha["n"])

@@ -21,6 +21,7 @@ from trato.api.exclusividades import Exclusividade
 from trato.api.moedas_saldo import creditos_validos
 from trato.api.rotas_app import pedido_visivel_ao_profissional
 from trato.api.rotas_mei import servico_mei
+from trato.api.selo import selo_retirado
 from trato.notificacoes.eventos import Evento
 
 router = APIRouter(prefix="/v1", tags=["exclusividade do cliente"])
@@ -164,6 +165,7 @@ def pedir(
     def apto(profissional_id: str) -> bool:
         return (
             profissional_id != usuario.id
+            and not selo_retirado(contexto, profissional_id)  # 10.3: não poderia orçar
             and pedido_visivel_ao_profissional(contexto, pedido.id, profissional_id) is not None
             and (not exigir_mei or mei.liberado(profissional_id))
         )

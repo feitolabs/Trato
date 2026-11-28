@@ -72,11 +72,15 @@ class _ConteudoState extends State<_Conteudo> {
   TextEditingController _controle(ConfigDefinicao d) {
     return _campos.putIfAbsent(
       d.chave,
-      () => TextEditingController(text: valorParaCampo(_vigente?.valores[d.chave] ?? 0, d)),
+      () {
+        final valor = _atual(d);
+        return TextEditingController(text: valor == null ? '' : valorParaCampo(valor, d));
+      },
     );
   }
 
-  int _atual(ConfigDefinicao d) => _vigente?.valores[d.chave] ?? 0;
+  /// Null = a versão vigente não publica este parâmetro. Nunca vira zero.
+  int? _atual(ConfigDefinicao d) => _vigente?.valores[d.chave];
 
   /// Valor proposto digitado, ou null quando o texto não vale.
   int? _digitado(ConfigDefinicao d) => campoParaValor(_controle(d).text, d);
@@ -86,12 +90,13 @@ class _ConteudoState extends State<_Conteudo> {
     final d = widget.config.definicoes.where((x) => x.chave == chave).firstOrNull;
     if (d == null) return null;
     final v = _campos.containsKey(chave) ? (_digitado(d) ?? _atual(d)) : _atual(d);
-    return paraHoras(v);
+    return v == null ? null : paraHoras(v);
   }
 
   String? _erro(ConfigDefinicao d) {
     final v = _digitado(d);
-    if (_controle(d).text.trim().isEmpty) return 'Digite um número';
+    // Campo vazio de parâmetro sem valor publicado não é erro: não há o que propor.
+    if (_controle(d).text.trim().isEmpty) return _atual(d) == null ? null : 'Digite um número';
     if (v == null) {
       return switch (d.unidade) {
         UnidadeConfig.centavos => kErroReais,
@@ -127,7 +132,8 @@ class _ConteudoState extends State<_Conteudo> {
         children: [
           Row(
             children: [
-              Expanded(child: CampoLeitura('Valor atual', valorLegivel(antes, d))),
+              Expanded(
+                  child: CampoLeitura('Valor atual', antes == null ? kSemValorPublicado : valorLegivel(antes, d))),
               const Icon(Icons.arrow_forward, size: 18, color: CoresTrato.textoMudo),
               const SizedBox(width: EspacosTrato.x3),
               Expanded(child: CampoLeitura('Valor proposto', valorLegivel(novo, d))),
@@ -419,7 +425,7 @@ Widget _campoProposto(ConfigDefinicao d, TextEditingController controle, String?
     return SeletorTrato<String>(
       rotulo: 'Valor proposto',
       habilitado: habilitado,
-      valor: controle.text.trim().isEmpty ? '0' : controle.text.trim(),
+      valor: controle.text.trim().isEmpty ? null : controle.text.trim(),
       opcoes: const [('0', 'Desligada'), ('1', 'Ligada')],
       aoMudar: (v) {
         controle.text = v;
@@ -431,6 +437,7 @@ Widget _campoProposto(ConfigDefinicao d, TextEditingController controle, String?
     UnidadeConfig.bps => (null, '%'),
     UnidadeConfig.centavos => ('R\$ ', null),
     UnidadeConfig.horas => (null, 'horas'),
+    UnidadeConfig.minutos => (null, 'minutos'),
     UnidadeConfig.dias => (null, 'dias'),
     UnidadeConfig.diasUteis => (null, 'dias úteis'),
     _ => (null, null),
@@ -467,7 +474,7 @@ class _LinhaTabela extends StatelessWidget {
   });
 
   final ConfigDefinicao def;
-  final int atual;
+  final int? atual;
   final TextEditingController controle;
   final String? erro;
   final bool mudou;
@@ -498,7 +505,10 @@ class _LinhaTabela extends StatelessWidget {
           Expanded(flex: _flexTabela[1], child: Text(faixaLegivel(def), style: TipografiaTrato.numeroTabular)),
           Expanded(
             flex: _flexTabela[2],
-            child: Text(valorLegivel(atual, def), style: TipografiaTrato.numeroTabular.copyWith(fontWeight: FontWeight.w700)),
+            child: atual == null
+                ? Text(kSemValorPublicado, style: TipografiaTrato.legenda)
+                : Text(valorLegivel(atual!, def),
+                    style: TipografiaTrato.numeroTabular.copyWith(fontWeight: FontWeight.w700)),
           ),
           Expanded(
             flex: _flexTabela[3],
@@ -532,7 +542,7 @@ class _LinhaCartao extends StatelessWidget {
   });
 
   final ConfigDefinicao def;
-  final int atual;
+  final int? atual;
   final TextEditingController controle;
   final String? erro;
   final bool mudou;
@@ -553,7 +563,7 @@ class _LinhaCartao extends StatelessWidget {
           if (ajuda.isNotEmpty) Text(ajuda, style: TipografiaTrato.legenda),
           const SizedBox(height: EspacosTrato.x2),
           Linha('Faixa permitida', faixaLegivel(def)),
-          Linha('Valor atual', valorLegivel(atual, def)),
+          Linha('Valor atual', atual == null ? kSemValorPublicado : valorLegivel(atual!, def)),
           const SizedBox(height: EspacosTrato.x2),
           _campoProposto(def, controle, erro, podePropor, aoMudar),
           if (podePropor) ...[

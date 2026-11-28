@@ -6,16 +6,19 @@ migration 20261125225600). Toda escrita é auditada. Sem as tabelas, responde 50
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import Pagina
 from trato.api.admin.papeis import Permissao
+from trato.api.avisos import servicos_de_notificacao
 from trato.api.contexto import Contexto, obter_contexto
+from trato.notificacoes.eventos import Evento
 from trato.persistencia.avaliacoes_moderacao import OcultacaoAvaliacao, RevisaoAvaliacao
 
 router = APIRouter(prefix="/v1/admin/avaliacoes", tags=["admin: moderação de avaliações"])
@@ -29,8 +32,34 @@ MotivoOcultacao = Literal[
 ]
 StatusRevisao = Literal["aberta", "em_analise", "aceita", "recusada"]
 
+log = logging.getLogger("trato.moderacao")
 
-class OcultarAvaliacaoIn(BaseModel):
+# Motivos da cláusula 12.6, como o autor os lê. A explicação do analista é interna e não vai.
+TEXTO_DO_MOTIVO: dict[str, str] = {
+    "ofensa_ou_ilegal": "conteúdo ofensivo ou ilegal",
+    "dados_pessoais": "exposição de dados pessoais",
+    "sem_pedido_real_ou_falsa": "avaliação sem pedido real ou falsa",
+    "nao_participou": "quem avaliou não participou do serviço",
+    "ordem_judicial": "ordem judicial",
+}
+
+
+class _Adiamento(BaseModel):
+    adiar_aviso: bool = Field(
+        False,
+        description="11.8: só quando avisar o autor atrapalha investigação de crime ou põe "
+        "alguém em risco. Exige a justificativa, que fica na auditoria.",
+    )
+    justificativa_adiamento: str | None = Field(None, min_length=10, max_length=1000)
+
+    @model_validator(mode="after")
+    def _exigir_justificativa(self) -> _Adiamento:
+        if self.adiar_aviso and not (self.justificativa_adiamento or "").strip():
+            raise ValueError("Para adiar o aviso ao autor, informe `justificativa_adiamento`.")
+        return self
+
+
+class OcultarAvaliacaoIn(_Adiamento):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     motivo: MotivoOcultacao
@@ -43,7 +72,7 @@ class ReverterOcultacaoIn(BaseModel):
     motivo: str = Field(min_length=10, max_length=2000)
 
 
-class DecidirRevisaoIn(BaseModel):
+class DecidirRevisaoIn(_Adiamento):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     status: Literal["aceita", "recusada"]
@@ -132,6 +161,64 @@ def _exigir_tabelas(contexto: Contexto) -> None:
         )
 
 
+def _avisar_autor(
+    request: Request, contexto: Contexto, ocu: OcultacaoAvaliacao
+) -> OcultacaoAvaliacao:
+    """11.8: informa o autor, com o motivo e como contestar (20.5). Idempotente pela ocultação.
+    Falha no aviso não desfaz a ocultação: `autor_avisado_em` fica vazio e a rota
+    `/avisar-autor` reenvia."""
+    try:
+        avaliacao = contexto.avaliacoes.obter_por_id(ocu.avaliacao_id)
+        if avaliacao is None:
+            return ocu
+        servico, _ = servicos_de_notificacao(request, contexto)
+        servico.notificar(
+            Evento.AVALIACAO_OCULTADA,
+            avaliacao.avaliador_id,
+            chave=f"ocultacao:{ocu.id}",
+            pedido_id=avaliacao.pedido_id,
+            corpo=f"Sua avaliação foi ocultada. Motivo: {TEXTO_DO_MOTIVO[ocu.motivo]}. "
+            "Você pode contestar pelo aplicativo ou pelo SAC em até 30 dias deste aviso.",
+            dados={"avaliacao_id": ocu.avaliacao_id, "motivo": ocu.motivo},
+        )
+        return contexto.avaliacoes_moderacao.marcar_autor_avisado(ocu.id, contexto.agora()) or ocu
+    except Exception:  # noqa: BLE001 - aviso não desfaz a moderação
+        log.exception("Aviso de avaliação ocultada falhou (%s)", ocu.id)
+        return ocu
+
+
+@router.post(
+    "/{avaliacao_id}/avisar-autor",
+    response_model=OcultacaoOut,
+    summary="Enviar o aviso adiado (ou que falhou) ao autor da avaliação oculta (11.8)",
+)
+def avisar_autor_da_ocultacao(
+    avaliacao_id: str,
+    request: Request,
+    operador: Operador = Depends(exigir(Permissao.AVALIACOES_MODERAR)),
+    contexto: Contexto = Depends(obter_contexto),
+    admin: AdminContexto = Depends(obter_admin),
+) -> OcultacaoOut:
+    _exigir_tabelas(contexto)
+    ativa = contexto.avaliacoes_moderacao.ocultacao_ativa(avaliacao_id)
+    if ativa is None:
+        raise HTTPException(409, "Esta avaliação não tem ocultação ativa.")
+    if ativa.autor_avisado_em is not None:
+        return _ocu_out(ativa)
+    avisada = _avisar_autor(request, contexto, ativa)
+    if avisada.autor_avisado_em is None:
+        raise HTTPException(503, "Não foi possível avisar o autor agora. Tente de novo.")
+    admin.auditoria.registrar(
+        ator_id=operador.id,
+        acao="avaliacao.autor_avisado",
+        entidade="avaliacoes",
+        entidade_id=avaliacao_id,
+        depois={"ocultacao_id": ativa.id},
+        motivo="Aviso ao autor (Termos 11.8)",
+    )
+    return _ocu_out(avisada)
+
+
 @router.post(
     "/{avaliacao_id}/ocultar",
     response_model=OcultacaoOut,
@@ -141,6 +228,7 @@ def _exigir_tabelas(contexto: Contexto) -> None:
 def ocultar_avaliacao(
     avaliacao_id: str,
     corpo: OcultarAvaliacaoIn,
+    request: Request,
     operador: Operador = Depends(exigir(Permissao.AVALIACOES_MODERAR)),
     contexto: Contexto = Depends(obter_contexto),
     admin: AdminContexto = Depends(obter_admin),
@@ -158,9 +246,16 @@ def ocultar_avaliacao(
         acao="avaliacao.ocultada",
         entidade="avaliacoes",
         entidade_id=avaliacao_id,
-        depois={"ocultacao_id": ocu.id, "motivo": corpo.motivo},
+        depois={
+            "ocultacao_id": ocu.id,
+            "motivo": corpo.motivo,
+            "aviso_adiado": corpo.adiar_aviso,
+            "justificativa_adiamento": corpo.justificativa_adiamento if corpo.adiar_aviso else None,
+        },
         motivo=corpo.explicacao,
     )
+    if not corpo.adiar_aviso:
+        ocu = _avisar_autor(request, contexto, ocu)
     return _ocu_out(ocu)
 
 
@@ -257,6 +352,7 @@ def iniciar_analise_revisao(
 def decidir_revisao(
     revisao_id: str,
     corpo: DecidirRevisaoIn,
+    request: Request,
     resposta: Response,
     operador: Operador = Depends(exigir(Permissao.AVALIACOES_MODERAR)),
     contexto: Contexto = Depends(obter_contexto),
@@ -280,6 +376,7 @@ def decidir_revisao(
 
     agora = contexto.agora()
     ocultacao_aplicada_id: str | None = None
+    nova_ocultacao: OcultacaoAvaliacao | None = None
     with contexto.transacao():
         rev, cod = contexto.avaliacoes_moderacao.decidir_revisao(
             revisao_id,
@@ -312,6 +409,7 @@ def decidir_revisao(
                     )
                     if cod_ocu == "ok" and ocu is not None:
                         ocultacao_aplicada_id = ocu.id
+                        nova_ocultacao = ocu
                 elif ativa is not None:
                     ocultacao_aplicada_id = ativa.id
             elif corpo.status == "aceita" and rev.tipo == "contestacao_ocultacao":
@@ -331,6 +429,10 @@ def decidir_revisao(
                     "tipo": rev.tipo,
                     "avaliacao_id": rev.avaliacao_id,
                     "ocultacao_aplicada_id": ocultacao_aplicada_id,
+                    "aviso_adiado": corpo.adiar_aviso,
+                    "justificativa_adiamento": corpo.justificativa_adiamento
+                    if corpo.adiar_aviso
+                    else None,
                 },
                 motivo=corpo.resposta,
             )
@@ -339,4 +441,6 @@ def decidir_revisao(
             ativa = contexto.avaliacoes_moderacao.ocultacao_ativa(rev.avaliacao_id)
             ocultacao_aplicada_id = ativa.id if ativa else rev.ocultacao_id
 
+    if nova_ocultacao is not None and not corpo.adiar_aviso:
+        _avisar_autor(request, contexto, nova_ocultacao)  # depois do commit
     return _rev_out(rev, ocultacao_aplicada_id=ocultacao_aplicada_id)

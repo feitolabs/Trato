@@ -482,6 +482,40 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                       ),
                       const SizedBox(height: EspacosTrato.x3),
                     ],
+                    if (_metodo == MetodoPagamento.pix &&
+                        textoPrazoPix(dados.pixExpiraEm, dados.pixValidadeMinutos) != null) ...[
+                      Text(
+                        textoPrazoPix(dados.pixExpiraEm, dados.pixValidadeMinutos)!,
+                        key: const Key('pagamento-pix-prazo'),
+                        style: TipografiaTrato.corpoPequeno
+                            .copyWith(color: context.cores.textoSecundario),
+                      ),
+                      const SizedBox(height: EspacosTrato.x3),
+                    ],
+                    if (rotuloEstornoStatus(dados.estornoStatus) != null) ...[
+                      CartaoTrato(
+                        key: const Key('pagamento-cartao-estorno'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              rotuloEstornoStatus(dados.estornoStatus)!,
+                              style: TipografiaTrato.corpoForte,
+                            ),
+                            if ((dados.estornoPrazoEstimado ?? '').trim().isNotEmpty) ...[
+                              const SizedBox(height: EspacosTrato.x1),
+                              Text(
+                                dados.estornoPrazoEstimado!.trim(),
+                                key: const Key('pagamento-estorno-prazo'),
+                                style: TipografiaTrato.corpoPequeno
+                                    .copyWith(color: context.cores.textoSecundario),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: EspacosTrato.x3),
+                    ],
                     if (_metodo == MetodoPagamento.cartao && dados.parcelamento.isNotEmpty) ...[
                       Text('Cartão parcelado', style: TipografiaTrato.corpoForte),
                       const SizedBox(height: EspacosTrato.x2),
@@ -496,9 +530,9 @@ class _PagamentoTelaState extends State<PagamentoTela> {
                         const SizedBox(height: EspacosTrato.x2),
                         _OpcaoParcela(
                           key: Key('parcela-${p.parcelas}'),
-                          titulo: '${p.parcelas}x de ${Dinheiro.formatar(p.valorParcelaCentavos)}',
-                          detalhe: 'Total ${Dinheiro.formatar(p.totalCentavos)} '
-                              '(inclui ${Dinheiro.formatar(p.custoCentavos)} de custo do parcelamento)',
+                          titulo: textoTituloParcela(p),
+                          // 6.4: exibe sem juros, custo total único e última parcela vindos do servidor.
+                          detalhe: textoDetalheParcela(p),
                           selecionada: _parcelas == p.parcelas,
                           aoTocar: () => setState(() => _parcelas = p.parcelas),
                         ),

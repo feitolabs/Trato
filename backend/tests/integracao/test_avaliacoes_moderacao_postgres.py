@@ -18,6 +18,30 @@ from .test_pagamento_postgres import linhas, migrations_novas, pg  # noqa: F401
 pytestmark = pytest.mark.integracao
 
 
+def _sem_avaliacoes_anteriores(c, profissional: str) -> None:
+    """O banco é dividido entre os módulos e este teste confere a média EXATA do profissional:
+    tira do caminho as avaliações que outros testes deixaram para ele (só no banco local)."""
+    alvo = "select id from public.avaliacoes where avaliado_id = %s"
+    with c.local.admin() as con, con.transaction():
+        con.execute("set local session_replication_role = replica")
+        for tabela in ("avaliacao_revisoes", "avaliacao_ocultacoes"):
+            con.execute(
+                f"delete from public.{tabela} where avaliacao_id in ({alvo})",  # noqa: S608
+                (profissional,),
+            )
+        con.execute("delete from public.avaliacoes where avaliado_id = %s", (profissional,))
+        con.execute("select public.recalcular_perfil_profissional(%s)", (profissional,))
+
+
+@pytest.fixture
+def profissional_sem_avaliacoes(equipe):  # noqa: F811
+    """Limpa antes (o que outros deixaram) e depois (o que este teste cria), nas duas ordens."""
+    c = equipe
+    _sem_avaliacoes_anteriores(c, c.ids["profissional"])
+    yield
+    _sem_avaliacoes_anteriores(c, c.ids["profissional"])
+
+
 def _criar_avaliacao_no_banco(c, nota: int, comentario: str) -> str:
     pid, _, _ = pago_e_agendado(c)
     avs = AvaliacoesPostgres(c.banco)
@@ -39,7 +63,11 @@ def _criar_avaliacao_no_banco(c, nota: int, comentario: str) -> str:
     return av.id
 
 
-def test_ocultar_reverter_e_revisao_no_postgres_real(equipe, migrations_novas):  # noqa: F811
+def test_ocultar_reverter_e_revisao_no_postgres_real(
+    equipe,  # noqa: F811
+    migrations_novas,  # noqa: F811
+    profissional_sem_avaliacoes,  # noqa: F811
+):
     _ = migrations_novas
     c = equipe
     mod = ModeracaoAvaliacoesPostgres(c.banco)

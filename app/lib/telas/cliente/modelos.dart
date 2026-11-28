@@ -1,3 +1,4 @@
+import '../comuns/contagem_avaliacoes.dart';
 import 'package:flutter/widgets.dart';
 
 /// Modelos simples das telas do cliente. Provisórios: o formato real vem do backend.
@@ -193,6 +194,7 @@ class Profissional {
     required this.nome,
     required this.iniciais,
     required this.verificacao,
+    this.seloConferidoEm,
     required this.especialidade,
     required this.servicosConcluidos,
     required this.nota,
@@ -205,6 +207,7 @@ class Profissional {
     this.categoriaId,
     this.categoriasIds = const [],
     this.precoAPartirCentavos,
+    this.contagem,
   });
 
   /// Id do profissional na API (nulo nos dados do protótipo).
@@ -220,11 +223,17 @@ class Profissional {
   /// Referência de preço mostrada na lista; o valor do serviço é o do orçamento.
   final int? precoAPartirCentavos;
 
+  /// Termos 12.3. Nulo: servidor antigo (a tela fica como antes).
+  final ContagemAvaliacoes? contagem;
+
   final String nome;
   final String iniciais;
 
   /// "Verificado" ou "Verificado Plus".
   final String verificacao;
+
+  /// `selo_conferido_em`: quando o selo foi conferido; nulo se a API não mandou.
+  final DateTime? seloConferidoEm;
   final String especialidade;
   final int servicosConcluidos;
   final double nota;
@@ -247,6 +256,8 @@ class CategoriaServico {
     this.descricao = '',
     this.aceitaRemoto = false,
     this.garantiaMinimaDias = 30,
+    this.incluido = const [],
+    this.naoIncluido = const [],
   });
 
   /// O admin liberou o atendimento remoto nesta categoria (o cliente escolhe presencial ou
@@ -264,6 +275,25 @@ class CategoriaServico {
   /// Serviços típicos da categoria, usados no Novo pedido.
   final List<String> servicos;
   final String descricao;
+
+  /// Itens incluídos nesta categoria (Termos 3.6; vazio se ausente/não configurado).
+  final List<String> incluido;
+
+  /// Itens não incluídos nesta categoria (Termos 3.6; vazio se ausente/não configurado).
+  final List<String> naoIncluido;
+
+  /// Lê listas de texto opcionais (`incluido`, `nao_incluido`) sem quebrar em servidor antigo.
+  static List<String> lerListaTexto(Object? bruto) {
+    if (bruto is! List) return const [];
+    final saida = <String>[];
+    for (final item in bruto) {
+      if (item is String) {
+        final t = item.trim();
+        if (t.isNotEmpty) saida.add(t);
+      }
+    }
+    return saida.isEmpty ? const [] : List.unmodifiable(saida);
+  }
 }
 
 class PedidoEmAndamento {

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
+from functools import partial
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from trato.api import medidas
+from trato.api import medidas, pedidos_conta
 from trato.api.admin.contexto import (
     AdminContexto,
     Operador,
@@ -29,8 +32,13 @@ from trato.api.admin.modelos import (
     UsuarioDetalheOut,
     UsuarioOut,
 )
+from trato.api.admin.mudanca_moedas import ACAO_AVISO
 from trato.api.admin.papeis import Permissao, pode
+from trato.api.admin.repositorios import FiltroAuditoria
+from trato.api.admin.rotas_avisos_previos import antecedencia_dias
+from trato.api.admin.rotas_medidas import campos_de_pedidos
 from trato.api.contexto import Contexto, obter_contexto
+from trato.financeiro import periodo
 from trato.persistencia.comum import como_uuid
 
 router = APIRouter(prefix="/v1/admin", tags=["admin: usuários e pedidos"])
@@ -78,7 +86,9 @@ def _marcar_trava(contexto: Contexto, operador: Operador, itens: list[UsuarioOut
 @router.get("/usuarios", response_model=Pagina[UsuarioOut], summary="Buscar usuários")
 def buscar_usuarios(
     q: str | None = Query(None, min_length=2, max_length=100, description="Nome ou id."),
-    status: str | None = Query(None, pattern="^(ativo|restrito|bloqueado|anonimizado)$"),
+    status: str | None = Query(
+        None, pattern="^(ativo|restrito|bloqueado|inativo|anonimizado)$"
+    ),
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
     operador: Operador = Depends(exigir(Permissao.USUARIOS_BUSCAR)),
@@ -183,6 +193,7 @@ def alterar_status_usuario(
     if uid is None:
         raise HTTPException(404, "Usuário não encontrado.")
     proteger_conta_da_equipe(admin, operador, str(uid))
+    inicio = contexto.agora()
     with contexto.transacao(), banco.transacao() as con:
         usuario = con.execute(
             "SELECT id, nome, status FROM public.usuarios WHERE id = %s for update", (uid,)
@@ -219,8 +230,13 @@ def alterar_status_usuario(
                 motivo_usuario=corpo.motivo_usuario,
                 clausulas=tuple(corpo.clausulas),
             )
+            # 20.6: com a tabela de medidas, quem trata os pedidos é a medida criada acima.
+            if corpo.status == "bloqueado" and not contexto.medidas.disponivel():
+                contexto.depois_do_commit(partial(pedidos_conta.tratar_pedidos, contexto, str(uid)))
     achado = admin.usuarios.obter(usuario_id)
     saida = UsuarioOut.model_validate(achado)
+    if corpo.status == "bloqueado" and usuario["status"] != "bloqueado":
+        saida = saida.model_copy(update=campos_de_pedidos(contexto, str(uid), inicio))
     _marcar_trava(contexto, operador, [saida])
     return saida
 
@@ -302,4 +318,163 @@ def detalhe_pedido(
             )
             for e in contexto.pedidos.eventos(pedido.id)
         ],
+    )
+
+
+# --- Conta inativa (Termos 4.9): inativar após aviso prévio >= 30 dias e reativar ---------------
+
+
+def _aviso_inatividade_cumprido(
+    admin: AdminContexto, contexto: Contexto, usuario_id: str
+) -> bool:
+    dias = antecedencia_dias(contexto, "inatividade")
+    agora = contexto.agora()
+    hoje = agora.astimezone(periodo.BRASILIA).date()
+    entradas, _ = admin.auditoria.listar(
+        FiltroAuditoria(acao=ACAO_AVISO, entidade="aviso_previo", entidade_id=usuario_id),
+        50,
+        0,
+    )
+    for entrada in entradas:
+        depois = entrada.depois if isinstance(entrada.depois, dict) else {}
+        if depois.get("tipo") != "inatividade":
+            continue
+        if depois.get("usuario_id") not in (None, usuario_id):
+            continue
+        if int(depois.get("falhas") or 0) > 0:
+            continue
+        emitido_raw = depois.get("emitido_em")
+        emitido = (
+            datetime.fromisoformat(emitido_raw)
+            if isinstance(emitido_raw, str)
+            else entrada.ocorrida_em
+        )
+        vigencia_raw = depois.get("vigencia")
+        vigencia = date.fromisoformat(vigencia_raw) if isinstance(vigencia_raw, str) else None
+        if agora >= emitido + timedelta(days=dias) and (vigencia is None or hoje >= vigencia):
+            return True
+    return False
+
+
+def _atualizar_status_inatividade(
+    admin: AdminContexto,
+    contexto: Contexto,
+    operador: Operador,
+    usuario_id: str,
+    *,
+    de_permitidos: tuple[str, ...],
+    para: str,
+    acao: str,
+    motivo: str,
+    erro_estado: str,
+) -> UsuarioOut:
+    proteger_conta_da_equipe(admin, operador, usuario_id)
+    banco = contexto.extras.get("banco") if contexto.extras else None
+    if banco is not None:
+        uid = como_uuid(usuario_id)
+        if uid is None:
+            raise HTTPException(404, "Usuário não encontrado.")
+        with contexto.transacao(), banco.transacao() as con:
+            usuario = con.execute(
+                "SELECT id, nome, status FROM public.usuarios WHERE id = %s for update", (uid,)
+            ).fetchone()
+            if usuario is None:
+                raise HTTPException(404, "Usuário não encontrado.")
+            if usuario["status"] not in de_permitidos:
+                raise HTTPException(409, erro_estado)
+            con.execute(
+                "UPDATE public.usuarios SET status = %s, atualizado_em = now() WHERE id = %s",
+                (para, uid),
+            )
+            admin.auditoria.registrar(
+                ator_id=operador.id,
+                acao=acao,
+                entidade="usuarios",
+                entidade_id=str(uid),
+                antes={"status": usuario["status"]},
+                depois={"status": para, "nome": usuario["nome"]},
+                motivo=motivo,
+            )
+    else:
+        atual = admin.usuarios.obter(usuario_id)
+        if atual is None:
+            raise HTTPException(404, "Usuário não encontrado.")
+        if atual.status not in de_permitidos:
+            raise HTTPException(409, erro_estado)
+        definir = getattr(admin.usuarios, "definir_status", None)
+        if definir is not None:
+            definir(usuario_id, para)
+        definir_auth = getattr(contexto.auth, "definir_inativo", None)
+        if definir_auth is not None:
+            definir_auth(usuario_id, para == "inativo")
+        admin.auditoria.registrar(
+            ator_id=operador.id,
+            acao=acao,
+            entidade="usuarios",
+            entidade_id=usuario_id,
+            antes={"status": atual.status},
+            depois={"status": para, "nome": atual.nome},
+            motivo=motivo,
+        )
+    achado = admin.usuarios.obter(usuario_id)
+    saida = UsuarioOut.model_validate(achado)
+    _marcar_trava(contexto, operador, [saida])
+    return saida
+
+
+@router.post(
+    "/usuarios/{usuario_id}/inativar",
+    response_model=UsuarioOut,
+    summary="Inativar conta após aviso prévio de 30 dias (Termos 4.9)",
+    responses={409: {"description": "Sem aviso prévio cumprido (>= 30 dias) ou status inválido."}},
+)
+def inativar_usuario(
+    usuario_id: str,
+    corpo: ComMotivo,
+    operador: Operador = Depends(exigir(Permissao.USUARIOS_STATUS)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> UsuarioOut:
+    if not _aviso_inatividade_cumprido(admin, contexto, usuario_id):
+        raise HTTPException(
+            409,
+            "É obrigatório enviar aviso prévio de inatividade com pelo menos 30 dias de "
+            "antecedência antes de inativar a conta (Termos 4.9).",
+        )
+    return _atualizar_status_inatividade(
+        admin,
+        contexto,
+        operador,
+        usuario_id,
+        de_permitidos=("ativo", "restrito"),
+        para="inativo",
+        acao="usuario.inativar",
+        motivo=corpo.motivo,
+        erro_estado="Só contas ativas ou restritas podem ser inativadas.",
+    )
+
+
+@router.post(
+    "/usuarios/{usuario_id}/reativar",
+    response_model=UsuarioOut,
+    summary="Reativar conta inativa gratuitamente (Termos 4.9)",
+    responses={409: {"description": "A conta não está inativa."}},
+)
+def reativar_usuario(
+    usuario_id: str,
+    corpo: ComMotivo,
+    operador: Operador = Depends(exigir(Permissao.USUARIOS_STATUS)),
+    admin: AdminContexto = Depends(obter_admin),
+    contexto: Contexto = Depends(obter_contexto),
+) -> UsuarioOut:
+    return _atualizar_status_inatividade(
+        admin,
+        contexto,
+        operador,
+        usuario_id,
+        de_permitidos=("inativo",),
+        para="ativo",
+        acao="usuario.reativar",
+        motivo=corpo.motivo,
+        erro_estado="Só contas inativas podem ser reativadas por esta rota.",
     )

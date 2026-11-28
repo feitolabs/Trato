@@ -16,3 +16,18 @@ String textoOrcamentoValidoAte(DateTime ate) {
 }
 
 bool ehOrcamentoVencido(Object erro) => erro is ErroTrato && erro.codigo == 'orcamento_vencido';
+
+/// Termos 5.2: orçamento antigo sem prazo, validade ou garantia não é renegociado (409). O
+/// servidor ainda não manda um código para este caso; por isso vale também o texto dele.
+bool ehOrcamentoIncompleto(Object erro) =>
+    erro is ErroTrato &&
+    (erro.codigo == 'orcamento_incompleto' ||
+        (erro.codigoHttp == 409 && erro.mensagem.contains('não tem prazo, validade e garantia')));
+
+/// Recusas que aparecem junto da ação.
+bool ehRecusaDoOrcamento(Object erro) => ehOrcamentoVencido(erro) || ehOrcamentoIncompleto(erro);
+
+/// A mensagem do servidor e, no orçamento incompleto, o que fazer.
+String textoDaRecusa(ErroTrato erro, {required bool profissional}) => !ehOrcamentoIncompleto(erro)
+    ? erro.mensagem
+    : '${erro.mensagem} ${profissional ? 'Envie um orçamento novo para continuar.' : 'Peça um orçamento novo ao profissional.'}';

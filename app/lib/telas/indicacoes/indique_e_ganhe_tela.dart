@@ -99,7 +99,8 @@ class _CartaoCodigo extends StatelessWidget {
     await Clipboard.setData(ClipboardData(text: texto));
     mensagens
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Texto copiado! Cole no WhatsApp para convidar.')));
+      ..showSnackBar(
+          const SnackBar(content: Text('Texto copiado! Cole no WhatsApp para convidar.')));
   }
 
   @override
@@ -109,7 +110,8 @@ class _CartaoCodigo extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Seu código', style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario)),
+          Text('Seu código',
+              style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario)),
           const SizedBox(height: EspacosTrato.x1),
           Semantics(
             label: 'Seu código de indicação: $codigo',
@@ -190,6 +192,15 @@ class _Resumo extends StatelessWidget {
               style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
             ),
           ],
+          if (resumo.validadeDias != null && resumo.validadeDias! > 0) ...[
+            const SizedBox(height: EspacosTrato.x2),
+            Text(
+              'Os Tratinhos de indicação valem por ${resumo.validadeDias} '
+              '${resumo.validadeDias == 1 ? 'dia' : 'dias'} após o crédito.',
+              key: const ValueKey('resumo-validade'),
+              style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
+            ),
+          ],
         ],
       ),
     );
@@ -205,7 +216,8 @@ class _LinhaIndicacao extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.cores;
-    final nome = (indicacao.nomeIndicado ?? '').trim().isEmpty ? 'Amigo(a)' : indicacao.nomeIndicado!;
+    final nome =
+        (indicacao.nomeIndicado ?? '').trim().isEmpty ? 'Amigo(a)' : indicacao.nomeIndicado!;
     final mostraBonus = indicacao.bonusTratinhos > 0 && indicacao.status != 'cancelado';
     return Padding(
       padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
@@ -374,8 +386,8 @@ class _CampoCodigoIndicacaoState extends State<CampoCodigoIndicacao> {
           controller: _controlador,
           focusNode: _foco,
           // Com o teclado aberto, sobra espaço abaixo do campo para o botão.
-          scrollPadding: EdgeInsets.fromLTRB(
-              20, 20, 20, 40 + MediaQuery.textScalerOf(context).scale(110)),
+          scrollPadding:
+              EdgeInsets.fromLTRB(20, 20, 20, 40 + MediaQuery.textScalerOf(context).scale(110)),
           readOnly: _ocupado,
           textCapitalization: TextCapitalization.characters,
           autocorrect: false,

@@ -339,6 +339,71 @@ SEM_REMOTO = (
 # --- Rotinas do agendador -----------------------------------------------------------------
 
 
+PRAZO_EXECUCAO_PADRAO_VISITA_DIAS = 1
+GARANTIA_PADRAO_VISITA_DIAS = 30
+VALIDADE_PADRAO_VISITA_HORAS = 72
+
+
+def _condicoes_orcamento_visita(
+    contexto: Any, rec: Recorrencia, visita: Visita, agora: datetime
+) -> tuple[int, datetime, int, str]:
+    """Termos 5.2: herda prazo, validade, garantia e fora_do_escopo da origem, com fallback."""
+    from trato.api.validade import FORA_DO_ESCOPO_NAO_INFORMADO  # evita ciclo
+
+    contrato = contexto.contratos.obter_do_pedido(rec.pedido_origem_id)
+    origem = contexto.pedidos.obter(rec.pedido_origem_id)
+    orc_id = (contrato.orcamento_id if contrato else None) or (
+        origem.orcamento_id if origem else None
+    )
+    orc_origem = contexto.orcamentos.detalhe(orc_id) if orc_id else None
+
+    prazo = (
+        contrato.prazo_execucao_dias
+        if contrato is not None
+        and contrato.prazo_execucao_dias is not None
+        and contrato.prazo_execucao_dias >= 1
+        else (
+            orc_origem.prazo_execucao_dias
+            if orc_origem is not None
+            and orc_origem.prazo_execucao_dias is not None
+            and orc_origem.prazo_execucao_dias >= 1
+            else PRAZO_EXECUCAO_PADRAO_VISITA_DIAS
+        )
+    )
+
+    garantia: int | None = None
+    if contrato is not None and contrato.garantia_dias is not None and contrato.garantia_dias >= 0:
+        garantia = contrato.garantia_dias
+    elif (
+        orc_origem is not None
+        and orc_origem.garantia_dias is not None
+        and orc_origem.garantia_dias >= 0
+    ):
+        garantia = orc_origem.garantia_dias
+    if garantia is None:
+        try:
+            garantia = int(contexto.config.carregar().garantias.garantia_dias_padrao)
+        except Exception:  # noqa: BLE001 - fallback explícito se config indisponível
+            garantia = GARANTIA_PADRAO_VISITA_DIAS
+
+    if (
+        orc_origem is not None
+        and orc_origem.validade_ate is not None
+        and orc_origem.enviado_em is not None
+        and orc_origem.validade_ate > orc_origem.enviado_em
+    ):
+        validade_ate = agora + (orc_origem.validade_ate - orc_origem.enviado_em)
+    elif visita.data_prevista_em > agora:
+        validade_ate = visita.data_prevista_em
+    else:
+        validade_ate = agora + timedelta(hours=VALIDADE_PADRAO_VISITA_HORAS)
+
+    fora_do_escopo = (
+        (orc_origem.fora_do_escopo or "").strip() if orc_origem is not None else ""
+    ) or FORA_DO_ESCOPO_NAO_INFORMADO
+    return prazo, validade_ate, garantia, fora_do_escopo
+
+
 def _pedido_da_visita(contexto: Any, rec: Recorrencia, visita: Visita, agora: datetime) -> str:
     """Cria o pedido da visita e envia o orçamento do profissional (valor da série).
 
@@ -360,11 +425,18 @@ def _pedido_da_visita(contexto: Any, rec: Recorrencia, visita: Visita, agora: da
         )
     gravado = contexto.pedidos.salvar(pedido, None, dados)
     contexto.extras.setdefault("pedidos_convidados", {})[gravado.id] = rec.profissional_id
+    prazo, validade_ate, garantia, fora_do_escopo = _condicoes_orcamento_visita(
+        contexto, rec, visita, agora
+    )
     contexto.orcamentos.enviar(
         pedido_id=gravado.id,
         profissional_id=rec.profissional_id,
         itens=[ItemOrcamento("outro", "Visita recorrente", Decimal(1), rec.valor_centavos)],
         agora=agora,
+        prazo_execucao_dias=prazo,
+        validade_ate=validade_ate,
+        garantia_dias=garantia,
+        fora_do_escopo=fora_do_escopo,
     )
     return gravado.id
 
@@ -415,6 +487,8 @@ def gerar_visitas(
             if repo.mudar_status(rec.id, (ST_ATIVA,), ST_PAUSADA, agora):
                 log.warning("Recorrência %s pausada: parte inativa ou não aprovada", rec.id)
             continue
+        if contexto.selos.retirada_aberta(rec.profissional_id):
+            continue  # 10.3: sem selo não nasce orçamento; a série volta com a regularização
         data = rec.proxima_visita_em
         try:
             with contexto.transacao():
@@ -469,6 +543,8 @@ def fechar_visitas(
     Devolve (confirmadas, expiradas). Expirar libera a agenda: o pedido aberto da visita é
     cancelado (quando possível) e ninguém é punido.
     """
+    from trato.api.indisponibilidade import ORIGENS_VISITA, prazo_vigente  # evita ciclo
+
     repo = contexto.recorrencias
     cfg = repo.config()
     confirmadas = expiradas = 0
@@ -482,6 +558,7 @@ def fechar_visitas(
             confirmadas += int(repo.mudar_visita(visita.id, (V_AGENDADA,), V_PAGA))
             continue
         limite = visita.data_prevista_em - timedelta(hours=cfg.limite_confirmacao_horas)
+        limite = prazo_vigente(contexto, ORIGENS_VISITA, visita.criado_em, limite, agora)  # 22.3
         if agora < limite and (pedido is None or pedido.estado.value != "cancelado"):
             continue
         if repo.mudar_visita(visita.id, (V_AGENDADA,), V_EXPIRADA):

@@ -104,8 +104,11 @@ class _AvaliacaoTelaState extends State<AvaliacaoTela> {
   }
 
   /// Termos 12.4: a tela avisa do incentivo, igual para qualquer nota.
-  String _textoBonus(DadosAvaliacao dados) =>
-      '${_textoGanho(dados)} Vale para qualquer nota, positiva ou negativa.';
+  String _textoBonus(DadosAvaliacao dados) {
+    final base = '${_textoGanho(dados)} Vale para qualquer nota, positiva ou negativa.';
+    final dias = dados.bonusValidadeDias;
+    return dias != null && dias > 0 ? '$base ${textoValidadeBonusDias(dias)}' : base;
+  }
 
   String _textoGanho(DadosAvaliacao dados) {
     if (dados.bonusMoedas <= 0) {

@@ -84,6 +84,8 @@ class Acao(StrEnum):
     # Termos 7.6: o analista não aceitou (ou não houve) justificativa do cliente ausente.
     CANCELAR_CLIENTE_AUSENTE = "cancelar_cliente_ausente"
     CANCELAR_PESSOA_DIFERENTE = "cancelar_pessoa_diferente"  # 9.5
+    CANCELAR_MEDIDA_CONTA = "cancelar_medida_conta"
+    CANCELAR_FORCA_MAIOR = "cancelar_forca_maior"  # 20.6: conta suspensa ou encerrada
     FAZER_CHECK_OUT = "fazer_check_out"
     CONFIRMAR_CONCLUSAO = "confirmar_conclusao"
     CONCLUIR_POR_PRAZO = "concluir_por_prazo"
@@ -91,6 +93,7 @@ class Acao(StrEnum):
     ABRIR_DISPUTA = "abrir_disputa"
     ENCERRAR_DISPUTA_POR_ACORDO = "encerrar_disputa_por_acordo"
     DECIDIR_DISPUTA = "decidir_disputa"
+    DECIDIR_CHECKOUT_SEM_CODIGO = "decidir_checkout_sem_codigo"
     PEDIR_RETRABALHO = "pedir_retrabalho"
     RESOLVER_RETRABALHO = "resolver_retrabalho"  # o profissional terminou: cliente confirma
     RESERVAR_EXCLUSIVIDADE = "reservar_exclusividade"  # cliente aceita a exclusividade
@@ -290,6 +293,7 @@ class Pedido:
     # cliente seguem valendo).
     remoto: bool = False
     check_out_sem_codigo: bool = False
+    substitui_pedido_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -376,6 +380,34 @@ REGRAS: dict[Acao, _Regra] = {
         {Papel.SISTEMA: _de(E.PAGO_E_RETIDO, E.AGENDADO)},
         None,
     ),
+    Acao.CANCELAR_FORCA_MAIOR: _Regra(
+        "cancelar por força maior",
+        {
+            Papel.SISTEMA: _de(
+                E.ORCAMENTO_ACEITO,
+                E.AGUARDANDO_CONFIRMACAO,
+                E.PAGO_E_RETIDO,
+                E.AGENDADO,
+                E.EM_ANDAMENTO,
+                E.EM_CONFIRMACAO,
+            )
+        },
+        None,
+    ),
+    Acao.CANCELAR_MEDIDA_CONTA: _Regra(
+        "cancelar por conta suspensa ou encerrada",
+        {
+            Papel.SISTEMA: _de(
+                E.ABERTO,
+                E.RESERVADO,
+                E.ORCAMENTO_ACEITO,
+                E.AGUARDANDO_CONFIRMACAO,
+                E.PAGO_E_RETIDO,
+                E.AGENDADO,
+            )
+        },
+        None,
+    ),
     Acao.FAZER_CHECK_OUT: _Regra(
         "fazer check-out",
         {Papel.PROFISSIONAL: _de(E.EM_ANDAMENTO, E.RETRABALHO)},
@@ -407,6 +439,9 @@ REGRAS: dict[Acao, _Regra] = {
     ),
     Acao.DECIDIR_DISPUTA: _Regra(
         "decidir a disputa", {Papel.MEDIADOR: _de(E.EM_DISPUTA)}, DecisaoDisputa
+    ),
+    Acao.DECIDIR_CHECKOUT_SEM_CODIGO: _Regra(
+        "decidir check-out sem código", {Papel.MEDIADOR: _de(E.EM_CONFIRMACAO)}, DecisaoDisputa
     ),
     Acao.PEDIR_RETRABALHO: _Regra(
         "pedir retrabalho", {Papel.CLIENTE: _de(E.CONCLUIDO)}, ProvaRetrabalho
@@ -803,9 +838,12 @@ _APLICAR = {
     Acao.CANCELAR_ARREPENDIMENTO: _cancelar_pelo_sistema,
     Acao.CANCELAR_CLIENTE_AUSENTE: _cancelar_pelo_sistema,
     Acao.CANCELAR_PESSOA_DIFERENTE: _cancelar_pelo_sistema,
+    Acao.CANCELAR_MEDIDA_CONTA: _cancelar_pelo_sistema,
+    Acao.CANCELAR_FORCA_MAIOR: _cancelar_pelo_sistema,
     Acao.ABRIR_DISPUTA: _abrir_disputa,
     Acao.ENCERRAR_DISPUTA_POR_ACORDO: _encerrar_disputa_por_acordo,
     Acao.DECIDIR_DISPUTA: _decidir_disputa,
+    Acao.DECIDIR_CHECKOUT_SEM_CODIGO: _decidir_disputa,
     Acao.PEDIR_RETRABALHO: _pedir_retrabalho,
     Acao.RESOLVER_RETRABALHO: _resolver_retrabalho,
     Acao.RESERVAR_EXCLUSIVIDADE: _reservar_exclusividade,

@@ -172,9 +172,18 @@ class _CartaoOrcamento extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _Dado(rotulo: 'Nota', valor: o.notaResumo)),
+              Expanded(
+                child: _Dado(
+                  rotulo: 'Nota',
+                  valor: (o.contagem?.novoNoTrato ?? false) ? semAvaliacoes : o.notaResumo,
+                ),
+              ),
               const SizedBox(width: EspacosTrato.x3),
               Expanded(child: _Dado(rotulo: 'Serviços concluídos', valor: o.servicosResumo)),
+              if (o.contagem case final c?) ...[
+                const SizedBox(width: EspacosTrato.x3),
+                Expanded(child: _Dado(rotulo: 'Avaliações', valor: '${c.total}')),
+              ],
             ],
           ),
           const SizedBox(height: EspacosTrato.x3),

@@ -56,7 +56,7 @@ def test_so_o_cliente_e_mesmo_bloqueado(fluxo):
     assert relatar(fluxo, pid, "t-outro-cliente").status_code == 404
     assert relatar(fluxo, pid, "t-prof").status_code == 403
     assert estado(fluxo, pid) is Estado.AGENDADO and incidentes(fluxo, pid) == []
-    bloquear(fluxo)
+    bloquear(fluxo, "bloqueio_preventivo")  # suspensão cancelaria o pedido (20.6)
     r = relatar(fluxo, pid)
     assert r.status_code == 200 and r.json()["cancelado"], r.text
 

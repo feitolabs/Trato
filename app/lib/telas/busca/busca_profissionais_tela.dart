@@ -1,3 +1,4 @@
+import '../comuns/contagem_avaliacoes.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -485,7 +486,9 @@ class _CartaoResultado extends StatelessWidget {
     final p = profissional;
     return Semantics(
       button: true,
-      label: '${p.nome}, ${descricaoDeCategorias(p.especialidade)}, nota ${formatarNota(p.nota)}',
+      label: '${p.nome}, ${descricaoDeCategorias(p.especialidade)}, '
+          '${p.contagem?.novoNoTrato ?? false ? 'Novo no Trato' : 'nota ${formatarNota(p.nota)}'}'
+          '${p.contagem == null ? '' : ', ${textoServicosConcluidos(p.servicosConcluidos)}, ${p.contagem!.textoAvaliacoes}'}',
       excludeSemantics: true,
       child: Material(
         color: context.cores.superficie,
@@ -511,8 +514,9 @@ class _CartaoResultado extends StatelessWidget {
                       ChipsCategorias(categorias: p.especialidade),
                       const SizedBox(height: EspacosTrato.x1),
                       Text(
-                        '${p.nota.toStringAsFixed(1).replaceAll('.', ',')} · '
+                        '${p.contagem?.novoNoTrato ?? false ? 'Novo no Trato' : p.nota.toStringAsFixed(1).replaceAll('.', ',')} · '
                         '${p.servicosConcluidos} ${p.servicosConcluidos == 1 ? 'serviço' : 'serviços'}'
+                        '${p.contagem == null ? '' : ' · ${p.contagem!.textoAvaliacoes}'}'
                         '${p.regiao != null && p.regiao!.isNotEmpty ? ' · ${p.regiao}' : ''}'
                         '${p.distanciaKm > 0 ? ' · ${p.distanciaKm.toStringAsFixed(1).replaceAll('.', ',')} km' : ''}',
                         style: TipografiaTrato.legenda,

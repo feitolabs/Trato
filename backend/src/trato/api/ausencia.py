@@ -22,6 +22,7 @@ from trato.api.ausencia_base import (
     caso_de,
     contestar_ate,
     do_pedido,
+    justificativa_ate,
     midia_do_pedido,
     pode_registrar_em,
     revisao_de,
@@ -273,7 +274,7 @@ def justificar(
         agora = contexto.agora()
         if item.status != AGUARDANDO_JUSTIFICATIVA or pedido.estado is not Estado.AGENDADO:
             raise HTTPException(409, "Este caso não está esperando justificativa.")
-        if agora > item.justificativa_ate:
+        if agora > justificativa_ate(contexto, item):
             raise HTTPException(409, "O prazo para justificar terminou.")
         novo = replace(item, status=EM_ANALISE, texto=texto, anexos=ids, justificativa_em=agora)
         if not contexto.ausencias.mudar(novo, (AGUARDANDO_JUSTIFICATIVA,)):

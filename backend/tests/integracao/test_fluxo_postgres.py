@@ -307,7 +307,15 @@ def test_autenticacao_jwt_do_supabase(cenario):
         assert r.status_code == 403 and r.json()["codigo"] == "conta_bloqueada"
         lista = c.cliente.get(rota, headers=ok)
         if lista.status_code == 200:
-            assert {p["estado"] for p in lista.json()} <= {e.value for e in ESTADOS_CONTRATADOS}
+            # 20.6 e 20.10: contratados, e o cancelado que chegou a ser pago (para acompanhar o
+            # reembolso). Nunca o aberto nem o cancelado sem pagamento.
+            for item in lista.json():
+                if item["estado"] == "cancelado":
+                    pedido = c.contexto.pedidos.obter(item["id"])
+                    assert pedido.referencia_pagamento is not None, item
+                    assert pedido.cliente_id.replace("-", "") == quem.replace("-", ""), item
+                else:
+                    assert item["estado"] in {e.value for e in ESTADOS_CONTRATADOS}, item
         else:
             assert lista.status_code == 403 and lista.json()["codigo"] == "conta_bloqueada"
     finally:

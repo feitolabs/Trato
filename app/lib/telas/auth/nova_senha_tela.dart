@@ -4,6 +4,7 @@ import '../../auth/servico_auth.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/foco_rolagem.dart';
+import '../fluxo/rotas.dart' show RotasTrato;
 import 'estrutura_auth.dart';
 import 'login_tela.dart';
 import 'validacao.dart';
@@ -94,6 +95,7 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
       return;
     }
     // Termina a sessão do link: a pessoa entra de verdade com a senha nova.
+    await RotasTrato.sessao?.avisarAcesso('logout'); // com o token ainda válido
     try {
       await _servico.sair();
     } on ErroAuth {
@@ -104,6 +106,7 @@ class _NovaSenhaTelaState extends State<NovaSenhaTela> {
   }
 
   Future<void> _desistir() async {
+    await RotasTrato.sessao?.avisarAcesso('logout'); // com o token ainda válido
     try {
       await _servico.sair();
     } on ErroAuth {

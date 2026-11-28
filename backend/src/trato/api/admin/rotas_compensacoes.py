@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from trato.api import compensacoes as regras
 from trato.api.admin.contexto import AdminContexto, Operador, exigir, obter_admin
 from trato.api.admin.modelos import Pagina
-from trato.api.admin.papeis import Permissao
+from trato.api.admin.papeis import Permissao, pode
 from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto, obter_contexto
 from trato.financeiro.extrato_profissional import reais
@@ -43,16 +43,30 @@ class CancelarCompensacaoIn(BaseModel):
     motivo: str = Field(min_length=10, max_length=1000)
 
 
+class ReduzirCompensacaoIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contestacao_id: str = Field(max_length=64, description="Contestação que ALTEROU para menos.")
+    novo_valor_centavos: int = Field(gt=0, strict=True)
+    motivo: str = Field(min_length=10, max_length=1000)
+
+
+class ReducaoOut(BaseModel):
+    resultado: str = Field(description="ok | ja_reduzida")
+    devolvido_centavos: int = Field(description="Voltou ao profissional nesta redução.")
+    compensacao: regras.DividaAdminOut
+
+
 class RegistroOut(BaseModel):
     resultado: str = Field(description="ok | ja_registrada")
-    compensacao: regras.DividaOut
+    compensacao: regras.DividaAdminOut
     avisado: bool
 
 
 class CancelamentoOut(BaseModel):
     resultado: str = Field(description="ok | ja_cancelada")
     devolvido_centavos: int
-    compensacao: regras.DividaOut
+    compensacao: regras.DividaAdminOut
 
 
 _ERROS = {
@@ -64,6 +78,11 @@ _ERROS = {
     "analista_invalido": (403, "Só alguém ativo da equipe pode fazer isto."),
     "nao_encontrada": (404, "Compensação não encontrada."),
     "indisponivel": (503, "A compensação ainda não está disponível."),
+    "estorno_ja_ordenado": (
+        409,
+        "Este pedido já teve uma compensação cancelada com estorno ordenado ao cliente. "
+        "Registrar de novo devolveria o dinheiro outra vez: nada foi gravado.",
+    ),
     "ja_registrada": (409, "Esta referência já virou compensação."),
     "ja_aprovada": (409, "Esta proposta já foi aprovada."),
     "ja_recusada": (409, "Esta proposta já foi recusada."),
@@ -73,9 +92,42 @@ _ERROS = {
 }
 
 
+_ERROS_REDUCAO = {
+    "conflito": (409, "Esta contestação já foi usada para outro valor ou outra compensação."),
+    "analista_invalido": (403, "Só líder de suporte ou administrador reduz compensação."),
+    "nao_encontrada": (404, "Compensação não encontrada."),
+    "ja_cancelada": (409, "Esta compensação foi cancelada: não há o que reduzir."),
+    "contestacao_invalida": (422, "Esta contestação não permite reduzir esta compensação."),
+    "decisao_substituida": (409, "Uma contestação posterior reduziu mais: use a mais recente."),
+    "valor_invalido": (422, "O novo valor precisa ser menor que o atual e caber na decisão."),
+    "indisponivel": (503, "A redução ainda não está disponível."),
+}
+
+
 def _erro(codigo: str, **extra: int) -> JSONResponse:
     status, mensagem = _ERROS.get(codigo, _ERROS["indisponivel"])
     return JSONResponse(status_code=status, content={"detail": mensagem, "codigo": codigo} | extra)
+
+
+class _EstornoJaOrdenado(Exception):
+    """Desfaz a transação do registro (dívida e livro)."""
+
+
+def _ordenar_estorno(  # type: ignore[no-untyped-def]
+    contexto: Contexto, servico, pedido_id: str, valor: int, divida_id: str
+) -> None:
+    """ÚNICO caminho do painel para estornar por compensação (decisão ou regresso). Chamar na
+    transação do registro, com o pedido travado, DEPOIS de a função do banco criar a dívida:
+    ela trava o contrato, a mesma trava do cancelamento, então um cancelamento simultâneo já é
+    visto aqui. Pedido com dívida cancelada que já teve estorno ordenado não ordena outro: o
+    dinheiro daquela não volta, e o teto do banco ignora as canceladas."""
+    canceladas, _ = contexto.compensacoes.listar(
+        pedido_id=pedido_id, status="cancelada", limite=500
+    )
+    prefixos = tuple(f"comp/{d.id}/" for d in canceladas)
+    if prefixos and any(o.chave.startswith(prefixos) for o in servico.ordens.do_pedido(pedido_id)):
+        raise _EstornoJaOrdenado
+    servico.ordenar_estorno_compensado(contexto, pedido_id, valor, divida_id)
 
 
 @router.post("", response_model=RegistroOut, summary="Registrar compensação de uma decisão")
@@ -97,41 +149,55 @@ def registrar(
     if servico is None:
         return _erro("indisponivel")
     travar = getattr(contexto.pedidos, "travar", None)
-    with contexto.transacao():  # dívida e ordem de estorno: tudo ou nada
-        if travar is not None:  # mesma ordem de travas dos outros fluxos: pedido, contrato
-            travar(pedido.id)
-        r = contexto.compensacoes.registrar_disputa(
-            pedido.id, corpo.contestacao_id, corpo.valor_centavos, motivo, operador.id
-        )
-        if r.resultado == "ok":
-            servico.ordenar_estorno_compensado(
-                contexto, pedido.id, corpo.valor_centavos, r.divida_id or ""
+    try:
+        with contexto.transacao():  # dívida e ordem de estorno: tudo ou nada
+            if travar is not None:  # mesma ordem de travas dos outros fluxos: pedido, contrato
+                travar(pedido.id)
+            r = contexto.compensacoes.registrar_disputa(
+                pedido.id, corpo.contestacao_id, corpo.valor_centavos, motivo, operador.id
             )
+            if r.resultado == "ok":
+                _ordenar_estorno(
+                    contexto, servico, pedido.id, corpo.valor_centavos, r.divida_id or ""
+                )
+    except _EstornoJaOrdenado:
+        return _erro("estorno_ja_ordenado")
     if r.resultado not in ("ok", "ja_registrada"):
         extra = {"maximo_centavos": r.maximo_centavos} if r.resultado == "acima_do_devido" else {}
         return _erro(r.resultado, **extra)
     avisado = regras.avisar_divida(contexto, r.divida_id or "", operador.id)
     divida = contexto.compensacoes.obter(r.divida_id or "")
-    return RegistroOut(resultado=r.resultado, compensacao=regras.saida(divida), avisado=avisado)
+    return RegistroOut(
+        resultado=r.resultado, compensacao=_para_o_painel(operador, divida), avisado=avisado
+    )
 
 
-@router.get("", response_model=Pagina[regras.DividaOut], summary="Compensações")
+def _para_o_painel(operador: Operador, divida) -> regras.DividaAdminOut:  # type: ignore[no-untyped-def]
+    # Reduzir e cancelar exigem a mesma permissão.
+    return regras.saida_admin(divida, pode(operador.membro.papel, Permissao.COMPENSACOES_CANCELAR))
+
+
+@router.get("", response_model=Pagina[regras.DividaAdminOut], summary="Compensações")
 def listar(
     profissional_id: str | None = None,
     pedido_id: str | None = None,
     status: str | None = Query(None, pattern="^(aberta|quitada|cancelada)$"),
+    revisao_pendente: bool = Query(
+        False, description="Só as com decisão posterior mais baixa ainda sem tratamento."
+    ),
     limite: int = Query(20, ge=1, le=100),
     deslocamento: int = Query(0, ge=0),
-    _: Operador = Depends(exigir(Permissao.DISPUTAS_DECIDIR)),
+    operador: Operador = Depends(exigir(Permissao.DISPUTAS_DECIDIR)),
     contexto: Contexto = Depends(obter_contexto),
 ):
     if not contexto.compensacoes.disponivel():
         return _erro("indisponivel")
+    filtro = {"revisao_pendente": True} if revisao_pendente else {}
     itens, total = contexto.compensacoes.listar(
-        profissional_id, pedido_id, status, limite, deslocamento
+        profissional_id, pedido_id, status, limite, deslocamento, **filtro
     )
     return Pagina(
-        itens=[regras.saida(d) for d in itens],
+        itens=[_para_o_painel(operador, d) for d in itens],
         total=total,
         limite=limite,
         deslocamento=deslocamento,
@@ -154,7 +220,9 @@ def avisar(
         return _erro("nao_encontrada")
     avisado = regras.avisar_divida(contexto, compensacao_id, operador.id)
     divida = contexto.compensacoes.obter(compensacao_id)
-    return RegistroOut(resultado="ok", compensacao=regras.saida(divida), avisado=avisado)
+    return RegistroOut(
+        resultado="ok", compensacao=_para_o_painel(operador, divida), avisado=avisado
+    )
 
 
 @router.post(
@@ -191,8 +259,54 @@ def cancelar(
     return CancelamentoOut(
         resultado=r.resultado,
         devolvido_centavos=r.devolvido_centavos,
-        compensacao=regras.saida(divida),
+        compensacao=_para_o_painel(operador, divida),
     )
+
+
+@router.post(
+    "/{compensacao_id}/reduzir",
+    response_model=ReducaoOut,
+    summary="Contestação reduziu a decisão: reduzir a dívida, sem novo estorno",
+)
+def reduzir(
+    compensacao_id: str,
+    corpo: ReduzirCompensacaoIn,
+    operador: Operador = Depends(exigir(Permissao.COMPENSACOES_CANCELAR)),
+    contexto: Contexto = Depends(obter_contexto),
+):
+    """Nada vai nem volta para o cliente: o Trato absorve só a diferença e o profissional segue
+    devendo o novo valor. O banco audita."""
+    motivo = corpo.motivo.strip()
+    if len(motivo) < 10:
+        return JSONResponse(422, {"detail": "Explique o motivo.", "codigo": "motivo_invalido"})
+    if not contexto.compensacoes.disponivel():
+        return _erro_reducao("indisponivel")
+    r = contexto.compensacoes.reduzir(
+        compensacao_id, corpo.contestacao_id, corpo.novo_valor_centavos, motivo, operador.id
+    )
+    if r.resultado not in ("ok", "ja_reduzida"):
+        return _erro_reducao(r.resultado)
+    divida = contexto.compensacoes.obter(compensacao_id)
+    avisar_partes(
+        contexto,
+        Evento.COMPENSACAO_REDUZIDA,
+        (divida.profissional_id,),
+        pedido_id=divida.pedido_id,
+        chave=f"compensacao:{divida.id}:reduzida:{corpo.contestacao_id}",
+        corpo=f"A compensação foi reduzida para {reais(corpo.novo_valor_centavos)}. "
+        f"Voltaram ao seu saldo liberado {reais(r.devolvido_centavos)}.",
+        dados={"compensacao_id": divida.id},
+    )
+    return ReducaoOut(
+        resultado=r.resultado,
+        devolvido_centavos=r.devolvido_centavos,
+        compensacao=_para_o_painel(operador, divida),
+    )
+
+
+def _erro_reducao(codigo: str) -> JSONResponse:
+    status, mensagem = _ERROS_REDUCAO.get(codigo, _ERROS_REDUCAO["indisponivel"])
+    return JSONResponse(status_code=status, content={"detail": mensagem, "codigo": codigo})
 
 
 # --- regresso (17.4) ------------------------------------------------------------------------------
@@ -239,7 +353,7 @@ class PropostaResultadoOut(BaseModel):
 class AprovacaoRegressoOut(BaseModel):
     resultado: str = Field(description="ok | ja_aprovada")
     proposta: PropostaOut
-    compensacao: regras.DividaOut
+    compensacao: regras.DividaAdminOut
     avisado: bool
 
 
@@ -315,14 +429,18 @@ def aprovar_regresso(
     if servico is None:
         return _erro("indisponivel")
     travar = getattr(contexto.pedidos, "travar", None)
-    with contexto.transacao():  # dívida e ordem de estorno: tudo ou nada
-        if travar is not None:  # mesma ordem de travas dos outros fluxos: pedido, contrato
-            travar(proposta.pedido_id)
-        r = contexto.compensacoes.aprovar_regresso(proposta.id, operador.id)
-        if r.resultado == "ok":
-            servico.ordenar_estorno_compensado(
-                contexto, proposta.pedido_id, proposta.valor_centavos, r.divida_id or ""
-            )
+    try:
+        with contexto.transacao():  # dívida e ordem de estorno: tudo ou nada
+            if travar is not None:  # mesma ordem de travas dos outros fluxos: pedido, contrato
+                travar(proposta.pedido_id)
+            r = contexto.compensacoes.aprovar_regresso(proposta.id, operador.id)
+            if r.resultado == "ok":
+                _ordenar_estorno(
+                    contexto, servico, proposta.pedido_id, proposta.valor_centavos,
+                    r.divida_id or "",
+                )  # fmt: skip
+    except _EstornoJaOrdenado:
+        return _erro("estorno_ja_ordenado")
     if r.resultado not in ("ok", "ja_aprovada"):
         if r.resultado == "nao_encontrada":
             return _erro("proposta_nao_encontrada")
@@ -332,7 +450,7 @@ def aprovar_regresso(
     return AprovacaoRegressoOut(
         resultado=r.resultado,
         proposta=_proposta_out(contexto.compensacoes.proposta(proposta.id)),
-        compensacao=regras.saida(contexto.compensacoes.obter(r.divida_id or "")),
+        compensacao=_para_o_painel(operador, contexto.compensacoes.obter(r.divida_id or "")),
         avisado=avisado,
     )
 

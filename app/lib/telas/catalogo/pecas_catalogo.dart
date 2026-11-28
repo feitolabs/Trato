@@ -64,8 +64,10 @@ class CartaoProfissional extends StatelessWidget {
         children: [
           Semantics(
             button: true,
-            label: 'Perfil de ${p.nome}, nota ${formatarNota(p.nota)}, '
-                '${p.servicosConcluidos} ${p.servicosConcluidos == 1 ? 'serviço concluído' : 'serviços concluídos'}',
+            label: 'Perfil de ${p.nome}, '
+                '${p.contagem?.novoNoTrato ?? false ? 'Novo no Trato' : 'nota ${formatarNota(p.nota)}'}, '
+                '${p.servicosConcluidos} ${p.servicosConcluidos == 1 ? 'serviço concluído' : 'serviços concluídos'}'
+                '${p.contagem == null ? '' : ', ${p.contagem!.textoAvaliacoes}'}',
             excludeSemantics: true,
             child: InkWell(
               onTap: aoAbrir,
@@ -83,11 +85,12 @@ class CartaoProfissional extends StatelessWidget {
                           Text(p.nome, style: TipografiaTrato.tituloCartao),
                           const SizedBox(height: EspacosTrato.x1),
                           if (p.verificacao.isNotEmpty) ...[
-                            SeloVerificacao(p.verificacao),
+                            SeloVerificacao(p.verificacao, conferidoEm: p.seloConferidoEm),
                             const SizedBox(height: EspacosTrato.x1),
                           ],
                           Text(
                             '${p.servicosConcluidos} ${p.servicosConcluidos == 1 ? 'serviço concluído' : 'serviços concluídos'}'
+                            '${p.contagem == null ? '' : ' · ${p.contagem!.textoAvaliacoes}'}'
                             '${p.regiao == null ? '' : ' · ${p.regiao}'}',
                             style: secundario,
                           ),
@@ -103,14 +106,17 @@ class CartaoProfissional extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.star_rounded, size: 18, color: context.cores.petroleo),
-                            const SizedBox(width: EspacosTrato.x1),
-                            Text(formatarNota(p.nota), style: TipografiaTrato.tituloCartao),
-                          ],
-                        ),
+                        if (p.contagem?.novoNoTrato ?? false)
+                          Text('Novo no Trato', style: secundario)
+                        else
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star_rounded, size: 18, color: context.cores.petroleo),
+                              const SizedBox(width: EspacosTrato.x1),
+                              Text(formatarNota(p.nota), style: TipografiaTrato.tituloCartao),
+                            ],
+                          ),
                         if (p.distanciaKm > 0) ...[
                           const SizedBox(height: EspacosTrato.x1),
                           Text(formatarDistancia(p.distanciaKm), style: secundario),

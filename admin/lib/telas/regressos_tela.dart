@@ -107,6 +107,8 @@ class _RegressosTelaState extends State<RegressosTela> {
   }
 }
 
+const kRegressoPendenteNoFinanceiro = 'Nada foi gravado e a proposta continua pendente. O caso vai ao financeiro.';
+
 class _Detalhe extends StatefulWidget {
   const _Detalhe({super.key, required this.inicial, required this.aoMudar});
   final Regresso inicial;
@@ -142,7 +144,11 @@ class _DetalheState extends State<_Detalhe> {
     } catch (e) {
       final maximo = e is ErroApi ? e.maximoCentavos : null;
       if (mounted) {
-        setState(() => _erro = maximo == null ? e.toString() : '$e O máximo é ${formatarReais(maximo)}.');
+        setState(() => _erro = e is ErroApi && e.codigo == 'estorno_ja_ordenado'
+            ? '$e $kRegressoPendenteNoFinanceiro'
+            : maximo == null
+                ? e.toString()
+                : '$e O máximo é ${formatarReais(maximo)}.');
       }
     } finally {
       try {

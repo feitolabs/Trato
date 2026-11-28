@@ -1,3 +1,4 @@
+import '../comuns/contagem_avaliacoes.dart';
 import '../../componentes/componentes.dart';
 import '../comuns/prazo_avaliacao.dart';
 import '../profissional/dinheiro.dart';
@@ -62,7 +63,9 @@ class OfertaExclusividadeCliente {
     this.profissionalId = '',
     this.profissionalNome,
     this.notaPublica,
+    this.contagem,
     this.responderAte,
+    this.prazoSuspenso = false,
     this.expiraEm,
     this.texto = 'Sem compromisso',
     this.outrosOrcamentosContinuamVisiveis = true,
@@ -74,9 +77,15 @@ class OfertaExclusividadeCliente {
   final String? profissionalNome;
   final double? notaPublica;
 
+  /// Termos 12.3. Nulo: servidor antigo (a tela fica como antes).
+  final ContagemAvaliacoes? contagem;
+
   /// `aguardando_cliente`, `ativa` ou `recusada`.
   final String status;
   final DateTime? responderAte;
+
+  /// Termos 22.3: falha da plataforma ativa; não mostrar contagem.
+  final bool prazoSuspenso;
   final DateTime? expiraEm;
   final String texto;
   final bool outrosOrcamentosContinuamVisiveis;
@@ -96,9 +105,14 @@ class Reagendamento {
     required this.fim,
     this.motivo = '',
     this.status = 'pendente',
+    this.avisoPrazo,
   });
 
   final String id;
+
+  /// Termos 7.5: aviso pronto do servidor (`aviso_prazo`). Nulo = nada a avisar ou
+  /// servidor antigo. O app nunca calcula prazo.
+  final String? avisoPrazo;
 
   /// Id de quem propôs (compara com o usuário logado).
   final String propostoPor;
@@ -118,7 +132,9 @@ class Reagendamento {
     final inicio = DateTime.tryParse('${bruto['nova_janela_inicio'] ?? ''}');
     final fim = DateTime.tryParse('${bruto['nova_janela_fim'] ?? ''}');
     if (id is! String || inicio == null || fim == null) return null;
+    final aviso = bruto['aviso_prazo'];
     return Reagendamento(
+      avisoPrazo: aviso is String && aviso.trim().isNotEmpty ? aviso.trim() : null,
       id: id,
       propostoPor: (bruto['proposto_por'] as String?) ?? '',
       inicio: inicio.toLocal(),
@@ -210,7 +226,15 @@ class PedidoEmExecucao {
     this.profissionalNome,
     this.profissionalId,
     this.enderecoResumo,
+    this.substituiPedidoId,
+    this.canceladoPorProfissional = false,
   });
+
+  /// Termos 7.7: id do pedido original que este substitui (nulo se ausente).
+  final String? substituiPedidoId;
+
+  /// Termos 7.7: cancelado por desistência ou ausência do profissional.
+  final bool canceladoPorProfissional;
 
   /// Id do profissional contratado, para a foto no atendimento.
   final String? profissionalId;

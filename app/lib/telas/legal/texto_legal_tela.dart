@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
+import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../comuns/estados.dart';
 import '../comuns/textos_dos_termos.dart';
 import 'guardar_texto.dart';
+import 'historico_versoes.dart';
 import 'registro_do_aceite.dart';
 
 /// Textos legais do app. Os arquivos em `assets/legal/` são cópias de `docs/juridico/` (um teste
@@ -35,7 +37,15 @@ const avisoRascunhoLegal = 'Documento oficial em vigor durante o piloto. '
 
 /// Índice com os dois textos (Termos de uso e Política de privacidade).
 class TermosEPoliticaTela extends StatelessWidget {
-  const TermosEPoliticaTela({super.key, required this.aoAbrir, this.consultaDoAceite});
+  const TermosEPoliticaTela({
+    super.key,
+    required this.aoAbrir,
+    this.consultaDoAceite,
+    this.consultaDeVersoes,
+  });
+
+  /// Termos 23.7: nulo sem o serviço do histórico.
+  final ConsultaDeVersoes? consultaDeVersoes;
 
   final ValueChanged<TextoLegal> aoAbrir;
 
@@ -63,6 +73,19 @@ class TermosEPoliticaTela extends StatelessWidget {
                   title: Text(t.titulo, style: TipografiaTrato.tituloCartao),
                   trailing: Icon(Icons.chevron_right, color: context.cores.petroleo),
                   onTap: () => aoAbrir(t),
+                ),
+              ),
+            ),
+          if (consultaDeVersoes != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: EspacosTrato.x3),
+              child: BotaoSecundario(
+                key: const ValueKey('historico-de-versoes'),
+                texto: 'Histórico de versões',
+                aoTocar: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HistoricoDeVersoesTela(consulta: consultaDeVersoes!),
+                  ),
                 ),
               ),
             ),

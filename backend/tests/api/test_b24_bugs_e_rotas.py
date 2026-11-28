@@ -522,3 +522,188 @@ def test_avaliacoes_postgres_de_linha_sem_type_error():
     )
     assert av.id == "av-pg-1"
     assert av.resposta == "Obrigado!"
+
+
+def test_cliente_avaliado_pode_responder_avaliacao_uma_vez(fluxo):  # noqa: F811
+    """BE-RESPOSTA-12.7 (Termos 12.7): cliente avaliado pelo profissional também pode responder."""
+    pid = fluxo.aceitar()
+    fluxo.pagar(pid)
+    fluxo.agendar(pid)
+    fluxo.iniciar(pid)
+    fluxo.encerrar_execucao(pid)
+    fluxo.concluir(pid)
+    av = fluxo.chamar(
+        "POST",
+        f"/v1/pedidos/{pid}/avaliacao",
+        "t-prof",
+        json={"nota_geral": 5, "comentario": "Cliente pontual e educado."},
+    )
+    assert av.status_code == 201, av.text
+    av_id = av.json()["id"]
+    assert av_id is not None
+
+    # Quem avaliou (profissional) e outro cliente não podem responder (403)
+    for token in ("t-prof", "t-outro-cliente"):
+        assert (
+            fluxo.chamar(
+                "POST",
+                f"/v1/avaliacoes/{av_id}/responder",
+                token,
+                json={"resposta": "Obrigado!"},
+            ).status_code
+            == 403
+        )
+
+    # Resposta vazia/só espaços é recusada (422)
+    assert (
+        fluxo.chamar(
+            "POST",
+            f"/v1/avaliacoes/{av_id}/responder",
+            "t-cliente",
+            json={"resposta": "   "},
+        ).status_code
+        == 422
+    )
+
+    # Cliente avaliado responde com sucesso e resposta fica visível na consulta
+    resp = fluxo.chamar(
+        "POST",
+        f"/v1/avaliacoes/{av_id}/responder",
+        "t-cliente",
+        json={"resposta": "Obrigado pelo ótimo atendimento!"},
+    )
+    assert resp.status_code == 200, resp.text
+    corpo = resp.json()
+    assert corpo["direcao"] == "profissional_para_cliente"
+    assert corpo["resposta"] == "Obrigado pelo ótimo atendimento!"
+    recebidas = fluxo.ctx.avaliacoes.recebidas(fluxo.ctx.pedidos.obter(pid).cliente_id)
+    assert any(a.id == av_id and a.resposta == "Obrigado pelo ótimo atendimento!" for a in recebidas)
+
+    # Segunda resposta é recusada (409)
+    assert (
+        fluxo.chamar(
+            "POST",
+            f"/v1/avaliacoes/{av_id}/responder",
+            "t-cliente",
+            json={"resposta": "Segunda tentativa"},
+        ).status_code
+        == 409
+    )
+
+
+def test_avaliacao_nao_publicada_nao_aceita_resposta(fluxo):  # noqa: F811
+    pid = fluxo.aceitar()
+    fluxo.pagar(pid)
+    fluxo.agendar(pid)
+    fluxo.iniciar(pid)
+    fluxo.encerrar_execucao(pid)
+    fluxo.concluir(pid)
+    av = fluxo.chamar(
+        "POST",
+        f"/v1/pedidos/{pid}/avaliacao",
+        "t-prof",
+        json={"nota_geral": 4, "comentario": "Bom atendimento."},
+    )
+    assert av.status_code == 201, av.text
+    av_id = av.json()["id"]
+    fluxo.ctx.avaliacoes.definir_status(av_id, "em_revisao")
+    r = fluxo.chamar(
+        "POST",
+        f"/v1/avaliacoes/{av_id}/responder",
+        "t-cliente",
+        json={"resposta": "Tentativa em revisão"},
+    )
+    assert r.status_code == 409, r.text
+
+
+def test_cliente_lista_avaliacoes_recebidas_publicadas_com_resposta(fluxo):  # noqa: F811
+    """BE-AVALIACOES-RECEBIDAS-12.7: GET /v1/me/avaliacoes/recebidas lista só publicadas do usuário."""
+    pid = fluxo.aceitar()
+    fluxo.pagar(pid)
+    fluxo.agendar(pid)
+    fluxo.iniciar(pid)
+    fluxo.encerrar_execucao(pid)
+    fluxo.concluir(pid)
+
+    av = fluxo.chamar(
+        "POST",
+        f"/v1/pedidos/{pid}/avaliacao",
+        "t-prof",
+        json={"nota_geral": 5, "comentario": "Excelente cliente."},
+    )
+    assert av.status_code == 201, av.text
+    av_id = av.json()["id"]
+
+    # Avaliação em moderação e avaliação descartada para o mesmo cliente não aparecem
+    fluxo.ctx.usuarios.atualizar_nome(PROFISSIONAL.id, "Carlos Eduardo Silva")
+    cli_id = fluxo.ctx.pedidos.obter(pid).cliente_id
+    fluxo.ctx.avaliacoes.salvar(
+        Avaliacao(
+            "ped-mod",
+            "profissional_para_cliente",
+            PROFISSIONAL.id,
+            cli_id,
+            2,
+            "Em revisão",
+            (),
+            AGORA,
+            id="av-mod",
+            status="em_revisao",
+        )
+    )
+    fluxo.ctx.avaliacoes.salvar(
+        Avaliacao(
+            "ped-desc",
+            "profissional_para_cliente",
+            PROFISSIONAL.id,
+            cli_id,
+            1,
+            "Descartada",
+            (),
+            AGORA,
+            id="av-desc",
+            status="descartada",
+        )
+    )
+    # Avaliação destinada a outro usuário não aparece
+    fluxo.ctx.avaliacoes.salvar(
+        Avaliacao(
+            "ped-outro",
+            "profissional_para_cliente",
+            PROFISSIONAL.id,
+            "cli-outro",
+            5,
+            "De outro cliente",
+            (),
+            AGORA,
+            id="av-outro",
+            status="publicada",
+        )
+    )
+
+    antes = fluxo.chamar("GET", "/v1/me/avaliacoes/recebidas", "t-cliente")
+    assert antes.status_code == 200, antes.text
+    itens = antes.json()
+    assert [i["id"] for i in itens] == [av_id]
+    assert itens[0]["nota_geral"] == 5
+    assert itens[0]["comentario"] == "Excelente cliente."
+    assert itens[0]["resposta"] is None
+    assert itens[0]["criada_em"] is not None
+    assert itens[0]["cliente_nome"] == "Carlos S."
+
+    # Após responder, a resposta aparece na listagem
+    resp = fluxo.chamar(
+        "POST",
+        f"/v1/avaliacoes/{av_id}/responder",
+        "t-cliente",
+        json={"resposta": "Muito obrigado!"},
+    )
+    assert resp.status_code == 200, resp.text
+    depois = fluxo.chamar("GET", "/v1/me/avaliacoes/recebidas", "t-cliente")
+    assert depois.status_code == 200, depois.text
+    assert depois.json()[0]["resposta"] == "Muito obrigado!"
+
+    # Outro cliente não vê avaliações deste cliente
+    outro = fluxo.chamar("GET", "/v1/me/avaliacoes/recebidas", "t-outro-cliente")
+    assert outro.status_code == 200, outro.text
+    assert [i["id"] for i in outro.json()] == []

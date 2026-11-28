@@ -24,6 +24,7 @@ from trato.api.auth import PapelUsuario, Usuario
 from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
 from trato.api.modelos import AbrirDisputaIn, AcaoPedidoIn
+from trato.api.regra_contratada import regra_do_contrato
 from trato.api.servicos import carregar_pedido
 from trato.financeiro import periodo
 from trato.notificacoes.eventos import Evento
@@ -93,6 +94,8 @@ def prazo(contexto: Contexto, pedido: Pedido) -> tuple[datetime | None, datetime
         dias = contexto.config.carregar().arrependimento_dias
     except Exception:  # noqa: BLE001 - o direito não depende de a configuração estar publicada
         dias = 7
+    contrato = contexto.contratos.obter_do_pedido(pedido.id)
+    dias = regra_do_contrato(contrato, "arrependimento_dias", "maior", dias)  # 23.6
     inicio = contratado_em(contexto, pedido)
     ate = arrependimento_ate(inicio, max(dias, 7)) if inicio else None
     return inicio, ate, ate is None or contexto.agora() <= ate

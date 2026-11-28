@@ -25,7 +25,7 @@ from trato.api.moedas import (
 from trato.financeiro import periodo
 from trato.lgpd.config import ConfigLgpd
 from trato.lgpd.repositorios import Consentimento, PedidoExclusao, RepositoriosLgpd
-from trato.persistencia.erros import ErroPersistencia
+from trato.persistencia.erros import ErroPersistencia, RegistrosPreservados
 from trato.seguranca.estado import Seguranca
 
 FORMATO_EXPORTACAO = "trato-lgpd-1"
@@ -303,6 +303,8 @@ class ServicoLgpd:
         for pedido in self._r.exclusoes.agendadas_ate(agora):
             try:
                 resultado = self._excluir_sem_pendencia(pedido, agora)
+            except RegistrosPreservados:  # 9.6: o banco recusou e tudo voltou atrás
+                resultado = [PRESERVACAO], {}
             except (ErroPersistencia, PedidoEncerrado):  # trava ocupada: nada foi gravado
                 log.warning("Exclusão %s ficou para a próxima rodada", pedido.id, exc_info=True)
                 adiadas += 1

@@ -20,6 +20,7 @@ from fastapi import HTTPException
 
 from trato.api.avisos import avisar_partes
 from trato.api.contexto import Contexto
+from trato.api.regra_contratada import dias_de_garantia
 from trato.disputas import Disputa, Estado, Resultado
 from trato.financeiro.ledger import Lancamento
 from trato.garantias import abrir_garantia
@@ -127,7 +128,10 @@ def efetivar(
                 contexto.garantias.salvar_garantia(
                     gravado.id,
                     abrir_garantia(
-                        gravado.concluido_em, categoria, contexto.config.carregar().garantias
+                        gravado.concluido_em,
+                        categoria,
+                        contexto.config.carregar().garantias,
+                        dias_de_garantia(contexto, contrato),
                     ),
                 )
         contexto.disputas.salvar(pedido_id, decidida)

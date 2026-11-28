@@ -9,7 +9,8 @@ import '../cliente/chips_categorias.dart';
 import '../cliente/cartao_avaliacao.dart';
 import '../cliente/etiquetas_elogio.dart';
 import '../cliente/modelos.dart' show formatarNota;
-import '../comuns/convite.dart' show CompartilharTexto, compartilharMeuPerfil, textoDivulgacaoPerfil;
+import '../comuns/convite.dart'
+    show CompartilharTexto, compartilharMeuPerfil, textoDivulgacaoPerfil;
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto;
 import '../profissional_apoio/apoio.dart';
 import 'perfil_publico.dart';
@@ -162,7 +163,8 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                     children: [
                       Text(p.nome, style: TipografiaTrato.tituloGrande),
                       const SizedBox(height: EspacosTrato.x1),
-                      if (p.verificacao != null) SeloVerificacao(p.verificacao!),
+                      if (p.verificacao != null)
+                        SeloVerificacao(p.verificacao!, conferidoEm: p.seloConferidoEm),
                       const SizedBox(height: EspacosTrato.x1),
                       ChipsCategorias(categorias: p.categoria),
                       const SizedBox(height: EspacosTrato.x1),
@@ -195,12 +197,20 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                       ),
               ),
             const SizedBox(height: EspacosTrato.x5),
+            if (p.contagem?.novoNoTrato ?? false) ...[
+              Text('Novo no Trato', style: TipografiaTrato.corpoForte),
+              const SizedBox(height: EspacosTrato.x2),
+            ],
             Row(
               children: [
                 Expanded(
                   child: _Indicador(
                     rotulo: 'Nota',
-                    valor: p.totalAvaliacoes == 0 ? '—' : formatarNota(p.nota),
+                    valor: (p.contagem?.novoNoTrato ?? false) ||
+                            p.totalAvaliacoes == 0 ||
+                            (p.contagem != null && p.nota == 0)
+                        ? '—'
+                        : formatarNota(p.nota),
                     extra: '(${p.totalAvaliacoes})',
                   ),
                 ),
@@ -284,7 +294,8 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   key: const Key('abrir-servicos-recorrentes'),
                   leading: Icon(Icons.event_repeat_outlined, color: context.cores.petroleo),
                   title: Text('Serviços recorrentes', style: TipografiaTrato.corpoForte),
-                  subtitle: Text('Visitas toda semana, quinzena ou mês', style: TipografiaTrato.legenda),
+                  subtitle:
+                      Text('Visitas toda semana, quinzena ou mês', style: TipografiaTrato.legenda),
                   trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoAbrirRecorrencias,
                 ),
@@ -299,7 +310,8 @@ class _PerfilPublicoTelaState extends State<PerfilPublicoTela> {
                   key: const Key('abrir-indique-e-ganhe'),
                   leading: Icon(Icons.card_giftcard_outlined, color: context.cores.petroleo),
                   title: Text('Indique e ganhe', style: TipografiaTrato.corpoForte),
-                  subtitle: Text('Convide amigos e ganhe Tratinhos', style: TipografiaTrato.legenda),
+                  subtitle:
+                      Text('Convide amigos e ganhe Tratinhos', style: TipografiaTrato.legenda),
                   trailing: Icon(Icons.chevron_right, color: context.cores.textoSecundario),
                   onTap: widget.aoAbrirIndicacoes,
                 ),

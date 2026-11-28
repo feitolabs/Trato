@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from trato import legal
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto
+from trato.api.repositorios import Contrato
 from trato.api.rotas_financeiro import _numeros_dos_pedidos
 from trato.api.rotas_profissional_cadastro import _nome_abreviado
 from trato.api.servicos import carregar_pedido
@@ -50,6 +51,16 @@ def _contratacao(contexto: Contexto, pedido_id: str, usuario: Usuario) -> tuple[
     return pedido, confirmada_em
 
 
+def _termos_do_contrato(
+    contrato: Contrato | None, confirmada_em: datetime
+) -> tuple[str | None, legal.VersaoDosTermos | None]:
+    """23.6: usa a versão gravada no contrato (061000); só cai na data em contratos antigos."""
+    if contrato is not None and contrato.termos_versao:
+        return contrato.termos_versao, legal.por_versao(contrato.termos_versao)
+    termos = legal.vigente_em(confirmada_em)
+    return (termos.versao if termos else None), termos
+
+
 def _arquivo(conteudo: bytes, nome: str) -> Response:
     return Response(
         content=conteudo,
@@ -72,14 +83,15 @@ def ver_contratacao(
     contexto: Contexto = Depends(obter_contexto),
 ) -> ContratacaoOut:
     pedido, confirmada_em = _contratacao(contexto, pedido_id, usuario)
-    termos = legal.vigente_em(confirmada_em)
+    contrato = contexto.contratos.obter_do_pedido(pedido.id)
+    versao, termos = _termos_do_contrato(contrato, confirmada_em)
     base = f"/v1/pedidos/{pedido.id}/contratacao"
     return ContratacaoOut(
         pedido_id=pedido.id,
         confirmada_em=confirmada_em,
         comprovante_url=f"{base}/comprovante.pdf",
         termos_disponiveis=termos is not None,
-        termos_versao=termos.versao if termos else None,
+        termos_versao=versao,
         termos_vigentes_desde=termos.vigente_desde if termos else None,
         termos_url=f"{base}/termos.pdf" if termos else None,
     )
@@ -119,7 +131,7 @@ def baixar_comprovante(
 
     numero = _numeros_dos_pedidos(contexto, [pedido.id]).get(pedido.id)
     codigo = f"PED-{numero}" if numero is not None else pedido.id[:8]
-    termos = legal.vigente_em(confirmada_em)
+    versao, _ = _termos_do_contrato(contrato, confirmada_em)
     dados = documentos.DadosComprovante(
         codigo=codigo,
         titulo=dados_pedido.titulo if dados_pedido else "",
@@ -133,7 +145,7 @@ def baixar_comprovante(
         desconto_centavos=cobranca.desconto_centavos if cobranca else 0,
         meio=cobranca.meio.value if cobranca else None,
         parcelas=cobranca.parcelas if cobranca else 1,
-        termos_versao=termos.versao if termos else None,
+        termos_versao=versao,
     )
     return _arquivo(
         documentos.comprovante_pdf(dados, contexto.agora()), f"comprovante-trato-{codigo}.pdf"
@@ -150,8 +162,9 @@ def baixar_termos(
     usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Response:
-    _, confirmada_em = _contratacao(contexto, pedido_id, usuario)
-    termos = legal.vigente_em(confirmada_em)
+    pedido, confirmada_em = _contratacao(contexto, pedido_id, usuario)
+    contrato = contexto.contratos.obter_do_pedido(pedido.id)
+    _, termos = _termos_do_contrato(contrato, confirmada_em)
     if termos is None:  # nunca entrega outra versão no lugar
         raise HTTPException(
             404,

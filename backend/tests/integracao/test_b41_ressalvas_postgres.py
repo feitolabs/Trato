@@ -74,6 +74,10 @@ def test_pedido_de_visita_so_aparece_para_o_profissional_da_serie(cenario):
     detalhe = get(c, f"/v1/profissional/pedidos-abertos/{pedido_visita}", "profissional2")
     assert detalhe.status_code == 404
     orcamento = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "horas",
@@ -81,7 +85,7 @@ def test_pedido_de_visita_so_aparece_para_o_profissional_da_serie(cenario):
                 "quantidade": 1,
                 "valor_unitario_centavos": 5_000,
             }
-        ]
+        ],
     }
     assert (
         post(c, f"/v1/pedidos/{pedido_visita}/orcamentos", "profissional2", orcamento).status_code

@@ -70,7 +70,8 @@ select p.id, p.cliente_id, p.status, p.criado_em, p.modalidade,
          from public.pedido_historico h
          where h.pedido_id = p.id
            and h.prova ->> 'acao' in ('fazer_check_out', 'resolver_retrabalho')
-         order by h.id desc limit 1), false) as check_out_sem_codigo
+         order by h.id desc limit 1), false) as check_out_sem_codigo,
+       to_jsonb(p) ->> 'substitui_pedido_id' as substitui_pedido_id
   from public.pedidos p
   left join public.contratos c on c.pedido_id = p.id and c.status <> 'cancelado'
   left join lateral (
@@ -97,6 +98,25 @@ class PedidosPostgres:
         self._segredo = segredo_codigos
 
     # --- leitura -----------------------------------------------------------------------
+    def ja_substituido(self, pedido_id: str) -> bool:
+        pid = como_uuid(pedido_id)
+        if pid is None:
+            return False
+        with self._banco.transacao() as con:
+            if not con.execute(
+                "select exists (select 1 from information_schema.columns where "
+                "table_schema = 'public' and table_name = 'pedidos' "
+                "and column_name = 'substitui_pedido_id') as tem"
+            ).fetchone()["tem"]:
+                return False
+            return bool(
+                con.execute(
+                    "select exists (select 1 from public.pedidos "
+                    "where substitui_pedido_id = %s) as tem",
+                    (pid,),
+                ).fetchone()["tem"]
+            )
+
     def obter(self, pedido_id: str) -> Pedido | None:
         achado = como_uuid(pedido_id)
         if achado is None:
@@ -476,6 +496,9 @@ class PedidosPostgres:
             estado_antes_da_disputa=_estado(linha["antes_da_disputa"]) if em_disputa else None,
             remoto=linha["modalidade"] == "remoto",
             check_out_sem_codigo=bool(linha.get("check_out_sem_codigo")),
+            substitui_pedido_id=(
+                str(linha["substitui_pedido_id"]) if linha.get("substitui_pedido_id") else None
+            ),
         )
 
     def _inserir(
@@ -529,12 +552,20 @@ class PedidosPostgres:
                 ).fetchone()
                 cidade = str(cid_padrao["id"]) if cid_padrao else exigir_uuid(d.cidade_id, "cidade")
 
+        extra_col, extra_ph, extra_val = "", "", ()
+        if pedido.substitui_pedido_id is not None and con.execute(
+            "select exists (select 1 from information_schema.columns where "
+            "table_schema = 'public' and table_name = 'pedidos' "
+            "and column_name = 'substitui_pedido_id') as tem"
+        ).fetchone()["tem"]:
+            extra_col, extra_ph = ", substitui_pedido_id", ", %s"
+            extra_val = (exigir_uuid(pedido.substitui_pedido_id, "pedido substituído"),)
         con.execute(
-            "insert into public.pedidos (id, cliente_id, categoria_id, cidade_id, bairro, "
+            "insert into public.pedidos (id, cliente_id, categoria_id, cidade_id, bairro, "  # noqa: S608
             "local_aprox_lat, local_aprox_lng, titulo, descricao, prazo_desejado, "
             "faixa_preco_min_centavos, faixa_preco_max_centavos, urgente, status, criado_em, "
-            "modalidade) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            f"modalidade{extra_col}) "
+            f"values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s{extra_ph})",
             (
                 pid,
                 exigir_uuid(pedido.cliente_id, "cliente"),
@@ -552,6 +583,7 @@ class PedidosPostgres:
                 _banco(pedido.estado),
                 pedido.aberto_em,
                 "remoto" if d.modalidade == "remoto" else "presencial",
+                *extra_val,
             ),
         )
         for resposta in d.respostas:

@@ -8,6 +8,10 @@ from test_notificacoes_api import servico_do
 from trato.pedidos.estados import Estado
 
 ORCAMENTO = {
+    "prazo_execucao_dias": 3,
+    "validade_ate": "2099-01-01T00:00:00Z",
+    "fora_do_escopo": "Materiais não incluídos.",
+    "garantia_dias": 90,
     "itens": [
         {
             "tipo": "horas",

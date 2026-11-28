@@ -43,6 +43,7 @@ from trato.api.repositorios_app import NotaMaterial, PedidoAberto, RecusaPedido
 from trato.api.rotas_app import AvaliacaoOut, AvaliarIn, PedidoAbertoOut, PerfilOut
 from trato.api.rotas_pedidos import MENSAGEM_SO_POR_PROPOSTA, respostas_out
 from trato.api.rotas_upload import urls_fotos_do_pedido
+from trato.api.selo import exigir_selo_para_orcar
 from trato.api.servicos import (
     ator_de,
     carregar_pedido,
@@ -50,7 +51,13 @@ from trato.api.servicos import (
     nomes_de_categorias,
     pedido_out,
 )
-from trato.api.validade import OrcamentoVencido, venceu
+from trato.api.validade import (
+    FORA_DO_ESCOPO_NAO_INFORMADO,
+    OrcamentoIncompleto,
+    OrcamentoVencido,
+    validade_vigente,
+    venceu,
+)
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.notificacoes.eventos import Evento
 from trato.pagamentos.cupons import (
@@ -61,6 +68,7 @@ from trato.pagamentos.cupons import (
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import EstadoCobranca
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
+from trato.pagamentos.prazos import dados_estorno, dados_pix_cobranca
 from trato.pagamentos.provedor.base import ErroProvedor
 from trato.pedidos import estados as pedidos_estados
 from trato.pedidos.estados import (
@@ -75,6 +83,7 @@ from trato.pedidos.estados import (
 )
 from trato.persistencia.erros import NaoEncontrado
 from trato.persistencia.usuarios import nome_de_exibicao
+from trato.profissional.nota import minimo_de_avaliacoes, nota_visivel
 from trato.seguranca.config import obter_config_seguranca
 from trato.seguranca.texto_livre import limpar_texto
 
@@ -177,6 +186,19 @@ class CobrancaContratoOut(BaseModel):
     desconto_possivel_centavos: int = Field(
         0, description="Desconto de moedas que seria aplicado neste pedido (sem reservar)."
     )
+    pix_expira_em: datetime | None = Field(
+        None, description="6.3: instante em que o QR code Pix expira (ISO8601)."
+    )
+    pix_validade_minutos: int | None = Field(
+        None, description="6.3: validade do Pix em minutos."
+    )
+    estorno_status: str | None = Field(
+        None,
+        description="6.10: `solicitado`, `em_processamento`, `concluido` ou `falhou`.",
+    )
+    estorno_prazo_estimado: str | None = Field(
+        None, description="6.10: prazo estimado do estorno conforme o meio de pagamento."
+    )
 
 
 class PagamentoContratoOut(BaseModel):
@@ -194,6 +216,19 @@ class PagamentoContratoOut(BaseModel):
     cobranca_id: str | None = None
     meio: str | None = None
     estado_pedido: str
+    pix_expira_em: datetime | None = Field(
+        None, description="6.3: instante em que o QR code Pix expira (ISO8601)."
+    )
+    pix_validade_minutos: int | None = Field(
+        None, description="6.3: validade do Pix em minutos."
+    )
+    estorno_status: str | None = Field(
+        None,
+        description="6.10: `solicitado`, `em_processamento`, `concluido` ou `falhou`.",
+    )
+    estorno_prazo_estimado: str | None = Field(
+        None, description="6.10: prazo estimado do estorno conforme o meio de pagamento."
+    )
 
 
 class RetrabalhoOut(BaseModel):
@@ -353,8 +388,13 @@ def _contrato_do_usuario(
     return pedido, contrato
 
 
-def _cobranca_out(contrato_id: str, cobranca) -> CobrancaContratoOut:
+def _cobranca_out(
+    contrato_id: str, cobranca, contexto: Contexto | None = None, servico=None
+) -> CobrancaContratoOut:
     pix = cobranca.meio is MeioPagamento.PIX
+    pix_expira_em, pix_validade_minutos = dados_pix_cobranca(cobranca, contexto)
+    ordens = servico.ordens.do_pedido(cobranca.pedido_id) if servico is not None else ()
+    estorno_status, estorno_prazo = dados_estorno(cobranca, ordens)
     return CobrancaContratoOut(
         contrato_id=contrato_id,
         cobranca_id=cobranca.id,
@@ -365,6 +405,10 @@ def _cobranca_out(contrato_id: str, cobranca) -> CobrancaContratoOut:
         tipo_instrucao="pix_copia_e_cola" if pix else "cartao_segredo_do_cliente",
         instrucao=cobranca.instrucao,
         criada_em=cobranca.criada_em,
+        pix_expira_em=pix_expira_em,
+        pix_validade_minutos=pix_validade_minutos,
+        estorno_status=estorno_status,
+        estorno_prazo_estimado=estorno_prazo,
     )
 
 
@@ -392,6 +436,7 @@ def detalhe_do_orcamento(
     if not (dono or autor):
         raise HTTPException(404, "Orçamento não encontrado.")
     campos = {k: v for k, v in vars(orc).items() if k != "itens"}
+    campos["validade_ate"] = validade_vigente(contexto, orc)
     desloc = somar_horas(orc.itens, "deslocamento")
     trab = somar_horas(orc.itens, "horas")
     total = None if desloc is None and trab is None else (desloc or Decimal(0)) + (trab or 0)
@@ -612,7 +657,7 @@ def _criar_cobranca(
         cobranca = _cobrar(valor_sem_moedas, desconto_sem_moedas, 0)
         motivo = indisponivel.motivo or MOTIVO_ORCAMENTO_ESGOTADO
         disponivel, volta, possivel = False, volta_em(motivo, contexto.agora()), 0
-    saida = _cobranca_out(pedido.id, cobranca)
+    saida = _cobranca_out(pedido.id, cobranca, contexto, servico)
     saida.desconto_disponivel = disponivel
     saida.desconto_indisponivel_motivo = motivo
     saida.desconto_volta_em = volta
@@ -666,6 +711,9 @@ def estado_do_pagamento(
             servico_a_cobrar = principal.servico_centavos
         elif principal.desconto_centavos > 0:
             servico_a_cobrar = max(0, contrato.valor_centavos - principal.desconto_centavos)
+    pix_expira_em, pix_validade_minutos = dados_pix_cobranca(principal, contexto)
+    ordens = servico.ordens.do_pedido(pedido.id) if servico is not None else ()
+    estorno_status, estorno_prazo = dados_estorno(principal, ordens)
     return PagamentoContratoOut(
         contrato_id=pedido.id,
         estado_pagamento=estado,
@@ -680,6 +728,10 @@ def estado_do_pagamento(
         cobranca_id=principal.id if principal else None,
         meio=principal.meio.value if principal else None,
         estado_pedido=pedido.estado.value,
+        pix_expira_em=pix_expira_em,
+        pix_validade_minutos=pix_validade_minutos,
+        estorno_status=estorno_status,
+        estorno_prazo_estimado=estorno_prazo,
     )
 
 
@@ -852,7 +904,7 @@ def _decidir_aditivo(
                     meio,
                     cliente_externo=preparo.cliente_id if preparo else None,
                 )
-                saida_cobranca = _cobranca_out(pedido.id, cobranca)
+                saida_cobranca = _cobranca_out(pedido.id, cobranca, contexto, servico)
                 if preparo is not None:
                     saida_cobranca.cliente_externo_id = preparo.cliente_id
                     saida_cobranca.chave_efemera = preparo.chave_efemera
@@ -1189,7 +1241,7 @@ def _orcamento_do_pedido(contexto: Contexto, pedido: Pedido, orcamento_id: str):
         raise HTTPException(404, "Orçamento não encontrado.")
     if detalhe.status != "enviado":
         raise HTTPException(409, "Este orçamento foi substituído por uma versão mais nova.")
-    if venceu(detalhe.validade_ate, contexto.agora()):  # nem renegocia nem gera versão vencida
+    if venceu(validade_vigente(contexto, detalhe), contexto.agora()):  # vencido: sem versão
         raise OrcamentoVencido
     return detalhe
 
@@ -1237,6 +1289,13 @@ def _garantia_com_piso(
     return max(dias, minima)
 
 
+def _exigir_orcamento_completo(detalhe, prazo_execucao_dias: int | None) -> None:  # type: ignore[no-untyped-def]
+    """5.2: nova versão ou negociação nunca copia validade, garantia ou prazo em branco."""
+    prazo = prazo_execucao_dias if prazo_execucao_dias is not None else detalhe.prazo_execucao_dias
+    if detalhe.validade_ate is None or detalhe.garantia_dias is None or prazo is None:
+        raise OrcamentoIncompleto
+
+
 def _publicar_nova_versao_orcamento(
     *,
     request: Request,
@@ -1252,15 +1311,17 @@ def _publicar_nova_versao_orcamento(
         prazo_execucao_dias if prazo_execucao_dias is not None else detalhe.prazo_execucao_dias
     )
     exigir_contato_livre(contexto, pedido, profissional_id)
+    exigir_selo_para_orcar(contexto, profissional_id)  # 10.3
+    _exigir_orcamento_completo(detalhe, prazo_final)
     novo_id = contexto.orcamentos.enviar(
         pedido_id=pedido.id,
         profissional_id=profissional_id,
         itens=_itens_preservando_horas(detalhe, valor_centavos),
         agora=contexto.agora(),
         prazo_execucao_dias=prazo_final,
-        validade_ate=detalhe.validade_ate,
+        validade_ate=validade_vigente(contexto, detalhe),
         garantia_dias=_garantia_com_piso(request, contexto, pedido.id, detalhe.garantia_dias),
-        fora_do_escopo=detalhe.fora_do_escopo,
+        fora_do_escopo=(detalhe.fora_do_escopo or "").strip() or FORA_DO_ESCOPO_NAO_INFORMADO,
         observacoes=detalhe.observacoes,
     )
     conversa = contexto.conversas.abrir(pedido.id, profissional_id)
@@ -1316,6 +1377,7 @@ def contraproposta(
     if pedido.estado not in (Estado.ABERTO, Estado.RESERVADO):
         raise HTTPException(409, "Este pedido já não aceita contraproposta.")
     detalhe = _orcamento_do_pedido(contexto, pedido, orcamento_id)
+    _exigir_orcamento_completo(detalhe, corpo.prazo_execucao_dias)
     valor = corpo.valor_centavos if corpo.valor_centavos is not None else detalhe.valor_centavos
     if valor > detalhe.valor_centavos:
         raise HTTPException(
@@ -1938,7 +2000,13 @@ def _perfil_out(contexto: Contexto, usuario: Usuario, request: Request | None = 
         papel=usuario.papel.value,
         status=detalhe.status,
         nivel_verificacao=detalhe.nivel_verificacao,
-        nota_publica=detalhe.nota_publica,
+        nota_publica=nota_visivel(
+            detalhe.nota_publica,
+            detalhe.avaliacoes_total,
+            minimo_de_avaliacoes(contexto.config),
+        ),
+        avaliacoes_total=detalhe.avaliacoes_total,
+        nota_minimo_avaliacoes=minimo_de_avaliacoes(contexto.config),
         servicos_concluidos=detalhe.servicos_concluidos,
         papeis=papeis,
         tem_perfil_profissional=tem_perfil,

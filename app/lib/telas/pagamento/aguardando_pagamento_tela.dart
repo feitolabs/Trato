@@ -7,6 +7,7 @@ import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../dados/repositorios.dart';
 import '../../tema/tema.dart';
+import 'modelos.dart';
 
 /// Depois de criar a cobrança, o app fica aqui até o BACKEND dizer que o pagamento foi
 /// confirmado (webhook assinado do provedor). O app nunca mostra "pago" por conta própria
@@ -85,6 +86,12 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
   @override
   Widget build(BuildContext context) {
     final pix = widget.cobranca?.pixCopiaECola;
+    final prazoPix = textoPrazoPix(
+      widget.cobranca?.pixExpiraEm,
+      widget.cobranca?.pixValidadeMinutos,
+    );
+    final estornoTitulo = rotuloEstornoStatus(widget.cobranca?.estornoStatus);
+    final estornoPrazo = (widget.cobranca?.estornoPrazoEstimado ?? '').trim();
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
@@ -129,6 +136,15 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Pix copia e cola', style: TipografiaTrato.tituloCartao),
+                      if (prazoPix != null) ...[
+                        const SizedBox(height: EspacosTrato.x1),
+                        Text(
+                          prazoPix,
+                          key: const Key('pix-prazo-validade'),
+                          style: TipografiaTrato.corpoPequeno
+                              .copyWith(color: context.cores.textoSecundario),
+                        ),
+                      ],
                       const SizedBox(height: EspacosTrato.x2),
                       SelectableText(pix, style: TipografiaTrato.corpoPequeno),
                       const SizedBox(height: EspacosTrato.x3),
@@ -144,6 +160,27 @@ class _AguardandoPagamentoTelaState extends State<AguardandoPagamentoTela> {
                             );
                         },
                       ),
+                    ],
+                  ),
+                ),
+              ],
+              if (estornoTitulo != null) ...[
+                const SizedBox(height: EspacosTrato.x4),
+                CartaoTrato(
+                  key: const Key('cartao-estorno-aguardando'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(estornoTitulo, style: TipografiaTrato.corpoForte),
+                      if (estornoPrazo.isNotEmpty) ...[
+                        const SizedBox(height: EspacosTrato.x1),
+                        Text(
+                          estornoPrazo,
+                          key: const Key('estorno-prazo-estimado'),
+                          style: TipografiaTrato.corpoPequeno
+                              .copyWith(color: context.cores.textoSecundario),
+                        ),
+                      ],
                     ],
                   ),
                 ),

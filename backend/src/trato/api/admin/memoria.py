@@ -334,6 +334,14 @@ class UsuariosAdminEmMemoria:
     def obter(self, usuario_id: str) -> UsuarioAdmin | None:
         return self._itens.get(usuario_id)
 
+    def definir_status(self, usuario_id: str, status: str) -> UsuarioAdmin | None:
+        atual = self._itens.get(usuario_id)
+        if atual is None:
+            return None
+        novo = replace(atual, status=status)
+        self._itens[usuario_id] = novo
+        return novo
+
     def nomes(self, ids: Sequence[str]) -> dict[str, str]:
         return {i: self._itens[i].nome for i in ids if i in self._itens}
 

@@ -2,6 +2,7 @@
 /// Dinheiro sempre em centavos inteiros. Só leitura de JSON; nenhuma regra aqui.
 library;
 
+import '../telas/comuns/contagem_avaliacoes.dart';
 import '../telas/comuns/formato_aparelho.dart';
 
 DateTime _data(Object? valor) => DateTime.parse(valor! as String).toLocal();
@@ -33,7 +34,11 @@ class PedidoApi {
     this.contratadoEm,
     this.checkOutSemCodigo = false,
     this.urgente = false,
+    this.substituiPedidoId,
   });
+
+  /// Termos 7.7: id do pedido original que este substitui (nulo se não for substituto ou servidor antigo).
+  final String? substituiPedidoId;
 
   /// Verdadeiro quando o profissional concluiu o check-out sem código (Plano B).
   final bool checkOutSemCodigo;
@@ -102,6 +107,7 @@ class PedidoApi {
         codigoConclusao: j['codigo_conclusao'] as String?,
         checkOutSemCodigo: j['check_out_sem_codigo'] == true,
         urgente: j['urgente'] == true,
+        substituiPedidoId: j['substitui_pedido_id'] as String?,
       );
 
   final String id;
@@ -138,14 +144,19 @@ class PedidoApi {
 }
 
 class EventoApi {
-  const EventoApi({required this.acao, required this.para, required this.em});
+  const EventoApi({required this.acao, required this.para, required this.em, this.atorPapel});
 
-  factory EventoApi.deJson(Map<String, dynamic> j) =>
-      EventoApi(acao: j['acao'] as String, para: j['para'] as String, em: _data(j['em']));
+  factory EventoApi.deJson(Map<String, dynamic> j) => EventoApi(
+        acao: j['acao'] as String,
+        para: j['para'] as String,
+        em: _data(j['em']),
+        atorPapel: j['ator_papel'] as String?,
+      );
 
   final String acao;
   final String para;
   final DateTime em;
+  final String? atorPapel;
 }
 
 class SaldoPedidoApi {
@@ -222,6 +233,7 @@ class ExclusividadeApi {
     required this.moedasCobradas,
     required this.criadaEm,
     this.responderAte,
+    this.prazoSuspenso = false,
     this.respondidaEm,
     this.expiraEm,
     this.encerradaEm,
@@ -238,6 +250,7 @@ class ExclusividadeApi {
         moedasCobradas: (j['moedas_cobradas'] as num?)?.toInt() ?? 100,
         criadaEm: _data(j['criada_em']),
         responderAte: _dataOuNulo(j['responder_ate']),
+        prazoSuspenso: j['prazo_suspenso'] == true,
         respondidaEm: _dataOuNulo(j['respondida_em']),
         expiraEm: _dataOuNulo(j['expira_em']),
         encerradaEm: _dataOuNulo(j['encerrada_em']),
@@ -256,6 +269,9 @@ class ExclusividadeApi {
   final int moedasCobradas;
   final DateTime criadaEm;
   final DateTime? responderAte;
+
+  /// Termos 22.3: falha da plataforma ativa; o prazo não está correndo.
+  final bool prazoSuspenso;
   final DateTime? respondidaEm;
   final DateTime? expiraEm;
   final DateTime? encerradaEm;
@@ -300,7 +316,9 @@ class OfertaExclusividadeApi {
     required this.status,
     this.profissionalNome,
     this.notaPublica,
+    this.contagem,
     this.responderAte,
+    this.prazoSuspenso = false,
     this.expiraEm,
     this.texto = 'Sem compromisso',
   });
@@ -311,8 +329,10 @@ class OfertaExclusividadeApi {
         profissionalId: (j['profissional_id'] as String?) ?? '',
         profissionalNome: j['profissional_nome'] as String?,
         notaPublica: (j['nota_publica'] as num?)?.toDouble(),
+        contagem: ContagemAvaliacoes.deJson(j),
         status: (j['status'] as String?) ?? 'aguardando_cliente',
         responderAte: _dataOuNulo(j['responder_ate']),
+        prazoSuspenso: j['prazo_suspenso'] == true,
         expiraEm: _dataOuNulo(j['expira_em']),
         texto: (j['texto'] as String?) ?? 'Sem compromisso',
       );
@@ -322,8 +342,14 @@ class OfertaExclusividadeApi {
   final String profissionalId;
   final String? profissionalNome;
   final double? notaPublica;
+
+  /// Termos 12.3. Nulo: servidor antigo (a tela fica como antes).
+  final ContagemAvaliacoes? contagem;
   final String status;
   final DateTime? responderAte;
+
+  /// Termos 22.3: falha da plataforma ativa; o prazo não está correndo.
+  final bool prazoSuspenso;
   final DateTime? expiraEm;
   final String texto;
 }

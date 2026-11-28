@@ -57,8 +57,12 @@ void main() {
 
     const daRemocao = 'Conta reativada, sem trava (mensagem de exemplo).';
     api.mensagemRisco = daRemocao;
+    // O banner fica no topo do detalhe; o botão, no fim.
+    final banner = find.textContaining('Conta restrita.', findRichText: true);
+    final lista = find.descendant(of: find.byType(ListView).last, matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(banner, -300, scrollable: lista);
+    expect(banner, findsOneWidget);
     await rolarListaAte(tester, find.text('Remover trava'));
-    expect(find.textContaining('Conta restrita.', findRichText: true), findsOneWidget);
     expect(_promessa, findsNothing);
     await _clicar(tester, find.text('Remover trava'));
     expect(_promessa, findsNothing);

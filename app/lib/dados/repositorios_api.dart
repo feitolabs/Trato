@@ -1,3 +1,4 @@
+import '../telas/comuns/contagem_avaliacoes.dart';
 import '../dispositivo/servico_localizacao.dart';
 import 'dart:async';
 import 'dart:io';
@@ -7,6 +8,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import '../auth/servico_auth.dart';
 import '../componentes/componentes.dart';
 import '../dispositivo/servico_camera.dart';
+import '../telas/aditivo/aditivo.dart' show aditivoSemValor;
 import '../telas/pedidos/documentos_contratacao.dart';
 import '../telas/exclusividade_cliente/modelos.dart';
 import '../telas/ausencia/modelos.dart';
@@ -16,9 +18,12 @@ import '../telas/comuns/prazo_avaliacao.dart';
 import '../telas/carteira/modelos.dart' hide ResumoCarteira;
 import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
+import '../telas/pagamento/estorno_pedido.dart';
 import '../telas/pagamento/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
+import '../telas/comuns/resultado_esperado.dart';
 import '../telas/pedidos/modelos.dart';
+import '../telas/cliente/modelos.dart' show Avaliacao;
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/dinheiro.dart';
 import '../telas/profissional/servico_check_in.dart';
@@ -36,6 +41,7 @@ import 'fila_offline.dart';
 import 'modelos_api.dart';
 import 'repositorios.dart';
 import 'servico_upload.dart';
+import 'servicos_api.dart' show servicoDaAvaliacao;
 import 'paralelo.dart';
 
 // IMPLEMENTAÇÕES QUE FALAM COM A API (modo `api`). Só pedem e mostram; o backend decide.
@@ -132,7 +138,13 @@ String _iniciais(String nome) {
 }
 
 class RepositorioPedidosApi
-    implements RepositorioPedidos, ServicoContratacao, PedidosComContaBloqueada {
+    implements
+        RepositorioPedidos,
+        ServicoContratacao,
+        PedidosComContaBloqueada,
+        EstornosDoPedido,
+        PropostaComAviso,
+        SubstituicaoDePedido {
   RepositorioPedidosApi(
     this._api, {
     this.textos = const TextosPadraoTelas(),
@@ -251,8 +263,10 @@ class RepositorioPedidosApi
       profissionalId: o.profissionalId,
       profissionalNome: o.profissionalNome,
       notaPublica: o.notaPublica,
+      contagem: o.contagem,
       status: o.status,
       responderAte: o.responderAte,
+      prazoSuspenso: o.prazoSuspenso,
       expiraEm: o.expiraEm,
       texto: o.texto,
     );
@@ -603,7 +617,9 @@ class RepositorioPedidosApi
         final estado = (a['estado'] as String?) ?? 'proposto';
         final valor = (a['valor_centavos'] as num?)?.toInt() ?? 0;
         final desc = (a['descricao'] as String?) ?? '';
-        if (estado == 'proposto' && aditivoPendente == null) {
+        // Termos 6.8: acabada a execução, o que não foi pago não vale mais.
+        final semValor = aditivoSemValor(estado, pedido.estado);
+        if (estado == 'proposto' && !semValor && aditivoPendente == null) {
           aditivoPendente = Aditivo(
             titulo: 'Aditivo proposto',
             valorCentavos: valor,
@@ -611,14 +627,15 @@ class RepositorioPedidosApi
           );
         }
         if (estado == 'pago') aditivosPagos += valor;
-        if (estado == 'aprovado') aditivosAprovados += valor;
+        if (estado == 'aprovado' && !semValor) aditivosAprovados += valor;
         aditivos.add(
           ItemResumoAditivo(
             id: (a['id'] as String?) ?? '',
             descricao: desc,
             valorCentavos: valor,
-            estado: estado,
+            estado: semValor ? 'sem_valor' : estado,
             estadoTexto: switch (estado) {
+              _ when semValor => 'Não vale mais',
               'aprovado' => 'Aprovado',
               'pago' => 'Pago',
               'recusado' => 'Recusado',
@@ -684,6 +701,13 @@ class RepositorioPedidosApi
       podeVerConclusao: const {'em_confirmacao', 'concluido'}.contains(pedido.estado),
       pagamentoConfirmado: pedido.pagamentoConfirmado,
       estadoApi: pedido.estado,
+      substituiPedidoId: pedido.substituiPedidoId,
+      canceladoPorProfissional: pedido.estado == 'cancelado' &&
+          eventos.any(
+            (e) =>
+                e.acao == 'registrar_ausencia' ||
+                (e.acao == 'cancelar' && e.atorPapel == 'profissional'),
+          ),
       remoto: pedido.remoto,
       categoriaNome: categoria.isEmpty ? null : categoria,
       descricao: descricaoPedido,
@@ -711,6 +735,12 @@ class RepositorioPedidosApi
           ? null
           : pedido.codigoInicio,
     );
+  }
+
+  @override
+  Future<String> substituir(String pedidoId) async {
+    final j = _mapa(await _api.post('/v1/pedidos/$pedidoId/substituir'));
+    return j['id'] as String;
   }
 
   /// Sem resposta ou servidor antigo: sem prazo conhecido (a tela fica como antes).
@@ -748,7 +778,8 @@ class RepositorioPedidosApi
         if (pedido.checkOutSemCodigo) throw const FormatException('sem prazo');
         final horas = ConfigPublica.atual.prazoConfirmacaoHoras;
         final eventos = [
-          for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos'))) EventoApi.deJson(j)
+          for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/eventos')))
+            EventoApi.deJson(j)
         ];
         final fim = eventos
             .where((e) => e.acao == 'fazer_check_out')
@@ -838,6 +869,7 @@ class RepositorioPedidosApi
     required String motivo,
     required String descricao,
     List<String> fotos = const [],
+    String? resultadoEsperado,
   }) async {
     final enviadas = fotos.isEmpty
         ? null
@@ -847,14 +879,31 @@ class RepositorioPedidosApi
             FinalidadeArquivo.evidenciaDisputa,
             pedidoId: pedidoId,
           );
-    await _api.post(
-      '/v1/pedidos/$pedidoId/disputa',
-      corpo: {
+    await _abrirDisputa(
+      pedidoId,
+      {
         'motivo': motivo,
         'descricao': descricao,
         if (enviadas != null) 'fotos': enviadas,
       },
+      resultadoEsperado,
     );
+  }
+
+  /// Termos 8.4: `resultado_esperado` na abertura. Servidor antigo recusa campo desconhecido
+  /// (422 sem código, nada é gravado): tenta uma vez sem ele; a escolha segue no relato.
+  Future<void> _abrirDisputa(String pedidoId, Map<String, Object?> corpo, String? esperado) async {
+    final rota = '/v1/pedidos/$pedidoId/disputa';
+    if (esperado == null) {
+      await _api.post(rota, corpo: corpo);
+      return;
+    }
+    try {
+      await _api.post(rota, corpo: {...corpo, 'resultado_esperado': esperado});
+    } on ErroTrato catch (e) {
+      if (e.codigoHttp != 422 || e.codigo != null) rethrow;
+      await _api.post(rota, corpo: corpo);
+    }
   }
 
   @override
@@ -868,8 +917,9 @@ class RepositorioPedidosApi
     }
     final codigo = '${j['motivo'] ?? ''}';
     final indice = _motivosDisputa.indexOf(codigo);
-    final descricao = '${j['descricao'] ?? ''}'.trim();
+    final (:descricao, :pedido) = separarRelato(j['descricao'], j['resultado_esperado']);
     return RelatoDoPedido(
+      resultadoEsperado: pedido,
       motivo: indice < 0 || indice >= textos.motivos.length ? 'Problema' : textos.motivos[indice],
       descricao: descricao.isEmpty ? null : descricao,
       abertoEm: DateTime.tryParse('${j['aberta_em']}'),
@@ -906,13 +956,17 @@ class RepositorioPedidosApi
       FinalidadeArquivo.evidenciaDisputa,
       pedidoId: pedidoId,
     );
-    await _api.post(
-      '/v1/pedidos/$pedidoId/disputa',
-      corpo: {
+    final escolha = textos.solucoes.indexOf(relato.solucao);
+    await _abrirDisputa(
+      pedidoId,
+      {
         'motivo': _motivosDisputa[indice < 0 ? 0 : indice],
-        'descricao': '${relato.descricao}\n\nSolução que o cliente prefere: ${relato.solucao}',
+        'descricao': '${relato.descricao}\n\n$marcaSolucaoPreferida ${relato.solucao}',
         'fotos': fotos,
       },
+      escolha >= 0 && escolha < codigosResultadoEsperado.length
+          ? codigosResultadoEsperado[escolha]
+          : null,
     );
   }
 
@@ -993,6 +1047,7 @@ class RepositorioPedidosApi
       profissionalId: pedido.profissionalId,
       bonusDisponivel: bonusDisponivel,
       bonusMoedas: bonusMoedas,
+      bonusValidadeDias: prazo.bonusValidadeDias,
       jaAvaliou: jaAvaliou,
       avaliarAte: prazo.ate,
       prazoEncerrado: prazo.encerrado,
@@ -1099,6 +1154,24 @@ class RepositorioPedidosApi
 
   /// `POST /v1/pedidos/{id}/acoes/cancelar` `{prova: {motivo}}`.
   @override
+  Future<List<EstornoDoPedido>> estornosDoPedido(String pedidoId) async {
+    try {
+      return [
+        for (final j in _lista(await _api.get('/v1/pedidos/$pedidoId/cobrancas')))
+          if (EstornoDoPedido.deJson(j) case final e?) e,
+      ];
+    } on ErroTrato catch (e) {
+      // Servidor antigo sem a rota, ou que ainda a nega à conta bloqueada: nada a mostrar.
+      if (e.tipo == TipoErro.naoEncontrado ||
+          e.tipo == TipoErro.indisponivel ||
+          e.codigo == 'conta_bloqueada') {
+        return const [];
+      }
+      rethrow;
+    }
+  }
+
+  @override
   Future<List<Reagendamento>> reagendamentos(String pedidoId) async {
     final itens = _lista(await _api.get('/v1/pedidos/$pedidoId/reagendamentos'));
     return [
@@ -1114,7 +1187,17 @@ class RepositorioPedidosApi
     required DateTime fim,
     String? motivo,
   }) async {
-    await _api.post(
+    await proporReagendamentoComAviso(pedidoId, inicio: inicio, fim: fim, motivo: motivo);
+  }
+
+  @override
+  Future<String?> proporReagendamentoComAviso(
+    String pedidoId, {
+    required DateTime inicio,
+    required DateTime fim,
+    String? motivo,
+  }) async {
+    final resposta = await _api.post(
       '/v1/pedidos/$pedidoId/reagendamentos',
       corpo: {
         'nova_janela_inicio': inicio.toUtc().toIso8601String(),
@@ -1122,6 +1205,7 @@ class RepositorioPedidosApi
         if (motivo != null && motivo.trim().isNotEmpty) 'motivo': motivo.trim(),
       },
     );
+    return Reagendamento.deJson(resposta)?.avisoPrazo;
   }
 
   @override
@@ -1464,14 +1548,18 @@ class RepositorioOrcamentosApi implements RepositorioOrcamentos {
     final garantia = j['garantia_dias'] as int?;
     final nota = (j['profissional_nota'] as num?)?.toDouble();
     final servicos = (j['profissional_servicos_concluidos'] as num?)?.toInt();
+    final contagem = ContagemAvaliacoes.deJson(j, chaveTotal: 'profissional_avaliacoes_total');
+    final novo = contagem?.novoNoTrato ?? false;
     return Orcamento(
+      contagem: contagem,
       id: j['id'] as String,
       profissional: nome,
       iniciais: _iniciais(nome),
       verificacao: seloDeVerificacao(j['profissional_nivel_verificacao'] as String?),
       totalCentavos: j['valor_centavos'] as int,
-      nota: nota ?? 0,
-      notaResumo: nota == null ? semAvaliacoes : nota.toStringAsFixed(1).replaceAll('.', ','),
+      nota: novo ? 0 : nota ?? 0,
+      notaResumo:
+          novo || nota == null ? semAvaliacoes : nota.toStringAsFixed(1).replaceAll('.', ','),
       servicosResumo: '${servicos ?? 0}',
       servicosConcluidos: servicos ?? 0,
       quando: _quandoRelativo(enviadoEm),
@@ -1516,6 +1604,14 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
       validadeAte: DateTime.tryParse('${j['validade_ate'] ?? ''}')?.toLocal(),
       pagoOuEmConfirmacao:
           j['pagamento_confirmado'] == true || j['estado'] == 'aguardando_confirmacao',
+      pixExpiraEm: lerDataIso(j['pix_expira_em']),
+      pixValidadeMinutos: (j['pix_validade_minutos'] as num?)?.toInt(),
+      estornoStatus: (j['estorno_status'] as String?)?.trim().isEmpty == true
+          ? null
+          : j['estorno_status'] as String?,
+      estornoPrazoEstimado: (j['estorno_prazo_estimado'] as String?)?.trim().isEmpty == true
+          ? null
+          : j['estorno_prazo_estimado'] as String?,
       valorAgoraCentavos: (j['total_a_pagar_centavos'] as num?)?.toInt() ?? valor,
       descontoCentavos: (j['desconto_centavos'] as num?)?.toInt() ?? 0,
       descontoCupomCentavos: (j['desconto_cupom_centavos'] as num?)?.toInt(),
@@ -1531,12 +1627,7 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           MotivoDescontoIndisponivel.deTexto(j['desconto_indisponivel_motivo']),
       parcelamento: [
         for (final o in (j['opcoes_parcelamento'] as List? ?? const []))
-          OpcaoParcelamento(
-            parcelas: (o as Map)['parcelas'] as int,
-            custoCentavos: o['custo_centavos'] as int,
-            totalCentavos: o['total_centavos'] as int,
-            valorParcelaCentavos: o['valor_parcela_centavos'] as int,
-          ),
+          _lerOpcaoParcelamento(o as Map),
       ],
       opcoes: [
         // `pix_disponivel: false` (campo opcional) esconde o Pix; ausente = como antes.
@@ -1553,6 +1644,34 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
             descricao: 'Pagamento seguro processado no app.',
           ),
       ],
+    );
+  }
+
+  static OpcaoParcelamento _lerOpcaoParcelamento(Map o) {
+    final valoresBrutos = o['valores_parcelas_centavos'];
+    final valoresParcelas = valoresBrutos is List
+        ? [
+            for (final v in valoresBrutos)
+              if (v is num) v.toInt(),
+          ]
+        : const <int>[];
+    final ultimaBruta = o['ultima_parcela_centavos'];
+    final ultima = ultimaBruta is num
+        ? ultimaBruta.toInt()
+        : (valoresParcelas.isNotEmpty ? valoresParcelas.last : null);
+    final custoBps = o['custo_total_bps'];
+    final diferenca = o['diferenca_a_vista_centavos'];
+    final semJuros = o['sem_juros'];
+    return OpcaoParcelamento(
+      parcelas: (o['parcelas'] as num).toInt(),
+      custoCentavos: (o['custo_centavos'] as num).toInt(),
+      totalCentavos: (o['total_centavos'] as num).toInt(),
+      valorParcelaCentavos: (o['valor_parcela_centavos'] as num).toInt(),
+      valoresParcelasCentavos: valoresParcelas,
+      ultimaParcelaCentavos: ultima,
+      custoTotalBps: custoBps is num ? custoBps.toInt() : null,
+      diferencaAVistaCentavos: diferenca is num ? diferenca.toInt() : null,
+      semJuros: semJuros is bool ? semJuros : null,
     );
   }
 
@@ -1670,6 +1789,14 @@ class RepositorioPagamentoApi implements RepositorioPagamento {
           j['tipo_instrucao'] == 'cartao_segredo_do_cliente' ? j['instrucao'] as String? : null,
       clienteCartaoId: j['cliente_externo_id'] as String?,
       chaveEfemera: j['chave_efemera'] as String?,
+      pixExpiraEm: lerDataIso(j['pix_expira_em']),
+      pixValidadeMinutos: (j['pix_validade_minutos'] as num?)?.toInt(),
+      estornoStatus: (j['estorno_status'] as String?)?.trim().isEmpty == true
+          ? null
+          : j['estorno_status'] as String?,
+      estornoPrazoEstimado: (j['estorno_prazo_estimado'] as String?)?.trim().isEmpty == true
+          ? null
+          : j['estorno_prazo_estimado'] as String?,
     );
   }
 
@@ -2010,6 +2137,7 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
           recorrenciaId: _textoDoDado(n['dados'], 'recorrencia_id'),
           chamadoId: _textoDoDado(n['dados'], 'chamado_id'),
           compensacaoId: _textoDoDado(n['dados'], 'compensacao_id'),
+          avaliacaoId: _textoDoDado(n['dados'], 'avaliacao_id'),
         ),
     ];
   }
@@ -2095,7 +2223,8 @@ class RepositorioNotificacoesApi implements RepositorioNotificacoes {
 }
 
 /// `GET` e `PATCH /v1/me`. O primeiro `GET /v1/me` depois do login cria o usuário no backend.
-class RepositorioPerfilApi implements RepositorioPerfil {
+class RepositorioPerfilApi
+    implements RepositorioPerfil, AvaliacoesRecebidasCliente, ReativacaoConta {
   RepositorioPerfilApi(this._api, {this.upload});
 
   final ClienteApi _api;
@@ -2107,6 +2236,45 @@ class RepositorioPerfilApi implements RepositorioPerfil {
   /// URL curta da foto por usuário; vale 45 s (a URL do backend expira em 5). Curto de propósito:
   /// quem troca a foto aparece com a nova na lista de mensagens e no perfil quase na hora.
   final Map<String, (DateTime, Future<String?>)> _fotos = {};
+
+  @override
+  Future<List<Avaliacao>> avaliacoesRecebidas() async {
+    final brutas = _lista(await _api.get('/v1/me/avaliacoes/recebidas'));
+    return [
+      for (final a in brutas)
+        () {
+          final criterios = Avaliacao.lerCriterios(a['criterios']);
+          final notaBruta = a['nota_decimal'] is num ? a['nota_decimal'] : a['nota_geral'];
+          final nome = ((a['cliente_nome'] as String?) ?? '').trim();
+          return Avaliacao(
+            id: a['id'] as String?,
+            cliente: nome.isEmpty ? 'Profissional' : nome,
+            servico: servicoDaAvaliacao(a),
+            nota: (notaBruta is num ? notaBruta : 0).toDouble(),
+            comentario: (a['comentario'] as String?) ?? '',
+            detalhes: Avaliacao.formatarCriterios(criterios),
+            criterios: criterios,
+            etiquetas: [for (final e in (a['etiquetas'] as List? ?? const [])) '$e'],
+            resposta: a['resposta'] as String?,
+          );
+        }(),
+    ];
+  }
+
+  @override
+  Future<String?> responderAvaliacao(String avaliacaoId, String resposta) async {
+    final texto = resposta.trim();
+    final j = _mapa(
+      await _api.post('/v1/avaliacoes/$avaliacaoId/responder', corpo: {'resposta': texto}),
+    );
+    return (j['resposta'] as String?) ?? texto;
+  }
+
+  @override
+  Future<bool> reativarConta() async {
+    final j = _mapa(await _api.post('/v1/me/reativar'));
+    return j['reativada'] == true || j['status'] == 'ativo';
+  }
 
   @override
   Future<String?> fotoDe(String usuarioId) {
@@ -2167,9 +2335,16 @@ class RepositorioPerfilApi implements RepositorioPerfil {
     final foto = _meuId == null ? null : await fotoDe(_meuId!);
     final nota = j['nota_publica'] as num?;
     final concluidos = j['servicos_concluidos'] as int?;
+    // 12.3: só para quem tem dados de profissional; cliente sem serviços não vira "Novo".
+    final contagem = concluidos == null ? null : ContagemAvaliacoes.deJson(j);
+    final novo = contagem?.novoNoTrato ?? false;
     final partes = [
-      if (nota != null) 'Nota ${nota.toStringAsFixed(1).replaceAll('.', ',')}',
+      if (novo)
+        semAvaliacoes
+      else if (nota != null)
+        'Nota ${nota.toStringAsFixed(1).replaceAll('.', ',')}',
       if (concluidos != null) '$concluidos ${concluidos == 1 ? 'serviço' : 'serviços'}',
+      if (contagem != null) contagem.textoAvaliacoes,
     ];
     int? moedas;
     var descontoDisponivel = true;
@@ -2241,6 +2416,7 @@ class RepositorioPerfilApi implements RepositorioPerfil {
             ItemPerfil(acao: AcaoPerfil.dadosPessoais, titulo: 'Dados pessoais'),
             ItemPerfil(acao: AcaoPerfil.enderecos, titulo: 'Endereços salvos'),
             ItemPerfil(acao: AcaoPerfil.favoritos, titulo: 'Profissionais de confiança'),
+            ItemPerfil(acao: AcaoPerfil.avaliacoesRecebidas, titulo: 'Avaliações recebidas'),
             ItemPerfil(acao: AcaoPerfil.servicosRecorrentes, titulo: 'Serviços recorrentes'),
             ItemPerfil(acao: AcaoPerfil.indiqueEGanhe, titulo: 'Indique e ganhe'),
           ],
@@ -2853,14 +3029,15 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     return [
       for (final l in ExtratoApi.deJson(json).itens)
         ItemExtrato(
-          titulo: 'Pedido ${_curto(l.pedidoId)} · ${l.ehCompensacao ? 'Compensação' : l.ehCompensacaoDevolvida ? 'Compensação devolvida' : switch (l.tipo) {
-              'retencao' => 'valor retido',
-              'repasse' => 'valor liberado',
-              'cobranca' => 'pagamento',
-              'taxa' => 'custo do parcelamento',
-              'estorno' => 'estorno',
-              _ => l.tipo.replaceAll('_', ' '),
-            }}',
+          titulo:
+              'Pedido ${_curto(l.pedidoId)} · ${l.ehCompensacao ? 'Compensação' : l.ehCompensacaoDevolvida ? 'Compensação devolvida' : switch (l.tipo) {
+                  'retencao' => 'valor retido',
+                  'repasse' => 'valor liberado',
+                  'cobranca' => 'pagamento',
+                  'taxa' => 'custo do parcelamento',
+                  'estorno' => 'estorno',
+                  _ => l.tipo.replaceAll('_', ' '),
+                }}',
           detalheData: _dia(l.data.toLocal()),
           brutoCentavos: l.valorCentavos,
           pedidoId: l.pedidoId,
@@ -2971,9 +3148,8 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     try {
       // Só informa o prazo: resposta lenta não segura a tela.
       final lido = PrazoAvaliacao.deJson(
-        _mapa(await _api
-            .get('/v1/pedidos/$pedidoId/avaliacao')
-            .timeout(const Duration(seconds: 4))),
+        _mapa(
+            await _api.get('/v1/pedidos/$pedidoId/avaliacao').timeout(const Duration(seconds: 4))),
       );
       _prazos[pedidoId] = lido;
       return lido;
@@ -3006,6 +3182,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
         status: ex.status,
         moedasCobradas: ex.moedasCobradas,
         responderAte: ex.responderAte,
+        prazoSuspenso: ex.prazoSuspenso,
         expiraEm: ex.expiraEm,
         saldoRestante: ex.saldoRestante,
         bloqueadoAte: ex.bloqueadoAte?.toLocal(),
@@ -3025,11 +3202,20 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
     var pendentes = 0;
     DateTime? liberacaoMoedas;
     int? valorMoeda;
+    var creditosProfissional = const <CreditoPorValidade>[];
     try {
       final moedas = _mapa(await _api.get('/v1/me/moedas'));
       pendentes = (moedas['moedas_pendentes_profissional'] as num?)?.toInt() ?? 0;
       liberacaoMoedas = lerDataIso(moedas['proxima_liberacao_profissional']);
       valorMoeda = (moedas['valor_moeda_centavos'] as num?)?.toInt();
+      creditosProfissional = [
+        for (final c in (moedas['creditos_profissional'] as List? ?? const []))
+          if (c is Map && c['moedas'] is num && (c['moedas'] as num) > 0)
+            CreditoPorValidade(
+              moedas: (c['moedas'] as num).toInt(),
+              expiraEm: DateTime.tryParse('${c['expira_em'] ?? ''}')?.toLocal(),
+            ),
+      ];
     } on Object {
       pendentes = 0;
     }
@@ -3041,6 +3227,7 @@ class RepositorioProfissionalApi implements RepositorioProfissional {
       moedasPendentesProfissional: pendentes,
       moedasPendentesLiberacao: liberacaoMoedas,
       moedaValorCentavos: valorMoeda,
+      creditosProfissional: creditosProfissional,
     );
   }
 

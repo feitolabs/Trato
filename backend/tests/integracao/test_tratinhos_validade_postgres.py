@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import threading
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -96,3 +97,37 @@ def test_devolucoes_concorrentes_nao_passam_do_gasto(conta):
         por_prazo[dias] = por_prazo.get(dias, 0) + i.quantidade
     assert por_prazo == {50: 60, 100: 40}
     assert repo.saldo(uid, agora + 49 * DIA) == 100
+
+
+# --- BE-MOEDAS-30 (13.11): saldo vivo e configuração dentro da trava ---
+
+
+def test_saldo_vivo_acaba_com_gasto_ou_vencimento(conta):
+    repo, uid, _, agora = conta
+    longe = agora + 4000 * DIA  # o banco é compartilhado: depois disto só vale o crédito daqui
+    assert repo.ha_saldo_vivo(longe) is False
+    repo.lancar(
+        LancamentoMoeda(
+            uid,
+            "bonus_avaliacao",
+            100,
+            f"vivo:{uid}",
+            agora,
+            expira_em=longe + DIA,
+        )
+    )
+    assert repo.ha_saldo_vivo(longe) is True
+    assert repo.ha_saldo_vivo(longe + 2 * DIA) is False
+    repo.lancar(LancamentoMoeda(uid, "uso", -100, f"gasto:{uid}", agora))
+    assert repo.ha_saldo_vivo(longe) is False
+
+
+def test_configuracao_grava_dentro_da_trava(conta):
+    repo = conta[0]
+    antes = repo.config()
+    try:
+        with repo.trava("config"):
+            repo.salvar_config(replace(repo.config(), reserva_minutos=45))
+        assert repo.config().reserva_minutos == 45
+    finally:
+        repo.salvar_config(antes)

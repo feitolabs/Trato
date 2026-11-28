@@ -155,3 +155,23 @@ def test_concorrencia_e_saldo_zero_no_postgres(cenario, migrations_novas):  # no
         (uid,),
     )
     assert [r[0] for r in ajustes] == [-100]
+
+
+def test_a4_falha_no_meio_desfaz_o_que_ja_zerou(cenario, migrations_novas, monkeypatch):  # noqa: F811
+    """Falha na 2ª carteira, dentro da transação da exclusão: a 1ª também volta."""
+    _ = migrations_novas
+    moedas = MoedasPostgres(cenario.banco)
+    uid = pessoa(cenario)
+    agora = datetime.now(UTC)
+    _creditar(moedas, uid, 50, f"a4-{uuid.uuid4()}", agora, expira_em=agora + timedelta(days=30))
+    original = moedas.saldo
+
+    def saldo(usuario, quando, carteira=CARTEIRA_CLIENTE):
+        if carteira == CARTEIRA_PROFISSIONAL:
+            raise RuntimeError("caiu")
+        return original(usuario, quando, carteira)
+
+    monkeypatch.setattr(moedas, "saldo", saldo)
+    with pytest.raises(RuntimeError), cenario.banco.transacao():
+        zerar_tratinhos_encerramento_voluntario(moedas, uid, str(uuid.uuid4()), agora)
+    assert original(uid, agora) == 50

@@ -158,7 +158,7 @@ void main() {
   });
 
   testWidgets('mediador não cancela; líder cancela com motivo e vê o devolvido', (tester) async {
-    await abrir(tester);
+    await abrir(tester, api: ApiFake()..compensacoes = [ApiFake.compensacaoDeExemplo(podeCancelar: false)]);
     expect(find.text('Cancelar compensação'), findsNothing);
     expect(find.textContaining('só para líder de suporte'), findsOneWidget);
   });

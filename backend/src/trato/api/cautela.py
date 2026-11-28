@@ -47,6 +47,11 @@ def exigir_contato_livre(contexto: Any, pedido: Pedido, profissional_id: str) ->
 
 
 def registros_preservados(contexto: Any, usuario_id: str) -> bool:
+    # O banco (122500) também protege o envolvido, mesmo sem pedido; sem a função, valem as
+    # partes dos pedidos.
+    no_banco = getattr(contexto.incidentes, "usuario_preservado", None)
+    if no_banco is not None and no_banco(usuario_id):
+        return True
     return any(
         _mesmo(usuario_id, p.cliente_id) or _mesmo(usuario_id, p.profissional_id)
         for p in _pedidos(contexto, "preservar_registros")

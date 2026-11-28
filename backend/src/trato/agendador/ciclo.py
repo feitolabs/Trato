@@ -59,7 +59,11 @@ class Agendador:
         rotina_recorrencias: Callable[[datetime], int] | None = None,
         rotina_estornos: Callable[[datetime], int] | None = None,
         rotina_medidas: Callable[[datetime], int] | None = None,
+        rotina_vencimento_moedas: Callable[[datetime], int] | None = None,
+        rotina_expurgo_acessos: Callable[[datetime], int] | None = None,
     ) -> None:
+        self._rotina_expurgo_acessos = rotina_expurgo_acessos  # None = desligado (padrão)
+        self._rotina_vencimento_moedas = rotina_vencimento_moedas  # None = sem aviso (13.4)
         self._rotina_medidas = rotina_medidas  # None = sem encerrar medidas vencidas
         self._rotina_estornos = rotina_estornos  # None = sem reenvio de estornos
         self._fonte = fonte
@@ -138,6 +142,18 @@ class Agendador:
                 estornos = self._rotina_estornos(agora)
             except Exception:  # provedor ou banco fora: o resto do ciclo segue
                 log.exception("Reenvio de estornos falhou")
+        if self._rotina_vencimento_moedas is not None:
+            try:
+                self._rotina_vencimento_moedas(agora)
+            except Exception:  # sem a tabela ou banco fora: o resto do ciclo segue
+                log.exception("Aviso de vencimento de Tratinhos falhou")
+        if self._rotina_expurgo_acessos is not None:
+            try:
+                apagados = self._rotina_expurgo_acessos(agora)
+                if apagados:
+                    log.info("Registros de acesso expurgados: %s", apagados)
+            except Exception:  # sem a função ou banco fora: o resto do ciclo segue
+                log.exception("Expurgo de acessos falhou")
         if self._rotina_medidas is not None:
             try:
                 self._rotina_medidas(agora)

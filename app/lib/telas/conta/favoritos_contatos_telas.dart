@@ -67,7 +67,8 @@ class _FavoritosTelaState extends State<FavoritosTela> {
             body = EstadoVazio(
               icone: Icons.favorite_border,
               titulo: 'Nenhum profissional de confiança ainda',
-              texto: 'Toque no coração no perfil de um profissional para salvá-lo como profissional de confiança.',
+              texto:
+                  'Toque no coração no perfil de um profissional para salvá-lo como profissional de confiança.',
               textoAcao: widget.aoBuscar == null ? null : 'Buscar profissionais',
               aoAcao: widget.aoBuscar,
             );
@@ -80,8 +81,12 @@ class _FavoritosTelaState extends State<FavoritosTela> {
               itemBuilder: (context, i) {
                 final f = itens[i];
                 final detalhe = [
-                  if (f.nota != null) 'Nota ${f.nota!.toStringAsFixed(1).replaceAll('.', ',')}',
+                  if (f.contagem?.novoNoTrato ?? false)
+                    'Novo no Trato'
+                  else if (f.nota != null)
+                    'Nota ${f.nota!.toStringAsFixed(1).replaceAll('.', ',')}',
                   if (f.servicos != null) '${f.servicos} serviços',
+                  if (f.contagem != null) f.contagem!.textoAvaliacoes,
                 ].join(' · ');
                 return CartaoTrato(
                   aoTocar: widget.aoAbrir == null ? null : () => widget.aoAbrir!(f),
@@ -233,8 +238,7 @@ class _ContatosConfiancaTelaState extends State<ContatosConfiancaTela> {
                 const SizedBox(height: EspacosTrato.x3),
               ],
               const SizedBox(height: EspacosTrato.x3),
-              if (itens.length < 5)
-                BotaoPrimario(texto: 'Adicionar contato', aoTocar: _adicionar),
+              if (itens.length < 5) BotaoPrimario(texto: 'Adicionar contato', aoTocar: _adicionar),
             ],
           );
           return recarregar == null ? lista : RefreshIndicator(onRefresh: recarregar, child: lista);
@@ -282,9 +286,8 @@ class _FormContatoTelaState extends State<_FormContatoTela> {
   Future<void> _salvar() async {
     final digitos = _telefone.text.replaceAll(RegExp(r'\D'), '');
     final errNome = _nome.text.trim().length < 2 ? 'Informe o nome.' : null;
-    final errTel = (digitos.length != 10 && digitos.length != 11)
-        ? 'Informe o telefone com DDD.'
-        : null;
+    final errTel =
+        (digitos.length != 10 && digitos.length != 11) ? 'Informe o telefone com DDD.' : null;
     setState(() {
       _tentou = true;
       _erroNome = errNome;
@@ -294,7 +297,8 @@ class _FormContatoTelaState extends State<_FormContatoTela> {
     if (errNome != null || errTel != null) {
       focarPrimeiroErro([
         EntradaCampoErro(key: _keyNome, focusNode: _focoNome, temErro: () => _erroNome != null),
-        EntradaCampoErro(key: _keyTelefone, focusNode: _focoTelefone, temErro: () => _erroTelefone != null),
+        EntradaCampoErro(
+            key: _keyTelefone, focusNode: _focoTelefone, temErro: () => _erroTelefone != null),
       ]);
       return;
     }
@@ -349,7 +353,8 @@ class _FormContatoTelaState extends State<_FormContatoTela> {
             ),
           ),
           const SizedBox(height: EspacosTrato.x3),
-          CampoTrato(rotulo: 'Parentesco (opcional)', controlador: _parentesco, dica: 'Irmã, amigo...'),
+          CampoTrato(
+              rotulo: 'Parentesco (opcional)', controlador: _parentesco, dica: 'Irmã, amigo...'),
           if (_erro != null) ...[
             const SizedBox(height: EspacosTrato.x3),
             Text(_erro!,

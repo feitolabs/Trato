@@ -181,6 +181,9 @@ class ConfigSeguranca(BaseSettings):
             "Content-Type",
             "Idempotency-Key",
             "X-Dispositivo-Id",
+            "X-Aparelho-Tipo",
+            "X-Sistema-Operacional",
+            "X-App-Versao",
         ]
     )
     corpo_max_bytes: int = Field(default=1_048_576, gt=0)

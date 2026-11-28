@@ -15,6 +15,17 @@ String descreverAcao(EntradaAuditoria e) {
     'dado_pessoal.documento_revelado' => com('abriu um documento enviado por'),
     'usuario.status_alterado' =>
       com('alterou o status de', d['status'] == null ? '' : ' para ${texto(d['status'] as String?)}'),
+    'usuario.inativar' => com('inativou a conta de'),
+    'usuario.reativar' => com('reativou a conta de'),
+    'indisponibilidade.registrada' => 'registrou uma falha da plataforma${_origemDaFalha(d['origem'] as String?)}',
+    'indisponibilidade.encerrada' => 'encerrou uma falha da plataforma${_origemDaFalha(d['origem'] as String?)}',
+    'forca_maior.decidido' =>
+      '${nome.isEmpty ? 'decidiu solicitação de força maior' : 'decidiu solicitação de força maior do pedido $nome'}${_decisaoForcaMaior(d['decisao'] as String?)}',
+    'checkout_sem_codigo.contato_manual' =>
+      '${nome.isEmpty ? 'registrou contato manual de check-out sem código' : 'registrou contato manual de check-out sem código no pedido $nome'}${_canalDoContato(d['canal'] as String?)}',
+    'profissional.selo_retirado' => com('retirou o selo de verificação de'),
+    'profissional.selo_reconferencia_pedida' => com('pediu nova conferência de identidade de'),
+    'profissional.selo_regularizado' => com('regularizou o selo de verificação de'),
     'categoria.criada' => com('criou a categoria'),
     'categoria.editada' => com('editou a categoria'),
     'categoria.ativada' => com('ativou a categoria'),
@@ -38,6 +49,13 @@ String descreverAcao(EntradaAuditoria e) {
     'config.publicada' => com('publicou a versão de configuração'),
     'config.reversao_proposta' => 'propôs reverter uma versão de Configurações',
     'financeiro.disputa_decidida' => com('decidiu a disputa de'),
+    'disputa.pedido_informacao_solicitado' =>
+      '${nome.isEmpty ? 'pediu informação adicional na disputa' : 'pediu informação adicional na disputa do pedido $nome'}${_papelDestinatarioInfo(d['destinatario_papel'] as String?)}',
+    'disputa.pedido_informacao_encerrado_sem_resposta' => nome.isEmpty
+        ? 'encerrou sem resposta um pedido de informação na disputa'
+        : 'encerrou sem resposta um pedido de informação no pedido $nome',
+    'financeiro.checkout_sem_codigo_decidido' =>
+      '${nome.isEmpty ? 'decidiu o check-out sem código' : 'decidiu o check-out sem código do pedido $nome'}${_decisaoCheckout(d['decisao'] as String?)}',
     'pagamento.divergencia_conciliada' => 'conciliou uma divergência de pagamento',
     'risco.saque_travado' => com('registrou trava de saques na conta de'),
     'risco.saque_destravado' => com('removeu a trava de saques da conta de'),
@@ -48,10 +66,54 @@ String descreverAcao(EntradaAuditoria e) {
       'resolveu um alerta de risco${d['resultado'] == null ? '' : ' (${d['resultado']})'}',
     'notificacao.campanha_disparada' => com('enviou a campanha'),
     'relatorio.exportado' => 'exportou ${_nomeRelatorio(texto(d['relatorio'] as String?))}',
+    'moedas.conceder_compensacao' => com(
+      'concedeu Tratinhos como compensação para',
+      d['quantidade'] == null ? '' : ' (${d['quantidade']} na carteira ${_carteiraTratinhos(d['carteira'] as String?)})',
+    ),
+    'moedas.cancelar_fraude' => com(
+      'cancelou Tratinhos por fraude de',
+      _resumoCancelamentoFraude(d),
+    ),
     'auditoria.cadeia_verificada' => 'verificou a cadeia de hash da auditoria',
     final outro => _legivel(outro) + (nome.isEmpty ? '' : ': $nome'),
   };
 }
+
+String _origemDaFalha(String? origem) => switch (origem) {
+      'app' => ' (aplicativo)',
+      'pagamento' => ' (pagamento)',
+      _ => '',
+    };
+
+String _canalDoContato(String? canal) => switch (canal) {
+      'telefone' => ' (Telefone)',
+      'whatsapp' => ' (WhatsApp)',
+      'email' => ' (E-mail)',
+      'outro' => ' (Outro)',
+      final c? when c.trim().isNotEmpty => ' ($c)',
+      _ => '',
+    };
+
+String _decisaoCheckout(String? decisao) => switch (decisao) {
+      'liberar' => ' (Liberar pagamento)',
+      'estornar' => ' (Estornar ao cliente)',
+      final v? when v.trim().isNotEmpty => ' ($v)',
+      _ => '',
+    };
+
+String _papelDestinatarioInfo(String? papel) => switch (papel) {
+      'cliente' => ' (Cliente)',
+      'profissional' => ' (Profissional)',
+      final v? when v.trim().isNotEmpty => ' ($v)',
+      _ => '',
+    };
+
+String _decisaoForcaMaior(String? decisao) => switch (decisao) {
+      'aprovado' => ' (Aprovado)',
+      'recusado' => ' (Recusado)',
+      final v? when v.trim().isNotEmpty => ' ($v)',
+      _ => '',
+    };
 
 String _nomeRelatorio(String tipo) => switch (tipo) {
       'financeiro' => 'Extrato Financeiro e Fiscal',
@@ -60,6 +122,20 @@ String _nomeRelatorio(String tipo) => switch (tipo) {
       'auditoria' => 'a trilha de auditoria',
       _ => 'um relatório',
     };
+
+String _carteiraTratinhos(String? carteira) => carteira == 'profissional' ? 'profissional' : 'cliente';
+
+String _resumoCancelamentoFraude(Map<String, dynamic> d) {
+  final partes = <String>[];
+  final deb = d['quantidade_debitada'];
+  if (deb is int && deb > 0) partes.add('$deb debitado(s)');
+  final pend = d['pendentes_cancelados'];
+  if (pend is int && pend > 0) partes.add('$pend pendente(s) cancelado(s)');
+  if (partes.isEmpty) return '';
+  final carteira = d['carteira'] as String?;
+  final onde = carteira == null ? '' : ' na carteira ${_carteiraTratinhos(carteira)}';
+  return ' (${partes.join(', ')}$onde)';
+}
 
 /// `algo.feito_aqui` -> "algo feito aqui" (último recurso, para uma ação que a tela ainda não conhece).
 String _legivel(String acao) => acao.replaceAll('.', ' ').replaceAll('_', ' ');
@@ -75,6 +151,7 @@ String descreverAtor(EntradaAuditoria e) {
 const filtrosDeAcao = <(String, String)>[
   ('verificacao.', 'Verificação'),
   ('financeiro.', 'Disputas'),
+  ('disputa.', 'Pedidos de informação'),
   ('pagamento.', 'Pagamentos'),
   ('usuario.', 'Usuários'),
   ('dado_pessoal.', 'Dados pessoais'),
@@ -83,6 +160,11 @@ const filtrosDeAcao = <(String, String)>[
   ('risco.', 'Risco e antifraude'),
   ('notificacao.', 'Notificações push'),
   ('cupom.', 'Cupons'),
+  ('moedas.', 'Tratinhos'),
+  ('profissional.selo', 'Selo do profissional'),
+  ('indisponibilidade.', 'Falhas da plataforma'),
+  ('forca_maior.', 'Força maior'),
+  ('checkout_sem_codigo.', 'Check-out sem código'),
   ('equipe.', 'Equipe'),
   ('config.', 'Configurações'),
   ('relatorio.', 'Relatórios'),

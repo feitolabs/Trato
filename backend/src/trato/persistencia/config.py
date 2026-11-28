@@ -118,6 +118,7 @@ class ConfigPostgres:
             lembrete_resposta_disputa_antecedencia_horas=p.get(
                 "lembrete_resposta_disputa_antecedencia_horas", 12
             ),
+            tratinhos_aviso_vencimento_dias=p.get("tratinhos_aviso_vencimento_dias", 7),
             prazo_avaliacao_dias=p.get("prazo_avaliacao_dias", PRAZO_AVALIACAO_PADRAO_DIAS),
             arrependimento_dias=max(7, p.get("arrependimento_dias", 7)),
             ausencia_espera_minutos=max(20, p.get("ausencia_espera_minutos", 20)),

@@ -2,6 +2,7 @@
 /// PROVISÓRIO: formato real vem do backend.
 library;
 
+import '../comuns/contagem_avaliacoes.dart';
 import '../cliente/modelos.dart' show Avaliacao, EtiquetaTop;
 
 export '../cliente/modelos.dart' show Avaliacao, DetalhePerfil, EtiquetaTop;
@@ -12,9 +13,11 @@ class PerfilPublico {
     required this.iniciais,
     required this.categoria,
     required this.verificacao,
+    this.seloConferidoEm,
     required this.noTratoDesde,
     required this.nota,
     required this.totalAvaliacoes,
+    this.contagem,
     required this.servicosConcluidos,
     required this.sobre,
     required this.cidade,
@@ -38,9 +41,15 @@ class PerfilPublico {
 
   /// Texto neutro vindo do backend, ex.: "Identidade conferida". Nunca "profissional seguro".
   final String? verificacao;
+
+  /// `selo_conferido_em`; nulo se a API não mandou.
+  final DateTime? seloConferidoEm;
   final int noTratoDesde;
   final double nota;
   final int totalAvaliacoes;
+
+  /// Termos 12.3. Nulo: servidor antigo (a tela fica como antes).
+  final ContagemAvaliacoes? contagem;
   final int servicosConcluidos;
   final String sobre;
   final String cidade;

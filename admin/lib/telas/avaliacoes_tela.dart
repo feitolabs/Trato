@@ -95,6 +95,9 @@ class _AvaliacoesTelaState extends State<AvaliacoesTela> {
               onSubmitted: (v) => setState(() => _avaliacaoId = v.trim()),
             ),
           ),
+          // No cabeçalho, um terceiro botão estoura o layout em telas médias.
+          if (podeModerar)
+            BotaoTrato.secundario('Avisar o autor', aoPressionar: () => abrirAvisarAutor(context)),
         ],
       ),
     );

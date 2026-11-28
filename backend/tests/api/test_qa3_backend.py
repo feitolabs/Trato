@@ -81,6 +81,7 @@ def test_fuzz_rotas_sem_token_dao_401_nunca_dado(amb):
         "/v1/config/publica",
         "/v1/publico",
         "/v1/legal",
+        "/v1/termos",  # 23.7: os Termos são públicos, como a página /termos
         "/v1/saude",
         "/legal",
         "/saude",

@@ -63,6 +63,8 @@ def test_catalogo_exige_login_e_lista_so_o_ativo(amb, busca):
         "pai_id",
         "aceita_remoto",
         "garantia_minima_dias",
+        "incluido",
+        "nao_incluido",
     } == set(cats[0])
     cidades = ver(amb, "/v1/catalogo/cidades", "t-prof").json()
     assert [(c["nome"], c["uf"]) for c in cidades] == [
@@ -81,6 +83,8 @@ def test_busca_so_aprovados_ordenada_e_sem_dado_pessoal(amb, busca):
     p1 = next(i for i in corpo["itens"] if i["id"] == "p1")
     assert p1["nome"] == "Maria S."  # abreviado
     assert set(p1) == {
+        "avaliacoes_total",  # 12.3
+        "nota_minimo_avaliacoes",
         "id",
         "nome",
         "bio",
@@ -92,6 +96,7 @@ def test_busca_so_aprovados_ordenada_e_sem_dado_pessoal(amb, busca):
         "bairros",
         "atende_remoto",
         "disponivel_agora",
+        "selo_conferido_em",
     }
     assert "Aparecida" not in r.text and "cpf" not in r.text.lower()
 

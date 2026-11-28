@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
 from conftest import cab
 
 from trato.pedidos.estados import Estado
 
 ORCAMENTO = {
+    "validade_ate": "2099-01-01T00:00:00Z",
     "itens": [
         {
             "tipo": "horas",
@@ -16,6 +20,7 @@ ORCAMENTO = {
         }
     ],
     "prazo_execucao_dias": 2,
+    "fora_do_escopo": "Materiais não incluídos.",
     "garantia_dias": 60,
 }
 
@@ -109,3 +114,27 @@ def test_depois_de_contratar_nao_cabe_contraproposta(amb):
     orc = _pedido_com_orcamento(amb)
     amb.semear_pedido(Estado.ORCAMENTO_ACEITO, orcamento_id=orc)
     assert _contra(amb, orc, 20_000).status_code == 409
+
+
+@pytest.mark.parametrize("campo", ["validade_ate", "garantia_dias", "prazo_execucao_dias"])
+@pytest.mark.parametrize("acao", ["contraproposta", "contraproposta/aceitar", "propor"])
+def test_orcamento_antigo_sem_os_campos_da_5_2_nao_gera_nada(amb, monkeypatch, campo, acao):
+    orc = _pedido_com_orcamento(amb)
+    antigo = replace(amb.contexto.orcamentos.detalhe(orc), **{campo: None})
+    monkeypatch.setattr(amb.contexto.orcamentos, "detalhe", lambda _: antigo)
+    if acao == "contraproposta/aceitar":  # a contraproposta foi feita antes desta regra
+        conversa = amb.contexto.conversas.abrir("ped-1", antigo.profissional_id)
+        pedido = amb.contexto.pedidos.obter("ped-1")
+        amb.contexto.conversas.enviar(
+            conversa, pedido.cliente_id, f"[contraproposta:{orc}:25000] Contraproposta"
+        )
+    quem = "t-cliente" if acao == "contraproposta" else "t-prof"
+    antes = len(amb.contexto.orcamentos.do_pedido("ped-1"))
+    r = amb.cliente.post(
+        f"/v1/pedidos/ped-1/orcamentos/{orc}/{acao}",
+        json={"valor_centavos": 25_000},
+        headers=cab(quem),
+    )
+    assert r.status_code == 409 and "5.2" in r.text, r.text
+    assert r.json()["codigo"] == "orcamento_incompleto"
+    assert len(amb.contexto.orcamentos.do_pedido("ped-1")) == antes

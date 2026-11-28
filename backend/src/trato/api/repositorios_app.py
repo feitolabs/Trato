@@ -216,6 +216,10 @@ class RepositorioUsuarios(Protocol):
 
     def atualizar_nome(self, usuario_id: str, nome: str) -> None: ...
 
+    def selos_conferidos_em(self, ids: Sequence[str]) -> dict[str, datetime]:
+        """Termos 10.2: id -> data da última verificação aprovada (sem data, fora do mapa)."""
+        ...
+
     def status_verificacao(self, usuario_id: str) -> str | None:
         """Status da verificação mais recente do profissional, ou None."""
 

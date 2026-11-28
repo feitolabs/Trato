@@ -359,7 +359,9 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
               aoAbrirPerfil: widget.aoAbrirPerfil,
               aoDenunciar: widget.aoDenunciar,
               aoAtualizar: widget.aoRecarregar == null ? null : _sincronizar,
-              aoProporNovaCondicao: conversa.pedidoAberto ? widget.aoProporNovaCondicao : null,
+              aoProporNovaCondicao: conversa.pedidoAberto && widget.aoProporNovaCondicao != null
+                  ? _proporNovaCondicao
+                  : null,
               aoSugerirAgenda: widget.aoSugerirAgenda == null
                   ? null
                   : () async {
@@ -367,6 +369,21 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
                       await _sincronizar();
                     },
             ),
+            if (_recusaDaProposta != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: EspacosTrato.x4,
+                  vertical: EspacosTrato.x2,
+                ),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _recusaDaProposta!,
+                    key: const ValueKey('recusa-da-proposta'),
+                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
+                  ),
+                ),
+              ),
             const _AvisoContato(),
             // Com o teclado aberto o espaço é curto: o aviso volta quando ele fecha.
             if (MediaQuery.viewInsetsOf(context).bottom == 0) const _AvisoPrivacidade(),
@@ -407,8 +424,21 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     );
   }
 
-  /// Orçamentos que o servidor recusou por validade, com o texto dele.
+  /// Orçamentos que o servidor recusou (vencido ou incompleto), com o texto a mostrar.
   final _vencidos = <String, String>{};
+
+  /// Recusa da "Nova proposta" (só o profissional propõe).
+  String? _recusaDaProposta;
+
+  Future<void> _proporNovaCondicao() async {
+    if (_recusaDaProposta != null) setState(() => _recusaDaProposta = null);
+    try {
+      await widget.aoProporNovaCondicao!();
+    } on ErroTrato catch (e) {
+      if (!ehRecusaDoOrcamento(e)) rethrow;
+      if (mounted) setState(() => _recusaDaProposta = textoDaRecusa(e, profissional: true));
+    }
+  }
 
   Future<void> _aceitarProposta(
     ContrapropostaChat prop,
@@ -417,8 +447,10 @@ class _ChatPedidoTelaState extends State<ChatPedidoTela> {
     try {
       await aceitar(prop);
     } on ErroTrato catch (e) {
-      if (!ehOrcamentoVencido(e)) rethrow;
-      if (mounted) setState(() => _vencidos[prop.orcamentoId] = e.mensagem);
+      if (!ehRecusaDoOrcamento(e)) rethrow;
+      // Quem aceita a contraproposta do cliente é o profissional.
+      final texto = textoDaRecusa(e, profissional: !prop.ehPropostaDoProfissional);
+      if (mounted) setState(() => _vencidos[prop.orcamentoId] = texto);
       return;
     }
     await _sincronizar();

@@ -35,6 +35,10 @@ def test_profissional_manda_foto_antes_de_ser_contratado_sem_mascara(e2, amb):
     amb.semear_pedido(Estado.ABERTO, orcamento_id=None, profissional_id=None)
     amb.contexto.contratos._itens.clear()
     orcamento = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "outro",
@@ -42,7 +46,7 @@ def test_profissional_manda_foto_antes_de_ser_contratado_sem_mascara(e2, amb):
                 "quantidade": 1,
                 "valor_unitario_centavos": 9_000,
             }
-        ]
+        ],
     }
     assert e2.post("/v1/pedidos/ped-1/orcamentos", "t-prof", orcamento).status_code == 201
     midia = _foto_no_chat(e2, "t-prof")  # profissional que vê o pedido aberto pode anexar

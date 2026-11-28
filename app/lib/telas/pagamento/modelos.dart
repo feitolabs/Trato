@@ -2,8 +2,49 @@
 // quanto pagar agora e em que condição são decididos pelo backend.
 
 import '../comuns/desconto_moedas.dart';
+import '../profissional/dinheiro.dart';
 
 enum MetodoPagamento { pix, cartao }
+
+/// Termos 6.4: quanto o parcelado custa a mais que o à vista. O valor vem do servidor.
+String textoDiferencaDoAVista(int custoCentavos) => custoCentavos > 0
+    ? '${Dinheiro.formatar(custoCentavos)} a mais que à vista (custo do parcelamento).'
+    : 'Sem diferença em relação ao à vista.';
+
+/// Termos 6.3: prazo de validade/expiração do Pix vindo do servidor. Nulo se ambos ausentes.
+String? textoPrazoPix(DateTime? expiraEm, int? validadeMinutos) {
+  final temMin = validadeMinutos != null && validadeMinutos > 0;
+  String? ate;
+  if (expiraEm != null) {
+    final d = expiraEm.day.toString().padLeft(2, '0');
+    final m = expiraEm.month.toString().padLeft(2, '0');
+    final h = expiraEm.hour.toString().padLeft(2, '0');
+    final min = expiraEm.minute.toString().padLeft(2, '0');
+    ate = '$d/$m, $h:$min';
+  }
+  if (temMin && ate != null) {
+    return 'Pix válido por $validadeMinutos '
+        '${validadeMinutos == 1 ? 'minuto' : 'minutos'} (até $ate).';
+  }
+  if (ate != null) return 'Código Pix válido até $ate.';
+  if (temMin) {
+    return 'Pix válido por $validadeMinutos ${validadeMinutos == 1 ? 'minuto' : 'minutos'}.';
+  }
+  return null;
+}
+
+/// Termos 6.10: rótulo legível do status de estorno devolvido pelo servidor.
+String? rotuloEstornoStatus(String? status) {
+  final limpo = (status ?? '').trim().toLowerCase();
+  if (limpo.isEmpty) return null;
+  return switch (limpo) {
+    'solicitado' => 'Estorno solicitado',
+    'em_processamento' => 'Estorno em processamento',
+    'concluido' => 'Estorno concluído',
+    'falhou' => 'Falha no estorno',
+    _ => 'Estorno: ${status!.trim()}',
+  };
+}
 
 class OpcaoPagamento {
   const OpcaoPagamento({required this.metodo, required this.titulo, required this.descricao});
@@ -11,6 +52,39 @@ class OpcaoPagamento {
   final MetodoPagamento metodo;
   final String titulo;
   final String descricao;
+}
+
+/// Termos 6.4: título da opção de parcelamento ("2x de R$ 50,00 sem juros" ou "2x de R$ 51,50").
+String textoTituloParcela(OpcaoParcelamento p) {
+  final base = '${p.parcelas}x de ${Dinheiro.formatar(p.valorParcelaCentavos)}';
+  return p.semJuros == true ? '$base sem juros' : base;
+}
+
+/// Termos 6.4: detalhe da opção de parcelamento com os valores prontos do servidor.
+/// Nunca inventa taxa mensal: `custoTotalBps` é custo único sobre o valor à vista.
+String textoDetalheParcela(OpcaoParcelamento p) {
+  final partes = <String>['Total ${Dinheiro.formatar(p.totalCentavos)}.'];
+  final ultima = p.ultimaParcelaCentavos;
+  if (p.parcelas > 1 && ultima != null && ultima != p.valorParcelaCentavos) {
+    partes.add('Última parcela de ${Dinheiro.formatar(ultima)} (fecha o total exato).');
+  }
+  final diferenca = p.diferencaAVistaCentavos ?? p.custoCentavos;
+  final bps = p.custoTotalBps;
+  if (p.semJuros == true) {
+    partes.add('Sem diferença em relação ao à vista.');
+  } else if (bps != null && bps > 0) {
+    if (diferenca > 0) {
+      partes.add(
+        '${Dinheiro.formatar(diferenca)} a mais que à vista '
+        '(${Dinheiro.formatarBps(bps)} de custo total no parcelamento).',
+      );
+    } else {
+      partes.add('Custo total de ${Dinheiro.formatarBps(bps)} no parcelamento.');
+    }
+  } else {
+    partes.add(textoDiferencaDoAVista(diferenca));
+  }
+  return partes.join(' ');
 }
 
 /// Cartão parcelado: o total por número de parcelas (custo do provedor repassado ao cliente).
@@ -21,12 +95,32 @@ class OpcaoParcelamento {
     required this.custoCentavos,
     required this.totalCentavos,
     required this.valorParcelaCentavos,
+    this.valoresParcelasCentavos = const [],
+    this.ultimaParcelaCentavos,
+    this.custoTotalBps,
+    this.diferencaAVistaCentavos,
+    this.semJuros,
   });
 
   final int parcelas;
   final int custoCentavos;
   final int totalCentavos;
   final int valorParcelaCentavos;
+
+  /// Uma por parcela, na ordem; a soma é `total_centavos`. Vazia em resposta antiga.
+  final List<int> valoresParcelasCentavos;
+
+  /// Valor da última parcela (absorve o resto da divisão). Null em resposta antiga.
+  final int? ultimaParcelaCentavos;
+
+  /// Custo único em pontos-base (100 = 1%) sobre o à vista (não é taxa mensal). Null em resposta antiga.
+  final int? custoTotalBps;
+
+  /// Diferença em centavos em relação ao à vista (Termos 6.4). Null em resposta antiga.
+  final int? diferencaAVistaCentavos;
+
+  /// `true`: opção sem juros/custo; `false`: tem custo. Null em resposta antiga.
+  final bool? semJuros;
 }
 
 class DadosPagamento {
@@ -52,10 +146,22 @@ class DadosPagamento {
     this.cpfCadastrado = true,
     this.validadeAte,
     this.pagoOuEmConfirmacao = false,
+    this.pixExpiraEm,
+    this.pixValidadeMinutos,
+    this.estornoStatus,
+    this.estornoPrazoEstimado,
   });
 
   /// O servidor diz que o pagamento já foi feito ou está sendo confirmado.
   final bool pagoOuEmConfirmacao;
+
+  /// Termos 6.3: expiração e validade em minutos do Pix (opcionais).
+  final DateTime? pixExpiraEm;
+  final int? pixValidadeMinutos;
+
+  /// Termos 6.10: status e prazo estimado do estorno (opcionais).
+  final String? estornoStatus;
+  final String? estornoPrazoEstimado;
 
   /// `validade_ate`: validade do orçamento aceito. Nula: o servidor não informou.
   final DateTime? validadeAte;
@@ -132,6 +238,10 @@ class DadosPagamento {
     List<OpcaoPagamento>? opcoes,
     DateTime? validadeAte,
     bool? pagoOuEmConfirmacao,
+    DateTime? pixExpiraEm,
+    int? pixValidadeMinutos,
+    String? estornoStatus,
+    String? estornoPrazoEstimado,
   }) =>
       DadosPagamento(
         subtitulo: subtitulo ?? this.subtitulo,
@@ -155,5 +265,9 @@ class DadosPagamento {
         opcoes: opcoes ?? this.opcoes,
         validadeAte: validadeAte ?? this.validadeAte,
         pagoOuEmConfirmacao: pagoOuEmConfirmacao ?? this.pagoOuEmConfirmacao,
+        pixExpiraEm: pixExpiraEm ?? this.pixExpiraEm,
+        pixValidadeMinutos: pixValidadeMinutos ?? this.pixValidadeMinutos,
+        estornoStatus: estornoStatus ?? this.estornoStatus,
+        estornoPrazoEstimado: estornoPrazoEstimado ?? this.estornoPrazoEstimado,
       );
 }

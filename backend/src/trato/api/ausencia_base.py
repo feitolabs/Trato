@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from trato.api.contexto import Contexto
+from trato.api.indisponibilidade import APP, prazo_vigente
 from trato.financeiro import periodo
 from trato.pedidos.estados import Acao, Pedido, ProvaClienteAusente
 from trato.persistencia.ausencias import Ausencia
@@ -107,6 +108,11 @@ def revisao_de(contexto: Contexto, caso: Cancelamento | None) -> Revisao | None:
     return contexto.chamados.revisao(caso.pedido_id, caso.retencao_mostrada_em)
 
 
+def justificativa_ate(contexto: Contexto, item: Ausencia) -> datetime | None:
+    """22.3: falha do app prorroga o prazo do cliente para justificar."""
+    return prazo_vigente(contexto, APP, item.avisado_em, item.justificativa_ate)
+
+
 def saida(contexto: Contexto, item: Ausencia) -> AusenciaOut:
     caso = caso_de(contexto, item.pedido_id)
     revisao = revisao_de(contexto, caso)
@@ -133,7 +139,7 @@ def saida(contexto: Contexto, item: Ausencia) -> AusenciaOut:
         chegada_em=item.chegada_em,
         pode_registrar_em=pode_registrar_em(item),
         registrada_em=item.registrada_em,
-        justificativa_ate=item.justificativa_ate,
+        justificativa_ate=justificativa_ate(contexto, item),
         justificativa_texto=item.texto,
         anexos=list(item.anexos),
         justificativa_enviada_em=item.justificativa_em,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 /// Sessão do usuário. Guarda só o token que o serviço de login entrega; quem faz o login
@@ -12,11 +13,36 @@ class SessaoTrato {
   /// atendimento e nas medidas. Pode ser chamado várias vezes (chamadas em paralelo).
   void Function(String? mensagem)? aoBloquear;
 
+  /// A API respondeu 403 `conta_inativa` (Termos 4.9): a pessoa continua logada para reativar
+  /// gratuitamente ou falar com o atendimento. Pode ser chamado várias vezes em paralelo.
+  void Function(String? mensagem)? aoInativar;
+
   /// Pede um token novo ao login. Devolve o token novo ou nulo. Quem monta o app liga isto ao
   /// serviço de login; sem ele, um 401 expira a sessão direto.
   Future<String?> Function()? renovar;
 
   String? get token => _token;
+
+  /// Termos 14.3: dados do aparelho que vão nas chamadas com sessão. Vazio = não envia.
+  Map<String, String> cabecalhosDoAparelho = const {};
+
+  /// Envia `login`, `sessao_renovada` ou `logout` com o token dado. Quem monta o app liga.
+  Future<void> Function(String evento, String token)? enviarAcesso;
+
+  /// Quanto o app espera pelo aviso de acesso antes de seguir.
+  Duration limiteDoAcesso = const Duration(seconds: 3);
+
+  /// Uma tentativa, com tempo curto. Nunca lança: login e logout não dependem dela.
+  Future<void> avisarAcesso(String evento, {String? token}) async {
+    final enviar = enviarAcesso;
+    final efetivo = token ?? _token;
+    if (enviar == null || efetivo == null || efetivo.isEmpty) return;
+    try {
+      await enviar(evento, efetivo).timeout(limiteDoAcesso);
+    } on Object {
+      // Sem rede, servidor antigo ou lento: segue sem registro e sem log.
+    }
+  }
 
   /// Id do usuário (`sub` do token), só para separar o cache de leitura de cada conta. Nulo se o
   /// token não for um JWT legível. Não guarda nada.
@@ -55,6 +81,7 @@ class SessaoTrato {
   Future<String?>? _renovando;
 
   void entrar(String token) => _token = token;
+
   /// Sai da conta e espera a limpeza (cache de leitura) terminar.
   Future<void> sair() async {
     _token = null;

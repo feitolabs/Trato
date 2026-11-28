@@ -82,6 +82,7 @@ class OrdemEstorno:
     criada_em: datetime
     estado: str = "pendente"  # pendente | enviada
     provedor_estorno_id: str | None = None
+    enviada_em: datetime | None = None  # quando o envio ao provedor foi registrado
 
 
 @dataclass(frozen=True)

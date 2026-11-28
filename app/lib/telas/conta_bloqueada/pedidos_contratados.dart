@@ -5,6 +5,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../comuns/resultado_esperado.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/erros.dart';
 import '../../tema/tema.dart';
@@ -80,7 +81,11 @@ class RelatoDoPedido {
     this.abertoEm,
     this.respostaAte,
     this.decisaoAte,
+    this.resultadoEsperado,
   });
+
+  /// Termos 8.4: o texto do que o cliente pediu. Nulo em disputa que não informou.
+  final String? resultadoEsperado;
 
   final String motivo;
   final String? descricao;
@@ -108,6 +113,7 @@ abstract interface class PedidosComContaBloqueada {
     required String motivo,
     required String descricao,
     List<String> fotos,
+    String? resultadoEsperado,
   });
 
   /// Nulo: o pedido não tem relato.
@@ -349,7 +355,16 @@ class _PedidoContratadoTelaState extends State<PedidoContratadoTela> {
                       children: [
                         Text('Problema relatado', style: TipografiaTrato.corpoForte),
                         Text(relato.motivo, style: corpo),
-                        if (relato.descricao != null) Text(relato.descricao!, style: corpo),
+                        if (relato.descricao != null && relato.descricao!.isNotEmpty)
+                          Text(relato.descricao!, style: corpo),
+                        if (relato.resultadoEsperado != null) ...[
+                          Text('Você pediu: ${relato.resultadoEsperado}', style: corpo),
+                          Text(
+                            avisoEscolhaDoCliente,
+                            style: TipografiaTrato.corpoPequeno
+                                .copyWith(color: c.textoSecundario),
+                          ),
+                        ],
                         if (relato.abertoEm != null)
                           Text('Aberto em ${_quando(relato.abertoEm!)}', style: corpo),
                         if (relato.respostaAte != null)
@@ -484,8 +499,9 @@ class _FolhaRelatoState extends State<_FolhaRelato> {
         widget.pedidoId,
         motivo: _motivo!,
         // O mesmo formato do relato com a conta ativa.
-        descricao: '$texto\n\nSolução que o cliente prefere: $_solucao',
+        descricao: '$texto\n\n$marcaSolucaoPreferida $_solucao',
         fotos: List.of(_fotos),
+        resultadoEsperado: _codigoDaSolucao(),
       );
       if (mounted) Navigator.of(context).pop(true);
     } on Object catch (e) {
@@ -495,6 +511,11 @@ class _FolhaRelatoState extends State<_FolhaRelato> {
         _erro = _mensagem(e, 'Não foi possível enviar agora. Tente de novo.');
       });
     }
+  }
+
+  String? _codigoDaSolucao() {
+    final i = widget.servico.solucoesDoRelato.indexOf(_solucao!);
+    return i >= 0 && i < codigosResultadoEsperado.length ? codigosResultadoEsperado[i] : null;
   }
 
   Widget _escolha({
@@ -553,12 +574,17 @@ class _FolhaRelatoState extends State<_FolhaRelato> {
             const SizedBox(height: EspacosTrato.x3),
             _escolha(
               chave: const ValueKey('relato-solucao'),
-              rotulo: 'Solução que você prefere',
+              rotulo: 'O que você espera',
               opcoes: [
                 for (final s in widget.servico.solucoesDoRelato) (codigo: s, texto: s),
               ],
-              erro: _tentou && _solucao == null ? 'Escolha a solução que você prefere.' : null,
+              erro: _tentou && _solucao == null ? 'Escolha o que você espera.' : null,
               aoMudar: (v) => setState(() => _solucao = v),
+            ),
+            const SizedBox(height: EspacosTrato.x1),
+            Text(
+              avisoEscolhaDoCliente,
+              style: TipografiaTrato.corpoPequeno.copyWith(color: c.textoSecundario),
             ),
             const SizedBox(height: EspacosTrato.x3),
             TextField(

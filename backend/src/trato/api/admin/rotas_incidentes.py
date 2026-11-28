@@ -93,6 +93,11 @@ class IncidenteOut(BaseModel):
     cautela_atrasada: bool = Field(
         False, description="Passou o prazo de 24 h (9.6) sem a cautela adotada."
     )
+    sinais_antifraude: list[str] = Field(
+        default_factory=list,
+        description="Só para a equipe, no 9.5: `relato_repetido_do_cliente:N` e "
+        "`relato_durante_espera_de_ausencia`. Não bloqueiam o reembolso.",
+    )
     responsavel_id: str | None = None
     desfecho: str | None = None
     encerrado_em: datetime | None = None
@@ -105,12 +110,18 @@ _CONFLITOS = {
 }
 
 
-def _out(i: Incidente, agora: datetime) -> IncidenteOut:
-    calculados = ("medidas", "cautela_atrasada")
+def _out(contexto: Contexto, i: Incidente) -> IncidenteOut:
+    agora = contexto.agora()
+    calculados = ("medidas", "cautela_atrasada", "sinais_antifraude")
     campos = {n: getattr(i, n) for n in IncidenteOut.model_fields if n not in calculados}
     medidas = [MedidaOut(**{n: getattr(m, n) for n in MedidaOut.model_fields}) for m in i.medidas]
     atrasada = i.status != "encerrado" and i.cautela_adotada_em is None and agora > i.cautela_ate
-    return IncidenteOut(**campos, medidas=medidas, cautela_atrasada=atrasada)
+    return IncidenteOut(
+        **campos,
+        medidas=medidas,
+        cautela_atrasada=atrasada,
+        sinais_antifraude=pessoa_diferente.sinais_antifraude(contexto, i),
+    )
 
 
 def _executar_9_5(contexto: Contexto, incidente_id: str) -> None:
@@ -192,7 +203,7 @@ def fila(
         quantidade=len(itens),
     )  # fmt: skip
     return Pagina(
-        itens=[_out(i, contexto.agora()) for i in itens],
+        itens=[_out(contexto, i) for i in itens],
         total=total,
         limite=limite,
         deslocamento=deslocamento,
@@ -209,7 +220,7 @@ def ver(
     _exigir_tabelas(contexto)
     achado = _obter(contexto, incidente_id)
     _auditar(admin, operador, "consultado", achado.id, "Consulta do incidente.")
-    return _out(achado, contexto.agora())
+    return _out(contexto, achado)
 
 
 @router.post(
@@ -256,7 +267,7 @@ def abrir(
             )  # fmt: skip
     if not novo:
         response.status_code = 200
-    return _out(incidente, contexto.agora())
+    return _out(contexto, incidente)
 
 
 @router.post(
@@ -285,7 +296,7 @@ def medida(
         _conferir(resultado)
         if resultado == "ok":
             _auditar(admin, operador, "medida", incidente_id, "Medida registrada.", tipo=corpo.tipo)
-    return _out(_obter(contexto, incidente_id), contexto.agora())
+    return _out(contexto, _obter(contexto, incidente_id))
 
 
 @router.post("/{incidente_id}/status", response_model=IncidenteOut, summary="Mudar o andamento")
@@ -307,7 +318,7 @@ def andamento(
                 admin, operador, "andamento", incidente_id, "Andamento alterado.",
                 status=corpo.status,
             )  # fmt: skip
-    return _out(_obter(contexto, incidente_id), contexto.agora())
+    return _out(contexto, _obter(contexto, incidente_id))
 
 
 @router.post(
@@ -331,4 +342,4 @@ def encerrar(
                 admin, operador, "encerrado", incidente_id, corpo.desfecho[:500],
                 status="encerrado",
             )  # fmt: skip
-    return _out(_obter(contexto, incidente_id), contexto.agora())
+    return _out(contexto, _obter(contexto, incidente_id))

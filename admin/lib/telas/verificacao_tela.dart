@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../componentes/base.dart';
+import 'selo_profissional.dart' show kOrientacaoSeloRetirado;
 import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
@@ -214,6 +215,9 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
   Timer? _escondeCpf;
   bool _decidindo = false;
 
+  /// Mensagem do servidor quando a aprovação é recusada porque o selo está retirado (10.3).
+  String? _erroSelo;
+
   @override
   void dispose() {
     _escondeCpf?.cancel();
@@ -356,11 +360,21 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
       motivosPadrao: aprovar ? null : motivosRecusaPadrao,
     );
     if (motivo == null || !mounted || _decidindo) return;
-    setState(() => _decidindo = true);
+    setState(() {
+      _decidindo = true;
+      _erroSelo = null;
+    });
     try {
       final ok = await executar(
         context,
-        () => api.decidirVerificacao(v.id, aprovar: aprovar, motivo: motivo),
+        () async {
+          try {
+            await api.decidirVerificacao(v.id, aprovar: aprovar, motivo: motivo);
+          } on ErroApi catch (e) {
+            if (e.codigo == 'selo_retirado' && mounted) setState(() => _erroSelo = e.mensagem);
+            rethrow;
+          }
+        },
         sucesso: aprovar ? 'Profissional aprovado.' : 'Profissional recusado.',
       );
       if (ok && mounted) await widget.aoMudar();
@@ -432,6 +446,10 @@ class _DetalheVerificacaoState extends State<DetalheVerificacao> {
         ] else if (comigo) ...[
           const SizedBox(height: EspacosTrato.x4),
           const BannerInfo('Você está analisando este cadastro.', icone: Icons.person_outline),
+        ],
+        if (_erroSelo case final erro?) ...[
+          const SizedBox(height: EspacosTrato.x4),
+          BannerInfo('$erro $kOrientacaoSeloRetirado', titulo: 'Selo retirado.', tom: Tom.erro),
         ],
         const SizedBox(height: EspacosTrato.x4),
         Wrap(

@@ -46,6 +46,7 @@ class ServicoNotificacoesRepositorio implements ServicoNotificacoes {
           recorrenciaId: n.recorrenciaId,
           chamadoId: n.chamadoId,
           compensacaoId: n.compensacaoId,
+          avaliacaoId: n.avaliacaoId,
           tipoApi: n.tipo,
           titulo: n.titulo,
           texto: n.texto,

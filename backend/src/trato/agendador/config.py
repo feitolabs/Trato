@@ -26,6 +26,10 @@ class ConfigAgendador(BaseSettings):
     # Só reenvia ordem de estorno criada há pelo menos isto (o envio logo após o commit pode
     # estar em andamento).
     estorno_idade_minima_segundos: int = 120
+    # Expurgo dos registros de acesso (Termos 16.1). DESLIGADO: só liga com
+    # TRATO_AGENDADOR_EXPURGO_ACESSOS_LIGADO=true (em produção é decisão do João).
+    expurgo_acessos_ligado: bool = False
+    expurgo_acessos_limite: int = 1000  # linhas por ciclo (transação curta); 1 a 100000
 
 
 @lru_cache

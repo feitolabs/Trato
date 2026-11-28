@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../dados/erros.dart';
 import '../../componentes/componentes.dart';
 import '../../dados/repositorios.dart' show Cobranca;
 import '../../tema/tema.dart';
@@ -104,11 +105,14 @@ class _CorpoState extends State<_Corpo> {
       });
       widget.aoResponder?.call(aprovar);
       if (aprovar && cobranca != null) widget.aoCobrancaCriada?.call(cobranca);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _enviando = null;
-        _erro = 'Não foi possível enviar sua resposta. Tente de novo.';
+        // 409: o servidor explica por que não dá mais para decidir.
+        _erro = e is ErroTrato && e.codigoHttp == 409
+            ? e.mensagem
+            : 'Não foi possível enviar sua resposta. Tente de novo.';
       });
     }
   }
@@ -116,7 +120,7 @@ class _CorpoState extends State<_Corpo> {
   @override
   Widget build(BuildContext context) {
     final d = widget.detalhe;
-    final aguardando = _estado == EstadoAditivo.aguardando;
+    final aguardando = _estado == EstadoAditivo.aguardando && !d.semValor;
     return CorpoRolavel(
       rodape: aguardando
           ? Column(
@@ -148,7 +152,10 @@ class _CorpoState extends State<_Corpo> {
           style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
-        switch (_estado) {
+        if (d.semValor)
+          const ChipStatus(texto: 'Aditivo não vale mais', tipo: TipoStatus.alerta)
+        else
+          switch (_estado) {
           EstadoAditivo.aguardando =>
             const ChipStatus(texto: 'Aguardando sua resposta', tipo: TipoStatus.alerta),
           EstadoAditivo.aprovado => const ChipStatus(
@@ -171,8 +178,11 @@ class _CorpoState extends State<_Corpo> {
         ),
         const SizedBox(height: EspacosTrato.x3),
         Text(
-          'O aditivo só vale se você aprovar aqui. A cobrança segue o fluxo '
-          'de pagamento do pedido.',
+          d.semValor
+              ? 'A execução do serviço terminou. Aditivo que não foi pago não vale mais e não '
+                  'há o que aprovar ou pagar.'
+              : 'O aditivo só vale se você aprovar aqui. A cobrança segue o fluxo '
+                  'de pagamento do pedido.',
           style: TipografiaTrato.legenda,
         ),
         const SizedBox(height: EspacosTrato.x2),

@@ -12,10 +12,21 @@ class LigacaoSessao {
     _atualizar(_auth.sessaoAtual);
     _inscricao = _auth.sessaoMudou.listen(_atualizar);
     _sessao.renovar = () async {
-      final novo = await _auth.renovarToken();
-      return novo ?? _auth.tokenAtual;
+      final token = await _auth.renovarToken() ?? _auth.tokenAtual;
+      if (token != null && token.isNotEmpty && token != _ultimoToken) {
+        _ultimoToken = token;
+        unawaited(_sessao.avisarAcesso('sessao_renovada', token: token));
+      }
+      return token;
     };
+    _iniciada = true;
   }
+
+  /// Falso enquanto lê a sessão já guardada: reabrir o app não é um login.
+  var _iniciada = false;
+
+  /// Último token já tratado, para a mesma renovação não ser avisada duas vezes.
+  String? _ultimoToken;
 
   final ServicoAuth _auth;
   final SessaoTrato _sessao;
@@ -28,11 +39,26 @@ class LigacaoSessao {
       unawaited(_sessao.sair());
     } else {
       final jaEstava = _sessao.token == token;
+      final anterior = _sessao.logada ? _sessao.usuarioId : null;
+      final estavaLogada = _sessao.logada;
       _sessao.entrar(token);
-      if (!jaEstava && aoEntrar != null) {
-        // Falha aqui (sem rede, API fora) não derruba o login: a próxima chamada tenta de novo.
-        unawaited(aoEntrar!().catchError((Object _) {}));
+      final novidade = token != _ultimoToken;
+      _ultimoToken = token;
+      // Outra conta por cima também é login.
+      final login = _iniciada &&
+          !jaEstava &&
+          (!estavaLogada || (anterior != null && anterior != _sessao.usuarioId));
+      if (_iniciada && !jaEstava && !login && novidade) {
+        unawaited(_sessao.avisarAcesso('sessao_renovada', token: token));
       }
+      // Falha aqui (sem rede, API fora) não derruba o login: a próxima chamada tenta de novo.
+      final preparo = !jaEstava && aoEntrar != null
+          ? aoEntrar!().catchError((Object _) {})
+          : Future<void>.value();
+      // O aviso de login espera o `GET /v1/me`, que cria o usuário no primeiro acesso.
+      unawaited(preparo.whenComplete(() async {
+        if (login && _sessao.logada) await _sessao.avisarAcesso('login', token: token);
+      }));
     }
   }
 

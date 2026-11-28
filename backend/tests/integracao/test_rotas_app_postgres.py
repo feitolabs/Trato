@@ -98,6 +98,7 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
         f"/v1/pedidos/{pedido_id}/orcamentos",
         "profissional",
         {
+            "validade_ate": "2099-01-01T00:00:00Z",
             "itens": [
                 {
                     "tipo": "horas",
@@ -117,6 +118,7 @@ def test_pedido_de_aberto_a_concluido_com_as_rotas_do_app(atuacao):
                 {"descricao": "Pintar", "valor_centavos": 50_000},
             ],
             "prazo_execucao_dias": 5,
+            "fora_do_escopo": "Materiais não incluídos.",
             "garantia_dias": 90,
         },
     )
@@ -248,6 +250,7 @@ def test_me_do_cliente_e_do_profissional(cenario):
         "id", "nome", "papel", "status", "nivel_verificacao", "nota_publica", "servicos_concluidos",
         "papeis", "tem_perfil_profissional", "status_verificacao", "disponivel_agora",
         "cpf_cadastrado", "exclusao_agendada_em",
+        "avaliacoes_total", "nota_minimo_avaliacoes",  # 12.3
     }  # fmt: skip
 
 

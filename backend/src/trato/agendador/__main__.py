@@ -16,7 +16,7 @@ import threading
 from datetime import timedelta
 
 from trato.agendador.ciclo import Agendador
-from trato.agendador.config import obter_config_agendador
+from trato.agendador.config import ConfigAgendador, obter_config_agendador
 from trato.agendador.executor import ExecutorContexto, FonteContexto, ids_ativos_postgres
 from trato.agendador.registro import RegistroPostgres
 from trato.agendador.trava import TravaAdvisoryPostgres
@@ -26,7 +26,16 @@ from trato.notificacoes.canais import canais_da_config
 from trato.notificacoes.config import obter_config_notificacoes
 from trato.notificacoes.postgres import EmailsDaContaPostgres, NotificacoesServicoPostgres
 from trato.notificacoes.servico import ServicoNotificacoes
+from trato.persistencia.acessos import AcessosPostgres
 from trato.persistencia.conexao import Banco
+
+
+def rotina_de_expurgo(banco: Banco, cfg: ConfigAgendador):  # type: ignore[no-untyped-def]
+    """None enquanto a configuração não ligar explicitamente (padrão)."""
+    if not cfg.expurgo_acessos_ligado:
+        return None
+    repo = AcessosPostgres(banco)
+    return lambda _agora: repo.expurgar(cfg.expurgo_acessos_limite)
 
 
 def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
@@ -87,6 +96,8 @@ def montar(banco: Banco | None = None) -> tuple[Agendador, Banco, float]:
         executor.gerar_visitas_recorrentes,
         executor.reenviar_estornos,
         executor.encerrar_medidas,
+        executor.avisar_tratinhos_vencendo,
+        rotina_de_expurgo(banco, cfg),
     )
     return agendador, banco, cfg.intervalo_segundos
 

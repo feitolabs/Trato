@@ -5,14 +5,21 @@ library;
 import 'formato_aparelho.dart';
 
 class PrazoAvaliacao {
-  const PrazoAvaliacao({this.ate, this.encerrado = false, this.bonusMoedas});
+  const PrazoAvaliacao({
+    this.ate,
+    this.encerrado = false,
+    this.bonusMoedas,
+    this.bonusValidadeDias,
+  });
 
   /// Campo ausente (servidor antigo) vira "sem prazo conhecido": a tela fica como antes.
   factory PrazoAvaliacao.deJson(Map<String, dynamic> j) {
     final ate = j['avaliar_ate'];
     final bonus = j['bonus_moedas'];
+    final validade = j['bonus_validade_dias'];
     return PrazoAvaliacao(
       bonusMoedas: bonus is num && bonus > 0 ? bonus.toInt() : null,
+      bonusValidadeDias: validade is num && validade > 0 ? validade.toInt() : null,
       ate: ate is String ? DateTime.tryParse(ate)?.toLocal() : null,
       encerrado: j['prazo_encerrado'] == true,
     );
@@ -26,7 +33,14 @@ class PrazoAvaliacao {
 
   /// Tratinhos que avaliar rende agora. Nulo: o servidor não informou (a tela não cita número).
   final int? bonusMoedas;
+
+  /// Termos 13.3: validade, em dias a partir do crédito, do bônus de avaliação. Nulo = omitir.
+  final int? bonusValidadeDias;
 }
+
+/// Termos 13.3: validade do bônus em dias, vinda do servidor.
+String textoValidadeBonusDias(int dias) =>
+    'Validade de $dias ${dias == 1 ? 'dia' : 'dias'} após o crédito.';
 
 const textoPrazoEncerrado = 'O prazo para avaliar este serviço terminou.';
 

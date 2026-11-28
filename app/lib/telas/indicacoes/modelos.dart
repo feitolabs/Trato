@@ -10,6 +10,7 @@ class ResumoIndicacoes {
     this.liberadas = 0,
     this.limiteMensal = 0,
     this.limiteMensalRestante = 0,
+    this.validadeDias,
   });
 
   final int cadastradas;
@@ -18,17 +19,22 @@ class ResumoIndicacoes {
   final int limiteMensal;
   final int limiteMensalRestante;
 
+  /// Termos 13.3: validade, em dias a partir do crédito, dos Tratinhos de indicação. Null em API antiga.
+  final int? validadeDias;
+
   static int _int(Object? v) => v is num ? v.toInt() : 0;
 
-  /// Campo ausente (backend antigo) vira 0.
+  /// Campo ausente (backend antigo) vira 0 (ou null para [validadeDias]).
   factory ResumoIndicacoes.deJson(Object? j) {
     if (j is! Map) return const ResumoIndicacoes();
+    final validade = j['validade_dias'];
     return ResumoIndicacoes(
       cadastradas: _int(j['cadastradas']),
       aguardandoLiberacao: _int(j['aguardando_liberacao']),
       liberadas: _int(j['liberadas']),
       limiteMensal: _int(j['limite_mensal']),
       limiteMensalRestante: _int(j['limite_mensal_restante']),
+      validadeDias: validade is num && validade > 0 ? validade.toInt() : null,
     );
   }
 }

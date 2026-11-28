@@ -1,6 +1,6 @@
 -- Desfaz supabase/seeds/seed_termos_e_config_100.sql. RASCUNHO. Só com OK do João.
--- Apaga só definições que nenhuma versão de configuração usa. Versão dos Termos em vigor não se
--- apaga (23.7): a linha 1.1 permanece. Idempotente.
+-- Apaga só definições que nenhuma versão de configuração usa. O seed não grava versão dos
+-- Termos; versão em vigor gravada à parte não se apaga (23.7). Idempotente.
 
 begin;
 

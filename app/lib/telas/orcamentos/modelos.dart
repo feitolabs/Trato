@@ -1,6 +1,8 @@
 // Modelos de orçamento. Provisórios. Valores em centavos inteiros; o app só exibe o que vier
 // dos dados (total, itens, valores de cancelamento): nenhuma conta de dinheiro roda aqui.
 
+import '../comuns/contagem_avaliacoes.dart';
+
 class ItemOrcamento {
   const ItemOrcamento({
     required this.descricao,
@@ -94,10 +96,14 @@ class Orcamento {
     this.detalhe,
     this.aceito = false,
     this.profissionalId,
+    this.contagem,
   });
 
   /// Id do profissional na API; com ele, o perfil público abre direto. Nulo nos dados de exemplo.
   final String? profissionalId;
+
+  /// Termos 12.3. Nulo: servidor antigo (a tela fica como antes).
+  final ContagemAvaliacoes? contagem;
 
   final String id;
   final String profissional;

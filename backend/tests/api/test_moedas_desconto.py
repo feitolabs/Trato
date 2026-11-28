@@ -46,8 +46,7 @@ def test_uso_respeita_saldo_e_teto_por_servico():
 
 
 def test_uso_zero_quando_desligado_sem_saldo_ou_servico_minusculo():
-    repo = MoedasEmMemoria(ConfigMoedas(ativo=False))
-    _dar_saldo(repo, 1_000)
+    repo = MoedasEmMemoria(ConfigMoedas(ativo=False))  # com saldo: test_tratinhos_fim_programa
     args = {"usuario_id": CLIENTE.id, "agora": AGORA}
     assert calcular_uso_moedas(repo, servico_centavos=100_000, **args).moedas == 0
     ligado = MoedasEmMemoria(ConfigMoedas(ativo=True, **_GRANDE))

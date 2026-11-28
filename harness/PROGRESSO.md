@@ -1227,3 +1227,54 @@ App e painel em 0.1.27+28: correções da auditoria do app (disputa, retrabalho,
 - 27/11 11:0x: Joao pediu entregar parcial e continuar. Pedido o parcial da BE-AVISOS-30.
 - 27/11 11:16: Joao: "pode publicar e registrar oq temos". Registro em docs/estado-2026-11-27.md. Publicacao aguarda escopo/OK (bloqueios no registro).
 - 27/11 11:2x: BE-AVISOS-30 parcial (1 teste falhando: test_somente_app_nao_inclui_disputa_nem_estorno). Commit local em branch nova a pedido do Joao; sem push.
+- 27/11: BE-AVISO-TRATINHOS pronto (Mestre rodou o teste que falhava e os alvos). Nao commitado.
+- 27/11: BE-MOEDAS-30 pronto (local, nao commitado; Mestre rodou testes novos). Joao confirmar: orcamento/tetos nao podem cair com saldo valido. Enviada so ADM-MOEDAS-30.
+- 27/11: ADM-MOEDAS-30 entregue (local; 193 testes ok segundo Admin; conferido no disco). Quem emite aviso x quem salva config: so administrador faz os dois. Enviada so BE-208-237.
+- 27/11: Joao aprovou leitura em paralelo ("pode"): SCOUT-TERMOS-35 (so leitura) junto com BE-208-237.
+- 27/11 12:1x SCOUT-TERMOS-35 (so leitura, sem testes): 3 cumpre (6.9, 15.2, 20.5), 30 parcial, 2 Joao (4.6, 9.3). Ressalva 6.9: contestacao aprovada fica pendente_financeiro sem executor achado. Detalhe: chat do Mestre, mensagem a248d5fd.
+- 27/11: BE-208-237 pronto (local; Mestre rodou testes novos). Falta painel/app para 20.8 e 23.7. Enviada SCOUT-TERMOS-61 (so leitura).
+- 27/11: Joao aprovou paralelo ("pode"): ADM-208 e APP-208-237 junto com SCOUT-TERMOS-61.
+- 27/11 SCOUT-TERMOS-61: 13 cumpre, 42 parcial, 3 nao, 3 Joao; 48 pendentes (38 codigo, 5 configurar, 5 Joao). Detalhe em docs/estado-2026-11-27.md.
+- 27/11: Joao: "acelere o desenvolvimento". Em paralelo: BE-LOTE-A, DB-LOTE-A, ADM-208, APP-208-237.
+- 27/11: DB-LOTE-A so arquivos (122500, 122600, seeds; relato Banco 33/0 em Postgres local; arquivos conferidos). Pendente Backend: tratar 23001/23514, pg_local. Joao: versao 1.0 dos Termos no seed.
+- 27/11: ADM-208 entregue (184 testes ok segundo Admin; conferido). Seguranca passou para gemini-4-hydrogen e recebeu SEG-COMMIT-DINHEIRO (so leitura do commit 3af627a).
+- 27/11: APP-208-237 entregue (local; 317 testes ok segundo Flutter; arquivos conferidos).
+- 27/11: APP-LOTE-A parcial (6.4 diferenca p/ a vista; 239 testes ok segundo Flutter). Pendente Backend (proximo lote): taxa de juros e sem_juros; valor de cada parcela (total//n nao fecha); validade para profissional, avaliacao, indicacoes, campanhas.
+- 27/11: SEG-COMMIT-DINHEIRO: REPROVADO (4 altas, 2 medias, 1 baixa). Enviada BE-SEG-ALTOS (prioridade).
+- 27/11: BE-LOTE-A entregue (local; relato Backend; 1 falha por acoplamento entre testes no Postgres: moderacao apos contrato). Visita recorrente sem prazo/validade/garantia. Enviadas APP-LOTE-B e ADM-LOTE-B.
+- 27/11 13:3x: APP-LOTE-B entregue (997 testes ok segundo Flutter; conferido). Pendencias: Backend contraproposta copia validade/garantia nulas (fura 5.2) e validade da carteira do profissional; App: tela para contestar ocultacao de avaliacao (enviar quando a maquina aliviar). CPU em 100%.
+- 27/11: ADM-LOTE-B entregue (176 testes ok segundo Admin; conferido). Enviada APP-CONTESTA-OCULTA.
+- 27/11: Joao: "tem o meu OK ate 15:00" (entendido: so codigo local).
+- 27/11: DB-SEG-M6 so arquivo (133600; relato Banco 21/0 + 600 comparacoes; arquivos conferidos). Backend: incluir 133600 no pg_local. Pendente (decisao pela regra favoravel): estorno criado apos encerramento de gasto anterior deve entrar na devolucao; mudar banco e backend juntos no proximo lote.
+- 27/11: DB-SEG-M6B so arquivo (relato Banco 46/0, 800 comparacoes; conferido). Backend: paridade na fila. Limite: estorno de lote ja vencido ganha validade nova e fica fora.
+- 27/11: APP-CONTESTA-OCULTA entregue (8 testes novos + 229 ok segundo Flutter; conferido). BE-SEG-ALTOS parcial (relato; testes Postgres A2 nao rodados; 1 falha nos vizinhos). Banco M6B: Mestre rodou 46/0.
+- 27/11 14:00: BE-SEG-ALTOS A1-A4 completos (Mestre: 19 passed, seg_altos + reorcar/aditivo Postgres). Falha pre-existente: test_ausencia_devolve_principal_e_aditivo_pago (enviada para fila). Precisa nova revisao da Seguranca. Backend comecou BE-M6-PARIDADE.
+- 27/11 18:50: Joao: "continue". OK ate 15:00 expirado; segue so codigo local (meta 100%). Pedido status ao Backend; enviadas ADM-SINAIS e DB-SEG-A1.
+- 27/11 18:5x: Backend parcial: M6 paridade pronta (2 falhas em retorno_tratinhos, provavel efeito 20.8); 5.2 contraproposta ok; ausencia-aditivo, lote B (1-3) e teste acoplado nao feitos. Enviada BE-FALHAS-1.
+- 27/11 18:5x: ADM-SINAIS entregue (148 testes ok segundo Admin; conferido). Mestre: paridade ok; 2 falhas de retorno reproduzidas.
+- 27/11 19:0x: DB-SEG-A1 so arquivo (185000; relato Banco 24/0; conferido). Backend precisa tratar 23505 (estornar 2a cobranca) ANTES da migration: BE-A1-INDICE na fila.
+- 27/11 19:0x: BE-FALHAS-1 pronto (defeito de teste nos 2 de retorno; cenario aditivo/ausencia corrigido). Backend em BE-A1-INDICE.
+- 27/11 19:0x: Joao: "faca sempre algo em paralelo". Enviadas APP-LOTE-C, ADM-CONFIGS e SEG-SQL.
+- 27/11 19:0x: ADM-CONFIGS entregue (143 testes ok segundo Admin; conferido). Enviada ADM-COMPENSACAO.
+- 27/11 19:1x: SEG-SQL (Gemini, so leitura): APROVADO COM RESSALVAS (4 medias, 2 baixas). Enviada DB-SEG-SQL ao Banco.
+- 27/11 19:2x: BE-A1-INDICE pronto (Mestre: 48 testes ok + ruff). APP-LOTE-C e ADM-COMPENSACAO entregues (conferidos os testes no disco). RISCO: possivel segundo estorno na compensacao reduzida (leitura do Admin). Enviada BE-COMPENSACAO-DUPLA (prioridade).
+- 27/11 19:3x: DB-SEG-SQL so arquivo (190000, 190100, 190200; seed sem versoes; relato Banco 38/0; conferido). Pendente Backend: pg_local 30-32 e expurgo em transacao curta. Nova revisao da Seguranca depois.
+- 27/11 19:1x: BE-COMPENSACAO-DUPLA: estorno duplo CONFIRMADO e bloqueado (409 estorno_ja_ordenado; Mestre rodou 5 testes ok). Fila Banco: compensacao_reduzir. Aberto: regresso 17.4 apos cancelamento pode ordenar novo estorno.
+- 27/11 19:2x: DB-RETENCAO so arquivo (190500, nao apaga dados de pedido; relato Banco 36/0 e 40/0; 190200 corrigida: dia_em_brasilia). Joao/juridico: destino por tabela apos 5 anos etc.
+- 27/11 19:2x: ADM-ESTORNO-409 entregue (191 testes ok segundo Admin; conferido). Risco regresso x cancelada: enviada BE-REGRESSO-DUPLO (prioridade) e APP-SUSPENSA.
+- 27/11 19:2x: APP-SUSPENSA entregue (35 testes ok segundo Flutter; conferido).
+- 27/11 19:3x: DB-COMP-REDUZIR so arquivo (191500; relato Banco 46/0; conferido). Fila Backend: BE-COMP-REDUZIR.
+- 27/11 19:3x: BE-ACESSOS pronto (local; expurgo desligado por padrao; conferido no disco). Producao: conferir TRATO_SEG_CONFIAR_X_FORWARDED_FOR e CORS. Enviada APP-ACESSOS.
+- 27/11 19:2x: Mestre rodou: grupo acessos/agendador/bloqueado/dois_papeis 69 ok, 3 falhas (/v1/me/acessos fora da lista do bloqueado); seguranca 146 ok; ruff 2 erros em compensacoes.py (Backend editando). BE-REGRESSO-DUPLO entregue (relato; nao rerodado). APP-ACESSOS entregue; Politica de Privacidade precisa atualizar.
+- 27/11 19:28: BE-COMP-REDUZIR pronto. Mestre: grupo acessos/agendador/bloqueado/dois_papeis 76 ok; compensacoes 23 ok; ruff ok. Verificacao de acessos concluida (local, esses testes). Enviada ADM-REDUZIR.
+- 27/11 19:3x: ADM-REDUZIR entregue (198 testes ok segundo Admin; conferido). Lacuna: divida quitada com decisao reduzida sem caminho no painel. Enviada BE-QUITADA.
+- 27/11 19:3x: BE-QUITADA pronto + LOTE-B-BANCO 1-3. Lacuna: aberta suspensa "analisar" sem boa saida (regra Joao). Enviadas ADM-REVISAO e DB-MIN-7.
+- 27/11 19:3x: DB-MIN-7 so arquivo (seed 7..30; relato Banco 8/0; conferido). Atencao: on conflict nao corrige definicao antiga.
+- 27/11 19:4x: ADM-REVISAO entregue (201 testes ok segundo Admin; campos conferidos). Aguardando SEG-SQL-2.
+- 27/11 19:4x: SEG-SQL-2: APROVADO COM RESSALVAS (anteriores resolvidas; 2 medias na 191500: teto sem estornos diretos; contestacao superada). Enviada DB-SEG-RED.
+- 27/11 19:4x: DB-SEG-RED corrigido (arquivo; relato Banco 18/0 + regressao 46/0 e 37/0). Enviada BE-SEG-RED. Joao: compensacao_origem_revista com contestacao superada.
+- 27/11 19:5x: ADM-SUSPENSA-NULA entregue (156 testes ok segundo Admin; conferido). Aguardando SEG-REDUCAO.
+- 27/11 19:5x: SEG-REDUCAO: APROVADO COM RESSALVAS (divergencia teto>=base CONFIRMADA media; 2 baixas). Enviada DB-SEG-RED-2.
+- 27/11 19:50: Joao: "algo em paralelo?". Enviadas BE-PARCELAS e SCOUT-TERMOS-48B (alem de DB-SEG-RED-2).
+- 27/11 19:5x: DB-SEG-RED-2 corrigido (arquivo; relato Banco 21/0 + regressao). Falta Backend ajustar 1 teste e nova conferencia.
+- 27/11 19:53: reducao de compensacao conferida pelo Mestre (assert contestacao_invalida; 22 testes Postgres ok). SCOUT-TERMOS-48B: 11 cumpre, 25 parcial, 2 nao, 5 Joao, 5 configurar; projecao 243 = 95/30/2/116.

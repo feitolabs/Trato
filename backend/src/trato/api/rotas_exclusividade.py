@@ -29,6 +29,7 @@ from trato.api.moedas import saldo_profissional
 from trato.api.servicos import nome_abreviado
 from trato.api.visibilidade import pedido_visivel_ao_profissional
 from trato.pedidos.estados import Estado
+from trato.profissional.nota import minimo_de_avaliacoes, nota_visivel
 
 router = APIRouter(prefix="/v1", tags=["exclusividade"])
 
@@ -55,7 +56,10 @@ class ExclusividadeOut(BaseModel):
     status: str
     moedas_cobradas: int
     criada_em: datetime
-    responder_ate: datetime | None = None
+    responder_ate: datetime | None = Field(
+        None, description="Já com a prorrogação por falha (22.3); null com `prazo_suspenso`."
+    )
+    prazo_suspenso: bool = Field(False, description="Falha ativa: o prazo não está correndo.")
     respondida_em: datetime | None = None
     expira_em: datetime | None = None
     encerrada_em: datetime | None = None
@@ -77,13 +81,20 @@ class ListaExclusividadesOut(BaseModel):
 
 
 class OfertaExclusividadeOut(BaseModel):
+    avaliacoes_total: int = Field(0, description="Avaliações publicadas recebidas (12.3).")
+    nota_minimo_avaliacoes: int = Field(
+        1, description="Abaixo disto a nota vem null (mostre 'novo no Trato')."
+    )
     id: str
     pedido_id: str
     profissional_id: str
     profissional_nome: str | None
     nota_publica: float | None
     status: str = Field(description="`aguardando_cliente` ou `ativa`.")
-    responder_ate: datetime | None
+    responder_ate: datetime | None = Field(
+        description="Já com a prorrogação por falha (22.3); null com `prazo_suspenso`."
+    )
+    prazo_suspenso: bool = Field(False, description="Falha ativa: o prazo não está correndo.")
     expira_em: datetime | None
     texto: str = Field(default=TEXTO_SEM_COMPROMISSO)
 
@@ -101,8 +112,21 @@ def _erro(status: int, codigo: str, mensagem: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"detail": mensagem, "codigo": codigo})
 
 
+def _responder_ate(contexto: Contexto, item: Exclusividade) -> datetime | None:
+    """Prazo efetivo (22.3). `None`: suspenso. Falha na leitura mostra o gravado."""
+    if item.pagador != "profissional" or item.status != "aguardando_cliente":
+        return item.responder_ate
+    try:
+        return contexto.exclusividades.prazo_de_resposta(item)
+    except Exception:  # noqa: BLE001 - tabela ausente: sem prorrogação
+        return item.responder_ate
+
+
 def _out(
-    item: Exclusividade, saldo_restante: int | None = None, bloqueio_dias: int | None = None
+    contexto: Contexto,
+    item: Exclusividade,
+    saldo_restante: int | None = None,
+    bloqueio_dias: int | None = None,
 ) -> ExclusividadeOut:
     # Recusada: o profissional fica sem pedir neste cliente até a data (config, em dias).
     bloqueado_ate = (
@@ -110,7 +134,9 @@ def _out(
         if bloqueio_dias is not None and item.status == "recusada" and item.encerrada_em
         else None
     )
+    efetivo = _responder_ate(contexto, item)
     return ExclusividadeOut(
+        prazo_suspenso=item.responder_ate is not None and efetivo is None,
         bloqueado_ate=bloqueado_ate,
         id=item.id,
         pedido_id=item.pedido_id,
@@ -118,7 +144,7 @@ def _out(
         status=item.status,
         moedas_cobradas=item.moedas_cobradas,
         criada_em=item.criada_em,
-        responder_ate=item.responder_ate,
+        responder_ate=efetivo,
         respondida_em=item.respondida_em,
         expira_em=item.expira_em,
         encerrada_em=item.encerrada_em,
@@ -183,12 +209,14 @@ def solicitar_exclusividade(
         if item is None:  # nunca deveria: a função acabou de criar
             return _erro(503, "indisponivel", "A prioridade está indisponível no momento.")
         avisar_exclusividade_oferta(request, contexto, exclusividade=item)
-        return _out(item, r.saldo_restante)
+        return _out(contexto, item, r.saldo_restante)
     if r.resultado == "ja_existe":
         item = contexto.exclusividades.obter(r.exclusividade_id or "")
         if item is None:
             return _erro(503, "indisponivel", "A prioridade está indisponível no momento.")
-        return JSONResponse(status_code=200, content=jsonable_encoder(_out(item, r.saldo_restante)))
+        return JSONResponse(
+            status_code=200, content=jsonable_encoder(_out(contexto, item, r.saldo_restante))
+        )
     if r.resultado in ERROS_SOLICITAR:
         return _erro(*ERROS_SOLICITAR[r.resultado])
     return _erro(503, "indisponivel", "A prioridade está indisponível no momento.")
@@ -210,7 +238,9 @@ def minhas_exclusividades(
         itens = []
     cfg = contexto.moedas.config()
     return ListaExclusividadesOut(
-        itens=[_out(i, bloqueio_dias=cfg.exclusividade_bloqueio_recusa_dias) for i in itens],
+        itens=[
+            _out(contexto, i, bloqueio_dias=cfg.exclusividade_bloqueio_recusa_dias) for i in itens
+        ],
         ativas_ou_pendentes=sum(1 for i in itens if i.status in EM_ANDAMENTO),
         limite_maximo=cfg.exclusividade_max_simultaneas,
         saldo_profissional=saldo_profissional(contexto.moedas, usuario.id, agora),
@@ -243,9 +273,16 @@ def oferta_do_pedido(
         pedido_id=item.pedido_id,
         profissional_id=item.profissional_id,
         profissional_nome=nome_abreviado(detalhe.nome) if detalhe else None,
-        nota_publica=detalhe.nota_publica if detalhe else None,
+        nota_publica=nota_visivel(
+            detalhe.nota_publica if detalhe else None,
+            detalhe.avaliacoes_total if detalhe else 0,
+            minimo_de_avaliacoes(contexto.config),
+        ),
+        avaliacoes_total=detalhe.avaliacoes_total if detalhe else 0,
+        nota_minimo_avaliacoes=minimo_de_avaliacoes(contexto.config),
         status=item.status,
-        responder_ate=item.responder_ate,
+        responder_ate=_responder_ate(contexto, item),
+        prazo_suspenso=item.responder_ate is not None and _responder_ate(contexto, item) is None,
         expira_em=item.expira_em,
     )
 

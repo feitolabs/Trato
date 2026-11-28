@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from contextlib import nullcontext
 from datetime import date, datetime
@@ -17,7 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from trato import legal
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.financeiro import periodo
 from trato.lgpd.servico import ErroLgpd, ServicoLgpd
+from trato.notificacoes.eventos import Evento
 from trato.persistencia.erros import ErroPersistencia
 from trato.seguranca.cliente import ip_do_cliente
 
@@ -137,6 +140,10 @@ def registrar_consentimento(
         )
     except ErroLgpd as erro:
         raise _erro(erro) from erro
+    if linha.finalidade == "termos_de_uso" and linha.aceito:
+        _enviar_copia_termos_email(
+            contexto, usuario.id, linha.versao_texto, linha.registrado_em, ip
+        )
     return ConsentimentoOut(
         finalidade=linha.finalidade,
         aceito=linha.aceito,
@@ -167,7 +174,52 @@ def processar_exclusoes(
 # --- Aceite dos Termos (1.4, 1.7 e 23.4) ----------------------------------------------
 # Nenhuma rota é bloqueada por aceite pendente: pela 23.4, continuar usando já é concordar.
 
+_log = logging.getLogger("trato.lgpd.termos")
 _TRAVA_ACEITE = threading.Lock()
+
+
+def _enviar_copia_termos_email(
+    contexto: Contexto,
+    usuario_id: str,
+    versao: str,
+    aceito_em: datetime,
+    ip: str | None,
+) -> None:
+    """Termos 1.5: envia cópia dos Termos por e-mail após o aceite. Falha nunca bloqueia aceite."""
+    notificador = contexto.extras.get("notificador")
+    if notificador is None:
+        return
+    doc = legal.por_versao(versao)
+    quando = aceito_em.astimezone(periodo.BRASILIA).strftime("%d/%m/%Y %H:%M")
+    cabecalho = [
+        f"Aceite registrado para os Termos de Uso do Trato — versão {versao}.",
+        f"Data do aceite (Brasília): {quando}.",
+    ]
+    if doc is not None:
+        cabecalho.append(f"Vigência da versão: {doc.vigente_desde:%d/%m/%Y}.")
+    if ip:
+        cabecalho.append(f"IP do registro: {ip}.")
+    texto_termos = ""
+    if doc is not None:
+        try:
+            texto_termos = f"\n\n---\n\n{doc.texto()}"
+        except Exception:  # noqa: BLE001 - resumo segue mesmo sem o arquivo
+            _log.warning("Texto dos Termos v%s indisponível para cópia por e-mail", versao)
+    corpo = "\n".join(cabecalho) + texto_termos
+    dados = {"versao": versao, "aceita_em": aceito_em.isoformat()}
+    if ip:
+        dados["ip"] = ip
+    try:
+        notificador.notificar(
+            Evento.TERMOS_ACEITOS,
+            usuario_id,
+            chave=f"termos-aceite:{usuario_id}:{versao}",
+            titulo=f"Cópia dos Termos de Uso (versão {versao})",
+            corpo=corpo,
+            dados=dados,
+        )
+    except Exception:  # noqa: BLE001 - envio de e-mail não pode quebrar cadastro/aceite
+        _log.warning("Falha ao enviar cópia dos Termos v%s por e-mail (1.5)", versao, exc_info=True)
 
 
 class SituacaoTermosOut(BaseModel):
@@ -179,6 +231,9 @@ class SituacaoTermosOut(BaseModel):
     aceite_pendente: bool
     versao_aceita: str | None = Field(None, description="Última versão com aceite registrado.")
     aceita_em: datetime | None = None
+    aceito_ip: str | None = Field(
+        None, description="IP do aceite de `versao_aceita` (1.4). Só o próprio usuário vê."
+    )
 
 
 class AceitarTermosIn(_Entrada):
@@ -212,6 +267,7 @@ def _situacao(
         aceite_pendente=do_vigente is None,
         versao_aceita=ultimo.versao_texto if ultimo else None,
         aceita_em=ultimo.registrado_em if ultimo else None,
+        aceito_ip=str(ultimo.ip) if ultimo and ultimo.ip else None,
     )
 
 
@@ -265,6 +321,7 @@ def aceitar_os_termos(
     ip = ip_do_cliente(request, seg.config if seg else None)
     banco = contexto.extras.get("banco")
     try:
+        novo_aceite_em: datetime | None = None
         # Duplo toque: um pedido por vez confere e grava (no banco, também entre servidores).
         with _TRAVA_ACEITE if banco is None else nullcontext():
             with banco.transacao() if banco is not None else nullcontext() as con:
@@ -276,10 +333,14 @@ def aceitar_os_termos(
                 if servico.aceite_dos_termos(usuario.id, vigente) is not None:
                     response.status_code = 200
                 else:
+                    novo_aceite_em = contexto.agora()
                     servico.registrar_consentimento(
-                        usuario, "termos_de_uso", True, vigente.versao, contexto.agora(), ip
+                        usuario, "termos_de_uso", True, vigente.versao, novo_aceite_em, ip
                     )
-                return _situacao(servico, usuario.id, vigente)
+                saida = _situacao(servico, usuario.id, vigente)
+        if novo_aceite_em is not None:
+            _enviar_copia_termos_email(contexto, usuario.id, vigente.versao, novo_aceite_em, ip)
+        return saida
     except ErroPersistencia as erro:
         if not _sem_a_tabela(erro):
             raise

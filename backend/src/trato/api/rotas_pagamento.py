@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from trato import disputas
@@ -19,12 +20,22 @@ from trato.api.admin.contexto import Operador, exigir, obter_admin
 from trato.api.admin.papeis import Permissao
 from trato.api.auth import PapelUsuario, Usuario
 from trato.api.cautela import exigir_contato_livre
-from trato.api.contexto import Contexto, exigir_papel, obter_contexto, usuario_atual
+from trato.api.contexto import (
+    ContaBloqueada,
+    Contexto,
+    bearer_opcional,
+    bloqueado_pode_no_pedido,
+    exigir_papel,
+    obter_contexto,
+    usuario_atual,
+    usuario_ou_bloqueado,
+)
 from trato.api.maioridade import exigir_maioridade
 from trato.api.servicos import ator_de, carregar_pedido
 from trato.pagamentos.custo import MeioPagamento
 from trato.pagamentos.modelos import Aditivo, CobrancaLocal
 from trato.pagamentos.orquestrador import ErroFluxo, ServicoPagamento
+from trato.pagamentos.prazos import dados_estorno, dados_pix_cobranca
 from trato.pedidos.estados import Estado, ResultadoDisputa
 
 router = APIRouter(prefix="/v1/pedidos", tags=["pagamento"])
@@ -65,6 +76,32 @@ class CobrancaOut(BaseModel):
     )
     instrucao: str | None = Field(None, description="Pix copia e cola ou segredo do cartão.")
     criada_em: datetime
+    pix_expira_em: datetime | None = Field(
+        None, description="6.3: instante em que o QR code Pix expira (ISO8601)."
+    )
+    pix_validade_minutos: int | None = Field(
+        None, description="6.3: validade do Pix em minutos."
+    )
+    estorno_status: str | None = Field(
+        None,
+        description="6.10: `solicitado`, `em_processamento`, `concluido` ou `falhou`.",
+    )
+    estorno_prazo_estimado: str | None = Field(
+        None, description="6.10: prazo estimado do estorno conforme o meio de pagamento."
+    )
+    estorno_valor_centavos: int | None = Field(
+        None,
+        description="6.10: quanto desta cobrança foi mandado devolver (veja `estorno_status` "
+        "para saber se já foi confirmado). null sem estorno.",
+    )
+    estorno_solicitado_em: datetime | None = Field(
+        None, description="6.10: quando o primeiro estorno desta cobrança foi registrado."
+    )
+    estorno_enviado_em: datetime | None = Field(
+        None,
+        description="6.10: quando o envio ao provedor foi registrado (o último, só com todos "
+        "enviados). Não é a data em que o dinheiro caiu: o servidor não tem essa data.",
+    )
 
 
 class AditivoIn(_Entrada):
@@ -114,8 +151,20 @@ def servico_de(request: Request) -> ServicoPagamento:
 Servico = Annotated[ServicoPagamento, Depends(servico_de)]
 
 
-def _cobranca_out(c: CobrancaLocal) -> CobrancaOut:
+def _cobranca_out(
+    c: CobrancaLocal,
+    contexto: Contexto | None = None,
+    servico: ServicoPagamento | None = None,
+) -> CobrancaOut:
+    pix_expira_em, pix_validade_minutos = dados_pix_cobranca(c, contexto)
+    ordens = servico.ordens.do_pedido(c.pedido_id) if servico is not None else ()
+    estorno_status, estorno_prazo = dados_estorno(c, ordens)
+    desta = [o for o in ordens if o.cobranca_id == c.id]
+    enviados = [o.enviada_em for o in desta if o.estado == "enviada" and o.enviada_em]
     return CobrancaOut(
+        estorno_valor_centavos=c.estornado_centavos or None,
+        estorno_solicitado_em=min((o.criada_em for o in desta), default=None),
+        estorno_enviado_em=max(enviados) if desta and len(enviados) == len(desta) else None,
         id=c.id,
         pedido_id=c.pedido_id,
         aditivo_id=c.aditivo_id,
@@ -125,6 +174,10 @@ def _cobranca_out(c: CobrancaLocal) -> CobrancaOut:
         status=c.status.value,
         instrucao=c.instrucao,
         criada_em=c.criada_em,
+        pix_expira_em=pix_expira_em,
+        pix_validade_minutos=pix_validade_minutos,
+        estorno_status=estorno_status,
+        estorno_prazo_estimado=estorno_prazo,
     )
 
 
@@ -182,7 +235,24 @@ def criar_cobranca(
         parcelas=corpo.parcelas,
         execucao_imediata=corpo.consentimento_execucao_imediata,
     )
-    return _cobranca_out(cobranca)
+    return _cobranca_out(cobranca, contexto, servico)
+
+
+def usuario_das_cobrancas(
+    request: Request,
+    credenciais: HTTPAuthorizationCredentials | None = Depends(bearer_opcional),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Como `usuario_atual`; a conta bloqueada só passa como CLIENTE do próprio pedido que
+    chegou a ser contratado, para acompanhar o que foi pago e devolvido (6.10, 20.6, 20.10)."""
+    try:
+        return usuario_atual(request, credenciais, contexto)
+    except ContaBloqueada:
+        usuario = usuario_ou_bloqueado(request, credenciais, contexto)
+        pedido = contexto.pedidos.obter(request.path_params.get("pedido_id", ""))
+        if not bloqueado_pode_no_pedido(pedido, usuario.id):
+            raise
+        return usuario
 
 
 @router.get(
@@ -192,7 +262,7 @@ def listar_cobrancas(
     pedido_id: str,
     request: Request,
     servico: Servico,
-    usuario: Usuario = Depends(usuario_atual),
+    usuario: Usuario = Depends(usuario_das_cobrancas),
     contexto: Contexto = Depends(obter_contexto),
 ) -> list[CobrancaOut]:
     pedido = carregar_pedido(
@@ -203,7 +273,10 @@ def listar_cobrancas(
         equipe=(Permissao.PAGAMENTOS_VER,),
         consulta="cobrancas",
     )
-    return [_cobranca_out(c) for c in servico.cobrancas.do_pedido(pedido.id)]
+    saida = [_cobranca_out(c, contexto, servico) for c in servico.cobrancas.do_pedido(pedido.id)]
+    if usuario.bloqueado:  # só acompanhar: sem Pix copia e cola nem segredo do cartão
+        saida = [c.model_copy(update={"instrucao": None}) for c in saida]
+    return saida
 
 
 @router.post(
@@ -248,7 +321,10 @@ def aprovar_aditivo(
     if erro_cpf := _exigir_cpf(contexto, usuario.id):
         return erro_cpf
     aditivo, cobranca = servico.aprovar_aditivo(contexto, pedido, aditivo_id, corpo.meio)
-    return AditivoAprovadoOut(aditivo=_aditivo_out(aditivo), cobranca=_cobranca_out(cobranca))
+    return AditivoAprovadoOut(
+        aditivo=_aditivo_out(aditivo),
+        cobranca=_cobranca_out(cobranca, contexto, servico),
+    )
 
 
 @router.get("/{pedido_id}/aditivos", response_model=list[AditivoOut], summary="Aditivos do pedido")

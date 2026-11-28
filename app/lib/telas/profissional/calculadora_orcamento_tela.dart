@@ -334,9 +334,14 @@ class _CalculadoraOrcamentoTelaState extends State<CalculadoraOrcamentoTela> {
       ? 'Informe por quantos dias o orçamento vale (mínimo 1 dia).'
       : null;
 
-  String? _erroForaDoEscopo() => _foraDoEscopo.text.trim().isEmpty
-      ? 'Diga o que não está incluído. Se nada ficar de fora, escreva isso.'
-      : null;
+  /// Termos 5.2: o servidor exige de 2 a 1000 caracteres (o campo já limita o máximo).
+  String? _erroForaDoEscopo() {
+    final tamanho = _foraDoEscopo.text.trim().runes.length;
+    if (tamanho == 0) {
+      return 'Diga o que não está incluído. Se nada ficar de fora, escreva isso.';
+    }
+    return tamanho < 2 ? 'Escreva pelo menos 2 caracteres sobre o que não está incluído.' : null;
+  }
 
   Future<void> _adicionarItem() async {
     final item = await showModalBottomSheet<ItemMaterial>(

@@ -21,6 +21,7 @@ from fastapi import HTTPException
 
 from trato.api.contexto import Contexto
 from trato.api.decisao_disputa import _TRAVA_EM_MEMORIA
+from trato.api.regra_contratada import dias_de_garantia
 from trato.disputas import Decisao, Disputa, Estado, Resultado, dividir_valor
 from trato.garantias import abrir_garantia
 from trato.pedidos import estados
@@ -112,7 +113,7 @@ def aceitar(
                     gravado.concluido_em,
                     contrato.categoria_id if contrato else None,
                     contexto.config.carregar().garantias,
-                    dias_contrato=contrato.garantia_dias if contrato else None,
+                    dias_contrato=dias_de_garantia(contexto, contrato),
                 ),
             )
         contexto.disputas.salvar(pedido_id, acordo)

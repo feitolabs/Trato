@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
+import '../comuns/resultado_esperado.dart';
 import 'apoio_conclusao.dart';
 import 'campo_longo.dart';
 import 'modelos.dart';
@@ -32,7 +33,10 @@ class RelatarProblemaTela extends StatefulWidget {
 
 class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
   late String? _motivo = widget.motivoInicial;
-  late String _solucao = widget.dados.solucoes.first;
+  /// Termos 8.4: escolha obrigatória; nada vem marcado.
+  String? _solucao;
+  var _faltaSolucao = false;
+  final _chaveSolucao = GlobalKey();
   late final _descricao = TextEditingController(text: widget.descricaoInicial);
   final _fotos = <String>[];
   var _enviando = false;
@@ -47,13 +51,19 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
 
   Future<void> _enviar() async {
     if (_enviando) return;
+    if (_solucao == null) {
+      setState(() => _faltaSolucao = true);
+      final campo = _chaveSolucao.currentContext;
+      if (campo != null) await Scrollable.ensureVisible(campo, alignment: 0.5);
+      return;
+    }
     setState(() => _enviando = true);
     try {
       await widget.aoEnviar?.call(
         EnvioRelato(
           motivo: _motivo!,
           descricao: _descricao.text.trim(),
-          solucao: _solucao,
+          solucao: _solucao!,
           fotos: [..._fotos],
         ),
       );
@@ -152,16 +162,30 @@ class _RelatarProblemaTelaState extends State<RelatarProblemaTela> {
           ],
         ),
         const SizedBox(height: EspacosTrato.x5),
-        Text('O que resolveria para você?', style: TipografiaTrato.corpoForte),
+        Text('O que você espera?', key: _chaveSolucao, style: TipografiaTrato.corpoForte),
         const SizedBox(height: EspacosTrato.x2),
         DropdownButtonFormField<String>(
+          key: const ValueKey('relato-resultado-esperado'),
           initialValue: _solucao,
+          hint: const Text('Escolha uma opção'),
+          decoration: InputDecoration(
+            errorText: _faltaSolucao ? 'Escolha o que você espera.' : null,
+            errorMaxLines: 3,
+          ),
           isExpanded: true,
           style: TipografiaTrato.corpo.copyWith(color: context.cores.texto),
           items: [
             for (final s in dados.solucoes) DropdownMenuItem(value: s, child: Text(s)),
           ],
-          onChanged: (s) => setState(() => _solucao = s ?? _solucao),
+          onChanged: (s) => setState(() {
+            _solucao = s ?? _solucao;
+            _faltaSolucao = false;
+          }),
+        ),
+        const SizedBox(height: EspacosTrato.x1),
+        Text(
+          avisoEscolhaDoCliente,
+          style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
         ),
         const SizedBox(height: EspacosTrato.x4),
         Text(

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import threading
 
+import pytest
+
 from trato.agendador.executor import Adiada, ExecutorContexto
 from trato.financeiro.ledger import CUSTODIA
 from trato.pagamentos.provedor.base import TipoEvento
@@ -58,6 +60,24 @@ def vencer_prazo(c, pid) -> None:
     _no_passado(c, ACEITE_ANTIGO, (pid,))
 
 
+@pytest.mark.parametrize("falha", [False, RuntimeError("caiu")], ids=["devolve_falso", "quebra"])
+def test_a2_reabrir_e_encerrar_sao_atomicos(pg, monkeypatch, falha):  # noqa: F811
+    pid = pedido_aceito(pg)
+    cobranca = cobrar_ok(pg, pid)
+    vencer_prazo(pg, pid)
+
+    def encerrar(_):
+        if falha:
+            raise falha
+        return False
+
+    monkeypatch.setattr(pg.pagto[1].contratos, "encerrar_por_pagamento_expirado", encerrar)
+    with pytest.raises(RuntimeError if falha else Adiada):
+        expirar(pg, pid)
+    assert estado_pedido(pg, pid) == "orcamento_aceito"
+    assert linhas(pg, COBRANCA, (cobranca["id"],)) == [("pendente",)]
+
+
 def test_banco_sem_a_migration_segue_como_antes(pg):  # noqa: F811
     """Primeiro do módulo: o rollback só passa sem pedido com dois contratos."""
     with pg.local.admin() as con:
@@ -66,15 +86,13 @@ def test_banco_sem_a_migration_segue_como_antes(pg):  # noqa: F811
         pid = pedido_aceito(pg)
         velha = cobrar_ok(pg, pid)
         vencer_prazo(pg, pid)
-        expirar(pg, pid)
-        assert estado_pedido(pg, pid) == "aberto"
+        with pytest.raises(Adiada):
+            expirar(pg, pid)
+        # Sem como encerrar o contrato, o pedido não reabre pela metade: nada muda.
+        assert estado_pedido(pg, pid) == "orcamento_aceito"
         ((contrato, orcamento, _),) = linhas(pg, CONTRATOS, (pid,))
         assert (contrato, orcamento) == ("aguardando_pagamento", "aceito")
-        assert linhas(pg, COBRANCA, (velha["id"],)) == [("expirado",)]
-        novo = enviar_orcamento(pg, pid)
-        r = aceitar(pg, pid, novo)
-        assert r.status_code == 409 and "já tem contrato" in r.text, r.text
-        assert estado_pedido(pg, pid) == "aberto"
+        assert linhas(pg, COBRANCA, (velha["id"],)) == [("pendente",)]
     finally:
         with pg.local.admin() as con:
             con.execute((RAIZ / "supabase" / "migrations" / f"{NOME}.sql").read_text("utf-8"))

@@ -7,6 +7,7 @@ identifica quem pede, monta a prova, chama a regra e grava o resultado.
 from __future__ import annotations
 
 import contextlib
+import threading
 import uuid
 from dataclasses import asdict, replace
 from datetime import timedelta
@@ -30,6 +31,7 @@ from trato.api.avisos import (
     avisar_pedido_urgente,
 )
 from trato.api.cautela import RELATO_RETIDO, contato_bloqueado, exigir_contato_livre
+from trato.api.checkout_sem_codigo import RELATOU
 from trato.api.contexto import (
     Contexto,
     bloqueado_pode_no_pedido,
@@ -42,6 +44,7 @@ from trato.api.exclusividades import (
     encerrar_exclusividade_do_pedido,
     encerrar_na_contratacao,
 )
+from trato.api.indisponibilidade import disputa_vigente, fim_do_congelamento
 from trato.api.maioridade import exigir_maioridade
 from trato.api.modelos import (
     AbrirDisputaIn,
@@ -69,6 +72,7 @@ from trato.api.modelos import (
     RetrabalhoOut,
 )
 from trato.api.recorrencias import SEM_REMOTO
+from trato.api.regra_contratada import dias_de_garantia
 from trato.api.repositorios import Contrato, DadosPedido, EnderecoPedido
 from trato.api.rotas_upload import urls_fotos_do_pedido
 from trato.api.servicos import (
@@ -102,6 +106,7 @@ from trato.pedidos.estados import (
     ProvaDisputa,
     ProvaRetrabalho,
 )
+from trato.persistencia.cancelamentos import Cancelamento
 from trato.persistencia.erros import ConflitoDeEstado
 from trato.seguranca.cliente import dispositivo_do_cliente, ip_do_cliente
 from trato.seguranca.config import obter_config_seguranca
@@ -186,7 +191,7 @@ def _concluir_efeitos(contexto: Contexto, pedido: Pedido) -> None:
         pedido.concluido_em,
         categoria,
         contexto.config.carregar().garantias,
-        dias_contrato=contrato.garantia_dias if contrato else None,
+        dias_contrato=dias_de_garantia(contexto, contrato),  # 23.6
     )
     contexto.garantias.salvar_garantia(pedido.id, garantia)
 
@@ -389,6 +394,7 @@ def _dados_out(
     *,
     fotos_urls: list[str] | None = None,
     convidado_id: str | None = None,
+    mostrar_endereco: bool = True,
 ) -> DadosPedidoOut:
     return DadosPedidoOut(
         titulo=d.titulo,
@@ -398,7 +404,7 @@ def _dados_out(
         faixa_preco_min_centavos=d.faixa_preco_min_centavos,
         faixa_preco_max_centavos=d.faixa_preco_max_centavos,
         urgente=d.urgente,
-        endereco=EnderecoIn(**asdict(d.endereco)) if d.endereco else None,
+        endereco=EnderecoIn(**asdict(d.endereco)) if d.endereco and mostrar_endereco else None,
         modalidade=d.modalidade,
         fotos_urls=list(fotos_urls or ()),
         profissional_convidado_id=d.profissional_convidado_id or convidado_id,
@@ -419,10 +425,17 @@ def ver_dados_do_pedido(
     if dados is None:
         raise HTTPException(404, "Este pedido não tem descrição gravada.")
     convidado_id = contexto.extras.get("pedidos_convidados", {}).get(pedido.id)
+    # 9.6: com contato bloqueado, o endereço completo do cliente fica oculto ao profissional.
+    ocultar_endereco = (
+        usuario.id == pedido.profissional_id
+        and usuario.id != pedido.cliente_id
+        and contato_bloqueado(contexto, pedido.cliente_id, usuario.id)
+    )
     return _dados_out(
         dados,
         fotos_urls=urls_fotos_do_pedido(request, pedido.id),
         convidado_id=convidado_id,
+        mostrar_endereco=not ocultar_endereco,
     ).model_copy(update={"respostas": respostas_out(contexto, pedido.id)})
 
 
@@ -638,6 +651,18 @@ def mudar_estado(
             disputa = contexto.disputas.obter(pedido.id)
             if disputa is not None and not disputa.encerrada:
                 contexto.disputas.salvar(pedido.id, disputa.encerrar_por_acordo())
+        if acao is Acao.CANCELAR and transicao.evento.ator.papel is Papel.PROFISSIONAL:
+            contexto.cancelamentos.registrar(
+                Cancelamento(
+                    pedido_id=gravado.id,
+                    solicitado_por=usuario.id,
+                    tipo="cancelamento_profissional",
+                    status="cancelado_sem_retencao",
+                    recebido_em=transicao.evento.em,
+                    motivo=getattr(prova, "motivo", "") or "",
+                    papel="profissional",
+                )
+            )
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, acao, contexto)
         if acao is Acao.REGISTRAR_CLIENTE_AUSENTE:
@@ -709,10 +734,11 @@ def _disputa_out(contexto: Contexto, pedido_id: str, d: disputas.Disputa) -> Dis
         motivo=d.motivo.value,
         valor_congelado_centavos=d.valor_congelado,
         aberta_em=d.aberta_em,
-        resposta_ate=d.prazos.resposta_ate,
+        resposta_ate=disputa_vigente(contexto, d).prazos.resposta_ate,
         decisao_ate=d.prazos.decisao_ate,
         respondida_em=d.respondida_em,
         sem_resposta=d.sem_resposta,
+        resultado_esperado=d.resultado_esperado,
     )
 
 
@@ -757,9 +783,15 @@ def abrir_disputa(
         agora,
         contexto.config.carregar().disputas,
     )
+    if not disputa.abertura_dentro_da_janela_de_congelamento and agora <= fim_do_congelamento(
+        contexto, pedido.concluido_em or agora
+    ):
+        disputa = replace(disputa, abertura_dentro_da_janela_de_congelamento=True)  # 22.3
+    disputa = replace(disputa, resultado_esperado=corpo.resultado_esperado)  # 8.4
     with contexto.transacao():  # o pedido primeiro: a disputa lê a descrição do histórico dele
         contexto.pedidos.salvar(transicao.pedido, transicao.evento)
         contexto.disputas.salvar(pedido.id, disputa)
+        contexto.checkout_sem_codigo.responder(pedido.id, RELATOU, agora)  # 5.7
     avisar_partes(
         contexto,
         EventoAviso.DISPUTA_ABERTA,
@@ -861,7 +893,9 @@ def responder_disputa(
             raise HTTPException(422, "Informe o valor do reembolso parcial.")
         if corpo.reembolso_parcial_centavos >= disputa.valor_congelado:
             raise HTTPException(422, "O reembolso parcial precisa ser menor que o valor retido.")
-    nova = disputa.responder(disputas.Ator.PROFISSIONAL, contexto.agora())
+    vigente = disputa_vigente(contexto, disputa)  # 22.3
+    nova = vigente.responder(disputas.Ator.PROFISSIONAL, contexto.agora())
+    nova = replace(nova, prazos=disputa.prazos)
     itens = _evidencias_da_resposta(corpo)
     with contexto.transacao():
         contexto.disputas.salvar(pedido_id, nova)
@@ -924,7 +958,9 @@ def pedir_retrabalho(
     if garantia is None and pedido.concluido_em is not None:
         contrato = contexto.contratos.obter_do_pedido(pedido.id)
         categoria = contrato.categoria_id if contrato else None
-        garantia = abrir_garantia(pedido.concluido_em, categoria, cfg.garantias)
+        garantia = abrir_garantia(
+            pedido.concluido_em, categoria, cfg.garantias, dias_de_garantia(contexto, contrato)
+        )
     prazos = cfg.prazos_pedido
     if garantia is not None:
         prazos = replace(prazos, garantia=timedelta(days=garantia.dias))
@@ -1055,3 +1091,90 @@ def atender_retrabalho(
         for gancho in contexto.apos_transicao:
             gancho(pedido, gravado, Acao.RESOLVER_RETRABALHO, contexto)
     return _retrabalho_visivel(contexto, pedido, usuario, novo)
+
+
+_TRAVA_SUBSTITUICAO = threading.RLock()
+
+
+def _cancelado_por_profissional(contexto: Contexto, pedido: Pedido) -> bool:
+    if pedido.estado is not Estado.CANCELADO:
+        return False
+    for ev in contexto.pedidos.eventos(pedido.id):
+        if ev.acao is Acao.REGISTRAR_AUSENCIA:
+            return True
+        if ev.acao is Acao.CANCELAR and ev.ator.papel is Papel.PROFISSIONAL:
+            return True
+    cancel = contexto.cancelamentos.do_pedido(pedido.id)
+    return cancel is not None and cancel.tipo == "cancelamento_profissional"
+
+
+@router.post(
+    "/{pedido_id}/substituir",
+    response_model=PedidoOut,
+    status_code=201,
+    summary="Criar pedido de substituição após falta ou cancelamento do profissional (Termos 7.7)",
+    dependencies=[Depends(exigir_maioridade)],
+)
+def substituir_pedido(
+    pedido_id: str,
+    request: Request,
+    usuario: Usuario = Depends(exigir_papel(PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL)),
+    contexto: Contexto = Depends(obter_contexto),
+) -> PedidoOut:
+    travar = getattr(contexto.pedidos, "travar", None)
+    with _TRAVA_SUBSTITUICAO if travar is None else contextlib.nullcontext():
+        with contexto.transacao():
+            original = contexto.pedidos.obter(pedido_id)
+            if original is None:
+                raise HTTPException(404, "Pedido não encontrado.")
+            if travar is not None:
+                travar(original.id)
+            original = contexto.pedidos.obter(pedido_id)
+            if original is None:
+                raise HTTPException(404, "Pedido não encontrado.")
+            if original.cliente_id != usuario.id:
+                raise HTTPException(
+                    403, "Só o cliente dono do pedido pode solicitar substituição."
+                )
+            if not _cancelado_por_profissional(contexto, original):
+                raise HTTPException(
+                    409,
+                    "Só é possível substituir um pedido cancelado pelo profissional ou por "
+                    "ausência dele.",
+                )
+            if contexto.pedidos.ja_substituido(original.id):
+                raise HTTPException(409, "Este pedido já possui um pedido de substituição.")
+            dados_orig = contexto.pedidos.dados_do_pedido(original.id)
+            dados_copia = (
+                replace(dados_orig, profissional_convidado_id=None)
+                if dados_orig is not None
+                else None
+            )
+            novo = replace(
+                estados.abrir_pedido(
+                    uuid.uuid4().hex, Ator(Papel.CLIENTE, usuario.id), contexto.agora()
+                ),
+                substitui_pedido_id=original.id,
+            )
+            gravado = contexto.pedidos.salvar(novo, None, dados_copia)
+    if dados_copia is not None and dados_copia.urgente:
+        avisar_pedido_urgente(
+            request,
+            contexto,
+            pedido_id=gravado.id,
+            categoria_id=dados_copia.categoria_id,
+            cliente_id=usuario.id,
+            titulo_pedido=dados_copia.titulo,
+        )
+    elif dados_copia is not None:
+        avisar_pedido_novo(
+            request,
+            contexto,
+            pedido_id=gravado.id,
+            categoria_id=dados_copia.categoria_id,
+            cidade_id=dados_copia.cidade_id,
+            bairro=dados_copia.bairro,
+            cliente_id=usuario.id,
+            remoto=dados_copia.modalidade == "remoto",
+        )
+    return pedido_out(gravado, usuario)

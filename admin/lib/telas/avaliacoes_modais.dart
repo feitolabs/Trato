@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../componentes/base.dart';
 import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
+import '../nucleo/formato.dart';
 import '../tema/tema.dart';
 import 'avaliacoes_tela.dart';
 
@@ -12,10 +13,52 @@ Future<bool> abrirDecidirRevisao(BuildContext context, RevisaoAvaliacao r) async
 Future<bool> abrirOcultarAvaliacao(BuildContext context, {String avaliacaoId = ''}) async =>
     await mostrarModal<bool>(context, largura: 560, construir: (_) => _ModalOcultarAvaliacao(avaliacaoId)) ?? false;
 
+Future<void> abrirAvisarAutor(BuildContext context) =>
+    mostrarModal<bool>(context, largura: 560, construir: (_) => const _ModalAvisarAutor());
+
 Future<bool> abrirReverterOcultacao(BuildContext context, {String avaliacaoId = ''}) async =>
     await mostrarModal<bool>(context, largura: 560, construir: (_) => _ModalReverterOcultacao(avaliacaoId)) ?? false;
 
+const _avisoNaoSaiu =
+    'O aviso ao autor não saiu. Use "Avisar o autor" em Avaliações para tentar de novo.';
+
 mixin _EnvioAvaliacao<T extends StatefulWidget> on State<T> {
+  /// Termos 11.8: o padrão é avisar o autor na hora.
+  bool adiarAviso = false;
+  final justificativaAdiamento = TextEditingController();
+
+  String? get justificativaSeAdiar => adiarAviso ? justificativaAdiamento.text.trim() : null;
+  bool get adiamentoValido => !adiarAviso || justificativaAdiamento.text.trim().length >= kMotivoMinimo;
+
+  @override
+  void dispose() {
+    justificativaAdiamento.dispose();
+    super.dispose();
+  }
+
+  List<Widget> camposAdiamento() => [
+        const SizedBox(height: EspacosTrato.x3),
+        Material(
+          type: MaterialType.transparency,
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Adiar o aviso ao autor', style: TipografiaTrato.corpo),
+            subtitle: Text('Só quando avisar atrapalha investigação de crime ou põe alguém em risco (Termos 11.8).',
+                style: TipografiaTrato.legenda),
+            value: adiarAviso,
+            onChanged: (v) => setState(() => adiarAviso = v),
+          ),
+        ),
+        if (adiarAviso)
+          texto('Justificativa do adiamento (auditoria)', justificativaAdiamento,
+              linhas: 2, maximo: 1000, ajuda: 'Pelo menos $kMotivoMinimo caracteres'),
+      ];
+
+  List<Widget> revisaoDoAviso() => [
+        Linha('Aviso ao autor', adiarAviso ? 'Adiado: envie depois em "Avisar o autor"' : 'Enviado agora'),
+        if (adiarAviso) Linha('Justificativa do adiamento', justificativaAdiamento.text.trim()),
+      ];
+
   bool enviando = false;
   bool revisando = false;
   String? erro;
@@ -132,6 +175,9 @@ class _ModalDecidirRevisaoState extends State<_ModalDecidirRevisao> with _EnvioA
   final _mesmoAnalista = TextEditingController();
 
   bool get _exigeOcultarMotivo => _status == 'aceita' && widget.revisao.tipo == 'revisao';
+  /// Só há aviso a adiar quando aceitar cria a ocultação.
+  bool get _podeAdiar => _exigeOcultarMotivo;
+
   bool get _permiteMesmoAnalista => _status == 'aceita' && widget.revisao.tipo == 'contestacao_ocultacao';
 
   @override
@@ -154,7 +200,7 @@ class _ModalDecidirRevisaoState extends State<_ModalDecidirRevisao> with _EnvioA
               : 'Aceitar o pedido de revisão oculta a avaliação pelo motivo escolhido (Termos 12.6).')
           : 'Recusar mantém a avaliação como está e registra a resposta para o solicitante.',
       verbo: 'Confirmar decisão',
-      valido: resp.length >= kMotivoMinimo && !mesmoInvalido,
+      valido: resp.length >= kMotivoMinimo && !mesmoInvalido && (!_podeAdiar || adiamentoValido),
       confirmar: () => enviar(() async {
         await context.api.decidirRevisaoAvaliacao(
           widget.revisao.id,
@@ -162,6 +208,7 @@ class _ModalDecidirRevisaoState extends State<_ModalDecidirRevisao> with _EnvioA
           resposta: resp,
           ocultarMotivo: _exigeOcultarMotivo ? _ocultarMotivo : null,
           mesmoAnalistaJustificativa: _permiteMesmoAnalista && mesmo.isNotEmpty ? mesmo : null,
+          justificativaAdiamento: _podeAdiar ? justificativaSeAdiar : null,
         );
         return 'Decisão registrada.';
       }),
@@ -180,6 +227,7 @@ class _ModalDecidirRevisaoState extends State<_ModalDecidirRevisao> with _EnvioA
             ajuda: 'Exigida se você mesmo ocultou a avaliação (Termos 20.5)',
             falha: mesmoInvalido ? 'Escreva ao menos $kMotivoMinimo caracteres ou deixe em branco' : null,
           ),
+        if (_podeAdiar) ...camposAdiamento(),
       ],
       revisao: [
         Linha('Decisão', _status == 'aceita' ? 'Aceitar pedido' : 'Recusar pedido'),
@@ -187,6 +235,9 @@ class _ModalDecidirRevisaoState extends State<_ModalDecidirRevisao> with _EnvioA
           Linha('Motivo da ocultação', rotuloAvaliacao(kMotivosOcultacaoAvaliacao, _ocultarMotivo)),
         Linha('Resposta', resp),
         if (_permiteMesmoAnalista && mesmo.isNotEmpty) Linha('Justificativa do mesmo analista', mesmo),
+        if (_podeAdiar) ...revisaoDoAviso(),
+        if (_podeAdiar)
+          const BannerInfo('Se a avaliação já estiver oculta, a decisão não envia aviso novo.'),
       ],
     );
   }
@@ -221,20 +272,24 @@ class _ModalOcultarAvaliacaoState extends State<_ModalOcultarAvaliacao> with _En
       consequencia: 'A avaliação deixa de aparecer no aplicativo e a ocultação fica registrada na auditoria.',
       verbo: 'Confirmar ocultação',
       destrutivo: true,
-      valido: id.isNotEmpty && exp.length >= kMotivoMinimo,
+      valido: id.isNotEmpty && exp.length >= kMotivoMinimo && adiamentoValido,
       confirmar: () => enviar(() async {
-        await context.api.ocultarAvaliacao(id, motivo: _motivo, explicacao: exp);
-        return 'Avaliação ocultada.';
+        final o = await context.api.ocultarAvaliacao(id,
+            motivo: _motivo, explicacao: exp, justificativaAdiamento: justificativaSeAdiar);
+        if (adiarAviso) return 'Avaliação ocultada. O aviso ao autor foi adiado.';
+        return o.autorAvisadoEm == null ? 'Avaliação ocultada. $_avisoNaoSaiu' : 'Avaliação ocultada.';
       }),
       formulario: [
         texto('Código da avaliação', _avaliacaoId, maximo: 64),
         escolha('Motivo', _motivo, kMotivosOcultacaoAvaliacao, (v) => _motivo = v),
         texto('Explicação', _explicacao, linhas: 3, maximo: 2000, ajuda: 'Pelo menos $kMotivoMinimo caracteres'),
+        ...camposAdiamento(),
       ],
       revisao: [
         Linha('Avaliação', id),
         Linha('Motivo', rotuloAvaliacao(kMotivosOcultacaoAvaliacao, _motivo)),
         Linha('Explicação', exp),
+        ...revisaoDoAviso(),
       ],
     );
   }
@@ -280,6 +335,43 @@ class _ModalReverterOcultacaoState extends State<_ModalReverterOcultacao> with _
         Linha('Avaliação', id),
         Linha('Motivo', mot),
       ],
+    );
+  }
+}
+
+class _ModalAvisarAutor extends StatefulWidget {
+  const _ModalAvisarAutor();
+
+  @override
+  State<_ModalAvisarAutor> createState() => _ModalAvisarAutorState();
+}
+
+class _ModalAvisarAutorState extends State<_ModalAvisarAutor> with _EnvioAvaliacao {
+  final _avaliacaoId = TextEditingController();
+
+  @override
+  void dispose() {
+    _avaliacaoId.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = _avaliacaoId.text.trim();
+    return montar(
+      titulo: revisando ? 'Enviar o aviso ao autor?' : 'Avisar o autor',
+      consequencia: 'Envia o aviso que foi adiado ou que falhou, com o motivo e como contestar (Termos 11.8).',
+      verbo: 'Enviar aviso',
+      valido: id.isNotEmpty,
+      confirmar: () => enviar(() async {
+        final o = await context.api.avisarAutorAvaliacao(id);
+        final quando = o.autorAvisadoEm;
+        return quando == null
+            ? 'O servidor não confirmou o aviso ao autor.'
+            : 'Autor avisado em ${formatarData(quando)}.';
+      }),
+      formulario: [texto('Código da avaliação', _avaliacaoId, maximo: 64)],
+      revisao: [Linha('Avaliação', id)],
     );
   }
 }

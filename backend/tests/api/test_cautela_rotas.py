@@ -5,6 +5,7 @@ de contato, e a preservação segura a remoção de arquivos. HTTP, memória e p
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 
 from conftest import AGORA, CLIENTE, PROFISSIONAL, cab
@@ -14,6 +15,7 @@ from test_contraproposta import _contra, _pedido_com_orcamento
 from test_fluxo_pagamento_e2e import fluxo  # noqa: F401
 
 from trato.api.cautela import CONTATO_BLOQUEADO
+from trato.api.repositorios import DadosPedido, EnderecoPedido
 from trato.pedidos.estados import Estado
 from trato.persistencia.incidentes import Incidente
 from trato.uploads import ArmazenamentoFake
@@ -206,3 +208,72 @@ def test_preservacao_adia_a_remocao_de_arquivos_ate_encerrar(fluxo):
     saida = servico.processar_vencidas(fluxo.ctx.agora())
     assert "arquivos_pendentes" not in saida, saida
     assert guardados() == set() and servico._r.fonte.limpezas_pendentes() == []
+
+
+# --- endereço completo do cliente: ocultado ao profissional com contato bloqueado (9.6) ----------
+
+
+def _gravar_endereco(ctx, pedido_id: str) -> None:
+    atual = ctx.pedidos.dados_do_pedido(pedido_id)
+    endereco = EnderecoPedido(
+        logradouro="Rua das Flores",
+        numero="123",
+        bairro="Centro",
+        cep="01001000",
+        complemento="Apto 4",
+        referencia="Portão azul",
+    )
+    if atual is None:
+        novos = DadosPedido(
+            categoria_id="cat-1",
+            cidade_id="cid-1",
+            titulo="Reparo elétrico",
+            descricao="Trocar disjuntor",
+            bairro="Centro",
+            endereco=endereco,
+        )
+    else:
+        novos = replace(atual, bairro="Centro", endereco=endereco)
+    ctx.pedidos.atualizar_dados(pedido_id, CLIENTE.id, novos)
+
+
+def test_endereco_ocultado_para_profissional_com_contato_bloqueado(fluxo):
+    pid, _ = pedido_marcado(fluxo)
+    _gravar_endereco(fluxo.ctx, pid)
+
+    # Sem bloqueio: endereço liberado aparece para o profissional
+    r = fluxo.amb.cliente.get(f"/v1/pedidos/{pid}/dados", headers=cab("t-prof"))
+    assert r.status_code == 200, r.text
+    assert r.json()["endereco"]["logradouro"] == "Rua das Flores"
+    assert r.json()["endereco"]["numero"] == "123"
+    assert r.json()["bairro"] == "Centro"
+
+    # Com bloqueio de contato (9.6): ocultado para o profissional, mantido para o cliente
+    iid = incidente(fluxo.ctx, pid, "bloquear_contato")
+    r_prof = fluxo.amb.cliente.get(f"/v1/pedidos/{pid}/dados", headers=cab("t-prof"))
+    assert r_prof.status_code == 200, r_prof.text
+    assert r_prof.json()["endereco"] is None
+    assert "Rua das Flores" not in r_prof.text
+    assert r_prof.json()["bairro"] == "Centro"
+
+    r_cli = fluxo.amb.cliente.get(f"/v1/pedidos/{pid}/dados", headers=cab("t-cliente"))
+    assert r_cli.status_code == 200, r_cli.text
+    assert r_cli.json()["endereco"]["logradouro"] == "Rua das Flores"
+
+    # Após encerrar o incidente: volta a aparecer para o profissional
+    encerrar(fluxo.ctx, iid)
+    r_depois = fluxo.amb.cliente.get(f"/v1/pedidos/{pid}/dados", headers=cab("t-prof"))
+    assert r_depois.status_code == 200, r_depois.text
+    assert r_depois.json()["endereco"]["logradouro"] == "Rua das Flores"
+
+
+def test_endereco_ocultado_em_outro_pedido_do_mesmo_par_com_contato_bloqueado(fluxo):
+    fluxo.amb.semear_pedido(Estado.CONCLUIDO, id="ped-outro", concluido_em=AGORA)
+    pid, _ = pedido_marcado(fluxo)
+    _gravar_endereco(fluxo.ctx, pid)
+
+    incidente(fluxo.ctx, "ped-outro", "bloquear_contato")
+    r = fluxo.amb.cliente.get(f"/v1/pedidos/{pid}/dados", headers=cab("t-prof"))
+    assert r.status_code == 200, r.text
+    assert r.json()["endereco"] is None
+    assert "Rua das Flores" not in r.text

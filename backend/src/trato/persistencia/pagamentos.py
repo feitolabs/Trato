@@ -38,7 +38,7 @@ from trato.pagamentos.parcelamento import ConfigParcelamento
 from trato.persistencia.comum import como_uuid, exigir_uuid
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import parametros_globais, versao_vigente
-from trato.persistencia.erros import NaoEncontrado
+from trato.persistencia.erros import INDICE_ADITIVO_PAGO, NaoEncontrado
 
 _MEIO_PARA_BANCO = {MeioPagamento.PIX: "pix", MeioPagamento.CARTAO: "cartao_credito"}
 _STATUS_PARA_BANCO = {
@@ -159,6 +159,19 @@ class CobrancasPostgres:
             ).fetchall()
         return [self._montar_cobranca(linha) for linha in linhas]
 
+    def confirmar_de_aditivo(self, cobranca: CobrancaLocal) -> bool:
+        """Grava a confirmação num ponto de retorno. False: o banco já tem outro pagamento
+        deste aditivo (20261127185000); a transação de fora continua boa para devolver."""
+        with self._banco.transacao() as con:
+            try:
+                with con.transaction():
+                    self.salvar(cobranca)
+            except psycopg.errors.UniqueViolation as erro:
+                if erro.diag.constraint_name != INDICE_ADITIVO_PAGO:
+                    raise
+                return False
+        return True
+
     def encerrar_contrato(self, pedido_id: str) -> None:
         """Nada a gravar: a marca vem do contrato de cada cobrança (`contratos.status`)."""
 
@@ -230,7 +243,11 @@ class AditivosPostgres:
     _SELECT = (
         "select a.id, c.pedido_id, a.motivo, a.valor_centavos, a.status, a.criado_em, "
         "a.decidido_em, exists (select 1 from public.pagamentos p where p.aditivo_id = a.id "
-        "and p.status in ('confirmado', 'reembolsado_parcial', 'reembolsado')) as pago "
+        # Os status do índice da 185000. 'reembolsado' só vale como pago se a cobrança entrou
+        # no livro (paga e depois devolvida); a órfã, devolvida na chegada, nunca contou.
+        "and (p.status in ('confirmado', 'reembolsado_parcial', 'contestado') "
+        "or (p.status = 'reembolsado' and exists (select 1 from public.lancamentos l "
+        "where l.chave_idempotencia = 'cob/' || p.stripe_payment_intent_id)))) as pago "
         "from public.aditivos a join public.contratos c on c.id = a.contrato_id "
     )
 
@@ -318,7 +335,7 @@ class OrdensEstornoPostgres:
 
     _SELECT = (
         "select o.chave_idempotencia, c.pedido_id, p.stripe_payment_intent_id, o.valor_centavos, "
-        "o.criada_em, o.estado, o.provedor_estorno_id from public.ordens_estorno o "
+        "o.criada_em, o.estado, o.provedor_estorno_id, o.enviada_em from public.ordens_estorno o "
         "join public.pagamentos p on p.id = o.pagamento_id "
         "join public.contratos c on c.id = o.contrato_id "
     )
@@ -333,6 +350,7 @@ class OrdensEstornoPostgres:
             linha["criada_em"],
             linha["estado"],
             linha["provedor_estorno_id"],
+            linha["enviada_em"],
         )
 
     def salvar(self, ordem: OrdemEstorno) -> None:

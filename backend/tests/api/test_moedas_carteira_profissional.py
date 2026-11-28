@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 from conftest import AGORA, CLIENTE, PROFISSIONAL, cab
+from psycopg.errors import UndefinedColumn
 
 from trato.agendador.executor import ExecutorContexto
 from trato.api.moedas import (
@@ -362,7 +363,7 @@ class _Con:
         self.sqls.append(sql)
         for coluna in self.faltam:
             if coluna in sql:
-                raise RuntimeError(f'column "{coluna}" does not exist')
+                raise UndefinedColumn(f'column "{coluna}" does not exist')
         if "select 1" in sql:  # `existe`: nenhuma linha
             self._linha = None
             return self

@@ -257,6 +257,9 @@ class AbrirDisputaIn(_Entrada):
     motivo: MotivoDisputa
     descricao: str
     fotos: list[FotoIn] = []
+    resultado_esperado: Literal["retrabalho", "reembolso_parcial", "reembolso_total"] | None = (
+        Field(None, description="8.4: o que o cliente espera. Não muda depois.")
+    )
 
 
 class RespostaDisputaIn(_Entrada):
@@ -331,6 +334,13 @@ class PedidoOut(BaseModel):
         description=(
             "Verdadeiro quando o check-out foi feito sem código do cliente e exige confirmação "
             "explícita para liberar o pagamento."
+        ),
+    )
+    substitui_pedido_id: str | None = Field(
+        None,
+        description=(
+            "ID do pedido original substituído após falta ou cancelamento do profissional "
+            "(Termos 7.7)."
         ),
     )
 
@@ -424,6 +434,9 @@ class DisputaOut(BaseModel):
     decisao_ate: datetime
     respondida_em: datetime | None
     sem_resposta: bool
+    resultado_esperado: str | None = Field(
+        None, description="8.4: o que o cliente pediu ao abrir; null se não informou."
+    )
     descricao: str | None = Field(
         None, description="O relato do cliente ao abrir (só em `GET .../disputa`)."
     )

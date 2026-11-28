@@ -125,3 +125,31 @@ def test_copia_do_backend_igual_a_do_app_na_mesma_versao():
     atual = legal.VERSOES[-1]
     if f"**Versão {atual.versao} " in texto:
         assert atual.texto() == texto
+
+
+def test_versao_gravada_no_contrato_prevalece_sobre_a_data(adm):
+    """BE-VERSAO-23.6: mesmo com data anterior à vigência de 1.1, a versão gravada prevalece."""
+    pid = _semear(adm, pago_em=datetime(2026, 11, 10, 12, 0, tzinfo=UTC), pid="ped-236-ok")
+    adm.contexto.contratos.salvar(
+        Contrato(pid, CLIENTE.id, PROFISSIONAL.id, 12_345, termos_versao="1.1")
+    )
+    corpo = _get(adm, pid).json()
+    assert corpo["termos_disponiveis"] is True
+    assert corpo["termos_versao"] == "1.1"
+    assert corpo["termos_url"] == f"/v1/pedidos/{pid}/contratacao/termos.pdf"
+    assert _get(adm, pid, "/termos.pdf").status_code == 200
+    assert b"1.1" in _get(adm, pid, "/comprovante.pdf").content
+
+
+def test_versao_gravada_ausente_no_servidor_nao_cai_em_outra_versao(adm):
+    """BE-VERSAO-23.6: se o contrato gravou versão sem texto local, não entrega outra no lugar."""
+    pid = _semear(adm, pago_em=PAGO_EM, pid="ped-236-antiga")
+    adm.contexto.contratos.salvar(
+        Contrato(pid, CLIENTE.id, PROFISSIONAL.id, 12_345, termos_versao="0.9")
+    )
+    corpo = _get(adm, pid).json()
+    assert corpo["termos_versao"] == "0.9"
+    assert corpo["termos_disponiveis"] is False
+    assert corpo["termos_url"] is None
+    assert _get(adm, pid, "/termos.pdf").status_code == 404
+    assert b"0.9" in _get(adm, pid, "/comprovante.pdf").content

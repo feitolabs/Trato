@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../telas/avaliacao_ocultada/revisao_ocultacao.dart';
 import '../telas/compensacoes/modelos.dart';
 import '../telas/contestacao_decisao/modelos.dart';
 import '../telas/medidas/modelos.dart';
@@ -17,6 +18,8 @@ import '../dispositivo/servico_camera.dart';
 import '../dispositivo/servico_localizacao.dart';
 import '../telas/aditivo/aditivo.dart';
 import '../telas/disputa_acordo/acordo.dart';
+import '../telas/disputa_acordo/pedidos_info.dart';
+import '../telas/pedidos/forca_maior.dart';
 import '../telas/disputa_profissional/disputa.dart';
 import '../telas/lgpd/modelos.dart';
 import '../telas/mensagens/modelos.dart';
@@ -55,6 +58,8 @@ class RepositoriosTrato {
     this.capturaVerificacao,
     this.disputaProfissional,
     this.acordoDisputa,
+    this.pedidosInfoDisputa,
+    this.forcaMaior,
     this.cadastroProfissional,
     this.perfilPublico,
     this.primeirosPassos,
@@ -66,6 +71,7 @@ class RepositoriosTrato {
     this.cep,
     this.sac,
     this.medidas,
+    this.revisaoOcultacao,
     this.compensacoes,
     this.contestacaoDecisao,
     this.mensagens,
@@ -80,6 +86,12 @@ class RepositoriosTrato {
 
   /// Proposta de devolução e acordo da disputa (Termos 8.2).
   final ServicoAcordoDisputa? acordoDisputa;
+
+  /// Pedidos de informação adicional na disputa (Termos 8.4).
+  final ServicoPedidosInfoDisputa? pedidosInfoDisputa;
+
+  /// Solicitações de isenção por força maior no pedido (Termos 7.8 e 22.6).
+  final ServicoForcaMaior? forcaMaior;
   final ServicoCadastroProfissional? cadastroProfissional;
   final ServicoPerfilPublico? perfilPublico;
 
@@ -101,6 +113,9 @@ class RepositoriosTrato {
 
   /// Medidas da conta (`/v1/me/medidas`). Nulo = demonstração.
   final ServicoMedidas? medidas;
+
+  /// Revisão de avaliação ocultada (Termos 11.8). Nulo = demonstração.
+  final ServicoRevisaoOcultacao? revisaoOcultacao;
 
   /// Compensações do profissional (`/v1/me/compensacoes`). Nulo = demonstração.
   final ServicoCompensacoes? compensacoes;
@@ -163,6 +178,8 @@ class RepositoriosTrato {
       verificacao: ServicoVerificacaoApi(api),
       disputaProfissional: ServicoDisputaProfissionalApi(api, upload: upload),
       acordoDisputa: ServicoAcordoDisputaApi(api),
+      pedidosInfoDisputa: ServicoPedidosInfoDisputaApi(api),
+      forcaMaior: ServicoForcaMaiorApi(api),
       cadastroProfissional: ServicoCadastroProfissionalApi(api, upload: upload),
       perfilPublico: ServicoPerfilPublicoApi(api),
       primeirosPassos: ServicoPrimeirosPassosApi(api),
@@ -174,6 +191,7 @@ class RepositoriosTrato {
       cep: ServicoCepApi(api),
       sac: ServicoSacApi(api),
       medidas: ServicoMedidasApi(api),
+      revisaoOcultacao: ServicoRevisaoOcultacaoApi(api),
       compensacoes: ServicoCompensacoesApi(api),
       contestacaoDecisao: ServicoContestacaoDecisaoApi(api, upload: upload),
       capturaVerificacao:

@@ -44,6 +44,7 @@ class ClienteApi {
         ..headers['Accept'] = 'application/pdf, */*';
       final efetivo = sessao.token;
       if (efetivo != null && efetivo.isNotEmpty) {
+        pedido.headers.addAll(sessao.cabecalhosDoAparelho);
         pedido.headers['Authorization'] = 'Bearer $efetivo';
       }
       return await http.Response.fromStream(await _cliente.send(pedido).timeout(tempoLimite));
@@ -96,6 +97,20 @@ class ClienteApi {
         token: token,
       );
 
+  /// `POST /v1/me/acessos`. Fora do caminho comum de propósito: um 401 aqui não renova nem
+  /// expira a sessão (a renovação geraria outro aviso, em laço).
+  Future<void> enviarAcesso(String evento, String token) async {
+    final pedido = http.Request('POST', _uri('/v1/me/acessos', null))
+      ..headers.addAll({
+        ...sessao.cabecalhosDoAparelho,
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json; charset=utf-8',
+      })
+      ..body = jsonEncode({'evento': evento});
+    await http.Response.fromStream(await _cliente.send(pedido));
+  }
+
   Future<Object?> patch(String caminho, {Object? corpo}) => _enviar('PATCH', caminho, corpo: corpo);
 
   Future<Object?> put(String caminho, {Object? corpo}) => _enviar('PUT', caminho, corpo: corpo);
@@ -121,6 +136,7 @@ class ClienteApi {
         ..headers['Accept'] = 'application/json';
       final efetivo = token ?? sessao.token;
       if (efetivo != null && efetivo.isNotEmpty) {
+        pedido.headers.addAll(sessao.cabecalhosDoAparelho);
         pedido.headers['Authorization'] = 'Bearer $efetivo';
       }
       if (chaveIdempotencia != null) {
@@ -237,9 +253,15 @@ class ClienteApi {
       // A sessão é expirada (e o cache limpo) por quem chama, com await.
       throw ErroTrato.sessaoExpirada;
     }
-    if (codigo == 403 && sessao.logada && _codigoErro(resposta) == 'conta_bloqueada') {
-      // Conta bloqueada não é sessão vencida: sem logout. O erro segue para quem chamou.
-      sessao.aoBloquear?.call(_detalhe(resposta));
+    if (codigo == 403 && sessao.logada) {
+      final codErro = _codigoErro(resposta);
+      if (codErro == 'conta_bloqueada') {
+        // Conta bloqueada não é sessão vencida: sem logout. O erro segue para quem chamou.
+        sessao.aoBloquear?.call(_detalhe(resposta));
+      } else if (codErro == 'conta_inativa') {
+        // Termos 4.9: conta inativa continua logada para reativar gratuitamente ou falar com suporte.
+        sessao.aoInativar?.call(_detalhe(resposta));
+      }
     }
     if (codigo == 404) {
       throw ErroTrato(

@@ -92,13 +92,13 @@ def test_libera_so_o_que_passa_do_limite_uma_vez_e_o_resto_ao_vencer(amb):
     assert saldo(amb) == (0, VALOR) and repasses(amb) == 2
 
 
-def test_duas_travas_nao_somam_vale_a_mais_recente(amb):
+def test_duas_travas_nao_somam_vale_o_maior_limite(amb):
     concluido(amb)
     travar(amb, 60_000, motivo="Primeira apuração.")
     amb.relogio.avancar(minutes=1)
     travar(amb, 10_000, motivo="Prejuízo revisto.")
     liberar(amb)
-    assert saldo(amb) == (10_000, VALOR - 10_000)
+    assert saldo(amb) == (60_000, VALOR - 60_000)
 
 
 def test_repetir_compara_fraude_e_limite(amb):

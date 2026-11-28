@@ -1,3 +1,4 @@
+import '../comuns/contagem_avaliacoes.dart';
 import 'package:flutter/material.dart';
 
 import '../../componentes/componentes.dart';
@@ -67,7 +68,8 @@ class PerfilProfissionalTela extends StatelessWidget {
                         children: [
                           Text(p.nome, style: TipografiaTrato.tituloGrande),
                           const SizedBox(height: EspacosTrato.x1),
-                          if (p.verificacao.isNotEmpty) SeloVerificacao(p.verificacao),
+                          if (p.verificacao.isNotEmpty)
+                            SeloVerificacao(p.verificacao, conferidoEm: p.seloConferidoEm),
                           const SizedBox(height: EspacosTrato.x1),
                           ChipsCategorias(categorias: p.especialidade),
                           const SizedBox(height: EspacosTrato.x1),
@@ -82,21 +84,29 @@ class PerfilProfissionalTela extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: EspacosTrato.x5),
-                if (d.totalAvaliacoes == 0 || p.servicosConcluidos == 0)
+                // 12.3: com a contagem do servidor, vale o mínimo; sem ela, como antes.
+                if (p.contagem?.novoNoTrato ??
+                    (d.totalAvaliacoes == 0 || p.servicosConcluidos == 0)) ...[
                   Text(
                     p.verificacao.isNotEmpty
                         ? 'Novo no Trato · Identidade verificada'
                         : 'Novo no Trato',
                     key: const ValueKey('novo-no-trato'),
                     style: TipografiaTrato.corpoForte,
-                  )
-                else
+                  ),
+                  if (p.contagem case final c?)
+                    Text(
+                      '${textoServicosConcluidos(p.servicosConcluidos)} · ${c.textoAvaliacoes}',
+                      key: const ValueKey('contagem-novo'),
+                      style: TipografiaTrato.corpoPequeno,
+                    ),
+                ] else
                   Row(
                     children: [
                       Expanded(
                         child: _Indicador(
                           rotulo: 'Nota',
-                          valor: formatarNota(p.nota),
+                          valor: p.contagem != null && p.nota == 0 ? '—' : formatarNota(p.nota),
                           extra: '(${d.totalAvaliacoes})',
                         ),
                       ),
@@ -165,7 +175,8 @@ class PerfilProfissionalTela extends StatelessWidget {
                 Text(
                   'O selo mostra o que foi conferido no cadastro. Compare os orçamentos e '
                   'converse antes de decidir.',
-                  style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                  style:
+                      TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
                 ),
                 const SizedBox(height: EspacosTrato.x6),
                 Text('Trabalhos', style: TipografiaTrato.titulo),
@@ -335,8 +346,8 @@ class _Indicador extends StatelessWidget {
                   if (extra != null)
                     TextSpan(
                       text: ' $extra',
-                      style:
-                          TipografiaTrato.corpoPequeno.copyWith(color: context.cores.textoSecundario),
+                      style: TipografiaTrato.corpoPequeno
+                          .copyWith(color: context.cores.textoSecundario),
                     ),
                 ],
               ),

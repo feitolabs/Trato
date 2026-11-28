@@ -11,6 +11,7 @@ import 'auth/servico_auth.dart';
 import 'auth/servico_auth_supabase.dart';
 import 'telas/auth/login_tela.dart';
 import 'telas/auth/nova_senha_tela.dart';
+import 'dados/aparelho_do_acesso.dart';
 import 'dados/cliente_api.dart';
 import 'componentes/banner_sem_conexao.dart';
 import 'dados/cache_leitura.dart';
@@ -98,11 +99,19 @@ Future<void> main() async {
       api: config.usaApi ? ClienteApi(urlBase: config.apiUrl, sessao: sessaoTrato) : null,
     );
   }
+  // Termos 14.3: identificação do aparelho nas chamadas com sessão.
+  sessaoTrato.cabecalhosDoAparelho = await carregarCabecalhosDoAparelho();
+  sessaoTrato.enviarAcesso = ClienteApi(urlBase: config.apiUrl, sessao: sessaoTrato).enviarAcesso;
   sessaoTrato.aoExpirar = abrirLoginPorSessaoExpirada;
   // 403 `conta_bloqueada`: tela de bloqueio, sem logout. Sair da conta esquece o bloqueio.
   sessaoTrato.aoBloquear =
       (mensagem) => RotasTrato.contaFoiBloqueada(() => navegadorTrato.currentState, mensagem);
-  sessaoTrato.aoSair.add(() async => RotasTrato.esquecerBloqueio());
+  sessaoTrato.aoInativar =
+      (mensagem) => RotasTrato.contaFoiInativada(() => navegadorTrato.currentState, mensagem);
+  sessaoTrato.aoSair.add(() async {
+    RotasTrato.esquecerBloqueio();
+    RotasTrato.esquecerInatividade();
+  });
   abrirLoginPorSessaoExpiradaHook = abrirLoginPorSessaoExpirada;
   RotasTrato.sessao = sessaoTrato;
   RotasTrato.dispositivo = dispositivoReal(navegador: navegadorTrato);

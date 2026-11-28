@@ -6,6 +6,8 @@ import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
+import 'aviso_tratinhos.dart';
+import 'moedas_usuario_secao.dart';
 
 /// "2026-11" ou "2026-11-01" -> "11/2026". Texto fora do padrão volta como veio.
 String mesDeReferencia(String mesRef) {
@@ -35,21 +37,37 @@ class MoedasTela extends StatefulWidget {
 
 class _MoedasTelaState extends State<MoedasTela> {
   int _versao = 0;
+  ErroApi? _recusa;
 
-  Future<void> _salvar(MoedasConfig nova) async {
+  Future<void> _salvar(MoedasConfig nova, String? avisoReferencia) async {
     final motivo = await pedirMotivo(
       context,
       titulo: 'Salvar a configuração dos Tratinhos?',
-      descricao: 'As novas regras valem para os próximos bônus e descontos. A alteração fica na auditoria.',
+      descricao: 'As novas regras valem para os próximos bônus e descontos. Mudança desfavorável ao usuário '
+          'depende de aviso prévio, e o servidor confere. A alteração fica na auditoria.',
       rotuloConfirmar: 'Salvar configuração',
     );
     if (motivo == null || !mounted) return;
+    setState(() => _recusa = null);
+    final api = context.api;
+    ErroApi? recusa;
     final ok = await executar(
       context,
-      () => context.api.salvarMoedasConfig(nova, motivo: motivo),
+      () async {
+        try {
+          await api.salvarMoedasConfig(nova, motivo: motivo, avisoReferencia: avisoReferencia);
+        } on ErroApi catch (e) {
+          if (e.status == 409) recusa = e;
+          rethrow;
+        }
+      },
       sucesso: 'Configuração dos Tratinhos salva.',
     );
-    if (ok && mounted) setState(() => _versao++);
+    if (!mounted) return;
+    setState(() {
+      _recusa = recusa;
+      if (ok) _versao++;
+    });
   }
 
   @override
@@ -85,6 +103,29 @@ class _MoedasTelaState extends State<MoedasTela> {
                   esqueleto: const SizedBox(height: 320, child: EsqueletoLista(linhas: 3)),
                   construir: (context, c, _) => _FormularioMoedas(config: c, aoSalvar: _salvar),
                 ),
+                if (_recusa case final recusa?) ...[
+                  const SizedBox(height: EspacosTrato.x3),
+                  RecusaDaConfigTratinhos(recusa),
+                ],
+                if (context.pode(Permissao.moedasConfigurar)) ...[
+                  const SizedBox(height: EspacosTrato.x4),
+                  const SecaoTratinhosUsuario(),
+                ],
+                if (context.pode(Permissao.notificacoesEnviar)) ...[
+                  const SizedBox(height: EspacosTrato.x4),
+                  CartaoSecao(
+                    titulo: 'Aviso prévio aos usuários',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Mudança ou fim do programa que piore a vida do usuário pede aviso antes (Termos 13.11).',
+                            style: TipografiaTrato.corpo),
+                        const SizedBox(height: EspacosTrato.x3),
+                        BotaoTrato.secundario('Emitir aviso', aoPressionar: () => abrirAvisoTratinhos(context)),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -216,7 +257,7 @@ class _BarraHoje extends StatelessWidget {
 class _FormularioMoedas extends StatefulWidget {
   const _FormularioMoedas({required this.config, required this.aoSalvar});
   final MoedasConfig config;
-  final Future<void> Function(MoedasConfig nova) aoSalvar;
+  final Future<void> Function(MoedasConfig nova, String? avisoReferencia) aoSalvar;
 
   @override
   State<_FormularioMoedas> createState() => _FormularioMoedasState();
@@ -259,6 +300,7 @@ class _CampoConfig {
 }
 
 class _FormularioMoedasState extends State<_FormularioMoedas> {
+  final _avisoReferencia = TextEditingController();
   late bool _ativo = widget.config.ativo;
   late final Map<String, _CampoConfig> _campos = _montar(widget.config);
   late final Map<String, _CampoConfig> _extras = _montarExtras(widget.config);
@@ -314,6 +356,7 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
 
   @override
   void dispose() {
+    _avisoReferencia.dispose();
     for (final c in [..._campos.values, ..._extras.values]) {
       c.texto.dispose();
     }
@@ -423,11 +466,28 @@ class _FormularioMoedasState extends State<_FormularioMoedas> {
           ],
           if (editavel) ...[
             const SizedBox(height: EspacosTrato.x4),
+            TextField(
+              key: const ValueKey('moedas-aviso-referencia'),
+              controller: _avisoReferencia,
+              maxLength: 60,
+              decoration: const InputDecoration(
+                labelText: 'Referência do aviso prévio (opcional)',
+                helperText: 'Só para mudança desfavorável: a mesma referência do aviso já enviado.',
+                helperMaxLines: 2,
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: EspacosTrato.x4),
             Align(
               alignment: Alignment.centerRight,
               child: BotaoTrato.primario(
                 'Salvar configuração',
-                aoPressionar: _valido ? () => widget.aoSalvar(_montarConfig()) : null,
+                aoPressionar: _valido
+                    ? () {
+                        final ref = _avisoReferencia.text.trim();
+                        widget.aoSalvar(_montarConfig(), ref.isEmpty ? null : ref);
+                      }
+                    : null,
               ),
             ),
           ],

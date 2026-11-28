@@ -94,7 +94,7 @@ def test_segundo_bloqueio_recomeca_do_ultimo_desbloqueio(fluxo):
 
 def test_bloqueio_encerrado_antes_do_check_out_nao_conta(fluxo):
     pid = fluxo.aceitar()
-    medida = bloquear(fluxo)
+    medida = bloquear(fluxo, "bloqueio_preventivo")  # suspensão cancelaria o pedido (20.6)
     fluxo.amb.relogio.avancar(minutes=1)
     assert reverter(fluxo.ctx, medida, "eq-mediador")
     fluxo.amb.contexto.auth.bloqueados.discard("t-cliente")

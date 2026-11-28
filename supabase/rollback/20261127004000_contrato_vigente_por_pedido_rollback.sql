@@ -99,7 +99,7 @@ create or replace function public.pedido_concluido_recalcula_perfil()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_pro uuid;

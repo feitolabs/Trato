@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../componentes/componentes.dart';
 import '../../dados/carregador.dart';
+import '../../dados/erros.dart';
 import '../../tema/tema.dart';
 import '../comuns/prazo_avaliacao.dart';
 import 'atendimento.dart';
@@ -28,7 +29,10 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoDesistir,
     this.secaoAusencia,
     this.secaoContestacao,
+    this.secaoEstorno,
+    this.secaoForcaMaior,
     this.secaoAcordo,
+    this.secaoPedidosInfo,
     this.secaoDocumentos,
     this.textoDesistir = 'Desistir do pedido',
     this.aoRemarcarVisita,
@@ -39,6 +43,7 @@ class PedidoExecucaoTela extends StatefulWidget {
     this.aoVerGarantia,
     this.aoBaixarComprovante,
     this.aoRepetirServico,
+    this.aoBuscarOutroProfissional,
     this.secaoReagendamento,
     this.aoCompartilharAtendimento,
     this.aoSosEmergencia,
@@ -48,6 +53,9 @@ class PedidoExecucaoTela extends StatefulWidget {
 
   /// Botão "Ajuda" do atendimento: central de ajuda com o relato deste pedido.
   final VoidCallback? aoAjuda;
+
+  /// Termos 7.7: cria pedido de substituição quando cancelado pelo profissional/ausência.
+  final Future<void> Function()? aoBuscarOutroProfissional;
 
   /// Ação principal por estado: `Pagar` (orçamento aceito), `Avaliar` e `Ver garantia`
   /// (finalizado). `Confirmar serviço` usa [aoVerConclusao]. Sem o callback, a ação não aparece.
@@ -108,8 +116,13 @@ class PedidoExecucaoTela extends StatefulWidget {
   /// Decisão da disputa e contestação (a seção some sozinha quando não há decisão).
   final Widget? secaoContestacao;
 
+  /// Termos 6.10: status e prazo do estorno (só o cliente).
+  final Widget? secaoEstorno;
+  final Widget? secaoForcaMaior;
+
   /// Proposta de devolução ou acordo da disputa (Termos 8.2).
   final Widget? secaoAcordo;
+  final Widget? secaoPedidosInfo;
 
   /// Comprovante e cópia dos Termos (5.3), só para o cliente com pagamento confirmado.
   final Widget? secaoDocumentos;
@@ -183,6 +196,26 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
 
   /// "Ver garantia ou pedir retrabalho" como link só quando a ação principal NÃO é "Ver garantia"
   /// (o que acontece depois de avaliar): assim existe um único acesso à garantia.
+  bool _substituindo = false;
+  String? _erroSubstituir;
+
+  Future<void> _substituir() async {
+    final acao = widget.aoBuscarOutroProfissional;
+    if (acao == null || _substituindo) return;
+    setState(() {
+      _substituindo = true;
+      _erroSubstituir = null;
+    });
+    try {
+      await acao();
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _erroSubstituir = mensagemErroTrato(e));
+    } finally {
+      if (mounted) setState(() => _substituindo = false);
+    }
+  }
+
   bool _linkGarantia(PedidoEmExecucao pedido) =>
       widget.aoVerGarantia != null &&
       pedido.estadoApi == 'concluido' &&
@@ -224,6 +257,33 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
                 texto: 'Ver garantia',
                 aoTocar: garantia,
               );
+      case 'cancelado':
+        if (widget.comoProfissional ||
+            !pedido.canceladoPorProfissional ||
+            widget.aoBuscarOutroProfissional == null) {
+          return null;
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BotaoPrimario(
+              key: const ValueKey('buscar-outro-profissional'),
+              texto: 'Buscar outro profissional',
+              carregando: _substituindo,
+              aoTocar: _substituir,
+            ),
+            if (_erroSubstituir != null) ...[
+              const SizedBox(height: EspacosTrato.x2),
+              Text(
+                _erroSubstituir!,
+                key: const ValueKey('erro-substituir-pedido'),
+                style: TipografiaTrato.corpoPequeno.copyWith(
+                  color: context.cores.vermelhoTexto,
+                ),
+              ),
+            ],
+          ],
+        );
     }
     return null;
   }
@@ -335,7 +395,10 @@ class _PedidoExecucaoTelaState extends State<PedidoExecucaoTela> {
         ],
         if (widget.secaoAusencia != null) widget.secaoAusencia!,
         if (widget.secaoAcordo != null) widget.secaoAcordo!,
+        if (widget.secaoPedidosInfo != null) widget.secaoPedidosInfo!,
         if (widget.secaoContestacao != null) widget.secaoContestacao!,
+        if (widget.secaoEstorno != null) widget.secaoEstorno!,
+        if (widget.secaoForcaMaior != null) widget.secaoForcaMaior!,
         if (pedido.codigoInicio != null) ...[
           const SizedBox(height: EspacosTrato.x4),
           CartaoTrato(

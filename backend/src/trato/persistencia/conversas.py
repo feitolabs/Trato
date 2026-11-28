@@ -63,6 +63,28 @@ _CONTATO_LIBERADO = (
 )
 
 
+# 9.6: incidente aberto com bloqueio de contato entre estas duas pessoas, em qualquer pedido
+# entre elas (o contrato pode já estar cancelado), esconde de novo o que já foi enviado.
+_SEM_BLOQUEIO_DE_CONTATO = (
+    " and not exists (select 1 from public.incidentes_seguranca i "
+    "join public.incidente_medidas im on im.incidente_id = i.id "
+    "join public.pedidos ip on ip.id = i.pedido_id "
+    "join public.contratos ic on ic.pedido_id = ip.id "
+    "where i.status <> 'encerrado' and im.tipo = 'bloquear_contato' "
+    "and ((ip.cliente_id = cv.cliente_id and ic.profissional_id = cv.profissional_id) "
+    "or (ip.cliente_id = cv.profissional_id and ic.profissional_id = cv.cliente_id)))"
+)
+
+
+def contato_liberado_sql(con: Any, base: str) -> str:
+    """`base` com o bloqueio da 9.6, quando as tabelas de incidentes existem (consultar uma
+    tabela ausente abortaria a transação)."""
+    tem = con.execute(
+        "select to_regclass('public.incidente_medidas') is not null as tem"
+    ).fetchone()["tem"]
+    return f"({base}{_SEM_BLOQUEIO_DE_CONTATO})" if tem else base
+
+
 # O mesmo trecho para consultas com parâmetros nomeados (lista de conversas).
 CONTATO_LIBERADO_NOMEADO = _CONTATO_LIBERADO.replace("any(%s)", "any(%(estados)s)")
 
@@ -178,7 +200,7 @@ class ConversasPostgres:
         conversa = exigir_uuid(conversa_id, "conversa")
         with self._banco.transacao() as con:
             linha = con.execute(
-                f"select {_CONTATO_LIBERADO} as liberado "  # noqa: S608
+                f"select {contato_liberado_sql(con, _CONTATO_LIBERADO)} as liberado "  # noqa: S608
                 "from public.conversas cv where cv.id = %s and cv.encerrada_em is null",
                 (_STATUS_COM_CONTATO, conversa),
             ).fetchone()
@@ -207,7 +229,7 @@ class ConversasPostgres:
                 (achado,),
             ).fetchall()
             liberado = con.execute(
-                f"select {_CONTATO_LIBERADO} as liberado "  # noqa: S608
+                f"select {contato_liberado_sql(con, _CONTATO_LIBERADO)} as liberado "  # noqa: S608
                 "from public.conversas cv where cv.id = %s",
                 (_STATUS_COM_CONTATO, achado),
             ).fetchone()

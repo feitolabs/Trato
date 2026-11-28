@@ -5,9 +5,11 @@ import '../telas/comuns/prazo_avaliacao.dart';
 import '../telas/carteira/modelos.dart';
 import '../telas/conclusao/modelos.dart';
 import '../telas/orcamentos/modelos.dart';
+import '../telas/pagamento/estorno_pedido.dart';
 import '../telas/pagamento/modelos.dart';
 import '../telas/pedido_novo/modelos.dart';
 import '../telas/pedidos/modelos.dart';
+import '../telas/cliente/modelos.dart' show Avaliacao;
 import '../telas/perfil_cliente/modelos.dart';
 import '../telas/profissional/servico_check_in.dart';
 import '../telas/profissional/servico_check_out.dart';
@@ -112,6 +114,29 @@ class DadosDoPedido {
     final b = (bairro == null || bairro!.isEmpty) ? '' : ' · $bairro';
     return '$rua$n$b';
   }
+}
+
+/// Termos 6.10: os estornos das cobranças de um pedido, também depois de cancelado.
+abstract interface class EstornosDoPedido {
+  /// `GET /v1/pedidos/{id}/cobrancas`: só as cobranças com `estorno_status`.
+  Future<List<EstornoDoPedido>> estornosDoPedido(String pedidoId);
+}
+
+/// Termos 7.7: criar pedido de substituição após cancelamento/ausência do profissional.
+abstract interface class SubstituicaoDePedido {
+  /// `POST /v1/pedidos/{id}/substituir`: devolve o id do novo pedido aberto.
+  Future<String> substituir(String pedidoId);
+}
+
+/// Termos 7.5: propor nova data devolvendo o aviso do servidor.
+abstract interface class PropostaComAviso {
+  /// O `aviso_prazo` da resposta; nulo quando não há (ou no servidor antigo).
+  Future<String?> proporReagendamentoComAviso(
+    String pedidoId, {
+    required DateTime inicio,
+    required DateTime fim,
+    String? motivo,
+  });
 }
 
 abstract interface class RepositorioPedidos {
@@ -281,6 +306,10 @@ class Cobranca {
     this.segredoCartao,
     this.clienteCartaoId,
     this.chaveEfemera,
+    this.pixExpiraEm,
+    this.pixValidadeMinutos,
+    this.estornoStatus,
+    this.estornoPrazoEstimado,
   });
 
   /// Cartão: o que a folha do provedor precisa (nunca aparece na tela).
@@ -296,6 +325,14 @@ class Cobranca {
   /// Código Pix "copia e cola" (modo teste do provedor).
   final String? pixCopiaECola;
   final String? urlCheckout;
+
+  /// Termos 6.3: expiração e validade em minutos do Pix (opcionais).
+  final DateTime? pixExpiraEm;
+  final int? pixValidadeMinutos;
+
+  /// Termos 6.10: status e prazo estimado do estorno (opcionais).
+  final String? estornoStatus;
+  final String? estornoPrazoEstimado;
 }
 
 abstract interface class RepositorioPagamento {
@@ -353,6 +390,7 @@ abstract interface class RepositorioChat {
 
   /// `GET /v1/pedidos/{pedido_id}/perfil-cliente`. Nulo em modo demo ou backend antigo.
   Future<ResumoPerfilCliente?> perfilClienteDoPedido(String pedidoId) async => null;
+
   /// [chaveIdempotencia]: mesma chave em cada tentativa da mesma mensagem, para o backend não
   /// duplicar quando o reenvio acontece depois de a internet voltar.
   Future<void> enviar(
@@ -390,6 +428,7 @@ class Notificacao {
     this.recorrenciaId,
     this.chamadoId,
     this.compensacaoId,
+    this.avaliacaoId,
   });
 
   final String id;
@@ -408,6 +447,9 @@ class Notificacao {
 
   /// Compensação (`dados.compensacao_id`), nos avisos `pagamento.compensacao_*`.
   final String? compensacaoId;
+
+  /// `dados.avaliacao_id`, no aviso `conta.avaliacao_ocultada`.
+  final String? avaliacaoId;
 
   /// Quando o backend informa: `disputa` ou `retrabalho` (abrem a tela do profissional).
   final String? tipo;
@@ -473,6 +515,21 @@ abstract interface class RepositorioPerfil {
 
   /// Envia a foto de perfil de quem está logado (a que o cliente e o profissional veem).
   Future<void> enviarFoto(String caminhoLocal);
+}
+
+/// Avaliações publicadas recebidas pelo cliente autenticado (Termos 12.7).
+abstract interface class AvaliacoesRecebidasCliente {
+  /// `GET /v1/me/avaliacoes/recebidas`: avaliações publicadas recebidas pelo usuário.
+  Future<List<Avaliacao>> avaliacoesRecebidas();
+
+  /// `POST /v1/avaliacoes/{avaliacao_id}/responder`: resposta única da parte avaliada.
+  Future<String?> responderAvaliacao(String avaliacaoId, String resposta);
+}
+
+/// Reativação gratuita de conta inativa (Termos 4.9).
+abstract interface class ReativacaoConta {
+  /// `POST /v1/me/reativar`: reativa a conta inativa gratuitamente.
+  Future<bool> reativarConta();
 }
 
 /// Filtros de `GET /v1/profissional/pedidos-abertos`. O backend aplica; o app só pede.
@@ -576,8 +633,7 @@ abstract interface class RepositorioProfissional {
   Future<ResumoExclusividades> minhasExclusividades() async => const ResumoExclusividades();
 
   /// Profissional desiste da exclusividade que o cliente pediu (os Tratinhos voltam a ele).
-  Future<void> desistirDaExclusividade(String exclusividadeId) async =>
-      throw UnimplementedError();
+  Future<void> desistirDaExclusividade(String exclusividadeId) async => throw UnimplementedError();
 
   /// Pede exclusividade de 48h num pedido aberto (`POST /v1/profissional/exclusividades`).
   Future<ExclusividadeProfissional> solicitarExclusividade(

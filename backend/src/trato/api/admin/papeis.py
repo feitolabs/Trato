@@ -62,6 +62,10 @@ class Permissao(StrEnum):
     AVALIACOES_MODERAR = "avaliacoes_moderar"  # ocultar/reverter avaliação e decidir revisão (12.6)
     MATERIAIS_CONTESTACAO_ANALISAR = "materiais_contestacao_analisar"  # contestação de nota (6.9)
     MATERIAIS_CONTESTACAO_APROVAR = "materiais_contestacao_aprovar"  # 4 olhos financeiro (6.9)
+    INDISPONIBILIDADES_GERENCIAR = "indisponibilidades_gerenciar"  # falhas que adiam prazos (22.3)
+    SELO_RETIRAR = "selo_retirar"  # retirar selo e pedir reconferência (10.3)
+    SELO_REGULARIZAR = "selo_regularizar"  # devolver o selo (10.3)
+    CHECKOUT_SEM_CODIGO_TRATAR = "checkout_sem_codigo_tratar"  # fila e contato manual (5.7)
     DASHBOARD_VER = "dashboard_ver"
     RISCO_VER = "risco_ver"
     RISCO_DECIDIR = "risco_decidir"
@@ -104,11 +108,14 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
             X.MEDIDAS_APLICAR,
             X.SUPORTE_VER,
             X.SAC_RESPONDER,
+            X.INDISPONIBILIDADES_GERENCIAR,
+            X.CHECKOUT_SEM_CODIGO_TRATAR,
             X.DASHBOARD_VER,
         }
     ),
     P.MEDIADOR: frozenset(
         {
+            X.CHECKOUT_SEM_CODIGO_TRATAR,
             X.INCIDENTES_VER,
             X.MATERIAIS_CONTESTACAO_ANALISAR,
             X.CONTA_RETORNO_ANALISAR,
@@ -124,6 +131,8 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
     ),
     P.CADASTRO: frozenset(
         {
+            X.SELO_RETIRAR,
+            X.SELO_REGULARIZAR,
             X.VERIFICACOES_VER,
             X.VERIFICACOES_DECIDIR,
             X.DOCUMENTOS_REVELAR,
@@ -155,6 +164,7 @@ MATRIZ: dict[PapelEquipe, frozenset[Permissao]] = {
     ),
     P.SEGURANCA: frozenset(
         {
+            X.SELO_RETIRAR,
             X.INCIDENTES_VER,
             X.MATERIAIS_CONTESTACAO_ANALISAR,
             X.CONTA_RETORNO_ANALISAR,

@@ -38,12 +38,14 @@ from trato.api.rotas_pagamento import instalar_pagamento
 from trato.config import Config, obter_config
 from trato.pagamentos.montagem import escolher_provedor
 from trato.pagamentos.orquestrador import ServicoPagamento
+from trato.persistencia.acessos import AcessosPostgres
 from trato.persistencia.app_extras import VerificacoesPostgres
 from trato.persistencia.auditoria import AuditoriaPostgres
 from trato.persistencia.ausencias import AusenciasPostgres
 from trato.persistencia.avaliacoes_moderacao import ModeracaoAvaliacoesPostgres
 from trato.persistencia.cancelamentos import CancelamentosPostgres
 from trato.persistencia.chamados import ChamadosPostgres
+from trato.persistencia.checkout_sem_codigo import CheckoutSemCodigoPostgres
 from trato.persistencia.compensacoes import CompensacoesPostgres
 from trato.persistencia.conexao import Banco
 from trato.persistencia.config import ConfigPostgres
@@ -60,11 +62,14 @@ from trato.persistencia.dinheiro import (
     GarantiasPostgres,
     RepassesPostgres,
 )
+from trato.persistencia.disputa_pedidos_info import DisputaPedidosInfoPostgres
 from trato.persistencia.exclusividades import ExclusividadesPostgres
 from trato.persistencia.execucao import ExecucaoPostgres
 from trato.persistencia.fechamentos import FechamentosPostgres
+from trato.persistencia.forca_maior import ForcaMaiorPostgres
 from trato.persistencia.incidentes import IncidentesPostgres
 from trato.persistencia.indicacoes import IndicacoesPostgres
+from trato.persistencia.indisponibilidades import IndisponibilidadesPostgres
 from trato.persistencia.ledger import LedgerPostgres
 from trato.persistencia.lgpd import criar_repositorios_lgpd_postgres
 from trato.persistencia.lgpd_titular import LgpdTitularPostgres
@@ -83,6 +88,7 @@ from trato.persistencia.reagendamentos import ReagendamentosPostgres
 from trato.persistencia.recorrencias import RecorrenciasPostgres
 from trato.persistencia.retorno_conta import RetornoContaPostgres
 from trato.persistencia.sac import SacPostgres
+from trato.persistencia.selos import SelosPostgres
 from trato.persistencia.usuarios import UsuariosPostgres
 from trato.profissional.ranking import RankingPostgres
 from trato.seguranca.config import parametros_docs
@@ -172,6 +178,11 @@ def criar_contexto_postgres(
         chamados=ChamadosPostgres(banco),
         sac=SacPostgres(banco),
         incidentes=IncidentesPostgres(banco),
+        checkout_sem_codigo=CheckoutSemCodigoPostgres(banco),
+        disputa_pedidos_info=DisputaPedidosInfoPostgres(banco),
+        forca_maior=ForcaMaiorPostgres(banco),
+        selos=SelosPostgres(banco),
+        indisponibilidades=IndisponibilidadesPostgres(banco),
         materiais_contestacao=ContestacaoMaterialPostgres(banco),
         retorno_conta=RetornoContaPostgres(banco),
         lgpd_titular=LgpdTitularPostgres(banco),
@@ -189,6 +200,7 @@ def criar_contexto_postgres(
             "auditoria": AuditoriaPostgres(banco),
             "lgpd": criar_repositorios_lgpd_postgres(banco),
             "banco": banco,
+            "acessos": AcessosPostgres(banco),
         },
     )
     if config.trato_ambiente.strip().lower() == "producao":

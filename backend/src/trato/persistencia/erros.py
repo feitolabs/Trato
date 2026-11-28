@@ -46,6 +46,27 @@ class Duplicado(ErroPersistencia):
     """Já existe um registro igual (chave única)."""
 
 
+# Índice único parcial da 20261127185000: um aditivo, um pagamento que vale.
+INDICE_ADITIVO_PAGO = "pagamentos_aditivo_pago_uidx"
+
+
+class AditivoJaPago(Duplicado):
+    """Outro pagamento deste aditivo já vale no banco."""
+
+
+class RegistrosPreservados(ConflitoDeEstado):
+    """Incidente não encerrado com preservação (Termos 9.6; 20261127122500): nada se apaga nem
+    se anonimiza, e a transação inteira volta. Tentar de novo depois."""
+
+
+class ContaAnonimizada(ConflitoDeEstado):
+    """Conta excluída não ganha pedido nem contrato (20261127122600)."""
+
+
+class SeloRetirado(ConflitoDeEstado):
+    """Retirada do selo sem regularização: o nível não sobe (10.3; 20261127223000)."""
+
+
 class DadosInvalidos(ErroPersistencia):
     """Faltou dado, ou o dado tem formato/valor inválido."""
 
@@ -61,11 +82,26 @@ class BancoIndisponivel(ErroPersistencia):
 def traduzir(erro: psycopg.Error) -> ErroPersistencia:
     """Traduz o erro do psycopg. Mensagens de gatilho (`raise exception`) são nossas e seguras."""
     if isinstance(erro, pg.UniqueViolation):
+        if erro.diag.constraint_name == INDICE_ADITIVO_PAGO:
+            return AditivoJaPago("Este aditivo já foi pago.")
         return Duplicado("Esse registro já existe.")
     if isinstance(erro, pg.ForeignKeyViolation):
         return DadosInvalidos("Referência inexistente (usuário, categoria, cidade ou pedido).")
     if isinstance(erro, pg.NotNullViolation):
         return DadosInvalidos("Falta um dado obrigatório.")
+    principal = getattr(erro.diag, "message_primary", None) or ""
+    if isinstance(erro, pg.RestrictViolation) and principal.startswith("registros_preservados"):
+        return RegistrosPreservados(
+            "Há registros preservados por uma apuração em andamento (Termos 9.6). "
+            "Nada foi apagado; tente de novo depois que ela terminar."
+        )
+    if isinstance(erro, pg.RestrictViolation) and principal.startswith("selo_retirado"):
+        return SeloRetirado(
+            "O selo deste profissional foi retirado (Termos 10.3). Regularize o selo antes de "
+            "aprovar um nível de verificação."
+        )
+    if isinstance(erro, pg.CheckViolation) and principal.startswith("conta_anonimizada"):
+        return ContaAnonimizada("Uma das contas foi excluída: não dá para criar pedido novo.")
     if "Pedido em exclusividade" in (getattr(erro.diag, "message_primary", None) or ""):
         return RegraDoBanco("Este pedido está reservado para outro profissional.")
     if isinstance(erro, pg.CheckViolation | pg.RestrictViolation):

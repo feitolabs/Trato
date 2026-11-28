@@ -50,14 +50,19 @@ from trato.persistencia.ausencias import AusenciasEmMemoria
 from trato.persistencia.avaliacoes_moderacao import ModeracaoAvaliacoesEmMemoria
 from trato.persistencia.cancelamentos import CancelamentosEmMemoria
 from trato.persistencia.chamados import ChamadosEmMemoria
+from trato.persistencia.checkout_sem_codigo import CheckoutSemCodigoEmMemoria
 from trato.persistencia.compensacoes import CompensacoesIndisponiveis
 from trato.persistencia.contestacoes_decisao import ContestacoesDecisaoEmMemoria
+from trato.persistencia.disputa_pedidos_info import DisputaPedidosInfoEmMemoria
+from trato.persistencia.forca_maior import ForcaMaiorEmMemoria
 from trato.persistencia.incidentes import IncidentesEmMemoria
+from trato.persistencia.indisponibilidades import IndisponibilidadesEmMemoria
 from trato.persistencia.lgpd_titular import LgpdTitularEmMemoria
 from trato.persistencia.materiais_contestacao import ContestacaoMaterialEmMemoria
 from trato.persistencia.medidas import MedidasEmMemoria
 from trato.persistencia.retorno_conta import RetornoContaEmMemoria
 from trato.persistencia.sac import SacEmMemoria
+from trato.persistencia.selos import SelosEmMemoria
 
 
 def agora_utc() -> datetime:
@@ -175,6 +180,14 @@ class Contexto:
     chamados: Any = field(default_factory=lambda: ChamadosEmMemoria())
     # Incidentes de segurança (`persistencia/incidentes.py`, Termos 9.3 a 9.6).
     incidentes: Any = field(default_factory=lambda: IncidentesEmMemoria())
+    # Janelas de indisponibilidade (`persistencia/indisponibilidades.py`, Termos 22.3).
+    indisponibilidades: Any = field(default_factory=lambda: IndisponibilidadesEmMemoria())
+    # Selo do profissional (`persistencia/selos.py`, Termos 10.3).
+    selos: Any = field(default_factory=lambda: SelosEmMemoria())
+    # Casos de check-out sem o Código Final (`persistencia/checkout_sem_codigo.py`, 5.7).
+    checkout_sem_codigo: Any = field(default_factory=lambda: CheckoutSemCodigoEmMemoria())
+    disputa_pedidos_info: Any = field(default_factory=lambda: DisputaPedidosInfoEmMemoria())
+    forca_maior: Any = field(default_factory=lambda: ForcaMaiorEmMemoria())
     materiais_contestacao: Any = field(default_factory=lambda: ContestacaoMaterialEmMemoria())
     retorno_conta: Any = field(default_factory=lambda: RetornoContaEmMemoria())
     lgpd_titular: Any = field(default_factory=lambda: LgpdTitularEmMemoria())
@@ -226,7 +239,9 @@ class Contexto:
             pendentes.append(funcao)
 
     def _contato_liberado(self, pedido_id: str, profissional_id: str) -> bool:
-        """Termos 5.4 e 11.2: pagamento confirmado e conversa com o profissional contratado."""
+        """Termos 5.4 e 11.2: pagamento confirmado e conversa com o profissional contratado.
+        Com o contato bloqueado entre as partes (9.6), nada passa, nem o já enviado."""
+        from trato.api.cautela import contato_bloqueado
         from trato.persistencia.conversas import ESTADOS_COM_CONTATO
 
         contrato = self.contratos.obter_do_pedido(pedido_id)
@@ -236,9 +251,30 @@ class Contexto:
             and pedido is not None
             and contrato.profissional_id == profissional_id
             and pedido.estado in ESTADOS_COM_CONTATO
+            and not contato_bloqueado(self, pedido.cliente_id, profissional_id)
+        )
+
+    def _avaliacoes_publicadas(self, usuario_id: str) -> int:
+        return sum(
+            1
+            for a in self.avaliacoes.recebidas(usuario_id)
+            if a.direcao == "cliente_para_profissional"
+        )
+
+    def _nivel_do_perfil(self, usuario_id: str) -> str | None:
+        detalhe = self.usuarios.detalhe(usuario_id)
+        if detalhe is None or not self.usuarios.tem_perfil_profissional(usuario_id):
+            return None
+        return detalhe.nivel_verificacao or "basico"
+
+    def _gravar_nivel_do_perfil(self, usuario_id: str, nivel: str) -> None:
+        self.usuarios.adicionar(
+            replace(self.usuarios.detalhe(usuario_id), nivel_verificacao=nivel)
         )
 
     def __post_init__(self) -> None:
+        from trato.api.regra_contratada import regras_do_aceite  # evita ciclo
+
         # Em memória, a retenção (9.6) enxerga os incidentes daqui; no Postgres é a tabela.
         ligar_incidentes = getattr(self.chamados, "ligar_incidentes", None)
         if ligar_incidentes is not None:
@@ -246,6 +282,14 @@ class Contexto:
         # Ao concluir um pedido, arma a indicação do indicado (bônus de Indique e Ganhe).
         if gancho_indicacoes not in self.apos_transicao:
             self.apos_transicao.append(gancho_indicacoes)
+        from trato.api.checkout_sem_codigo import gancho_checkout_sem_codigo  # evita ciclo
+
+        if gancho_checkout_sem_codigo not in self.apos_transicao:
+            self.apos_transicao.append(gancho_checkout_sem_codigo)
+        if isinstance(self.checkout_sem_codigo, CheckoutSemCodigoEmMemoria):
+            self.checkout_sem_codigo.pedidos = self.pedidos
+        if isinstance(self.disputa_pedidos_info, DisputaPedidosInfoEmMemoria):
+            self.disputa_pedidos_info.disputas = self.disputas
         # A versão em memória das exclusividades usa o livro de moedas e os pedidos daqui.
         vincular = getattr(self.exclusividades, "vincular", None)
         if vincular is not None:
@@ -272,6 +316,13 @@ class Contexto:
                 Contadores(lambda: self.agora().timestamp()),
                 lambda: self.extras.get("auditoria"),
             )
+        if hasattr(self.contratos, "regras_no_aceite"):
+            self.contratos.regras_no_aceite = lambda: regras_do_aceite(self.config)
+        if hasattr(self.usuarios, "contar_avaliacoes") and hasattr(self.avaliacoes, "recebidas"):
+            self.usuarios.contar_avaliacoes = self._avaliacoes_publicadas
+        if isinstance(self.selos, SelosEmMemoria):
+            self.selos.ler_nivel = self._nivel_do_perfil
+            self.selos.gravar_nivel = self._gravar_nivel_do_perfil
         # Antes da contratação a conversa mascara contatos: a memória pergunta ao repositório.
         if isinstance(self.conversas, ConversasEmMemoria) and self.conversas.contratado is None:
             self.conversas.contato_liberado = self._contato_liberado
@@ -302,7 +353,27 @@ class ContaBloqueada(HTTPException):
         )
 
 
+class ContaInativa(HTTPException):
+    """Termos 4.9: conta inativada após aviso prévio de 30 dias. Bloqueia uso normal, mas
+    permite reativação gratuita pelo próprio usuário (`POST /v1/me/reativar`) e atendimento."""
+
+    codigo = "conta_inativa"
+
+    def __init__(self) -> None:
+        super().__init__(
+            403,
+            "Sua conta está inativa por falta de uso. Você pode reativá-la gratuitamente pelo "
+            "aplicativo ou pelo atendimento (Termos 4.9).",
+        )
+
+
 async def tratar_conta_bloqueada(_: Request, erro: ContaBloqueada) -> JSONResponse:
+    return JSONResponse(
+        status_code=erro.status_code, content={"detail": erro.detail, "codigo": erro.codigo}
+    )
+
+
+async def tratar_conta_inativa(_: Request, erro: ContaInativa) -> JSONResponse:
     return JSONResponse(
         status_code=erro.status_code, content={"detail": erro.detail, "codigo": erro.codigo}
     )
@@ -317,16 +388,49 @@ def usuario_atual(
     token = credenciais.credentials if credenciais else None
     usuario = contexto.auth.autenticar(token) if token else None
     if usuario is None:
+        inativa = getattr(contexto.auth, "conta_inativa", None)
+        if token and inativa is not None and inativa(token):
+            raise ContaInativa
         bloqueada = getattr(contexto.auth, "conta_bloqueada", None)
         if token and bloqueada is not None and bloqueada(token):
             raise ContaBloqueada
         raise HTTPException(
             401, "Faça login para continuar.", headers={"WWW-Authenticate": "Bearer"}
         )
+    _registrar_acesso(request, contexto, usuario.id)
     return usuario
 
 
+def usuario_para_reativacao(
+    request: Request,
+    credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    contexto: Contexto = Depends(obter_contexto),
+) -> Usuario:
+    """Aceita conta ativa ou inativa (4.9) de cliente/profissional; bloqueada continua 403."""
+    token = credenciais.credentials if credenciais else None
+    bloqueada = getattr(contexto.auth, "conta_bloqueada", None)
+    if token and bloqueada is not None and bloqueada(token):
+        raise ContaBloqueada
+    entrar = getattr(contexto.auth, "autenticar_para_suporte", contexto.auth.autenticar)
+    usuario = entrar(token) if token else None
+    if usuario is None:
+        raise HTTPException(
+            401, "Faça login para continuar.", headers={"WWW-Authenticate": "Bearer"}
+        )
+    if usuario.papel not in (PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL):
+        raise HTTPException(403, "A equipe não usa reativação pelo aplicativo.")
+    _registrar_acesso(request, contexto, usuario.id)
+    return usuario
+
+
+def _registrar_acesso(request: Request, contexto: Contexto, usuario_id: str) -> None:
+    from trato.api.acessos import registrar  # import tardio: evita ciclo
+
+    registrar(request, contexto, usuario_id)
+
+
 def usuario_do_suporte(
+    request: Request,
     credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
     contexto: Contexto = Depends(obter_contexto),
 ) -> Usuario:
@@ -340,6 +444,7 @@ def usuario_do_suporte(
         )
     if usuario.papel not in (PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL):
         raise HTTPException(403, "A equipe atende pelo painel.")
+    _registrar_acesso(request, contexto, usuario.id)
     return usuario
 
 
@@ -386,6 +491,7 @@ def usuario_do_pedido_contratado(
             pedidos = [contexto.pedidos.obter(pedido_id)]
         if not any(bloqueado_pode_no_pedido(p, usuario.id) for p in pedidos):
             raise
+        _registrar_acesso(request, contexto, usuario.id)
         return replace(usuario, bloqueado=True)
 
 
@@ -416,6 +522,7 @@ def usuario_ou_bloqueado(
         usuario = entrar(credenciais.credentials) if entrar and credenciais else None
         if usuario is None or usuario.papel is PapelUsuario.EQUIPE:
             raise
+        _registrar_acesso(request, contexto, usuario.id)
         return replace(usuario, bloqueado=True)
     if usuario.papel not in (PapelUsuario.CLIENTE, PapelUsuario.PROFISSIONAL):
         raise HTTPException(403, "Seu perfil não pode fazer isso.")

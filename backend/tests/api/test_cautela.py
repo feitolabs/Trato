@@ -110,8 +110,8 @@ def test_prazo_de_cautela_vencido_avisa_a_equipe_uma_vez(fluxo):
 def test_bloqueado_ve_o_pedido_cancelado_por_pessoa_diferente(fluxo):
     for antes in (True, False):
         pid, _ = agendado(fluxo)
-        if antes:
-            bloquear(fluxo)
+        if antes:  # suspensão já cancelaria o pedido antes do relato (20.6)
+            bloquear(fluxo, "bloqueio_preventivo")
         assert relatar(fluxo, pid).json()["cancelado"] is True
         if not antes:
             bloquear(fluxo)

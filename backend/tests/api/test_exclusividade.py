@@ -83,6 +83,10 @@ def _saldo(amb, quem=PRO):
 
 def _orcar(amb, quem="t-prof", pid="ped-1"):
     corpo = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "horas",
@@ -90,7 +94,7 @@ def _orcar(amb, quem="t-prof", pid="ped-1"):
                 "quantidade": 1,
                 "valor_unitario_centavos": 10_000,
             }
-        ]
+        ],
     }
     return amb.cliente.post(f"/v1/pedidos/{pid}/orcamentos", json=corpo, headers=cab(quem))
 

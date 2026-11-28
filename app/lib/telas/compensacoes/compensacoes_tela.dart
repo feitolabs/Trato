@@ -138,7 +138,7 @@ class _CartaoCompensacao extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: ChipStatus(
               texto: c.situacaoTexto,
-              tipo: switch (c.status) {
+              tipo: c.emRevisao ? TipoStatus.info : switch (c.status) {
                 'aberta' => TipoStatus.alerta,
                 'quitada' => TipoStatus.sucesso,
                 _ => TipoStatus.info,

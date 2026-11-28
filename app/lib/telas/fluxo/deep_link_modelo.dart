@@ -26,12 +26,24 @@ enum DestinoApp {
   /// Medidas da conta (avisos `conta.medida_*`).
   medidas,
 
+  /// Central de privacidade (aviso de marketing, tela `privacidade`): é onde se revoga.
+  privacidade,
+
+  /// Selo do profissional (avisos `conta.selo_*`, tela `perfil`).
+  selo,
+
   /// Compensações do profissional (avisos com `compensacao_id`).
   compensacoes,
 
   /// Contestação da decisão da disputa (avisos `disputa.contestada` e
   /// `disputa.contestacao_decidida`).
-  contestacaoDecisao;
+  contestacaoDecisao,
+
+  /// Saldo de Tratinhos da carteira do aviso (`pagamento.tratinhos_vencendo`).
+  tratinhos,
+
+  /// Pedir revisão de uma avaliação ocultada; o id é o da avaliação.
+  contestarOcultacao;
 
   /// O host do link (`br.com.feitolabs.trato://<host>/<id>`).
   static DestinoApp? doHost(String host) => switch (host) {
@@ -118,6 +130,39 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
     return t.isEmpty ? null : t;
   }
 
+  // Tratinhos perto de vencer: `tela: notificacoes`, mas o ponto certo é o saldo da carteira.
+  if (texto('evento') == 'pagamento.tratinhos_vencendo') {
+    final carteira = texto('carteira') ?? texto('papel');
+    return ResultadoLink.valido(
+      DestinoApp.tratinhos,
+      null,
+      papel: carteira == 'profissional' || carteira == 'cliente' ? carteira : null,
+    );
+  }
+  // Avaliação ocultada (11.8): com o id da avaliação, abre o pedido de revisão; sem ele, segue
+  // a tela do aviso (o pedido).
+  final avaliacao = texto('avaliacao_id');
+  if (texto('evento') == 'conta.avaliacao_ocultada' && idDeLinkValido(avaliacao)) {
+    return ResultadoLink.valido(DestinoApp.contestarOcultacao, avaliacao,
+        papel: switch (texto('papel')) {
+          'profissional' => 'profissional',
+          'cliente' => 'cliente',
+          _ => null,
+        });
+  }
+  // Termos 10.3: `tela: perfil` nos avisos do selo, que é só do profissional.
+  if (texto('tela') == 'perfil' && (texto('evento') ?? '').startsWith('conta.selo_')) {
+    return const ResultadoLink.valido(DestinoApp.selo, null, papel: 'profissional');
+  }
+  // Termos 5.7: check-out sem Código Final é sempre do cliente e abre o pedido, mesmo
+  // quando vem só `pedido_id` (sem `tela` ou `papel`).
+  if (texto('evento') == 'pagamento.checkout_sem_codigo') {
+    final pedido = texto('pedido_id');
+    if (pedido == null) return ResultadoLink.ignorado;
+    return idDeLinkValido(pedido)
+        ? ResultadoLink.valido(DestinoApp.pedido, pedido, papel: 'cliente')
+        : const ResultadoLink.invalido(DestinoApp.pedido, papel: 'cliente');
+  }
   final destino = switch (texto('tela')) {
     'orcamentos' => DestinoApp.orcamentos,
     'pedido' => DestinoApp.pedido,
@@ -129,6 +174,7 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
     'indique-e-ganhe' => DestinoApp.indicacoes,
     'suporte' => DestinoApp.suporte,
     'medidas' => DestinoApp.medidas,
+    'privacidade' => DestinoApp.privacidade,
     _ => null,
   };
   if (destino == null) return ResultadoLink.ignorado;
@@ -149,8 +195,8 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
     );
   }
   // Avisos da contestação da decisão: `tela: pedido`, mas o ponto certo é a contestação.
-  final contestacao = const {'disputa.contestada', 'disputa.contestacao_decidida'}
-      .contains(texto('evento'));
+  final contestacao =
+      const {'disputa.contestada', 'disputa.contestacao_decidida'}.contains(texto('evento'));
   if (destino == DestinoApp.pedido && contestacao) {
     final pedido = texto('pedido_id');
     if (pedido == null) return ResultadoLink.ignorado;
@@ -164,7 +210,9 @@ ResultadoLink resultadoDoPush(Map<String, dynamic> dados) {
     return ResultadoLink.valido(destino, idDeLinkValido(chamado) ? chamado : null, papel: papel);
   }
   // Telas sem id.
-  if (destino == DestinoApp.indicacoes || destino == DestinoApp.medidas) {
+  if (destino == DestinoApp.indicacoes ||
+      destino == DestinoApp.medidas ||
+      destino == DestinoApp.privacidade) {
     return ResultadoLink.valido(destino, null, papel: papel);
   }
   // Recorrência: o id da série vem em `recorrencia_id`; sem ele, abre a lista.

@@ -69,15 +69,24 @@ class ProvedorAuthSupabase:
         perfil = self._usuarios.perfil(sub)
         return perfil is not None and perfil.status == "bloqueado"
 
+    def conta_inativa(self, token: str) -> bool:
+        """Token válido de conta com status `inativo` (Termos 4.9)."""
+        try:
+            sub = str(self._decodificar(token)["sub"])
+        except jwt.PyJWTError:
+            return False
+        perfil = self._usuarios.perfil(sub)
+        return perfil is not None and perfil.status == "inativo"
+
     def autenticar_para_suporte(self, token: str) -> Usuario | None:
-        """Atendimento (Termos 20.5): conta bloqueada ou suspensa abre e acompanha chamados.
-        Só conta que já existe; a anonimizada continua fora."""
+        """Atendimento (Termos 20.5 e 4.9): conta bloqueada, suspensa ou inativa abre chamados
+        e (quando inativa) pode reativar. Só conta que já existe; a anonimizada continua fora."""
         try:
             sub = str(self._decodificar(token)["sub"])
         except jwt.PyJWTError:
             return None
         perfil = self._usuarios.perfil(sub)
-        if perfil is None or perfil.status not in (*STATUS_QUE_ENTRAM, "bloqueado"):
+        if perfil is None or perfil.status not in (*STATUS_QUE_ENTRAM, "bloqueado", "inativo"):
             return None
         return Usuario(perfil.id, perfil.papel)
 

@@ -21,7 +21,7 @@ import 'apoio/exemplos/demo.dart';
 import 'apoio/fontes.dart';
 
 /// As únicas chamadas que o servidor abre a quem está bloqueado.
-final _abertas = RegExp(r'^(GET /v1/pedidos(/p1(/disputa)?)?|'
+final _abertas = RegExp(r'^(GET /v1/pedidos(/p1(/disputa|/cobrancas)?)?|'
     r'POST /v1/pedidos/p1/(acoes/confirmar_conclusao|disputa))$');
 
 Map<String, Object?> _pedido({
@@ -182,6 +182,7 @@ void main() {
     expect(jsonDecode(envio.body), {
       'motivo': 'dano',
       'descricao': 'Quebrou o piso.\n\nSolução que o cliente prefere: Reembolso parcial',
+      'resultado_esperado': 'reembolso_parcial',
     });
     expect(find.byKey(const ValueKey('contratado-relato')), findsOneWidget);
     expect(s.rotas.where((r) => !_abertas.hasMatch(r)), isEmpty);

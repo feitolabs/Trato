@@ -5,9 +5,21 @@ import '../dados/modelos.dart';
 import '../nucleo/escopo.dart';
 import '../nucleo/formato.dart';
 import '../tema/tema.dart';
+import 'avisos_previos.dart';
 
 const _tituloMax = 50;
 const _mensagemMax = 140;
+
+/// Termos 15.4: quem recebe marketing. Quem filtra é o backend.
+const kPublicoDoMarketing = 'só quem aceitou receber avisos e novidades';
+
+const kOperacionalSemPropaganda = 'É proibido enviar oferta ou propaganda como operacional: esse envio não confere o '
+    'consentimento de marketing (Termos 15.4). Use só para andamento de serviço e avisos de conta.';
+
+const kConfirmaSemPropaganda = 'Confirmo que esta mensagem não tem oferta nem propaganda';
+
+const _avisoOperacional =
+    BannerInfo(kOperacionalSemPropaganda, titulo: 'Sem oferta ou propaganda.', tom: Tom.alerta);
 
 String rotuloSegmento(String s) => switch (s) {
       'todos' => 'Todos os ativos',
@@ -44,6 +56,8 @@ class _NotificacoesTelaState extends State<NotificacoesTela> {
             padding: EdgeInsets.fromLTRB(margem, 0, margem, EspacosTrato.x6),
             children: [
               _NovaCampanha(aoEnviar: () => setState(() => _versao++)),
+              const SizedBox(height: EspacosTrato.x5),
+              const CartaoAvisosPrevios(),
               const SizedBox(height: EspacosTrato.x5),
               Text('Histórico', style: TipografiaTrato.secao),
               const SizedBox(height: EspacosTrato.x3),
@@ -84,6 +98,9 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
   List<CategoriaAdmin> _categorias = const [];
   Future<EstimativaCampanha>? _estimativa;
   bool _enviando = false;
+
+  /// Recusa do último envio, como o servidor escreveu. Fica na tela até a próxima revisão.
+  String? _erroEnvio;
 
   @override
   void initState() {
@@ -132,7 +149,7 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
         tipo: _tipo,
         categoriaId: _categoriaId,
         cidadeId: _cidadeId,
-      );
+      )..ignore(); // a recusa é mostrada pelo FutureBuilder, que só escuta no quadro seguinte
     });
   }
 
@@ -144,38 +161,67 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
 
   Future<void> _revisar() async {
     final api = context.api;
+    final operacional = _tipo == 'operacional';
+    var semPropaganda = false;
     final confirmou = await mostrarModal<bool>(
       context,
-      construir: (ctx) => CorpoModal(
-        titulo: 'Enviar esta campanha?',
-        consequencia: 'O envio não pode ser desfeito: as pessoas recebem a notificação na hora.',
-        filhos: [
-          Linha('Tipo', _tipo == 'marketing' ? 'Marketing' : 'Operacional'),
-          Linha('Segmento', rotuloSegmento(_segmento)),
-          Linha('Título', _titulo.text.trim()),
-          Linha('Mensagem', _mensagem.text.trim()),
-          const SizedBox(height: EspacosTrato.x2),
-          const AvisoAuditoria(),
-        ],
-        acoes: [
-          BotaoTrato.secundario('Cancelar', aoPressionar: () => Navigator.of(ctx).pop(false)),
-          BotaoTrato.primario('Enviar campanha', aoPressionar: () => Navigator.of(ctx).pop(true)),
-        ],
+      construir: (_) => StatefulBuilder(
+        builder: (ctx, atualizar) => CorpoModal(
+          titulo: 'Enviar esta campanha?',
+          consequencia: 'O envio não pode ser desfeito: as pessoas recebem a notificação na hora.',
+          filhos: [
+            Linha('Tipo', operacional ? 'Operacional' : 'Marketing'),
+            Linha('Segmento', rotuloSegmento(_segmento)),
+            if (!operacional) const Linha('Público', 'No segmento, $kPublicoDoMarketing'),
+            Linha('Título', _titulo.text.trim()),
+            Linha('Mensagem', _mensagem.text.trim()),
+            const SizedBox(height: EspacosTrato.x2),
+            if (operacional) ...[
+              _avisoOperacional,
+              Material(
+                type: MaterialType.transparency,
+                child: CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(kConfirmaSemPropaganda, style: TipografiaTrato.corpo),
+                  value: semPropaganda,
+                  onChanged: (v) => atualizar(() => semPropaganda = v ?? false),
+                ),
+              ),
+            ],
+            const AvisoAuditoria(),
+          ],
+          acoes: [
+            BotaoTrato.secundario('Cancelar', aoPressionar: () => Navigator.of(ctx).pop(false)),
+            BotaoTrato.primario('Enviar campanha',
+                aoPressionar: operacional && !semPropaganda ? null : () => Navigator.of(ctx).pop(true)),
+          ],
+        ),
       ),
     );
     if (confirmou != true || !mounted) return;
-    setState(() => _enviando = true);
+    setState(() {
+      _enviando = true;
+      _erroEnvio = null;
+    });
     final ok = await executar(
       context,
-      () => api.dispararCampanhaNotificacao(
-        titulo: _titulo.text.trim(),
-        mensagem: _mensagem.text.trim(),
-        segmento: _segmento,
-        tipo: _tipo,
-        categoriaId: _categoriaId,
-        cidadeId: _cidadeId,
-        motivo: _motivo.text.trim(),
-      ),
+      () async {
+        try {
+          await api.dispararCampanhaNotificacao(
+            titulo: _titulo.text.trim(),
+            mensagem: _mensagem.text.trim(),
+            segmento: _segmento,
+            tipo: _tipo,
+            categoriaId: _categoriaId,
+            cidadeId: _cidadeId,
+            motivo: _motivo.text.trim(),
+          );
+        } catch (e) {
+          if (mounted) setState(() => _erroEnvio = e.toString());
+          rethrow;
+        }
+      },
       sucesso: 'Campanha enviada.',
     );
     if (!mounted) return;
@@ -234,9 +280,13 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
           children: [
             _cartaoTipo('operacional', 'Operacional', 'Andamento de serviço e avisos de conta'),
             const SizedBox(width: EspacosTrato.x3),
-            _cartaoTipo('marketing', 'Marketing', 'Campanhas e novidades'),
+            _cartaoTipo('marketing', 'Marketing', 'Campanhas e novidades: $kPublicoDoMarketing'),
           ],
         ),
+        if (_tipo == 'operacional') ...[
+          const SizedBox(height: EspacosTrato.x3),
+          _avisoOperacional,
+        ],
         const SizedBox(height: EspacosTrato.x4),
         TextField(
           controller: _titulo,
@@ -329,7 +379,7 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
               if (snap.connectionState != ConnectionState.done) {
                 return Semantics(label: 'Carregando', child: const BlocoEsqueleto(largura: 140, altura: 24));
               }
-              if (snap.hasError) return Text(snap.error.toString(), style: TipografiaTrato.legenda);
+              if (snap.hasError) return BannerInfo(snap.error.toString(), tom: Tom.erro);
               final e = snap.data!;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,8 +387,8 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
                   Text('${formatarMilhar(e.destinatarios)} pessoas', style: TipografiaTrato.valor),
                   if (_tipo == 'marketing')
                     Text(
-                      'Marketing respeita a preferência de cada usuário: ${formatarMilhar(e.desativaram)} '
-                      'desativaram e não recebem.',
+                      'Marketing vai $kPublicoDoMarketing e não desligou o push. Ficam de fora: '
+                      '${formatarMilhar(e.desativaram)} (sem consentimento, com ele revogado ou com o push desligado).',
                       style: TipografiaTrato.legenda,
                     ),
                 ],
@@ -346,6 +396,10 @@ class _NovaCampanhaState extends State<_NovaCampanha> {
             },
           ),
         const SizedBox(height: EspacosTrato.x4),
+        if (_erroEnvio case final erro?) ...[
+          BannerInfo(erro, titulo: 'A campanha não foi confirmada.', tom: Tom.erro),
+          const SizedBox(height: EspacosTrato.x3),
+        ],
         BotaoTrato.primario(
           'Revisar e enviar',
           aoPressionar: _valida && !_enviando ? _revisar : null,

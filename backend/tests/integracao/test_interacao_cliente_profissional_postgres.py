@@ -30,6 +30,7 @@ def _desfaz_vinculo_do_profissional2(cenario):
 
 def corpo_orcamento(valor_unitario: int = 10_000, quantidade: str = "8") -> dict:
     return {
+        "validade_ate": "2099-01-01T00:00:00Z",
         "itens": [
             {
                 "tipo": "horas",
@@ -40,6 +41,7 @@ def corpo_orcamento(valor_unitario: int = 10_000, quantidade: str = "8") -> dict
         ],
         "etapas": [{"descricao": "Serviço", "valor_centavos": 10_000}],
         "prazo_execucao_dias": 5,
+        "fora_do_escopo": "Materiais não incluídos.",
         "garantia_dias": 90,
     }
 
@@ -343,6 +345,7 @@ def test_orcamento_no_formato_do_app_e_aceito(atuacao):  # noqa: F811
         "prazo_execucao_dias": 3,
         "validade_ate": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
         "sinal_material_centavos": 0,
+        "fora_do_escopo": "Materiais não incluídos.",
         "garantia_dias": 30,
     }
     r = post(c, f"/v1/pedidos/{pedido_id}/orcamentos", "profissional", corpo)

@@ -8,7 +8,16 @@ import '../nucleo/formato.dart';
 import '../nucleo/papeis.dart';
 import '../tema/tema.dart';
 import 'conversa_modal.dart';
+import 'disputa_pedidos_info.dart';
 import 'falha_trato_modal.dart';
+
+/// Termos 8.4: o resultado que o cliente pediu ao abrir. Código novo aparece como veio.
+String rotuloResultadoEsperado(String codigo) => switch (codigo) {
+      'retrabalho' => 'Retrabalho',
+      'reembolso_parcial' => 'Reembolso parcial',
+      'reembolso_total' => 'Reembolso total',
+      final outro => outro,
+    };
 
 /// F7.2 — fila de disputas (RF-DIS-01 a RF-DIS-04).
 class DisputasTela extends StatefulWidget {
@@ -397,6 +406,7 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
           if (d.respostaAte != null) Linha('Resposta até', formatarData(d.respostaAte!)),
         ],
         if (d.descricao.isNotEmpty && d.descricao != d.motivo) Linha('Relato', d.descricao),
+        if (d.resultadoEsperado case final pedido?) Linha('O que o cliente pede', rotuloResultadoEsperado(pedido)),
         if (d.status == StatusDisputa.acordo) ...[
           if (d.divisao != null || d.decisao == DecisaoDisputa.reembolsoParcial)
             Linha(
@@ -480,6 +490,8 @@ class _DetalheDisputaState extends State<DetalheDisputa> {
             padding: EdgeInsets.only(top: EspacosTrato.x4),
             child: BannerInfo('Seu papel acompanha a disputa, mas não decide.'),
           ),
+        const SizedBox(height: EspacosTrato.x5),
+        SecaoPedidosInfoDisputa(disputa: d),
       ],
     );
   }

@@ -7,6 +7,8 @@ from conftest import cab
 from trato.pedidos.estados import Estado
 
 POR_HORA = {
+    "prazo_execucao_dias": 3,
+    "validade_ate": "2099-01-01T00:00:00Z",
     "itens": [
         {
             "tipo": "deslocamento",
@@ -27,6 +29,7 @@ POR_HORA = {
             "valor_unitario_centavos": 5_000,
         },
     ],
+    "fora_do_escopo": "Materiais não incluídos.",
     "garantia_dias": 60,
 }
 
@@ -55,6 +58,10 @@ def test_orcamento_sem_horas_nao_traz_total_de_horas(amb):
     amb.semear_pedido(Estado.ABERTO, orcamento_id=None, profissional_id=None)
     amb.contexto.contratos._itens.clear()
     corpo = {
+        "prazo_execucao_dias": 3,
+        "validade_ate": "2099-01-01T00:00:00Z",
+        "fora_do_escopo": "Materiais não incluídos.",
+        "garantia_dias": 90,
         "itens": [
             {
                 "tipo": "outro",
@@ -62,7 +69,7 @@ def test_orcamento_sem_horas_nao_traz_total_de_horas(amb):
                 "quantidade": 1,
                 "valor_unitario_centavos": 9_000,
             }
-        ]
+        ],
     }
     r = amb.cliente.post("/v1/pedidos/ped-1/orcamentos", json=corpo, headers=cab("t-prof"))
     det = amb.cliente.get(f"/v1/orcamentos/{r.json()['id']}", headers=cab("t-cliente")).json()

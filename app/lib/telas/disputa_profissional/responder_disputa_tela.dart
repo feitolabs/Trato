@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../comuns/resultado_esperado.dart';
 import '../../componentes/componentes.dart';
 import '../../tema/tema.dart';
 import '../conclusao/apoio_conclusao.dart' show EspacoFoto, LinhaValor, formatarReais;
@@ -19,12 +20,14 @@ class ResponderDisputaTela extends StatelessWidget {
     required this.disputaId,
     this.aoAdicionarEvidencia,
     this.aoRespondida,
+    this.secaoPedidosInfo,
   });
 
   final ServicoDisputaProfissional servico;
   final String disputaId;
   final CapturarFoto? aoAdicionarEvidencia;
   final ValueChanged<TipoRespostaDisputa>? aoRespondida;
+  final Widget? secaoPedidosInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -42,17 +45,19 @@ class ResponderDisputaTela extends StatelessWidget {
               servico: servico,
               aoAdicionarEvidencia: aoAdicionarEvidencia,
               aoRespondida: aoRespondida,
+              secaoPedidosInfo: secaoPedidosInfo,
             )
-          : _SoLeitura(disputa: d),
+          : _SoLeitura(disputa: d, secaoPedidosInfo: secaoPedidosInfo),
     );
   }
 }
 
 /// Disputa que não espera resposta: só a situação e o relato.
 class _SoLeitura extends StatelessWidget {
-  const _SoLeitura({required this.disputa});
+  const _SoLeitura({required this.disputa, this.secaoPedidosInfo});
 
   final DetalheDisputa disputa;
+  final Widget? secaoPedidosInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -85,9 +90,11 @@ class _SoLeitura extends StatelessWidget {
               Text(d.descricao, style: TipografiaTrato.corpo),
               const SizedBox(height: EspacosTrato.x3),
               LinhaValor(rotulo: 'O cliente pediu', valor: d.solucaoPedida),
+              Text(avisoPedidoDoCliente, style: TipografiaTrato.corpoPequeno),
             ],
           ),
         ),
+        if (secaoPedidosInfo != null) secaoPedidosInfo!,
       ],
     );
   }
@@ -99,12 +106,14 @@ class _Corpo extends StatefulWidget {
     required this.servico,
     required this.aoAdicionarEvidencia,
     required this.aoRespondida,
+    this.secaoPedidosInfo,
   });
 
   final DetalheDisputa disputa;
   final ServicoDisputaProfissional servico;
   final CapturarFoto? aoAdicionarEvidencia;
   final ValueChanged<TipoRespostaDisputa>? aoRespondida;
+  final Widget? secaoPedidosInfo;
 
   @override
   State<_Corpo> createState() => _CorpoState();
@@ -140,9 +149,8 @@ class _CorpoState extends State<_Corpo> {
     return (c == null || c <= 0) ? null : c;
   }
 
-  String? get _erroMensagem => _mensagem.text.trim().length < 5
-      ? 'Escreva sua resposta (mínimo 5 caracteres).'
-      : null;
+  String? get _erroMensagem =>
+      _mensagem.text.trim().length < 5 ? 'Escreva sua resposta (mínimo 5 caracteres).' : null;
   String? get _erroReembolso =>
       _tipo == TipoRespostaDisputa.proporReembolsoParcial && _centavos == null
           ? 'Informe o valor em reais para devolução.'
@@ -256,6 +264,7 @@ class _CorpoState extends State<_Corpo> {
         Text('${d.cliente} relatou um problema', style: TipografiaTrato.tituloGrande),
         const SizedBox(height: EspacosTrato.x2),
         Text(d.titulo, style: TipografiaTrato.corpo.copyWith(color: context.cores.textoSecundario)),
+        if (widget.secaoPedidosInfo != null) widget.secaoPedidosInfo!,
         const SizedBox(height: EspacosTrato.x4),
         CartaoTrato(
           child: Column(
@@ -319,7 +328,8 @@ class _CorpoState extends State<_Corpo> {
                   padding: const EdgeInsets.only(top: EspacosTrato.x2),
                   child: Text(
                     _erroMensagem!,
-                    style: TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
+                    style:
+                        TipografiaTrato.corpoPequeno.copyWith(color: context.cores.vermelhoTexto),
                   ),
                 ),
             ],
